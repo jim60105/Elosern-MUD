@@ -59,6 +59,12 @@ class ServiceHostRow:
     ``authored_kwargs`` holds the row's flat identity kwargs (``shop_key`` /
     ``branch_key`` / ``dialogue_key``); the shared assembly helper projects
     them per blueprint component.
+
+    ``host_key`` is the host's canonical stable authored identity: the place's
+    ``host_profile_key``, which is also this row's ``profile_key``. It is the
+    same canonical person identity the live NPC records as its profile
+    provenance, so reuse never depends on a capability, a component order, a
+    display name, a location or a component-level service identifier.
     """
 
     name: str
@@ -68,3 +74,14 @@ class ServiceHostRow:
     service_id: str
     authored_kwargs: "Mapping[str, str]"
     profile_key: str
+    host_key: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.host_key, str) or not self.host_key.strip():
+            raise GuildConfigError("guild_economy.yaml: host_key must be a non-empty string")
+        if self.host_key != self.profile_key:
+            raise GuildConfigError(
+                f"guild_economy.yaml: host_key {self.host_key!r} must equal "
+                f"profile_key {self.profile_key!r}; the canonical host identity "
+                "is the authored profile key"
+            )

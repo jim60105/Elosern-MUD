@@ -20,6 +20,7 @@ from ._support import (
     GUILD_SERVICE_ID,
     IMPORTED_COMMISSIONER_SERVICE_ID,
     ServiceContentIsolation,
+    synthetic_profile,
 )
 
 
@@ -40,11 +41,15 @@ class ServiceHostQuestIssuerSyncTests(ServiceContentIsolation, EvenniaTestCase):
             anchor_room=GUILD_HALL_TAG,
             service_id=COMMISSIONER_SERVICE_ID,
             authored_kwargs={},
-            profile_key=GUILD_SERVICE_ID,
+            profile_key=COMMISSIONER_SERVICE_ID,
+            host_key=COMMISSIONER_SERVICE_ID,
         )
 
     def _sync_with_commissioner_row(self):
         catalog = get_catalog()
+        self._patch_profiles(
+            synthetic_profile(GUILD_SERVICE_ID, COMMISSIONER_SERVICE_ID)
+        )
         self._patch_roster(tuple(catalog.service_hosts) + (self._commissioner_row(),))
         sync_service_content()
 
@@ -60,7 +65,7 @@ class ServiceHostQuestIssuerSyncTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertEqual(component.service_id, COMMISSIONER_SERVICE_ID)
         first_pk = host.pk
 
-        # Second run: reuse through the service_id anchor, no duplicate host,
+        # Second run: reuse through the canonical identity, no duplicate host,
         # no duplicate component, no raise.
         self._sync_with_commissioner_row()
         hosts = NPC.objects.filter(db_key=COMMISSIONER_NAME)

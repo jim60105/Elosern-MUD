@@ -43,7 +43,15 @@
 
 ## 2. 事前決定：寫卡之前要回答的五個問題
 
-1. **這是永久服務主人嗎？** 是 → 走地點登錄表：在 `world/lore/settlements/places.py` 的 `PlaceDefinition` 宣告 `host_name`／`host_title`／`host_race`／`host_subrace`／`host_sex`／`profession`／服務 kwargs，啟動 `sync_service_content` 依登錄表推導名冊、find-or-create 主人並組裝元件。**不要**用匯入卡建永久主人。名冊收斂（`_converge_service_hosts`）以元件 `service_id` 為準，名冊沒授權的主人會被同步刪除。
+1. **這是永久服務主人嗎？** 是 → 走地點登錄表：在 `world/lore/settlements/places.py` 的 `PlaceDefinition` 宣告 `host_name`／`host_title`／`host_race`／`host_subrace`／`host_sex`／`profession`／服務 kwargs，啟動 `sync_service_content` 依登錄表推導名冊、find-or-create 主人並組裝元件。**不要**用匯入卡建永久主人。
+
+   主人的身分是 **canonical authored identity**：名冊列（`ServiceHostRow.host_key`）與活體 NPC 身上的 `npc_profile_key` 取自同一個 `host_profile_key`。同步只憑這個鍵找人，**不再**看元件的排列順序、元件的 `service_id`、顯示名或位置；因此調換／增減能力、或改寫 `service_id`，都不會生出第二個人。同一個 host key 若被兩個活體 NPC 或兩列名冊同時宣稱，整批在寫入前就以具名完整性錯誤拒收；若該身分屬於常駐冒險者（`guild_adventurer_person_key`），同步也拒收、絕不接管。
+
+   名冊對主人只做兩件事：一是把**受管能力集合**（六個能力詞彙：`guild_staff`／`guild_exam_reception`／`merchant`／`scripted_dialogue`／`quest_issuer`／`church_host`）收斂到宣告值——缺少的補上、宣告裡沒有的移除，六個詞彙以外的元件永不觸碰；二是只改寫**作者設定白名單**（`service_id`、`branch_key`、`shop_key`、`dialogue_key`、`issuer_key`、`church`、`initial_arousal`、`service_binding`／`anchor_room_id`）。商人的 `merchant_stock`／`last_restock_day`、位置、庫存、關係與其他遊戲狀態都屬於各自的擁有者，同步不會重置；主人的位置即使離開錨定房間也不會被搬回（place-bound 服務因此維持暫停）。
+
+   整批（身分預檢 → 元件收斂 → 初次庫存 → 整列退役）在同一個交易內執行：任何一步失敗都回滾資料列，並還原重用主人的屬性／標籤／元件快取、清掉本批建立的實例、補回已執行退役所動到的隊伍／附身狀態。
+
+   名冊列被整列移除時，才由 `content_source` 類別下的 `service_host` 標籤授權**整列退役**：只有「正常同步套用過該列」的主人帶有此標籤，且只有在其 canonical identity 不再被任何列宣告時才刪除；刪除走既有 `NPC.at_object_delete` 生命週期。沒有標籤的 NPC（不論帶著什麼舊標題或舊 `service_id`）永不被同步刪除，標題本身也永不構成任何查詢或刪除依據。
 2. **需要什麼能力？** 能力＝職業藍圖的元件組，`professions.yaml` 是目前的全部五列：
 
    | 職業列 | 元件組 | 綁定 | 用途 |
@@ -372,6 +380,9 @@ uv run --locked python -m tools.spec_traceability check
 | 元件缺作者身份 kwargs | 驗證＋載入雙閘（`ProfessionAssemblyError`） | `component <type> is missing authored identity kwargs <fields>` |
 | `anchor_room` 無房間／多房間／非 Room | 載入（交易內解析） | `ValueError` 點名記錄與 tag |
 | `dialogue_key` 未登錄（服務主人路徑） | `validate_service_hosts`（啟動載入） | `GuildConfigError` 點名地點與鍵 |
+| 兩列名冊共用一個 `host_profile_key`（canonical 身分重複） | `validate_service_hosts`（啟動載入） | `GuildConfigError` 點名重複的 host_key |
+| `ServiceHostRow.host_key` 空白或不等於 `profile_key` | `ServiceHostRow` 建構（`__post_init__`） | `GuildConfigError` |
+| 兩個活體 NPC 宣稱同一 canonical 身分，或該身分屬於常駐冒險者 | `sync_service_content` 身分預檢（任何寫入之前） | `ServiceHostIntegrityError`，整批不寫 |
 | 出貨名冊不一致、卡片損壞、問候語漂移、孤立設定檔 | `npc_persona_roster_validation`（伺服器啟動門禁，`sync_all` 之前） | `NpcRosterError` 具名列出所有違規項目並中止啟動 |
 | 排程形狀／模板／狀態詞彙 | `set_npc_schedule`→`resolve_schedule` | 具名 `ScheduleError` 子類別，寫入前拒絕 |
 
@@ -381,7 +392,7 @@ uv run --locked python -m tools.spec_traceability check
 
 | 錯誤 | 後果 |
 |---|---|
-| 用匯入卡建永久服務主人（店主、公會主管） | 啟動收斂以名冊為準，名冊未授權的主人會被同步刪除；永久主人只能宣告在 `places.py` |
+| 用匯入卡建永久服務主人（店主、公會主管） | 匯入卡建的主人不帶 `content_source`／`service_host` 標籤，同步永不接管也不會刪除它，於是世上多了一個同名卻不受名冊管轄的人；永久主人只能宣告在 `places.py` |
 | `key` 寫英文卻期待人物列顯示中文名 | 載入器用 `key` 建物件，`display_name` 不參與顯示；顯示名就是 `key` |
 | `title` 帶空白、全形空格、`|` 或超過 32 碼點 | 語意驗證拒收；U+3000 是「姓名　稱號」合成器的專用分隔符，永不允許出現在名字或稱號裡 |
 | place-bound 元件卻漏寫或寫錯 `anchor_room` | tag 解析不到唯一房間→整批拒收；person-bound（`quest_issuer`）反過來帶 anchor 也被拒 |
@@ -393,6 +404,8 @@ uv run --locked python -m tools.spec_traceability check
 | 拿 `NPC` 型別期待 LLM 生成對話 | 生成管線掛在 `LLMNPC.at_talked_to`；`NPC` 只有劇本對話。匯入生成人物要顯式 `typeclass=LLMNPC` |
 | 直接寫 `npc.db.schedule` | 唯一寫入者是 `set_npc_schedule`（它同時記生效 tick 與 `schedule` tag）；旁路寫入的排程沒有生效事實 |
 | 以為 `anchor_room` 會把人物搬進房間 | 錨點只是元件持久的事實；位置由載入程式 `move_to` 決定 |
+| 以為同步會把離開錨定房間的主人搬回去 | 重用永不搬遷；place-bound 服務依錨點與位置判定為暫停，位置由移動／生命週期擁有者決定 |
+| 手動把非受管元件掛到受管主人身上 | 六個能力詞彙以外的元件永不觸碰；六個詞彙內的元件則受名冊收斂，宣告裡沒有就會被移除 |
 
 ---
 

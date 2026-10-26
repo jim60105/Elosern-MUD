@@ -224,7 +224,7 @@ contrib's own bare `evennia.contrib.grid.xyzgrid.xyzroom.XYZExit`.
 - **THEN** it SHALL cover diagonal links exactly as it covers cardinal ones
 
 ### Requirement: Altoria service content synchronizes idempotently without resetting live state
-Startup SHALL create service hosts by stable service identity from every current hosted place declaration, using its authored identity and shared profession blueprint. Repeated sync SHALL update authored descriptions/component definitions without duplicating hosts or resetting initialized merchant stock or mutable identity. Interiors, doorways and exam metadata SHALL retain their existing synchronization contract.
+Startup SHALL create service hosts by stable canonical host provenance from every current hosted place declaration, using its authored identity and resolved capability plan. Repeated sync SHALL update authored descriptions/component definitions without duplicating hosts, relocating reused hosts or resetting initialized merchant stock, restock progress or mutable identity. Interiors, doorways and exam metadata SHALL retain their existing synchronization contract.
 
 #### Scenario: Fresh startup creates a playable service path
 - **WHEN** startup runs on an empty database after grid sync
@@ -246,6 +246,10 @@ Startup SHALL create service hosts by stable service identity from every current
   every other shop uses
 
 #### Scenario: Interiors, doorways, and exam metadata are created exactly once
+<!-- The shipped text fixed the surface at ONE merchant NPC, TWO interiors and FOUR doorway
+     exits while the place registry already drove two, three and six. altoria-adornments-and-
+     remedies adds two more merchant places, so the quantities are restated as registry-driven
+     — the idempotence, no-reset and single-creation guarantees elsewhere are unchanged. -->
 - **WHEN** guild-economy startup runs against the place registry
 - **THEN** it SHALL create one permanent interior and its two directed doorway exits for each
   place-registry row, and exam spawn metadata, exactly once
@@ -293,8 +297,6 @@ Altoria SHALL use the integer-meter node positions declared in `world/maps/altor
 | 上城門 | (4, 5) | (4690, 5010) |
 | 學院前 | (5, 5) | (5650, 5200) |
 | 王宮前庭 | (4, 6) | (4500, 6350) |
-
-
 
 #### Scenario: Physical city interpretation
 - **WHEN** settlement and routes are inspected

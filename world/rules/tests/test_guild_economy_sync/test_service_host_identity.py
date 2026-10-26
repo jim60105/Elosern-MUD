@@ -10,6 +10,7 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildExamReception
 from typeclasses.components import GuildStaff
 from typeclasses.components import Merchant
+from typeclasses.components import ScriptedDialogue
 from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom
 from world.maps.bootstrap import sync_service_interiors
@@ -22,10 +23,11 @@ from world.art.official_refs import (
 )
 from world.rules.guild_config import get_catalog
 from world.rules.guild_config import load_catalog_into_cache
-from world.rules.guild_economy import ServiceAnchorIntegrityError
+from world.rules.guild_economy import ServiceHostIntegrityError
 from world.rules.guild_economy import sync_service_content
 from world.rules.npc_persona import provenance_profile_key
 from ._support import (
+    GENERAL_STORE_TAG,
     GUILD_HALL_TAG,
     GUILD_SERVICE_ID,
     MERCHANT_SERVICE_ID,
@@ -34,18 +36,23 @@ from ._support import (
     _guild_host_name,
     _guild_row,
     _merchant_host_name,
+    _merchant_row,
     _merchant_shop_key,
+    _npc_profiles,
     _place_by_kind,
     _places,
     _settlements,
     _shops,
     _subraces,
     before_row_profession,
+    canonical_host,
+    profession_with,
+    synthetic_profile,
 )
 
 
 class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
-    """Authored creation, service-anchor reuse, no runtime identity writes (D3)."""
+    """Authored creation, canonical-identity reuse, no runtime identity writes."""
 
     def _guild_host(self):
         return NPC.objects.filter(db_key=_guild_host_name()).first()
@@ -162,7 +169,6 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
 
     def test_resync_after_profile_edit_leaves_version_2_card_unchanged(self):
         from world.rules.npc_persona import update_npc_persona, current_persona_version, read_npc_persona
-        from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
 
         sync_service_content()
         host = self._guild_host()
@@ -183,7 +189,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
     def test_reused_host_without_metadata_gets_no_write(self):
         from world.rules.npc_persona import current_persona_version
 
-        legacy = self._anchored_legacy_host("舊公會無卡管理人")
+        legacy = self._canonical_legacy_host("舊公會無卡管理人")
         self.assertIsNone(current_persona_version(legacy))
         sync_service_content()
         legacy.refresh_from_db()
@@ -211,10 +217,11 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         broken_row = dataclasses.replace(
             _guild_row(),
             profile_key="t_unresolved_profile_key",
+            host_key="t_unresolved_profile_key",
         )
         patched = tuple(broken_row if r.service_id == GUILD_SERVICE_ID else r for r in catalog.service_hosts)
         self._patch_roster(patched)
-        with self.assertRaises(ServiceAnchorIntegrityError):
+        with self.assertRaises(ServiceHostIntegrityError):
             sync_service_content()
 
     @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
@@ -222,7 +229,8 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         sync_service_content()
         before = self._guild_host()
         self.assertIsNotNone(before)
-        # Simulate an author renaming the roster row: the anchor keeps the host.
+        # Simulate an author renaming the roster row: the canonical identity
+        # keeps the host, and the display name is never a selector.
         catalog = get_catalog()
         renamed_row = guild_config.ServiceHostRow(
             name="改名後",
@@ -232,6 +240,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             service_id=GUILD_SERVICE_ID,
             authored_kwargs=dict(_guild_row().authored_kwargs),
             profile_key=_guild_row().profile_key,
+            host_key=_guild_row().host_key,
         )
         rows = tuple(
             renamed_row if row.service_id == GUILD_SERVICE_ID else row
@@ -324,6 +333,9 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             host_race="human",
             host_subrace=None,
             host_sex="other",
+            # The stand-in place is its own person: borrowing a shipped host's
+            # profile key would claim that host's canonical identity.
+            host_profile_key="t_altoria_trading_post",
             authored_kwargs=(
                 ("shop_key", "t_trading_post"),
                 ("dialogue_key", store_kwargs["dialogue_key"]),
@@ -356,6 +368,16 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             patch.dict(_places(), {"t_trading_post": new_place}),
             patch.dict(_shops(), {"t_trading_post": new_shop}),
             patch.object(
+                guild_economy,
+                "NPC_PROFILE_REGISTRY",
+                {
+                    **_npc_profiles(),
+                    "t_altoria_trading_post": synthetic_profile(
+                        _merchant_row().profile_key, "t_altoria_trading_post"
+                    ),
+                },
+            ),
+            patch.object(
                 guild_config, "load_commerce_config", return_value=patched_commerce
             ),
         ):
@@ -385,18 +407,21 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             set(merchant.merchant_stock),
         )
 
-    def _anchored_legacy_host(self, key):
-        # A pre-identity dev host anchored by service_id under a free key.
+    def _canonical_legacy_host(self, key, row=None):
+        """An existing host of one roster person, as a previous sync leaves it.
+
+        The canonical authored identity plus the capabilities that row
+        declared — never a component order or a service id, which is exactly
+        what the sync must stop inferring identity from.
+        """
+        row = row or _guild_row()
         legacy = create_object(NPC, key=key, location=self._guild_hallish())
         legacy.components.add(
-            GuildStaff.create(legacy, service_id=GUILD_SERVICE_ID, branch_key=_guild_branch_key())
-        )
-        legacy.components.add(
-            GuildExamReception.create(
-                legacy, service_id=GUILD_SERVICE_ID, branch_key=_guild_branch_key()
+            GuildStaff.create(
+                legacy, service_id=row.service_id, branch_key=_guild_branch_key()
             )
         )
-        return legacy
+        return canonical_host(legacy, row)
 
     @covers_requirement(
         "place-driven-service-sync::one-place-record-yields-a-complete-working-location"
@@ -468,71 +493,70 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             self.assertEqual(NPC.objects.all_family().filter(db_location=interior).count(), 0)
 
     @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
-    def test_sync_never_backfills_a_title_into_an_anchored_host(self):
-        legacy = self._anchored_legacy_host("舊公會管理人")
+    def test_sync_never_backfills_a_title_into_a_reused_host(self):
+        legacy = self._canonical_legacy_host("舊公會管理人")
         sync_service_content()
         legacy.refresh_from_db()
-        # Reused as-is (roster membership keeps it): no runtime title write,
+        # Reused as-is (its canonical identity keeps it): no runtime title write,
         # no second authored host.
         self.assertEqual(legacy.npc_title, "")
         self.assertEqual(NPC.objects.filter(db_key=_guild_host_name()).count(), 0)
 
-    @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
-    def test_unrelated_npc_sharing_a_retired_key_survives_convergence(self):
-        # Deletion anchors on the service-component identity shape, never the
-        # key: an unrelated NPC with no service component is never destroyed.
-        unrelated = create_object(NPC, key=GUILD_SERVICE_ID, location=self._guild_hallish())
-        sync_service_content()
-        unrelated.refresh_from_db()  # still alive
-
-    @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
-    def test_ambiguous_titled_same_anchor_host_is_kept_with_warning(self):
-        # A titled NPC holding both a roster-matching anchor and a stale
-        # foreign service_id is ambiguous residue; convergence refuses to
-        # guess and names the condition instead.
-        host = self._anchored_legacy_host("可疑公會管理人")
-        host.npc_title = "手工頭銜"
-        host.save()
-        extra = create_object(NPC, key="殘留商人", location=self._guild_hallish())
-        extra.components.add(
-            Merchant.create(extra, service_id="retired_shop_id", shop_key=_merchant_shop_key())
-        )
-        # Attach a second, retired-anchor component to the SAME host so it
-        # holds both a roster-matching anchor and a stale one.
-        titled = host
-        titled.components.add(
-            Merchant.create(titled, service_id="retired_shop_id", shop_key=_merchant_shop_key())
+    def test_an_untagged_residue_host_survives_without_reading_its_title(self):
+        # A hand-authored NPC carries an arbitrary historical title and a stale
+        # service component. Neither grants ownership: it has no source tag, so
+        # every sync leaves it exactly as it is and warns about nothing.
+        residue = create_object(NPC, key="殘留公會管理人", location=self._guild_hallish())
+        residue.npc_title = "手工頭銜"
+        residue.save()
+        residue.components.add(
+            Merchant.create(
+                residue, service_id="retired_shop_id", shop_key=_merchant_shop_key()
+            )
         )
         with patch("world.rules.guild_economy.log_warn") as warned:
             sync_service_content()
-        titled.refresh_from_db()  # kept for manual repair
-        host.refresh_from_db()
-        self.assertIsNotNone(titled.components.get(Merchant.get_component_slot()))
-        events = [
-            call for call in warned.call_args_list
-            if call.args and call.args[0] == "guild_service_host_convergence_ambiguous"
-        ]
-        self.assertEqual(len(events), 1)
-        # The unrelated titleless stale-merchant is deleted, not warned.
-        with self.assertRaises(NPC.DoesNotExist):
-            extra.refresh_from_db()
+        residue.refresh_from_db()
+        self.assertIsNotNone(residue.components.get(Merchant.get_component_slot()))
+        self.assertEqual(residue.npc_title, "手工頭銜")
+        self.assertFalse(
+            [
+                call
+                for call in warned.call_args_list
+                if call.args and str(call.args[0]).startswith("guild_service_host_convergence")
+            ]
+        )
+
+    def test_an_unrelated_npc_sharing_the_roster_name_survives(self):
+        # A display name is not an identity selector: an NPC carrying the
+        # roster's own name is neither adopted nor retired.
+        unrelated = create_object(NPC, key=_guild_host_name(), location=self._guild_hallish())
+        unrelated_pk = unrelated.pk
+        sync_service_content()
+        unrelated.refresh_from_db()
+        self.assertEqual(unrelated.pk, unrelated_pk)
+        self.assertIsNotNone(NPC.objects.filter(pk=unrelated_pk).first())
 
     @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
-    def test_duplicate_service_anchors_fail_closed_before_mutation(self):
-        # Two live NPCs claiming one service anchor violate the single-host
-        # invariant: sync raises the named integrity error and creates nothing.
-        first = self._anchored_legacy_host("分身公會管理人一")
-        second = create_object(NPC, key="分身公會管理人二", location=self._guild_hallish())
-        second.components.add(
-            GuildStaff.create(
-                second, service_id=GUILD_SERVICE_ID, branch_key=_guild_branch_key()
-            )
+    @covers_requirement(
+        "npc-service-host-identity::canonical-source-identity-selects-one-host-independently-of-capabilities"
+    )
+    def test_duplicate_canonical_identity_fails_closed_before_mutation(self):
+        # Two live NPCs claiming one canonical authored host identity violate
+        # the one-person invariant: sync raises the named integrity error and
+        # writes nothing at all.
+        first = self._canonical_legacy_host("分身公會管理人一")
+        second = canonical_host(
+            create_object(NPC, key="分身公會管理人二", location=self._guild_hallish()),
+            _guild_row(),
         )
-        with self.assertRaises(ServiceAnchorIntegrityError):
+        before_count = NPC.objects.all_family().count()
+        with self.assertRaises(ServiceHostIntegrityError):
             sync_service_content()
         first.refresh_from_db()
         second.refresh_from_db()  # untouched fail-closed, no arbitrary pick
-        self.assertEqual(NPC.objects.filter(db_key=_guild_host_name()).count(), 0)
+        self.assertEqual(NPC.objects.all_family().count(), before_count)
+        self.assertIsNone(self._guild_host())  # no third person was created
 
     @covers_requirement(
         "guild-registration::roster-convergence-deletes-service-hosts-absent-from-the-roster"
@@ -569,30 +593,222 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
     @covers_requirement(
         "guild-registration::roster-convergence-deletes-service-hosts-absent-from-the-roster"
     )
-    def test_stale_keyed_host_is_converged_away_and_recreated_authored(self):
-        # A dev host still keyed by the roster service_id (the old sync shape)
-        # still matches roster membership through its component service_id, so
-        # it is reused as-is (never renamed); deleting the row converges it
-        # away, and restoring the row recreates the full authored identity.
-        legacy = self._anchored_legacy_host(GUILD_SERVICE_ID)
+    def test_a_source_host_is_retired_when_its_whole_row_is_removed(self):
+        # Retirement authority is the source-ownership tag: the row's host is
+        # tagged by a normal sync, so removing the whole declaration retires it
+        # through the existing lifecycle, and restoring the row recreates the
+        # full authored identity.
+        legacy = self._canonical_legacy_host(GUILD_SERVICE_ID)
+        sync_service_content()
+        host = NPC.objects.filter(pk=legacy.pk).first()
+        self.assertIsNotNone(host)
         self._roster_minus(GUILD_SERVICE_ID)
         with self.captureOnCommitCallbacks(execute=True):
             sync_service_content()
         with self.assertRaises(NPC.DoesNotExist):
-            legacy.refresh_from_db()
+            host.refresh_from_db()
         # Stop the shrunk-roster patcher: the next sync sees the full roster.
         for patcher in reversed(self._patchers):
             patcher.stop()
         self._patchers.clear()
         with self.captureOnCommitCallbacks(execute=True):
             sync_service_content()  # roster restored
-        host = self._guild_host()
-        self.assertIsNotNone(host)
-        self.assertEqual(host.npc_title, _guild_row().title)
-        self.assertIsNotNone(host.components.get(GuildStaff.get_component_slot()))
+        recreated = self._guild_host()
+        self.assertIsNotNone(recreated)
+        self.assertEqual(recreated.npc_title, _guild_row().title)
+        self.assertIsNotNone(recreated.components.get(GuildStaff.get_component_slot()))
 
     def _guild_hallish(self):
         return search_object_by_tag(GUILD_HALL_TAG)[0]
+
+
+class ServiceHostReconciliationTests(ServiceContentIsolation, EvenniaTestCase):
+    """One canonical person, reconciled capabilities, preserved live state."""
+
+    def _guild_host(self):
+        return NPC.objects.filter(db_key=_guild_host_name()).first()
+
+    @covers_requirement(
+        "npc-service-host-identity::canonical-source-identity-selects-one-host-independently-of-capabilities"
+    )
+    def test_capability_reorder_keeps_one_person_and_the_same_slots(self):
+        sync_service_content()
+        before = self._guild_host()
+        self.assertIsNotNone(before)
+        pk_before = before.pk
+        slots_before = sorted(before.components.db_names)
+        # Narrative dialogue moves to the front: declaration order is
+        # presentation, so it cannot select or create a person.
+        self._patch_host_row(
+            _guild_row().host_key,
+            profession=profession_with(
+                _guild_row().profession.key,
+                ScriptedDialogue.name,
+                GuildExamReception.name,
+                GuildStaff.name,
+            ),
+        )
+        sync_service_content()
+        host = self._guild_host()
+        self.assertEqual(host.pk, pk_before)
+        self.assertEqual(NPC.objects.filter(db_key=_guild_host_name()).count(), 1)
+        self.assertEqual(sorted(host.components.db_names), slots_before)
+
+    @covers_requirement(
+        "npc-service-host-identity::managed-reconciliation-preserves-unrelated-and-subsystem-owned-state"
+    )
+    def test_removing_a_capability_keeps_the_person_and_unrelated_state(self):
+        from evennia.contrib.base_systems.components import Component, DBField
+
+        class T_UnrelatedProbe(Component):
+            name = "t_unrelated_probe"
+            probe = DBField(default=None)
+
+        sync_service_content()
+        host = self._guild_host()
+        pk_before = host.pk
+        room_before = host.location
+        host.attributes.add("t_probe_inventory", ["t_probe_goods"])
+        host.components.add(T_UnrelatedProbe.create(host, probe="kept"))
+        # Drop the reception capability from the declaration only.
+        self._patch_host_row(
+            _guild_row().host_key,
+            profession=profession_with(
+                _guild_row().profession.key, GuildStaff.name, ScriptedDialogue.name
+            ),
+        )
+        sync_service_content()
+        host = self._guild_host()
+        self.assertEqual(host.pk, pk_before)
+        self.assertEqual(host.location, room_before)
+        self.assertIsNone(host.components.get(GuildExamReception.get_component_slot()))
+        self.assertIsNotNone(host.components.get(GuildStaff.get_component_slot()))
+        self.assertIsNotNone(host.components.get("t_unrelated_probe"))
+        self.assertEqual(host.attributes.get("t_probe_inventory"), ["t_probe_goods"])
+
+    @covers_requirement(
+        "npc-service-host-identity::canonical-source-identity-selects-one-host-independently-of-capabilities"
+    )
+    def test_an_empty_declaration_keeps_the_person_and_clears_the_managed_set(self):
+        sync_service_content()
+        before = self._guild_host()
+        pk_before = before.pk
+        name_before = before.key
+        room_before = before.location
+        empty = dataclasses.replace(_guild_row().profession, components=())
+        self._patch_host_row(_guild_row().host_key, profession=empty)
+        sync_service_content()
+        host = self._guild_host()
+        self.assertEqual(host.pk, pk_before)
+        self.assertEqual(host.key, name_before)
+        self.assertEqual(host.location, room_before)
+        self.assertEqual(host.components.db_names, [])
+
+    @covers_requirement(
+        "npc-service-host-identity::canonical-source-identity-selects-one-host-independently-of-capabilities"
+    )
+    def test_a_service_identity_edit_converges_on_the_same_person(self):
+        from typeclasses.components import ScriptedDialogue
+
+        sync_service_content()
+        host = self._guild_host()
+        pk_before = host.pk
+        edited_service_id = f"t_{GUILD_SERVICE_ID}_edited"
+        self._patch_host_row(_guild_row().host_key, service_id=edited_service_id)
+        sync_service_content()
+        host = self._guild_host()
+        self.assertEqual(host.pk, pk_before)
+        self.assertEqual(NPC.objects.filter(db_key=_guild_host_name()).count(), 1)
+        for slot in (
+            GuildStaff.get_component_slot(),
+            GuildExamReception.get_component_slot(),
+            ScriptedDialogue.get_component_slot(),
+        ):
+            with self.subTest(slot=slot):
+                component = host.components.get(slot)
+                self.assertIsNotNone(component)
+                self.assertEqual(component.service_id, edited_service_id)
+
+    @covers_requirement(
+        "npc-service-host-identity::canonical-source-identity-selects-one-host-independently-of-capabilities"
+    )
+    def test_a_moved_host_stays_moved(self):
+        from evennia.utils.search import search_object_by_tag
+
+        # The host stands outside its anchor room: the place-bound service is
+        # paused, and no sync drags the person back.
+        sync_service_content()
+        host = self._guild_host()
+        elsewhere = search_object_by_tag(GENERAL_STORE_TAG)[0]
+        host.location = elsewhere
+        host.save()
+        sync_service_content()
+        moved = NPC.objects.filter(pk=host.pk).first()
+        self.assertEqual(moved.location, elsewhere)
+        staff = moved.components.get(GuildStaff.get_component_slot())
+        self.assertEqual(staff.service_binding, "place")
+        self.assertNotEqual(staff.anchor_room_id, elsewhere.pk)
+
+    @covers_requirement(
+        "npc-service-host-identity::managed-reconciliation-preserves-unrelated-and-subsystem-owned-state"
+    )
+    def test_a_shop_identity_edit_preserves_live_commerce_progress(self):
+        merchant_row = _merchant_row()
+        sync_service_content()
+        host = NPC.objects.filter(db_key=_merchant_host_name()).first()
+        merchant = host.components.get(Merchant.get_component_slot())
+        stock_before = {"t_probe_goods": 3}
+        merchant.merchant_stock = stock_before
+        merchant.last_restock_day = 42
+        other_shop_key = next(
+            key for key in get_catalog().shop_configs if key != merchant.shop_key
+        )
+        self._patch_host_row(
+            merchant_row.host_key,
+            authored_kwargs={**dict(merchant_row.authored_kwargs), "shop_key": other_shop_key},
+        )
+        sync_service_content()
+        host = NPC.objects.filter(db_key=_merchant_host_name()).first()
+        merchant = host.components.get(Merchant.get_component_slot())
+        self.assertEqual(merchant.shop_key, other_shop_key)
+        self.assertEqual(dict(merchant.merchant_stock), stock_before)
+        self.assertEqual(merchant.last_restock_day, 42)
+
+    @covers_requirement(
+        "npc-service-host-identity::managed-reconciliation-preserves-unrelated-and-subsystem-owned-state"
+    )
+    def test_removing_and_restoring_the_clergy_capability_preserves_sexual_state(self):
+        from typeclasses.components import ChurchHost
+
+        clergy_row = next(
+            row
+            for row in get_catalog().service_hosts
+            if any(
+                component.type_key == ChurchHost.name
+                for component in row.profession.components
+            )
+        )
+        sync_service_content()
+        host = NPC.objects.filter(db_key=clergy_row.name).first()
+        self.assertIsNotNone(host)
+        sexual_before = dict(host.db.sexual or {})
+        self.assertTrue(sexual_before)
+        self._patch_host_row(
+            clergy_row.host_key,
+            profession=profession_with(clergy_row.profession.key, ScriptedDialogue.name),
+        )
+        sync_service_content()
+        host = NPC.objects.filter(pk=host.pk).first()
+        self.assertIsNone(host.components.get(ChurchHost.get_component_slot()))
+        self.assertEqual(dict(host.db.sexual or {}), sexual_before)
+        for patcher in reversed(self._patchers):
+            patcher.stop()
+        self._patchers.clear()
+        sync_service_content()
+        host = NPC.objects.filter(pk=host.pk).first()
+        self.assertIsNotNone(host.components.get(ChurchHost.get_component_slot()))
+        self.assertEqual(dict(host.db.sexual or {}), sexual_before)
+
 
 class ServiceHostAnchorReuseTests(ServiceContentIsolation, EvenniaTestCase):
     """Anchor survives key drift: a renamed host stays reused (no rename path)."""
@@ -622,30 +838,9 @@ class ServiceHostAnchorRoomTests(ServiceContentIsolation, EvenniaTestCase):
         "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
     )
     def test_unresolvable_anchor_room_skips_only_its_row(self):
-        catalog = get_catalog()
-        rows = tuple(
-            guild_config.ServiceHostRow(
-                row.name,
-                row.title,
-                row.profession,
-                "no_such_room_tag",
-                row.service_id,
-                row.authored_kwargs,
-                row.profile_key,
-            )
-            if row.service_id == MERCHANT_SERVICE_ID
-            else row
-            for row in catalog.service_hosts
-        )
-        patched = guild_config.GuildCatalog(
-            merit_thresholds=catalog.merit_thresholds,
-            shop_configs=catalog.shop_configs,
-            quest_offers=catalog.quest_offers,
-            service_hosts=rows,
-        )
-        with patch.object(guild_economy, "get_catalog", return_value=patched):
-            with patch("world.rules.guild_economy.log_warn") as warned:
-                sync_service_content()
+        self._patch_host_row(_merchant_row().host_key, anchor_room="no_such_room_tag")
+        with patch("world.rules.guild_economy.log_warn") as warned:
+            sync_service_content()
         events = [
             call for call in warned.call_args_list
             if call.args and call.args[0] == "guild_service_host_anchor_room_missing"
@@ -707,7 +902,7 @@ class ServiceHostProvenanceTests(ServiceContentIsolation, EvenniaTestCase):
         room = search_object_by_tag(GUILD_HALL_TAG)[0]
         with self.assertRaises(RuntimeError):
             with transaction.atomic():
-                host = guild_economy._sync_service_host(roster_row, room)
+                host = guild_economy._sync_service_host(roster_row, room, created=[])
                 self.assertEqual(
                     host.attributes.get(NPC_PROFILE_PROVENANCE_ATTRIBUTE),
                     roster_row.profile_key,

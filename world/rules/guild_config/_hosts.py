@@ -49,6 +49,7 @@ def validate_service_hosts() -> tuple[ServiceHostRow, ...]:
 
     rows: list[ServiceHostRow] = []
     seen_service_ids: set[str] = set()
+    seen_host_keys: set[str] = set()
     for place in PLACE_REGISTRY.values():
         # One row per host-declaring place: a place authors either a complete
         # host or none of it (validate_place_registry), and the host-less
@@ -68,6 +69,15 @@ def validate_service_hosts() -> tuple[ServiceHostRow, ...]:
                 "one roster row per service anchor"
             )
         seen_service_ids.add(service_id)
+        # One canonical person, one host: the authored profile key is the
+        # stable identity every sync reuses, so two rows claiming it would make
+        # "which person is this?" unanswerable before any write happens.
+        if profile_key in seen_host_keys:
+            raise _error(
+                f"duplicate host_key {profile_key!r} in the place registry; "
+                "one roster row per canonical host identity"
+            )
+        seen_host_keys.add(profile_key)
         try:
             profession = profession_config.get_profession(profession_key)
         except profession_config.ProfessionConfigError as error:
@@ -135,6 +145,7 @@ def validate_service_hosts() -> tuple[ServiceHostRow, ...]:
                 service_id=service_id,
                 authored_kwargs=authored,
                 profile_key=profile_key,
+                host_key=profile_key,
             )
         )
     return tuple(rows)

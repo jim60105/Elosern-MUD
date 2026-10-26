@@ -119,21 +119,15 @@ def _validate_row(raw: Any, position: int, seen: set[str]) -> Profession:
     seen.add(key)
 
     raw_components = raw["components"]
-    if not isinstance(raw_components, list) or not raw_components:
-        raise _error(f"profession {key!r} components must be a non-empty list")
+    if not isinstance(raw_components, list):
+        raise _error(f"profession {key!r} components must be a list")
     components = tuple(
         _validate_component(entry, key, position) for position, entry in enumerate(raw_components)
     )
-    anchor_class = PROFESSION_COMPONENT_TYPES[components[0].type_key]
-    if "service_id" not in anchor_class._fields:
-        # The roster-sync reuse path reads service_id unconditionally on the
-        # FIRST component class of a row's profession; a row anchored on a
-        # class without the field would raise AttributeError inside the
-        # startup sync. Reject at authoring time, naming the row (design D3).
-        raise _error(
-            f"profession {key!r} anchors on component {components[0].type_key!r} "
-            "which defines no service_id"
-        )
+    # An empty blueprint is valid: a source-managed host may declare no
+    # capability at all, and its canonical authored identity (never a
+    # component) is what the sync reuses. No component-order invariant is
+    # enforced here — declaration order is presentation, not identity.
 
     template = raw["schedule_template"]
     if template is not None:

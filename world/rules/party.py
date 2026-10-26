@@ -223,6 +223,22 @@ def bound_owner_of(npc: Any) -> Any | None:
     return player
 
 
+def membership_owner(npc: Any) -> Any | None:
+    """Resolve the live player recorded on the NPC side of a binding.
+
+    Unlike ``bound_owner_of`` this read is deliberately one-sided: a caller
+    compensating a rolled-back deletion must find the owner even when the
+    player-side list is already half-cleaned. Read-only and never raises.
+    """
+    member = getattr(getattr(npc, "db", None), "party_member", None)
+    if member is None:
+        return None
+    try:
+        return _resolve_live_object(int(member))
+    except (TypeError, ValueError):  # observability: ignore R2: a malformed backref reads as no owner
+        return None
+
+
 def live_companions(player: Any) -> list[Any]:
     """Resolve the live companion NPC objects of ``player`` (safe accessor).
 

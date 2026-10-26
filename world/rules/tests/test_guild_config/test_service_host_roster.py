@@ -95,8 +95,27 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             [place.service_id for place in self._hosted_places()],
         )
         self.assertEqual(
-            set(catalog.host_by_service_id),
-            {place.service_id for place in self._hosted_places()},
+            set(catalog.host_by_host_key),
+            {place.host_profile_key for place in self._hosted_places()},
+        )
+
+    @covers_requirement(
+        "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
+    )
+    def test_every_row_carries_the_place_s_canonical_host_identity(self):
+        rows = validate_service_hosts()
+        for row in rows:
+            with self.subTest(host_key=row.host_key):
+                self.assertTrue(row.host_key)
+                # The row's canonical identity is the authored profile key,
+                # never a capability, a name or a service identifier.
+                self.assertEqual(row.host_key, row.profile_key)
+                self.assertEqual(
+                    row.host_key,
+                    PLACE_REGISTRY[row.anchor_room].host_profile_key,
+                )
+        self.assertEqual(
+            len({row.host_key for row in rows}), len(rows), "host identities are unique"
         )
 
     def test_rulebook_no_longer_hand_authors_a_service_hosts_roster(self):
@@ -144,6 +163,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
                 PLACE_REGISTRY["altoria_general_store"],
                 key="t_new_blueprint_place",
                 service_id="t_new_blueprint_host",
+                host_profile_key="t_new_blueprint_host",
                 profession=blueprint.key,
                 assortment_keys=(),
                 authored_kwargs=(("dialogue_key", "guild_staff"),),
@@ -206,6 +226,28 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         ):
             with self.assertRaises(GuildConfigError):
                 validate_service_hosts()
+
+    @covers_requirement(
+        "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
+    )
+    def test_two_rows_claiming_one_canonical_identity_are_rejected(self):
+        # The canonical authored profile identity selects the person, so two
+        # rows sharing it would make reuse unanswerable before any write.
+        guild = PLACE_REGISTRY["altoria_guild_hall"]
+        store = PLACE_REGISTRY["altoria_general_store"]
+        colliding = replace(
+            guild,
+            key="t_colliding",
+            service_id="t_colliding_service",
+            host_profile_key=store.host_profile_key,
+        )
+        with mock.patch.dict(
+            PLACE_REGISTRY, {"t_colliding": colliding}, clear=False
+        ):
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_service_hosts()
+        self.assertIn("duplicate host_key", str(caught.exception))
+        self.assertIn(store.host_profile_key, str(caught.exception))
 
     @covers_requirement(
         "merchant-dialogue::every-merchant-host-answers-when-spoken-to"

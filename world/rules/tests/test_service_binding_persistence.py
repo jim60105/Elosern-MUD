@@ -142,3 +142,26 @@ class ServiceBindingPersistenceTests(EvenniaTestCase):
         after = npc.components.get(Merchant.get_component_slot())
         self.assertEqual((after.service_id, after.shop_key), before_id)
         self.assertEqual(after.anchor_room_id, self.square.pk)
+
+    @covers_requirement(
+        "service-anchoring::service-components-carry-an-authored-person-or-place-binding"
+    )
+    def test_reassembly_converges_only_the_authored_configuration_allowlist(self):
+        # Authored configuration converges on a live component; the commerce
+        # lifecycle's own state (stock, restock day) is never written by
+        # assembly, so a shop edit cannot reset progress.
+        npc = create_object(NPC, key="configured merchant", location=self.anchor)
+        self._assemble(npc, self.anchor)
+        component = npc.components.get(Merchant.get_component_slot())
+        component.merchant_stock = {"t_probe_goods": 2}
+        component.last_restock_day = 9
+        assemble_profession_components(
+            npc,
+            MERCHANT_PROBE,
+            {Merchant.name: {"service_id": "s2", "shop_key": "t_other_stall"}},
+            anchor_room=self.anchor,
+        )
+        after = npc.components.get(Merchant.get_component_slot())
+        self.assertEqual((after.service_id, after.shop_key), ("s2", "t_other_stall"))
+        self.assertEqual(dict(after.merchant_stock), {"t_probe_goods": 2})
+        self.assertEqual(after.last_restock_day, 9)

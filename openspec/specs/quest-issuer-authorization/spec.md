@@ -44,69 +44,50 @@ Private commission authority SHALL reside exclusively in the registered `QuestIs
 - **THEN** it SHALL NOT resolve to any issuer key
 
 ### Requirement: The QuestIssuer component mirrors the existing service-host component shape
-
-`QuestIssuer` SHALL be a component named `quest_issuer` carrying `service_id`, `issuer_key`,
-`service_binding`, and `anchor_room_id` — the same four-field shape `GuildStaff`, `GuildExamReception`,
-and `Merchant` carry, with `issuer_key` in the place of `branch_key`. `service_id` SHALL be present
-because the roster-sync reuse path reads it unconditionally on whichever component class anchors a
-profession row.
+The quest-issuer capability SHALL retain its service_id, optional issuer_key, binding and anchor fields as deterministic authority/configuration only. Host reuse SHALL depend on canonical host provenance, independently of these fields or declaration order.
 
 #### Scenario: The component is a marker and identity holder only
-- **WHEN** the component class is inspected
-- **THEN** it declares exactly `service_id`, `issuer_key`, `service_binding`, and `anchor_room_id`
-  and contains no quest, reward, or record mutation
+- **WHEN** a commission mutation is requested
+- **THEN** the capability delegates to the deterministic owner and performs no quest/reward writes itself
 
 #### Scenario: A commissioner blueprint survives repeated roster synchronization
-- **WHEN** the guild-economy roster sync runs twice with a profession row anchored on
-  `quest_issuer`
-- **THEN** the second run reuses the existing host through its `service_id` anchor without raising,
-  and creates no duplicate host
+- **WHEN** the commissioner is reordered or its service_id changes
+- **THEN** the same canonical host dbref is reused without duplicates
 
 #### Scenario: The generic host resolver finds a co-located commissioner
-- **WHEN** `resolve_local_service_host` is called for the `QuestIssuer` class with exactly one
-  co-located carrier
-- **THEN** it returns that carrier, and with zero or several carriers it reports the same
-  no-host and ambiguous-host outcomes it reports for every other service component
+- **WHEN** an implicit command has exactly one local commissioner
+- **THEN** it resolves that host; zero or multiple remain implicit-command refusal cases
 
 #### Scenario: A missing service_id would break the roster-sync reuse path
-- **WHEN** a commissioner blueprint's anchor component lacked `service_id`
-- **THEN** the roster-sync reuse path would raise `AttributeError` inside the guild-economy startup
-  sync, which is why the field is required
+- **WHEN** host identity is resolved for a commissioner
+- **THEN** lookup does not read service_id and cannot fail due to its absence
 
 #### Scenario: Mutations delegate to the deterministic core
-- **WHEN** a quest, reward, or quest record mutation is requested through a commissioner
-- **THEN** the component itself never registers, mutates, or settles it; every such mutation delegates
-  to the deterministic core exactly as the other service components do
+- **WHEN** a quest, reward or record mutation is requested through a commissioner
+- **THEN** the component delegates to its deterministic owner and performs no business writes
 
 #### Scenario: The component resolves through the existing generic resolver
-- **WHEN** a commissioner host is resolved
-- **THEN** it is resolvable through the existing generic
-  `resolve_local_service_host(actor, component_class)` with no change to that function
+- **WHEN** implicit discovery resolves a commissioner
+- **THEN** the existing generic component resolver retains its local zero/one/multiple-host behavior
 
 ### Requirement: Every profession row anchors on a component that carries a service identity
-
-The profession loader SHALL enforce that the FIRST component of every profession row names a
-component class defining `service_id`, and a contract test SHALL fail naming the offending row
-otherwise.
+Authored host reuse SHALL use canonical host provenance and SHALL NOT require any first capability or component-level service identity.
 
 #### Scenario: A row anchored on an identity-less component fails the contract
-- **WHEN** a profession row is authored whose first component names a class that does not define
-  `service_id`
-- **THEN** the contract test fails naming that row, before any server synchronization runs
+- **WHEN** a host declares narrative dialogue first or no capabilities
+- **THEN** host lookup remains valid through canonical provenance
 
 #### Scenario: Every existing row satisfies the invariant
-- **WHEN** the contract test runs against the shipped profession rulebook
-- **THEN** every row's first component class defines `service_id`
+- **WHEN** all shipped host declarations synchronize twice
+- **THEN** every canonical identity selects exactly one host independently of capability order
 
 #### Scenario: Without enforcement the failure lands at startup, not authoring
-- **WHEN** a row is anchored on a class without `service_id` and no loader check exists
-- **THEN** the roster-sync reuse path, which resolves a row's host by reading `service_id` on the
-  class anchoring that row, would raise inside startup synchronization rather than at authoring time
+- **WHEN** a duplicate canonical host identity exists
+- **THEN** full-batch preflight rejects before mutations
 
 #### Scenario: The invariant is promoted from convention to enforcement
-- **WHEN** the state before this capability is inspected
-- **THEN** the invariant held only by convention — `scripted_dialogue` also lacks the field and is
-  never placed first — and this capability makes it explicit and enforced
+- **WHEN** a source-managed host plan is validated
+- **THEN** canonical provenance uniqueness is enforced, with no first-component service-id invariant
 
 ### Requirement: An issuer key resolves in exactly two authored forms
 
