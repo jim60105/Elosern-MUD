@@ -51,7 +51,7 @@ export function applyView(ctx) {
   // `focusPress` reads it at key time, so it never trails a router move.
   ctx.formationOrder = null;
   ctx.stageTargetNow = function stageTargetNow() {
-    const rs = ctx.reducer.getState();
+    const rs = ctx.reducer.getCommittedState();
     if (rs.mode !== "combat" || ctx.router.depth() === 0) {
       return null;
     }
@@ -511,16 +511,19 @@ export function applyView(ctx) {
     };
   };
 
-  ctx.publishView = function publishView() {
+  ctx.publishView = function publishView(current) {
     const prev = ctx.view.value;
-    let rs = ctx.reducer.getState();
+    // The reducer's subscriber hands the immutable committed record straight
+    // in, so an ordinary publication reads no snapshot at all; every other
+    // caller (a local-only UI change) reads the current committed record.
+    let rs = current || ctx.reducer.getCommittedState();
     ctx.handleTransportLifecycle(prev, rs);
     // A matching result may record the one recovery episode (a revision this
     // client never adopted) and publish it synchronously; the committed state
     // is therefore re-read so this projection can never overwrite the nested
-    // one with the pre-transition snapshot.
+    // one with the pre-transition record.
     ctx.handleActionResult(rs);
-    rs = ctx.reducer.getState();
+    rs = ctx.reducer.getCommittedState();
     // The in-flight record is captured before the release: the round's
     // completing publication can carry the declared revision, so
     // `releaseIfReady` may clear `inFlight` in this same pass, and the record
@@ -562,7 +565,7 @@ export function applyView(ctx) {
     ctx.autoAdvanceCombatActor(rs);
     // The bag tab's held cross-member item (webclient-party-bag-retire) opens
     // its frame last, after the publication, once its actor switch committed.
-    ctx.followCombatItem(ctx.reducer.getState());
+    ctx.followCombatItem(ctx.reducer.getCommittedState());
   };
 
   const partyAvailable = computed(() => !!ctx.view.value.partyAvailable);

@@ -66,7 +66,7 @@ export function applySkillUse(ctx) {
   // nothing: the tab disables 施放 in combat, where casting stays on the
   // command card.
   ctx.beginSkillUse = function beginSkillUse(skillKey) {
-    const rs = ctx.reducer.getState();
+    const rs = ctx.reducer.getCommittedState();
     const contextActions = (rs.panels && rs.panels.context_actions) || null;
     if (
       (contextActions && contextActions.kind === "combat") ||

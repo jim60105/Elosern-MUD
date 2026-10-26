@@ -393,7 +393,7 @@ export function applyDialogueReading(ctx) {
     if (memory.sending !== null || memory.pending.length === 0) {
       return;
     }
-    const rs = ctx.reducer.getState();
+    const rs = ctx.reducer.getCommittedState();
     if (
       !rs.connected ||
       rs.phase !== "active" ||
@@ -529,7 +529,7 @@ export function applyDialogueReading(ctx) {
     if (Number.isInteger(delivery.npc_id) && delivery.npc_id > 0) {
       return delivery.npc_id;
     }
-    const rs = ctx.reducer.getState();
+    const rs = ctx.reducer.getCommittedState();
     const panel = rs.panels && rs.panels.dialogue;
     if (panel && panel.available === true && panel.context_id === delivery.context_id) {
       const identity = panel.host && panel.host.identity;
@@ -563,7 +563,7 @@ export function applyDialogueReading(ctx) {
     ) {
       return null;
     }
-    const rs = ctx.reducer.getState();
+    const rs = ctx.reducer.getCommittedState();
     if (rs.mode !== "dialogue") {
       return null;
     }
@@ -782,7 +782,7 @@ export function applyDialogueReading(ctx) {
     if (memory.unlockPending.length === 0) {
       return 0;
     }
-    const rs = ctx.reducer.getState();
+    const rs = ctx.reducer.getCommittedState();
     const panel = rs.mode === "dialogue" && rs.panels ? rs.panels.dialogue : null;
     if (!panel || panel.available !== true) {
       // Nothing to show against: keep the batches; the next committed sync
@@ -873,7 +873,7 @@ export function applyDialogueReading(ctx) {
     const wireRevision = result.presentationRevision ?? result.presentation_revision;
     const revision = Number.isInteger(wireRevision)
       ? wireRevision
-      : ctx.reducer.getState().revision;
+      : ctx.reducer.getCommittedState().revision;
     if (typeof revision === "number" && revision > memory.settleRevision) {
       memory.settleRevision = revision;
     }

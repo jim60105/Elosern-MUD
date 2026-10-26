@@ -68,7 +68,7 @@ export function applyPresence(ctx) {
   // exactly the router path's. The caller passes a row it re-resolved from
   // the committed panels at THIS moment.
   ctx.activateExplorationRow = function activateExplorationRow(item) {
-    const rs = ctx.reducer.getState();
+    const rs = ctx.reducer.getCommittedState();
     if (!ctx.dockOnExplorationForm(rs)) {
       return { sent: false, handled: false, reason: "mode" };
     }
@@ -107,7 +107,7 @@ export function applyPresence(ctx) {
   // look row. The overflow card's picks come back through here, so there is
   // one activation path.
   ctx.activatePresence = function activatePresence(key) {
-    const rs = ctx.reducer.getState();
+    const rs = ctx.reducer.getCommittedState();
     if (rs.mode !== "exploration") {
       return { sent: false, handled: false, reason: "mode" };
     }
@@ -217,7 +217,7 @@ export function applyPresence(ctx) {
   // stage every digit is claimed — one beyond the slots does nothing — and
   // with no rail no digit is claimed.
   ctx.presenceDigit = function presenceDigit(key, repeat) {
-    const rs = ctx.reducer.getState();
+    const rs = ctx.reducer.getCommittedState();
     if (rs.mode !== "exploration" || ctx.router.depth() === 0) {
       return null;
     }

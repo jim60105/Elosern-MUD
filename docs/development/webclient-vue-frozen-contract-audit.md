@@ -171,6 +171,7 @@
       ],
       "create_store_members": [
         "getState",
+        "getCommittedState",
         "subscribe",
         "setConnected",
         "beginTransport",
@@ -268,7 +269,7 @@
 
 Façade 說明（行為契約，橋接器必須保留行為本身，名稱相符並不足夠）：
 
-- **`Protocol`** — 傳輸生成 reducer 及其驗證器表格。`createStore` 回傳 store 介面 `create_store_members`（不可部分發布的快照採用、epoch 與修訂版本門控、過期 epoch 集合、每次認可一次通知的語意，即由 `webclient-oob-protocol` 與 `webclient-desktop-shell` 狀態化簡需求所固定的行為）。`envelope_names` 清單為確切的版本化 OOB 訊息集合（`PROTOCOL_VERSION = 1`）。
+- **`Protocol`** — 傳輸生成 reducer 及其驗證器表格。`createStore` 回傳 store 介面 `create_store_members`（不可部分發布的快照採用、epoch 與修訂版本門控、過期 epoch 集合、每次認可一次通知的語意，即由 `webclient-oob-protocol` 與 `webclient-desktop-shell` 狀態化簡需求所固定的行為）。同一份 reducer 上有兩個明確的讀取契約：`getState()` 回傳每次呼叫各自一份、可自由編輯且與後續認可互不影響的分離可變快照；`getCommittedState()` 回傳該次發布唯一一份、遞迴凍結的已認可記錄，`subscribe(listener)` 交付的正是同一個物件（每次完整發布恰好一次通知、未完成的分片零次）。差量中未變動的面板、結果或中繼資料發布中的既有面板，以及同一 epoch 內隨選地圖，皆以同一個參照沿用，既不重新複製亦不重新凍結；傳輸封裝在 `receive` 返回後的任何改寫都無法觸及已認可內容。`envelope_names` 清單為確切的版本化 OOB 訊息集合（`PROTOCOL_VERSION = 1`）。
 - **`KeyboardRouter`** — 選單堆疊焦點路由器。`createRouter(options)` 回傳恰好具備 `router_instance_members` 的路由器；`handle(key, repeat)` 為單一按鍵進入轉接器。宣告語意：`press`/`handle` 恰好在路由器消耗該按鍵（方向鍵／Enter／Escape／Space／`/`）時回傳 `true`，且重複的 Enter 與 Space 會被壓制；未消耗的按鍵回傳 `false` 並向下傳遞。`setMutationInFlight`/`isAwaitingRevision` 為提交門控。正式環境的 `window.Elosern.keyboard` 執行個體是*相鄰*的測試架構全域變數，非凍結模組介面的一部份（§2.1）。
 - **`narrativeInput`** — 單一敘事附加路徑（玩家輸入行與抉擇點串流結尾區塊）。`appendInput(text, display?)` 透過分隔線、未讀與捲動保持行為回顯一行 `.inp`；`mount/replace/unmountChoicePoint` 擁有恰好一個串流結尾區塊（無掛載時為 no-op，區塊為呼叫端提供的 DOM 節點）。
 - **`actions`** — 單一動作分派進入點。`submit(actionId, payload, display?)` 恰好在真實請求分派時回傳請求 ID（已鎖定或重複的提交不分派且不回顯）；`display` 描述器絕不外洩至傳輸承載資料中。`client` 為獨立於 DOM 的動作客戶端（`createActionClient` 介面）；`isInFlight`/`isLocked` 驅動異動鎖定；重新連線執行重新同步且絕不自動重試。
@@ -752,3 +753,9 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 
 - **§2.3 新 family：** 加入 `choice-card-lock`（可見鎖定話題列尾的掛鎖）、`choice-card-tip`（懸停或鍵盤焦點時顯示於卡片旁、不可聚焦的需求提示框）與 `choice-card-tip-text`（列的 `aria-describedby` 所指的隱藏提示文字）。鎖定話題列仍可選取以播放拒絕場景，不帶 `aria-disabled`。
 - **§5 完整性聲明維持成立：** 所有新增受管目標均登記於上方 §2.3；`tests/test_webclient_frozen_contract.py` 維持綠燈。
+
+### webclient-immutable-adoption — 2026-10-26
+
+- **§1 介面補登：** `Protocol` 的 `create_store_members` 加入 `getCommittedState`（同一份 reducer 的唯讀契約：該次發布唯一一份遞迴凍結的已認可記錄，`subscribe` 交付同一個物件）。`getState` 的分離可變快照契約、不可部分發布的採用語意、epoch 與修訂版本門控，以及每次認可一次通知的既有行為皆未改變；未變動的面板、同一 epoch 的隨選地圖與等值的完整對齊以同一參照沿用，屬既有行為的實作方式，不新增對外識別碼。
+- **§2.3、§3：** 未新增或移除任何受管瀏覽器目標、hook 或增量項目；本變更不觸及 OOB 線路與面板序列化。
+- **§5 完整性聲明維持成立：** 未遺留未註冊的受管目標；`tests/test_webclient_frozen_contract.py` 維持綠燈。

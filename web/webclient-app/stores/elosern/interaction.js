@@ -18,7 +18,7 @@ export function applyInteraction(ctx) {
   // and expand and focus the command line through `drawerRequest` (design
   // D2). Dispatches nothing.
   ctx.borrowDialogueCommand = function borrowDialogueCommand() {
-    const rs = ctx.reducer.getState();
+    const rs = ctx.reducer.getCommittedState();
     const vm = dialogueViewModel((rs.panels && rs.panels.dialogue) || null);
     if (!vm) {
       return false;
@@ -31,7 +31,7 @@ export function applyInteraction(ctx) {
   };
 
   ctx.handleExplorationItem = function handleExplorationItem(item) {
-    const rs = ctx.reducer.getState();
+    const rs = ctx.reducer.getCommittedState();
     if (!ctx.dockOnExplorationForm(rs)) {
       return false;
     }
@@ -141,7 +141,7 @@ export function applyInteraction(ctx) {
       }
       return false;
     }
-    if (ctx.reducer.getState().mode === "dialogue") {
+    if (ctx.reducer.getCommittedState().mode === "dialogue") {
       return key === "/" ? ctx.router.press(key, !!repeat) : false;
     }
     // The stage target step (webclient-combat-stage-target-picking D2): the
@@ -231,7 +231,7 @@ export function applyInteraction(ctx) {
   // exploration-presence-rail design D2), so the payload, the command echo,
   // and the connection lock inside `dispatchAction` are the old exit chip's.
   ctx.activateExit = function activateExit(exitRef) {
-    const rs = ctx.reducer.getState();
+    const rs = ctx.reducer.getCommittedState();
     if (!ctx.dockOnExplorationForm(rs)) {
       return { sent: false, reason: "mode" };
     }

@@ -112,7 +112,7 @@ export function applyHud(ctx) {
     // `escape-root` handler performs. The drawer's own Escape handler
     // owns the key while focus is trapped in the drawer.
     if (
-      ctx.dockOnExplorationForm(ctx.reducer.getState()) &&
+      ctx.dockOnExplorationForm(ctx.reducer.getCommittedState()) &&
       activeSubDock.value
     ) {
       ctx.setActiveSubDock(null);

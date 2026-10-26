@@ -184,6 +184,44 @@ bypasses it. On-demand map assembly is unaffected except that a completed
 general snapshot prunes a map transfer whose target is already committed and
 retains same-epoch complete maps.
 
+## Browser read contracts and value ownership
+
+One reducer (`web/static/webclient/js/elosern/protocol/store.js`) owns the
+committed presentation and exposes two explicit read contracts over it. They are
+two reads of the same authoritative store, never two stores.
+
+| Read | Contract |
+|---|---|
+| `getState()` | One detached, deeply mutable snapshot per call: a consumer may edit it freely and may retain it, and neither the reducer nor another snapshot ever observes those edits. Later commits never mutate a retained snapshot. This is the explicit-copy path, and its documented copy cost applies. |
+| `getCommittedState()` | The owned committed record of the current publication. It is frozen recursively, and every `subscribe` listener of that publication receives this same object. Ordinary view, resolver and consumer reads use it and clone nothing. |
+
+Ownership rules:
+
+- Validated transport input still belongs to the caller, so every adopted
+  payload is copied away from the transport's object graph and frozen once
+  before it becomes committed state. Writing to the original envelope, a map
+  body, or an action result's `data` slot after `receive` returns cannot change
+  any committed value.
+- An update carries each unchanged committed panel by reference, applies the
+  explicit removals, and adopts the named replacements. A metadata- or
+  result-only publication therefore reuses every panel value by `===` identity,
+  and an old committed record a listener retained keeps exactly the values it
+  published.
+- A snapshot replaces eager membership, but an already committed panel whose
+  content is structurally identical is reused instead of replaced (a plain
+  JSON-value comparison, with no serialization, digest or hash). An equal
+  complete alignment therefore publishes the same panel objects, so it never
+  replays a delivery or a terminal combat beat.
+- Same-epoch on-demand maps keep their value references across every commit; a
+  new epoch (or a detach) clears them.
+- Committed values are frozen in production, not only in development. A
+  consumer never gains a write channel into committed state; any copy it needs
+  for local editing is its own small owned copy (`frame-resolvers.js::isolate`
+  for resolved menus, and local copies for client-owned selections, drafts,
+  queues and animations).
+- A publication notifies once, with one record, and a pending publication part
+  notifies zero times (see "Receiver assembly" above).
+
 ## Bounded complete recovery
 
 The browser reducer (`web/static/webclient/js/elosern/protocol/store.js`) owns

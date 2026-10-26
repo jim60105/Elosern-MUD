@@ -38,7 +38,7 @@ export function applyCombat(ctx) {
   // no committed row, so a partial target list is never echoed as complete
   // (D3b).
   function participantNamesByIdentity(identities) {
-    const rs = ctx.reducer.getState();
+    const rs = ctx.reducer.getCommittedState();
     const panel = (rs.panels && rs.panels.context_actions) || {};
     const byId = new Map();
     if (panel.kind !== "combat") {
@@ -101,7 +101,7 @@ export function applyCombat(ctx) {
     if (identity === undefined || identity === null) {
       return null;
     }
-    const rs = ctx.reducer.getState();
+    const rs = ctx.reducer.getCommittedState();
     const panel = (rs.panels && rs.panels.exploration) || {};
     for (const target of panel.interact || []) {
       if (String(target.identity) === String(identity)) {
@@ -120,7 +120,7 @@ export function applyCombat(ctx) {
     if (typeof skillKey !== "string" || skillKey === "") {
       return null;
     }
-    const rs = ctx.reducer.getState();
+    const rs = ctx.reducer.getCommittedState();
     const panel = (rs.panels && rs.panels.context_actions) || {};
     if (panel.kind !== "combat") {
       return null;
@@ -161,7 +161,7 @@ export function applyCombat(ctx) {
       }
       return value !== undefined && value !== null && value !== "";
     };
-    const panels = (ctx.reducer.getState().panels) || {};
+    const panels = (ctx.reducer.getCommittedState().panels) || {};
     if (actionId === "shop.buy" || actionId === "shop.sell") {
       if (!has("itemLabel")) {
         const shop = (panels.services && panels.services.shop) || {};
