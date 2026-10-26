@@ -22,9 +22,9 @@ This document records the line-by-line editorial and lore verification for the `
 
 ### Elves Standing, Rarity, and Culture
 - **Canon**: Total population ~300 elves across three branches (斐歐恩, 基亞蘭, 伊歐拉斯) compared to ~30M mortal races (21M humans, 9M beastfolk). All three nations treat elves with highest reverence, as beings above royalty (皇族之上的高級存在). Elves have open relationships with no marriage system or bodily shame.
-- **Church Origin**: The church's principal deity is 光明女神, the direct ancestral deity of the 斐歐恩 (forest elves). The holy scriptures explicitly record that elven uninhibited sexual customs represent the divine nature of the goddess, who regards intimacy and physical joy as the root of life and highest grace.
+- **Church Origin**: The church's principal deity is 光明女神, the direct ancestral deity of the 斐歐恩 (forest elves). The holy scriptures record that elven uninhibited sexual customs represent the divine nature of the goddess, who regards intimacy and physical joy as the root of life and highest grace.
 - **Host Handling**:
-  - `altoria_high_priestess`: Topic 01 features a race-specific variant (`kind: race_is`, `race_key: elf`, priority 10) where the High Priestess bows in deep respect, recognizing the elf traveler as kin of the goddess's direct lineage (斐歐恩之民). She affirms that worldly ranks do not apply in the temple, and elves are welcome to participate, stroll, or contemplate in the light as they wish.
+  - `altoria_high_priestess`: Topic 01 features an elven guest variant (`kind: race_is`, `race_key: elf`, priority 10) where the High Priestess bows in polite, composed respect, recognizing the elf traveler as kin of the goddess's direct lineage (斐歐恩族的始祖神祇). She affirms that the temple's tradition comes from that heritage, and elven travelers may sit for the lection, walk through the hall, or contemplate in the light as they wish.
   - `altoria_sanctum_deacon`: Retains open, respectful commerce without generic fantasy puritanical embarrassment or condescending explanations.
 
 ### Religion (光明教會) and the Sanctum Ministry
@@ -36,14 +36,15 @@ This document records the line-by-line editorial and lore verification for the `
   - No invented purity dogma, no hidden back room, no invented sacrament, no fee or blessing the sources do not declare.
 - **Host Handling**:
   - `altoria_high_priestess`:
+    - Composed, polite, modern formal zh-TW with complete sentences.
     - Explains daily services (日課) at morning and dusk without requiring baptism, identity disclosure, or fees.
     - Blessings and prayers for journey safety are performed freely without charge; holy water is directed to the deacon's counter.
-    - Publicly and openly explains the sanctum ministry without evasion, comparing its open ministry to a tavern serving wine—ordinary, holy, and continent-wide knowledge.
+    - Publicly and plainly explains the sanctum ministry without evasion, comparing its open ministry to a tavern serving wine—ordinary, holy, and continent-wide knowledge.
     - Directs all merchandise, holy water purchases, and ritual vessels to Deacon Rohaisya.
   - `altoria_sanctum_deacon`:
-    - Welcoming, businesslike, and attentive. Directly presents wares on shelves with fixed price tags on the counter card.
-    - Explains baptismal holy water as pure water blessed by High Priestess Eliana with light magic, carrying the temple's sun emblem wax seal.
-    - Explains ritual vessels (censer of desire, holy mist) as instruments of holy reverence and joy.
+    - Welcoming, businesslike, and chatty with natural spoken zh-TW particles (喔／啦／吧／嘛). Directly presents wares on shelves with fixed price tags on the counter card.
+    - Explains baptismal holy water as pure water blessed by High Priestess Eliana with light magic, with usage instructions on the label.
+    - Explains ritual vessels (censer of desire, holy mist) as instruments for relaxation and liturgy.
     - Explains sanctuary arrangements: visitors meet nuns in consultation rooms to agree upon times, rooms, and services with mutual consent; holy prayers are directed back to the main hall.
 
 ---
@@ -71,7 +72,7 @@ This document records the line-by-line editorial and lore verification for the `
     - `slime_lube_gel` (史萊姆潤滑凝膠)
     - `hot_kiss_potion` (熱吻藥水)
     - `baptismal_holy_water` (受洗聖水)
-  - Buy-back covers items belonging to the sanctum's own stock (`柜上有的東西，用舊了洗滌潔淨帶回櫃上，我也按成色折算收回`). No unstocked goods, raw ores, or weapons are purchased or promised.
+  - Buy-back covers items belonging to the sanctum's own stock (`要是從前在我這兒買的器物，用舊了洗乾淨拿回來，我也按成色折算收回喔`). No unstocked goods, raw ores, or weapons are purchased or promised.
 
 ---
 
@@ -79,39 +80,39 @@ This document records the line-by-line editorial and lore verification for the `
 
 ### A. altoria_high_priestess (艾莉安娜‧寒水)
 1. **Opening Greeting**:
-   - Closed lectionary, morning light through high arched windows. Solemn and serene greeting with 「願平安與你同在，旅人」, stating openly that worship, sanctuary, and shop are three open doors under one light.
+   - Closed lectionary, morning light through high windows. Calm and courteous greeting with 「願平安與你同在，旅人」, stating plainly that worship, sanctuary, and shop are three open counters under one roof.
 2. `altoria_temple.topic_01` (keyword: 禮拜, label: 禮拜):
    - **Variant `elf_kin_worship`** (`kind: race_is`, `race_key: elf`, priority 10):
-     - Actor asks about daily lections and whether visitors of different backgrounds share the same ritual.
-     - Host bows in deep reverent respect to the elven visitor, citing the ancient lineage of the goddess given to the Fionnen, and affirms that elves may sit, stroll, or contemplate in peace.
+     - Actor asks about daily lections and whether elven visitors have special rules.
+     - Host bows in polite respect, noting that the Light Goddess is the ancestral deity of the Fionnen elves and temple traditions stem from that heritage. She invites the elf to sit, walk, or contemplate freely, with two complete actor turns.
    - **Fallback `altoria_temple.topic_01_scene`** (unconditional):
-     - Actor asks about rules, schedule, and whether prior registration or lineage verification is required.
-     - Host descends the lection steps, explaining that morning bell and dusk lections are open to all without registration, and one may stay for the sermon, speak privately, or request baptism.
+     - Actor asks about schedule and registration for lections.
+     - Host steps down to the pews, explaining morning bell and sunset lections require no registration or baptism, with two complete conversational beats.
 3. `altoria_temple.topic_02` (keyword: 祝禱, label: 祝禱):
-   - Actor asks about travel blessing fees and donations.
-   - Host shakes her head, stating that the light's blessing takes no coin from travelers. She explains that lingering miasma can be washed away with baptismal holy water kept at the sanctum counter, preserving the separation between free grace and material vessels.
+   - Actor asks about prayer fees for journey safety and cleansing miasma.
+   - Host explains that prayers are completely free of charge at the lectern, while bottled holy water for travel is kept at the deacon's shop counter.
 4. `altoria_temple.topic_03` (keyword: 聖所, label: 聖所):
-   - Actor asks about the sanctum hall and how the devotional services are conducted.
-   - Host turns toward the open colonnade, explaining calmly that the church views bodily intimacy and joy as divine worship. She notes that light magic is used for bodily conditioning and contraception, and confirms the open, continent-wide nature of the ministry.
+   - Actor asks if the sanctuary is beside the hall and about its ministry.
+   - Host explains the sanctuary directly under the same roof, confirming bodily service as worship and light magic for contraception, and points the actor down the hallway to the duty nuns.
 5. `altoria_temple.topic_04` (keyword: 商店, label: 商店):
-   - Actor asks about the goods counter in the church.
-   - Host introduces Deacon Rohaisya Fenwick who manages holy water, ritual vessels, and spiritual instruments, directing purchases to the deacon and welcoming travelers back for prayer.
+   - Actor asks about the goods counter in the church and buying holy water.
+   - Host introduces Deacon Rohaisya Fenwick who handles holy water, ritual vessels, and goods with board prices, and invites travelers back for prayer.
 
 ### B. altoria_sanctum_deacon (羅海西亞‧芬威克)
 1. **Opening Greeting**:
-   - Flips the ledger page with a warm greeting. Asks if items are for personal use or companions, pointing out the clear price tags on the counter board, and offering guidance on sanctuary services.
+   - Flips the ledger page with a light smile and informal zh-TW particles. Asks if items are for personal use or gifts, pointing to price tags on the board.
 2. `altoria_sanctum.topic_01` (keyword: 賣什麼, label: 賣什麼):
-   - Actor asks about the wares and categories available at the counter.
-   - Host categorizes the assortment into wearable charms, intimate crystals, mood bath salts, mists, censers, lubricants, potions, and baptismal holy water, noting fixed board pricing and careful packaging.
+   - Actor asks about available wares and pricing.
+   - Host categorizes the wares on both shelves, lists exact assortment items, and explains fixed board prices across two conversational turns.
 3. `altoria_sanctum.topic_02` (keyword: 聖水, label: 聖水):
-   - Actor asks about how baptismal holy water is used on travel and its cleansing effects.
-   - Host shows the sealed glass vial with the temple's sun wax seal, explaining its light-magic blessing by the High Priestess, instructions on the label, and distinguishing free prayers in the main hall from purchasing bottled holy water.
+   - Actor asks how baptismal holy water is used and kept during travel.
+   - Host shows the bottle, explains how to wipe wrists and forehead, notes that prayers in the hall are free, while bottled water is paid at the counter.
 4. `altoria_sanctum.topic_03` (keyword: 禮器, label: 禮器):
-   - Actor asks about ritual censers and mist ornaments.
-   - Host explains that desire censers and goddess mist serve both church liturgical practice and personal home devotion, with prices fixed on the board and clean buy-back available for used vessels.
+   - Actor asks about ritual censers and mist vessels and recycling old items.
+   - Host explains their use in ceremony and at home, confirms clean buy-back for cash, and keeps dialogue lively and practical.
 5. `altoria_sanctum.topic_04` (keyword: 聖所事務, label: 聖所事務):
-   - Actor asks about arranging sanctuary ministry services.
-   - Host points down the quiet corridor, explaining that visitors meet welcoming nuns in private consultation rooms to agree on timing, rooms, and services by mutual consent, highlighting light-magic conditioning and contraception.
+   - Actor asks how sanctuary service arrangements are made.
+   - Host explains that duty nuns meet guests through the corridor to agree on rooms, times, and services by mutual consent, highlighting light-magic care and contraception.
 
 ---
 
@@ -119,8 +120,8 @@ This document records the line-by-line editorial and lore verification for the `
 
 - **In-Character Only**: No backticks, command tokens (`buy`, `pray`, `talk`), stats, mechanics, or UI hints.
 - **Punctuation & Script**: Full-width Traditional Chinese punctuation throughout. Single space between CJK and ASCII alphanumeric characters.
-- **Prohibited Patterns**: Zero instances of 「您」, sentence-final 「的，」/「的。」, calques (折入, 回填, 落地, 賦能), or banned wuxia terms (過招, 招式, 祕技, 拜師, 功夫, 掌門, 江湖, 客官).
-- **Scene Shapes**: Every scene starts with a complete actor speech line, followed by narration and host responses, within 3–8 lines. No player commitments, vows, payments, or identity assertions.
+- **Prohibited Patterns**: Zero instances of 「您」, sentence-final 「的，」/「的。」, calques (折入, 回填, 落地, 賦能), or banned wuxia terms.
+- **Scene Shapes**: Every scene starts with a natural spoken actor question, includes natural second actor turns, followed by narration and host responses, within 3–8 lines.
 - **Revision Tracking**: All authored scenes declare `revision: r2`.
 - **Validation**:
   - `npc_content_lint.py`: Exit 0 with 0 errors.
