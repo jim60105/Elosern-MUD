@@ -140,7 +140,7 @@ them.
 
 | kind | key | reviewed | greeting | responses | service-semantics | disposition |
 | --- | --- | --- | --- | --- | --- | --- |
-| `dialogue_table` | `guild_staff` | 2026-10-26 | 葛里安‧衛登 sets down the quill and looks up from the heavy register, greeting the adventurer and outlining branch registration, picking contracts from the board, and returning to report | four newly authored scenes cover registering at F rank, taking commissions from the central board, guild neutrality and rank progression across three nations (with an E-rank qualified variant), and the formal turn-in settlement process | preserves the 回報 native service turn-in and summary listing semantics, registration/board/exam authority remain unchanged, and topic_04 serves as the informational fallback | accepted: greeting is the sole source and service semantics hold |
+| `dialogue_table` | `guild_staff` | 2026-10-26 | 葛里安‧衛登 sets down the quill and looks up from the heavy register, greeting the adventurer and outlining branch registration, picking contracts from the board, and returning to report | four newly authored scenes with full two-turn exchanges cover registering at F rank without fees, taking commissions from the central board with safety advice, guild neutrality across three nations with an E-rank senior variant, and the formal turn-in settlement process verifying vouchers and vouchers before payout | preserves the 回報 native service turn-in and summary listing semantics, registration/board/exam authority remain unchanged, and topic_04 serves as the informational fallback | accepted: greeting is the sole source and service semantics hold |
 
 | kind | key | reviewed | card | voice | disposition |
 | --- | --- | --- | --- | --- | --- |
