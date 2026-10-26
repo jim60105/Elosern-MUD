@@ -92,3 +92,18 @@ stable topic IDs and deterministic effects.
 #### Scenario: Invalid content cannot partially replace the snapshot
 - **WHEN** an owned YAML contains duplicate mapping keys, unsafe tags, unknown profile ownership, invalid schema or unresolved declaration references
 - **THEN** validation rejects publication of the complete new snapshot and exposes no partially accepted replacement
+
+### Requirement: upper-civic content has exclusive profile-key YAML ownership
+The owned hosts SHALL obtain their authored topics and greetings from automatically discovered
+`world/lore/dialogue/content/<NpcProfile.key>.yaml` files using the exact canonical bindings in
+design.md. Filenames SHALL derive ownership without duplicate owner fields or manual
+registration. Content replacement SHALL leave canonical profiles read-only and retain existing
+stable topic IDs and deterministic effects.
+
+#### Scenario: Owned files are discovered without registration
+- **WHEN** the exclusively owned files `altoria_noble_watch_captain.yaml`、`altoria_drill_instructor.yaml`、`altoria_academy_dean.yaml` pass the shared static snapshot validation
+- **THEN** their canonical hosts `altoria_noble_watch_captain`、`altoria_drill_instructor`、`altoria_academy_dean` receive the authored greeting and the four baseline topics with original stable topic IDs through normal discovery, with no registration-list or profile edit
+
+#### Scenario: Invalid content cannot partially replace the snapshot
+- **WHEN** an owned YAML contains duplicate mapping keys, unsafe tags, unknown profile ownership, invalid schema or unresolved declaration references
+- **THEN** validation rejects publication of the complete new snapshot and exposes no partially accepted replacement
