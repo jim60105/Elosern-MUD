@@ -38,7 +38,7 @@ SNAPSHOT_PANEL_BYTES = 58_000
 DELTA_PANEL_BYTES = 65_500
 
 #: Participants per fixture case.
-CASES = ("snapshot", "delta", "omit", "nochange")
+CASES = ("snapshot", "delta", "omit", "nochange", "eager")
 
 #: The repeated row marker of each oversized payload, written as a code point
 #: so this test module carries no shipped-content string literal.
@@ -290,6 +290,25 @@ def run(caller: Any, case: str) -> str:
             session, caller, coordinator, {OVERSIZED_PANEL: panel}
         )
         return _report(case, receipt, panel, extra=str(mutated))
+    if case == "eager":
+        # The coordinator's own eager panel set: the exact membership every
+        # complete checkpoint must carry. Reported from the registry, not from
+        # a browser-side list, so the check cannot agree with itself.
+        receipt = coordinator.published_revision
+        names = ",".join(sorted(coordinator.registry.eager_panel_names))
+        return " ".join(
+            (
+                "INCREMENTAL_SYNC",
+                case,
+                str(coordinator.epoch),
+                str(receipt),
+                "unchanged",
+                "0",
+                "2",
+                hashlib.sha256(b"{}").hexdigest(),
+                names,
+            )
+        )
     # "nochange": the coordinator's own render of the committed candidate.
     from web.webclient.presentation.ingress import build_presentation_context
 

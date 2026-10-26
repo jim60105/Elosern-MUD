@@ -125,8 +125,9 @@ _INSTALL_GATE = """() => {
   const root = window.Evennia;
   const original = root.emit;
   const gate = {
-    corruptDeltaBase: null,
+    dropNextDelta: false,
     corruptSnapshotAbove: null,
+    dropped: [],
     corrupted: [],
     received: [],
   };
@@ -140,16 +141,12 @@ _INSTALL_GATE = """() => {
   root.emit = function (name, args, kwargs) {
     if (name === 'ui_snapshot' || name === 'ui_update' || name === 'ui_publication_part') {
       const seen = matches(name, args);
-      if (gate.corruptDeltaBase !== null && name === 'ui_update') {
-        const value = gate.corruptDeltaBase;
-        gate.corruptDeltaBase = null;
-        const broken = {};
-        if (seen.envelope && typeof seen.envelope === 'object') {
-          for (const key of Object.keys(seen.envelope)) { broken[key] = seen.envelope[key]; }
-        }
-        broken.base_revision = value;
-        gate.corrupted.push('ui_update');
-        return original.call(root, name, [broken], kwargs);
+      if (gate.dropNextDelta && name === 'ui_update') {
+        // Withhold exactly one genuine publication: the client never sees it,
+        // and the next publication's baseline exposes the gap.
+        gate.dropNextDelta = false;
+        gate.dropped.push(seen.revision);
+        return undefined;
       }
       if (
         gate.corruptSnapshotAbove !== null &&
@@ -176,6 +173,7 @@ _INSTALL_GATE = """() => {
   };
   window.__syncGateState = function () {
     return {
+      dropped: gate.dropped.slice(),
       corrupted: gate.corrupted.length,
       received: gate.received.slice(),
     };
@@ -206,6 +204,7 @@ _INSTALL_GATE = """() => {
         envelope && typeof envelope === 'object' ? envelope.revision : null,
         result && result.accepted,
         result && result.reason,
+        result && result.pending === true,
       ]);
     }
     return result;
@@ -570,29 +569,70 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
         )
         return envelope
 
-    def _assert_locked_episode(self, page, base: int, panel_names: set) -> None:
+    def _trace_mark(self, page) -> int:
+        """The trace length now: records after it belong to the injected fault."""
+        return page.evaluate("() => window.__syncTrace.records.length")
+
+    def _assert_locked_episode(self, page, base: int, eager: set, trace_mark: int) -> list:
         """Assert the recorded episode kept the prior state and locked mutations.
 
         The subscriber's records are the contract's own read of every
         transition, so the locked window is asserted from them rather than by
-        delaying a live frame.
+        delaying a live frame. The window is scoped to the records after the
+        fault was armed, and the retained panels must be the pre-fault values,
+        not merely the same names.
         """
         episodes = page.evaluate(
-            """() => window.__syncTrace.records.map((record) => [
-                 record.revision,
-                 record.recovery.status,
-                 record.mutationsLocked,
-                 Object.keys(record.panels || {}).sort(),
-               ])"""
+            """([mark]) => {
+              const records = window.__syncTrace.records;
+              return records.slice(mark).map((record, index) => {
+                const previous = records[mark + index - 1] || null;
+                return [
+                  record.revision,
+                  record.recovery.status,
+                  record.mutationsLocked,
+                  Object.keys(record.panels || {}).sort(),
+                  JSON.stringify(record.panels),
+                  previous ? previous.revision : null,
+                  previous ? JSON.stringify(previous.panels) : null,
+                ];
+              });
+            }""",
+            [trace_mark],
         )
-        window = [entry for entry in episodes if entry[1] in ("needed", "requested")]
-        self.assertTrue(window, f"no recovery episode was recorded: {episodes}")
-        for revision, status, locked, names in window:
-            self.assertEqual(revision, base, f"the {status} episode kept the revision")
-            self.assertIs(locked, True, f"the {status} episode locked mutations")
-            self.assertEqual(
-                set(names), panel_names, f"the {status} episode kept the panels"
+        locked = [
+            entry
+            for entry in episodes
+            if entry[1] in ("needed", "requested", "failed")
+        ]
+        self.assertTrue(locked, f"no recovery episode was recorded after the fault: {episodes}")
+        for revision, status, is_locked, names, panels, previous, previous_panels in locked:
+            self.assertGreaterEqual(
+                revision, base, f"the {status} episode sits on the last committed revision"
             )
+            self.assertEqual(
+                revision, previous, f"the {status} episode kept the committed revision"
+            )
+            self.assertIs(is_locked, True, f"the {status} episode locked mutations")
+            self.assertEqual(set(names), eager, f"the {status} episode kept every panel")
+            self.assertEqual(
+                panels,
+                previous_panels,
+                f"the {status} episode retained the committed values",
+            )
+        return episodes
+
+    def _assert_base_mismatch(self, page, trace_mark: int) -> None:
+        """Assert the fault window rejected a delta for an unadopted baseline."""
+        verdicts = page.evaluate("() => window.__syncGateState().received")
+        rejected = [
+            entry
+            for entry in verdicts
+            if entry[0] == UPDATE and entry[2] is False and entry[3] == "base_mismatch"
+        ]
+        self.assertGreaterEqual(
+            len(rejected), 1, f"a delta was rejected for its baseline: {verdicts}"
+        )
 
     def _assert_preserved(self, page, base: int, revision: int, excluded) -> None:
         """Assert every panel the delta did not name kept its committed identity."""
@@ -668,6 +708,8 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
     def test_graphical_and_text_checkpoint_sequence(self):
         """Committed gameplay publishes only its changes; each settlement aligns once."""
         page, frames = self._open()
+        eager = self._eager_panels(page)
+        wait_for_presentation_settled(page)
         base = store_state(page)["revision"]
         epoch = self._committed_epoch(page)
 
@@ -746,7 +788,9 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
         )
         checkpoint = checkpoint_frame["args"][0]
         self.assertEqual(checkpoint["presentation_epoch"], epoch)
-        self.assertEqual(set(checkpoint["panels"]), set(store_state(page)["panels"]))
+        self.assertEqual(
+            set(checkpoint["panels"]), eager, "the checkpoint carries every eager panel"
+        )
         self.assertGreater(
             len(checkpoint["panels"]), len(delta["panels"]), "the checkpoint is complete"
         )
@@ -818,9 +862,11 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
         self.assertLessEqual(crossing_revision, crossed)
         self.assertEqual(crossing_frame["args"][0]["presentation_epoch"], epoch)
         self.assertEqual(
-            set(crossing_frame["args"][0]["panels"]), set(store_state(page)["panels"])
+            set(crossing_frame["args"][0]["panels"]),
+            eager,
+            "the boundary checkpoint carries every eager panel",
         )
-        self.assertGreaterEqual(set(store_state(page)["panels"]), before_panels)
+        self.assertEqual(set(store_state(page)["panels"]), eager)
 
         # -- metadata-only skip control through the real coordinator --------
         match = self._fixture(page, "nochange")
@@ -846,6 +892,11 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
     def test_oversized_snapshot_and_delta_adopt_once(self):
         """Both oversized kinds cross the real socket as bounded parts, once."""
         page, frames = self._open()
+        # The gate is installed without arming a fault: it records the
+        # reducer's own verdict per part frame, which is what proves the
+        # pending parts staged nothing.
+        self._install_gate(page)
+        eager = self._eager_panels(page)
 
         match = self._fixture(page, "snapshot")
         revision = int(match[2])
@@ -856,7 +907,13 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
         wait_for_store_state(page, lambda s: s["revision"] >= revision, timeout=90000)
         wait_for_presentation_settled(page)
         self._assert_part_transfer(
-            page, frames, mark=0, revision=revision, kind="snapshot", base=None
+            page,
+            frames,
+            mark=0,
+            revision=revision,
+            kind="snapshot",
+            base=None,
+            eager=eager,
         )
         self._assert_adopted_panel(page, revision, "lore_codex", payload_bytes, digest)
 
@@ -883,6 +940,7 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
             revision=revision,
             kind="delta",
             base=delta_base,
+            eager=eager,
         )
         self._assert_adopted_panel(page, revision, "lore_codex", payload_bytes, digest)
         state = store_state(page)
@@ -899,6 +957,7 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
         revision: int,
         kind: str,
         base: int | None,
+        eager: set,
     ) -> None:
         """Assert one logical publication crossed as one bounded part transfer."""
         at_revision = _presentation(frames, mark, revision)
@@ -923,6 +982,22 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
         self.assertEqual({part["total_bytes"] for part in parts}, {total})
         if kind == "delta":
             self.assertEqual({part["base_revision"] for part in parts}, {base})
+        # Every part before the last is staged only: the reducer rejects it as
+        # pending, adopts nothing and notifies nobody until the final part
+        # produces the one complete commit.
+        verdicts = [
+            entry
+            for entry in page.evaluate("() => window.__syncGateState().received")
+            if entry[0] == PART and entry[1] == revision
+        ]
+        self.assertEqual(
+            len(verdicts), len(parts), "every part frame reached the reducer"
+        )
+        for _name, _seen, accepted, _reason, pending in verdicts[:-1]:
+            self.assertIs(accepted, False, "a pending part is never adopted")
+            self.assertIs(pending, True, "a non-final part is staged, not committed")
+        self.assertIs(verdicts[-1][2], True, "the final part commits")
+        self.assertIsNot(verdicts[-1][4], True, "the final part is not pending")
         for frame, part in zip(at_revision, parts):
             self.assertLessEqual(
                 len(frame["text"].encode("utf-8")),
@@ -933,6 +1008,18 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
         self.assertEqual(
             self._commits(page, revision), 1,
             "the transfer adopts exactly once",
+        )
+        committed_names = page.evaluate(
+            """([revision]) => {
+              const records = window.__syncTrace.records.filter(
+                (record) => record.revision === revision);
+              if (records.length === 0) { return null; }
+              return Object.keys(records[records.length - 1].panels || {}).sort();
+            }""",
+            [revision],
+        )
+        self.assertEqual(
+            set(committed_names), eager, "the adopted state carries every eager panel"
         )
 
     def _assert_adopted_panel(
@@ -989,20 +1076,36 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
         """One withheld publication costs exactly one bounded repair."""
         page, frames = self._open()
         self._install_gate(page)
+        eager = self._eager_panels(page)
+        wait_for_presentation_settled(page)
         base = store_state(page)["revision"]
         before = store_state(page)
         sent_mark = len(outbound_messages(page))
+        trace_mark = self._trace_mark(page)
 
-        # One genuine delta arrives with a baseline this client never
-        # committed: the transport fault that stands for a publication this
-        # client missed. The locked window is read from the subscriber's own
-        # records, so no frame is delayed and the live sequence keeps its
-        # ordering.
-        self._arm_gate(page, corruptDeltaBase=base - 1)
-        activate_first_compass_exit(page)
+        # Withhold exactly one genuine publication before the reducer sees it.
+        # The next real publication then arrives with a baseline this client
+        # never committed, which is the missed-publication condition; the
+        # locked window is read from the subscriber's own records, so no frame
+        # is delayed and the live sequence keeps its ordering.
+        self._arm_gate(page, dropNextDelta=True)
+        match = self._fixture(page, "delta")
+        withheld = int(match[2])
         page.wait_for_function(
-            "() => window.__syncGateState().corrupted === 1", timeout=60000
+            "() => window.__syncGateState().dropped.length === 1", timeout=60000
         )
+        withheld_revisions = page.evaluate(
+            "() => window.__syncGateState().dropped"
+        )
+        self.assertEqual(
+            len(withheld_revisions), 1, "exactly one genuine publication was withheld"
+        )
+        self.assertGreaterEqual(
+            withheld_revisions[0],
+            withheld,
+            "the withheld publication belongs to the fault window",
+        )
+        self.assertGreater(withheld, base)
         # The episode is transient by design (the repair lands immediately), so
         # the locked window and the single request are read from the
         # subscriber's recorded transitions and the outbound recorder.
@@ -1013,7 +1116,8 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
             and _unlocked(s),
             timeout=60000,
         )
-        self._assert_locked_episode(page, base, set(before["panels"]))
+        self._assert_locked_episode(page, base, eager, trace_mark)
+        self._assert_base_mismatch(page, trace_mark)
         self.assertEqual(
             self._syncs_since(page, sent_mark),
             1,
@@ -1029,11 +1133,18 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
             1,
             "the repair never repeats",
         )
+        self.assertEqual(
+            self._actions_since(page, sent_mark),
+            0,
+            "no mutation is replayed for the episode",
+        )
+        self.assertEqual(set(repaired["panels"]), eager, "the repair is complete")
 
         # A test-scope publication changes a canonical field but omits its
-        # owning panel; only the next real checkpoint restores it. The
-        # publication is identified by the receipt's own revision, so a later
-        # legitimate re-render cannot mask what it carried.
+        # owning panel. The omission is proven at the receipt's own revision,
+        # and the attributing repair is the *next complete checkpoint*: its
+        # own committed record must carry the mutated value, so the repair can
+        # never be credited to the omitting delta.
         stale_hp = _hp_trait(store_state(page))
         mark = len(frames)
         match = self._fixture(page, "omit")
@@ -1057,15 +1168,49 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
             "the committed panel stayed stale at the omitting revision: "
             f"gate={page.evaluate('() => window.__syncGateState()')}",
         )
+        # The player's explicit synchronize is the next real semantic
+        # checkpoint. It is verified independently: its own committed record
+        # must carry the canonical value and the registry's whole eager set.
         page.evaluate("() => Elosern.actions.client.sync()")
         wait_for_store_state(page, lambda s: s["revision"] > omit_revision, timeout=90000)
         wait_for_presentation_settled(page)
-        restored = store_state(page)
+        checkpoints = [
+            frame
+            for frame in _presentation(frames, mark)
+            if frame["name"] == SNAPSHOT and (_revision_of(frame) or 0) > omit_revision
+        ]
+        self.assertTrue(checkpoints, "no complete checkpoint followed the omission")
+        restoring = checkpoints[0]
+        restoring_revision = _revision_of(restoring)
+        # The first publication that re-renders the owning panel after the
+        # omission must carry the canonical value: the stale baseline is never
+        # reused, whichever real publication restores it.
+        rerenders = [
+            frame
+            for frame in _presentation(frames, mark)
+            if (_revision_of(frame) or 0) > omit_revision
+            and "character" in (((frame["args"] or [{}])[0] or {}).get("panels") or {})
+        ]
+        self.assertTrue(rerenders, "the omitted panel was never re-rendered")
         self.assertEqual(
-            _hp_trait(restored), mutated_hp,
-            "the fresh checkpoint restored the omitted canonical field",
+            _hp_at(page, _revision_of(rerenders[0])),
+            mutated_hp,
+            "the next fresh render of the panel carries the canonical value",
         )
-        self.assertEqual(restored["recovery"]["status"], "idle")
+        self.assertEqual(
+            set(restoring["args"][0]["panels"]),
+            eager,
+            "the restoring checkpoint is complete",
+        )
+        wait_for_store_state(
+            page, lambda s: s["revision"] >= restoring_revision, timeout=30000
+        )
+        self.assertEqual(
+            _hp_at(page, restoring_revision),
+            mutated_hp,
+            "the checkpoint's own committed record restored the omitted field",
+        )
+        self.assertEqual(store_state(page)["recovery"]["status"], "idle")
 
     # -- 4. failed repair, explicit recovery and local state ----------------
 
@@ -1083,22 +1228,35 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
         """A failed repair stays bounded and usable; valid local state survives."""
         page, frames = self._open()
         self._install_gate(page)
+        eager = self._eager_panels(page)
+        wait_for_presentation_settled(page)
         base = store_state(page)["revision"]
         before = store_state(page)
         sent_mark = len(outbound_messages(page))
+        trace_mark = self._trace_mark(page)
 
-        # The one automatic repair is delivered corrupted: the episode becomes
-        # terminal instead of requesting again.
-        self._arm_gate(page, corruptDeltaBase=base - 1, corruptSnapshotAbove=base)
-        activate_first_compass_exit(page)
+        # Withhold one genuine publication, then corrupt the single automatic
+        # repair: the episode becomes terminal instead of requesting again.
+        self._arm_gate(page, dropNextDelta=True, corruptSnapshotAbove=base)
+        self._fixture(page, "delta")
+        page.wait_for_function(
+            "() => window.__syncGateState().dropped.length === 1", timeout=60000
+        )
         wait_for_store_state(
             page, lambda s: s.get("recovery", {}).get("status") == "failed", timeout=60000
         )
-        wait_for_store_state(page, lambda s: s["revision"] == base, timeout=5000)
         failed = store_state(page)
         self.assertEqual(failed["recovery"]["status"], "failed")
         self.assertIs(failed["mutationsLocked"], True, "graphical mutations stay locked")
-        self.assertEqual(failed["panels"], before["panels"], "nothing is erased")
+        self.assertEqual(set(failed["panels"]), eager, "nothing is erased")
+        episodes = self._assert_locked_episode(page, base, eager, trace_mark)
+        self._assert_base_mismatch(page, trace_mark)
+        self.assertEqual(
+            [entry[1] for entry in episodes].count("failed"),
+            1,
+            "exactly one transition into the terminal episode",
+        )
+        locked_revision = failed["revision"]
         self.assertEqual(
             self._syncs_since(page, sent_mark),
             1,
@@ -1110,17 +1268,26 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
             1,
             "no synchronization loop follows the terminal episode",
         )
-        before_narrative = narrative_log_text(page)
-        self._send_text(page, "look")
-        wait_for_store_state(
-            page,
-            lambda s: s["revision"] == base,
-            timeout=5000,
+        self.assertEqual(
+            self._actions_since(page, sent_mark),
+            0,
+            "no mutation is replayed for the failed episode",
         )
-        page.wait_for_timeout(1200)
+        before_output = self._out_lines(page)
+        self._send_text(page, "look")
+        page.wait_for_function(
+            "(before) => window.__elosernBridge.store.narrative.filter("
+            "(line) => line && line.kind === 'out').length > before",
+            arg=before_output,
+            timeout=30000,
+        )
         self.assertGreater(
-            len(narrative_log_text(page)), len(before_narrative),
-            "text input and output still work",
+            self._out_lines(page),
+            before_output,
+            "the server still answers text while the episode is terminal",
+        )
+        self.assertEqual(
+            store_state(page)["revision"], locked_revision, "text consumes no revision"
         )
 
         # The player's explicit synchronize spends the one further attempt.
@@ -1131,7 +1298,7 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
         self.assertEqual(recovered["recovery"]["status"], "idle")
         self.assertGreater(recovered["revision"], base)
         self.assertEqual(recovered["epoch"], before["epoch"], "same live epoch")
-        self.assertEqual(set(recovered["panels"]), set(before["panels"]))
+        self.assertEqual(set(recovered["panels"]), eager)
 
         # -- valid local UI state survives a same-mode checkpoint -----------
         open_command_line(page)
@@ -1238,6 +1405,40 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
                 for name, _args, _kwargs in outbound_messages(page)[mark:]
                 if name == "ui_sync"
             ]
+        )
+
+    @staticmethod
+    def _actions_since(page, mark: int) -> int:
+        """How many mutation requests left the client after ``mark``."""
+        return len(
+            [
+                name
+                for name, _args, _kwargs in outbound_messages(page)[mark:]
+                if name == "ui_action"
+            ]
+        )
+
+    def _eager_panels(self, page) -> set:
+        """The coordinator's own eager panel set, reported by the fixture."""
+        match = self._fixture(page, "eager")
+        names = match[7]
+        self.assertNotEqual(names, "-", "the fixture reported no eager panel set")
+        return set(names.split(","))
+
+    @staticmethod
+    def _out_lines(page) -> int:
+        """How many server-output narrative lines the log holds.
+
+        Only ``out`` lines count: the client appends the player's own ``in``
+        echo synchronously, so a length check could pass without the server
+        ever answering.
+        """
+        return page.evaluate(
+            """() => {
+              const lines = window.__elosernBridge.store.narrative;
+              if (!Array.isArray(lines)) { return 0; }
+              return lines.filter((line) => line && line.kind === 'out').length;
+            }"""
         )
 
 
