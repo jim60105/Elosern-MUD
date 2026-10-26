@@ -477,7 +477,7 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
     )
     @covers_requirement(
         "webclient-publication-settlements::"
-        "one-committed-operation-publishes-one-final-publication"
+        "every-watcher-receives-one-final-checkpoint-publication-per-committed-group"
     )
     @covers_requirement(
         "webclient-immutable-presentation::"
