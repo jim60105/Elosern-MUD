@@ -2,7 +2,7 @@
 
 ## Context
 
-The service owns guarded manual writes and history. External OMP writes the same files but is started/stopped outside the editor; filesystem silence cannot establish process state.
+The service owns guarded manual writes and history. External OMP writes the same files but is started/stopped outside the editor; filesystem silence cannot establish process state. The approved frontend design (`docs/superpowers/specs/2026-10-26-map-editor-frontend-design.md` D3, §1.1) removes the explicit handoff: manual and AI editing alternate routinely, the operator knows when OMP was asked to act, and the document fingerprint guard is the only overwrite protection.
 
 Observed repository evidence came from root-correct CodeGraph queries and current main/active specs, not an archive-only contract. See proposal.md for authorization and scope.
 
@@ -12,19 +12,25 @@ Deliver this prerequisite-bounded slice completely. Preserve the architectural D
 
 ## Decisions
 
-Use service states inspection, manual, handoff_pending, external, return_pending and paused. Every source/layout/history/generated-output mutation route checks service session/turn/state; UI disabled controls are additional presentation only. Startup/reconnect/restart inspect fresh disk and require explicit manual resume. A service restart creates a new session generation and rejects old tabs/requests. Never restore mutation permission or replay accepted/pending commands from browser storage.
+There is no turn state machine, ownership state, handoff, external turn or return action, and no resume/handoff/return route. The service has two orthogonal conditions besides normal operation: a write pause and a stale preview. Every source/layout/history/generated-output mutation route checks the launch token, session generation, write pause, stale preview and the target document's expected fingerprint; the frontend does not pre-disable controls per state (design D4) and shows the service rejection in the priority banner.
 
-Handoff resolves current drafts by explicit confirm/cancel, closes admission, drains already-admitted saves and flushes before granting external ownership. Failure retains a visible failed/paused manual recovery state and never grants the external turn. History clears at successful handoff. During external turn keep browsing/search/select/inspect/context-copy/viewport/layers useful. Return requires the user to confirm the external writer stopped, rereads actual disk and applies authoring-load gate; it never serializes the pre-AI snapshot. Loadable semantic WIP can resume repair, structural failure stays read-only for external repair.
+watchfiles watches the source, layout and artifact roots for create/replace/rename/delete, including newly created documents and layouts. Coalesce briefly, read a coherent candidate and publish only on authoring-load success; a debounce is no multi-file transaction.
 
-watchfiles watches directories for create/replace/rename/delete, including newly created documents and layouts. Coalesce briefly, read a coherent candidate and publish only on authoring success; a debounce is no multi-file transaction. Keep the previous preview and view on malformed candidates, label its inspector as stale and expose source file/field/line. With no prior preview show unavailable, never a valid-looking empty world. External index changes invalidate external-check status too. Unexpected manual-mode file changes immediately pause new writes; require explicit reload acknowledging draft/history discard, without merge/diff/replay. Preserve current map/viewport/selection by qualified identity on valid external reload; clear deleted selections with an explanation.
+Treat a directory notification as the service's own output only when freshly read presence/content matches the writer's committed fingerprint ledger, including expected absence after removal. Reconcile delayed/coalesced notifications against current disk and the latest committed state; never suppress an event just because its path was recently saved. Own notifications keep undo history.
 
-Treat a directory notification as expected service output only when freshly read presence/content matches the writer's committed fingerprint ledger, including expected absence after removal. Reconcile delayed/coalesced notifications against current disk and the latest committed state; never suppress an event just because its path was recently saved. Expected service notifications retain manual ownership and undo history. A differing external fingerprint pauses writes even when it immediately follows a service save at the same path. Test two ordinary saves with real delayed watcher delivery, then a real external replacement at that path.
+A differing external fingerprint whose candidate loads is adopted automatically as the new snapshot: clear the undo/redo history (it covers only the uninterrupted manual segment since the last adopted external change), preserve current map/viewport/selection by qualified identity and clear deleted selections with an explanation. Semantic work-in-progress simply loads with its diagnostics. If the client holds an uncommitted field draft, it does not adopt silently: it shows the "file changed externally" banner naming the document and the draft/history that will be discarded, and adopts only on the explicit 載入新版 action. A draft submitted against the old snapshot is rejected by the fingerprint guard.
+
+A candidate that does not load keeps the previous preview and view, labels the snapshot and its inspector as stale, exposes source file/field/line and rejects world-data and layout writes until a loadable candidate is adopted; recovery is automatic on the next loadable change, never a rewrite of external files. With no prior preview show unavailable, never a valid-looking empty world. External index changes invalidate external-check status too.
+
+A service start or restart creates a new session generation and invalidates the launch token; a tab from an old session is rejected and must reconnect and reread before any write. Startup reads current disk and is immediately writable when the world loads. Uncertain post-replacement durability sets the write pause until an explicit reread. Never restore write permission or replay accepted/pending commands from browser storage.
+
+The remaining race is documented, not hidden: if OMP and the editor write the same document within one settle interval, the guard rejects the editor's write and the editor reloads; the operator is responsible for not editing in both places at once. The editor never labels OMP as running or finished.
 
 Observe the external context source closure as invalidation input where available, and independently refresh its full membership/hash evidence before every destructive command. An unchanged exported index file alone cannot establish freshness.
 
 ### Exact implementation ownership
 
-elosern_map_editor session state machine/watch coordinator/SSE; frontend connection/preview/turn state and handoff dialogs; all mutation guards; independent real-filesystem tests
+elosern_map_editor watch coordinator/write-pause state/SSE; frontend connection/preview state, priority banner conditions and draft-held adoption; all mutation guards; independent real-filesystem tests
 
 Use worker-contract.md for fixed producer/consumer interfaces and command ordering. All paths not present today are proposed additions, not observed implementations. No open product decisions are delegated to the implementation worker.
 
@@ -32,17 +38,16 @@ Use worker-contract.md for fixed producer/consumer interfaces and command orderi
 
 | Requirement | Discoverable test owners | Observable defect/effect |
 | --- | --- | --- |
-| Handoff grants one cooperative writer after persistence | tests/test_map_editor_turns.py, test_map_editor_watching.py (new discoverable wrappers); standalone service tests; focused standalone browser recovery class | Flush failure and all negative scenarios in its delta |
-| External return adopts loadable disk state without rewriting history | tests/test_map_editor_turns.py, test_map_editor_watching.py (new discoverable wrappers); standalone service tests; focused standalone browser recovery class | Semantic repair and all negative scenarios in its delta |
-| Watching and reconnect retain truthful preview state | tests/test_map_editor_turns.py, test_map_editor_watching.py (new discoverable wrappers); standalone service tests; focused standalone browser recovery class | Real filesystem replacement and all negative scenarios in its delta |
+| External changes are followed without overwriting them | tests/test_map_editor_file_following.py, test_map_editor_watching.py (new discoverable wrappers); standalone service tests; focused standalone browser recovery class | Loadable external change and all negative scenarios in its delta |
+| Watching and reconnect retain truthful preview state | tests/test_map_editor_file_following.py, test_map_editor_watching.py (new discoverable wrappers); standalone service tests; focused standalone browser recovery class | Real filesystem replacement and all negative scenarios in its delta |
 
 Each row must become substantive discoverable tests. For pure refactors and data conversions, preserve behavior claims already established and add only mechanism evidence warranted by the new boundary. Human interpretation of names/prose/visual fidelity stays in `docs/design/map-editor-review.md`. Temporary conversion comparison establishes no incidental geography/prose change; do not retain a second approval corpus.
 
 ## Risks / Trade-offs
 
-Sequence after writer integration. Generation later adds a state guard to this same state machine; no second watcher, session owner or merge protocol.
+Sequence after writer integration. Generation later adds its mutation guard beside this write-pause state; no second watcher, session owner, turn state machine or merge protocol.
 
-Independent environments and immutable snapshots require explicit adapters. Keep a failed candidate out of published state and test the prior baseline. One-document atomic replacement avoids claiming multi-file filesystem transactions; cooperative turn-taking deliberately excludes concurrent writers and automatic merge/retry.
+Independent environments and immutable snapshots require explicit adapters. Keep a failed candidate out of published state and test the prior baseline. One-document atomic replacement avoids claiming multi-file filesystem transactions; continuous file following with the fingerprint guard deliberately excludes concurrent-writer merging and automatic retry.
 
 ## Migration Plan
 
@@ -50,7 +55,7 @@ Pre-release clean cutover only. Complete producer and every consumer in this cha
 
 ## Focused implementation checks
 
-tests/test_map_editor_turns.py, test_map_editor_watching.py (new discoverable wrappers); standalone service tests; focused standalone browser recovery class
+tests/test_map_editor_file_following.py, test_map_editor_watching.py (new discoverable wrappers); standalone service tests; focused standalone browser recovery class
 
 Select the smallest corresponding package/component/test class at apply time using existing project commands. Core/service package checks use their own uv project locks; game checks use root uv and the guarded test settings. Real browser checks use a standalone service rather than the game fixture. Run the contract gate once after all slice edits land. These are future checks, not evidence that implementation exists now.
 

@@ -16,7 +16,7 @@ Implement domain modules and named one-document commands for all continent suppo
 
 Locations support create/select/name/description/kind/place/inspect/search even with no local map. IDs are generated/new and confirmed against schema; established IDs cannot be renamed. Navigate to local maps only when settlement location_ref derives one; otherwise show absence. Creating a location and its map are separate completed commands. District editor supports all names/kinds/region membership/stable landmark selectors and WIP reachability diagnostics. Footprint cell-paint/mask controls and an explicit per-cell alternative write only the owning settlement; binding inspector/editor labels local/world anchors without assigning interior metres. All changes route through guarded writer; cross-document cascades remain excluded. Deletion follows current map incoming refs plus current external context absence and explains dependents, with no cascade.
 
-An ordinary geography commit marks dependent partition output stale; do not regenerate per pointer move. Keep old output labelled with its input revision. Every continental surface uses read-only behavior in external/paused/generation state and keeps browse/layer/selection/context useful.
+An ordinary geography commit marks dependent partition output stale; do not regenerate per pointer move. Keep old output labelled with its input revision. Continental tools are not pre-disabled per state (frontend design D4): while the service has a write pause, a stale preview or a running generation it rejects the command and the priority banner shows why; browse/layer/selection/context stay available. Screens follow frontend design §4.1: diamond control-point handles distinct from their feature, 隸屬 link, `km 地理` / `1 km 格` labelled fields, the monospace footprint cell-grid control and a derived-results inspector section.
 
 ### Exact implementation ownership
 
@@ -36,7 +36,7 @@ Each row must become substantive discoverable tests. For pure refactors and data
 
 Geography handlers own separate service/frontend modules; footprint writes intentionally share settlement document serialization with settlement tools. No simultaneous same-document command writers.
 
-Independent environments and immutable snapshots require explicit adapters. Keep a failed candidate out of published state and test the prior baseline. One-document atomic replacement avoids claiming multi-file filesystem transactions; cooperative turn-taking deliberately excludes concurrent writers and automatic merge/retry.
+Independent environments and immutable snapshots require explicit adapters. Keep a failed candidate out of published state and test the prior baseline. One-document atomic replacement avoids claiming multi-file filesystem transactions; continuous file following with the fingerprint guard deliberately excludes concurrent-writer merging and automatic retry.
 
 ## Migration Plan
 

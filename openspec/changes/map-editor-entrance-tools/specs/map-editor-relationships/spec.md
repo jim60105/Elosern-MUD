@@ -26,7 +26,7 @@ Object deletion SHALL require no map-internal incoming references and current ex
 
 #### Scenario: Unavailable context
 - **WHEN** the index is missing, stale or incompatible
-- **THEN** deletion is disabled with a reason while non-destructive inspection/placement/property edits remain possible
+- **THEN** deletion is refused with that reason shown at the delete action while non-destructive inspection/placement/property edits remain possible
 
 #### Scenario: Freshness is checked at execution
 - **WHEN** an external source changes after inspection but before a delete or object-removing undo executes

@@ -2,7 +2,7 @@
 
 ## Context
 
-The independent browser and service state exist. The companion frontend brief fixes information/actions/state and accessibility acceptance, while leaving panel arrangement/theme to a subsequent specialist.
+The independent browser and service state exist. The companion frontend brief fixes information/actions/state and accessibility acceptance; the approved frontend design fixes panel arrangement, theme, state presentation and the keyboard contract.
 
 Observed repository evidence came from root-correct CodeGraph queries and current main/active specs, not an archive-only contract. See proposal.md for authorization and scope.
 
@@ -12,17 +12,19 @@ Deliver this prerequisite-bounded slice completely. Preserve the architectural D
 
 ## Decisions
 
-At apply time first commission a frontend/UX visual specialist using the complete companion brief and these concrete service contracts. Deliver annotated continental/settlement/interior and cross-layer designs, content hierarchy/navigation model, component/state specifications, focus/keyboard behavior, all failure states, primary 1280x800/1920x1080 and compact 960x720 layouts, and 200% zoom disclosure. Record decisions and acceptance-scenario mapping in docs/design/map-editor-review.md. This is a mandatory specialist deliverable, not authorization to remove functional tools. Tone, wording quality and visual polish/fidelity are human-reviewed in that document, never requirements established by snapshot/copy/count pins. The current user request authorizes proposals only; it does not declare this specialist work or implementation approved/completed.
+Implement the approved frontend specialist deliverable, `docs/superpowers/specs/2026-10-26-map-editor-frontend-design.md`, with the `docs/design/map-editor/` Storybook prototype (`Design/MapEditor`) as the visual reference. The specialist design is complete and approved; this slice does not commission another one. Record the per-scenario fidelity check in `docs/design/map-editor-review.md` (one row per design §8 scenario with its disposition). Tone, wording quality and visual polish are human-reviewed there, never requirements established by snapshot/copy/count pins.
 
-Implement shared workspace chrome against service snapshots without choosing a competing domain schema. Provide workspace identity, connection/current turn, draft/in-flight/saved/failed/uncertain state and persistent preview/currentness/index/partition status before a preview can be mistaken for saved. Add domain/map navigation, location-to-map and return context, source owner, search disambiguation with parent/source, readable/copyable IDs and paths. Selection supports none/single/multi and a keyboard/text list alternative; mixed/cross-owner selections inspect but cannot batch mutate.
+Layout and visual language follow design §2-§3: the three-column workbench (navigation, canvas, inspector) with the diagnostics strip, the map-drawer-style header with domain pill tabs on keys 1/2/3, the game's ink-night tokens, serif gold headings, gold focus and seal red reserved for errors. Use only the allowlisted game tokens/fonts/ui-scale (map-editor-standalone-service). Support 1451x790 and 2560x1440 with the game's `--ui-scale` and 16 px floor; at 200 % zoom or when both side columns cannot fit, the columns become header-toggled drawers.
 
-Diagnostics distinguish structure, semantic WIP, invalid/unavailable external context, stale partition and service/save failure. Locate target objects and reveal/offer hidden layers; source-only parse errors show file/line without a source editor. List incoming/outgoing relationships. Copy OMP context is plain text containing relative paths, domain/map/qualified IDs, units/currentness, ownership and save-before/stop-before-return agreement. It leaks no token/credential/history and starts no task. No selection-file or AI-control protocol.
+Implement shared workspace chrome against service snapshots without choosing a competing domain schema. Workspace state is the four header status chips (save, file sync, index, partition; design §5.1) plus one priority banner showing the single highest-priority condition with its one action (design §5.2: disconnected, save failed/uncertain, external change held by a draft, stale preview). There is no turn, ownership or handoff indicator (design D3). The frontend does not pre-disable controls per state (design D4); service rejections appear in the banner slot. Add domain/map navigation, location-to-map and return context (breadcrumb return button and Alt+←), source owner, search disambiguation with parent/source, readable/copyable IDs and paths. Selection supports none/single/multi and the object list as the keyboard/text alternative; mixed/cross-owner selections inspect/copy only, with the reason shown in place of mutation actions.
 
-Use Traditional Chinese interface copy, English IDs and technical units. Desktop Chromium/Firefox, mouse/keyboard, WCAG 2.2 AA, visible focus, non-color distinctions and drag alternatives are required. Scope platform-aware save/undo/redo/Escape shortcuts outside text input; input undo/delete stays local. Field failures restore field focus, closing a dialog restores its trigger, and diagnostics/cross-map navigation retains return context. Confirm only meaningful destructive transitions; disabled actions expose reasons. No game shell styles, chat/source/model/Git/diff/live-state surfaces.
+Diagnostics distinguish structure, semantic WIP, invalid/unavailable external context, stale partition and service/save failure. Locate target objects and offer 顯示圖層並前往 for hidden layers; source-only parse errors show file/line without a source editor. List incoming/outgoing relationships. Copy OMP context is plain text containing relative paths, domain/map/qualified IDs, coordinate frames/units and whether it came from current files or a stale preview. It states no turn ownership or handoff agreement, leaks no token/credential/history and starts no task. No selection-file or AI-control protocol.
+
+Use Traditional Chinese interface copy, English IDs and technical units. Desktop Chromium/Firefox, mouse/keyboard, WCAG 2.2 AA, visible focus, non-color distinctions and drag alternatives are required. Implement the keyboard contract of design §6: F6 region cycling, 1/2/3 domains, tool keys, canvas arrow-key object walking with Enter into the inspector, Shift+arrow nudging, platform-aware undo/redo, Ctrl/⌘+C context copy, Delete, ordered Escape cancellation, Alt+← return and / or Ctrl/⌘+K search. Single-key shortcuts never act in text inputs, selectors or IME composition; input undo/delete stays local. Field failures keep field focus, closing a drawer or selector restores its trigger, and diagnostics/cross-map navigation keeps return context. No editor operation uses a confirmation dialog (design §5.4). No game shell styles, chat/source/model/Git/diff/live-state surfaces.
 
 ### Exact implementation ownership
 
-editor frontend workspace/navigation/inspection/diagnostics/clipboard/focus modules; docs/design/map-editor-review.md (future specialist deliverable); no game shell imports
+editor frontend workspace/navigation/inspection/diagnostics/clipboard/focus modules; docs/design/map-editor-review.md (per-scenario fidelity review of the approved design); no game shell imports
 
 Use worker-contract.md for fixed producer/consumer interfaces and command ordering. All paths not present today are proposed additions, not observed implementations. No open product decisions are delegated to the implementation worker.
 
@@ -30,17 +32,17 @@ Use worker-contract.md for fixed producer/consumer interfaces and command orderi
 
 | Requirement | Discoverable test owners | Observable defect/effect |
 | --- | --- | --- |
-| Workspace navigation and diagnostics identify source context | editor frontend tests for workspace/search/diagnostics/context/focus; proposed web/tests/browser/test_map_editor_accessibility.py for real keyboard/compact/zoom behavior and traceability | Duplicate name and hidden target and all negative scenarios in its delta |
-| Selection context is a copy-only external bridge | editor frontend tests for workspace/search/diagnostics/context/focus; proposed web/tests/browser/test_map_editor_accessibility.py for real keyboard/compact/zoom behavior and traceability | Stale multi-selection and all negative scenarios in its delta |
-| Essential workspace operations have keyboard and reflow access | editor frontend tests for workspace/search/diagnostics/context/focus; proposed web/tests/browser/test_map_editor_accessibility.py for real keyboard/compact/zoom behavior and traceability | Keyboard and focus and all negative scenarios in its delta |
+| Workspace navigation and diagnostics identify source context | editor frontend tests for workspace/search/diagnostics/context/focus; proposed web/tests/browser/test_map_editor_accessibility.py for real keyboard/viewport/zoom behavior and traceability | Duplicate name and hidden target and all negative scenarios in its delta |
+| Selection context is a copy-only external bridge | editor frontend tests for workspace/search/diagnostics/context/focus; proposed web/tests/browser/test_map_editor_accessibility.py for real keyboard/viewport/zoom behavior and traceability | Stale multi-selection and all negative scenarios in its delta |
+| Essential workspace operations have keyboard and reflow access | editor frontend tests for workspace/search/diagnostics/context/focus; proposed web/tests/browser/test_map_editor_accessibility.py for real keyboard/viewport/zoom behavior and traceability | Keyboard and focus and all negative scenarios in its delta |
 
 Each row must become substantive discoverable tests. For pure refactors and data conversions, preserve behavior claims already established and add only mechanism evidence warranted by the new boundary. Human interpretation of names/prose/visual fidelity stays in `docs/design/map-editor-review.md`. Temporary conversion comparison establishes no incidental geography/prose change; do not retain a second approval corpus.
 
 ## Risks / Trade-offs
 
-Frontend shell/focus modules are shared with domain editors; keep commands/tools in domain-owned modules. The visual specialist is an apply-time deliverable and never replaces any approved functional requirement.
+Frontend shell/focus modules are shared with domain editors; keep commands/tools in domain-owned modules. The approved frontend design governs layout and states and never replaces any approved functional requirement.
 
-Independent environments and immutable snapshots require explicit adapters. Keep a failed candidate out of published state and test the prior baseline. One-document atomic replacement avoids claiming multi-file filesystem transactions; cooperative turn-taking deliberately excludes concurrent writers and automatic merge/retry.
+Independent environments and immutable snapshots require explicit adapters. Keep a failed candidate out of published state and test the prior baseline. One-document atomic replacement avoids claiming multi-file filesystem transactions; continuous file following with the fingerprint guard deliberately excludes concurrent-writer merging and automatic retry.
 
 ## Migration Plan
 
@@ -48,7 +50,7 @@ Pre-release clean cutover only. Complete producer and every consumer in this cha
 
 ## Focused implementation checks
 
-editor frontend tests for workspace/search/diagnostics/context/focus; proposed web/tests/browser/test_map_editor_accessibility.py for real keyboard/compact/zoom behavior and traceability
+editor frontend tests for workspace/search/diagnostics/context/focus; proposed web/tests/browser/test_map_editor_accessibility.py for real keyboard/viewport/zoom behavior and traceability
 
 Select the smallest corresponding package/component/test class at apply time using existing project commands. Core/service package checks use their own uv project locks; game checks use root uv and the guarded test settings. Real browser checks use a standalone service rather than the game fixture. Run the contract gate once after all slice edits land. These are future checks, not evidence that implementation exists now.
 

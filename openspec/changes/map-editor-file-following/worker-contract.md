@@ -6,12 +6,12 @@ Read [the fixed interfaces and caller cutover checklist](../map-core-sparse-geom
 
 ## This slice
 
-Implement external AI turn-taking, directory watching, stale preview adoption and explicit reconnect/restart recovery.
+Implement continuous workspace file following: directory watching, own-write recognition, automatic adoption of loadable external changes, stale preview retention and reconnect/restart recovery, with no explicit AI handoff.
 
-Implementation owners: elosern_map_editor session state machine/watch coordinator/SSE; frontend connection/preview/turn state and handoff dialogs; all mutation guards; independent real-filesystem tests
+Implementation owners: elosern_map_editor watch coordinator/write-pause state/SSE; frontend connection/preview state, priority banner conditions and draft-held adoption; all mutation guards; independent real-filesystem tests
 
 Prerequisites: map-editor-document-commands.
 
-Required evidence owners: tests/test_map_editor_turns.py, test_map_editor_watching.py (new discoverable wrappers); standalone service tests; focused standalone browser recovery class.
+Required evidence owners: tests/test_map_editor_file_following.py, test_map_editor_watching.py (new discoverable wrappers); standalone service tests; focused standalone browser recovery class.
 
 Use this change's design.md, complete spec deltas and ordered tasks.md for its exact behavior and negative cases. Every test must assert the actual consumer effect or unchanged baseline. The shared contract does not authorize generic file mutation, cross-document cascades, extra product surfaces, implementation during proposal creation or omission of any dependent domain/editor acceptance.

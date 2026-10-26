@@ -221,7 +221,7 @@ The prototype is reference material for visual fidelity and state coverage. It i
 | --- | --- |
 | P11 `map-editor-standalone-service` | Remove the handoff/resume routes. Add the token/font/ui-scale import allowlist and its boundary check. Serve the game fonts locally. |
 | P12 `map-editor-document-commands` | Commands carry expected fingerprint plus snapshot revision; no turn generation. Undo history resets on adopted external change. |
-| P13 `map-editor-turn-recovery` | Replace the turn state machine with continuous file following and own-write recognition (§1.1). Rename the capability accordingly. |
+| P13 `map-editor-file-following` (renamed from `map-editor-turn-recovery`) | Replace the turn state machine with continuous file following and own-write recognition (§1.1); capability renamed to `map-editor-file-following`. |
 | P14 `map-editor-interaction-shell` | Implement this layout, chips, banner, diagnostics, keyboard contract, and copied context. Cite this document and the prototype as the specialist deliverable. |
 | P15–P18 domain tools | Adopt the domain screens of §4 and the inline delete refusal; no per-state control disabling. |
 | P19 `map-editor-partition-jobs` | Drop the "block AI handoff" clause; keep blocking mutations and invalidation. |

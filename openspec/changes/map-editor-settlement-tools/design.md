@@ -16,7 +16,7 @@ Provide creation of a settlement document for an existing location using core sc
 
 Implement directed road create/edit/delete with source/destination qualified node selectors, authored compass direction and optional bends, and explicit bidirectional creation changing both ordered entries in one document/command. Two directed meanings remain separately inspectable. Dragging endpoints never recomputes stored directions. Bend-point add/remove/move and numeric alternatives use integer metres. Length and route validation come from the core, never canvas measurements.
 
-Single-document multi-node movement is one completed autosaved/undoable command; selection can be made with a list and no box gesture. Cross-document selection may inspect/copy but cannot mutate, with a reason. Invalid duplicate ID/coordinate/outgoing-direction or unknown endpoint blocks writes; loadable unfinished connectivity stays saveable WIP. Deletion requires explicit removal of internal refs and current-context no external incoming refs, without cascades. Support external/read-only/stale/error states and keyboard focus from the interaction shell.
+Single-document multi-node movement is one completed autosaved/undoable command; selection can be made with a list and no box gesture. Cross-document selection may inspect/copy but cannot mutate, with a reason. Invalid duplicate ID/coordinate/outgoing-direction or unknown endpoint blocks writes; loadable unfinished connectivity stays saveable WIP. Deletion requires explicit removal of internal refs and current-context no external incoming refs, without cascades. Use the interaction shell's chips, banner and keyboard focus; tools are not pre-disabled per state and service rejections appear in the banner. Screens follow frontend design §4.2: directed road rows with core lengths, separate incoming rows, the road tool's explicit 建立雙向 option and bend handles with numeric rows.
 
 ### Exact implementation ownership
 
@@ -36,7 +36,7 @@ Each row must become substantive discoverable tests. For pure refactors and data
 
 Settlement command module is separate from geography/interior modules, but footprint and cross-layer relationships use the same serialized owning-document writer. Domain slices may proceed after the shared shell without duplicated interaction state.
 
-Independent environments and immutable snapshots require explicit adapters. Keep a failed candidate out of published state and test the prior baseline. One-document atomic replacement avoids claiming multi-file filesystem transactions; cooperative turn-taking deliberately excludes concurrent writers and automatic merge/retry.
+Independent environments and immutable snapshots require explicit adapters. Keep a failed candidate out of published state and test the prior baseline. One-document atomic replacement avoids claiming multi-file filesystem transactions; continuous file following with the fingerprint guard deliberately excludes concurrent-writer merging and automatic retry.
 
 ## Migration Plan
 

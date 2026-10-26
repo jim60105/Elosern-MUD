@@ -14,7 +14,7 @@ Deliver this prerequisite-bounded slice completely. Preserve the architectural D
 
 Implement interior document/room creation, duplication, deletion, name/description/scene/art controls and directed named internal connections. No shop/NPC/service record is required. Existing service-room joins are inspectable read-only identity context; host/goods authoring stays excluded. Duplication assigns new IDs without retargeting incoming references. Use core schema/reference diagnostics and current external context deletion guards.
 
-Show a coordinate-free graph with automatic initial layout for new rooms and presentation-only editor layout positions. Reuse existing layout command/history path, extending explicit layout numeric controls labelled editor-only rather than world east/north metres or distances. A create-room command writes only its interior source document; absent layout uses deterministic presentation placement until a later distinct layout command. No two-file creation transaction or layout field in RuntimeMapSnapshot. Named connections expose source/destination/direction labels with keyboard selectors, and no computed physical route length. Exterior entrances are added by the separate relationship slice; this slice must not duplicate their state or author mirrored records.
+Show a coordinate-free graph with automatic initial layout for new rooms and presentation-only editor layout positions. Reuse existing layout command/history path, extending explicit layout numeric controls labelled editor-only rather than world east/north metres or distances. A create-room command writes only its interior source document; absent layout uses deterministic presentation placement until a later distinct layout command. No two-file creation transaction or layout field in RuntimeMapSnapshot. Named connections expose source/destination/direction labels with keyboard selectors, and no computed physical route length. Exterior entrances are added by the separate relationship slice; this slice must not duplicate their state or author mirrored records. Screens follow frontend design §4.3: room cards on a plain canvas without dot field or scale, the fixed 版面僅供編輯器使用 · 不代表距離或座標 note, ⇄/單向 connection labels and the layout file named in the diagnostics strip after a layout save.
 
 ### Exact implementation ownership
 
@@ -34,7 +34,7 @@ Each row must become substantive discoverable tests. For pure refactors and data
 
 Reuses the initial layout handler rather than replacing it. Serialize shared schema/selector components through interaction shell; no source conflict with separately owned settlement handler.
 
-Independent environments and immutable snapshots require explicit adapters. Keep a failed candidate out of published state and test the prior baseline. One-document atomic replacement avoids claiming multi-file filesystem transactions; cooperative turn-taking deliberately excludes concurrent writers and automatic merge/retry.
+Independent environments and immutable snapshots require explicit adapters. Keep a failed candidate out of published state and test the prior baseline. One-document atomic replacement avoids claiming multi-file filesystem transactions; continuous file following with the fingerprint guard deliberately excludes concurrent-writer merging and automatic retry.
 
 ## Migration Plan
 

@@ -4,7 +4,7 @@
 
 Prove the complete independent editor and preserved game behavior through real browser/file/game consumer acceptance without inventing new behavior. The approved architecture needs a closed, runnable slice with one source owner and complete consumer coverage.
 
-Source documents are `docs/superpowers/specs/2026-10-26-map-editor-design.md` and its companion `2026-10-26-map-editor-frontend-requirements.md`, read afresh for this batch. Their status remains written-spec review pending. The current request authorizes proposal creation only, not implementation approval or a change to design substance.
+Source documents are `docs/superpowers/specs/2026-10-26-map-editor-design.md`, its companion `2026-10-26-map-editor-frontend-requirements.md` and the approved frontend specialist deliverable `2026-10-26-map-editor-frontend-design.md`, which amends both where it says so. Their status remains written-spec review pending. The current request authorizes proposal creation only, not implementation approval or a change to design substance.
 
 ## What Changes
 
@@ -28,7 +28,7 @@ No executable behavior changes; `.openspec.yaml` declares `skip_specs: true`. Ex
 
 proposed web/tests/browser/test_map_editor_workflows.py and test_map_editor_accessibility.py; tests/test_map_editor_independent_environment.py; map runtime integration tests; CI/package evidence entry points; docs/development/map-editor.md and docs/design/map-editor-review.md
 
-This is one bounded engineer-day within the mandatory complete batch. `batch-plan.md` in map-core-sparse-geometry contains the dependency/conflict matrix and source coverage. Tests/docs are included with each task. The frontend specialist's visual polish, copy quality and design fidelity are human-reviewed in `docs/design/map-editor-review.md`; tests establish mechanisms and interactions rather than shipped wording or markup.
+This is one bounded engineer-day within the mandatory complete batch. `batch-plan.md` in map-core-sparse-geometry contains the dependency/conflict matrix and source coverage. Tests/docs are included with each task. Visual direction, states and copy follow the approved frontend design and the `docs/design/map-editor/` prototype; fidelity is human-reviewed per scenario in `docs/design/map-editor-review.md`, and tests establish mechanisms and interactions rather than shipped wording or markup.
 
 ## Batch:
 

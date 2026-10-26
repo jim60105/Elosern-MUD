@@ -2,6 +2,7 @@
 
 **Date:** 2026-10-26
 **Status:** Design decisions approved in conversation; written-spec review pending.
+**Amended by:** [Standalone Map Editor Frontend Design](2026-10-26-map-editor-frontend-design.md) §1 (game visual language, 1451×790/2560×1440 viewports, no explicit AI handoff, coarse state presentation). Where the two disagree, the frontend design governs.
 **Scope:** All authored static maps, a standalone graphical editor, shared map libraries, and file-based collaboration with an external AI executor.
 **Implementation status:** Not implemented by this document.
 
@@ -306,7 +307,7 @@ The proposal batch is complete. This inventory records planning artifacts, not i
 | P10 | [map-view-shared-foundations](../../../openspec/changes/map-view-shared-foundations/proposal.md) | Neutral frontend map primitives and existing game-surface migration. | None |
 | P11 | [map-editor-standalone-service](../../../openspec/changes/map-editor-standalone-service/proposal.md) | Independent environment/build, secure local service, and browser workspace. | P08, P09, P10 |
 | P12 | [map-editor-document-commands](../../../openspec/changes/map-editor-document-commands/proposal.md) | Guarded single-document persistence, autosave, and undo/redo. | P11 |
-| P13 | [map-editor-turn-recovery](../../../openspec/changes/map-editor-turn-recovery/proposal.md) | External AI handoff, file watching, stale previews, and recovery. | P12 |
+| P13 | [map-editor-file-following](../../../openspec/changes/map-editor-file-following/proposal.md) | Continuous file following, own-write recognition, stale previews, and recovery. | P12 |
 | P14 | [map-editor-interaction-shell](../../../openspec/changes/map-editor-interaction-shell/proposal.md) | Navigation, inspection, diagnostics, accessibility, and copy-only AI context. | P13 |
 | P15 | [map-editor-continent-tools](../../../openspec/changes/map-editor-continent-tools/proposal.md) | Continental geometry, locations, districts, footprints, and bindings. | P14 |
 | P16 | [map-editor-settlement-tools](../../../openspec/changes/map-editor-settlement-tools/proposal.md) | Nodes/prototypes, directed roads, bends, and physical route inspection. | P14 |
@@ -344,6 +345,8 @@ This is a conservative schedule derived from the proposal dependencies and share
 The batches permit parallel implementation only where the listed boundaries remain independent. Shared shard manifests, traceability records, locks, and documentation always have one integration owner. Existing movement/publication/NPC proposals retain the serialization rules in the batch plan. Recheck current proposal phases before scheduling; a proposed external prerequisite must land first, while an archived prerequisite is consumed through its merged contract.
 
 ### 12.3 Frontend specialist coordination
+
+**Update (2026-10-26):** the specialist deliverable is [the frontend design](2026-10-26-map-editor-frontend-design.md) with its `docs/design/map-editor/` Storybook prototype, and P11–P20 plus the shared worker contract and batch plan have been reconciled with it (P13 renamed to `map-editor-file-following`). The approval gate below remains: the written frontend design still needs user review before B10.
 
 Frontend visual design remains unassigned implementation work. The specialist receives the companion frontend requirements and this architecture, then produces annotated screens, interaction/state flows, component specifications, and keyboard/focus behavior for user review. The specialist does not need to create duplicate functional OpenSpec proposals.
 

@@ -14,7 +14,7 @@ Deliver this prerequisite-bounded slice completely. Preserve the architectural D
 
 Implement qualified endpoint selection across location/wilderness/settlement/permanent-interior domains supported by the core schema. Expose settlement wilderness entrances and starting-room entry as settlement-owned tools; expose exterior/interior and special interior-to-interior links in the owning interior. Persist endpoints, each applicable directional label/aliases and explicit one-way/two-way meaning in one record. Show computed current coordinates for spatial endpoints read-only when helpful, never accept an unlabelled coordinate string or display-name target.
 
-Both endpoints are inspectable/navigable with map/domain/qualified ID/source owner. Follow a relationship and retain useful return map/view/selection context. Editing one relationship writes only its owner; a bidirectional meaning is not a second file operation. Do not change Limbo's one-way invariant. Invalid/wrong-domain/absent endpoints identify the relationship and field. Refuse deletion of referenced objects with navigable incoming refs; missing/stale context disables destructive deletion without blocking placement/property edits. Removing a reference and later deleting the target are explicit separate complete commands, never a cross-document cascade.
+Both endpoints are inspectable/navigable with map/domain/qualified ID/source owner. Follow a relationship and retain useful return map/view/selection context. Editing one relationship writes only its owner; a bidirectional meaning is not a second file operation. Do not change Limbo's one-way invariant. Invalid/wrong-domain/absent endpoints identify the relationship and field. Refuse deletion of referenced objects with navigable incoming refs, shown inline in the inspector without a modal (frontend design §5.4); missing/stale context refuses destructive deletion with that reason without blocking placement/property edits. The relationship inspector, 前往另一端, breadcrumb return button/Alt+← and qualified-ID selector follow frontend design §4.4. Removing a reference and later deleting the target are explicit separate complete commands, never a cross-document cascade.
 
 ### Exact implementation ownership
 
@@ -35,7 +35,7 @@ Each row must become substantive discoverable tests. For pure refactors and data
 
 Relationship handlers extend settlement/interior domain modules after those slices; serialize these edits and shared selector/navigation modules. No mirrored reverse owner or second deletion validator.
 
-Independent environments and immutable snapshots require explicit adapters. Keep a failed candidate out of published state and test the prior baseline. One-document atomic replacement avoids claiming multi-file filesystem transactions; cooperative turn-taking deliberately excludes concurrent writers and automatic merge/retry.
+Independent environments and immutable snapshots require explicit adapters. Keep a failed candidate out of published state and test the prior baseline. One-document atomic replacement avoids claiming multi-file filesystem transactions; continuous file following with the fingerprint guard deliberately excludes concurrent-writer merging and automatic retry.
 
 ## Migration Plan
 

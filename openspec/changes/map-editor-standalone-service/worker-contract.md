@@ -8,7 +8,7 @@ Read [the fixed interfaces and caller cutover checklist](../map-core-sparse-geom
 
 Install and run the independent local editor service and browser workspace with bounded authenticated domain APIs.
 
-Implementation owners: new tools/map-editor/{pyproject.toml,uv.lock,elosern_map_editor,frontend}; packages/map-view local dependency; frontend pnpm lock; launch/docs/development/map-editor.md; tests/test_map_editor_service.py
+Implementation owners: new tools/map-editor/{pyproject.toml,uv.lock,elosern_map_editor,frontend}; packages/map-view local dependency; frontend pnpm lock; editor import-boundary check for the allowlisted game tokens/fonts/ui-scale; launch/docs/development/map-editor.md; tests/test_map_editor_service.py
 
 Prerequisites: map-interior-runtime-cutover, map-reference-context-export, map-view-shared-foundations.
 

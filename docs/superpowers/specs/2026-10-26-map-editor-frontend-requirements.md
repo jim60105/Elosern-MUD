@@ -4,6 +4,7 @@
 **Status:** Design decisions approved in conversation; written-spec review pending.
 **Audience:** Frontend/UX/visual designer and subsequent implementers.
 **Authority:** [Standalone Developer Map Editor Design](2026-10-26-map-editor-design.md).
+**Amended by:** [Standalone Map Editor Frontend Design](2026-10-26-map-editor-frontend-design.md) §1 (game visual language, 1451×790/2560×1440 viewports, no explicit AI handoff, coarse state presentation). Its decisions D1–D4 replace §2's viewport list and theme exclusion and the handoff/turn material of §§5–7, 9 and 10; where the two disagree, the frontend design governs.
 
 This brief defines the information, operations, states, and acceptance criteria that the editor design must support. Panel arrangement, visual theme, typography, component appearance, and detailed responsive composition belong to the subsequent designer. This document is a requirements handoff, not an implemented interface or a visual mockup.
 

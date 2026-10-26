@@ -17,6 +17,10 @@ The editor SHALL install, load maps and serve its browser application in an inde
 - **WHEN** the built editor is served with Node unavailable and network access denied
 - **THEN** essential UI and shared map drawing remain available without CDN or game dist requests
 
+#### Scenario: Game theme without the game shell
+- **WHEN** the editor build is scanned and rendered at 1451x790 and 2560x1440
+- **THEN** it imports from the game tree only the allowlisted tokens, fonts and ui-scale modules, and its chrome scales with the game's ui-scale factor without loading the game shell stylesheet
+
 ### Requirement: Local API confines and authorizes workspace access
 The service SHALL enforce expected Host/Origin, launch-session authorization for mutations, bounded data input and allowlisted confined document access.
 

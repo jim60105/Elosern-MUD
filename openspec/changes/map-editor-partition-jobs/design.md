@@ -12,9 +12,9 @@ Deliver this prerequisite-bounded slice completely. Preserve the architectural D
 
 ## Decisions
 
-Install the core generation extra in the editor project lock without root game dependencies. A service-owned single job runner executes generation outside HTTP/SSE event loop, taking a captured snapshot/input signature. Only one job is admitted at a time. During generation block all world-data mutations and AI handoff at service admission while keeping browse/inspect/viewport/status/cancel useful. Layout-only commands may remain allowed only through the existing single-document state guard since they cannot change generation input; document that distinction rather than silently disabling browsing. External-turn policy still denies every mutation/publication.
+Install the core generation extra in the editor project lock without root game dependencies. A service-owned single job runner executes generation outside HTTP/SSE event loop, taking a captured snapshot/input signature. Only one job is admitted at a time. During generation reject all world-data mutations at service admission while keeping browse/inspect/viewport/status/cancel useful; there is no handoff to block (frontend design D3). Layout-only commands may remain allowed through the existing single-document guard since they cannot change generation input; document that distinction rather than silently disabling browsing. A write pause or stale preview also refuses publication.
 
-Cancel/failure leaves the prior artifact unchanged. External file notifications invalidate captured inputs; before output publication, recheck session/turn permission and the full current source signature, then use the existing confined atomic artifact replacement path. An invalidated result is rejected and never labelled current. No ordinary drag/game action triggers regeneration. Expose current/stale/generating/cancelled/failed status, represented input revision and actionable diagnostics. Old partition geometry may remain inspectable only with persistent older-input labels; source saved state is separate from output freshness. Cancellation after publication has already completed is reported as completed, never promises rollback of a replaced artifact.
+Cancel/failure leaves the prior artifact unchanged. External file notifications invalidate captured inputs; before output publication, recheck the session, write pause and the full current source signature, then use the existing confined atomic artifact replacement path. An invalidated result is rejected and never labelled current. No ordinary drag/game action triggers regeneration. Expose current/stale/generating/cancelled/failed status through the header 分區 chip (regenerate when stale, cancel while generating), the represented input revision and actionable diagnostics. Old partition geometry may remain inspectable only with persistent older-input labels; source saved state is separate from output freshness. Cancellation after publication has already completed is reported as completed, never promises rollback of a replaced artifact.
 
 ### Exact implementation ownership
 
@@ -35,7 +35,7 @@ Each row must become substantive discoverable tests. For pure refactors and data
 
 Extends the same state machine/writer from workspace slices; serialize those files rather than add a job-specific mutation authority. Partition artifact remains generated/read-only.
 
-Independent environments and immutable snapshots require explicit adapters. Keep a failed candidate out of published state and test the prior baseline. One-document atomic replacement avoids claiming multi-file filesystem transactions; cooperative turn-taking deliberately excludes concurrent writers and automatic merge/retry.
+Independent environments and immutable snapshots require explicit adapters. Keep a failed candidate out of published state and test the prior baseline. One-document atomic replacement avoids claiming multi-file filesystem transactions; continuous file following with the fingerprint guard deliberately excludes concurrent-writer merging and automatic retry.
 
 ## Migration Plan
 
