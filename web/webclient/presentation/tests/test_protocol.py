@@ -257,6 +257,9 @@ class SnapshotUpdateTests(unittest.TestCase):
         result = validate_ui_snapshot(_snapshot(), known_panels={"status"})
         self.assertEqual(list(result["panels"]), ["status"])
 
+    @covers_requirement(
+        "webclient-oob-protocol::deltas-require-the-exact-committed-baseline"
+    )
     def test_update_requires_the_exact_base_fields(self):
         payload = _update()
         del payload["base_revision"]
@@ -270,6 +273,9 @@ class SnapshotUpdateTests(unittest.TestCase):
         with self.assertRaises(ProtocolValidationError):
             validate_ui_snapshot(_update())
 
+    @covers_requirement(
+        "webclient-oob-protocol::deltas-require-the-exact-committed-baseline"
+    )
     def test_base_revision_is_bounded_and_older_than_the_target(self):
         for bad in (0, -1, True, 1.5, "3", 4, 5):
             with self.subTest(base_revision=bad):
@@ -278,6 +284,9 @@ class SnapshotUpdateTests(unittest.TestCase):
         normalized = validate_ui_update(_update(base_revision=1, revision=2))
         self.assertEqual(normalized["base_revision"], 1)
 
+    @covers_requirement(
+        "webclient-oob-protocol::removal-unavailable-and-metadata-only-updates-remain-distinct"
+    )
     def test_removed_panels_shape_and_relations(self):
         known = {"status", "quest_log", "area_map", "world_map"}
         normalized = validate_ui_update(
@@ -306,6 +315,9 @@ class SnapshotUpdateTests(unittest.TestCase):
                 _update(removed_panels=["status"]), known_panels=known
             )
 
+    @covers_requirement(
+        "webclient-oob-protocol::removal-unavailable-and-metadata-only-updates-remain-distinct"
+    )
     def test_metadata_only_update_is_valid(self):
         normalized = validate_ui_update(
             _update(

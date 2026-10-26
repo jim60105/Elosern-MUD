@@ -36,7 +36,7 @@ Each Elosern OOB message SHALL be one JSON object in Evennia's command/args/kwar
 - **THEN** both production validators and protocol-store admission accept the same bounded complete frame, while any over-budget body rejects before effect/session publication
 
 ### Requirement: Full snapshots and updates have registered replacement semantics
-A version-1 `ui_snapshot` SHALL contain exactly `protocol_version`, `presentation_epoch`, `revision`, `mode`, `panels`, `layout_version`, and `server_time`. A `ui_update` SHALL contain the same exact top-level field set, with a nonempty registered subset in `panels`. Every included eager update panel SHALL completely replace its prior value. On-demand map bodies SHALL be omitted from eager snapshots, kept separately within an epoch, and cleared on a new epoch. No JSON Patch is used.
+A version-1 ui_snapshot SHALL retain its seven exact metadata/panel fields. A ui_update SHALL add exact base_revision and removed_panels fields, permitting empty panels. Included panels SHALL replace complete values; removed eager names SHALL be explicit and disjoint. Snapshots SHALL replace all eager membership while retaining same-epoch on-demand maps. No JSON Patch is used.
 
 #### Scenario: Full synchronization replaces the complete store
 - **WHEN** the browser accepts a valid `ui_snapshot`
@@ -52,11 +52,11 @@ A version-1 `ui_snapshot` SHALL contain exactly `protocol_version`, `presentatio
 
 #### Scenario: Update metadata is complete
 - **WHEN** the server emits a valid `ui_update`
-- **THEN** it includes the active mode, current server time, and layout version together with its epoch, new revision, and nonempty panel subset
+- **THEN** it includes the active mode, current server time, and layout version together with its epoch, new revision, and a possibly empty panel subset plus exact base_revision and removed_panels
 
 #### Scenario: A dialogue-mode update always carries the dialogue panel
 - **WHEN** an affected-panel update is published while the viewer's recomputed mode resolves to `dialogue` and its named subset omits the `dialogue` panel
-- **THEN** the emitted update still carries a freshly rendered `dialogue` panel alongside the named subset, and the client never commits mode `dialogue` over a stale dialogue panel
+- **THEN** the staged committed presentation always carries the correct dialogue panel: the server freshly renders it as a candidate, transmits it when changed, and the client validates mode/dialogue consistency against the staged state even when equal dialogue is omitted from the wire
 
 #### Scenario: Top-level field value bounds are exact
 - **WHEN** a snapshot or update envelope is validated
@@ -317,3 +317,41 @@ The real authored continental map payload SHALL be measured in canonical UTF-8 b
 #### Scenario: Multipart delivery never exposes incomplete state
 - **WHEN** measured frame limitations require parts and a part is missing, duplicated, malformed, superseded or from an old epoch
 - **THEN** the browser never adopts an incomplete/mixed map, retains or safely invalidates its prior complete map, bounds assembly memory and discards old-epoch data
+
+### Requirement: Deltas require the exact committed baseline
+For the live transport and epoch, a delta SHALL require base_revision equal to the committed revision and a newer target. All replacements, removals and metadata SHALL validate before one atomic commit and notification. Deltas SHALL NOT establish initial state.
+
+#### Scenario: Missing predecessor preserves committed state
+- **WHEN** the browser at revision7 receives a valid delta with base6 and target8
+- **THEN** it rejects base_mismatch, preserves revision7 panels/mode/time and locks mutations for complete recovery
+
+#### Scenario: Initial delta cannot establish epoch
+- **WHEN** an awaiting browser receives a delta with no complete snapshot baseline
+- **THEN** it adopts nothing and cannot establish an epoch
+
+#### Scenario: Newer target can skip unused integers
+- **WHEN** the committed revision is7 and a valid delta has base7 and target10
+- **THEN** the browser commits10 once; admission does not invent a predecessor9
+
+#### Scenario: Staged failure rolls back every field
+- **WHEN** one replacement or mode/dialogue relation fails validation alongside valid replacements and metadata
+- **THEN** no staged panel, removal, mode, time or revision becomes observable
+
+#### Scenario: On-demand map revision follows exact base
+- **WHEN** a specialized map transfer repeats base7 and target8 across its existing map-body parts
+- **THEN** no partial map changes revision7 and only complete validated map adoption commits8
+
+### Requirement: Removal unavailable and metadata-only updates remain distinct
+A delta SHALL allow empty replacements, explicit duplicate-free registered eager removals and complete metadata. Removed names SHALL be disjoint from replacements and exclude on-demand maps. Unavailable values SHALL replace panels rather than delete them.
+
+#### Scenario: Three distinct eager operations
+- **WHEN** a delta replaces status with unavailable, removes a registered eager panel and omits another
+- **THEN** status remains present as unavailable, the removed key is absent and the omitted panel is unchanged
+
+#### Scenario: Invalid removals reject atomically
+- **WHEN** removals contain an unknown name, map name, duplicate or replacement overlap
+- **THEN** both validators reject the entire delta
+
+#### Scenario: Metadata-only adoption
+- **WHEN** a delta has empty panels/removals with changed server time or mode consistent with staged panels
+- **THEN** the browser atomically commits metadata and revision without deleting existing panels
