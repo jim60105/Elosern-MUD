@@ -31,7 +31,7 @@
 
 #### Scenario: The shipped table's exact membership
 - **WHEN** the shipped table is loaded
-- **THEN** it contains exactly the `merchant`, `guild_staff`, `guild_exam_reception`, `quest_issuer` and `attendant` professions, each with `schedule_template: null` and `default_tier: null`
+- **THEN** it contains exactly the `merchant`, `guild_staff`, `guild_exam_reception`, `quest_issuer`, `attendant` and `clergy` professions, each with `schedule_template: null` and `default_tier: null`
 
 #### Scenario: The merchant blueprint trades and answers
 - **WHEN** the `merchant` row is read

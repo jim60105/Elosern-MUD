@@ -26,12 +26,12 @@ participant. `requested_by` SHALL be audit metadata and SHALL NOT bypass validat
 - **THEN** start rejects identically with no affinity or exam mutation
 
 #### Scenario: An off-anchor examiner cannot open examinations
-- **WHEN** a qualified place-bound examiner is away from its service anchor
+- **WHEN** the place-bound examination-reception counter is away from its service anchor
 - **THEN** service_available refuses the start before resources, affinity or records change
 
 #### Scenario: Gate verdicts refuse before eligibility
-- **WHEN** the gate returns a `remote` verdict (actor and examiner not co-located) or an
-  `off_anchor` verdict (place-bound examiner away from its anchor room)
+- **WHEN** the gate returns a `remote` verdict (actor and reception counter not co-located) or an
+  `off_anchor` verdict (place-bound reception counter away from its anchor room)
 - **THEN** both are refused before any eligibility check, and a `malformed_binding` verdict fails
   closed
 
