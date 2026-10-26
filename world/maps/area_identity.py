@@ -172,10 +172,12 @@ def _instance_identity(location: Any, family: type) -> AlignmentIdentity | None:
     """The identity of one instance component, or ``None`` when untrustworthy.
 
     Connectivity alone is not instance membership: two separately spawned
-    instances are distinct contexts even if a passage joins them. The
-    authoritative creation fact is the spawn ``origin_room`` every room of one
-    instance shares, so a component that mixes origins (or misses one) has no
-    comparable identity and aligns conservatively.
+    instances are distinct contexts even if a passage joins them, and the same
+    origin can spawn several instances. The authoritative creation facts are the
+    spawn ``origin_room`` and the ``scene_identity`` every room of one instance
+    shares, so a component that mixes either value (or misses one) has no
+    comparable identity and aligns conservatively instead of inheriting the
+    root's identity.
     """
     rooms, _exits = room_component(location, lambda room: isinstance(room, family))
     root_id = min(rooms)
@@ -184,15 +186,17 @@ def _instance_identity(location: Any, family: type) -> AlignmentIdentity | None:
     origin_pk = getattr(getattr(origin, "origin_room", None), "pk", None)
     if origin_pk is None:
         return None
+    token = getattr(root, "scene_identity", None)
+    if not isinstance(token, str) or not token:
+        return None
     for room_id, room in rooms.items():
         member_origin = getattr(
             getattr(getattr(room, "db", None), "origin_room", None), "pk", None
         )
         if member_origin != origin_pk:
             return None
-    token = getattr(root, "scene_identity", None)
-    if not isinstance(token, str) or not token:
-        return None
+        if getattr(room, "scene_identity", None) != token:
+            return None
     return AlignmentIdentity(
         layer="instance",
         area_key=f"instance:{root_id}",

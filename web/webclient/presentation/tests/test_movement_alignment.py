@@ -217,6 +217,17 @@ class AreaIdentityTests(EvenniaTest):
         )
         self.assertIsNone(read_alignment_identity(_actor(second)))
 
+    def test_one_origin_with_different_scene_identities_is_untrustworthy(self):
+        first = _instance_room("洞窟", self.room1, "instance:first")
+        second = _instance_room("洞窟", self.room1, "instance:second")
+        _join(first, second)
+
+        # The same origin can spawn several instances, so its identity alone
+        # never joins two scenes: the component has no comparable identity and
+        # must never inherit the root's.
+        self.assertIsNone(read_alignment_identity(_actor(first)))
+        self.assertIsNone(read_alignment_identity(_actor(second)))
+
     def test_an_unknown_position_has_no_identity(self):
         self.assertIsNone(read_alignment_identity(_actor(None)))
         self.assertIsNone(read_alignment_identity(_actor(SimpleNamespace())))
@@ -318,6 +329,19 @@ class CommittedMovementFactTests(EvenniaTest):
         with self.captureOnCommitCallbacks(execute=True):
             self.char1.execute_cmd(exit_obj.key, session=self.session)
 
+        self.assertEqual(len(self.recorder.facts), 1)
+        self.assertIsNone(self.recorder.facts[0].destination)
+
+    def test_a_mixed_instance_component_aligns_conservatively(self):
+        destination, exit_obj = self._instance_destination()
+        # A connected sibling spawned from the same origin with another scene
+        # identity makes the whole component non-comparable.
+        _join(destination, _instance_room("洞窟", self.room1, "instance:sibling"))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.char1.execute_cmd(exit_obj.key, session=self.session)
+
+        self.assertIs(self.char1.location, destination)
         self.assertEqual(len(self.recorder.facts), 1)
         self.assertIsNone(self.recorder.facts[0].destination)
 
