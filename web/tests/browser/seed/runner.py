@@ -463,6 +463,16 @@ def main() -> None:
 
     _party_management_acceptance_fixture(character)
 
+    # The incremental-synchronization smoke relocates the character (and the
+    # monsters above) onto a real gate room so the graphical move, the combat
+    # settlement and the map-boundary traversal all run on production seams.
+    # An unset flag is a no-op for every other suite.
+    from web.tests.browser.seed.incremental_sync_fixture import (
+        _incremental_sync_fixture,
+    )
+
+    _incremental_sync_fixture(character)
+
     print(
         f"seeded account={account.key} character={result.display_name} "
         f"race={result.race} magic_power={result.magic_power}"

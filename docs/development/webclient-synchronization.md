@@ -626,3 +626,41 @@ that skip integers, supply the baseline explicitly. A synthetic session that
 publishes a delta first establishes a committed baseline snapshot, exactly as a
 live transport does. There is no validator fallback for a missing
 `base_revision` or `removed_panels`.
+
+## Functional acceptance
+
+`web/tests/browser/test_incremental_sync.py` is the changed-path functional
+smoke for this protocol. Each journey runs the real managed runtime: the
+session's `PresentationCoordinator` owns the publication, the batch crosses the
+managed Evennia server, AMP, the portal and the WebSocket, and the production
+reducer/view adopts it. No journey injects a
+synthetic snapshot to fake a server state, mocks the wire, or reads a second
+store; the test-only `web/tests/browser/incremental_sync_fixture.py` builds
+payloads, calls the production validator and the real coordinator, and
+`web/tests/browser/seed/incremental_sync_fixture.py` supplies the room and
+monster placement the journeys need.
+
+| Journey | What it proves |
+|---|---|
+| `test_graphical_and_text_checkpoint_sequence` | An ordinary combat start and a nonterminal round publish deltas on the exact committed `base_revision` with only the changed panels while untouched panels keep their object identity; a terminal combat settlement publishes exactly one fresh complete checkpoint whose result names its revision; a same-area compass move stays incremental; an unchanged read action publishes nothing and consumes no revision; a different-map traversal through text publishes one complete checkpoint in the same epoch; and an identical candidate is skipped entirely (no frame, no revision) by the real coordinator. |
+| `test_oversized_snapshot_and_delta_adopt_once` | An oversized complete snapshot and an oversized single-panel delta (the panel itself legal and just under its own 65,536-byte cap, so the envelope header cannot fit intact) cross the socket as one bounded `ui_publication_part` transfer with sequential indexes, one transfer identity and a legal part count, every frame inside the generic frame ceiling, and the browser adopts each complete document exactly once. |
+| `test_missing_publication_recovers_complete_baseline` | One genuine delta withheld before the reducer makes the matching result start the one bounded repair: the prior complete state and revision survive, mutations lock, no mutation is resubmitted, and exactly one `ui_sync` retrieves a complete baseline. A test-scope publication that changes a canonical field while omitting its owning panel leaves the committed panel stale until the next real checkpoint re-renders it from canonical state. |
+| `test_failed_recovery_and_alignment_preserve_local_state` | A corrupted repair snapshot makes the episode terminal — no second automatic request, no sync loop, graphical mutations locked, text input/output still usable — and the player's explicit synchronize re-establishes the base. An open drawer, its focused item and unsaved command-line text survive a same-mode checkpoint without a remount, while a real mode change runs the existing teardown; a subscriber-held committed record is frozen and cannot be written through. |
+
+Run one journey at a time; each boots its own managed runtime:
+
+```text
+uv run --locked python -m web.tests.browser.unittest_driver \
+    web.tests.browser.test_incremental_sync.IncrementalSyncBrowserTests.<journey>
+```
+
+The four methods are registered once in `.github/browser-shards.json`; the full
+managed suite and the traceability evidence run stay CI-owned.
+
+### No performance claim
+
+This smoke reports functional behavior only. It measures no latency, does not
+benchmark or profile the renderer, makes no long-task or allocation assertion,
+and states no no-stutter guarantee. The byte limits it asserts (the 65,536-byte
+generic frame ceiling, the 24,576-byte part size and the derived part count) are
+protocol resource bounds, not measurements of workload or responsiveness.

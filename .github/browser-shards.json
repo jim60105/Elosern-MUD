@@ -182,7 +182,11 @@
         "web.tests.browser.test_browser_exploration_state.ExplorationBrowserTest.test_focus_follows_the_item_key_across_committed_re_resolution",
         "web.tests.browser.test_browser_exploration_state.ExplorationBrowserTest.test_suggestions_frame_is_status_driven",
         "web.tests.browser.test_browser_exploration_state.ExplorationBrowserTest.test_whole_stack_loss_cascades_to_the_degraded_root_and_recovers",
-        "web.tests.browser.test_browser_lineage.PartyLineageTabBrowserTest"
+        "web.tests.browser.test_browser_lineage.PartyLineageTabBrowserTest",
+        "web.tests.browser.test_incremental_sync.IncrementalSyncBrowserTests.test_graphical_and_text_checkpoint_sequence",
+        "web.tests.browser.test_incremental_sync.IncrementalSyncBrowserTests.test_oversized_snapshot_and_delta_adopt_once",
+        "web.tests.browser.test_incremental_sync.IncrementalSyncBrowserTests.test_missing_publication_recovers_complete_baseline",
+        "web.tests.browser.test_incremental_sync.IncrementalSyncBrowserTests.test_failed_recovery_and_alignment_preserve_local_state"
       ],
       "files_b": [
         "web.tests.browser.test_browser_creation_concept.ConceptCreationJourneys.test_concept_field_journey_to_activation_at_the_capped_viewport",
