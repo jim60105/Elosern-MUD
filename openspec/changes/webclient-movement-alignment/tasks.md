@@ -4,16 +4,16 @@ All checkboxes are implementation work, not authorization to apply during propos
 
 ## 1. Authoritative identities and committed facts
 
-- [ ] 1.1 Write test_movement_alignment identity cases before extracting read-only room_component and adding world/maps/area_identity.py. Verify grid map-key change, identical labels, same-map pooled wilderness, interior connected component, instance root/scene identity replacement and unknown identity conservative alignment. Preserve area_map existing graph output and never invoke map presenters for identity.
-- [ ] 1.2 Reuse P's complete frozen alignment fact/emit API and add movement_settlement grouped commit-only emission with source captured before traversal and destination after compensation; register ingress watcher callback idempotently. Test rollback/refusal no fact, lawful current watcher fan-out, independent session baselines and late epoch callback drop. Document deterministic-owner to read-only observer boundary.
+- [x] 1.1 Write test_movement_alignment identity cases before extracting read-only room_component and adding world/maps/area_identity.py. Verify grid map-key change, identical labels, same-map pooled wilderness, interior connected component, instance root/scene identity replacement and unknown identity conservative alignment. Preserve area_map existing graph output and never invoke map presenters for identity.
+- [x] 1.2 Reuse P's complete frozen alignment fact/emit API and add movement_settlement grouped commit-only emission with source captured before traversal and destination after compensation; register ingress watcher callback idempotently. Test rollback/refusal no fact, lawful current watcher fan-out, independent session baselines and late epoch callback drop. Document deterministic-owner to read-only observer boundary.
 
 ## 2. Serialized settlement integration
 
-- [ ] 2.1 Enroll deterministic movement/direct-player hooks in P causal groups and attach _move_adapter's private publication_group_id before queue drain; preserve P independent text completion and always-Deferred receipt APIs. Test real UI/text boundary moves yielding one fresh final eager snapshot/result for every watcher in either push/fact callback order, no intermediate dialogue cleanup delta, unchanged same-area moves incremental, deliberate omitted candidate repaired and no unopened map load. Register test_movement_alignment.py once and update movement checkpoint docs. Do not reimplement P queue/callback infrastructure.
+- [x] 2.1 Enroll deterministic movement/direct-player hooks in P causal groups and attach _move_adapter's private publication_group_id before queue drain; preserve P independent text completion and always-Deferred receipt APIs. Test real UI/text boundary moves yielding one fresh final eager snapshot/result for every watcher in either push/fact callback order, no intermediate dialogue cleanup delta, unchanged same-area moves incremental, deliberate omitted candidate repaired and no unopened map load. Register test_movement_alignment.py once and update movement checkpoint docs. Do not reimplement P queue/callback infrastructure.
 
 ## 3. Focused integrated verification
 
-- [ ] 3.1 Run M-PY and existing map protocol regression below after all edits plus contract_gate. Preserve original text Deferred value/Failure and Telnet exclusion. Tests must demonstrate source identity captured before pooled room mutation, not a post-move heuristic.
+- [x] 3.1 Run M-PY and existing map protocol regression below after all edits plus contract_gate. Preserve original text Deferred value/Failure and Telnet exclusion. Tests must demonstrate source identity captured before pooled room mutation, not a post-move heuristic.
 
 ## Verification commands
 
