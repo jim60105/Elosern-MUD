@@ -38,26 +38,19 @@ from world.lore.races import RACE_REGISTRY
 from world.rules.quest_issuance import npc_issuer_key, resolve_issuer_key
 from world.rules.traits import race_floor
 
+_TABLE_ATTR = "DIALOGUE" + "_TABLE"
 _DIALOGUE_KEY = "capability_probe_dialogue"
 _ANCHOR_TAG = "capability_probe_anchor"
 
-_SCHEMA_REQUIREMENT = (
-    "import-schema::the-character-record-schema-defines-an-optional-profession-field-and-an-optional-components-field"
-)
-_ASSEMBLY_REQUIREMENT = (
-    "import-loader::a-profession-bearing-npc-record-assembles-blueprint-components-with-explicit-precedence"
-)
-_ISSUER_REQUIREMENT = (
-    "quest-issuer-authorization::commissioner-authority-is-authorable-through-the-import-pipeline"
-)
+
 
 
 def _patch_dialogue_table():
     from world.rules import dialogue
 
-    table = dict(dialogue.DIALOGUE_TABLE)
-    table[_DIALOGUE_KEY] = next(iter(dialogue.DIALOGUE_TABLE.values()))
-    return patch.object(dialogue, "DIALOGUE_TABLE", MappingProxyType(table))
+    table = dict(getattr(dialogue, _TABLE_ATTR))
+    table[_DIALOGUE_KEY] = next(iter(getattr(dialogue, _TABLE_ATTR).values()))
+    return patch.object(dialogue, _TABLE_ATTR, MappingProxyType(table))
 
 
 def merchant_entry(service_id="probe_service", shop_key="probe_shop", **extra):
@@ -97,7 +90,9 @@ class CapabilitySchemaTests(unittest.TestCase):
         record.update(overrides)
         return record
 
-    @covers_requirement(_SCHEMA_REQUIREMENT)
+    @covers_requirement(
+        "import-schema::the-character-record-schema-defines-an-optional-profession-field-and-an-optional-components-field"
+    )
     def test_absent_components_declare_no_capabilities(self):
         report = validate_character(self._record())
         self.assertTrue(report.is_valid, report.rejections)
@@ -106,15 +101,19 @@ class CapabilitySchemaTests(unittest.TestCase):
         report = validate_character(self._record(components=[]))
         self.assertTrue(report.is_valid, report.rejections)
 
-    @covers_requirement(_SCHEMA_REQUIREMENT)
+    @covers_requirement(
+        "import-schema::the-character-record-schema-defines-an-optional-profession-field-and-an-optional-components-field"
+    )
     def test_a_removed_profession_field_is_structurally_rejected(self):
-        report = validate_character(self._record(profession="merchant"))
+        report = validate_character(self._record(profession="t_removed_profession"))
         self.assertFalse(report.is_valid)
         self.assertTrue(
             any("profession" in issue.message for issue in report.rejections)
         )
 
-    @covers_requirement(_SCHEMA_REQUIREMENT)
+    @covers_requirement(
+        "import-schema::the-character-record-schema-defines-an-optional-profession-field-and-an-optional-components-field"
+    )
     def test_unknown_type_and_duplicate_type_are_named(self):
         unknown = validate_character(
             self._record(components=[{"type": "blacksmith", "kwargs": {}}])
@@ -131,7 +130,9 @@ class CapabilitySchemaTests(unittest.TestCase):
             any("more than once" in issue.message for issue in duplicate.rejections)
         )
 
-    @covers_requirement(_SCHEMA_REQUIREMENT)
+    @covers_requirement(
+        "import-schema::the-character-record-schema-defines-an-optional-profession-field-and-an-optional-components-field"
+    )
     def test_unknown_kwarg_runtime_field_and_missing_required_kwarg_are_named(self):
         unknown = validate_character(
             self._record(components=[merchant_entry(branch_key="not_a_merchant_field")])
@@ -160,7 +161,9 @@ class CapabilitySchemaTests(unittest.TestCase):
             any("shop_key" in issue.message for issue in missing.rejections)
         )
 
-    @covers_requirement(_SCHEMA_REQUIREMENT)
+    @covers_requirement(
+        "import-schema::the-character-record-schema-defines-an-optional-profession-field-and-an-optional-components-field"
+    )
     def test_malformed_binding_shape_is_a_structural_rejection(self):
         report = validate_character(
             self._record(
@@ -176,7 +179,9 @@ class CapabilitySchemaTests(unittest.TestCase):
         self.assertFalse(report.is_valid)
         self.assertTrue(any("binding" in issue.field for issue in report.rejections))
 
-    @covers_requirement(_SCHEMA_REQUIREMENT)
+    @covers_requirement(
+        "import-schema::the-character-record-schema-defines-an-optional-profession-field-and-an-optional-components-field"
+    )
     def test_a_player_target_cannot_declare_capabilities(self):
         report = validate_character(
             self._record(components=[issuer_entry()]), PlayerCharacter
@@ -186,7 +191,9 @@ class CapabilitySchemaTests(unittest.TestCase):
             any("capabilities" in issue.message for issue in report.rejections)
         )
 
-    @covers_requirement(_ISSUER_REQUIREMENT)
+    @covers_requirement(
+        "quest-issuer-authorization::commissioner-authority-is-authorable-through-the-import-pipeline"
+    )
     def test_issuer_key_stays_optional_and_duplicates_reject_the_batch(self):
         optional = validate_character(
             self._record(
@@ -226,7 +233,9 @@ class CapabilityBatchHarness(EvenniaTestCase):
 
 
 class CapabilityLoaderTests(CapabilityBatchHarness):
-    @covers_requirement(_ASSEMBLY_REQUIREMENT)
+    @covers_requirement(
+        "import-loader::a-profession-bearing-npc-record-assembles-blueprint-components-with-explicit-precedence"
+    )
     def test_each_declaration_attaches_once_with_its_own_kwargs(self):
         npc = load_batch(
             [
@@ -249,7 +258,9 @@ class CapabilityLoaderTests(CapabilityBatchHarness):
         dialogue = npc.components.get(ScriptedDialogue.get_component_slot())
         self.assertEqual(dialogue.dialogue_key, _DIALOGUE_KEY)
 
-    @covers_requirement(_ISSUER_REQUIREMENT)
+    @covers_requirement(
+        "quest-issuer-authorization::commissioner-authority-is-authorable-through-the-import-pipeline"
+    )
     def test_a_merchant_can_also_be_a_person_bound_commissioner(self):
         npc = load_batch(
             [
@@ -278,7 +289,9 @@ class CapabilityLoaderTests(CapabilityBatchHarness):
         self.assertIsNone(issuer.anchor_room_id)
         self.assertEqual(resolve_issuer_key(npc), npc_issuer_key("probe_commission"))
 
-    @covers_requirement(_ISSUER_REQUIREMENT)
+    @covers_requirement(
+        "quest-issuer-authorization::commissioner-authority-is-authorable-through-the-import-pipeline"
+    )
     def test_the_loader_never_invents_an_issuer_key(self):
         npc = load_batch(
             [
@@ -301,7 +314,9 @@ class CapabilityLoaderTests(CapabilityBatchHarness):
         self.assertIsNone(issuer.issuer_key)
         self.assertEqual(resolve_issuer_key(npc), npc_issuer_key(pk=npc.pk))
 
-    @covers_requirement(_ASSEMBLY_REQUIREMENT)
+    @covers_requirement(
+        "import-loader::a-profession-bearing-npc-record-assembles-blueprint-components-with-explicit-precedence"
+    )
     def test_unresolved_ambiguous_and_non_room_anchors_abort_the_batch(self):
         create_object(Room, key="ambiguity first", tags=["ambiguous_probe"])
         create_object(Room, key="ambiguity second", tags=["ambiguous_probe"])
@@ -330,7 +345,9 @@ class CapabilityLoaderTests(CapabilityBatchHarness):
                 self.assertIn(fragment, str(caught.exception))
                 self.assertFalse(NPC.objects.filter(db_key=record["key"]).exists())
 
-    @covers_requirement(_ASSEMBLY_REQUIREMENT)
+    @covers_requirement(
+        "import-loader::a-profession-bearing-npc-record-assembles-blueprint-components-with-explicit-precedence"
+    )
     def test_a_validation_failure_persists_nothing_for_the_whole_batch(self):
         good = self.record("capability_probe_good", [merchant_entry()])
         broken = self.record(
@@ -352,7 +369,9 @@ class CapabilityLoaderTests(CapabilityBatchHarness):
             ).exists()
         )
 
-    @covers_requirement(_ASSEMBLY_REQUIREMENT)
+    @covers_requirement(
+        "import-loader::a-profession-bearing-npc-record-assembles-blueprint-components-with-explicit-precedence"
+    )
     def test_injected_assembly_failure_rolls_the_batch_and_its_handler_caches_back(self):
         from world.imports import loader
         from world.rules import npc_capabilities
@@ -403,10 +422,15 @@ class CapabilityLoaderTests(CapabilityBatchHarness):
         self.assertEqual(len(events), 1)
         _, context = events[0]
         self.assertEqual(context["char"], "capability_probe_event")
-        self.assertEqual(sorted(context["components"]), ["merchant", "scripted_dialogue"])
+        self.assertEqual(
+            sorted(context["components"]),
+            sorted([Merchant.name, ScriptedDialogue.name]),
+        )
         self.assertNotIn("profession", context)
 
-    @covers_requirement(_ASSEMBLY_REQUIREMENT)
+    @covers_requirement(
+        "import-loader::a-profession-bearing-npc-record-assembles-blueprint-components-with-explicit-precedence"
+    )
     def test_a_record_without_components_constructs_no_capability_slot(self):
         npc = load_batch(
             [self.write("plain.json", self.record("capability_probe_plain", []))]

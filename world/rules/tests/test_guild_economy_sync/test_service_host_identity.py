@@ -331,7 +331,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             host_profile_key="t_altoria_trading_post",
             components=(
                 capability(
-                    "merchant",
+                    Merchant.name,
                     binding=place_bound("t_trading_post"),
                     service_id="t_altoria_trading_post",
                     shop_key="t_trading_post",
@@ -421,7 +421,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         staff_kwargs = next(
             declaration.kwargs
             for declaration in row.components
-            if declaration.type == "guild_staff"
+            if declaration.type == GuildStaff.name
         )
         legacy.components.add(
             GuildStaff.create(
@@ -715,6 +715,9 @@ class ServiceHostReconciliationTests(ServiceContentIsolation, EvenniaTestCase):
     @covers_requirement(
         "npc-service-host-identity::canonical-source-identity-selects-one-host-independently-of-capabilities"
     )
+    @covers_requirement(
+        "quest-issuer-authorization::every-profession-row-anchors-on-a-component-that-carries-a-service-identity"
+    )
     def test_a_service_identity_edit_converges_on_the_same_person(self):
         from typeclasses.components import ScriptedDialogue
 
@@ -793,7 +796,7 @@ class ServiceHostReconciliationTests(ServiceContentIsolation, EvenniaTestCase):
                     declaration,
                     kwargs={**declaration.kwargs, "shop_key": other_shop_key},
                 )
-                if declaration.type == "merchant"
+                if declaration.type == Merchant.name
                 else declaration
                 for declaration in merchant_row.components
             ),

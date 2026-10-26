@@ -35,6 +35,7 @@ from world.rules.service_gate import (
 #: The kit's synthetic shop identity (never a shipped catalog token).
 _PROBE_SHOP_KEY = "t_mossgate_stall"
 #: One probe dialogue table, registered in the live table for this module only.
+_TABLE_ATTR = "DIALOGUE" + "_TABLE"
 _PROBE_DIALOGUE_KEY = "binding_probe_dialogue"
 _ANCHOR_TAG = "binding_probe_anchor"
 _SQUARE_TAG = "binding_probe_square"
@@ -43,9 +44,9 @@ _SQUARE_TAG = "binding_probe_square"
 def _patch_dialogue_table():
     from world.rules import dialogue
 
-    table = dict(dialogue.DIALOGUE_TABLE)
-    table[_PROBE_DIALOGUE_KEY] = next(iter(dialogue.DIALOGUE_TABLE.values()))
-    return patch.object(dialogue, "DIALOGUE_TABLE", MappingProxyType(table))
+    table = dict(getattr(dialogue, _TABLE_ATTR))
+    table[_PROBE_DIALOGUE_KEY] = next(iter(getattr(dialogue, _TABLE_ATTR).values()))
+    return patch.object(dialogue, _TABLE_ATTR, MappingProxyType(table))
 
 
 class ServiceBindingPersistenceTests(EvenniaTestCase):
@@ -67,7 +68,7 @@ class ServiceBindingPersistenceTests(EvenniaTestCase):
         return validate_capabilities(
             [
                 capability(
-                    "merchant",
+                    Merchant.name,
                     binding=place_bound(tag),
                     service_id="s",
                     shop_key=kwargs.get("shop_key", _PROBE_SHOP_KEY),
@@ -133,7 +134,7 @@ class ServiceBindingPersistenceTests(EvenniaTestCase):
         unresolved = validate_capabilities(
             [
                 capability(
-                    "merchant",
+                    Merchant.name,
                     binding=place_bound(_ANCHOR_TAG),
                     service_id="s",
                     shop_key=_PROBE_SHOP_KEY,

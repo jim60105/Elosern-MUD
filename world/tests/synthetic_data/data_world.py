@@ -33,6 +33,7 @@ from world.maps.city_gates import CityGateDef
 from world.rules.buffs import BuffDefinition, PHYSIOLOGICAL_PROTECTION
 from world.rules.fatigue import PROJECTION_BUFF_KEYS
 from world.rules.dialogue import DialogueDefinition, KeywordResponse
+from typeclasses.components import GuildStaff, Merchant
 from world.rules.npc_capabilities import capability, place_bound
 
 from world.tests.synthetic_data.vocab import (
@@ -241,7 +242,7 @@ SYNTH_PLACES: dict[str, PlaceDefinition] = {
         assortment_keys=(),
         components=(
             capability(
-                "guild_staff",
+                GuildStaff.name,
                 binding=place_bound("t_mossgate_guild_hall"),
                 service_id="t_mossgate_guild_master",
                 branch_key="t_mossgate_branch",
@@ -270,7 +271,7 @@ SYNTH_PLACES: dict[str, PlaceDefinition] = {
         assortment_keys=("t_mossgate_goods",),
         components=(
             capability(
-                "merchant",
+                Merchant.name,
                 binding=place_bound("t_mossgate_store"),
                 service_id="t_mossgate_merchant",
                 shop_key="t_mossgate_stall",

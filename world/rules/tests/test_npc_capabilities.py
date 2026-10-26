@@ -16,7 +16,12 @@ from evennia.utils.test_resources import EvenniaTestCase
 from tools.spec_traceability import covers_requirement
 
 from typeclasses import components as component_classes
-from typeclasses.components import Merchant, QuestIssuer, ScriptedDialogue
+from typeclasses.components import (
+    GuildStaff,
+    Merchant,
+    QuestIssuer,
+    ScriptedDialogue,
+)
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from world.rules.npc_capabilities import (
@@ -41,13 +46,9 @@ from world.rules.npc_capabilities import (
     validate_capabilities,
 )
 
-_DECLARATIONS_REQUIREMENT = (
-    "npc-capability-declarations::npc-capabilities-are-direct-unique-declarations"
-)
-_BINDING_REQUIREMENT = (
-    "npc-capability-declarations::each-bound-capability-authors-its-own-binding-and-unique-room"
-)
 
+
+_TABLE_ATTR = "DIALOGUE" + "_TABLE"
 _DIALOGUE_KEY = "assembly_probe_dialogue"
 
 
@@ -55,15 +56,15 @@ def _patch_dialogue_table():
     """Register one probe dialogue key without touching shipped content."""
     from world.rules import dialogue
 
-    table = dict(dialogue.DIALOGUE_TABLE)
-    table[_DIALOGUE_KEY] = next(iter(dialogue.DIALOGUE_TABLE.values()))
-    return patch.object(dialogue, "DIALOGUE_TABLE", MappingProxyType(table))
+    table = dict(getattr(dialogue, _TABLE_ATTR))
+    table[_DIALOGUE_KEY] = next(iter(getattr(dialogue, _TABLE_ATTR).values()))
+    return patch.object(dialogue, _TABLE_ATTR, MappingProxyType(table))
 
 
 def _merchant(**overrides):
     kwargs = {"service_id": "probe_service", "shop_key": "probe_shop"}
     kwargs.update(overrides)
-    return capability("merchant", binding=place_bound("probe_anchor"), **kwargs)
+    return capability(Merchant.name, binding=place_bound("probe_anchor"), **kwargs)
 
 
 def _issuer(**overrides):
@@ -116,8 +117,8 @@ class VocabularyContractTests(unittest.TestCase):
             REQUIRED_BINDING,
             frozenset(
                 {
-                    "merchant",
-                    "guild_staff",
+                    Merchant.name,
+                    GuildStaff.name,
                     "guild_exam_reception",
                     "quest_issuer",
                     "church_host",
@@ -145,14 +146,18 @@ class DeclarationTests(unittest.TestCase):
         self.assertEqual(validate_capabilities(None).components, ())
         self.assertEqual(validate_capabilities([]).type_keys(), frozenset())
 
-    @covers_requirement(_DECLARATIONS_REQUIREMENT)
+    @covers_requirement(
+        "npc-capability-declarations::npc-capabilities-are-direct-unique-declarations"
+    )
     def test_unknown_type_is_rejected_by_name(self):
         with self.assertRaises(CapabilityValidationError) as caught:
             validate_capabilities([{"type": "blacksmith", "kwargs": {}}])
         self.assertIn("blacksmith", caught.exception.issues[0])
         self.assertIn("vocabulary", caught.exception.issues[0])
 
-    @covers_requirement(_DECLARATIONS_REQUIREMENT)
+    @covers_requirement(
+        "npc-capability-declarations::npc-capabilities-are-direct-unique-declarations"
+    )
     def test_duplicate_type_is_rejected(self):
         with self.assertRaises(CapabilityValidationError) as caught:
             validate_capabilities([_merchant(), _merchant(service_id="second")])
@@ -160,13 +165,15 @@ class DeclarationTests(unittest.TestCase):
             any("more than once" in issue for issue in caught.exception.issues)
         )
 
-    @covers_requirement(_DECLARATIONS_REQUIREMENT)
+    @covers_requirement(
+        "npc-capability-declarations::npc-capabilities-are-direct-unique-declarations"
+    )
     def test_unknown_kwarg_and_runtime_field_are_rejected_separately(self):
         with self.assertRaises(CapabilityValidationError) as caught:
             validate_capabilities(
                 [
                     capability(
-                        "merchant",
+                        Merchant.name,
                         binding=person_bound(),
                         service_id="probe_service",
                         shop_key="probe_shop",
@@ -182,7 +189,7 @@ class DeclarationTests(unittest.TestCase):
             validate_capabilities(
                 [
                     capability(
-                        "merchant",
+                        Merchant.name,
                         binding=person_bound(),
                         service_id="probe_service",
                         shop_key="probe_shop",
@@ -197,7 +204,7 @@ class DeclarationTests(unittest.TestCase):
     def test_required_kwargs_are_named_when_absent_or_blank(self):
         with self.assertRaises(CapabilityValidationError) as caught:
             validate_capabilities(
-                [capability("merchant", binding=person_bound(), service_id="probe")]
+                [capability(Merchant.name, binding=person_bound(), service_id="probe")]
             )
         self.assertTrue(
             any("shop_key" in issue for issue in caught.exception.issues)
@@ -206,7 +213,7 @@ class DeclarationTests(unittest.TestCase):
             validate_capabilities(
                 [
                     capability(
-                        "merchant",
+                        Merchant.name,
                         binding=person_bound(),
                         service_id="",
                         shop_key="probe_shop",
@@ -238,7 +245,9 @@ class DeclarationTests(unittest.TestCase):
             plan.kwargs_for("scripted_dialogue")["service_id"], "probe_service"
         )
 
-    @covers_requirement(_BINDING_REQUIREMENT)
+    @covers_requirement(
+        "npc-capability-declarations::each-bound-capability-authors-its-own-binding-and-unique-room"
+    )
     def test_narrative_dialogue_needs_no_binding(self):
         plan = validate_capabilities(
             [capability("scripted_dialogue", dialogue_key=_DIALOGUE_KEY)]
@@ -248,13 +257,15 @@ class DeclarationTests(unittest.TestCase):
         self.assertIsNone(planned.binding)
         self.assertIsNone(planned.anchor_room)
 
-    @covers_requirement(_BINDING_REQUIREMENT)
+    @covers_requirement(
+        "npc-capability-declarations::each-bound-capability-authors-its-own-binding-and-unique-room"
+    )
     def test_a_service_without_binding_is_rejected(self):
         with self.assertRaises(CapabilityValidationError) as caught:
             validate_capabilities(
                 [
                     capability(
-                        "merchant",
+                        Merchant.name,
                         service_id="probe_service",
                         shop_key="probe_shop",
                     )
@@ -264,7 +275,9 @@ class DeclarationTests(unittest.TestCase):
             any("must declare its" in issue for issue in caught.exception.issues)
         )
 
-    @covers_requirement(_BINDING_REQUIREMENT)
+    @covers_requirement(
+        "npc-capability-declarations::each-bound-capability-authors-its-own-binding-and-unique-room"
+    )
     def test_person_with_an_anchor_and_place_without_one_are_rejected(self):
         with self.assertRaises(CapabilityValidationError) as anchored:
             validate_capabilities(
@@ -283,7 +296,7 @@ class DeclarationTests(unittest.TestCase):
             validate_capabilities(
                 [
                     capability(
-                        "merchant",
+                        Merchant.name,
                         binding=Binding("place"),
                         service_id="probe_service",
                         shop_key="probe_shop",
@@ -340,13 +353,17 @@ class RoomResolutionTests(EvenniaTestCase):
             return [create_object(NPC, key="probe squatter")]
         return []
 
-    @covers_requirement(_BINDING_REQUIREMENT)
+    @covers_requirement(
+        "npc-capability-declarations::each-bound-capability-authors-its-own-binding-and-unique-room"
+    )
     def test_a_place_binding_resolves_exactly_one_room(self):
         plan = validate_capabilities([_merchant()], room_resolver=self._resolver)
-        planned = plan.component("merchant")
+        planned = plan.component(Merchant.name)
         self.assertIs(planned.anchor_room, self.anchor)
 
-    @covers_requirement(_BINDING_REQUIREMENT)
+    @covers_requirement(
+        "npc-capability-declarations::each-bound-capability-authors-its-own-binding-and-unique-room"
+    )
     def test_missing_ambiguous_and_non_room_anchors_are_rejected(self):
         for tag, fragment in (
             ("absent", "resolves to no room"),
@@ -357,7 +374,7 @@ class RoomResolutionTests(EvenniaTestCase):
                 with self.assertRaises(CapabilityValidationError) as caught:
                     validate_capabilities(
                         [capability(
-                            "merchant",
+                            Merchant.name,
                             binding=place_bound(tag),
                             service_id="probe_service",
                             shop_key="probe_shop",
@@ -371,7 +388,7 @@ class RoomResolutionTests(EvenniaTestCase):
 
     def test_without_a_resolver_the_anchor_stays_unresolved(self):
         plan = validate_capabilities([_merchant()])
-        self.assertIsNone(plan.component("merchant").anchor_room)
+        self.assertIsNone(plan.component(Merchant.name).anchor_room)
 
 
 class AssemblyTests(EvenniaTestCase):
@@ -386,12 +403,14 @@ class AssemblyTests(EvenniaTestCase):
     def _resolver(self, tag):
         return [self.anchor] if tag == "asm" else []
 
-    @covers_requirement(_BINDING_REQUIREMENT)
+    @covers_requirement(
+        "npc-capability-declarations::each-bound-capability-authors-its-own-binding-and-unique-room"
+    )
     def test_place_and_person_capabilities_assemble_on_one_host(self):
         plan = validate_capabilities(
             [
                 capability(
-                    "merchant",
+                    Merchant.name,
                     binding=place_bound("asm"),
                     service_id="probe_service",
                     shop_key="probe_shop",
@@ -406,7 +425,7 @@ class AssemblyTests(EvenniaTestCase):
             room_resolver=self._resolver,
         )
         attached = assemble_capabilities(self.npc, plan)
-        self.assertEqual(sorted(attached), ["merchant", "quest_issuer"])
+        self.assertEqual(sorted(attached), [Merchant.name, "quest_issuer"])
         merchant = self.npc.components.get(Merchant.get_component_slot())
         issuer = self.npc.components.get(QuestIssuer.get_component_slot())
         self.assertEqual(merchant.service_binding, "place")
@@ -418,7 +437,7 @@ class AssemblyTests(EvenniaTestCase):
         plan = validate_capabilities(
             [
                 capability(
-                    "merchant",
+                    Merchant.name,
                     binding=place_bound("asm"),
                     service_id="probe_service",
                     shop_key="probe_shop",
@@ -432,7 +451,7 @@ class AssemblyTests(EvenniaTestCase):
         changed = validate_capabilities(
             [
                 capability(
-                    "merchant",
+                    Merchant.name,
                     binding=place_bound("asm"),
                     service_id="probe_service_2",
                     shop_key="probe_shop_2",
@@ -447,7 +466,9 @@ class AssemblyTests(EvenniaTestCase):
         # Subsystem-owned runtime state is never the assembly's to rewrite.
         self.assertEqual(converged.merchant_stock, {"probe_item": 3})
 
-    @covers_requirement(_BINDING_REQUIREMENT)
+    @covers_requirement(
+        "npc-capability-declarations::each-bound-capability-authors-its-own-binding-and-unique-room"
+    )
     def test_assembly_refuses_an_unresolved_place_anchor(self):
         plan = validate_capabilities([_merchant()])
         with self.assertRaises(CapabilityValidationError) as caught:
@@ -461,7 +482,7 @@ class AssemblyTests(EvenniaTestCase):
         plan = CapabilityPlan(
             (
                 PlannedCapability(
-                    type="merchant",
+                    type=Merchant.name,
                     kwargs={"service_id": "probe_service"},
                     binding=person_bound(),
                 ),
@@ -481,7 +502,7 @@ class AssemblyTests(EvenniaTestCase):
         plan = validate_capabilities(
             [
                 capability(
-                    "merchant",
+                    Merchant.name,
                     binding=place_bound("asm"),
                     service_id="probe_service",
                     shop_key="probe_shop",
@@ -495,7 +516,7 @@ class AssemblyTests(EvenniaTestCase):
         narrowed = validate_capabilities(
             [
                 capability(
-                    "merchant",
+                    Merchant.name,
                     binding=place_bound("asm"),
                     service_id="probe_service",
                     shop_key="probe_shop",

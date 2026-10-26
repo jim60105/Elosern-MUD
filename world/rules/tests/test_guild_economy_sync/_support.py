@@ -238,13 +238,13 @@ def _merchant_host_name():
     return _merchant_row().name
 
 def _guild_branch_key():
-    return component_kwargs(_guild_row(), "guild_staff")["branch_key"]
+    return component_kwargs(_guild_row(), GuildStaff.name)["branch_key"]
 
 def _guild_dialogue_key():
     return component_kwargs(_guild_row(), "scripted_dialogue")["dialogue_key"]
 
 def _merchant_shop_key():
-    return component_kwargs(_merchant_row(), "merchant")["shop_key"]
+    return component_kwargs(_merchant_row(), Merchant.name)["shop_key"]
 
 class ServiceContentIsolation(QuestRegistryIsolation):
     def setUp(self):

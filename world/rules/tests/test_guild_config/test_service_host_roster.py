@@ -1,4 +1,4 @@
-"""Data-contract test: place-derived service host roster and place-declaration contract
+"""Data-contract test: place-derived service host roster and current place-declaration contract
 
 Slice of ``test_guild_config``: ServiceHostRosterTests. The derived service
 hosts are exactly the hosted place declarations, checked in both directions;

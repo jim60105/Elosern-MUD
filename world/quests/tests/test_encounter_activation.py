@@ -311,3 +311,31 @@ class EncounterActivationTests(EncounterActivationTestBase):
         grant = scene_store.list_commission_grants(self.published.package_id)[0]
         self.assertFalse(grant.registered)
         self.assertEqual(grant.npc_id, 0)
+
+    @covers_requirement(
+        "npc-capability-declarations::generated-commissioners-carry-complete-explicit-capability-configuration"
+    )
+    def test_the_generated_commissioner_receives_its_declared_person_bound_plan(self):
+        # Real publication -> activation -> provisioning: the commission role's
+        # declared capability plan is what the spawned actor carries, with the
+        # trusted scoped identity the deterministic boundary supplied.
+        from typeclasses.components import QuestIssuer
+        from world.quests.scene_package import generated_role_service_id
+        from world.rules.quest_issuance import resolve_issuer_key
+
+        result = self._activate("market")
+        self.assertTrue(result.activated)
+        binding = scene_store.get_role_binding(self.published.package_id, "mother")
+        self.assertIsNotNone(binding)
+        actor = ObjectDB.objects.get(pk=binding.npc_id)
+        component = actor.components.get(QuestIssuer.get_component_slot())
+        self.assertIsNotNone(component)
+        self.assertEqual(component.service_binding, "person")
+        self.assertIsNone(component.anchor_room_id)
+        self.assertEqual(component.issuer_key, "story_mother")
+        self.assertEqual(
+            component.service_id,
+            generated_role_service_id(self.published.package_id, "mother"),
+        )
+        self.assertEqual(resolve_issuer_key(actor), "npc:story_mother")
+        self.assertIn("npc:story_mother", result.commission_keys)

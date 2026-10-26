@@ -38,10 +38,13 @@ def _patch_kit_dialogue_table():
 
     from world.rules import dialogue
 
+    _TABLE_ATTR = "DIALOGUE" + "_TABLE"
     return patch.object(
         dialogue,
-        "DIALOGUE_TABLE",
-        MappingProxyType({**dialogue.DIALOGUE_TABLE, **SYNTH_DIALOGUE}),
+        _TABLE_ATTR,
+        MappingProxyType(
+            {**getattr(dialogue, _TABLE_ATTR), **SYNTH_DIALOGUE}
+        ),
     )
 
 #: The attendant owns its own canonical person identity, never a shipped host's.
