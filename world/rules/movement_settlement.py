@@ -34,12 +34,15 @@ and the script is the canonical registry singleton, so this is accepted and
 documented (design D2).
 """
 
+import contextvars
+from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, Iterator
 
 from django.db import transaction
 from evennia.utils.search import search_script
 
+from world.maps.area_identity import is_alignment_boundary, read_alignment_identity
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.observability import log_warn
 from world.quests.transitions import snapshot_pin_reasons, snapshot_quest_log
@@ -54,6 +57,15 @@ from world.rules.clock import (
     get_world_clock,
 )
 from world.rules.party import follow_scope
+from world.rules.presentation_events import (
+    AlignmentIdentity,
+    PresentationAlignmentFact,
+    current_publication_group,
+    emit_alignment_fact,
+    new_publication_group,
+    on_publication_commit,
+    publication_group,
+)
 from world.rules.surfaces import attribute_snapshot
 
 # Move-observable attribute surfaces the settlement can write on the traverser
@@ -123,6 +135,110 @@ class MovementSnapshot:
     tick_snapshot: Any
 
 
+# ---------------------------------------------------------------------------
+# Committed alignment checkpoints (webclient-movement-alignment).
+#
+# The deterministic movement owner is the only place a relocation is known to
+# have committed, so it is also the only place a movement checkpoint fact may
+# be captured. Capture is read-only: these helpers copy authoritative
+# identities into frozen values and hand one fact to the presentation layer's
+# registered observer. Nothing here mutates game state, builds a publication,
+# or imports the webclient.
+# ---------------------------------------------------------------------------
+
+
+#: Traversers whose relocation the running settlement will publish itself.
+_settlement_owners: contextvars.ContextVar[tuple[int, ...]] = contextvars.ContextVar(
+    "elosern_movement_settlement_owners", default=()
+)
+
+#: Source identities of direct moves no settlement owns, per actor id.
+_direct_move_sources: contextvars.ContextVar[
+    tuple[tuple[int, AlignmentIdentity | None], ...]
+] = contextvars.ContextVar("elosern_direct_move_sources", default=())
+
+
+@contextmanager
+def settlement_scope(actor: Any) -> Iterator[None]:
+    """Mark that the movement settlement owns ``actor``'s relocation here.
+
+    ``PlayerCharacter`` also captures direct moves in its own move hooks; the
+    scope lets that hook stand down for exactly the actors the settlement will
+    publish, so one traversal emits one fact. The marker is per actor, so an
+    unrelated actor moved inside the same synchronous chain (a follower, a
+    possessed body, a second player) keeps its own capture.
+    """
+    actor_id = int(actor.pk)
+    token = _settlement_owners.set(_settlement_owners.get() + (actor_id,))
+    try:
+        yield
+    finally:
+        _settlement_owners.reset(token)
+
+
+def settlement_owns_movement(actor: Any) -> bool:
+    """Whether the running settlement publishes ``actor``'s relocation."""
+    return int(actor.pk) in _settlement_owners.get()
+
+
+def publish_movement_boundary(
+    actor: Any,
+    source_identity: AlignmentIdentity | None,
+    destination_identity: AlignmentIdentity | None,
+) -> None:
+    """Publish one committed movement checkpoint when the transition crossed.
+
+    Both identities are already-copied values: ``source_identity`` was read
+    before the traversal (so a pooled room mutated by it cannot rewrite the
+    source) and ``destination_identity`` was read after the settled relocation
+    and any compensation (so a failure or a rollback that restored the source
+    position cannot publish a boundary). Only the *emission* waits for the
+    surrounding transaction, so a rolled-back outer transaction still emits
+    nothing, while a same-area relocation emits nothing at all.
+    """
+    if not is_alignment_boundary(source_identity, destination_identity):
+        return
+    actor_id = int(actor.pk)
+
+    def _committed() -> None:
+        group = current_publication_group() or new_publication_group()
+        emit_alignment_fact(
+            PresentationAlignmentFact(
+                group_id=group.id,
+                actor_id=actor_id,
+                cause="movement_boundary",
+                source=source_identity,
+                destination=destination_identity,
+            )
+        )
+
+    on_publication_commit(_committed)
+
+
+def note_direct_move_start(actor: Any) -> None:
+    """Copy the source identity of a direct move no settlement owns."""
+    if settlement_owns_movement(actor):
+        return
+    actor_id = int(actor.pk)
+    identity = read_alignment_identity(actor)
+    kept = tuple(entry for entry in _direct_move_sources.get() if entry[0] != actor_id)
+    _direct_move_sources.set(kept + ((actor_id, identity),))
+
+
+def note_direct_move_end(actor: Any) -> None:
+    """Publish the committed checkpoint of a direct move, at most once."""
+    if settlement_owns_movement(actor):
+        return
+    actor_id = int(actor.pk)
+    sources = _direct_move_sources.get()
+    for index, (key, identity) in enumerate(sources):
+        if key != actor_id:
+            continue
+        _direct_move_sources.set(sources[:index] + sources[index + 1 :])
+        publish_movement_boundary(actor, identity, read_alignment_identity(actor))
+        return
+
+
 def settle_movement(
     traversing_object: Any,
     source_location: Any,
@@ -172,64 +288,88 @@ def settle_movement(
 
         before = visited_before_traversal(traversing_object)
         source_node = traversal_node_id(traversing_object, source_location)
-    snapshot = _snapshot_movement_state(
-        traversing_object,
-        source_location,
-        destination=destination,
-        wilderness_coordinates=wilderness_coordinates,
-        wilderness_source_coordinates=wilderness_source_coordinates,
-        window_seconds=window_seconds,
-    )
-    try:
-        from world.quests.escort_events import escort_event_boundary
+    # The committed area/instance identity of the position being left. It is
+    # read before the traversal, so a pooled room the move recycles or mutates
+    # cannot rewrite which area the traverser left.
+    source_identity = read_alignment_identity(traversing_object)
+    # Every panel push, checkpoint fact and settlement callback of this
+    # traversal shares one causal publication group, so each watcher receives
+    # one final publication for the commit (webclient-publication-settlements).
+    with publication_group(), settlement_scope(traversing_object):
+        snapshot = _snapshot_movement_state(
+            traversing_object,
+            source_location,
+            destination=destination,
+            wilderness_coordinates=wilderness_coordinates,
+            wilderness_source_coordinates=wilderness_source_coordinates,
+            window_seconds=window_seconds,
+        )
+        try:
+            from world.quests.escort_events import escort_event_boundary
 
-        with escort_event_boundary((
-            traversing_object, *(state.entity for state in snapshot.companions),
-        )), transaction.atomic():
-            result = traverse()
-            # A published encounter whose declared locator covers the settled
-            # position activates here, inside the owning movement transaction
-            # and before the boundary's trailing final escort/outcome
-            # evaluation, so a meeting role exists before the shared evaluator
-            # observes the resulting position (dream-story-dispatch §7). The
-            # pass never raises: a refused encounter store can never cancel a
-            # completed move.
-            from world.quests.encounter_dispatch import activate_pending_encounters
+            with escort_event_boundary((
+                traversing_object, *(state.entity for state in snapshot.companions),
+            )), transaction.atomic():
+                result = traverse()
+                # A published encounter whose declared locator covers the settled
+                # position activates here, inside the owning movement transaction
+                # and before the boundary's trailing final escort/outcome
+                # evaluation, so a meeting role exists before the shared evaluator
+                # observes the resulting position (dream-story-dispatch §7). The
+                # pass never raises: a refused encounter store can never cancel a
+                # completed move.
+                from world.quests.encounter_dispatch import activate_pending_encounters
 
-            activate_pending_encounters(
+                activate_pending_encounters(
+                    traversing_object,
+                    room=getattr(traversing_object, "location", None),
+                    tick=int(get_world_clock().tick),
+                )
+        except Exception:
+            _compensate_after_rollback(snapshot)
+            raise
+        wilderness_lineage = (
+            wilderness_coordinates is not None or wilderness_source_coordinates is not None
+        )
+        if (
+            not result
+            and wilderness_lineage
+            and traversing_object.location is not source_location
+        ):
+            _compensate_after_rollback(snapshot)
+        settled = traversing_object.location is not source_location
+        if wilderness_lineage and result and not settled:
+            # A terrain room is a pooled view over coordinates: a successful
+            # step may stay on the same room object while the traverser moved to
+            # another cell. The wilderness identity is the registered map, so
+            # this can never fake a boundary inside one continuous area.
+            settled = True
+        if settled:
+            # A settled relocation: any dialogue the character was holding
+            # belongs to the room it left (webclient-align-07). Checked against
+            # the post-compensation location, so a falsy wilderness return that
+            # was moved back never clears; the plain-exit lineage returns
+            # ``None`` on both branches, so the location is the only reliable
+            # success signal.
+            from world.rules.dialogue import clear_dialogue_session
+
+            # The moving actor owns the session, including a possessed companion
+            # acting through the transferred puppet.
+            clear_dialogue_session(traversing_object)
+            # The committed checkpoint, captured only for a settled relocation:
+            # a refusal, a rollback or a compensated falsy return publishes
+            # nothing, and a same-area move stays incremental.
+            publish_movement_boundary(
                 traversing_object,
-                room=getattr(traversing_object, "location", None),
-                tick=int(get_world_clock().tick),
+                source_identity,
+                read_alignment_identity(traversing_object),
             )
-    except Exception:
-        _compensate_after_rollback(snapshot)
-        raise
-    wilderness_lineage = (
-        wilderness_coordinates is not None or wilderness_source_coordinates is not None
-    )
-    if (
-        not result
-        and wilderness_lineage
-        and traversing_object.location is not source_location
-    ):
-        _compensate_after_rollback(snapshot)
-    if traversing_object.location is not source_location:
-        # A settled relocation: any dialogue the character was holding belongs
-        # to the room it left (webclient-align-07). Checked against the
-        # post-compensation location, so a falsy wilderness return that was
-        # moved back never clears; the plain-exit lineage returns ``None`` on
-        # both branches, so the location is the only reliable success signal.
-        from world.rules.dialogue import clear_dialogue_session
+        if narrate_traversal and not (wilderness_lineage and not result):
+            from world.rules.map_discovery import publish_traversal_narrative
 
-        # The moving actor owns the session, including a possessed companion
-        # acting through the transferred puppet.
-        clear_dialogue_session(traversing_object)
-    if narrate_traversal and not (wilderness_lineage and not result):
-        from world.rules.map_discovery import publish_traversal_narrative
-
-        if traversal_node_id(traversing_object, traversing_object.location) != source_node:
-            publish_traversal_narrative(traversing_object, before)
-    return result
+            if traversal_node_id(traversing_object, traversing_object.location) != source_node:
+                publish_traversal_narrative(traversing_object, before)
+        return result
 
 
 def settle_relocation(entity: Any, destination: Any) -> None:
@@ -265,52 +405,64 @@ def settle_relocation(entity: Any, destination: Any) -> None:
     source_coordinates = (
         source.coordinates if source_wilderness is not None else None
     )
-    snapshot = _snapshot_movement_state(
-        entity,
-        source,
-        destination=destination,
-        wilderness_coordinates=None,
-        wilderness_source_coordinates=source_coordinates,
-    )
-    attrs = snapshot_attributes(entity, ("dialogue_session",))
-    try:
-        with transaction.atomic():
-            destination_wilderness = getattr(destination, "wilderness", None)
-            if destination_wilderness is not None:
-                # A terrain room is a pooled view over coordinates: a plain
-                # move_to runs the contrib's receive hook without the extra
-                # move kwargs and leaves the entity registered at its old
-                # cell. Gate explicitly, then enter through the provider API.
-                if not destination.at_pre_object_receive(entity, source):
-                    raise ConsoleError("invalid_argument", "movement_refused")
-                from evennia.contrib.grid.wilderness.wilderness import (
-                    enter_wilderness,
-                )
+    # The committed identity of the position being left, copied before any
+    # write (the same reason the coordinates above are captured here).
+    source_identity = read_alignment_identity(entity)
+    with publication_group(), settlement_scope(entity):
+        snapshot = _snapshot_movement_state(
+            entity,
+            source,
+            destination=destination,
+            wilderness_coordinates=None,
+            wilderness_source_coordinates=source_coordinates,
+        )
+        attrs = snapshot_attributes(entity, ("dialogue_session",))
+        try:
+            with transaction.atomic():
+                destination_wilderness = getattr(destination, "wilderness", None)
+                if destination_wilderness is not None:
+                    # A terrain room is a pooled view over coordinates: a plain
+                    # move_to runs the contrib's receive hook without the extra
+                    # move kwargs and leaves the entity registered at its old
+                    # cell. Gate explicitly, then enter through the provider API.
+                    if not destination.at_pre_object_receive(entity, source):
+                        raise ConsoleError("invalid_argument", "movement_refused")
+                    from evennia.contrib.grid.wilderness.wilderness import (
+                        enter_wilderness,
+                    )
 
-                moved = enter_wilderness(
+                    moved = enter_wilderness(
+                        entity,
+                        coordinates=destination.coordinates,
+                        name=destination_wilderness.db_key or WILDERNESS_NAME,
+                    )
+                else:
+                    moved = entity.move_to(destination, quiet=True, move_type="teleport")
+                if not moved:
+                    raise ConsoleError("invalid_argument", "movement_refused")
+                record_arrival(entity)
+                follow_companions(
                     entity,
-                    coordinates=destination.coordinates,
-                    name=destination_wilderness.db_key or WILDERNESS_NAME,
+                    source,
+                    destination=destination,
+                    wilderness_source_coordinates=source_coordinates,
                 )
-            else:
-                moved = entity.move_to(destination, quiet=True, move_type="teleport")
-            if not moved:
-                raise ConsoleError("invalid_argument", "movement_refused")
-            record_arrival(entity)
-            follow_companions(
-                entity,
-                source,
-                destination=destination,
-                wilderness_source_coordinates=source_coordinates,
-            )
-            observe_arrival_lore(entity, destination)
-            reanchor_home_on_gate_arrival(entity, destination)
-            if source is not destination:
-                clear_dialogue_session(entity)
-    except Exception:
-        _compensate(snapshot)
-        restore_attributes(entity, attrs)
-        raise
+                observe_arrival_lore(entity, destination)
+                reanchor_home_on_gate_arrival(entity, destination)
+                if source is not destination:
+                    clear_dialogue_session(entity)
+                # Registered last inside the owning transaction: any later
+                # failure rolls the relocation back together with this
+                # checkpoint, so a refused or failed teleport publishes nothing.
+                publish_movement_boundary(
+                    entity,
+                    source_identity,
+                    read_alignment_identity(entity),
+                )
+        except Exception:
+            _compensate(snapshot)
+            restore_attributes(entity, attrs)
+            raise
 
 
 def _snapshot_movement_state(

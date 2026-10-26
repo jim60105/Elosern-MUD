@@ -29,6 +29,7 @@ from web.webclient.presentation.protocol import MAX_SAFE_INTEGER
 from world.observability import log_error, log_warn
 from world.rules.clock import DaypartError, get_world_clock, seconds_until_daypart
 from world.rules.combat_session import CombatSessionError, SessionReason, engage
+from world.rules.presentation_events import publication_group
 from world.rules.dialogue import (
     DuplicateSelectionError,
     StaleContextError,
@@ -634,25 +635,38 @@ def _move_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> d
         log_warn("exit_access_failed", context={"char": actor.pk, "exit": exit_obj.pk}, exc=exc)
         return _rejected("locked", "此出口目前無法通行。")
     source_location = actor.location
-    try:
-        exit_obj.at_traverse(actor, destination)
-    except Exception as exc:
-        log_error("exit_traverse_failed", context={"char": actor.pk, "exit": exit_obj.pk}, exc=exc)
-        return _rejected("move_failed", "移動失敗。")
-    if actor.location is source_location and _current_node(actor) in (None, current_node):
-        # ``at_traverse`` returns None on both branches (the movement cost and
-        # knowledge hooks live in ``at_post_traverse``), so success is detected
-        # by the actor actually relocating. Wilderness rooms may be reused:
-        # their canonical coordinate node changes without object replacement.
-        from world.rules.combat_session import is_in_active_session
+    # The traversal, its committed settlement and this result share one causal
+    # publication group. The group bound here is the dispatcher's invocation
+    # group (a nested scope reuses it); the private slot below makes the
+    # attachment explicit, so a completion enqueued before the reactor drain
+    # always names the group the movement checkpoint joined and the two
+    # coalesce into one publication.
+    with publication_group() as captured:
+        try:
+            exit_obj.at_traverse(actor, destination)
+        except Exception as exc:
+            log_error("exit_traverse_failed", context={"char": actor.pk, "exit": exit_obj.pk}, exc=exc)
+            return _rejected("move_failed", "移動失敗。")
+        if actor.location is source_location and _current_node(actor) in (None, current_node):
+            # ``at_traverse`` returns None on both branches (the movement cost
+            # and knowledge hooks live in ``at_post_traverse``), so success is
+            # detected by the actor actually relocating. Wilderness rooms may
+            # be reused: their canonical coordinate node changes without object
+            # replacement.
+            from world.rules.combat_session import is_in_active_session
 
-        if is_in_active_session(actor):
-            return _rejected("in_combat", "你仍在戰鬥中，無法移動。")
-        return _rejected("move_failed", "移動失敗。")
-    message = f"你移動到了{actor.location.key}。"
-    # The shared exit settlement publishes the committed movement narrative,
-    # including first-landmark discovery, once for every traversal lineage.
-    return _success("moved", message, AFFECTED_FULL)
+            if is_in_active_session(actor):
+                return _rejected("in_combat", "你仍在戰鬥中，無法移動。")
+            return _rejected("move_failed", "移動失敗。")
+        message = f"你移動到了{actor.location.key}。"
+        # The shared exit settlement publishes the committed movement
+        # narrative, including first-landmark discovery, once for every
+        # traversal lineage.
+        result = _success("moved", message, AFFECTED_FULL)
+    from web.webclient.actions.dispatcher import PUBLICATION_GROUP_FIELD
+
+    result[PUBLICATION_GROUP_FIELD] = captured.id
+    return result
 
 
 def _look_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:

@@ -58,25 +58,18 @@ from web.webclient.presentation.map_panels import (
 from web.webclient.presentation.protocol import json_byte_size
 from web.webclient.presentation.registry import PanelUnavailableError
 from world.observability import log_warn
+from world.maps.area_identity import (
+    AreaGraphOverBound as _OverBound,
+    ROOM_GRAPH_MAX_ROOMS,
+    room_component as _room_component,
+)
 from world.rules.map_knowledge import KnowledgeError, encode_grid, encode_room, encode_wild, parse_knowledge
 
 #: Label of a room-graph node the player has not entered (minimap rule: the
 #: room name is withheld until a visit).
 UNEXPLORED_LABEL = "未探索"
 
-#: Upper bound on the same-family rooms walked to name a room graph. The walk
-#: only fixes the graph's stable identity; the emitted (known) set is bounded
-#: separately by ``AREA_MAX_NODES``.
-ROOM_GRAPH_MAX_ROOMS = 4_096
-
-#: ``__in`` list size per query, well under SQLite's bound-variable limit.
-_QUERY_CHUNK = 200
-
 _HALF_WINDOW = WILDERNESS_WINDOW // 2
-
-
-class _OverBound(Exception):
-    """An area graph exceeds its measured finite bound (never truncated)."""
 
 
 # ---------------------------------------------------------------------------
@@ -239,60 +232,6 @@ def _grid_area(actor: Any, location: Any, visit_ids: set[str]) -> dict[str, Any]
 # ---------------------------------------------------------------------------
 # Instance / interior room graphs.
 # ---------------------------------------------------------------------------
-
-
-def _chunks(values: list[Any]) -> Iterable[list[Any]]:
-    for start in range(0, len(values), _QUERY_CHUNK):
-        yield values[start : start + _QUERY_CHUNK]
-
-
-def _room_exits(room_ids: list[int]) -> list[Any]:
-    """Every exit leaving or entering one of ``room_ids`` (chunked queries)."""
-    from django.db.models import Q
-    from evennia.objects.models import ObjectDB
-
-    exits: dict[int, Any] = {}
-    for chunk in _chunks(room_ids):
-        query = ObjectDB.objects.filter(
-            Q(db_location__in=chunk) | Q(db_destination__in=chunk),
-            db_destination__isnull=False,
-        )
-        for obj in query:
-            if getattr(obj, "destination", None) is not None:
-                exits[int(obj.id)] = obj
-    return [exits[key] for key in sorted(exits)]
-
-
-def _room_component(location: Any, same_family: Callable[[Any], bool]) -> tuple[dict[int, Any], list[Any]]:
-    """The same-family rooms connected to ``location`` and every exit seen.
-
-    Exits count in both directions, so one-way passages still join the graph.
-    The walk ends at the family boundary and is bounded by
-    ``ROOM_GRAPH_MAX_ROOMS``.
-    """
-    rooms: dict[int, Any] = {int(location.id): location}
-    frontier = [int(location.id)]
-    exits: dict[int, Any] = {}
-    while frontier:
-        found: list[int] = []
-        for exit_obj in _room_exits(frontier):
-            exits[int(exit_obj.id)] = exit_obj
-            for end in (exit_obj.location, exit_obj.destination):
-                if end is None or not getattr(end, "id", None):
-                    continue
-                end_id = int(end.id)
-                if end_id in rooms or not same_family(end):
-                    continue
-                rooms[end_id] = end
-                found.append(end_id)
-        if len(rooms) > ROOM_GRAPH_MAX_ROOMS:
-            log_warn(
-                "area_map_over_bound",
-                context={"layer": "room_graph", "room": int(location.id), "rooms": len(rooms)},
-            )
-            raise _OverBound
-        frontier = found
-    return rooms, [exits[key] for key in sorted(exits)]
 
 
 def _room_graph_area(actor: Any, location: Any, visit_ids: set[str], *, is_instance: bool) -> dict[str, Any]:
