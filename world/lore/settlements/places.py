@@ -13,7 +13,7 @@ and never rewrites them on a later sync, so an authored edit takes effect
 through roster convergence rather than a backfill.
 
 A place's host is optional as ONE indivisible group: a place either authors
-the complete host (name, title, race, sex, profile key — with a subrace and
+the complete host (name, race, sex, profile key — with a subrace and
 capability declarations as its optional parts) or authors none of it,
 describing a place that simply exists: a plaza, a forecourt, a quay. A
 partially authored host is a load error, not a half-built NPC. A hosted place
@@ -90,7 +90,6 @@ class PlaceDefinition:
     # all-or-nothing set; host_subrace stays outside the count because None is
     # a legitimate authored value even for a place with a host).
     host_name: str | None = None
-    host_title: str | None = None
     host_race: str | None = field(  # RACE_REGISTRY key
         default=None, metadata=ref("races", inverse="host_places", nullable=True)
     )
@@ -182,7 +181,6 @@ def place_service_ids(place: PlaceDefinition) -> tuple[str, ...]:
 # even on a host-declaring place (every capital host authors None today).
 HOST_IDENTITY_FIELDS: tuple[str, ...] = (
     "host_name",
-    "host_title",
     "host_race",
     "host_sex",
     "host_profile_key",

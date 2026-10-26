@@ -40,7 +40,7 @@ class NpcPersonaPrivacyAndBoundsTest(EvenniaTest):
         self.player.location = self.room
 
         self.npc = create_object(NPC, key="機密NPC")
-        self.npc.npc_title = "機密人物"
+        self.npc.attributes.add("npc_title", "機密人物")
         self.npc.location = self.room
 
         self.secret_text = "極度機密絕不外流的生平與暗號"

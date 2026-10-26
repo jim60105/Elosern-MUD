@@ -151,7 +151,7 @@ def _apply_authored_initial_arousal(host: NPC, plan, attached: list[str]) -> Non
 def _sync_service_host(row, room, plan, host=None, *, created: list[NPC]) -> NPC:
     """Create or converge one source-managed host from a roster row.
 
-    A reused host keeps its dbref, name, title, persona, traits, inventory,
+    A reused host keeps its dbref, name, persona, traits, inventory,
     relationships and location: this sync never relocates, renames, retitles or
     rebuilds anything identity-shaped. What it does converge is the declaration:
     the managed capability set (add missing, remove obsolete) and the authored
@@ -185,11 +185,10 @@ def _create_and_initialize_host(
     row, room, profile=None, *, created: list[NPC]
 ) -> NPC:
     """Build, baseline, initialize persona, and schedule creation event."""
-    from world.rules.npc_identity import validate_npc_name, validate_npc_title
+    from world.rules.npc_identity import validate_npc_name
 
     host = create_object(NPC, key=validate_npc_name(row.name), location=room)
     created.append(host)
-    host.npc_title = validate_npc_title(row.title)
     place = PLACE_REGISTRY.get(row.spawn_room)
     if place is None:
         raise RuntimeError(

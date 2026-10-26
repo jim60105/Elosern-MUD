@@ -35,7 +35,7 @@ class GuildNPCIdentityTests(unittest.TestCase):
     def test_invalid_branch_host_name_is_named_by_row_and_field(self):
         row = GUILD_BRANCH_REGISTRY["guild_branch_altoria"]
         bad = {
-            "k": GuildBranch(row.key, row.display_name_zh, "  ", row.host_title, row.anchor_key)
+            "k": GuildBranch(row.key, row.display_name_zh, "  ", row.anchor_key)
         }
         with self.assertRaises(ValueError) as caught:
             validate_guild_npc_identities(branches=bad)

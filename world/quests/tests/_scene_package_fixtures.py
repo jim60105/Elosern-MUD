@@ -43,7 +43,6 @@ def topic(topic_id: str, keyword: str, text: str, **overrides) -> dict:
 def characterization(tag: str) -> dict:
     return {
         "display_name": f"測試住民{tag}",
-        "title": "迷路的旅人",
         "age": 30,
         "apparent_age": 30,
         "portrait": {"stable_key": f"test_portrait_{tag}"},

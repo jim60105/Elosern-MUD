@@ -162,7 +162,7 @@ class MemberGiveCommandTests(_TransferCommandBase):
 
     def test_member_give_resolves_the_display_name_without_a_mirror(self):
         self._hold(self.commander, _POTION.key)
-        self.aila.npc_title = "合成稱號"
+        self.aila.attributes.add("npc_title", "合成稱號")
 
         output = self._give(f"{_POTION.display_name_zh} = 艾拉")
 
@@ -298,7 +298,7 @@ class RetrieveCommandTests(_TransferCommandBase):
     )
     def test_retrieve_moves_a_copy_to_the_commander_without_advancing_time(self):
         self._hold(self.aila, _POTION.key, _POTION.key)
-        self.aila.npc_title = "合成稱號"
+        self.aila.attributes.add("npc_title", "合成稱號")
         first = self._mirror(self.aila, _POTION.key)
         second = self._mirror(self.aila, _POTION.key)
         tick = get_world_clock().tick

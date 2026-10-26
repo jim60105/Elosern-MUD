@@ -66,7 +66,6 @@ class ServiceHostRow:
     """
 
     name: str
-    title: str
     spawn_room: str
     components: "tuple[CapabilityDeclaration, ...]"
     profile_key: str

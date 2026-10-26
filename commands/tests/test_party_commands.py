@@ -135,7 +135,7 @@ class PartyCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         # npc-title-identity-core D8: targeting never learns the title. The
         # composed string is not a key, alias, or search hit; the plain name
         # resolves exactly as before the title existed.
-        self.npc.npc_title = "南門守衛"
+        self.npc.attributes.add("npc_title", "南門守衛")
         found = self.char1.search("艾洛希雅", quiet=True)
         first = found[0] if isinstance(found, list) and found else found
         self.assertEqual(int(getattr(first, "pk", -1)), int(self.npc.pk))

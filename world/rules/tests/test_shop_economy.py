@@ -1502,7 +1502,6 @@ class ShopCompletenessDefectTests(EvenniaTestCase):
         second_shop = ShopDefinition(
             key=self.SECOND_SHOP,
             host_name="苔徑二號攤",
-            host_title="苔徑市集合成二號攤主",
             assortment_keys=("t_mossgate_goods",),
         )
         open_synthetic_scope(
@@ -1577,7 +1576,6 @@ class ShopAssortmentResolutionTests(EvenniaTestCase):
         shop = ShopDefinition(
             key="t_unknown_ref_stall",
             host_name="苔徑迷路攤",
-            host_title="苔徑市集合成迷路攤主",
             assortment_keys=("t_no_such_assortment",),
         )
         open_synthetic_scope(
@@ -1606,7 +1604,6 @@ class ShopAssortmentResolutionTests(EvenniaTestCase):
         shop = ShopDefinition(
             key="t_overlap_stall",
             host_name="苔徑疊櫃攤",
-            host_title="苔徑市集合成疊櫃攤主",
             assortment_keys=("t_mossgate_goods", self.OVERLAP_ASSORTMENT),
         )
         open_synthetic_scope(
@@ -1647,7 +1644,6 @@ class ShopAssortmentResolutionTests(EvenniaTestCase):
         shop = ShopDefinition(
             key="t_shared_apple_stall",
             host_name="苔徑蘋果攤",
-            host_title="苔徑市集合成蘋果攤主",
             assortment_keys=(self.OVERLAP_ASSORTMENT,),
         )
         open_synthetic_scope(

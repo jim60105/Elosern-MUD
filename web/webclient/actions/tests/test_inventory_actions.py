@@ -634,7 +634,7 @@ class InventoryToggleAdapterTests(InventoryActionBase):
     )
     def test_companion_toggle_names_the_member_and_leaves_the_commander_alone(self):
         companion = self._companion()
-        companion.npc_title = "合成稱號"
+        companion.attributes.add("npc_title", "合成稱號")
         companion.db.inventory = [_T_BLADE.key]
         self.player.db.inventory = [_T_BLADE.key]
         result = _inventory_toggle_equip_adapter(

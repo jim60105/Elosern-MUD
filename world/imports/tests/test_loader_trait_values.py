@@ -293,60 +293,29 @@ class LoaderLineageAutoSeedTests(EvenniaTestCase):
 
 
 class LoaderTitleTests(EvenniaTestCase):
-    """npc-title-import-pipeline: the loader is the import face's title writer."""
+    """npc-title-authoring-removal: no import path writes an NPC title."""
 
-    @covers_requirement("npc-identity-titles::the-import-loader-persists-the-validated-title-on-npc-entities-only")
-    def test_imported_npc_reads_back_its_authored_title(self):
+    def test_imported_npc_persists_no_title_attribute(self):
         entity = instantiate_character(example_record())
-        self.assertEqual(entity.npc_title, "參考範例")
+        self.assertIsNone(entity.attributes.get("npc_title"))
+        self.assertEqual(entity.key, example_record()["key"])
 
-    def test_title_persists_in_the_stripped_canonical_form(self):
-        record = example_record()
-        record["title"] = " 南門守衛 "
-        entity = instantiate_character(record)
-        self.assertEqual(entity.npc_title, "南門守衛")
-
-    def test_padding_heavy_title_persists_the_validators_canonical_form(self):
-        # End-to-end half of the validator-equivalence contract: a raw value
-        # over the bound that the validator canonicalizes and accepts must
-        # persist as the stripped form, proving no raw-length behavior in the
-        # loader either (npc-identity-titles).
-        record = example_record()
-        record["title"] = " " * 40 + "衛"
-        entity = instantiate_character(record)
-        self.assertEqual(entity.npc_title, "衛")
-
-    def test_padding_heavy_title_persists_stripped_end_to_end(self):
-        # The delta's padding-heavy scenario end to end: the validator's
-        # acceptance -- not the raw length -- governs creation too, so the
-        # raw-40-space title the structural phase accepted lands stripped.
-        record = example_record()
-        record["title"] = " " * 40 + "衛"
-        entity = instantiate_character(record)
-        self.assertEqual(entity.npc_title, "衛")
-
-    @covers_requirement("npc-identity-titles::the-import-loader-persists-the-validated-title-on-npc-entities-only")
     def test_player_character_import_persists_no_title(self):
         entity = instantiate_character(example_record(), PlayerCharacter)
         self.assertIsInstance(entity, PlayerCharacter)
         self.assertIsNone(entity.attributes.get("npc_title"))
 
-    def test_player_character_record_still_requires_a_valid_title(self):
-        record = example_record()
-        record["title"] = "南門 衛"
-        with self.assertRaises(ImportRejected):
-            instantiate_character(record, PlayerCharacter)
-
-    def test_missing_title_rejects_without_construction(self):
-        record = example_record()
-        del record["title"]
-        with self.assertRaises(ImportRejected):
-            instantiate_character(record)
+    def test_a_legacy_title_rejects_without_construction(self):
+        for legacy in ("南門守衛", "南門 守衛", 5):
+            with self.subTest(title=repr(legacy)):
+                record = example_record()
+                record["title"] = legacy
+                with self.assertRaises(ImportRejected):
+                    instantiate_character(record)
         self.assertFalse(NPC.objects.filter(db_key="human_reference").exists())
 
-
     @covers_requirement("npc-identity-titles::the-existing-import-contracts-are-unchanged-by-the-added-title-field")
-    def test_verbatim_seams_survive_the_added_field(self):
+    def test_verbatim_seams_survive_the_title_removal(self):
         record = example_record()
         entity = instantiate_character(record)
         self.assertEqual(entity.db.persona, record["persona"])
@@ -364,16 +333,3 @@ class LoaderTitleTests(EvenniaTestCase):
         )
         self.assertEqual(entity.db.disguised_stats, record["disguised_stats"] or None)
 
-    def test_internal_seam_rejects_invalid_title_before_construction(self):
-        # Design D3's fail-closed second gate: even a caller that bypasses
-        # validation and reaches the private construction seam directly must
-        # raise BEFORE any object is created — never a half-built untitled
-        # NPC. The validator raises NPCTitleError here, not ImportRejected.
-        from world.imports.loader import _instantiate_validated_character
-        from world.rules.npc_identity import NPCTitleError
-
-        record = example_record()
-        record["title"] = "南門 衛"
-        with self.assertRaises(NPCTitleError):
-            _instantiate_validated_character(record)
-        self.assertFalse(NPC.objects.filter(db_key="human_reference").exists())

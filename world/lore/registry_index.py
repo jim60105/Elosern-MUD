@@ -156,7 +156,7 @@ REGISTRY_INDEX: tuple[RegistrySpec, ...] = (
     # 聚落
     _spec("settlements", "聚落", "聚落", _attr("world.lore.settlements.settlements", "SETTLEMENT_REGISTRY"), f"{_LORE}/settlements/settlements.py", "archetype", "zcoord"),
     _spec("places", "場所", "聚落", _attr("world.lore.settlements.places", "PLACE_REGISTRY"), f"{_LORE}/settlements", "room_name_zh", "settlement_key", "kind"),
-    _spec("shops", "商店", "聚落", _attr("world.lore.settlements.shops", "SHOP_REGISTRY"), f"{_LORE}/settlements/shops.py", "host_name", "host_title"),
+    _spec("shops", "商店", "聚落", _attr("world.lore.settlements.shops", "SHOP_REGISTRY"), f"{_LORE}/settlements/shops.py", "host_name"),
     # 人物
     _spec("npc_profiles", "NPC 人物設定", "人物", _attr("world.lore.npc_profiles", "NPC_PROFILE_REGISTRY"), f"{_LORE}/npc_profiles", "card.identity.public", "apparent_age"),
     _spec("dialogue", "對話表", "人物", _attr("world.lore.dialogue", "DIALOGUE_ROWS"), f"{_LORE}/dialogue", "greeting"),
@@ -171,7 +171,7 @@ REGISTRY_INDEX: tuple[RegistrySpec, ...] = (
     _spec("quest_definitions", "任務定義", "任務", _quest_definitions, "world/quests/catalog.py", "display_name", "quest_type", "rank"),
     # 規則書
     _spec("shop_configs", "商店營業設定", "規則書", _guild_section("shop_configs"), f"{_RULEBOOK}/commerce", "display_name_zh", "open_hour", "close_hour"),
-    _spec("service_hosts", "服務主持人", "規則書", _guild_section("service_hosts"), f"{_LORE}/settlements/places.py", "name", "title", "spawn_room"),
+    _spec("service_hosts", "服務主持人", "規則書", _guild_section("service_hosts"), f"{_LORE}/settlements/places.py", "name", "spawn_room"),
     _spec("monster_behaviour_profiles", "魔物行為設定", "規則書", _attr("world.rules.monster_behaviour", "BEHAVIOUR_PROFILES"), f"{_RULEBOOK}/monster_behaviour.yaml", "target_strategy", "skill_choice"),
 )
 

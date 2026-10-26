@@ -66,7 +66,6 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             row = by_host[place.host_profile_key]
             with self.subTest(host_key=place.host_profile_key):
                 self.assertEqual(row.name, place.host_name)
-                self.assertEqual(row.title, place.host_title)
                 self.assertEqual(row.spawn_room, place.key)
                 self.assertEqual(row.components, place.components)
                 self.assertEqual(
@@ -97,9 +96,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         ]
         branch = GUILD_BRANCH_REGISTRY[branch_key]
         guild_row = by_host[guild_place.host_profile_key]
-        self.assertEqual(
-            (guild_row.name, guild_row.title), (branch.host_name, branch.host_title)
-        )
+        self.assertEqual(guild_row.name, branch.host_name)
         for place in _hosted_places():
             shop_key = place_shop_identity(place)
             if shop_key is None:
@@ -107,9 +104,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             with self.subTest(place=place.key):
                 shop = SHOP_REGISTRY[shop_key]
                 row = by_host[place.host_profile_key]
-                self.assertEqual(
-                    (row.name, row.title), (shop.host_name, shop.host_title)
-                )
+                self.assertEqual(row.name, shop.host_name)
 
     def test_catalog_exposes_the_roster(self):
         catalog = load_guild_catalog(QUEST_DEFINITION_REGISTRY)
@@ -175,8 +170,6 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
     def test_named_offenses_raise_the_catalog_error_family_without_db_access(self):
         store = PLACE_REGISTRY["altoria_general_store"]
         mutations = [
-            # Empty (whitespace-only) required field.
-            replace(store, key="t_offense", host_title="   "),
             # Missing (empty) required field.
             replace(store, key="t_offense", host_name=""),
             # Non-string spawn room tag (the place key doubles as the tag).
@@ -423,7 +416,6 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             PLACE_REGISTRY["altoria_general_store"],
             key=key,
             host_name=None,
-            host_title=None,
             host_race=None,
             host_subrace=None,
             host_sex=None,
@@ -455,7 +447,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         # The skip must never turn malformed material into a silent empty
         # room: a row with a host name and no profile is NOT skipped — it
         # falls through to the roster's named rejections.
-        partial = replace(self._hostless(), host_name="測試半人", host_title="測試殘缺")
+        partial = replace(self._hostless(), host_name="測試半人")
         with mock.patch.dict(PLACE_REGISTRY, {"t_plaza": partial}, clear=True):
             with self.assertRaises(GuildConfigError):
                 validate_service_hosts()

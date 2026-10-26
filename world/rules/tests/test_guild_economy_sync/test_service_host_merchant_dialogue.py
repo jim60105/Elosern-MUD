@@ -175,7 +175,7 @@ class MerchantDialogueSyncTests(ServiceContentIsolation, EvenniaTestCase):
         # gains it on the next sync, identity untouched.
         sync_service_content()
         host = _merchant_host()
-        pk_before, name_before, title_before = host.pk, host.name, host.npc_title
+        pk_before, name_before = host.pk, host.name
         host.components.remove_by_name(ScriptedDialogue.name)
         self.assertFalse(is_dialogue_host(host))
 
@@ -184,7 +184,7 @@ class MerchantDialogueSyncTests(ServiceContentIsolation, EvenniaTestCase):
         converged = _merchant_host()
         self.assertEqual(converged.pk, pk_before)
         self.assertEqual(converged.name, name_before)
-        self.assertEqual(converged.npc_title, title_before)
+        self.assertIsNone(converged.attributes.get("npc_title"))
         self.assertTrue(is_dialogue_host(converged))
         self.assertEqual(
             dialogue_key_for(converged), _dialogue_key_of_service(MERCHANT_SERVICE_ID)

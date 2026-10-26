@@ -181,7 +181,7 @@ class GridFollowTests(EvenniaTest):
         rejecting.rejected_keys = ("stuck",)
         door = create_object(Exit, key="trap", location=self.room1, destination=rejecting)
         stuck = self._companion("stuck")
-        stuck.npc_title = "南門守衛"
+        stuck.attributes.add("npc_title", "南門守衛")
         with patch.object(self.char1, "msg") as msg:
             door.at_traverse(self.char1, rejecting)
         self.assertIs(stuck.location, self.room1)

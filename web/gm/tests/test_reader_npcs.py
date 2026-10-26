@@ -59,7 +59,7 @@ class NpcReaderTests(EvenniaTest):
         self.npc.race = SYNTH_RACE
         self.npc.apply_race_baseline()
         restore_gauges_to_full(self.npc)
-        self.npc.npc_title = "合成頭銜"
+        self.npc.attributes.add("npc_title", "合成頭銜")
         self.dialogue = ScriptedDialogue.create(self.npc, dialogue_key="t_reader_dialogue")
         self.npc.components.add(self.dialogue)
         self.npc.components.add(
@@ -99,17 +99,6 @@ class NpcReaderTests(EvenniaTest):
         self.assertEqual(detail["label"], display_name)
         self.assertEqual(item["label"], display_name)
         self.assertEqual(row_value(section_of(detail, "npc_identity"), "名稱"), display_name)
-
-    def test_a_raising_title_accessor_never_reaches_the_reader(self):
-        def _raise() -> str:
-            raise RuntimeError("corrupt persisted attribute read")
-
-        with patch.object(NPC, "npc_title", new=property(lambda self: _raise())):
-            detail = npcs.detail(self.npc)
-            item = npcs.item_of(self.npc)
-        self.assertEqual(detail["label"], self.npc.key)
-        self.assertEqual(item["label"], self.npc.key)
-        self.assertEqual(failed_sections(detail), {})
 
     def test_persona_card_exposes_seven_sections_and_the_version(self):
         detail = npcs.detail(self.npc)

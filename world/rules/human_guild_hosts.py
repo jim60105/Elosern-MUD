@@ -25,9 +25,7 @@ from world.rules.fatigue import (
     RESERVE_ATTRIBUTE,
     initialize_fatigue_state,
 )
-from world.rules.npc_identity import (
-    live_key_taken_by_other, validate_npc_name, validate_npc_title,
-)
+from world.rules.npc_identity import live_key_taken_by_other, validate_npc_name
 from world.rules.npc_persona import initialize_npc_persona
 from world.rules.npc_schedules import get_rulebook, resolve_schedule, set_npc_schedule
 from world.rules.social_identity import set_social_identities
@@ -96,7 +94,6 @@ def validate_adventurers(
         if person.key != key:
             raise GuildHostIntegrityError(f"person {key!r} has invalid identity")
         validate_npc_name(person.name)
-        validate_npc_title(person.title)
         profile = profiles.get(person.profile_key)
         if profile is None or person.profile_key in seen_profiles:
             raise GuildHostIntegrityError(f"person {key!r} has missing or shared profile {person.profile_key!r}")
@@ -127,7 +124,7 @@ def validate_adventurers(
                 raise GuildHostIntegrityError(f"person {key!r} has unsupported equipment {item_key!r}")
         record = {
             "record_type": "character", "schema_version": 1, "key": person.name,
-            "display_name": person.name, "title": person.title,
+            "display_name": person.name,
             "race": "human", "subrace": person.subrace, "sex": "other",
             "age": profile.age, "apparent_age": profile.apparent_age,
             "stats": dict(zip(_BASE_KEYS, person.bases, strict=True)),
@@ -213,7 +210,6 @@ def sync_persistent_adventurers(
                     host = create_object(LLMNPC, key=person.name, location=rooms["home"])
                     host.attributes.add(PERSON_ATTRIBUTE, key)
                     host.attributes.add(NPC_PROFILE_PROVENANCE_ATTRIBUTE, person.profile_key)
-                    host.npc_title = person.title
                     host.race, host.subrace, host.sex = "human", person.subrace, "other"
                     host.db.guild_rank = person.rank
                     host._apply_trait_config(_trait_config({

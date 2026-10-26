@@ -1,7 +1,8 @@
 """Pure unit tests for the shared blueprint-characterization bound helper.
 
-Covers the per-entry validation rules (REQUIRED authored ``display_name`` and
-``title`` through the shared identity validators, paired ``age``/``apparent_age``
+Covers the per-entry validation rules (REQUIRED authored ``display_name``
+through the shared identity validator, the removed ``title`` field rejecting,
+paired ``age``/``apparent_age``
 integer/floor/lifespan-band rules, the exactly-one-``stable_key`` portrait rule,
 missing-key-vs-``None`` distinction), the cross-entry duplicate-``stable_key``
 agreement rule, the whole-blueprint authored-name uniqueness rule, and the
@@ -37,7 +38,6 @@ _DROP = object()
 def _entry(**overrides):
     entry = {
         "display_name": "莉絲‧晨星",
-        "title": "城鎮圖書館員",
         "persona": occupant_card_record(),
     }
     if overrides.pop("no_identity", False):
@@ -314,17 +314,28 @@ class CharacterizationEntryValidationTests(unittest.TestCase):
     @covers_requirement("blueprint-portrait-policy::quest-blueprint-npc-req-entries-may-declare-portrait-policy-and-characterization")
     def test_missing_required_identity_rejects(self):
         for entry in (
-            _entry(no_identity=True),  # both fields missing
-            _entry(no_identity=True, title="城鎮圖書館員"),  # name missing
-            _entry(no_identity=True, display_name="莉絲‧晨星"),  # title missing
+            _entry(no_identity=True),  # the card and name are missing
+            _entry(no_identity=True, persona=occupant_card_record()),  # name missing
             _entry(display_name=None),
-            _entry(title=None),
-            _entry(title="含 空白"),
-            _entry(title="稱" * 33),
+            _entry(display_name=""),
+            _entry(display_name="莉絲\u3000晨星"),
+            _entry(display_name="名" * (MAX_NPC_NAME_CODE_POINTS + 1)),
         ):
             with self.subTest(entry=sorted(entry)):
                 self.assertTrue(
                     characterize_errors(entry, lifespan_upper_bound=80), entry
+                )
+
+    @covers_requirement("blueprint-portrait-policy::quest-blueprint-npc-req-entries-may-declare-portrait-policy-and-characterization")
+    def test_the_removed_title_field_rejects_as_a_shape_violation(self):
+        for legacy in ("城鎮圖書館員", None, "", 5):
+            with self.subTest(title=repr(legacy)):
+                errors = characterize_errors(
+                    _entry(title=legacy), lifespan_upper_bound=80
+                )
+                self.assertTrue(errors, legacy)
+                self.assertTrue(
+                    any("title" in message for message in errors), errors
                 )
 
     @covers_requirement("blueprint-portrait-policy::the-shared-bound-helper-is-the-single-validation-rule-source-for-both-layers")

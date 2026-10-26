@@ -158,7 +158,7 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
                     continue
                 self.assertIsNotNone(host)
                 self.assertEqual(host.location, interior)
-                self.assertEqual(host.npc_title, place.host_title)
+                self.assertIsNone(host.attributes.get("npc_title"))
 
     @covers_requirement(
         "ciaran-village-commerce::the-village-s-hosts-are-its-own-people"
@@ -191,13 +191,10 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
     @covers_requirement(
         "ciaran-village-crafts::the-village-supplies-adornments-and-remedies-from-two-more-homes"
     )
-    def test_village_titles_avoid_commercial_words(self):
+    def test_village_room_names_avoid_commercial_words(self):
         sync_service_content()
         for place in _village_places():
             with self.subTest(place=place.key):
-                if place.host_title is not None:
-                    self.assertNotIn("老闆", place.host_title)
-                    self.assertNotIn("店主", place.host_title)
                 self.assertNotIn("店", place.room_name_zh)
                 self.assertNotIn("舖", place.room_name_zh)
                 self.assertNotIn("櫃檯", place.room_desc_zh)

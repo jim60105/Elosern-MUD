@@ -128,17 +128,16 @@ class SocialIdentityTagModelTests(EvenniaTestCase):
         "social-identity::social-qualification-has-identical-meaning-across-sources"
     )
     @covers_requirement("social-identity::social-identity-is-explicit-typed-state")
-    def test_persona_title_and_race_never_grant_identity(self):
-        """Persona prose describing noble or title/race alone never implies social identity."""
+    def test_persona_and_race_never_grant_identity(self):
+        """Persona prose describing noble birth or race alone never implies social identity."""
         npc = MagicMock(spec=NPC)
         npc.race = "elf"
-        npc.npc_title = "宮廷大貴族"
         npc.db.persona = {
             "identity": {"public": "世代傳承的尊貴大貴族"},
             "life_story": "出生於貴族之家，血統純正。",
         }
         npc.attributes.has.return_value = False
-        # Reading social identity must be empty despite noble persona/title/elf race
+        # Reading social identity must be empty despite noble persona/elf race
         self.assertEqual(read_social_identities(npc), frozenset())
 
     @covers_requirement("social-identity::identity-writes-follow-deterministic-construction")

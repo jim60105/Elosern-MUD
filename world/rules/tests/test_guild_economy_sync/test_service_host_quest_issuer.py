@@ -41,7 +41,6 @@ class ServiceHostQuestIssuerSyncTests(ServiceContentIsolation, EvenniaTestCase):
     def _commissioner_row(self):
         return ServiceHostRow(
             name=COMMISSIONER_NAME,
-            title="委託人灰婆婆",
             spawn_room=GUILD_HALL_TAG,
             components=(
                 capability(

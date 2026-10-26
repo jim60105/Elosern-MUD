@@ -19,7 +19,7 @@ def validate_service_hosts() -> tuple[ServiceHostRow, ...]:
     """Batch-validate the service-host roster derived from the place registry.
 
     The roster is not authored separately: each place that declares a host
-    yields one row carrying the host identity (``name``/``title``), the
+    yields one row carrying the host identity (``name``), the
     canonical authored profile identity, the interior room tag its host is
     created in (the place key), and the place's direct capability
     declarations.
@@ -44,7 +44,6 @@ def validate_service_hosts() -> tuple[ServiceHostRow, ...]:
             continue
         what = f"place {place.key!r}"
         name = _require_text(place.host_name, f"{what}.host_name")
-        title = _require_text(place.host_title, f"{what}.host_title")
         spawn_room = _require_text(place.key, f"{what}.key (spawn room tag)")
         profile_key = _require_text(place.host_profile_key, f"{what}.host_profile_key")
         if profile_key in seen_host_keys:
@@ -113,7 +112,6 @@ def validate_service_hosts() -> tuple[ServiceHostRow, ...]:
         rows.append(
             ServiceHostRow(
                 name=name,
-                title=title,
                 spawn_room=spawn_room,
                 components=place.components,
                 profile_key=profile_key,

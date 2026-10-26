@@ -57,7 +57,7 @@ class PersistentHumanGuildHostTests(EvenniaTest):
         self.profile = NpcProfile("t_host_profile", card, age=42, apparent_age=39,
                                  voice=NpcVoiceLines(greeting="「來坐吧。」", misunderstood="「再說一次吧。」"))
         self.person = GuildAdventurer(
-            "t_person", "合成旅人", "旅人", self.profile.key, "t_home", "t_rank",
+            "t_person", "合成旅人", self.profile.key, "t_home", "t_rank",
             "t_subrace", (150, 120, 120, 15, 15, 15, 25), self.skill.key,
             (sword.key, armor.key), "t_person_weekly",
             branch_key="t_branch",

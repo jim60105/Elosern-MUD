@@ -284,7 +284,6 @@ class SceneRequirementRegistryTests(CompileRegistryIsolation, unittest.TestCase)
                 "tier": "bandit",
                 "disposition": None,
                 "display_name": "黑鬍",
-                "title": "林間盜匪首領",
                 "persona": occupant_card_record(),
             }
         ]
@@ -333,7 +332,6 @@ class SceneRequirementRegistryTests(CompileRegistryIsolation, unittest.TestCase)
                 "tier": "bandit",
                 "disposition": None,
                 "display_name": "黑鬍",
-                "title": "林間盜匪首領",
                 "persona": occupant_card_record(),
             }
         ]

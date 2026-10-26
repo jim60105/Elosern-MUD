@@ -25,7 +25,6 @@ class ShopDefinition:
     key: str
     # Authored NPC identity of the shop's service host (design D5).
     host_name: str
-    host_title: str
     assortment_keys: tuple[str, ...] = field(
         metadata=ref_many("assortments", inverse="shops")
     )
@@ -63,7 +62,6 @@ def _derive_shop_registry() -> dict[str, ShopDefinition]:
         registry[shop_key] = ShopDefinition(
             key=shop_key,
             host_name=place.host_name,
-            host_title=place.host_title,
             assortment_keys=place.assortment_keys,
         )
     return registry
@@ -80,7 +78,7 @@ def validate_shop_npc_identities(
     Pure checker callable with explicit rows (tests); defaults to the shipped
     registry. Raises ValueError naming the offending row and rule.
     """
-    from world.rules.npc_identity import validate_npc_name, validate_npc_title
+    from world.rules.npc_identity import validate_npc_name
 
     for definition in (SHOP_REGISTRY if definitions is None else definitions).values():
         try:
@@ -88,12 +86,6 @@ def validate_shop_npc_identities(
         except ValueError as error:
             raise ValueError(
                 f"shop {definition.key} has an invalid host_name: {error}"
-            ) from error
-        try:
-            validate_npc_title(definition.host_title)
-        except ValueError as error:
-            raise ValueError(
-                f"shop {definition.key} has an invalid host_title: {error}"
             ) from error
 
 

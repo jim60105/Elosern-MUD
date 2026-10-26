@@ -91,24 +91,10 @@ class NPC(LivingEntity):
     runtime-state attribute ``schedule_state`` is declared there (current
     state value or ``None``) and written only by the schedule-runtime change.
 
-    ``npc_title`` carries the single-line plain-text title (design
-    2026-09-03-npc-identity-titles §3): authored once by a creation path
-    (import loader, blueprint materialization, registry-backed host or
-    examiner), each of which validates through
-    ``world.rules.npc_identity.validate_npc_title`` before assigning, and
-    immutable afterwards. There is deliberately no title-specific runtime
-    write surface (no setter, no helper, no command, no dialogue path);
-    Evennia's generic ``.db`` access is framework infrastructure outside
-    that guarantee, so malformed stored state can only come from it and the
-    composer degrades it to the plain name. ``autocreate=False`` keeps a
-    read of an absent title from persisting a row (Evennia materializes an
-    autocreated property on first read), preserving the composer's
-    pure-read contract.
     """
 
     dialogue_memory: Any | None = AttributeProperty(default=None)
     schedule: Any | None = AttributeProperty(default=None)
-    npc_title: str = AttributeProperty(default="", autocreate=False)
 
     def move_to(self, destination, *args, **kwargs):
         """Settle direct actor moves through the existing movement owner."""

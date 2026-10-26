@@ -184,7 +184,6 @@ class ScenarioDirectorValidatorTests(unittest.TestCase):
                 "role": "bandit",
                 "tier": _npc_tier_key(),
                 "display_name": "沉穩獵人",
-                "title": "森林嚮導",
                 "persona": occupant_card_record(),
             }
             entry.update(overrides)
@@ -374,7 +373,6 @@ class SceneBoundValidatorTests(RegistryIsolationMixin, unittest.TestCase):
                 "tier": _npc_tier_key(),
                 "disposition": None,
                 "display_name": "黑鬍",
-                "title": "林間盜匪首領",
                 "persona": occupant_card_record(),
             }
         ]
@@ -604,7 +602,6 @@ class CharacterizationValidatorTests(unittest.TestCase):
                 "tier": _npc_tier_key(),
                 "disposition": None,
                 "display_name": "黑鬍",
-                "title": "林間盜匪首領",
                 "persona": occupant_card_record(),
                 "age": 35,
                 "apparent_age": 35,
@@ -799,7 +796,6 @@ class CharacterizationValidatorTests(unittest.TestCase):
                 "tier": _npc_tier_key(),
                 "disposition": None,
                 "display_name": "另一個人",
-                "title": "林間盜匪副手",
                 "persona": occupant_card_record(),
                 "age": 40,
                 "apparent_age": 40,
@@ -820,7 +816,7 @@ class CharacterizationValidatorTests(unittest.TestCase):
 
     @covers_requirement("scenario-director::blueprint-validation-accepts-and-bounds-the-optional-npc-characterization-fields")
     def test_missing_identity_is_rejected_and_retried(self):
-        for field in ("display_name", "title"):
+        for field in ("display_name",):
             with self.subTest(field=field):
                 client = FakeLLMClient()
                 bad = self._instance_bound_payload()
@@ -841,6 +837,25 @@ class CharacterizationValidatorTests(unittest.TestCase):
                     result = await_result(d)
                 self.assertEqual(result, _blueprint())
                 self.assertEqual(len(client.calls), 2)
+
+    @covers_requirement("scenario-director::blueprint-validation-accepts-and-bounds-the-optional-npc-characterization-fields")
+    def test_a_removed_title_field_is_rejected_and_retried(self):
+        client = FakeLLMClient()
+        bad = self._instance_bound_payload()
+        bad["stages"][0]["npc_req"][0]["title"] = "林間盜匪首領"
+        errors = scenario_director._VALIDATORS["npc_characterization"](bad)
+        self.assertTrue(any("title" in error for error in errors), errors)
+        client.add_response(
+            lambda d: len(d.messages) == 2, json.dumps(bad, ensure_ascii=False)
+        )
+        client.add_response(
+            lambda d: len(d.messages) == 3, json.dumps(_payload(), ensure_ascii=False)
+        )
+        with override_settings(LLM_PROFILES=_raw()):
+            d = generate_quest_blueprint(client, context=_context())
+            result = await_result(d)
+        self.assertEqual(result, _blueprint())
+        self.assertEqual(len(client.calls), 2)
 
     @covers_requirement("npc-identity-titles::the-blueprint-author-face-enforces-occupant-name-uniqueness")
     def test_duplicate_names_reject_and_retry(self):

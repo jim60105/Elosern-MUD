@@ -146,7 +146,6 @@ def _characterized_payload(**overrides):
             "tier": "bandit",
             "disposition": None,
             "display_name": "黑鬍",
-            "title": "林間盜匪首領",
             "persona": occupant_card_record(),
             "age": 35,
             "apparent_age": 35,

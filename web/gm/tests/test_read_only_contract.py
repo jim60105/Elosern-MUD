@@ -78,7 +78,6 @@ FORBIDDEN_TARGET_ATTRS = frozenset(
         "guild_rank",
         "loot_table",
         "behaviour_tree",
-        "npc_title",
         "quest_log",
         "race",
         "schedule",

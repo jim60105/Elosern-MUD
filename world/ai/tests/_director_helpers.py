@@ -269,7 +269,6 @@ def _instance_payload():
             "tier": _npc_tier_key(),
             "disposition": None,
             "display_name": "灰篷旅人",
-            "title": "夜巡帶頭者",
             "persona": occupant_card_record(),
         }
     ]

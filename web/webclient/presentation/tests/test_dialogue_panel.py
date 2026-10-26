@@ -312,7 +312,7 @@ class DialoguePresenterTests(EvenniaTest):
             self.host, self.player, AffinitySource.QUEST_COMPLETION, 47
         )
         affinity_value = self.host.relations.affinity_for(self.player)
-        self.host.npc_title = "合成稱號"
+        self.host.attributes.add("npc_title", "合成稱號")
         open_or_refresh_dialogue(self.player, self.host, "任務板在右側。")
 
         payload = self._render()

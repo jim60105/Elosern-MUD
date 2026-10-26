@@ -205,7 +205,6 @@ SCENARIO_DIRECTOR_OUTPUT_SCHEMA: dict[str, Any] = {
                                 "role",
                                 "tier",
                                 "display_name",
-                                "title",
                                 "persona",
                             ],
                             "properties": {
@@ -213,7 +212,6 @@ SCENARIO_DIRECTOR_OUTPUT_SCHEMA: dict[str, Any] = {
                                 "tier": {"type": "string"},
                                 "disposition": {"type": ["string", "null"]},
                                 "display_name": {"type": ["string", "null"]},
-                                "title": {"type": ["string", "null"]},
                                 "age": {"type": ["integer", "null"], "minimum": 0},
                                 "apparent_age": {
                                     "type": ["integer", "null"],

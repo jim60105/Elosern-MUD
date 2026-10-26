@@ -64,7 +64,6 @@ from world.quests.tests._card_fixtures import occupant_card_record
 # and of the other test areas' example identities. The authored name IS the
 # spawned key, so the tests assert the round trip precisely.
 SYNTH_OCCUPANT_NAME = "合成場面客"
-SYNTH_OCCUPANT_TITLE = "合成場面稱號"
 
 
 def _portrait_callbacks(callbacks):
@@ -182,7 +181,6 @@ def _instance_bound_payload(**overrides):
                         "tier": _T_NPC_TIER,
                         "disposition": None,
                         "display_name": SYNTH_OCCUPANT_NAME,
-                        "title": SYNTH_OCCUPANT_TITLE,
                         "persona": occupant_card_record(),
                     }
                 ],

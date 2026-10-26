@@ -76,7 +76,7 @@ SYMBOL_RE = re.compile(r"(_REGISTRY|_TABLE|_TIERS|_PACK_REGISTRY)$|^XYMAP_DATA$"
 DISPLAY_FIELDS = frozenset(
     {
         "label", "name", "display_name", "display_name_zh", "display", "title",
-        "name_zh", "common_name_zh", "host_name", "host_title",
+        "name_zh", "common_name_zh", "host_name",
         "examiner_name", "examiner_title", "rank_name", "pronoun_display",
         "label_zh", "title_zh", "display_label", "common_name",
     }

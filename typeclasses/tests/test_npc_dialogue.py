@@ -1023,7 +1023,7 @@ class NPCTitleDialogueContextTests(EvenniaTest):
 
     @covers_requirement('npc-identity-titles::the-npc-dialogue-context-carries-the-title-as-read-only-data')
     def test_a_titled_npc_context_carries_no_title(self):
-        self.npc.npc_title = "南門守衛"
+        self.npc.attributes.add("npc_title", "南門守衛")
         context = self.npc._npc_context()
         self.assertEqual(sorted(context), ["desc", "location", "name"])
         self.assertNotIn("南門守衛", "".join(context.values()))
@@ -1043,19 +1043,15 @@ class NPCTitleDialogueContextTests(EvenniaTest):
         self.assertNotIn("npc_title", after)
 
     @covers_requirement('npc-identity-titles::the-npc-dialogue-context-carries-the-title-as-read-only-data')
-    def test_a_raising_title_accessor_never_reaches_the_context(self):
+    def test_a_stored_title_never_reaches_the_context(self):
         from world.ai.npc_dialogue import _system_message
 
-        self.npc.npc_title = "南門守衛"
+        self.npc.attributes.add("npc_title", "南門守衛")
         baseline = dict(self.npc._npc_context())
         rendered = _system_message(baseline)
 
-        def _raise() -> str:
-            raise RuntimeError("corrupt persisted attribute read")
-
-        with patch.object(NPC, "npc_title", new=property(lambda self: _raise())):
-            context = dict(self.npc._npc_context())
-            self.assertEqual(_system_message(context), rendered)
+        context = dict(self.npc._npc_context())
+        self.assertEqual(_system_message(context), rendered)
         self.assertEqual(context, baseline)
         self.assertNotIn("南門守衛", rendered)
 

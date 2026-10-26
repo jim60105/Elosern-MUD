@@ -70,7 +70,6 @@ SYNTH_GUILD_BRANCHES: dict[str, GuildBranch] = {
         "t_mossgate_branch",
         "苔徑公會合成分部",
         "霧鱗‧灰秤",
-        "苔徑分部會長",
         "t_hollow_tarn",
     ),
 }
@@ -235,7 +234,6 @@ SYNTH_PLACES: dict[str, PlaceDefinition] = {
         doorway_key_zh="合成公會廳入口",
         doorway_aliases=("synthetic hall",),
         host_name="合成苔徑會長",
-        host_title="合成苔徑分會館長",
         host_race="human",
         host_subrace=None,
         host_sex="other",
@@ -264,7 +262,6 @@ SYNTH_PLACES: dict[str, PlaceDefinition] = {
         doorway_key_zh="合成雜貨店入口",
         doorway_aliases=("synthetic store",),
         host_name="合成苔徑店主",
-        host_title="合成苔徑雜貨店主",
         host_race="human",
         host_subrace=None,
         host_sex="other",
@@ -299,7 +296,6 @@ SYNTH_SHOPS: dict[str, ShopDefinition] = {
     "t_mossgate_stall": ShopDefinition(
         key="t_mossgate_stall",
         host_name="霧鱗‧灰秤",
-        host_title="苔徑市集合成攤主",
         assortment_keys=("t_mossgate_goods",),
     ),
 }

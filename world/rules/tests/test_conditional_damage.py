@@ -904,7 +904,6 @@ class CombatTraitsPersistenceAndConstructionTests(EvenniaTestCase):
     def test_quest_compilation_and_scene_builder_carry_combat_traits(self):
         char_req = {
             "display_name": "亡靈祭司",
-            "title": "無光者",
             "age": 40,
             "apparent_age": 40,
             "persona": occupant_card_record(),
@@ -921,7 +920,6 @@ class CombatTraitsPersistenceAndConstructionTests(EvenniaTestCase):
         # Deserialization from payload
         payload = {
             "display_name": "亡靈祭司",
-            "title": "無光者",
             "age": 40,
             "apparent_age": 40,
             "portrait_stable_key": None,

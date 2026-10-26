@@ -378,7 +378,6 @@ class ShopRuleTests(unittest.TestCase):
         second = ShopDefinition(
             key="t_second_shop",
             host_name="合成二號",
-            host_title="合成二號店老闆",
             assortment_keys=("t_shared_goods",),
         )
         # Per-shop display names resolve to the owning place's room name, so
@@ -388,7 +387,6 @@ class ShopRuleTests(unittest.TestCase):
             key="t_second_shop",
             room_name_zh="合成二號店",
             host_name="合成二號",
-            host_title="合成二號店老闆",
             components=(
                 capability(
                     "merchant",

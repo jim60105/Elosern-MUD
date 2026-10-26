@@ -1,29 +1,11 @@
-"""NPC typeclass tests: canonical-age helper and the title storage surface.
-
-The title cases pin the immutable-by-structure attribute, its inertness on
-every display read, and the deliberate absence of any title write API on the
-typeclass or the command surface.
-"""
-
-import inspect
-from unittest.mock import patch
+"""NPC typeclass tests: the canonical-age helper."""
 
 from tools.spec_traceability import covers_requirement
 
-from evennia import default_cmds
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
-from commands.character_creation import CharacterCreationCmdSet
-from commands.default_cmdsets import AccountCmdSet, CharacterCmdSet
-from commands.localized import ProjectXYZGridCmdSet
-from commands.title import CmdTitle
 from typeclasses.npcs import NPC, ensure_npc_canonical_age
-from world.rules.npc_identity import validate_npc_title
-
-
-def _raise_corrupt_title_read() -> str:
-    raise RuntimeError("corrupt persisted attribute read")
 
 
 class EnsureNpcCanonicalAgeTests(EvenniaTestCase):
@@ -102,101 +84,6 @@ class EnsureNpcCanonicalAgeTests(EvenniaTestCase):
             ensure_npc_canonical_age(npc, age=35, apparent_age=True)
         self.assertIsNone(npc.attributes.get("age"))
         self.assertIsNone(npc.attributes.get("apparent_age"))
-
-
-class NPCTitleDisplayTests(EvenniaTestCase):
-    """The immutable-by-structure attribute is inert on every display read."""
-
-    def setUp(self):
-        super().setUp()
-        self.npc = create_object(NPC, key="塞提斯")
-
-    @covers_requirement('npc-identity-titles::the-npc-title-is-a-creation-time-attribute-with-no-runtime-write-surface')
-    def test_new_npc_title_reads_empty_without_materializing_a_row(self):
-        self.assertEqual(self.npc.npc_title, "")
-        self.assertIsNone(self.npc.attributes.get("npc_title", return_obj=True))
-
-    def test_display_name_stays_the_plain_name_with_a_title_stored(self):
-        self.npc.npc_title = validate_npc_title("南門守衛")
-        self.assertEqual(self.npc.get_display_name(self.npc), "塞提斯")
-
-    def test_a_raising_title_accessor_never_reaches_the_display_name(self):
-        self.npc.npc_title = validate_npc_title("南門守衛")
-        with patch.object(
-            NPC, "npc_title", new=property(lambda self: _raise_corrupt_title_read())
-        ):
-            self.assertEqual(self.npc.get_display_name(self.npc), "塞提斯")
-
-
-class NPCTitleWriteSurfaceAbsenceTests(EvenniaTestCase):
-    """No title-specific write surface exists on the typeclass or commands.
-
-    The guarantee's scope (spec: no runtime write surface): absence of any
-    title setter/helper/command this capability introduces. Evennia's generic
-    attribute access (``entity.db.npc_title = ...``) is framework
-    infrastructure outside the claim — malformed-state tests deliberately
-    seed through it. Mirrors the title-system fixed-title delete-surface pin.
-    """
-
-    @covers_requirement('npc-identity-titles::the-npc-title-is-a-creation-time-attribute-with-no-runtime-write-surface')
-    def test_npc_interface_exposes_no_title_mutating_callable(self):
-        offenders = {
-            name
-            for name, member in inspect.getmembers(NPC, predicate=inspect.isfunction)
-            if "title" in name.lower()
-        }
-        self.assertEqual(offenders, set())
-        forbidden_write_verbs = (
-            "set", "update", "assign", "change", "edit", "rename", "grant",
-            "revoke", "clear", "remove", "delete", "add", "write", "mutate",
-        )
-        verb_offenders = {
-            name
-            for name, member in inspect.getmembers(NPC, predicate=inspect.isfunction)
-            for verb in forbidden_write_verbs
-            if verb in name.lower() and "title" in name.lower()
-        }
-        self.assertEqual(verb_offenders, set())
-
-    @covers_requirement('npc-identity-titles::the-npc-title-is-a-creation-time-attribute-with-no-runtime-write-surface')
-    def test_registered_command_surface_has_no_npc_title_command(self):
-        merged = {
-            command.key: command
-            for cmdset in (CharacterCmdSet(), AccountCmdSet())
-            for command in cmdset.commands
-        }
-        default_classes = {
-            type(command)
-            for cmdset in (
-                default_cmds.CharacterCmdSet(),
-                default_cmds.AccountCmdSet(),
-            )
-            for command in cmdset.commands
-        }
-        mounted = {
-            key: command
-            for key, command in merged.items()
-            if type(command) not in default_classes
-        }
-        for cmdset in (ProjectXYZGridCmdSet(), CharacterCreationCmdSet()):
-            mounted.update({command.key: command for command in cmdset.commands})
-        self.assertTrue(mounted, "the mounted command scan found no project commands")
-        title_tokens = ("title", "稱號", "npc_title")
-        title_related = []
-        for command in mounted.values():
-            raw = command.aliases
-            names = {command.key} | ({raw} if isinstance(raw, str) else set(raw))
-            if any(token in name.lower() for name in names for token in title_tokens):
-                title_related.append(command)
-        # The only title commands in the game are the player title system's
-        # own surface (title-system), which this capability leaves unchanged
-        # and which can never touch an NPC title; no NPC-title command exists.
-        self.assertTrue(
-            all(isinstance(command, CmdTitle) for command in title_related),
-            f"unexpected NPC-title command: {sorted({c.key for c in title_related if not isinstance(c, CmdTitle)})}",
-        )
-        for command in title_related:
-            self.assertNotIn("npc", command.key.lower())
 
 
 if __name__ == "__main__":

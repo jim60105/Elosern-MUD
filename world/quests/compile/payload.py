@@ -102,7 +102,6 @@ def _characterization_to_payload(
         return None
     return {
         "display_name": characterization.display_name,
-        "title": characterization.title,
         "age": characterization.age,
         "apparent_age": characterization.apparent_age,
         "portrait_stable_key": characterization.portrait_stable_key,
@@ -239,9 +238,9 @@ def _characterization_from_payload(
     where = f"stored quest {quest!r} stage {stage} occupant {occupant}"
     if not isinstance(data, Mapping):
         raise QuestCompileError(f"{where} carries no characterization")
-    if "title" not in data:
+    if "title" in data:
         raise QuestCompileError(
-            f"{where} characterization lacks the required authored title field"
+            f"{where} characterization carries the removed NPC title field"
         )
     if "background" in data:
         raise QuestCompileError(
@@ -257,7 +256,6 @@ def _characterization_from_payload(
         ) from error
     return StageNpcCharacterization(
         display_name=data["display_name"],
-        title=data["title"],
         age=data["age"],
         apparent_age=data["apparent_age"],
         portrait_stable_key=data["portrait_stable_key"],

@@ -67,7 +67,6 @@ from ._support import (
     _instance_bound_payload,
     SceneBuilderTestBase,
     SYNTH_OCCUPANT_NAME,
-    SYNTH_OCCUPANT_TITLE,
 )
 
 class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
@@ -90,28 +89,26 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
         npc = self._spawned_npc(
             self._characterized(
                 display_name=f"  {SYNTH_OCCUPANT_NAME}  ",
-                title=f" {SYNTH_OCCUPANT_TITLE} ",
             )
         )
         self.assertEqual(npc.key, SYNTH_OCCUPANT_NAME)
         self.assertEqual(npc.db.display_name, SYNTH_OCCUPANT_NAME)
-        self.assertEqual(npc.npc_title, SYNTH_OCCUPANT_TITLE)
+        self.assertIsNone(npc.attributes.get("npc_title"))
 
     @covers_requirement("npc-identity-titles::blueprint-scene-occupants-spawn-under-the-authored-name-with-the-authored-title")
     def test_full_characterization_is_materialized_fully(self):
         npc = self._spawned_npc(
             self._characterized(
                 display_name=SYNTH_OCCUPANT_NAME,
-                title=SYNTH_OCCUPANT_TITLE,
                 age=68,
                 apparent_age=68,
                 portrait={"stable_key": "forest_bandit_chief"},
             )
         )
-        # The authored name IS the key; the title lands as the validated form.
+        # The authored name IS the key; no title is written.
         self.assertEqual(npc.key, SYNTH_OCCUPANT_NAME)
         self.assertEqual(npc.db.display_name, SYNTH_OCCUPANT_NAME)
-        self.assertEqual(npc.npc_title, SYNTH_OCCUPANT_TITLE)
+        self.assertIsNone(npc.attributes.get("npc_title"))
         self.assertEqual(npc.db.age, 68)
         self.assertEqual(npc.db.apparent_age, 68)
         self.assertEqual(
