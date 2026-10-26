@@ -315,6 +315,9 @@ class CombatReconnectBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
         page.wait_for_timeout(1200)
 
     @covers_requirement("webclient-combat-menu::reconnect-rebuilds-combat-without-replaying-intent")
+    @covers_requirement(
+        "webclient-sync-recovery::action-results-cannot-claim-synchronization-before-adoption"
+    )
     def test_disconnect_after_submit_shows_uncertain_notice_no_retry(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)

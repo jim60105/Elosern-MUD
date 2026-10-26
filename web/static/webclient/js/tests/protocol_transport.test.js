@@ -170,7 +170,14 @@ test("a multi-panel message with one malformed panel is rejected atomically", ()
   });
   const result = store.receive(1, "ui_snapshot", [mixed], {});
   assert.equal(result.accepted, false);
-  assert.equal(seen.length, 0, "no subscriber observes a partially applied message");
+  // No partially applied panel state is ever visible: the one published state
+  // carries the empty (unestablished) presentation and the recorded recovery
+  // episode of this failure.
+  assert.equal(seen.length, 1, "one publication for the recorded episode");
+  assert.deepEqual(seen[0].panels, {});
+  assert.equal(seen[0].activeEpoch, null);
+  assert.equal(seen[0].recovery.status, "needed");
+  assert.equal(seen[0].mutationsLocked, true);
 
   // A malformed included status payload rejects the whole update.
   const malformedStatus = {

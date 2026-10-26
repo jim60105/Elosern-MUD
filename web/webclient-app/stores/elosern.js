@@ -202,6 +202,13 @@ export const useElosernStore = defineStore("elosern", () => {
     setPrompt: ctx.setPrompt,
     appendText: ctx.appendText,
     sendText: ctx.sendText,
+    // The bounded complete recovery gate (webclient-sync-recovery): the one
+    // `ui_sync` entry every request source shares, plus the episode
+    // transitions the wire transport's deadline and the bridge's re-arm use.
+    requestPresentationSync: ctx.requestPresentationSync,
+    recoveryStatus: ctx.recoveryStatus,
+    failRecovery: ctx.failRecovery,
+    resetRecoveryEpisode: ctx.resetRecoveryEpisode,
     // The combat beat playback (webclient-combat-beat-queue): the message
     // window reports a shown beat and can end the round; the store owns the
     // lock both gate.

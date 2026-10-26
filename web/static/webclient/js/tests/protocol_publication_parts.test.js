@@ -1042,7 +1042,12 @@ test("an old generation part or timer callback cannot touch live state", () => {
   assert.equal(store.publicationAssemblyStats().live, true);
   store.beginTransport(2);
   assert.equal(store.publicationAssemblyStats().live, false);
-  assert.deepEqual(store.getState().recovery, { status: "idle", cause: null, generation: 2 });
+  assert.deepEqual(store.getState().recovery, {
+    status: "idle",
+    cause: null,
+    generation: 2,
+    targetRevision: null,
+  });
   // A call that was already queued fires after the clear: it is inert.
   clock.fireCleared();
   assert.equal(store.getState().recovery.status, "idle");
@@ -1120,7 +1125,12 @@ test("a recovered generation keeps mutations locked through an unrelated delta",
     {}
   );
   assert.equal(repair.accepted, true);
-  assert.deepEqual(store.getState().recovery, { status: "idle", cause: null, generation: 1 });
+  assert.deepEqual(store.getState().recovery, {
+    status: "idle",
+    cause: null,
+    generation: 1,
+    targetRevision: null,
+  });
   assert.equal(store.getState().mutationsLocked, false);
 });
 

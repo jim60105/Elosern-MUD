@@ -42,7 +42,14 @@ test("status v3 provenance rejects malformed initial and replacement messages at
     assert.equal(committed.receive(1, "ui_snapshot", [snapshot()], {}).accepted, true);
     const before = committed.getState();
     assert.equal(committed.receive(1, "ui_update", [update({ revision: 2, panels: { status: panel } })], {}).reason, "invalid");
-    assert.deepEqual(committed.getState(), before);
+    // Every committed value survives the atomic rejection; the only change is
+    // the one recorded complete-recovery episode (webclient-sync-recovery).
+    const after = committed.getState();
+    assert.deepEqual(after.panels, before.panels);
+    assert.equal(after.revision, before.revision);
+    assert.deepEqual(after.serverTime, before.serverTime);
+    assert.equal(after.recovery.status, "needed");
+    assert.equal(after.mutationsLocked, true);
   }
   for (const kind of ["equipment", "mixed", "non_equipment", "unknown"]) {
     const provenance = { kind, equipment_sources: ["equipment", "mixed"].includes(kind) ? [source] : [] };

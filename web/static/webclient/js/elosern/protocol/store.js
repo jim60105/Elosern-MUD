@@ -37,11 +37,21 @@ var mapPublications = {};
 var assembler = mapParts.createMapAssembler();
 // General publication assembly (webclient-publication-assembly): one bounded
 // transfer independent of the specialized map assembler above.
-var recovery = { status: "idle", cause: null, generation: 0 };
+// Bounded complete recovery (webclient-sync-recovery): one episode per
+// transport generation. "needed" is one recorded failure awaiting the single
+// automatic request, "requested" is that request in flight, "failed" is a
+// terminal episode (the one attempt did not land); nothing but a valid
+// complete snapshot, an explicit player attempt or a new generation moves a
+// failed episode again.
+var recovery = { status: "idle", cause: null, generation: 0, targetRevision: null };
 var publicationAssembler = createPublicationAssembler();
 var retired = createRetiredEpochSet();
 var mutationsLocked = true;
 var protocolError = null;
+// The incompatible-protocol condition is terminal for the sequence, so it is
+// latched: a later recoverable error replaces `protocolError` but can never
+// re-open a sequence that an incompatible peer already invalidated.
+var incompatible = false;
 var lastActionResult = null;
 var listeners = [];
 var connected = false;
@@ -58,17 +68,127 @@ function createPublicationAssembler() {
       if (capturedGeneration !== generation) {
         return;
       }
-      recordRecovery(failure.reason);
+      noteRecovery(failure.reason);
     },
   });
 }
 
-// One explicit recovery-needed signal per failure. The single request sender
-// that turns it into a ui_sync belongs to the recovery change; here the
-// reducer records it and keeps graphical mutations locked.
-function recordRecovery(cause) {
-  recovery = { status: "needed", cause: cause, generation: generation };
+// The incompatible-protocol condition is terminal for the sequence: a fresh
+// transport generation is the only thing that clears it (beginTransport).
+function protocolIncompatible() {
+  return incompatible;
+}
+
+// One failure signal per episode. An idle or already-needed episode records a
+// pending repair; a failure that lands while the single repair is requested
+// proves that repair did not arrive intact, so the episode becomes terminal
+// rather than requesting a second time. A failed episode is never re-armed by
+// traffic; `targetRevision` names the revision an unadopted action result
+// claimed, so adopting exactly that publication ends the episode.
+function noteRecovery(cause, targetRevision) {
+  if (recovery.status === "failed") {
+    return false;
+  }
+  if (recovery.status === "requested") {
+    enterFailed(cause);
+    notify();
+    return true;
+  }
+  recovery = {
+    status: "needed",
+    cause: cause,
+    generation: generation,
+    targetRevision: typeof targetRevision === "number" ? targetRevision : null,
+  };
   mutationsLocked = true;
+  notify();
+  return true;
+}
+
+// A terminal episode keeps everything the sequence already committed and the
+// graphical mutations locked; only the timers/buffers of an abandoned repair
+// are released by the caller that knows the repair itself failed.
+function enterFailed(cause) {
+  recovery = {
+    status: "failed",
+    cause: cause,
+    generation: generation,
+    targetRevision: null,
+  };
+  mutationsLocked = true;
+}
+
+// The app's single sender/timeout owner turns a recorded need into exactly one
+// request. `explicit` is the player's own synchronize intent, which may spend
+// one further attempt after a failed automatic repair.
+function markRecoveryRequested(explicit) {
+  if (protocolIncompatible()) {
+    return false;
+  }
+  if (
+    recovery.status !== "needed" &&
+    !(explicit && recovery.status === "failed")
+  ) {
+    return false;
+  }
+  recovery = {
+    status: "requested",
+    cause: recovery.cause,
+    generation: generation,
+    targetRevision: recovery.targetRevision,
+  };
+  mutationsLocked = true;
+  notify();
+  return true;
+}
+
+// A repair response that cannot arrive any more (its bounded response deadline
+// expired) ends the episode and releases the abandoned transfer's timer and
+// buffers, so a late part can never resurrect it.
+function failRecovery(cause) {
+  if (recovery.status !== "requested") {
+    return false;
+  }
+  enterFailed(cause || recovery.cause);
+  assembler.clear();
+  publicationAssembler.clear();
+  notify();
+  return true;
+}
+
+// Re-arm the single request permission without adopting anything: a requested
+// repair returns to "needed", so the episode (and its mutation lock) survives.
+// A failed episode is never re-armed; a fresh generation or the player's own
+// explicit attempt are its only exits.
+function resetRecoveryEpisode() {
+  if (recovery.status !== "requested") {
+    return false;
+  }
+  recovery = {
+    status: "needed",
+    cause: recovery.cause,
+    generation: generation,
+    targetRevision: recovery.targetRevision,
+  };
+  notify();
+  return true;
+}
+
+// A committed publication ends a pending episode when it is a valid complete
+// snapshot, or when it adopts exactly the revision an unadopted action result
+// claimed (the missed publication arrived after all). A failed episode is
+// terminal only for further *requests*: the repair that finally lands still
+// clears it.
+function settleRecovery(isSnapshot, committedRevision) {
+  if (recovery.status === "idle") {
+    return;
+  }
+  if (
+    isSnapshot ||
+    (recovery.targetRevision !== null && committedRevision >= recovery.targetRevision)
+  ) {
+    recovery = { status: "idle", cause: null, generation: generation, targetRevision: null };
+  }
 }
 
 function cloneState() {
@@ -95,7 +215,9 @@ function cloneState() {
       status: recovery.status,
       cause: recovery.cause,
       generation: recovery.generation,
+      targetRevision: recovery.targetRevision,
     },
+    protocolIncompatible: protocolIncompatible(),
     mutationsLocked: mutationsLocked,
     protocolError: protocolError === null ? null : JSON.parse(canonicalJson(protocolError)),
     lastActionResult: lastActionResult === null ? null : JSON.parse(canonicalJson(lastActionResult)),
@@ -174,18 +296,16 @@ function commitPresentation(meta, isSnapshot, staged) {
   assembler.pruneThrough(meta.revision);
   publicationAssembler.pruneThrough(meta.revision);
   phase = "active";
-  // A valid complete snapshot is the one committed outcome that clears a
-  // recorded recovery need; a delta never clears or bypasses it.
-  if (isSnapshot && recovery.status === "needed") {
-    recovery = { status: "idle", cause: null, generation: generation };
-  }
+  // A valid complete snapshot repairs the whole eager store, so it ends a
+  // pending episode; a delta normally neither clears nor bypasses one, except
+  // when it adopts exactly the publication an unadopted result claimed.
+  settleRecovery(isSnapshot, meta.revision);
   // A reload-required (incompatible) protocol error keeps the graphical
   // controls locked even while ordinary presentations keep committing;
   // only a fresh transport generation (beginTransport) clears the error.
   // Outstanding recovery keeps them locked too, even while an unrelated
   // delta commits.
-  mutationsLocked =
-    !!(protocolError && protocolError.reloadRequired) || recovery.status === "needed";
+  mutationsLocked = protocolIncompatible() || recovery.status !== "idle";
   notify();
 }
 
@@ -269,7 +389,7 @@ function receivePublicationPart(payload) {
     // Otherwise the corrupt transfer cannot be identified: discard the live
     // assembly and record one recovery need.
     publicationAssembler.clear();
-    recordRecovery("invalid");
+    noteRecovery("invalid");
     return {
       accepted: false,
       reason: "invalid",
@@ -311,7 +431,7 @@ function receivePublicationPart(payload) {
     // The epoch admitted this frame, so the corruption belongs to the live
     // sequence: discard the in-flight transfer and record one recovery need.
     publicationAssembler.clear();
-    recordRecovery("invalid");
+    noteRecovery("invalid");
     return {
       accepted: false,
       reason: "invalid",
@@ -351,7 +471,7 @@ function receivePublicationPart(payload) {
       throw new Error("logical base_revision disagrees with its part headers");
     }
   } catch (error) {
-    recordRecovery("invalid");
+    noteRecovery("invalid");
     return {
       accepted: false,
       reason: "invalid",
@@ -363,7 +483,7 @@ function receivePublicationPart(payload) {
   if (phase === "idle" || phase === "awaiting_initial_snapshot" || phase === "detached") {
     var established = establishSnapshot(meta);
     if (!established.accepted) {
-      recordRecovery("invalid");
+      noteRecovery("invalid");
       established.recovery = "needed";
     }
     return established;
@@ -374,7 +494,7 @@ function receivePublicationPart(payload) {
   if (outcome.kind === "delta" && meta.baseRevision !== revision) {
     // The exact base is rechecked at final adoption: an intervening commit
     // invalidates the assembled delta.
-    recordRecovery("base_mismatch");
+    noteRecovery("base_mismatch");
     return { accepted: false, reason: "base_mismatch", recovery: "needed" };
   }
   var committed = commitCandidate(
@@ -382,7 +502,7 @@ function receivePublicationPart(payload) {
     outcome.kind === "snapshot" ? "ui_snapshot" : "ui_update"
   );
   if (!committed.accepted) {
-    recordRecovery("invalid");
+    noteRecovery("invalid");
     committed.recovery = "needed";
   }
   return committed;
@@ -401,6 +521,17 @@ return {
   publicationAssemblyStats: function () {
     return publicationAssembler.stats();
   },
+
+  // Bounded complete recovery (webclient-sync-recovery). `noteRecovery` is the
+  // one failure recorder (also called from the reducer's own failure paths and
+  // by the app for a result claiming an unadopted revision);
+  // `markRecoveryRequested` and `failRecovery` are the app's single
+  // sender/timeout owner's transitions. Every one of them reports whether it
+  // changed the episode.
+  noteRecovery: noteRecovery,
+  markRecoveryRequested: markRecoveryRequested,
+  failRecovery: failRecovery,
+  resetRecoveryEpisode: resetRecoveryEpisode,
 
   subscribe: function (listener) {
     if (typeof listener !== "function") {
@@ -453,10 +584,13 @@ return {
     assembler.clear();
     publicationAssembler.clear();
     publicationAssembler = createPublicationAssembler();
-    recovery = { status: "idle", cause: null, generation: generation };
+    // A new transport generation is a fresh failure episode: the previous
+    // episode's state (and its lock) never survives the reconnect.
+    recovery = { status: "idle", cause: null, generation: generation, targetRevision: null };
     phase = "awaiting_initial_snapshot";
     mutationsLocked = true;
     protocolError = null;
+    incompatible = false;
     lastActionResult = null;
     notify();
   },
@@ -472,6 +606,9 @@ return {
       return { accepted: false, reason: "unknown_message" };
     }
     if (!Array.isArray(args) || args.length < 1) {
+      // A transport-corrupted presentation frame of the live sequence: nothing
+      // can be admitted from it, so record the one repair episode.
+      noteRecovery("missing_envelope");
       return { accepted: false, reason: "missing_envelope" };
     }
     var payload = args[0];
@@ -496,6 +633,7 @@ return {
             ? validateSnapshot(payload)
             : validateUpdate(payload);
       } catch (error) {
+        noteRecovery("invalid");
         return { accepted: false, reason: "invalid", detail: error.message };
       }
 
@@ -522,7 +660,7 @@ return {
         // Establishing a sequence starts from an empty on-demand store.
         var established = establishSnapshot(meta);
         if (!established.accepted) {
-          recordRecovery("invalid");
+          noteRecovery("invalid");
           established.recovery = "needed";
         }
         return established;
@@ -540,7 +678,7 @@ return {
         // incomplete transfer is abandoned and one complete sync is
         // requested instead of committing the delta.
         publicationAssembler.clear();
-        recordRecovery("incomplete_predecessor");
+        noteRecovery("incomplete_predecessor");
         return {
           accepted: false,
           reason: "incomplete_predecessor",
@@ -549,10 +687,9 @@ return {
       }
       if (messageName === "ui_update" && meta.baseRevision !== revision) {
         // A delta is admitted only against the exact committed baseline. The
-        // rejected publication commits nothing and locks mutations until the
-        // recovery owner completes a fresh snapshot. A rejection never
-        // notifies subscribers.
-        mutationsLocked = true;
+        // rejected publication commits nothing and records one repair episode;
+        // its notification carries the lock and the recovery state.
+        noteRecovery("base_mismatch");
         return { accepted: false, reason: "base_mismatch" };
       }
       if (meta.part) {
@@ -587,7 +724,14 @@ return {
       }
       // Stage every replacement, removal, and metadata field before one commit
       // and one notification; a rejected stage leaves committed state intact.
-      return commitCandidate(meta, messageName);
+      // A rejection is a presentation this client cannot render, so it records
+      // the same one repair episode as a schema rejection.
+      var committed = commitCandidate(meta, messageName);
+      if (!committed.accepted) {
+        noteRecovery("invalid");
+        committed.recovery = "needed";
+      }
+      return committed;
     }
 
     if (messageName === "ui_action_result") {
@@ -638,7 +782,16 @@ return {
       protocolErrorPayload.code === "unsupported_version" ||
       protocolErrorPayload.reloadRequired
     ) {
+      // An incompatible protocol cannot be repaired by a fresh sync: the
+      // controls stay locked behind the reload notice, and an outstanding
+      // repair attempt ends without a second request.
+      incompatible = true;
       mutationsLocked = true;
+      failRecovery("incompatible_protocol");
+    } else {
+      // A recoverable server-side presentation failure: one complete repair
+      // (or the terminal failed episode if one is already requested).
+      noteRecovery("protocol_error");
     }
     notify();
     return { accepted: true };

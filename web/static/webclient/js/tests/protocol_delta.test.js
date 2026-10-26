@@ -169,12 +169,16 @@ test("a missing predecessor preserves every committed field and locks mutations"
   const result = store.receive(1, "ui_update", [delta({ revision: 8, base_revision: 6 })], {});
   assert.equal(result.accepted, false);
   assert.equal(result.reason, "base_mismatch");
-  assert.equal(notified, 0, "a rejected delta never notifies subscribers");
+  // The rejected publication commits nothing, but it does record the one
+  // complete-recovery episode, so subscribers see exactly one notification
+  // carrying the unchanged values plus that state (webclient-sync-recovery).
+  assert.equal(notified, 1, "the recovery episode is published, nothing else");
   const after = store.getState();
   assert.equal(after.revision, 7);
   assert.deepEqual(after.panels, before.panels);
   assert.deepEqual(after.serverTime, before.serverTime);
   assert.equal(after.mode, before.mode);
+  assert.equal(after.recovery.status, "needed");
   assert.equal(after.mutationsLocked, true, "the recovery owner must re-sync before mutations resume");
 });
 
@@ -222,12 +226,16 @@ test("one failing member rolls back the whole staged delta", () => {
   const result = store.receive(1, "ui_update", [broken], {});
   assert.equal(result.accepted, false);
   assert.equal(result.reason, "invalid");
-  assert.equal(notified, 0, "a rejected presentation never notifies");
+  // The staged values are rolled back entirely; the only published change is
+  // the recorded recovery episode.
+  assert.equal(notified, 1, "the recovery episode is published, nothing else");
   const after = store.getState();
   assert.deepEqual(after.panels, before.panels);
   assert.equal(after.mode, before.mode);
   assert.equal(after.revision, before.revision);
   assert.deepEqual(after.serverTime, before.serverTime);
+  assert.equal(after.recovery.status, "needed");
+  assert.equal(after.mutationsLocked, true);
 });
 
 test("a delta whose staged mode is dialogue must leave a committed dialogue panel", () => {

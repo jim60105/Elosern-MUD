@@ -1,71 +1,42 @@
-// C4: one-sync-per-episode resync (the legacy requestResync contract), extracted
-// from AppClient so the SFC stays a passive renderer. The real "renderer cannot
-// render" signal is the committed view's `protocolError` (set when the server
-// reports a panel/presentation error, e.g. `malformed_envelope` /
-// `unsupported_version`). When it transitions null -> set while connected, the
-// renderer auto-requests exactly one `ui_sync` for the failure episode; the
-// bridge's guard blocks a second request in the same transport generation. When
-// the error clears (the server re-synced / reconnected), the episode re-arms.
+// C4 (webclient-vue-10-wire-views-browser): the renderer's automatic complete
+// repair, extracted from AppClient so the SFC stays a passive renderer.
+//
+// webclient-sync-recovery: the reducer is the single authority on a failure
+// episode. Every failure source (exact-base mismatch, an invalid or
+// incomplete publication, an assembly failure/expiry, a recoverable server
+// protocol error, or a matching action result claiming an unadopted revision)
+// records one `recovery: needed` state and locks graphical mutations there.
+// This composable reacts to that one signal and asks the bridge's gate for the
+// single `ui_sync` of the episode; the bridge/store gate coalesces every
+// request source, so no second failure can start a second sync. The episode
+// ends only through the reducer (a valid complete snapshot, the claimed
+// revision being adopted, an explicit player synchronize or a new transport
+// generation), so there is nothing to re-arm here.
 import { computed, watch } from "vue";
-
-// A `ui_protocol_error` is only auto-resynced when it is recoverable: a
-// version mismatch (`unsupported_version`) or a reload-required error cannot
-// be fixed by a fresh sync, so no request is sent for those (the graphical
-// controls stay locked and the text fallback carries the game).
-const RESYNCABLE_ERROR_CODES = new Set([
-  "malformed_envelope",
-  "presentation_unavailable",
-  "no_puppet",
-  "internal_error",
-]);
-
-function isResyncableError(error) {
-  return (
-    !!error &&
-    RESYNCABLE_ERROR_CODES.has(error.code) &&
-    error.reloadRequired !== true
-  );
-}
 
 export function useResync(store) {
   function resyncActions() {
     return (window.Elosern && window.Elosern.actions) || null;
   }
 
-  // The combined "renderer cannot render" failure state: true when EITHER a
-  // locally-rejected malformed presentation (`lastPanelRejection`) OR a
-  // recoverable server `ui_protocol_error` is active. A single shared
-  // one-sync-per-episode guard ("presentation") is re-armed only when BOTH
-  // signals are cleared, so the guard truly represents one whole-presentation
-  // failure episode (one sync per episode, no premature re-arm).
-  const presentationFailure = computed(() => {
-    const resyncableError = isResyncableError(store.view.protocolError);
-    return !!store.lastPanelRejection || resyncableError;
-  });
-
-  watch(
-    presentationFailure,
-    (failing, prevFailing) => {
-      const actions = resyncActions();
-      if (!actions || !store.view.connected) {
-        return;
-      }
-      if (failing && !prevFailing) {
-        // A failure signal just became active (a malformed presentation was
-        // rejected, or a recoverable protocol error committed): request one
-        // ui_sync for this whole-presentation failure episode. The bridge's
-        // one-sync-per-episode guard blocks a second request in the same
-        // transport generation.
-        actions.requestResync("presentation");
-      }
-      if (!failing && prevFailing) {
-        // Both failure signals cleared (a fresh snapshot accepted AND no active
-        // recoverable protocol error): re-arm the episode so the next failure
-        // can request once more.
-        actions.resetResyncEpisode("presentation");
-      }
-    }
+  // The whole-presentation failure state: true exactly while the reducer holds
+  // an unrequested repair need.
+  const presentationFailure = computed(
+    () => store.view.recovery.status === "needed",
   );
+
+  watch(presentationFailure, (failing, prevFailing) => {
+    if (!failing || prevFailing) {
+      return;
+    }
+    const actions = resyncActions();
+    if (!actions) {
+      return;
+    }
+    // One automatic complete repair for this failure episode. A disconnected
+    // transport or a failed episode declines inside the gate.
+    actions.requestResync("presentation");
+  });
 
   return { presentationFailure };
 }

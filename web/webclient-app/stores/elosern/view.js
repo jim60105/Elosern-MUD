@@ -252,6 +252,15 @@ export function applyView(ctx) {
       mapPublications: rs.mapPublications || {},
       mutationsLocked: rs.mutationsLocked,
       protocolError: rs.protocolError,
+      // The bounded complete recovery state (webclient-sync-recovery): the
+      // existing failure surface already locks every graphical mutation
+      // through `mutationsLocked`; this read-only slice names the episode's
+      // state and cause so a surface can explain it.
+      recovery: {
+        status: rs.recovery.status,
+        cause: rs.recovery.cause,
+        generation: rs.recovery.generation,
+      },
       lastActionResult: rs.lastActionResult,
       // The memory-only dialogue completion queue (authored-dialogue-
       // reading-client): pending/saved reading status, plus the one transient
@@ -504,9 +513,14 @@ export function applyView(ctx) {
 
   ctx.publishView = function publishView() {
     const prev = ctx.view.value;
-    const rs = ctx.reducer.getState();
+    let rs = ctx.reducer.getState();
     ctx.handleTransportLifecycle(prev, rs);
+    // A matching result may record the one recovery episode (a revision this
+    // client never adopted) and publish it synchronously; the committed state
+    // is therefore re-read so this projection can never overwrite the nested
+    // one with the pre-transition snapshot.
     ctx.handleActionResult(rs);
+    rs = ctx.reducer.getState();
     // The in-flight record is captured before the release: the round's
     // completing publication can carry the declared revision, so
     // `releaseIfReady` may clear `inFlight` in this same pass, and the record

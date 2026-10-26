@@ -128,6 +128,21 @@ export function applyTransport(ctx) {
         tone: "crit",
       });
     }
+    // Ordered publication means a matching result naming a revision the client
+    // has not committed implies a publication it never adopted (a lost or
+    // rejected frame). The result is recorded once above for message/data
+    // deduplication, but it can never release this action: the presentation
+    // is behind canonical state, so one complete repair is requested and the
+    // mutation lock stays held until the claimed revision (or a complete
+    // snapshot) is adopted.
+    if (
+      typeof result.presentationRevision === "number" &&
+      rs.revision !== null &&
+      result.presentationRevision > rs.revision
+    ) {
+      ctx.reducer.noteRecovery("unadopted_result", result.presentationRevision);
+      return;
+    }
     if (result.outcome === "rejected" && result.code === "no_puppet") {
       // The puppet is gone; no presentation will ever gate this rejection,
       // so the lock is released unconditionally.
@@ -252,6 +267,88 @@ export function applyTransport(ctx) {
 
   ctx.setSender = function setSender(next) {
     ctx.sender = next || null;
+  };
+
+  // ------------------------------------------------ bounded recovery (R)
+
+  // The one coalescing `ui_sync` gate (webclient-sync-recovery). Every request
+  // source goes through it, so a failure episode costs at most one automatic
+  // complete repair no matter how many failures it collects:
+  //
+  // - "auto"      a failure the renderer could not render, or a reducer
+  //               rejection the view exposes as `recovery: needed`;
+  // - "lifecycle" the reconnect/initial-sync deferral (a plain sync when the
+  //               sequence is healthy, the repair request when one is needed);
+  // - "manual"    the player's own explicit synchronize, which is also the one
+  //               way a failed automatic repair may be attempted again.
+  //
+  // Returns whether a `ui_sync` left the client. The reducer owns the episode
+  // state and the mutation lock; this gate never invents a second one.
+  ctx.requestPresentationSync = function requestPresentationSync(mode) {
+    const auto = mode !== "manual" && mode !== "lifecycle";
+    const explicit = mode === "manual";
+    const rs = ctx.reducer.getState();
+    if (rs.protocolIncompatible || !rs.connected) {
+      // An incompatible protocol cannot be repaired by a sync, and a closed
+      // transport can carry nothing: record the need only (a reconnect runs
+      // the initial-sync lifecycle with a fresh generation).
+      if (auto && rs.recovery.status === "idle") {
+        ctx.reducer.noteRecovery("renderer");
+      }
+      return false;
+    }
+    if (!(ctx.sender && typeof ctx.sender.sendSync === "function")) {
+      return false;
+    }
+    const status = rs.recovery.status;
+    if (status === "requested") {
+      // This episode's one request already left: coalesce.
+      return false;
+    }
+    if (status === "failed" && !explicit) {
+      // A failed episode never retries itself; a new generation or the
+      // player's own explicit synchronize are its only exits.
+      return false;
+    }
+    if (status === "idle") {
+      if (!auto) {
+        // A healthy sequence's lifecycle/manual sync is not an episode: it
+        // neither locks mutations nor starts a repair deadline.
+        return sendSyncFrame(false);
+      }
+      ctx.reducer.noteRecovery("renderer");
+    }
+    if (!ctx.reducer.markRecoveryRequested(explicit)) {
+      return false;
+    }
+    return sendSyncFrame(true);
+  };
+
+  function sendSyncFrame(recoveryRequest) {
+    try {
+      ctx.sender.sendSync();
+    } catch (error) {
+      // A synchronous transport failure: the request never left, so the
+      // episode becomes failed (locked, but one explicit retry remains)
+      // instead of waiting out a deadline nothing will answer.
+      if (recoveryRequest) {
+        ctx.reducer.failRecovery("send_failed");
+      }
+      return false;
+    }
+    return true;
+  }
+
+  ctx.recoveryStatus = function recoveryStatus() {
+    return ctx.reducer.getState().recovery.status;
+  };
+
+  ctx.failRecovery = function failRecovery(cause) {
+    return ctx.reducer.failRecovery(cause);
+  };
+
+  ctx.resetRecoveryEpisode = function resetRecoveryEpisode() {
+    return ctx.reducer.resetRecoveryEpisode();
   };
 
   ctx.setLoggedIn = function setLoggedIn(value) {

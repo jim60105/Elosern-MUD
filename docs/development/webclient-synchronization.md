@@ -177,12 +177,91 @@ remains incomplete — as parts or intact — abandons that transfer and signals
 recovery instead of committing out of order.
 
 An assembly failure (timeout, contradiction, invalid body, or a logical
-document that fails validation) records one `recovery: needed` cause on the
-reducer and keeps graphical mutations locked; the recovery change owns the
-single `ui_sync` request sender. A valid complete snapshot clears that need; a
-delta neither clears nor bypasses it. On-demand map assembly is unaffected
-except that a completed general snapshot prunes a map transfer whose target is
-already committed and retains same-epoch complete maps.
+document that fails validation) records the client's one recovery episode (see
+"Bounded complete recovery" below) and keeps graphical mutations locked. A
+valid complete snapshot clears that episode; a delta neither clears nor
+bypasses it. On-demand map assembly is unaffected except that a completed
+general snapshot prunes a map transfer whose target is already committed and
+retains same-epoch complete maps.
+
+## Bounded complete recovery
+
+The browser reducer (`web/static/webclient/js/elosern/protocol/store.js`) owns
+one recovery episode per transport generation:
+
+| State | Meaning |
+|---|---|
+| `idle` | No failure is outstanding; normal gates apply |
+| `needed` | One failure is recorded and the single automatic request is owed |
+| `requested` | That one `ui_sync` left the client; the repair is in flight |
+| `failed` | The one attempt did not land; terminal for this generation |
+
+Every failure source records the same episode rather than a second one: an
+exact-base mismatch, an invalid or incomplete publication, an assembly failure
+or expiry, a transport-corrupted frame, a recoverable `ui_protocol_error`, and
+(from the app) a matching action result claiming a revision the client never
+adopted. A failure never erases panels. Every state keeps the last complete
+presentation and its revision exactly as committed and locks graphical
+mutations; text play is never gated. A failure recorded while `requested` makes
+the episode `failed` (the repair itself did not arrive intact), so a repeated
+malformed payload can never start a second automatic sync.
+
+`requestPresentationSync(mode)` in `web/webclient-app/stores/elosern/transport.js`
+is the single coalescing gate; `bridge.js`'s `requestResync` (automatic),
+`client.sync` (the player's explicit synchronize), the reconnect lifecycle and
+the reducer's own state drive it. Modes:
+
+| Mode | `idle` | `needed` | `requested` | `failed` |
+|---|---|---|---|---|
+| `auto` (renderer / view) | records a need, then requests | requests | coalesces | refuses |
+| `lifecycle` (reconnect deferral) | plain sync, no episode | requests | coalesces | refuses |
+| `manual` (player) | plain sync, no episode | requests | coalesces | **one** further attempt |
+
+A disconnected or incompatible-protocol sequence never sends: the need is
+recorded and the reconnect's own initial-sync lifecycle (a fresh generation)
+owns the next request. A synchronous send failure makes the episode `failed`
+instead of waiting out a deadline nothing will answer.
+
+The repair has two independent bounds. The client's response deadline is
+30,000 ms from `sendSync` (`web/webclient-app/transport.js`, cancelled by any
+commit, failure, reset or disconnect that ends the episode); a part-assembled
+repair additionally carries its own 30,000 ms first-part deadline. Expiry of
+either while `requested` fails the episode and releases the abandoned
+transfer's timers and buffers.
+
+The episode ends through a valid, newer live-sequence complete snapshot (the
+repair the client asked for, which replaces the whole eager store), through the
+adopted revision when the claim was a single unadopted publication, through the
+player's own explicit synchronize (one further attempt), or through a new
+transport generation. Nothing the client receives re-arms a failed episode and
+no mutation is ever resubmitted; a publication that cannot be planned inside
+the logical policy is never truncated, it simply leaves the repair failed.
+
+### Action-result revision safety
+
+Publication order means a matching `ui_action_result` may only name the
+revision its presentation committed. A result naming a newer revision than the
+committed one is recorded once (message/data deduplication) but can never
+release the in-flight mutation: it implies a publication this client did not
+adopt, so it starts the one complete repair and keeps the lock until the
+claimed revision, or a complete snapshot, is adopted. A result at or below the
+committed revision satisfies the matched action under the existing
+request/epoch checks and never changes committed metadata or panels; busy and
+foreign results unlock nothing.
+
+### Server safe failures
+
+A preflight or send failure never claims a revision that was not synchronized.
+A result-only safe answer (`_publish_now`'s `result_only` path) claims
+`held_revision` — the last fully installed baseline revision, or 0 before any
+publication — never the issued target an invalidated baseline still reports. A
+failed completion publication additionally emits one `presentation_unavailable`
+protocol error (no revision, no reload demand) before that single bounded
+answer, so the client marks its presentation unavailable and asks for one
+complete repair. An explicit `ui_sync` whose complete snapshot violates the
+publication policy (schema or the 16,777,216-byte logical ceiling) answers with
+the same safe `presentation_unavailable` and stops: nothing is truncated and no
+retry loop starts.
 
 ## Admission
 

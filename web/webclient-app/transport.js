@@ -34,6 +34,13 @@ const OOB_MESSAGES = [
   "ui_protocol_error",
 ];
 
+// One bounded recovery response deadline per request (webclient-sync-recovery):
+// the complete repair this client asked for must land within 30 000 ms of the
+// request, or the episode becomes terminal and only an explicit player
+// synchronize (or a new transport generation) may ask again. The sibling
+// assembly deadline of a multi-part repair starts at its own first part.
+const RECOVERY_RESPONSE_TIMEOUT_MS = 30000;
+
 export function wireTransport(store, consoleHandle) {
   const evennia = window.Evennia;
   if (!evennia || !evennia.emitter) {
@@ -45,14 +52,37 @@ export function wireTransport(store, consoleHandle) {
   }
 
   let generation = 0;
+  let recoveryTimer = null;
 
   function isConnOpen() {
     return typeof evennia.isConnected === "function" ? evennia.isConnected() : true;
   }
 
+  function clearRecoveryDeadline() {
+    if (recoveryTimer === null) {
+      return;
+    }
+    window.clearTimeout(recoveryTimer);
+    recoveryTimer = null;
+  }
+
+  function startRecoveryDeadline() {
+    clearRecoveryDeadline();
+    recoveryTimer = window.setTimeout(function () {
+      recoveryTimer = null;
+      // Expiry of the bound is a failed repair: locked, no automatic retry.
+      store.failRecovery("timeout");
+    }, RECOVERY_RESPONSE_TIMEOUT_MS);
+  }
+
   function sendSync() {
     if (isConnOpen()) {
       evennia.msg("ui_sync", [Protocol.syncEnvelope()], {});
+      // The request just left as an episode's single repair attempt: the
+      // bounded response deadline starts with it.
+      if (store.recoveryStatus() === "requested") {
+        startRecoveryDeadline();
+      }
     }
   }
 
@@ -60,12 +90,13 @@ export function wireTransport(store, consoleHandle) {
     // A reconnect can emit `logged_in` before the portal re-attaches the
     // account's puppet: the bounded deferral re-synchronizes while still
     // awaiting the initial snapshot OR while detached (a `no_puppet` error
-    // right after login) — one shot per `logged_in`, never a loop.
+    // right after login) — one shot per `logged_in`, never a loop, and never
+    // a retry of a failed repair (the gate declines that).
     if (
       store.view.phase === "awaiting_initial_snapshot" ||
       store.view.phase === "detached"
     ) {
-      sendSync();
+      store.requestPresentationSync("lifecycle");
     }
   }
 
@@ -91,6 +122,14 @@ export function wireTransport(store, consoleHandle) {
     sendSync: sendSync,
   });
 
+  // The deadline belongs to the episode, not to the frame: any commit, failure
+  // or generation reset that ends it cancels the pending expiry.
+  store.subscribe(function () {
+    if (store.recoveryStatus() !== "requested") {
+      clearRecoveryDeadline();
+    }
+  });
+
   retireReplacedFallback();
 
   registerOobListeners();
@@ -113,6 +152,9 @@ export function wireTransport(store, consoleHandle) {
   });
 
   evennia.emitter.on("connection_close", function (args, kwargs) {
+    // A closed transport will never deliver the repair being waited for; the
+    // need survives the reconnect's own initial-sync lifecycle instead.
+    clearRecoveryDeadline();
     if (consoleHandle && consoleHandle.model) {
       consoleHandle.model.setConnected(false);
     }

@@ -30,6 +30,7 @@ from web.webclient.presentation.coordinator import (
 from web.webclient.presentation.protocol import (
     PROTOCOL_VERSION,
     UI_PROTOCOL_ERROR,
+    ProtocolValidationError,
     check_envelope,
 )
 from web.webclient.presentation.registry import build_production_registry
@@ -400,6 +401,13 @@ def synchronize_session(session: Any, actor: Any) -> Deferred:
 
     def _failed(failure: Failure) -> None:
         quiet = isinstance(failure, Failure) and failure.check(ClockUnavailable)
+        # The complete snapshot itself violates the publication policy (an
+        # over-limit or schema-invalid logical document). Retrying cannot fix
+        # that, and nothing is ever truncated to fit: report the presentation
+        # unavailable and stop, which is exactly the bounded failed repair.
+        unpublishable = isinstance(failure, Failure) and failure.check(
+            ProtocolValidationError
+        )
         try:
             if quiet:
                 log_unavailable(coordinator.describe_session(), "world clock is absent")
@@ -407,6 +415,18 @@ def synchronize_session(session: Any, actor: Any) -> Deferred:
                     session,
                     code="presentation_unavailable",
                     message="目前無法取得世界時間，圖形介面暫停同步",
+                    reload_required=False,
+                )
+                return None
+            if unpublishable:
+                log_unavailable(
+                    coordinator.describe_session(),
+                    "complete presentation exceeds the publication policy",
+                )
+                send_protocol_error(
+                    session,
+                    code="presentation_unavailable",
+                    message="目前無法傳送完整的圖形介面資料，圖形介面暫停同步",
                     reload_required=False,
                 )
                 return None
