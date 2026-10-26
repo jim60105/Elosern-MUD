@@ -46,7 +46,17 @@ Use conditions only with concrete existing canonical keys reviewed at implementa
 
 ### Validation ownership
 
-Add tagged `world/lore/tests/test_authored_dialogue_content_lower_civic.py` data-contract tests naming ONLY owned host keys; supply the exact test label/tag entries to the integration owner for serialized updates to tools/test_data_freeze.json and .github/evennia-shards.json; do not edit shared manifests in the parallel content worktree. Keep mechanism tests synthetic. Assertions cover complete topic inventory, stable IDs, actor-first multi-line attribution, all declaration references/bounds/fallbacks, no OOC/backticks/commands/mechanic names, host-specific canonical office/assortment facts and no old speech-only conversion. Do not freeze exact prose in behavior assertions or add a duplicate mutable balance table. Editorial review must check every line and record line-specific findings; green schema tests alone cannot establish in-character quality or mandatory-source fidelity.
+Tests cover logic only; prose is not tested. This slice therefore adds no test module and no
+manifest entry. Ownership is established by the existing shared loader contract — filename-stem
+discovery against registered profile keys, rejection of explicit owner fields, duplicate
+mapping-key/unsafe-tag/schema/reference rejection, bidirectional binding completeness and
+all-or-nothing snapshot publication — exercised by `world.lore.tests.test_dialogue_assembly`,
+`world.rules.tests.test_dialogue_sources` and `world.rules.tests.test_authored_dialogue_runtime`.
+Stable topic IDs and the four-topic inventory per host are asserted there through the canonical
+`dialogue_key` binding. Do not freeze exact prose in assertions or add a duplicate mutable balance
+table. Editorial review must check every line and record line-specific findings in
+`docs/lore/lower-civic-dialogue-review.md`; green schema tests alone cannot establish in-character
+quality or mandatory-source fidelity.
 
 Exercise one real constructed owned host through browser manual playback and the identical topic offline via CmdTalk, comparing scene identity/attribution and deterministic effect counts, not exact prose echo. Existing shared synthetic browser mechanics stay in owning engine changes; use a per-slice data-contract smoke/test so simultaneous content workers do not edit the shared browser fixture. Ensure replay gives no second effect and text emission records formal read. Update affected docs/lore review/authoring notes and any command-topic examples changed; preserve command syntax and service settlement. This slice completes only after every owned YAML contains all four rewritten baseline topics, all declared variants/refusals and its rewritten opening. Across the ten slices, acceptance covers all 25 hosts, 100 baseline topics and all 25 openings; no catch-all final prose replacement is deferred.
 
