@@ -56,7 +56,10 @@ class DialogueSourcesTests(unittest.TestCase):
                 self.assertTrue(source.dialogue.greeting)
                 self.assertEqual(len(source.dialogue.topics), 4)
 
-    @covers_requirement("scripted-dialogue::dialogue-tables-are-immutable-keyed-and-registry-backed")
+    @covers_requirement(
+        "scripted-dialogue::dialogue-tables-are-immutable-keyed-and-registry-backed",
+        "authored-dialogue-content::guild-content-has-exclusive-profile-key-yaml-ownership",
+    )
     def test_guild_staff_profile_service_distinction(self):
         bindings = canonical_dialogue_bindings()
         self.assertEqual(bindings["guild_staff"], "altoria_guild_master")
