@@ -160,6 +160,7 @@ class ActionLockingTest(BrowserAcceptanceTest):
 
     @covers_requirement(
         "webclient-oob-protocol::protocol-failures-degrade-without-disabling-text-play",
+        "webclient-sync-recovery::recovery-coalesces-failures-and-remains-bounded",
         "webclient-desktop-shell::narrative-output-remains-the-authoritative-text-surface-and-is-read-page-by-page",
     )
     def test_ordinary_text_works_when_structured_oob_rendering_fails(self):

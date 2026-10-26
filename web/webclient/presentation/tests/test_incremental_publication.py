@@ -538,6 +538,9 @@ class BaselineOwnershipTests(unittest.TestCase):
         self.assertEqual(session.frames("ui_action_result")[-1]["presentation_revision"], 1)
         self.assertEqual(coordinator.revision, 1)
 
+    @covers_requirement(
+        "webclient-sync-recovery::action-results-cannot-claim-synchronization-before-adoption"
+    )
     def test_a_result_only_safe_answer_claims_only_the_held_revision(self):
         """A safe answer never asserts a synchronization that did not happen."""
         session = FakeSession()
@@ -1029,6 +1032,9 @@ class DispatcherCompletionTests(unittest.TestCase):
         self.assertEqual(results[0]["outcome"], "error")
         self.assertFalse(dispatcher._sequence_state(session).in_flight)
 
+    @covers_requirement(
+        "webclient-sync-recovery::recovery-coalesces-failures-and-remains-bounded"
+    )
     def test_a_failed_completion_publication_reports_presentation_unavailable(self):
         """The safe failure signal claims no revision and only answers once."""
         from web.webclient.actions import dispatcher
@@ -1082,6 +1088,9 @@ class DispatcherCompletionTests(unittest.TestCase):
 class FailedCompleteRepairTests(unittest.TestCase):
     """An unpublishable complete snapshot stops as a safe unavailable envelope."""
 
+    @covers_requirement(
+        "webclient-sync-recovery::recovery-coalesces-failures-and-remains-bounded"
+    )
     def test_a_repair_that_cannot_be_published_returns_presentation_unavailable(self):
         from unittest.mock import patch
 
