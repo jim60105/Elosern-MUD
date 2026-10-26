@@ -38,12 +38,18 @@ MIGRATED_FILES = (
     "world/art/tests/test_worker.py",
     "world/imports/tests/test_degraded_banner.py",
     "world/imports/tests/test_loader_trait_values.py",
-    "world/imports/tests/test_capability_imports.py",
     "world/imports/tests/test_schema.py",
     "world/imports/tests/test_validation_semantics.py",
     "world/prompts/tests/test_degrade.py",
     "world/prompts/tests/test_loader.py",
     "world/prompts/tests/test_verbatim_shipment.py",
+)
+
+#: Successor modules written after the migration. They replaced debt-carrying
+#: files one for one, so they never entered the seed ledger, but they belong to
+#: the same zero-findings guarantee.
+_SCAN_ONLY_FILES = (
+    "world/imports/tests/test_capability_imports.py",
 )
 
 #: Oversized modules later split into same-named packages (art test split).
@@ -59,7 +65,7 @@ _SPLIT_PACKAGES = (
 
 def _finding_scan_files() -> tuple[str, ...]:
     """Every manifest file to scan, following split modules into slices."""
-    files: list[str] = []
+    files: list[str] = list(_SCAN_ONLY_FILES)
     for rel in MIGRATED_FILES:
         name = rel.rsplit("/", 1)[-1][: -len(".py")]
         if name in _SPLIT_PACKAGES:

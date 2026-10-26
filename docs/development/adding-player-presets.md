@@ -13,7 +13,7 @@
 
 ## 1. 背景：一張卡的資料住在一個 registry 裡
 
-模板是 `PLAYER_PRESET_REGISTRY` 字典中的 frozen dataclass `PlayerPreset`，共二十個欄位，分屬九個資料域。卡寫進 registry 之後，Telnet 建立精靈、WebClient 建立面板與 NPC 夥伴建構器都讀同一張卡，沒有第二份作者副本。
+模板是 `PLAYER_PRESET_REGISTRY` 字典中的 frozen dataclass `PlayerPreset`，共二十一個欄位，分屬十個資料域。卡寫進 registry 之後，Telnet 建立精靈、WebClient 建立面板與 NPC 夥伴建構器都讀同一張卡，沒有第二份作者副本。
 
 | 資料域 | 欄位 | 內容 |
 |---|---|---|
@@ -22,6 +22,7 @@
 | 技能 | `active_skills`、`passive_skills`、`skill_proficiency`、`affinity_elements` | 主動／被動技能鍵、宣告式練習 XP、開局親附屬性 |
 | 物品與裝備 | `starting_items`、`starting_equipment` | 開局攜帶清單，以及其中開局就穿上的子集 |
 | 人格 | `persona` | import-card 形狀的七鍵人格（見 §3 Step 2） |
+| 社會身分 | `social_identities` | 已登記的社會身分鍵（如貴族、神職人員），供對話條件與公會登錄讀取；選填，空 tuple 表示無標記 |
 | 性傾向基線 | `sexual_baseline` | 寫入 `entity.db.sexual` 的開局狀態，`None` 則沿用泛用預設 |
 | 偽裝 | `disguised_stats` | 純顯示層的偽裝軸值，永不進入戰鬥與判定 |
 | 夥伴 | `starting_companions` | 指向夥伴自己模板卡的同行宣告清單 |
