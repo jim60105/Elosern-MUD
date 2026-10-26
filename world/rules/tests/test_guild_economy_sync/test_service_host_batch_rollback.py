@@ -62,6 +62,10 @@ class ServiceHostBatchRollbackTests(ServiceContentIsolation, EvenniaTestCase):
                 "key": npc.key,
                 "location": npc.location.pk if npc.location else None,
                 "slots": sorted(npc.components.db_names),
+                "tags": sorted(
+                    (str(key), str(category))
+                    for key, category in npc.tags.all(return_key_and_category=True)
+                ),
                 "attributes": {
                     key: deepcopy(npc.attributes.get(key))
                     for key in HOST_ATTRIBUTE_SURFACES
@@ -217,36 +221,33 @@ class ServiceHostBatchRollbackTests(ServiceContentIsolation, EvenniaTestCase):
                     row.host_key,
                 )
 
-    def test_a_fault_during_retirement_restores_the_rows_and_party_state(self):
-        from world.rules.party import join_party, party_ids
+    def test_a_fault_inside_a_retirement_restores_the_rows_and_party_state(self):
+        from evennia.utils.create import create_object
+        from world.rules.party import join_party, party_ids, party_meta
 
         sync_service_content()
-        rows = [self._first_processable_row()]
-        rows.extend(
+        rows = [
             row
             for row in get_catalog().service_hosts
-            if row.host_key != rows[0].host_key and self._host_for(row) is not None
-        )
-        first_host = self._host_for(rows[0])
-        second_host = self._host_for(rows[1])
-        self.assertIsNotNone(second_host)
-        # A committed delete clears the instance's pk, so keep the identity.
-        first_pk, second_pk = first_host.pk, second_host.pk
-        # The first retired host is a live companion: its deletion purges the
-        # owner's party surfaces, which the rollback must put back.
-        from evennia.utils.create import create_object
-
+            if self._host_for(row) is not None
+        ][:3]
+        self.assertEqual(len(rows), 3)
+        hosts = [self._host_for(row) for row in rows]
+        # A committed delete clears the instance's pk, so keep the identities.
+        pks = [host.pk for host in hosts]
+        # All three retired hosts are companions of ONE owner: each retirement
+        # shrinks the same party list, so compensation must replay the earliest
+        # snapshot last.
         player = create_object(PlayerCharacter, key="retirement owner")
         player.race = "human"
         player.apply_race_baseline()
-        player.location = first_host.location
-        join_party(first_host, player)
-        self.assertEqual(party_ids(player), [first_host.pk])
+        for host in hosts:
+            player.location = host.location
+            join_party(host, player)
+        self.assertEqual(party_ids(player), pks)
         self._patch_roster(
             tuple(
-                row
-                for row in get_catalog().service_hosts
-                if row.host_key not in {rows[0].host_key, rows[1].host_key}
+                row for row in get_catalog().service_hosts if row not in rows
             )
         )
         before = self._snapshot()
@@ -256,19 +257,24 @@ class ServiceHostBatchRollbackTests(ServiceContentIsolation, EvenniaTestCase):
 
         def delete_with_fault(instance, *args, **kwargs):
             calls["count"] += 1
-            if calls["count"] == 2:
-                raise RuntimeError("injected retirement fault")
+            if calls["count"] == len(hosts):
+                # The deletion hook has already purged this host's party
+                # binding by the time the row deletion fails.
+                instance.at_object_delete()
+                raise RuntimeError("injected post-hook retirement fault")
             return real_delete(instance, *args, **kwargs)
 
         with patch.object(NPC, "delete", delete_with_fault):
             with self.assertRaises(RuntimeError):
                 sync_service_content()
 
-        # Both rows are back, and the owner's party surfaces survived the
-        # already-executed first deletion.
-        self.assertIsNotNone(NPC.objects.filter(pk=first_pk).first())
-        self.assertIsNotNone(NPC.objects.filter(pk=second_pk).first())
-        self.assertEqual(party_ids(player), [first_pk])
+        # Every row is back, and the owner still holds all three bindings with
+        # their metadata, both in process and after a full cache flush.
+        for pk in pks:
+            self.assertIsNotNone(NPC.objects.filter(pk=pk).first())
+        self.assertEqual(party_ids(player), pks)
+        self.assertEqual(sorted(party_meta(player)), sorted(str(pk) for pk in pks))
         self._assert_snapshot(before)
         flush_cache()
+        self.assertEqual(party_ids(player), pks)
         self._assert_snapshot(before)

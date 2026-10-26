@@ -310,12 +310,16 @@ def _retire_source_hosts(hosts: list[NPC], retired: list[dict[str, Any]]) -> Non
 
     Each retirement leaves the idmapper before it deletes, so a rollback makes
     the next read load the restored rows instead of a dead cached instance.
-    ``retired`` receives each host's captured owner-side state BEFORE the next
-    deletion can fail, so the caller's rollback path can put back what a
-    partially completed retirement already changed.
+    ``retired`` receives each host's captured owner-side state BEFORE that
+    host's own deletion runs: a failure inside ``NPC.at_object_delete`` has
+    already purged the owner's party binding (or handed back possession) by
+    the time it raises, and database rollback cannot undo an in-process cache.
+    Registering first also covers a deletion that fails after earlier
+    retirements succeeded.
     """
     for host in hosts:
         state = _capture_retirement(host)
+        retired.append(state)
         host.flush_from_cache(force=True)
         context = {
             "char": state["char"],
@@ -325,7 +329,6 @@ def _retire_source_hosts(hosts: list[NPC], retired: list[dict[str, Any]]) -> Non
         if not host.delete():
             log_warn("guild_service_host_retirement_refused", context=context)
             continue
-        retired.append(state)
         transaction.on_commit(
             lambda context=context: log_info(
                 "guild_service_host_convergence_removed", context=context
@@ -334,8 +337,14 @@ def _retire_source_hosts(hosts: list[NPC], retired: list[dict[str, Any]]) -> Non
 
 
 def _restore_retirements(states: list[dict[str, Any]]) -> None:
-    """Put back the owner-side surfaces a rolled-back retirement changed."""
-    for state in states:
+    """Put back the owner-side surfaces a rolled-back retirement changed.
+
+    Replay runs newest-first: two retired hosts of one owner each snapshot that
+    owner as they were just before their own deletion, so only the EARLIEST
+    snapshot is the pre-batch state. Restoring forward would leave the second
+    snapshot's already-shrunk party list in place.
+    """
+    for state in reversed(states):
         owner = state.get("owner")
         if owner is None:
             continue
