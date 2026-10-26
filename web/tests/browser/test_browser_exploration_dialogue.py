@@ -28,6 +28,7 @@ from .browser_helpers import (
     overview_target_with_affordance,
     sent_action_count,
     store_state,
+    wait_for_presentation_settled,
     wait_for_store_state,
 )
 from .harness import ManagedServer, ManagedServerTearDownMixin
@@ -738,8 +739,11 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 1)
 
         # The exit row dispatches the deterministic leave seam exactly once
-        # (the list returns once the reply is read).
+        # (the list returns once the reply is read). The scripted reply's own
+        # publication burst and reading acknowledgement must land first, so
+        # the leave names the newest revision.
         open_dialogue_choices(page)
+        wait_for_presentation_settled(page)
         result_before_exit = (
             store_state(page).get("lastActionResult") or {}
         ).get("requestId")
