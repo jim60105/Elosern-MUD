@@ -538,6 +538,68 @@ class BaselineOwnershipTests(unittest.TestCase):
         self.assertEqual(session.frames("ui_action_result")[-1]["presentation_revision"], 1)
         self.assertEqual(coordinator.revision, 1)
 
+    def test_a_result_only_safe_answer_claims_only_the_held_revision(self):
+        """A safe answer never asserts a synchronization that did not happen."""
+        session = FakeSession()
+        coordinator = _coordinator(
+            session,
+            _registry(
+                _spec("status", lambda context: {"available": True, "value": 1}),
+                _spec(
+                    "area_map",
+                    lambda context: {
+                        "available": True,
+                        "nodes": [{"id": index} for index in range(400)],
+                    },
+                    on_demand=True,
+                ),
+            ),
+        )
+        # Nothing was ever published: the only honest claim is revision 0.
+        self.assertEqual(coordinator.held_revision, 0)
+        publication_receipt(
+            coordinator.enqueue_publication(
+                _context, result_only=True, completion=_completion("r0")
+            )
+        )
+        self.assertEqual(
+            session.frames("ui_action_result")[-1]["presentation_revision"], 0
+        )
+
+        coordinator.full_snapshot(_context())
+        self.assertEqual(coordinator.held_revision, 1)
+        session.sent.clear()
+
+        armed = {"on": True}
+
+        def fail_the_publication(name, envelope, index):
+            if armed["on"] and name == "ui_update":
+                armed["on"] = False
+                raise RuntimeError("socket gone")
+
+        # A partial send invalidates the delta baseline and consumes the issued
+        # target, so that target is a revision the client cannot hold.
+        session.on_send = fail_the_publication
+        publication_failure(
+            coordinator.enqueue_publication(_context, affected_panels={"area_map"})
+        ).trap(RuntimeError)
+        session.on_send = None
+        escaped = coordinator.revision
+        self.assertGreater(escaped, coordinator.held_revision)
+        self.assertEqual(coordinator.published_revision, escaped)
+        session.sent.clear()
+
+        # The safe answer names the last complete presentation instead.
+        publication_receipt(
+            coordinator.enqueue_publication(
+                _context, result_only=True, completion=_completion("r1")
+            )
+        )
+        answer = session.frames("ui_action_result")[-1]
+        self.assertEqual(answer["presentation_revision"], coordinator.held_revision)
+        self.assertLess(answer["presentation_revision"], escaped)
+        self.assertEqual(session.names(), ["ui_action_result"])
+
     @covers_requirement(
         "webclient-incremental-publication::publication-baseline-belongs-to-one-live-session-sequence"
     )
@@ -966,6 +1028,85 @@ class DispatcherCompletionTests(unittest.TestCase):
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]["outcome"], "error")
         self.assertFalse(dispatcher._sequence_state(session).in_flight)
+
+    def test_a_failed_completion_publication_reports_presentation_unavailable(self):
+        """The safe failure signal claims no revision and only answers once."""
+        from web.webclient.actions import dispatcher
+
+        state = {"value": 1}
+        session = FakeSession()
+        registry = _registry(
+            _spec("status", lambda context: {"available": True, "value": state["value"]})
+        )
+        coordinator = _coordinator(session, registry)
+        session.ndb.elosern_coordinator = coordinator
+        coordinator.full_snapshot(_context())
+        session.sent.clear()
+        sequence = dispatcher._sequence_state(session)
+        sequence.in_flight = True
+        sequence.epoch = coordinator.epoch
+        held = coordinator.held_revision
+        # The completion's own presentation really differs, so it is planned,
+        # validated and then fails to send.
+        state["value"] = 2
+
+        def fail_presentation_send(name, envelope, index):
+            if name in ("ui_snapshot", "ui_update"):
+                raise RuntimeError("socket gone")
+
+        session.on_send = fail_presentation_send
+        dispatcher._publish_completion(
+            session,
+            session.puppet or _context().actor,
+            {"outcome": "success", "code": "ok", "message": "完成", "affected_panels": ["status"]},
+            registry,
+            "r1",
+            coordinator.epoch,
+        )
+        session.on_send = None
+
+        errors = session.frames("ui_protocol_error")
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0]["code"], "presentation_unavailable")
+        self.assertFalse(errors[0]["reload_required"])
+        self.assertNotIn("revision", errors[0])
+        answers = session.frames("ui_action_result")
+        self.assertEqual(len(answers), 1)
+        self.assertEqual(answers[0]["presentation_revision"], held)
+        self.assertFalse(dispatcher._sequence_state(session).in_flight)
+        # Nothing was retried: one bounded answer and one safe signal.
+        self.assertEqual(session.names().count("ui_snapshot"), 0)
+        self.assertEqual(session.names().count("ui_update"), 0)
+
+
+class FailedCompleteRepairTests(unittest.TestCase):
+    """An unpublishable complete snapshot stops as a safe unavailable envelope."""
+
+    def test_a_repair_that_cannot_be_published_returns_presentation_unavailable(self):
+        from unittest.mock import patch
+
+        from web.webclient.presentation import ingress
+        from web.webclient.presentation.publication_parts import PublicationCodecError
+
+        session = FakeSession()
+        session.protocol_key = "websocket"
+        actor = SimpleNamespace(pk=1)
+        session.puppet = actor
+        with patch.object(
+            ingress,
+            "build_presentation_context",
+            side_effect=PublicationCodecError("logical publication over the ceiling"),
+        ):
+            ingress.synchronize_session(session, actor)
+
+        errors = session.frames("ui_protocol_error")
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0]["code"], "presentation_unavailable")
+        self.assertFalse(errors[0]["reload_required"])
+        # Nothing was truncated, no frame was sent, and nothing loops.
+        self.assertEqual(session.frames("ui_snapshot"), [])
+        self.assertEqual(session.frames("ui_publication_part"), [])
+        self.assertEqual(session.names(), ["ui_protocol_error"])
 
 
 if __name__ == "__main__":

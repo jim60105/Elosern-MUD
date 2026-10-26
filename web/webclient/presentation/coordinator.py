@@ -384,6 +384,21 @@ class PresentationCoordinator:
         return self._revision
 
     @property
+    def held_revision(self) -> int:
+        """The newest revision the client really holds, or 0 before any publication.
+
+        Unlike :attr:`revision` (the newest *issued* target) and
+        :attr:`published_revision` (which falls back to that issued target once
+        the baseline is invalidated) this never names a publication whose
+        frames may not have arrived. A safe failure answer claims this value,
+        so it can never assert a synchronization that did not happen. An
+        invalidated baseline keeps the last fully installed revision, which is
+        exactly what the client was last given.
+        """
+        baseline = self._baseline
+        return 0 if baseline is None else baseline.revision
+
+    @property
     def committed_panels(self) -> dict[str, Any]:
         """Owned copies of the eager panel values the client currently holds.
 
@@ -797,7 +812,11 @@ class PresentationCoordinator:
         send so an escaped target is never reused.
         """
         if entry.result_only:
-            revision = self.published_revision
+            # A result-only answer publishes no presentation, so it may only
+            # name the revision the client already holds: after a failed or
+            # partial presentation the issued target is a revision nothing
+            # was synchronized to, and the answer must never claim it.
+            revision = self.held_revision
             envelope = self._completion_envelope(entry, revision)
             if envelope is not None:
                 self._send_result(envelope)

@@ -590,6 +590,12 @@ def _completion_failed(
         _settle_in_flight(session, epoch, None)
         return
     log_error("presentation_publish_failed", context=context, exc=error)
+    # Nothing was published, so the client's presentation is behind canonical
+    # state. Report that through the safe protocol-error surface (it carries no
+    # revision) before the single bounded answer below: the client then holds
+    # the presentation unavailable and asks for one complete repair, instead of
+    # resuming graphical mutations against stale panels.
+    _send_presentation_unavailable(session)
     fallback = {
         "outcome": "error",
         "code": _INTERNAL_CODE,
@@ -606,6 +612,32 @@ def _completion_failed(
         force_snapshot=False,
         cache=True,
     )
+
+
+def _send_presentation_unavailable(session: Any) -> None:
+    """Mark the current presentation unavailable after a failed publication.
+
+    The frame claims no revision and demands no reload: the client's next
+    complete repair (the usual ``ui_sync`` path) rebuilds it. A transport that
+    cannot carry the notice is already gone, so the delivery failure is logged
+    here instead of raised into the caller's command settlement.
+    """
+    try:
+        _send_protocol_error(
+            session,
+            _protocol_error_envelope(
+                "presentation_unavailable", "圖形介面暫時無法更新，正在重新同步"
+            ),
+        )
+    except Exception as send_error:  # observability: ignore R2: the publication failure above is the reported failure; a transport that cannot carry the notice is already gone
+        log_warn(
+            "presentation_unavailable_delivery_failed",
+            context={
+                "surface": "dispatcher",
+                "session": str(getattr(session, "sessid", "?")),
+            },
+            exc=send_error,
+        )
 
 
 def _publish_with_result(
@@ -657,6 +689,7 @@ def _publish_with_result(
             # The recovery presentation could not be planned or sent, so the
             # safe result still travels as the same owner's result-only answer.
             log_error("presentation_publish_failed", context=context, exc=error)
+            _send_presentation_unavailable(session)
             _publish_with_result(
                 session,
                 actor,
