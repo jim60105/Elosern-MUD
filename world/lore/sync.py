@@ -1,6 +1,6 @@
 """Idempotent DB mirror for registries from lore-world-data."""
 
-from dataclasses import asdict
+from dataclasses import fields, is_dataclass
 from enum import Enum
 from typing import Any, Mapping
 
@@ -100,6 +100,30 @@ def _db_safe(value: Any) -> Any:
     return value
 
 
+def _plain(value: Any) -> Any:
+    """Return a DB-storable plain copy of one registry entry.
+
+    ``dataclasses.asdict`` deep-copies every leaf, which fails on the
+    read-only mappings capability declarations expose. Convert the shape
+    explicitly instead: dataclasses become dicts, mappings become plain dicts,
+    and tuples/lists keep their container type. :func:`_db_safe` then replaces
+    enums.
+    """
+
+    if is_dataclass(value) and not isinstance(value, type):
+        return {
+            field.name: _plain(getattr(value, field.name))
+            for field in fields(value)
+        }
+    if isinstance(value, Mapping):
+        return {key: _plain(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return tuple(_plain(item) for item in value)
+    if isinstance(value, list):
+        return [_plain(item) for item in value]
+    return value
+
+
 def sync_one(category: str, key: str, entry: Any) -> None:
     """Create or overwrite one category-qualified lore record."""
 
@@ -109,7 +133,7 @@ def sync_one(category: str, key: str, entry: Any) -> None:
         LoreRecord, key=script_key, persistent=True
     )
     script.db.category = category
-    script.db.fields = _db_safe(asdict(entry))
+    script.db.fields = _db_safe(_plain(entry))
 
 
 def sync_all() -> None:
