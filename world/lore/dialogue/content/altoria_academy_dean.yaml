@@ -96,23 +96,23 @@ topics:
       speaker: host
       text: 「天資是生來既定之物，學院無法憑空賜予親和，但能引導你認清自身的長處與道路。」
 - topic_id: altoria_academy.topic_04
-  keyword: 傳承
-  label: 傳承
+  keyword: 求學
+  label: 求學
   fallback:
     scene_id: altoria_academy.topic_04_scene
     revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「學院名聲這麼大，不知有沒有由導師單獨收徒、親自指點高深秘術的門路？」
+      text: 「學院的課是怎麼上的？能不能請一位導師單獨帶著我學？」
     - kind: narration
       text: 奧德溫‧薩契整了整衣袍，扶正眼鏡，神色格外坦率平靜。
     - kind: speech
       speaker: host
-      text: 「學院是探求真理之所，並沒有私相收徒的規矩，也不提供任何一蹴可幾的捷徑。」
+      text: 「學院沒有把學生交到某一位導師手上的規矩，也沒有私下傳授的門路。課在講堂裡上，誰走進來都能聽。」
     - kind: speech
       speaker: host
-      text: 「無論咒文或是戰陣之藝，都需要自身在日復一日的研讀與實踐中磨礪而出。學院只授予學識，無法代人修煉。」
+      text: 「咒文也好，戰陣之藝也好，都得自己一天一天讀、一天一天練。學院只把學識攤開擺著，那些苦功沒有人代得了。」
     - kind: speech
       speaker: host
-      text: 「若想驗證自身的實力位階，應當前往中央廣場東側的冒險者公會參加考核，那裡才有評定能力的權限。」
+      text: 「想驗證自己練到什麼程度，得去中央廣場東側的冒險者公會參加考核，評定實力的權限在他們那裡。」
