@@ -41,7 +41,7 @@ any ancestor with `requires`.
 | Key | Required | Rule |
 |---|---|---|
 | `scene_id` | yes | `[a-z][a-z0-9_.-]{0,95}`, unique across the whole file (fallbacks, variants, refusals) |
-| `revision` | yes | printable ASCII, 1..32 chars; bump when lines change (`r1`, `r2`, ...) |
+| `revision` | yes | printable ASCII, 1..32 chars; bump when the lines of an already-shipped scene change (`r1` → `r2`), and keep the current value while polishing inside the same unmerged change |
 | `lines` | yes | 1..32 lines |
 
 Each line is exactly one of:
@@ -82,6 +82,11 @@ variants:
 Selection: the highest matching `priority` wins; no match uses `fallback`.
 `when` is required, `priority` is required, duplicate priorities are rejected.
 
+Give a combined condition (`all` of rank plus carried item, elf *and* exposure)
+`20` and a single trait `10`; when two variants can both match, the more specific
+context must carry the higher number, otherwise the general scene shadows it.
+Every topic keeps an unconditional `fallback` as the base scene.
+
 ## Conditions
 
 `all` / `any` take 1..16 `children` (nesting depth ≤4). Every leaf operand must
@@ -104,12 +109,37 @@ key rejects the whole snapshot.
 | `skill_owned` | `skill_key`, `min_proficiency` (optional) | acting body owns the skill, optionally at the threshold |
 | `exposure` | `minimum`, `maximum` (at least one, inclusive, integers 0..4) | acting body's effective exposure; worn gear counts |
 
+Ordinal `0..4` maps to `EXPOSURE_LEVELS` = 極低／低／中等／高／極高
+(`world/lore/sexual_vocab.py`); the condition never takes the label itself.
+Operand sources for the canonical keys:
+
+| Operand | Registry |
+|---|---|
+| `race_key` | `world/lore/races.py::RACE_REGISTRY` (`human`, `beastfolk`, `elf`) |
+| `identity_key` | `world/lore/social_identities.py::SOCIAL_IDENTITY_REGISTRY` (`noble`, `clergy`, `official`, `adventurer`) |
+| `rank_key` | guild ranks `F`..`A` (`world/lore/guild.py`) |
+| `skill_key` | `world/skills/` `SKILL_REGISTRY` |
+| `item_key` | item registry; the same key must appear in the host's assortment before the prose promises it |
+| `stage_key` | affinity stages (`world/rules/affinity*`) |
+| companion `source_key` | `PLAYER_PRESET_REGISTRY` for `preset`, a profile key for `profile` |
+| `definition_key`, `state` | quest definition registry and the states listed above |
+
+An unknown operand rejects the whole snapshot at startup, so a typo is a load
+failure rather than a silently dead variant.
+
 Actor-versus-owner is not a stylistic choice: race, social identity, carried
 items, skills and exposure read the acting body; guild rank, quest state,
 affinity and reading progress read the owning player. A possessed elf companion
 qualifies on her race while the owner's guild rank still governs guild topics.
 Hints are generated from these declarations with canonical public labels, so the
 prose never has to explain a requirement.
+
+## What the schema cannot check
+
+The parser validates shape, references and budgets. It cannot see that a line
+invented a place, a price, a title or a commission type, and it cannot judge
+whether a scene reads like a conversation. Those are the review pass's job:
+resolve every proper noun to a registry row, then read the file as speech.
 
 ## Limits
 
