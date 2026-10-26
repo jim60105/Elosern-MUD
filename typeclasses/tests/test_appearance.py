@@ -768,6 +768,7 @@ class NPCTitleAppearanceTests(EvenniaCommandTestMixin, EvenniaTest):
 
         return patch.object(NPC, "npc_title", new=property(lambda self: _raise()))
 
+    @covers_requirement('npc-identity-titles::every-npc-identity-surface-uses-the-plain-authored-name')
     def test_room_character_line_renders_plain_names_only(self):
         appearance = self.char1.at_look(self.room1)
         self.assertIn("人物：", appearance)

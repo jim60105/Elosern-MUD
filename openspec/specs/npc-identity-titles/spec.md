@@ -193,7 +193,7 @@ This capability SHALL add the NPC title behavior without changing the requiremen
 #### Scenario: An imported NPC reads back its authored title
 
 - **WHEN** a batch containing a character record whose `title` is `"南門守衛"` is loaded
-- **THEN** the constructed NPC's `npc_title` equals `"南門守衛"`, and the room character listing renders the composed 「姓名　稱號」 for it
+- **THEN** the constructed NPC's `npc_title` equals `"南門守衛"`, and the room character listing renders the plain authored `key`
 
 #### Scenario: A title with surrounding whitespace persists in its stripped form
 
@@ -380,8 +380,8 @@ before creating any room or entity.
 
 #### Scenario: A materialized occupant answers to its authored name
 - **WHEN** a compiled stage with `npc_req: [{"role": "bandit", "tier": "bandit", "display_name": "測試人物", "title": "測試稱號", ...}]` materializes
-- **THEN** the spawned NPC's `key` is `測試人物`, its `npc_title` is `測試稱號`, and the full
-  identity composer renders 「測試人物　測試稱號」 on full-identity surfaces
+- **THEN** the spawned NPC's `key` is `測試人物`, its `npc_title` is `測試稱號`, and every
+  presentation surface renders the plain name `測試人物`
 
 #### Scenario: A missing title rolls back the materialization
 - **WHEN** a forge-constructed spawn requirement reaches the SceneBuilder with `title` absent or
@@ -529,6 +529,17 @@ Service-host and persistent adventurer creation SHALL each emit one facade info 
 #### Scenario: Opponent spawn logs
 - **WHEN** persistent adventurer assembly creates the qualified person
 - **THEN** its creation event identifies char/profile/branch once, while examination reuse emits no opponent-spawn creation event
+
+### Requirement: Every NPC identity surface uses the plain authored name
+NPC text, exploration, dialogue, party, inspection, skill targeting and management identity surfaces SHALL render the plain authored name without reading or composing an independent title. Historical title attributes SHALL remain inert; player title presentation SHALL remain unchanged.
+
+#### Scenario: All identity surfaces ignore historical titles
+- **WHEN** a real NPC carries title sentinel data or a raising title accessor
+- **THEN** room/look/dialogue/party/editor/GM surfaces retain plain names without accessing it
+
+#### Scenario: No identity replacement
+- **WHEN** an NPC title is removed from a display
+- **THEN** the old title is not merged into name, description or a replacement role field
 
 ### Requirement: The existing scene-builder and generated-quest contracts are unchanged where not amended
 Except for the authored-identity behaviour stated in this delta, the scene-builder spawn contracts

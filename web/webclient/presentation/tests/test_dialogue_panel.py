@@ -303,6 +303,7 @@ class DialoguePresenterTests(EvenniaTest):
     def _render(self):
         return self.registry.render("dialogue", self.context)
 
+    @covers_requirement('npc-identity-titles::every-npc-identity-surface-uses-the-plain-authored-name')
     @covers_requirement(
         "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-3-presentation-panel"
     )

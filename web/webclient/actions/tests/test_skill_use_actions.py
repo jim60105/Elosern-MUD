@@ -344,6 +344,7 @@ class SkillPreviewActionTests(_SkillUseCase):
         self.assertNotEqual(by_id[first.pk], by_id[second.pk])
         self.assertTrue(by_id[first.pk].startswith("twin villager"))
 
+    @covers_requirement('npc-identity-titles::every-npc-identity-surface-uses-the-plain-authored-name')
     def test_target_labels_carry_the_plain_key_and_keep_the_label_bound(self):
         sentinel = self._npc("sentinel villager")
         sentinel.npc_title = "合成稱號"

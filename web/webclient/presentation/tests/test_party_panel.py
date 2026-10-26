@@ -561,6 +561,7 @@ class PartyPresenterTests(EvenniaTest):
             npc.db.party_member = owner
             self.assertEqual(self.registry.render("party", context), UNAVAILABLE_PAYLOAD)
 
+    @covers_requirement('npc-identity-titles::every-npc-identity-surface-uses-the-plain-authored-name')
     @covers_requirement(
         "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )

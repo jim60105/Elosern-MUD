@@ -77,6 +77,7 @@ class NpcReaderTests(EvenniaTest):
         self.assertEqual(keys[0], "identity")
         self.assertEqual(failed_sections(detail), {})
 
+    @covers_requirement('npc-identity-titles::every-npc-identity-surface-uses-the-plain-authored-name')
     def test_identity_reports_the_plain_name_and_dialogue_key(self):
         detail = npcs.detail(self.npc)
         identity = section_of(detail, "npc_identity")

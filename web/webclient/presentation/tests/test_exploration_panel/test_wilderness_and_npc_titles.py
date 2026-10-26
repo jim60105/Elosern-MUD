@@ -157,6 +157,7 @@ class NPCPanelRowsTests(BattlefieldIsolation, EvenniaTestCase):
     def _interact_rows(self, payload, pk):
         return [row for row in payload["interact"] if row["identity"] == pk]
 
+    @covers_requirement('npc-identity-titles::every-npc-identity-surface-uses-the-plain-authored-name')
     def test_npc_rows_read_with_the_plain_key_on_both_row_kinds(self):
         npc = create_object(NPC, key=_HUD_NAME, location=self.room1)
         npc.npc_title = _HUD_SENTINEL
