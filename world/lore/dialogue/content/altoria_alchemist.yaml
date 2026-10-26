@@ -1,55 +1,87 @@
 schema_version: 1
-greeting: 鍊金坊的希碧拉‧灰沼從一整牆瓶罐後面探出頭，指尖還沾著草綠色：「哪裡受傷了？還是先備著，以防萬一？說吧，我聽著。」
+greeting: 鍊金坊的希碧拉‧灰沼從一整牆瓶罐後面探出頭，指尖還沾著草綠色汁液：「哪裡受傷了？還是打算出城，想先備妥救急的藥水？直接說吧，我聽著。」
 topics:
 - topic_id: altoria_alchemist.topic_01
   keyword: 藥劑
   label: 藥劑
   fallback:
     scene_id: altoria_alchemist.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 藥劑
+      text: 希碧拉坊主，我想備幾瓶救急的藥水防身。架上這幾種瓶裝藥劑有什麼區別？
+    - kind: narration
+      text: 希碧拉‧灰沼隨手拉過乾淨棉布擦拭滴管，平靜地指著木架中央的三色玻璃瓶。
     - kind: speech
       speaker: host
-      text: 「治療藥水，小傷用。強效治療藥水，傷得重才用，別拿來治擦傷，浪費。魔力藥水是藍色，施法施到頭昏的時候喝。瓶標上都有寫，看不懂再問我。」
+      text: 「紅瓶是尋常的治療藥水，擦傷或皮肉小傷喝上一口就管用。旁邊大號的紅瓶是強效治療藥水，傷及筋骨才用得著；別拿來應付擦傷，那是浪費銅幣。」
+    - kind: speech
+      speaker: actor
+      text: 那排泛著深藍色光澤的長頸瓶呢？施展法術時派得上用場嗎？
+    - kind: speech
+      speaker: host
+      text: 「那是魔力藥水。連續念咒、耗盡氣力感到頭昏眼花的時候喝一小口，能平復頭暈，把消耗掉的魔力補回來。瓶標我都親手標好用量，出門前看清楚，可別慌亂中抓錯瓶子喔。」
 - topic_id: altoria_alchemist.topic_02
   keyword: 外敷
   label: 外敷
   fallback:
     scene_id: altoria_alchemist.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 外敷
+      text: 除了口服藥水，鋪子裡有便於隨身攜帶、應付跌打損傷的外敷藥膏嗎？
+    - kind: narration
+      text: 希碧拉‧灰沼從櫃檯底層端出兩個陶罐，陶罐邊緣封著防潮蠟印。
     - kind: speech
       speaker: host
-      text: 「獸王國藥草膏，部族薩滿熬成，抹在腫痛的地方。王國礦工提神湯很辣，礦工下坑前灌一碗，有沒有用，看你自己撐不撐得住。這兩樣算不上正經藥水，塞在行囊底備著就好。」
+      text: 「深褐色的罐子是獸王國藥草膏，部族老法子熬成，專門塗抹在跌打腫痛的瘀青上。氣味有些嗆鼻，但消腫極快，行囊底層塞上一罐很踏實。」
+    - kind: speech
+      speaker: actor
+      text: 旁邊那個陶壺裡裝的是什麼？聞起來有一股辛辣的草根味。
+    - kind: speech
+      speaker: host
+      text: 「那是王國礦工提神湯，辛辣得很。丘陵礦工下深坑前總灌上一碗驅散寒氣與睏意。這兩樣算不上名貴藥劑，但在野外受凍受傷時，確實比什麼都管用。」
 - topic_id: altoria_alchemist.topic_03
   keyword: 特殊
   label: 特殊
   fallback:
     scene_id: altoria_alchemist.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 特殊
+      text: 聽說鍊金術也能調製些效用奇特的烈性藥劑，坊裡備有這類特殊調配嗎？
+    - kind: narration
+      text: 希碧拉‧灰沼眼神微斂，身子朝櫃檯貼了紅標的木架前挪了半步，語氣透出審慎。
     - kind: speech
       speaker: host
-      text: 「迷情藥？有。不過我得先問，要用在誰身上，對方知道嗎？藥效不強，意志硬一點的人抵擋得住。想清楚了再來跟我說。還有，紅標那排別自己伸手拿喔。」
+      text: 「迷情藥？架上確實有調好的份額。但我得先問個明白，打算用在誰身上，對方知情嗎？藥力只能牽動興致，碰上意志堅定的人毫無用處，可別指望拿它做勉強人的事。」
+    - kind: speech
+      speaker: actor
+      text: 那麼若是遇上心智堅定或懷有戒備的人，這藥效真會全然不起作用嗎？
+    - kind: speech
+      speaker: host
+      text: 「一點用處也沒有。心意不順的人喝下去只會覺得發熱煩躁，反倒壞事。想明白了再決定買不買。還有，貼著紅標的那一排瓶子藥性猛烈，想要哪一瓶由我親手取放，免得打翻誤事喔。」
 - topic_id: altoria_alchemist.topic_04
   keyword: 聖水
   label: 聖水
   fallback:
     scene_id: altoria_alchemist.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 聖水
+      text: 如果想尋找能洗除旅途污穢、神殿祝聖過的受洗聖水，坊裡有存貨嗎？
+    - kind: narration
+      text: 希碧拉‧灰沼乾脆地搖了搖頭，抬手朝上方的台地揚了揚下巴。
     - kind: speech
       speaker: host
-      text: 「受洗聖水不在我這。那是聖所的東西，爬上聖階到大神殿前，聖所有自己的櫃檯。我這裡只有調出來的藥，祝福要找神官，不歸我管。」
+      text: 「受洗聖水不在我這兒賣。那是光明教會的東西，由修女與神官藉由光魔法祝聖祈禱而成，專門洗除旅人在外沾染的穢氣。調藥歸我，神職者的祝禱歸神職者，我這裡概不過問。」
+    - kind: speech
+      speaker: actor
+      text: 那我該往哪裡去才能請到真正的受洗聖水？
+    - kind: speech
+      speaker: host
+      text: 「登上聖階，往大神殿前的聖所走。聖所有專門的櫃檯發放受洗聖水與聖器。要求受洗聖水，到聖所櫃檯詢問才是正途。」
