@@ -58,6 +58,61 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
+        "webclient-immutable-presentation::ordinary-committed-notifications-reuse-immutable-unchanged-payloads",
+        "webclient-immutable-presentation::explicit-detached-snapshots-retain-isolation",
+    )
+    def test_immutable_committed_record_node_suite_passes(self):
+        # The ownership contract (webclient-immutable-adoption): a delta keeps
+        # the unchanged eager panel by === identity while replacing the changed
+        # one, a metadata-only notification and an equal alignment reuse the
+        # already owned panel values, a hostile subscriber in either strictness
+        # and a mutation of the transport caller's own envelope or result graph
+        # cannot reach the committed record, a listener's retained old record
+        # stays the earlier committed state, and one notification is published
+        # per complete publication (none for a pending part). getState()
+        # snapshots are edited and retained without touching either the reducer
+        # or a later commit, and same-epoch map references survive an eager
+        # snapshot.
+        result = subprocess.run(
+            [
+                "node",
+                "--test",
+                str(REPO_ROOT / "web/static/webclient/js/tests/protocol_immutable.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "immutable committed record Node suite failed:\n"
+            + result.stdout
+            + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+    @covers_requirement(
+        "webclient-immutable-presentation::complete-alignment-preserves-valid-local-interaction-state",
+        "webclient-immutable-presentation::ordinary-committed-notifications-reuse-immutable-unchanged-payloads",
+    )
+    def test_immutable_presentation_vitest_evidence_passes(self):
+        # What only the composed client shows (webclient-immutable-adoption):
+        # the view projects the committed panels by reference and keeps the
+        # unchanged ones by identity across a delta, subscribers and the getter
+        # see one frozen record, a hostile consumer cannot write through the
+        # published view or a resolved menu, a complete same-mode alignment
+        # keeps the open drawer, the focused field and its unsaved text without
+        # remounting, the existing mode-change and unavailable-backing-panel
+        # teardown still runs, and an equal checkpoint replays neither a settled
+        # dialogue delivery nor a completed combat round.
+        self._run_single_vitest_file(
+            "web/webclient-app/tests/immutable_presentation.test.js",
+            "immutable presentation",
+        )
+
+    @covers_requirement(
         "webclient-contextual-hud::the-vitals-island-is-shown-only-in-combat-or-while-a-vital-or-a-condition-needs-attention",
     )
     def test_vitals_visibility_node_suite_passes(self):
