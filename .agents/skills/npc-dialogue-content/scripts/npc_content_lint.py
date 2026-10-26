@@ -9,16 +9,18 @@ that the snapshot loads.
 
 Usage::
 
-    uv run --locked python <checkout>/.agents/skills/npc-dialogue-content/scripts/npc_content_lint.py \
+    uv run --locked python .agents/skills/npc-dialogue-content/scripts/npc_content_lint.py \
         world/lore/dialogue/content/altoria_merchant.yaml
     ... scripts/npc_content_lint.py <content-dir> --json
     ... scripts/npc_content_lint.py <file> --places     # heuristic place check
     ... scripts/npc_content_lint.py <file> --no-registry
 
 The repository used for registry and place lookups is the checkout that contains
-the target file (first ancestor with ``world/lore/dialogue/__init__.py``), so
-running the primary checkout's script against a feature worktree's content still
-reads that worktree's registries. ``--repo`` overrides it.
+the target file (first ancestor with ``world/lore/dialogue/__init__.py``), and the
+script is meant to be run from that same checkout. Run the copy that lives in your
+own worktree: invoking another checkout's copy is what the worktree gate blocks,
+and copying the script elsewhere lets it drift from the skill revision you are
+working under. ``--repo`` overrides the lookup root.
 
 Exit status is ``1`` when any ERROR is reported, ``0`` otherwise. WARN findings
 fail the run only under ``--strict``.

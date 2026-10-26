@@ -21,9 +21,14 @@ BEFORE composing or reviewing any prose, read:
 1. `tmp/story_settings/world_info.md` — the mandatory world source. If it is
    unavailable, stop: content authoring is blocked until the real source exists.
    Never substitute generic fantasy assumptions or invented lore.
-2. This skill and `references/scene-schema.md`, read from the **primary checkout**
-   (`/var/home/jim60105/repos/MUD/.agents/skills/npc-dialogue-content/`). A
-   feature worktree can predate the latest skill revision; the primary copy wins.
+2. This skill and `references/scene-schema.md`, read from **the checkout you are
+   working in** — in a feature worktree that is
+   `<worktree>/.agents/skills/npc-dialogue-content/`, and the primary checkout's
+   copy is not consulted at all. Worktrees are cut from the branch that already
+   carries the current skill, so the worktree's own copy is authoritative for
+   that worktree. Run `scripts/npc_content_lint.py` from that same path; never
+   copy the script into `tmp/` or invoke another checkout's copy, which the
+   worktree gate rejects.
 3. The host's own canon: its `NpcProfile` in `world/lore/npc_profiles/<slice>.py`
    (card, voice), its `PlaceDefinition` in `world/lore/settlements/places.py`
    (name, title, race, profession, assortment, `dialogue_key`), plus the lore rows
@@ -238,17 +243,19 @@ Editorial quality is carried by the review document, not by an assertion.
    `uv run --locked python -c "from world.lore.dialogue import DIALOGUE_SNAPSHOT; print(len(DIALOGUE_SNAPSHOT))"`.
    One bad file rejects the whole snapshot and blocks server startup; the error
    names file, profile and dialogue key.
-2. Run the mechanical lint over your files:
-   `uv run --locked python .agents/skills/npc-dialogue-content/scripts/npc_content_lint.py world/lore/dialogue/content/<host>.yaml`.
-   It reports OOC and 武俠 tokens, backticks, ASCII commands, 您, sentence-final
-   的, CJK–Latin spacing, half-width punctuation, calques, unbalanced 「」, scene
-   shape and condition operands that do not exist in the registries. It reads the
-   registries of the checkout that contains the target file, so running the
-   primary copy against a worktree's content is safe (`--repo` overrides). Exit 1
-   means an ERROR finding; WARN findings are prompts and fail only under
-   `--strict`. Add `--places` when the scene names streets or buildings to get
-   a heuristic list of place-like words missing from `places*.py`
-   (warnings there are prompts, not verdicts).
+2. Run the mechanical lint over your files, using the script in **this** checkout:
+   `uv run --locked python .agents/skills/npc-dialogue-content/scripts/npc_content_lint.py world/lore/dialogue/content/<host>.yaml`,
+   from the worktree root. It reports OOC and 武俠 tokens, backticks, ASCII
+   commands, 您, sentence-final 的, CJK–Latin spacing, half-width punctuation,
+   calques, unbalanced 「」, scene shape and condition operands that do not exist
+   in the registries. It resolves the registries from the checkout that contains
+   the target file (`--repo` overrides). Do not copy the script out of
+   `.agents/skills/` and do not run another checkout's copy: the worktree gate
+   blocks it, and the copy also drifts from the skill revision that worktree
+   carries. Exit 1 means an ERROR finding; WARN findings are prompts and fail
+   only under `--strict`. Add `--places` when the scene names streets or
+   buildings to get a heuristic list of place-like words missing from
+   `places*.py` (warnings there are prompts, not verdicts).
 3. Read the lint's WARN lines, then sweep every proper noun by hand and resolve
    it to a registry row (see *Nothing invented*). The lint cannot detect an
    invented title, fee, commission type or institution.
