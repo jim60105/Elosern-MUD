@@ -695,6 +695,7 @@ const REGISTERED_MUTATION_ACTIONS = {
     payload: { npc_id: "granny", item_key: SYNTH_ITEM.id },
     display: { actionLabel: `交付 ${SYNTH_ITEM.display} 給 灰婆婆` },
   },
+  "explore.dialogue_complete": null,
   "explore.dialogue_leave": null,
   "explore.look": { payload: { room: true }, display: { room: true } },
   "explore.move": { payload: { exit_ref: "e1", current_node: "n1" }, display: { exitLabel: "北門" } },

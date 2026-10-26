@@ -762,6 +762,25 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       },
     },
     {
+      // The reading acknowledgement is panel-owned bookkeeping: the client
+      // confirms one delivered receipt from its memory-only queue
+      // (authored-dialogue-reading-client), so nothing is typed and nothing is
+      // echoed; the committed reading is the outcome.
+      id: "EXPECTED SILENCE: explore.dialogue_complete reading acknowledgement",
+      ids: ["explore.dialogue_complete"],
+      silence: true,
+      prepare() {
+        openExploration();
+        store.dispatchAction("explore.dialogue_complete", {
+          npc_id: 41,
+          delivery_id: "dlv_surface",
+          context_id: null,
+          topic_id: "t_surface_topic",
+          scene_revision: "rev_1",
+        });
+      },
+    },
+    {
       id: "blocked duplicate dispatch (in flight) adds no second line",
       ids: ["explore.wait"],
       prepare() {

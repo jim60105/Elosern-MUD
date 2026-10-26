@@ -693,6 +693,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
                 "explore.possess_release",
                 "explore.deliver",
                 "explore.talk_open",
+                "explore.dialogue_complete",
             },
         )
         surfaces = {entry.surface for entry in vocabulary if entry.navigation}

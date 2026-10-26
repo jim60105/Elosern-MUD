@@ -121,6 +121,10 @@
     // success line is the player-facing outcome, delivered as narrative by the
     // commit itself (webclient-align-11).
     "explore.dialogue_leave",
+    // The reading acknowledgement (authored-dialogue-reading) is panel-owned
+    // bookkeeping: the client confirms one delivered receipt after the player
+    // finished the scene, so no typed command line exists to echo.
+    "explore.dialogue_complete",
     // Opening the skill-tab use preview reads a server preview and casts
     // nothing; only the confirmed `explore.cast` echoes a command line.
     "explore.skill_preview",
