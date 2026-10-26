@@ -14,7 +14,7 @@
 //   skills.js             — B3 skills slice
 //   local_map.js          — B4 `local_map` v1 lattice family + localMapModelFor
 //   art_panels.js         — B4 `art` panel family
-//   dialogue_panels.js    — the committed `dialogue` panel (v2)
+//   dialogue_panels.js    — the committed `dialogue` panel (v3)
 //   services_panels.js    — B4 `services` panel family
 //   creation_panels.js    — B5 `creation` v5 wizard family
 //   party_panels.js       — align-05 party panel family

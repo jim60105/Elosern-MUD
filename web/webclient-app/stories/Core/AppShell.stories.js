@@ -19,6 +19,7 @@ import {
   FOE_PORTRAIT_CATALOG,
   PARTY_PARTICIPANTS,
   combatSkills,
+  dialoguePanelFixture,
   foeParticipants,
   withPlateConditions,
   NARRATIVE_SAMPLE,
@@ -211,21 +212,20 @@ const MODE_JOURNEY_CATALOG = {
     context: { name: "店長", role: "對話對象" },
   },
 };
-const MODE_JOURNEY_DIALOGUE = {
-  schema_version: 2, available: true, kind: "dialogue",
-  host: { identity: 7, display_name: "店長", portrait_ref: "7" },
-  bond_stage: "熟識",
-  line: "又見面了。今晚爐火正旺，要喝點什麼，還是想打聽些消息？",
+const MODE_JOURNEY_LINE = "又見面了。今晚爐火正旺，要喝點什麼，還是想打聽些消息？";
+const MODE_JOURNEY_DIALOGUE = dialoguePanelFixture({
+  hostId: 7,
+  hostName: "店長",
+  hostPortraitRef: "7",
+  bondStage: "熟識",
+  line: MODE_JOURNEY_LINE,
   choices: [
-    { keyword_id: "news", label: "最近有什麼消息？" },
-    { keyword_id: "town", label: "關於這座城鎮" },
-    { keyword_id: "guild", label: "冒險者公會在哪裡？" },
-    { keyword_id: "rest", label: "我想稍作休息" },
+    ["news", "最近有什麼消息？"],
+    ["town", "關於這座城鎮"],
+    ["guild", "冒險者公會在哪裡？"],
+    ["rest", "我想稍作休息"],
   ],
-};
-const MODE_JOURNEY_DIALOGUE_CLOSED = {
-  schema_version: 2, available: false, reason: { code: "dialogue_unavailable", message: "對話已結束" },
-};
+});
 
 // The combat panel with `foes` active foes (webclient-combat-foes-on-stage):
 // the player's side — the player and the first `companions` slots of the
@@ -481,18 +481,19 @@ const renderPlayer = (args) => ({
               } : MODE_JOURNEY_CATALOG["7"],
             },
           } } : {}),
-          ...(args.dialogue ? { dialogue: {
-            schema_version: 2, available: true, kind: "dialogue",
-            host: { identity: 7, display_name: args.dialogue === "missing" ? "合成‧旅人" : "店長", portrait_ref: args.dialogue === "missing" ? null : "7" },
-            bond_stage: "熟識",
+          ...(args.dialogue ? { dialogue: dialoguePanelFixture({
+            hostId: 7,
+            hostName: args.dialogue === "missing" ? "合成‧旅人" : "店長",
+            hostPortraitRef: args.dialogue === "missing" ? null : "7",
+            bondStage: "熟識",
             line: "歡迎來到西風酒館。你可以在這裡打聽消息，也可以稍作休息再出發。",
             choices: [
-              { keyword_id: "news", label: "最近有什麼消息？" },
-              { keyword_id: "town", label: "關於這座城鎮" },
-              { keyword_id: "guild", label: "冒險者公會在哪裡？" },
-              { keyword_id: "rest", label: "我想稍作休息" },
+              ["news", "最近有什麼消息？"],
+              ["town", "關於這座城鎮"],
+              ["guild", "冒險者公會在哪裡？"],
+              ["rest", "我想稍作休息"],
             ],
-          } } : {}),
+          }) } : {}),
         },
       });
       if (args.companionSpeaks) {
@@ -759,11 +760,11 @@ const renderPlayer = (args) => ({
         const steps = {
           talk: () => {
             store.appendText("in", "與店長交談");
-            commit("dialogue", { art, dialogue: MODE_JOURNEY_DIALOGUE }, `店長說：「${MODE_JOURNEY_DIALOGUE.line}」`);
+            commit("dialogue", { art, dialogue: MODE_JOURNEY_DIALOGUE }, `店長說：「${MODE_JOURNEY_LINE}」`);
           },
           leave: () => {
             store.appendText("in", "結束對話");
-            commit("exploration", { dialogue: MODE_JOURNEY_DIALOGUE_CLOSED }, "你向店長點頭致意，轉身離開吧檯。爐火在身後劈啪作響。");
+            commit("exploration", {}, "你向店長點頭致意，轉身離開吧檯。爐火在身後劈啪作響。");
           },
           fight: () => {
             store.appendText("in", "攻擊灰袍盜賊");
