@@ -199,7 +199,7 @@ export function applyTransport(ctx) {
     // reconciliation already ran; this hook then settles the attempt and
     // republishes the status.
     if (messageName === "ui_action_result" && result && result.accepted) {
-      const committed = ctx.reducer.getState().lastActionResult;
+      const committed = ctx.reducer.getCommittedState().lastActionResult;
       if (committed && typeof ctx.onDialogueReadingResult === "function") {
         ctx.onDialogueReadingResult(committed);
       }
@@ -287,7 +287,7 @@ export function applyTransport(ctx) {
   ctx.requestPresentationSync = function requestPresentationSync(mode) {
     const auto = mode !== "manual" && mode !== "lifecycle";
     const explicit = mode === "manual";
-    const rs = ctx.reducer.getState();
+    const rs = ctx.reducer.getCommittedState();
     if (rs.protocolIncompatible || !rs.connected) {
       // An incompatible protocol cannot be repaired by a sync, and a closed
       // transport can carry nothing: record the need only (a reconnect runs
@@ -340,7 +340,7 @@ export function applyTransport(ctx) {
   }
 
   ctx.recoveryStatus = function recoveryStatus() {
-    return ctx.reducer.getState().recovery.status;
+    return ctx.reducer.getCommittedState().recovery.status;
   };
 
   ctx.failRecovery = function failRecovery(cause) {
@@ -426,7 +426,7 @@ export function applyTransport(ctx) {
     // is read from the committed exploration panel and passed as the
     // `commandDisplay` descriptor so the CommandEcho catalog resolves the line.
     if (ctx.freeformTarget != null) {
-      const rs = ctx.reducer.getState();
+      const rs = ctx.reducer.getCommittedState();
       const panel = (rs.panels && rs.panels.exploration) || {};
       let npcLabel = "";
       for (const target of panel.interact || []) {

@@ -77,8 +77,21 @@ export function useLetters(store) {
     if (request.action === "letters.read") {
       if (!data || !Array.isArray(data.body_parts)) { message.value = "信件資料無法讀取。"; return; }
       opened.value = { sourceId: data.source_id, senderId: data.sender_id, body: data.body_parts.join("") };
-      const row = page.value?.letters.find((letter) => letter.source_id === data.source_id);
-      if (row && Number.isSafeInteger(data.read_tick)) row.read_tick = data.read_tick;
+      // The folio page is the committed result's own frozen record
+      // (webclient-immutable-adoption), so the read row is replaced in a local
+      // owned copy instead of being written in place.
+      const rows = page.value?.letters;
+      const index =
+        Array.isArray(rows) && Number.isSafeInteger(data.read_tick)
+          ? rows.findIndex((letter) => letter.source_id === data.source_id)
+          : -1;
+      if (index !== -1) {
+        page.value = {
+          ...page.value,
+          letters: rows.map((letter, position) =>
+            position === index ? { ...letter, read_tick: data.read_tick } : letter),
+        };
+      }
       message.value = "信件已開啟。";
     } else {
       page.value = data;

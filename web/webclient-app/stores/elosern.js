@@ -63,7 +63,10 @@ export const useElosernStore = defineStore("elosern", () => {
   // D-A): menus derived from the reducer's committed state at call time. The
   // cutover changes route their push sites through it; this seam stays the
   // single derivation entry (`resolveFrame` below, bridge-exposed).
-  ctx.frameResolver = createFrameResolver({ getState: () => ctx.reducer.getState() });
+  // The resolver's `getState` dependency is bound to the reducer's immutable
+  // committed record (webclient-immutable-adoption): menus are derived from
+  // frozen committed facts, never from a whole-state copy.
+  ctx.frameResolver = createFrameResolver({ getState: () => ctx.reducer.getCommittedState() });
 
   // D5: client-local dispatch bookkeeping (the tested legacy action-client
   // semantics; the transport send is an attachable seam).
@@ -169,7 +172,7 @@ export const useElosernStore = defineStore("elosern", () => {
 
   // The initial committed view (the original `initialView()`): built before
   // any publish so `view` is a complete snapshot from the first render.
-  ctx.view.value = ctx.buildView(null, ctx.reducer.getState());
+  ctx.view.value = ctx.buildView(null, ctx.reducer.getCommittedState());
 
   // H5 (tasks 7.5/7.8): re-apply the persisted presentation preferences at
   // load (the original site: after the signature variables `publishView`
@@ -177,8 +180,11 @@ export const useElosernStore = defineStore("elosern", () => {
   // temporal-dead-zone).
   ctx.loadPresentationPreferences();
 
-  ctx.reducer.subscribe(() => {
-    ctx.publishView();
+  // One notification per complete publication, carrying that publication's one
+  // immutable committed record; the view projection consumes it directly and
+  // clones nothing (webclient-immutable-adoption).
+  ctx.reducer.subscribe((committed) => {
+    ctx.publishView(committed);
   });
 
   // Re-run the committed-view publish (releaseIfReady + router-gate sync) so
@@ -316,7 +322,10 @@ export const useElosernStore = defineStore("elosern", () => {
     lastPanelRejection: ctx.lastPanelRejection,
     // The protocol store's subscription seam (the C4 harness re-map): browser
     // tests observe `beginTransport` notifications (the transport-reset state
-    // with a null epoch and empty panels) to gate on deterministic state.
+    // with a null epoch and empty panels) to gate on deterministic state. It
+    // forwards the reducer's immutable committed records unchanged
+    // (webclient-immutable-adoption): one frozen record per complete
+    // publication, `getCommittedState()`'s value, never a mutable copy.
     subscribe: (listener) => ctx.reducer.subscribe(listener),
     // Set which re-homed sub-dock currently owns the action-dock surface
     // (null clears). The sub-dock panels set/clear this on mount/unmount;

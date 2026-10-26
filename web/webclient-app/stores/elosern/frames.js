@@ -130,7 +130,7 @@ export function applyFrames(ctx) {
     ctx.pendingActorSelection = null;
     ctx.inStackMutation = true;
     try {
-      router.resetFrame(ctx.rootDescriptorFor(ctx.reducer.getState()), { openerKey: null });
+      router.resetFrame(ctx.rootDescriptorFor(ctx.reducer.getCommittedState()), { openerKey: null });
     } finally {
       ctx.inStackMutation = false;
     }
@@ -179,7 +179,7 @@ export function applyFrames(ctx) {
   // `combat.actor` descriptor from the card chrome. Refused while a mutation
   // is in flight, a round plays, or the cross-side question holds the dock.
   ctx.openCombatActor = function openCombatActor() {
-    const rs = ctx.reducer.getState();
+    const rs = ctx.reducer.getCommittedState();
     if (!committedCombat(rs) || ctx.inFlight || ctx.beatLocked() || ctx.crossSideConfirm || ctx.partyExitPrompt) {
       return false;
     }
@@ -197,7 +197,7 @@ export function applyFrames(ctx) {
   // for that member's canonical choices (one read-only query) and opens the
   // same root flow once its panel commits.
   ctx.selectCombatActor = function selectCombatActor(actorId) {
-    const rs = ctx.reducer.getState();
+    const rs = ctx.reducer.getCommittedState();
     const panel = committedCombat(rs);
     if (!panel || actorId === null || actorId === undefined) {
       return false;
@@ -214,7 +214,7 @@ export function applyFrames(ctx) {
   // One read-only `combat.actor_choices` query with the committed
   // session/revision/actor. Returns false when the dispatch was refused.
   ctx.requestCombatActor = function requestCombatActor(actorId) {
-    const rs = ctx.reducer.getState();
+    const rs = ctx.reducer.getCommittedState();
     const panel = committedCombat(rs);
     if (!panel || !panel.session || actorId === null || actorId === undefined) {
       return false;
@@ -240,7 +240,7 @@ export function applyFrames(ctx) {
   // The guarded v7 `combat.command` payload for the committed panel, or null.
   // Read at submit time, so the envelope never carries a stale version.
   ctx.buildCombatCommand = function buildCombatCommand(command) {
-    return CombatMenu.commandEnvelope(committedCombat(ctx.reducer.getState()), command);
+    return CombatMenu.commandEnvelope(committedCombat(ctx.reducer.getCommittedState()), command);
   };
 
   // Send one already-built envelope through the single dispatch entry and
@@ -249,7 +249,7 @@ export function applyFrames(ctx) {
     if (!envelope) {
       return null;
     }
-    const rs = ctx.reducer.getState();
+    const rs = ctx.reducer.getCommittedState();
     const requestId = ctx.dispatchAction("combat.command", envelope, display);
     if (requestId === null || requestId === undefined) {
       return null;
@@ -282,7 +282,7 @@ export function applyFrames(ctx) {
   // canonical choices committed (`followCombatItem`).
   ctx.pendingCombatItem = null;
   ctx.useCombatItem = function useCombatItem(itemKey, actorId) {
-    const rs = ctx.reducer.getState();
+    const rs = ctx.reducer.getCommittedState();
     const panel = committedCombat(rs);
     if (!panel || ctx.inFlight || ctx.beatLocked() || ctx.crossSideConfirm || ctx.partyExitPrompt) {
       return false;
@@ -365,7 +365,7 @@ export function applyFrames(ctx) {
       }
       // Escape from an exploration re-homed sub-dock (character / services):
       // clear the sub-dock and re-home the exploration root frame.
-      else if (ctx.dockOnExplorationForm(ctx.reducer.getState()) && ctx.activeSubDock.value) {
+      else if (ctx.dockOnExplorationForm(ctx.reducer.getCommittedState()) && ctx.activeSubDock.value) {
         ctx.setActiveSubDock(null);
         // The sub-dock owned the surface, not the frame stack: re-home the
         // declarative exploration root (the sub-dock frames were legacy).
@@ -794,7 +794,7 @@ export function applyFrames(ctx) {
   // envelope, so 是 sends exactly the versions and actor the question was
   // worded for.
   ctx.askCrossSide = function askCrossSide(kind, form, focusKey, command, display) {
-    const rs = ctx.reducer.getState();
+    const rs = ctx.reducer.getCommittedState();
     const panel = committedCombat(rs);
     const payload = command ? command.payload : null;
     const key = subjectKeyOf(kind, payload);
@@ -1039,7 +1039,7 @@ export function applyFrames(ctx) {
   // before an exit prompt opens). Neither operation requires the commanded
   // member to be commandable — the request belongs to the commander.
   ctx.requestPartyExit = function requestPartyExit(operation) {
-    const rs = ctx.reducer.getState();
+    const rs = ctx.reducer.getCommittedState();
     const panel = committedCombat(rs);
     if (
       !panel ||
@@ -1073,7 +1073,7 @@ export function applyFrames(ctx) {
     // The dispatch published before this record existed, so its own
     // synchronous result (or its released lock after a failed send) is
     // settled here, against the committed state as it is now.
-    if (consumePendingPartyExit(ctx.reducer.getState())) {
+    if (consumePendingPartyExit(ctx.reducer.getCommittedState())) {
       ctx.publishView();
     }
     return true;

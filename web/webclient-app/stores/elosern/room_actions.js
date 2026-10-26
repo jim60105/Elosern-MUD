@@ -61,7 +61,7 @@ export function applyRoomActions(ctx) {
   // The place card's 查看房間 (design D3): the committed room's look row,
   // through the gate. Nothing is submitted while locked.
   ctx.activateRoomLook = function activateRoomLook() {
-    const rs = ctx.reducer.getState();
+    const rs = ctx.reducer.getCommittedState();
     if (rs.mode !== "exploration") {
       return { sent: false, handled: false, reason: "mode" };
     }
@@ -74,7 +74,7 @@ export function applyRoomActions(ctx) {
   // suggestions card only while the committed envelope presents one (its
   // status is not `unavailable`).
   ctx.openRoomCard = function openRoomCard(kind) {
-    const rs = ctx.reducer.getState();
+    const rs = ctx.reducer.getCommittedState();
     if (!ROOM_CARD_KINDS.has(kind) || rs.mode !== "exploration") {
       return false;
     }
