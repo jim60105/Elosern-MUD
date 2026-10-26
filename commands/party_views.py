@@ -17,7 +17,6 @@ from world.rules.lineage_query import (
     lineage_position_for,
     proficiency_progress_for_keys,
 )
-from world.rules.npc_identity import npc_display_name
 from world.rules.party_scope import (
     PartyScopeError,
     resolve_commander,
@@ -49,8 +48,8 @@ def _number_text(value: int | float) -> str:
 
 
 def _member_name(member: Any) -> str:
-    """The member's player-facing name (composed NPC identity when present)."""
-    return npc_display_name(member)
+    """The member's player-facing name: its plain authored key."""
+    return str(member.key)
 
 
 def _modifier_text(value: Any) -> str:

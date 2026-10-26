@@ -162,10 +162,12 @@ class MemberGiveCommandTests(_TransferCommandBase):
 
     def test_member_give_resolves_the_display_name_without_a_mirror(self):
         self._hold(self.commander, _POTION.key)
+        self.aila.npc_title = "合成稱號"
 
         output = self._give(f"{_POTION.display_name_zh} = 艾拉")
 
         self.assertIn(f"你把 1 個{_POTION.display_name_zh}交給了艾拉。", output)
+        self.assertNotIn("合成稱號", output)
         self.assertEqual(self.commander.db.inventory, [])
         self.assertEqual(self.aila.db.inventory, [_POTION.key])
 
@@ -296,6 +298,7 @@ class RetrieveCommandTests(_TransferCommandBase):
     )
     def test_retrieve_moves_a_copy_to_the_commander_without_advancing_time(self):
         self._hold(self.aila, _POTION.key, _POTION.key)
+        self.aila.npc_title = "合成稱號"
         first = self._mirror(self.aila, _POTION.key)
         second = self._mirror(self.aila, _POTION.key)
         tick = get_world_clock().tick
@@ -303,6 +306,7 @@ class RetrieveCommandTests(_TransferCommandBase):
         output = self._retrieve(f"{_POTION.key} = 艾拉")
 
         self.assertIn(f"你從艾拉那裡取回了 1 個{_POTION.display_name_zh}。", output)
+        self.assertNotIn("合成稱號", output)
         self.assertEqual(self.aila.db.inventory, [_POTION.key])
         self.assertEqual(self.commander.db.inventory, [_POTION.key])
         self.assertEqual([obj.pk for obj in self.commander.contents_get()], [first.pk])

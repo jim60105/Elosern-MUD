@@ -83,7 +83,6 @@ from world.rules.dialogue import (
     open_or_refresh_dialogue,
 )
 from world.rules.movement_settlement import settle_movement
-from world.rules.npc_identity import npc_display_name
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 from world.quests.catalog import register_catalog
 from world.lore.dialogue.conditions import Carries, RaceIs
@@ -312,9 +311,11 @@ class DialoguePresenterTests(EvenniaTest):
             self.host, self.player, AffinitySource.QUEST_COMPLETION, 47
         )
         affinity_value = self.host.relations.affinity_for(self.player)
+        self.host.npc_title = "合成稱號"
         open_or_refresh_dialogue(self.player, self.host, "任務板在右側。")
 
         payload = self._render()
+        self.assertNotIn("合成稱號", str(payload["host"]))
         self.assertEqual(
             set(payload),
             {
@@ -340,7 +341,7 @@ class DialoguePresenterTests(EvenniaTest):
             payload["host"],
             {
                 "identity": int(self.host.pk),
-                "display_name": npc_display_name(self.host),
+                "display_name": self.host.key,
                 # The host is a present dialogue host, so it is in the art view
                 # the catalog is keyed from and the panel ships its key.
                 "portrait_ref": portrait_catalog_key(self.host.pk),
@@ -380,7 +381,7 @@ class DialoguePresenterTests(EvenniaTest):
         self.assertEqual(portrait_ref, portrait_catalog_key(self.host.pk))
         self.assertIn(portrait_ref, art["portrait_catalog"])
         entry = art["portrait_catalog"][portrait_ref]
-        self.assertEqual(entry["context"]["name"], npc_display_name(self.host))
+        self.assertEqual(entry["context"]["name"], self.host.key)
         # Membership, never resolution success, gates the key: the entry behind
         # it is the complete canonical descriptor with no real candidate while
         # the portrait is unresolved, and the panel ships the key anyway.

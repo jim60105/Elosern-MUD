@@ -1005,11 +1005,10 @@ class TitleDialogueContextTests(EvenniaTest):
 
 
 class NPCTitleDialogueContextTests(EvenniaTest):
-    """The speaking NPC's own title is read-only dialogue data (D7).
+    """The speaking NPC's context carries no independent title.
 
-    ``_npc_context`` gains a ``title`` key carrying the stored title; the
-    system-message renderer reads only name/desc/location, so every rendered
-    prompt stays byte-identical until a later change adds a {title} slot.
+    ``_npc_context`` exposes name, description and location only; a stored
+    title is neither read nor emitted, and building the context writes nothing.
     """
 
     def setUp(self):
@@ -1017,16 +1016,16 @@ class NPCTitleDialogueContextTests(EvenniaTest):
         self.npc = create_object(LLMNPC, key="塞提斯", location=self.room1)
 
     @covers_requirement('npc-identity-titles::the-npc-dialogue-context-carries-the-title-as-read-only-data')
-    def test_titled_npc_context_carries_the_title(self):
+    def test_a_titled_npc_context_carries_no_title(self):
         self.npc.npc_title = "南門守衛"
         context = self.npc._npc_context()
-        self.assertEqual(context["title"], "南門守衛")
-        self.assertEqual(sorted(context), ["desc", "location", "name", "title"])
+        self.assertEqual(sorted(context), ["desc", "location", "name"])
+        self.assertNotIn("南門守衛", "".join(context.values()))
 
     @covers_requirement('npc-identity-titles::the-npc-dialogue-context-carries-the-title-as-read-only-data')
-    def test_untitled_npc_context_carries_an_empty_title(self):
+    def test_an_untitled_npc_context_carries_the_same_shape(self):
         context = self.npc._npc_context()
-        self.assertEqual(context["title"], "")
+        self.assertEqual(sorted(context), ["desc", "location", "name"])
 
     @covers_requirement('npc-identity-titles::the-npc-dialogue-context-carries-the-title-as-read-only-data')
     def test_building_the_context_persists_nothing(self):
@@ -1038,18 +1037,21 @@ class NPCTitleDialogueContextTests(EvenniaTest):
         self.assertNotIn("npc_title", after)
 
     @covers_requirement('npc-identity-titles::the-npc-dialogue-context-carries-the-title-as-read-only-data')
-    def test_the_title_never_reaches_the_rendered_system_message(self):
+    def test_a_raising_title_accessor_never_reaches_the_context(self):
         from world.ai.npc_dialogue import _system_message
 
-        untitled = dict(self.npc._npc_context())
         self.npc.npc_title = "南門守衛"
-        titled = dict(self.npc._npc_context())
-        self.assertEqual(titled["title"], "南門守衛")
-        untitled["title"] = titled["title"]  # isolate: same keys, only data differs
-        baseline = _system_message({k: v for k, v in titled.items() if k != "title"})
-        self.assertEqual(_system_message(titled), baseline)
-        self.assertEqual(_system_message(untitled), baseline)
-        self.assertNotIn("南門守衛", _system_message(titled))
+        baseline = dict(self.npc._npc_context())
+        rendered = _system_message(baseline)
+
+        def _raise() -> str:
+            raise RuntimeError("corrupt persisted attribute read")
+
+        with patch.object(LLMNPC, "npc_title", new=property(lambda self: _raise())):
+            context = dict(self.npc._npc_context())
+            self.assertEqual(_system_message(context), rendered)
+        self.assertEqual(context, baseline)
+        self.assertNotIn("南門守衛", rendered)
 
 
 class DialogueVersionGateTests(EvenniaTest):

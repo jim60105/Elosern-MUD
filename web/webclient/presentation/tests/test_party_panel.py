@@ -89,7 +89,6 @@ from world.rules.affinity import AffinitySource, apply_affinity_change
 from world.rules.affinity_config import get_config
 from world.rules.art_view import portrait_catalog_key
 from world.rules.combat_session import engage, read_session
-from world.rules.npc_identity import npc_display_name
 from world.rules.party import join_party, leave_party
 from world.rules.unlock_notices import MemberUnlocks, unlock_flags
 from world.rules.tests._combat_session_helpers import (
@@ -575,8 +574,10 @@ class PartyPresenterTests(EvenniaTest):
         )
         self.assertTrue(outcome.applied)
         affinity_value = first.relations.affinity_for(self.player)
+        first.npc_title = "合成稱號"
 
         payload = self._render()
+        self.assertNotIn("合成稱號", str(payload["slots"]))
         self.assertEqual(payload["schema_version"], PARTY_SCHEMA_VERSION)
         self.assertIs(payload["available"], True)
         self.assertEqual(
@@ -588,9 +589,7 @@ class PartyPresenterTests(EvenniaTest):
             payload["slots"][0],
             {
                 "identity": int(self.player.pk),
-                "display_name": npc_display_name(self.player)[
-                    :MAX_DISPLAY_NAME_CODE_POINTS
-                ],
+                "display_name": self.player.key[:MAX_DISPLAY_NAME_CODE_POINTS],
                 # The exploration art view excludes ordinary player actors, so
                 # the commander's own row carries the truthful null.
                 "portrait_ref": None,
@@ -611,9 +610,7 @@ class PartyPresenterTests(EvenniaTest):
             payload["slots"][1],
             {
                 "identity": int(first.pk),
-                "display_name": npc_display_name(first)[
-                    :MAX_DISPLAY_NAME_CODE_POINTS
-                ],
+                "display_name": first.key[:MAX_DISPLAY_NAME_CODE_POINTS],
                 # Both companions are present and joined, so both are admitted
                 # to the bounded art view and carry their own catalog key even
                 # though neither has real artwork yet.

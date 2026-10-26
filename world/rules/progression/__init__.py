@@ -67,7 +67,6 @@ from world.rules.progression._scales import (  # noqa: F401
     _load_freeform_cast_scales,
     _load_freeform_scale_ladder,
 )
-from world.rules.npc_identity import npc_display_name
 from world.rules.unlock_notices import COMPANION_UNLOCK_LINE, UnlockNotice
 from world.rules.progression._scaling import (  # noqa: F401
     FreeformLadderRung,
@@ -299,7 +298,7 @@ def _unlock_notice(learner: Any, skill: SkillDef) -> UnlockNotice:
     """
     from world.rules.party import bound_owner_of
 
-    name = npc_display_name(learner)
+    name = str(getattr(learner, "key", "") or "")
     line = (
         COMPANION_UNLOCK_LINE.format(member=name, skill=skill.label)
         if bound_owner_of(learner) is not None

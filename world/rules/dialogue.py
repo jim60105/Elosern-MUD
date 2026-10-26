@@ -1468,7 +1468,6 @@ def _select_authored_topic(
     # 3. Preview resulting dialogue panel budget check
     from web.webclient.presentation.affordances import _scripted_keyword_descriptors
     from web.webclient.presentation.dialogue import DIALOGUE_MAX_CHOICES
-    from world.rules.npc_identity import npc_display_name
 
     choices = _scripted_keyword_descriptors(
         host, actor=actor, context_id=target_context_id
@@ -1479,7 +1478,7 @@ def _select_authored_topic(
         "kind": "dialogue",
         "host": {
             "identity": int(getattr(host, "pk", 1)),
-            "display_name": npc_display_name(host)[:64],
+            "display_name": getattr(host, "key", "")[:64],
             "portrait_ref": None,
         },
         "actor": {

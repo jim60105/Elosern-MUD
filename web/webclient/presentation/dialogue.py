@@ -417,7 +417,6 @@ def dialogue_presenter(context: PresentationContext) -> dict[str, Any]:
         resolve_dialogue_context,
     )
     from world.rules.dialogue_sources import resolve_dialogue_source
-    from world.rules.npc_identity import npc_display_name
 
     actor = context.actor
     if bool(getattr(actor, "creation_pending", False)):
@@ -527,7 +526,7 @@ def dialogue_presenter(context: PresentationContext) -> dict[str, Any]:
             "kind": "dialogue",
             "host": {
                 "identity": host_identity,
-                "display_name": npc_display_name(npc)[:MAX_DISPLAY_NAME_CODE_POINTS],
+                "display_name": getattr(npc, "key", "")[:MAX_DISPLAY_NAME_CODE_POINTS],
                 "portrait_ref": portrait_ref,
             },
             "actor": {

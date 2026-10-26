@@ -280,35 +280,6 @@ class NPC(LivingEntity):
         line = affinity_stage_line(self, looker)
         return f"{desc}\n{line}" if line else desc
 
-    def get_display_name(self, looker=None, *, full_identity=False, **kwargs) -> str:
-        """Render the plain name, or 「姓名　稱號」 when the caller opts in.
-
-        ``full_identity`` is an explicit, per-surface decision (design D3):
-        only the room character listing and the look header pass it. With the
-        flag false this returns the inherited rendering byte-identically —
-        echoes, combat text, and every other caller never see a title.
-        """
-        if not full_identity:
-            return super().get_display_name(looker, **kwargs)
-        from world.rules.npc_identity import npc_display_name
-
-        return npc_display_name(self)
-
-    def return_appearance(self, looker, **kwargs) -> str:
-        """Look header carries the full identity by default (design D4).
-
-        Evennia fills the appearance template's ``{name}`` slot from
-        ``self.get_display_name(looker, **kwargs)``, so this is the only
-        injection point that leaves the template itself untouched.
-        ``setdefault`` keeps the caller in charge: an explicit
-        ``full_identity=False`` renders the plain header. The text 看 command,
-        the ``at_look`` seam, and the webclient ``explore.look`` action share
-        this framework, so all three headers stay identical (the
-        localized-appearance contract).
-        """
-        kwargs.setdefault("full_identity", True)
-        return super().return_appearance(looker, **kwargs)
-
 
 def _swallow_cancelled(failure):
     """Trap a timer cancellation so no CancelledError leaks to the speaker."""
@@ -348,17 +319,10 @@ class LLMNPC(NPC):
 
     def _npc_context(self) -> dict[str, str]:
         """Build the plain-data NPC identity for the prompt builder."""
-        from world.rules.npc_identity import npc_title_value
-
         return {
             "name": self.key or "",
             "desc": self.db.desc or "",
             "location": self.location.key if self.location else "",
-            # Read-only seam (design D7): the renderer does not consume
-            # ``title`` until a later prompt change adds a {title} slot, so
-            # every rendered prompt stays byte-identical while authored
-            # titles exist.
-            "title": npc_title_value(self),
         }
 
     def _player_context(self, character: Any, *, identity_detail: bool = False) -> dict[str, Any]:

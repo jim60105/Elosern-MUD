@@ -50,7 +50,6 @@ from world.rules.guild_offers import (
     accept_guild_offer,
     abandon_guild_quest,
 )
-from world.rules.npc_identity import npc_display_name
 from world.rules.npc_schedules import interaction_reason
 from world.rules.party_inventory import toggle_member_equipment, use_member_item
 from world.rules.party_scope import (
@@ -689,7 +688,7 @@ def _inventory_toggle_equip_adapter(actor: Any, payload: dict[str, Any], session
     result = outcome.result
     if result.outcome != "success":
         return _rejected(result.reason)
-    subject = "你" if outcome.member is actor else npc_display_name(outcome.member)
+    subject = "你" if outcome.member is actor else str(outcome.member.key)
     message = toggle_equipment_message(result, item_key, subject)
     actor.msg(message)
     return _success("equipment_toggled", message, ())

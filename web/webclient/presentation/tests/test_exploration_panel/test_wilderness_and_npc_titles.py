@@ -1,5 +1,8 @@
-from tools.spec_traceability import covers_requirement
 import unittest
+from unittest.mock import patch
+
+from tools.spec_traceability import covers_requirement
+
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
@@ -24,7 +27,7 @@ from ._support import _context
 # local to this HUD consumer test, so no assertion here names a shipped
 # character or borrows another test area's example identity.
 _HUD_NAME = "合成看板人"
-_HUD_TITLE = "合成看板稱號"
+_HUD_SENTINEL = "合成看板稱號"
 
 
 class WildernessExplorationPresenterTests(EvenniaTestCase):
@@ -99,13 +102,12 @@ class WildernessExplorationPresenterTests(EvenniaTestCase):
         )
 
 
-class NPCTitlePanelRowsTests(BattlefieldIsolation, EvenniaTestCase):
-    """Entity and interact rows carry 「姓名　稱號」; every other row is untouched.
+class NPCPanelRowsTests(BattlefieldIsolation, EvenniaTestCase):
+    """Every entity and interact row carries the plain authored key.
 
-    npc-title-identity-core D5: the swap is to the display-name SOURCE on the
-    two character-row kinds only. Bounds, schema version, field sets, and the
-    plain-key shared helper all stay as specified for
-    ``webclient-exploration-menu``.
+    A stored title is inert on this panel: the row name comes from the shared
+    plain-key helper, bounds and schema version are unchanged, and a corrupt
+    title accessor cannot make the panel unavailable.
     """
 
     def setUp(self):
@@ -155,35 +157,33 @@ class NPCTitlePanelRowsTests(BattlefieldIsolation, EvenniaTestCase):
     def _interact_rows(self, payload, pk):
         return [row for row in payload["interact"] if row["identity"] == pk]
 
-    @covers_requirement('npc-identity-titles::the-webclient-exploration-panel-renders-the-npc-full-identity-on-entity-and-interact-rows')
-    def test_titled_npc_reads_with_title_on_both_row_kinds(self):
+    def test_npc_rows_read_with_the_plain_key_on_both_row_kinds(self):
         npc = create_object(NPC, key=_HUD_NAME, location=self.room1)
-        npc.npc_title = _HUD_TITLE
+        npc.npc_title = _HUD_SENTINEL
         payload = self._render()
         self.assertTrue(payload["available"])
         pk = int(npc.pk)
         self.assertEqual(
-            self._entity_rows(payload, pk)["display_name"], f"{_HUD_NAME}　{_HUD_TITLE}"
+            self._entity_rows(payload, pk)["display_name"], _HUD_NAME
         )
         interact = self._interact_rows(payload, pk)
         self.assertTrue(interact)
         self.assertTrue(
-            all(row["display_name"] == f"{_HUD_NAME}　{_HUD_TITLE}" for row in interact)
+            all(row["display_name"] == _HUD_NAME for row in interact)
         )
         # The row is the client's only source for the truthful portrait
-        # placeholder: it carries the composed display name and no portrait
+        # placeholder: it carries the plain display name and no portrait
         # reference, so the placeholder initial is never guessed from another
         # field and never comes from a stock image.
         for row in (self._entity_rows(payload, pk), *interact):
             self.assertIsNone(row["portrait_ref"])
         validate_exploration(payload)
 
-    @covers_requirement('npc-identity-titles::the-webclient-exploration-panel-renders-the-npc-full-identity-on-entity-and-interact-rows')
     def test_non_entity_rows_keep_the_plain_key_source(self):
         from web.webclient.presentation.affordances import _bounded_display_name
 
         npc = create_object(NPC, key=_HUD_NAME, location=self.room1)
-        npc.npc_title = _HUD_TITLE
+        npc.npc_title = _HUD_SENTINEL
         monster = create_object(Monster, key="野狼", location=self.room1)
         coin = create_object("typeclasses.objects.Object", key="銅幣", location=self.room1)
         destination = create_object(Room, key="南大道", location=None)
@@ -213,8 +213,7 @@ class NPCTitlePanelRowsTests(BattlefieldIsolation, EvenniaTestCase):
         )
         validate_exploration(payload)
 
-    @covers_requirement('npc-identity-titles::the-webclient-exploration-panel-renders-the-npc-full-identity-on-entity-and-interact-rows')
-    def test_untitled_and_malformed_titles_keep_the_panel_available(self):
+    def test_inert_titles_keep_the_panel_available(self):
         untitled = create_object(NPC, key="布魯諾", location=self.room1)
         broken = create_object(NPC, key="米拉", location=self.room1)
         broken.db.npc_title = 123
@@ -223,42 +222,46 @@ class NPCTitlePanelRowsTests(BattlefieldIsolation, EvenniaTestCase):
         markup = create_object(NPC, key="腐名", location=self.room1)
         markup.db.npc_title = "|r南門守衛|n"  # would emit Evennia markup
         ambiguous = create_object(NPC, key="含糊", location=self.room1)
-        ambiguous.db.npc_title = "南門\u3000守衛"  # internal separator
+        ambiguous.db.npc_title = "南門\u3000守衛"
         control = create_object(NPC, key="控制", location=self.room1)
         control.db.npc_title = "南門\x1b守衛"  # control character
-        payload = self._render()
+        raising = create_object(NPC, key="炸裂", location=self.room1)
+
+        def _raise() -> str:
+            raise RuntimeError("corrupt persisted attribute read")
+
+        with patch.object(NPC, "npc_title", new=property(lambda self: _raise())):
+            payload = self._render()
         self.assertTrue(payload["available"])
-        self.assertEqual(
-            self._entity_rows(payload, int(untitled.pk))["display_name"], "布魯諾"
+        expected = (
+            (untitled, "布魯諾"),
+            (broken, "米拉"),
+            (whitespace, "老赫"),
+            (markup, "腐名"),
+            (ambiguous, "含糊"),
+            (control, "控制"),
+            (raising, "炸裂"),
         )
-        self.assertEqual(
-            self._entity_rows(payload, int(broken.pk))["display_name"], "米拉"
-        )
-        self.assertEqual(
-            self._entity_rows(payload, int(whitespace.pk))["display_name"], "老赫"
-        )
-        for entity, plain in ((markup, "腐名"), (ambiguous, "含糊"), (control, "控制")):
+        for entity, plain in expected:
             with self.subTest(plain=plain):
                 row = self._entity_rows(payload, int(entity.pk))
                 self.assertEqual(row["display_name"], plain)
                 for interact in self._interact_rows(payload, int(entity.pk)):
-                    self.assertNotIn("\u3000", interact["display_name"])
-                    self.assertNotIn("|", interact["display_name"])
+                    self.assertEqual(interact["display_name"], plain)
         validate_exploration(payload)
 
-    @covers_requirement('npc-identity-titles::the-webclient-exploration-panel-renders-the-npc-full-identity-on-entity-and-interact-rows', 'npc-identity-titles::a-single-deterministic-composer-renders-the-npc-full-identity')
-    def test_composed_bounds_hold_for_legal_and_overlong_titles(self):
+    def test_the_plain_name_bound_holds_for_an_overlong_key(self):
         long_npc = create_object(NPC, key="長" * 64, location=self.room1)
-        long_npc.npc_title = "守" * 32
-        broken = create_object(NPC, key="毀" * 60, location=self.room1)
-        broken.db.npc_title = "壞" * 200  # corrupt overlong storage title
+        overlong = create_object(NPC, key="毀" * 200, location=self.room1)
+        overlong.npc_title = _HUD_SENTINEL
         payload = self._render()
-        composed = self._entity_rows(payload, int(long_npc.pk))["display_name"]
-        self.assertEqual(len(composed), 64 + 1 + 32)
-        self.assertLessEqual(len(composed), MAX_DISPLAY_NAME_CODE_POINTS)
-        damaged = self._entity_rows(payload, int(broken.pk))["display_name"]
+        self.assertEqual(
+            self._entity_rows(payload, int(long_npc.pk))["display_name"],
+            "長" * 64,
+        )
+        damaged = self._entity_rows(payload, int(overlong.pk))["display_name"]
         self.assertEqual(len(damaged), MAX_DISPLAY_NAME_CODE_POINTS)
-        for row in self._interact_rows(payload, int(broken.pk)):
+        for row in self._interact_rows(payload, int(overlong.pk)):
             self.assertLessEqual(
                 len(row["display_name"]), MAX_DISPLAY_NAME_CODE_POINTS
             )

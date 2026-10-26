@@ -550,14 +550,18 @@ class MemberTokenTests(PartyScopeTestCase):
     @covers_requirement(
         "party-member-authority::text-member-tokens-resolve-only-within-the-party"
     )
-    def test_titled_companion_resolves_by_composed_name_and_bare_key(self):
+    def test_titled_companion_resolves_by_plain_key_only(self):
         companion = self._companion("艾拉")
         companion.npc_title = "見習劍士"
 
-        self.assertIs(
-            resolve_member_token(self.char1, "艾拉　見習劍士"), companion
-        )
         self.assertIs(resolve_member_token(self.char1, "艾拉"), companion)
+        # The old composed alias is gone: no member answers to it, and the
+        # ordinary zero-match rejection applies.
+        _rejected(
+            self,
+            lambda: resolve_member_token(self.char1, "艾拉　見習劍士"),
+            REASON_NOT_PARTY_MEMBER,
+        )
 
     @covers_requirement(
         "party-member-authority::text-member-tokens-resolve-only-within-the-party"
@@ -583,20 +587,6 @@ class MemberTokenTests(PartyScopeTestCase):
         _rejected(
             self,
             lambda: resolve_member_token(self.char1, "雙胞胎"),
-            REASON_NOT_PARTY_MEMBER,
-        )
-
-    @covers_requirement(
-        "party-member-authority::text-member-tokens-resolve-only-within-the-party"
-    )
-    def test_composed_name_collision_is_rejected(self):
-        titled = self._companion("甲")
-        titled.npc_title = "乙"
-        self._companion("甲　乙")
-
-        _rejected(
-            self,
-            lambda: resolve_member_token(self.char1, "甲　乙"),
             REASON_NOT_PARTY_MEMBER,
         )
 

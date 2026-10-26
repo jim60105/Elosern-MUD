@@ -116,7 +116,6 @@ def _party_transfer_adapter(
 ) -> dict[str, Any]:
     """Move the named items through the member transfer rule."""
     del session
-    from world.rules.npc_identity import npc_display_name
     from world.rules.quest_delivery import item_display_name
 
     try:
@@ -131,7 +130,7 @@ def _party_transfer_adapter(
         return {"outcome": "rejected", "code": error.reason, "message": error.message}
     message = (
         f"你把 {outcome.quantity} 個{item_display_name(outcome.item_key)}"
-        f"交給了{npc_display_name(outcome.receiver)}。"
+        f"交給了{outcome.receiver.key}。"
     )
     return {
         "outcome": "success",
