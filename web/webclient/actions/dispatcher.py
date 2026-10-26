@@ -56,10 +56,16 @@ from web.webclient.presentation.protocol import (
     validate_ui_action,
 )
 from web.webclient.presentation.registry import PresentationRegistry
+from world.rules.presentation_events import publication_group
 
 
 # Bounded size of the completed-request cache per live sequence.
 CACHE_CAPACITY = 64
+
+# The private adapter-result slot naming the causal publication group of the
+# synchronous deterministic work the adapter performed. It is internal: it is
+# never copied into a result envelope and never serialized.
+PUBLICATION_GROUP_FIELD = "publication_group_id"
 
 # Stable results produced by the dispatcher itself (not by an adapter).
 _BUSY_CODE = "busy"
@@ -297,27 +303,50 @@ def _invoke_adapter(
     existing callers and tests keep their signatures) is threaded into the
     completion publication so the dialogue trigger can identify talk
     completions (action-options-trigger-hooks D3).
+
+    The synchronous adapter invocation is bound to one causal publication
+    group, so every panel push and checkpoint fact the adapter's committed work
+    enqueues coalesces with this action's completion into a single publication.
+    The binding is closed before this function returns, so a pending adapter
+    ``Deferred`` never carries it: an adapter that resumes after asynchronous
+    work binds its own final synchronous call and names it in the private result
+    slot instead.
     """
-    try:
-        result = adapter(actor, normalized, session)
-    except Exception as error:
-        log_error(
-            "action_adapter_failed",
-            context={
-                "char": str(getattr(actor, "pk", "?")),
-                "surface": "dispatcher",
-                "request_id": request_id,
-            },
-            exc=error,
-        )
+    failed = False
+    result: Any = None
+    with publication_group() as captured:
+        group_id = captured.id
+        try:
+            result = adapter(actor, normalized, session)
+        except Exception as error:
+            log_error(
+                "action_adapter_failed",
+                context={
+                    "char": str(getattr(actor, "pk", "?")),
+                    "surface": "dispatcher",
+                    "request_id": request_id,
+                },
+                exc=error,
+            )
+            failed = True
+    if failed:
         _settle_internal_error(session, actor, action_registry, registry, request_id, epoch)
         return
     if isinstance(result, Deferred):
         result.addBoth(
-            lambda value, _s=session, _a=actor, _r=registry, _q=request_id, _e=epoch, _i=action_id: _publish_completion(_s, _a, value, _r, _q, _e, action_id=_i)
+            lambda value, _s=session, _a=actor, _r=registry, _q=request_id, _e=epoch, _i=action_id: _publish_completion(_s, _a, value, _r, _q, _e, action_id=_i, group_id=None)
         )
         return
-    _publish_completion(session, actor, result, registry, request_id, epoch, action_id=action_id)
+    _publish_completion(
+        session,
+        actor,
+        result,
+        registry,
+        request_id,
+        epoch,
+        action_id=action_id,
+        group_id=group_id,
+    )
 
 
 def _settle_internal_error(
@@ -361,6 +390,7 @@ def _publish_completion(
     request_id: str,
     epoch: str,
     action_id: str | None = None,
+    group_id: str | None = None,
 ) -> Any:
     """Publish canonical presentation and the matching result for an adapter.
 
@@ -372,6 +402,16 @@ def _publish_completion(
     in-flight marker is therefore released only after both sends, and the
     captured ``epoch`` must still match the live coordinator — a retired
     sequence publishes nothing into its replacement.
+
+    The completion joins the causal group of the adapter's synchronous work
+    (``group_id``), so any push or checkpoint fact from that work merges into
+    the same publication instead of preceding it. An adapter that resumed after
+    asynchronous work names the group it captured in the private
+    ``publication_group_id`` slot, which wins. A result-only completion (the
+    sequence-retiring actions B carved out) is flushed immediately: its adapter
+    may already have scheduled the retirement for the next reactor turn, so the
+    answer has to leave first. Every other group keeps waiting for the deferred
+    boundary.
     """
     coordinator = attach_coordinator(session, registry)
     state = _sequence_state(session)
@@ -397,6 +437,7 @@ def _publish_completion(
             "correlation_id": secrets.token_hex(16),
         }
 
+    target_group = _publication_group_id(value) or group_id
     result = _normalize_result(value)
     outcome = result["outcome"]
     affected = value.get("affected_panels")
@@ -436,7 +477,10 @@ def _publish_completion(
         result_only=result_only,
         expected_epoch=epoch,
         completion=_completion(request_id, result),
+        group_id=target_group,
     )
+    if result_only and target_group is not None:
+        coordinator.flush_publication_group(target_group)
     deferred.addCallbacks(
         lambda receipt: _completion_published(
             receipt, session, actor, coordinator, request_id, action_id, result, value, epoch
@@ -446,6 +490,25 @@ def _publish_completion(
         ),
     )
     return value
+
+
+def _publication_group_id(value: Any) -> str | None:
+    """The adapter's private causal-group slot, or ``None`` when absent/invalid.
+
+    Only an adapter that resumed after asynchronous work sets it, to name the
+    group it wrapped its final synchronous deterministic call in. Any other
+    value is ignored: the completion then makes its own standalone group.
+    """
+    if not isinstance(value, dict):
+        return None
+    candidate = value.get(PUBLICATION_GROUP_FIELD)
+    if not isinstance(candidate, str) or len(candidate) != 32:
+        return None
+    try:
+        int(candidate, 16)
+    except ValueError:  # observability: ignore R2: an unparseable identifier is the rejected value, not a swallowed failure
+        return None
+    return candidate
 
 
 def _completion_published(
@@ -697,7 +760,8 @@ def _normalize_result(value: dict[str, Any]) -> dict[str, Any]:
     unstable or oversized code, empty or oversized message, malformed
     correlation ID, a malformed or misplaced adapter data slot) is replaced by
     a safe generic internal error so the browser can never be asked to accept
-    an out-of-schema result.
+    an out-of-schema result. The private causal-group slot is stripped here, so
+    no group identity can ever be serialized.
     """
     from web.webclient.presentation.protocol import (
         _validate_identifier,
@@ -706,6 +770,9 @@ def _normalize_result(value: dict[str, Any]) -> dict[str, Any]:
         _validate_request_id,
     )
 
+    value = {
+        key: item for key, item in value.items() if key != PUBLICATION_GROUP_FIELD
+    }
     outcome = value.get("outcome")
     code = value.get("code")
     message = value.get("message")

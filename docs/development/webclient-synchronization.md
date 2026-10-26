@@ -172,10 +172,11 @@ raising into its async caller.
 One synchronous publication critical section sends a prepared batch, with no
 await between frames, so no reentrant sync or push can appear between an
 action's presentation frames and its result. Public enqueues run at the existing
-serialized reactor boundary (scheduled for the reactor's next turn when it is
-running, inline when nothing is running); reentrant work joins the same queue
-and drains immediately after the current batch, in order. At most 64 intents
-may be pending for one sequence.
+serialized publication boundary; reentrant work joins the same queue and drains
+immediately after the current batch, in order. The boundary is described under
+"Causal publication groups" below: every queued entry waits for the reactor's
+next turn, except the dispatcher's result-only retirement flush. At most 64
+group entries and 64 waiting callers may be pending for one sequence.
 
 Planning reserves the next target revision without consuming it: all frames and
 the action-result envelope are validated first, so a preflight failure sends no
@@ -193,6 +194,101 @@ intact under its scoped allowance and an area map as bounded parts that repeat
 the same `base_revision`/`revision`. Every frame of every logical publication is
 prevalidated before any is sent, and an on-demand body never enters the eager
 baseline.
+
+## Causal publication groups
+
+One committed deterministic operation can produce several presentation effects:
+an ordinary panel push from an on-commit callback, a checkpoint fact from a
+movement/terminal/skip owner, and the fan-out to every watcher session. They
+share one ephemeral **causal publication group** so each watcher receives one
+final publication for that commit instead of a delta followed by a correction.
+`world/rules/presentation_events.py` is the whole API; nothing is persisted, no
+group identity is serialized, and no second publication owner exists.
+
+### Group lifetime and capture
+
+| Entry | Contract |
+|---|---|
+| `new_publication_group()` | A fresh `PublicationGroup` with a unique 32-hex ephemeral id. |
+| `publication_group(group=None)` | Binds the group (or a new one) for one synchronous scope. A nested scope **reuses** the active group, so nested on-commit callbacks keep one identity. The binding is closed and reset in `finally`, before the callable returns, and is never active while an external operation is pending. |
+| `current_publication_group()` | The live binding, or `None`. Twisted's `@inlineCallbacks` copies the context at generator start, so a resumed generator still *references* the binding object; because the binding is closed when its synchronous owner returned, resumption reports `None` and can never revive an already-published group. Resumed deterministic work opens its own scope. |
+| `on_publication_commit(callback, *, using=None)` | Registers on Django's `transaction.on_commit` while capturing the group active at registration time, and rebinds **exactly** that group for the callback's synchronous execution — even when another group is bound at commit time (an outer transaction committing inside another committed operation). A rolled-back transaction registers and runs nothing; callback exceptions keep Django's existing behaviour. |
+
+A group is captured at the `enqueue_publication` call boundary (explicit
+`group_id`, else the live binding, else a fresh standalone group). A group-less
+publisher therefore gets its own group and is never attached heuristically to a
+pending action. `independent=True` marks an explicit entry (a `ui_sync`, a text
+refresh, a recovery answer) that must never join an ambient command group.
+
+### Queue shape and drain boundary
+
+The coordinator keeps **one pending entry per group id**, in first-enqueue
+order. Within an entry the declarations merge:
+
+- candidate names and a declared eager scope are unioned; any request that
+  declares unknown scope widens the whole entry to "compare every eager panel";
+- explicit removals are unioned and win over a replacement of the same name;
+- a checkpoint promotion (`force_snapshot`, a committed alignment fact) wins,
+  so the entry publishes one fresh complete snapshot and no intermediate delta;
+- a completion's context factory (which carries the action-local round record)
+  survives later ordinary pushes; otherwise the newest factory wins, and every
+  grouped factory rebuilds current canonical state.
+
+**Every** queued entry drains at the reactor's next turn: all on-commit
+callbacks of the synchronous operations that queued them have run by then, so
+each entry is complete before it is planned and sent. First-enqueue order is
+therefore publication order — a later text refresh or explicit sync can never
+overtake an earlier committed operation, and an earlier entry is never finalized
+by unrelated later work. `ui_sync`, a text refresh, an async generation
+completion and a dispatcher recovery answer are still their **own** entries
+(`independent=True`); they simply queue at the same boundary. Two narrow
+exceptions keep B's ordering guarantees:
+
+- the dispatcher's **result-only** completion (the sequence-retiring actions)
+  flushes just its own group before returning, because its adapter may already
+  have scheduled the retirement for the next turn;
+- explicit `ui_sync` remains an independent forced-snapshot entry and may run
+  while any number of domain Deferreds are pending, but it never interleaves a
+  prepared presentation/result batch.
+
+A process without a running reactor (the test runner, a one-off command) has no
+live transport to observe frames, so the injected scheduler publishes at the
+enqueue boundary there; tests inject a queued scheduler to exercise the
+production boundary deterministically.
+
+### Checkpoint facts
+
+`PresentationAlignmentFact(group_id, actor_id, cause, source, destination)`
+carries a committed checkpoint for one actor (`movement_boundary`,
+`combat_terminal`, `skip_completed`) and `AlignmentIdentity`/`emit_alignment_fact`
+are fully functional value and observer APIs with no no-op fallback. The
+registered observer (`web/webclient/presentation/alignment.py`, connected at
+`at_server_start`) forwards each fact to every lawful watcher of the actor as a
+forced-snapshot intent under the fact's group id: it merges with that group's
+ordinary push whether the fact callback ran before or after it, needs no
+initiating session, and is a no-op for a fact with no live watcher. M owns the
+movement identity reader/first producer; S owns the terminal/skip producers. A
+later options/art generation completion forms a new standalone group and is
+never suppressed by an earlier one.
+
+### Outcomes and bounds
+
+Every public queueing entry returns `Deferred[PublicationReceipt | None]`. All
+waiters of one group resolve with the **same** actual receipt after every frame
+and the attached result have sent; a retired sequence resolves `None` for all of
+them; preflight, send and overflow failures errback every waiter with the real
+error (`PresentationQueueFull` for the bound). Completed group metadata is
+removed before its waiters resolve, so no history grows, and `reset`/detach
+clear pending groups. The bound is 64 pending group entries and 64 waiting
+callers, with result-only answers exempt; exceeding it invalidates the baseline
+and answers explicitly. The guarded helpers (`publish_panel_update`,
+`refresh_after_command`, `synchronize_session`) are terminal consumers: they log
+a published failure, never raise into an async caller, and now also resolve the
+actual receipt on success.
+
+A one-shot delivery notice that the wire contract forbids inside a snapshot (a
+claimed dialogue `unlock_batch`) publishes as its own **independent** entry, so
+a later checkpoint promotion can never consume and drop it.
 
 ## Fixtures
 

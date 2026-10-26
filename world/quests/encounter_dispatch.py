@@ -253,7 +253,9 @@ def _refresh_after_commit(owner: Any) -> None:
     character's own committed seam, so the boundary stays below the presentation
     layer: only a live, player-driven owner is refreshed, visibility and access
     gates stay authoritative, and an offline owner simply keeps its durable
-    state for the reconnect sync to publish.
+    state for the reconnect sync to publish. The registration captures the
+    current causal publication group, so the refreshes it triggers coalesce with
+    the commit's checkpoint presentation.
     """
 
     def refresh() -> None:
@@ -263,7 +265,9 @@ def _refresh_after_commit(owner: Any) -> None:
 
         _schedule_projection_refresh_after_activation(owner)
 
-    transaction.on_commit(refresh)
+    from world.rules.presentation_events import on_publication_commit
+
+    on_publication_commit(refresh)
 
 
 def activate_for_move(actor: Any, *, tick: int | None = None) -> tuple[Any, ...]:

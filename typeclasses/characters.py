@@ -15,15 +15,17 @@ def _schedule_action_options_after_move(actor: Any) -> None:
     The room-entry trigger must never run inside the movement transaction's
     critical section: a rollback would leave suggestions derived from a room
     the player never reached. The scheduling is therefore registered through
-    ``transaction.on_commit`` (the ``commands/scene.py`` precedent), so it
-    runs only after the settlement transaction commits — or immediately when
-    no outer transaction is active. The gate and the fire-and-forget call
+    the publication-commit seam (Django's ``on_commit`` plus the captured causal
+    publication group), so it runs only after the settlement transaction
+    commits — or immediately when no outer transaction is active — and its
+    immediate current-state push coalesces into the movement settlement's one
+    publication instead of preceding it. The gate and the fire-and-forget call
     happen inside the committed callback; every synchronous failure is logged
     as a bounded diagnostic and swallowed, never altering settlement.
     """
-    from django.db import transaction
+    from world.rules.presentation_events import on_publication_commit
 
-    transaction.on_commit(
+    on_publication_commit(
         lambda: _schedule_action_options_committed(actor)
     )
 

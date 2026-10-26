@@ -28,6 +28,7 @@ never carry a batch, so a reconnect cannot replay it.
 """
 
 from world.observability import log_warn
+from world.rules.presentation_events import current_publication_group
 
 from web.webclient.presentation.coordinator import publish_panel_update
 from web.webclient.presentation.ingress import build_presentation_context
@@ -121,6 +122,15 @@ def push_dialogue_reading(owner: object, *, unlock_batch: object = None) -> None
     the module docstring for the per-watcher wrapping. Never raises: a failure
     is isolated to one bounded diagnostic and the next canonical sync
     re-establishes the truth.
+
+    A claimed batch is a one-shot delivery notice: the wire contract allows it
+    only on a delta (snapshots always carry ``null``), and the claim is already
+    consumed, so this push publishes as its own independent entry and can never
+    be merged into a settlement group that a checkpoint would promote to a
+    snapshot. A plain reading push inside a causal group submits the panel *name*
+    (the coordinator renders it from current canonical state at the group's
+    boundary, so a merged later change is never overwritten by an eagerly
+    rendered payload); outside a group it renders and pushes the payload itself.
     """
     deps = _deps()
     # The facade binding keeps the lint's syntactic facade-call recognition
@@ -129,21 +139,36 @@ def push_dialogue_reading(owner: object, *, unlock_batch: object = None) -> None
     puppets = _owner_puppets(owner, log_warn=log_warn)
     if not puppets:
         return
-    try:
-        registry = deps.build_registry()
-    except Exception as error:
-        log_warn(
-            "dialogue_reading_push_failed",
-            context={
-                "surface": "presentation",
-                "char": str(getattr(owner, "pk", "?")),
-            },
-            exc=error,
-        )
-        return
+    grouped = current_publication_group() is not None
+    # A grouped plain push submits only the panel name; the claimed-batch push
+    # needs the rendered panel to wrap the notice, so only the former skips the
+    # registry.
+    registry = None
+    if unlock_batch is not None or not grouped:
+        try:
+            registry = deps.build_registry()
+        except Exception as error:
+            log_warn(
+                "dialogue_reading_push_failed",
+                context={
+                    "surface": "presentation",
+                    "char": str(getattr(owner, "pk", "?")),
+                },
+                exc=error,
+            )
+            return
     for puppet in puppets:
         for watcher, epoch in deps.watchers_for(puppet):
             try:
+                if unlock_batch is None and grouped:
+                    deps.publish(
+                        watcher,
+                        puppet,
+                        {},
+                        expected_epoch=epoch,
+                        affected_panels=("dialogue",),
+                    )
+                    continue
                 context = deps.build_context(watcher, puppet)
                 payload = registry.render("dialogue", context)
                 if (
@@ -164,13 +189,23 @@ def push_dialogue_reading(owner: object, *, unlock_batch: object = None) -> None
                             },
                             exc=error,
                         )
-                deps.publish(
-                    watcher,
-                    puppet,
-                    {"dialogue": payload},
-                    context=context,
-                    expected_epoch=epoch,
-                )
+                if unlock_batch is not None:
+                    deps.publish(
+                        watcher,
+                        puppet,
+                        {"dialogue": payload},
+                        context=context,
+                        expected_epoch=epoch,
+                        independent=True,
+                    )
+                else:
+                    deps.publish(
+                        watcher,
+                        puppet,
+                        {"dialogue": payload},
+                        context=context,
+                        expected_epoch=epoch,
+                    )
             except Exception as error:
                 log_warn(
                     "dialogue_reading_push_failed",

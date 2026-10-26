@@ -141,20 +141,21 @@ class NPC(LivingEntity):
         epoch-guarded ``party`` panel push (webclient-align-04) so a dismissed
         companion never lingers in committed presentation until the next
         unrelated sync; the fan-out is deferred through
-        ``transaction.on_commit`` (the established side-effect seam) so a
-        rolled-back deletion never burns a presentation revision or shows a
-        removal that was undone, and never fails the delete.
+        the publication-commit seam (Django's ``on_commit`` plus the captured
+        causal publication group) so a rolled-back deletion never burns a
+        presentation revision or shows a removal that was undone, never fails
+        the delete, and still coalesces with the same commit's checkpoint
+        presentation.
         """
-        from django.db import transaction
-
         from world.rules.party import bound_owner_of, purge_npc_memberships
+        from world.rules.presentation_events import on_publication_commit
 
         owner = bound_owner_of(self)
         purge_npc_memberships(self)
         if owner is not None:
             from web.webclient.presentation.party_push import push_party_update
 
-            transaction.on_commit(lambda: push_party_update(owner))
+            on_publication_commit(lambda: push_party_update(owner))
         # A deleted companion no longer satisfies any CompanionPresent
         # topic, so the captured prior owner's current conversation is
         # reprojected once the deletion commits. The owner was read BEFORE
@@ -175,7 +176,7 @@ class NPC(LivingEntity):
             # have burned anyone's session. The dbid is captured now — the
             # object's pk is gone by the time the callback fires.
             departed_id = int(self.pk)
-            transaction.on_commit(
+            on_publication_commit(
                 lambda: self._clear_dialogue_sessions_naming_me(
                     departure_room, npc_id=departed_id
                 )
@@ -196,7 +197,9 @@ class NPC(LivingEntity):
         transaction, whose rollback compensation cannot restore the attribute
         cache — a later failed step would otherwise clear a bystander's live
         session for a departure that never committed. Outside any transaction
-        the callback runs immediately.
+        the callback runs immediately. The publication group active at
+        registration is captured, so the clearance push joins the movement
+        settlement's one publication instead of preceding it.
         """
         super().at_post_move(source_location, **kwargs)
         from world.quests.escort_events import collect_escort_actors
@@ -228,10 +231,10 @@ class NPC(LivingEntity):
         )
         if source_location is None:
             return
-        from django.db import transaction
+        from world.rules.presentation_events import on_publication_commit
 
         room = source_location
-        transaction.on_commit(lambda: self._clear_dialogue_sessions_naming_me(room))
+        on_publication_commit(lambda: self._clear_dialogue_sessions_naming_me(room))
 
     def _clear_dialogue_sessions_naming_me(self, room, npc_id: int | None = None) -> None:
         """Clear every character session in ``room`` that names this NPC.

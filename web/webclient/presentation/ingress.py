@@ -364,18 +364,25 @@ def synchronize_session(session: Any, actor: Any) -> Deferred:
     """Publish the complete baseline for a puppeted session; return its Deferred.
 
     The publication is the coordinator's serialized own batch: the Deferred
-    resolves once every frame has sent and this helper has registered the
-    watcher and scheduled the options trigger, or ``None`` when the sequence
-    retired before it ran (nothing is registered or scheduled then). A failure —
-    the world clock absent, or any publication error — is replaced by the safe
-    protocol error and never raises into text play.
+    resolves with the actual :class:`PublicationReceipt` once every frame has
+    sent and this helper has registered the watcher and scheduled the options
+    trigger, or ``None`` when the sequence retired before it ran (nothing is
+    registered or scheduled then). A failure — the world clock absent, or any
+    publication error — is reported through the safe protocol error and never
+    raises into text play.
+
+    An explicit synchronization is an independent queue entry: it never joins
+    the causal group of a command that happens to be executing, so it cannot
+    promote or answer for that command's presentation.
     """
     coordinator = _coordinator_for(session, actor)
     deferred = coordinator.enqueue_publication(
-        lambda: build_presentation_context(session, actor), force_snapshot=True
+        lambda: build_presentation_context(session, actor),
+        force_snapshot=True,
+        independent=True,
     )
 
-    def _published(receipt: Any) -> None:
+    def _published(receipt: Any) -> Any:
         if receipt is None:
             # The captured sequence retired before execution: this session is
             # no longer a watcher of ``actor`` and nothing may be scheduled.
@@ -389,7 +396,7 @@ def synchronize_session(session: Any, actor: Any) -> Deferred:
 
         register_watcher(session)
         _schedule_on_reconnect(session, actor, coordinator)
-        return None
+        return receipt
 
     def _failed(failure: Failure) -> None:
         quiet = isinstance(failure, Failure) and failure.check(ClockUnavailable)
@@ -459,25 +466,33 @@ def refresh_after_command(session: Any, actor: Any) -> Deferred:
     The settled command's eager scope is unknown, so every eager panel is
     re-rendered from then-current canonical state and only real differences are
     transmitted: a command that changed nothing consumes no revision and sends
-    no presentation frame. Presentation failure is logged separately and never
-    replaces the command's own value or Failure; Telnet and AJAX sessions are
-    never touched.
+    no presentation frame. The returned Deferred carries the actual receipt (or
+    ``None`` for a retired sequence); presentation failure is logged separately
+    and never replaces the command's own value or Failure; Telnet and AJAX
+    sessions are never touched.
+
+    This refresh is its own queue entry, never a member of the command's causal
+    group: the command's committed group has already published (or is about to
+    at the reactor boundary), and a second current-state comparison is exactly
+    what "the command settled" means. Two commands settling in reverse order
+    therefore enqueue two refreshes in completion order, each against the
+    then-current canonical state.
     """
     if not is_webclient(session):
         return succeed(None)
     coordinator = _coordinator_for(session, actor)
     deferred = coordinator.enqueue_publication(
-        lambda: build_presentation_context(session, actor)
+        lambda: build_presentation_context(session, actor), independent=True
     )
 
-    def _published(receipt: Any) -> None:
+    def _published(receipt: Any) -> Any:
         if receipt is None:
             return None
         from web.webclient.presentation.watchers import register_watcher
 
         register_watcher(session)
         _schedule_on_reconnect(session, actor, coordinator)
-        return None
+        return receipt
 
     def _failed(failure: Failure) -> None:
         error = failure.value if isinstance(failure, Failure) else failure
