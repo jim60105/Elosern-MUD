@@ -106,7 +106,9 @@ def _publish_generated_dialogue_host(host, character) -> str:
             ),
         ),
     ]
-    payload["dialogue"] = [entry]
+    # Every conversable role declares a complete phase dialogue; the seed only
+    # rebinds the mother's first phase, so the companion role keeps its own.
+    payload["dialogue"] = [entry, _dialogue("daughter")]
     definition = validate_scene_package(payload)
     row, _created = scene_store.publish_package(
         package_id=definition.package_id,

@@ -780,7 +780,11 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
                 facade.actions.handlePresentation({
                     protocol_version: 1,
                     presentation_epoch: store.view.epoch,
-                    revision: 2,
+                    revision: store.view.revision + 1,
+                    // One exact-base delta: the reducer adopts it only against
+                    // the committed baseline it names (webclient delta contract).
+                    base_revision: store.view.revision,
+                    removed_panels: [],
                     mode: "exploration",
                     panels: { status: store.view.panels.status },
                     layout_version: 1,

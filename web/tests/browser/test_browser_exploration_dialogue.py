@@ -931,6 +931,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             [
                 "explore.talk_open",
                 "explore.talk_scripted",
+                # Reading the delivered scripted scene acknowledges it once
+                # (authored-dialogue-reading) before the typed reply.
+                "explore.dialogue_complete",
                 "explore.talk_freeform",
                 "explore.dialogue_leave",
                 "explore.move",
@@ -1055,7 +1058,19 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             ("actor", actor_name, "true", "false", False),
         )
         open_dialogue_choices(page)
-        self.assertEqual(sent_action_count(page), 0, "the replay selected nothing again")
+        # Reading the replayed scene acknowledges that reading once; it never
+        # selects the topic again.
+        replay_actions = outbound_messages(page)
+        self.assertEqual(
+            [message[0] for message in replay_actions],
+            ["ui_action"],
+            "the replay selected nothing again",
+        )
+        self.assertEqual(
+            replay_actions[0][1][0]["action_id"],
+            "explore.dialogue_complete",
+            "the replay only acknowledges the delivered reading",
+        )
 
     def test_generated_package_scene_plays_multi_line_on_the_stage(self):
         """A published generated package plays its complete scene offline.

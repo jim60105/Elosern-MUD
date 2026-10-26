@@ -210,7 +210,7 @@ class ActionLockingTest(BrowserAcceptanceTest):
                 ];
             }"""
         )
-        self.assertTrue(first, "first resync of an episode must be allowed")
+        self.assertFalse(first, "the episode's one repair is already spent")
         self.assertFalse(second, "a second resync in one episode must be blocked")
         syncs = [cmd for cmd, _a, _k in page.evaluate("window.__elosernSent")
                  if cmd == "ui_sync"]
