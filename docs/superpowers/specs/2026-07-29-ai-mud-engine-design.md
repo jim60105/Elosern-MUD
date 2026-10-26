@@ -52,6 +52,17 @@ These were settled during design. Do not relitigate them inside a change.
 > immutable payload remains in the existing world/quests scene-package database under deterministic
 > publication authority. Generated/private content never writes source files or enters the static
 > registry. The approved dialogue design and Shared contract v2 define the exact boundaries.
+
+> **Amended 2026-10-26, standalone map-editor planning.** Authored static-map declarations
+> have a bounded YAML exception under `content/maps/`, as defined by
+> `docs/superpowers/specs/2026-10-26-map-editor-design.md`. The game and an independently
+> installed developer editor share a framework-neutral map core; game consumers receive
+> validated immutable snapshots, while persistent room/exit lifecycle remains owned by
+> `world/maps/`. Non-map lore retains its existing source format and ownership. Generated
+> partition/reference artifacts are read-only outputs, not competing map sources. This
+> amendment approves the planned cutover; it does not claim that the current Python map
+> declarations or their consumers have already been migrated.
+
 | D10 | **Generated scene art is keyed by archetype; authored rooms may override it with official artwork.** Resolution uses room official art, archetype generated art, archetype official art, then a declared town/forest terminal image. Every scene type has bundled official artwork. | GPU cost still scales with scene *kinds*, while authored locations can have distinct official art and remain illustrated offline. |
 | D11 | **The engine never calls Stable Diffusion.** It maintains a queue and shells out to a configurable worker command. | Keeps the engine free of GPU concerns and lets the prompt-writing agent be swapped without touching engine code. |
 
