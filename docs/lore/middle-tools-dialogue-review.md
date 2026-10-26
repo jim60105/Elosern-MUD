@@ -48,39 +48,42 @@ Canonical Sources:
 ## 4. Per-Topic Intent and Scene Structure Review
 
 ### A. altoria_general_store (瑪爾特‧金秤)
-1. **Opening Greeting**: Concise small talk in-character. Asks if actor is leaving the city or returning; points to shelves and brass scales.
+Adopted verbatim from the refined model draft `/var/home/jim60105/repos/MUD/tmp/altoria_general_store_refined.yaml`.
+1. **Opening Greeting**: Setting small talk in-character. Asks if actor is leaving the city or returning; points to shelves and offers fair appraisal.
 2. `altoria_general_store.topic_01` (keyword: 賣什麼):
-   - Actor asks about available exploration goods. Host lists lanterns, compasses, flares, and camp warding kits, stating fixed prices without haggling.
+   - Actor asks about available exploration goods. Host lists lanterns, compasses, flares, camp warding kits, and raw ores/crystals for smithing, stating fixed board prices without haggling.
 3. `altoria_general_store.topic_02` (keyword: 材料):
-   - Actor inquires about monster materials buy-back. Host confirms weighing goblin ears, slime residue, troll fangs, and drake scales on brass scales, and mentions rare mana cores and elven spider silk.
+   - Actor inquires about monster materials buy-back. Host confirms weighing goblin ears, slime residue, troll fangs, and drake scales on brass scales, and highlights rare mana cores and elven spider silk.
 4. `altoria_general_store.topic_03` (keyword: 行頭):
-   - Actor asks what a beginner should prepare. Host gives practical advice on lanterns, compasses, flare talismans, camp ward stones, and signal conches.
+   - Actor asks what a beginner should prepare. Host gives practical advice on lanterns, compasses, flare talismans, camp ward stones, and signal conches, explaining the purpose of each item.
 5. `altoria_general_store.topic_04` (keyword: 飾品藥水):
    - Actor asks about accessories and potions. Host points to neighboring jeweller (艾蓮娜) and alchemist (希碧拉), and directs baptismal holy water inquiries to the Grand Temple's holy sanctuary.
 
 ### B. altoria_forge (維爾登‧黑潭)
-1. **Opening Greeting**: Short, blunt. Asks what weapon the actor wields and dominant hand.
+Aligned to the refined standard with complete turns, grounded explanations, and laconic blacksmith attitude.
+1. **Opening Greeting**: Short, blunt. Asks what weapon the actor wields and dominant hand amidst striking anvil sparks.
 2. `altoria_forge.topic_01` (keyword: 兵器):
-   - Actor asks about weapons. Host lists swords, daggers, throwing axes, longbows, and apprentice staves.
+   - Actor asks about weapons. Host lists common swords, daggers, throwing axes, longbows, and apprentice staves, noting the plain water quenching and sturdy grip.
 3. `altoria_forge.topic_02` (keyword: 好貨):
    - Actor asks for premium equipment. Host highlights the knight's service blade made for the training grounds and the element-infused magic sword.
 4. `altoria_forge.topic_03` (keyword: 賣鐵):
-   - Actor asks about selling old weapons. Host accepts intact weapons matching assortment, refusing raw unworked ore.
+   - Actor asks about selling old weapons. Host accepts intact weapons matching assortment, refusing raw unworked ore and redirecting to the general store's scales.
 5. `altoria_forge.topic_04` (keyword: 保養):
-   - Variant `swordsman_advice` (`SkillOwned`: `basic_swordplay` >= 1, priority 10): Host recognizes swordsman grip and posture, offering advice on cleaning, oiling, and not using blades as levers.
+   - Variant `swordsman_advice` (`SkillOwned`: `basic_swordplay` >= 1, priority 10): Host recognizes swordsman grip and posture, offering advice on cleaning, oiling, whetstones, and discarding cracked blades.
    - Fallback `altoria_forge.topic_04_fallback_scene`: Laconic instructions on whetstones, oiling, and replacing cracked blades.
 
 ### C. altoria_tailor (妮絲塔‧狐溪)
+Aligned to the refined standard with enthusiastic conversational tone, attentive fitting details, and proud craft heritage.
 1. **Opening Greeting**: Welcoming, chatty. Remarks on actor's clothing cut and asks about travel plans.
 2. `altoria_tailor.topic_01` (keyword: 衣甲):
-   - Actor asks about protective clothing. Host presents leather armor, chainmail, mage robes, and knight platemail.
+   - Actor asks about protective clothing. Host presents leather armor, chainmail, mage robes, and knight platemail, detailing movement comfort and protection.
 3. `altoria_tailor.topic_02` (keyword: 旅裝):
-   - Actor asks about long travel apparel. Host emphasizes proper fit to prevent chafing and highlights archmage mending robes.
+   - Actor asks about long travel apparel. Host emphasizes proper fit to prevent chafing on the road and highlights archmage mending robes.
 4. `altoria_tailor.topic_03` (keyword: 禮服):
    - Variant `noble_formalwear` (`SocialIdentityIs`: `noble`, priority 10): Host acknowledges noble patron and discusses banqueting attire and Grand Temple holy vestments.
    - Fallback `altoria_tailor.topic_03_fallback_scene`: Host discusses orders from north avenue nobles, church nuns' open holy robes, saintess vestments, and alluring lace undergarments.
 5. `altoria_tailor.topic_04` (keyword: 收衣):
-   - Actor asks about buy-back of old clothing. Host confirms buy-back for restitching and re-lining.
+   - Actor asks about buy-back of old clothing. Host confirms buy-back for restitching and re-lining into fresh gear.
 
 ---
 
@@ -90,3 +93,4 @@ Canonical Sources:
 - **Punctuation & Script**: Full-width Traditional Chinese punctuation (，。、「」『』？！). Space between CJK and ASCII alphanumeric characters.
 - **Prohibited Patterns**: Zero instances of 「您」, sentence-final 「的，」/「的。」, or calques (折入, 回填, 落地, 賦能).
 - **Scene Shapes**: All formal scenes start with complete actor `speech` line, followed by host responses and stage narration, within 3–8 lines.
+- **Revision Tracking**: All authored scenes across all three hosts declare `revision: r2`.
