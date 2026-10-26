@@ -28,7 +28,7 @@ topics:
         text: 「我們只是途經酒館稍作歇息，喝杯飲品順便聽聽路況。」
       - kind: speech
         speaker: host
-        text: 「放心，我屋裡的常客懂得進退。想打聽城外道路動靜，多留意西邊桌那幾位斥候的閒聊便是，他們剛從西陵谷地探路回來。」
+        text: 「放心，我屋裡的常客懂得進退。想打聽城外道路動靜，多留意西邊桌那幾位斥候的閒聊便是，他們剛從西部丘陵探路回來。」
   fallback:
     scene_id: altoria_tavern.topic_01_scene
     revision: r2
