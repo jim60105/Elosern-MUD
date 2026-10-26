@@ -287,3 +287,66 @@ This is an umbrella architecture and product contract covering the complete edit
 | Generation and end-to-end acceptance | Shared partition input/generation integration, current-output proofs, full manual/AI-turn browser smoke, and final designer acceptance. |
 
 Every approved capability remains required for the completed editor. Decomposition does not authorize presenting a limited map viewer or one-domain editor as the finished product. Detailed frontend layout is a subsequent designer deliverable governed by the companion brief. No implementation begins before the user reviews these written documents and the next planning step completes.
+
+### 12.1 Created OpenSpec proposals
+
+The proposal batch is complete. This inventory records planning artifacts, not implementation progress or authorization to apply them. Each link opens its proposal; the same change directory contains its design, tasks, worker contract, and applicable delta specs.
+
+| ID | Proposal | Deliverable | Direct prerequisites |
+| --- | --- | --- | --- |
+| P01 | [map-core-sparse-geometry](../../../openspec/changes/map-core-sparse-geometry/proposal.md) | Independent sparse graphs, coordinates, and deterministic terrain. | None |
+| P02 | [map-core-authoring-documents](../../../openspec/changes/map-core-authoring-documents/proposal.md) | Complete authoring schema, safe round-trip YAML, discovery, and validation gates. | P01 |
+| P03 | [map-qualified-static-references](../../../openspec/changes/map-qualified-static-references/proposal.md) | Stable qualified references and complete static-consumer migration. | P01; `npc-title-authoring-removal` and its prerequisites |
+| P04 | [map-geography-yaml-cutover](../../../openspec/changes/map-geography-yaml-cutover/proposal.md) | Continental declarations and all geographic locations in YAML. | P02 |
+| P05 | [map-settlement-yaml-cutover](../../../openspec/changes/map-settlement-yaml-cutover/proposal.md) | All settlement graphs, prototypes, bindings, footprints, and wilderness entries in YAML. | P03, P04 |
+| P06 | [map-district-yaml-cutover](../../../openspec/changes/map-district-yaml-cutover/proposal.md) | District declarations and stable landmark references in YAML. | P05 |
+| P07 | [map-partition-core-generation](../../../openspec/changes/map-partition-core-generation/proposal.md) | Shared partition algorithm, snapshot input assembly, and lightweight artifact freshness checks. | P06 |
+| P08 | [map-interior-runtime-cutover](../../../openspec/changes/map-interior-runtime-cutover/proposal.md) | All permanent interiors and complete immutable game snapshot publication. | P06, P07 |
+| P09 | [map-reference-context-export](../../../openspec/changes/map-reference-context-export/proposal.md) | Authoritative static-reference export and independent freshness checking. | P08 |
+| P10 | [map-view-shared-foundations](../../../openspec/changes/map-view-shared-foundations/proposal.md) | Neutral frontend map primitives and existing game-surface migration. | None |
+| P11 | [map-editor-standalone-service](../../../openspec/changes/map-editor-standalone-service/proposal.md) | Independent environment/build, secure local service, and browser workspace. | P08, P09, P10 |
+| P12 | [map-editor-document-commands](../../../openspec/changes/map-editor-document-commands/proposal.md) | Guarded single-document persistence, autosave, and undo/redo. | P11 |
+| P13 | [map-editor-turn-recovery](../../../openspec/changes/map-editor-turn-recovery/proposal.md) | External AI handoff, file watching, stale previews, and recovery. | P12 |
+| P14 | [map-editor-interaction-shell](../../../openspec/changes/map-editor-interaction-shell/proposal.md) | Navigation, inspection, diagnostics, accessibility, and copy-only AI context. | P13 |
+| P15 | [map-editor-continent-tools](../../../openspec/changes/map-editor-continent-tools/proposal.md) | Continental geometry, locations, districts, footprints, and bindings. | P14 |
+| P16 | [map-editor-settlement-tools](../../../openspec/changes/map-editor-settlement-tools/proposal.md) | Nodes/prototypes, directed roads, bends, and physical route inspection. | P14 |
+| P17 | [map-editor-interior-tools](../../../openspec/changes/map-editor-interior-tools/proposal.md) | Coordinate-free rooms/connections and separate editor layouts. | P14 |
+| P18 | [map-editor-entrance-tools](../../../openspec/changes/map-editor-entrance-tools/proposal.md) | Cross-layer relationships, navigation, and reference-safe deletion. | P15, P16, P17 |
+| P19 | [map-editor-partition-jobs](../../../openspec/changes/map-editor-partition-jobs/proposal.md) | Explicit background regeneration, cancellation, and guarded artifact publication. | P07, P18 |
+| P20 | [map-editor-integrated-acceptance](../../../openspec/changes/map-editor-integrated-acceptance/proposal.md) | Complete independent browser/filesystem and committed game-consumer acceptance. | P19, transitively the whole batch |
+
+P20 uses `skip_specs: true` because it supplies evidence for existing behavior rather than adding another product requirement. The [batch plan](../../../openspec/changes/map-core-sparse-geometry/batch-plan.md) contains the detailed dependency/conflict matrix, existing-proposal overlaps, source-authority timeline, and acceptance ownership. The [canonical worker contract](../../../openspec/changes/map-core-sparse-geometry/worker-contract.md) defines cross-slice interfaces and caller inventories.
+
+### 12.2 Parallel implementation batches
+
+This is a conservative schedule derived from the proposal dependencies and shared-file conflicts. A batch starts after its prerequisites have landed in the integration baseline. Parallel workers use separate feature branches/worktrees; independent tasks do not authorize simultaneous integration of conflicting files.
+
+| Batch | Changes eligible to run together | Entry conditions and serialization |
+| --- | --- | --- |
+| B01 | P01 + P10 | No semantic dependency between Python core extraction and frontend primitives. Serialize shared metadata/documentation integration and overlapping game-view edits with `webclient-immutable-adoption`. |
+| B02 | P02 | P01 complete. Keep core schema/model ownership serial with later source migrations. |
+| B03 | P03 | P01 and `npc-title-authoring-removal` complete. P03 shares core and game-adapter surfaces with source migrations, so this schedule keeps it separate from P02/P04. |
+| B04 | P04 | P02 complete; P03 already landed under this conservative schedule. |
+| B05 | P05 | P03 + P04 complete. |
+| B06 | P06 | P05 complete. |
+| B07 | P07 | P06 complete; serialize partition input, decoder, and artifact edits. |
+| B08 | P08 | P06 + P07 complete; preserve the final NPC service/identity contracts. |
+| B09 | P09 | P08 complete; export against final authoritative static declarations. |
+| B10 | P11 | P08 + P09 + P10 complete; approved frontend design and proposal reconciliation required before editor UI implementation. |
+| B11 | P12 | P11 complete; one persistence/history owner. |
+| B12 | P13 | P12 complete; one watcher and turn state machine. |
+| B13 | P14 | P13 complete; implement the approved interaction design. |
+| B14 | P15 + P16 + P17 | P14 complete and shared shell/schema/selector interfaces fixed. Separate domain modules; serialize shared files, dependency locks, manifests, and footprint/settlement integration. If work requires shared implementation changes, land those first or sequence the affected workers. |
+| B15 | P18 | P15 + P16 + P17 complete; extends their relationship and selector modules. |
+| B16 | P19 | P07 + P18 complete; extends the existing mutation state machine. |
+| B17 | P20 | All preceding changes complete with their own focused evidence; integrated acceptance cannot replace it. |
+
+The batches permit parallel implementation only where the listed boundaries remain independent. Shared shard manifests, traceability records, locks, and documentation always have one integration owner. Existing movement/publication/NPC proposals retain the serialization rules in the batch plan. Recheck current proposal phases before scheduling; a proposed external prerequisite must land first, while an archived prerequisite is consumed through its merged contract.
+
+### 12.3 Frontend specialist coordination
+
+Frontend visual design remains unassigned implementation work. The specialist receives the companion frontend requirements and this architecture, then produces annotated screens, interaction/state flows, component specifications, and keyboard/focus behavior for user review. The specialist does not need to create duplicate functional OpenSpec proposals.
+
+Design work can proceed alongside B01-B09. Before B10 or any earlier editor-specific UI implementation, obtain user approval of the specialist's design and reconcile affected existing proposals, particularly P11-P19 and P20's acceptance evidence. Backend/API changes discovered during design must be reflected in their owning proposals before apply. P10 may proceed independently because it extracts neutral geometry and preserves existing game behavior without deciding the editor layout.
+
+This coordination gate is recorded here as the intended scheduling constraint. The existing proposal batch describes specialist design as an apply-time deliverable; its affected artifacts must be updated to express the pre-implementation gate before those UI changes are applied. This document update does not claim that reconciliation has already occurred.
