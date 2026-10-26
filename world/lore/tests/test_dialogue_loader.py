@@ -251,6 +251,7 @@ class DialogueLoaderTests(unittest.TestCase):
         "authored-dialogue-content::lower-civic-content-has-exclusive-profile-key-yaml-ownership",
         "authored-dialogue-content::middle-tools-content-has-exclusive-profile-key-yaml-ownership",
         "authored-dialogue-content::middle-exchange-content-has-exclusive-profile-key-yaml-ownership",
+        "authored-dialogue-content::upper-faith-content-has-exclusive-profile-key-yaml-ownership",
     )
     def test_duplicate_mapping_keys_rejected(self) -> None:
         """Duplicate mapping keys at root or nested levels are strictly rejected."""
@@ -359,6 +360,7 @@ topics: []
         "authored-dialogue-content::lower-civic-content-has-exclusive-profile-key-yaml-ownership",
         "authored-dialogue-content::middle-tools-content-has-exclusive-profile-key-yaml-ownership",
         "authored-dialogue-content::middle-exchange-content-has-exclusive-profile-key-yaml-ownership",
+        "authored-dialogue-content::upper-faith-content-has-exclusive-profile-key-yaml-ownership",
     )
     def test_unsafe_tags_rejected(self) -> None:
         """Custom and object-construction YAML tags are rejected."""
@@ -406,6 +408,7 @@ topics: []
         "authored-dialogue-content::lower-civic-content-has-exclusive-profile-key-yaml-ownership",
         "authored-dialogue-content::middle-tools-content-has-exclusive-profile-key-yaml-ownership",
         "authored-dialogue-content::middle-exchange-content-has-exclusive-profile-key-yaml-ownership",
+        "authored-dialogue-content::upper-faith-content-has-exclusive-profile-key-yaml-ownership",
     )
     def test_filename_stem_not_in_registered_profiles_rejected(self) -> None:
         """Discovered file whose stem is not a registered NpcProfile.key rejects."""
@@ -428,6 +431,7 @@ topics: []
     @covers_requirement("authored-dialogue-sources::static-dialogue-discovery-derives-owner-from-profile-key-filename")
     @covers_requirement("authored-dialogue-content::middle-tools-content-has-exclusive-profile-key-yaml-ownership")
     @covers_requirement("authored-dialogue-content::middle-exchange-content-has-exclusive-profile-key-yaml-ownership")
+    @covers_requirement("authored-dialogue-content::upper-faith-content-has-exclusive-profile-key-yaml-ownership")
     def test_filename_using_dialogue_key_or_display_name_rejected(self) -> None:
         """Filename using dialogue alias instead of profile key rejects."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -469,6 +473,7 @@ topics: []
         "authored-dialogue-content::lower-civic-content-has-exclusive-profile-key-yaml-ownership",
         "authored-dialogue-content::middle-tools-content-has-exclusive-profile-key-yaml-ownership",
         "authored-dialogue-content::middle-exchange-content-has-exclusive-profile-key-yaml-ownership",
+        "authored-dialogue-content::upper-faith-content-has-exclusive-profile-key-yaml-ownership",
     )
     def test_discovered_file_without_binding_rejected(self) -> None:
         """A discovered file whose profile has no binding rejects."""
@@ -529,6 +534,7 @@ topics: []
         "authored-dialogue-content::lower-civic-content-has-exclusive-profile-key-yaml-ownership",
         "authored-dialogue-content::middle-tools-content-has-exclusive-profile-key-yaml-ownership",
         "authored-dialogue-content::middle-exchange-content-has-exclusive-profile-key-yaml-ownership",
+        "authored-dialogue-content::upper-faith-content-has-exclusive-profile-key-yaml-ownership",
     )
     def test_forbidden_explicit_owner_field_rejected(self) -> None:
         """Explicit owner fields in YAML root (npc_id, profile_key, owner) are rejected."""
@@ -556,6 +562,7 @@ topics: []
         "authored-dialogue-content::lower-civic-content-has-exclusive-profile-key-yaml-ownership",
         "authored-dialogue-content::middle-tools-content-has-exclusive-profile-key-yaml-ownership",
         "authored-dialogue-content::middle-exchange-content-has-exclusive-profile-key-yaml-ownership",
+        "authored-dialogue-content::upper-faith-content-has-exclusive-profile-key-yaml-ownership",
     )
     def test_schema_version_type_strictness(self) -> None:
         """schema_version must be exact int 1; bool or float rejects."""
@@ -583,6 +590,7 @@ topics: []
         "authored-dialogue-content::lower-civic-content-has-exclusive-profile-key-yaml-ownership",
         "authored-dialogue-content::middle-tools-content-has-exclusive-profile-key-yaml-ownership",
         "authored-dialogue-content::middle-exchange-content-has-exclusive-profile-key-yaml-ownership",
+        "authored-dialogue-content::upper-faith-content-has-exclusive-profile-key-yaml-ownership",
     )
     def test_all_or_nothing_snapshot_rejection(self) -> None:
         """One invalid neighbor rejects the entire load atomically."""
@@ -710,6 +718,7 @@ topics:
         "authored-dialogue-content::lower-civic-content-has-exclusive-profile-key-yaml-ownership",
         "authored-dialogue-content::middle-tools-content-has-exclusive-profile-key-yaml-ownership",
         "authored-dialogue-content::middle-exchange-content-has-exclusive-profile-key-yaml-ownership",
+        "authored-dialogue-content::upper-faith-content-has-exclusive-profile-key-yaml-ownership",
     )
     def test_unknown_condition_reference_rejects(self) -> None:
         """A dialogue condition referencing an unknown key against DialogueReferences rejects."""
@@ -862,6 +871,7 @@ topics:
         "authored-dialogue-content::lower-civic-content-has-exclusive-profile-key-yaml-ownership",
         "authored-dialogue-content::middle-tools-content-has-exclusive-profile-key-yaml-ownership",
         "authored-dialogue-content::middle-exchange-content-has-exclusive-profile-key-yaml-ownership",
+        "authored-dialogue-content::upper-faith-content-has-exclusive-profile-key-yaml-ownership",
     )
     def test_new_valid_registered_profile_discovered_with_no_file_index_edit(self) -> None:
         """Adding a new file for a new registered profile & binding succeeds dynamically."""

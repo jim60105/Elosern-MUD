@@ -1,55 +1,117 @@
 schema_version: 1
-greeting: 講台邊的艾莉安娜‧寒水主祭合上經冊，晨光從她背後的高窗落進大殿：「願平安與你同在，旅人。日課、祝禱，或是想問的事，都可以在這裡說。這座神殿同時是禮拜堂、聖所與聖所的商店，三處都敞開著，你想問哪一處，我都會回答。」
+greeting: 講台邊的艾莉安娜‧寒水主祭合上經冊，晨光從她身後的高窗落進大殿。她抬起頭，語氣平和：「願平安與你同在，旅人。日課、祝禱，或是想問聖所與商店的事，都可以在這裡說。大殿、聖所和商店都敞開著，你想問哪一處，我都照實回答。」
 topics:
 - topic_id: altoria_temple.topic_01
   keyword: 禮拜
   label: 禮拜
+  variants:
+  - variant_id: elf_kin_worship
+    priority: 10
+    when:
+      kind: race_is
+      race_key: elf
+    scene:
+      scene_id: altoria_temple.topic_01_scene_elf
+      revision: r2
+      lines:
+      - kind: speech
+        speaker: actor
+        text: 「我想了解大殿日課的時間，精靈要是過來，有什麼特別的規矩嗎？」
+      - kind: narration
+        text: 艾莉安娜‧寒水注視著眼前的客人，雙手交疊在胸前，躬身行禮。
+      - kind: speech
+        speaker: host
+        text: 「願平安與你同在，尊貴的精靈旅人。教會聖典記載，始祖光明女神將歡愉視為生命本源與恩賜，我們這座神殿的信仰就是傳承自斐歐恩族。」
+      - kind: speech
+        speaker: host
+        text: 「晨鐘之後與日落之前，長椅隨你挑選。想坐下來聽講道，或是想在殿裡走動、在陽光下安靜坐著，都隨你的心意。」
+      - kind: speech
+        speaker: actor
+        text: 「既然這樣，我就隨意參觀了。」
+      - kind: speech
+        speaker: host
+        text: 「請便。如果有話想單獨跟我談，我都在講台邊，隨時可以過來。」
   fallback:
     scene_id: altoria_temple.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 禮拜
+      text: 「我想詢問大殿日課的時間與規矩，來聽講需要先登記嗎？」
+    - kind: narration
+      text: 艾莉安娜‧寒水走下講台階梯，在長椅旁停下腳步。
     - kind: speech
       speaker: host
-      text: 「日課在晨鐘之後與日落之前，都在講台前舉行，任何人都有座位。不必受洗，也不必報上身家，進門坐下就算參與。想聽講道，就留到鐘響；想單獨說話，光明聽得見，我也聽得見。」
+      text: 「不用登記，也不用報上身分。日課在晨鐘之後與日落之前，都在講台前舉行。進門找個空位坐下就算參與，想聽多久都可以。」
+    - kind: speech
+      speaker: actor
+      text: 「要是還沒受洗入教，也可以進來坐著聽嗎？」
+    - kind: speech
+      speaker: host
+      text: 「當然可以。進門的人都是客人，想聽講道就留到鐘聲停歇；如果心裡有事想單獨談談，我都在這裡聽你說。要是以後想正式入教，再找我辦理入教儀式。」
 - topic_id: altoria_temple.topic_02
   keyword: 祝禱
   label: 祝禱
   fallback:
     scene_id: altoria_temple.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 祝禱
+      text: 「出遠門前如果想求個平安，向主祭請求祝禱要收多少奉獻？」
+    - kind: narration
+      text: 艾莉安娜‧寒水搖了搖頭，把腰間掛著的念珠拿在手裡。
     - kind: speech
       speaker: host
-      text: 「祝禱、祝福，為遠行的人祈求平安，都在講台邊進行，不收分文。若身上沾了邪氣，可以用受洗聖水洗淨，聖水擺在聖所的櫃上，由執事經手。想正式入教的人，也可以在這裡向我請求入教儀式。」
+      text: 「祝禱與平安祝福都在講台邊進行，不收分文。你只要站在講台旁，我就會替你向光明祈求庇護，願你旅途平安。」
+    - kind: speech
+      speaker: actor
+      text: 「要是出城沾了不乾淨的瘴氣或邪氣，也能在這裡洗去嗎？」
+    - kind: speech
+      speaker: host
+      text: 「要是沾了邪氣，可以用受洗聖水洗淨。聖水由我親手用光魔法祝聖過，不過瓶裝水放在聖所的商店櫃上，由執事保管。祈禱找我，買水去旁邊櫃檯。」
 - topic_id: altoria_temple.topic_03
   keyword: 聖所
   label: 聖所
   fallback:
     scene_id: altoria_temple.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 聖所
+      text: 「聖所是在大殿旁邊嗎？聽說裡面的服事也是教會的一份事工。」
+    - kind: narration
+      text: 艾莉安娜‧寒水轉向左邊敞開的走廊，神色坦然。
     - kind: speech
       speaker: host
-      text: 「聖所就在這棟建築裡，左手邊，同一片屋頂、同一排窗。本會以性愛為修道之途，聖所公開服事，這件事在大陸上無人不知，和酒館供酒一樣平常。禮拜、聖所與商店是同一份信仰生活的三處櫃檯，你想問哪一處，我都照實回答。」
+      text: 「聖所就在大殿左手邊，同一個屋簷下。教會以性愛為修道之途，修女與修士奉獻肉身服事信眾，這件事在全大陸都知道，跟酒館賣酒一樣平常。」
+    - kind: speech
+      speaker: host
+      text: 「聖職人員會用光魔法調護身體與避孕，過程明白乾淨，不用覺得難以開口。禮拜、聖所與商店是同一份信仰生活的三處櫃檯，都在這座屋頂底下。」
+    - kind: speech
+      speaker: actor
+      text: 「如果想安排那邊的服事，該找誰接洽？」
+    - kind: speech
+      speaker: host
+      text: 「順著走廊走過去，聖所門內就有值守的修女接待，房間與時段都會當面跟你談好。」
 - topic_id: altoria_temple.topic_04
   keyword: 商店
   label: 商店
   fallback:
     scene_id: altoria_temple.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 商店
+      text: 「大殿裡好像有在賣東西的櫃檯，主要賣些什麼？」
+    - kind: narration
+      text: 艾莉安娜‧寒水朝裡廳方向指了指。
     - kind: speech
       speaker: host
-      text: 「商店在裡廳，由聖所執事羅海西亞‧芬威克看管。受洗聖水、禮儀器物與修道用的物件，都在她的櫃上。挑選物品請問她，祝禱的事再回來問我。」
+      text: 「商店在裡廳，由聖所執事羅海西亞‧芬威克掌管。受洗聖水、禮器與修道用的物件，都在她的櫃上。」
+    - kind: speech
+      speaker: actor
+      text: 「想買聖水的話，直接找執事拿就行了嗎？」
+    - kind: speech
+      speaker: host
+      text: 「對，價錢寫在櫃邊的牌子上，挑好拿到櫃前跟她結算。要是對器具用法有疑問，她都會仔細告訴你。買好了東西想再求個平安，隨時回來找我。」
