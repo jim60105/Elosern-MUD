@@ -11,7 +11,9 @@ from unittest import mock
 from world.lore.anchors import ANCHOR_REGISTRY
 from world.lore.settlements.places import (
     PLACE_REGISTRY,
+    place_capabilities,
     place_is_hostless,
+    place_shop_identity,
     validate_place_registry,
     PlaceKind,
 )
@@ -21,6 +23,7 @@ from world.lore.settlements.settlements import (
     validate_settlement_registry,
 )
 from world.lore.settlements.shops import SHOP_REGISTRY
+from world.rules.npc_capabilities import capability, place_bound
 
 
 def _place_fields(place) -> tuple:
@@ -324,9 +327,9 @@ class PlaceRegistryTests(unittest.TestCase):
                     "ciaran_lareneth_home", "ciaran_nireth_home",
                     "ciaran_valwyn_home", "ciaran_vethiel_home"):
             place = PLACE_REGISTRY[key]
-            self.assertEqual(place.profession, "merchant")
             self.assertTrue(place.assortment_keys)
-            self.assertIn("shop_key", dict(place.authored_kwargs))
+            self.assertIsNotNone(place_shop_identity(place))
+            self.assertTrue(place_capabilities(place, "merchant"))
 
     @covers_requirement(
         "settlement-place-registry::a-place-is-the-single-authored-record-of-one-service-location"
@@ -401,7 +404,7 @@ class PlaceRegistryTests(unittest.TestCase):
                 # The derived shop row follows this place's own declaration:
                 # its identity and its assortment keys are the place's, and no
                 # shop row exists for a place that authors no shop identity.
-                shop_key = dict(place.authored_kwargs).get("shop_key")
+                shop_key = place_shop_identity(place)
                 if shop_key is None:
                     continue
                 shop = SHOP_REGISTRY[shop_key]
@@ -412,7 +415,14 @@ class PlaceRegistryTests(unittest.TestCase):
                 self.assertEqual(shop.assortment_keys, place.assortment_keys)
 
     def _plant(self, place, **changes):
-        return replace(place, key="t_offense_place", service_id="t_offense", **changes)
+        planted = {
+            "components": tuple(
+                replace(declaration, binding=place_bound("t_offense_place"))
+                for declaration in place.components
+            )
+        }
+        planted.update(changes)
+        return replace(place, key="t_offense_place", **planted)
 
     def _assert_rejected(self, place, fragment=None):
         with mock.patch.dict(
@@ -455,14 +465,12 @@ class PlaceRegistryTests(unittest.TestCase):
     def test_shop_identity_without_assortments_is_rejected(self):
         self._assert_rejected(self._plant(self.store, assortment_keys=()), "shop_key")
 
-    def test_duplicate_authored_kwarg_is_rejected(self):
-        place = self._plant(
-            self.store,
-            authored_kwargs=(
-                ("shop_key", "altoria_general_store"),
-                ("shop_key", "t_other"),
-            ),
-        )
+    def test_a_duplicate_capability_type_is_rejected(self):
+        # One entry per capability: two merchant declarations on one place
+        # could never resolve to one shop identity, so the declaration set
+        # rejects the duplicate by name.
+        merchant = place_capabilities(self.store, "merchant")[0]
+        place = self._plant(self.store, components=(merchant, merchant))
         self._assert_rejected(place)
 
     def test_duplicate_shop_identity_across_places_is_rejected(self):
@@ -474,8 +482,14 @@ class PlaceRegistryTests(unittest.TestCase):
         duplicate = replace(
             self.store,
             key="t_second_shop_place",
-            service_id="t_second_shop_place",
-            authored_kwargs=(("shop_key", "altoria_general_store"),),
+            components=(
+                capability(
+                    "merchant",
+                    binding=place_bound("t_second_shop_place"),
+                    service_id="t_second_shop_service",
+                    shop_key=place_shop_identity(self.store),
+                ),
+            ),
         )
         with mock.patch.dict(
             PLACE_REGISTRY, {"t_second_shop_place": duplicate}, clear=False
@@ -497,11 +511,9 @@ class PlaceRegistryTests(unittest.TestCase):
             host_race=None,
             host_subrace=None,
             host_sex=None,
-            profession=None,
-            service_id=None,
             host_profile_key=None,
             assortment_keys=(),
-            authored_kwargs=(),
+            components=(),
         )
         base.update(changes)
         return replace(self.guild, **base)
@@ -534,16 +546,25 @@ class PlaceRegistryTests(unittest.TestCase):
         self.assertIn("t_plaza_place", message)
         for field in ("host_name", "host_title"):
             self.assertIn(field, message)
-        for field in ("host_race", "host_sex", "profession", "service_id"):
+        for field in ("host_race", "host_sex"):
             self.assertIn(field, message)
         self.assertIn("host_profile_key", message)
-        # The mirror image: a profession without a host name.
-        profession_only = replace(self._hostless(), profession="merchant")
+        # The mirror image: a capability without a host name.
+        capability_only = replace(
+            self._hostless(),
+            components=(
+                capability(
+                    "scripted_dialogue",
+                    binding=place_bound("t_plaza_place"),
+                    dialogue_key="guild_staff",
+                ),
+            ),
+        )
         with self.assertRaises(ValueError) as caught:
-            validate_place_registry({"t_plaza_place": profession_only})
+            validate_place_registry({"t_plaza_place": capability_only})
         message = str(caught.exception)
         self.assertIn("t_plaza_place", message)
-        self.assertIn("profession", message)
+        self.assertIn("components", message)
         self.assertIn("host_name", message)
 
     @covers_requirement(
@@ -569,12 +590,12 @@ class PlaceRegistryTests(unittest.TestCase):
     @covers_requirement(
         "settlement-place-registry::a-place-is-the-single-authored-record-of-one-service-location"
     )
-    def test_a_stray_subrace_or_kwargs_break_the_absent_host(self):
+    def test_a_stray_subrace_or_capability_breaks_the_absent_host(self):
         # A wholly absent group carries no optional parts either: a stray
-        # subrace or component kwargs is found-but-rest-missing material.
+        # subrace or capability declaration is found-but-rest-missing material.
         for changes in (
             {"host_subrace": "high_elven"},
-            {"authored_kwargs": (("dialogue_key", "guild_staff"),)},
+            {"components": (capability("scripted_dialogue", dialogue_key="guild_staff"),)},
         ):
             with self.subTest(**changes):
                 with self.assertRaises(ValueError) as caught:
@@ -656,7 +677,10 @@ class PlaceRegistryTests(unittest.TestCase):
         return replace(
             self.guild,
             key=key,
-            service_id=f"{key}_service",
+            components=tuple(
+                replace(declaration, binding=place_bound(key))
+                for declaration in self.guild.components
+            ),
             room_name_zh=f"合成巷道室 {key}",
             exterior_xy=(1300, 2600),
             doorway_key_zh=doorway,
@@ -724,7 +748,7 @@ class DerivedShopRegistryTests(unittest.TestCase):
         )
         shop = SHOP_REGISTRY["altoria_general_store"]
         store = PLACE_REGISTRY["altoria_general_store"]
-        self.assertEqual(shop.key, dict(store.authored_kwargs)["shop_key"])
+        self.assertEqual(shop.key, place_shop_identity(store))
         self.assertEqual(shop.host_name, store.host_name)
         self.assertEqual(shop.host_title, store.host_title)
         self.assertEqual(shop.assortment_keys, store.assortment_keys)

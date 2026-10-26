@@ -31,6 +31,7 @@ from world.quests.tests._fixtures import (
 )
 from world.lore.settlements.assortments import AssortmentDefinition
 from world.lore.settlements.shops import ShopDefinition
+from world.rules.npc_capabilities import place_bound
 from world.rules.clock import WorldClock
 from world.rules.economy import (
     TradeError,
@@ -1456,10 +1457,19 @@ _MOSSGATE_SCALES = {"t_mossgate": 100}
 def _place_row(shop_key: str) -> "PlaceDefinition":
     """A place row authoring ``shop_key`` (kit store template)."""
     base = SYNTH_PLACES["t_mossgate_store"]
+    merchant = next(
+        declaration for declaration in base.components if declaration.type == "merchant"
+    )
     return replace(
         base,
         key=f"t_place_for_{shop_key}",
-        authored_kwargs=(("shop_key", shop_key),),
+        components=(
+            replace(
+                merchant,
+                kwargs={**merchant.kwargs, "shop_key": shop_key},
+                binding=place_bound(f"t_place_for_{shop_key}"),
+            ),
+        ),
         assortment_keys=("t_mossgate_goods",),
     )
 

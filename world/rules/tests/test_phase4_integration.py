@@ -9,6 +9,7 @@ from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from typeclasses.rooms import Room
+from world.lore.settlements.places import place_shop_identity
 from commands.action import CmdCast
 from commands.combat import CmdEngage
 from commands.guild import (
@@ -60,9 +61,7 @@ def _place_by_kind(kind: str):
 GUILD_HALL_TAG = _place_by_kind("guild_hall").key
 GENERAL_STORE_TAG = _place_by_kind("general_store").key
 EATERY_TAG = _place_by_kind("eatery").key
-GENERAL_STORE_SHOP_KEY = dict(_place_by_kind("general_store").authored_kwargs)[
-    "shop_key"
-]
+GENERAL_STORE_SHOP_KEY = place_shop_identity(_place_by_kind("general_store"))
 
 
 class Phase4Isolation(QuestRegistryIsolation):

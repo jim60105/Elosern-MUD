@@ -33,6 +33,7 @@ from world.maps.city_gates import CityGateDef
 from world.rules.buffs import BuffDefinition, PHYSIOLOGICAL_PROTECTION
 from world.rules.fatigue import PROJECTION_BUFF_KEYS
 from world.rules.dialogue import DialogueDefinition, KeywordResponse
+from world.rules.npc_capabilities import capability, place_bound
 
 from world.tests.synthetic_data.vocab import (
     _SYNTH_GATE_XY,
@@ -237,12 +238,19 @@ SYNTH_PLACES: dict[str, PlaceDefinition] = {
         host_race="human",
         host_subrace=None,
         host_sex="other",
-        profession="t_mossgate_staff",
-        service_id="t_mossgate_guild_master",
         assortment_keys=(),
-        authored_kwargs=(
-            ("branch_key", "t_mossgate_branch"),
-            ("dialogue_key", "t_mossgate_staff"),
+        components=(
+            capability(
+                "guild_staff",
+                binding=place_bound("t_mossgate_guild_hall"),
+                service_id="t_mossgate_guild_master",
+                branch_key="t_mossgate_branch",
+            ),
+            capability(
+                "scripted_dialogue",
+                binding=place_bound("t_mossgate_guild_hall"),
+                dialogue_key="t_mossgate_staff",
+            ),
         ),
     ),
     "t_mossgate_store": PlaceDefinition(
@@ -259,10 +267,15 @@ SYNTH_PLACES: dict[str, PlaceDefinition] = {
         host_race="human",
         host_subrace=None,
         host_sex="other",
-        profession="t_mossgate_merchant",
-        service_id="t_mossgate_merchant",
         assortment_keys=("t_mossgate_goods",),
-        authored_kwargs=(("shop_key", "t_mossgate_stall"),),
+        components=(
+            capability(
+                "merchant",
+                binding=place_bound("t_mossgate_store"),
+                service_id="t_mossgate_merchant",
+                shop_key="t_mossgate_stall",
+            ),
+        ),
     ),
     # A host-less place (hostless-places): every host field keeps its default,
     # so this row is the kit fixture for "a place that simply exists" — the
