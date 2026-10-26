@@ -22,8 +22,9 @@ var EPOCH_LENGTH = 22;
 // web.webclient.presentation.publication_parts, OpenSpec change
 // webclient-publication-codec). One logical snapshot/delta above its intact
 // frame allowance travels as bounded parts of its single canonical UTF-8 JSON
-// byte sequence; each part is at most 16,384 raw bytes and never a giant
-// base64 string. The values must stay equal to the server table:
+// byte sequence; each part is at most 24,576 raw bytes (at the maximum logical
+// size the final part is the 16,384-byte remainder) and never a giant base64
+// string. The values must stay equal to the server table:
 // PUBLICATION_MAX_PARTS is derived (ceil(MAX_BYTES / PART_BYTES)) and the last
 // part at the maximum holds 16,384 raw bytes in 11 chunks. The assembly
 // timeout and live-assembly bound are receiver policy owned by the browser

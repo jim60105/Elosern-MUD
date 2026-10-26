@@ -284,6 +284,13 @@ class WorldMapCoordinatorTests(unittest.TestCase):
         self.assertEqual(len(worlds), 1)
         self.assertEqual(list(worlds[0][1]["panels"]), ["world_map"])
         self.assertGreater(worlds[0][1]["revision"], general[0][1]["revision"])
+        # The general transfer precedes the map frame and the map's exact base
+        # is the completed general publication's revision.
+        self.assertEqual(
+            [name for name, _ in frames],
+            [UI_PUBLICATION_PART] * len(general) + ["ui_update"],
+        )
+        self.assertEqual(worlds[0][1]["base_revision"], general[0][1]["revision"])
         raw = b"".join(
             validate_publication_part(frame)[1] for _, frame in general
         )

@@ -445,6 +445,36 @@ class PartWireTests(unittest.TestCase):
             with self.subTest(case=name), self.assertRaises(ProtocolValidationError):
                 validate_publication_part(value)
 
+    def test_noncanonical_base64_padding_is_rejected(self):
+        # Final parts with a one- and a two-byte remainder; each alternate
+        # spelling decodes to the same raw bytes and is rejected only by the
+        # canonical re-encoding rule.
+        for total, canonical_chunk, variants in (
+            (PUBLICATION_PART_BYTES + 1, "eA==", ("eB==", "eA===")),
+            (PUBLICATION_PART_BYTES + 2, "eHg=", ("eHh=", "eHg==")),
+        ):
+            parts = encode_publication_parts(
+                b"x" * total,
+                presentation_epoch=EPOCH,
+                revision=1,
+                publication_kind="snapshot",
+                transfer_id="b" * 32,
+            )
+            last = parts[-1]
+            self.assertEqual(last["chunks"], [canonical_chunk])
+            self.assertEqual(validate_publication_part(last)[1], b"x" * (total - PUBLICATION_PART_BYTES))
+            for variant in variants:
+                value = json.loads(json.dumps(last))
+                value["chunks"] = [variant]
+                with self.subTest(case=variant), self.assertRaises(
+                    ProtocolValidationError
+                ):
+                    validate_publication_part(value)
+            # The canonical spelling of the same bytes stays acceptable.
+            canonical = json.loads(json.dumps(last))
+            canonical["chunks"] = [canonical_chunk]
+            validate_publication_part(canonical)
+
     def test_cjk_character_crossing_a_part_boundary_survives(self):
         def candidate(pad: int) -> dict:
             rows = ["😀" * 512 for _ in range(48)]
