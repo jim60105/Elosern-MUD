@@ -13,3 +13,7 @@ Each district SHALL resolve one qualified landmark to a reachable walkable posit
 - **WHEN** a settlement landmark moves with its stable node identity
 - **THEN** the runtime canonical landmark follows its new binding while district lighting still reads existing visited-node knowledge
 
+#### Scenario: Deep forest has one discovery landmark
+- **WHEN** a region district spans nominal national claims
+- **THEN** its one qualified landmark resolves independently of national borders and discovery still requires that landmark's canonical visited identity
+
