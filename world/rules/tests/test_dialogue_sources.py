@@ -35,6 +35,7 @@ class DialogueSourcesTests(unittest.TestCase):
     @covers_requirement(
         "scripted-dialogue::dialogue-tables-are-immutable-keyed-and-registry-backed",
         "authored-dialogue-selection::scene-selection-is-independent-of-content-provider",
+        "authored-dialogue-content::lower-hospitality-content-has-exclusive-profile-key-yaml-ownership",
     )
     def test_complete_inventory_of_25_tables(self):
         bindings = canonical_dialogue_bindings()

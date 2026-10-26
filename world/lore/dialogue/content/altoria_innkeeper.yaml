@@ -1,55 +1,93 @@
 schema_version: 1
-greeting: 爐火旅店的溫弗蕾德‧古林從櫃檯後站起來，腰間的鑰匙叮噹作響：「歡迎啊，孩子，一路辛苦了吧。樓上有房間，每間都有門閂。想歇一下，樓下火塘邊有椅子；想睡個好覺，床單我才剛換過。要是想趁安靜練個劍、溫習一下咒文，房裡也很安靜喔。」
+greeting: 爐火旅店的老闆娘溫弗蕾德‧古林正站在櫃檯後整理記事簿，腰間那串黃銅鑰匙發出清脆的微響。她抬起頭溫和地笑道：「歡迎光臨，孩子。長途趕路累壞了吧？樓上房間都收拾妥帖了，床鋪乾淨整潔。大廳火塘邊也能坐著暖暖身子；若想安靜溫習咒文或練練劍術，客房裡清靜得很，不會有人打擾。」
 topics:
 - topic_id: altoria_lodging.topic_01
   keyword: 房間
   label: 房間
   fallback:
     scene_id: altoria_lodging.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 房間
+      text: 「老闆娘，樓上的客房布置與周遭環境如何？夜裡隔音安不安靜？」
+    - kind: narration
+      text: 溫弗蕾德輕輕晃動手中擦拭鋥亮的黃銅鑰匙串，眼神格外慈祥。
     - kind: speech
       speaker: host
-      text: 「房間在樓上，一張床、一個臉盆，門閂一拉，裡面就是你自己的地方了。要歇一下，在房裡或樓下火塘邊都行。我這裡沒什麼了不起，就是牆厚、門關得緊。」
+      text: 「每間客房都備有軟木床鋪、乾淨臉盆和一張結實書桌，窗戶朝向安靜的巷弄內側，南大道的車馬喧鬧半點傳不進來。」
+    - kind: speech
+      speaker: host
+      text: 「更要緊的是房門門栓厚實堅固。扣上門栓後就是你自個兒的天地，任誰也不能不請自來。我這旅店經營二十年，圖的就是客人住得踏實。」
+    - kind: speech
+      speaker: actor
+      text: 「能在城裡找到這樣清靜安全的地方投宿，確實讓人放下一身防備。」
 - topic_id: altoria_lodging.topic_02
   keyword: 過夜
   label: 過夜
   fallback:
     scene_id: altoria_lodging.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 過夜
+      text: 「在野外露營與進城投宿旅店，隔天起來的精神差別真的很大嗎？」
+    - kind: narration
+      text: 老闆娘倒了一杯溫熱的薄荷茶遞過櫃檯，語重心長地勸導。
     - kind: speech
       speaker: host
-      text: 「累壞了吧？那就上樓睡個好覺。樓下也有人靠著火塘打瞌睡，不過聽我一句，上樓睡，安靜多了。睡路邊跟睡床上，隔天起來的精神差很多呢。」
+      text: 「那可差遠啦，孩子。荒郊野地裡哪怕閉著眼，耳朵也得時刻提防魔獸嚎叫與草木動靜，根本沒法深睡。」
+    - kind: speech
+      speaker: host
+      text: 「緊繃了一整天，進了屋躺在乾燥柔軟的被褥上安穩歇息一夜，次日醒來手腳才靈便。睡足了覺出城冒險，路上才不容易出差錯。」
+    - kind: speech
+      speaker: actor
+      text: 「聽老闆娘這麼一說，確實該上樓好好睡上一覺，養足精神再出發。」
+    - kind: speech
+      speaker: host
+      text: 「先喝口熱茶順順氣，等會兒拿了鑰匙就上去歇息吧，安心睡到天亮。」
 - topic_id: altoria_lodging.topic_03
   keyword: 修煉
   label: 修煉
   fallback:
     scene_id: altoria_lodging.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 修煉
+      text: 「客房裡空間合適閉門溫習典籍或沉思冥想嗎？會不會影響到隔壁客人？」
+    - kind: narration
+      text: 溫弗蕾德指了指厚實的隔牆與頂棚粗壯橫樑，笑著點了點頭。
     - kind: speech
       speaker: host
-      text: 「光坐著發呆多可惜呀。很多冒險者會待在房裡，一邊歇一邊練劍、溫習咒文，我這裡夠安靜，不會有人吵你。先想一下要練哪樣吧。」
+      text: 「合適得很呢。不少投宿的年輕法師和劍士，入夜後都在屋裡靜心梳理所學。只要不動用爆裂烈火，屋裡隨你專心揣摩。」
+    - kind: speech
+      speaker: host
+      text: 「這棟老樓的石牆與板壁砌得極厚，隔絕動靜最好不過。靜下心來在燈下溫習一遍，比在人聲喧囂的地方琢磨管用得多。」
+    - kind: speech
+      speaker: actor
+      text: 「我正打算趁夜深無人打擾時好好收束心神，多謝老闆娘成全。」
+    - kind: speech
+      speaker: host
+      text: 「要是房裡燈油不夠用隨時下樓添上，別熬傷了眼睛便是，多保重身體。」
 - topic_id: altoria_lodging.topic_04
   keyword: 澡堂
   label: 澡堂
   fallback:
     scene_id: altoria_lodging.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 澡堂
+      text: 「趕了一整天路滿身風塵，這附近哪裡能痛快沐浴洗去疲憊？」
+    - kind: narration
+      text: 溫弗蕾德笑瞇瞇地從身後櫥櫃取出一捲乾淨的粗亞麻布巾，放在櫃檯上。
     - kind: speech
       speaker: host
-      text: 「浴場啊？出了巷子往東走就到了，伊莎貝爾在顧。男女分兩邊，池子燒的是河水。睡覺的事找我，洗澡的事找她。洗乾淨再回來睡，床單也比較乾淨嘛。」
+      text: 「出門順著客棧巷往東走到底，就是伊莎貝爾姑娘經營的公共浴場，池水燒得滾熱透徹，用的全是清澈河水。」
+    - kind: speech
+      speaker: host
+      text: 「男女兩側浴堂分開，嚴守規矩。先去那裡洗去一路征塵，再回我這兒鑽進暖被窩，那滋味才叫舒坦呢。」
+    - kind: speech
+      speaker: actor
+      text: 「太好了，我這就帶上換洗衣物去浴場走一趟，回來再好好休息。」
