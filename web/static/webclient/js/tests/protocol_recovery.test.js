@@ -447,3 +447,64 @@ test("the episode transitions report whether they changed it", () => {
   assert.equal(store.getState().mutationsLocked, true);
   assert.equal(store.markRecoveryRequested(false), true);
 });
+
+test("a rejected staged presentation records the episode", () => {
+  const store = committedStore();
+  // A newer snapshot whose staged mode is dialogue without a committed or
+  // staged dialogue panel: schema-valid, semantically rejected.
+  const before = store.getState();
+  const rejected = store.receive(
+    1,
+    "ui_snapshot",
+    [
+      snapshot({
+        revision: 8,
+        mode: "dialogue",
+        panels: { status: validStatusPanel() },
+      }),
+    ],
+    {}
+  );
+  assert.equal(rejected.accepted, false);
+  assert.equal(rejected.reason, "invalid");
+  assert.equal(rejected.recovery, "needed");
+  const after = store.getState();
+  assert.deepEqual(after.panels, before.panels);
+  assert.equal(after.revision, before.revision);
+  assert.equal(after.recovery.status, "needed");
+  assert.equal(after.mutationsLocked, true);
+  assert.equal(store.markRecoveryRequested(false), true);
+});
+
+test("an incompatible protocol stays locked after a later recoverable error", () => {
+  const store = committedStore();
+  store.receive(
+    1,
+    "ui_protocol_error",
+    [protocolError({ code: "unsupported_version", reload_required: false })],
+    {}
+  );
+  assert.equal(store.getState().protocolIncompatible, true);
+  // A recoverable error replaces the displayed error but never re-opens the
+  // sequence an incompatible peer already invalidated.
+  store.receive(
+    1,
+    "ui_protocol_error",
+    [protocolError({ code: "presentation_unavailable", reload_required: false })],
+    {}
+  );
+  assert.equal(store.getState().protocolIncompatible, true);
+  assert.equal(store.markRecoveryRequested(false), false);
+  store.receive(
+    1,
+    "ui_snapshot",
+    [snapshot({ revision: 9, panels: { status: validStatusPanel() } })],
+    {}
+  );
+  assert.equal(store.getState().protocolIncompatible, true);
+  assert.equal(store.getState().mutationsLocked, true);
+  assert.equal(store.markRecoveryRequested(true), false);
+  // Only a new transport generation clears it.
+  store.beginTransport(2);
+  assert.equal(store.getState().protocolIncompatible, false);
+});

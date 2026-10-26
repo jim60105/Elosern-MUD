@@ -48,6 +48,10 @@ var publicationAssembler = createPublicationAssembler();
 var retired = createRetiredEpochSet();
 var mutationsLocked = true;
 var protocolError = null;
+// The incompatible-protocol condition is terminal for the sequence, so it is
+// latched: a later recoverable error replaces `protocolError` but can never
+// re-open a sequence that an incompatible peer already invalidated.
+var incompatible = false;
 var lastActionResult = null;
 var listeners = [];
 var connected = false;
@@ -72,11 +76,7 @@ function createPublicationAssembler() {
 // The incompatible-protocol condition is terminal for the sequence: a fresh
 // transport generation is the only thing that clears it (beginTransport).
 function protocolIncompatible() {
-  return !!(
-    protocolError &&
-    (protocolError.reloadRequired === true ||
-      protocolError.code === "unsupported_version")
-  );
+  return incompatible;
 }
 
 // One failure signal per episode. An idle or already-needed episode records a
@@ -590,6 +590,7 @@ return {
     phase = "awaiting_initial_snapshot";
     mutationsLocked = true;
     protocolError = null;
+    incompatible = false;
     lastActionResult = null;
     notify();
   },
@@ -723,7 +724,14 @@ return {
       }
       // Stage every replacement, removal, and metadata field before one commit
       // and one notification; a rejected stage leaves committed state intact.
-      return commitCandidate(meta, messageName);
+      // A rejection is a presentation this client cannot render, so it records
+      // the same one repair episode as a schema rejection.
+      var committed = commitCandidate(meta, messageName);
+      if (!committed.accepted) {
+        noteRecovery("invalid");
+        committed.recovery = "needed";
+      }
+      return committed;
     }
 
     if (messageName === "ui_action_result") {
@@ -777,6 +785,7 @@ return {
       // An incompatible protocol cannot be repaired by a fresh sync: the
       // controls stay locked behind the reload notice, and an outstanding
       // repair attempt ends without a second request.
+      incompatible = true;
       mutationsLocked = true;
       failRecovery("incompatible_protocol");
     } else {

@@ -883,6 +883,10 @@ def _send_stale(session: Any, coordinator: PresentationCoordinator, state: Seque
             },
             exc=error,
         )
+        # The complete re-announcement never landed, so the client's panels are
+        # stale: say so through the safe protocol-error surface (no revision
+        # claim) before the bounded stale answer.
+        _send_presentation_unavailable(session)
         fallback = coordinator.enqueue_publication(
             lambda: build_presentation_context(session, actor),
             result_only=True,
