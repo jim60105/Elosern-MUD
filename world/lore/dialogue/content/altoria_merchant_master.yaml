@@ -1,55 +1,109 @@
 schema_version: 1
-greeting: 商會公所的尤斯汀‧柯德溫會長從稅率長桌後起身，向你略一點頭：「歡迎來到商會公所。閣下若想了解商隊、商路或公所的事務，本人樂意說明。另外請閣下先知道一件事，公所不發委託。」
+greeting: 商會公所的尤斯汀‧柯德溫會長從稅率長桌後起身，向來客鄭重欠身：「歡迎來到商會公所。閣下若想了解東市商隊、各方商路或公所會務，本人樂意說明。但有一點請閣下先知悉，商會公所概不發放護衛委託。」
 topics:
 - topic_id: altoria_merchant_hall.topic_01
   keyword: 商隊
   label: 商隊
+  variants:
+  - variant_id: morning_caravan_dispatch
+    priority: 10
+    when:
+      kind: time_period
+      start_daypart: dawn
+      end_daypart: noon
+    scene:
+      scene_id: altoria_merchant_hall.topic_01_dawn_scene
+      revision: r2
+      lines:
+      - kind: speech
+        speaker: actor
+        text: 尤斯汀會長，這清晨時分公所門外車馬絡繹不絕，商隊正忙著清點啟程嗎？
+      - kind: narration
+        text: 尤斯汀‧柯德溫會長目光掠過窗外晨曦下的貨運馬車，拿起粉筆核對牆上的商隊名冊。
+      - kind: speech
+        speaker: host
+        text: 「正是如此。黎明至正午前是東門商隊離城最忙碌的時辰，書記正趕在城門大開時逐一核實出發貨單。本公所負責登記與協調各商號行程，防止官道擁堵。」
+      - kind: speech
+        speaker: host
+        text: 「不過公所向來秉持中立，既不替商隊招募同行護衛，也不為任何貨物作保。若是想查閱本季出發的商隊字號，牆邊的粉筆名牌皆有明載。」
   fallback:
-    scene_id: altoria_merchant_hall.topic_01_scene
-    revision: r1
+    scene_id: altoria_merchant_hall.topic_01_fallback_scene
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 商隊
+      text: 尤斯汀會長，我想請教本季往來王都的商隊運作情形，公所平時如何調度？
+    - kind: narration
+      text: 尤斯汀‧柯德溫會長拿起粉筆，指向牆壁地圖旁整齊劃一的各商號名錄。
     - kind: speech
       speaker: host
-      text: 「本季出城的商隊，書記會用粉筆把隊名寫在牆上路線圖的旁邊，只記哪一隊出發、哪一隊回城。公所負責登錄與協調，不安排旁人同行，也不替任何人擔保貨物。」
+      text: 「本季進出王都的各支商隊，書記皆以粉筆如實記於地圖側旁。公所掌理行程登錄、關稅評議與行會協調，確保貨運秩序井然。」
+    - kind: speech
+      speaker: actor
+      text: 那麼如果有旅人或護衛想隨商隊同行，公所能代為安排嗎？
+    - kind: speech
+      speaker: host
+      text: 「本公所嚴守職責，不安排旁人搭車同行，亦不替任何行商擔保私運貨物。商隊與護衛間的私下約定概與公所無涉，這一點必須向閣下說明清楚。」
 - topic_id: altoria_merchant_hall.topic_02
   keyword: 商路
   label: 商路
   fallback:
     scene_id: altoria_merchant_hall.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 商路
+      text: 王都的各條對外商路是如何劃分的？大宗貨物通常從哪座城門出入？
+    - kind: narration
+      text: 尤斯汀‧柯德溫會長走到懸掛的羊皮紙路線圖前，指尖沿著主幹商道緩步劃過。
     - kind: speech
       speaker: host
-      text: 「王都的大宗貨物多半從東門出城，沿官道往東。東市原是舊城牆邊發展起來的貨棧街，穀物與玻璃都在這裡集散，外國的錢幣也從這裡流進城；工匠巷的鐵器走市場街，鍊金坊的藥材多從東門進城。閣下若要問路，城門的衛兵比本人清楚。」
+      text: 「王都大宗貨物多半出東門沿官道東行。東市原是依傍舊城牆發展的貨棧街，各國穀物與玻璃皆在此集散，外國硬幣亦由東門流入；工匠巷鍛造的鐵器走市場街，鍊金坊熬製的藥材原料則多自東門進城。」
+    - kind: speech
+      speaker: actor
+      text: 如果想探聽東門外官道沿途的治安與岔路，公所能提供指引嗎？
+    - kind: speech
+      speaker: host
+      text: 「公所只核算關稅與商路通暢度，並不掌管沿線軍事防衛。閣下若欲詳詢城外哨所與路況，駐守城門的王國衛兵隊遠比本人清楚得多。」
 - topic_id: altoria_merchant_hall.topic_03
   keyword: 委託
   label: 委託
   fallback:
     scene_id: altoria_merchant_hall.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 委託
+      text: 聽聞東市商隊常遭逢魔獸侵擾，公所是否有張貼商隊護衛或運送貨物的差事？
+    - kind: narration
+      text: 尤斯汀‧柯德溫會長神情肅然，雙手交疊壓在皮面帳冊上，坦誠直言。
     - kind: speech
       speaker: host
-      text: 「公所的牆上沒有委託，門邊也沒有名單。商隊確實需要護衛，但這類工作目前沒有正式的安排，本人不能讓閣下去做一件沒有著落的差事。若想找事做，請到公會前的冒險者公會大廳，看他們的任務板。」
+      text: 「公所牆上並無告示板，門邊亦無僱傭名冊。商隊行經荒野確實需要得力護衛，但商會體系尚未建立正規護衛委託法規，本人絕不能讓閣下去接一件權責不清、毫無著落的差事。」
+    - kind: speech
+      speaker: actor
+      text: 那麼若想以武藝賺取酬勞、接取護送或討伐差事，閣下會推薦何處？
+    - kind: speech
+      speaker: host
+      text: 「請閣下移步前往公會前的冒險者公會大廳。公會大廳立有合格的任務公告板，所有討伐、採集與押運差事皆有法度保障，在那裡尋找活計才是正途。」
 - topic_id: altoria_merchant_hall.topic_04
   keyword: 會務
   label: 會務
   fallback:
     scene_id: altoria_merchant_hall.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 會務
+      text: 商會公所在王都具體掌管哪些政務？各商號間的糾紛也由公所裁決嗎？
+    - kind: narration
+      text: 尤斯汀‧柯德溫會長撫過胸前的商會徽章，指著窗下長桌上厚重的帳簿。
     - kind: speech
       speaker: host
-      text: 「公所負責三件事，調停各行會之間的利益、評議關稅章程，以及在季底清算各家的帳目。若想入會，請帶引薦人當面來談。稅則抄在窗下那張長桌上，閣下可以自行翻閱，要抄一份也無妨。」
+      text: 「本公所掌理三項要務，調停各行會利益、評議關稅章程，以及在季末清算各家帳目。若有商號欲申請入會，須備齊保薦人文書當面商議。」
+    - kind: speech
+      speaker: actor
+      text: 這些評議出來的關稅細則與章程，外來行商也能查閱嗎？
+    - kind: speech
+      speaker: host
+      text: 「稅率條文皆抄錄於窗下長桌之上，白紙黑字，公允透明。閣下若有需要，自可隨意翻閱檢視，當場手抄一份帶回亦無妨。」

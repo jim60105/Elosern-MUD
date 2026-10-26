@@ -1,55 +1,103 @@
 schema_version: 1
-greeting: 首飾坊的艾蓮娜‧鴉丘放下鹿皮布，目光先停在你的衣領上：「歡迎。你身上那件……算了，先不提。請隨意看吧，喜歡哪一件，我拿出來讓你對著光瞧。」
+greeting: 首飾坊的艾蓮娜‧鴉丘放下鹿皮布，目光在客人的衣領與指尖停了停：「請隨意看。看中哪一件，我拿出來讓你迎著日光看個清楚；若是帶著舊飾件想弄清來歷，也可以擺在絨布墊上。」
 topics:
 - topic_id: altoria_jeweller.topic_01
   keyword: 飾品
   label: 飾品
   fallback:
     scene_id: altoria_jeweller.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 飾品
+      text: 艾蓮娜坊主，我想挑一件能隨身佩戴的飾品。玻璃櫃裡都陳列了哪些樣式？
+    - kind: narration
+      text: 艾蓮娜‧鴉丘以指尖推正單片放大鏡，指向擦拭得一塵不染的玻璃展示櫃。
     - kind: speech
       speaker: host
-      text: 「這一櫃全是隨身戴的飾品。銀髮簪是平原的老手藝，狼牙項鍊是獸王國部族的樣式，朝聖者銅符，走聖階的信眾幾乎都戴一枚。防禦戒指鑲著一顆結晶，難得一見。身上別掛太多，挑幾件真用得上的就好。」
+      text: 「這一櫃全是隨身穿戴的物件。素面銀髮簪是平原的老工法，素雅沉靜；狼牙項鍊是獸王國部族的成年樣式，粗獷耐看；朝聖者銅符呢，沿著聖階前往大神殿的信眾多半會在胸前佩戴一枚。」
+    - kind: speech
+      speaker: actor
+      text: 那枚泛著微光的戒指呢？看起來似乎不同尋常。
+    - kind: speech
+      speaker: host
+      text: 「那是防禦戒指，戒面鑲嵌了完整的魔導結晶，是罕見的精細物件。身上的飾件貴在稱意與護身，挑一兩件真正合用的就好，掛得滿身叮噹作響反倒累贅。」
 - topic_id: altoria_jeweller.topic_02
   keyword: 鑲工
   label: 鑲工
+  variants:
+  - variant_id: inspect_protective_ring
+    priority: 10
+    when:
+      kind: carries
+      item_key: protective_ring
+      minimum: 1
+    scene:
+      scene_id: altoria_jeweller.topic_02_protective_ring_scene
+      revision: r2
+      lines:
+      - kind: speech
+        speaker: actor
+        text: 我手上這枚防禦戒指也是在鋪子裡挑選而來。想請教坊主，這上頭的鑲嵌工夫有什麼講究？
+      - kind: narration
+        text: 艾蓮娜‧鴉丘眼中浮現一絲專注神色，雙手隔著絲絨墊端詳那枚戒環的爪座。
+      - kind: speech
+        speaker: host
+        text: 「看鑲工要看爪座的咬合，不能只看寶石的光澤。這枚防禦戒指的四角包爪是用銀銅合金精準壓平，既得扣穩結晶的稜角，又不能遮蔽魔力流動。這種手藝全憑指尖的感覺，急不得。」
+      - kind: speech
+        speaker: host
+        text: 「平日戴在手上，留心別讓硬物直撞爪尖就好。只要底座沒鬆，這枚戒指就能長久護著你。」
   fallback:
-    scene_id: altoria_jeweller.topic_02_scene
-    revision: r1
+    scene_id: altoria_jeweller.topic_02_fallback_scene
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 鑲工
+      text: 聽說首飾坊的鑲工在市場街最有名氣，看飾品時該怎麼辨別工法的好壞？
+    - kind: narration
+      text: 艾蓮娜‧鴉丘托起一塊深黑色的平絨托盤，指尖掠過幾件精細的飾物。
     - kind: speech
       speaker: host
-      text: 「看鑲工要看爪，別看光。這枚淨化吊墜的銀用聖水反覆洗過，聽說擋得住瘴氣；無懼胸針用赤鐵打成，是獵魔人戴的東西。光輝聖徽的徽面用整塊料雕成，你摸一下邊緣就知道了。」
+      text: 「看鑲工要看爪，不能只盯著寶石看。你看這枚淨化吊墜，爪座是用經受洗聖水洗過的細銀打成，能防瘴氣侵蝕；無懼胸針則用赤鐵反覆鍛打咬住底托，沉穩內斂，獵魔人特別偏愛這種分量。」
+    - kind: speech
+      speaker: host
+      text: 「至於這枚光輝聖徽，徽面是整塊白石雕鑿，邊緣爪齒壓得平整圓滑，貼肉佩戴絕不刮傷衣料。懂得看爪子的人，才算真正懂得挑首飾。」
 - topic_id: altoria_jeweller.topic_03
   keyword: 奇物
   label: 奇物
   fallback:
     scene_id: altoria_jeweller.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 奇物
+      text: 聽隔壁雜貨店的瑪爾特說，你這裡還收著幾樣少見的魔導奇物？
+    - kind: narration
+      text: 艾蓮娜‧鴉丘神情淡然，轉身從櫃檯最深處的木匣裡取出兩件用綢布妥善包裹的物件。
     - kind: speech
       speaker: host
-      text: 「儲物袋是帝國那邊的空間魔法，袋子不大，裡頭卻比看起來大得多。滑翔斗篷用蛛絲織成，從高處跳下去能托住人。這兩件都難得，價錢在櫃上的小牌子，我就不唸了。」
+      text: 「瑪爾特倒是熱心。這裡備著的兩樣奇物，確實不是普通首飾。這隻儲物袋出自帝國的空間魔法，外表只是一個巴掌大的小袋子，內裡容納的物件卻遠比看起來多得多。」
+    - kind: speech
+      speaker: actor
+      text: 旁邊那件疊放整齊的斗篷又是什麼用處？
+    - kind: speech
+      speaker: host
+      text: 「那是滑翔斗篷，用中央山脈帶來的精靈蛛絲混紡編織。從迷宮高處或山崖跳下時，張開斗篷便能乘風滑行、平穩落腳。兩件都是難得的精細物件，價錢全寫在小木牌上，合心意再買。」
 - topic_id: altoria_jeweller.topic_04
   keyword: 收飾
   label: 收飾
   fallback:
     scene_id: altoria_jeweller.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 收飾
+      text: 如果手邊有舊的首飾或冒險得來的配飾換了下來，你這裡願意收購嗎？
+    - kind: narration
+      text: 艾蓮娜‧鴉丘將鹿皮布收好，取出一面擦拭透亮的水晶放大鏡平放在櫃檯上。
     - kind: speech
       speaker: host
-      text: 「舊飾件可以拿來，我櫃上有的樣式都收。缺爪、斷鏈也請先說一聲。藥師珠串、迷情絲頸環這類有點來歷，我會多問兩句從哪裡來，別介意。」
+      text: 「只要是櫃上有的樣式，我都收。銀簪、項鍊、指環，就算缺了細爪或斷了鏈子，只要金屬成色還在，拿過來我都照實評估成色折算現錢。」
+    - kind: speech
+      speaker: host
+      text: 「不過像是藥師珠串、迷情絲頸環這類來歷特殊的古舊飾物，我得先問清楚源自何處。只要不是來路不明的贓物，首飾坊自然會給個公道價錢。」
