@@ -12,6 +12,7 @@ literals — so this module stays outside the test-data debt ledger.
 """
 
 from pathlib import Path
+import inspect
 from unittest.mock import patch
 
 from django.db import transaction
@@ -72,7 +73,17 @@ class SaintessOathObservabilityTests(EvenniaTest):
         ):
             with transaction.atomic():
                 changes = apply_event(holder, FLIP_EVENT)
-        self.assertEqual(len(callbacks), 1, "exactly one on_commit callback queued")
+        # The flip also queues one dialogue-availability refresh (the authored
+        # dialogue conditions read the same physical state); this contract owns
+        # only the oath event, so count the callbacks the oath writer queued.
+        oath_callbacks = [
+            callback
+            for callback in callbacks
+            if inspect.unwrap(callback).__code__.co_filename.endswith(
+                "world/rules/sexual_transitions.py"
+            )
+        ]
+        self.assertEqual(len(oath_callbacks), 1, "exactly one oath callback queued")
         self.assertEqual(changes.get("virgin"), "down")
         self.assertFalse(holder.sexual.virgin)
         self.assertEqual(self._events(info), [OATH_EVENT])

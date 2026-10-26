@@ -6,6 +6,7 @@ collected test module).
 """
 
 from contextlib import ExitStack
+import inspect
 from pathlib import Path
 import tempfile
 from unittest.mock import patch
@@ -70,17 +71,24 @@ def _portrait_callbacks(callbacks):
     """The captured on-commit callbacks excluding other boundary events.
 
     The observability migration schedules one ``quest_transition`` event per
-    changed quest, and the NPC persona initializer one
-    ``npc_persona_initialized`` event per spawned occupant, through
-    ``transaction.on_commit``; the portrait-seam contracts below count only the
-    callbacks the seam itself owns.
+    changed quest, the NPC persona initializer one ``npc_persona_initialized``
+    event per spawned occupant, and a spawned dialogue host one availability
+    refresh, all through ``transaction.on_commit``; the portrait-seam contracts
+    below count only the callbacks the seam itself owns. A callback registered
+    through ``on_publication_commit`` keeps its owner identity, so the filter
+    unwraps the causal-group binder before reading the source file.
     """
+    boundary_owners = (
+        "world/quests/transitions.py",
+        "world/rules/npc_persona.py",
+        "world/rules/dialogue_availability.py",
+    )
     return [
         callback
         for callback in callbacks
-        if not getattr(getattr(callback, "__code__", None), "co_filename", "").endswith(
-            ("world/quests/transitions.py", "world/rules/npc_persona.py")
-        )
+        if not getattr(
+            getattr(inspect.unwrap(callback), "__code__", None), "co_filename", ""
+        ).endswith(boundary_owners)
     ]
 
 def _raw(**overrides):

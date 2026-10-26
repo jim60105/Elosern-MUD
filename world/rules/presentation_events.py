@@ -34,6 +34,7 @@ which committed operation a presentation effect belongs to.
 """
 
 import contextvars
+import functools
 import secrets
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -174,6 +175,11 @@ def on_publication_commit(
 
     captured = current_publication_group() or new_publication_group()
 
+    # ``functools.wraps`` keeps the wrapped callback's identity visible
+    # (``__name__``, ``__doc__``, ``__wrapped__``), so diagnostics and the
+    # tests that classify captured on-commit callbacks still see the owner
+    # rather than this binder.
+    @functools.wraps(callback)
     def _committed() -> None:
         with _exact_publication_group(captured):
             callback()

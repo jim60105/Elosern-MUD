@@ -246,7 +246,7 @@ SCENARIO_TO_TEST = {
         "config_shop", "ShopRuleTests", "test_float_price_is_rejected"
     ),
     "Repeated startup preserves a sold-out item": ref(
-        "sync", "ServiceContentSyncTests", "test_merchant_stock_initializes_only_when_absent"
+        "sync", "ServiceContentSyncTests", "test_merchant_stock_initializes_only_when_uninitialized"
     ),
     "Malformed stock fails closed": ref(
         "economy", "MerchantStockParsingTests", "test_malformed_stock_fails_closed"
@@ -298,7 +298,7 @@ SCENARIO_TO_TEST = {
         "sync", "ServiceContentSyncTests", "test_repeated_sync_creates_no_duplicates"
     ),
     "Live merchant stock survives content resync": ref(
-        "sync", "ServiceContentSyncTests", "test_merchant_stock_initializes_only_when_absent"
+        "sync", "ServiceContentSyncTests", "test_merchant_stock_initializes_only_when_uninitialized"
     ),
     # equipment-inventory
     "add_item appends through an inventory plan": ref(
