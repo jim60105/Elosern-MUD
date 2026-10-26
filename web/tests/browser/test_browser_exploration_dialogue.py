@@ -972,6 +972,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self._wait_exploration_available(page)
         host = overview_target_with_affordance(page, "explore.talk_open")
         activate_overview_chip(page, "target-%s" % host["identity"])
+        # The possession commit's publication burst must land before the open
+        # submit: the dispatcher names the newest revision exactly.
+        wait_for_presentation_settled(page)
         _press(page, "Enter")  # 交談 -> explore.talk_open
         self._wait_panel(page, "dialogue", lambda p: p.get("available") is True)
         wait_for_store_state(
