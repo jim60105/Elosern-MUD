@@ -2,9 +2,9 @@
 
 ## 1. Closed implementation units
 
-- [ ] 1.1 Implement explicit manual admission, generations/document fingerprint and one-document layout handler; test stale requests and no world-data side effects and document command envelopes.
-- [ ] 1.2 Implement temporary-file flush/replace and serialized saves with injectable failures; test pre-replace intactness, replacement acknowledgement and uncertain-durability pause without retries.
-- [ ] 1.3 Implement draft/confirm/cancel and persistence UI distinctions plus manual-segment undo/redo through the same path; test drag once, invalid drafts never written and history failure behavior.
+- [ ] 1.1 Implement explicit manual admission, generations/document presence-or-hash guards and the first layout handler; test absent first layout, stale create/remove rejection and no world-data side effects; document command envelopes.
+- [ ] 1.2 Implement serialized internal create/replace/remove effects, flushed temporary publication, no-overwrite create and guarded unlink with injectable failures; test each pre-publication baseline, acknowledged presence/content and uncertain-durability pause without retries.
+- [ ] 1.3 Implement draft/confirm/cancel, persistence states and history inverses through the same writer; test create to undo-absence to redo, remove to undo-restore, retained comments, stale/invalid inverses preserving disk/history and fresh external-reference checks for every object-removing inverse.
 - [ ] 1.4 Test same-owner multi-selection and reject cross-owner mutation, register evidence/ownership, document refresh/history limitations and run focused writer/history/browser and contract checks.
 
 ## Workflow follow-up
