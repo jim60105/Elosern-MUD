@@ -577,60 +577,51 @@ and title validators at module load time (invalid values raise named `ValueError
   without mutating the shipped registries
 
 ### Requirement: Guild service hosts reuse by service anchor and never rename
-`sync_guild_economy` SHALL locate a service host by the `service_id` recorded on its service
-component — never by display `key`. A missing host SHALL be created once under the roster row's
-authored `name` as its `key` with the authored `title` persisted as its NPC title. An existing
-host located by its service anchor SHALL never be renamed and SHALL never have its title written
-at sync time — a host that predates authored identities is reused as-is, never backfilled.
+Service hosts SHALL reuse canonical authored profile provenance independent of component IDs/order and preserve existing identity and live state. Whole-row retirement SHALL use explicit source ownership and SHALL never consult title content.
+
+#### Scenario: Canonical host remains stable
+- **WHEN** a service ID, display-name declaration or capability order changes
+- **THEN** the existing host dbref/name/location/state survive
+
+#### Scenario: No title-based ownership inference
+- **WHEN** a host carries an arbitrary historical title
+- **THEN** it grants no lookup or deletion authority
 
 #### Scenario: First sync creates the authored host
-- **WHEN** `sync_guild_economy` runs with no existing host for a service component
-- **THEN** exactly one NPC is created whose `key` is the roster row's authored `name`, whose
-  `npc_title` is the row's authored `title`, and which carries the service component
+- **WHEN** no canonical profile-provenance host exists for a valid row
+- **THEN** one host is created with its authored name/profile and resolved capability plan atomically
 
 #### Scenario: Re-sync neither duplicates nor renames
-- **WHEN** `sync_guild_economy` runs again after the host exists, including with a changed
-  roster `name`
-- **THEN** the same NPC is reused, no second host exists, and its `key` is unchanged
+- **WHEN** the canonical host exists and source name or capability order changes
+- **THEN** its dbref/name/location/runtime state survive without a duplicate
 
 #### Scenario: A host predating authored identities is reused, not backfilled
-- **WHEN** a pre-existing host located by its service anchor carries no authored title and its
-  `service_id` is on the roster
-- **THEN** the sync reuses it as-is: no title is written, nothing is renamed, and no second
-  authored host is created
+- **WHEN** an existing canonical npc_profile_key host has historical attributes
+- **THEN** it is reused without name/title backfill or component-ID fallback
 
 #### Scenario: An unrelated NPC with no service component survives convergence
-- **WHEN** convergence runs while an NPC shares a retired host key but carries no service
-  component
-- **THEN** the NPC is not deleted
+- **WHEN** an unmanaged NPC shares a retired name but no source ownership
+- **THEN** it is not deleted
 
 #### Scenario: Duplicate service anchors fail closed
-- **WHEN** two live NPCs carry service components with the same `service_id` and sync runs
-- **THEN** a named integrity error is raised and no host is created, renamed, or deleted
+- **WHEN** two live hosts claim one canonical authored host profile
+- **THEN** the complete operation rejects before host creation/deletion/configuration
 
 #### Scenario: Anchor contention fails closed before any mutation
-
-- **WHEN** sync locates a service anchor claimed by more than one live host
-- **THEN** it fails closed with a named integrity error before any mutation
+- **WHEN** canonical profile provenance has multiple claimants
+- **THEN** a named integrity failure precedes all writes
 
 #### Scenario: Convergence replaces the legacy-key cleanup as the deletion mechanism
-
-- **WHEN** the deletion mechanism for stale hosts is considered
-- **THEN** roster-authoritative convergence replaces the batch's one-time legacy-key cleanup:
-  deletion anchors on roster membership of the component `service_id`, never the entity key
+- **WHEN** a managed lifecycle is synchronized
+- **THEN** only explicit source ownership and whole-row retirement authorize deletion, never keys or component IDs
 
 #### Scenario: A stale titleless candidate is deleted for recreation
-
-- **WHEN** a titleless candidate's service anchors all match no roster row
-- **THEN** it is unambiguous stale development state and is deleted, so the roster pass recreates
-  it under the full authored identity when its row returns
+- **WHEN** an NPC lacks current whole-row retirement authority
+- **THEN** it survives regardless of old title or component IDs; losing a current host's last capability also preserves the host
 
 #### Scenario: Component-less NPCs survive and anchored titled candidates are kept
-
-- **WHEN** an NPC carrying no service component exists, and separately when a titled candidate
-  still holds at least one roster-matching anchor
-- **THEN** the component-less NPC survives untouched, and the titled candidate is kept with a
-  named warning for manual repair
+- **WHEN** component-less or currently declared canonical hosts carry historical title attributes
+- **THEN** they survive without any title-based ownership or lifecycle decision
 
 ### Requirement: Exam examiners carry their authored identity
 Persistent qualified adventurer assembly SHALL establish authored name/title once through existing identity validators and collision-safe roster discipline. Exams SHALL reuse that identity and stable dbref without rank-derived spawn identities or card/title replacement.

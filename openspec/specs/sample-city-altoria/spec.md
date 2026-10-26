@@ -224,7 +224,7 @@ contrib's own bare `evennia.contrib.grid.xyzgrid.xyzroom.XYZExit`.
 - **THEN** it SHALL cover diagonal links exactly as it covers cardinal ones
 
 ### Requirement: Altoria service content synchronizes idempotently without resetting live state
-Startup SHALL create service hosts by stable service identity from every current hosted place declaration, using its authored identity and shared profession blueprint. Repeated sync SHALL update authored descriptions/component definitions without duplicating hosts or resetting initialized merchant stock or mutable identity. Interiors, doorways and exam metadata SHALL retain their existing synchronization contract.
+Startup SHALL create service hosts by stable canonical host provenance from every current hosted place declaration, using its authored identity and resolved capability plan. Repeated sync SHALL update authored descriptions/component definitions without duplicating hosts, relocating reused hosts or resetting initialized merchant stock, restock progress or mutable identity. Interiors, doorways and exam metadata SHALL retain their existing synchronization contract.
 
 #### Scenario: Fresh startup creates a playable service path
 - **WHEN** startup runs on an empty database after grid sync

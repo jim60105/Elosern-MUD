@@ -140,7 +140,7 @@ be granted at registration; it is granted by the first guild reward claim
 
 ### Requirement: Service hosts are created and converged from a declarative YAML roster
 The service-host roster SHALL be derived from the place registry rather than hand-authored: each
-place yields one row declaring `name`, `title`, `profession`, the interior room tag it anchors to,
+place yields one row declaring `name`, `title`, `profession`, a canonical host_key equal to profile_key and the initial spawn room tag,
 `service_id`, and the authored component identity kwargs.
 `world/rules/guild_economy.py::sync_service_content` SHALL interpret the roster and assemble
 components through the shared `world/rules/profession_assembly.py` helper, never a code-side
@@ -186,29 +186,23 @@ component literal.
 
 #### Scenario: Sync resolves rows and reuses hosts under the unchanged contract
 - **WHEN** `sync_service_content` processes one roster row
-- **THEN** it resolves the room by tag and finds-or-creates the host NPC on the `service_id`
-  anchor under the unchanged never-rename/never-retitle reuse contract
+- **THEN** it resolves the spawn room uniquely and finds-or-creates the host by canonical npc_profile_key provenance, preserving reused location, identity and runtime state
 
 ### Requirement: Roster convergence deletes service hosts absent from the roster
-Sync SHALL treat the roster as authoritative, and the roster's authority SHALL NOT depend on
-anchor-room resolution: the duplicate-anchor fail-closed probe and the convergence sweep run for
-every roster row on every sync. A live NPC whose EVERY service-component `service_id` matches no
-roster row is deleted. Each deletion emits one info event with the host and service identifiers.
+Only explicitly source-owned hosts whose complete host declaration is removed SHALL be retired through the existing host lifecycle. Capability removal or component service IDs SHALL NOT authorize deleting a host; unrelated NPCs SHALL survive.
 
 #### Scenario: A roster-shrunk host is deleted on next sync
-- **WHEN** a roster row is removed and sync runs
-- **THEN** its host (and only hosts failing roster membership) is deleted, its party bindings
-  purged through the existing `NPC.at_object_delete` hook, and an info event names it
+- **WHEN** an explicitly source-tagged host loses its whole declaration
+- **THEN** only that host is deleted through existing party/dialogue lifecycle cleanup with commit-bound logging
 
 #### Scenario: An unrelated NPC sharing a retired key survives
-- **WHEN** an NPC without any service component shares a retired legacy key
-- **THEN** convergence leaves it untouched, exactly as the pre-change cleanup did
+- **WHEN** an unmanaged NPC shares a name or component service ID
+- **THEN** it remains untouched
 
 #### Scenario: A host claimed through any anchor is never destroyed
-- **WHEN** a live NPC matches the roster through ANY anchor
-- **THEN** convergence never destroys it
+- **WHEN** a currently declared canonical host loses its first or final capability
+- **THEN** the host survives with exactly its remaining managed set
 
 #### Scenario: Titled mixed residue survives for manual repair
-- **WHEN** convergence finds a host with titled mixed residue
-- **THEN** the situation is treated as ambiguous, a named warning is emitted, and the host survives
-  for manual repair
+- **WHEN** an unmanaged host carries arbitrary old title/component attributes
+- **THEN** none grants roster deletion authority and it survives without reading the title
