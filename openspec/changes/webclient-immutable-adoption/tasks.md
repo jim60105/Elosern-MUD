@@ -4,16 +4,16 @@ All checkboxes are implementation work, not authorization to apply during propos
 
 ## 1. Ownership and explicit read APIs
 
-- [ ] 1.1 Write protocol_immutable.test.js hostile-input/subscriber and detached snapshot tests, then implement copy-and-freeze-on-adoption, immutable getCommittedState/subscribe and isolated mutable getState. Retain unchanged delta references, immutable old records and same-epoch map references; reuse equal snapshot payloads without serialize/hash equality. Document the two read APIs and immutable-consumer contract.
-- [ ] 1.2 Migrate elosern.js/view.js subscription payload flow and every live resolver/consumer read in the design's exact inventory, including hud.js, to getCommittedState. Keep one reducer and remove unconditional all-state clone/serialization on ordinary notify/view/resolver paths. Replace any actual payload mutation at those consumers with a local owned copy; leave local form/model/reading queues mutable. Extend immutable_presentation.test.js and frame resolver tests with frozen inputs.
+- [x] 1.1 Write protocol_immutable.test.js hostile-input/subscriber and detached snapshot tests, then implement copy-and-freeze-on-adoption, immutable getCommittedState/subscribe and isolated mutable getState. Retain unchanged delta references, immutable old records and same-epoch map references; reuse equal snapshot payloads without serialize/hash equality. Document the two read APIs and immutable-consumer contract.
+- [x] 1.2 Migrate elosern.js/view.js subscription payload flow and every live resolver/consumer read in the design's exact inventory, including hud.js, to getCommittedState. Keep one reducer and remove unconditional all-state clone/serialization on ordinary notify/view/resolver paths. Replace any actual payload mutation at those consumers with a local owned copy; leave local form/model/reading queues mutable. Extend immutable_presentation.test.js and frame resolver tests with frozen inputs.
 
 ## 2. Preserve UI semantic lifecycle
 
-- [ ] 2.1 Add component assertions for same-mode checkpoint keeping valid menu/focus/unsaved text/playback progress, and actual mode/identity/availability change retaining existing teardown. Regress maps, creation drafts, beat/delivery identity and snapshot isolation; update frozen-contract audit/API documentation and traceability without weakening frozen behavior claims.
+- [x] 2.1 Add component assertions for same-mode checkpoint keeping valid menu/focus/unsaved text/playback progress, and actual mode/identity/availability change retaining existing teardown. Regress maps, creation drafts, beat/delivery identity and snapshot isolation; update frozen-contract audit/API documentation and traceability without weakening frozen behavior claims.
 
 ## 3. Focused integrated verification
 
-- [ ] 3.1 Run I-NODE and I-VUE below after edits plus contract_gate. Acceptance uses reference equality/mutation resistance and functional component behavior only, with no profiling or measurement gate.
+- [x] 3.1 Run I-NODE and I-VUE below after edits plus contract_gate. Acceptance uses reference equality/mutation resistance and functional component behavior only, with no profiling or measurement gate.
 
 ## Verification commands
 

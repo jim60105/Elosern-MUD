@@ -804,3 +804,48 @@ describe("frame resolver — the creation family", () => {
     });
   });
 });
+
+// webclient-immutable-adoption: the registry reads the immutable committed
+// record in the live client, so a deep-frozen committed state must resolve to
+// the same meaningful rows, not merely avoid throwing.
+describe("frame resolver — frozen committed input", () => {
+  it("resolves the exploration families from a deeply frozen committed state", () => {
+    const state = deepFreeze(committedState());
+    const resolver = resolverFor(state);
+
+    const exits = resolver.explorationExits();
+    expect(exits.currentNode).toBe("room:42");
+    expect(exits.rows.map((row) => row.key)).toContain("exit-east");
+    const east = exits.rows.find((row) => row.key === "exit-east");
+    expect(east.enabled).toBe(true);
+    expect(east.actionId).toBe("explore.move");
+
+    const presence = resolver.explorationPresence();
+    expect(presence.map((entry) => entry.identity)).toContain(7);
+    const verbs = resolver.explorationVerbs(7);
+    expect(verbs.items.map((item) => item.label)).toContain("交談");
+
+    const navigation = resolver.resolve({ source: "exploration.navigation" });
+    expect(navigation.items.map((item) => item.key)).toEqual(["character", "quests", "inventory"]);
+    expect(resolver.resolve({ source: "exploration.root" })).toMatchObject({ title: "場景", items: [] });
+
+    // The frozen input is untouched by resolution.
+    expect(JSON.stringify(state.panels)).toBe(JSON.stringify(committedState().panels));
+  });
+
+  it("resolves combat and creation frames from a deeply frozen committed state", () => {
+    const combat = deepFreeze(combatState());
+    const combatResolver = resolverFor(combat);
+    expect(combatResolver.resolve({ source: "combat.root" }).items.length).toBeGreaterThan(0);
+    const skill = combatResolver.resolve({ source: "combat.skill", params: { skillKey: T_A } });
+    expect(skill.items.length).toBeGreaterThan(0);
+
+    const creation = deepFreeze(
+      committedState({ mode: "creation", panels: { creation: creationPanelFixture() } }),
+    );
+    const creationResolver = resolverFor(creation);
+    expect(creationResolver.resolve({ source: "creation.root" })).toEqual(
+      CreationMenu.buildMenus(creation.panels.creation).menus.root,
+    );
+  });
+});
