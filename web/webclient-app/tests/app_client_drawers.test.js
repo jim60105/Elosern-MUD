@@ -934,7 +934,11 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
         provenance: { kind: "non_equipment", equipment_sources: [] } }],
     });
     for (const [revision, mode] of [[1, "dialogue"], [2, "creation"], [3, "exploration"]]) {
-      expect(store.receive(1, "ui_snapshot", [fx.snapshot({ revision, mode, panels: { status } })], {}).accepted).toBe(true);
+      // A dialogue-mode snapshot must carry its committed dialogue panel.
+      const panels = mode === "dialogue"
+        ? { status, dialogue: v3Panel({ hostId: 103, hostName: "測試同行", actorId: 102, bondStage: null, line: "測試台詞。", keywords: [] }) }
+        : { status };
+      expect(store.receive(1, "ui_snapshot", [fx.snapshot({ revision, mode, panels })], {}).accepted).toBe(true);
       await w.vm.$nextTick();
       if (mode === "dialogue") expect(w.findComponent(StatusPanel).props("visible")).toBe(false);
       if (mode === "creation") expect(w.get('[data-testid="elosern-stage"]').attributes("data-elosern-mode")).toBe("creation");

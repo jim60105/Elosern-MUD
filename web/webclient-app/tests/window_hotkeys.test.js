@@ -11,6 +11,7 @@ import AppClient from "../AppClient.vue";
 import { CHARACTER_PANEL_SAMPLE } from "../stories/fixtures.js";
 import { useElosernStore } from "../stores/elosern.js";
 import * as fx from "./store/protocol_fixtures.js";
+import { dialoguePanel } from "./support/dialogue_panel.js";
 import { partyWindowTab, rememberPartyWindowTab, resetPartyWindowMemory } from "../components/party-window-memory.js";
 import { PARTY_WINDOW_PANEL_SAMPLE } from "../stories/fixtures/party_panels.js";
 import { QUEST_LOG_PANEL_SAMPLE } from "../stories/fixtures/quest_log_panels.js";
@@ -41,6 +42,8 @@ function commit({ mode = "exploration", party = true, extra = {} } = {}) {
           quest_log: QUEST_LOG_PANEL_SAMPLE,
         };
   if (party) panels.party = PARTY_WINDOW_PANEL_SAMPLE;
+  // A dialogue-mode snapshot must carry its committed dialogue panel.
+  if (mode === "dialogue") panels.dialogue = dialoguePanel();
   const result = store.receive(1, "ui_snapshot", [fx.snapshot({ mode, panels: { ...panels, ...extra } })], {});
   expect(result.accepted).toBe(true);
 }

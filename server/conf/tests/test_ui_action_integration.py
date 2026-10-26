@@ -140,6 +140,11 @@ class UiActionIntegrationTests(EvenniaTest):
             lambda actor, payload, session=None: {"outcome": "success", "code": "ok", "message": "完成", "affected_panels": ("status",)}
         )
         self._sync()
+        # A canonical change between the sync and the completion makes the
+        # declared panel differ from the published baseline, so the completion
+        # must carry a delta before its result; an unchanged completion
+        # legitimately sends the result alone (webclient-incremental-publication).
+        self.char1.traits.hp.current = self.char1.traits.hp.current - 1
         action = self._live_action("r:2")
         self.sessionhandler.data_out.reset_mock()
         self._send_action(registry, action)
@@ -479,6 +484,23 @@ class MultiCharacterActionIntegrationTests(EvenniaTest):
             if "ui_action_result" in call.kwargs
         ]
 
+    def _latest_presentation(self):
+        """The newest committed presentation frame of either kind.
+
+        A full snapshot and a delta both commit canonical state; which one a
+        publication uses depends on the live baseline, so a consumer assertion
+        reads the last frame rather than assuming one shape.
+        """
+        envelopes = [
+            (index, name, call.kwargs[name][0][0])
+            for index, call in enumerate(self.sessionhandler.data_out.call_args_list)
+            for name in ("ui_snapshot", "ui_update")
+            if name in call.kwargs
+        ]
+        if not envelopes:
+            return None
+        return max(envelopes, key=lambda entry: entry[0])[2]
+
     @covers_requirement(
         "webclient-character-roster::creating-a-character-is-an-allowlisted-account-scoped-action"
     )
@@ -570,10 +592,11 @@ class MultiCharacterActionIntegrationTests(EvenniaTest):
         self.assertEqual(activate_results[0]["outcome"], "success")
         self.assertFalse(getattr(char_b, "creation_pending", True))
 
-        # Snapshot after activation is now in exploration mode
-        active_snapshots = self._get_snapshots()
-        self.assertTrue(active_snapshots)
-        post_act_snapshot = active_snapshots[-1]
+        # The activation's mode transition publishes one delta carrying every
+        # eager panel (webclient-incremental-publication); it is the newest
+        # committed presentation of either frame kind.
+        post_act_snapshot = self._latest_presentation()
+        self.assertIsNotNone(post_act_snapshot)
         self.assertEqual(post_act_snapshot["mode"], "exploration")
         self.assertEqual(post_act_snapshot["panels"]["status"]["actor"]["identity"], str(char_b.pk))
         self.assertTrue(post_act_snapshot["panels"]["character"]["available"])

@@ -385,6 +385,12 @@ describe("map requests follow explicit scope and committed moves only while open
     const w = mount(AppClient, { attachTo: document.body });
     wrappers.push(w);
     const receive = (name, body) => expect(store.receive(store.view.generation, name, [body], {}).accepted).toBe(true);
+    // A map part is one slice of a single logical transfer: every part but
+    // the last is reported as `pending`, and only the complete map commits.
+    const receivePart = (body) => {
+      const outcome = store.receive(store.view.generation, "ui_update", [body], {});
+      expect(outcome.accepted || outcome.pending === true).toBe(true);
+    };
     const publish = (world, revision = store.view.revision + 1) => {
       receive("ui_update", fx.update({ revision, panels: { world_map: world } }));
       return revision;
@@ -401,7 +407,7 @@ describe("map requests follow explicit scope and committed moves only while open
       await tick();
       if (order === "body-first") { result(request, revision, outcome); await tick(); }
     };
-    return { store, sender, w, receive, publish, result, reply };
+    return { store, sender, w, receive, receivePart, publish, result, reply };
   }
 
   it.each(["body-first", "result-first"])("cached reopen waits for its own silent fresh baseline (%s)", async (order) => {
@@ -471,7 +477,7 @@ describe("map requests follow explicit scope and committed moves only while open
   });
 
   it("old openings, partial transfers and failed results never qualify cached knowledge", async () => {
-    const { store, sender, w, publish, result, receive, reply } = liveDrawer();
+    const { store, sender, w, publish, result, receivePart, reply } = liveDrawer();
     store.openOverlay("map");
     await tick();
     const oldRequest = sender.sent.actions.at(-1);
@@ -490,11 +496,11 @@ describe("map requests follow explicit scope and committed moves only while open
     // A part frame carries exactly its one panel: the shared snapshot fixture
     // would otherwise merge its default status panel in beside it.
     const partFrame = (part) => ({ ...fx.update({ revision }), panels: { world_map: part } });
-    receive("ui_update", partFrame(parts[0]));
+    receivePart(partFrame(parts[0]));
     await tick();
     expect(store.view.mapPublications.world_map).toBe(oldRevision);
     expect(w.find('[data-testid="world-map"]').exists()).toBe(false);
-    for (const part of parts.slice(1)) receive("ui_update", partFrame(part));
+    for (const part of parts.slice(1)) receivePart(partFrame(part));
     await tick();
     expect(w.find('[data-testid="world-map"]').exists()).toBe(true);
     expect(store.view.mapPublications.world_map).toBe(revision);
