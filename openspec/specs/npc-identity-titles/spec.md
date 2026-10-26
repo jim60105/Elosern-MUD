@@ -57,7 +57,6 @@ Removing the NPC title behavior SHALL NOT change the requirement text of `locali
 - **WHEN** the exploration panel is built in a room containing an NPC
 - **THEN** the payload still validates against the unchanged schema version 1 field set and bounds
 
-
 ### Requirement: The import face rejects a name already used by an existing NPC
 
 The author-supplied name at the import face is the record's `key` — the value the loader passes to `create_object` and the plain name every display surface renders. `world/imports/loader.py` SHALL, before constructing anything and inside the same transaction, reject a batch whose record `key` equals the key of an already-persisted `NPC` (including subclasses such as `LLMNPC`), failing the whole batch with zero entities persisted and a `key` diagnostic on the offending record.
@@ -111,7 +110,6 @@ The author-supplied name at the import face is the record's `key` — the value 
 
 - **WHEN** the collision rejection is reported
 - **THEN** the record-level diagnostic naming the `key` field is carried by the existing `ImportRejected` report shape
-
 
 ### Requirement: The offline validation CLI stays a file-scope check with no database access
 
@@ -197,7 +195,6 @@ Scene occupants SHALL materialize under their validated authored name with perso
 - **WHEN** a current characterization lacks required name/persona or violates age bounds
 - **THEN** materialization rejects before partial construction
 
-
 ### Requirement: The blueprint author face enforces occupant name uniqueness
 Any two `npc_req` entries within one blueprint — in the same stage or across stages — SHALL NOT
 declare the same `display_name`. The name rule is blueprint-wide uniqueness, stricter than the
@@ -255,7 +252,6 @@ Host and adventurer sources SHALL author validated names and canonical profile i
 #### Scenario: The row validators are pure and explicitly callable
 - **WHEN** explicit synthetic rows are passed to identity validators
 - **THEN** they can reject invalid names/profiles without mutating shipped registries
-
 
 ### Requirement: Guild service hosts reuse by service anchor and never rename
 Service hosts SHALL reuse canonical authored profile provenance independent of component IDs/order and preserve existing identity and live state. Whole-row retirement SHALL use explicit source ownership and SHALL never consult title content.
@@ -315,7 +311,6 @@ Qualified persistent adventurers SHALL retain their authored names and stable pe
 - **WHEN** the actual qualified persistent adventurer hosts an examination
 - **THEN** authored name and stable person provenance remain with no independent title/profession write
 
-
 ### Requirement: Host and examiner creation emit boundary info events
 Service-host and persistent adventurer creation SHALL each emit one facade info event only on actual creation, never idempotent reuse, with char/service and profile/branch identifiers. Examination starts SHALL emit lifecycle boundary events with exam/host/target identifiers, without entity-creation events or player-facing prose.
 
@@ -348,3 +343,14 @@ observable behaviour.
 #### Scenario: The pre-existing scene contracts still hold
 - **WHEN** the scene-builder and durable-store suites run after this change
 - **THEN** every pre-existing requirement scenario of those capabilities still passes
+
+### Requirement: Current NPC authoring has no independent title field
+All current NPC imports, place hosts, adventurer definitions and generated/materialized characterization SHALL omit independent title fields and writes. Closed input schemas SHALL reject removed fields; stored title/profession data SHALL remain unread without a migration.
+
+#### Scenario: Title-free authoring works
+- **WHEN** valid imports, hosts and generated scenes omit titles
+- **THEN** each validates/materializes while player titles and scene roles/tiers remain unchanged
+
+#### Scenario: No dormant writer
+- **WHEN** a real creation/import/sync/materialization path succeeds
+- **THEN** no npc_title or adventurer profession attribute is persisted

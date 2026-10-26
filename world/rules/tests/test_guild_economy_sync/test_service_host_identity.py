@@ -64,6 +64,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
 
     @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
     @covers_requirement("npc-identity-titles::host-and-examiner-creation-emit-boundary-info-events")
+    @covers_requirement("npc-identity-titles::current-npc-authoring-has-no-independent-title-field")
     def test_first_sync_creates_the_authored_host_once(self):
         # The creation event is commit-bound (sync runs inside startup
         # transactions); execute the callbacks to observe it.

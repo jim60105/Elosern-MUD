@@ -96,6 +96,7 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
         self.assertIsNone(npc.attributes.get("npc_title"))
 
     @covers_requirement("npc-identity-titles::blueprint-scene-occupants-spawn-under-the-authored-name-with-the-authored-title")
+    @covers_requirement("npc-identity-titles::current-npc-authoring-has-no-independent-title-field")
     def test_full_characterization_is_materialized_fully(self):
         npc = self._spawned_npc(
             self._characterized(

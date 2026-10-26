@@ -281,12 +281,14 @@ class SchemaTests(TestCase):
 class RemovedTitleFieldSchemaTests(TestCase):
     """npc-title-authoring-removal: the record title field is gone."""
 
+    @covers_requirement("import-schema::character-records-exclude-the-removed-npc-title-property")
     def test_title_is_neither_required_nor_a_declared_property(self):
         self.assertNotIn("title", CHARACTER_SCHEMA_V1["required"])
         self.assertNotIn("title", CHARACTER_SCHEMA_V1["properties"])
         # The doc-title keyword lives at the schema's own top level.
         self.assertEqual(CHARACTER_SCHEMA_V1["title"], "CHARACTER_SCHEMA_V1")
 
+    @covers_requirement("import-schema::character-records-exclude-the-removed-npc-title-property")
     def test_a_title_free_record_is_structurally_valid(self):
         record = example_record()
         self.assertNotIn("title", record)
@@ -294,6 +296,7 @@ class RemovedTitleFieldSchemaTests(TestCase):
             list(Draft202012Validator(CHARACTER_SCHEMA_V1).iter_errors(record))
         )
 
+    @covers_requirement("import-schema::character-records-exclude-the-removed-npc-title-property")
     def test_a_legacy_title_is_an_additional_property_rejection(self):
         record = example_record()
         record["title"] = "南門守衛"

@@ -21,6 +21,10 @@ Each place SHALL own non-map kind, qualified room reference, optional complete h
 - **WHEN** a hostless place declares host/capability/goods configuration
 - **THEN** it is rejected while ordinary plazas/interiors still synchronize
 
+#### Scenario: Host authoring has no title
+- **WHEN** a current place/roster identity is declared
+- **THEN** it has a validated name and profile and no title/host_title field
+
 #### Scenario: One record carries a whole location
 - **WHEN** a place loads
 - **THEN** its qualified room reference, host identity, direct components and goods are authored in the place; room/exterior/doorway data are authored once in the interior document

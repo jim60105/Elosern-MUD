@@ -295,16 +295,19 @@ class LoaderLineageAutoSeedTests(EvenniaTestCase):
 class LoaderTitleTests(EvenniaTestCase):
     """npc-title-authoring-removal: no import path writes an NPC title."""
 
+    @covers_requirement("npc-identity-titles::current-npc-authoring-has-no-independent-title-field")
     def test_imported_npc_persists_no_title_attribute(self):
         entity = instantiate_character(example_record())
         self.assertIsNone(entity.attributes.get("npc_title"))
         self.assertEqual(entity.key, example_record()["key"])
 
+    @covers_requirement("npc-identity-titles::current-npc-authoring-has-no-independent-title-field")
     def test_player_character_import_persists_no_title(self):
         entity = instantiate_character(example_record(), PlayerCharacter)
         self.assertIsInstance(entity, PlayerCharacter)
         self.assertIsNone(entity.attributes.get("npc_title"))
 
+    @covers_requirement("npc-identity-titles::current-npc-authoring-has-no-independent-title-field")
     def test_a_legacy_title_rejects_without_construction(self):
         for legacy in ("南門守衛", "南門 守衛", 5):
             with self.subTest(title=repr(legacy)):
