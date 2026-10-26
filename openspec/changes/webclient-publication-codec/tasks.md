@@ -4,16 +4,16 @@ All checkboxes are implementation work, not authorization to apply during propos
 
 ## 1. Exact codec and bounds
 
-- [ ] 1.1 Write new test_publication_parts byte/header cases, then add production publication_parts.py encoder/part validator and mirrored constants to the exact wire table. Cover maximum/final remainder, canonical padding, extra fields, bool indices, CJK split and logical/header parity. Add protocol message registration/exports. Document exact wire/constant table.
-- [ ] 1.2 Split logical validation from single-frame byte checks without relaxing root structural or panel-local limits. Test invalid oversized panel vs valid logical aggregate, existing scoped dialogue intact allowance, single near-cap panel whose envelope cannot fit, 16MiB maximum and overflow before sends. Pure byte-split helper may test synthetic larger schema; production acceptance fixture must stay within registered schema.
+- [x] 1.1 Write new test_publication_parts byte/header cases, then add production publication_parts.py encoder/part validator and mirrored constants to the exact wire table. Cover maximum/final remainder, canonical padding, extra fields, bool indices, CJK split and logical/header parity. Add protocol message registration/exports. Document exact wire/constant table.
+- [x] 1.2 Split logical validation from single-frame byte checks without relaxing root structural or panel-local limits. Test invalid oversized panel vs valid logical aggregate, existing scoped dialogue intact allowance, single near-cap panel whose envelope cannot fit, 16MiB maximum and overflow before sends. Pure byte-split helper may test synthetic larger schema; production acceptance fixture must stay within registered schema.
 
 ## 2. Actual sender integration
 
-- [ ] 2.1 Wire encoder into coordinator eager snapshot/delta plans and eager companions of specialized map plans; prevalidate all frames and result before any send, preserve B receipt/baseline failure semantics and no ACK. Test real session.msg command order, intact small vs ui_publication_part large publication and specialized map path remaining distinct. Register test_publication_parts.py in one shard, add traceability and update synchronization delivery docs.
+- [x] 2.1 Wire encoder into coordinator eager snapshot/delta plans and eager companions of specialized map plans; prevalidate all frames and result before any send, preserve B receipt/baseline failure semantics and no ACK. Test real session.msg command order, intact small vs ui_publication_part large publication and specialized map path remaining distinct. Register test_publication_parts.py in one shard, add traceability and update synchronization delivery docs.
 
 ## 3. Focused integrated verification
 
-- [ ] 3.1 Run C-PY and C-NODE constants/parity regressions below once after edits plus contract_gate. A supplies the real browser assembly next; do not install a legacy receiver, fake decoder or deployment compatibility flag in this sender slice.
+- [x] 3.1 Run C-PY and C-NODE constants/parity regressions below once after edits plus contract_gate. A supplies the real browser assembly next; do not install a legacy receiver, fake decoder or deployment compatibility flag in this sender slice.
 
 ## Verification commands
 
