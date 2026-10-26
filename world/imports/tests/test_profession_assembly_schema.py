@@ -12,7 +12,7 @@ from unittest.mock import patch
 from tools.spec_traceability import covers_requirement
 
 from typeclasses.components import (
-    GuildExaminer,
+    GuildExamReception,
     GuildStaff,
     Merchant,
     QuestIssuer,
@@ -30,7 +30,7 @@ from world.rules.profession_config import Profession, ProfessionComponent
 # resolved through the classes themselves — never renamed, never literal.
 _MERCHANT = Merchant.name
 _GUILD_STAFF = GuildStaff.name
-_GUILD_EXAMINER = GuildExaminer.name
+_GUILD_EXAM_RECEPTION = GuildExamReception.name
 _SCRIPTED_DIALOGUE = ScriptedDialogue.name
 _QUEST_ISSUER = QuestIssuer.name
 
@@ -215,7 +215,7 @@ class AssemblyPlanTests(TestCase):
             key="t_guildcrew",
             components=(
                 ProfessionComponent(_GUILD_STAFF, "place"),
-                ProfessionComponent(_GUILD_EXAMINER, "place"),
+                ProfessionComponent(_GUILD_EXAM_RECEPTION, "place"),
                 ProfessionComponent(_SCRIPTED_DIALOGUE, "place"),
             ),
             schedule_template=None,
@@ -233,7 +233,7 @@ class AssemblyPlanTests(TestCase):
             plan,
             [
                 (_GUILD_STAFF, {"service_id": "s", "branch_key": "b"}),
-                (_GUILD_EXAMINER, {}),
+                (_GUILD_EXAM_RECEPTION, {}),
                 (_SCRIPTED_DIALOGUE, {}),
             ],
         )

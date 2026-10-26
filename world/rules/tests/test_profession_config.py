@@ -63,7 +63,7 @@ class ShippedTableTests(ProfessionCacheIsolation):
             {
                 "merchant",
                 "guild_staff",
-                "guild_examiner",
+                "guild_exam_reception",
                 "quest_issuer",
                 "attendant",
                 "clergy",
@@ -81,13 +81,13 @@ class ShippedTableTests(ProfessionCacheIsolation):
         staff = table["guild_staff"]
         self.assertEqual(
             [(c.type_key, c.default_binding) for c in staff.components],
-            [("guild_staff", "place"), ("guild_examiner", "place"), ("scripted_dialogue", "place")],
+            [("guild_staff", "place"), ("guild_exam_reception", "place"), ("scripted_dialogue", "place")],
         )
 
-        examiner = table["guild_examiner"]
+        reception = table["guild_exam_reception"]
         self.assertEqual(
-            [(c.type_key, c.default_binding) for c in examiner.components],
-            [("guild_examiner", "place"), ("scripted_dialogue", "place")],
+            [(c.type_key, c.default_binding) for c in reception.components],
+            [("guild_exam_reception", "place"), ("scripted_dialogue", "place")],
         )
 
         issuer = table["quest_issuer"]
@@ -156,7 +156,7 @@ class ShippedTableTests(ProfessionCacheIsolation):
             [
                 "attendant",
                 "clergy",
-                "guild_examiner",
+                "guild_exam_reception",
                 "guild_staff",
                 "merchant",
                 "quest_issuer",

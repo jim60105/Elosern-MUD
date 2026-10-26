@@ -8,7 +8,8 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
 from tools.spec_traceability import covers_requirement
-from typeclasses.npcs import NPC
+from typeclasses.components import GuildExamReception
+from typeclasses.npcs import LLMNPC, NPC
 from typeclasses.rooms import Room
 from typeclasses.exits import Exit
 from world.lore.guild_adventurers import GuildAdventurer, ExamQualification
@@ -19,6 +20,7 @@ from world.lore.settlements.places import PlaceDefinition, PlaceKind
 from world.rules import human_guild_hosts as hosts, npc_schedules as schedules
 from world.rules.action import ActionRequest, ActionResolver
 from world.rules.combat import Battlefield, BattlefieldActionContext
+from world.rules.party import is_companion, join_party
 from world.rules.progression import can_use_skill
 from world.skills.registry import SkillKind, SkillPrerequisite
 from world.skills.equipment import EquipmentSlot
@@ -137,6 +139,49 @@ class PersistentHumanGuildHostTests(EvenniaTest):
         self.assertEqual(host.db.equipment["weapon_main"], "t_host_sword")
         self.assertEqual(host.db.equipment["armor"], "t_host_armor")
         self.assertEqual((host.db.age, host.db.apparent_age), (42, 39))
+
+    @covers_requirement(
+        "human-guild-hosts::altoria-qualifications-select-one-persistent-adventurer-per-branch-and-target"
+    )
+    def test_repeated_sync_keeps_qualified_persons_ordinary_without_profession_writes(self):
+        host, = self.sync()
+        identity = (host.pk, host.key)
+        ordinary = (
+            dict(host.db.schedule),
+            list(host.db.inventory),
+            dict(host.db.equipment),
+        )
+
+        again, = self.sync()
+
+        self.assertEqual((again.pk, again.key), identity)
+        self.assertEqual(
+            (dict(again.db.schedule), list(again.db.inventory), dict(again.db.equipment)),
+            ordinary,
+        )
+        self.assertIsInstance(again, LLMNPC)
+        self.assertFalse(again.components.has(GuildExamReception.get_component_slot()))
+        self.assertFalse(again.attributes.has("profession"))
+        self.assertEqual(
+            hosts.qualified_host(
+                "t_branch", "t_rank",
+                people=self.people, qualifications=self.bindings,
+            ).pk,
+            again.pk,
+        )
+
+    @covers_requirement(
+        "human-guild-hosts::altoria-qualifications-select-one-persistent-adventurer-per-branch-and-target"
+    )
+    def test_a_synced_qualified_person_stays_an_ordinary_recruitable_companion(self):
+        host, = self.sync()
+        self.char1.location = host.location
+
+        join_party(host, self.char1)
+
+        self.assertTrue(is_companion(host, self.char1))
+        self.assertFalse(host.components.has(GuildExamReception.get_component_slot()))
+        self.assertFalse(host.attributes.has("profession"))
 
     @covers_requirement(
         "human-guild-hosts::altoria-qualifications-select-one-persistent-adventurer-per-branch-and-target"

@@ -47,7 +47,7 @@ def _component_labels() -> dict[str, str]:
     pairs = (
         (component_types.GuildStaff, "公會櫃檯"),
         (component_types.ChurchHost, "教會神職"),
-        (component_types.GuildExaminer, "公會考官"),
+        (component_types.GuildExamReception, "考核櫃檯"),
         (component_types.Merchant, "商人"),
         (component_types.ScriptedDialogue, "腳本對話"),
         (component_types.QuestIssuer, "委託發布者"),

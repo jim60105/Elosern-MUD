@@ -5,7 +5,7 @@ from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import patch
 from tools.spec_traceability import covers_requirement
-from typeclasses.components import GuildExaminer, GuildStaff, Merchant
+from typeclasses.components import GuildExamReception, GuildStaff, Merchant
 from world.lore.items import (
     EquipmentModifierKey,
     ItemDefinition,
@@ -80,7 +80,7 @@ from ._support import (
     ServiceRegistryIsolation,
     TICK_NOON,
     actor,
-    guild_examiner,
+    exam_reception,
     guild_staff,
     quest_record,
     registration,
@@ -325,7 +325,7 @@ class QuestRenderingTests(ServiceRegistryIsolation):
     @covers_requirement("webclient-service-menus::the-guild-surface-covers-registration-board-quest-log-and-rank-examination")
     def test_exam_eligibility_shows_exact_next_rank_only(self):
         rank = self._rank(
-            FakeHost("a", 1, guild_staff(), guild_examiner()),
+            FakeHost("a", 1, guild_staff(), exam_reception()),
             registration=registration(), guild_rank="F", merit=50,
         )
         self.assertIsNotNone(rank)
@@ -342,7 +342,7 @@ class QuestRenderingTests(ServiceRegistryIsolation):
         # Merit qualification and request availability are distinct facts:
         # below threshold the request still reaches the counter.
         rank = self._rank(
-            FakeHost("a", 1, guild_staff(), guild_examiner()),
+            FakeHost("a", 1, guild_staff(), exam_reception()),
             registration=registration(), guild_rank="F", merit=49,
         )
         self.assertFalse(rank.merit_qualified)
@@ -352,7 +352,7 @@ class QuestRenderingTests(ServiceRegistryIsolation):
     @covers_requirement("webclient-service-menus::the-guild-surface-covers-registration-board-quest-log-and-rank-examination")
     def test_exam_request_disables_only_for_target_and_counter_gates(self):
         unregistered = self._rank(
-            FakeHost("a", 1, guild_staff(), guild_examiner()), guild_rank=None, merit=999,
+            FakeHost("a", 1, guild_staff(), exam_reception()), guild_rank=None, merit=999,
         )
         self.assertEqual(
             (unregistered.merit_qualified, unregistered.exam_request.enabled,
@@ -360,21 +360,21 @@ class QuestRenderingTests(ServiceRegistryIsolation):
             (False, False, "unregistered"),
         )
         wrong_branch = self._rank(
-            FakeHost("a", 1, guild_staff(), guild_examiner(branch_key="t_other_branch")),
+            FakeHost("a", 1, guild_staff(), exam_reception(branch_key="t_other_branch")),
             registration=registration(), guild_rank="F", merit=999,
         )
         self.assertEqual(
             (wrong_branch.merit_qualified, wrong_branch.exam_request.reason_code),
             (True, "wrong_branch"),
         )
-        busy = FakeHost("a", 1, guild_staff(), guild_examiner())
+        busy = FakeHost("a", 1, guild_staff(), exam_reception())
         busy.db = SimpleNamespace(schedule_state="busy")
         blocked = self._rank(busy, registration=registration(), guild_rank="F", merit=999)
         self.assertEqual(
             (blocked.merit_qualified, blocked.exam_request.enabled, blocked.exam_request.reason_code),
             (True, False, "schedule_blocked"),
         )
-        malformed = FakeHost("a", 1, guild_staff(), guild_examiner(service_binding="portable"))
+        malformed = FakeHost("a", 1, guild_staff(), exam_reception(service_binding="portable"))
         malformed.ndb = SimpleNamespace()
         with patch("world.rules.service_gate.log_warn"):
             off_anchor = self._rank(
@@ -382,7 +382,7 @@ class QuestRenderingTests(ServiceRegistryIsolation):
             )
         self.assertEqual(off_anchor.exam_request.reason_code, "service_unavailable")
 
-    def test_rank_surface_absent_without_examiner(self):
+    def test_rank_surface_absent_without_reception(self):
         room = FakeRoom(FakeHost("a", 1, guild_staff(), location=None))
         player = actor(location=room, registration=registration(), guild_rank="F")
         with patch(

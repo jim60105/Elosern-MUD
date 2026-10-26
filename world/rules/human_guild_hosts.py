@@ -93,8 +93,8 @@ def validate_adventurers(
 
     seen_profiles = set()
     for key, person in people.items():
-        if person.key != key or person.profession != "adventurer":
-            raise GuildHostIntegrityError(f"person {key!r} has invalid identity/profession")
+        if person.key != key:
+            raise GuildHostIntegrityError(f"person {key!r} has invalid identity")
         validate_npc_name(person.name)
         validate_npc_title(person.title)
         profile = profiles.get(person.profile_key)
@@ -212,7 +212,6 @@ def sync_persistent_adventurers(
                     host.attributes.add(NPC_PROFILE_PROVENANCE_ATTRIBUTE, person.profile_key)
                     host.npc_title = person.title
                     host.race, host.subrace, host.sex = "human", person.subrace, "other"
-                    host.db.profession = person.profession
                     host.db.guild_rank = person.rank
                     host._apply_trait_config(_trait_config({
                         **dict(zip(_BASE_KEYS, person.bases, strict=True)), "guild_merit": 0,

@@ -6,7 +6,7 @@ import unittest
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.characters import PlayerCharacter
-from typeclasses.components import GuildExaminer, GuildStaff, QuestIssuer
+from typeclasses.components import GuildExamReception, GuildStaff, QuestIssuer
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from world.quests.catalog import register_catalog

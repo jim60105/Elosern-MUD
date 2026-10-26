@@ -173,7 +173,7 @@ def off_anchor_place_service(npc: Any) -> str | None:
     as "any place-bound component off its anchor strands the npc".
     """
     from typeclasses.components import (
-        GuildExaminer,
+        GuildExamReception,
         GuildStaff,
         Merchant,
         ScriptedDialogue,
@@ -189,7 +189,7 @@ def off_anchor_place_service(npc: Any) -> str | None:
     if components is None:
         return None
     location_pk = getattr(getattr(npc, "location", None), "pk", None)
-    for component_class in (GuildStaff, GuildExaminer, Merchant, ScriptedDialogue):
+    for component_class in (GuildStaff, GuildExamReception, Merchant, ScriptedDialogue):
         if not components.has(component_class.name):
             continue
         component = components.get(component_class.get_component_slot())

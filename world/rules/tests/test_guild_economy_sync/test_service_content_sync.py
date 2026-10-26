@@ -3,7 +3,7 @@
 from tools.spec_traceability import covers_requirement
 from evennia.utils.search import search_object_by_tag
 from evennia.utils.test_resources import EvenniaTestCase
-from typeclasses.components import GuildExaminer
+from typeclasses.components import GuildExamReception
 from typeclasses.components import GuildStaff
 from typeclasses.components import Merchant
 from typeclasses.components import ScriptedDialogue
@@ -57,7 +57,9 @@ class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertIsNotNone(guild_host)
         self.assertIsNotNone(merchant_host)
         self.assertTrue(guild_host.components.has(GuildStaff.get_component_slot()))
-        self.assertTrue(guild_host.components.has(GuildExaminer.get_component_slot()))
+        self.assertTrue(
+            guild_host.components.has(GuildExamReception.get_component_slot())
+        )
         self.assertTrue(guild_host.components.has(ScriptedDialogue.get_component_slot()))
         self.assertTrue(merchant_host.components.has(Merchant.get_component_slot()))
         self.assertEqual(
@@ -69,7 +71,9 @@ class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTestCase):
             GUILD_SERVICE_ID,
         )
         self.assertEqual(
-            guild_host.components.get(GuildExaminer.get_component_slot()).service_id,
+            guild_host.components.get(
+                GuildExamReception.get_component_slot()
+            ).service_id,
             GUILD_SERVICE_ID,
         )
         self.assertEqual(
@@ -170,14 +174,14 @@ class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTestCase):
         sync_service_content()
         guild_host = self._guild_host()
         self.assertEqual(
-            [name for name in guild_host.components.db_names if name in {GuildStaff.get_component_slot(), GuildExaminer.get_component_slot()}],
-            [GuildStaff.get_component_slot(), GuildExaminer.get_component_slot()],
+            [name for name in guild_host.components.db_names if name in {GuildStaff.get_component_slot(), GuildExamReception.get_component_slot()}],
+            [GuildStaff.get_component_slot(), GuildExamReception.get_component_slot()],
         )
         sync_service_content()
         guild_host = self._guild_host()
         self.assertEqual(
-            [name for name in guild_host.components.db_names if name in {GuildStaff.get_component_slot(), GuildExaminer.get_component_slot()}],
-            [GuildStaff.get_component_slot(), GuildExaminer.get_component_slot()],
+            [name for name in guild_host.components.db_names if name in {GuildStaff.get_component_slot(), GuildExamReception.get_component_slot()}],
+            [GuildStaff.get_component_slot(), GuildExamReception.get_component_slot()],
         )
 
 class ServiceContentWithoutInteriorsTests(EvenniaTestCase):

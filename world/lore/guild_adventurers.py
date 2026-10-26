@@ -17,7 +17,6 @@ class GuildAdventurer:
     sword_skill: str
     equipment: tuple[str, ...]
     schedule_template: str
-    profession: str = "adventurer"
     sword_branches: tuple[str, ...] = ()
     branch_key: str = "guild_branch_altoria"
 

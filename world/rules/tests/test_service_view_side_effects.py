@@ -14,7 +14,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
-from typeclasses.components import GuildExaminer, GuildStaff, Merchant
+from typeclasses.components import GuildExamReception, GuildStaff, Merchant
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from world.quests.definitions import QUEST_DEFINITION_REGISTRY, QuestStage
@@ -85,7 +85,9 @@ class ServicesViewSideEffectTests(EvenniaTestCase):
             GuildStaff.create(self.staff, service_id="staff", branch_key=BRANCH)
         )
         self.staff.components.add(
-            GuildExaminer.create(self.staff, service_id="examiner", branch_key=BRANCH)
+            GuildExamReception.create(
+                self.staff, service_id="counter", branch_key=BRANCH
+            )
         )
         self.merchant_npc = create_object(NPC, key="shop keeper", location=self.store)
         self.merchant = Merchant.create(

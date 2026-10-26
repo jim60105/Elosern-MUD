@@ -27,7 +27,7 @@ guild_economy.yaml SHALL retain strictly increasing non-negative merit threshold
 
 ### Requirement: start_guild_exam is the sole trigger and validates authority itself
 `start_guild_exam(actor, examiner, target_rank, requested_by=...)` SHALL be the only mutation-capable
-examination-start API. It SHALL validate the co-located `GuildExaminer` counter through the shared
+examination-start API. It SHALL validate the co-located `GuildExamReception` counter through the shared
 `service_available` resolver, the selected persistent host's qualification and identity for the
 registered branch's next rank, true cumulative merit, and no active battle or exam for either
 participant. `requested_by` SHALL be audit metadata and SHALL NOT bypass validation.
@@ -49,12 +49,12 @@ participant. `requested_by` SHALL be audit metadata and SHALL NOT bypass validat
 - **THEN** start rejects identically with no affinity or exam mutation
 
 #### Scenario: An off-anchor examiner cannot open examinations
-- **WHEN** a qualified place-bound examiner is away from its service anchor
+- **WHEN** the place-bound examination-reception counter is away from its service anchor
 - **THEN** service_available refuses the start before resources, affinity or records change
 
 #### Scenario: Gate verdicts refuse before eligibility
-- **WHEN** the gate returns a `remote` verdict (actor and examiner not co-located) or an
-  `off_anchor` verdict (place-bound examiner away from its anchor room)
+- **WHEN** the gate returns a `remote` verdict (actor and reception counter not co-located) or an
+  `off_anchor` verdict (place-bound reception counter away from its anchor room)
 - **THEN** both are refused before any eligibility check, and a `malformed_binding` verdict fails
   closed
 

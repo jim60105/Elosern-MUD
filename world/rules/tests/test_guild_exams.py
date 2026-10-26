@@ -18,7 +18,7 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
-from typeclasses.components import GuildExaminer, GuildStaff
+from typeclasses.components import GuildExamReception, GuildStaff
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from world.quests.catalog import register_catalog
@@ -156,7 +156,9 @@ class ExamHostFixture(ExamRegistryIsolation):
             GuildStaff.create(self.counter, service_id="staff", branch_key=EXAM_BRANCH)
         )
         self.counter.components.add(
-            GuildExaminer.create(self.counter, service_id="counter", branch_key=EXAM_BRANCH)
+            GuildExamReception.create(
+                self.counter, service_id="counter", branch_key=EXAM_BRANCH
+            )
         )
         register_adventurer(self.player, self.counter)
         self.host = make_exam_host(self.hall)
@@ -538,7 +540,9 @@ class ExamStartTests(ExamHostFixture, EvenniaTestCase):
 
     @covers_requirement("guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself")
     def test_off_anchor_counter_is_refused_before_any_eligibility_write(self):
-        component = self.counter.components.get(GuildExaminer.get_component_slot())
+        component = self.counter.components.get(
+            GuildExamReception.get_component_slot()
+        )
         component.service_binding = "place"
         component.anchor_room_id = self.hall.pk
         square = create_object(Room, key="exam square")

@@ -21,7 +21,7 @@ from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.characters import PlayerCharacter
 
 
-from typeclasses.components import GuildExaminer, GuildStaff, QuestIssuer
+from typeclasses.components import GuildExamReception, GuildStaff, QuestIssuer
 
 
 from typeclasses.npcs import NPC
