@@ -10,10 +10,7 @@ from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
-
-if TYPE_CHECKING:
-    from world.rules.profession_config import Profession
+from typing import Any, Literal
 
 from jsonschema import Draft202012Validator
 
@@ -54,11 +51,6 @@ class RecordReport:
     record: dict[str, Any] | None = None
     rejections: list[Issue] = field(default_factory=list)
     warnings: list[Issue] = field(default_factory=list)
-    # The registry row the validator resolved for this record's ``profession``
-    # (None when absent). The loader constructs from THIS snapshot, never a
-    # fresh lookup, so a rulebook cache reload between the two gates can never
-    # mix rows inside one constructed entity.
-    profession_row: "Profession | None" = None
 
     @property
     def is_valid(self) -> bool:
@@ -530,154 +522,40 @@ def _is_npc_target(typeclass: type | None) -> bool:
     return issubclass(typeclass, NPC)
 
 
-def _check_profession_fields(
+def _check_capability_fields(
     record: dict[str, Any], is_npc_target: bool
-) -> tuple[list[Issue], "Profession | None"]:
-    """Reject an incomplete or misplaced profession/components pair.
+) -> list[Issue]:
+    """Reject an unusable direct capability declaration set.
 
-    Every rejection is decided from the record, the profession registry, and the
-    component vocabulary alone, so the whole plan (blueprint expansion plus the
-    authored identity kwargs) fails as a named ISSUE in the shared batch report
-    BEFORE any entity is constructed. The loader re-runs the same
-    ``assembly.resolve_plan`` fail-closed as its second gate — on the ROW
-    returned here, never a fresh lookup, so a cache reload between the gates
-    cannot mix rows inside one constructed entity.
+    The shared capability core decides the whole set DB-free — vocabulary,
+    duplicates, per-type required/optional kwargs, runtime-owned fields,
+    binding shape and registry references — so an incomplete plan fails as a
+    named ISSUE in the batch report BEFORE any entity is constructed. The
+    loader re-runs the same validator with a room resolver as its second,
+    fail-closed gate inside the import transaction.
+
+    An absent or empty ``components`` list is a valid declaration of no
+    capabilities; only a PlayerCharacter-targeted record carrying any
+    declaration is rejected, and NPC-only assembly stays untouched otherwise.
     """
-    profession_value = record.get("profession")
     entries = record.get("components")
-    if profession_value is None:
-        if record.get("anchor_room"):
-            return [
-                Issue(
-                    "anchor_room",
-                    "an anchor room only anchors profession-assembled "
-                    "components; the record declares no profession",
-                )
-            ] + (
-                [
-                    Issue(
-                        "components",
-                        "explicit components require a profession blueprint; the "
-                        "assembly plan is defined only alongside a profession",
-                    )
-                ]
-                if "components" in record
-                else []
-            ), None
-        # PRESENCE semantics, not truthiness: an explicitly declared empty
-        # ``components`` array is still a declaration without a blueprint.
-        if "components" in record:
-            return [
-                Issue(
-                    "components",
-                    "explicit components require a profession blueprint; the "
-                    "assembly plan is defined only alongside a profession",
-                )
-            ], None
-        return [], None
-    issues: list[Issue] = []
+    if not entries:
+        return []
     if not is_npc_target:
-        issues.append(
+        return [
             Issue(
-                "profession",
-                "a PlayerCharacter-targeted record cannot declare a profession; "
-                "professions assemble NPC components only",
+                "components",
+                "a PlayerCharacter-targeted record cannot declare capabilities; "
+                "capability components assemble NPCs only",
             )
-        )
-    from world.imports import assembly
-    from world.rules.profession_config import PROFESSION_COMPONENT_TYPES, get_profession
-    from world.rules.profession_assembly import (
-        component_field_names,
-        plan_bindings,
-        missing_identity_kwargs,
-    )
+        ]
+    from world.rules.npc_capabilities import CapabilityValidationError, validate_capabilities
 
-    profession = get_profession(profession_value)
-    if profession is None:
-        issues.append(
-            Issue(
-                "profession",
-                f"unknown profession key '{profession_value}' is not a profession "
-                "rulebook row",
-            )
-        )
-    if entries is not None:
-        seen: set[str] = set()
-        for index, entry in enumerate(entries):
-            type_key = entry["type"]
-            if type_key not in PROFESSION_COMPONENT_TYPES:
-                issues.append(
-                    Issue(
-                        f"components.{index}.type",
-                        f"unknown component type '{type_key}' is outside the "
-                        "profession component vocabulary",
-                    )
-                )
-                continue
-            if type_key in seen:
-                issues.append(
-                    Issue(
-                        f"components.{index}.type",
-                        f"duplicate component type '{type_key}'; one entry per "
-                        "component slot",
-                    )
-                )
-                continue
-            seen.add(type_key)
-            allowed = component_field_names(type_key)
-            for kwarg in sorted(entry["kwargs"]):
-                if kwarg not in allowed:
-                    issues.append(
-                        Issue(
-                            f"components.{index}.kwargs",
-                            f"component '{type_key}' accepts no kwarg '{kwarg}'; "
-                            f"authored kwargs are {sorted(allowed)}",
-                        )
-                    )
-    if profession is None or issues:
-        return issues, None
-    # Identity completeness on the FINAL resolved set: blueprint-only and
-    # explicit-replacement components face the same non-empty identity rule
-    # (the loader never invents a service anchor).
-    for type_key, kwargs in assembly.resolve_plan(profession, record):
-        missing = missing_identity_kwargs(type_key, kwargs)
-        if missing:
-            issues.append(
-                Issue(
-                    "components",
-                    f"profession '{profession_value}' component '{type_key}' is "
-                    f"missing authored identity kwargs {missing}",
-                )
-            )
-    if issues:
-        return issues, None
-    # Authored binding/anchor consistency (service-anchoring D1/D8), decided
-    # DB-free from the resolved plan: an anchor exists exactly when the plan
-    # carries a place-bound component. A person-only plan with an anchor is
-    # the invalid "person carrying an anchor" combination; a place-bearing
-    # plan without one could never resolve its anchor.
-    bindings = plan_bindings(profession, assembly.explicit_map(record))
-    has_place = any(binding == "place" for binding in bindings.values())
-    anchor = record.get("anchor_room")
-    if anchor and not has_place:
-        issues.append(
-            Issue(
-                "anchor_room",
-                "person-bound components co-presence-only; an anchor room "
-                "is the invalid authored combination",
-            )
-        )
-    if has_place and not anchor:
-        issues.append(
-            Issue(
-                "anchor_room",
-                "the resolved plan contains place-bound components; an "
-                "anchor_room tag is required",
-            )
-        )
-    if issues:
-        return issues, None
-    return issues, profession
+    try:
+        validate_capabilities(entries)
+    except CapabilityValidationError as error:
+        return [Issue("components", message) for message in error.issues]
+    return []
 
 
 def _check_skill_proficiency_keys(record: dict[str, Any]) -> list[Issue]:
@@ -844,10 +722,7 @@ def validate_character(
     report.rejections.extend(_check_affinity_elements(record))
     report.rejections.extend(_check_combat_traits(record))
     report.rejections.extend(_check_skills(record, "npc" if npc_target else "player"))
-    profession_issues, report.profession_row = _check_profession_fields(
-        record, npc_target
-    )
-    report.rejections.extend(profession_issues)
+    report.rejections.extend(_check_capability_fields(record, npc_target))
     report.rejections.extend(_check_social_identities(record))
     report.warnings.extend(_check_stats_band(record))
     return report

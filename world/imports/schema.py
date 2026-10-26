@@ -218,19 +218,6 @@ CHARACTER_SCHEMA_V1 = {
                 "neutral classification."
             ),
         },
-        "profession": {
-            "anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}],
-            "description": (
-                "Optional assembly-time profession blueprint key. A non-null value "
-                "must name a row of the loaded profession rulebook "
-                "(world/rules/profession_config.py); an unknown key rejects the "
-                "record in the shared batch validator. null or an absent field "
-                "means no profession. The blueprint assembles NPC components, "
-                "applies the row's schedule template, and supplies a default tier; "
-                "it takes effect only for NPC-targeted imports and never overrides "
-                "the record's own literal stats."
-            ),
-        },
         "components": {
             "type": "array",
             "items": {
@@ -242,32 +229,50 @@ CHARACTER_SCHEMA_V1 = {
                         "type": "object",
                         "propertyNames": {"type": "string"},
                     },
+                    "binding": {
+                        "description": (
+                            "Optional availability binding of one capability. "
+                            "{kind: 'person'} makes the service travel with its "
+                            "host (co-presence); {kind: 'place', anchor_room: "
+                            "<room tag>} anchors it to exactly one room, resolved "
+                            "by tag inside the import transaction. Required for "
+                            "every service capability (merchant, guild_staff, "
+                            "guild_exam_reception, quest_issuer, church_host) and "
+                            "omitted by ordinary narrative dialogue. An anchor on "
+                            "a person binding is the invalid combination."
+                        ),
+                        "anyOf": [
+                            {
+                                "type": "object",
+                                "required": ["kind"],
+                                "additionalProperties": False,
+                                "properties": {"kind": {"const": "person"}},
+                            },
+                            {
+                                "type": "object",
+                                "required": ["kind", "anchor_room"],
+                                "additionalProperties": False,
+                                "properties": {
+                                    "kind": {"const": "place"},
+                                    "anchor_room": {"type": "string", "minLength": 1},
+                                },
+                            },
+                        ],
+                    },
                 },
                 "additionalProperties": False,
             },
             "description": (
-                "Optional explicit per-record component assembly entries "
-                "[{type, kwargs}]. An entry's type must name a key of the "
-                "profession component vocabulary and its kwargs are the authored "
-                "service-identity values (service_id, shop_key, branch_key, "
-                "dialogue_key, issuer_key as the component class defines "
-                "them); the loader never invents identity. Entries override "
-                "the profession blueprint for their type (design D5) and may "
-                "add vocabulary components the blueprint omits. Valid only "
-                "alongside a profession; only for NPC-targeted imports."
-            ),
-        },
-        "anchor_room": {
-            "anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}],
-            "description": (
-                "Optional room tag naming the anchor for the record's "
-                "place-bound service components (service-anchoring D2/D8). "
-                "Required exactly when the resolved assembly plan contains a "
-                "place-bound component, forbidden when it contains a "
-                "person-bound one (co-presence carries no anchor), and "
-                "meaningless without a profession. The loader resolves the tag "
-                "inside the import transaction; an unknown tag rejects the "
-                "batch. null or an absent field means no anchor."
+                "Optional direct NPC capability declarations "
+                "[{type, kwargs, binding?}]. Each entry names one capability of "
+                "the closed vocabulary and authors exactly that capability's "
+                "configuration (service_id, shop_key, branch_key, dialogue_key, "
+                "issuer_key, church, initial_arousal as its type defines); the "
+                "loader never invents or defaults an identifier. Entries are "
+                "independent: no blueprint expands, no ordering decides "
+                "anything, and one entry per type is allowed. Declarations are "
+                "validated as a complete batch before anything is constructed, "
+                "and only for NPC-targeted imports."
             ),
         },
         "social_identities": {
