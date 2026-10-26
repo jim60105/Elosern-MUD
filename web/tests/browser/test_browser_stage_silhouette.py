@@ -23,7 +23,12 @@ from PIL import Image
 from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
-from .browser_helpers import inject_snapshot, scene_block, valid_local_map_panel
+from .browser_helpers import (
+    dialogue_panel,
+    inject_snapshot,
+    scene_block,
+    valid_local_map_panel,
+)
 from ._journey_support import (
     _SCENE_PNG_BYTES,
     _artwork_descriptor,
@@ -147,15 +152,14 @@ def _art_panel(entry: dict) -> dict:
 
 
 def _dialogue_panel() -> dict:
-    return {
-        "schema_version": 2,
-        "available": True,
-        "kind": "dialogue",
-        "host": {"identity": 7, "display_name": "店長", "portrait_ref": "7"},
-        "bond_stage": "熟識",
-        "line": "又見面了。今晚爐火正旺。",
-        "choices": [{"keyword_id": "news", "label": "最近有什麼消息？"}],
-    }
+    return dialogue_panel(
+        host_id=7,
+        host_name="店長",
+        host_portrait_ref="7",
+        bond_stage="熟識",
+        line="又見面了。今晚爐火正旺。",
+        choices=(("news", "最近有什麼消息？"),),
+    )
 
 
 class StageSilhouetteBrowserTest(BrowserAcceptanceTest):

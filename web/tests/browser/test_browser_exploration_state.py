@@ -7,6 +7,7 @@ from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     CARD_SELECTOR,
+    dialogue_panel,
     SUGGESTIONS_CARD_SELECTOR,
     WAIT_CARD_SELECTOR,
     activate_card_row,
@@ -24,6 +25,7 @@ from .browser_helpers import (
     presence_entry_keys,
     sent_action_count,
     store_state,
+    wait_for_presentation_settled,
     wait_for_store_state,
 )
 from .harness import ManagedServer, ManagedServerTearDownMixin
@@ -140,6 +142,10 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         release = page.locator('[data-testid="action-bar__btn--possess"]')
         release.wait_for(timeout=30000)
         self.assertEqual(release.inner_text().strip(), "解除附身")
+        # The possession commit's publication burst must land before the next
+        # submit: the dispatcher names the newest revision exactly and a
+        # submit in that window is refused as stale.
+        wait_for_presentation_settled(page)
         release.click()
         self.assertEqual(sent_action_count(page, "explore.possess_release"), 1)
         # The release unpuppets the companion: the client enters its
@@ -519,19 +525,13 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         inject_update(
             page,
             {
-                "dialogue": {
-                    "schema_version": 2,
-                    "available": True,
-                    "kind": "dialogue",
-                    "host": {
-                        "identity": member_id,
-                        "display_name": member["display_name"],
-                        "portrait_ref": member.get("portrait_ref"),
-                    },
-                    "bond_stage": None,
-                    "line": "……",
-                    "choices": [],
-                },
+                "dialogue": dialogue_panel(
+                    host_id=member_id,
+                    host_name=member["display_name"],
+                    host_portrait_ref=member.get("portrait_ref"),
+                    line="……",
+                    choices=(),
+                ),
             },
             mode="dialogue",
         )
@@ -756,7 +756,11 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         look = ("explore.look", "看看石碑", {"target_id": 9102})
         wait = ("explore.wait", "等到天亮", {"daypart": "dawn"})
         talk = ("explore.talk_open", "找哨衛聊聊", {"npc_id": 9001})
-        scripted = ("explore.talk_scripted", "問候哨衛", {"npc_id": 9001, "keyword_id": "問候"})
+        scripted = (
+            "explore.talk_scripted",
+            "問候哨衛",
+            {"npc_id": 9001, "topic_id": "哨衛.問候", "context_id": None},
+        )
         accepted = self._inject_panels(page, self._ready_context(look, wait, talk))
         self.assertTrue(accepted["accepted"], accepted)
 

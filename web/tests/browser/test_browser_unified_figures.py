@@ -37,6 +37,7 @@ from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     inject_snapshot,
+    dialogue_panel,
     open_verb_card,
     store_state,
     valid_local_map_panel,
@@ -402,15 +403,14 @@ class UnifiedFiguresBrowserTest(BrowserAcceptanceTest):
                 "status": valid_status_panel("測試主角", "1"),
                 "local_map": valid_local_map_panel(),
                 "art": _art_panel(),
-                "dialogue": {
-                    "schema_version": 2,
-                    "available": True,
-                    "kind": "dialogue",
-                    "host": {"identity": 7, "display_name": "店長", "portrait_ref": "7"},
-                    "bond_stage": "熟識",
-                    "line": "又見面了。今晚爐火正旺。",
-                    "choices": [{"keyword_id": "news", "label": "最近有什麼消息？"}],
-                },
+                "dialogue": dialogue_panel(
+                    host_id=7,
+                    host_name="店長",
+                    host_portrait_ref="7",
+                    bond_stage="熟識",
+                    line="又見面了。今晚爐火正旺。",
+                    choices=(("news", "最近有什麼消息？"),),
+                ),
             },
             mode="dialogue",
         )

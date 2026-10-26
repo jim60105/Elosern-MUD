@@ -7,6 +7,7 @@ from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     activate_wait_row,
+    dialogue_panel,
     focus_action_dock,
     install_outbound_recorder,
     inject_snapshot,
@@ -409,15 +410,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             page,
             {
                 "local_map": valid_local_map_panel(),
-                "dialogue": {
-                    "schema_version": 2,
-                    "available": True,
-                    "kind": "dialogue",
-                    "host": {"identity": 11, "display_name": "小販", "portrait_ref": None},
-                    "bond_stage": None,
-                    "line": "歡迎光臨。",
-                    "choices": [{"keyword_id": "goods", "label": "有什麼貨？"}],
-                },
+                "dialogue": dialogue_panel(line="歡迎光臨。"),
             },
             mode="dialogue",
         )

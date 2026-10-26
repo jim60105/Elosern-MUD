@@ -15,6 +15,7 @@ from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     fresh_epoch,
+    dialogue_panel,
     focus_action_dock,
     install_outbound_recorder,
     open_dialogue_choices,
@@ -333,16 +334,24 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
         self.assertFalse(result["accepted"])
         self.assertEqual(result["reason"], "invalid")
 
-        # The panel renderer requests one resync; a second request in the same
-        # episode is blocked, so a malformed panel cannot create a sync loop.
-        first = page.evaluate(
-            "() => Elosern.actions.requestResync('status')"
+        # The renderer's automatic repair already spent this episode's single
+        # sync, so every further request in the same episode is refused and a
+        # malformed panel cannot create a sync loop. Both requests run in one
+        # page task: a server snapshot answering the first request would
+        # legitimately end the failure episode and re-arm the gate.
+        first, second = page.evaluate(
+            """() => [
+                Elosern.actions.requestResync('status'),
+                Elosern.actions.requestResync('status'),
+            ]"""
         )
-        second = page.evaluate(
-            "() => Elosern.actions.requestResync('status')"
+        self.assertFalse(first, "the episode's one repair is already spent")
+        self.assertFalse(second, "a second repair in one episode must be blocked")
+        self.assertEqual(
+            len([cmd for cmd, _a, _k in page.evaluate("window.__elosernSent") if cmd == "ui_sync"]),
+            1,
+            "the malformed snapshot triggers exactly one repair",
         )
-        self.assertTrue(first)
-        self.assertFalse(second)
 
         # Ordinary text play continues.
         narrative_before = narrative_log_length(page)
@@ -570,15 +579,7 @@ class ContextualHudStandingJourneyTest(BrowserAcceptanceTest):
                     page,
                     {
                         "local_map": map_panel,
-                        "dialogue": {
-                            "schema_version": 2,
-                            "available": True,
-                            "kind": "dialogue",
-                            "host": {"identity": 11, "display_name": "小販", "portrait_ref": None},
-                            "bond_stage": None,
-                            "line": "歡迎光臨。",
-                            "choices": [{"keyword_id": "goods", "label": "有什麼貨？"}],
-                        },
+                        "dialogue": dialogue_panel(line="歡迎光臨。"),
                     },
                     mode="dialogue",
                 )

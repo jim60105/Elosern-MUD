@@ -7,6 +7,7 @@ from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest, ui_scale
 from .browser_helpers import (
     CARD_SELECTOR,
+    dialogue_panel,
     activate_overview_chip,
     focus_action_dock,
     install_outbound_recorder,
@@ -203,8 +204,11 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
 
         # Commit dialogue: the toggle remains visible and the command line
-        # stays collapsed until opened.
-        _inject_snapshot(page, {"local_map": map_panel}, mode="dialogue")
+        # stays collapsed until opened. A dialogue snapshot carries its
+        # committed dialogue panel (the mode form requires one).
+        _inject_snapshot(
+            page, {"local_map": map_panel, "dialogue": dialogue_panel()}, mode="dialogue"
+        )
         _wait_mode(page, "dialogue")
         self.assertTrue(toggle.is_visible(), "the command-line toggle is visible in dialogue")
         self.assertEqual(anchor.get_attribute("data-expanded"), "false")
@@ -891,15 +895,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                     "exploration": exploration,
                     "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
                     "local_map": valid_local_map_panel(),
-                    "dialogue": {
-                        "schema_version": 2,
-                        "available": True,
-                        "kind": "dialogue",
-                        "host": {"identity": 11, "display_name": "小販", "portrait_ref": None},
-                        "bond_stage": None,
-                        "line": "歡迎光臨。",
-                        "choices": [{"keyword_id": "goods", "label": "有什麼貨？"}],
-                    },
+                    "dialogue": dialogue_panel(line="歡迎光臨。"),
                 },
                 mode="dialogue",
             )
@@ -1088,15 +1084,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             page.evaluate("() => window.__elosernBridge.store.setFontScale(1)")
 
             # Dialogue: the marker ends at the left-aligned column's edge.
-            panels["dialogue"] = {
-                "schema_version": 2,
-                "available": True,
-                "kind": "dialogue",
-                "host": {"identity": 11, "display_name": "小販", "portrait_ref": None},
-                "bond_stage": None,
-                "line": "歡迎光臨。",
-                "choices": [{"keyword_id": "goods", "label": "有什麼貨？"}],
-            }
+            panels["dialogue"] = dialogue_panel(line="歡迎光臨。")
             _inject_snapshot(page, panels, mode="dialogue")
             _wait_mode(page, "dialogue")
             page.evaluate(
@@ -1204,20 +1192,15 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             {
                 "exploration": exploration,
                 "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
-                "dialogue": {
-                    "schema_version": 2,
-                    "available": True,
-                    "kind": "dialogue",
-                    "host": {"identity": 11, "display_name": "小販", "portrait_ref": None},
-                    "bond_stage": None,
-                    "line": "歡迎光臨，要看看今天的貨嗎？",
-                    "choices": [
-                        {"keyword_id": "goods", "label": "有什麼貨？"},
-                        {"keyword_id": "price", "label": "價錢怎麼算？"},
-                        {"keyword_id": "town", "label": "最近鎮上如何？"},
-                        {"keyword_id": "road", "label": "路上安全嗎？"},
-                    ],
-                },
+                "dialogue": dialogue_panel(
+                    line="歡迎光臨，要看看今天的貨嗎？",
+                    choices=(
+                        ("goods", "有什麼貨？"),
+                        ("price", "價錢怎麼算？"),
+                        ("town", "最近鎮上如何？"),
+                        ("road", "路上安全嗎？"),
+                    ),
+                ),
             },
             mode="dialogue",
         )
@@ -1406,15 +1389,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             page,
             {
                 **explore_panels,
-                "dialogue": {
-                    "schema_version": 2,
-                    "available": True,
-                    "kind": "dialogue",
-                    "host": {"identity": 11, "display_name": "小販", "portrait_ref": None},
-                    "bond_stage": None,
-                    "line": "歡迎光臨，要看看今天的貨嗎？",
-                    "choices": [{"keyword_id": "goods", "label": "有什麼貨？"}],
-                },
+                "dialogue": dialogue_panel(line="歡迎光臨，要看看今天的貨嗎？"),
             },
             mode="dialogue",
         )

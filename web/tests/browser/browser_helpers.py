@@ -1193,6 +1193,75 @@ def visible_minimap_actionable(page: Page):
     return None
 
 
+def dialogue_panel(
+    *,
+    host_id: int = 11,
+    host_name: str = "小販",
+    host_portrait_ref: str | None = None,
+    actor_id: int = 1,
+    actor_name: str = "測試者",
+    actor_portrait_ref: str | None = None,
+    bond_stage: str | None = None,
+    context_id: str = "ctx-1",
+    line: str = "歡迎光臨。",
+    choices: tuple[tuple[str, str], ...] = (("goods", "有什麼貨？"),),
+) -> dict:
+    """A committed version-3 dialogue panel for an injected snapshot.
+
+    The v3 form is available-only: leaving the conversation drops the panel
+    instead of committing an unavailable one. Each choice carries the
+    projected descriptor a client dispatches, so it names its topic and host.
+    """
+    return {
+        "schema_version": 3,
+        "available": True,
+        "kind": "dialogue",
+        "host": {
+            "identity": host_id,
+            "display_name": host_name,
+            "portrait_ref": host_portrait_ref,
+        },
+        "actor": {
+            "identity": actor_id,
+            "display_name": actor_name,
+            "portrait_ref": actor_portrait_ref,
+        },
+        "bond_stage": bond_stage,
+        "context_id": context_id,
+        "delivery": {
+            "delivery_id": "delivery-1",
+            "context_id": context_id,
+            "topic_id": None,
+            "scene_id": "native_line",
+            "scene_revision": "r1",
+            "phase_revision": None,
+            "kind": "opening",
+            "lines": [{"kind": "speech", "speaker": "host", "text": line}],
+        },
+        "choices": [
+            {
+                "topic_id": f"host.{keyword}",
+                "keyword_id": keyword,
+                "label": label,
+                "availability": "open",
+                "requirement_hint": None,
+                "unread": False,
+                "predecessors": [],
+                "action_payload": {
+                    "npc_id": host_id,
+                    "topic_id": f"host.{keyword}",
+                    "context_id": context_id,
+                },
+            }
+            for keyword, label in choices
+        ],
+        "pure_chain": [],
+        "reading_revision": 0,
+        "completed_topic_ids": [],
+        "unlock_batch": None,
+    }
+
+
 def valid_local_map_panel(**overrides) -> dict:
     """A schema-valid available local_map panel for injected snapshots.
 

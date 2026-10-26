@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest, ui_scale
-from .browser_helpers import open_dialogue_choices, valid_local_map_panel
+from .browser_helpers import dialogue_panel, open_dialogue_choices, valid_local_map_panel
 from ._journey_support import (
     _art_panel,
     _SCENE_PNG_BYTES,
@@ -59,15 +59,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         minimap column at every acceptance viewport; the paged line's column
         starts under the player anchor's left edge; no interactive anchor
         overlaps another; the return to exploration empties `actor-right`."""
-        dialogue = {
-            "schema_version": 2,
-            "available": True,
-            "kind": "dialogue",
-            "host": {"identity": 11, "display_name": "小販", "portrait_ref": None},
-            "bond_stage": None,
-            "line": "歡迎光臨。",
-            "choices": [{"keyword_id": "goods", "label": "有什麼貨？"}],
-        }
+        dialogue = dialogue_panel(line="歡迎光臨。")
         for viewport in ((1451, 790), (1741, 948), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
@@ -138,20 +130,16 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         intersects no other interactive anchor with the vitals, party, and
         minimap islands present, and every row is reachable (scrolling inside
         the card if the stage is short)."""
-        dialogue = {
-            "schema_version": 2,
-            "available": True,
-            "kind": "dialogue",
-            "host": {"identity": 11, "display_name": "小販", "portrait_ref": None},
-            "bond_stage": "熟識",
-            "line": "歡迎光臨，要看看今天的貨嗎？",
-            "choices": [
-                {"keyword_id": "goods", "label": "有什麼貨？"},
-                {"keyword_id": "price", "label": "價錢怎麼算？"},
-                {"keyword_id": "town", "label": "最近鎮上如何？"},
-                {"keyword_id": "road", "label": "路上安全嗎？"},
-            ],
-        }
+        dialogue = dialogue_panel(
+            bond_stage="熟識",
+            line="歡迎光臨，要看看今天的貨嗎？",
+            choices=(
+                ("goods", "有什麼貨？"),
+                ("price", "價錢怎麼算？"),
+                ("town", "最近鎮上如何？"),
+                ("road", "路上安全嗎？"),
+            ),
+        )
         # A committed scene whose label and alt text are far longer than the
         # caption row between the portraits: the row stays one line, so the
         # list still stops above it.

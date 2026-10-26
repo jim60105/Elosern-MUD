@@ -15,7 +15,12 @@ from __future__ import annotations
 from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
-from .browser_helpers import open_dialogue_choices, snapshot_envelope, wait_for_store_state
+from .browser_helpers import (
+    dialogue_panel,
+    open_dialogue_choices,
+    snapshot_envelope,
+    wait_for_store_state,
+)
 from ._journey_support import (
     _combat_panel,
     _exploration_context_actions_panel,
@@ -28,20 +33,15 @@ REFERENCE = (1451, 790)
 
 
 def _dialogue_panel() -> dict:
-    return {
-        "schema_version": 2,
-        "available": True,
-        "kind": "dialogue",
-        "host": {"identity": 11, "display_name": "小販", "portrait_ref": None},
-        "bond_stage": None,
-        "line": "歡迎光臨，要看看今天的貨嗎？",
-        "choices": [
-            {"keyword_id": "goods", "label": "有什麼貨？"},
-            {"keyword_id": "price", "label": "價錢怎麼算？"},
-            {"keyword_id": "town", "label": "最近鎮上如何？"},
-            {"keyword_id": "road", "label": "路上安全嗎？"},
-        ],
-    }
+    return dialogue_panel(
+        line="歡迎光臨，要看看今天的貨嗎？",
+        choices=(
+            ("goods", "有什麼貨？"),
+            ("price", "價錢怎麼算？"),
+            ("town", "最近鎮上如何？"),
+            ("road", "路上安全嗎？"),
+        ),
+    )
 
 
 def _exploration_panels() -> dict:
@@ -51,11 +51,8 @@ def _exploration_panels() -> dict:
     }
 
 
-_CLOSED_DIALOGUE = {
-    "schema_version": 2,
-    "available": False,
-    "reason": {"code": "dialogue_unavailable", "message": "對話已結束"},
-}
+# The version-3 dialogue form is available-only: leaving the conversation
+# drops the panel, so the exploration snapshot simply carries no dialogue key.
 
 
 # Commits one snapshot and reads the stage in the next animation frame, in
@@ -218,7 +215,7 @@ class ModeTransitionsBrowserTest(BrowserAcceptanceTest):
         return self._commit(page, "dialogue", {**_exploration_panels(), "dialogue": _dialogue_panel()})
 
     def _leave_dialogue(self, page) -> dict:
-        return self._commit(page, "exploration", {**_exploration_panels(), "dialogue": _CLOSED_DIALOGUE})
+        return self._commit(page, "exploration", dict(_exploration_panels()))
 
     @covers_requirement(
         "webclient-contextual-hud::mode-changes-transition-at-the-motion-level",
