@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: WebClient text commands refresh presentation after completion
-The project `text` input function SHALL preserve Evennia's ordinary command semantics and SHALL observe both callback and errback settlement without replacing the original Deferred value or Failure. It SHALL compare all eager candidates from then-current canonical state only after a WebClient command settles and use a fresh complete snapshot when a semantic checkpoint or recovery requires it and SHALL NOT emit graphical state for Telnet commands. Idle handling, nickname replacement, command output, session counters, and text access SHALL remain functional.
+The project `text` input function SHALL preserve ordinary command semantics and observe both callback and errback settlement without replacing the original Deferred value or Failure. Only after a WebClient command settles SHALL it compare all eager candidates from then-current canonical state, using a fresh complete snapshot when a semantic checkpoint or recovery requires it, and it SHALL emit no graphical state for Telnet commands.
 
 #### Scenario: A completed WebClient command refreshes state
 - **WHEN** a puppeted WebClient submits an ordinary synchronous text command that changes canonical state
@@ -24,3 +24,7 @@ The project `text` input function SHALL preserve Evennia's ordinary command sema
 #### Scenario: Presentation failure never consumes a command failure
 - **WHEN** the post-settlement publication attempt fails
 - **THEN** the presentation failure SHALL be logged separately and SHALL NOT consume a command failure
+
+#### Scenario: Ordinary text behaviour is untouched
+- **WHEN** a puppeted WebClient submits any ordinary text command
+- **THEN** idle handling, nickname replacement, command output, session counters, and text access SHALL keep working as they do without the publication wrapper

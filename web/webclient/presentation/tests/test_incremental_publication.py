@@ -11,6 +11,8 @@ from collections import deque
 from types import SimpleNamespace
 import unittest
 
+from tools.spec_traceability import covers_requirement
+
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.coordinator import (
     MAX_PENDING_PUBLICATIONS,
@@ -131,31 +133,49 @@ def _completion(request_id="r1", **result):
 class JsonValueSemanticsTests(unittest.TestCase):
     """The comparator and the owned-copy contract."""
 
+    @covers_requirement(
+        "webclient-incremental-publication::candidate-equality-follows-json-value-semantics"
+    )
     def test_object_key_order_is_irrelevant(self):
         self.assertTrue(
             json_value_equal({"a": 1, "b": {"c": 2, "d": 3}}, {"b": {"d": 3, "c": 2}, "a": 1})
         )
 
+    @covers_requirement(
+        "webclient-incremental-publication::candidate-equality-follows-json-value-semantics"
+    )
     def test_array_order_is_significant(self):
         self.assertFalse(json_value_equal([1, 2], [2, 1]))
         self.assertFalse(json_value_equal([1, 2], [1, 2, 3]))
         self.assertTrue(json_value_equal([1, {"a": 2}], [1, {"a": 2}]))
 
+    @covers_requirement(
+        "webclient-incremental-publication::candidate-equality-follows-json-value-semantics"
+    )
     def test_boolean_and_number_are_distinct(self):
         self.assertFalse(json_value_equal(True, 1))
         self.assertFalse(json_value_equal(1, True))
         self.assertTrue(json_value_equal(True, True))
 
+    @covers_requirement(
+        "webclient-incremental-publication::candidate-equality-follows-json-value-semantics"
+    )
     def test_numbers_share_one_type(self):
         self.assertTrue(json_value_equal(1, 1.0))
         self.assertFalse(json_value_equal(1, 2))
         self.assertFalse(json_value_equal("1", 1))
         self.assertFalse(json_value_equal(None, False))
 
+    @covers_requirement(
+        "webclient-incremental-publication::candidate-equality-follows-json-value-semantics"
+    )
     def test_object_key_sets_must_match(self):
         self.assertFalse(json_value_equal({"a": 1}, {"a": 1, "b": 2}))
         self.assertFalse(json_value_equal({"a": 1}, {"b": 1}))
 
+    @covers_requirement(
+        "webclient-incremental-publication::candidate-equality-follows-json-value-semantics"
+    )
     def test_copy_owns_nested_containers(self):
         shared = [{"rows": [1, 2]}]
         owned = copy_json_value(shared)
@@ -170,6 +190,9 @@ class JsonValueSemanticsTests(unittest.TestCase):
 class CandidateComparisonTests(unittest.TestCase):
     """Only real JSON differences reach the wire."""
 
+    @covers_requirement(
+        "webclient-incremental-publication::candidate-equality-follows-json-value-semantics"
+    )
     def test_reordered_dictionary_keys_are_suppressed(self):
         session = FakeSession()
         coordinator = _coordinator(
@@ -187,6 +210,9 @@ class CandidateComparisonTests(unittest.TestCase):
         self.assertEqual(session.sent, [])
         self.assertEqual(coordinator.revision, 1)
 
+    @covers_requirement(
+        "webclient-incremental-publication::candidate-equality-follows-json-value-semantics"
+    )
     def test_list_order_and_boolean_changes_are_published(self):
         session = FakeSession()
         coordinator = _coordinator(
@@ -209,6 +235,9 @@ class CandidateComparisonTests(unittest.TestCase):
         self.assertIs(frames[-2]["panels"]["status"]["flag"], True)
         self.assertEqual(frames[-1]["panels"]["status"]["flag"], 1)
 
+    @covers_requirement(
+        "webclient-incremental-publication::candidate-equality-follows-json-value-semantics"
+    )
     def test_integral_float_candidate_matches_the_integer_baseline(self):
         session = FakeSession()
         coordinator = _coordinator(
@@ -221,6 +250,9 @@ class CandidateComparisonTests(unittest.TestCase):
         )
         self.assertFalse(receipt.published)
 
+    @covers_requirement(
+        "webclient-incremental-publication::candidate-equality-follows-json-value-semantics"
+    )
     def test_presenter_alias_mutation_cannot_corrupt_the_baseline(self):
         rows = [1, 2]
         session = FakeSession()
@@ -282,6 +314,9 @@ class CandidateComparisonTests(unittest.TestCase):
             coordinator.committed_panels["status"], replacement
         )
 
+    @covers_requirement(
+        "webclient-incremental-publication::candidate-equality-follows-json-value-semantics"
+    )
     def test_unchanged_candidates_are_omitted_and_untouched_panels_preserved(self):
         session = FakeSession()
         coordinator = _coordinator(
@@ -310,6 +345,9 @@ class CandidateComparisonTests(unittest.TestCase):
 class UnknownScopeTests(unittest.TestCase):
     """An absent declaration re-renders every eager panel, never maps."""
 
+    @covers_requirement(
+        "webclient-incremental-publication::unknown-scope-recomputes-all-eager-panels-without-full-retransmission"
+    )
     def test_unknown_scope_renders_each_eager_panel_and_sends_only_differences(self):
         renders: dict[str, int] = {"status": 0, "party": 0, "area_map": 0}
         changed = {"value": 1}
@@ -347,6 +385,9 @@ class UnknownScopeTests(unittest.TestCase):
         self.assertEqual(delta["base_revision"], 1)
         self.assertEqual(receipt.revision, 2)
 
+    @covers_requirement(
+        "webclient-incremental-publication::unknown-scope-recomputes-all-eager-panels-without-full-retransmission"
+    )
     def test_unchanged_dialogue_companion_stays_consistent(self):
         session = FakeSession()
         coordinator = _coordinator(
@@ -375,6 +416,9 @@ class UnknownScopeTests(unittest.TestCase):
 class BaselineOwnershipTests(unittest.TestCase):
     """One isolated baseline per live sequence; no reuse after failure."""
 
+    @covers_requirement(
+        "webclient-incremental-publication::publication-baseline-belongs-to-one-live-session-sequence"
+    )
     def test_two_viewers_keep_isolated_baselines(self):
         calls = {"value": 1}
 
@@ -402,6 +446,9 @@ class BaselineOwnershipTests(unittest.TestCase):
         self.assertEqual(one.revision, 2)
         self.assertEqual(two.revision, 2)
 
+    @covers_requirement(
+        "webclient-incremental-publication::publication-baseline-belongs-to-one-live-session-sequence"
+    )
     def test_preflight_failure_sends_nothing_and_consumes_no_revision(self):
         oversized = {"available": True, **{f"pad_{index}": "x" * 1500 for index in range(50)}}
         session = FakeSession()
@@ -418,6 +465,9 @@ class BaselineOwnershipTests(unittest.TestCase):
         self.assertEqual(coordinator.revision, before)
         self.assertEqual(coordinator.published_revision, before)
 
+    @covers_requirement(
+        "webclient-incremental-publication::publication-baseline-belongs-to-one-live-session-sequence"
+    )
     def test_partial_send_invalidates_the_baseline_and_never_reuses_the_target(self):
         def dense(context):
             body = {
@@ -459,6 +509,9 @@ class BaselineOwnershipTests(unittest.TestCase):
         self.assertEqual(receipt.revision, escaped + 1)
         self.assertGreater(receipt.revision, escaped)
 
+    @covers_requirement(
+        "webclient-incremental-publication::publication-baseline-belongs-to-one-live-session-sequence"
+    )
     def test_unchanged_completion_consumes_no_revision_and_orders_the_result(self):
         session = FakeSession()
         coordinator = _coordinator(
@@ -479,6 +532,9 @@ class BaselineOwnershipTests(unittest.TestCase):
         self.assertEqual(session.frames("ui_action_result")[-1]["presentation_revision"], 1)
         self.assertEqual(coordinator.revision, 1)
 
+    @covers_requirement(
+        "webclient-incremental-publication::publication-baseline-belongs-to-one-live-session-sequence"
+    )
     def test_metadata_only_change_advances_the_revision(self):
         clock = SimpleNamespace(**{
             key: getattr(_Calendar, key)
@@ -559,6 +615,9 @@ class BaselineOwnershipTests(unittest.TestCase):
         self.assertEqual(set(delta["panels"]), {"status"})
         self.assertNotIn("party", coordinator.committed_panels)
 
+    @covers_requirement(
+        "webclient-incremental-publication::publication-baseline-belongs-to-one-live-session-sequence"
+    )
     def test_partial_send_of_a_multi_frame_publication_invalidates_the_baseline(self):
         # A schema-valid synthetic area body whose 400 edges exceed one frame's
         # list ceiling, so one logical map publication really spans many frames.
@@ -605,6 +664,9 @@ class BaselineOwnershipTests(unittest.TestCase):
         self.assertEqual(receipt.kind, "snapshot")
         self.assertGreater(receipt.revision, escaped)
 
+    @covers_requirement(
+        "webclient-incremental-publication::publication-baseline-belongs-to-one-live-session-sequence"
+    )
     def test_invalid_action_result_aborts_before_any_frame(self):
         from web.webclient.presentation.publication import PublicationCompletion
 
@@ -708,6 +770,9 @@ class BaselineOwnershipTests(unittest.TestCase):
         coordinator.enqueue_publication(_context)
         self.assertEqual(resolutions, [None])
 
+    @covers_requirement(
+        "webclient-incremental-publication::publication-baseline-belongs-to-one-live-session-sequence"
+    )
     def test_complete_batch_cannot_interleave(self):
         state = {"value": 1}
         session = FakeSession()
@@ -741,6 +806,9 @@ class BaselineOwnershipTests(unittest.TestCase):
         # snapshot follows both.
         self.assertEqual(names, ["ui_update", "ui_action_result", "ui_snapshot"])
 
+    @covers_requirement(
+        "webclient-incremental-publication::publication-baseline-belongs-to-one-live-session-sequence"
+    )
     def test_result_delivery_failure_keeps_the_published_baseline(self):
         session = FakeSession()
         coordinator = _coordinator(
