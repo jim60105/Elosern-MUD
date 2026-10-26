@@ -78,10 +78,10 @@ Aligned to the refined standard with enthusiastic conversational tone, attentive
 2. `altoria_tailor.topic_01` (keyword: 衣甲):
    - Actor asks about protective clothing. Host presents leather armor, chainmail, mage robes, and knight platemail, detailing movement comfort and protection.
 3. `altoria_tailor.topic_02` (keyword: 旅裝):
-   - Actor asks about long travel apparel. Host emphasizes proper fit to prevent chafing on the road and highlights archmage mending robes.
+   - Actor asks about long travel apparel. Host emphasizes proper fit to prevent chafing on the road and highlights robes for academy magic scholars.
 4. `altoria_tailor.topic_03` (keyword: 禮服):
    - Variant `noble_formalwear` (`SocialIdentityIs`: `noble`, priority 10): Host acknowledges noble patron and discusses banqueting attire and Grand Temple holy vestments.
-   - Fallback `altoria_tailor.topic_03_fallback_scene`: Host discusses orders from north avenue nobles, church nuns' open holy robes, saintess vestments, and alluring lace undergarments.
+   - Fallback `altoria_tailor.topic_03_fallback_scene`: Host discusses orders from north avenue nobles, church nuns' open holy robes, saintess vestments, and confidential custom lace intimate wear fitting.
 5. `altoria_tailor.topic_04` (keyword: 收衣):
    - Actor asks about buy-back of old clothing. Host confirms buy-back for restitching and re-lining into fresh gear.
 
