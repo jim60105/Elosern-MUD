@@ -141,11 +141,13 @@ class SceneBuilderOfflineLoopTests(SceneBuilderIsolation, EvenniaCommandTestMixi
         grant_lineage(self.player, [_T_CAST_SKILL])
         self.player.location = self.anchor
         self.staff = create_object(NPC, key="scene staff", location=self.anchor)
-        self.staff.components.add(
-            GuildStaff.create(
-                self.staff, service_id="staff", branch_key=_T_ISSUER
-            )
+        staff_component = GuildStaff.create(
+            self.staff, service_id="staff", branch_key=_T_ISSUER
         )
+        # A serving host declares its authored availability binding: the gate
+        # fails closed on a missing one.
+        staff_component.service_binding = "person"
+        self.staff.components.add(staff_component)
         from world.rules.guild import register_adventurer
 
         register_adventurer(self.player, self.staff)

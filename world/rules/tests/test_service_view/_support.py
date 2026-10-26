@@ -207,6 +207,9 @@ class FakeHost:
         self.pk = pk
         self.components = FakeComponents(*components)
         self.location = location
+        # The shared service gate debounces its malformed-binding warn on
+        # ``host.ndb``; a host double carries the same non-persistent surface.
+        self.ndb = SimpleNamespace()
 
 
 class FakeRoom:
@@ -252,15 +255,18 @@ class FakeAttributes:
 
 
 def guild_staff(**fields):
+    fields.setdefault("service_binding", "person")
     return FakeComponent(GuildStaff.name, branch_key=BRANCH, **fields)
 
 
 def exam_reception(**fields):
+    fields.setdefault("service_binding", "person")
     fields.setdefault("branch_key", BRANCH)
     return FakeComponent(GuildExamReception.name, **fields)
 
 
 def merchant(**fields):
+    fields.setdefault("service_binding", "person")
     fields.setdefault("shop_key", T_SHOP)
     fields.setdefault(
         "merchant_stock",

@@ -333,13 +333,18 @@ class PersistentHumanGuildHostTests(EvenniaTest):
         with self.assertRaises(hosts.GuildHostIntegrityError):
             self.sync()
         self.people[self.person.key] = replace(self.person, home_key="t_hosted_home")
+        hosted_home = replace(
+            self.home_place,
+            key="t_hosted_home",
+            host_profile_key=self.person.key,
+        )
         with patch(
             "world.lore.settlements.places.PLACE_REGISTRY",
             {
                 "t_home": self.home_place,
-                "t_hosted_home": replace(
-                    self.home_place, key="t_hosted_home", service_id="t_service"
-                ),
+                # A residence that hosts a service of its own: the canonical
+                # host identity marks it as a service place, not a home.
+                "t_hosted_home": hosted_home,
             },
         ):
             with self.assertRaises(hosts.GuildHostIntegrityError):

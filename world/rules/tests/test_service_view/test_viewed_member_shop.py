@@ -149,6 +149,9 @@ class ViewedMemberShopTests(BattlefieldIsolation, EvenniaTest):
         self.far_room = create_object(Room, key="viewed shop far room")
         self.keeper = create_object(NPC, key="viewed shop keeper", location=self.room)
         merchant = Merchant.create(self.keeper, service_id="viewed_store", shop_key=_SHOP)
+        # A serving host declares its authored availability binding: the gate
+        # fails closed on a missing one.
+        merchant.service_binding = "person"
         self.keeper.components.add(merchant)
         merchant.merchant_stock = {
             _SWORD.key: 3,

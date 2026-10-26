@@ -592,11 +592,13 @@ class GuildBoardRestoreTests(RegistryIsolationMixin, EvenniaTestCase):
         get_world_clock()
         self.hall = create_object(Room, key="restore-guild-hall")
         self.staff = create_object(NPC, key="restore staff", location=self.hall)
-        self.staff.components.add(
-            GuildStaff.create(
-                self.staff, service_id="staff", branch_key=_issuer_key()
-            )
+        staff_component = GuildStaff.create(
+            self.staff, service_id="staff", branch_key=_issuer_key()
         )
+        # A serving host declares its authored availability binding: the gate
+        # fails closed on a missing one.
+        staff_component.service_binding = "person"
+        self.staff.components.add(staff_component)
         self.player = create_object(PlayerCharacter, key="restore-board-player")
         self.player.race = "human"
         self.player.apply_race_baseline()
