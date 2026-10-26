@@ -1,55 +1,87 @@
 schema_version: 1
-greeting: 藥草園邊的屋裡滿是苦甜交錯的氣味，妮瑞斯‧米斯特瓦勒正替藥爐壓小火，回頭先把你上下打量了一遍：「沒受傷吧？那就好。這輪藥剛起罐，強效治療藥水和魔力藥水都還有一些，要帶幾罐上路就跟我說喔。」
+greeting: 藥草園旁的石屋裡瀰漫著微苦回甘的草木香氣。妮瑞斯‧米斯特瓦勒將藥爐風口掩小，轉過身仔細端詳你的步態與肩背：「身上沒帶重傷吧？那就好。這爐剛熬透，強效治療藥水和魔力藥水都妥善裝好了罐，打算帶幾罐上路防身就直接跟我說喔。」
 topics:
 - topic_id: ciaran_nireth_home.topic_01
   keyword: 調藥
   label: 調藥
   fallback:
     scene_id: ciaran_nireth_home.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 調藥
+      text: 屋裡這些陶罐與火爐，就是你平日熬製藥水的地方嗎？
+    - kind: narration
+      text: 妮瑞斯‧米斯特瓦勒拿布巾按了按額角滲出的細汗，目光掃過爐台上排列整齊的藥瓶。
     - kind: speech
       speaker: host
-      text: 「藥草從園裡採，方子是族裡老一輩傳下來的方法，一爐小火從早熬到晚。精靈不會生病，可是傷口和用光的魔力，不管哪一族都一樣。手邊有的就兩種，強效治療藥水和魔力藥水。」
+      text: 「藥草全是我每天清晨在門前園子裡摘採，配方依循族裡長輩傳下來的火候，用慢火細煨一整天。精靈雖然天生不受瘟病侵害，但筋骨創傷與枯竭的魔力，無論哪一族遇上都是同等凶險喔。」
+    - kind: speech
+      speaker: actor
+      text: 你在這裡常備的藥水，主要能應對哪些凶險情況？
+    - kind: speech
+      speaker: host
+      text: 「我手邊常備的就兩種，強效治療藥水用來封口止血、續接筋骨，魔力藥水用來充盈耗竭的魔力。藥效確實穩妥，絕無半點浮誇。」
 - topic_id: ciaran_nireth_home.topic_02
   keyword: 重傷
   label: 重傷
   fallback:
     scene_id: ciaran_nireth_home.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 重傷
+      text: 如果遭遇魔獸撕咬或兵刃重創，該用哪種藥劑應急？
+    - kind: narration
+      text: 妮瑞斯‧米斯特瓦勒從木架上取下一隻封著紅繩的陶瓶，神情十分鄭重。
     - kind: speech
       speaker: host
-      text: 「紅色那罐是強效治療藥水，傷得重才開，小傷用清水和草灰就夠了，別浪費喔。要帶幾罐防身，留幾枚銅幣給我就好。」
+      text: 「那得用這罐繫著紅繩的強效治療藥水。真傷及臟腑或是筋骨斷裂，仰頭喝下一整罐，藥力才能迅速穩住生機。若是尋常擦傷蹭破皮，用井水洗淨敷點草灰就能癒合，可別隨意糟蹋藥喔。」
+    - kind: speech
+      speaker: actor
+      text: 準備出外歷練的話，能向你換幾罐帶在身上防範萬一嗎？
+    - kind: speech
+      speaker: host
+      text: 「要帶去防身自然可以，留下幾枚銅幣當作耗材的代價便成。記得收妥在腰包內層，危急關頭才拿出來救命，平時切莫貪圖省事胡亂吞服。」
 - topic_id: ciaran_nireth_home.topic_03
   keyword: 魔力
   label: 魔力
   fallback:
     scene_id: ciaran_nireth_home.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 魔力
+      text: 施展法術過度而魔力枯竭時，喝你調製的藥水真能平復過來嗎？
+    - kind: narration
+      text: 妮瑞斯‧米斯特瓦勒指了指另一側繫著藍繩的小釉罐，語氣篤定。
     - kind: speech
       speaker: host
-      text: 「藍色那罐是魔力藥水，施法的人累了，喝一口就能緩過來，精靈喝也一樣有效。聽說外頭把這東西當寶，在谷裡只是多熬一爐的事啊。」
+      text: 「藍繩這罐便是魔力藥水。施法者若感到精神疲乏、體內魔力見底，拔開木塞飲用，乾涸的魔力便能逐步回湧。我們精靈日常若是魔力損耗過劇，同樣也是靠它平復元氣。」
+    - kind: speech
+      speaker: actor
+      text: 聽說外頭人類城鎮將魔力回復藥水視為千金難求的珍品，在這裡取得也這般繁複嗎？
+    - kind: speech
+      speaker: host
+      text: 「外邦人愛把這物事神化誇大，在我們暗影谷村，不過是多劈幾捆柴火、在藥草園多守一爐晝夜的心力。只要村裡藥草長勢良好，多熬幾罐分與外來客人，並非難事啊。」
 - topic_id: ciaran_nireth_home.topic_04
   keyword: 藥草
   label: 藥草
   fallback:
     scene_id: ciaran_nireth_home.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 藥草
+      text: 如果有旅人從外地採得奇花異草，能拿來賣給你入藥調劑嗎？
+    - kind: narration
+      text: 妮瑞斯‧米斯特瓦勒擺了擺沾著草汁的手掌，語氣十分堅決。
     - kind: speech
       speaker: host
-      text: 「園裡的藥草我自己採，外頭的我不收，誰知道藥性有沒有走掉。我熬的藥你要是用不到，原封不動拿回來，我收下就是。」
+      text: 「外頭送來的生草我一概不收。採摘離根隔了幾日、曬乾時沾了風塵雜氣，藥性走失便會害人。我的藥只用這片藥草園親手培植的植株，根葉底細我都摸得透徹。」
+    - kind: speech
+      speaker: actor
+      text: 要是換去的成藥始終沒機會用上，也能完好帶回來交還給你嗎？
+    - kind: speech
+      speaker: host
+      text: 「未曾啟封、瓶塞蠟封完好的藥罐，你原封不動帶回來，我都照數收回，銅幣也會原樣退你。調出來的好藥就該留給真正遇難受傷的人，擱在箱底發霉可不行喔。」

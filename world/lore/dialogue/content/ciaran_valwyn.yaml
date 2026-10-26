@@ -1,55 +1,111 @@
 schema_version: 1
-greeting: 村北古樹下的屋裡，瓦爾溫‧斯蒂爾瓦特爾正把一串貝殼掛上繩結，聽見腳步聲就回頭笑了：「哎，有人來了！你從哪裡來呀？路上看到什麼了？先別急著走，坐下來聊一會兒。這屋裡掛的東西都有故事，想聽哪一樣，我都講給你聽。」
+greeting: 村北古樹下的石屋裡懸滿四處蒐羅來的奇異物件。瓦爾溫‧斯蒂爾瓦特爾正把一串洗淨的海貝穿上皮繩，聽見門口動靜便滿臉驚喜地轉過身來：「哎，有客人來了！你是打哪兒來的呀？路上看見什麼奇聞了？快進來坐下歇會兒。我這屋裡掛著的每件收藏都有來歷，想聽哪一段我都講給你聽。」
 topics:
 - topic_id: ciaran_valwyn_home.topic_01
   keyword: 蒐羅
   label: 蒐羅
   fallback:
     scene_id: ciaran_valwyn_home.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 蒐羅
+      text: 牆上掛著這麼多羽毛、種子與貝殼，全是你四處採集回來的嗎？
+    - kind: narration
+      text: 瓦爾溫‧斯蒂爾瓦特爾滿懷興致地指向樑下一枚斑駁的青色大羽毛。
     - kind: speech
       speaker: host
-      text: 「這些呀，路上撿到、林子裡換來、溪水沖上岸，全都在這兒。哎，你看那根羽毛，三百年前一隻大鳥掉下來，那天下了好大的雨……啊，又扯遠了。這幾樣我要留著，不換，你看就好。」
+      text: 「是啊！沿著山徑拾得、深潭邊換來、溪水沖刷上岸，全都在這兒呢。你看那根青翎，是三百年前一隻大鳥避雷落進谷底時褪下，那天雨下得好急……哎呀，我又扯遠了。這些物件各繫著小木牌記著歲月，我留著作紀念，是不換給外人的喔。」
+    - kind: speech
+      speaker: actor
+      text: 每件零星物件都標註著年歲與地點，整理起來想必費了不少心神吧？
+    - kind: speech
+      speaker: host
+      text: 「一點也不費事，記下它們從哪裡來，就是最快活的事啦！屋裡能看的物件多得很，你看中哪樣隨管開口問，我全都記得一清二楚。」
 - topic_id: ciaran_valwyn_home.topic_02
   keyword: 蛛絲
   label: 蛛絲
   fallback:
     scene_id: ciaran_valwyn_home.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 蛛絲
+      text: 門邊懸著的那幾捆銀亮絲線，就是傳聞中質地極韌的精靈蛛絲嗎？
+    - kind: narration
+      text: 瓦爾溫‧斯蒂爾瓦特爾伸手牽起一縷微光流轉的絲線，示範般在指尖拉扯繃直。
     - kind: speech
       speaker: host
-      text: 「精靈蛛絲是林子裡的蛛吐的絲，韌得很，編成繩子，風雨都扯不斷。村裡每個人都會編，我編得多一點，就掛出來給大家取用。你要幾束就跟我說，我替你從繩上解下來。」
+      text: 「正是精靈蛛絲！深林裡的巨蛛吐出來的絲，韌度驚人，就算編製成細索，強風暴雨也扯它不斷。村裡每個族人都懂如何採絲編繩，我平時編得格外起勁，多出來的就掛在門邊供人取用。」
+    - kind: speech
+      speaker: actor
+      text: 這種蛛絲如果拿來當作防具或修補行頭的素材，需要怎麼跟你換取？
+    - kind: speech
+      speaker: host
+      text: 「你想帶幾束回去鞣製皮甲或加固弓弦，跟我說一聲便好，我替你從掛繩上解下來。留下相應的銅幣，就能安心帶進深山闖蕩啦。」
 - topic_id: ciaran_valwyn_home.topic_03
   keyword: 耳環
   label: 耳環
+  variants:
+  - variant_id: familiar_visitor
+    priority: 10
+    when:
+      kind: affinity_at_least
+      stage_key: familiar
+    scene:
+      scene_id: ciaran_valwyn_home.topic_03_familiar
+      revision: r2
+      lines:
+      - kind: speech
+        speaker: actor
+        text: 你耳邊戴著的那對月牙耳環，彎弧精巧細緻，上頭是不是也藏著一段故事？
+      - kind: narration
+        text: 瓦爾溫‧斯蒂爾瓦特爾側過臉撫了撫耳垂，眼神裡帶著認出熟識客人的笑意。
+      - kind: speech
+        speaker: host
+        text: 「哎，你也是認識的人了！這對月牙耳環你之前見過吧。那是銀葉坡格威娜拉的手藝，我用撿來的貝殼跟她換來戴了許多年，可不能解下來給你喔。」
+      - kind: speech
+        speaker: actor
+        text: 既然是你珍藏多年的心愛飾物，我自然不會強求，去哪裡能尋得這般精緻的巧物？
+      - kind: speech
+        speaker: host
+        text: 「你若真心喜歡這副樣式，沿著路去銀葉坡找格威娜拉便是。她窗邊掛著好幾對剛做妥的綴飾，去她那裡耐心挑選，準能挑著合心意的東西。」
   fallback:
     scene_id: ciaran_valwyn_home.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 耳環
+      text: 你耳邊戴著的那對月牙耳環，彎弧精巧細緻，上頭是不是也藏著一段故事？
+    - kind: narration
+      text: 瓦爾溫‧斯蒂爾瓦特爾側過臉撫了撫耳上的銀飾，帶著笑意迎上你的視線。
     - kind: speech
       speaker: host
-      text: 「這對月牙耳環？格威娜拉的手藝，我跟她換來，戴了好多年了。哎，要是你也喜歡，去銀葉坡找她，她窗邊掛著一整排呢。我這對可不給喔，上面有故事。」
+      text: 「這對月牙耳環好看吧？是銀葉坡格威娜拉的手藝，我拿撿來的小貝殼跟她換取佩戴，已過許多年啦。要是你也中意，順著路去銀葉坡找她，她窗邊掛著好幾對呢。我這對可不能解下來換給你喔，上面記著好多年的事呢。」
+    - kind: speech
+      speaker: actor
+      text: 既然是你珍藏多年的心愛飾物，我自然不會強求，去哪裡能尋得這般精緻的巧物？
+    - kind: speech
+      speaker: host
+      text: 「沿著石徑往銀葉坡走，格威娜拉就住在那兒。她打製的首飾在村裡最出名，去她窗邊挑一副合眼緣的帶上路，保管不會讓你白跑一趟。」
 - topic_id: ciaran_valwyn_home.topic_04
   keyword: 以物易物
   label: 以物易物
   fallback:
     scene_id: ciaran_valwyn_home.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 以物易物
+      text: 聽說你最喜歡跟往來的旅人以物易物，平常都拿些什麼來交換？
+    - kind: narration
+      text: 瓦爾溫‧斯蒂爾瓦特爾雙手托著下巴，眼睛閃爍著好奇的光芒。
     - kind: speech
       speaker: host
-      text: 「我最喜歡換東西了！不過我換的是故事，你說一段路上的見聞，我就講一段這屋裡哪樣東西的來歷。蛛絲要是用不完，原封不動拿回來，我收下，回你幾枚銅幣。」
+      text: 「我最愛跟人換東西了！不過比起金屬銅幣，我更喜歡換各處的奇聞軼事。你講一段在山林荒野的見聞，我就講一段這屋裡某件老物件的來歷，這才算真正划算的交換呀。」
+    - kind: speech
+      speaker: actor
+      text: 如果先前跟你換走的精靈蛛絲沒能用完，也能完好帶回來退換嗎？
+    - kind: speech
+      speaker: host
+      text: 「只要蛛絲沒有散落受損、原樣整捆拿回來，我自會替你收下，換回幾枚銅幣貼補盤纏。好料子回了這間屋子，遲早還能派上新用場呢。」
