@@ -59,6 +59,8 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 protocol_version: 1,
                 presentation_epoch: v.epoch,
                 revision: v.revision + 1,
+                base_revision: v.revision,
+                removed_panels: [],
                 mode: v.mode,
                 layout_version: v.layoutVersion ?? 1,
                 panels: { local_map: panel },

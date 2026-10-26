@@ -509,6 +509,8 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
                     protocol_version: 1,
                     presentation_epoch: s.epoch,
                     revision: s.revision + 1,
+                    base_revision: s.revision,
+                    removed_panels: [],
                     mode: 'exploration',
                     layout_version: 1,
                     server_time: s.serverTime,

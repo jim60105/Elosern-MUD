@@ -165,6 +165,8 @@ test("title_ballot is in the production panel allowlist and a bad panel rejects 
     },
   };
   envelope.revision = 6;
+  envelope.base_revision = 5;
+  envelope.removed_panels = [];
   assert.doesNotThrow(() => Protocol.validateUpdate(envelope));
 });
 

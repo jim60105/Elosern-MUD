@@ -97,16 +97,19 @@ describe("store protocol ordering", () => {
 
     it("preserves the last committed state when payloads are rejected", () => {
       openSession();
+      // A schema-valid delta can only be stale at a revision the sequence has
+      // already passed, so commit revision 2 first.
+      expect(store.receive(1, "ui_update", [fx.update({ revision: 2 })], {}).accepted).toBe(true);
       const committed = JSON.parse(JSON.stringify(store.view));
 
       const staleRevision = store.receive(
         1,
         "ui_update",
-        [fx.update({ revision: 1 })],
+        [fx.update({ revision: 2 })],
         {},
       );
       expect(staleRevision.reason).toBe("not_newer");
-      const offEpoch = store.receive(1, "ui_update", [fx.update({ presentation_epoch: fx.EPOCH_B })], {});
+      const offEpoch = store.receive(1, "ui_update", [fx.update({ revision: 3, presentation_epoch: fx.EPOCH_B })], {});
       expect(offEpoch.reason).toBe("different_epoch");
 
       expect(store.view).toEqual(committed);
@@ -130,7 +133,7 @@ describe("store protocol ordering", () => {
       store.setConnected(true);
       // phase = awaiting_initial_snapshot: only a valid full snapshot can
       // establish active state; an update never does.
-      const result = store.receive(1, "ui_update", [fx.update({ revision: 1, presentation_epoch: fx.EPOCH_C })], {});
+      const result = store.receive(1, "ui_update", [fx.update({ revision: 2, presentation_epoch: fx.EPOCH_C })], {});
       expect(result.accepted).toBe(false);
       expect(result.reason).toBe("update_cannot_establish_epoch");
       expect(store.view.phase).toBe("awaiting_initial_snapshot");

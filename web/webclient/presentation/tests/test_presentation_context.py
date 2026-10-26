@@ -154,6 +154,11 @@ class PublicationPathSnapshotTests(EvenniaTest):
         self.session.ndb.options_state = _options_state(
             str(self.player.pk), self.fingerprint
         )
+        # Every publication path follows the transport's initial sync: the
+        # fixture establishes the committed baseline first, then asserts only
+        # the publications under test.
+        synchronize_session(self.session, self.player)
+        self.session.sent.clear()
 
     def test_context_factory_carries_the_current_situation_fingerprint(self):
         context = build_presentation_context(self.session, self.player)

@@ -88,12 +88,20 @@ test("a large area map arrives whole through bounded parts", () => {
     protocol_version: 1,
     presentation_epoch: EPOCH,
     revision,
+    base_revision: revision - 1,
+    removed_panels: [],
     mode: "exploration",
     panels,
     layout_version: 1,
     server_time: serverTime(),
   });
-  assert.equal(store.receive(1, "ui_snapshot", [frame(1, { status: validStatusPanel() })], {}).accepted, true);
+  const snapshot = (revision, panels) => {
+    const value = frame(revision, panels);
+    delete value.base_revision;
+    delete value.removed_panels;
+    return value;
+  };
+  assert.equal(store.receive(1, "ui_snapshot", [snapshot(1, { status: validStatusPanel() })], {}).accepted, true);
   for (const part of parts) {
     store.receive(1, "ui_update", [frame(2, { area_map: part })], {});
   }

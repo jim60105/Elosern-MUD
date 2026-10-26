@@ -152,7 +152,17 @@ function snapshot(overrides) {
 }
 
 function update(overrides) {
-  return snapshot(overrides);
+  const value = snapshot(overrides);
+  // The helper models one consecutive publication: the fixture's own
+  // revision is the target and its predecessor is the baseline. A test that
+  // models a skipped target supplies its own explicit base_revision.
+  if (!Object.prototype.hasOwnProperty.call(value, "base_revision")) {
+    value.base_revision = value.revision - 1;
+  }
+  if (!Object.prototype.hasOwnProperty.call(value, "removed_panels")) {
+    value.removed_panels = [];
+  }
+  return value;
 }
 
 function actionResult(overrides) {

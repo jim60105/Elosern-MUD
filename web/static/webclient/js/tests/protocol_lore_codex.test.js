@@ -256,6 +256,8 @@ test("lore_codex is in panel allowlist and validates in snapshots and unavailabl
 
   envelope.panels = { lore_codex: unavailable };
   envelope.revision = 2;
+  envelope.base_revision = 1;
+  envelope.removed_panels = [];
   assert.doesNotThrow(() => Protocol.validateUpdate(envelope));
 
   assert.deepEqual(

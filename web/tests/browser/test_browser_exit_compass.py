@@ -142,6 +142,8 @@ class ExitCompassBrowserTest(BrowserAcceptanceTest):
                   const update = JSON.parse(JSON.stringify(rooms[next].envelope));
                   update.presentation_epoch = v.epoch;
                   update.revision = revision;
+                  update.base_revision = revision - 1;
+                  update.removed_panels = [];
                   store.receive(v.generation, 'ui_update', [update], {});
                 }, 150);
                 return undefined;

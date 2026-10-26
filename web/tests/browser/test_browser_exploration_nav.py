@@ -110,6 +110,8 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 protocol_version: 1,
                 presentation_epoch: s.epoch,
                 revision: s.revision + 1,
+                base_revision: s.revision,
+                removed_panels: [],
                 mode: s.mode,
                 layout_version: s.layoutVersion ?? 1,
                 panels,

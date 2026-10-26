@@ -1613,6 +1613,8 @@ def inject_update(page: Page, panels: dict, mode: str = "exploration") -> None:
         "(args) => { const s = window.__elosernBridge.store.view;"
         " const env = args.envelope;"
         " env.presentation_epoch = s.epoch;"
+        " env.base_revision = s.revision;"
+        " env.removed_panels = [];"
         " env.revision = s.revision + 1;"
         " return window.__elosernBridge.store.receive("
         "s.generation, 'ui_update', [env], {}); }",

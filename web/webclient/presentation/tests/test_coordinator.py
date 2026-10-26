@@ -186,11 +186,52 @@ class CoordinatorBasicsTests(unittest.TestCase):
     def test_panel_update_completely_replaces_named_panels(self):
         session = FakeSession()
         coordinator = _coordinator(session, _registry(_status_spec()))
+        # A delta requires the exact committed baseline: establish it first
+        # and record only the publication under assertion.
+        coordinator.full_snapshot(_context())
+        session.sent.clear()
         coordinator.panel_update(_context(), {"status": _available_payload(value=9)})
         envelope = session.sent[0]["ui_update"][0][0]
         self.assertEqual(envelope["mode"], "exploration")
         self.assertEqual(envelope["panels"]["status"]["value"], 9)
-        self.assertEqual(envelope["revision"], 1)
+        self.assertEqual(envelope["revision"], 2)
+        self.assertEqual(envelope["base_revision"], 1)
+        self.assertEqual(envelope["removed_panels"], [])
+
+    def test_panel_update_removals_are_explicit_and_disjoint(self):
+        session = FakeSession()
+        coordinator = _coordinator(
+            session,
+            _registry(
+                _status_spec(),
+                PresenterSpec(
+                    name="other",
+                    schema_version=1,
+                    unavailable_reason=("missing_data", "無法讀取角色資料"),
+                    presenter=lambda context: _available_payload(),
+                ),
+            ),
+        )
+        coordinator.full_snapshot(_context())
+        session.sent.clear()
+        envelope = coordinator.panel_update(
+            _context(), {}, removed_panels=("other",)
+        )
+        self.assertEqual(envelope["removed_panels"], ["other"])
+        self.assertEqual(envelope["panels"], {})
+        self.assertEqual(envelope["base_revision"], 1)
+        self.assertEqual(envelope["revision"], 2)
+        with self.assertRaises(ValueError):
+            coordinator.panel_update(
+                _context(),
+                {"status": _available_payload(value=1)},
+                removed_panels=("status",),
+            )
+        with self.assertRaises(ValueError):
+            coordinator.panel_update(_context(), {}, removed_panels=("unknown",))
+        with self.assertRaises(ValueError):
+            coordinator.panel_update(_context(), {}, removed_panels=("area_map",))
+        self.assertEqual(coordinator.revision, 2)
 
     def test_panel_update_rejects_empty_and_unknown(self):
         session = FakeSession()

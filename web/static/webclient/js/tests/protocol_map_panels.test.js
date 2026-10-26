@@ -33,6 +33,20 @@ function envelope(revision, panels, extra) {
   );
 }
 
+// One exact-base delta. The helper models consecutive publications, so the
+// baseline is the directly preceding revision; a scenario that follows an
+// abandoned, never-committed transfer supplies its own base_revision.
+function updateEnvelope(revision, panels, extra) {
+  const value = envelope(revision, panels, extra);
+  if (!Object.prototype.hasOwnProperty.call(value, "base_revision")) {
+    value.base_revision = revision - 1;
+  }
+  if (!Object.prototype.hasOwnProperty.call(value, "removed_panels")) {
+    value.removed_panels = [];
+  }
+  return value;
+}
+
 function activeStore() {
   const store = Protocol.createStore();
   store.beginTransport(1);
@@ -42,7 +56,7 @@ function activeStore() {
 }
 
 function sendParts(store, revision, panel, parts, extra) {
-  return parts.map((part) => store.receive(1, "ui_update", [envelope(revision, { [panel]: part }, extra)], {}));
+  return parts.map((part) => store.receive(1, "ui_update", [updateEnvelope(revision, { [panel]: part }, extra)], {}));
 }
 
 function rejects(fn) {
@@ -159,7 +173,7 @@ test("an eager snapshot never carries a map panel", () => {
 
 test("a single-frame map update lands in the separate map slot", () => {
   const store = activeStore();
-  const result = store.receive(1, "ui_update", [envelope(2, { area_map: F.gridArea() })], {});
+  const result = store.receive(1, "ui_update", [updateEnvelope(2, { area_map: F.gridArea() })], {});
   assert.equal(result.accepted, true);
   const state = store.getState();
   assert.deepEqual(state.maps.area_map, F.gridArea());
@@ -169,7 +183,7 @@ test("a single-frame map update lands in the separate map slot", () => {
     available: false,
     reason: { code: "map_unavailable", message: "地圖目前無法顯示" },
   };
-  assert.equal(store.receive(1, "ui_update", [envelope(3, { world_map: unavailable })], {}).accepted, true);
+  assert.equal(store.receive(1, "ui_update", [updateEnvelope(3, { world_map: unavailable })], {}).accepted, true);
   assert.deepEqual(store.getState().maps.world_map, unavailable);
 });
 
@@ -179,9 +193,9 @@ test("a single-frame map update lands in the separate map slot", () => {
 
 test("same-epoch eager refreshes retain maps; a new epoch clears them", () => {
   const store = activeStore();
-  store.receive(1, "ui_update", [envelope(2, { area_map: F.gridArea() })], {});
+  store.receive(1, "ui_update", [updateEnvelope(2, { area_map: F.gridArea() })], {});
   // An eager update and a same-epoch full snapshot keep the map unchanged.
-  assert.equal(store.receive(1, "ui_update", [envelope(3, { status: validStatusPanel() })], {}).accepted, true);
+  assert.equal(store.receive(1, "ui_update", [updateEnvelope(3, { status: validStatusPanel() })], {}).accepted, true);
   assert.equal(store.receive(1, "ui_snapshot", [envelope(4, { status: validStatusPanel() })], {}).accepted, true);
   assert.deepEqual(store.getState().maps.area_map, F.gridArea());
   // A no-puppet detachment and a new transport generation clear both stores.
@@ -190,7 +204,7 @@ test("same-epoch eager refreshes retain maps; a new epoch clears them", () => {
   ], {});
   assert.deepEqual(store.getState().maps, {});
   const fresh = activeStore();
-  fresh.receive(1, "ui_update", [envelope(2, { area_map: F.gridArea() })], {});
+  fresh.receive(1, "ui_update", [updateEnvelope(2, { area_map: F.gridArea() })], {});
   fresh.beginTransport(2);
   assert.deepEqual(fresh.getState().maps, {});
 });
@@ -207,7 +221,10 @@ test("a complete transfer is adopted atomically, metadata included", () => {
   let notified = 0;
   store.subscribe(() => notified++);
   const results = sendParts(store, 2, "area_map", parts, { mode: "combat" });
-  results.slice(0, -1).forEach((result) => assert.equal(result.partial, true));
+  results.slice(0, -1).forEach((result) => {
+    assert.equal(result.accepted, false);
+    assert.equal(result.pending, true);
+  });
   assert.equal(results[results.length - 1].accepted, true);
   assert.equal(notified, 1);
   const state = store.getState();
@@ -243,7 +260,7 @@ test("duplicate, conflicting and replayed parts never adopt mixed state", () => 
   assert.deepEqual(store.getState().maps, {});
   // After a completed transfer, a replayed part is stale.
   const fresh = F.encodeParts(F.wildernessArea(), TRANSFER_B);
-  sendParts(store, 3, "area_map", fresh);
+  sendParts(store, 3, "area_map", fresh, { base_revision: 1 });
   assert.ok(store.getState().maps.area_map);
   assert.equal(sendParts(store, 3, "area_map", [fresh[0]])[0].reason, "not_newer");
 });
@@ -253,14 +270,16 @@ test("a newer transfer retires an older one; a stray older one is ignored", () =
   const older = F.encodeParts(F.wildernessArea({ title: "舊地圖" }), TRANSFER_A);
   const newer = F.encodeParts(F.wildernessArea({ title: "新地圖" }), TRANSFER_B);
   sendParts(store, 2, "area_map", older.slice(0, 2));
-  sendParts(store, 3, "area_map", newer.slice(0, 1));
+  // Revision 2 never committed, so the newer publication still builds on
+  // the committed baseline 1 rather than inventing a predecessor.
+  sendParts(store, 3, "area_map", newer.slice(0, 1), { base_revision: 1 });
   // A same-or-lower-revision frame of another transfer never disturbs the live one.
   assert.equal(
-    sendParts(store, 3, "area_map", F.encodeParts(F.wildernessArea(), TRANSFER_C).slice(0, 1))[0].reason,
+    sendParts(store, 3, "area_map", F.encodeParts(F.wildernessArea(), TRANSFER_C).slice(0, 1), { base_revision: 1 })[0].reason,
     "superseded_transfer"
   );
   assert.equal(sendParts(store, 2, "area_map", older.slice(2, 3))[0].reason, "finished_transfer");
-  sendParts(store, 3, "area_map", newer.slice(1));
+  sendParts(store, 3, "area_map", newer.slice(1), { base_revision: 1 });
   assert.equal(store.getState().maps.area_map.title, "新地圖");
 });
 
@@ -268,7 +287,8 @@ test("an interleaved newer eager update makes an unfinished transfer stale", () 
   const store = activeStore();
   const parts = F.encodeParts(F.wildernessArea(), TRANSFER_A);
   sendParts(store, 2, "area_map", parts.slice(0, 1));
-  assert.equal(store.receive(1, "ui_update", [envelope(3, { status: validStatusPanel() })], {}).accepted, true);
+  // The partial transfer never committed, so the eager delta builds on 1.
+  assert.equal(store.receive(1, "ui_update", [updateEnvelope(3, { status: validStatusPanel() }, { base_revision: 1 })], {}).accepted, true);
   assert.equal(store.mapAssemblyStats().live, 0);
   assert.equal(sendParts(store, 2, "area_map", parts.slice(1, 2))[0].reason, "not_newer");
   assert.deepEqual(store.getState().maps, {});
@@ -289,7 +309,7 @@ test("malformed chunks, counts and bodies are rejected", () => {
   assert.equal(bad((p) => { p.index = p.count; }).accepted, false);
   assert.equal(bad((p) => { p.extra = 1; }).accepted, false);
   // A part frame carries exactly one panel.
-  const mixed = store.receive(1, "ui_update", [envelope(2, { area_map: parts[0], status: validStatusPanel() })], {});
+  const mixed = store.receive(1, "ui_update", [updateEnvelope(2, { area_map: parts[0], status: validStatusPanel() })], {});
   assert.equal(mixed.accepted, false);
   // A body that decodes but violates the schema is never adopted.
   const invalid = F.encodeParts(Object.assign(F.gridArea(), { secret: 1 }), TRANSFER_B);
@@ -302,7 +322,7 @@ test("malformed chunks, counts and bodies are rejected", () => {
     available: true,
     part: { transfer_id: TRANSFER_C, index: 0, count: 1, byte_length: 3, chunk: raw.toString("base64") },
   };
-  assert.equal(sendParts(store, 3, "area_map", [notUtf8])[0].reason, "invalid_body");
+  assert.equal(sendParts(store, 3, "area_map", [notUtf8], { base_revision: 1 })[0].reason, "invalid_body");
   assert.deepEqual(store.getState().maps, {});
 });
 

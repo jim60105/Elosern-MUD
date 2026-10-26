@@ -70,6 +70,8 @@ def _snapshot(**overrides):
 
 def _update(**overrides):
     value = _snapshot(revision=4, mode="combat")
+    value["base_revision"] = 3
+    value["removed_panels"] = []
     value.update(overrides)
     return value
 
@@ -234,8 +236,9 @@ class SnapshotUpdateTests(unittest.TestCase):
     def test_empty_and_unknown_panels_rejected(self):
         with self.assertRaises(ProtocolValidationError):
             validate_ui_snapshot(_snapshot(panels={}))
-        with self.assertRaises(ProtocolValidationError):
-            validate_ui_update(_update(panels={}))
+        # A delta may carry an empty panel map: metadata-only and
+        # removal-only publications are exact-base deltas too.
+        self.assertEqual(validate_ui_update(_update(panels={}))["panels"], {})
         with self.assertRaises(ProtocolValidationError):
             validate_ui_snapshot(
                 _snapshot(panels={"unknown_panel": {}}), known_panels={"status"}
@@ -253,6 +256,69 @@ class SnapshotUpdateTests(unittest.TestCase):
         validate_ui_snapshot(_snapshot(panels={"anything": {}}))
         result = validate_ui_snapshot(_snapshot(), known_panels={"status"})
         self.assertEqual(list(result["panels"]), ["status"])
+
+    def test_update_requires_the_exact_base_fields(self):
+        payload = _update()
+        del payload["base_revision"]
+        with self.assertRaises(ProtocolValidationError):
+            validate_ui_update(payload)
+        payload = _update()
+        del payload["removed_panels"]
+        with self.assertRaises(ProtocolValidationError):
+            validate_ui_update(payload)
+        # A snapshot keeps its exact seven fields: delta fields are unknown.
+        with self.assertRaises(ProtocolValidationError):
+            validate_ui_snapshot(_update())
+
+    def test_base_revision_is_bounded_and_older_than_the_target(self):
+        for bad in (0, -1, True, 1.5, "3", 4, 5):
+            with self.subTest(base_revision=bad):
+                with self.assertRaises(ProtocolValidationError):
+                    validate_ui_update(_update(base_revision=bad))
+        normalized = validate_ui_update(_update(base_revision=1, revision=2))
+        self.assertEqual(normalized["base_revision"], 1)
+
+    def test_removed_panels_shape_and_relations(self):
+        known = {"status", "quest_log", "area_map", "world_map"}
+        normalized = validate_ui_update(
+            _update(panels={}, removed_panels=["quest_log"]),
+            known_panels=known,
+        )
+        self.assertEqual(normalized["removed_panels"], ["quest_log"])
+        invalid = (
+            "quest_log",  # not an array
+            ["mystery"],  # unknown name
+            ["area_map"],  # on-demand map name
+            ["world_map"],  # on-demand map name
+            ["quest_log", "quest_log"],  # duplicate
+            ["quest_log "],  # malformed panel name
+            [f"p{i}" for i in range(33)],  # over the panel ceiling
+        )
+        for removed in invalid:
+            with self.subTest(removed=removed):
+                with self.assertRaises(ProtocolValidationError):
+                    validate_ui_update(
+                        _update(panels={}, removed_panels=removed), known_panels=known
+                    )
+        # A replaced name may never also be removed.
+        with self.assertRaises(ProtocolValidationError):
+            validate_ui_update(
+                _update(removed_panels=["status"]), known_panels=known
+            )
+
+    def test_metadata_only_update_is_valid(self):
+        normalized = validate_ui_update(
+            _update(
+                panels={},
+                base_revision=3,
+                revision=8,
+                server_time=_server_time(hour=15),
+            )
+        )
+        self.assertEqual(normalized["panels"], {})
+        self.assertEqual(normalized["removed_panels"], [])
+        self.assertEqual(normalized["revision"], 8)
+        self.assertEqual(normalized["server_time"]["hour"], 15)
 
 
 class ResultEnvelopeTests(unittest.TestCase):

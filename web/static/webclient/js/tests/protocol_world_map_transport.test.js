@@ -31,6 +31,15 @@ function envelope(revision, panels) {
   };
 }
 
+// One exact-base delta over the directly preceding revision (every scenario
+// here models consecutive publications).
+function update(revision, panels) {
+  return Object.assign(envelope(revision, panels), {
+    base_revision: revision - 1,
+    removed_panels: [],
+  });
+}
+
 function activeStore() {
   const store = Protocol.createStore();
   store.beginTransport(1);
@@ -57,7 +66,7 @@ function paddedSibling(bytes) {
 test("an intact world map above 64 KB is adopted in one frame", () => {
   const store = activeStore();
   const body = F.largeWorldMap(200000);
-  const frame = wire(envelope(2, { world_map: body }));
+  const frame = wire(update(2, { world_map: body }));
   assert.ok(core.jsonByteSize(frame) > GENERIC);
   assert.throws(() => core.checkEnvelope(frame));
   const result = store.receive(1, "ui_update", [frame], {});
@@ -70,8 +79,8 @@ test("an intact world map above 64 KB is adopted in one frame", () => {
 test("map publication marks track logical adoption, never clones or unrelated revisions", () => {
   const store = activeStore();
   assert.deepEqual(store.getState().mapPublications, {});
-  store.receive(1, "ui_update", [envelope(2, { world_map: F.worldMap() })], {});
-  store.receive(1, "ui_update", [envelope(3, { area_map: F.gridArea() })], {});
+  store.receive(1, "ui_update", [update(2, { world_map: F.worldMap() })], {});
+  store.receive(1, "ui_update", [update(3, { area_map: F.gridArea() })], {});
   assert.deepEqual(store.getState().mapPublications, { world_map: 2, area_map: 3 });
   const copy = store.getState();
   copy.mapPublications.world_map = 999;
@@ -80,12 +89,12 @@ test("map publication marks track logical adoption, never clones or unrelated re
   assert.ok(store.getState().maps.world_map);
   const parts = F.encodeParts(F.largeWorldMap(100000), "P".repeat(22));
   for (const part of parts.slice(0, -1)) {
-    assert.equal(store.receive(1, "ui_update", [envelope(5, { world_map: part })], {}).partial, true);
+    assert.equal(store.receive(1, "ui_update", [update(5, { world_map: part })], {}).pending, true);
     assert.equal(store.getState().mapPublications.world_map, 2);
   }
-  assert.equal(store.receive(1, "ui_update", [envelope(5, { world_map: parts.at(-1) })], {}).accepted, true);
+  assert.equal(store.receive(1, "ui_update", [update(5, { world_map: parts.at(-1) })], {}).accepted, true);
   assert.equal(store.getState().mapPublications.world_map, 5);
-  assert.equal(store.receive(1, "ui_update", [envelope(5, { world_map: F.worldMap() })], {}).accepted, false);
+  assert.equal(store.receive(1, "ui_update", [update(5, { world_map: F.worldMap() })], {}).accepted, false);
   assert.equal(store.getState().mapPublications.world_map, 5);
   store.receive(1, "ui_protocol_error", [{ protocol_version: 1, code: "no_puppet", message: "Detached", reload_required: false }], {});
   assert.deepEqual(store.getState().mapPublications, {});
@@ -96,10 +105,10 @@ test("map publication marks track logical adoption, never clones or unrelated re
 test("a world map above its logical ceiling is rejected and the prior map retained", () => {
   const store = activeStore();
   const small = F.worldMap();
-  assert.equal(store.receive(1, "ui_update", [wire(envelope(2, { world_map: small }))], {}).accepted, true);
+  assert.equal(store.receive(1, "ui_update", [wire(update(2, { world_map: small }))], {}).accepted, true);
   const big = F.largeWorldMap(Protocol.MAP_MAX_BYTES.world_map + 1);
   assert.ok(core.jsonByteSize(big) > Protocol.MAP_MAX_BYTES.world_map);
-  const result = store.receive(1, "ui_update", [wire(envelope(3, { world_map: big }))], {});
+  const result = store.receive(1, "ui_update", [wire(update(3, { world_map: big }))], {});
   assert.equal(result.accepted, false);
   assert.equal(result.reason, "invalid");
   assert.equal(core.canonicalJson(store.getState().maps.world_map), core.canonicalJson(small));
@@ -110,13 +119,13 @@ test("the world ceiling is exact: at the bound adopts, one byte over rejects", (
   const max = Protocol.MAP_MAX_BYTES.world_map;
   const at = F.worldMapOfBytes(max);
   const over = F.worldMapOfBytes(max + 1);
-  assert.equal(activeStore().receive(1, "ui_update", [wire(envelope(2, { world_map: at }))], {}).accepted, true);
-  assert.equal(activeStore().receive(1, "ui_update", [wire(envelope(2, { world_map: over }))], {}).accepted, false);
+  assert.equal(activeStore().receive(1, "ui_update", [wire(update(2, { world_map: at }))], {}).accepted, true);
+  assert.equal(activeStore().receive(1, "ui_update", [wire(update(2, { world_map: over }))], {}).accepted, false);
 });
 
 test("siblings keep the generic frame: an oversized companion is rejected", () => {
   const store = activeStore();
-  const frame = envelope(2, { world_map: F.worldMap(), status: Object.assign(validStatusPanel(), paddedSibling(70000)) });
+  const frame = update(2, { world_map: F.worldMap(), status: Object.assign(validStatusPanel(), paddedSibling(70000)) });
   assert.throws(() => Protocol.checkWorldMapEnvelope(wire(frame)), /canonical JSON exceeds|fields|exceeds/);
   assert.equal(store.receive(1, "ui_update", [wire(frame)], {}).accepted, false);
 });
@@ -128,7 +137,7 @@ test("an area map beside an intact world map stays inside the generic frame", ()
       F.gridNode(100 + index, 50, { visibility: "seen", label: "合成街道".repeat(20) })
     )
   );
-  const frame = wire(envelope(2, { world_map: F.largeWorldMap(100000), area_map: area }));
+  const frame = wire(update(2, { world_map: F.largeWorldMap(100000), area_map: area }));
   assert.throws(() => Protocol.checkWorldMapEnvelope(frame), /exceeds/);
   assert.equal(activeStore().receive(1, "ui_update", [frame], {}).accepted, false);
 });
@@ -136,6 +145,7 @@ test("an area map beside an intact world map stays inside the generic frame", ()
 test("a __proto__ sibling cannot hide from the generic walk", () => {
   const text =
     '{"protocol_version":1,"presentation_epoch":"' + EPOCH + '","revision":2,"mode":"exploration",' +
+    '"base_revision":1,"removed_panels":[],' +
     '"panels":{"world_map":' + JSON.stringify(F.worldMap()) + ',"__proto__":{"t":"' + "x".repeat(3000) + '"}},' +
     '"layout_version":1,"server_time":' + JSON.stringify(serverTime()) + "}";
   const frame = JSON.parse(text);
@@ -153,7 +163,7 @@ test("scalar and field rules still apply outside and inside the world map", () =
     "long world string": (f) => { f.panels.world_map.districts[1].name = "名".repeat(3000); },
   };
   for (const [name, mutate] of Object.entries(cases)) {
-    const frame = wire(envelope(2, { world_map: F.largeWorldMap(80000), status: validStatusPanel() }));
+    const frame = wire(update(2, { world_map: F.largeWorldMap(80000), status: validStatusPanel() }));
     mutate(frame);
     assert.equal(activeStore().receive(1, "ui_update", [frame], {}).accepted, false, name);
   }
@@ -174,7 +184,7 @@ test("the allowance is world-map only: snapshots, parts, area and local maps sta
   // local_map keeps its 65,536-byte envelope even beside an intact world map.
   const local = { schema_version: 1, available: true, layer: "grid", current_node: "grid:t_map:0:0", title: "t", nodes: [], edges: [], legend: ["x".repeat(2000)] };
   for (let index = 0; index < 40; index++) local["t_pad_" + index] = "y".repeat(2000);
-  const frame = wire(envelope(2, { world_map: F.worldMap(), local_map: local }));
+  const frame = wire(update(2, { world_map: F.worldMap(), local_map: local }));
   assert.ok(core.jsonByteSize(frame.panels.local_map) > GENERIC);
   assert.throws(() => Protocol.checkWorldMapEnvelope(frame), /canonical JSON exceeds|fields/);
 });
@@ -193,7 +203,7 @@ test("the full 5 km checkerboard is retained while 1 km trails keep their cap", 
     ]),
   };
   const store = activeStore();
-  assert.equal(store.receive(1, "ui_update", [wire(envelope(2, { world_map: body }))], {}).accepted, true);
+  assert.equal(store.receive(1, "ui_update", [wire(update(2, { world_map: body }))], {}).accepted, true);
   assert.equal(store.getState().maps.world_map.trail.rows.length, 540);
   assert.deepEqual(store.getState().maps.world_map.trail.rows[539][1][269], [538, 1]);
   body.trail.resolution_km = 1;

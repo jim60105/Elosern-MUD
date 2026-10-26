@@ -237,6 +237,10 @@ class GalleryActionIntegrationTests(EvenniaTest):
         self.sent = []
         self.transport = SimpleNamespace(ndb=SimpleNamespace(), puppet=self.actor, protocol_key="websocket", msg=lambda **kwargs: self.sent.append(kwargs))
         self.coordinator = attach_coordinator(self.transport, self.registry)
+        # A live action follows the session's initial sync: commit the
+        # baseline so every action publication is one exact-base delta.
+        self.coordinator.full_snapshot(build_presentation_context(self.transport, self.actor))
+        self.sent.clear()
         self.serial = 0
 
     def character(self, cls, stable_key):
@@ -715,6 +719,8 @@ class OfficialPreferenceActionTests(EvenniaTest):
             msg=lambda **kwargs: self.sent.append(kwargs),
         )
         self.coordinator = attach_coordinator(self.transport, self.registry)
+        self.coordinator.full_snapshot(build_presentation_context(self.transport, self.actor))
+        self.sent.clear()
         self.serial = 0
 
     # -- harness ----------------------------------------------------------

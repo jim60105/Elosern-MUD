@@ -27,9 +27,10 @@ import * as fx from "./protocol_fixtures.js";
 // The exploration commit pair the production server ships together: the
 // `exploration` panel plus its `local_map` anchor, on top of the snapshot's
 // status/context_actions panels.
-function explorationCommit(revision, explorationOverrides, contextActionsOverrides) {
+function explorationCommit(revision, explorationOverrides, contextActionsOverrides, baseRevision) {
   return fx.update({
     revision,
+    ...(baseRevision === undefined ? {} : { base_revision: baseRevision }),
     panels: {
       exploration: fx.explorationPanel(explorationOverrides),
       local_map: fx.localMapPanel(),
@@ -73,10 +74,12 @@ function openChildFrame(store) {
 
 // A commit that moves the actor: `look.room.identity` is the panel's own
 // stable movement key (webclient-scene-overview-swap D2).
-function roomChange(revision, identity) {
+// `baseRevision` names the fixture's actual last committed revision when the
+// scenario skips integers; an omitted value is the directly preceding one.
+function roomChange(revision, identity, baseRevision) {
   return explorationCommit(revision, {
     look: { room: { identity, display_name: "另一個房間", room: true } },
-  });
+  }, undefined, baseRevision);
 }
 
 // The committed dialogue panel a successful 交談 commits
@@ -222,6 +225,7 @@ describe("declarative frame stack (store contract)", () => {
         [
           fx.update({
             revision: 3,
+            base_revision: 1,
             panels: {
               exploration: {
                 schema_version: 4,
@@ -295,6 +299,7 @@ describe("declarative frame stack (store contract)", () => {
         [
           fx.update({
             revision: 3,
+            base_revision: 1,
             mode: "combat",
             panels: { context_actions: fx.combatActions(), local_map: fx.localMapPanel() },
           }),
@@ -407,7 +412,7 @@ describe("declarative frame stack (store contract)", () => {
     it("an open child frame resets to the exploration root on every move", () => {
       openExploration(store);
       openChildFrame(store);
-      store.receive(1, "ui_update", [roomChange(3, 99)], {});
+      store.receive(1, "ui_update", [roomChange(3, 99, 1)], {});
       expect(store.router.depth()).toBe(1);
       expect(store.router.currentDescriptor().source).toBe("exploration.root");
       expect(store.view.focus.key).toBeNull();
@@ -415,7 +420,7 @@ describe("declarative frame stack (store contract)", () => {
       // Again from the next room.
       openChildFrame(store);
       expect(store.router.currentDescriptor()).toEqual(CHILD);
-      store.receive(1, "ui_update", [roomChange(5, 101)], {});
+      store.receive(1, "ui_update", [roomChange(5, 101, 3)], {});
       expect(store.router.depth()).toBe(1);
       expect(store.router.currentDescriptor().source).toBe("exploration.root");
       expect(store.view.dockTrail.length).toBe(1);
@@ -491,6 +496,7 @@ describe("declarative frame stack (store contract)", () => {
         [
           fx.update({
             revision: 3,
+            base_revision: 1,
             panels: {
               exploration: {
                 schema_version: 4,

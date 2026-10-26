@@ -26,6 +26,7 @@ from web.webclient.presentation.protocol import (
     check_envelope,
     json_byte_size,
     new_presentation_epoch,
+    validate_ui_update,
 )
 from web.webclient.presentation.map_panels import (
     WORLD_MAP_PANEL,
@@ -130,9 +131,16 @@ class PresentationCoordinator:
         context: PresentationContext,
         panels: dict[str, Any],
         revision: int | None = None,
+        base_revision: int | None = None,
+        removed_panels: tuple[str, ...] = (),
     ) -> dict[str, Any]:
-        """Assemble one exact snapshot/update envelope from committed panel data."""
-        return {
+        """Assemble one exact snapshot/update envelope from committed panel data.
+
+        ``base_revision`` of ``None`` builds a full snapshot (seven exact
+        fields); any other value builds a delta carrying the exact committed
+        baseline and its explicit, disjoint removal list.
+        """
+        envelope = {
             "protocol_version": PROTOCOL_VERSION,
             "presentation_epoch": self._epoch,
             "revision": self._next_revision() if revision is None else revision,
@@ -141,6 +149,15 @@ class PresentationCoordinator:
             "layout_version": LAYOUT_VERSION,
             "server_time": self.server_time(),
         }
+        if base_revision is not None:
+            envelope["base_revision"] = base_revision
+            envelope["removed_panels"] = list(removed_panels)
+        return envelope
+
+    def _checked_update(self, envelope: dict[str, Any]) -> None:
+        """Prevalidate one delta against both the frame and the delta schema."""
+        check_envelope(envelope)
+        validate_ui_update(envelope, known_panels=set(self.registry.panel_names))
 
     def _checked_map_body(self, name: str, payload: Any) -> dict[str, Any]:
         """Validate one map body, degrading a malformed one to unavailable.
@@ -163,7 +180,11 @@ class PresentationCoordinator:
             return self.registry.build_unavailable(name, internal=True, correlation_id=correlation_id)
 
     def _publish_with_maps(
-        self, context: PresentationContext, panels: dict[str, Any], map_names: list[str]
+        self,
+        context: PresentationContext,
+        panels: dict[str, Any],
+        map_names: list[str],
+        removed_panels: tuple[str, ...] = (),
     ) -> dict[str, Any]:
         """Deliver an update naming on-demand map panels, in parts if needed.
 
@@ -187,19 +208,31 @@ class PresentationCoordinator:
         mode = self._mode_provider(context)
         server_time = self.server_time()
 
-        def envelope(revision: int, body: dict[str, Any]) -> dict[str, Any]:
+        def envelope(
+            revision: int, body: dict[str, Any], removed: tuple[str, ...] = ()
+        ) -> dict[str, Any]:
+            # Every logical publication is one exact-base delta: its baseline
+            # is the revision committed before it, so a repeated same-base
+            # transfer (all parts of one map) never advances the sequence.
             return {
                 "protocol_version": PROTOCOL_VERSION,
                 "presentation_epoch": self._epoch,
                 "revision": revision,
+                "base_revision": revision - 1,
+                "removed_panels": list(removed),
                 "mode": mode,
                 "panels": body,
                 "layout_version": LAYOUT_VERSION,
                 "server_time": server_time,
             }
 
-        candidate = envelope(self._revision + 1, panels)
+        candidate = envelope(self._revision + 1, panels, removed_panels)
         if self._fits_one_frame(candidate):
+            # Prevalidate the delta schema before consuming a revision: an
+            # intact map frame is one exact-base delta like any other.
+            validate_ui_update(
+                candidate, known_panels=set(self.registry.panel_names)
+            )
             self._next_revision()
             self._send(UPDATE_MESSAGE, candidate)
             self._log_intact_world_map(candidate)
@@ -223,18 +256,30 @@ class PresentationCoordinator:
         base = self._revision
         for offset, (name, bodies, parts) in enumerate(planned, start=1):
             for body in bodies:
-                frame = envelope(base + offset, body)
+                frame = envelope(
+                    base + offset,
+                    body,
+                    removed_panels if name is None else (),
+                )
                 if name == WORLD_MAP_PANEL and carries_intact_world_map(frame):
                     check_world_map_envelope(frame)
                 else:
                     check_envelope(frame)
+                validate_ui_update(frame, known_panels=set(self.registry.panel_names))
         last = None
         for name, bodies, parts in planned:
             revision = self._next_revision()
             for body in bodies:
-                self._send(UPDATE_MESSAGE, envelope(revision, body))
+                self._send(
+                    UPDATE_MESSAGE,
+                    envelope(
+                        revision,
+                        body,
+                        removed_panels if name is None else (),
+                    ),
+                )
             if name is None:
-                last = envelope(revision, eager)
+                last = envelope(revision, eager, removed_panels)
                 continue
             last = envelope(revision, {name: panels[name]})
             if not parts:
@@ -341,31 +386,53 @@ class PresentationCoordinator:
         return envelope
 
     def panel_update(
-        self, context: PresentationContext, panels: dict[str, Any]
+        self,
+        context: PresentationContext,
+        panels: dict[str, Any],
+        removed_panels: tuple[str, ...] = (),
     ) -> dict[str, Any]:
-        """Build and send an affected-panel update at a new revision.
+        """Build and send one exact-base delta at a new revision.
 
-        ``panels`` must be a nonempty subset of registered panel names. Every
-        included panel completely replaces its prior value; the update carries
-        the same metadata as a snapshot.
+        ``panels`` is a subset of registered panel names and may be empty when
+        ``removed_panels`` names the eager panels the planner deleted. Every
+        included panel completely replaces its prior value, every removal is
+        explicit (an absent candidate never implies one), and the delta
+        carries the exact committed ``base_revision`` plus the same metadata
+        as a snapshot.
 
         The mode is recomputed at send time on every envelope, so a subset
         that flips the client into or out of the dialogue mode must never
-        ship without the dialogue panel it implies. Every update whose
-        recomputed mode is ``dialogue`` always carries a freshly rendered
-        dialogue panel; every clear path already names the panel explicitly
-        (engage, departure/movement/leave-party pushes, full refreshes), so
-        the committed mode and the committed dialogue panel can never diverge
-        on the wire. Full snapshots render every panel, so this rule is
-        update-only.
+        ship without the dialogue panel it implies. Every publication whose
+        recomputed mode is ``dialogue`` includes a freshly rendered dialogue
+        panel among its candidates; every clear path already names the panel
+        explicitly (engage, departure/movement/leave-party pushes, full
+        refreshes), so the committed mode and the committed dialogue panel
+        can never diverge on the wire. Full snapshots render every panel, so
+        this rule is update-only.
         """
-        if not panels:
-            raise ValueError("panel update requires a nonempty panel subset")
+        removed = tuple(removed_panels)
+        if not panels and not removed:
+            raise ValueError("panel update requires a panel subset or removals")
         unknown = set(panels) - self.registry.panel_names
         if unknown:
             raise ValueError(
                 f"panel update references unknown panels {sorted(unknown)}"
             )
+        unknown_removed = set(removed) - self.registry.eager_panel_names
+        if unknown_removed:
+            raise ValueError(
+                f"panel update removes unregistered eager panels {sorted(unknown_removed)}"
+            )
+        overlap = set(removed) & set(panels)
+        if overlap:
+            raise ValueError(
+                f"panel update both replaces and removes {sorted(overlap)}"
+            )
+        if self._revision == 0:
+            # A delta cannot establish initial state: with no committed
+            # baseline the only wire-valid first publication is the complete
+            # snapshot, and the next publication is an exact-base delta.
+            return self.full_snapshot(context)
         if (
             self._mode_provider(context) == DIALOGUE_PANEL
             and DIALOGUE_PANEL not in panels
@@ -375,11 +442,18 @@ class PresentationCoordinator:
                 **panels,
                 DIALOGUE_PANEL: self.registry.render(DIALOGUE_PANEL, context),
             }
+            removed = tuple(name for name in removed if name != DIALOGUE_PANEL)
         map_names = sorted(set(panels) & self.registry.on_demand_panel_names)
         if map_names:
-            return self._publish_with_maps(context, panels, map_names)
-        envelope = self._build_presentation(context, panels, revision=self._revision + 1)
-        check_envelope(envelope)
+            return self._publish_with_maps(context, panels, map_names, removed)
+        envelope = self._build_presentation(
+            context,
+            panels,
+            revision=self._revision + 1,
+            base_revision=self._revision,
+            removed_panels=removed,
+        )
+        self._checked_update(envelope)
         self._next_revision()
         self._send(UPDATE_MESSAGE, envelope)
         return envelope

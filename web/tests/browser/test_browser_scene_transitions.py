@@ -260,6 +260,8 @@ _ISLAND_COMMIT = r"""async ([env]) => {
   const s = window.__elosernBridge.store.view;
   env.presentation_epoch = s.epoch;
   env.revision = s.revision + 1;
+  env.base_revision = s.revision;
+  env.removed_panels = [];
   const accepted = window.__elosernBridge.store.receive(s.generation, 'ui_update', [env], {}).accepted;
   await new Promise((resolve) => setTimeout(resolve, 0));
   read();
@@ -366,6 +368,8 @@ _REDUCED_COMMIT = """async ([env]) => {
   const s = window.__elosernBridge.store.view;
   env.presentation_epoch = s.epoch;
   env.revision = s.revision + 1;
+  env.base_revision = s.revision;
+  env.removed_panels = [];
   const result = window.__elosernBridge.store.receive(s.generation, 'ui_update', [env], {});
   capture();
   if (!result || result.accepted !== true) {
@@ -512,6 +516,8 @@ class SceneTransitionsBrowserTest(BrowserAcceptanceTest):
               const s = window.__elosernBridge.store.view;
               env.presentation_epoch = s.epoch;
               env.revision = s.revision + 1;
+              env.base_revision = s.revision;
+              env.removed_panels = [];
               const accepted = window.__elosernBridge.store.receive(s.generation, 'ui_update', [env], {}).accepted;
               // Let Vue flush the commit, then read the start state before a
               // frame of the transition runs.
@@ -719,6 +725,8 @@ class SceneTransitionsBrowserTest(BrowserAcceptanceTest):
               const s = window.__elosernBridge.store.view;
               env.presentation_epoch = s.epoch;
               env.revision = s.revision + 1;
+              env.base_revision = s.revision;
+              env.removed_panels = [];
               window.__elosernBridge.store.receive(s.generation, 'ui_update', [env], {});
               await new Promise((resolve) => requestAnimationFrame(() => resolve()));
               const count = (sel) => document.querySelectorAll(sel).length;

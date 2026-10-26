@@ -11,7 +11,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 
 const Protocol = require("../elosern/protocol.js");
-const { EPOCH_A, VALID_EPOCH, actionResult, connectedStore, nested, protocolError, serverTime, snapshot, unavailableStatusPanel, validStatusPanel } = require("./protocol_support.js");
+const { EPOCH_A, VALID_EPOCH, actionResult, connectedStore, nested, protocolError, serverTime, snapshot, unavailableStatusPanel, update, validStatusPanel } = require("./protocol_support.js");
 
 test("status v3 provenance rejects malformed initial and replacement messages atomically", () => {
   const source = { item_key: "t_a", label: "合成護符" };
@@ -41,7 +41,7 @@ test("status v3 provenance rejects malformed initial and replacement messages at
     committed.beginTransport(1);
     assert.equal(committed.receive(1, "ui_snapshot", [snapshot()], {}).accepted, true);
     const before = committed.getState();
-    assert.equal(committed.receive(1, "ui_update", [snapshot({ revision: 2, panels: { status: panel } })], {}).reason, "invalid");
+    assert.equal(committed.receive(1, "ui_update", [update({ revision: 2, panels: { status: panel } })], {}).reason, "invalid");
     assert.deepEqual(committed.getState(), before);
   }
   for (const kind of ["equipment", "mixed", "non_equipment", "unknown"]) {

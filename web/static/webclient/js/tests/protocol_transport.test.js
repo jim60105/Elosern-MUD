@@ -182,7 +182,7 @@ test("a multi-panel message with one malformed panel is rejected atomically", ()
     disguise_active: false,
     combat: null,
   };
-  const malformed = update();
+  const malformed = snapshot();
   malformed.panels = { status: malformedStatus };
   assert.equal(store.receive(1, "ui_snapshot", [malformed], {}).reason, "invalid");
   assert.equal(store.getState().phase, "awaiting_initial_snapshot");

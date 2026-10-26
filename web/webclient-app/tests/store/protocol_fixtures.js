@@ -312,7 +312,17 @@ export function snapshot(overrides = undefined) {
 }
 
 export function update(overrides = undefined) {
-  return snapshot(overrides);
+  const value = snapshot(overrides);
+  // One consecutive publication: the fixture's revision is the target and its
+  // predecessor is the committed baseline. A test modelling a skipped target
+  // supplies its own explicit base_revision.
+  if (!Object.prototype.hasOwnProperty.call(value, "base_revision")) {
+    value.base_revision = value.revision - 1;
+  }
+  if (!Object.prototype.hasOwnProperty.call(value, "removed_panels")) {
+    value.removed_panels = [];
+  }
+  return value;
 }
 
 export function actionResult(overrides = undefined) {

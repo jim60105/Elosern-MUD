@@ -57,6 +57,11 @@ class PublishPanelUpdateTests(EvenniaTestCase):
 
     def test_matching_epoch_publishes_the_update_envelope(self):
         coordinator = attach_coordinator(self.session, self.registry)
+        # A live push always follows the session's initial sync, so the
+        # fixture starts from a committed baseline (revision 1) and only the
+        # pushed delta remains under assertion.
+        coordinator.full_snapshot(self._context())
+        self.session.sent.clear()
         epoch = coordinator.epoch
         envelope = publish_panel_update(
             self.session,
@@ -67,6 +72,9 @@ class PublishPanelUpdateTests(EvenniaTestCase):
         )
         self.assertIsNotNone(envelope)
         self.assertEqual(envelope["presentation_epoch"], epoch)
+        self.assertEqual(envelope["base_revision"], 1)
+        self.assertEqual(envelope["removed_panels"], [])
+        self.assertEqual(envelope["revision"], 2)
         updates = self.session._update_envelopes()
         self.assertEqual(len(updates), 1)
         self.assertEqual(updates[0]["presentation_epoch"], epoch)
@@ -77,7 +85,7 @@ class PublishPanelUpdateTests(EvenniaTestCase):
             updates[0]["panels"]["context_actions"]["schema_version"],
             self.registry.spec("context_actions").schema_version,
         )
-        self.assertEqual(coordinator.revision, 1)
+        self.assertEqual(coordinator.revision, 2)
 
     def test_mismatched_epoch_publishes_nothing_and_bumps_no_revision(self):
         coordinator = attach_coordinator(self.session, self.registry)
