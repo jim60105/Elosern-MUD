@@ -32,6 +32,6 @@ depends-on: authored-dialogue-unread-notices
 
 The dependency chain includes authored-dialogue-contracts, authored-dialogue-yaml-loader and authored-dialogue-runtime; content uses their completed v2 schema/scanner implementation.
 
-Code conflicts: Content slices exclusively own their per-NPC YAML files and unique test/review files; they do not edit shared region Python modules, profile definitions, loader code or a registration list. Profiles and place bindings are read-only canonical inputs. The integration owner serializes test-manifest entries in tools/test_data_freeze.json and .github/evennia-shards.json, runs the combined gate, and serializes archive into the shared authored-dialogue-content spec. No manual content registration is added.
+Code conflicts: Content slices exclusively own their per-NPC YAML files and a unique review document; they do not edit shared region Python modules, profile definitions, loader code or a registration list. Profiles and place bindings are read-only canonical inputs. No test module or manifest entry belongs to a content slice; the integration owner runs the combined gate, and serializes archive into the shared authored-dialogue-content spec. No manual content registration is added.
 
 Shared contract: `../authored-dialogue-contracts/design.md`, Shared contract v2. This change owns only the interfaces explicitly assigned in its design. All active proposals are planning context; dependencies refer to future completed implementation, not mere proposal existence.

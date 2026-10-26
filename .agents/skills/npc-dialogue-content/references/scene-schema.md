@@ -52,7 +52,7 @@ Each line is exactly one of:
   text: 「我想問問這件斗篷。」
 - kind: speech
   speaker: host       # the NPC being talked to
-  text: 「羊毛的，山裡擋風夠用。」
+  text: 「羊毛料子，山裡擋風夠用。」
 - kind: narration
   text: 她把斗篷抖開，就著窗光看縫線。
 ```
@@ -163,6 +163,9 @@ UTF-8 Chinese text; do not escape it.
 
 ## Worked example
 
+The example illustrates shape and technique. Its names, stock and prices belong
+to that host only; never copy them into another scene.
+
 ```yaml
 schema_version: 1
 greeting: 櫃檯後的裁縫抬起頭，把捲尺往脖子上一掛：「要改衣服，還是挑布？」
@@ -200,7 +203,7 @@ topics:
         text: 「店裡有哪些布？」
       - kind: speech
         speaker: host
-        text: 「裡間還有幾匹沒擺出來的，絲的光澤勝過架上這些。您若要見，我去取。」
+        text: 「裡間還有幾匹沒擺上架。絲的光澤勝過外面這些，你若要見，我去取。」
       - kind: speech
         speaker: host
         text: 「城裡幾位大人也都用這家的料子。價錢照舊，只是得等兩日。」
@@ -217,7 +220,7 @@ topics:
     lines:
     - kind: speech
       speaker: host
-      text: 「那種事，等我們再熟一點再說吧。」
+      text: 「那種事我向來不跟人說。你換個話題，我都答。」
   fallback:
     scene_id: body_measure.tailor_past_scene
     revision: r1
@@ -230,5 +233,5 @@ topics:
       text: 「從我母親那時候就在了。這條街換過三次招牌，裁縫桌沒換過。」
     - kind: speech
       speaker: host
-      text: 「剪刀是她的，我留著。手感這種東西，換一把就得重新學。」
+      text: 「這把剪刀跟了我母親大半輩子。我留著，換一把就得重新學手感。」
 ```

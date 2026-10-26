@@ -68,7 +68,9 @@ Exact YAML keys, condition vocabulary, limits and a worked example:
 
 A scene is a conversation, not a menu echo. Read one already-accepted scene
 (`world/lore/dialogue/content/altoria_merchant.yaml` is the reviewed reference
-for a sharp shopkeeper) and match its density before writing your own.
+for a sharp shopkeeper) and match its density before writing your own. The
+examples below illustrate technique only: never carry another host's names,
+prices, stock or promises into your scene.
 
 1. **Complete the sentence and the turn.** No telegraphese. A clipped ending
    either disappears or becomes a reason-bearing closing line.
@@ -121,10 +123,15 @@ loader cannot detect it.
 | race, exposure band, skill, social identity, companion key | `RACE_REGISTRY`, `EXPOSURE_LEVELS`, `SKILL_REGISTRY`, `SOCIAL_IDENTITY_REGISTRY`, `PLAYER_PRESET_REGISTRY` |
 
 Observed failures worth remembering: `西陵谷地` (no such place),
-`平原黑水潭` (the smith's surname mistaken for a pond), `大術師` (not a
-canonical title — the magic ladder names spell tiers, not people), `誘蠱`
-(not a word), `驅趕野鼠` (not an F-rank commission type), `真功夫`
-(武俠 vocabulary). A name that sounds right is not evidence.
+`平原黑水潭` (the smith's surname mistaken for a pond), `驅趕野鼠` (not an
+F-rank commission type), `真功夫` (武俠 vocabulary). A name that sounds right is
+not evidence.
+
+The inverse also matters: item display names are canonical even when they read
+oddly. `大術師補綴長袍` and `誘蠱蕾絲內衣` are registered equipment names
+(`world/lore/items/data_named_equipment.py`), and 大術師 is a real academy title,
+so never "correct" them into new wording — quote the registry, or avoid the
+reference.
 
 Before handoff, list every proper noun your scenes contain and the registry row
 each one resolves to. If one has no row, rewrite the line.
@@ -143,17 +150,19 @@ world-side equivalent instead.
 | 去公會用 `guild list` 接委託 | 去公會大廳的看板找找委託 |
 | 熟練度越高越快 | 做久了手腳自然就俐落了 |
 
-- Mechanic paraphrases count as OOC even without a command: 歇下來, 越久越熟,
-  不適, 系統, 選單, 按鈕.
+- Mechanic paraphrases count as OOC when they describe a game state: 歇下來 as a
+  status, 越久越熟 as a skill model, 不適 as a negative status, plus 系統, 選單
+  and 按鈕. The same words used in their ordinary sense are fine.
 - No backticks, no ASCII command tokens, no bracketed hint like 「（輸入⋯）」.
 - Do not explain a requirement in fiction. Locked-topic hints are generated from
   the declared conditions with canonical public labels; a refusal deflects in
   character instead of restating the condition.
 - A merchant only buys back goods its own assortment offers; never promise goods
   the host does not sell.
-- Existing specs or tests that require dialogue to "name the commands" must be
-  MODIFIED in the change's delta spec, with the tests switched to a "no backticked
-  token / no OOC" assertion.
+- Content-only slices add no tests and no manifest entries. If this change's own
+  artifacts still demand a content assertion, reconcile that requirement in the
+  change's artifacts before marking the affected tasks complete, and record the
+  editorial checks in the review document instead.
 
 ## Scene model
 
@@ -233,8 +242,11 @@ Editorial quality is carried by the review document, not by an assertion.
    `uv run --locked python .agents/skills/npc-dialogue-content/scripts/npc_content_lint.py world/lore/dialogue/content/<host>.yaml`.
    It reports OOC and 武俠 tokens, backticks, ASCII commands, 您, sentence-final
    的, CJK–Latin spacing, half-width punctuation, calques, unbalanced 「」, scene
-   shape and condition operands that do not exist in the registries. Exit 1 means
-   a real defect. Add `--places` when the scene names streets or buildings to get
+   shape and condition operands that do not exist in the registries. It reads the
+   registries of the checkout that contains the target file, so running the
+   primary copy against a worktree's content is safe (`--repo` overrides). Exit 1
+   means an ERROR finding; WARN findings are prompts and fail only under
+   `--strict`. Add `--places` when the scene names streets or buildings to get
    a heuristic list of place-like words missing from `places*.py`
    (warnings there are prompts, not verdicts).
 3. Read the lint's WARN lines, then sweep every proper noun by hand and resolve
@@ -243,9 +255,10 @@ Editorial quality is carried by the review document, not by an assertion.
 4. Read each line asking "could this character know this?" Anything about
    skills, ticks, stats, exposure bands, or the UI fails.
 5. Check register against the setting, then the banned-pattern list: no 您, no
-   sentence-final 的, no mid-sentence colon, no reduplication, no half-width
-   punctuation beside Chinese, single space between CJK and alphanumerics, no
-   English calques (折入／回填／賦能／落地／拉齊), no 中式武俠 vocabulary.
+   sentence-final 的, no mid-sentence colon, no 疊字 such as 慢慢／輕輕, no
+   half-width punctuation beside Chinese, single space between CJK and
+   alphanumerics, no English calques (折入／賦能／拉齊, and 回填／深潛／落地 when
+   used as calques rather than literally), no 中式武俠 vocabulary.
 6. Check scene shape: actor-first formal scene, actor line possession-safe, no new
    player commitment, at least one host line, 3–8 lines, complete beats.
 7. Check qualification: only optional personal content is gated, service access is
@@ -269,9 +282,6 @@ Editorial quality is carried by the review document, not by an assertion.
     pipes, redirects and `;` are rejected by the guard, and `.env.test` inside the
     repository is not used.
 
-When reviewing someone else's content, report findings as `file:line`, the
-offending phrase, which rule it breaks, and a suggested in-character rewrite.
-
 ## Workflow
 
 - A rewrite replaces every owned topic body, variant, refusal and the opening. Do
@@ -283,7 +293,8 @@ offending phrase, which rule it breaks, and a suggested in-character rewrite.
   data-contract test (first docstring line `Data-contract test: <rationale>`,
   registered in `tools/test_data_freeze.json`) — but a content slice adds none,
   because it adds no logic.
-- Before handoff run `scripts/npc_content_lint.py` over every file you touched,
+- Before handoff run `scripts/npc_content_lint.py` over every owned dialogue YAML
+  file you changed,
   the focused module for the owning package, and
   `uv run --locked python -m tools.test_data_lint check`,
   `uv run --locked python -m tools.spec_traceability check`, and
