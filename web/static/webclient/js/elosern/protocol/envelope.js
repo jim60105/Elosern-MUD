@@ -180,11 +180,56 @@ function validatePanels(value, knownPanels, nonempty, allowMaps) {
   return { panels: normalized, part: part };
 }
 
-function validateCommonMetadata(payload, name, knownPanels, panelsNonempty, allowMaps) {
+// The exact top-level field sets of the two presentation envelopes.
+var SNAPSHOT_FIELDS = [
+  "protocol_version",
+  "presentation_epoch",
+  "revision",
+  "mode",
+  "panels",
+  "layout_version",
+  "server_time",
+];
+var UPDATE_FIELDS = SNAPSHOT_FIELDS.concat(["base_revision", "removed_panels"]);
+
+// The explicit removal list of one ui_update: a duplicate-free array of
+// registered eager panel names, disjoint from the replaced names and never
+// naming an on-demand map panel. An absent candidate never implies a removal,
+// so every deletion must be named here.
+function validateRemovedPanels(value, panels, knownPanels) {
+  if (!Array.isArray(value)) {
+    throw new Error("removed_panels must be a JSON array");
+  }
+  if (value.length > MAX_PANEL_COUNT) {
+    throw new Error("removed_panels exceeds the maximum of " + MAX_PANEL_COUNT + " panels");
+  }
+  var seen = Object.create(null);
+  var removed = [];
+  for (var i = 0; i < value.length; i++) {
+    var name = validatePanelName(value[i]);
+    if (seen[name]) {
+      throw new Error("removed_panels contains the duplicate name " + name);
+    }
+    seen[name] = true;
+    if (Object.prototype.hasOwnProperty.call(MAP_PANEL_SCHEMAS, name)) {
+      throw new Error("removed_panels never names the on-demand panel " + name);
+    }
+    if (!Object.prototype.hasOwnProperty.call(knownPanels, name)) {
+      throw new Error("removed_panels contains unknown panel name " + name);
+    }
+    if (Object.prototype.hasOwnProperty.call(panels, name)) {
+      throw new Error("removed_panels overlaps the replaced panel " + name);
+    }
+    removed.push(name);
+  }
+  return removed;
+}
+
+function validateCommonMetadata(payload, name, knownPanels, panelsNonempty, allowMaps, fields) {
   requireExactFields(
     payload,
     name,
-    ["protocol_version", "presentation_epoch", "revision", "mode", "panels", "layout_version", "server_time"],
+    fields,
     []
   );
   requireInt(payload.protocol_version, "protocol_version", 1, 1);
@@ -215,11 +260,18 @@ function validateCommonMetadata(payload, name, knownPanels, panelsNonempty, allo
 }
 
 function validateSnapshot(payload) {
-  return validateCommonMetadata(payload, "ui_snapshot", PANEL_ALLOWLIST, true, false);
+  return validateCommonMetadata(payload, "ui_snapshot", PANEL_ALLOWLIST, true, false, SNAPSHOT_FIELDS);
 }
 
 function validateUpdate(payload) {
-  return validateCommonMetadata(payload, "ui_update", PANEL_ALLOWLIST, true, true);
+  var meta = validateCommonMetadata(payload, "ui_update", PANEL_ALLOWLIST, false, true, UPDATE_FIELDS);
+  var baseRevision = requireInt(payload.base_revision, "base_revision", 1, MAX_SAFE_INTEGER);
+  if (baseRevision >= meta.revision) {
+    throw new Error("base_revision must be older than revision");
+  }
+  meta.baseRevision = baseRevision;
+  meta.removedPanels = validateRemovedPanels(payload.removed_panels, meta.panels, PANEL_ALLOWLIST);
+  return meta;
 }
 
 function validateActionResult(payload) {

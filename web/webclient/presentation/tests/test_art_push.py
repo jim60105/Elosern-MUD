@@ -350,6 +350,11 @@ class ArtPushPresenterTests(EvenniaTestCase):
             calendar_provider=_fake_calendar,
         )
         session.ndb.elosern_coordinator = coordinator
+        # A live push always follows the session's initial sync, so the
+        # fixture starts from a committed baseline and records only the
+        # publications each test drives.
+        coordinator.full_snapshot(build_presentation_context(session, actor or self.player))
+        session.sent.clear()
         return session
 
     def _complete_scene(self):
@@ -654,7 +659,8 @@ class ArtPushPresenterTests(EvenniaTestCase):
         self.assertTrue(
             generated[0]["resource"]["url"].startswith("/art/scene/t_synth_bazaar.png")
         )
-        self.assertEqual(envelope["revision"], 1)
+        self.assertEqual(envelope["revision"], 2)
+        self.assertEqual(envelope["base_revision"], 1)
         self.assertNotIn("context_actions", envelope["panels"])
         # Scene-only exclusion (design D3): the completed subject names the
         # current SCENE, not a current portrait-catalog value, so the targeted
@@ -777,9 +783,15 @@ class ArtPushPresenterTests(EvenniaTestCase):
         host.save()
 
         session = FakeSession(self.player)
-        session.ndb.elosern_coordinator = PresentationCoordinator(
+        coordinator = PresentationCoordinator(
             session, self.registry, calendar_provider=_fake_calendar
         )
+        session.ndb.elosern_coordinator = coordinator
+        # The session synced before the worker completed: publish the
+        # committed baseline (dropped from the recorded traffic) so the
+        # push is one exact-base delta.
+        coordinator.full_snapshot(build_presentation_context(session, self.player))
+        session.sent.clear()
         context = build_presentation_context(session, self.player)
         self.assertEqual(PresentationCoordinator.mode_for(context), "exploration")
         open_or_refresh_dialogue(self.player, host, "歡迎。")

@@ -257,6 +257,8 @@ test("title_codex is in the production panel allowlist and a bad panel rejects a
   envelope.panels.title_codex = validTitleCodexPanel();
   assert.doesNotThrow(() => Protocol.validateSnapshot(envelope));
   envelope.revision = 8;
+  envelope.base_revision = 7;
+  envelope.removed_panels = [];
   assert.doesNotThrow(() => Protocol.validateUpdate(envelope));
 });
 

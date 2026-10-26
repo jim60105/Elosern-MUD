@@ -297,6 +297,8 @@ process.stdout.write(JSON.stringify(cases.map((text) => {
                 "protocol_version": 1,
                 "presentation_epoch": "e" * 22,
                 "revision": 2,
+                "base_revision": 1,
+                "removed_panels": [],
                 "mode": "exploration",
                 "panels": {"area_map": part},
                 "layout_version": 1,
@@ -315,16 +317,27 @@ const P = require('./web/static/webclient/js/elosern/protocol.js');
 const frames = JSON.parse(fs.readFileSync(0, 'utf8'));
 const store = P.createStore();
 store.beginTransport(1);
-const snap = Object.assign({}, frames[0], {revision: 1, panels: {}});
-snap.panels = {};
+const frame = frames[0];
+// A snapshot keeps the seven exact metadata fields; the delta-only
+// base_revision / removed_panels are dropped from the baseline.
+const snap = {
+  protocol_version: frame.protocol_version,
+  presentation_epoch: frame.presentation_epoch,
+  revision: 1,
+  mode: frame.mode,
+  panels: {},
+  layout_version: frame.layout_version,
+  server_time: frame.server_time,
+};
 const first = store.receive(1, 'ui_snapshot', [Object.assign({}, snap, {panels: {status: {schema_version: 4, available: false, reason: {code: 'x', message: 'x'}}}})], {});
 const results = frames.map((f) => store.receive(1, 'ui_update', [f], {}));
 process.stdout.write(JSON.stringify({first, results, state: store.getState()}));
 """
         out = json.loads(_node(script, json.dumps(frames)))
         self.assertTrue(out["first"]["accepted"])
-        self.assertTrue(all(result["accepted"] for result in out["results"]))
-        self.assertTrue(all(result.get("partial") for result in out["results"][:-1]))
+        self.assertFalse(out["results"][-1].get("pending"))
+        self.assertTrue(out["results"][-1]["accepted"])
+        self.assertTrue(all(result.get("pending") for result in out["results"][:-1]))
         self.assertEqual(out["state"]["maps"]["area_map"], validate_area_map(body))
         self.assertEqual(out["state"]["revision"], 2)
 

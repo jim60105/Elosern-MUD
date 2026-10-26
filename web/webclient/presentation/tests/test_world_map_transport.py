@@ -82,6 +82,10 @@ def _frame(panels: dict, revision: int = 2) -> dict:
         "protocol_version": 1,
         "presentation_epoch": "w" * 22,
         "revision": revision,
+        # Every ui_update is one exact-base delta; the parity baseline is the
+        # browser store's revision 1 snapshot.
+        "base_revision": revision - 1,
+        "removed_panels": [],
         "mode": "exploration",
         "panels": panels,
         "layout_version": 1,

@@ -962,6 +962,9 @@ class DialogueWireTransitionTests(BattlefieldIsolation, EvenniaTest):
         session, coordinator = self._coordinator()
         open_or_refresh_dialogue(self.player, self.host, "歡迎。")
         context = PresentationContext(actor=self.player, protocol_version=1)
+        # Establish the committed baseline the delta builds on.
+        coordinator.full_snapshot(context)
+        session.sent.clear()
         # A publisher naming only unrelated panels (e.g. a clock-tick status
         # update) must never emit mode dialogue without the panel it implies:
         # the coordinator injects a freshly rendered dialogue panel.
@@ -975,6 +978,8 @@ class DialogueWireTransitionTests(BattlefieldIsolation, EvenniaTest):
     def test_non_dialogue_updates_do_not_widen_the_subset(self):
         session, coordinator = self._coordinator()
         context = PresentationContext(actor=self.player, protocol_version=1)
+        coordinator.full_snapshot(context)
+        session.sent.clear()
         envelope = coordinator.panel_update(
             context, {"status": self.registry.render("status", context)}
         )

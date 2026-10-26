@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import { isVitalsVisible } from "../../components/vitals.js";
 import { useElosernStore } from "../../stores/elosern.js";
+import Protocol from "../../../static/webclient/js/elosern/protocol.js";
 import * as fx from "../store/protocol_fixtures.js";
 
 describe("isVitalsVisible (webclient-retire-redundant-hud, design D2)", () => {
@@ -43,16 +44,34 @@ describe("isVitalsVisible (webclient-retire-redundant-hud, design D2)", () => {
       revision, presentation_epoch: epoch, mode,
       panels: { status: fx.statusPanel({ resources: fullResources, conditions: [condition(kind)] }) },
     });
+    // Every delta names its exact committed baseline; these fixtures publish
+    // consecutive revisions, so the predecessor is the directly prior one.
+    const delta = (revision, kind, mode = "exploration", epoch = fx.EPOCH_A) => ({
+      ...message(revision, kind, mode, epoch),
+      base_revision: revision - 1,
+      removed_panels: [],
+    });
+    // A committed dialogue mode always pairs with a committed dialogue panel.
+    const dialogueDelta = (revision, kind) => {
+      const envelope = delta(revision, kind, "dialogue");
+      envelope.panels.dialogue = {
+        schema_version: Protocol.PANEL_ALLOWLIST.dialogue,
+        available: false,
+        reason: { code: "dialogue_unavailable", message: "目前沒有對話。" },
+      };
+      return envelope;
+    };
     expect(store.receive(1, "ui_snapshot", [message(1, "equipment")], {}).accepted).toBe(true);
     expect(store.view.vitals.visible).toBe(false);
-    expect(store.receive(1, "ui_update", [message(2, "mixed")], {}).accepted).toBe(true);
+    expect(store.receive(1, "ui_update", [delta(2, "mixed")], {}).accepted).toBe(true);
     expect(store.view.vitals.visible).toBe(true);
-    expect(store.receive(1, "ui_update", [message(3, "equipment")], {}).accepted).toBe(true);
+    expect(store.receive(1, "ui_update", [delta(3, "equipment")], {}).accepted).toBe(true);
     expect(store.view.vitals.visible).toBe(false);
-    expect(store.receive(1, "ui_update", [message(2, "mixed")], {}).accepted).toBe(false);
+    expect(store.receive(1, "ui_update", [delta(2, "mixed")], {}).accepted).toBe(false);
     expect(store.view.vitals.visible).toBe(false);
     for (const [revision, mode] of [[4, "dialogue"], [5, "creation"], [6, "exploration"]]) {
-      expect(store.receive(1, "ui_update", [message(revision, "mixed", mode)], {}).accepted).toBe(true);
+      const envelope = mode === "dialogue" ? dialogueDelta(revision, "mixed") : delta(revision, "mixed", mode);
+      expect(store.receive(1, "ui_update", [envelope], {}).accepted).toBe(true);
       // The store carries data attention; the mounted shell owns mode gates.
       expect(store.view.vitals.visible).toBe(true);
     }
@@ -60,7 +79,7 @@ describe("isVitalsVisible (webclient-retire-redundant-hud, design D2)", () => {
     expect(store.receive(2, "ui_snapshot", [message(1, "equipment", "exploration", fx.EPOCH_B)], {}).accepted).toBe(true);
     expect(store.receive(2, "ui_update", [message(99, "mixed")], {}).accepted).toBe(false);
     expect(store.view.vitals.visible).toBe(false);
-    const unavailable = fx.snapshot({ revision: 2, presentation_epoch: fx.EPOCH_B, mode: "combat" });
+    const unavailable = fx.update({ revision: 2, base_revision: 1, presentation_epoch: fx.EPOCH_B, mode: "combat" });
     unavailable.panels.status = {
       schema_version: 4, available: false, reason: { code: "status_unavailable", message: "暫無資料" },
     };
@@ -141,7 +160,7 @@ describe("isVitalsVisible (webclient-retire-redundant-hud, design D2)", () => {
       label: "精神充沛", severity: "informational", restriction: null,
     }])], {}).accepted).toBe(true);
     expect(store.view.vitals.visible).toBe(false);
-    expect(store.receive(1, "ui_update", [message(2, [
+    expect(store.receive(1, "ui_update", [{ ...message(2, [
       {
         identity: "42", name: "影行者", reserve_percent: 80, stage: "normal",
         label: "精神充沛", severity: "informational", restriction: null,
@@ -150,7 +169,7 @@ describe("isVitalsVisible (webclient-retire-redundant-hud, design D2)", () => {
         identity: "77", name: "同伴", reserve_percent: 2, stage: "forced_sleep",
         label: "強制睡眠", severity: "critical", restriction: "沉睡中，無法行動",
       },
-    ])], {}).accepted).toBe(true);
+    ]), base_revision: 1, removed_panels: [] }], {}).accepted).toBe(true);
     expect(store.view.vitals.visible).toBe(true);
   });
 

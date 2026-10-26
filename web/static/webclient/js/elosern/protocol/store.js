@@ -78,24 +78,59 @@ function notify() {
   });
 }
 
-function commitPresentation(meta, isSnapshot) {
+// Stage the eager panel map a presentation would commit, without touching the
+// committed state. An update keeps every unchanged committed panel, applies the
+// explicit removals, then replaces the named panels completely; a snapshot
+// keeps nothing. Every retained and staged value is cloned, so a rejected or
+// accepted presentation never aliases transport data or committed state.
+function stagePanels(meta, isSnapshot) {
+  var staged = {};
+  if (!isSnapshot) {
+    Object.keys(panels).forEach(function (name) {
+      staged[name] = JSON.parse(canonicalJson(panels[name]));
+    });
+    meta.removedPanels.forEach(function (name) {
+      delete staged[name];
+    });
+  }
+  Object.keys(meta.panels).forEach(function (name) {
+    if (Object.prototype.hasOwnProperty.call(mapPanels.MAP_PANEL_SCHEMAS, name)) {
+      return;
+    }
+    staged[name] = JSON.parse(canonicalJson(meta.panels[name]));
+  });
+  return staged;
+}
+
+// A committed dialogue mode must always pair with a committed dialogue panel.
+// The server re-renders dialogue as a candidate on every publication and may
+// omit it when unchanged; the receiver therefore validates the relationship
+// against the STAGED state rather than requiring the panel on every delta.
+function dialogueConsistent(meta, staged) {
+  if (meta.mode !== "dialogue") {
+    return true;
+  }
+  return Object.prototype.hasOwnProperty.call(staged, "dialogue");
+}
+
+function commitPresentation(meta, isSnapshot, staged) {
   activeEpoch = meta.epoch;
   revision = meta.revision;
   mode = meta.mode;
   layoutVersion = meta.layoutVersion;
   serverTime = meta.serverTime;
-  if (isSnapshot) {
-    // A full snapshot replaces the complete store atomically, including
-    // panels omitted from the new payload.
-    panels = {};
-  }
-  // An update replaces only the named panels, each completely, and never
-  // merges nested fields. Map panels land in their separate on-demand slot;
-  // a snapshot never names them, so same-epoch maps survive it.
+  // A full snapshot replaces the complete eager store atomically, including
+  // panels omitted from the new payload. An update replaces only the named
+  // panels, each completely, never merges nested fields, and deletes exactly
+  // the explicitly removed eager names. Map panels land in their separate
+  // on-demand slot; a snapshot never names them, so same-epoch maps survive it.
+  panels = staged;
   Object.keys(meta.panels).forEach(function (name) {
-    var target = Object.prototype.hasOwnProperty.call(mapPanels.MAP_PANEL_SCHEMAS, name) ? maps : panels;
-    target[name] = JSON.parse(canonicalJson(meta.panels[name]));
-    if (target === maps) mapPublications[name] = meta.revision;
+    if (!Object.prototype.hasOwnProperty.call(mapPanels.MAP_PANEL_SCHEMAS, name)) {
+      return;
+    }
+    maps[name] = JSON.parse(canonicalJson(meta.panels[name]));
+    mapPublications[name] = meta.revision;
   });
   // An unfinished transfer at or below the committed revision can never be
   // adopted any more; free it now.
@@ -227,7 +262,7 @@ return {
         maps = {};
         mapPublications = {};
         assembler.clear();
-        commitPresentation(meta, true);
+        commitPresentation(meta, true, stagePanels(meta, true));
         return { accepted: true, established: true, revision: meta.revision };
       }
 
@@ -238,18 +273,37 @@ return {
       if (meta.revision <= revision) {
         return { accepted: false, reason: "not_newer" };
       }
+      if (messageName === "ui_update" && meta.baseRevision !== revision) {
+        // A delta is admitted only against the exact committed baseline. The
+        // rejected publication commits nothing and locks mutations until the
+        // recovery owner completes a fresh snapshot. A rejection never
+        // notifies subscribers.
+        mutationsLocked = true;
+        return { accepted: false, reason: "base_mismatch" };
+      }
+      var staged;
       if (meta.part) {
         // One bounded map part: nothing (metadata included) is adopted until
-        // the whole transfer decoded and validated.
+        // the whole transfer decoded and validated. Parts repeat the same
+        // exact base and target, so no partial map advances the revision.
         var outcome = assembler.offer(
           meta.part.panel,
           meta.part.header,
           meta.part.bytes,
           meta.revision,
-          canonicalJson([meta.revision, meta.mode, meta.layoutVersion, meta.serverTime])
+          canonicalJson([
+            meta.baseRevision,
+            meta.revision,
+            meta.mode,
+            meta.layoutVersion,
+            meta.serverTime,
+            // The removal list is part of the one logical envelope: parts
+            // with different removals are conflicting, not interchangeable.
+            meta.removedPanels.slice().sort(),
+          ])
         );
         if (outcome.status === "partial") {
-          return { accepted: true, partial: true, revision: meta.revision };
+          return { accepted: false, pending: true, revision: meta.revision };
         }
         if (outcome.status !== "complete") {
           return { accepted: false, reason: outcome.reason, detail: outcome.detail };
@@ -258,7 +312,17 @@ return {
         logicalPanels[outcome.panel] = outcome.logical;
         meta.panels = logicalPanels;
       }
-      commitPresentation(meta, messageName === "ui_snapshot");
+      // Stage every replacement, removal, and metadata field before one commit
+      // and one notification; a rejected stage leaves committed state intact.
+      staged = stagePanels(meta, messageName === "ui_snapshot");
+      if (!dialogueConsistent(meta, staged)) {
+        return {
+          accepted: false,
+          reason: "invalid",
+          detail: "dialogue mode requires a committed dialogue panel",
+        };
+      }
+      commitPresentation(meta, messageName === "ui_snapshot", staged);
       return { accepted: true, revision: meta.revision };
     }
 

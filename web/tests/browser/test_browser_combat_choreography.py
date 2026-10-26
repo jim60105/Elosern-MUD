@@ -142,6 +142,10 @@ _PLAY_ROUND = """async ([env, kind, lines]) => {
   const view = store.view;
   env.presentation_epoch = view.epoch;
   env.revision = view.revision + 1;
+  if (kind === 'ui_update') {
+    env.base_revision = view.revision;
+    env.removed_panels = [];
+  }
   const result = store.receive(view.generation, kind, [env], {});
   if (!result.accepted) throw new Error('round publication rejected: ' + JSON.stringify(result));
   store.receive(view.generation, 'ui_action_result', [{

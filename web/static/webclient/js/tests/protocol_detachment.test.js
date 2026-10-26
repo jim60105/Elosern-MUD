@@ -87,7 +87,7 @@ test("detached store re-establishes only on a fresh-epoch full snapshot", () => 
   assert.equal(store.getState().phase, "detached");
 
   // An update can never re-establish a detached store.
-  const updateResult = store.receive(1, "ui_update", [update({ presentation_epoch: EPOCH_B, revision: 1 })], {});
+  const updateResult = store.receive(1, "ui_update", [update({ presentation_epoch: EPOCH_B, revision: 2, base_revision: 1 })], {});
   assert.equal(updateResult.accepted, false);
   assert.equal(updateResult.reason, "update_cannot_establish_epoch");
   assert.equal(store.getState().phase, "detached");

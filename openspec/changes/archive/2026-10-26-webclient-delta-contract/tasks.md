@@ -4,17 +4,17 @@ All checkboxes are implementation work, not authorization to apply during propos
 
 ## 1. Exact logical schemas
 
-- [ ] 1.1 Write Python test_protocol and Node protocol_core cases for required base_revision/removed_panels, empty metadata-only update, invalid overlap/unknown/map removal and bool integer rejection; then update protocol.py and protocol/envelope.js validators/exports to the shared design. Observable acceptance is identical server/client admission, no fallback defaults.
-- [ ] 1.2 Write exact-base staged reducer tests in new protocol_delta.test.js, then update protocol/store.js receive/commit so invalid replacements/removals/metadata or B mismatch preserve all old fields, delta cannot establish epoch and a valid skipped-number target admits from its exact B. Verify staged dialogue coupling and one notification.
+- [x] 1.1 Write Python test_protocol and Node protocol_core cases for required base_revision/removed_panels, empty metadata-only update, invalid overlap/unknown/map removal and bool integer rejection; then update protocol.py and protocol/envelope.js validators/exports to the shared design. Observable acceptance is identical server/client admission, no fallback defaults.
+- [x] 1.2 Write exact-base staged reducer tests in new protocol_delta.test.js, then update protocol/store.js receive/commit so invalid replacements/removals/metadata or B mismatch preserve all old fields, delta cannot establish epoch and a valid skipped-number target admits from its exact B. Verify staged dialogue coupling and one notification.
 
 ## 2. Complete emitter and fixture cutover
 
-- [ ] 2.1 Update coordinator _build_presentation/panel_update/_publish_with_maps to emit exact B/N for every update, including repeated same-B specialized map parts. Migrate actual update fixture producers enumerated in design, including JS helper/direct literals, Vue stories/tests, Python dispatcher/map fixtures and world_map_transport_fixture.py. Tests must supply the actual committed predecessor for nonconsecutive targets; no legacy schema aliases.
-- [ ] 2.2 Replace unconditional dialogue wire-presence checks with fresh candidate/staged consistency behavior while preserving all registered schema versions and map retention. Update docs/development/webclient-synchronization.md (new protocol contract) and old OOB foundation supersession notes; register new Python labels only when adding a Python module, and keep requirement decorators on meaningful changed-behavior tests.
+- [x] 2.1 Update coordinator _build_presentation/panel_update/_publish_with_maps to emit exact B/N for every update, including repeated same-B specialized map parts. Migrate actual update fixture producers enumerated in design, including JS helper/direct literals, Vue stories/tests, Python dispatcher/map fixtures and world_map_transport_fixture.py. Tests must supply the actual committed predecessor for nonconsecutive targets; no legacy schema aliases.
+- [x] 2.2 Replace unconditional dialogue wire-presence checks with fresh candidate/staged consistency behavior while preserving all registered schema versions and map retention. Update docs/development/webclient-synchronization.md (new protocol contract) and old OOB foundation supersession notes; register new Python labels only when adding a Python module, and keep requirement decorators on meaningful changed-behavior tests.
 
 ## 3. Focused integrated verification
 
-- [ ] 3.1 After all owned edits land, run D-PY, D-NODE and D-VUE below once as focused batches, plus contract_gate. Check existing fixture-driven suites affected by this breaking shape in CI, without running full managed browser locally. Acceptance includes zero remaining production/fixture emitters relying on missing B/N; a source search over ui_update producers is an inventory check, not a compatibility path.
+- [x] 3.1 After all owned edits land, run D-PY, D-NODE and D-VUE below once as focused batches, plus contract_gate. Check existing fixture-driven suites affected by this breaking shape in CI, without running full managed browser locally. Acceptance includes zero remaining production/fixture emitters relying on missing B/N; a source search over ui_update producers is an inventory check, not a compatibility path.
 
 ## Verification commands
 
