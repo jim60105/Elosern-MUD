@@ -4,12 +4,12 @@ All checkboxes are implementation work, not authorization to apply during propos
 
 ## 1. Production-path browser scenarios
 
-- [ ] 1.1 Implement IncrementalSyncBrowserTests.test_graphical_and_text_checkpoint_sequence and test_oversized_snapshot_and_delta_adopt_once with the exact test-only fixture in design. Use real registry/coordinator/socket/browser and canonical action/command paths, count target-revision commits/frames and assert byte bounds, content and result order. Add synthetic seed registration and focused functional documentation together; no production code.
-- [ ] 1.2 Implement test_missing_publication_recovers_complete_baseline and test_failed_recovery_and_alignment_preserve_local_state using one bounded transport fault per case. Assert complete canonical repair including deliberately omitted candidate, one automatic sync/no mutation retry, failed-repair lock/text fallback, explicit recovery/new epoch and valid local UI state. Restore interception/listeners and release all buffers between cases. Register four method labels once in browser-shards and traceability.
+- [x] 1.1 Implement IncrementalSyncBrowserTests.test_graphical_and_text_checkpoint_sequence and test_oversized_snapshot_and_delta_adopt_once with the exact test-only fixture in design. Use real registry/coordinator/socket/browser and canonical action/command paths, count target-revision commits/frames and assert byte bounds, content and result order. Add synthetic seed registration and focused functional documentation together; no production code.
+- [x] 1.2 Implement test_missing_publication_recovers_complete_baseline and test_failed_recovery_and_alignment_preserve_local_state using one bounded transport fault per case. Assert complete canonical repair including deliberately omitted candidate, one automatic sync/no mutation retry, failed-repair lock/text fallback, explicit recovery/new epoch and valid local UI state. Restore interception/listeners and release all buffers between cases. Register four method labels once in browser-shards and traceability.
 
 ## 2. Final integrated acceptance
 
-- [ ] 2.1 Run F-BROWSER-1 through F-BROWSER-4 as separate focused commands below, then affected existing map smoke and contract_gate. Capture actual pass/failure evidence; fix owning runtime defects without weakening scenarios before accepting. Document exercised paths/blockers and explicitly state that no performance/latency/no-stutter evidence is claimed. Full browser/evidence suite remains CI-owned.
+- [x] 2.1 Run F-BROWSER-1 through F-BROWSER-4 as separate focused commands below, then affected existing map smoke and contract_gate. Capture actual pass/failure evidence; fix owning runtime defects without weakening scenarios before accepting. Document exercised paths/blockers and explicitly state that no performance/latency/no-stutter evidence is claimed. Full browser/evidence suite remains CI-owned.
 
 ## Verification commands
 

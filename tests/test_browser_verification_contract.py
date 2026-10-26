@@ -8,6 +8,7 @@ isolated, repeatable, and free of failure suppression or remote fixtures.
 """
 
 from pathlib import Path
+import ast
 import json
 import re
 import tomllib
@@ -18,6 +19,36 @@ import yaml
 from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+#: The synchronization acceptance modules whose evidence is functional only:
+#: they cross the real publication path and assert protocol byte bounds, never
+#: measured workload or responsiveness.
+SYNC_VERIFICATION_MODULES = (
+    "web/tests/browser/test_incremental_sync.py",
+    "web/tests/browser/incremental_sync_fixture.py",
+)
+
+#: Modules that could measure time, CPU or allocations if a synchronization
+#: acceptance module imported them.
+MEASUREMENT_MODULES = frozenset(
+    {"cProfile", "profile", "resource", "statistics", "time", "timeit", "tracemalloc"}
+)
+
+#: Clock, CPU and allocation entry points that would turn a functional
+#: assertion into a latency, profile or allocation claim.
+MEASUREMENT_CALLS = frozenset(
+    {
+        "getrusage",
+        "monotonic",
+        "monotonic_ns",
+        "perf_counter",
+        "perf_counter_ns",
+        "process_time",
+        "process_time_ns",
+        "time",
+        "time_ns",
+    }
+)
 
 
 def _read(name: str) -> str:
@@ -272,6 +303,41 @@ class BrowserVerificationContractTests(unittest.TestCase):
         self.assertEqual(
             steps["Install Node.js"]["with"]["node-version"], "24"
         )
+
+    @covers_requirement(
+        "webclient-incremental-sync-verification::"
+        "synchronization-verification-excludes-performance-claims"
+    )
+    def test_synchronization_acceptance_measures_nothing(self):
+        for name in SYNC_VERIFICATION_MODULES:
+            tree = ast.parse(_read(name))
+            imported = set()
+            called = set()
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    imported.update(
+                        alias.name.split(".")[0] for alias in node.names
+                    )
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    imported.add(node.module.split(".")[0])
+                elif isinstance(node, ast.Call):
+                    target = node.func
+                    if isinstance(target, ast.Attribute):
+                        called.add(target.attr)
+                    elif isinstance(target, ast.Name):
+                        called.add(target.id)
+            self.assertEqual(
+                imported & MEASUREMENT_MODULES,
+                set(),
+                f"{name} must stay functional: no timing, profiling or "
+                "allocation module",
+            )
+            self.assertEqual(
+                called & MEASUREMENT_CALLS,
+                set(),
+                f"{name} must assert protocol bounds, never measured "
+                "latency, profile or allocation",
+            )
 
 
 if __name__ == "__main__":
