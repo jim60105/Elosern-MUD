@@ -37,6 +37,7 @@ from web.webclient.presentation.skill_use_selection import (
     SkillUseSelection,
     retire_skill_use_selection,
 )
+from web.webclient.presentation.tests._support import last_frame
 from world.rules.buffs import entity_active_buffs
 from world.rules.clock import get_world_clock, read_world_clock
 from world.rules.combat_session import (
@@ -439,7 +440,7 @@ class FieldCastActionTests(_SkillUseCase):
     def _tick(self):
         return read_world_clock().tick
 
-    def test_ordinary_single_heal_settles_and_publishes_a_full_snapshot(self):
+    def test_ordinary_single_heal_settles_and_publishes_the_changed_panels(self):
         npc = self._npc("wounded npc")
         npc.traits.hp.current = 1
         self._act("explore.skill_preview", {"skill_key": _T_HEAL})
@@ -448,7 +449,9 @@ class FieldCastActionTests(_SkillUseCase):
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "cast")
         kind, envelope = self._last_publication()
-        self.assertEqual(kind, "ui_snapshot")
+        # The completion publishes only the differences from the committed
+        # baseline (an exact-base delta), and the result names its revision.
+        self.assertEqual(kind, "ui_update")
         self.assertEqual(result["presentation_revision"], envelope["revision"])
         self.assertGreater(int(npc.traits.hp.current), 1)
         self.assertGreater(self._tick(), tick_before)
@@ -517,7 +520,7 @@ class FieldCastActionTests(_SkillUseCase):
         self.assertEqual(result["outcome"], "success", result)
         self.assertEqual(result["code"], "round")
         kind, envelope = self._last_publication()
-        self.assertEqual(kind, "ui_snapshot")
+        self.assertEqual(kind, "ui_update")
         self.assertEqual(envelope["mode"], "combat")
         self.assertIsNotNone(read_session(self.player))
         self.assertEqual(envelope["panels"]["combat_beats"]["available"], True)
@@ -554,7 +557,7 @@ class FieldCastActionTests(_SkillUseCase):
         self.assertEqual(record.opening_first_actor, str(self.player.key))
         self.assertEqual(self.player.traits.mp.value, mp_before)
         kind, envelope = self._last_publication()
-        self.assertEqual(kind, "ui_snapshot")
+        self.assertEqual(kind, "ui_update")
         self.assertEqual(envelope["mode"], "combat")
 
     def test_instant_terminal_opening_publishes_settled_exploration(self):
@@ -862,7 +865,8 @@ class SkillUsePanelValidationTests(_SkillUseCase):
         self.assertEqual(len(panel["skill"]["openings"]), 64)
         self.assertEqual(len(panel["skill"]["targets"]), 64)
         context = build_presentation_context(self.session, self.player)
-        snapshot = self.coordinator.full_snapshot(context)
+        self.coordinator.full_snapshot(context)
+        snapshot = last_frame(self.session, "ui_snapshot")
         self.assertLessEqual(json_byte_size(snapshot), 65_536)
         self.assertEqual(snapshot["panels"]["skill_use"]["available"], True)
 

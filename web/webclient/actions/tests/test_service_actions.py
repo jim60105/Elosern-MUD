@@ -1246,7 +1246,8 @@ class ServiceDispatchTests(ServiceActionBase):
         self.assertEqual(list(self.player.db.inventory or []), [])
 
     @covers_requirement("webclient-service-menus::service-action-completion-updates-canonical-panels-and-preserves-narrative")
-    def test_rejected_action_publishes_a_refresh_snapshot(self):
+    def test_rejected_action_answers_at_the_current_revision(self):
+        """A rejection that changes no canonical content costs no revision."""
         self._register()
         self.player.location = self.store
         self.player.db.wallet = 5
@@ -1263,8 +1264,9 @@ class ServiceDispatchTests(ServiceActionBase):
             self.action_registry,
             self.registry,
         )
-        # A rejected outcome publishes a full snapshot at a newer revision.
-        self.assertGreater(coordinator.revision, before)
+        # The rejected outcome changed nothing the client holds, so no
+        # presentation frame was sent and the revision is unchanged.
+        self.assertEqual(coordinator.revision, before)
         result = self._last_result()
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "insufficient_funds")

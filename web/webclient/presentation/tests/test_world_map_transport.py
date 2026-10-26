@@ -32,6 +32,10 @@ from web.webclient.presentation.protocol import (
     json_byte_size,
 )
 from web.webclient.presentation.registry import PresenterSpec
+from web.webclient.presentation.tests._support import (
+    publication_failure,
+    publication_receipt,
+)
 from web.webclient.presentation.tests.test_map_panel_protocol import (
     _Session,
     _context,
@@ -207,8 +211,10 @@ class WorldMapFrameParityTests(unittest.TestCase):
         self.assertEqual(js, [WORLD_MAP_FRAME_MAX_BYTES, map_panels.WORLD_MAX_BYTES])
 
 
-def _world_registry(world_body, *, dialogue=False, area=None):
-    registry = _registry(area or (lambda: _copy("grid")), [], dialogue=dialogue)
+def _world_registry(world_body, *, dialogue=False, area=None, state=None):
+    registry = _registry(
+        area or (lambda: _copy("grid")), [], dialogue=dialogue, state=state
+    )
     registry.register(
         PresenterSpec("world_map", 1, ("map_unavailable", "世界地圖"), lambda ctx: world_body(), on_demand=True)
     )
@@ -223,10 +229,14 @@ class WorldMapCoordinatorTests(unittest.TestCase):
         coordinator = _coordinator(session, _world_registry(lambda: _copy("large")))
         coordinator.full_snapshot(_context())
         with mock.patch("web.webclient.presentation.coordinator.log_debug") as log_debug:
-            revision = coordinator._publish_presentation(_context(), {"world_map"})
+            receipt = publication_receipt(
+                coordinator.enqueue_publication(
+                    lambda: _context(), affected_panels={"world_map"}
+                )
+            )
         (name, frame), = session.frames()[1:]
         self.assertEqual(name, "ui_update")
-        self.assertEqual(frame["revision"], revision)
+        self.assertEqual(frame["revision"], receipt.revision)
         self.assertNotIn("part", frame["panels"]["world_map"])
         self.assertEqual(frame["panels"]["world_map"], validate_world_map(_copy("large")))
         self.assertGreater(json_byte_size(frame), MAX_CANONICAL_JSON_BYTES)
@@ -238,9 +248,17 @@ class WorldMapCoordinatorTests(unittest.TestCase):
     @covers_requirement("webclient-oob-protocol::elosern-oob-messages-use-exact-versioned-envelopes")
     def test_a_dialogue_companion_rides_in_the_same_frame(self):
         session = _Session()
-        coordinator = _coordinator(session, _world_registry(lambda: _copy("large"), dialogue=True), mode="dialogue")
+        state = {"status": 0, "dialogue": 0}
+        coordinator = _coordinator(
+            session,
+            _world_registry(lambda: _copy("large"), dialogue=True, state=state),
+            mode="dialogue",
+        )
         coordinator.full_snapshot(_context())
-        coordinator._publish_presentation(_context(), {"world_map"})
+        # The conversation changed, so the dialogue companion is a real
+        # difference carried by the same frame.
+        state["dialogue"] = 1
+        coordinator.enqueue_publication(lambda: _context(), affected_panels={"world_map"})
         (_, frame), = session.frames()[1:]
         self.assertEqual(set(frame["panels"]), {"world_map", "dialogue"})
 
@@ -253,9 +271,12 @@ class WorldMapCoordinatorTests(unittest.TestCase):
         padded = _padded(_status(), 70_000)
         before = coordinator.revision
         with mock.patch.object(registry, "render", side_effect=lambda name, ctx: padded if name == "status" else _copy("large")):
-            with self.assertRaises(ProtocolValidationError):
-                # The companion alone is over the generic frame: nothing is sent.
-                coordinator._publish_presentation(_context(), {"status", "world_map"})
+            # The companion alone is over the generic frame: nothing is sent.
+            publication_failure(
+                coordinator.enqueue_publication(
+                    lambda: _context(), affected_panels={"status", "world_map"}
+                )
+            ).trap(ProtocolValidationError)
         self.assertEqual(coordinator.revision, before)
         self.assertEqual(len(session.frames()), 1)
 
@@ -265,7 +286,9 @@ class WorldMapCoordinatorTests(unittest.TestCase):
         session = _Session()
         coordinator = _coordinator(session, _world_registry(lambda: _copy("large"), area=_dense_grid))
         coordinator.full_snapshot(_context())
-        coordinator._publish_presentation(_context(), {"area_map", "world_map"})
+        coordinator.enqueue_publication(
+            lambda: _context(), affected_panels={"area_map", "world_map"}
+        )
         frames = [frame for _, frame in session.frames()[1:]]
         area = [frame for frame in frames if "area_map" in frame["panels"]]
         world = [frame for frame in frames if "world_map" in frame["panels"]]
@@ -285,7 +308,7 @@ class WorldMapCoordinatorTests(unittest.TestCase):
         coordinator = _coordinator(session, _world_registry(lambda: _copy("over")))
         coordinator.full_snapshot(_context())
         with mock.patch("web.webclient.presentation.coordinator.log_error") as log_error:
-            coordinator._publish_presentation(_context(), {"world_map"})
+            coordinator.enqueue_publication(lambda: _context(), affected_panels={"world_map"})
         (_, frame), = session.frames()[1:]
         self.assertIs(frame["panels"]["world_map"]["available"], False)
         self.assertEqual(log_error.call_args.args[0], "map_panel_invalid")

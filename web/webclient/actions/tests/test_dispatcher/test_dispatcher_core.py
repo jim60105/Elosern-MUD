@@ -30,9 +30,9 @@ from ._support import (
 
 
 class DispatcherTests(unittest.TestCase):
-    def _session_with_coordinator(self):
+    def _session_with_coordinator(self, presentation=None):
         session = FakeSession()
-        _coordinator(session)
+        _coordinator(session, presentation)
         session.puppet = FakeActor()
         return session
 
@@ -181,13 +181,18 @@ class DispatcherTests(unittest.TestCase):
         "webclient-action-dispatch::admitted-action-completion-publishes-canonical-state-before-unlocking"
     )
     def test_success_publishes_update_before_result_and_unlocks(self):
-        session = self._session_with_coordinator()
+        state = {"value": 1}
+        presentation = _presenter_registry(state)
+        session = self._session_with_coordinator(presentation)
         registry = ActionRegistry("test")
         registry.register(_proof_spec())
         coordinator = session.ndb.elosern_coordinator
         coordinator.full_snapshot(SimpleNamespace(actor=session.puppet, protocol_version=1))
+        # The committed action changed the canonical status value; an unchanged
+        # completion would (correctly) send only its result.
+        state["value"] = 2
         envelope = self._envelope(epoch=coordinator.epoch, base_revision=coordinator.revision, action_id="proof.noop")
-        handle_ui_action(session, session.puppet, envelope, registry, _presenter_registry())
+        handle_ui_action(session, session.puppet, envelope, registry, presentation)
         # The synchronous adapter published update then result.
         updates = [call for call in session.sent if "ui_update" in call]
         results = [call for call in session.sent if "ui_action_result" in call]

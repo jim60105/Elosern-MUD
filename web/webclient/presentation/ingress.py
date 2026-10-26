@@ -7,10 +7,13 @@ post-command refresh here.
 """
 
 from copy import deepcopy
+import secrets
 from types import MappingProxyType
 from typing import Any
 
 from twisted.internet.defer import Deferred
+from twisted.internet.defer import succeed
+from twisted.python.failure import Failure
 
 from web.webclient.presentation.context import (
     FrozenCard,
@@ -357,47 +360,72 @@ def _current_options_fingerprint(actor: Any) -> str | None:
     return situation[0] if situation is not None else None
 
 
-def synchronize_session(session: Any, actor: Any) -> bool:
-    """Emit a full snapshot for a puppeted session; return success.
+def synchronize_session(session: Any, actor: Any) -> Deferred:
+    """Publish the complete baseline for a puppeted session; return its Deferred.
 
-    Returns ``True`` after a snapshot is sent, ``False`` when a safe protocol
-    error replaced it (for example, the world clock is unexpectedly absent).
-    Never raises: presentation failures are logged and isolated so text play is
-    unaffected.
+    The publication is the coordinator's serialized own batch: the Deferred
+    resolves once every frame has sent and this helper has registered the
+    watcher and scheduled the options trigger, or ``None`` when the sequence
+    retired before it ran (nothing is registered or scheduled then). A failure —
+    the world clock absent, or any publication error — is replaced by the safe
+    protocol error and never raises into text play.
     """
     coordinator = _coordinator_for(session, actor)
-    context = build_presentation_context(session, actor)
-    try:
-        coordinator.synchronize(context)
-    except ClockUnavailable:
-        log_unavailable(coordinator.describe_session(), "world clock is absent")
-        send_protocol_error(
-            session,
-            code="presentation_unavailable",
-            message="目前無法取得世界時間，圖形介面暫停同步",
-            reload_required=False,
-        )
-        return False
-    except Exception:
-        correlation_id = __import__("secrets").token_hex(16)
-        log_unavailable(coordinator.describe_session(), f"sync failed {correlation_id}")
-        send_protocol_error(
-            session,
-            code="internal_error",
-            message="同步時發生內部錯誤",
-            reload_required=True,
-            correlation_id=correlation_id,
-        )
-        return False
-    # The snapshot is on the wire; this session is a live watcher of its
-    # puppet for the room-entry hook (idempotent per session). A function-local
-    # import keeps the ingress importable while a worker is under development
-    # and avoids a module cycle (watchers imports the ingress predicate).
-    from web.webclient.presentation.watchers import register_watcher
+    deferred = coordinator.enqueue_publication(
+        lambda: build_presentation_context(session, actor), force_snapshot=True
+    )
 
-    register_watcher(session)
-    _schedule_on_reconnect(session, actor, coordinator)
-    return True
+    def _published(receipt: Any) -> None:
+        if receipt is None:
+            # The captured sequence retired before execution: this session is
+            # no longer a watcher of ``actor`` and nothing may be scheduled.
+            return None
+        # The snapshot is on the wire; this session is a live watcher of its
+        # puppet for the room-entry hook (idempotent per session). A
+        # function-local import keeps the ingress importable while a worker is
+        # under development and avoids a module cycle (watchers imports the
+        # ingress predicate).
+        from web.webclient.presentation.watchers import register_watcher
+
+        register_watcher(session)
+        _schedule_on_reconnect(session, actor, coordinator)
+        return None
+
+    def _failed(failure: Failure) -> None:
+        quiet = isinstance(failure, Failure) and failure.check(ClockUnavailable)
+        try:
+            if quiet:
+                log_unavailable(coordinator.describe_session(), "world clock is absent")
+                send_protocol_error(
+                    session,
+                    code="presentation_unavailable",
+                    message="目前無法取得世界時間，圖形介面暫停同步",
+                    reload_required=False,
+                )
+                return None
+            correlation_id = secrets.token_hex(16)
+            log_unavailable(
+                coordinator.describe_session(), f"sync failed {correlation_id}"
+            )
+            send_protocol_error(
+                session,
+                code="internal_error",
+                message="同步時發生內部錯誤",
+                reload_required=True,
+                correlation_id=correlation_id,
+            )
+        except Exception as send_error:
+            # A transport that cannot carry the safe protocol error is already
+            # gone; the failure is reported here instead of raising into the
+            # caller's command settlement.
+            log_unavailable(
+                coordinator.describe_session(),
+                f"sync failure could not be reported ({type(send_error).__name__})",
+            )
+        return None
+
+    deferred.addCallbacks(_published, _failed)
+    return deferred
 
 
 def _schedule_on_reconnect(
@@ -425,19 +453,43 @@ def _schedule_on_reconnect(
         )
 
 
-def refresh_after_command(session: Any, actor: Any) -> None:
-    """Best-effort full snapshot after a WebClient command settles.
+def refresh_after_command(session: Any, actor: Any) -> Deferred:
+    """Best-effort comparison refresh after a WebClient command settles.
 
-    Presentation failure is logged separately and never replaces the command's
-    own value or Failure; Telnet and AJAX sessions are never touched.
+    The settled command's eager scope is unknown, so every eager panel is
+    re-rendered from then-current canonical state and only real differences are
+    transmitted: a command that changed nothing consumes no revision and sends
+    no presentation frame. Presentation failure is logged separately and never
+    replaces the command's own value or Failure; Telnet and AJAX sessions are
+    never touched.
     """
     if not is_webclient(session):
-        return
-    try:
-        synchronize_session(session, actor)
-    except Exception:
-        correlation_id = __import__("secrets").token_hex(16)
-        log_unavailable(getattr(session, "sessid", "?"), f"refresh failed {correlation_id}")
+        return succeed(None)
+    coordinator = _coordinator_for(session, actor)
+    deferred = coordinator.enqueue_publication(
+        lambda: build_presentation_context(session, actor)
+    )
+
+    def _published(receipt: Any) -> None:
+        if receipt is None:
+            return None
+        from web.webclient.presentation.watchers import register_watcher
+
+        register_watcher(session)
+        _schedule_on_reconnect(session, actor, coordinator)
+        return None
+
+    def _failed(failure: Failure) -> None:
+        error = failure.value if isinstance(failure, Failure) else failure
+        correlation_id = secrets.token_hex(16)
+        log_unavailable(
+            getattr(session, "sessid", "?"),
+            f"refresh failed {correlation_id} ({type(error).__name__})",
+        )
+        return None
+
+    deferred.addCallbacks(_published, _failed)
+    return deferred
 
 
 def observe_command_settlement(deferred: Deferred, session: Any) -> None:

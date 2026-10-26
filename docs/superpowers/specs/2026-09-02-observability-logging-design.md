@@ -312,6 +312,15 @@ startup 各 registration 步驟、prompt library load、degrade 清單——
 combat 每回合中間值等高頻資料走 `log_debug`，受 Evennia `VERBOSE` 控制，
 預設不污染 server.log。
 
+### 4.6 WebClient 簡報發布邊界
+
+每個 session 的簡報發布由單一擁有者序列化完成；每個「真的送出」的邏輯發布
+寫一條 info，供比對「客戶端現在應該持有哪些面板」與「伺服器以為送了什麼」：
+
+| event | context |
+|---|---|
+| `presentation_published` | `session`、`kind`（`snapshot`／`delta`）、`revision`、`mode`、`panels`（實際送出的替換面板，逗號分隔或 `-`）、`removed`（顯式移除，逗號分隔或 `-`）。未變更而未送出的發布不寫 info；地圖分片細節仍走 `log_debug`（`map_panel_transfer_sent`／`world_map_frame_sent`） |
+
 ## 5. 遷移策略
 
 遷移量（約 160 處 log 呼叫＋大量吞例外點）超出單一 change 的容量，分四個

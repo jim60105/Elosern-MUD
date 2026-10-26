@@ -58,8 +58,14 @@ from web.webclient.presentation.protocol import (
     check_envelope,
     json_byte_size,
     validate_ui_snapshot,
+    validate_ui_update,
 )
 from web.webclient.presentation.registry import build_production_registry
+from web.webclient.presentation.tests._support import (
+    committed_view,
+    last_frame,
+    recorded_frames,
+)
 from world.rules.affinity import AffinitySource, apply_affinity_change
 from world.rules.art_view import (
     MAX_PORTRAIT_CATALOG,
@@ -785,13 +791,17 @@ class DialogueWireTransitionTests(BattlefieldIsolation, EvenniaTest):
 
     def test_scripted_talk_commits_dialogue_mode_atomically(self):
         session, coordinator = self._coordinator()
-        before = coordinator.full_snapshot(
+        coordinator.full_snapshot(
             PresentationContext(actor=self.player, protocol_version=1)
         )
+        before = committed_view(session.sent)
         self.assertEqual(before["mode"], "exploration")
         self.assertEqual(before["panels"]["dialogue"], UNAVAILABLE_PAYLOAD)
         # validate against the registered allowlist — the panel name must be known
-        validate_ui_snapshot(before, known_panels=set(self.registry.panel_names))
+        validate_ui_snapshot(
+            recorded_frames(session.sent)[-1],
+            known_panels=set(self.registry.panel_names),
+        )
 
         envelope = {
             "protocol_version": 1,
@@ -804,24 +814,30 @@ class DialogueWireTransitionTests(BattlefieldIsolation, EvenniaTest):
         handle_ui_action(
             session, self.player, envelope, self.action_registry, self.registry
         )
-        snapshots = [
-            call["ui_snapshot"][0][0] for call in session.sent if "ui_snapshot" in call
-        ]
         results = [
             call["ui_action_result"][0][0]
             for call in session.sent
             if "ui_action_result" in call
         ]
         self.assertEqual(results[-1]["outcome"], "success")
-        committed = snapshots[-1]
-        # The settled record precedes the existing snapshot publication: the
-        # published panel already carries the authored reply.
+        # The completion publication commits the whole mode transition: the
+        # client-visible view (baseline plus the completion delta) carries the
+        # authored reply in dialogue mode.
+        committed = committed_view(session.sent)
         self.assertEqual(committed["mode"], "dialogue")
+        validate_ui_update(
+            recorded_frames(session.sent)[-1],
+            known_panels=set(self.registry.panel_names),
+        )
         self.assertIs(committed["panels"]["dialogue"]["available"], True)
         self.assertIsNotNone(committed["panels"]["dialogue"]["delivery"])
-        self.assertIn(
-            "冒險者公會",
-            committed["panels"]["dialogue"]["delivery"]["lines"][1]["text"],
+        lines = [
+            line["text"]
+            for line in committed["panels"]["dialogue"]["delivery"]["lines"]
+        ]
+        self.assertTrue(
+            any("冒險者公會" in text for text in lines),
+            "the published delivery carries the authored reply: %r" % (lines,),
         )
         self.assertEqual(
             committed["panels"]["dialogue"]["choices"],
@@ -847,14 +863,14 @@ class DialogueWireTransitionTests(BattlefieldIsolation, EvenniaTest):
             set(committed["panels"]["exploration"]),
             set(before["panels"]["exploration"]),
         )
-        validate_ui_snapshot(committed, known_panels=set(self.registry.panel_names))
 
     def test_movement_clear_returns_mode_and_degrades_the_panel(self):
         session, coordinator = self._coordinator()
         open_or_refresh_dialogue(self.player, self.host, "歡迎。")
-        opened = coordinator.full_snapshot(
+        coordinator.full_snapshot(
             PresentationContext(actor=self.player, protocol_version=1)
         )
+        opened = committed_view(session.sent)
         self.assertEqual(opened["mode"], "dialogue")
 
         away = create_object(Room, key="廣場", location=None)
@@ -865,14 +881,13 @@ class DialogueWireTransitionTests(BattlefieldIsolation, EvenniaTest):
             destination=away,
         )
         self.assertIsNone(self.player.db.dialogue_session)
-        cleared = coordinator.full_snapshot(
+        coordinator.full_snapshot(
             PresentationContext(actor=self.player, protocol_version=1)
         )
+        cleared = committed_view(session.sent)
         self.assertEqual(cleared["mode"], "exploration")
         self.assertEqual(cleared["panels"]["dialogue"], UNAVAILABLE_PAYLOAD)
-        latest = [
-            call["ui_snapshot"][0][0] for call in session.sent if "ui_snapshot" in call
-        ][-1]
+        latest = last_frame(session, "ui_snapshot")
         self.assertEqual(latest["mode"], "exploration")
         self.assertEqual(latest["panels"]["dialogue"], UNAVAILABLE_PAYLOAD)
 
@@ -958,31 +973,48 @@ class DialogueWireTransitionTests(BattlefieldIsolation, EvenniaTest):
             self.host.move_to(away)
         self.assertIsNone(self.player.db.dialogue_session)
 
-    def test_dialogue_mode_update_injects_the_panel_into_unrelated_subsets(self):
+    def test_dialogue_mode_update_compares_the_panel_for_unrelated_subsets(self):
         session, coordinator = self._coordinator()
         open_or_refresh_dialogue(self.player, self.host, "歡迎。")
         context = PresentationContext(actor=self.player, protocol_version=1)
         # Establish the committed baseline the delta builds on.
         coordinator.full_snapshot(context)
+        baseline = committed_view(session.sent)
         session.sent.clear()
         # A publisher naming only unrelated panels (e.g. a clock-tick status
-        # update) must never emit mode dialogue without the panel it implies:
-        # the coordinator injects a freshly rendered dialogue panel.
-        envelope = coordinator.panel_update(
-            context, {"status": self.registry.render("status", context)}
+        # update) must never emit mode dialogue with a stale or missing panel:
+        # the coordinator renders dialogue as a candidate of that publication
+        # and compares it against the committed value.
+        coordinator.panel_update(
+            context,
+            {
+                "status": self.registry.build_unavailable(
+                    "status", internal=True, correlation_id="b" * 32
+                )
+            },
         )
+        envelope = last_frame(session, "ui_update")
         self.assertEqual(envelope["mode"], "dialogue")
         self.assertIn("status", envelope["panels"])
-        self.assertIs(envelope["panels"]["dialogue"]["available"], True)
+        # The committed dialogue panel is byte-identical, so the delta omits it
+        # and the staged state stays consistent (a candidate, not a mandate).
+        self.assertNotIn("dialogue", envelope["panels"])
+        self.assertIs(baseline["panels"]["dialogue"]["available"], True)
 
     def test_non_dialogue_updates_do_not_widen_the_subset(self):
         session, coordinator = self._coordinator()
         context = PresentationContext(actor=self.player, protocol_version=1)
         coordinator.full_snapshot(context)
         session.sent.clear()
-        envelope = coordinator.panel_update(
-            context, {"status": self.registry.render("status", context)}
+        coordinator.panel_update(
+            context,
+            {
+                "status": self.registry.build_unavailable(
+                    "status", internal=True, correlation_id="c" * 32
+                )
+            },
         )
+        envelope = last_frame(session, "ui_update")
         self.assertEqual(envelope["mode"], "exploration")
         self.assertEqual(set(envelope["panels"]), {"status"})
 
@@ -1030,18 +1062,29 @@ class DialogueTextCommandSettlementTests(BattlefieldIsolation, EvenniaTest):
 
         inputfuncs.text(session, f"talk {self.host.key} 註冊")
 
-        snapshots = [c["ui_snapshot"][0][0] for c in recorded if "ui_snapshot" in c]
-        self.assertTrue(snapshots, "the settled talk must refresh presentation")
-        committed = snapshots[-1]
-        # The post-command full refresh recomputes mode from canonical state:
-        # mode and the available dialogue panel commit in one envelope.
+        self.assertTrue(
+            recorded_frames(recorded), "the settled talk must refresh presentation"
+        )
+        # The post-command comparison refresh recomputes mode from canonical
+        # state: the committed view (whatever baseline plus differences the
+        # settlement published) carries the reply in dialogue mode.
+        committed = committed_view(recorded)
         self.assertEqual(committed["mode"], "dialogue")
         self.assertIs(committed["panels"]["dialogue"]["available"], True)
         self.assertIsNotNone(committed["panels"]["dialogue"]["delivery"])
-        self.assertIn(
-            "登記很簡單",
-            committed["panels"]["dialogue"]["delivery"]["lines"][1]["text"],
+        delivery = committed["panels"]["dialogue"]["delivery"]
+        # The keyword command committed the authored topic's scene: the reply
+        # dialogue is the delivered exchange's final line, and the topic is one
+        # the host's own affordance descriptors list for this context.
+        scripted = _scripted_keyword_descriptors(
+            self.host, actor=self.player, context_id=delivery["context_id"]
         )
+        self.assertIn(
+            delivery["topic_id"],
+            {item["topic_id"] for item in scripted},
+            "the settled keyword played one of the host's scripted topics",
+        )
+        self.assertEqual(delivery["lines"][-1]["speaker"], "host")
 
 
 class DialogueAvailabilityPanelTests(BattlefieldIsolation, EvenniaTest):
@@ -1114,11 +1157,8 @@ class DialogueAvailabilityPanelTests(BattlefieldIsolation, EvenniaTest):
         return results[-1]
 
     def _last_committed_panel(self, session):
-        snapshots = [
-            call["ui_snapshot"][0][0] for call in session.sent if "ui_snapshot" in call
-        ]
-        updates = [call["ui_update"][0][0] for call in session.sent if "ui_update" in call]
-        return (snapshots or updates)[-1]["panels"]["dialogue"]
+        committed = committed_view(session.sent)
+        return committed["panels"]["dialogue"]
 
     @covers_requirement(
         "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-3-presentation-panel"
@@ -1126,7 +1166,8 @@ class DialogueAvailabilityPanelTests(BattlefieldIsolation, EvenniaTest):
     def test_hidden_choice_is_absent_and_no_body_ships_before_selection(self):
         session, coordinator = self._coordinator()
         self._open()
-        snapshot = coordinator.full_snapshot(self.context)
+        coordinator.full_snapshot(self.context)
+        snapshot = committed_view(session.sent)
         panel = snapshot["panels"]["dialogue"]
         self.assertIs(panel["available"], True)
 
@@ -1145,7 +1186,10 @@ class DialogueAvailabilityPanelTests(BattlefieldIsolation, EvenniaTest):
         # The whole committed snapshot — panel, exploration vocabulary and
         # every other panel — carries no scene body.
         self.assertEqual(_panel_body_sentinels(snapshot), [])
-        validate_ui_snapshot(snapshot, known_panels=set(self.registry.panel_names))
+        validate_ui_snapshot(
+            recorded_frames(session.sent)[-1],
+            known_panels=set(self.registry.panel_names),
+        )
 
     @covers_requirement(
         "authored-dialogue-selection::authored-selection-delivers-complete-scenes-atomically"
@@ -1204,7 +1248,8 @@ class DialogueAvailabilityPanelTests(BattlefieldIsolation, EvenniaTest):
         session, coordinator = self._coordinator()
         self.player.db.inventory = [_PANEL_ITEM]
         live = self._open()
-        listed = coordinator.full_snapshot(self.context)["panels"]["dialogue"]
+        coordinator.full_snapshot(self.context)
+        listed = committed_view(session.sent)["panels"]["dialogue"]
         choice = next(
             item for item in listed["choices"] if item["topic_id"] == _PANEL_LOCKED
         )

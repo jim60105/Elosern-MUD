@@ -44,6 +44,7 @@ from web.webclient.presentation import watchers
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.coordinator import PresentationCoordinator
 from web.webclient.presentation.registry import build_production_registry
+from web.webclient.presentation.tests._support import committed_view
 from world.lore.dialogue.conditions import (
     AffinityAtLeast,
     CompanionPresent,
@@ -310,9 +311,13 @@ class _WatcherMixin:
         return panels
 
     def _dialogue_panel(self, recorded: list[dict]) -> dict:
-        panels = self._panels(recorded)
-        self.assertTrue(panels, "the committed refresh must fan a panel out")
-        return panels[-1]["dialogue"]
+        # A publication transmits only differences, so the dialogue panel a
+        # fan-out committed is read from the replayed committed view (the
+        # recorded baseline plus every delta), never from the newest frame
+        # alone.
+        committed = committed_view(recorded)
+        self.assertTrue(committed["panels"], "the committed refresh must fan a panel out")
+        return committed["panels"]["dialogue"]
 
     def _choices(self, recorded: list[dict]) -> dict[str, dict]:
         dialogue = self._dialogue_panel(recorded)

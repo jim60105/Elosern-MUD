@@ -28,6 +28,7 @@ import secrets
 from typing import Any, Mapping
 
 from twisted.internet.defer import Deferred
+from twisted.python.failure import Failure
 
 from web.webclient.actions.registry import ActionRegistry
 from world.observability import log_error, log_warn
@@ -36,14 +37,21 @@ from world.rules.combat_beats import RoundRecord
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.coordinator import (
     PresentationCoordinator,
+    ResultDeliveryError,
     attach_coordinator,
 )
 from web.webclient.presentation.ingress import build_presentation_context
+from web.webclient.presentation.publication import (
+    PublicationCompletion,
+    PublicationReceipt,
+    copy_json_value,
+)
 from web.webclient.presentation.protocol import (
     PROTOCOL_VERSION,
     UI_ACTION_RESULT,
     ProtocolValidationError,
     check_envelope,
+    validate_ui_action_result,
     _validate_result_data,
     validate_ui_action,
 )
@@ -254,12 +262,21 @@ def handle_ui_action(
     # still match so a puppet change cannot publish A-derived state to B.
     state.in_flight = True
     state.epoch = coordinator.epoch
-    deferred = _invoke_adapter(session, actor, spec.adapter, normalized, action_registry, registry, request_id, state.epoch, action_id=spec.action_id)
-    if deferred is not None:
-        deferred.addBoth(lambda result, session=session, epoch=state.epoch: _settle_in_flight(session, epoch, result))
-    else:
-        # The adapter resolved synchronously through the synchronous path.
-        _settle_in_flight(session, state.epoch, None)
+    # The publication Deferred is the single completion authority: it releases
+    # the in-flight marker (and runs the scheduled triggers) only after the
+    # presentation frames and the matching result have sent, whether the
+    # adapter resolved synchronously or through its own Deferred.
+    _invoke_adapter(
+        session,
+        actor,
+        spec.adapter,
+        normalized,
+        action_registry,
+        registry,
+        request_id,
+        state.epoch,
+        action_id=spec.action_id,
+    )
 
 
 def _invoke_adapter(
@@ -272,14 +289,14 @@ def _invoke_adapter(
     request_id: str,
     epoch: str,
     action_id: str | None = None,
-) -> Deferred | None:
+) -> None:
     """Invoke the adapter, observing both settlement paths.
 
-    Returns the Deferred when the adapter is Deferred-returning; otherwise the
-    synchronous result is published immediately through the critical section.
-    ``action_id`` (default ``None`` so existing callers and tests keep their
-    signatures) is threaded into the completion publication so the dialogue
-    trigger can identify talk completions (action-options-trigger-hooks D3).
+    Both paths funnel into :func:`_publish_completion`, whose publication
+    Deferred owns the in-flight release. ``action_id`` (default ``None`` so
+    existing callers and tests keep their signatures) is threaded into the
+    completion publication so the dialogue trigger can identify talk
+    completions (action-options-trigger-hooks D3).
     """
     try:
         result = adapter(actor, normalized, session)
@@ -293,14 +310,14 @@ def _invoke_adapter(
             },
             exc=error,
         )
-        return _settle_internal_error(session, actor, action_registry, registry, request_id, epoch)
+        _settle_internal_error(session, actor, action_registry, registry, request_id, epoch)
+        return
     if isinstance(result, Deferred):
         result.addBoth(
             lambda value, _s=session, _a=actor, _r=registry, _q=request_id, _e=epoch, _i=action_id: _publish_completion(_s, _a, value, _r, _q, _e, action_id=_i)
         )
-        return result
+        return
     _publish_completion(session, actor, result, registry, request_id, epoch, action_id=action_id)
-    return None
 
 
 def _settle_internal_error(
@@ -311,23 +328,29 @@ def _settle_internal_error(
     request_id: str,
     epoch: str,
 ) -> None:
+    """Publish the internal-error recovery snapshot and its matching result."""
     correlation_id = secrets.token_hex(16)
     coordinator = attach_coordinator(session, registry)
     if coordinator.epoch != epoch:
         # The sequence was retired; nothing may publish into the replacement.
         _settle_in_flight(session, epoch, None)
         return
-    context = build_presentation_context(session, actor)
-    _publish_presentation(session, coordinator, context, None)
     result = {
         "outcome": "error",
         "code": _INTERNAL_CODE,
         "message": _INTERNAL_MESSAGE,
         "correlation_id": correlation_id,
     }
-    _cache_result(_sequence_state(session), request_id, result)
-    _send_action_result(session, coordinator.epoch, request_id, result, coordinator.revision)
-    _settle_in_flight(session, epoch, None)
+    _publish_with_result(
+        session,
+        actor,
+        coordinator,
+        request_id,
+        result,
+        epoch=epoch,
+        force_snapshot=True,
+        cache=True,
+    )
 
 
 def _publish_completion(
@@ -341,16 +364,14 @@ def _publish_completion(
 ) -> Any:
     """Publish canonical presentation and the matching result for an adapter.
 
-    This runs in the coordinator publication critical section: exactly one next
-    revision is allocated, the completion presentation is sent before the
-    exact result naming the same revision, and the server in-flight marker is
-    released only after both sends. The captured ``epoch`` must still match the
-    live coordinator; a retired sequence publishes nothing into its
-    replacement. After both sends, a successful talk completion fires the
-    action-options dialogue trigger fire-and-forget (action-options-trigger-
-    hooks D3): the reply text, update, and result are already on the wire, so
-    the trigger cannot reorder existing traffic; a scheduling failure is
-    logged and swallowed, never raised into publication.
+    The normalized result is handed to the coordinator as one immutable
+    completion: the coordinator prevalidates the exact ``ui_action_result``
+    envelope against the revision it is about to publish, sends every
+    presentation frame and then that result inside one serialized critical
+    section, and resolves this publication's Deferred only afterwards. The
+    in-flight marker is therefore released only after both sends, and the
+    captured ``epoch`` must still match the live coordinator — a retired
+    sequence publishes nothing into its replacement.
     """
     coordinator = attach_coordinator(session, registry)
     state = _sequence_state(session)
@@ -376,67 +397,81 @@ def _publish_completion(
             "correlation_id": secrets.token_hex(16),
         }
 
-    outcome = value.get("outcome")
+    result = _normalize_result(value)
+    outcome = result["outcome"]
     affected = value.get("affected_panels")
+    # Result-only completion (namegen-creation-ui D10): an adapter that
+    # declares ``no_presentation`` on a success/rejected outcome ships its
+    # result through the same serialized owner without any presentation, so it
+    # cannot interleave another batch's frames. Every adapter already
+    # publishes one way or the other, so a dice-roll that must not re-sync the
+    # player's unsaved form edits had no channel; the duplicate-request busy
+    # result is the established send-result-without-publish precedent. The
+    # flag is internal: ``_normalize_result`` never copies it into the wire
+    # envelope, and existing adapters (which never set it) are unchanged.
+    result_only = bool(value.get("no_presentation")) and outcome in ("success", "rejected")
+    if outcome in ("stale", "error"):
+        # Recovery outcomes always re-announce the complete baseline.
+        declaration = None
+        force_snapshot = True
+    elif result_only:
+        declaration = None
+        force_snapshot = False
+    else:
+        # A valid declaration scopes the comparison to those panels; an absent
+        # declaration means unknown eager scope (compare every eager panel and
+        # transmit only differences).
+        declaration = affected if isinstance(affected, (tuple, list, set)) else None
+        force_snapshot = False
     # The completing action's frozen round record reaches ONLY this
     # publication, and only when it really is one (combat-beats-panel D2): an
     # adapter cannot smuggle an arbitrary object into a presenter's read
     # context through the internal slot.
     combat_round = value.get("combat_round")
-    context = build_presentation_context(
-        session,
-        actor,
-        combat_round=combat_round if isinstance(combat_round, RoundRecord) else None,
+    round_record = combat_round if isinstance(combat_round, RoundRecord) else None
+    deferred = coordinator.enqueue_publication(
+        lambda: build_presentation_context(session, actor, combat_round=round_record),
+        affected_panels=declaration,
+        force_snapshot=force_snapshot,
+        result_only=result_only,
+        expected_epoch=epoch,
+        completion=_completion(request_id, result),
     )
-    # Result-only completion (namegen-creation-ui D10): an adapter that
-    # declares ``no_presentation`` on a success/rejected outcome ships its
-    # result without a snapshot or panel update. Every adapter already
-    # publishes one way or the other, so a dice-roll that must not re-sync
-    # the player's unsaved form edits had no channel; the duplicate-request
-    # busy result is the established send-result-without-publish precedent.
-    # The flag is internal: ``_normalize_result`` never copies it into the
-    # wire envelope, and existing adapters (which never set it) are unchanged.
-    result_only = bool(value.get("no_presentation")) and outcome in ("success", "rejected")
-    if not isinstance(affected, (tuple, list, set)):
-        affected = None
-    if affected is not None:
-        unknown = set(affected) - coordinator.registry.panel_names
-        if unknown:
-            # An adapter declaring panels it does not own cannot publish; use a
-            # full recovery snapshot instead of raising mid-publication.
-            affected = None
-    try:
-        if result_only:
-            pass
-        elif outcome in ("stale", "error") or not affected:
-            _publish_presentation(session, coordinator, context, None)
-        else:
-            _publish_presentation(session, coordinator, context, tuple(affected))
-    except Exception as error:
-        correlation_id = secrets.token_hex(16)
-        log_error(
-            "presentation_publish_failed",
-            context={
-                "char": str(getattr(actor, "pk", "?")),
-                "surface": "dispatcher",
-                "correlation_id": correlation_id,
-            },
-            exc=error,
-        )
-        result = {
-            "outcome": "error",
-            "code": _INTERNAL_CODE,
-            "message": _INTERNAL_MESSAGE,
-            "correlation_id": correlation_id,
-        }
-        _cache_result(state, request_id, result)
-        _send_action_result(session, coordinator.epoch, request_id, result, coordinator.revision)
-        _settle_in_flight(session, epoch, None)
-        return value
+    deferred.addCallbacks(
+        lambda receipt: _completion_published(
+            receipt, session, actor, coordinator, request_id, action_id, result, value, epoch
+        ),
+        lambda failure: _completion_failed(
+            failure, session, actor, coordinator, request_id, result, epoch
+        ),
+    )
+    return value
 
-    result = _normalize_result(value)
-    _cache_result(state, request_id, result)
-    _send_action_result(session, coordinator.epoch, request_id, result, coordinator.revision)
+
+def _completion_published(
+    receipt: PublicationReceipt | None,
+    session: Any,
+    actor: Any,
+    coordinator: PresentationCoordinator,
+    request_id: str,
+    action_id: str | None,
+    result: dict[str, Any],
+    value: dict[str, Any],
+    epoch: str,
+) -> None:
+    """Release the in-flight marker after the batch (and its result) sent.
+
+    ``None`` means the captured sequence retired before its publication ran:
+    nothing was sent and nothing may be published into the replacement. After a
+    released marker, a successful talk or terminal-combat completion schedules
+    its action-options regeneration fire-and-forget
+    (action-options-trigger-hooks D3 / action-options-wiring-hardening D2): the
+    reply text, presentation and result are already on the wire, so the trigger
+    cannot reorder existing traffic, and a scheduling failure is logged and
+    swallowed, never raised into publication.
+    """
+    if receipt is not None:
+        _cache_result(_sequence_state(session), request_id, result)
     _settle_in_flight(session, epoch, None)
     # The gates use the *normalized* outcome actually sent to the client: a
     # raw ``success`` that normalizes into an internal error must never
@@ -456,7 +491,139 @@ def _publish_completion(
         and value.get("field_combat_terminal") is True
     ):
         _schedule_terminal_combat_options(actor)
-    return value
+    return None
+
+
+def _completion_failed(
+    failure: Any,
+    session: Any,
+    actor: Any,
+    coordinator: PresentationCoordinator,
+    request_id: str,
+    result: dict[str, Any],
+    epoch: str,
+) -> None:
+    """Recover from a publication failure without leaving the request unanswered.
+
+    A presentation/preflight failure means nothing was published: the batched
+    request is answered with the safe internal-error result through the same
+    serialized owner (never from inside another batch), the cached duplicate
+    entry stays truthful, and the in-flight marker is released once that answer
+    resolves. A failure that happens *after* the presentation published (the
+    result frame alone failed to send) must never manufacture a contradictory
+    outcome: the completed result is cached for replay, the delivery
+    uncertainty is logged as an operational failure, and the marker simply
+    releases.
+    """
+    error = failure.value if isinstance(failure, Failure) else failure
+    context = {
+        "char": str(getattr(actor, "pk", "?")),
+        "surface": "dispatcher",
+        "request_id": request_id,
+    }
+    if isinstance(error, ResultDeliveryError):
+        log_error("action_result_delivery_failed", context=context, exc=error)
+        _cache_result(_sequence_state(session), request_id, result)
+        _settle_in_flight(session, epoch, None)
+        return
+    log_error("presentation_publish_failed", context=context, exc=error)
+    fallback = {
+        "outcome": "error",
+        "code": _INTERNAL_CODE,
+        "message": _INTERNAL_MESSAGE,
+        "correlation_id": secrets.token_hex(16),
+    }
+    _publish_with_result(
+        session,
+        actor,
+        coordinator,
+        request_id,
+        fallback,
+        epoch=epoch,
+        force_snapshot=False,
+        cache=True,
+    )
+
+
+def _publish_with_result(
+    session: Any,
+    actor: Any,
+    coordinator: PresentationCoordinator,
+    request_id: str,
+    result: dict[str, Any],
+    *,
+    epoch: str,
+    force_snapshot: bool,
+    cache: bool,
+) -> None:
+    """Answer one request through the serialized owner, with or without frames.
+
+    Used where the response itself must not be lost (an adapter failure, a
+    publication failure, an internal recovery): the result travels as a
+    result-only publication so it always leaves after any batch already in
+    progress, never between another action's presentation and its result. A
+    recovery snapshot that cannot even be planned falls back to that result-only
+    answer, so the admitted request is never left unanswered; a failure of the
+    answer itself (``ResultDeliveryError``) is logged as delivery uncertainty
+    and never answered twice. Either way the in-flight marker releases once the
+    final answer's Deferred resolves.
+    """
+    state = _sequence_state(session)
+    if cache:
+        _cache_result(state, request_id, result)
+    deferred = coordinator.enqueue_publication(
+        lambda: build_presentation_context(session, actor),
+        force_snapshot=force_snapshot,
+        result_only=not force_snapshot,
+        expected_epoch=coordinator.epoch,
+        completion=_completion(request_id, result),
+    )
+
+    def _published(receipt: PublicationReceipt | None) -> None:
+        _settle_in_flight(session, epoch, None)
+        return None
+
+    def _failed(failure: Any) -> None:
+        error = failure.value if isinstance(failure, Failure) else failure
+        context = {
+            "char": str(getattr(actor, "pk", "?")),
+            "surface": "dispatcher",
+            "request_id": request_id,
+        }
+        if force_snapshot and not isinstance(error, ResultDeliveryError):
+            # The recovery presentation could not be planned or sent, so the
+            # safe result still travels as the same owner's result-only answer.
+            log_error("presentation_publish_failed", context=context, exc=error)
+            _publish_with_result(
+                session,
+                actor,
+                coordinator,
+                request_id,
+                result,
+                epoch=epoch,
+                force_snapshot=False,
+                cache=False,
+            )
+            return None
+        log_error(
+            "action_result_fallback_failed",
+            context=context,
+            exc=error,
+        )
+        _settle_in_flight(session, epoch, None)
+        return None
+
+    deferred.addCallbacks(_published, _failed)
+
+
+def _completion(request_id: str, result: dict[str, Any]) -> PublicationCompletion:
+    """Build the immutable coordinator completion for one normalized result."""
+    owned = copy_json_value(dict(result))
+
+    def envelope(epoch: str, revision: int) -> dict[str, Any]:
+        return _result_envelope(epoch, request_id, owned, revision)
+
+    return PublicationCompletion(request_id=request_id, result=owned, envelope=envelope)
 
 
 def _schedule_dialogue_options(
@@ -585,29 +752,65 @@ def _internal_result(correlation_id: str | None) -> dict[str, Any]:
     }
 
 
-def _publish_presentation(
-    session: Any,
-    coordinator: PresentationCoordinator,
-    context: PresentationContext,
-    affected: Any,
-) -> None:
-    """Send a full snapshot (or affected-panel update) at one new revision."""
-    if affected:
-        panels = {name: coordinator.registry.render(name, context) for name in affected}
-        coordinator.panel_update(context, panels)
-    else:
-        coordinator.full_snapshot(context)
-
-
 def _send_stale(session: Any, coordinator: PresentationCoordinator, state: SequenceState, request_id: str) -> None:
-    context = build_presentation_context(
-        session, getattr(session, "puppet", None)
-    )
-    _publish_presentation(session, coordinator, context, None)
+    """Re-announce the complete baseline, then answer the stale request.
+
+    The recovery snapshot is planned and prevalidated with the stale result
+    envelope before the first frame, so the client always receives the complete
+    snapshot that makes its superseded base usable again *before* the one
+    bounded stale result. A publication failure falls back to the stale result
+    alone at the current revision, so a pre-admission rejection is never lost.
+    """
     result = _stale_result()
     # A stale result is never cached: the browser resubmits the same request ID
     # with a newer base revision, and a cached stale entry would wrongly replay.
-    _send_action_result(session, coordinator.epoch, request_id, result, coordinator.revision)
+    actor = getattr(session, "puppet", None)
+    deferred = coordinator.enqueue_publication(
+        lambda: build_presentation_context(session, actor),
+        force_snapshot=True,
+        expected_epoch=coordinator.epoch,
+        completion=_completion(request_id, result),
+    )
+
+    def _failed(failure: Any) -> None:
+        error = failure.value if isinstance(failure, Failure) else failure
+        log_error(
+            "stale_recovery_publish_failed",
+            context={
+                "surface": "dispatcher",
+                "request_id": request_id,
+                "session": str(getattr(session, "sessid", "?")),
+            },
+            exc=error,
+        )
+        fallback = coordinator.enqueue_publication(
+            lambda: build_presentation_context(session, actor),
+            result_only=True,
+            expected_epoch=coordinator.epoch,
+            completion=_completion(request_id, result),
+        )
+
+        def _answer_failed(answer_failure: Any) -> None:
+            answer_error = (
+                answer_failure.value
+                if isinstance(answer_failure, Failure)
+                else answer_failure
+            )
+            log_error(
+                "stale_result_delivery_failed",
+                context={
+                    "surface": "dispatcher",
+                    "request_id": request_id,
+                    "session": str(getattr(session, "sessid", "?")),
+                },
+                exc=answer_error,
+            )
+            return None
+
+        fallback.addErrback(_answer_failed)
+        return None
+
+    deferred.addErrback(_failed)
 
 
 def _send_rejected(
@@ -634,6 +837,18 @@ def _send_action_result(
     result: dict[str, Any],
     presentation_revision: int,
 ) -> None:
+    session.msg(
+        **{UI_ACTION_RESULT: ((_result_envelope(epoch, request_id, result, presentation_revision),), {})}
+    )
+
+
+def _result_envelope(
+    epoch: str,
+    request_id: str,
+    result: dict[str, Any],
+    presentation_revision: int,
+) -> dict[str, Any]:
+    """Build the exact ``ui_action_result`` naming one published revision."""
     envelope: dict[str, Any] = {
         "protocol_version": PROTOCOL_VERSION,
         "presentation_epoch": epoch,
@@ -647,7 +862,7 @@ def _send_action_result(
         envelope["correlation_id"] = result["correlation_id"]
     if "data" in result:
         envelope["data"] = result["data"]
-    session.msg(**{UI_ACTION_RESULT: ((envelope,), {})})
+    return envelope
 
 
 def _send_protocol_error(session: Any, envelope: dict[str, Any]) -> None:

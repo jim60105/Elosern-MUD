@@ -77,6 +77,7 @@ class RegistryTests(unittest.TestCase):
                     "explore.talk_open",
                     "explore.talk_scripted",
                     "explore.talk_freeform",
+                    "explore.dialogue_complete",
                     "explore.dialogue_leave",
                     "explore.party_invite",
                     "explore.party_leave",

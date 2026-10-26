@@ -58,13 +58,20 @@ def _registry(*specs):
     return registry
 
 
-def _presenter_registry():
+def _presenter_registry(state: dict | None = None):
+    """A single ``status`` panel whose rendered value a test can change.
+
+    ``state`` models canonical state the presenter reads: mutating it between
+    the priming snapshot and a completion is how a test says "the action
+    changed this panel", which is the only reason a delta is transmitted.
+    """
+    values = {"value": 1} if state is None else state
     return _registry(
         PresenterSpec(
             name="status",
             schema_version=1,
             unavailable_reason=("missing_data", "無法讀取角色資料"),
-            presenter=lambda context: {"available": True, "value": 1},
+            presenter=lambda context: {"available": True, "value": values["value"]},
         )
     )
 
@@ -86,10 +93,10 @@ def _proof_spec(action_id="proof.noop", adapter=None):
     )
 
 
-def _coordinator(session):
+def _coordinator(session, presentation_registry=None):
     coordinator = PresentationCoordinator(
         session,
-        _presenter_registry(),
+        presentation_registry or _presenter_registry(),
         calendar_provider=lambda: SimpleNamespace(
             year=1204, season_index=0, season_name="春", day_in_season=1, hour=1, minute=0, second=0
         ),

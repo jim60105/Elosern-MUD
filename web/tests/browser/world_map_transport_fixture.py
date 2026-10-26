@@ -35,8 +35,21 @@ def publish(caller: Any, case: str) -> str:
         unavailable_reason=("map_unavailable","世界地圖目前無法顯示"),presenter=lambda context:body,on_demand=True))
     coordinator.registry=registry
     try:
-        revision=coordinator._publish_presentation(build_presentation_context(session,caller),{WORLD_MAP_PANEL})
+        # The coordinator's publication owner renders through the live
+        # registry, so the measurement registry must stay installed until the
+        # publication has actually drained and reported its receipt.
+        deferred=coordinator.enqueue_publication(
+            lambda: build_presentation_context(session,caller),
+            affected_panels={WORLD_MAP_PANEL},
+        )
+        resolutions:list[Any]=[]
+        deferred.addCallbacks(resolutions.append,resolutions.append)
+        coordinator.drain()
     finally:
         coordinator.registry=original
+    receipt=resolutions[0]
+    if receipt is None or not hasattr(receipt, "revision"):
+        raise RuntimeError(f"world map publication failed: {receipt!r}")
+    revision=receipt.revision
     raw=canonical_bytes(body)
     return f"WORLD_MAP {case} {revision} {len(raw)} {hashlib.sha256(raw).hexdigest()}"

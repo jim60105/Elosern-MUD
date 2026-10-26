@@ -40,6 +40,7 @@ from web.webclient.presentation.protocol import (
     json_byte_size,
 )
 from web.webclient.presentation.registry import build_production_registry
+from web.webclient.presentation.tests._support import committed_view, recorded_frames
 from world.art import descriptors
 from world.art.fallback_keys import FALLBACK_KEYS
 from world.art.gallery import record_for as gallery_record_for
@@ -1562,17 +1563,17 @@ class ArtSnapshotIntegrationTests(BattlefieldIsolation, EvenniaTest):
             build_production_action_registry(),
             build_production_registry(),
         )
-        # A terminal outcome (the confirmed surrender) publishes a full
-        # snapshot: the mode flips back to exploration, so every mode-relevant
-        # panel is replaced, including the art catalog without the session's
-        # own monster.
-        snapshots = [
-            call.kwargs["ui_snapshot"][0][0]
-            for call in self.sessionhandler.data_out.call_args_list
-            if "ui_snapshot" in call.kwargs
-        ]
-        self.assertTrue(snapshots, "a terminal combat action must publish a full snapshot")
-        panels = snapshots[-1]["panels"]
+        # A terminal outcome (the confirmed surrender) publishes the committed
+        # post-combat state through the one publication owner: the mode flips
+        # back to exploration, so the completion's exact-base delta carries
+        # every mode-relevant panel that changed, including the art catalog
+        # without the session's own monster.
+        recorded = [call.kwargs for call in self.sessionhandler.data_out.call_args_list]
+        frames = recorded_frames(recorded)
+        self.assertTrue(frames, "a terminal combat action must publish presentation")
+        self.assertEqual(frames[-1]["mode"], "exploration")
+        committed = committed_view(recorded, base_panels=envelope["panels"])
+        panels = committed["panels"]
         for name in ("status", "context_actions", "art", "exploration", "character", "services", "local_map"):
             self.assertIn(name, panels)
         # The ended session's participants leave the art catalog in the same
@@ -1580,12 +1581,6 @@ class ArtSnapshotIntegrationTests(BattlefieldIsolation, EvenniaTest):
         catalog = panels["art"]["portrait_catalog"]
         self.assertNotIn(str(monster.pk), catalog)
         self.assertNotIn(str(self.char1.pk), catalog)
-        updates = [
-            call.kwargs["ui_update"][0][0]
-            for call in self.sessionhandler.data_out.call_args_list
-            if "ui_update" in call.kwargs
-        ]
-        self.assertFalse(updates, "a terminal outcome must not publish a partial update")
 
     @covers_requirement("webclient-art-panel::the-art-panel-is-an-exact-read-only-panel-available-in-exploration-and-combat-modes")
     def test_text_command_refresh_snapshot_includes_the_art_panel(self):
@@ -1652,16 +1647,14 @@ class ArtSnapshotIntegrationTests(BattlefieldIsolation, EvenniaTest):
             coordinator.registry,
         )
 
-        # Verify that an update was emitted in one single revision before the action result
-        updates = [
-            call.kwargs["ui_update"][0][0]
-            for call in self.sessionhandler.data_out.call_args_list
-            if "ui_update" in call.kwargs
-        ]
-        self.assertTrue(updates, "engage must publish an atomic update")
-        committed = updates[-1]
-        self.assertEqual(committed["mode"], "combat")
-        panels = committed["panels"]
+        # Verify that one atomic publication carried the combat view before the
+        # action result: the delta transmits the changed panels, and the
+        # committed view holds every mode-relevant panel in combat mode.
+        recorded = [call.kwargs for call in self.sessionhandler.data_out.call_args_list]
+        frames = recorded_frames(recorded)
+        self.assertTrue(frames, "engage must publish an atomic update")
+        self.assertEqual(frames[-1]["mode"], "combat")
+        panels = committed_view(recorded, base_panels=envelope["panels"])["panels"]
         for expected_panel in ("status", "context_actions", "dialogue", "art"):
             self.assertIn(expected_panel, panels)
 
