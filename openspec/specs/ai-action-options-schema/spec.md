@@ -28,7 +28,7 @@ wire shape, no hidden side structure. `OptionSet` SHALL carry `fingerprint`, `co
 
 #### Scenario: Card params carry the mapping shape
 - **WHEN** a `SuggestionCard` declares `params`
-- **THEN** `params` is a `Mapping[str, str | int]`, additionally admitting the exact boolean room-survey marker `{"room": true}` of the canonical look payload (schema design doc §1.1)
+- **THEN** `params` is a `Mapping[str, str | int | None]`, additionally admitting the exact boolean room-survey marker `{"room": true}` of the canonical look payload (schema design doc §1.1)
 
 #### Scenario: OptionSet field values are fixed
 - **WHEN** an `OptionSet` is constructed
@@ -53,7 +53,7 @@ wire shape, no hidden side structure. `OptionSet` SHALL carry `fingerprint`, `co
 
 #### Scenario: Accepted value shapes are enumerated
 - **WHEN** a param value is validated
-- **THEN** it is an int within `MAX_SAFE_INTEGER`, a string ≤ 32 chars, or the exact boolean room-survey marker (`{"room": true}` of the canonical look payload, schema design doc §1.1)
+- **THEN** it is an int within `MAX_SAFE_INTEGER`, a string ≤ 32 chars, JSON null, or the exact boolean room-survey marker (`{"room": true}` of the canonical look payload, schema design doc §1.1)
 
 #### Scenario: Card-count acceptance is a ladder/generation split
 - **WHEN** the validation ladder checks card count

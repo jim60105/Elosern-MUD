@@ -111,10 +111,12 @@ def _validate_suggestion_params(action_code: str, kind: str, params: Any) -> dic
     """Validate one card's params: canonical payload or the freeform binding.
 
     A ``known_action`` card's params are the matching canonical affordance's
-    validator-normalized payload (1..4 keys; safe integers and bounded strings
-    plus the literal boolean ``true`` for the ``explore.look`` room-survey
-    form; any other boolean is rejected). A ``freeform`` card's params are
-    exactly the ``{"npc_id": positive int}`` binding.
+    validator-normalized payload (1..4 keys; safe integers, bounded strings and
+    JSON null plus the literal boolean ``true`` for the ``explore.look``
+    room-survey form; any other boolean is rejected). Null is the canonical
+    ``explore.talk_scripted`` descriptor's ``context_id`` before a conversation
+    exists, mirroring ``panels/suggestions.js``. A ``freeform`` card's params
+    are exactly the ``{"npc_id": positive int}`` binding.
     """
     if not isinstance(params, dict):
         raise ProtocolValidationError("suggestion params must be a JSON object")
@@ -123,6 +125,8 @@ def _validate_suggestion_params(action_code: str, kind: str, params: Any) -> dic
     if kind == "freeform":
         return _validate_affordance_params(action_code, params)
     for key, value in params.items():
+        if value is None:
+            continue
         if isinstance(value, bool):
             if action_code == "explore.look" and params == _ROOM_SURVEY_PARAMS:
                 continue

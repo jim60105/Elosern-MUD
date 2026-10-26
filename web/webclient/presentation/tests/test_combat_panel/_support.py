@@ -271,7 +271,9 @@ def _exploration_panel(**overrides):
             {
                 "action_id": "explore.talk_scripted",
                 "label": "註冊",
-                "params": {"npc_id": 5, "keyword_id": "註冊"},
+                # The projected descriptor of one authored topic; no live
+                # conversation exists yet, so the nullable context is null.
+                "params": {"npc_id": 5, "topic_id": "註冊", "context_id": None},
                 "freeform": False,
                 "navigation": False,
                 "enabled": True,

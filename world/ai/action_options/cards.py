@@ -57,14 +57,19 @@ def _validate_params_shape(params: Mapping[str, Any], path: str) -> None:
     exact room-survey marker ``{"room": true}`` of the canonical look payload
     (schema design doc §1.1). Any other boolean or any boolean mixed with other
     fields is rejected, so a proposal never carries a wire value no dispatcher
-    validator produces. Anything else (including any nested container) is
-    rejected so a proposal never holds a mutable value.
+    validator produces. ``None`` is admitted because the canonical
+    ``explore.talk_scripted`` descriptor carries a nullable ``context_id``
+    (no live conversation yet) and the card's params are that exact payload.
+    Anything else (including any nested container) is rejected so a proposal
+    never holds a mutable value.
     """
     if len(params) > MAX_PARAMS:
         raise ValueError(f"{path} exceeds the maximum of {MAX_PARAMS} params")
     for key, value in params.items():
         if not isinstance(key, str) or not key:
             raise ValueError(f"{path} params keys must be non-empty strings")
+        if value is None:
+            continue
         if isinstance(value, bool):
             if params != {"room": True}:
                 raise ValueError(
@@ -107,7 +112,7 @@ class SuggestionCard:
     kind: str
     action_code: str
     label: str
-    params: Mapping[str, str | int | bool]
+    params: Mapping[str, str | int | bool | None]
     hint: str | None = None
 
     def __post_init__(self) -> None:

@@ -73,13 +73,24 @@ class SchedulingContractTests(_BaseServiceTests):
         with override_settings(LLM_PROFILES=_raw()):
             await_result(self._schedule(client=client))
             first_fingerprint = self._state()["fingerprint"]
+            coordinator = session.ndb.elosern_coordinator
+            revision_before = coordinator.revision
             before = len(self._envelopes("ui_update"))
             await_result(self._schedule(client=client))
         self.assertEqual(len(client.calls), 1)
         self.assertEqual(self._state()["fingerprint"], first_fingerprint)
         self.assertEqual(self._state()["status"], "ready")
-        self.assertGreater(
-            len(self._envelopes("ui_update")), before, "the replay republishes"
+        # The replay re-derives and re-publishes the session's own displayed
+        # set, but the identical panel matches the published baseline, so the
+        # shared delta owner sends no frame and consumes no revision
+        # (webclient-incremental-publication).
+        self.assertEqual(
+            len(self._envelopes("ui_update")), before, "an identical replay sends no frame"
+        )
+        self.assertEqual(
+            session.ndb.elosern_coordinator.revision,
+            revision_before,
+            "an identical replay consumes no revision",
         )
 
     @covers_requirement(

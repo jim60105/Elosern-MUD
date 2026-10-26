@@ -21,7 +21,7 @@ class ContextActionsExplorationFormTests(unittest.TestCase):
         self.assertEqual(normalized["affordances"][0]["params"], {"room": True})
         self.assertEqual(
             normalized["affordances"][1]["params"],
-            {"npc_id": 5, "keyword_id": "註冊"},
+            {"npc_id": 5, "topic_id": "註冊", "context_id": None},
         )
         self.assertTrue(normalized["affordances"][2]["navigation"])
         self.assertNotIn("surface", normalized["affordances"][0])
