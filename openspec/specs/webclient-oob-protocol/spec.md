@@ -5,7 +5,7 @@ Versioned WebSocket OOB envelopes, epoch/revision ordering, authenticated synchr
 ## Requirements
 
 ### Requirement: Elosern OOB messages use exact versioned envelopes
-Each Elosern OOB message SHALL be one JSON object in Evennia's command/args/kwargs first positional argument. Version 1 SHALL define ui_sync, ui_action, ui_snapshot, ui_update, ui_action_result and ui_protocol_error. Envelopes SHALL reject unknown fields, invalid scalars and non-finite numbers. world_map and v3 dialogue publications SHALL use only their declared finite scoped allowances; unrelated panels keep their bounds. Transport SHALL deliver one complete replacement or atomic reassembly.
+Each Elosern OOB message SHALL be one JSON object in Evennia's command/args/kwargs first positional argument. Version 1 SHALL define ui_sync, ui_action, ui_snapshot, ui_update, ui_action_result, ui_protocol_error and ui_publication_part. Envelopes SHALL reject unknown fields, invalid scalars, non-finite numbers. Scoped allowances bind world_map and v3 dialogue; other panels keep theirs. General delivery is intact within its frame allowance or atomically reassembled in a distinct logical ceiling.
 
 #### Scenario: A version-1 message uses the Evennia transport
 - **WHEN** the server emits a valid version-1 full snapshot
@@ -25,11 +25,11 @@ Each Elosern OOB message SHALL be one JSON object in Evennia's command/args/kwar
 
 #### Scenario: Global structural bounds reject oversized envelopes
 - **WHEN** a non-exempt message exceeds the existing 65536-byte or other generic structural limits, or a world-map message exceeds its separately measured declared bounds, or a dialogue publication exceeds its 98304-byte whole-envelope, 24576-byte dialogue or 65536-byte dialogue-removed envelope bound
-- **THEN** both validators reject it before dispatch/adoption, retaining all non-size scalar safety rules and panel-local bounds
+- **THEN** both frame validators reject the oversized intact frame before dispatch/adoption; a general publication may instead use individually bounded parts, whose reassembled document keeps logical/schema/panel bounds without reapplying the generic frame ceiling
 
 #### Scenario: Field-specific limits stay within global bounds
 - **WHEN** a registered field defines a field-specific limit
-- **THEN** it is no larger than its applicable enclosing bound, with world_map, reassembled area_map and v3 dialogue publications using only their explicitly scoped finite logical bounds, and unrelated panel budgets unchanged
+- **THEN** it is no larger than its applicable enclosing bound, with specialized maps and v3 dialogue retaining their scoped panel limits, general reassembly using its finite logical aggregate limit, and unrelated panel budgets unchanged
 
 #### Scenario: Multilingual chain fits the real outer transport
 - **WHEN** a maximum valid CJK primary scene and public successor are published then replayed after reconnect

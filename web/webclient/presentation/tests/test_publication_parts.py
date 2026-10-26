@@ -215,6 +215,9 @@ class SharedConstantTableTests(unittest.TestCase):
     @covers_requirement(
         "webclient-oob-protocol::elosern-oob-messages-use-exact-versioned-envelopes"
     )
+    @covers_requirement(
+        "webclient-publication-delivery::general-delivery-has-finite-shared-resource-limits"
+    )
     def test_the_finite_resource_table_is_exact_and_derived(self):
         self.assertEqual(PUBLICATION_MAX_BYTES, 16_777_216)
         self.assertEqual(PUBLICATION_PART_BYTES, 24_576)
@@ -242,6 +245,9 @@ class SharedConstantTableTests(unittest.TestCase):
 
     @covers_requirement(
         "webclient-oob-protocol::elosern-oob-messages-use-exact-versioned-envelopes"
+    )
+    @covers_requirement(
+        "webclient-publication-delivery::general-delivery-has-finite-shared-resource-limits"
     )
     def test_the_browser_mirror_declares_the_same_constants(self):
         names = [
@@ -301,6 +307,9 @@ class PartWireTests(unittest.TestCase):
     @covers_requirement(
         "webclient-oob-protocol::elosern-oob-messages-use-exact-versioned-envelopes"
     )
+    @covers_requirement(
+        "webclient-publication-delivery::general-publication-parts-use-exact-bounded-wire-fields"
+    )
     def test_fragmented_snapshot_headers_match_the_logical_document(self):
         logical = _snapshot({"status": _panel()})
         frames = encode_publication("ui_snapshot", logical)
@@ -334,6 +343,9 @@ class PartWireTests(unittest.TestCase):
     @covers_requirement(
         "webclient-oob-protocol::elosern-oob-messages-use-exact-versioned-envelopes"
     )
+    @covers_requirement(
+        "webclient-publication-delivery::general-publication-parts-use-exact-bounded-wire-fields"
+    )
     def test_fragmented_delta_repeats_its_exact_base(self):
         logical = _delta({"status": _panel()}, revision=9, base_revision=8)
         frames = encode_publication("ui_update", logical)
@@ -343,6 +355,9 @@ class PartWireTests(unittest.TestCase):
             self.assertEqual(frame.envelope["base_revision"], 8)
             self.assertEqual(frame.envelope["revision"], 9)
 
+    @covers_requirement(
+        "webclient-publication-delivery::general-delivery-has-finite-shared-resource-limits"
+    )
     def test_part_boundaries_24576_and_24577(self):
         at_bound = encode_publication_parts(
             b"x" * PUBLICATION_PART_BYTES,
@@ -367,6 +382,9 @@ class PartWireTests(unittest.TestCase):
         self.assertEqual(raw, b"x")
         self.assertEqual(header["part_index"], 1)
 
+    @covers_requirement(
+        "webclient-publication-delivery::general-delivery-has-finite-shared-resource-limits"
+    )
     def test_exact_maximum_derives_683_parts_and_overflow_rejects(self):
         canonical = b"x" * PUBLICATION_MAX_BYTES
         parts = encode_publication_parts(
@@ -390,6 +408,9 @@ class PartWireTests(unittest.TestCase):
                 publication_kind="snapshot",
             )
 
+    @covers_requirement(
+        "webclient-publication-delivery::general-publication-parts-use-exact-bounded-wire-fields"
+    )
     def test_part_shape_rejections(self):
         parts = encode_publication_parts(
             canonical_bytes(_delta({"status": _panel()})),
@@ -445,6 +466,9 @@ class PartWireTests(unittest.TestCase):
             with self.subTest(case=name), self.assertRaises(ProtocolValidationError):
                 validate_publication_part(value)
 
+    @covers_requirement(
+        "webclient-publication-delivery::general-publication-parts-use-exact-bounded-wire-fields"
+    )
     def test_noncanonical_base64_padding_is_rejected(self):
         # Final parts with a one- and a two-byte remainder; each alternate
         # spelling decodes to the same raw bytes and is rejected only by the
@@ -475,6 +499,9 @@ class PartWireTests(unittest.TestCase):
             canonical["chunks"] = [canonical_chunk]
             validate_publication_part(canonical)
 
+    @covers_requirement(
+        "webclient-publication-delivery::general-delivery-has-finite-shared-resource-limits"
+    )
     def test_cjk_character_crossing_a_part_boundary_survives(self):
         def candidate(pad: int) -> dict:
             rows = ["😀" * 512 for _ in range(48)]
@@ -531,6 +558,9 @@ class PartWireTests(unittest.TestCase):
         _headers, raw = _headers_and_raw(frame.envelope for frame in parts)
         self.assertEqual(json.loads(raw.decode("utf-8")), heavy)
 
+    @covers_requirement(
+        "webclient-publication-delivery::general-delivery-has-finite-shared-resource-limits"
+    )
     def test_over_bound_dialogue_panel_is_rejected_not_fragmented(self):
         logical = _snapshot(
             {
@@ -549,6 +579,9 @@ class PartWireTests(unittest.TestCase):
         with self.assertRaises(PublicationCodecError):
             encode_publication("ui_snapshot", logical)
 
+    @covers_requirement(
+        "webclient-publication-delivery::general-delivery-has-finite-shared-resource-limits"
+    )
     def test_registered_panel_validator_rejects_malformed_nested_content(self):
         def reject(payload):
             raise ProtocolValidationError("nested schema refused")
@@ -590,6 +623,9 @@ class PartWireTests(unittest.TestCase):
                 "ui_snapshot", broken, panel_validators={"lore_codex": (never, 1)}
             )
 
+    @covers_requirement(
+        "webclient-publication-delivery::general-delivery-has-finite-shared-resource-limits"
+    )
     def test_aggregate_overflow_and_foreign_commands_reject(self):
         with self.assertRaises(PublicationCodecError):
             encode_publication("ui_action_result", _snapshot({"status": {}}))
@@ -735,6 +771,9 @@ class CoordinatorCodecTests(unittest.TestCase):
     @covers_requirement(
         "webclient-oob-protocol::full-snapshots-and-updates-have-registered-replacement-semantics"
     )
+    @covers_requirement(
+        "webclient-publication-delivery::all-delivery-frames-are-validated-before-publication"
+    )
     def test_oversized_snapshot_sends_parts_and_installs_the_baseline(self):
         panel, panel_size = _near_cap_lore_codex()
         session = _Session()
@@ -768,6 +807,9 @@ class CoordinatorCodecTests(unittest.TestCase):
 
     @covers_requirement(
         "webclient-oob-protocol::full-snapshots-and-updates-have-registered-replacement-semantics"
+    )
+    @covers_requirement(
+        "webclient-publication-delivery::all-delivery-frames-are-validated-before-publication"
     )
     def test_fragmented_delta_keeps_its_exact_base_and_orders_the_result(self):
         panel, _ = _near_cap_lore_codex()
@@ -820,6 +862,9 @@ class CoordinatorCodecTests(unittest.TestCase):
             logical["panels"]["lore_codex"], validate_lore_codex(holder["panel"])
         )
 
+    @covers_requirement(
+        "webclient-publication-delivery::all-delivery-frames-are-validated-before-publication"
+    )
     def test_invalid_supplied_panel_sends_nothing_and_consumes_no_revision(self):
         panel, _ = _near_cap_lore_codex()
         session = _Session()
@@ -840,6 +885,9 @@ class CoordinatorCodecTests(unittest.TestCase):
         self.assertEqual(coordinator.revision, before)
         self.assertEqual(coordinator.published_revision, before)
 
+    @covers_requirement(
+        "webclient-publication-delivery::all-delivery-frames-are-validated-before-publication"
+    )
     def test_invalid_eager_candidate_blocks_a_combined_map_batch(self):
         panel, _ = _near_cap_lore_codex()
         holder = {"panel": panel}
@@ -864,6 +912,9 @@ class CoordinatorCodecTests(unittest.TestCase):
         self.assertEqual(coordinator.revision, before)
         self.assertEqual(coordinator.published_revision, before)
 
+    @covers_requirement(
+        "webclient-publication-delivery::all-delivery-frames-are-validated-before-publication"
+    )
     def test_general_parts_never_wrap_a_specialized_map_body(self):
         panel, _ = _near_cap_lore_codex()
         holder = {"panel": panel}
@@ -909,6 +960,9 @@ class CoordinatorCodecTests(unittest.TestCase):
                 },
             )
 
+    @covers_requirement(
+        "webclient-publication-delivery::all-delivery-frames-are-validated-before-publication"
+    )
     def test_part_send_failure_invalidates_the_baseline_and_repairs(self):
         panel, _ = _near_cap_lore_codex()
         holder = {"panel": panel}
