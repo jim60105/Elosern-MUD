@@ -29,6 +29,7 @@ from unittest import mock
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
@@ -174,6 +175,7 @@ class CheckpointTestBase(BattlefieldIsolation, EvenniaTest):
 class TerminalCombatCheckpointTests(CheckpointTestBase):
     """Only a newly committed terminal settlement is a checkpoint."""
 
+    @covers_requirement("webclient-settlement-alignment::every-completed-combat-termination-is-a-fresh-checkpoint")
     def test_a_committed_terminal_settlement_publishes_one_checkpoint(self):
         record = self._engage()
         self._settle(record, "victory")
@@ -185,6 +187,7 @@ class TerminalCombatCheckpointTests(CheckpointTestBase):
         self.assertIsNone(fact.source)
         self.assertIsNone(fact.destination)
 
+    @covers_requirement("webclient-settlement-alignment::every-completed-combat-termination-is-a-fresh-checkpoint")
     def test_every_recorded_participant_receives_the_checkpoint(self):
         companion = self._companion(360000, SleepPosture.AWAKE)
         record = self._engage()
@@ -199,6 +202,7 @@ class TerminalCombatCheckpointTests(CheckpointTestBase):
         )
         self.assertEqual(set(self.recorder.causes()), {COMBAT_TERMINAL})
 
+    @covers_requirement("webclient-settlement-alignment::every-completed-combat-termination-is-a-fresh-checkpoint")
     def test_a_terminal_settlement_joins_the_ambient_causal_group(self):
         record = self._engage()
         with publication_group() as captured:
@@ -213,10 +217,12 @@ class TerminalCombatCheckpointTests(CheckpointTestBase):
             [fact.group_id for fact in self.recorder.facts], [captured.id]
         )
 
+    @covers_requirement("webclient-settlement-alignment::every-completed-combat-termination-is-a-fresh-checkpoint")
     def test_an_ordinary_engagement_publishes_no_checkpoint(self):
         self._engage()
         self.assertEqual(self.recorder.facts, [])
 
+    @covers_requirement("webclient-settlement-alignment::every-completed-combat-termination-is-a-fresh-checkpoint")
     def test_an_ordinary_nonterminal_round_publishes_no_checkpoint(self):
         monster = self._spawn()
         with (
@@ -231,6 +237,7 @@ class TerminalCombatCheckpointTests(CheckpointTestBase):
         self.assertIsNotNone(read_session(self.player))
         self.assertEqual(self.recorder.facts, [], "only changed candidates publish")
 
+    @covers_requirement("webclient-settlement-alignment::every-completed-combat-termination-is-a-fresh-checkpoint")
     def test_the_replayed_settlement_branch_publishes_no_checkpoint(self):
         record = self._engage()
         settled = replace(record, settled_tick=int(get_world_clock().tick))
@@ -239,6 +246,7 @@ class TerminalCombatCheckpointTests(CheckpointTestBase):
         self.assertEqual(replay["outcome"], "victory")
         self.assertEqual(self.recorder.facts, [])
 
+    @covers_requirement("webclient-settlement-alignment::every-completed-combat-termination-is-a-fresh-checkpoint")
     def test_a_terminal_sleep_opening_publishes_the_checkpoint(self):
         record = self._engage()
         write_fatigue_state(self.player, 0, SleepPosture.FORCED)
@@ -248,6 +256,7 @@ class TerminalCombatCheckpointTests(CheckpointTestBase):
         self.assertIsNotNone(result, "the all-asleep opening settled terminally")
         self.assertEqual(self.recorder.causes(), [COMBAT_TERMINAL])
 
+    @covers_requirement("webclient-settlement-alignment::every-completed-combat-termination-is-a-fresh-checkpoint")
     def test_a_failed_terminal_write_publishes_nothing(self):
         record = self._engage()
         with mock.patch(
@@ -264,6 +273,7 @@ class TerminalCombatCheckpointTests(CheckpointTestBase):
                     )
         self.assertEqual(self.recorder.facts, [], "a rolled-back unit emits nothing")
 
+    @covers_requirement("webclient-settlement-alignment::every-completed-combat-termination-is-a-fresh-checkpoint")
     def test_an_unparseable_recovery_cleanup_publishes_one_act_only_checkpoint(self):
         self.player.db.active_combat = {"not": "a valid record"}
         with self.captureOnCommitCallbacks(execute=True):
@@ -272,6 +282,7 @@ class TerminalCombatCheckpointTests(CheckpointTestBase):
         self.assertEqual(self.recorder.causes(), [COMBAT_TERMINAL])
         self.assertEqual(self.recorder.actors(), [int(self.player.pk)])
 
+    @covers_requirement("webclient-settlement-alignment::every-completed-combat-termination-is-a-fresh-checkpoint")
     def test_an_already_settled_cleanup_publishes_nothing(self):
         record = self._engage()
         self.player.db.active_combat = to_storage(
@@ -286,6 +297,9 @@ class TerminalCombatCheckpointTests(CheckpointTestBase):
 class SkipCheckpointTests(CheckpointTestBase):
     """Only a completed explicit skip is a checkpoint."""
 
+    @covers_requirement(
+        "webclient-settlement-alignment::completed-explicit-skips-align-after-authoritative-settlement"
+    )
     def test_a_positive_awake_skip_publishes_one_checkpoint(self):
         with self.captureOnCommitCallbacks(execute=True):
             result = advance_wait(self.player, 60)
@@ -293,6 +307,9 @@ class SkipCheckpointTests(CheckpointTestBase):
         self.assertEqual(self.recorder.causes(), [AWAKENED_SKIP])
         self.assertEqual(self.recorder.actors(), [int(self.player.pk)])
 
+    @covers_requirement(
+        "webclient-settlement-alignment::completed-explicit-skips-align-after-authoritative-settlement"
+    )
     def test_a_truncated_interval_that_ends_the_request_still_qualifies(self):
         self._companion(0, SleepPosture.FORCED)
         with self.captureOnCommitCallbacks(execute=True):
@@ -300,12 +317,18 @@ class SkipCheckpointTests(CheckpointTestBase):
         self.assertEqual(result.elapsed_seconds, 6000)
         self.assertEqual(self.recorder.causes(), [AWAKENED_SKIP])
 
+    @covers_requirement(
+        "webclient-settlement-alignment::completed-explicit-skips-align-after-authoritative-settlement"
+    )
     def test_a_zero_time_wait_publishes_nothing(self):
         with self.captureOnCommitCallbacks(execute=True):
             result = advance_wait(self.player, 0)
         self.assertEqual(result.elapsed_seconds, 0)
         self.assertEqual(self.recorder.facts, [])
 
+    @covers_requirement(
+        "webclient-settlement-alignment::completed-explicit-skips-align-after-authoritative-settlement"
+    )
     def test_a_refused_skip_publishes_nothing(self):
         self._spawn()
         with self.captureOnCommitCallbacks(execute=True):
@@ -313,6 +336,9 @@ class SkipCheckpointTests(CheckpointTestBase):
                 advance_wait(self.player, 60)
         self.assertEqual(self.recorder.facts, [])
 
+    @covers_requirement(
+        "webclient-settlement-alignment::completed-explicit-skips-align-after-authoritative-settlement"
+    )
     def test_a_rolled_back_advance_publishes_nothing(self):
         clock = get_world_clock()
         before = int(clock.tick)
@@ -325,6 +351,9 @@ class SkipCheckpointTests(CheckpointTestBase):
         self.assertEqual(int(get_world_clock().tick), before)
         self.assertEqual(self.recorder.facts, [])
 
+    @covers_requirement(
+        "webclient-settlement-alignment::completed-explicit-skips-align-after-authoritative-settlement"
+    )
     def test_an_ambient_causal_group_is_reused(self):
         with publication_group() as captured:
             with self.captureOnCommitCallbacks(execute=True):
@@ -333,6 +362,9 @@ class SkipCheckpointTests(CheckpointTestBase):
             [fact.group_id for fact in self.recorder.facts], [captured.id]
         )
 
+    @covers_requirement(
+        "webclient-settlement-alignment::completed-explicit-skips-align-after-authoritative-settlement"
+    )
     def test_a_duplicate_operation_receipt_publishes_nothing(self):
         with self.captureOnCommitCallbacks(execute=True):
             first = advance_wait(self.player, 60, operation_id="synthetic-once")
@@ -340,6 +372,9 @@ class SkipCheckpointTests(CheckpointTestBase):
         self.assertEqual(first, second)
         self.assertEqual(self.recorder.causes(), [AWAKENED_SKIP])
 
+    @covers_requirement(
+        "webclient-settlement-alignment::completed-explicit-skips-align-after-authoritative-settlement"
+    )
     def test_sleep_entry_publishes_nothing(self):
         write_fatigue_state(self.player, 180000, SleepPosture.AWAKE)
         with self.captureOnCommitCallbacks(execute=True):
@@ -347,6 +382,9 @@ class SkipCheckpointTests(CheckpointTestBase):
         self.assertIsNotNone(entry.receipt)
         self.assertEqual(self.recorder.facts, [], "sleep entry is not a settlement")
 
+    @covers_requirement(
+        "webclient-settlement-alignment::completed-explicit-skips-align-after-authoritative-settlement"
+    )
     def test_the_open_owner_dream_question_publishes_nothing(self):
         write_fatigue_state(self.player, 180000, SleepPosture.AWAKE)
         with self.captureOnCommitCallbacks(execute=True):
@@ -354,6 +392,9 @@ class SkipCheckpointTests(CheckpointTestBase):
         self.assertIsNone(outcome.result)
         self.assertEqual(self.recorder.facts, [], "the choice is not a settlement")
 
+    @covers_requirement(
+        "webclient-settlement-alignment::completed-explicit-skips-align-after-authoritative-settlement"
+    )
     def test_a_retained_partial_sleep_publishes_nothing_then_completes_once(self):
         self._fill_gauges()
         write_fatigue_state(self.player, 180000, SleepPosture.AWAKE)
@@ -373,6 +414,9 @@ class SkipCheckpointTests(CheckpointTestBase):
         self.assertTrue(completed.completed, completed)
         self.assertEqual(self.recorder.causes(), [AWAKENED_SKIP])
 
+    @covers_requirement(
+        "webclient-settlement-alignment::completed-explicit-skips-align-after-authoritative-settlement"
+    )
     def test_an_owner_continuation_publishes_exactly_one_checkpoint(self):
         self._fill_gauges()
         write_fatigue_state(self.player, 180000, SleepPosture.AWAKE)
@@ -401,6 +445,9 @@ class SkipCheckpointTests(CheckpointTestBase):
         self.assertTrue(result.completed, result)
         self.assertEqual(self.recorder.causes(), [AWAKENED_SKIP])
 
+    @covers_requirement(
+        "webclient-settlement-alignment::completed-explicit-skips-align-after-authoritative-settlement"
+    )
     def test_a_replayed_sleep_interval_publishes_nothing(self):
         self._fill_gauges()
         write_fatigue_state(self.player, 180000, SleepPosture.AWAKE)
@@ -412,6 +459,9 @@ class SkipCheckpointTests(CheckpointTestBase):
             continue_sleep(self.player, entry, operation_id="synthetic-interval")
         self.assertEqual(self.recorder.facts, [])
 
+    @covers_requirement(
+        "webclient-settlement-alignment::completed-explicit-skips-align-after-authoritative-settlement"
+    )
     def test_a_sleep_completing_on_an_interactive_boundary_publishes_the_checkpoint(
         self,
     ):
@@ -595,6 +645,7 @@ class SettlementPublicationTests(BattlefieldIsolation, _WatcherFixture, EvenniaT
         self.recorder = _FactRecorder()
         register_alignment_observer(self.recorder)
 
+    @covers_requirement("webclient-settlement-alignment::every-completed-combat-termination-is-a-fresh-checkpoint")
     def test_graphical_terminal_combat_publishes_one_snapshot_then_its_result(self):
         self._prime()
         self._graphical_terminal_exit(self.sessions[0])
@@ -618,6 +669,7 @@ class SettlementPublicationTests(BattlefieldIsolation, _WatcherFixture, EvenniaT
         )
         self.assertEqual(self.telnet.sent, [], "Telnet receives no graphical state")
 
+    @covers_requirement("webclient-settlement-alignment::every-completed-combat-termination-is-a-fresh-checkpoint")
     def test_text_terminal_combat_publishes_one_snapshot(self):
         from commands.combat import CmdCombatForfeit
 
@@ -643,6 +695,9 @@ class SettlementPublicationTests(BattlefieldIsolation, _WatcherFixture, EvenniaT
             self.assertEqual(session.names(), ["ui_snapshot"])
             self.assertEqual(session.frames("ui_snapshot")[0]["mode"], "exploration")
 
+    @covers_requirement(
+        "webclient-settlement-alignment::completed-explicit-skips-align-after-authoritative-settlement"
+    )
     def test_a_completed_rest_publishes_one_snapshot(self):
         self._prime()
         session = self.sessions[0]
@@ -674,6 +729,9 @@ class SettlementPublicationTests(BattlefieldIsolation, _WatcherFixture, EvenniaT
         # arrives as the complete snapshot alone.
         self.assertEqual(len(self.sessions[1].frames("ui_snapshot")), 1)
 
+    @covers_requirement(
+        "webclient-settlement-alignment::completed-explicit-skips-align-after-authoritative-settlement"
+    )
     def test_a_zero_time_wait_publishes_a_delta_only(self):
         self._prime()
         session = self.sessions[0]
@@ -690,6 +748,9 @@ class SettlementPublicationTests(BattlefieldIsolation, _WatcherFixture, EvenniaT
         self.assertEqual(session.frames("ui_snapshot"), [])
         self.assertIn("ui_action_result", session.names())
 
+    @covers_requirement(
+        "webclient-settlement-alignment::completed-explicit-skips-align-after-authoritative-settlement"
+    )
     def test_sleep_entry_publishes_a_delta_only(self):
         self._prime()
         session = self.sessions[0]
@@ -743,6 +804,7 @@ class NonterminalRoundPublicationTests(BattlefieldIsolation, _WatcherFixture, Ev
         grant_lineage(self.char1, [_T_SINGLE])
         self._install_watchers()
 
+    @covers_requirement("webclient-settlement-alignment::every-completed-combat-termination-is-a-fresh-checkpoint")
     def test_a_nonterminal_round_publishes_a_delta_and_no_snapshot(self):
         self._prime()
         monster = self._spawn()
@@ -806,6 +868,7 @@ class TextTerminalRoundPublicationTests(BattlefieldIsolation, _WatcherFixture, E
         self.recorder = _FactRecorder()
         register_alignment_observer(self.recorder)
 
+    @covers_requirement("webclient-settlement-alignment::every-completed-combat-termination-is-a-fresh-checkpoint")
     def test_a_text_terminal_round_coalesces_its_preterminal_work(self):
         from world.rules.combat_session import rounds as rounds_module
 
@@ -885,6 +948,7 @@ class TerminalOpeningPublicationTests(BattlefieldIsolation, _WatcherFixture, Eve
         grant_lineage(self.char1, [_T_SINGLE])
         self._install_watchers()
 
+    @covers_requirement("webclient-settlement-alignment::every-completed-combat-termination-is-a-fresh-checkpoint")
     def test_a_field_cast_opening_that_ends_the_fight_publishes_one_snapshot(self):
         from world.rules.combat_initiation import initiate_field_combat
 
@@ -991,6 +1055,9 @@ class CheckpointCompletenessTests(BattlefieldIsolation, _WatcherFixture, Evennia
         self.scheduler.run()
         self.web.sent.clear()
 
+    @covers_requirement(
+        "webclient-settlement-alignment::completed-explicit-skips-align-after-authoritative-settlement"
+    )
     def test_a_checkpoint_restores_a_deliberately_omitted_panel(self):
         self._prime()
         self.state["status"] = 2
