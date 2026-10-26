@@ -65,6 +65,10 @@ class ChurchHostIsolation(EvenniaTest):
         self.char1.location = self.hall
         self.celebrant = create_object(NPC, key="t_celebrant", location=self.hall)
         self.component = ChurchHost.create(self.celebrant, service_id="t_celebrant")
+        # The authored church capability is place-bound to its venue room: the
+        # shared gate fails closed on a component without a binding.
+        self.component.service_binding = "place"
+        self.component.anchor_room_id = self.hall.pk
         self.celebrant.components.add(self.component)
         self.clock = WorldClock(tick=0)
         self._clock_patch = patch(
@@ -170,9 +174,14 @@ class ChurchEnrollmentRiteTests(ChurchHostIsolation):
         # A remote host (not co-located) is refused by the service gate.
         elsewhere = create_object(Room, key="t_elsewhere")
         remote = create_object(NPC, key="t_remote_celebrant", location=elsewhere)
-        remote.components.add(
-            ChurchHost.create(remote, service_id="t_remote_celebrant")
+        remote_component = ChurchHost.create(
+            remote, service_id="t_remote_celebrant"
         )
+        # Anchored to its own room, so the refusal is the remote verdict, not a
+        # malformed binding.
+        remote_component.service_binding = "place"
+        remote_component.anchor_room_id = elsewhere.pk
+        remote.components.add(remote_component)
         with self.assertRaises(EnrollmentError) as caught:
             enroll(self.char1, remote)
         self.assertEqual(caught.exception.args[0], EnrollmentReason.REMOTE_HOST)

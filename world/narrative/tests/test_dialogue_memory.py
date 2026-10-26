@@ -34,7 +34,7 @@ from world.rules.tests.combat_fixtures import BattlefieldIsolation
 def synthetic_record():
     return {
         "record_type": "character", "schema_version": 1, "key": "合成工匠",
-        "display_name": "合成工匠", "title": "合成修繕工", "age": 27, "apparent_age": 27,
+        "display_name": "合成工匠", "age": 27, "apparent_age": 27,
         "race": "t_duskmari", "subrace": "t_duskmari_evensong", "sex": "female",
         "stats": {"hp": 150, "mp": 100, "sp": 150, "atk_phys": 5,
                   "agility": 5, "defense": 5, "magic_power": 10, "guild_merit": 0},

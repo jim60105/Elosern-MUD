@@ -304,7 +304,6 @@ def _instance_bound_payload(**overrides):
                         "tier": _npc_tier_key(),
                         "disposition": None,
                         "display_name": "黑鬍",
-                        "title": "林間盜匪首領",
                         "persona": occupant_card_record(),
                     }
                 ],
