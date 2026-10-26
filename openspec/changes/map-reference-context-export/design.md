@@ -16,6 +16,8 @@ Add a game-side development exporter to tools/map_reference_context.py. Read act
 
 Expose a pure core checker which takes filesystem manifest/hash information supplied by the editor and reports current or unavailable (missing, changed, membership mismatch, incompatible). Discover membership from declared allowlisted roots/globs and tracked importer dependencies rather than trusting only yesterday's output file list. Do not import game modules or execute paths from the index. A current index can report outgoing references valid/invalid and locate incoming static refs. Unknown/unavailable never means valid. Add a game-side CI --check path that regenerates/compares without writing and rejects stale committed output. Actual game adoption still checks its registries rather than trusting the export. Index changes commit with input changes. Live occupied/home/inbound room safety stays game-owned.
 
+The editor service invokes the pure freshness checker against current closure membership and hashes immediately before every destructive operation, including undo that removes a newly created object/document. Browser status and watcher silence never substitute for that check. If an external quest/service source changes or is added while the index bytes remain unchanged, deletion refuses as external-context unavailable without a browser refresh. Keep ordinary non-destructive authoring available.
+
 ### Exact implementation ownership
 
 proposed tools/map_reference_context.py; content/map-reference-context.json; packages/map-core reference-context codec/checker; authoritative quest/service/scene/art/lore declarations; CI planning for check integration; docs/development/map-editor.md

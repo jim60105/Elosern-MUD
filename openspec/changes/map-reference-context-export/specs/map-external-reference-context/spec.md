@@ -28,3 +28,7 @@ Independent reference checking SHALL mark context unavailable when its external 
 - **WHEN** a current index lists an incoming external static reference
 - **THEN** that reference can be identified for deletion refusal; unavailable context cannot establish absence of references
 
+#### Scenario: External source changes before deletion
+- **WHEN** an external dependency adds a static map reference while the exported index bytes and browser snapshot remain unchanged
+- **THEN** the service's destructive-command freshness check reports unavailable and refuses deletion, including an object-removing undo, without changing disk/history or requiring browser refresh
+
