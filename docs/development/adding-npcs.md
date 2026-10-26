@@ -7,7 +7,7 @@
 - `docs/superpowers/specs/2026-07-29-ai-mud-engine-design.md`（世界資料與確定性核心的邊界）
 - [角色建立與匯入](/gm/characters)（JSON 卡欄位語意的現行契約）
 - `world/imports/schema.py::CHARACTER_SCHEMA_V1`（結構驗證的唯一來源）
-- `world/rules/rulebook/professions.yaml`（職業藍圖的閉合詞彙）
+- `world/rules/npc_capabilities.py`（能力詞彙、驗證與組裝的唯一擁有者）
 
 ---
 
@@ -43,27 +43,32 @@
 
 ## 2. 事前決定：寫卡之前要回答的五個問題
 
-1. **這是永久服務主人嗎？** 是 → 走地點登錄表：在 `world/lore/settlements/places.py` 的 `PlaceDefinition` 宣告 `host_name`／`host_title`／`host_race`／`host_subrace`／`host_sex`／`profession`／服務 kwargs，啟動 `sync_service_content` 依登錄表推導名冊、find-or-create 主人並組裝元件。**不要**用匯入卡建永久主人。
+1. **這是永久服務主人嗎？** 是 → 走地點登錄表：在 `world/lore/settlements/places.py` 的 `PlaceDefinition` 宣告 `host_name`／`host_title`／`host_race`／`host_subrace`／`host_sex`／`host_profile_key` 與 `components`（直接能力宣告），啟動 `sync_service_content` 依登錄表推導名冊、find-or-create 主人並組裝能力。**不要**用匯入卡建永久主人。
 
    主人的身分是 **canonical authored identity**：名冊列（`ServiceHostRow.host_key`）與活體 NPC 身上的 `npc_profile_key` 取自同一個 `host_profile_key`。同步只憑這個鍵找人，**不再**看元件的排列順序、元件的 `service_id`、顯示名或位置；因此調換／增減能力、或改寫 `service_id`，都不會生出第二個人。同一個 host key 若被兩個活體 NPC 或兩列名冊同時宣稱，整批在寫入前就以具名完整性錯誤拒收；若該身分屬於常駐冒險者（`guild_adventurer_person_key`），同步也拒收、絕不接管。
 
-   名冊對主人只做兩件事：一是把**受管能力集合**（六個能力詞彙：`guild_staff`／`guild_exam_reception`／`merchant`／`scripted_dialogue`／`quest_issuer`／`church_host`）收斂到宣告值——缺少的補上、宣告裡沒有的移除，六個詞彙以外的元件永不觸碰；二是只改寫**作者設定白名單**（`service_id`、`branch_key`、`shop_key`、`dialogue_key`、`issuer_key`、`church`、`initial_arousal`、`service_binding`／`anchor_room_id`）。商人的 `merchant_stock`／`last_restock_day`、位置、庫存、關係與其他遊戲狀態都屬於各自的擁有者，同步不會重置；主人的位置即使離開錨定房間也不會被搬回（place-bound 服務因此維持暫停）。
+   名冊對主人只做兩件事：一是把**受管能力集合**（六個能力詞彙：`guild_staff`／`guild_exam_reception`／`merchant`／`scripted_dialogue`／`quest_issuer`／`church_host`）收斂到宣告值——缺少的補上、宣告裡沒有的移除，六個詞彙以外的元件永不觸碰；二是只改寫**作者設定白名單**（各能力自己的 `service_id`／`shop_key`／`branch_key`／`dialogue_key`／`issuer_key`／`church`／`initial_arousal`，加上組裝唯一寫入的 `service_binding`／`anchor_room_id`）。商人的 `merchant_stock`／`last_restock_day`、位置、庫存、關係與其他遊戲狀態都屬於各自的擁有者，同步不會重置；主人的位置即使離開錨定房間也不會被搬回（place-bound 服務因此維持暫停）。
 
-   整批（身分預檢 → 元件收斂 → 初次庫存 → 整列退役）在同一個交易內執行：任何一步失敗都回滾資料列，並還原重用主人的屬性／標籤／元件快取、清掉本批建立的實例、補回已執行退役所動到的隊伍／附身狀態。
+   整批（身分預檢 → 室內準備與**完整**房間解析 → 能力組裝 → 初次庫存 → 整列退役）在同一個交易內執行。房間解析必須全部成功：tag 對不到房間、對到多個房間、或對到非 Room 物件，都以具名完整性錯誤拒絕**整個**操作，不會略過單列，已準備的室內也一起回滾；任何一步失敗都回滾資料列，並還原重用主人的屬性／標籤／元件快取、清掉本批建立的實例、補回已執行退役所動到的隊伍／附身狀態。
 
    名冊列被整列移除時，才由 `content_source` 類別下的 `service_host` 標籤授權**整列退役**：只有「正常同步套用過該列」的主人帶有此標籤，且只有在其 canonical identity 不再被任何列宣告時才刪除；刪除走既有 `NPC.at_object_delete` 生命週期。沒有標籤的 NPC（不論帶著什麼舊標題或舊 `service_id`）永不被同步刪除，標題本身也永不構成任何查詢或刪除依據。
-2. **需要什麼能力？** 能力＝職業藍圖的元件組，`professions.yaml` 是目前的全部五列：
+2. **需要什麼能力？** 能力就是**直接宣告**在該人物身上的元件，沒有職業藍圖、沒有展開、沒有隱含預設。每個能力一筆 `{type, kwargs, binding}`，同一型別只能一筆：
 
-   | 職業列 | 元件組 | 綁定 | 用途 |
+   | 能力型別 | 必填 kwargs | 選填 kwargs | 綁定 |
    |---|---|---|---|
-   | `merchant` | `merchant` + `scripted_dialogue` | place | 會交易也會說話的店主；`dialogue_key` **必須**手寫，無問候語的店主屬作者錯誤 |
-   | `guild_staff` | `guild_staff` + `guild_exam_reception` + `scripted_dialogue` | place | 公會主管（註冊＋考核接待＋回報） |
-   | `guild_exam_reception` | `guild_exam_reception` + `scripted_dialogue` | place | 純考核接待櫃檯 |
-   | `quest_issuer` | `quest_issuer` | person | 私人委託發包人；身分隨人走，**不得**釘房 |
-   | `attendant` | `scripted_dialogue` | place | 對話即服務的管事（旅店老闆、衛兵隊長、教官）；職業在 `host_title` 與對話表裡，不另設列 |
+   | `merchant` | `service_id`、`shop_key` | — | 必填 |
+   | `guild_staff` | `service_id`、`branch_key` | — | 必填 |
+   | `guild_exam_reception` | `service_id`、`branch_key` | — | 必填 |
+   | `quest_issuer` | `service_id` | `issuer_key`（留空即 `npc:#<pk>`） | 必填 |
+   | `scripted_dialogue` | `dialogue_key` | `service_id` | 選填（純敘事對話不綁定） |
+   | `church_host` | `service_id`、`church`、`initial_arousal` | — | 必填 |
+
+   綁定只有兩種寫法：`{"kind": "person"}`（服務跟著人走，不得帶錨定房間）與 `{"kind": "place", "anchor_room": "<房間 tag>"}`（tag 必須恰好解析到一個 Room）。`service_binding`／`anchor_room_id`／`merchant_stock`／`last_restock_day` 屬執行期欄位，作者資料一律不得填寫。地點主人宣告的每個能力都綁在**自己的房號**（`place.key`）；沒有能力的主人（`components=()`）也是合法宣告，同步只保留人、清空受管能力。
+
+   多數出貨地點是常見組合：店主＝`merchant` + `scripted_dialogue`；公會主管＝`guild_staff` + `guild_exam_reception` + `scripted_dialogue`；純接待＝`scripted_dialogue`；主祭＝`scripted_dialogue` + `church_host`。這些組合本身就是各能力並列的結果，沒有可引用的職業列。
 
 3. **需要劇本對話嗎？** 對話住在 `world/lore/dialogue/content/<profile_key>.yaml`，由載入器自動探索載入為不可變 `DIALOGUE_SNAPSHOT`。見 Step 3。
-4. **需要日程嗎？** 排程詞彙住在 `world/rules/rulebook/npc_schedules.yaml`：狀態詞彙 `duty`／`resting`／`busy`，模板 `guard`／`storekeeper`／`resident`。匯入卡的職業藍圖只在列帶 `schedule_template` 時自動套排程（現行出貨列全為 `null`），其餘情況由程式呼叫 `world/rules/npc_schedules.py::set_npc_schedule`（`db.schedule` 的唯一寫入者）。
+4. **需要日程嗎？** 排程詞彙住在 `world/rules/rulebook/npc_schedules.yaml`：狀態詞彙 `duty`／`resting`／`busy`，模板 `guard`／`storekeeper`／`resident`。匯入與能力宣告都不再附帶排程預設，需要排程時由程式呼叫 `world/rules/npc_schedules.py::set_npc_schedule`（`db.schedule` 的唯一寫入者）。
 5. **數值來源在哪？** 設計文件與既有 rulebook。`stats` 是匯入卡路徑的字面基準值（永不預先乘技能倍率）；平衡數值由設計文件決定，卡作者不發明平衡表。
 6. **這是出貨的服務主人、常駐冒險者或同行夥伴嗎？** 服務主人與常駐冒險者必須在 `world/lore/npc_profiles/` 所屬切片登錄 `NpcProfile`，並在地點或 `world/lore/guild_adventurers.py` 的人物列填入引用鍵；同行夥伴則在夥伴預設卡填寫延伸欄位。所有出貨來源都必須登記於名冊清單，見 §3.1。
 
@@ -73,7 +78,7 @@
 
 ### Step 0 — 核對登錄鍵
 
-卡上點名的每個鍵都必須已登錄：`race`／`subrace`（`world/lore/races.py`）、`skills`／`passives`（`world/skills/registry.py`）、`inventory` 的物品鍵（`ITEM_REGISTRY`）、`profession`（`professions.yaml`）、`dialogue_key`（`DIALOGUE_ROWS`）、`host_profile_key`（`NPC_PROFILE_REGISTRY`）。CLI 驗證器全部比對，未知鍵直接拒收。
+卡上點名的每個鍵都必須已登錄：`race`／`subrace`（`world/lore/races.py`）、`skills`／`passives`（`world/skills/registry.py`）、`inventory` 的物品鍵（`ITEM_REGISTRY`）、各能力的 `service_id` 與店號／分會鍵、`dialogue_key`（`DIALOGUE_ROWS`）、`host_profile_key`（`NPC_PROFILE_REGISTRY`）。CLI 驗證器全部比對，未知鍵直接拒收。
 
 ### Identity-qualified skill kits
 
@@ -110,21 +115,24 @@ for declaration semantics.
   "subrace": "human_plains",
   "sex": "male",
   "stats": {"hp": 90, "mp": 20, "sp": 60},
-  "profession": "attendant",
   "components": [
-    { "type": "scripted_dialogue", "kwargs": { "dialogue_key": "ferry_attendant" } }
+    {
+      "type": "scripted_dialogue",
+      "kwargs": { "dialogue_key": "ferry_attendant" },
+      "binding": { "kind": "place", "anchor_room": "riverside_ford" }
+    }
   ],
-  "anchor_room": "riverside_ford",
   "...": "其餘必填欄見範例卡"
 }
 ```
 
-組裝語意（`world/imports/loader.py::_apply_profession`）：
+組裝語意（`world/imports/loader.py::_apply_capabilities`）：
 
-- `components` 只能與 `profession` 併用；同型條目**完全取代**藍圖條目（kwargs 只取記錄值），藍圖未列的詞彙型別可按記錄順序附加。
-- 身分辨識一律手寫，匯入器絕不憑空補值：`shop_key`（Merchant）、`branch_key`（GuildStaff/GuildExamReception）、`dialogue_key`（ScriptedDialogue）、`issuer_key`（QuestIssuer，缺席時解析為 `npc:#<pk>`）。解析後仍缺身份的規畫整批具名拒收。
-- `anchor_room` 是錨定房間的 **room tag**，恰好等於「規畫含 place-bound 元件」時必填、含 person-bound 元件時 forbidden。載入器在同一筆交易內解析：tag 解析不到房間、或解析到多個房間、或 tag 落在非 Room 物件上，都整批拒收並點名記錄與 tag。
-- 職業列的 `default_tier` 只在 `stats` 為空時作為特質基準；卡宣告任何字面數值時職業不影響特質。
+- `components` 是獨立的直接宣告：沒有藍圖可以覆寫，也沒有職業可併用；同一型別只能一筆，順序不代表任何語意。
+- 設定一律手寫，匯入器絕不憑空補值：`shop_key`（merchant）、`branch_key`（guild_staff／guild_exam_reception）、`dialogue_key`（scripted_dialogue）、`issuer_key`（quest_issuer，缺席時解析為 `npc:#<pk>`）。缺任何必填設定都整批具名拒收。
+- 每個服務能力自己帶 `binding`。person 綁定不得帶錨定房間；place 綁定的 `anchor_room` 是 **room tag**，載入器在同一筆交易內解析：tag 解析不到房間、解析到多個房間、或落在非 Room 物件上，都整批拒收並點名記錄與 tag。
+- 純敘事對話（`scripted_dialogue` 不帶 `binding`）只走既有的交談、共處與排程條件，不產生任何服務入口。
+- 特質只由種族基準加卡上的字面 `stats` 組成，能力宣告不影響任何數值；`age`／`apparent_age` 仍各自限制在 0–10000。
 
 ### Step 2 — 驗證
 
@@ -357,7 +365,7 @@ registry. Hold start/extension/release events are emitted on the outer commit.
 MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb \
   world.imports.tests.test_loader_trait_values \
   world.imports.tests.test_batch_all_or_nothing \
-  world.imports.tests.test_profession_assembly_loader \
+  world.imports.tests.test_capability_imports \
   world.rules.tests.test_dialogue
 uv run --locked python -m tools.spec_traceability check
 ```
@@ -376,7 +384,7 @@ uv run --locked python -m tools.spec_traceability check
 | 批次內重名 | CLI／驗證階段 | 整批拒收 |
 | 與資料庫既有 NPC 重名 | `load_batch`／`instantiate_character` 載入時（`_flag_existing_npc_names`） | 整批拒收，reason=`existing_npc_name` |
 | 未知 race／subrace／技能／物品、`magic_power` 超種族魔力帶、偽裝鍵非 `stats` 子集、無神性種族帶非空偽裝層 | 語意驗證 | 拒收（計量條超出合理帶僅警告） |
-| 未知 `profession`、`profession` 落在 `PlayerCharacter`、`components` 脫離 `profession` | 語意驗證 | 整批具名拒收 |
+| 未知能力型別、重複型別、未知或執行期 kwargs、`components` 落在 `PlayerCharacter` | 語意驗證（`npc_capabilities`） | 整批具名拒收 |
 | 元件缺作者身份 kwargs | 驗證＋載入雙閘（`ProfessionAssemblyError`） | `component <type> is missing authored identity kwargs <fields>` |
 | `anchor_room` 無房間／多房間／非 Room | 載入（交易內解析） | `ValueError` 點名記錄與 tag |
 | `dialogue_key` 未登錄（服務主人路徑） | `validate_service_hosts`（啟動載入） | `GuildConfigError` 點名地點與鍵 |
@@ -397,13 +405,13 @@ uv run --locked python -m tools.spec_traceability check
 | `title` 帶空白、全形空格、`|` 或超過 32 碼點 | 語意驗證拒收；U+3000 是「姓名　稱號」合成器的專用分隔符，永不允許出現在名字或稱號裡 |
 | place-bound 元件卻漏寫或寫錯 `anchor_room` | tag 解析不到唯一房間→整批拒收；person-bound（`quest_issuer`）反過來帶 anchor 也被拒 |
 | merchant 職業不寫 `dialogue_key` | 藍圖覆蓋檢查具名拒收。無問候語的店主是 `merchant-dialogue` 移除的缺陷，永不作為預設 |
-| 自創 `profession` 或元件型別 | 職業與元件型別都是閉合詞彙；新元件組屬規格驅動變更，見 §6 |
+| 自創能力型別或綁定種類 | 兩者都是閉合詞彙；新能力屬規格驅動變更，見 §6 |
 | 並發跑兩個 `load_batch` 共用 NPC key 空間 | 名稱唯一性是 lookup-then-create，普通交易不串行 missing-row 檢查，後果是雙建；內容載入必須單一寫入者串行 |
 | 沿用舊的 `persona` 形狀（單行 `identity` 字串、`background` 欄、缺 `speech_style`） | NPC 匯入整批拒收，點名 `persona.<欄位>`；照參考範例卡寫滿七欄 |
 | 為過測試而捏造卡上登錄鍵 | 未知鍵由驗證器具名拒收；測試該用受控合成資料（`world/tests/synthetic_data`），勿修改出貨卡 |
 | 拿 `NPC` 型別期待 LLM 生成對話 | 生成管線掛在 `LLMNPC.at_talked_to`；`NPC` 只有劇本對話。匯入生成人物要顯式 `typeclass=LLMNPC` |
 | 直接寫 `npc.db.schedule` | 唯一寫入者是 `set_npc_schedule`（它同時記生效 tick 與 `schedule` tag）；旁路寫入的排程沒有生效事實 |
-| 以為 `anchor_room` 會把人物搬進房間 | 錨點只是元件持久的事實；位置由載入程式 `move_to` 決定 |
+| 以為 place 綁定的 `anchor_room` 會把人物搬進房間 | 錨點只是元件持久的事實；位置由載入程式 `move_to` 決定 |
 | 以為同步會把離開錨定房間的主人搬回去 | 重用永不搬遷；place-bound 服務依錨點與位置判定為暫停，位置由移動／生命週期擁有者決定 |
 | 手動把非受管元件掛到受管主人身上 | 六個能力詞彙以外的元件永不觸碰；六個詞彙內的元件則受名冊收斂，宣告裡沒有就會被移除 |
 
@@ -416,9 +424,9 @@ uv run --locked python -m tools.spec_traceability check
 `world/lore/guild_adventurers.py` owns normal person identities and separate
 branch/rank qualifications. `world/rules/human_guild_hosts.py` validates and
 assembles these people as `LLMNPC` instances. A person row carries no
-profession value and assembly writes no `db.profession`: occupation and
+capability declaration and assembly attaches none: occupation and
 examination authority stay with the independent qualification table, never
-with a new component blueprint in `professions.yaml`. Qualification selection
+with a capability component on the adventurer. Qualification selection
 requires one exact branch/target binding and one persistent person dbref. It
 never selects by display key or summons an absent person. Qualification alone
 never attaches an examination-reception capability to the adventurer. Rank
@@ -498,8 +506,8 @@ both offline reply paths independently of the existing scripted-table rules.
 
 加一張內容卡（新旅店老闆、新委託人、新劇情人物）照上面的流程做即可。以下超出「加資料」範圍：
 
-- **永久服務主人**：改 `world/lore/settlements/places.py` 的地點宣告（`host_*`＋`profession`＋服務 kwargs），商店商品與時段見[新增物品指南](/development/adding-items) Step 4。
-- **新職業列、新元件型別、新元件綁定**：職業是組裝期元件組的閉合詞彙，擴充會波及 `professions.yaml`、`typeclasses/components.py`、`world/rules/profession_config.py` 與對稱測試，請走 OpenSpec 流程（`openspec-propose`）。
+- **永久服務主人**：改 `world/lore/settlements/places.py` 的地點宣告（`host_*`＋`components` 直接能力宣告），商店商品與時段見[新增物品指南](/development/adding-items) Step 4。
+- **新能力型別、新能力綁定**：能力詞彙是閉合的，擴充會波及 `typeclasses/components.py`、`world/rules/npc_capabilities.py` 與對稱測試，請走 OpenSpec 流程（`openspec-propose`）。
 - **新角色階級（`NPCTier`）或新場景人物原型**：任務場景人物的數值由 `race_key`＋`static_tier_key` 從 lore 表推導，新階級是 lore＋規格變更。
 - **新對話關鍵詞行為**（與 `回報` 同類、會解析規則狀態的關鍵詞）：屬於規則行為，超出表格資料的範圍。
 - **玩家角色**：見[新增角色模板指南](/development/adding-player-presets)。

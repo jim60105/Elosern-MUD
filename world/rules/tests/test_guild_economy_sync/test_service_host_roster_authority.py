@@ -35,7 +35,7 @@ class ServiceHostRosterAuthorityTests(ServiceContentIsolation, EvenniaTestCase):
     def _rows_with_tags(self, tag):
         catalog = get_catalog()
         return tuple(
-            dataclasses.replace(row, anchor_room=tag) for row in catalog.service_hosts
+            dataclasses.replace(row, spawn_room=tag) for row in catalog.service_hosts
         )
 
     def _untagged_stale_host(self):
@@ -56,17 +56,13 @@ class ServiceHostRosterAuthorityTests(ServiceContentIsolation, EvenniaTestCase):
         guild = NPC.objects.filter(db_key=_guild_host_name()).first()
         merchant = NPC.objects.filter(db_key=_merchant_host_name()).first()
         self._patch_roster(())
-        with patch("world.rules.guild_economy.log_warn") as warned:
-            with self.captureOnCommitCallbacks(execute=True):
-                sync_service_content()
+        # An empty roster declares nothing: there is no spawn room or anchor
+        # left to resolve, so the batch is legitimate and the source-owned
+        # hosts whose whole declaration is gone are retired.
+        sync_service_content()
         for host in (guild, merchant):
             with self.assertRaises(NPC.DoesNotExist):
                 host.refresh_from_db()
-        still_missing = [
-            call for call in warned.call_args_list
-            if call.args and call.args[0] == "guild_economy_service_interiors_still_missing"
-        ]
-        self.assertEqual(len(still_missing), 1)  # creation skipped; deletion was not
 
     @covers_requirement(
         "guild-registration::roster-convergence-deletes-service-hosts-absent-from-the-roster"
@@ -81,7 +77,10 @@ class ServiceHostRosterAuthorityTests(ServiceContentIsolation, EvenniaTestCase):
         stale = self._untagged_stale_host()
         expected = NPC.objects.all_family().count()  # nothing dies
         self._patch_roster(self._rows_with_tags("no_such_room_tag"))
-        with self.captureOnCommitCallbacks(execute=True):
+        # Room resolution is complete and fail-closed: an unresolvable anchor
+        # rejects the whole operation, so no host is skipped, moved or retired
+        # and the prepared interiors roll back with the batch.
+        with self.assertRaises(ServiceHostIntegrityError):
             sync_service_content()
         # The untagged leftover survives: no declaration was ever removed.
         stale.refresh_from_db()
@@ -116,8 +115,8 @@ class ServiceHostRosterAuthorityTests(ServiceContentIsolation, EvenniaTestCase):
         catalog = get_catalog()
         self._patch_roster(
             tuple(
-                dataclasses.replace(row, anchor_room="no_such_room_tag")
-                if row.service_id == MERCHANT_SERVICE_ID
+                dataclasses.replace(row, spawn_room="no_such_room_tag")
+                if row.host_key == MERCHANT_SERVICE_ID
                 else row
                 for row in catalog.service_hosts
             )

@@ -16,6 +16,8 @@ from world.lore.items import ItemRarity
 from world.lore.settlements.assortments import ASSORTMENT_REGISTRY
 from world.lore.settlements.assortments import AssortmentDefinition
 from world.lore.settlements.places import PLACE_REGISTRY
+from world.lore.settlements.places import place_shop_identity
+from world.rules.npc_capabilities import capability, place_bound
 from world.lore.settlements.shops import SHOP_REGISTRY
 from world.lore.settlements.shops import ShopDefinition
 from world.rules.guild_config import GuildConfigError
@@ -384,11 +386,17 @@ class ShopRuleTests(unittest.TestCase):
         second_place = replace(
             PLACE_REGISTRY["altoria_general_store"],
             key="t_second_shop",
-            service_id="t_second_shop_service",
             room_name_zh="合成二號店",
             host_name="合成二號",
             host_title="合成二號店老闆",
-            authored_kwargs=(("shop_key", "t_second_shop"),),
+            components=(
+                capability(
+                    "merchant",
+                    binding=place_bound("t_second_shop"),
+                    service_id="t_second_shop_service",
+                    shop_key="t_second_shop",
+                ),
+            ),
             assortment_keys=("t_shared_goods",),
         )
         rows = [
@@ -460,9 +468,9 @@ def _complete_override(item_key: str, buy_copper: int) -> dict:
 
 def _place_by_shop() -> dict:
     return {
-        dict(place.authored_kwargs)["shop_key"]: place
+        place_shop_identity(place): place
         for place in PLACE_REGISTRY.values()
-        if dict(place.authored_kwargs).get("shop_key")
+        if place_shop_identity(place)
     }
 
 

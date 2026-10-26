@@ -51,6 +51,7 @@ from typeclasses.components import (
 )
 from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom
+from world.lore.settlements.places import place_dialogue_keys
 from world.rules.dialogue import dialogue_key_for, greeting_for, table_response
 from world.rules.guild_config import get_catalog
 from world.rules.guild_economy import sync_service_content
@@ -147,7 +148,7 @@ def _host(place):
 
 
 def _authored(place):
-    return dict(place.authored_kwargs)
+    return tuple(sorted(place_dialogue_keys(place)))
 
 
 def _table_text(place):
@@ -339,13 +340,13 @@ class AltoriaCrownWatchTests(ServiceContentIsolation, EvenniaTestCase):
         # And the derived roster carries no work-offering row for any of
         # them: three plain attendant rows, dialogue office only.
         anchors = {
-            row.anchor_room: row for row in get_catalog().service_hosts
+            row.spawn_room: row for row in get_catalog().service_hosts
         }
         for place in _staffed_places():
             with self.subTest(row=place.kind):
                 row = anchors[place.key]
-                self.assertEqual(row.profession.key, "attendant")
-                self.assertEqual(set(row.authored_kwargs), {"dialogue_key"})
+                self.assertEqual(row.component_types(), ("scripted_dialogue",))
+                self.assertEqual(row.component_types(), ("scripted_dialogue",))
 
     @covers_requirement(
         "altoria-crown-and-watch::the-watch-posts-no-work-of-its-own"
@@ -393,7 +394,7 @@ class AltoriaCrownWatchTests(ServiceContentIsolation, EvenniaTestCase):
                 tuple(
                     row
                     for row in get_catalog().service_hosts
-                    if row.anchor_room not in saved_rows
+                    if row.spawn_room not in saved_rows
                 )
             )
             with self.captureOnCommitCallbacks(execute=True):

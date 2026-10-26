@@ -31,7 +31,7 @@ BEFORE composing or reviewing any prose, read:
    worktree gate rejects.
 3. The host's own canon: its `NpcProfile` in `world/lore/npc_profiles/<slice>.py`
    (card, voice), its `PlaceDefinition` in `world/lore/settlements/places.py`
-   (name, title, race, profession, assortment, `dialogue_key`), plus the lore rows
+   (name, title, race, direct capability declarations, assortment, `dialogue_key`), plus the lore rows
    the scene actually references (race, religion, item, district).
 4. `skill://chinese-content-writing-guideline` and `skill://writing-style-guideline`.
 

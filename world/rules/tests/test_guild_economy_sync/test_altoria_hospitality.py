@@ -39,6 +39,7 @@ from typeclasses.components import Merchant, ScriptedDialogue
 from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom
 from world.rules.clock import WorldClock
+from world.lore.settlements.places import place_dialogue_keys
 from world.rules.dialogue import dialogue_key_for, greeting_for, table_response
 from world.rules import guild_config, guild_economy
 from world.rules.guild_config import get_catalog
@@ -90,7 +91,7 @@ def _host(place):
 
 
 def _authored(place):
-    return dict(place.authored_kwargs)
+    return tuple(sorted(place_dialogue_keys(place)))
 
 
 def _table_text(place):
@@ -297,7 +298,7 @@ class AltoriaHospitalityTests(ServiceContentIsolation, EvenniaTestCase):
             tuple(
                 row
                 for row in get_catalog().service_hosts
-                if row.anchor_room not in saved_rows
+                if row.spawn_room not in saved_rows
             )
         )
         with self.captureOnCommitCallbacks(execute=True):

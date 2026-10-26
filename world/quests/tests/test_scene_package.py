@@ -187,9 +187,12 @@ class ScenePackagePublicationTests(RegistryIsolationMixin, EvenniaTestCase):
         self.assertEqual(grants[0].issuer_key, "npc:story_mother")
 
     def test_a_guild_branch_package_registers_its_offer(self):
+        # A guild-branch package issues no commission, so no role declares a
+        # capability (a generated capability belongs to a commission role).
         package = _package(
             quest=_quest_payload(issuer=_issuer_key()),
             commissions=[],
+            roles=[_role("mother"), _role("daughter")],
         )
         published = publish_scene_package(package, owner="tester")
         self.assertEqual(published.definition.commissions, ())

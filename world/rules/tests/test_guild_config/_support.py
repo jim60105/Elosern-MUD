@@ -33,6 +33,7 @@ from world.lore.items import (
 )
 from world.lore.settlements.assortments import ASSORTMENT_REGISTRY, AssortmentDefinition
 from world.lore.settlements.places import PLACE_REGISTRY, PlaceDefinition, PlaceKind
+from world.rules.npc_capabilities import capability, place_bound
 from world.lore.settlements.shops import (
     SHOP_REGISTRY,
     ShopDefinition,
@@ -181,10 +182,15 @@ def _price_shop_env(
         host_race="human",
         host_subrace=None,
         host_sex="other",
-        profession="t_price_merchant",
-        service_id="t_price_merchant",
         assortment_keys=(assortment_key,),
-        authored_kwargs=(("shop_key", shop_key),),
+        components=(
+            capability(
+                "merchant",
+                binding=place_bound(place_key),
+                service_id="t_price_merchant",
+                shop_key=shop_key,
+            ),
+        ),
         extra_item_keys=extra_item_keys,
         excluded_item_keys=excluded_item_keys,
     )

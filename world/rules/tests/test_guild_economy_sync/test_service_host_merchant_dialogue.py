@@ -33,6 +33,11 @@ from world.rules.dialogue import (
     is_dialogue_host,
 )
 from world.rules.economy import buy, parse_merchant_stock, sell
+from world.lore.settlements.places import (
+    place_dialogue_keys,
+    place_is_hostless,
+    place_shop_identity,
+)
 from world.rules.guild_config import get_catalog
 from world.rules.guild_economy import sync_service_content
 
@@ -60,8 +65,7 @@ def _merchant_places():
     return [
         place
         for place in _places().values()
-        if "dialogue_key" in dict(place.authored_kwargs)
-        and "shop_key" in dict(place.authored_kwargs)
+        if place_dialogue_keys(place) and place_shop_identity(place) is not None
     ]
 
 
@@ -83,7 +87,11 @@ def _table_text(definition):
 
 def _dialogue_key_of_service(service_id):
     """The dialogue key the roster row authors (never named literally here)."""
-    return _roster_row(service_id).authored_kwargs["dialogue_key"]
+    return next(
+        declaration.kwargs["dialogue_key"]
+        for declaration in _roster_row(service_id).components
+        if declaration.type == "scripted_dialogue"
+    )
 
 
 def _merchant_host():
@@ -204,11 +212,11 @@ class MerchantDialogueSyncTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertTrue(places, "registry lost the de-commercialised settlement")
         for place in places:
             with self.subTest(place=place.key):
-                if place.service_id is None:
+                if place_is_hostless(place):
                     # 共食棚 (ciaran-village-commons): a host-less commons
                     # speaks with no voice — nothing here to police.
                     continue
-                definition = table[_dialogue_key_of_service(place.service_id)]
+                definition = table[_dialogue_key_of_service(place.host_profile_key)]
                 prose = re.sub(r"`[^`]*`", "", _table_text(definition))
                 for word in banned:
                     self.assertNotIn(word, prose)
@@ -234,7 +242,10 @@ class MerchantDialogueSyncTests(ServiceContentIsolation, EvenniaTestCase):
         greetings = set()
         for place in places:
             with self.subTest(place=place.key):
-                authored = dict(place.authored_kwargs)
+                authored = {
+                    "dialogue_key": place_dialogue_keys(place)[0],
+                    "shop_key": place_shop_identity(place),
+                }
                 definition = table[authored["dialogue_key"]]
                 text = _table_text(definition)
                 greetings.add(definition.greeting)

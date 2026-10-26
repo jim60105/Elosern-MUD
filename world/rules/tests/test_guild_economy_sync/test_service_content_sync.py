@@ -223,9 +223,14 @@ class ServiceContentWithoutInteriorsTests(EvenniaTestCase):
         GUILD_OFFER_REGISTRY.update(self._offer_items)
         super().tearDown()
 
-    def test_sync_service_content_without_interiors_degrades_gracefully(self):
-        # No sync_grid was run; interiors do not exist, so no hosts are created.
-        sync_service_content()
+    def test_sync_service_content_without_interiors_fails_closed(self):
+        # No sync_grid was run and no synthetic grid exists, so the interiors
+        # repair still cannot resolve a spawn room: the complete operation
+        # rejects (no row is skipped) and nothing is created.
+        from world.rules.guild_economy import ServiceHostIntegrityError
+
+        with self.assertRaises(ServiceHostIntegrityError):
+            sync_service_content()
         self.assertEqual(NPC.objects.all_family().count(), 0)
 
 

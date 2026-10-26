@@ -7,6 +7,7 @@ component caches exactly as they were, and must not leave a half-built object
 in the idmapper for the next sync to inherit.
 """
 
+import dataclasses
 from copy import deepcopy
 from unittest.mock import patch
 
@@ -27,17 +28,29 @@ from world.art.official_refs import NPC_PROFILE_PROVENANCE_ATTRIBUTE
 from world.rules import guild_economy
 from world.rules.guild_config import get_catalog
 from world.rules.guild_economy import HOST_ATTRIBUTE_SURFACES, sync_service_content
+from world.rules.npc_capabilities import COMPONENT_TYPES
 
 from ._support import ServiceContentIsolation
 
-#: Managed capability type keys mapped to the slot each one occupies.
-PROFESSION_TYPE_SLOTS = {
-    GuildStaff.name: GuildStaff.get_component_slot(),
-    GuildExamReception.name: GuildExamReception.get_component_slot(),
-    Merchant.name: Merchant.get_component_slot(),
-    ScriptedDialogue.name: ScriptedDialogue.get_component_slot(),
-    ChurchHost.name: ChurchHost.get_component_slot(),
-}
+def _slot(type_key: str) -> str:
+    """The component slot one declared capability type occupies."""
+    return COMPONENT_TYPES[type_key].get_component_slot()
+
+
+def _with_service_id(row, service_id: str):
+    """The row with every declared service identity rewritten."""
+    return dataclasses.replace(
+        row,
+        components=tuple(
+            dataclasses.replace(
+                declaration,
+                kwargs={**declaration.kwargs, "service_id": service_id},
+            )
+            if "service_id" in declaration.kwargs
+            else declaration
+            for declaration in row.components
+        ),
+    )
 
 
 class ServiceHostBatchRollbackTests(ServiceContentIsolation, EvenniaTestCase):
@@ -51,7 +64,7 @@ class ServiceHostBatchRollbackTests(ServiceContentIsolation, EvenniaTestCase):
         from world.rules.guild_economy import _room_by_tag
 
         for row in get_catalog().service_hosts:
-            if _room_by_tag(row.anchor_room) is not None:
+            if _room_by_tag(row.spawn_room) is not None:
                 return row
         raise AssertionError("roster lost every resolvable row")
 
@@ -107,16 +120,16 @@ class ServiceHostBatchRollbackTests(ServiceContentIsolation, EvenniaTestCase):
         sync_service_content()
         row = self._first_processable_row()
         host = self._host_for(row)
-        slot = PROFESSION_TYPE_SLOTS[row.profession.components[0].type_key]
+        slot = _slot(row.components[0].type)
         host.components.remove_by_name(slot)
         self.assertFalse(host.components.has(slot))
 
         before = self._snapshot()
         with patch.object(
             guild_economy,
-            "assemble_profession_components",
+            "assemble_capabilities",
             new=self._fault_after(
-                guild_economy.assemble_profession_components, allowed_calls=1
+                guild_economy.assemble_capabilities, allowed_calls=1
             ),
         ):
             with self.assertRaises(RuntimeError):
@@ -137,19 +150,17 @@ class ServiceHostBatchRollbackTests(ServiceContentIsolation, EvenniaTestCase):
         sync_service_content()
         row = self._first_processable_row()
         host = self._host_for(row)
-        component = host.components.get(
-            PROFESSION_TYPE_SLOTS[row.profession.components[0].type_key]
-        )
+        component = host.components.get(_slot(row.components[0].type))
         service_before = component.service_id
-        edited_service_id = f"t_{row.service_id}_edited"
-        self._patch_host_row(row.host_key, service_id=edited_service_id)
+        edited_service_id = f"t_{row.host_key}_edited"
+        self._patch_host_row(row.host_key, components=_with_service_id(row, edited_service_id).components)
 
         before = self._snapshot()
         with patch.object(
             guild_economy,
-            "assemble_profession_components",
+            "assemble_capabilities",
             new=self._fault_after(
-                guild_economy.assemble_profession_components, allowed_calls=1
+                guild_economy.assemble_capabilities, allowed_calls=1
             ),
         ):
             with self.assertRaises(RuntimeError):
@@ -177,9 +188,9 @@ class ServiceHostBatchRollbackTests(ServiceContentIsolation, EvenniaTestCase):
         before = self._snapshot()
         with patch.object(
             guild_economy,
-            "converge_managed_components",
+            "assemble_capabilities",
             new=self._fault_after(
-                guild_economy.converge_managed_components, allowed_calls=1
+                guild_economy.assemble_capabilities, allowed_calls=1
             ),
         ):
             with self.assertRaises(RuntimeError):

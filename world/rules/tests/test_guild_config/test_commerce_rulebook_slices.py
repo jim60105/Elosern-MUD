@@ -10,7 +10,7 @@ from pathlib import Path
 import yaml
 
 from world.lore.settlements.assortments import ASSORTMENT_REGISTRY
-from world.lore.settlements.places import PLACE_REGISTRY
+from world.lore.settlements.places import PLACE_REGISTRY, place_shop_identity
 from world.lore.settlements.shops import SHOP_REGISTRY
 from world.rules.guild_config import (
     GuildConfigError,
@@ -26,9 +26,9 @@ _SHIPPED_DIR = Path(__file__).resolve().parents[3] / "rules" / "rulebook" / "com
 def _place_by_shop() -> dict:
     """The place that authors each derived shop identity."""
     return {
-        dict(place.authored_kwargs)["shop_key"]: place
+        place_shop_identity(place): place
         for place in PLACE_REGISTRY.values()
-        if dict(place.authored_kwargs).get("shop_key")
+        if place_shop_identity(place)
     }
 
 _A_ASSORTMENTS = """

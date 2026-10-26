@@ -31,6 +31,10 @@ from world.quests.room_observation import QuestObservableRoomMixin
 from world.quests.runtime import QuestState, accept_quest, read_records, to_storage
 from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.rules.guild_offers import QuestReward
+from world.quests.tests._scene_package_fixtures import (
+    issuer_capabilities,
+    issuer_plan,
+)
 from world.rules.quest_issuance import (
     QuestIssuance,
     Settlement,
@@ -109,7 +113,9 @@ class EscortOfferMixin:
         issuer.race = "human"
         issuer.apply_race_baseline()
         content_key = f"{package_id}_issuer"
-        issuer_key = provision_scoped_issuer(issuer, content_key=content_key)
+        issuer_key = provision_scoped_issuer(
+            issuer, content_key=content_key, plan=issuer_plan(content_key)
+        )
         register_quest_issuance(
             QuestIssuance(
                 definition_key=definition.key,
@@ -124,8 +130,14 @@ class EscortOfferMixin:
             owner_id="fixture",
             payload={
                 "roles": [
-                    {"role_id": role}
-                    for role in ("issuer", *objective.protected_role_refs)
+                    {
+                        "role_id": "issuer",
+                        "capabilities": issuer_capabilities(content_key),
+                    },
+                    *(
+                        {"role_id": role}
+                        for role in objective.protected_role_refs
+                    ),
                 ],
                 "commissions": [
                     {"role_id": "issuer", "issuer_content_key": content_key}
