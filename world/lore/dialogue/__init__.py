@@ -19,7 +19,7 @@ from world.lore.dialogue.shape import (
     SceneVariant,
 )
 from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
-from world.lore.settlements.places import PLACE_REGISTRY
+from world.lore.settlements.places import PLACE_REGISTRY, place_dialogue_keys
 
 CONTENT_DIR = Path(__file__).resolve().parent / "content"
 
@@ -28,13 +28,10 @@ def canonical_dialogue_bindings() -> dict[str, str]:
     """Derive canonical dialogue_key -> profile_key mappings from PLACE_REGISTRY."""
     bindings: dict[str, str] = {}
     for place in PLACE_REGISTRY.values():
-        diag_key = None
-        for k, v in place.authored_kwargs:
-            if k == "dialogue_key":
-                diag_key = v
-                break
-        if diag_key and place.host_profile_key:
-            bindings[diag_key] = place.host_profile_key
+        if not place.host_profile_key:
+            continue
+        for dialogue_key in place_dialogue_keys(place):
+            bindings[dialogue_key] = place.host_profile_key
     return bindings
 
 

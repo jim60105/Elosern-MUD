@@ -74,12 +74,6 @@ def _quest_definitions() -> Mapping[str, Any]:
     return MappingProxyType({definition.key: definition for definition in QUEST_CATALOG})
 
 
-def _professions() -> Mapping[str, Any]:
-    from world.rules.profession_config import all_professions
-
-    return MappingProxyType({profession.key: profession for profession in all_professions()})
-
-
 def _guild_section(section: str) -> Callable[[], Mapping[str, Any]]:
     """One keyed section of the guild-economy catalog.
 
@@ -176,9 +170,8 @@ REGISTRY_INDEX: tuple[RegistrySpec, ...] = (
     # 任務
     _spec("quest_definitions", "任務定義", "任務", _quest_definitions, "world/quests/catalog.py", "display_name", "quest_type", "rank"),
     # 規則書
-    _spec("professions", "職業", "規則書", _professions, f"{_RULEBOOK}/professions.yaml", "default_tier", "schedule_template"),
     _spec("shop_configs", "商店營業設定", "規則書", _guild_section("shop_configs"), f"{_RULEBOOK}/commerce", "display_name_zh", "open_hour", "close_hour"),
-    _spec("service_hosts", "服務主持人", "規則書", _guild_section("service_hosts"), f"{_LORE}/settlements/places.py", "name", "title", "anchor_room"),
+    _spec("service_hosts", "服務主持人", "規則書", _guild_section("service_hosts"), f"{_LORE}/settlements/places.py", "name", "title", "spawn_room"),
     _spec("monster_behaviour_profiles", "魔物行為設定", "規則書", _attr("world.rules.monster_behaviour", "BEHAVIOUR_PROFILES"), f"{_RULEBOOK}/monster_behaviour.yaml", "target_strategy", "skill_choice"),
 )
 

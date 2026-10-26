@@ -30,6 +30,7 @@ instructor lives beside the blade-smith's doorstep, and 艾莉妮斯的家 off
 """
 
 from world.lore.settlements.places import PlaceDefinition, PlaceKind
+from world.rules.npc_capabilities import capability, place_bound
 
 ROWS: tuple[PlaceDefinition, ...] = (
     PlaceDefinition(
@@ -49,10 +50,14 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_race="elf",
         host_subrace="ciaran",
         host_sex="female",
-        profession="attendant",
-        service_id="ciaran_elenis",
         host_profile_key="ciaran_elenis",
-        authored_kwargs=(("dialogue_key", "ciaran_elenis_home"),),
+        components=(
+            capability(
+                "scripted_dialogue",
+                binding=place_bound("ciaran_elenis_home"),
+                dialogue_key="ciaran_elenis_home",
+            ),
+        ),
     ),
     PlaceDefinition(
         key="ciaran_gwenaera_home",
@@ -72,13 +77,20 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_race="elf",
         host_subrace="ciaran",
         host_sex="female",
-        profession="merchant",
-        service_id="ciaran_gwenaera",
         host_profile_key="ciaran_gwenaera",
         assortment_keys=("elven_adornments",),
-        authored_kwargs=(
-            ("shop_key", "ciaran_gwenaera_home"),
-            ("dialogue_key", "ciaran_gwenaera_home"),
+        components=(
+            capability(
+                "merchant",
+                binding=place_bound("ciaran_gwenaera_home"),
+                service_id="ciaran_gwenaera",
+                shop_key="ciaran_gwenaera_home",
+            ),
+            capability(
+                "scripted_dialogue",
+                binding=place_bound("ciaran_gwenaera_home"),
+                dialogue_key="ciaran_gwenaera_home",
+            ),
         ),
     ),
     PlaceDefinition(
@@ -99,13 +111,20 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_race="elf",
         host_subrace="ciaran",
         host_sex="female",
-        profession="merchant",
-        service_id="ciaran_hailiel",
         host_profile_key="ciaran_hailiel",
         assortment_keys=("elven_crafted_arms",),
-        authored_kwargs=(
-            ("shop_key", "ciaran_hailiel_home"),
-            ("dialogue_key", "ciaran_hailiel_home"),
+        components=(
+            capability(
+                "merchant",
+                binding=place_bound("ciaran_hailiel_home"),
+                service_id="ciaran_hailiel",
+                shop_key="ciaran_hailiel_home",
+            ),
+            capability(
+                "scripted_dialogue",
+                binding=place_bound("ciaran_hailiel_home"),
+                dialogue_key="ciaran_hailiel_home",
+            ),
         ),
     ),
     PlaceDefinition(
@@ -125,13 +144,20 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_race="elf",
         host_subrace="ciaran",
         host_sex="female",
-        profession="merchant",
-        service_id="ciaran_lareneth",
         host_profile_key="ciaran_lareneth",
         assortment_keys=("elven_fare",),
-        authored_kwargs=(
-            ("shop_key", "ciaran_lareneth_home"),
-            ("dialogue_key", "ciaran_lareneth_home"),
+        components=(
+            capability(
+                "merchant",
+                binding=place_bound("ciaran_lareneth_home"),
+                service_id="ciaran_lareneth",
+                shop_key="ciaran_lareneth_home",
+            ),
+            capability(
+                "scripted_dialogue",
+                binding=place_bound("ciaran_lareneth_home"),
+                dialogue_key="ciaran_lareneth_home",
+            ),
         ),
     ),
     PlaceDefinition(
@@ -152,13 +178,20 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_race="elf",
         host_subrace="ciaran",
         host_sex="female",
-        profession="merchant",
-        service_id="ciaran_nireth",
         host_profile_key="ciaran_nireth",
         assortment_keys=("elven_remedies",),
-        authored_kwargs=(
-            ("shop_key", "ciaran_nireth_home"),
-            ("dialogue_key", "ciaran_nireth_home"),
+        components=(
+            capability(
+                "merchant",
+                binding=place_bound("ciaran_nireth_home"),
+                service_id="ciaran_nireth",
+                shop_key="ciaran_nireth_home",
+            ),
+            capability(
+                "scripted_dialogue",
+                binding=place_bound("ciaran_nireth_home"),
+                dialogue_key="ciaran_nireth_home",
+            ),
         ),
     ),
     PlaceDefinition(
@@ -191,10 +224,14 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_race="elf",
         host_subrace="ciaran",
         host_sex="female",
-        profession="attendant",
-        service_id="ciaran_teliel",
         host_profile_key="ciaran_teliel",
-        authored_kwargs=(("dialogue_key", "ciaran_teliel_home"),),
+        components=(
+            capability(
+                "scripted_dialogue",
+                binding=place_bound("ciaran_teliel_home"),
+                dialogue_key="ciaran_teliel_home",
+            ),
+        ),
     ),
     PlaceDefinition(
         key="ciaran_valwyn_home",
@@ -213,13 +250,20 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_race="elf",
         host_subrace="ciaran",
         host_sex="female",
-        profession="merchant",
-        service_id="ciaran_valwyn",
         host_profile_key="ciaran_valwyn",
         assortment_keys=("elven_sundries",),
-        authored_kwargs=(
-            ("shop_key", "ciaran_valwyn_home"),
-            ("dialogue_key", "ciaran_valwyn_home"),
+        components=(
+            capability(
+                "merchant",
+                binding=place_bound("ciaran_valwyn_home"),
+                service_id="ciaran_valwyn",
+                shop_key="ciaran_valwyn_home",
+            ),
+            capability(
+                "scripted_dialogue",
+                binding=place_bound("ciaran_valwyn_home"),
+                dialogue_key="ciaran_valwyn_home",
+            ),
         ),
     ),
     PlaceDefinition(
@@ -239,13 +283,20 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_race="elf",
         host_subrace="ciaran",
         host_sex="female",
-        profession="merchant",
-        service_id="ciaran_vethiel",
         host_profile_key="ciaran_vethiel",
         assortment_keys=("elven_attire",),
-        authored_kwargs=(
-            ("shop_key", "ciaran_vethiel_home"),
-            ("dialogue_key", "ciaran_vethiel_home"),
+        components=(
+            capability(
+                "merchant",
+                binding=place_bound("ciaran_vethiel_home"),
+                service_id="ciaran_vethiel",
+                shop_key="ciaran_vethiel_home",
+            ),
+            capability(
+                "scripted_dialogue",
+                binding=place_bound("ciaran_vethiel_home"),
+                dialogue_key="ciaran_vethiel_home",
+            ),
         ),
     ),
 )

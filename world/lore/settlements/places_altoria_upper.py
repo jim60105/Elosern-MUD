@@ -43,6 +43,7 @@ arousal seed.
 """
 
 from world.lore.settlements.places import PlaceDefinition, PlaceKind
+from world.rules.npc_capabilities import capability, place_bound
 
 ROWS: tuple[PlaceDefinition, ...] = (
     PlaceDefinition(
@@ -64,19 +65,27 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_race="human",
         host_subrace=None,
         host_sex="female",
-        profession="clergy",
-        service_id="altoria_high_priestess",
         host_profile_key="altoria_high_priestess",
         assortment_keys=(),
-        authored_kwargs=(
-            ("dialogue_key", "altoria_temple"),
+        components=(
+            capability(
+                "scripted_dialogue",
+                binding=place_bound("altoria_temple"),
+                dialogue_key="altoria_temple",
+            ),
             # implement-church-foundation: the venue joins the derived
-            # church-place set, and the host's blueprint (clergy) attaches
-            # the ChurchHost capability; the raised initial arousal is the
-            # clergy spawn-data seed (design §5.3).
-            ("church", "light_church"),
-            ("initial_arousal", "微興奮"),
+            # church-place set, and the host carries the ChurchHost
+            # ministry capability; the raised initial arousal is the clergy
+            # spawn-data seed the sync applies at host creation (§5.3).
+            capability(
+                "church_host",
+                binding=place_bound("altoria_temple"),
+                service_id="altoria_high_priestess",
+                church="light_church",
+                initial_arousal="微興奮",
+            ),
         ),
+        church=True,
     ),
     PlaceDefinition(
         key="altoria_sanctum",
@@ -97,15 +106,24 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_race="human",
         host_subrace=None,
         host_sex="female",
-        profession="merchant",
-        service_id="altoria_sanctum_deacon",
         host_profile_key="altoria_sanctum_deacon",
         assortment_keys=("sanctum_wares",),
-        authored_kwargs=(
-            ("shop_key", "altoria_sanctum_shop"),
-            ("dialogue_key", "altoria_sanctum"),
-            ("church", "light_church"),
+        components=(
+            capability(
+                "merchant",
+                binding=place_bound("altoria_sanctum"),
+                service_id="altoria_sanctum_deacon",
+                shop_key="altoria_sanctum_shop",
+            ),
+            capability(
+                "scripted_dialogue",
+                binding=place_bound("altoria_sanctum"),
+                dialogue_key="altoria_sanctum",
+            ),
         ),
+        # The sanctum itself is the church venue (the derived set reads this
+        # place flag); its host stays a plain merchant by owner decision.
+        church=True,
     ),
     # 聖潔王都王宮 — the palace, host-less by decision (altoria-crown-and-watch
     # design: the emptiness is the content). The document's 貴族區 value is
@@ -151,11 +169,15 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_race="human",
         host_subrace=None,
         host_sex="male",
-        profession="attendant",
-        service_id="altoria_noble_watch_captain",
         host_profile_key="altoria_noble_watch_captain",
         assortment_keys=(),
-        authored_kwargs=(("dialogue_key", "altoria_noble_watch"),),
+        components=(
+            capability(
+                "scripted_dialogue",
+                binding=place_bound("altoria_noble_watch"),
+                dialogue_key="altoria_noble_watch",
+            ),
+        ),
     ),
     # 聖潔王都校場 — the document's 訓練場 landed as an attendant place: the
     # instructor teaches with dialogue only, because rest plus practice and
@@ -180,11 +202,15 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_race="human",
         host_subrace=None,
         host_sex="male",
-        profession="attendant",
-        service_id="altoria_drill_instructor",
         host_profile_key="altoria_drill_instructor",
         assortment_keys=(),
-        authored_kwargs=(("dialogue_key", "altoria_drill_yard"),),
+        components=(
+            capability(
+                "scripted_dialogue",
+                binding=place_bound("altoria_drill_yard"),
+                dialogue_key="altoria_drill_yard",
+            ),
+        ),
     ),
     # 聖潔王都王立魔法學院 — the capital's academy, off 學院前 (5,5), the
     # square the map already carries. The document's 魔法學院與圖書館 is 〔有〕
@@ -215,10 +241,14 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_race="human",
         host_subrace=None,
         host_sex="male",
-        profession="attendant",
-        service_id="altoria_academy_dean",
         host_profile_key="altoria_academy_dean",
         assortment_keys=(),
-        authored_kwargs=(("dialogue_key", "altoria_academy"),),
+        components=(
+            capability(
+                "scripted_dialogue",
+                binding=place_bound("altoria_academy"),
+                dialogue_key="altoria_academy",
+            ),
+        ),
     ),
 )
