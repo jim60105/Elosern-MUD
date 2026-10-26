@@ -12,12 +12,11 @@ one shared bound helper and preserved through the whole blueprint lifecycle.
 ### Requirement: Quest blueprint npc_req entries may declare portrait policy and characterization
 `BlueprintNpcReq` (the scenario director's `npc_req` entry shape) SHALL require the per-occupant
 identity fields `display_name` (authored name: bounded non-empty text validated through the
-shared NPC name rule) and `title` (authored NPC title: single-line plain text validated through
-the shared NPC title rule), and SHALL accept the optional paired integers `age`/`apparent_age`
+shared NPC name rule), and SHALL accept the optional paired integers `age`/`apparent_age`
 and a `portrait` object with exactly one bounded `stable_key` field.
 
 #### Scenario: A named occupant with a story-driven age validates
-- **WHEN** a blueprint stage declares `npc_req: [{"role": "librarian", "tier": "civilian", "display_name": "莉絲‧晨星", "title": "城鎮圖書館員", "age": 68, "apparent_age": 68, "portrait": {"stable_key": "library_keeper"}}]`
+- **WHEN** a blueprint stage declares `npc_req: [{"role": "librarian", "tier": "civilian", "display_name": "莉絲‧晨星", "age": 68, "apparent_age": 68, "portrait": {"stable_key": "library_keeper"}}]`
 - **THEN** the blueprint validates and carries all fields through the whole lifecycle
 
 #### Scenario: An elf of several centuries validates within the race lifespan band
@@ -25,9 +24,8 @@ and a `portrait` object with exactly one bounded `stable_key` field.
 - **THEN** the values validate because 300 does not exceed the elf lifespan upper bound (1200)
 
 #### Scenario: A missing authored name or title is rejected
-- **WHEN** an `npc_req` entry omits `display_name` or `title`, or carries either as empty text
-- **THEN** the blueprint is rejected before any compilation — the identity fields are required,
-  never defaulted
+- **WHEN** a current `npc_req` entry carries the removed title field or omits `display_name`/`persona`
+- **THEN** the shared characterization validation rejects it before compile or template registration, while the title-free form retains all name/age/portrait/persona checks
 
 #### Scenario: An unpaired age is rejected
 - **WHEN** an `npc_req` entry declares `age` without `apparent_age`, or vice versa, or declares
@@ -62,13 +60,12 @@ and a `portrait` object with exactly one bounded `stable_key` field.
 - **THEN** the blueprint is rejected
 
 #### Scenario: An invalid authored title is rejected
-- **WHEN** `title` exceeds its bound or contains whitespace, control characters, or the markup
-  separator
-- **THEN** the blueprint is rejected by the shared NPC title rule
+- **WHEN** a current `npc_req` entry carries the removed title field with any value
+- **THEN** the shared characterization validation rejects it as a shape violation before compile or template registration, never converting it into identity text
 
 #### Scenario: Duplicate stable keys must agree on characterization
 - **WHEN** one blueprint declares two `npc_req` entries with the same `stable_key` but different
-  `display_name`, title, or ages
+  `display_name` or ages
 - **THEN** the blueprint is rejected; identical characterization under the shared key validates
 
 #### Scenario: A portrait block means the named policy
@@ -102,51 +99,56 @@ and a `portrait` object with exactly one bounded `stable_key` field.
 - **THEN** it is a frozen value object so the blueprint's immutability-by-construction guard
   (`_reject_mutable_containers`) is preserved
 
+#### Scenario: Title-free contract is complete
+- **WHEN** this source emits or validates an NPC characterization
+- **THEN** display_name/persona and applicable role/tier, age-pair/race-lifespan, portrait-key, uniqueness and immutable-digest rules remain; no title field is accepted, required, serialized, prompted or written
+
+
 ### Requirement: The blueprint lifecycle preserves the characterization fields
-The scenario director's output jsonschema SHALL declare the identity fields (`display_name`,
-`title`) and the three optional fields; `to_payload()` SHALL serialize all five; `from_payload()`
-SHALL reconstruct them into the frozen value object, rejecting a payload that lacks the required
-`title` with a named compile error rather than a `KeyError`; and the canonical digest
-serialization (the content hash that distinguishes quests) SHALL include them — including the
-`title`.
+The scenario director's output jsonschema SHALL declare the identity fields (`display_name`) and the three optional fields; `to_payload()` SHALL serialize all title-free characterization fields; `from_payload()`
+SHALL reconstruct them into the frozen value object, rejecting removed title fields and missing required names with a named compile error; and the canonical digest serialization SHALL include all remaining characterization fields.
 
 #### Scenario: A round trip preserves the characterization
 - **WHEN** a blueprint carrying all fields passes through `to_payload()` and back through
   `from_payload()`
-- **THEN** the rebuilt blueprint carries identical display name, title, ages, and stable key
+- **THEN** the rebuilt blueprint carries identical display name, ages, and stable key
 
 #### Scenario: Characterization differences change the content digest
-- **WHEN** two blueprints are identical except one declares a different `display_name`, `title`,
-  or age
+- **WHEN** two blueprints are identical except one declares a different `display_name` or age
 - **THEN** their canonical digest keys differ
 
 #### Scenario: Restoring a payload without the title fails with a named error
-- **WHEN** `from_payload()` receives a characterization payload lacking `title`
-- **THEN** it raises the named compile error identifying the missing field
+- **WHEN** a stored characterization payload carries the removed title field
+- **THEN** `from_payload()` raises the named compile error instead of dropping the field, while a title-free payload restores unchanged
 
 #### Scenario: Characterization-only differences yield different digest keys
-- **WHEN** two blueprints differ only in characterization (including only in `title`)
+- **WHEN** two blueprints differ only in characterization (including only in display_name)
 - **THEN** they yield different digest keys
+
+#### Scenario: Title-free contract is complete
+- **WHEN** this source emits or validates an NPC characterization
+- **THEN** display_name/persona and applicable role/tier, age-pair/race-lifespan, portrait-key, uniqueness and immutable-digest rules remain; no title field is accepted, required, serialized, prompted or written
+
 
 ### Requirement: The shared bound helper is the single validation rule source for both layers
 A pure validation function SHALL exist under `world/quests/` (never under `world/ai/` and never
-importing it) that validates every per-occupant field — requiring `display_name` and `title` —
+importing it) that validates every per-occupant field — requiring `display_name` —
 against a resolved race-lifespan upper bound, implementing exactly the rules above. The scenario
 director's blueprint validation and the deterministic compile boundary SHALL both call this
-helper; neither SHALL inline the age/name/title/key checks itself.
+helper; neither SHALL inline the age/name/key checks itself.
 
 #### Scenario: Both validation layers call the shared helper
 - **WHEN** the blueprint validator and the compiler each validate an entry carrying the fields
 - **THEN** both produce identical accept/reject decisions for identical input, and a repository
-  test asserts no duplicated inline implementation of the age/name/title/key rules exists
+  test asserts no duplicated inline implementation of the age/name/key rules exists
 
 #### Scenario: A race-bound change propagates without Python edits
 - **WHEN** a race's `lifespan` upper bound changes in `world/lore/races.py`
 - **THEN** both validation layers adopt the new bound on next import with no other code change
 
 #### Scenario: Title rules live in exactly one module
-- **WHEN** the title validation behaviour changes in `world/rules/npc_identity.py`
-- **THEN** blueprint validation adopts it with no edit under `world/quests/` or `world/ai/`
+- **WHEN** a current characterization carries the removed title field
+- **THEN** the shared characterization helper is the one place that rejects it, on every path that validates an occupant
 
 #### Scenario: The helper carries the full rule set
 - **WHEN** the shared helper validates entries
@@ -155,10 +157,8 @@ helper; neither SHALL inline the age/name/title/key checks itself.
   authored-name uniqueness rules across the entry set
 
 #### Scenario: Name and title rules come from the shared validators
-- **WHEN** either validation layer needs the name or title character-set rules
-- **THEN** they are obtained by delegating to the single shared validators in
-  `world/rules/npc_identity.py` via a function-local deferred import, and neither validation
-  layer inlines or duplicates the character-set rules itself
+- **WHEN** a current characterization input carries the removed title field
+- **THEN** the shared characterization helper rejects it, and the surviving name rule still comes only from `world.rules.npc_identity`
 
 #### Scenario: The scenario director imports the helper read-only
 - **WHEN** the scenario director calls the shared helper
@@ -169,42 +169,57 @@ helper; neither SHALL inline the age/name/title/key checks itself.
 - **WHEN** the shared helper enforces the age floor
 - **THEN** the bound is a named constant in the helper
 
+#### Scenario: Title-free contract is complete
+- **WHEN** this source emits or validates an NPC characterization
+- **THEN** display_name/persona and applicable role/tier, age-pair/race-lifespan, portrait-key, uniqueness and immutable-digest rules remain; no title field is accepted, required, serialized, prompted or written
+
+
 ### Requirement: The compile boundary carries the characterization fields
 `StageSpawnRequirement` (the deterministic requirements value the SceneBuilder consumes) SHALL
-carry the authored `display_name`, the authored `title`, and the optional paired
+carry the authored `display_name`, the optional paired
 `age`/`apparent_age` and named-portrait `stable_key` through from the accepted blueprint, all
 validated by the shared helper. The requirements value SHALL preserve the fields in deterministic
 order.
 
 #### Scenario: A compiled requirement preserves the fields
 - **WHEN** an accepted blueprint with all fields is compiled
-- **THEN** `StageSpawnRequirement` exposes the display name, title, both ages, and the stable key
+- **THEN** `StageSpawnRequirement` exposes the display name, both ages, and the stable key
   in deterministic order
 
 #### Scenario: A title-only difference stays distinguishable after compile
-- **WHEN** two accepted blueprints differ only in an occupant's `title`
-- **THEN** their compiled requirements digests differ
+- **WHEN** two inputs differ only by the removed title field
+- **THEN** the title-bearing input is rejected before compile, so no removed field can influence the compiled digest
 
 #### Scenario: The compiled digest includes the characterization
 - **WHEN** the canonical content digest is computed over the compiled requirements
-- **THEN** it includes the characterization including `title`, so identical scenes with different
+- **THEN** it includes the characterization excluding title, so identical scenes with different
   characterization stay distinguishable
 
+#### Scenario: Title-free contract is complete
+- **WHEN** this source emits or validates an NPC characterization
+- **THEN** display_name/persona and applicable role/tier, age-pair/race-lifespan, portrait-key, uniqueness and immutable-digest rules remain; no title field is accepted, required, serialized, prompted or written
+
+
 ### Requirement: The hand-written template pool may carry characterization fields
-`world/ai/director_templates.py` SHALL declare the required `display_name` and `title` (and may
+`world/ai/director_templates.py` SHALL declare the required `display_name` (and may
 declare the optional fields) on its `npc_reqs` entries; template quests go through the same
 validation as AI proposals, so a template with a missing or malformed identity fails template
 registration rather than producing a broken quest.
 
 #### Scenario: A template with valid identity and characterization registers
-- **WHEN** a hand-written template declares a named occupant with a valid title and paired
+- **WHEN** a hand-written template declares a named occupant with a validated authored name and paired
   canonical ages within the race band
 - **THEN** the template registers and its quests carry the identity and characterization fields
 
 #### Scenario: A template without an authored title is rejected at registration
-- **WHEN** a template `npc_req` entry omits `title`
+- **WHEN** a hand-written template occupant carries the removed title field
 - **THEN** template registration rejects it before any quest can use it
 
 #### Scenario: A template with a negative-age entry is rejected at registration
 - **WHEN** a template declares `age: -1`
 - **THEN** template registration rejects it before any quest can use it
+
+#### Scenario: Title-free contract is complete
+- **WHEN** this source emits or validates an NPC characterization
+- **THEN** display_name/persona and applicable role/tier, age-pair/race-lifespan, portrait-key, uniqueness and immutable-digest rules remain; no title field is accepted, required, serialized, prompted or written
+
