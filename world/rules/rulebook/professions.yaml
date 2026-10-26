@@ -39,10 +39,14 @@
 #     (design 2026-09-22-church-system-design §5.1). Per owner decision she
 #     is the SOLE ChurchHost: the sanctum steward 羅海西亞‧芬威克 stays a
 #     plain `merchant` selling the sanctum's wares, ministry being the
-#     celebrant's office alone. ScriptedDialogue stays the FIRST component so
-#     the roster reuse anchor (the blueprint's first service-bearing class)
-#     is unchanged from the attendant era and an existing synced host is
-#     converged, never duplicated.
+#     celebrant's office alone.
+#
+# Component ORDER carries no identity: a roster host is reused by its canonical
+# authored profile identity (the place's `host_profile_key`), so reordering,
+# adding, removing or emptying the component list of any row above keeps the
+# same person. A row may declare an empty `components: []` list when its host
+# carries no capability at all; the sync then removes the managed capabilities
+# that row no longer declares and preserves the person.
 #
 # The `merchant` row is the shopkeeper blueprint: a merchant BOTH trades and
 # answers (merchant-dialogue). Since that change the row carries the same

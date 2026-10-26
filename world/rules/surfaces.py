@@ -97,3 +97,40 @@ def read_counter_trait(obj: Any, key: str) -> int:
 def write_counter_trait(obj: Any, key: str, value: int) -> None:
     """Set one counter trait's integer current value."""
     obj.traits[key].current = int(value)
+
+
+def restore_component_state(
+    obj: Any, snapshots: Mapping[str, tuple[bool, Any]]
+) -> None:
+    """Restore one host's pre-batch attributes and rebuild its component caches.
+
+    A rolled-back transaction restores the durable rows, but every attribute the
+    batch wrote stays readable in process: the ``Attribute`` rows themselves are
+    idmapper instances whose ``db_value`` the write already replaced, so
+    resetting the handler lookup cache alone would re-serve the rolled-back
+    values (see ``fix-clock-rollback-cache-sync``). Writing the snapshot back
+    through the handler makes those instances agree with the database again.
+
+    The component handler is then rebuilt from the restored ``component_names``
+    attribute, so a slot the batch added or removed is no longer cached. Both
+    the attribute and the tag cache are dropped first, and the component handler
+    is re-initialized through the typeclass's own ``at_init`` (the engine's
+    documented cache-rebuild path) instead of reaching into its internals.
+
+    Every step is best-effort: a restore failure is logged and never masks the
+    original exception.
+    """
+    restore_attributes(obj, snapshots)
+    for stage, step in (
+        ("attribute_cache", obj.attributes.reset_cache),
+        ("tag_cache", obj.tags.reset_cache),
+        ("component_cache", obj.at_init),
+    ):
+        try:
+            step()
+        except Exception as error:
+            log_warn(
+                "rollback_restore_failed",
+                exc=error,
+                context={"stage": stage, "obj": str(obj)},
+            )

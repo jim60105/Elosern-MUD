@@ -97,7 +97,7 @@ def _guild_section(section: str) -> Callable[[], Mapping[str, Any]]:
         if catalog is not None:
             if section == "shop_configs":
                 return MappingProxyType(dict(catalog.shop_configs))
-            return MappingProxyType(dict(catalog.host_by_service_id))
+            return MappingProxyType(dict(catalog.host_by_host_key))
         if section == "shop_configs":
             commerce = guild_config.load_commerce_config()
             return MappingProxyType(
@@ -109,7 +109,9 @@ def _guild_section(section: str) -> Callable[[], Mapping[str, Any]]:
                     )
                 )
             )
-        return MappingProxyType({row.service_id: row for row in guild_config.validate_service_hosts()})
+        return MappingProxyType(
+            {row.host_key: row for row in guild_config.validate_service_hosts()}
+        )
 
     load.__qualname__ = f"load<guild_config.{section}>"
     return load

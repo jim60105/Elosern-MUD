@@ -43,6 +43,25 @@ _IDENTITY_KWARGS = frozenset(
 # what makes "assembly is the only writer" structurally true.
 _ASSEMBLY_BOUND_FIELDS = frozenset({"service_binding", "anchor_room_id"})
 
+# The authored configuration a source sync may converge on an EXISTING
+# component: identity values the author edits in place (a changed shop,
+# branch, dialogue table, issuer or venue) plus the authored spawn-data seed.
+# Subsystem-owned runtime state is deliberately absent — merchant stock and
+# restock progress belong to the commerce lifecycle, and the binding fields
+# above have their own single writer — so no sync can rewrite live progress by
+# re-applying the declaration.
+_CONFIGURATION_FIELDS = frozenset(
+    {
+        "service_id",
+        "branch_key",
+        "shop_key",
+        "dialogue_key",
+        "issuer_key",
+        "church",
+        "initial_arousal",
+    }
+)
+
 
 class ProfessionAssemblyError(ValueError):
     """A resolved attach plan lacks authored identity kwargs.
@@ -180,6 +199,14 @@ def assemble_profession_components(
     convergence and the never-rename/never-retitle contract is untouched.
     A ``place`` plan without an ``anchor_room`` raises: the caller failed to
     supply the anchor its blueprint declares.
+
+    Authoring an existing component's configuration in place is also
+    convergence: each planned ``_CONFIGURATION_FIELDS`` value the class
+    declares is written onto the live component, so an edited ``service_id``,
+    ``shop_key``, ``branch_key``, ``dialogue_key``, ``issuer_key``, ``church``
+    or ``initial_arousal`` reaches the reused host without a second person.
+    Nothing outside that allowlist is ever written: stock, restock progress and
+    every other subsystem-owned surface keep their own owners.
     """
     plan = resolve_component_plan(profession, authored_map)
     missing = {
@@ -200,14 +227,56 @@ def assemble_profession_components(
         if not entity.components.has(component_class.name):
             entity.components.add(component_class.create(entity, **kwargs))
             attached.append(type_key)
-    for type_key, _kwargs in plan:
+    for type_key, kwargs in plan:
         component = entity.components.get(
             PROFESSION_COMPONENT_TYPES[type_key].get_component_slot()
         )
         if component is None:  # vocabulary class without a live slot (unreachable)
             continue
+        for field in sorted(_CONFIGURATION_FIELDS & set(kwargs)):
+            if field in component._fields:
+                setattr(component, field, kwargs[field])
         component.service_binding = bindings[type_key]
         component.anchor_room_id = (
             anchor_room.pk if bindings[type_key] == "place" else None
         )
     return attached
+
+
+def component_attribute_keys(type_key: str) -> tuple[str, ...]:
+    """The host-attribute keys backing one component's persistent fields.
+
+    A component field is stored on the host under the contrib's
+    ``slot::field`` key. Callers that must restore a host's pre-batch state
+    read the same keys, so the declaration stays next to the vocabulary
+    instead of being restated by every maintainer.
+    """
+    component_class = PROFESSION_COMPONENT_TYPES[type_key]
+    slot = component_class.get_component_slot()
+    return tuple(f"{slot}::{name}" for name in component_class._fields)
+
+
+def converge_managed_components(
+    entity: Any,
+    *,
+    managed_type_keys: frozenset[str],
+    declared_type_keys: frozenset[str],
+) -> list[str]:
+    """Remove the managed components the declaration no longer declares.
+
+    A source-managed host owns the managed capability vocabulary and nothing
+    else: every managed slot absent from the resolved declaration is removed
+    through the component handler (its fields, its tag and its cached slot all
+    disappear), while a component outside ``managed_type_keys`` is never
+    touched. A declaration with no capabilities empties the managed set and
+    keeps the person. Returns the removed type keys in vocabulary order.
+    """
+    removed: list[str] = []
+    for type_key in sorted(managed_type_keys - declared_type_keys):
+        slot = PROFESSION_COMPONENT_TYPES[type_key].get_component_slot()
+        component = entity.components.get(slot)
+        if component is None:
+            continue
+        entity.components.remove(component)
+        removed.append(type_key)
+    return removed

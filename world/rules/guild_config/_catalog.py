@@ -30,8 +30,9 @@ class GuildCatalog:
         return {offer.definition_key: offer for offer in self.quest_offers}
 
     @property
-    def host_by_service_id(self) -> dict[str, ServiceHostRow]:
-        return {row.service_id: row for row in self.service_hosts}
+    def host_by_host_key(self) -> dict[str, ServiceHostRow]:
+        """The roster keyed by canonical host identity, never a service id."""
+        return {row.host_key: row for row in self.service_hosts}
 
 
 def register_catalog_offers(catalog: GuildCatalog) -> None:
