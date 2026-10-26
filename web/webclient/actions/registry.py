@@ -96,7 +96,8 @@ def build_production_action_registry() -> ActionRegistry:
     account adapters (``account.character.switch``, ``account.character.create``), the two
     NPC author-editor adapters (``npc.persona.read``, ``npc.persona.update``), the
     two party adapters (``party.transfer``, ``party.view_member``), the
-    ``options.dismiss`` action, and the read-only ``map.view`` request. Each action binds one exact payload validator
+    ``options.dismiss`` action, and the read-only ``map.view`` and
+    ``services.open`` requests. Each action binds one exact payload validator
     and one narrow deterministic adapter; no action routes through the text
     parser.
     """
@@ -226,6 +227,7 @@ def build_production_action_registry() -> ActionRegistry:
         _quest_track_adapter,
         _quest_turnin_adapter,
         _sell_adapter,
+        _services_open_adapter,
         validate_buy_payload,
         validate_exam_request_payload,
         validate_guild_register_payload,
@@ -236,6 +238,7 @@ def build_production_action_registry() -> ActionRegistry:
         validate_quest_track_payload,
         validate_quest_turnin_payload,
         validate_sell_payload,
+        validate_services_open_payload,
     )
     from web.webclient.actions.title_actions import (
         _title_accept_adapter,
@@ -401,6 +404,17 @@ def build_production_action_registry() -> ActionRegistry:
             # No affected panels: the toggle changes inventory, character
             # equipment, and derived appraisal surfaces, published as one
             # full canonical snapshot.
+            affected_panels=(),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="services.open",
+            validate_payload=validate_services_open_payload,
+            adapter=_services_open_adapter,
+            # The read carries its own private result (`no_presentation`), so
+            # it publishes no panel and re-renders nothing; the empty tuple
+            # only names the contract ("no panels owned").
             affected_panels=(),
         )
     )

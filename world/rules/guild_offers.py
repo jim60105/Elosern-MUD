@@ -346,9 +346,22 @@ def abandon_guild_quest(actor: Any, staff: Any, quest_id: str) -> Any:
     """Delegate abandonment to the quest runtime for the exact quest ID.
 
     The guild layer performs no second abandonment state and never constructs
-    or reinterprets quest-record dicts itself.
+    or reinterprets quest-record dicts itself. ``staff`` is the caller's exact
+    selected host: it must carry the capability and pass the shared gate, but
+    the guild layer never discovers or disambiguates a room host of its own.
     """
-    del staff
-    from world.quests.runtime import abandon_quest
+    from typeclasses.components import GuildStaff
+    from world.rules.service_gate import service_available
 
+    from world.quests.runtime import abandon_quest
+    from world.rules.guild import GuildServiceError
+
+    if not isinstance(staff, NPC):
+        raise BoardAccessError("no local GuildStaff host")
+    guild_staff = staff.components.get(GuildStaff.get_component_slot())
+    if guild_staff is None:
+        raise BoardAccessError("no local GuildStaff host")
+    verdict = service_available(actor, staff, guild_staff)
+    if not verdict.allowed:
+        raise GuildServiceError(verdict.reason)
     return abandon_quest(actor, quest_id)

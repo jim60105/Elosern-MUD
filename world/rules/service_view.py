@@ -1,4 +1,4 @@
-"""Frozen no-mutation read model for the version-7 services panel.
+"""Frozen no-mutation read model for the version-8 services panel.
 
 The services panel (WebClient ``services``) is built exclusively by this
 module from canonical guild, quest, shop, wallet, inventory, rank, and merit
@@ -9,15 +9,19 @@ creates the world-clock singleton (it reads only through
 The top-level ``host`` is display-only reconciliation metadata and never an
 availability authority or an action payload field.
 
-Host resolution is per service class: ``guild``/``rank`` resolve ``GuildStaff``
-and the ``GuildExamReception`` exam counter respectively and ``shop`` resolves
-``Merchant``, each
-through the same ``resolve_local_service_host`` rule the commands use. Zero or
-multiple hosts of the class a surface requires make that surface unavailable;
-different host classes co-located in one room are independent and never
-cross-class ambiguity. The rank surface never looks up the qualified
-persistent host: request availability is independent of the host's
-attendance and of the actor's merit (guild-exam-appointment-surface).
+Host resolution is per service class: ``guild`` resolves ``GuildStaff``,
+``rank`` resolves the ``GuildExamReception`` exam counter and ``shop``
+resolves ``Merchant``, each through the same ``resolve_local_service_host``
+rule the commands use. Zero or multiple hosts of the class a surface requires
+make that surface unavailable; different host classes co-located in one room
+are independent and never cross-class ambiguity. A targeted read
+(``provider_id``) resolves only the selected NPC: its sections are the
+capabilities that NPC carries and no other room provider contributes. The
+rank surface never depends on guild staff and never looks up the qualified
+persistent host: request availability is independent of the host's attendance
+and of the actor's merit (guild-exam-appointment-surface). Every non-null
+section carries its provider's dbref, and the top-level ``host`` stays
+display-only metadata.
 
 The shop rows describe one viewed party member (services-shop-structured-rows):
 the held count and server equipment delta of each stock row, the member's
@@ -225,18 +229,23 @@ class RankView:
     next_threshold: int | None
     merit_qualified: bool
     exam_request: ActionDescriptorView
+    provider_id: int
 
 
 @dataclass(frozen=True)
 class GuildSectionView:
-    """The guild surface (registration, board, quest log, rank)."""
+    """The guild surface (registration, board, quest log) of one staff host.
 
+    The rank surface is independent of guild staff and travels beside this
+    section on :class:`ServicesView`.
+    """
+
+    provider_id: int
     branch_label: str
     rank_ladder: tuple[str, ...]
     registration: RegistrationView
     board: tuple[BoardRowView, ...]
     quests: tuple[QuestRowView, ...]
-    rank: RankView | None
 
 
 @dataclass(frozen=True)
@@ -285,6 +294,7 @@ class SellableRowView:
 class ShopSectionView:
     """The shop surface (open state, viewed member, stock, sellable rows)."""
 
+    provider_id: int
     open: bool
     member_id: int
     stock: tuple[StockRowView, ...]
@@ -312,6 +322,7 @@ class ServicesView:
     host: HostView | None
     player: PlayerSummaryView
     guild: GuildSectionView | None
+    rank: RankView | None
     shop: ShopSectionView | None
     pagination: PaginationView
     guild_unavailable_reason: str | None = None
@@ -509,8 +520,23 @@ def _build_quests(
     return tuple(rows)
 
 
+def _read_registration(
+    actor: Any,
+) -> tuple[Mapping[str, Any] | None, bool]:
+    """Return ``(registration, malformed)`` for the rank surface's own read."""
+    try:
+        return parse_guild_registration(actor), False
+    except GuildDataError:
+        return None, True
+
+
 def _exam_request_reason(
-    actor: Any, counter: Any, registration: Mapping[str, Any] | None, next_rank: str | None
+    actor: Any,
+    counter: Any,
+    registration: Mapping[str, Any] | None,
+    next_rank: str | None,
+    *,
+    malformed_registration: bool = False,
 ) -> str | None:
     """The stable disabled reason of the exam request, or ``None`` when enabled.
 
@@ -525,6 +551,8 @@ def _exam_request_reason(
     verdict = service_available(actor, counter, component)
     if not verdict.allowed:
         return "remote_examiner" if verdict.reason == REASON_REMOTE else "service_unavailable"
+    if malformed_registration:
+        return "malformed_registration"
     if registration is None:
         return "unregistered"
     if registration["branch_key"] != component.branch_key:
@@ -535,17 +563,29 @@ def _exam_request_reason(
 
 
 def _build_rank(
-    actor: Any, counter: Any, registration: Mapping[str, Any] | None, catalog: Any
+    actor: Any, counter: Any, catalog: Any
 ) -> RankView | None:
+    """Build the independent rank surface of one exact exam counter.
+
+    Only the counter's presence, schedule, service gate and the actor's own
+    registration decide it; guild staff play no part.
+    """
     if counter is None:
         return None
+    registration, malformed = _read_registration(actor)
     rank_key = getattr(actor, "guild_rank", None)
     merit = _read_merit(actor)
     next_rank, next_threshold = _next_rank_and_threshold(rank_key, catalog)
     merit_qualified = (
         registration is not None and next_rank is not None and merit >= next_threshold
     )
-    reason = _exam_request_reason(actor, counter, registration, next_rank)
+    reason = _exam_request_reason(
+        actor,
+        counter,
+        registration,
+        next_rank,
+        malformed_registration=malformed,
+    )
     return RankView(
         rank=rank_key,
         merit=merit,
@@ -561,6 +601,7 @@ def _build_rank(
             quantity_min=None,
             quantity_max=None,
         ),
+        provider_id=int(counter.pk),
     )
 
 
@@ -568,7 +609,6 @@ def _build_guild(
     actor: Any,
     staff: Any,
     staff_reason: str | None,
-    reception: Any,
     catalog: Any,
     tick: int,
 ) -> tuple[GuildSectionView | None, str | None]:
@@ -596,9 +636,9 @@ def _build_guild(
     registered = registration is not None
     board = _build_board(records, offers)
     quests = _build_quests(actor, records, claims, registration, tick)
-    rank = _build_rank(actor, reception, registration, catalog)
     register_reason = None if not registered else "already_registered"
     section = GuildSectionView(
+        provider_id=int(staff.pk),
         branch_label=GUILD_BRANCH_REGISTRY[
             staff.components.get(GuildStaff.get_component_slot()).branch_key
         ].display_name_zh,
@@ -619,7 +659,6 @@ def _build_guild(
         ),
         board=board,
         quests=quests,
-        rank=rank,
     )
     return section, None
 
@@ -749,6 +788,7 @@ def _build_shop(
     sellable_rows = _sellable_rows(config, stock, counts, worn, open_now, scope)
     return (
         ShopSectionView(
+            provider_id=int(merchant_host.pk),
             open=open_now,
             member_id=int(member.pk),
             stock=stock_rows,
@@ -861,22 +901,39 @@ def _sellable_rows(
     return tuple(rows)
 
 
-def build_services_view(actor: Any, viewed: Any = None) -> ServicesView:
+def _carries(npc: Any, component_class: type) -> Any | None:
+    """Return ``npc``'s component of the class, or ``None``."""
+    components = getattr(npc, "components", None)
+    if components is None or not components.has(component_class.name):
+        return None
+    return components.get(component_class.get_component_slot())
+
+
+def build_services_view(
+    actor: Any, viewed: Any = None, *, provider_id: int | None = None
+) -> ServicesView:
     """Build the frozen services view for ``actor`` or raise ``ServicesViewError``.
 
     ``viewed`` is the session's viewed party member (the presenter resolves
     it through ``resolve_viewed_member``); ``None`` means the commander. It
     chooses only whose facts the shop rows present and never authorizes.
 
+    ``provider_id`` selects one exact NPC: only that NPC's capabilities become
+    the guild, rank and shop sections, and no other room provider contributes
+    (a capability the selected NPC lacks stays null). It never supplies
+    authority — mutations carry their own exact ``npc_id`` — and no room
+    provider is ever substituted. Without it the room's single provider per
+    class is discovered as before.
+
     A missing world-clock singleton or an unreadable player summary raises
     ``ServicesViewError`` so the caller can choose the whole-panel unavailable
     form; a failure confined to one surface is recorded as that surface's
     stable reason while the rest of the panel stays healthy. During an active
-    combat session the remote service surfaces (host, guild, shop) are forced
-    null with zero pagination totals while the canonical player summary
-    stays available. Outside combat, a possessed actor omits only the guild
-    and rank surfaces: the merchant still resolves normally and the shop keeps
-    its ordinary viewed-member rows.
+    combat session the remote service surfaces (host, guild, rank, shop) are
+    forced null with zero pagination totals while the canonical player
+    summary stays available. Outside combat, a possessed actor omits only the
+    guild and rank surfaces: the merchant still resolves normally and the shop
+    keeps its ordinary viewed-member rows.
     """
     from world.rules.combat_session import is_in_active_session
 
@@ -896,22 +953,56 @@ def build_services_view(actor: Any, viewed: Any = None) -> ServicesView:
 
     player = _build_player(player_source, wallet, catalog)
     in_combat = is_in_active_session(actor)
+    targeted = provider_id is not None
+    provider = None
+    if targeted:
+        from world.rules.service_targets import require_service_provider
+
+        # Identity admission runs for every targeted read, combat included: an
+        # unusable selection is rejected, never silently read as an empty
+        # snapshot. The caller (``services.open``) owns the rejection result.
+        provider = require_service_provider(actor, provider_id)
     if in_combat:
         guild, guild_reason = None, None
+        rank = None
         shop, shop_reason = None, None
         host = None
+    elif targeted:
+        staff = _carries(provider, GuildStaff)
+        reception = _carries(provider, GuildExamReception)
+        merchant = _carries(provider, Merchant)
+        host = _build_host(provider, None)
+        if owner is not None:
+            guild, guild_reason = None, None
+            rank = None
+        else:
+            guild, guild_reason = _build_guild(
+                actor, staff, None, catalog, tick
+            )
+            rank = _build_rank(actor, reception, catalog)
+        shop, shop_reason = _build_shop(
+            actor,
+            viewed if viewed is not None else actor,
+            merchant,
+            None,
+            catalog,
+            tick,
+            wallet,
+        )
     else:
         merchant_host, merchant_reason = _resolve_host(actor, Merchant)
         if owner is not None:
             guild, guild_reason = None, None
+            rank = None
             host = _build_host(None, merchant_host)
         else:
             staff, staff_reason = _resolve_host(actor, GuildStaff)
             reception, _ = _resolve_host(actor, GuildExamReception)
             host = _build_host(staff, merchant_host)
             guild, guild_reason = _build_guild(
-                actor, staff, staff_reason, reception, catalog, tick
+                actor, staff, staff_reason, catalog, tick
             )
+            rank = _build_rank(actor, reception, catalog)
         shop, shop_reason = _build_shop(
             actor,
             viewed if viewed is not None else actor,
@@ -926,6 +1017,7 @@ def build_services_view(actor: Any, viewed: Any = None) -> ServicesView:
         host=host,
         player=player,
         guild=guild,
+        rank=rank,
         shop=shop,
         pagination=PaginationView(
             board_total=len(guild.board) if guild is not None else 0,

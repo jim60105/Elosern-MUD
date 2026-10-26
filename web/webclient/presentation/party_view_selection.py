@@ -128,6 +128,30 @@ def resolve_viewed_member(context: Any) -> Any | None:
     return commander
 
 
+@dataclass(frozen=True)
+class _SessionViewContext:
+    """The two facts :func:`resolve_viewed_member` reads, from a raw session."""
+
+    actor: Any
+    party_view: PartyViewSelection | None
+
+
+def resolve_session_viewed_member(session: Any, actor: Any) -> Any | None:
+    """The viewed member an action adapter resolves from the raw session.
+
+    The same rule the presenters apply: the session's own selection while it
+    still names this commander's member, else the commander. Action adapters
+    read the shop rows' member facts from here, so a read result and the
+    published panel never disagree about who is being presented.
+    """
+    return resolve_viewed_member(
+        _SessionViewContext(
+            actor=actor,
+            party_view=party_view_selection_snapshot(session, actor),
+        )
+    )
+
+
 def selected_skill_key_for(context: Any, member: Any) -> str | None:
     """The selected 技能-tab skill key when the selection names ``member``.
 
@@ -175,6 +199,7 @@ __all__ = [
     "TABS",
     "PartyViewSelection",
     "party_view_selection_snapshot",
+    "resolve_session_viewed_member",
     "resolve_viewed_member",
     "selected_item_key_for",
     "selected_skill_key_for",

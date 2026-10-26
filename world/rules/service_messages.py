@@ -37,6 +37,7 @@ from world.rules.guild_offers import (
 from world.rules.clock import WorldDateTime
 from world.rules.npc_schedules import SCHEDULE_BLOCKED_REASON
 from world.rules.service_gate import MESSAGE_OFF_ANCHOR
+from world.rules.service_targets import ServiceTargetError, ServiceTargetReason
 
 # The bounded generic fallback; never carries a traceback or raw payload.
 FALLBACK_CODE = "service_rejected"
@@ -50,6 +51,16 @@ SERVICE_REASON_MESSAGES: dict[str, str] = {
     "no_staff": "這裡沒有公會服務人員。",
     "ambiguous_staff": "這裡有多名公會服務人員。",
     "remote_staff": "公會服務人員不在這裡。",
+    # Exact selected-provider admission (npc-targeted-service-flows).
+    "no_such_target": "這裡沒有這個對象。",
+    "wrong_capability": "他沒有提供這項服務。",
+    "off_anchor": MESSAGE_OFF_ANCHOR,
+    "malformed_binding": "他的服務目前無法使用。",
+    "possessed_service": "附身狀態下無法使用這項服務。",
+    "abandon_target_mismatch": "這份委託無法用這種方式放棄。",
+    "services_too_large": "服務資訊暫時無法讀取。",
+    "services_unavailable": "服務資訊暫時無法讀取。",
+    "not_allowed_mode": "目前無法使用這項服務。",
     # Shared anchoring-gate refusal; the prose is owned by service_gate.
     "service_unavailable": MESSAGE_OFF_ANCHOR,
     "already_registered": "你已經是冒險者了。",
@@ -145,9 +156,16 @@ _ENUM_REASON_TYPES = (
     TradeReason,
     EquipmentToggleReason,
     ItemUseReason,
+    ServiceTargetReason,
 )
 # Exception types whose ``args[0]`` may carry an enum member or a raw string.
-_ARGS_REASON_TYPES = (GuildError, GuildExamError, TradeError, RewardClaimError)
+_ARGS_REASON_TYPES = (
+    GuildError,
+    GuildExamError,
+    TradeError,
+    RewardClaimError,
+    ServiceTargetError,
+)
 
 
 def rejection_code(reason: Any) -> str:
