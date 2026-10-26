@@ -87,9 +87,9 @@ Scholarly, structured, patient, pedantic register. Opens with "welcome", analyze
    - Actor asks about the nature and roles of the elements. Dean manifests a soft white light in his palm and presents the eight canonical elements and their operational roles: 火 (burst/burn), 水 (mana tides), 風 (swiftness/movement), 土 (terrain/ward), 雷 (initiative/stuns), 冰 (stillness/freezing), 光 (healing/purification), 暗 (weakening/erosion), emphasizing that true comprehension comes from channeling mana resonance.
 4. `altoria_academy.topic_03` (keyword: 親和):
    - Actor asks how magic affinity differences arise across beings. Dean analyzes in two layers: species inborn affinity (elves have innate attunement and fast learning tempo, whereas orcs have strong bodies but limited affinity) and personal element inclination, explaining that academy cannot grant affinity but helps clarify paths.
-5. `altoria_academy.topic_04` (keyword: 傳承; renamed from wuxia keyword 拜師):
-   - Renamed from `拜師` to `傳承` (label `傳承`) to comply with JRPG fantasy anti-wuxia rules while keeping `topic_id: altoria_academy.topic_04` unchanged.
-   - Actor asks if the academy accepts private disciples or provides direct mentorship from masters. Dean clarifies that the academy is a place of scholarly truth without private master-disciple paths, insists that competence comes from daily study and practice, and directs rank evaluation to the adventurers' guild.
+5. `altoria_academy.topic_04` (keyword: 求學; renamed from the wuxia keyword 拜師):
+   - Renamed from `拜師` to `求學` (label `求學`) to comply with the JRPG fantasy anti-wuxia rules while keeping `topic_id: altoria_academy.topic_04` unchanged. The master-and-disciple framing went with it: the actor asks how the academy's lessons are run and whether a tutor can take one student alone, not whether a master will accept a disciple.
+   - Dean answers that the academy hands no student to a single tutor and offers no private instruction; the lectures are open to whoever walks in. Spells and battlefield craft alike come from reading and drilling day after day, and the academy lays out knowledge but cannot do the work for anyone. Anyone wanting their level assessed goes to the adventurers' guild hall east of the central plaza, which holds the authority to grade it.
 
 ---
 
@@ -98,7 +98,7 @@ Scholarly, structured, patient, pedantic register. Opens with "welcome", analyze
 - **In-Character Only**: No backticks, command names (`rest`, `buy`, `talk`), or UI mentions. No combat mechanic units (such as 回合).
 - **Punctuation & Script**: Full-width Traditional Chinese punctuation (，。、「」『』？！). Space between CJK and ASCII alphanumeric characters.
 - **Prohibited Patterns**: Zero instances of 「您」, sentence-final 「的，」/「的。」, or calques (折入, 回填, 落地, 賦能). Minimized classical archaisms (亦／皆／乃 replaced by spoken equivalents).
-- **Wuxia Banned Tokens**: All wuxia terms (過招, 劍招, 招式, 祕技, 拜師, 功夫, 江湖, 客官, 掌門) eliminated. Keyword `拜師` in `altoria_academy.topic_04` renamed to `傳承`.
+- **Wuxia Banned Tokens**: All wuxia terms (過招, 劍招, 招式, 祕技, 拜師, 功夫, 江湖, 客官, 掌門) eliminated. Keyword `拜師` in `altoria_academy.topic_04` renamed to `求學`, and the training-yard examination line no longer counts combat turns.
 - **Scene Shapes**: All formal scenes start with complete actor `speech` line, followed by host responses and stage narration, within 3–8 lines.
 - **Revision Tracking**: All authored scenes across all three hosts declare `revision: r2`.
 - **Offline / Browser Smoke Note**: In accordance with slice constraints, local browser manual login is non-operational and content slices add no test modules; offline data integrity is verified via `DIALOGUE_SNAPSHOT` and focused Evennia logic test execution.
