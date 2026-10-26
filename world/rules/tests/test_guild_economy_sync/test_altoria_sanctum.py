@@ -40,7 +40,7 @@ from typeclasses.components import Merchant, ScriptedDialogue
 from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom
 from world.rules.clock import WorldClock
-from world.lore.settlements.places import place_dialogue_keys
+from world.lore.settlements.places import place_dialogue_keys, place_shop_identity
 from world.rules.economy import buy, parse_merchant_stock, sell
 from world.rules.guild_config import get_catalog
 from world.rules.guild_economy import sync_service_content
@@ -81,7 +81,12 @@ def _host(place):
 
 
 def _authored(place):
-    return tuple(sorted(place_dialogue_keys(place)))
+    keys = place_dialogue_keys(place)
+    authored: dict = {"dialogue_key": keys[0]} if keys else {}
+    shop_key = place_shop_identity(place)
+    if shop_key is not None:
+        authored["shop_key"] = shop_key
+    return authored
 
 
 def _table_text(place):

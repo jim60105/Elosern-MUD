@@ -2,10 +2,10 @@
 
 The one registered clergy roster row (艾莉安娜‧寒水 high celebrant) must
 resolve as a live service host with the ChurchHost capability attached
-through her profession blueprint and the raised initial arousal seeded into
-her spawn data; per owner decision the sanctum steward 羅海西亞‧芬威克 stays a
-plain merchant — no ChurchHost, no arousal seed — while both places keep the
-``church`` venue kwarg the derived church-place set reads. Every other host
+through her direct capability declaration and the raised initial arousal
+seeded into her spawn data; per owner decision the sanctum steward 羅海西亞‧
+芬威克 stays a plain merchant — no ChurchHost, no arousal seed — while both
+places keep the ``church`` venue flag the derived church-place set reads. Every other host
 stays clear of the clergy component, and place-driven-service-sync
 convergence is idempotent with the new component — a second pass changes
 nothing, and a pre-change host is converged rather than duplicated.
@@ -31,14 +31,30 @@ CELEBRANT_SERVICE_ID = "altoria_high_priestess"
 STEWARD_SERVICE_ID = "altoria_sanctum_deacon"
 
 
-def _clergy_rows():
-    """The roster rows authoring the ``church`` venue kwarg (the derived
-    church-place set projected onto the roster)."""
+def _church_place_rows():
+    """The roster rows whose place is a church venue (the derived set projection)."""
+    from world.lore.church.places import CHURCH_PLACES
+
     return {
-        row.service_id: row
+        row.host_key: row
         for row in get_catalog().service_hosts
-        if "church" in row.authored_kwargs
+        if row.spawn_room in CHURCH_PLACES
     }
+
+
+def _church_host_kwargs(row):
+    """The authored church_host declaration kwargs of one roster row."""
+    for declaration in row.components:
+        if declaration.type == "church_host":
+            return declaration.kwargs
+    raise AssertionError(f"row {row.host_key!r} declares no church_host capability")
+
+
+def _dialogue_key(row) -> str:
+    for declaration in row.components:
+        if declaration.type == "scripted_dialogue":
+            return declaration.kwargs["dialogue_key"]
+    raise AssertionError(f"row {row.host_key!r} declares no dialogue capability")
 
 
 def _host_for(row):
@@ -57,7 +73,7 @@ class ChurchHostSyncTests(ServiceContentIsolation, EvenniaTestCase):
     )
     def test_the_celebrant_resolves_as_the_sole_church_host(self):
         sync_service_content()
-        rows = _clergy_rows()
+        rows = _church_place_rows()
         # Both church places author the venue flag; only the celebrant row
         # carries the clergy capability.
         self.assertEqual(set(rows), {CELEBRANT_SERVICE_ID, STEWARD_SERVICE_ID})
@@ -67,12 +83,12 @@ class ChurchHostSyncTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertIsNotNone(component)
         self.assertEqual(component.service_id, CELEBRANT_SERVICE_ID)
         celebrant_row = rows[CELEBRANT_SERVICE_ID]
-        self.assertEqual(component.church, celebrant_row.authored_kwargs["church"])
+        self.assertEqual(component.church, _church_host_kwargs(celebrant_row)["church"])
         # Her spawn data carries the raised initial arousal authored on the
         # row (design §5.3), stored like any imported baseline.
         self.assertEqual(
             celebrant.db.sexual["arousal"],
-            celebrant_row.authored_kwargs["initial_arousal"],
+            _church_host_kwargs(celebrant_row)["initial_arousal"],
         )
         # Place-bound anchoring is converged by the shared assembly.
         self.assertEqual(component.service_binding, "place")
@@ -83,7 +99,7 @@ class ChurchHostSyncTests(ServiceContentIsolation, EvenniaTestCase):
     )
     def test_the_steward_stays_a_plain_merchant_without_the_component(self):
         sync_service_content()
-        steward_row = _clergy_rows()[STEWARD_SERVICE_ID]
+        steward_row = _church_place_rows()[STEWARD_SERVICE_ID]
         steward = _host_for(steward_row)
         self.assertIsNotNone(steward)
         # Owner decision: ministry is the celebrant's office alone — the
@@ -94,10 +110,11 @@ class ChurchHostSyncTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertIsNotNone(
             steward.components.get(ScriptedDialogue.get_component_slot())
         )
-        # Her profession blueprint is the same profession the commercial
+        # Her declaration is the same merchant + dialogue pair the commercial
         # service host carries: the merchant surface is intact.
         self.assertEqual(
-            steward_row.profession.key, _merchant_row().profession.key
+            [declaration.type for declaration in steward_row.components],
+            [declaration.type for declaration in _merchant_row().components],
         )
 
     @covers_requirement(
@@ -109,8 +126,8 @@ class ChurchHostSyncTests(ServiceContentIsolation, EvenniaTestCase):
             host = _host_for(row)
             if host is None:
                 continue
-            with self.subTest(service_id=row.service_id):
-                if row.service_id != CELEBRANT_SERVICE_ID:
+            with self.subTest(host_key=row.host_key):
+                if row.host_key != CELEBRANT_SERVICE_ID:
                     self.assertIsNone(_church_host(host))
 
     @covers_requirement(
@@ -119,15 +136,15 @@ class ChurchHostSyncTests(ServiceContentIsolation, EvenniaTestCase):
     def test_a_second_sync_pass_changes_nothing(self):
         sync_service_content()
         before = {
-            row.service_id: (_host_for(row).pk, dict(host.db.sexual or {}))
+            row.host_key: (_host_for(row).pk, dict(host.db.sexual or {}))
             for row in get_catalog().service_hosts
-            if row.service_id in _clergy_rows()
+            if row.host_key in _church_place_rows()
             if (host := _host_for(row)) is not None
         }
         n_before = NPC.objects.all_family().count()
         sync_service_content()
         for service_id, (pk_before, sexual_before) in before.items():
-            row = _clergy_rows()[service_id]
+            row = _church_place_rows()[service_id]
             host = _host_for(row)
             with self.subTest(service_id=service_id):
                 self.assertEqual(host.pk, pk_before)
@@ -138,19 +155,19 @@ class ChurchHostSyncTests(ServiceContentIsolation, EvenniaTestCase):
         "church-ordination::church-venues-and-clergy-hosts-exist-as-authored-content"
     )
     def test_a_pre_change_host_is_converged_not_duplicated(self):
-        # A celebrant host synced under the former attendant blueprint
-        # (ScriptedDialogue only, no ChurchHost) must be REUSED by the new
-        # blueprint: its canonical authored identity is unchanged, so
+        # A celebrant host synced before the ChurchHost declaration existed
+        # (ScriptedDialogue only) must be REUSED: its canonical authored
+        # identity is unchanged, so
         # convergence attaches church_host and seeds the authored arousal —
         # one host, never a second creation.
-        rows = _clergy_rows()
+        rows = _church_place_rows()
         celebrant_row = rows[CELEBRANT_SERVICE_ID]
-        room = search_object_by_tag(celebrant_row.anchor_room)[0]
+        room = search_object_by_tag(celebrant_row.spawn_room)[0]
         old = create_object(NPC, key=celebrant_row.name, location=room)
         old_dialogue = ScriptedDialogue.create(
             old,
             service_id=CELEBRANT_SERVICE_ID,
-            dialogue_key=celebrant_row.authored_kwargs["dialogue_key"],
+            dialogue_key=_dialogue_key(celebrant_row),
         )
         old.components.add(old_dialogue)
         canonical_host(old, celebrant_row)
@@ -163,7 +180,7 @@ class ChurchHostSyncTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertIsNotNone(_church_host(converged))
         self.assertEqual(
             converged.db.sexual["arousal"],
-            celebrant_row.authored_kwargs["initial_arousal"],
+            _church_host_kwargs(celebrant_row)["initial_arousal"],
         )
 
 
