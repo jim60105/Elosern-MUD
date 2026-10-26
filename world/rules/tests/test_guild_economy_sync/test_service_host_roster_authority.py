@@ -11,7 +11,7 @@ from typeclasses.components import Merchant
 from typeclasses.components import ScriptedDialogue
 from typeclasses.npcs import NPC
 from world.rules.guild_config import get_catalog
-from world.rules.guild_economy import ServiceAnchorIntegrityError
+from world.rules.guild_economy import ServiceHostIntegrityError
 from world.rules.guild_economy import sync_service_content
 from ._support import (
     GENERAL_STORE_TAG,
@@ -21,13 +21,16 @@ from ._support import (
     ServiceContentIsolation,
     _guild_branch_key,
     _guild_host_name,
+    _guild_row,
+    _merchant_row,
     _merchant_host_name,
     _merchant_shop_key,
+    canonical_host,
 )
 
 
 class ServiceHostRosterAuthorityTests(ServiceContentIsolation, EvenniaTestCase):
-    """Roster authority never depends on anchor-room resolution (design D9)."""
+    """Source ownership alone authorizes retirement; rooms never gate it."""
 
     def _rows_with_tags(self, tag):
         catalog = get_catalog()
@@ -35,7 +38,8 @@ class ServiceHostRosterAuthorityTests(ServiceContentIsolation, EvenniaTestCase):
             dataclasses.replace(row, anchor_room=tag) for row in catalog.service_hosts
         )
 
-    def _stale_host(self):
+    def _untagged_stale_host(self):
+        """A leftover host of no declared person, carrying no source ownership."""
         host = create_object(NPC, key="殘留服務人", location=None)
         host.components.add(
             Merchant.create(host, service_id="retired_shop_id", shop_key=_merchant_shop_key())
@@ -70,19 +74,18 @@ class ServiceHostRosterAuthorityTests(ServiceContentIsolation, EvenniaTestCase):
     @covers_requirement(
         "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
     )
-    def test_all_rows_unresolvable_still_converge_and_never_touch_roster_hosts(self):
+    def test_all_rows_unresolvable_never_retire_roster_hosts(self):
         sync_service_content()
         guild = NPC.objects.filter(db_key=_guild_host_name()).first()
         merchant = NPC.objects.filter(db_key=_merchant_host_name()).first()
-        stale = self._stale_host()
-        expected = NPC.objects.all_family().count() - 1  # only the stale host dies
+        stale = self._untagged_stale_host()
+        expected = NPC.objects.all_family().count()  # nothing dies
         self._patch_roster(self._rows_with_tags("no_such_room_tag"))
         with self.captureOnCommitCallbacks(execute=True):
             sync_service_content()
-        # The stale host is converged away...
-        with self.assertRaises(NPC.DoesNotExist):
-            stale.refresh_from_db()
-        # ...while roster-listed hosts stay byte-identical and unmoved.
+        # The untagged leftover survives: no declaration was ever removed.
+        stale.refresh_from_db()
+        # ...and roster-listed hosts stay byte-identical and unmoved.
         guild.refresh_from_db()
         merchant.refresh_from_db()
         self.assertEqual(
@@ -99,18 +102,17 @@ class ServiceHostRosterAuthorityTests(ServiceContentIsolation, EvenniaTestCase):
     @covers_requirement(
         "guild-registration::roster-convergence-deletes-service-hosts-absent-from-the-roster"
     )
-    def test_duplicate_anchor_on_unresolvable_row_fails_closed_before_any_mutation(self):
-        # A duplicate claim on a row whose room cannot resolve still fails
-        # closed: NOTHING is created, moved, or deleted — convergence included.
-        first = create_object(NPC, key="分身商人一", location=self._hall())
-        second = create_object(NPC, key="分身商人二", location=self._hall())
-        for host in (first, second):
-            host.components.add(
-                Merchant.create(
-                    host, service_id=MERCHANT_SERVICE_ID, shop_key=_merchant_shop_key()
-                )
-            )
-        stale = self._stale_host()
+    def test_duplicate_identity_on_unresolvable_row_fails_closed_before_any_mutation(self):
+        # A duplicate canonical claim on a row whose room cannot resolve still
+        # fails closed: NOTHING is created, moved, repointed, or deleted.
+        merchant_row = _merchant_row()
+        first = canonical_host(
+            create_object(NPC, key="分身商人一", location=self._hall()), merchant_row
+        )
+        second = canonical_host(
+            create_object(NPC, key="分身商人二", location=self._hall()), merchant_row
+        )
+        stale = self._untagged_stale_host()
         catalog = get_catalog()
         self._patch_roster(
             tuple(
@@ -120,7 +122,7 @@ class ServiceHostRosterAuthorityTests(ServiceContentIsolation, EvenniaTestCase):
                 for row in catalog.service_hosts
             )
         )
-        with self.assertRaises(ServiceAnchorIntegrityError):
+        with self.assertRaises(ServiceHostIntegrityError):
             sync_service_content()
         first.refresh_from_db()
         second.refresh_from_db()
@@ -162,9 +164,9 @@ class ServiceHostBindingConvergenceTests(ServiceContentIsolation, EvenniaTestCas
         "service-anchoring::service-components-carry-an-authored-person-or-place-binding"
     )
     def test_reuse_backfills_missing_binding_fields_on_legacy_hosts(self):
-        # A host whose components predate the anchoring change carries no
-        # binding fields; the next sync writes them without touching identity
-        # or moving the host.
+        # A host of the declared person whose components predate the anchoring
+        # change carries no binding fields; the next sync writes them without
+        # touching identity or moving the host.
         hall = search_object_by_tag(GUILD_HALL_TAG)[0]
         host = create_object(NPC, key=_guild_host_name(), location=hall)
         host.components.add(
@@ -174,6 +176,7 @@ class ServiceHostBindingConvergenceTests(ServiceContentIsolation, EvenniaTestCas
                 branch_key=_guild_branch_key(),
             )
         )
+        canonical_host(host, _guild_row())
         legacy = host.components.get(GuildStaff.get_component_slot())
         self.assertIsNone(legacy.service_binding)
         sync_service_content()

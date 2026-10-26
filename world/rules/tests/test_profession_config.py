@@ -216,11 +216,11 @@ class RejectionTests(ProfessionCacheIsolation):
                     "is missing fields",
                     field,
                 )
-        with self.subTest("empty components"):
+        with self.subTest("non-list components"):
             self.assert_rejected(
-                lambda raw: raw["professions"][0].update(components=[]),
+                lambda raw: raw["professions"][0].update(components="merchant"),
                 "merchant",
-                "components must be a non-empty list",
+                "components must be a list",
             )
 
     @covers_requirement(
@@ -381,88 +381,61 @@ class ComponentVocabularyContractTests(unittest.TestCase):
                 self.assertEqual(component_class.name, type_key)
 
 
-class ServiceIdAnchorContractTests(ProfessionCacheIsolation):
-    """Contract: every profession row anchors on a class carrying service_id.
+class CanonicalHostIdentityContractTests(ProfessionCacheIsolation):
+    """Contract: a blueprint never carries host identity, in any order or shape.
 
-    The roster-sync reuse path reads ``service_id`` unconditionally on the
-    FIRST component class of a row's profession (guild_economy's
-    ``_row_anchor_class`` then ``_find_service_host``); a row anchored on a
-    class without the field would raise ``AttributeError`` inside the startup
-    sync. The loader therefore rejects such a row at authoring time, and this
-    contract pins both the shipped rulebook and the named rejection.
+    Host reuse is canonical authored profile provenance, so the loader enforces
+    no component-order and no component-level service-identity invariant: a row
+    may declare its narrative dialogue first or declare no capability at all,
+    and both shapes load. Identity is a row property (``host_key``), never a
+    property of the first component.
     """
 
-    SHIPPED_RULEBOOK = (
-        Path(profession_config.__file__).parent / "rulebook" / "professions.yaml"
-    )
-
-    def _anchor_offenders(self, rows: list[dict]) -> list[str]:
-        offenders: list[str] = []
-        for row in rows:
-            first_type = row["components"][0]["type"]
-            component_class = PROFESSION_COMPONENT_TYPES.get(first_type)
-            if component_class is None or "service_id" not in component_class._fields:
-                offenders.append(row["key"])
-        return offenders
-
-    def _shipped_rows(self) -> list[dict]:
-        raw = yaml.safe_load(self.SHIPPED_RULEBOOK.read_text(encoding="utf-8"))
-        return raw["professions"]
-
-    @covers_requirement(
-        "quest-issuer-authorization::every-profession-row-anchors-on-a-component-that-carries-a-service-identity",
-    )
-    def test_every_shipped_row_anchors_on_a_service_id_class(self):
-        self.assertEqual(self._anchor_offenders(self._shipped_rows()), [])
-
-    @covers_requirement(
-        "quest-issuer-authorization::every-profession-row-anchors-on-a-component-that-carries-a-service-identity",
-    )
-    def test_a_row_anchored_on_an_identity_less_class_is_named(self):
-        # The loader refuses to produce a table whose rows could crash the
-        # startup sync: the raised error names the offending row and anchor.
-        # Every shipped vocabulary class now declares service_id (scripted
-        # dialogue hosts anchor through it too — place-attendant-profession),
-        # so the rejection is pinned against a synthetic anchor-less class.
-        class Anchorless:
-            name = "anchorless"
-            _fields = {}
-
-        dialogue_first = {
-            "key": "dialogue_first",
-            "components": [{"type": "anchorless", "default_binding": "place"}],
-            "schedule_template": None,
-            "default_tier": None,
-        }
-        rows = [base_row("legit_merchant"), dialogue_first]
-        with tempfile.TemporaryDirectory() as home:
-            path = Path(home) / "professions.yaml"
-            path.write_text(yaml.safe_dump(base_file(*rows)), encoding="utf-8")
-            sentinel = object()
-            profession_config.TABLE = sentinel
-            with mock.patch.dict(
-                PROFESSION_COMPONENT_TYPES, {"anchorless": Anchorless}
-            ):
-                with self.assertRaises(ProfessionConfigError) as caught:
-                    load_professions(path)
-            self.assertIs(profession_config.TABLE, sentinel)
-        message = str(caught.exception)
-        self.assertIn("dialogue_first", message)
-        self.assertIn("anchorless", message)
-        self.assertIn("service_id", message)
-
-    @covers_requirement(
-        "quest-issuer-authorization::every-profession-row-anchors-on-a-component-that-carries-a-service-identity",
-    )
-    def test_quest_issuer_anchor_satisfies_the_contract(self):
-        row = base_row("commissioner_row")
-        row["components"] = [{"type": "quest_issuer", "default_binding": "person"}]
+    def _load_one(self, key: str, components: list[dict]):
+        row = {**base_row(key), "components": components}
         with tempfile.TemporaryDirectory() as home:
             path = Path(home) / "professions.yaml"
             path.write_text(yaml.safe_dump(base_file(row)), encoding="utf-8")
-            table = load_professions(path)
+            return load_professions(path)[key]
+
+    @covers_requirement(
+        "quest-issuer-authorization::every-profession-row-anchors-on-a-component-that-carries-a-service-identity",
+    )
+    def test_a_dialogue_first_row_loads_without_a_service_identity_anchor(self):
+        profession = self._load_one(
+            "dialogue_first",
+            [
+                {"type": "scripted_dialogue", "default_binding": "place"},
+                {"type": "guild_staff", "default_binding": "place"},
+            ],
+        )
         self.assertEqual(
-            [(c.type_key, c.default_binding) for c in table["commissioner_row"].components],
+            [component.type_key for component in profession.components],
+            ["scripted_dialogue", "guild_staff"],
+        )
+
+    @covers_requirement(
+        "quest-issuer-authorization::every-profession-row-anchors-on-a-component-that-carries-a-service-identity",
+    )
+    def test_a_row_declaring_no_capability_loads(self):
+        # A source-managed host may declare no capability; its canonical
+        # identity still selects and preserves the person.
+        profession = self._load_one("no_capability", [])
+        self.assertEqual(profession.components, ())
+
+    @covers_requirement(
+        "quest-issuer-authorization::every-profession-row-anchors-on-a-component-that-carries-a-service-identity",
+    )
+    def test_the_quest_issuer_blueprint_still_loads_unchanged(self):
+        profession = self._load_one(
+            "commissioner_row",
+            [{"type": "quest_issuer", "default_binding": "person"}],
+        )
+        self.assertEqual(
+            [
+                (component.type_key, component.default_binding)
+                for component in profession.components
+            ],
             [("quest_issuer", "person")],
         )
 

@@ -53,9 +53,10 @@ from world.rules.economy import (
     parse_merchant_stock,
 )
 from world.rules.guild_economy import (
-    ServiceAnchorIntegrityError,
+    ServiceHostIntegrityError,
     sync_service_content,
 )
+from world.art.official_refs import NPC_PROFILE_PROVENANCE_ATTRIBUTE
 
 #: Live-catalog resolvers read the registries through attribute strings
 #: assembled at call time (the shared probes helpers' binding-safe accessor),
@@ -93,6 +94,32 @@ def _npc_profiles():
 def _place_by_kind(kind: str):
     """The live place row of one service kind (registry-ordered first match)."""
     return next(place for place in _places().values() if place.kind == kind)
+
+
+def synthetic_profile(source_key: str, key: str):
+    """A copy of one shipped profile under a fresh, invented key.
+
+    A roster row's ``host_key`` is a unique person identity, so a synthetic
+    row cannot borrow a shipped host's profile without claiming that host's
+    person. The copy keeps the card, ages, voice and identities of the source
+    while owning its own canonical key.
+    """
+    return dataclasses.replace(_npc_profiles()[source_key], key=key)
+
+
+def canonical_host(npc, row):
+    """Give a hand-built NPC the canonical authored identity a roster row uses."""
+    npc.attributes.add(NPC_PROFILE_PROVENANCE_ATTRIBUTE, row.host_key)
+    return npc
+
+
+def profession_with(profession_key: str, *type_keys: str):
+    """The named profession narrowed or reordered to ``type_keys``."""
+    profession = get_profession(profession_key)
+    by_type = {component.type_key: component for component in profession.components}
+    return dataclasses.replace(
+        profession, components=tuple(by_type[type_key] for type_key in type_keys)
+    )
 
 def _restore_places_snapshot(snapshot: dict) -> None:
     """Restore the place registry to a full ordered snapshot, position-safe.
@@ -261,6 +288,26 @@ class ServiceContentIsolation(QuestRegistryIsolation):
         patcher.start()
         self._patchers.append(patcher)
         self.addCleanup(patcher.stop)
+
+    def _patch_profiles(self, *profiles):
+        """Add synthetic profiles to the registry the sync resolves rows against."""
+        registry = dict(_npc_profiles())
+        for profile in profiles:
+            registry[profile.key] = profile
+        patcher = patch.object(guild_economy, "NPC_PROFILE_REGISTRY", registry)
+        patcher.start()
+        self._patchers.append(patcher)
+        self.addCleanup(patcher.stop)
+
+    def _patch_host_row(self, host_key, **changes):
+        """Patch exactly one roster row (by canonical key) with ``changes``."""
+        catalog = get_catalog()
+        self._patch_roster(
+            tuple(
+                dataclasses.replace(row, **changes) if row.host_key == host_key else row
+                for row in catalog.service_hosts
+            )
+        )
 
 def before_row_profession(catalog):
     for row in catalog.service_hosts:

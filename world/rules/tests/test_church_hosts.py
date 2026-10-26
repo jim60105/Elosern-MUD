@@ -24,6 +24,7 @@ from world.rules.guild_economy import sync_service_content
 from world.rules.tests.test_guild_economy_sync._support import (
     ServiceContentIsolation,
     _merchant_row,
+    canonical_host,
 )
 
 CELEBRANT_SERVICE_ID = "altoria_high_priestess"
@@ -138,10 +139,10 @@ class ChurchHostSyncTests(ServiceContentIsolation, EvenniaTestCase):
     )
     def test_a_pre_change_host_is_converged_not_duplicated(self):
         # A celebrant host synced under the former attendant blueprint
-        # (ScriptedDialogue ahead, no ChurchHost) must be REUSED by the new
-        # blueprint: the anchor class is unchanged, convergence attaches
-        # church_host and seeds the authored arousal — one host, never a
-        # second creation.
+        # (ScriptedDialogue only, no ChurchHost) must be REUSED by the new
+        # blueprint: its canonical authored identity is unchanged, so
+        # convergence attaches church_host and seeds the authored arousal —
+        # one host, never a second creation.
         rows = _clergy_rows()
         celebrant_row = rows[CELEBRANT_SERVICE_ID]
         room = search_object_by_tag(celebrant_row.anchor_room)[0]
@@ -152,6 +153,7 @@ class ChurchHostSyncTests(ServiceContentIsolation, EvenniaTestCase):
             dialogue_key=celebrant_row.authored_kwargs["dialogue_key"],
         )
         old.components.add(old_dialogue)
+        canonical_host(old, celebrant_row)
 
         sync_service_content()
 

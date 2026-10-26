@@ -135,23 +135,42 @@ class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertEqual(int(self._merchant_host().attributes.get("age")), 44)
         self.assertEqual(int(self._merchant_host().attributes.get("apparent_age")), 44)
 
-    def test_merchant_stock_initializes_only_when_absent(self):
+    def test_merchant_stock_initializes_only_when_uninitialized(self):
         sync_service_content()
         merchant = self._merchant_host().components.get(Merchant.get_component_slot())
         stock = dict(merchant.merchant_stock)
         offers = get_catalog().shop_configs[_merchant_shop_key()].offers
         self.assertEqual(sorted(stock), sorted(offer.item_key for offer in offers))
         self.assertGreater(len(stock), 3)
-        # Probe on the lowest offered item key: any offered key survives the
+        # Probe on the lowest offered item key: live progress survives the
         # resync identically; none is named.
         probe_key = min(offer.item_key for offer in offers)
         stock[probe_key] = 1
+        removed_key = max(offer.item_key for offer in offers)
+        del stock[removed_key]
         merchant.merchant_stock = stock
+        merchant.last_restock_day = 11
 
         sync_service_content()
 
         merchant = self._merchant_host().components.get(Merchant.get_component_slot())
+        # An initialized stock is never re-seeded, not even for an offer whose
+        # key a config edit removed from the live dictionary.
         self.assertEqual(merchant.merchant_stock[probe_key], 1)
+        self.assertNotIn(removed_key, merchant.merchant_stock)
+        self.assertEqual(merchant.last_restock_day, 11)
+
+    def test_an_uninitialized_merchant_stock_is_seeded_once(self):
+        sync_service_content()
+        merchant = self._merchant_host().components.get(Merchant.get_component_slot())
+        merchant.merchant_stock = None
+        sync_service_content()
+        merchant = self._merchant_host().components.get(Merchant.get_component_slot())
+        offers = get_catalog().shop_configs[_merchant_shop_key()].offers
+        self.assertEqual(
+            dict(merchant.merchant_stock),
+            {offer.item_key: offer.initial_stock for offer in offers},
+        )
 
     @covers_requirement(
         "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"

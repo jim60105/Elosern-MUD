@@ -19,13 +19,21 @@ from world.rules.guild_economy import sync_service_content
 from world.rules.profession_config import get_profession
 from world.tests.synthetic_data import SYNTH_DIALOGUE
 import unittest
-from ._support import GUILD_HALL_TAG, GUILD_SERVICE_ID, ServiceContentIsolation
+from ._support import (
+    GUILD_HALL_TAG,
+    GUILD_SERVICE_ID,
+    ServiceContentIsolation,
+    synthetic_profile,
+)
 
 #: The kit's one dialogue fixture, resolved from the mapping rather than
 #: spelled, per the synthetic-kit convention.
 KIT_DIALOGUE_KEY = next(iter(SYNTH_DIALOGUE))
 
 ATTENDANT_SERVICE_ID = "t_attendant_clerk"
+
+#: The attendant owns its own canonical person identity, never a shipped host's.
+ATTENDANT_HOST_KEY = "t_attendant_clerk"
 
 
 class PlaceAttendantSyncTests(ServiceContentIsolation, EvenniaTestCase):
@@ -39,11 +47,13 @@ class PlaceAttendantSyncTests(ServiceContentIsolation, EvenniaTestCase):
             anchor_room=GUILD_HALL_TAG,
             service_id=ATTENDANT_SERVICE_ID,
             authored_kwargs={"dialogue_key": KIT_DIALOGUE_KEY},
-            profile_key=GUILD_SERVICE_ID,
+            profile_key=ATTENDANT_HOST_KEY,
+            host_key=ATTENDANT_HOST_KEY,
         )
 
     def _sync_with_attendant_row(self):
         catalog = get_catalog()
+        self._patch_profiles(synthetic_profile(GUILD_SERVICE_ID, ATTENDANT_HOST_KEY))
         self._patch_roster(tuple(catalog.service_hosts) + (self._attendant_row(),))
         sync_service_content()
 
@@ -72,7 +82,7 @@ class PlaceAttendantSyncTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertIsNotNone(first)
         first_pk = first.pk
 
-        # Second run: the service_id anchor finds the existing host; no
+        # Second run: the canonical identity finds the existing host; no
         # duplicate NPC and no duplicate dialogue component.
         self._sync_with_attendant_row()
         hosts = NPC.objects.filter(db_key="合成櫃檯店員")
