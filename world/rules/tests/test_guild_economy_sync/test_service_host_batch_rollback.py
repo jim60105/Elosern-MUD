@@ -31,11 +31,11 @@ from ._support import ServiceContentIsolation
 
 #: Managed capability type keys mapped to the slot each one occupies.
 PROFESSION_TYPE_SLOTS = {
-    "guild_staff": GuildStaff.get_component_slot(),
-    "guild_exam_reception": GuildExamReception.get_component_slot(),
-    "merchant": Merchant.get_component_slot(),
-    "scripted_dialogue": ScriptedDialogue.get_component_slot(),
-    "church_host": ChurchHost.get_component_slot(),
+    GuildStaff.name: GuildStaff.get_component_slot(),
+    GuildExamReception.name: GuildExamReception.get_component_slot(),
+    Merchant.name: Merchant.get_component_slot(),
+    ScriptedDialogue.name: ScriptedDialogue.get_component_slot(),
+    ChurchHost.name: ChurchHost.get_component_slot(),
 }
 
 
