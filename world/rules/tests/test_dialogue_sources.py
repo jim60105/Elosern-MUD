@@ -42,6 +42,7 @@ class DialogueSourcesTests(unittest.TestCase):
         "authored-dialogue-content::upper-faith-content-has-exclusive-profile-key-yaml-ownership",
         "authored-dialogue-content::upper-civic-content-has-exclusive-profile-key-yaml-ownership",
         "authored-dialogue-content::ciaran-crafts-content-has-exclusive-profile-key-yaml-ownership",
+        "authored-dialogue-content::ciaran-fare-content-has-exclusive-profile-key-yaml-ownership",
     )
     def test_complete_inventory_of_25_tables(self):
         bindings = canonical_dialogue_bindings()
