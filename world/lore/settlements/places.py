@@ -27,7 +27,7 @@ from typing import Mapping
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.lore.registry_refs import ref, ref_many
 from world.lore.sex import SEX_VALUES
-from world.rules.npc_capabilities import CapabilityDeclaration, validate_capabilities
+from world.lore.settlements.capability_declarations import CapabilityDeclaration
 
 from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
 
@@ -235,7 +235,9 @@ def _validate_host_group(place: PlaceDefinition) -> None:
     )
 
 
-def validate_place_registry(places: Mapping[str, PlaceDefinition]) -> None:
+def validate_place_registry(
+    places: Mapping[str, PlaceDefinition], *, check_capabilities: bool = True
+) -> None:
     """Fail closed on a malformed place record, naming the place and rule.
 
     Record validity (design §3.2): the settlement must exist, the host race
@@ -329,10 +331,21 @@ def validate_place_registry(places: Mapping[str, PlaceDefinition]) -> None:
             )
         if type(place.church) is not bool:
             raise ValueError(f"place {place.key!r} church must be a boolean")
-        try:
-            validate_capabilities(place.components)
-        except ValueError as error:
-            raise ValueError(f"place {place.key!r} {error}") from error
+        if check_capabilities:
+            # The declaration vocabulary/configuration is validated by the one
+            # capability owner; this import is deferred so the place registry
+            # stays importable without an Evennia environment (the import-time
+            # self-check passes ``check_capabilities=False`` and the roster/
+            # catalog load owns the full check before any write).
+            from world.rules.npc_capabilities import (
+                CapabilityValidationError,
+                validate_capabilities,
+            )
+
+            try:
+                validate_capabilities(place.components)
+            except CapabilityValidationError as error:
+                raise ValueError(f"place {place.key!r} {error}") from error
         for declaration in place.components:
             binding = declaration.binding
             if binding is None or binding.kind != "place":
@@ -450,4 +463,4 @@ PLACE_REGISTRY: dict[str, PlaceDefinition] = {
     )
 }
 
-validate_place_registry(PLACE_REGISTRY)
+validate_place_registry(PLACE_REGISTRY, check_capabilities=False)

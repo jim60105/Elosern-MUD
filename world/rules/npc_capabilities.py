@@ -32,6 +32,15 @@ from typeclasses.components import (
     QuestIssuer,
     ScriptedDialogue,
 )
+from world.lore.settlements.capability_declarations import (
+    BINDING_KINDS,
+    Binding,
+    CapabilityDeclaration,
+    CapabilityValidationError,
+    capability,
+    person_bound,
+    place_bound,
+)
 from world.lore.sexual_vocab import AROUSAL_LEVELS
 
 #: The closed capability vocabulary. Keys MUST equal each component class's
@@ -45,10 +54,6 @@ COMPONENT_TYPES: dict[str, type] = {
     "quest_issuer": QuestIssuer,
     "church_host": ChurchHost,
 }
-
-#: The closed binding vocabulary: a capability either travels with the person
-#: (co-presence) or is anchored to exactly one authored place.
-BINDING_KINDS = frozenset({"person", "place"})
 
 #: Fields the runtime owns. Authored data can never set them: the assembly is
 #: their single writer (binding + anchor) and the subsystems own their state
@@ -80,75 +85,13 @@ OPTIONAL_KWARGS: dict[str, frozenset[str]] = {
 
 #: Capabilities that ARE a service. Every one of them must declare its binding:
 #: an unbound service is exactly the "unknown availability" state the service
-#: gate now fails closed on.
+#: gate fails closed on.
 REQUIRED_BINDING = frozenset(
     {"merchant", "guild_staff", "guild_exam_reception", "quest_issuer", "church_host"}
 )
 
 _ENTRY_FIELDS = frozenset({"type", "kwargs", "binding"})
 _BINDING_FIELDS = frozenset({"kind", "anchor_room"})
-
-
-class CapabilityValidationError(ValueError):
-    """One or more authored capability declarations are unusable.
-
-    ``issues`` holds one named message per offense (record/place/role, type and
-    field). Callers translate the list into their own failure surface without
-    re-deriving what was wrong.
-    """
-
-    def __init__(self, issues: Sequence[str], *, owner: str | None = None):
-        self.issues = tuple(issues)
-        self.owner = owner
-        prefix = f"{owner}: " if owner else ""
-        super().__init__(prefix + "; ".join(self.issues))
-
-
-@dataclass(frozen=True)
-class Binding:
-    """One authored availability binding."""
-
-    kind: str
-    #: The room tag a ``place`` binding anchors to; ``None`` for ``person``.
-    anchor_room: str | None = None
-
-
-def person_bound() -> Binding:
-    """Return the co-presence binding a traveling capability declares."""
-    return Binding("person")
-
-
-def place_bound(anchor_room: str) -> Binding:
-    """Return the anchored binding a fixed-location capability declares."""
-    return Binding("place", anchor_room)
-
-
-def capability(
-    type_key: str, *, binding: Binding | None = None, **kwargs: Any
-) -> CapabilityDeclaration:
-    """Author one declaration in the same shape a JSON record uses."""
-    return CapabilityDeclaration(type_key, kwargs, binding)
-
-
-@dataclass(frozen=True)
-class CapabilityDeclaration:
-    """One authored capability: its type, authored kwargs and binding.
-
-    Exactly the JSON entry's fields, frozen. ``kwargs`` is exposed as a
-    read-only mapping, so a declaration cannot be edited after authoring and a
-    plan built from it stays immutable.
-    """
-
-    type: str
-    kwargs: Mapping[str, Any]
-    binding: Binding | None = None
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.kwargs, Mapping):
-            raise CapabilityValidationError(
-                [f"component {self.type!r} kwargs must be a mapping"]
-            )
-        object.__setattr__(self, "kwargs", MappingProxyType(dict(self.kwargs)))
 
 
 @dataclass(frozen=True)
@@ -162,12 +105,36 @@ class PlannedCapability:
     #: resolver ran; always ``None`` for ``person`` and unbound capabilities).
     anchor_room: Any | None = None
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.kwargs, Mapping):
+            raise CapabilityValidationError(
+                [f"component {self.type!r} kwargs must be a mapping"]
+            )
+        object.__setattr__(self, "kwargs", MappingProxyType(dict(self.kwargs)))
+
 
 @dataclass(frozen=True)
 class CapabilityPlan:
     """The complete, validated, immutable capability set of one entity."""
 
     components: tuple[PlannedCapability, ...] = ()
+
+    def __post_init__(self) -> None:
+        # Vocabulary membership and uniqueness are structural: a plan cannot
+        # even hold two entries of one capability type. The per-type kwargs,
+        # binding and resolved-anchor invariants are re-checked by
+        # :func:`assemble_capabilities` before any write.
+        seen: set[str] = set()
+        for component in self.components:
+            if component.type not in COMPONENT_TYPES:
+                raise CapabilityValidationError(
+                    [f"component {component.type!r} is outside the vocabulary"]
+                )
+            if component.type in seen:
+                raise CapabilityValidationError(
+                    [f"component {component.type!r} is declared more than once"]
+                )
+            seen.add(component.type)
 
     def type_keys(self) -> frozenset[str]:
         return frozenset(component.type for component in self.components)
@@ -307,23 +274,36 @@ def _validate_references(type_key: str, kwargs: Mapping[str, Any], path: str, is
                 f"{path}.kwargs authors initial_arousal {level!r} outside "
                 f"{list(AROUSAL_LEVELS)}"
             )
+    if type_key == "quest_issuer":
+        authored = kwargs.get("issuer_key")
+        if isinstance(authored, str) and authored:
+            from world.rules.quest_issuance import IssuerKeyError, parse_issuer_key
+
+            try:
+                parse_issuer_key(f"npc:{authored}")
+            except IssuerKeyError as error:
+                issues.append(
+                    f"{path}.kwargs authors issuer_key {authored!r} outside the "
+                    f"issuer-key grammar: {error}"
+                )
 
 
 def _loaded_dialogue_table() -> Any | None:
-    """The dialogue registry when it is already loaded, else ``None``.
+    """The dialogue registry, or ``None`` during one bootstrap window.
 
-    The place registry validates itself at import time, and the dialogue
-    registry imports the place registry (its canonical bindings derive from
-    it), so importing it from here could re-enter a half-built module. This
-    check therefore runs at every boundary where the registry is loaded
-    (imports validation, roster/config validation, generated packages) and
-    defers only the import-time place self-check, whose dialogue keys the
-    roster derivation re-checks before any write.
+    The place registry validates itself while the lore package is still
+    importing, and the dialogue facade imports that package; that single
+    import-time window is the only case where the facade cannot be loaded yet,
+    so the reference check defers there and the roster derivation re-checks the
+    keys before any write. Every later boundary (imports validation, assembly,
+    roster/config, generated packages) loads the registry through its owner and
+    enforces the check.
     """
-    import sys
-
-    module = sys.modules.get("world.rules.dialogue")
-    return None if module is None else getattr(module, "DIALOGUE_TABLE", None)
+    try:
+        from world.rules.dialogue import DIALOGUE_TABLE
+    except ImportError:  # observability: ignore R2: importing the dialogue facade re-enters the lore package that is mid-import; the deferral is limited to that bootstrap window and every persistence boundary re-validates through assemble_capabilities
+        return None
+    return DIALOGUE_TABLE
 
 
 def _resolve_room(tag: str, resolver: Callable[[str], Sequence[Any]], path: str, issues: list[str]) -> Any | None:
@@ -349,6 +329,20 @@ def _resolve_room(tag: str, resolver: Callable[[str], Sequence[Any]], path: str,
         )
         return None
     return rooms[0]
+
+
+def resolve_room(tag: str, resolver: Callable[[str], Sequence[Any]]) -> Any:
+    """Resolve one room tag to exactly one Room, or raise by name.
+
+    The one exact-one-Room rule the capability anchors use, exposed so a caller
+    that must resolve a room of its own (a host's spawn room) applies the same
+    fail-closed semantics instead of taking a first match.
+    """
+    issues: list[str] = []
+    room = _resolve_room(tag, resolver, "room", issues)
+    if issues:
+        raise CapabilityValidationError(issues)
+    return room
 
 
 def validate_capabilities(
@@ -394,6 +388,11 @@ def validate_capabilities(
             )
             continue
         seen.add(type_key)
+        if not isinstance(kwargs, Mapping):
+            # The kwargs shape failure is already recorded; stop here so the
+            # remaining checks never touch a non-mapping.
+            issues.append(f"{path}.kwargs must be a mapping")
+            continue
         _validate_kwargs(type_key, kwargs, path, issues)
         _validate_references(type_key, kwargs, path, issues)
         binding = _as_binding(raw_binding, path, issues)
@@ -443,32 +442,7 @@ def assemble_capabilities(
         raise CapabilityValidationError(
             [f"{type(entity).__name__} cannot hold capability components"]
         )
-    issues: list[str] = []
-    for component in plan.components:
-        if component.type not in COMPONENT_TYPES:
-            issues.append(f"component {component.type!r} is outside the vocabulary")
-            continue
-        missing = [
-            field
-            for field in sorted(REQUIRED_KWARGS[component.type])
-            if not isinstance(component.kwargs.get(field), str)
-            or not component.kwargs[field]
-        ]
-        if missing:
-            issues.append(
-                f"component {component.type!r} is missing authored kwargs {missing}"
-            )
-        if (
-            component.binding is not None
-            and component.binding.kind == "place"
-            and component.anchor_room is None
-        ):
-            issues.append(
-                f"component {component.type!r} is place-bound but its anchor room "
-                f"{component.binding.anchor_room!r} was never resolved"
-            )
-    if issues:
-        raise CapabilityValidationError(issues)
+    _revalidate_plan(plan)
     attached: list[str] = []
     for component in plan.components:
         component_class = COMPONENT_TYPES[component.type]
@@ -480,10 +454,12 @@ def assemble_capabilities(
         live = holder.get(component_class.get_component_slot())
         if live is None:  # vocabulary class without a live slot (unreachable)
             continue
-        allowed = component_field_names(component.type)
-        for field in sorted(allowed & set(component.kwargs)):
+        # Every authored field converges, including the OPTIONAL ones: an
+        # omitted optional value clears to its declared default, so a reused
+        # host cannot keep a stale authored identity.
+        for field in sorted(component_field_names(component.type)):
             if field in live._fields:
-                setattr(live, field, component.kwargs[field])
+                setattr(live, field, component.kwargs.get(field))
         live.service_binding = None if component.binding is None else component.binding.kind
         live.anchor_room_id = (
             component.anchor_room.pk
@@ -498,6 +474,51 @@ def assemble_capabilities(
             if live is not None:
                 holder.remove(live)
     return attached
+
+
+def _revalidate_plan(plan: CapabilityPlan) -> None:
+    """Re-run every shared invariant on a plan before it is written.
+
+    :class:`CapabilityPlan` only guarantees vocabulary membership and
+    uniqueness structurally, and both carriers are public classes, so assembly
+    repeats the same checks the authored-entry validator applies: per-type
+    kwargs, registry references, binding shape/requirement and a resolved place
+    anchor. A hand-built plan fails here instead of reaching a component
+    factory.
+    """
+    issues: list[str] = []
+    for index, component in enumerate(plan.components):
+        path = f"components[{index}]"
+        if not isinstance(component.kwargs, Mapping):
+            issues.append(f"{path}.kwargs must be a mapping")
+            continue
+        _validate_kwargs(component.type, component.kwargs, path, issues)
+        _validate_references(component.type, component.kwargs, path, issues)
+        binding = component.binding
+        if binding is not None:
+            if not isinstance(binding, Binding):
+                issues.append(f"{path}.binding must be a Binding")
+                continue
+            raw_binding: dict[str, Any] = {"kind": binding.kind}
+            if binding.anchor_room is not None:
+                raw_binding["anchor_room"] = binding.anchor_room
+            _as_binding(raw_binding, path, issues)
+        if binding is None and component.type in REQUIRED_BINDING:
+            issues.append(
+                f"{path} component {component.type!r} is a service and must declare "
+                "its person or place binding"
+            )
+        if (
+            binding is not None
+            and binding.kind == "place"
+            and component.anchor_room is None
+        ):
+            issues.append(
+                f"{path} component {component.type!r} is place-bound but its anchor "
+                f"room {binding.anchor_room!r} was never resolved"
+            )
+    if issues:
+        raise CapabilityValidationError(issues)
 
 
 __all__ = [
@@ -519,5 +540,6 @@ __all__ = [
     "managed_type_keys",
     "person_bound",
     "place_bound",
+    "resolve_room",
     "validate_capabilities",
 ]

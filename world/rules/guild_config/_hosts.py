@@ -38,6 +38,7 @@ def validate_service_hosts() -> tuple[ServiceHostRow, ...]:
     rows: list[ServiceHostRow] = []
     seen_host_keys: set[str] = set()
     seen_service_ids: set[str] = set()
+    seen_issuer_keys: set[str] = set()
     for place in PLACE_REGISTRY.values():
         if place_is_hostless(place):
             continue
@@ -93,6 +94,15 @@ def validate_service_hosts() -> tuple[ServiceHostRow, ...]:
             service_id = declaration.kwargs.get("service_id")
             if isinstance(service_id, str) and service_id:
                 row_service_ids.add(service_id)
+            issuer_key = declaration.kwargs.get("issuer_key")
+            if isinstance(issuer_key, str) and issuer_key:
+                if issuer_key in seen_issuer_keys:
+                    raise _error(
+                        f"{what} authors issuer_key {issuer_key!r} that another "
+                        "roster row already claims; one commission identity per "
+                        "authored key"
+                    )
+                seen_issuer_keys.add(issuer_key)
         duplicated = sorted(row_service_ids & seen_service_ids)
         if duplicated:
             raise _error(

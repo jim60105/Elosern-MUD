@@ -473,6 +473,8 @@ def activate_scene_encounter(
     created_pks: list[int] = []
     bindings: dict[str, int] = {}
     commission_keys: list[str] = []
+    reused_snapshots: list[tuple[Any, dict[str, Any]]] = []
+    issuance_snapshot: dict[tuple[str, str], Any] = {}
     try:
         with transaction.atomic():
             encounter_row, _reserved = scene_store.reserved_encounter(
@@ -486,6 +488,14 @@ def activate_scene_encounter(
                 )
                 if located is None:
                     raise EncounterUnavailable(reason)
+            # An already-bound actor can be re-provisioned by this activation;
+            # its capability surfaces are snapshotted first so a later failure
+            # restores the live object as well as the database row.
+            reused_snapshots = _snapshot_bound_actors(definition, row)
+            # Commission registration also writes the in-process issuance
+            # registry, which a database rollback cannot undo: snapshot it here
+            # so a later failure leaves no phantom authority behind.
+            issuance_snapshot = _snapshot_issuance_registry()
             for role_id in encounter.role_ids:
                 # One shared path for both boundaries: a bound role keeps its
                 # exact actor where it is, an unbound role is materialized once.
@@ -528,9 +538,13 @@ def activate_scene_encounter(
                 with escort_event_boundary():
                     collect_escort_actors(tuple(activated))
     except EncounterUnavailable as error:  # observability: ignore R2: the named unavailability is emitted as scene_encounter_unavailable by _unavailable() and returned to the caller
+        _restore_bound_actors(reused_snapshots)
+        _restore_issuance_registry(issuance_snapshot)
         evict_created_actors(created_pks)
         return _unavailable(package_id, scene_id, player, error.reason, tick=tick)
     except Exception:
+        _restore_bound_actors(reused_snapshots)
+        _restore_issuance_registry(issuance_snapshot)
         evict_created_actors(created_pks)
         raise
 
@@ -604,6 +618,60 @@ def evict_created_actors(created_pks: list[int]) -> None:
     """
     if created_pks:
         flush_cache()
+
+
+def _capability_surfaces() -> tuple[str, ...]:
+    """Every attribute an activation may write on a reused bound actor."""
+    from world.rules.npc_capabilities import COMPONENT_TYPES, component_attribute_keys
+
+    keys: list[str] = ["component_names"]
+    for type_key in sorted(COMPONENT_TYPES):
+        keys.extend(component_attribute_keys(type_key))
+    return tuple(keys)
+
+
+def _snapshot_bound_actors(definition: Any, row: Any) -> list[tuple[Any, dict[str, Any]]]:
+    """Snapshot the capability surfaces of every bound actor a commission touches."""
+    from world.rules.surfaces import snapshot_attributes
+
+    surfaces = _capability_surfaces()
+    snapshots: list[tuple[Any, dict[str, Any]]] = []
+    for role in definition.roles:
+        if not role.capabilities:
+            continue
+        binding = scene_store.get_role_binding(row.package_id, role.role_id)
+        if binding is None:
+            continue
+        actor, _reason = _resolve_actor(binding.npc_id)
+        if actor is None:
+            continue
+        snapshots.append((actor, snapshot_attributes(actor, surfaces)))
+    return snapshots
+
+
+def _restore_bound_actors(snapshots: list[tuple[Any, dict[str, Any]]]) -> None:
+    """Restore a rolled-back activation's reused-actor capability surfaces."""
+    from world.rules.surfaces import restore_component_state
+
+    for actor, surface in snapshots:
+        restore_component_state(actor, surface)
+
+
+def _snapshot_issuance_registry() -> dict[tuple[str, str], Any]:
+    """Copy the in-process private-commission registry before activation writes."""
+    from world.rules.quest_issuance import QUEST_ISSUANCE_REGISTRY
+
+    return dict(QUEST_ISSUANCE_REGISTRY)
+
+
+def _restore_issuance_registry(snapshot: dict[tuple[str, str], Any]) -> None:
+    """Put the registry back exactly as it was before the rolled-back activation."""
+    from world.rules.quest_issuance import QUEST_ISSUANCE_REGISTRY
+
+    if QUEST_ISSUANCE_REGISTRY == snapshot:
+        return
+    QUEST_ISSUANCE_REGISTRY.clear()
+    QUEST_ISSUANCE_REGISTRY.update(snapshot)
 
 
 __all__ = [

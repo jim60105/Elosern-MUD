@@ -418,6 +418,27 @@ def provision_scoped_issuer(host: Any, *, content_key: str, plan: Any) -> str:
                 f"host already carries authored issuer key {authored!r}; refusing "
                 f"to provision {content_key!r}"
             )
+        # A reused actor's existing capability must already BE the declared
+        # plan. Repurposing incompatible authored state (a place binding, an
+        # anchor, another scoped service identity) would silently rewrite
+        # authored authority, so it is refused before any write.
+        existing_binding = existing.service_binding
+        if existing_binding not in (None, "person"):
+            raise QuestIssuanceError(
+                f"host already carries a {existing_binding!r}-bound issuer "
+                "capability; the generated plan is person-bound"
+            )
+        if existing.anchor_room_id is not None:
+            raise QuestIssuanceError(
+                "host already carries an anchored issuer capability; the "
+                "generated plan is person-bound"
+            )
+        existing_service = existing.service_id
+        if existing_service not in (None, "", declared.kwargs["service_id"]):
+            raise QuestIssuanceError(
+                f"host already carries issuer service {existing_service!r}; the "
+                f"declared scoped identity is {declared.kwargs['service_id']!r}"
+            )
     owner = issuer_key_owner(key, exclude=host)
     if owner is not None:
         raise QuestIssuanceError(

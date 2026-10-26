@@ -34,7 +34,7 @@ from world.rules.buffs import BuffDefinition, PHYSIOLOGICAL_PROTECTION
 from world.rules.fatigue import PROJECTION_BUFF_KEYS
 from world.rules.dialogue import DialogueDefinition, KeywordResponse
 from typeclasses.components import GuildStaff, Merchant
-from world.rules.npc_capabilities import capability, place_bound
+from world.lore.settlements.capability_declarations import capability, place_bound
 
 from world.tests.synthetic_data.vocab import (
     _SYNTH_GATE_XY,

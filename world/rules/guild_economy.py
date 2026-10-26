@@ -34,9 +34,11 @@ from world.maps.bootstrap import sync_service_interiors
 from world.rules.guild_config import get_catalog, load_catalog_into_cache
 from world.rules.npc_capabilities import (
     COMPONENT_TYPES,
+    CapabilityValidationError,
     assemble_capabilities,
     component_attribute_keys,
     managed_type_keys,
+    resolve_room,
     validate_capabilities,
 )
 from world.rules.surfaces import (
@@ -465,6 +467,7 @@ def sync_service_content() -> None:
             _retire_source_hosts(retirement_candidates, retired)
     except Exception:
         _restore_batch(created=created, reused=reused, retired=retired)
+        _evict_batch_cache()
         raise
 
 
@@ -472,24 +475,25 @@ def _resolve_service_plans(roster):
     """Resolve every spawn room and every capability anchor, or fail closed.
 
     Interiors are prepared first (the existing repair pass) and then EVERY
-    row's spawn room and every declared place anchor is resolved. A missing,
-    ambiguous or non-Room anchor raises :class:`ServiceHostIntegrityError`
-    naming the row, so the surrounding transaction rolls the whole batch —
-    prepared interiors included — back. Nothing here writes a host.
+    row's spawn room and every declared place anchor is resolved through the
+    same exact-one-Room rule (a zero-capability host included). A missing,
+    ambiguous or non-Room room raises :class:`ServiceHostIntegrityError` naming
+    the row, so the surrounding transaction rolls the whole batch — prepared
+    interiors included — back. Nothing here writes a host.
     """
-    rooms = {row.host_key: _room_by_tag(row.spawn_room) for row in roster}
-    if any(room is None for room in rooms.values()):
+    rooms, problems = _resolve_spawn_rooms(roster)
+    if problems:
         log_warn(
             "guild_economy_service_interiors_missing",
             context={"action": "sync_service_interiors_first"},
         )
         sync_service_interiors()
-        rooms = {row.host_key: _room_by_tag(row.spawn_room) for row in roster}
-    unresolved = sorted(row.host_key for row in roster if rooms[row.host_key] is None)
-    if unresolved:
+        rooms, problems = _resolve_spawn_rooms(roster)
+    if problems:
         raise ServiceHostIntegrityError(
-            f"service host spawn room unresolved for {unresolved}; the complete "
-            "operation rolls back"
+            "service host spawn room unresolved: "
+            + "; ".join(problems)
+            + "; the complete operation rolls back"
         )
     plans = {}
     for row in roster:
@@ -502,6 +506,33 @@ def _resolve_service_plans(roster):
                 f"service host {row.host_key!r} declares unusable capabilities: {error}"
             ) from error
     return rooms, plans
+
+
+def _resolve_spawn_rooms(roster):
+    """Resolve every roster row's spawn room, collecting named problems."""
+    rooms: dict[str, Any] = {}
+    problems: list[str] = []
+    for row in roster:
+        try:
+            rooms[row.host_key] = resolve_room(row.spawn_room, _rooms_by_tag)
+        except CapabilityValidationError as error:  # observability: ignore R2: the failure is collected into a named problem and the caller raises ServiceHostIntegrityError with every unresolved row, so nothing is swallowed
+            problems.append(f"{row.host_key!r} -> {error}")
+    return rooms, problems
+
+
+def _evict_batch_cache() -> None:
+    """Drop the identity map after a rolled-back batch.
+
+    The database rollback restores the rows, but interior preparation also
+    created rooms/exits and rewrote their attributes inside the same process;
+    the idmapper would keep serving those live objects. A global flush is the
+    engine's own recovery idiom (the same reason
+    ``world/rules/surfaces.py`` documents attribute-cache restoration), and this
+    path only runs when the batch refused to commit.
+    """
+    from evennia.utils.idmapper.models import flush_cache
+
+    flush_cache()
 
 
 def _initialize_merchant_stock(hosts: list[NPC]) -> None:

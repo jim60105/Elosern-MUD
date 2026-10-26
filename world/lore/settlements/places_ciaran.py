@@ -30,7 +30,10 @@ instructor lives beside the blade-smith's doorstep, and 艾莉妮斯的家 off
 """
 
 from world.lore.settlements.places import PlaceDefinition, PlaceKind
-from world.rules.npc_capabilities import capability, place_bound
+from world.lore.settlements.capability_declarations import (
+    capability,
+    place_bound,
+)
 
 ROWS: tuple[PlaceDefinition, ...] = (
     PlaceDefinition(
