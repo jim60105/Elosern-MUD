@@ -87,7 +87,7 @@ Stored truth and `disguised_stats` SHALL be shown side by side; disguise SHALL b
 
 #### Scenario: NPC summary fields
 - **WHEN** an NPC curated summary is rendered
-- **THEN** it includes character fields plus title/profession, shop/guild service components, seven-section persona and version, today's schedule/current slot, dialogue key, memory and dialogue tabs
+- **THEN** it includes applicable character fields with plain NPC name and no independent NPC title or duplicate profession summary, shop/guild service components, seven-section persona and version, today's schedule/current slot, dialogue key, memory and dialogue tabs
 
 #### Scenario: Monster summary fields
 - **WHEN** a monster curated summary is rendered

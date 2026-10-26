@@ -37,7 +37,11 @@ In its ready states the editor SHALL present the complete labeled card — the s
 
 #### Scenario: The heading names the bound NPC
 - **WHEN** the editor is in its ready states
-- **THEN** the bound NPC's name and title appear in its heading
+- **THEN** the bound NPC's plain name appears in its heading
+
+#### Scenario: Header contains no independent NPC title
+- **WHEN** the selected NPC editor opens
+- **THEN** the header shows the plain name and the private read result contains no npc_title field
 
 #### Scenario: Controls are marked and carry budgets
 - **WHEN** the card controls render
