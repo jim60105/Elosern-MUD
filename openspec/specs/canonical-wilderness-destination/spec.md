@@ -14,8 +14,12 @@ One resolver SHALL derive the arrival node from the current coordinates, directi
 registry's gateway rules, never from the pooled self-loop `exit_obj.destination`. It returns the
 gate's `grid:` node at a registered `approach_cell`/`return_direction`, `None` on a
 provider-invalid neighbor, else the adjacent `wild:` node. A point-shape entry answers only its
-`return_direction`. Grid coordinates are integer meters in the settlement's local
-frame; wilderness coordinates remain one-kilometer cell indices.
+`return_direction`.
+
+#### Scenario: Coordinate frames stay per-layer
+- **WHEN** a resolved grid node and a resolved wilderness node are compared
+- **THEN** grid coordinates are integer meters in the settlement's local frame while wilderness
+  coordinates remain one-kilometer cell indices
 
 #### Scenario: Wilderness direction resolves to the true neighbor
 - **WHEN** the resolver is asked for the north direction from `wild:(500, 700)`

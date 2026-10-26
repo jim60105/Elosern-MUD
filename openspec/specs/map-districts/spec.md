@@ -28,7 +28,12 @@ A district SHALL be lit if and only if its exact landmark node is in the player 
 - **THEN** that district becomes lit on read without a second discovery attribute, while other districts remain unlit
 
 ### Requirement: The authored continent has a complete discoverable landmark roster
-The district registry SHALL contain the individually authored districts and landmarks declared in `world/lore/map_districts.py`, with Traditional Chinese names and a target district width of roughly 200 km. Every district SHALL retain exactly one reachable canonical landmark, with the northern deep forest remaining one region district and its single deep landmark. Frozen ownership and outlines SHALL be regenerated from this roster; the roster size SHALL remain authored data rather than a specification-owned count.
+The district registry SHALL contain the districts and landmarks authored in
+`world/lore/map_districts.py`, named in Traditional Chinese with a target district width of roughly
+200 km. Every district SHALL retain exactly one reachable canonical landmark; the northern deep
+forest stays one region district with its single deep landmark. Frozen ownership and outlines SHALL
+be regenerated from this roster, whose size SHALL stay authored data, not a specification-owned
+count.
 
 #### Scenario: Final roster remains geographically valid
 - **WHEN** the full authored registry is validated and partitioned

@@ -8,13 +8,12 @@ are exercised against a second, deliberately unlike entry.
 ## Requirements
 
 ### Requirement: The village is a small connected grid with one anchor
-`world/maps/village_ciaran.py` SHALL declare map data for
-`zcoord="village_ciaran"` describing the connected tree declared by `NODE_IDS`,
-`PROTOTYPES`, and `ROADS`, with a single entrance node, a central plaza, and exterior nodes reflecting
-the branch's culture and dwellings. The plaza SHALL spawn as the settlement's
-sole `AnchorRoom`, carrying `anchor_key="village_ciaran"`. Every
-intra-village link SHALL spawn as the project's costed grid exit so
-movement inside the village charges the distance-derived move cost.
+`world/maps/village_ciaran.py` SHALL declare map data for `zcoord="village_ciaran"` describing the
+connected tree declared by `NODE_IDS`, `PROTOTYPES`, and `ROADS`, with a single entrance node, a
+central plaza, and exterior nodes reflecting the branch's culture and dwellings. The plaza SHALL
+spawn as the settlement's sole `AnchorRoom`, carrying `anchor_key="village_ciaran"`. Every
+intra-village link SHALL spawn as the costed grid exit, so village movement charges its
+distance-derived cost.
 
 #### Scenario: The village grid spawns connected with one anchor
 - **WHEN** grid synchronization runs

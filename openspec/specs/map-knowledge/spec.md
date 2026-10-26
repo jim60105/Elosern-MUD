@@ -62,9 +62,11 @@ ordinary interior rooms. Grid/wilderness X and Y SHALL be integers within the pr
 `z-map-key` and `wilderness-name` SHALL be registered bounded strings; `room:<dbref>` SHALL be a
 positive integer dbref.
 
-These canonical knowledge IDs are distinct from a sparse settlement's stable
-English-slug `node_id` in `NODE_IDS` and from its Chinese prototype display `key`.
-Grid X and Y are settlement-local integer meters; wilderness X and Y are cell indices.
+#### Scenario: Canonical knowledge IDs are not settlement node IDs
+- **WHEN** a canonical knowledge ID and a sparse settlement's `NODE_IDS` entry are compared
+- **THEN** the canonical ID is distinct from the settlement's English-slug `node_id` and its Chinese
+  prototype display `key`, and grid X and Y are settlement-local integer meters while wilderness
+  X and Y are cell indices
 
 #### Scenario: A valid grid node ID round-trips
 - **WHEN** a canonical node ID of the form `grid:capital_altoria:3050:150` is decoded and re-encoded

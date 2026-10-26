@@ -61,12 +61,16 @@ mainland, ridge, water, footprints).
 ### Requirement: get_location_name and at_prepare_room delegate to the deterministic terrain model
 `ElosernWildernessMapProvider.get_location_name(coordinates)` SHALL return
 `WILDERNESS_REGION_REGISTRY[region_for_coordinates(*coordinates)].display_name_zh`.
-`at_prepare_room(coordinates, caller, room)` SHALL set
-`room.ndb.active_desc` from `terrain_description(*coordinates)` and `room.scene_archetype` from
-`REGION_SCENE_ARCHETYPES[region_for_coordinates(*coordinates)]`, unconditionally, on every call.
-It SHALL set `room.scene_identity` from the wilderness name and current coordinates,
-and clear `room.room_art_key` on every activation. It SHALL additionally
-initialize the coordinate's deterministic monster population per the scenarios below.
+`at_prepare_room(coordinates, caller, room)` SHALL unconditionally set these room fields on every
+call, and SHALL clear `room.room_art_key` on every activation:
+
+```
+room.ndb.active_desc = terrain_description(*coordinates)
+room.scene_archetype = REGION_SCENE_ARCHETYPES[region_for_coordinates(*coordinates)]
+room.scene_identity  = wilderness name and current coordinates
+```
+
+It SHALL also initialize the coordinate's deterministic monster population per the scenarios below.
 
 #### Scenario: get_location_name matches the region registry
 - **WHEN** `get_location_name((x, y))` is called

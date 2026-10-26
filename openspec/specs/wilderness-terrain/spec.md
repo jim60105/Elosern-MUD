@@ -8,13 +8,23 @@ input. These functions satisfy the design doc's offline-playability criterion at
 ## Requirements
 
 ### Requirement: WILDERNESS_REGION_REGISTRY covers the authored terrain regions
-`world/lore/wilderness_regions.py` SHALL define a frozen `WildernessRegion` dataclass (`key`,
-`display_name_zh`, `nation_key: str | None`, `terrain_flavor_zh: tuple[str, ...]` with at least two
-entries, and `nominal_nation_keys: tuple[str, ...]`) and a module-level
-`WILDERNESS_REGION_REGISTRY: dict[str, WildernessRegion]` containing
-one entry per authored terrain region, using the registry's Traditional Chinese display names.
-`nation_key` SHALL be `None` for regions shared across nominal borders;
-`nominal_nation_keys` SHALL list their claimants, while the provider resolves each cell's claim.
+`world/lore/wilderness_regions.py` SHALL define a frozen `WildernessRegion` dataclass of exactly
+these fields:
+
+```
+WildernessRegion(
+    key: str,
+    display_name_zh: str,
+    nation_key: str | None,
+    terrain_flavor_zh: tuple[str, ...],   # at least two entries
+    nominal_nation_keys: tuple[str, ...],
+)
+```
+
+It SHALL define a module-level `WILDERNESS_REGION_REGISTRY: dict[str, WildernessRegion]` with one
+entry per authored terrain region, using the registry's Traditional Chinese display names.
+`nation_key` SHALL be `None` for regions shared across nominal borders; `nominal_nation_keys` SHALL
+list their claimants, while the provider resolves each cell's claim.
 
 #### Scenario: The registry covers the declared regions without duplicate names
 - **WHEN** `WILDERNESS_REGION_REGISTRY` is inspected
