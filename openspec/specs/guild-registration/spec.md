@@ -157,8 +157,7 @@ component literal.
 
 #### Scenario: An unresolvable anchor room fails sync closed and names the row
 - **WHEN** sync resolves a row whose room tag matches no room
-- **THEN** the named warning event carries the row's `service_id`, no host is created or moved,
-  and the remaining rows still process exactly as the pre-change missing-interiors path
+- **THEN** the complete operation fails before persistence and names the unresolved row
 
 #### Scenario: Assembly is the shared helper, not a code-side literal
 - **WHEN** `world/rules/guild_economy.py` is searched for `ComponentClass` literals or

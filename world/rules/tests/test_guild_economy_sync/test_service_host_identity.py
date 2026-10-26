@@ -538,6 +538,9 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertIsNotNone(NPC.objects.filter(pk=unrelated_pk).first())
 
     @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
+    @covers_requirement(
+        "npc-service-host-identity::canonical-source-identity-selects-one-host-independently-of-capabilities"
+    )
     def test_duplicate_canonical_identity_fails_closed_before_mutation(self):
         # Two live NPCs claiming one canonical authored host identity violate
         # the one-person invariant: sync raises the named integrity error and
@@ -625,6 +628,9 @@ class ServiceHostReconciliationTests(ServiceContentIsolation, EvenniaTestCase):
     def _guild_host(self):
         return NPC.objects.filter(db_key=_guild_host_name()).first()
 
+    @covers_requirement(
+        "npc-service-host-identity::canonical-source-identity-selects-one-host-independently-of-capabilities"
+    )
     def test_capability_reorder_keeps_one_person_and_the_same_slots(self):
         sync_service_content()
         before = self._guild_host()
@@ -648,6 +654,9 @@ class ServiceHostReconciliationTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertEqual(NPC.objects.filter(db_key=_guild_host_name()).count(), 1)
         self.assertEqual(sorted(host.components.db_names), slots_before)
 
+    @covers_requirement(
+        "npc-service-host-identity::managed-reconciliation-preserves-unrelated-and-subsystem-owned-state"
+    )
     def test_removing_a_capability_keeps_the_person_and_unrelated_state(self):
         from evennia.contrib.base_systems.components import Component, DBField
 
@@ -677,6 +686,9 @@ class ServiceHostReconciliationTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertIsNotNone(host.components.get("t_unrelated_probe"))
         self.assertEqual(host.attributes.get("t_probe_inventory"), ["t_probe_goods"])
 
+    @covers_requirement(
+        "npc-service-host-identity::canonical-source-identity-selects-one-host-independently-of-capabilities"
+    )
     def test_an_empty_declaration_keeps_the_person_and_clears_the_managed_set(self):
         sync_service_content()
         before = self._guild_host()
@@ -692,6 +704,9 @@ class ServiceHostReconciliationTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertEqual(host.location, room_before)
         self.assertEqual(host.components.db_names, [])
 
+    @covers_requirement(
+        "npc-service-host-identity::canonical-source-identity-selects-one-host-independently-of-capabilities"
+    )
     def test_a_service_identity_edit_converges_on_the_same_person(self):
         from typeclasses.components import ScriptedDialogue
 
@@ -714,6 +729,9 @@ class ServiceHostReconciliationTests(ServiceContentIsolation, EvenniaTestCase):
                 self.assertIsNotNone(component)
                 self.assertEqual(component.service_id, edited_service_id)
 
+    @covers_requirement(
+        "npc-service-host-identity::canonical-source-identity-selects-one-host-independently-of-capabilities"
+    )
     def test_a_moved_host_stays_moved(self):
         from evennia.utils.search import search_object_by_tag
 
@@ -731,6 +749,9 @@ class ServiceHostReconciliationTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertEqual(staff.service_binding, "place")
         self.assertNotEqual(staff.anchor_room_id, elsewhere.pk)
 
+    @covers_requirement(
+        "npc-service-host-identity::managed-reconciliation-preserves-unrelated-and-subsystem-owned-state"
+    )
     def test_a_shop_identity_edit_preserves_live_commerce_progress(self):
         merchant_row = _merchant_row()
         sync_service_content()
@@ -753,6 +774,9 @@ class ServiceHostReconciliationTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertEqual(dict(merchant.merchant_stock), stock_before)
         self.assertEqual(merchant.last_restock_day, 42)
 
+    @covers_requirement(
+        "npc-service-host-identity::managed-reconciliation-preserves-unrelated-and-subsystem-owned-state"
+    )
     def test_removing_and_restoring_the_clergy_capability_preserves_sexual_state(self):
         from typeclasses.components import ChurchHost
 

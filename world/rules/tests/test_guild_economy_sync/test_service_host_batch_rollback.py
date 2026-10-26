@@ -13,6 +13,7 @@ from unittest.mock import patch
 from evennia.utils.idmapper.models import flush_cache
 from evennia.utils.test_resources import EvenniaTestCase
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import (
     ChurchHost,
@@ -99,6 +100,9 @@ class ServiceHostBatchRollbackTests(ServiceContentIsolation, EvenniaTestCase):
 
         return wrapper
 
+    @covers_requirement(
+        "npc-service-host-identity::managed-reconciliation-preserves-unrelated-and-subsystem-owned-state"
+    )
     def test_a_fault_after_a_component_attach_restores_the_previous_slots(self):
         sync_service_content()
         row = self._first_processable_row()
@@ -126,6 +130,9 @@ class ServiceHostBatchRollbackTests(ServiceContentIsolation, EvenniaTestCase):
         flush_cache()
         self._assert_snapshot(before)
 
+    @covers_requirement(
+        "npc-service-host-identity::managed-reconciliation-preserves-unrelated-and-subsystem-owned-state"
+    )
     def test_a_fault_after_a_configuration_update_restores_the_previous_values(self):
         sync_service_content()
         row = self._first_processable_row()
@@ -153,6 +160,9 @@ class ServiceHostBatchRollbackTests(ServiceContentIsolation, EvenniaTestCase):
         flush_cache()
         self._assert_snapshot(before)
 
+    @covers_requirement(
+        "npc-service-host-identity::managed-reconciliation-preserves-unrelated-and-subsystem-owned-state"
+    )
     def test_a_fault_after_a_component_removal_restores_the_obsolete_slot(self):
         sync_service_content()
         row = self._first_processable_row()
@@ -181,6 +191,9 @@ class ServiceHostBatchRollbackTests(ServiceContentIsolation, EvenniaTestCase):
         flush_cache()
         self._assert_snapshot(before)
 
+    @covers_requirement(
+        "npc-service-host-identity::managed-reconciliation-preserves-unrelated-and-subsystem-owned-state"
+    )
     def test_a_fault_after_the_second_row_creation_leaves_no_trace(self):
         created = []
 
@@ -221,6 +234,9 @@ class ServiceHostBatchRollbackTests(ServiceContentIsolation, EvenniaTestCase):
                     row.host_key,
                 )
 
+    @covers_requirement(
+        "npc-service-host-identity::managed-reconciliation-preserves-unrelated-and-subsystem-owned-state"
+    )
     def test_a_fault_inside_a_retirement_restores_the_rows_and_party_state(self):
         from evennia.utils.create import create_object
         from world.rules.party import join_party, party_ids, party_meta

@@ -44,15 +44,11 @@ Private commission authority SHALL reside exclusively in the registered `QuestIs
 - **THEN** it SHALL NOT resolve to any issuer key
 
 ### Requirement: The QuestIssuer component mirrors the existing service-host component shape
-
-`QuestIssuer` SHALL be a component named `quest_issuer` carrying `service_id`, `issuer_key`,
-`service_binding`, and `anchor_room_id` — the same four-field shape `GuildStaff`, `GuildExamReception`,
-and `Merchant` carry, with `issuer_key` in the place of `branch_key`. The quest-issuer capability SHALL retain its service_id, optional issuer_key, binding and anchor fields as deterministic authority/configuration only. Host reuse SHALL depend on canonical host provenance, independently of these fields or declaration order.
+The quest-issuer capability SHALL retain its service_id, optional issuer_key, binding and anchor fields as deterministic authority/configuration only. Host reuse SHALL depend on canonical host provenance, independently of these fields or declaration order.
 
 #### Scenario: The component is a marker and identity holder only
-- **WHEN** the component class is inspected
-- **THEN** it declares exactly `service_id`, `issuer_key`, `service_binding`, and `anchor_room_id`
-  and contains no quest, reward, or record mutation
+- **WHEN** a commission mutation is requested
+- **THEN** the capability delegates to the deterministic owner and performs no quest/reward writes itself
 
 #### Scenario: A commissioner blueprint survives repeated roster synchronization
 - **WHEN** the commissioner is reordered or its service_id changes
@@ -67,17 +63,14 @@ and `Merchant` carry, with `issuer_key` in the place of `branch_key`. The quest-
 - **THEN** lookup does not read service_id and cannot fail due to its absence
 
 #### Scenario: Mutations delegate to the deterministic core
-- **WHEN** a quest, reward, or quest record mutation is requested through a commissioner
-- **THEN** the component itself never registers, mutates, or settles it; every such mutation delegates
-  to the deterministic core exactly as the other service components do
+- **WHEN** a quest, reward or record mutation is requested through a commissioner
+- **THEN** the component delegates to its deterministic owner and performs no business writes
 
 #### Scenario: The component resolves through the existing generic resolver
-- **WHEN** a commissioner host is resolved
-- **THEN** it is resolvable through the existing generic
-  `resolve_local_service_host(actor, component_class)` with no change to that function
+- **WHEN** implicit discovery resolves a commissioner
+- **THEN** the existing generic component resolver retains its local zero/one/multiple-host behavior
 
 ### Requirement: Every profession row anchors on a component that carries a service identity
-
 Authored host reuse SHALL use canonical host provenance and SHALL NOT require any first capability or component-level service identity.
 
 #### Scenario: A row anchored on an identity-less component fails the contract

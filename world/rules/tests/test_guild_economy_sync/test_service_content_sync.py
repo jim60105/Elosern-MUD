@@ -175,6 +175,9 @@ class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTestCase):
     @covers_requirement(
         "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
     )
+    @covers_requirement(
+        "npc-service-host-identity::managed-reconciliation-preserves-unrelated-and-subsystem-owned-state"
+    )
     def test_repeated_sync_creates_no_duplicates(self):
         sync_service_content()
         counts = (
@@ -189,6 +192,9 @@ class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTestCase):
             counts,
         )
 
+    @covers_requirement(
+        "npc-service-host-identity::managed-reconciliation-preserves-unrelated-and-subsystem-owned-state"
+    )
     def test_repeated_sync_does_not_replicate_components(self):
         sync_service_content()
         guild_host = self._guild_host()
