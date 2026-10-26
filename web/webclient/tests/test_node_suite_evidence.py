@@ -1906,5 +1906,37 @@ class PartyExitEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
 
+class PublicationAssemblyEvidenceTest(unittest.TestCase):
+    """webclient-publication-assembly: the browser owns the bounded general
+    assembly's lifetime — one live transfer per transport, a fixed first-part
+    deadline no traffic extends, supersession by a newer snapshot, and release
+    of buffers/timers on disconnect, detach, epoch retirement and expiry
+    independently of the specialized map assembler. Those lifecycle rules only
+    exist in the DOM-independent reducer, so its Node file is the executed
+    evidence; the Python cross-language fixture covers adoption separately."""
+
+    @covers_requirement(
+        "webclient-publication-assembly::assembly-lifetime-and-teardown-are-explicit",
+    )
+    def test_publication_assembly_node_suite_passes(self):
+        result = subprocess.run(
+            [
+                "node",
+                "--test",
+                str(REPO_ROOT / "web/static/webclient/js/tests/protocol_publication_parts.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "publication assembly Node evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

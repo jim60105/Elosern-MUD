@@ -1018,6 +1018,9 @@ class BrowserAssemblyFixtureTests(unittest.TestCase):
         self.assertEqual(reassembled, raw)
         return parts
 
+    @covers_requirement(
+        "webclient-publication-assembly::general-assembly-adopts-one-complete-validated-publication",
+    )
     def test_the_encoder_bytes_commit_one_atomic_browser_state(self):
         panel, _ = _near_cap_lore_codex()
         snapshot = _snapshot({"lore_codex": panel})
