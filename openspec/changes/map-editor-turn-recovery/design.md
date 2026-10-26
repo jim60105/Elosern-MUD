@@ -18,6 +18,10 @@ Handoff resolves current drafts by explicit confirm/cancel, closes admission, dr
 
 watchfiles watches directories for create/replace/rename/delete, including newly created documents and layouts. Coalesce briefly, read a coherent candidate and publish only on authoring success; a debounce is no multi-file transaction. Keep the previous preview and view on malformed candidates, label its inspector as stale and expose source file/field/line. With no prior preview show unavailable, never a valid-looking empty world. External index changes invalidate external-check status too. Unexpected manual-mode file changes immediately pause new writes; require explicit reload acknowledging draft/history discard, without merge/diff/replay. Preserve current map/viewport/selection by qualified identity on valid external reload; clear deleted selections with an explanation.
 
+Treat a directory notification as expected service output only when freshly read presence/content matches the writer's committed fingerprint ledger, including expected absence after removal. Reconcile delayed/coalesced notifications against current disk and the latest committed state; never suppress an event just because its path was recently saved. Expected service notifications retain manual ownership and undo history. A differing external fingerprint pauses writes even when it immediately follows a service save at the same path. Test two ordinary saves with real delayed watcher delivery, then a real external replacement at that path.
+
+Observe the external context source closure as invalidation input where available, and independently refresh its full membership/hash evidence before every destructive command. An unchanged exported index file alone cannot establish freshness.
+
 ### Exact implementation ownership
 
 elosern_map_editor session state machine/watch coordinator/SSE; frontend connection/preview/turn state and handoff dialogs; all mutation guards; independent real-filesystem tests

@@ -39,3 +39,7 @@ File events and connection changes SHALL publish only authoring-loadable candida
 - **WHEN** disk changes during manual mode or the service restarts while a tab retains commands
 - **THEN** writes pause or reject, reload explains discarded drafts/history, and no write permission or command replay is restored locally
 
+#### Scenario: Own saves do not become external changes
+- **WHEN** two service saves receive delayed/coalesced real watcher events, followed by an external replacement at the same path
+- **THEN** matching committed fingerprints preserve manual permission/history, while the external fingerprint pauses writes without blanket path/event suppression
+
