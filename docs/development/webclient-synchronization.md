@@ -174,9 +174,9 @@ await between frames, so no reentrant sync or push can appear between an
 action's presentation frames and its result. Public enqueues run at the existing
 serialized publication boundary; reentrant work joins the same queue and drains
 immediately after the current batch, in order. The boundary is described under
-"Causal publication groups" below: grouped work waits for the reactor's next
-turn, standalone work publishes at its own enqueue boundary. At most 64 group
-entries and 64 waiting callers may be pending for one sequence.
+"Causal publication groups" below: every queued entry waits for the reactor's
+next turn, except the dispatcher's result-only retirement flush. At most 64
+group entries and 64 waiting callers may be pending for one sequence.
 
 Planning reserves the next target revision without consuming it: all frames and
 the action-result envelope are validated first, so a preflight failure sends no
@@ -212,7 +212,7 @@ group identity is serialized, and no second publication owner exists.
 | `new_publication_group()` | A fresh `PublicationGroup` with a unique 32-hex ephemeral id. |
 | `publication_group(group=None)` | Binds the group (or a new one) for one synchronous scope. A nested scope **reuses** the active group, so nested on-commit callbacks keep one identity. The binding is closed and reset in `finally`, before the callable returns, and is never active while an external operation is pending. |
 | `current_publication_group()` | The live binding, or `None`. Twisted's `@inlineCallbacks` copies the context at generator start, so a resumed generator still *references* the binding object; because the binding is closed when its synchronous owner returned, resumption reports `None` and can never revive an already-published group. Resumed deterministic work opens its own scope. |
-| `on_publication_commit(callback, *, using=None)` | Registers on Django's `transaction.on_commit` while capturing the group active at registration time, and rebinds exactly that group for the callback's synchronous execution. A rolled-back transaction registers and runs nothing; callback exceptions keep Django's existing behaviour. |
+| `on_publication_commit(callback, *, using=None)` | Registers on Django's `transaction.on_commit` while capturing the group active at registration time, and rebinds **exactly** that group for the callback's synchronous execution — even when another group is bound at commit time (an outer transaction committing inside another committed operation). A rolled-back transaction registers and runs nothing; callback exceptions keep Django's existing behaviour. |
 
 A group is captured at the `enqueue_publication` call boundary (explicit
 `group_id`, else the live binding, else a fresh standalone group). A group-less
@@ -234,13 +234,15 @@ order. Within an entry the declarations merge:
   survives later ordinary pushes; otherwise the newest factory wins, and every
   grouped factory rebuilds current canonical state.
 
-Grouped entries drain at the reactor's **next turn**: every on-commit callback
-of the synchronous owning transaction has run by then, so the entry is complete
-before it is planned and sent. Fully standalone requests (text refresh, explicit
-sync, async generation completion, a dispatcher recovery answer) publish at
-their own enqueue boundary, as before. Entries belonging to a captured group are
-never finalized by an unrelated standalone publication. Two narrow exceptions
-keep B's ordering guarantees:
+**Every** queued entry drains at the reactor's next turn: all on-commit
+callbacks of the synchronous operations that queued them have run by then, so
+each entry is complete before it is planned and sent. First-enqueue order is
+therefore publication order — a later text refresh or explicit sync can never
+overtake an earlier committed operation, and an earlier entry is never finalized
+by unrelated later work. `ui_sync`, a text refresh, an async generation
+completion and a dispatcher recovery answer are still their **own** entries
+(`independent=True`); they simply queue at the same boundary. Two narrow
+exceptions keep B's ordering guarantees:
 
 - the dispatcher's **result-only** completion (the sequence-retiring actions)
   flushes just its own group before returning, because its adapter may already

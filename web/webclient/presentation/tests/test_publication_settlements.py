@@ -296,6 +296,88 @@ class PublicationGroupApiTests(unittest.TestCase):
         self.assertEqual(log_warn.call_args.kwargs["context"]["cause"], "skip_completed")
 
 
+class DialogueReadingGroupTests(unittest.TestCase):
+    """A reading push submits a name inside a group and stays independent with a batch."""
+
+    def _run(self, *, unlock_batch, grouped):
+        from web.webclient.presentation import dialogue_push
+
+        published: list = []
+        rendered: list = []
+        watcher = FakeSession()
+        puppet = SimpleNamespace(pk=1)
+
+        def _forbidden(reason):
+            def _fail(*_args, **_kwargs):
+                raise AssertionError(reason)
+
+            return _fail
+
+        deps = dialogue_push.PanelPushDeps(
+            watchers_for=lambda actor: ((watcher, "epoch-1"),),
+            build_registry=(
+                _forbidden("a grouped plain push must not build the registry")
+                if grouped and unlock_batch is None
+                else (
+                    lambda: SimpleNamespace(
+                        render=lambda name, context: rendered.append(name)
+                        or {"available": True}
+                    )
+                )
+            ),
+            build_context=(
+                _forbidden("a grouped plain push must not render eagerly")
+                if grouped and unlock_batch is None
+                else (
+                    lambda session, actor: PresentationContext(
+                        actor=actor, protocol_version=1
+                    )
+                )
+            ),
+            publish=lambda session, actor, panels, **kwargs: published.append(
+                (panels, kwargs)
+            ),
+            log_warn=lambda *args, **kwargs: None,
+        )
+        with (
+            mock.patch.object(dialogue_push, "_deps", return_value=deps),
+            mock.patch.object(dialogue_push, "_owner_puppets", return_value=(puppet,)),
+        ):
+            if grouped:
+                with publication_group():
+                    dialogue_push.push_dialogue_reading(
+                        SimpleNamespace(pk=5), unlock_batch=unlock_batch
+                    )
+            else:
+                dialogue_push.push_dialogue_reading(
+                    SimpleNamespace(pk=5), unlock_batch=unlock_batch
+                )
+        return published, rendered
+
+    def test_a_plain_reading_push_inside_a_group_submits_the_panel_name(self):
+        published, rendered = self._run(unlock_batch=None, grouped=True)
+        self.assertEqual(rendered, [])
+        self.assertEqual(len(published), 1)
+        panels, kwargs = published[0]
+        self.assertEqual(panels, {})
+        self.assertEqual(
+            kwargs, {"expected_epoch": "epoch-1", "affected_panels": ("dialogue",)}
+        )
+
+    def test_a_plain_reading_push_outside_a_group_still_renders_its_payload(self):
+        published, rendered = self._run(unlock_batch=None, grouped=False)
+        self.assertEqual(rendered, ["dialogue"])
+        self.assertEqual(published[0][0], {"dialogue": {"available": True}})
+        self.assertNotIn("independent", published[0][1])
+
+    def test_a_claimed_batch_publishes_its_decorated_payload_independently(self):
+        published, rendered = self._run(unlock_batch=object(), grouped=True)
+        self.assertEqual(rendered, ["dialogue"])
+        panels, kwargs = published[0]
+        self.assertIn("dialogue", panels)
+        self.assertTrue(kwargs["independent"])
+
+
 class CoordinatorGroupingTests(unittest.TestCase):
     """One pending entry per group, merged declarations and real outcomes."""
 
@@ -309,6 +391,8 @@ class CoordinatorGroupingTests(unittest.TestCase):
         ]
         for coordinator in coordinators:
             coordinator.full_snapshot(_context())
+        scheduled.run()
+        for coordinator in coordinators:
             coordinator.session.sent.clear()
         return state, sessions, coordinators, scheduled
 
@@ -381,7 +465,7 @@ class CoordinatorGroupingTests(unittest.TestCase):
         self.assertEqual([waiter.result for waiter in waiters], [None, None, None])
         self.assertEqual(sessions[0].sent, [])
 
-    def test_standalone_work_publishes_inline_and_never_finalizes_a_group(self):
+    def test_queue_order_is_publication_order_for_grouped_and_standalone_work(self):
         state, sessions, coordinators, scheduled = self._two_watchers()
         coordinator = coordinators[0]
         group = new_publication_group()
@@ -389,15 +473,24 @@ class CoordinatorGroupingTests(unittest.TestCase):
         grouped = coordinator.enqueue_publication(
             _context, affected_panels={"status"}, group_id=group.id
         )
-        self.assertEqual(sessions[0].sent, [], "the grouped entry keeps waiting")
-        standalone = coordinator.enqueue_publication(_context)
-        self.assertEqual(sessions[0].names(), ["ui_update"])
-        self.assertFalse(grouped.called, "the group is still pending")
-        self.assertTrue(standalone.called)
+        standalone = coordinator.enqueue_publication(_context, force_snapshot=True)
+        self.assertEqual(sessions[0].sent, [], "every entry waits for the boundary")
         state["value"] = 3
         scheduled.run()
         self.assertTrue(grouped.called)
-        self.assertEqual(sessions[0].frames("ui_update")[-1]["base_revision"], 2)
+        self.assertTrue(standalone.called)
+        published = [
+            (next(iter(call)), call[next(iter(call))][0][0]["revision"])
+            for call in sessions[0].sent
+        ]
+        self.assertEqual(
+            published,
+            [("ui_update", 2), ("ui_snapshot", 3)],
+            "the earlier committed entry published first",
+        )
+        self.assertEqual(
+            sessions[0].frames()[0]["base_revision"], 1
+        )
 
     def test_preflight_failure_errbacks_every_group_waiter_and_sends_nothing(self):
         state, sessions, coordinators, scheduled = self._two_watchers()
@@ -438,53 +531,52 @@ class CoordinatorGroupingTests(unittest.TestCase):
             publication_failure(waiter).trap(RuntimeError)
         self.assertGreater(coordinator.revision, 1)
         sessions[0].on_send = None
-        receipt = publication_receipt(coordinator.enqueue_publication(_context))
+        recovery = coordinator.enqueue_publication(_context)
+        scheduled.run()
+        receipt = publication_receipt(recovery)
         self.assertEqual(receipt.kind, "snapshot", "an escaped frame forbids deltas")
 
-    def test_waiting_callers_beyond_the_bound_overflow_explicitly(self):
-        state, sessions, coordinators, scheduled = self._two_watchers()
-        coordinator = coordinators[0]
-        group = new_publication_group()
-        waiters = [
-            coordinator.enqueue_publication(
-                _context, affected_panels={"status"}, group_id=group.id
-            )
-            for _ in range(MAX_PENDING_PUBLICATIONS + 1)
-        ]
-        self.assertTrue(
-            publication_failure(waiters[-1]).check(PresentationQueueFull)
-        )
-        scheduled.run()
-        receipts = [
-            publication_receipt(waiter) for waiter in waiters[:-1]
-        ]
-        self.assertEqual(len(receipts), MAX_PENDING_PUBLICATIONS)
-        self.assertTrue(
-            all(isinstance(receipt, PublicationReceipt) for receipt in receipts)
-        )
-
-    def test_pending_group_entries_beyond_the_bound_overflow_explicitly(self):
-        state, sessions, coordinators, scheduled = self._two_watchers()
-        coordinator = coordinators[0]
-        waiters = [
-            coordinator.enqueue_publication(
-                _context,
-                affected_panels={"status"},
-                group_id=new_publication_group().id,
-            )
-            for _ in range(MAX_PENDING_PUBLICATIONS + 1)
-        ]
-        self.assertTrue(publication_failure(waiters[-1]).check(PresentationQueueFull))
-        self.assertEqual(sessions[0].sent, [])
+    def test_the_pending_bound_overflow_explicitly_in_one_group_or_many(self):
+        for spread in (False, True):
+            with self.subTest(spread=spread):
+                state, sessions, coordinators, scheduled = self._two_watchers()
+                coordinator = coordinators[0]
+                ids = [
+                    new_publication_group().id
+                    for _ in range(MAX_PENDING_PUBLICATIONS + 1)
+                ]
+                if not spread:
+                    ids = [ids[0]] * len(ids)
+                waiters = [
+                    coordinator.enqueue_publication(
+                        _context, affected_panels={"status"}, group_id=group_id
+                    )
+                    for group_id in ids
+                ]
+                self.assertTrue(
+                    publication_failure(waiters[-1]).check(PresentationQueueFull)
+                )
+                self.assertEqual(
+                    len(coordinator._pending_groups),
+                    1 if not spread else MAX_PENDING_PUBLICATIONS,
+                )
+                scheduled.run()
+                receipts = [publication_receipt(waiter) for waiter in waiters[:-1]]
+                self.assertEqual(len(receipts), MAX_PENDING_PUBLICATIONS)
+                self.assertTrue(
+                    all(isinstance(receipt, PublicationReceipt) for receipt in receipts)
+                )
+                self.assertEqual(sessions[0].names()[0], "ui_snapshot")
 
     def test_explicit_synchronization_never_joins_the_active_group(self):
         state, sessions, coordinators, scheduled = self._two_watchers()
         coordinator = coordinators[0]
         with publication_group() as group:
             deferred = coordinator.synchronize(_context())
-            self.assertTrue(deferred.called, "an explicit sync is its own entry")
-            self.assertEqual(publication_receipt(deferred).kind, "snapshot")
             self.assertNotIn(group.id, coordinator._pending_groups)
+        self.assertEqual(len(coordinator._pending_groups), 1, "the sync made its own entry")
+        scheduled.run()
+        self.assertEqual(publication_receipt(deferred).kind, "snapshot")
         self.assertEqual(sessions[0].names(), ["ui_snapshot"])
 
     def test_later_asynchronous_work_is_a_distinct_ordered_publication(self):
@@ -498,12 +590,12 @@ class CoordinatorGroupingTests(unittest.TestCase):
         scheduled.run()
         self.assertEqual(sessions[0].frames("ui_update")[-1]["revision"], 2)
         state["value"] = 3
-        receipt = publication_receipt(
-            coordinator.enqueue_publication(
-                _context,
-                candidate_panels={"status": {"available": True, "value": 3}},
-            )
+        later = coordinator.enqueue_publication(
+            _context,
+            candidate_panels={"status": {"available": True, "value": 3}},
         )
+        scheduled.run()
+        receipt = publication_receipt(later)
         self.assertEqual(receipt.kind, "delta")
         self.assertEqual(receipt.revision, 3)
         self.assertEqual(sessions[0].frames("ui_update")[-1]["base_revision"], 2)
@@ -540,6 +632,7 @@ class CoordinatorGroupingTests(unittest.TestCase):
 
         sessions[0].on_send = interpose
         outer = coordinator.enqueue_publication(_context, affected_panels={"status"})
+        scheduled.run()
         sessions[0].on_send = None
         outer_receipt = publication_receipt(outer)
         inner_receipt = publication_receipt(inner[0])
@@ -565,6 +658,7 @@ class TextIngressIndependenceTests(unittest.TestCase):
             self.session, _state_registry(self.state), scheduler=self.scheduler
         )
         self.coordinator.full_snapshot(_context(self.actor))
+        self.scheduler.run()
         self.session.sent.clear()
 
     def test_two_text_commands_settle_in_reverse_order(self):
@@ -578,16 +672,19 @@ class TextIngressIndependenceTests(unittest.TestCase):
         first.callback("first")
         self.assertEqual(second.result, "second")
         self.assertEqual(first.result, "first")
+        self.assertEqual(self.session.sent, [], "the refreshes wait for the boundary")
+        self.assertEqual(len(self.coordinator._pending_groups), 2, "one entry per command")
+        self.scheduler.run()
         updates = self.session.frames("ui_update")
-        self.assertEqual(
-            [frame["panels"]["status"]["value"] for frame in updates], [2, 3]
-        )
+        self.assertEqual(len(updates), 1, "both refreshes compare the same current state")
+        self.assertEqual(updates[0]["panels"]["status"]["value"], 3)
 
     def test_a_failed_command_preserves_its_failure_and_still_refreshes(self):
         pending = Deferred()
         observe_command_settlement(pending, self.session)
         self.state["value"] = 2
         pending.errback(RuntimeError("command failed"))
+        self.scheduler.run()
         self.assertIsInstance(pending.result, Failure)
         self.assertTrue(pending.result.check(RuntimeError))
         self.assertEqual(self.session.names(), ["ui_update"])
@@ -607,21 +704,24 @@ class TextIngressIndependenceTests(unittest.TestCase):
         observe_command_settlement(text, self.session)
         self.state["value"] = 5
         text.callback("text")
-        self.assertEqual(self.session.names(), ["ui_update"], "text did not wait")
+        self.assertEqual(text.result, "text", "text is never blocked or rejected")
+        self.assertEqual(self.session.sent, [], "nothing publishes before the boundary")
+        self.assertEqual(
+            len(self.coordinator._pending_groups),
+            2,
+            "the command group and the text refresh are separate entries",
+        )
+        self.scheduler.run()
+        self.assertEqual(self.session.names(), ["ui_update"])
         self.coordinator.enqueue_publication(
             lambda: _context(self.actor), force_snapshot=True, independent=True
         )
-        self.assertEqual(self.session.names(), ["ui_update", "ui_snapshot"])
-        # The pending group's entry is still there: the sync published its own
-        # independent entry instead of consuming or promoting the command's.
-        self.assertTrue(self.coordinator._pending_groups)
-        self.scheduler.run()
-        self.assertFalse(self.coordinator._pending_groups)
-        self.assertEqual(
-            self.session.names(),
-            ["ui_update", "ui_snapshot"],
-            "the sync already published the group's unchanged state",
+        self.assertTrue(
+            self.coordinator._pending_groups,
+            "the sync is its own entry, not merged into a completed one",
         )
+        self.scheduler.run()
+        self.assertEqual(self.session.names(), ["ui_update", "ui_snapshot"])
 
 
 class DispatcherGroupTests(unittest.TestCase):
@@ -797,9 +897,8 @@ class AlignmentDeliveryTests(EvenniaTest):
                 self.build_presentation_context(session, self.char1)
             )
             self.register_watcher(session)
+            scheduler.run()
             session.sent.clear()
-            while scheduler.callbacks:
-                scheduler.callbacks.pop(0)()
 
     def _commit(self, *, push_first):
         from web.webclient.presentation.party_push import push_party_update
@@ -916,6 +1015,22 @@ class RollbackSilenceTests(EvenniaTest):
                 )
         self.assertEqual(len(observed), 1)
         self.assertIs(observed[0], group)
+        self.assertIsNone(current_publication_group())
+
+    def test_a_commit_callback_keeps_its_captured_group_under_another_ambient_one(self):
+        observed: list = []
+        with self.captureOnCommitCallbacks(execute=False) as callbacks:
+            with publication_group() as captured:
+                on_publication_commit(
+                    lambda: observed.append(current_publication_group())
+                )
+        self.assertEqual(len(callbacks), 1)
+        with publication_group() as ambient:
+            for callback in callbacks:
+                callback()
+        self.assertEqual(len(observed), 1)
+        self.assertIs(observed[0], captured)
+        self.assertIsNot(observed[0], ambient)
         self.assertIsNone(current_publication_group())
 
 

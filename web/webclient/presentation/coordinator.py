@@ -25,23 +25,22 @@ Group-less work (an explicit sync, a text-command refresh, an async generation
 completion) stays its own independent entry and never joins an ambient command
 group.
 
-Only one publication batch runs at a time. ``enqueue_publication`` appends the
-intent and runs the drain, which is a private synchronous critical section:
-nothing awaits and no other publication can interleave between an action's
-presentation frames and its result. It completes before the enqueueing callback
-returns, so a sequence-retiring effect the adapter scheduled for a later turn
-always runs after its result. A reentrant publish (a sync, push or completion
-requested from inside a send or a receipt callback) joins the same queue and is
-drained immediately after the current batch, in order.
+Only one publication batch runs at a time. ``enqueue_publication`` queues an
+intent and schedules the drain, which is a private synchronous critical
+section: nothing awaits and no other publication can interleave between an
+action's presentation frames and its result. A reentrant publish (a sync, push
+or completion requested from inside a send or a receipt callback) joins the
+same queue and is drained immediately after the current batch, in order.
 
-Grouped work drains at the reactor's next turn instead: every on-commit
-callback of the synchronous owning transaction runs before the reactor returns,
-so the group entry is complete before it is planned and sent. A process without
-a running reactor (the test runner, a one-off command) has no live transport to
-observe frames, so the injected scheduler publishes at the enqueue boundary
-there. A completing action's result-only answer is flushed immediately (its
-adapter may already have scheduled a sequence retirement for the next turn),
-which is the narrow exception B already carved out for those actions.
+Every queued entry drains at the reactor's next turn: all on-commit callbacks
+of the synchronous operations that queued them have run by then, so each entry
+is complete before it is planned and sent, and first-enqueue order is
+publication order. A process without a running reactor (the test runner, a
+one-off command) has no live transport to observe frames, so the injected
+scheduler publishes at the enqueue boundary there. A completing action's
+result-only answer is flushed immediately (its adapter may already have
+scheduled a sequence retirement for the next turn), which is the narrow
+exception B already carved out for those actions.
 
 The coordinator never writes canonical game state and never reaches for a
 mutation helper: calendar data comes only from the read-only
@@ -174,7 +173,6 @@ class _Intent:
     force_snapshot: bool
     result_only: bool
     group_id: str
-    standalone: bool
     epoch: str
     expected_epoch: str | None
     completion: PublicationCompletion | None
@@ -189,9 +187,9 @@ class _PendingGroup:
     publication answers all of them: the union of candidate names and explicit
     removals, "unknown scope" if any request declared it, checkpoint promotion
     if any request forced a snapshot, and one receipt for every waiting
-    ``Deferred``. ``grouped`` records whether the group was captured from a
-    committed operation (deferred drain) or is a standalone request (drained at
-    the enqueue boundary).
+    ``Deferred``. The entry is always complete before it drains: every queued
+    request waits for the reactor-next-turn boundary, which is after the
+    synchronous commit callbacks of the operations that queued it.
     """
 
     group_id: str
@@ -202,7 +200,6 @@ class _PendingGroup:
     removed_panels: tuple[str, ...]
     force_snapshot: bool
     result_only: bool
-    grouped: bool
     epoch: str
     expected_epoch: str | None
     completion: PublicationCompletion | None
@@ -210,7 +207,7 @@ class _PendingGroup:
     completion_factory: bool
 
     @classmethod
-    def from_intent(cls, intent: "_Intent", *, grouped: bool) -> "_PendingGroup":
+    def from_intent(cls, intent: "_Intent") -> "_PendingGroup":
         candidates = dict(intent.candidates) if intent.candidates is not None else None
         return cls(
             group_id=intent.group_id,
@@ -221,7 +218,6 @@ class _PendingGroup:
             removed_panels=intent.removed_panels,
             force_snapshot=intent.force_snapshot,
             result_only=intent.result_only,
-            grouped=grouped,
             epoch=intent.epoch,
             expected_epoch=intent.expected_epoch,
             completion=intent.completion,
@@ -496,43 +492,34 @@ class PresentationCoordinator:
             deferred.errback(error)
             return deferred
         entry = self._pending_groups.get(intent.group_id)
-        if entry is None:
-            # A result-only answer is one admitted action's completion, not a
-            # presentation intent: it is bounded by the sequence's single
-            # in-flight marker, so the queue bound (a publisher-loop guard)
-            # never drops it.
-            if not intent.result_only and (
-                len(self._pending) >= MAX_PENDING_PUBLICATIONS
-                or self._pending_waiter_count() >= MAX_PENDING_PUBLICATIONS
-            ):
-                self._invalidate_baseline()
-                deferred.errback(
-                    PresentationQueueFull(
-                        "presentation queue full for %s" % self.describe_session()
-                    )
+        # A result-only answer is one admitted action's completion, not a
+        # presentation intent: it is bounded by the sequence's single in-flight
+        # marker, so the queue bound (a publisher-loop guard) never drops it.
+        if not intent.result_only and (
+            self._pending_waiter_count() >= MAX_PENDING_PUBLICATIONS
+            or (
+                entry is None
+                and len(self._pending) >= MAX_PENDING_PUBLICATIONS
+            )
+        ):
+            self._invalidate_baseline()
+            deferred.errback(
+                PresentationQueueFull(
+                    "presentation queue full for %s" % self.describe_session()
                 )
-                return deferred
-            entry = _PendingGroup.from_intent(intent, grouped=not intent.standalone)
+            )
+            return deferred
+        if entry is None:
+            entry = _PendingGroup.from_intent(intent)
             self._pending.append(entry)
             self._pending_groups[intent.group_id] = entry
         else:
-            if (
-                not intent.result_only
-                and len(entry.waiters) >= MAX_PENDING_PUBLICATIONS
-            ):
-                self._invalidate_baseline()
-                deferred.errback(
-                    PresentationQueueFull(
-                        "presentation group overflow for %s"
-                        % self.describe_session()
-                    )
-                )
-                return deferred
             entry.merge(intent)
-        if entry.grouped:
-            self._schedule_deferred_drain()
-        else:
-            self._schedule_drain()
+        # One drain boundary for every queued publication: the reactor's next
+        # turn, after every synchronous commit callback of the operations that
+        # queued them. Queue order (first enqueue) is therefore the publication
+        # order, and no later operation can overtake an earlier committed one.
+        self._schedule_deferred_drain()
         return deferred
 
     def full_snapshot(self, context: PresentationContext) -> Deferred:
@@ -651,7 +638,6 @@ class PresentationCoordinator:
             force_snapshot=bool(force_snapshot),
             result_only=bool(result_only),
             group_id=captured or new_publication_group().id,
-            standalone=captured is None,
             epoch=self._epoch,
             expected_epoch=expected_epoch,
             completion=completion,
@@ -682,21 +668,6 @@ class PresentationCoordinator:
     # Serialized drain and the single synchronous publisher.
     # ------------------------------------------------------------------
 
-    def _schedule_drain(self) -> None:
-        """Run the serialized drain for standalone intents before returning.
-
-        An intent that belongs to no captured group publishes at its own enqueue
-        boundary, as B defined: an explicit sync or recovery answer must be on
-        the wire before a sequence-retiring effect the adapter already scheduled
-        can retire the epoch. Grouped intents are deliberately left queued for
-        :meth:`_schedule_deferred_drain`, because their own commit callbacks have
-        not all run yet; publishing them here would split one causal group into
-        an intermediate delta plus its checkpoint snapshot.
-        """
-        if self._draining:
-            return
-        self._drain(standalone_only=True)
-
     def drain(self) -> None:
         """Run every queued publication now (deterministic seam for tests/tooling)."""
         self._drain()
@@ -719,7 +690,9 @@ class PresentationCoordinator:
         """Schedule one drain after the current reactor turn.
 
         A committed operation's on-commit callbacks all run before the reactor
-        returns, so its group entry is complete when the scheduled drain runs.
+        returns, so every entry is complete when the scheduled drain runs, and
+        draining them in first-enqueue order keeps publication order equal to
+        completion order even when a later standalone refresh is queued first.
         """
         if self._drain_scheduled:
             return
@@ -750,14 +723,12 @@ class PresentationCoordinator:
     def _drain(
         self,
         *,
-        standalone_only: bool = False,
         only: "_PendingGroup | None" = None,
     ) -> None:
         """Run queued group entries in order inside the publication critical section.
 
-        ``standalone_only`` publishes the entries that belong to no captured
-        group and leaves grouped entries for their deferred boundary.
-        ``only`` publishes exactly one identified entry in place.
+        ``only`` publishes exactly one identified entry in place (the dispatcher's
+        result-only flush); otherwise every entry drains in queue order.
         """
         if self._draining:
             return
@@ -769,24 +740,15 @@ class PresentationCoordinator:
                         return
                     entry = only
                 else:
-                    entry = next(
-                        (
-                            candidate
-                            for candidate in self._pending
-                            if not standalone_only or not candidate.grouped
-                        ),
-                        None,
-                    )
-                    if entry is None:
-                        return
+                    entry = self._pending[0]
                 self._pending.remove(entry)
                 self._pending_groups.pop(entry.group_id, None)
                 self._execute(entry)
         finally:
             self._draining = False
-        if standalone_only and self._pending and not self._drain_scheduled:
-            # A reentrant enqueue hit the draining guard: retry the grouped work
-            # at its deferred boundary instead of stranding its waiters.
+        if self._pending and not self._drain_scheduled:
+            # A reentrant enqueue hit the draining guard: retry at the deferred
+            # boundary instead of stranding its waiters.
             self._schedule_deferred_drain()
 
     def _execute(self, entry: _PendingGroup) -> None:

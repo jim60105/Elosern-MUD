@@ -141,6 +141,24 @@ def publication_group(group: PublicationGroup | None = None) -> Iterator[Publica
         _active.reset(token)
 
 
+@contextmanager
+def _exact_publication_group(group: PublicationGroup) -> Iterator[PublicationGroup]:
+    """Bind exactly ``group`` for one synchronous scope, overriding any ambient one.
+
+    Only :func:`on_publication_commit` uses this: a callback captured under group
+    A must run under A even when it is invoked while group B is bound (an outer
+    transaction committing inside another committed operation). Domain callers
+    keep the nested-reuse rule of :func:`publication_group`.
+    """
+    binding = _Binding(group)
+    token = _active.set(binding)
+    try:
+        yield group
+    finally:
+        binding.closed = True
+        _active.reset(token)
+
+
 def on_publication_commit(
     callback: Callable[[], None], *, using: str | None = None
 ) -> None:
@@ -157,7 +175,7 @@ def on_publication_commit(
     captured = current_publication_group() or new_publication_group()
 
     def _committed() -> None:
-        with publication_group(captured):
+        with _exact_publication_group(captured):
             callback()
 
     transaction.on_commit(_committed, using=using)
