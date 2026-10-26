@@ -152,14 +152,20 @@ class ExamHostFixture(ExamRegistryIsolation):
         self.hall = create_object(Room, key="exam hall")
         self.player = self._candidate("exam player")
         self.counter = create_object(NPC, key="guild counter", location=self.hall)
-        self.counter.components.add(
-            GuildStaff.create(self.counter, service_id="staff", branch_key=EXAM_BRANCH)
+        staff_component = GuildStaff.create(
+            self.counter, service_id="staff", branch_key=EXAM_BRANCH
         )
-        self.counter.components.add(
-            GuildExamReception.create(
-                self.counter, service_id="counter", branch_key=EXAM_BRANCH
-            )
+        # A serving host declares its authored place binding: the shared gate
+        # fails closed on a component without one.
+        staff_component.service_binding = "place"
+        staff_component.anchor_room_id = self.hall.pk
+        self.counter.components.add(staff_component)
+        reception_component = GuildExamReception.create(
+            self.counter, service_id="counter", branch_key=EXAM_BRANCH
         )
+        reception_component.service_binding = "place"
+        reception_component.anchor_room_id = self.hall.pk
+        self.counter.components.add(reception_component)
         register_adventurer(self.player, self.counter)
         self.host = make_exam_host(self.hall)
 

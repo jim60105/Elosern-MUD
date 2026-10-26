@@ -81,14 +81,20 @@ class ServicesViewSideEffectTests(EvenniaTestCase):
         self.hall = create_object(Room, key="guild hall")
         self.store = create_object(Room, key="general store")
         self.staff = create_object(NPC, key="guild master", location=self.hall)
-        self.staff.components.add(
-            GuildStaff.create(self.staff, service_id="staff", branch_key=BRANCH)
+        staff_component = GuildStaff.create(
+            self.staff, service_id="staff", branch_key=BRANCH
         )
-        self.staff.components.add(
-            GuildExamReception.create(
-                self.staff, service_id="counter", branch_key=BRANCH
-            )
+        # A serving host declares its authored place binding: the shared gate
+        # fails closed on a component without one.
+        staff_component.service_binding = "place"
+        staff_component.anchor_room_id = self.hall.pk
+        self.staff.components.add(staff_component)
+        reception_component = GuildExamReception.create(
+            self.staff, service_id="counter", branch_key=BRANCH
         )
+        reception_component.service_binding = "place"
+        reception_component.anchor_room_id = self.hall.pk
+        self.staff.components.add(reception_component)
         self.merchant_npc = create_object(NPC, key="shop keeper", location=self.store)
         self.merchant = Merchant.create(
             self.merchant_npc,

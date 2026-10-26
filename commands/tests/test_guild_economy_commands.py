@@ -110,6 +110,17 @@ def _register_board_offer(definition_key: str) -> None:
     )
 
 
+def _place_bound(component, room):
+    """Declare the authored place binding on a fixture-attached host.
+
+    Every shipped service capability is anchored to its venue room; the shared
+    service gate fails closed on a component without a persisted binding.
+    """
+    component.service_binding = "place"
+    component.anchor_room_id = room.pk
+    return component
+
+
 class CommandIsolation(BattlefieldIsolation, QuestRegistryIsolation):
     def setUp(self):
         super().setUp()
@@ -143,7 +154,10 @@ class GuildCommandTests(CommandIsolation, EvenniaCommandTestMixin, EvenniaTest):
         self.char1.apply_race_baseline()
         self.staff = create_object(NPC, key="staff", location=self.hall)
         self.staff.components.add(
-            GuildStaff.create(self.staff, service_id="staff", branch_key=BRANCH)
+            _place_bound(
+                GuildStaff.create(self.staff, service_id="staff", branch_key=BRANCH),
+                self.hall,
+            )
         )
         _register_board_offer("introductory_hunt")
 
@@ -215,7 +229,10 @@ class GuildCommandTests(CommandIsolation, EvenniaCommandTestMixin, EvenniaTest):
     def test_ambiguous_staff_rejects(self):
         second = create_object(NPC, key="staff2", location=self.hall)
         second.components.add(
-            GuildStaff.create(second, service_id="staff2", branch_key=BRANCH)
+            _place_bound(
+                GuildStaff.create(second, service_id="staff2", branch_key=BRANCH),
+                self.hall,
+            )
         )
         self.call(CmdGuildRegister(), "", "這裡沒有公會服務人員")
 
@@ -230,7 +247,10 @@ class QuestDetailCommandTests(CommandIsolation, EvenniaCommandTestMixin, Evennia
         self.char1.apply_race_baseline()
         self.staff = create_object(NPC, key="staff", location=self.hall)
         self.staff.components.add(
-            GuildStaff.create(self.staff, service_id="staff", branch_key=BRANCH)
+            _place_bound(
+                GuildStaff.create(self.staff, service_id="staff", branch_key=BRANCH),
+                self.hall,
+            )
         )
         _register_board_offer("introductory_hunt")
         from world.quests.runtime import accept_quest
@@ -375,10 +395,13 @@ class EconomyCommandTests(CommandIsolation, EvenniaCommandTestMixin, EvenniaTest
         self.char1.apply_race_baseline()
         self.char1.db.wallet = 500
         self.merchant_npc = create_object(NPC, key="t_synth_courier", location=self.store)
-        self.merchant = Merchant.create(
-            self.merchant_npc,
-            service_id="t_shop_service",
-            shop_key=SHOP_KEY,
+        self.merchant = _place_bound(
+            Merchant.create(
+                self.merchant_npc,
+                service_id="t_shop_service",
+                shop_key=SHOP_KEY,
+            ),
+            self.store,
         )
         self.merchant_npc.components.add(self.merchant)
         self.merchant.merchant_stock = {key: 20 for key in _GOODS}
@@ -424,17 +447,23 @@ class ScheduleGateCommandTests(CommandIsolation, EvenniaCommandTestMixin, Evenni
         self.char1.apply_race_baseline()
         self.char1.db.wallet = 500
         self.merchant_npc = create_object(NPC, key="t_synth_courier", location=self.store)
-        self.merchant = Merchant.create(
-            self.merchant_npc,
-            service_id="t_shop_service",
-            shop_key=SHOP_KEY,
+        self.merchant = _place_bound(
+            Merchant.create(
+                self.merchant_npc,
+                service_id="t_shop_service",
+                shop_key=SHOP_KEY,
+            ),
+            self.store,
         )
         self.merchant_npc.components.add(self.merchant)
         self.merchant.merchant_stock = {key: 20 for key in _GOODS}
         self.hall = create_object(Room, key="guild hall")
         self.staff = create_object(NPC, key="staff", location=self.hall)
         self.staff.components.add(
-            GuildStaff.create(self.staff, service_id="staff", branch_key=BRANCH)
+            _place_bound(
+                GuildStaff.create(self.staff, service_id="staff", branch_key=BRANCH),
+                self.hall,
+            )
         )
 
     @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
@@ -485,8 +514,11 @@ class ScheduleGateCommandTests(CommandIsolation, EvenniaCommandTestMixin, Evenni
         self.char1.location = self.hall
         reception = create_object(NPC, key="reception", location=self.hall)
         reception.components.add(
-            GuildExamReception.create(
-                reception, service_id="reception", branch_key=BRANCH
+            _place_bound(
+                GuildExamReception.create(
+                    reception, service_id="reception", branch_key=BRANCH
+                ),
+                self.hall,
             )
         )
         reception.db.schedule_state = "busy"
@@ -553,7 +585,10 @@ class SpeciesHuntBoardCommandTests(
         self.char1.apply_race_baseline()
         self.staff = create_object(NPC, key="staff", location=self.hall)
         self.staff.components.add(
-            GuildStaff.create(self.staff, service_id="staff", branch_key=BRANCH)
+            _place_bound(
+                GuildStaff.create(self.staff, service_id="staff", branch_key=BRANCH),
+                self.hall,
+            )
         )
         self.objective = QuestObjective(
             kind=ObjectiveKind.DEFEAT,

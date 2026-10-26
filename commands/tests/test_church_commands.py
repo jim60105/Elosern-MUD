@@ -37,6 +37,10 @@ class ChurchJoinCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.component = ChurchHost.create(
             self.celebrant, service_id="t_celebrant"
         )
+        # The authored church capability is place-bound to its venue room; a
+        # component without a persisted binding fails closed in the shared gate.
+        self.component.service_binding = "place"
+        self.component.anchor_room_id = self.hall.pk
         self.celebrant.components.add(self.component)
         self.clock = WorldClock(tick=0)
         self._clock_patch = patch(

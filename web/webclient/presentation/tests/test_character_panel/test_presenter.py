@@ -413,9 +413,12 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
 
         self.player.location = self.room1
         staff = create_object(NPC, key="公會職員", location=self.room1)
-        staff.components.add(
-            GuildStaff.create(staff, service_id="staff", branch_key=BRANCH)
-        )
+        staff_component = GuildStaff.create(staff, service_id="staff", branch_key=BRANCH)
+        # A serving host declares its authored place binding: the shared gate
+        # fails closed on a component without one.
+        staff_component.service_binding = "place"
+        staff_component.anchor_room_id = self.room1.pk
+        staff.components.add(staff_component)
         register_adventurer(self.player, staff=staff)
         write_counter_trait(self.player, "guild_merit", 60)
         payload = self._render()

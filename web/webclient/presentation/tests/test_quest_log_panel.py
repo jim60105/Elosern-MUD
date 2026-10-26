@@ -412,9 +412,14 @@ class QuestLogPresenterTests(EvenniaTest):
 
     def test_guild_label_uses_branch_registry_with_remainder_fallback(self):
         staff = create_object(NPC, key="guild master", location=self.room)
-        staff.components.add(
-            GuildStaff.create(staff, service_id="staff", branch_key=T_BRANCH)
+        staff_component = GuildStaff.create(
+            staff, service_id="staff", branch_key=T_BRANCH
         )
+        # A serving host declares its authored place binding: the shared gate
+        # fails closed on a component without one.
+        staff_component.service_binding = "place"
+        staff_component.anchor_room_id = self.room.pk
+        staff.components.add(staff_component)
         definition = register(quest("branch_label_quest"))
         self.player.race = "human"
         self.player.apply_race_baseline()
@@ -478,9 +483,12 @@ class QuestLogPresenterTests(EvenniaTest):
         # catalog so the counter board never touches shipped data.
         install_synthetic_catalog(self, synth_catalog())
         staff = create_object(NPC, key="parity clerk", location=self.room)
-        staff.components.add(
-            GuildStaff.create(staff, service_id="staff", branch_key=T_BRANCH)
+        staff_component = GuildStaff.create(
+            staff, service_id="staff", branch_key=T_BRANCH
         )
+        staff_component.service_binding = "place"
+        staff_component.anchor_room_id = self.room.pk
+        staff.components.add(staff_component)
         definition = register(quest("counter_parity"))
         self.player.race = "human"
         self.player.apply_race_baseline()

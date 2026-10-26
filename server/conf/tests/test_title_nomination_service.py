@@ -968,6 +968,10 @@ class _RealDeedFixture:
         component = Merchant.create(
             self.merchant, service_id="h_real_merchant", shop_key=shop_key
         )
+        # The authored merchant capability is place-bound to its shop room: the
+        # shared service gate fails closed on a component without a binding.
+        component.service_binding = "place"
+        component.anchor_room_id = self.room.pk
         self.merchant.components.add(component)
         component.merchant_stock = {_T_BOUGHT: 20}
         self.player = create_object(

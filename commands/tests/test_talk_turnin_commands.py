@@ -108,11 +108,14 @@ class TalkTurnInCommandTests(TalkTurnInCommandIsolation, EvenniaCommandTestMixin
         self.char1.race = "human"
         self.char1.apply_race_baseline()
         self.staff = create_object(NPC, key="公會職員", location=self.hall)
-        self.staff.components.add(
-            GuildStaff.create(
-                self.staff, service_id="staff", branch_key=BRANCH
-            )
+        staff_component = GuildStaff.create(
+            self.staff, service_id="staff", branch_key=BRANCH
         )
+        # The authored guild capability is place-bound to its hall: the shared
+        # gate fails closed on a component without a persisted binding.
+        staff_component.service_binding = "place"
+        staff_component.anchor_room_id = self.hall.pk
+        self.staff.components.add(staff_component)
         self.staff.components.add(
             ScriptedDialogue.create(self.staff, dialogue_key=GUILD_STAFF_DIALOGUE_KEY)
         )
@@ -215,9 +218,10 @@ class TalkTurnInCommandTests(TalkTurnInCommandIsolation, EvenniaCommandTestMixin
     @covers_requirement("guild-quest-board::player-facing-guild-commands-resolve-one-local-service-host")
     def test_turnin_with_ambiguous_staff_is_rejected(self):
         second = create_object(NPC, key="second clerk", location=self.hall)
-        second.components.add(
-            GuildStaff.create(second, service_id="second", branch_key=BRANCH)
-        )
+        second_staff = GuildStaff.create(second, service_id="second", branch_key=BRANCH)
+        second_staff.service_binding = "place"
+        second_staff.anchor_room_id = self.hall.pk
+        second.components.add(second_staff)
         second.components.add(
             ScriptedDialogue.create(second, dialogue_key=GUILD_STAFF_DIALOGUE_KEY)
         )
@@ -231,9 +235,10 @@ class TalkTurnInCommandTests(TalkTurnInCommandIsolation, EvenniaCommandTestMixin
         self.call(CmdGuildAccept(), _QUEST_KEY, "你接取了任務")
         quest_id = self._complete_quest()
         second = create_object(NPC, key="second clerk", location=self.hall)
-        second.components.add(
-            GuildStaff.create(second, service_id="second", branch_key=BRANCH)
-        )
+        second_staff = GuildStaff.create(second, service_id="second", branch_key=BRANCH)
+        second_staff.service_binding = "place"
+        second_staff.anchor_room_id = self.hall.pk
+        second.components.add(second_staff)
         output = self.call(CmdsTalk(), f"公會職員 {GUILD_STAFF_TURNIN_KEYWORD} {quest_id}")
         self.assertIn("這裡沒有公會服務人員", output)
         self.assertEqual(self.char1.db.wallet, 0)

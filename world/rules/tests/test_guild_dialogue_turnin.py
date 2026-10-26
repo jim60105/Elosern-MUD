@@ -66,9 +66,14 @@ _NOTHING_LINE = "「目前沒有可以交回的任務。」"
 
 
 def _attach_staff(npc, service_id: str = "staff") -> None:
-    npc.components.add(
-        GuildStaff.create(npc, service_id=service_id, branch_key=ALTORIA_BRANCH)
+    component = GuildStaff.create(
+        npc, service_id=service_id, branch_key=ALTORIA_BRANCH
     )
+    # A serving host declares its authored place binding: the shared gate
+    # fails closed on a component without one.
+    component.service_binding = "place"
+    component.anchor_room_id = npc.location.pk
+    npc.components.add(component)
 
 
 def _offer(

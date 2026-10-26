@@ -83,19 +83,23 @@ class ExamIntentTests(BattlefieldIsolation, ExamRegistryIsolation, EvenniaTestCa
         self.player.apply_race_baseline()
         self.player.location = self.hall
         self.staff = create_object(NPC, key="guild staff", location=self.hall)
-        self.staff.components.add(
-            GuildStaff.create(
-                self.staff, service_id="staff", branch_key=BRANCH
-            )
+        staff_component = GuildStaff.create(
+            self.staff, service_id="staff", branch_key=BRANCH
         )
+        # A serving host declares its authored place binding: the shared gate
+        # fails closed on a component without one.
+        staff_component.service_binding = "place"
+        staff_component.anchor_room_id = self.hall.pk
+        self.staff.components.add(staff_component)
         self.reception = create_object(NPC, key="reception", location=self.hall)
-        self.reception.components.add(
-            GuildExamReception.create(
-                self.reception,
-                service_id="counter",
-                branch_key=BRANCH,
-            )
+        reception_component = GuildExamReception.create(
+            self.reception,
+            service_id="counter",
+            branch_key=BRANCH,
         )
+        reception_component.service_binding = "place"
+        reception_component.anchor_room_id = self.hall.pk
+        self.reception.components.add(reception_component)
         register_adventurer(self.player, self.staff)
         self.host = make_exam_host(self.hall)
 
@@ -150,11 +154,14 @@ class ExamIntentTests(BattlefieldIsolation, ExamRegistryIsolation, EvenniaTestCa
     @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
     def test_wrong_branch_reception_discards_only_the_intent(self):
         reception = create_object(NPC, key="other branch reception", location=self.hall)
-        reception.components.add(
-            GuildExamReception.create(
-                reception, service_id="other", branch_key="t_other_branch"
-            )
+        reception_component = GuildExamReception.create(
+            reception, service_id="other", branch_key="t_other_branch"
         )
+        # The wrong-branch refusal must be the branch check, so this host still
+        # declares its place binding and serves from the same hall.
+        reception_component.service_binding = "place"
+        reception_component.anchor_room_id = self.hall.pk
+        reception.components.add(reception_component)
         self._give_merit(50)
         outcome = apply_npc_intent(reception, self.player, _exam_intent("E"))
         self.assertFalse(outcome.applied)

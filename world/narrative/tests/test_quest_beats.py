@@ -240,7 +240,14 @@ class QuestBeatTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase):
         self.owner.location = self.room1
         self.room1.anchor_key = self.payload["stages"][0]["location_req"]["anchor_key"]
         self.npc.location = self.room1
-        self.npc.components.add(GuildStaff.create(self.npc, service_id="test", branch_key=self.payload["issuer"]))
+        staff_component = GuildStaff.create(
+            self.npc, service_id="test", branch_key=self.payload["issuer"]
+        )
+        # A serving host declares its authored place binding: the shared gate
+        # fails closed on a component without one.
+        staff_component.service_binding = "place"
+        staff_component.anchor_room_id = self.room1.pk
+        self.npc.components.add(staff_component)
         with patch("world.rules.guild.get_display_value", return_value=100):
             register_adventurer(self.owner, self.npc)
 

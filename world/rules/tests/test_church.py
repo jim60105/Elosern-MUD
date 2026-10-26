@@ -185,6 +185,10 @@ class ChurchMeritWalletIsolationTests(EvenniaTest):
         self.merchant = Merchant.create(
             self.merchant_npc, service_id="t_ledger_merchant", shop_key=shop_key
         )
+        # A serving host declares its authored place binding: the shared gate
+        # fails closed on a component without one.
+        self.merchant.service_binding = "place"
+        self.merchant.anchor_room_id = self.store.pk
         self.merchant_npc.components.add(self.merchant)
         self.merchant.merchant_stock = {item_key: 20}
         self.player = self.char1

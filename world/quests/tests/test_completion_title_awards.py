@@ -364,6 +364,10 @@ class PurchaseCompletionTitleRollbackTests(
         component = Merchant.create(
             self.merchant, service_id="completion_title_merchant", shop_key=shop_key
         )
+        # A serving host declares its authored place binding: the shared gate
+        # fails closed on a component without one.
+        component.service_binding = "place"
+        component.anchor_room_id = self.store.pk
         self.merchant.components.add(component)
         component.merchant_stock = {_T_BOUGHT: 20}
         self.player = create_object(PlayerCharacter, key="completion title buyer")

@@ -69,9 +69,14 @@ T_ITEM = SYNTH_ITEMS["t_ember_spray"].key
 
 
 def _attach_staff(npc) -> None:
-    npc.components.add(
-        GuildStaff.create(npc, service_id="staff", branch_key=ALTORIA_BRANCH)
+    component = GuildStaff.create(
+        npc, service_id="staff", branch_key=ALTORIA_BRANCH
     )
+    # A serving host declares its authored place binding: the shared gate
+    # fails closed on a component without one.
+    component.service_binding = "place"
+    component.anchor_room_id = npc.location.pk
+    npc.components.add(component)
 
 
 def _offer(definition_key: str, copper: int = 50, merit: int = 25, items=(T_ITEM,)) -> GuildQuestOffer:
@@ -337,19 +342,19 @@ class BoardAcceptanceIssuerKeyTests(OfferRegistryIsolation, EvenniaTestCase):
             )
         )
         registry[self.SECOND_BRANCH] = GuildBranch(
-            self.SECOND_BRANCH,
-            "埃洛西恩冒險者公會 第二分會",
-            "測試會長",
-            "測試分會會長",
+            key=self.SECOND_BRANCH,
+            display_name_zh="埃洛西恩冒險者公會 第二分會",
+            host_name="測試會長",
             # Branch anchors are free-form identities on this invented row.
-            "t_hollow_tarn",
+            anchor_key="t_hollow_tarn",
         )
         self.staff_b = create_object(NPC, key="staff b", location=self.hall)
-        self.staff_b.components.add(
-            GuildStaff.create(
-                self.staff_b, service_id="staff-b", branch_key=self.SECOND_BRANCH
-            )
+        staff_b_component = GuildStaff.create(
+            self.staff_b, service_id="staff-b", branch_key=self.SECOND_BRANCH
         )
+        staff_b_component.service_binding = "place"
+        staff_b_component.anchor_room_id = self.hall.pk
+        self.staff_b.components.add(staff_b_component)
 
     @covers_requirement("guild-quest-board::board-acceptance-and-abandonment-delegate-to-quest-lifecycle")
     def test_board_acceptance_names_the_issuing_branch(self):

@@ -74,11 +74,14 @@ class OfferQuestIntentTests(ExamRegistryIsolation, EvenniaTestCase):
         self.player.apply_race_baseline()
         self.player.location = self.room
         self.staff = create_object(NPC, key="offer staff", location=self.room)
-        self.staff.components.add(
-            GuildStaff.create(
-                self.staff, service_id="staff", branch_key=self.ALTORIA_BRANCH
-            )
+        staff_component = GuildStaff.create(
+            self.staff, service_id="staff", branch_key=self.ALTORIA_BRANCH
         )
+        # A serving host declares its authored place binding: the shared gate
+        # fails closed on a component without one.
+        staff_component.service_binding = "place"
+        staff_component.anchor_room_id = self.room.pk
+        self.staff.components.add(staff_component)
         register_adventurer(self.player, self.staff)
         definition = _register_quest(_quest("forest_clearing", rank="F"))
         register_guild_offer(

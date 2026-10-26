@@ -58,13 +58,16 @@ class OfflineDirectorEndToEndTests(CompileRegistryIsolation, EvenniaTestCase):
         register_scenario_director()
         self.hall = create_object(Room, key="offline-hall")
         self.staff = create_object(NPC, key="offline staff", location=self.hall)
-        self.staff.components.add(
-            GuildStaff.create(
-                self.staff,
-                service_id="staff",
-                branch_key="guild_branch_altoria",
-            )
+        staff_component = GuildStaff.create(
+            self.staff,
+            service_id="staff",
+            branch_key="guild_branch_altoria",
         )
+        # A serving host declares its authored place binding: the shared gate
+        # fails closed on a component without one.
+        staff_component.service_binding = "place"
+        staff_component.anchor_room_id = self.hall.pk
+        self.staff.components.add(staff_component)
         self.player = create_object(PlayerCharacter, key="offline-director-player")
         self.player.race = "human"
         self.player.apply_race_baseline()

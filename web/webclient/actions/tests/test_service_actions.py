@@ -231,21 +231,29 @@ class ServiceActionBase(BattlefieldIsolation, EvenniaTest):
         self.hall = create_object(Room, key="guild hall")
         self.store = create_object(Room, key="general store")
         self.staff = create_object(NPC, key="guild master", location=self.hall)
-        self.staff.components.add(
-            GuildStaff.create(self.staff, service_id="staff", branch_key=BRANCH)
+        staff_component = GuildStaff.create(
+            self.staff, service_id="staff", branch_key=BRANCH
         )
+        # Every authored service capability is place-bound to its venue room;
+        # the shared gate fails closed on a component without a binding.
+        staff_component.service_binding = "place"
+        staff_component.anchor_room_id = self.hall.pk
+        self.staff.components.add(staff_component)
         self.reception = create_object(NPC, key="guild reception", location=self.hall)
-        self.reception.components.add(
-            GuildExamReception.create(
-                self.reception, service_id="counter", branch_key=BRANCH
-            )
+        reception_component = GuildExamReception.create(
+            self.reception, service_id="counter", branch_key=BRANCH
         )
+        reception_component.service_binding = "place"
+        reception_component.anchor_room_id = self.hall.pk
+        self.reception.components.add(reception_component)
         self.merchant_npc = create_object(NPC, key="store keeper", location=self.store)
         self.merchant = Merchant.create(
             self.merchant_npc,
             service_id="store",
             shop_key=T_SHOP,
         )
+        self.merchant.service_binding = "place"
+        self.merchant.anchor_room_id = self.store.pk
         self.merchant_npc.components.add(self.merchant)
         self.merchant.merchant_stock = {
             _T_MEAL: 20,

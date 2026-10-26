@@ -185,9 +185,14 @@ class SiteClearOutAcceptanceTests(
             )
         ).key
         self.staff = create_object(NPC, key="clear-out-staff", location=self.room)
-        self.staff.components.add(
-            GuildStaff.create(self.staff, service_id="clear-out-staff", branch_key=_BRANCH)
+        staff_component = GuildStaff.create(
+            self.staff, service_id="clear-out-staff", branch_key=_BRANCH
         )
+        # A serving host declares its authored place binding: the shared gate
+        # fails closed on a component without one.
+        staff_component.service_binding = "place"
+        staff_component.anchor_room_id = self.room.pk
+        self.staff.components.add(staff_component)
 
     # -- helpers ------------------------------------------------------------
 

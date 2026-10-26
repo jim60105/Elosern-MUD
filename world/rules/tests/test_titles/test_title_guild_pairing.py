@@ -114,11 +114,14 @@ class TitleGuildPairingTests(EvenniaTest):
         self.player.apply_race_baseline()
         self.player.location = self.room
         self.staff = create_object(NPC, key="title guild staff", location=self.room)
-        self.staff.components.add(
-            GuildStaff.create(
-                self.staff, service_id="staff", branch_key="t_mossgate_branch"
-            )
+        staff_component = GuildStaff.create(
+            self.staff, service_id="staff", branch_key="t_mossgate_branch"
         )
+        # A serving host declares its authored place binding: the shared gate
+        # fails closed on a component without one.
+        staff_component.service_binding = "place"
+        staff_component.anchor_room_id = self.room.pk
+        self.staff.components.add(staff_component)
 
     @covers_requirement("title-system::guild-registration-and-rank-promotion-grant-paired-titles-atomically")
     def test_first_quest_epithet_grant_banks_and_auto_equips_the_epithet_slot(self):

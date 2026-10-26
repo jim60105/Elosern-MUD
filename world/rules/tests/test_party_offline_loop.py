@@ -188,9 +188,14 @@ class OfflinePartyQuestLoopTests(BattlefieldIsolation, EvenniaCommandTestMixin, 
             Exit, key="城門", location=self.hall, destination=self.hunt_ground
         )
         self.staff = create_object(NPC, key="公會接待員", location=self.hall)
-        self.staff.components.add(
-            GuildStaff.create(self.staff, service_id="staff", branch_key=ALTORIA_BRANCH)
+        staff_component = GuildStaff.create(
+            self.staff, service_id="staff", branch_key=ALTORIA_BRANCH
         )
+        # A serving host declares its authored place binding: the shared gate
+        # fails closed on a component without one.
+        staff_component.service_binding = "place"
+        staff_component.anchor_room_id = self.hall.pk
+        self.staff.components.add(staff_component)
         self.char1.race = _race_key()
         self.char1.apply_race_baseline()
         # Static magic_power raised to the kit spell's tuning threshold.

@@ -155,13 +155,16 @@ def _ensure_merchant(room):
     host = create_object(NPC, key=MERCHANT_NAME, location=room, nohome=True)
     ensure_npc_canonical_age(host)
     offers = guild_config.get_catalog().shop_configs[SHOP_KEY].offers
-    host.components.add(
-        Merchant.create(
-            host,
-            shop_key=SHOP_KEY,
-            merchant_stock={rule.item_key: rule.initial_stock for rule in offers},
-        )
+    merchant = Merchant.create(
+        host,
+        shop_key=SHOP_KEY,
+        merchant_stock={rule.item_key: rule.initial_stock for rule in offers},
     )
+    # The authored merchant capability is place-bound to the room it stands in:
+    # the shared service gate fails closed on a component without a binding.
+    merchant.service_binding = "place"
+    merchant.anchor_room_id = room.pk
+    host.components.add(merchant)
     host.save()
     _tag(host, MERCHANT_TAG)
     return host
