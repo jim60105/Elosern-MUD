@@ -1,40 +1,34 @@
 # place-attendant-hosts Specification
 
 ## Purpose
-Define the `attendant` profession blueprint: the place-bound, talk-only service host whose
-service is conversation — the authored dialogue seam that binds a host to a dialogue table
-that exists, and the rule that adding the blueprint changes no shipped host.
+Define the talk-only service host whose service is conversation: an authored place declares
+its dialogue capability directly, the seam that binds a host to a dialogue table that exists,
+and dialogue alone grants no trade, guild, reception or commission authority.
 
 ## Requirements
 
 ### Requirement: A place whose service is conversation has a blueprint to host it
-The profession rulebook SHALL declare an `attendant` profession carrying exactly one
-place-bound `scripted_dialogue` component. A place registry row MAY name it, and doing so
-SHALL yield one service host that carries the row's authored name, title, race, subrace and
-sex, and a dialogue table — and no trade, guild or commission capability.
+A complete hosted place SHALL declare narrative dialogue directly without needing an attendant profession. Dialogue alone SHALL grant no trading, guild, reception or commission authority.
 
 #### Scenario: An attendant place yields a talk-only host
-- **WHEN** a synthetic place row naming the attendant profession is synchronized
-- **THEN** one host exists at that place carrying a scripted-dialogue component bound to the
-  authored dialogue key, and carrying no merchant, guild-staff, guild-examiner or
-  quest-issuer component
+- **WHEN** a place declares only scripted dialogue
+- **THEN** one canonical host answers its configured dialogue and carries no other service capability
 
 #### Scenario: An attendant row authoring a trade kwarg is rejected
-- **WHEN** a synthetic place row names the attendant profession and authors a `shop_key`
-- **THEN** catalog load raises the named error identifying the place and the kwarg no
-  component consumes
+- **WHEN** a dialogue component authors a shop kwarg
+- **THEN** the whole candidate rejects the unknown per-type field
 
 #### Scenario: An attendant place declares no goods
-- **WHEN** a synthetic place row names the attendant profession and declares assortments
-- **THEN** load raises naming the place, because assortments require a shop identity
+- **WHEN** a dialogue-only place declares goods without merchant
+- **THEN** the complete candidate rejects it
 
 #### Scenario: An attendant row authors exactly the dialogue kwarg
-- **WHEN** a place row is authored for the attendant profession
-- **THEN** authoring it requires exactly the identity kwargs the component declares (`dialogue_key`)
+- **WHEN** ordinary narrative dialogue is authored
+- **THEN** dialogue_key is required while service association and binding are not inferred
 
 #### Scenario: Trade kwargs on an attendant row hit the dead-kwarg rule
-- **WHEN** an attendant row carries a `shop_key` or `branch_key`
-- **THEN** it is rejected as a kwarg no component consumes, by the same dead-kwarg rule every other profession already obeys
+- **WHEN** a narrative component carries branch_key
+- **THEN** per-type validation rejects the unrelated field
 
 ### Requirement: An authored host is bound to a dialogue table that exists
 Catalog load SHALL reject a place row whose authored `dialogue_key` resolves to no dialogue
@@ -56,9 +50,3 @@ nothing, which is indistinguishable at runtime from an intentionally silent NPC.
 - **WHEN** a `dialogue_key` reaches the registry from any other route
 - **THEN** it still degrades to the no-understanding line rather than raising
 
-### Requirement: Adding the blueprint changes no shipped host
-Introducing an unused profession blueprint SHALL NOT alter existing place rows, service hosts, interiors or dialogue. Host creation SHALL follow current place declarations and shared assembly without implicit profession-default personnel. A later authored roster edit SHALL take effect through its existing sync contract without freezing historical identities.
-
-#### Scenario: The shipped roster is unchanged by the new blueprint
-- **WHEN** a synthetic unused blueprint is registered while hosted place declarations stay unchanged
-- **THEN** derived identities, professions, anchors and components remain unchanged; adding a place using that blueprint creates only its declared host

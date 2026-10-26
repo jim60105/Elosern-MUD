@@ -15,8 +15,9 @@ class GuildStaff(Component):
     name = "guild_staff"
     service_id = DBField(default=None)
     branch_key = DBField(default=None)
-    # Authored availability binding (service-anchoring D2): copied from the
-    # profession blueprint by the shared assembly; only it writes them.
+    # Authored availability binding (service-anchoring D2): written by the
+    # shared capability assembly from the declaration's own binding; only it
+    # writes them.
     service_binding = DBField(default=None)
     anchor_room_id = DBField(default=None)
 
@@ -74,12 +75,9 @@ class ScriptedDialogue(Component):
 
     Any NPC carrying this component answers authored ``talk`` lines from the
     immutable keyed table in ``world/rules/dialogue.py``.
-    ``service_id`` is load-bearing for place-bound hosts: the roster-sync
-    reuse path reads it unconditionally on whichever component class anchors
-    a profession row (design D3), exactly like ``QuestIssuer`` — which is why
-    ``profession_config`` rejects a row anchored on a class that lacks it.
-    Place-bound rows receive it projected from the roster anchor, never
-    authored as a kwarg; person-bound imports author it like any identity.
+    ``service_id`` is an optional authored anchor value: ordinary narrative
+    dialogue declares only ``dialogue_key`` and no binding, while a
+    place-associated table declares its own place binding.
     """
 
     name = "scripted_dialogue"
@@ -96,10 +94,9 @@ class QuestIssuer(Component):
     private commission; a primary key alone would make every NPC a potential
     commissioner. ``issuer_key`` is the authored content key (``npc:<key>``
     form); an absent value resolves to the host's database identity
-    (``npc:#<pk>``). ``service_id`` is load-bearing: the roster-sync reuse
-    path reads it unconditionally on whichever component class anchors a
-    profession row. Identity only — every commission registration, mutation,
-    and settlement delegates to the deterministic core.
+    (``npc:#<pk>``). ``service_id`` is the scoped identity a generated
+    commission role carries. Identity only — every commission registration,
+    mutation, and settlement delegates to the deterministic core.
     """
 
     name = "quest_issuer"

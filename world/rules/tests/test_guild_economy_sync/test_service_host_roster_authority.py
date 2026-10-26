@@ -32,10 +32,62 @@ from ._support import (
 class ServiceHostRosterAuthorityTests(ServiceContentIsolation, EvenniaTestCase):
     """Source ownership alone authorizes retirement; rooms never gate it."""
 
+    def test_a_zero_capability_row_still_requires_exactly_one_room_per_tag(self):
+        # The exact-one-Room rule belongs to the spawn room itself, not to a
+        # capability anchor: a host that declares no capability must still fail
+        # closed on an ambiguous or non-Room spawn tag.
+        bare_row = dataclasses.replace(
+            next(
+                row
+                for row in get_catalog().service_hosts
+                if row.host_key == MERCHANT_SERVICE_ID
+            ),
+            components=(),
+        )
+        ambiguous_tag = "t_ambiguous_spawn_tag"
+        create_object(NPC, key="ambiguous first", tags=[ambiguous_tag])
+        create_object(NPC, key="ambiguous second", tags=[ambiguous_tag])
+        for tag, fragment in (
+            (ambiguous_tag, "resolves to"),
+            ("t_absent_spawn_tag", "resolves to no room"),
+        ):
+            with self.subTest(tag=tag):
+                row = dataclasses.replace(bare_row, spawn_room=tag)
+                self._patch_roster((row,))
+                with self.assertRaises(ServiceHostIntegrityError) as caught:
+                    sync_service_content()
+                self.assertIn(fragment, str(caught.exception))
+
+    def test_interior_preparation_rolls_back_with_the_failed_batch(self):
+        # A later failure must take the prepared interiors with it: the repair
+        # pass runs inside the same transaction as the plan resolution and the
+        # writes, so the recreated room is gone after the rollback.
+        from evennia.objects.models import ObjectDB
+        from world.rules import guild_economy
+
+        interior_tag = _merchant_row().spawn_room
+        for obj in list(search_object_by_tag(interior_tag)):
+            obj.delete()
+        self.assertEqual(list(search_object_by_tag(interior_tag)), [])
+        with patch.object(
+            guild_economy, "_initialize_merchant_stock", side_effect=RuntimeError("boom")
+        ):
+            with self.assertRaises(RuntimeError):
+                sync_service_content()
+        self.assertEqual(
+            list(search_object_by_tag(interior_tag)),
+            [],
+            "the rolled-back interior must not persist",
+        )
+        self.assertFalse(
+            ObjectDB.objects.filter(db_key=_merchant_host_name()).exists(),
+            "no host row survives the rolled-back batch",
+        )
+
     def _rows_with_tags(self, tag):
         catalog = get_catalog()
         return tuple(
-            dataclasses.replace(row, anchor_room=tag) for row in catalog.service_hosts
+            dataclasses.replace(row, spawn_room=tag) for row in catalog.service_hosts
         )
 
     def _untagged_stale_host(self):
@@ -56,17 +108,13 @@ class ServiceHostRosterAuthorityTests(ServiceContentIsolation, EvenniaTestCase):
         guild = NPC.objects.filter(db_key=_guild_host_name()).first()
         merchant = NPC.objects.filter(db_key=_merchant_host_name()).first()
         self._patch_roster(())
-        with patch("world.rules.guild_economy.log_warn") as warned:
-            with self.captureOnCommitCallbacks(execute=True):
-                sync_service_content()
+        # An empty roster declares nothing: there is no spawn room or anchor
+        # left to resolve, so the batch is legitimate and the source-owned
+        # hosts whose whole declaration is gone are retired.
+        sync_service_content()
         for host in (guild, merchant):
             with self.assertRaises(NPC.DoesNotExist):
                 host.refresh_from_db()
-        still_missing = [
-            call for call in warned.call_args_list
-            if call.args and call.args[0] == "guild_economy_service_interiors_still_missing"
-        ]
-        self.assertEqual(len(still_missing), 1)  # creation skipped; deletion was not
 
     @covers_requirement(
         "guild-registration::roster-convergence-deletes-service-hosts-absent-from-the-roster"
@@ -81,7 +129,10 @@ class ServiceHostRosterAuthorityTests(ServiceContentIsolation, EvenniaTestCase):
         stale = self._untagged_stale_host()
         expected = NPC.objects.all_family().count()  # nothing dies
         self._patch_roster(self._rows_with_tags("no_such_room_tag"))
-        with self.captureOnCommitCallbacks(execute=True):
+        # Room resolution is complete and fail-closed: an unresolvable anchor
+        # rejects the whole operation, so no host is skipped, moved or retired
+        # and the prepared interiors roll back with the batch.
+        with self.assertRaises(ServiceHostIntegrityError):
             sync_service_content()
         # The untagged leftover survives: no declaration was ever removed.
         stale.refresh_from_db()
@@ -116,8 +167,8 @@ class ServiceHostRosterAuthorityTests(ServiceContentIsolation, EvenniaTestCase):
         catalog = get_catalog()
         self._patch_roster(
             tuple(
-                dataclasses.replace(row, anchor_room="no_such_room_tag")
-                if row.service_id == MERCHANT_SERVICE_ID
+                dataclasses.replace(row, spawn_room="no_such_room_tag")
+                if row.host_key == MERCHANT_SERVICE_ID
                 else row
                 for row in catalog.service_hosts
             )

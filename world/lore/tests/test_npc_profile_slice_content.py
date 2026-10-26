@@ -25,7 +25,7 @@ from world.lore.guild_adventurers import ADVENTURER_REGISTRY, EXAM_QUALIFICATION
 from world.lore.npc_card import NpcCard
 from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
 from world.lore.player_presets import PLAYER_PRESET_REGISTRY
-from world.lore.settlements.places import PLACE_REGISTRY
+from world.lore.settlements.places import PLACE_REGISTRY, place_dialogue_keys
 from world.rules.npc_roster_validation import derive_shipped_sources
 
 # A line in a host's own world never names a command, a mechanic or an
@@ -41,11 +41,14 @@ _ASCII_TOKEN_RE = re.compile(r"[A-Za-z]{2,}")
 
 def _hosted_places() -> list:
     """Every shipped place that declares a service host, in registry order."""
-    return [place for place in PLACE_REGISTRY.values() if place.service_id is not None]
+    return [
+        place for place in PLACE_REGISTRY.values() if place.host_profile_key is not None
+    ]
 
 
 def _dialogue_key(place) -> str | None:
-    return dict(place.authored_kwargs).get("dialogue_key")
+    keys = place_dialogue_keys(place)
+    return keys[0] if keys else None
 
 
 def _characterization_problem(text: str, origin: str) -> str | None:
@@ -98,14 +101,13 @@ class NpcHostCharacterizationContractTests(unittest.TestCase):
         hosts = _hosted_places()
         self.assertTrue(hosts, "the place registry declares no hosted place")
         for place in hosts:
-            with self.subTest(host=place.service_id):
+            with self.subTest(host=place.host_profile_key):
                 # The profile reference travels through the place record and is
-                # the host's service identity -- never a display name, never a
+                # the host's canonical identity -- never a display name, never a
                 # borrowed key.
-                self.assertEqual(place.host_profile_key, place.service_id)
-                self.assertIn(place.service_id, NPC_PROFILE_REGISTRY)
-                profile = NPC_PROFILE_REGISTRY[place.service_id]
-                self.assertEqual(profile.key, place.service_id)
+                self.assertIn(place.host_profile_key, NPC_PROFILE_REGISTRY)
+                profile = NPC_PROFILE_REGISTRY[place.host_profile_key]
+                self.assertEqual(profile.key, place.host_profile_key)
                 NpcCard.from_record(profile.card.to_record())
                 self.assertIs(type(profile.age), int)
                 self.assertIsNot(profile.age, True)
@@ -119,7 +121,7 @@ class NpcHostCharacterizationContractTests(unittest.TestCase):
     )
     def test_every_scripted_host_uses_its_table_as_the_sole_greeting_source(self):
         for place in _hosted_places():
-            with self.subTest(host=place.service_id):
+            with self.subTest(host=place.host_profile_key):
                 profile = NPC_PROFILE_REGISTRY[place.host_profile_key]
                 # The table authors the greeting; only the misunderstanding
                 # reply belongs to the profile.
@@ -138,7 +140,9 @@ class NpcHostCharacterizationContractTests(unittest.TestCase):
         table_hosts: dict[str, list] = {key: [] for key in DIALOGUE_ROWS}
         for place in _hosted_places():
             key = _dialogue_key(place)
-            self.assertIn(key, table_hosts, f"{place.service_id} references {key!r}")
+            self.assertIn(
+                key, table_hosts, f"{place.host_profile_key} references {key!r}"
+            )
             table_hosts[key].append(place)
         for table_key, hosts in table_hosts.items():
             with self.subTest(table=table_key):
@@ -146,7 +150,7 @@ class NpcHostCharacterizationContractTests(unittest.TestCase):
                     len(hosts),
                     1,
                     f"table {table_key!r} must be answered by exactly one profiled host, "
-                    f"got {[h.service_id for h in hosts]}",
+                    f"got {[h.host_profile_key for h in hosts]}",
                 )
                 self.assertIn(hosts[0].host_profile_key, NPC_PROFILE_REGISTRY)
 

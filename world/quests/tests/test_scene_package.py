@@ -30,6 +30,7 @@ from world.quests.tests._scene_package_fixtures import (
     package as _package,
     phase as _phase,
     quest_payload as _quest_payload,
+    issuer_capabilities,
     role as _role,
 )
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY
@@ -186,10 +187,67 @@ class ScenePackagePublicationTests(RegistryIsolationMixin, EvenniaTestCase):
         self.assertEqual(grants[0].npc_id, 0)
         self.assertEqual(grants[0].issuer_key, "npc:story_mother")
 
+    def test_generated_capability_rejections_are_named_before_publication(self):
+        # The complete rejection matrix: a commission role without its
+        # capability, a non-person binding, a mismatched authored issuer key, a
+        # conflicting authored scoped identity, and a capability on a role that
+        # issues no commission.
+        def with_mother(capabilities):
+            return [
+                _role("mother", capabilities=capabilities),
+                _role("daughter"),
+            ]
+
+        cases = {
+            "missing capability": [_role("mother"), _role("daughter")],
+            "place bound": with_mother(
+                [
+                    {
+                        "type": issuer_capabilities("story_mother")[0]["type"],
+                        "kwargs": {"issuer_key": "story_mother"},
+                        "binding": {"kind": "person", "anchor_room": "t_anchor"},
+                    }
+                ]
+            ),
+            "mismatched issuer key": with_mother(issuer_capabilities("other_commission")),
+            "conflicting scoped identity": with_mother(
+                [
+                    {
+                        "type": issuer_capabilities("story_mother")[0]["type"],
+                        "kwargs": {
+                            "issuer_key": "story_mother",
+                            "service_id": "t_forged_service",
+                        },
+                        "binding": {"kind": "person"},
+                    }
+                ]
+            ),
+        }
+        for label, roles in cases.items():
+            with self.subTest(case=label):
+                with self.assertRaises(ScenePackageError):
+                    publish_scene_package(_package(roles=roles), owner="tester")
+
+        # A non-commission role may declare no capability at all.
+        stray = [
+            _role("mother", capabilities=issuer_capabilities("story_mother")),
+            _role("daughter", capabilities=issuer_capabilities("story_mother")),
+        ]
+        with self.assertRaises(ScenePackageError):
+            publish_scene_package(_package(roles=stray), owner="tester")
+
+        # The commission role's own capabilities must exist: dropping them
+        # alone is the "missing capability" case above.
+        self.assertEqual(len(scene_store.list_packages()), 0)
+
+
     def test_a_guild_branch_package_registers_its_offer(self):
+        # A guild-branch package issues no commission, so no role declares a
+        # capability (a generated capability belongs to a commission role).
         package = _package(
             quest=_quest_payload(issuer=_issuer_key()),
             commissions=[],
+            roles=[_role("mother"), _role("daughter")],
         )
         published = publish_scene_package(package, owner="tester")
         self.assertEqual(published.definition.commissions, ())

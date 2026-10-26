@@ -48,7 +48,6 @@ from world.rules.guild_config._commerce import (  # noqa: F401
 )
 from world.rules.guild_config._hosts import (  # noqa: F401
     _place_for_shop,
-    _require_place_kwargs,
     validate_service_hosts,
 )
 from world.rules.guild_config._loaders import (  # noqa: F401
@@ -84,7 +83,7 @@ from world.quests.definitions import QUEST_DEFINITION_REGISTRY
 from world.skills.registry import SKILL_REGISTRY  # noqa: F401  (old namespace name)
 
 if TYPE_CHECKING:
-    from world.rules.profession_config import Profession
+    from world.rules.npc_capabilities import CapabilityDeclaration
 
 
 def load_guild_catalog(definition_registry: Mapping[str, Any]) -> GuildCatalog:

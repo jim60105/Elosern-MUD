@@ -35,6 +35,10 @@ two (鍊金坊、商會公所); the registry's doorway-name rule keeps them hone
 """
 
 from world.lore.settlements.places import PlaceDefinition, PlaceKind
+from world.lore.settlements.capability_declarations import (
+    capability,
+    place_bound,
+)
 
 ROWS: tuple[PlaceDefinition, ...] = (
     PlaceDefinition(
@@ -75,13 +79,26 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_race="human",
         host_subrace=None,
         host_sex="other",
-        profession="guild_staff",
-        service_id="altoria_guild_master",
         host_profile_key="altoria_guild_master",
         assortment_keys=(),
-        authored_kwargs=(
-            ("branch_key", "guild_branch_altoria"),
-            ("dialogue_key", "guild_staff"),
+        components=(
+            capability(
+                "guild_staff",
+                binding=place_bound("altoria_guild_hall"),
+                service_id="altoria_guild_master",
+                branch_key="guild_branch_altoria",
+            ),
+            capability(
+                "guild_exam_reception",
+                binding=place_bound("altoria_guild_hall"),
+                service_id="altoria_guild_master",
+                branch_key="guild_branch_altoria",
+            ),
+            capability(
+                "scripted_dialogue",
+                binding=place_bound("altoria_guild_hall"),
+                dialogue_key="guild_staff",
+            ),
         ),
     ),
     PlaceDefinition(
@@ -101,16 +118,23 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_race="human",
         host_subrace=None,
         host_sex="other",
-        profession="merchant",
-        service_id="altoria_merchant",
         host_profile_key="altoria_merchant",
         # The 58-item monolith split along the specialist axis
         # (commerce-assortment-registry): the general store keeps the
         # sundries shelf, the specialists take weapons, food and armour.
         assortment_keys=("general_sundries",),
-        authored_kwargs=(
-            ("shop_key", "altoria_general_store"),
-            ("dialogue_key", "altoria_general_store"),
+        components=(
+            capability(
+                "merchant",
+                binding=place_bound("altoria_general_store"),
+                service_id="altoria_merchant",
+                shop_key="altoria_general_store",
+            ),
+            capability(
+                "scripted_dialogue",
+                binding=place_bound("altoria_general_store"),
+                dialogue_key="altoria_general_store",
+            ),
         ),
     ),
     PlaceDefinition(
@@ -130,13 +154,20 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_race="human",
         host_subrace="human_plains",
         host_sex="male",
-        profession="merchant",
-        service_id="altoria_blacksmith",
         host_profile_key="altoria_blacksmith",
         assortment_keys=("common_arms",),
-        authored_kwargs=(
-            ("shop_key", "altoria_forge"),
-            ("dialogue_key", "altoria_forge"),
+        components=(
+            capability(
+                "merchant",
+                binding=place_bound("altoria_forge"),
+                service_id="altoria_blacksmith",
+                shop_key="altoria_forge",
+            ),
+            capability(
+                "scripted_dialogue",
+                binding=place_bound("altoria_forge"),
+                dialogue_key="altoria_forge",
+            ),
         ),
     ),
     PlaceDefinition(
@@ -155,13 +186,20 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_race="human",
         host_subrace="human_plains",
         host_sex="female",
-        profession="merchant",
-        service_id="altoria_tailor",
         host_profile_key="altoria_tailor",
         assortment_keys=("common_outfits",),
-        authored_kwargs=(
-            ("shop_key", "altoria_tailor"),
-            ("dialogue_key", "altoria_tailor"),
+        components=(
+            capability(
+                "merchant",
+                binding=place_bound("altoria_tailor"),
+                service_id="altoria_tailor",
+                shop_key="altoria_tailor",
+            ),
+            capability(
+                "scripted_dialogue",
+                binding=place_bound("altoria_tailor"),
+                dialogue_key="altoria_tailor",
+            ),
         ),
     ),
     # altoria-adornments-and-remedies: the last two specialists of the
@@ -184,13 +222,20 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_race="human",
         host_subrace="human_plains",
         host_sex="female",
-        profession="merchant",
-        service_id="altoria_jeweller",
         host_profile_key="altoria_jeweller",
         assortment_keys=("capital_adornments",),
-        authored_kwargs=(
-            ("shop_key", "altoria_jeweller"),
-            ("dialogue_key", "altoria_jeweller"),
+        components=(
+            capability(
+                "merchant",
+                binding=place_bound("altoria_jeweller"),
+                service_id="altoria_jeweller",
+                shop_key="altoria_jeweller",
+            ),
+            capability(
+                "scripted_dialogue",
+                binding=place_bound("altoria_jeweller"),
+                dialogue_key="altoria_jeweller",
+            ),
         ),
     ),
     PlaceDefinition(
@@ -209,13 +254,20 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_race="human",
         host_subrace="human_plains",
         host_sex="female",
-        profession="merchant",
-        service_id="altoria_alchemist",
         host_profile_key="altoria_alchemist",
         assortment_keys=("capital_remedies",),
-        authored_kwargs=(
-            ("shop_key", "altoria_alchemist"),
-            ("dialogue_key", "altoria_alchemist"),
+        components=(
+            capability(
+                "merchant",
+                binding=place_bound("altoria_alchemist"),
+                service_id="altoria_alchemist",
+                shop_key="altoria_alchemist",
+            ),
+            capability(
+                "scripted_dialogue",
+                binding=place_bound("altoria_alchemist"),
+                dialogue_key="altoria_alchemist",
+            ),
         ),
     ),
     # 聖潔王都商會公所 — the merchants' guild hall, off 東市 (5,3), sharing
@@ -244,11 +296,15 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_race="human",
         host_subrace=None,
         host_sex="male",
-        profession="attendant",
-        service_id="altoria_merchant_master",
         host_profile_key="altoria_merchant_master",
         assortment_keys=(),
-        authored_kwargs=(("dialogue_key", "altoria_merchant_hall"),),
+        components=(
+            capability(
+                "scripted_dialogue",
+                binding=place_bound("altoria_merchant_hall"),
+                dialogue_key="altoria_merchant_hall",
+            ),
+        ),
     ),
     # 聖潔王都市集棚 — the covered market stalls, off 市場街 (2,3), sharing
     # that exterior with the general store and the jeweller under a third

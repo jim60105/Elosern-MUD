@@ -8,7 +8,6 @@ from evennia.utils.create import create_object
 
 from typeclasses.entities import LivingEntity
 from typeclasses.npcs import NPC
-from world.imports import assembly
 from world.imports.validate import (
     BatchReport,
     Issue,
@@ -18,16 +17,15 @@ from world.imports.validate import (
 from world.lore.npc_card import normalize_card
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.observability import log_info, log_warn
-from world.rules import profession_config
 from world.rules.fatigue import initialize_fatigue_state
 from world.rules.npc_identity import validate_npc_title
-from world.rules.npc_persona import initialize_npc_persona
-from world.rules.npc_schedules import set_npc_schedule
-from world.rules.profession_assembly import (
-    ProfessionAssemblyError,
-    assemble_profession_components,
+from world.rules.npc_capabilities import (
+    CapabilityValidationError,
+    assemble_capabilities,
+    validate_capabilities,
 )
-from world.rules.traits import _trait_config, build_initial_traits, race_floor
+from world.rules.npc_persona import initialize_npc_persona
+from world.rules.traits import _trait_config, race_floor
 
 
 class ImportRejected(Exception):
@@ -96,116 +94,57 @@ def _flag_existing_npc_names(report: BatchReport) -> list[str]:
     return sorted(taken)
 
 
-def _resolve_trait_values(
-    record: dict[str, Any], tier: str | None = None
-) -> dict[str, int]:
-    """Build the trait values the record's stats describe.
+def _resolve_trait_values(record: dict[str, Any]) -> dict[str, int]:
+    """Build the trait values the record's stats describe, literally.
 
-    The tier branch is the profession line's ONLY tier influence (design D4):
-    it runs when the caller passes a registry ``default_tier`` AND the record
-    declares no literal stats, and it routes through the race-baseline tiered
-    construction (``build_initial_traits(race, subrace, tier)`` — the same
-    construction ``initial_trait_config`` wraps). A record declaring any
-    literal stat keeps the unchanged race-floor-plus-literals path, and every
-    ``tier=None`` call is byte-identical to the pre-change loader.
+    Every record loads the same way: the race floor for the keys the record
+    omits, the record's own literal values for the ones it supplies. No
+    capability, declaration order or authored default multiplies, re-derives or
+    replaces a stated value.
     """
-    stats = record["stats"]
-    if tier is not None and not stats:
-        return build_initial_traits(record["race"], record.get("subrace"), tier)
     values = race_floor(RACE_REGISTRY[record["race"]])
-    values.update(stats)
+    values.update(record["stats"])
     return values
 
 
-def _apply_profession(
+def _resolve_capability_rooms(tag: str) -> list[Any]:
+    """Every tagged object the capability core may inspect for one anchor."""
+    from evennia.utils.search import search_object_by_tag
+
+    return list(search_object_by_tag(tag))
+
+
+def _apply_capabilities(
     record: dict[str, Any],
     entity: LivingEntity,
     typeclass: type[LivingEntity],
-    profession_row: profession_config.Profession | None = None,
 ) -> None:
-    """Assemble the record's profession blueprint onto the constructed entity.
+    """Assemble the record's declared capabilities onto the constructed entity.
 
     Runs inside the caller's all-or-nothing transaction, after the attribute
-    writes. The validation phase already rejected an incomplete plan as a
-    named batch issue; this is the second, fail-closed gate (the same
-    ``resolve_plan`` the validator ran), so the batch can never persist a
-    half-assembled or identity-less component set. Construction uses the
-    validator's resolved ROW snapshot (``profession_row``) whenever the caller
-    is the validated boundary, never a fresh cache lookup, so a rulebook
-    reload between the two gates cannot mix rows inside one entity. An absent
-    ``profession`` is a no-op on the first statement — the byte-identity
-    guarantee.
+    writes. The validation phase already rejected an unusable declaration set
+    as a named batch issue; this is the second, fail-closed gate: the SAME
+    shared core re-validates the complete declaration set with a room resolver,
+    and the assembler attaches exactly the plan it returns. A missing,
+    ambiguous or non-Room anchor therefore rejects the whole batch (prepared
+    entities included) instead of persisting a half-assembled host. A record
+    declaring no capabilities is a no-op on the first statement.
     """
-    profession_key = record.get("profession")
-    if not profession_key:
+    entries = record.get("components")
+    if not entries:
         return
     if not issubclass(typeclass, NPC):
-        # Unreachable through the validated load boundary (validation names it
-        # as an issue); the explicit raise keeps a direct caller honest.
         raise ValueError(
-            f"record {record['key']!r}: profession {profession_key!r} assembles "
-            f"NPC components only, not {typeclass.__name__}"
+            f"record {record['key']!r}: capability components assemble NPCs "
+            f"only, not {typeclass.__name__}"
         )
-    profession = (
-        profession_row
-        if profession_row is not None
-        else profession_config.get_profession(profession_key)
-    )
-    if profession is None:
-        raise ValueError(
-            f"record {record['key']!r}: unknown profession {profession_key!r}"
-        )
-    # Place-bound plans name their anchor by room tag; the record's location
-    # is authored elsewhere, so the anchor is resolved by tag inside this
-    # same all-or-nothing transaction. Validation decided the binding/anchor
-    # combination DB-free; room existence is a load-time fact here.
-    anchor_room = None
-    anchor_tag = record.get("anchor_room")
-    if anchor_tag:
-        from evennia.utils.search import search_object_by_tag
-
-        # A room tag names a ROOM: any tagged object (an NPC wearing the
-        # tag would make a person "anchor" a storefront) and an ambiguous
-        # multi-match are load-time rejections naming the record and tag —
-        # the anchor the components persist must be unambiguous or absent.
-        from typeclasses.rooms import Room
-
-        found = [
-            obj
-            for obj in search_object_by_tag(anchor_tag)
-            if isinstance(obj, Room)
-        ]
-        if not found:
-            raise ValueError(
-                f"record {record['key']!r}: anchor_room {anchor_tag!r} "
-                "resolves to no room"
-            )
-        if len(found) > 1:
-            raise ValueError(
-                f"record {record['key']!r}: anchor_room {anchor_tag!r} "
-                f"resolves to {len(found)} rooms; the anchor must be unique"
-            )
-        anchor_room = found[0]
-    # The shared deterministic-core attach mechanism (declarative-service-hosts):
-    # the same helper the guild service-host sync calls, so import and sync
-    # assembly can never drift. Its identity-gap check is this function's
-    # second gate, translated verbatim into the record-named ValueError the
-    # batch-rejection path expects.
     try:
-        attached = assemble_profession_components(
-            entity, profession, assembly.explicit_map(record), anchor_room=anchor_room
+        plan = validate_capabilities(
+            entries, room_resolver=_resolve_capability_rooms
         )
-    except ProfessionAssemblyError as error:
-        named = "; ".join(
-            f"component {type_key!r} is missing authored identity kwargs {fields}"
-            for type_key, fields in sorted(error.missing.items())
-        )
-        raise ValueError(f"record {record['key']!r}: profession {named}") from error
-    if profession.schedule_template is not None and isinstance(entity, NPC):
-        set_npc_schedule(
-            entity,
-            {"schema_version": 1, "template": profession.schedule_template},
-        )
+        attached = assemble_capabilities(entity, plan)
+    except CapabilityValidationError as error:
+        raise ValueError(f"record {record['key']!r}: {error}") from error
     # Emitted only when the enclosing transaction commits: a later record can
     # still fail and roll the whole batch back, and a success event must never
     # describe an NPC that was never persisted. The context is frozen at
@@ -213,9 +152,8 @@ def _apply_profession(
     transaction.on_commit(
         lambda context={
             "char": record["key"],
-            "profession": profession_key,
             "components": list(attached),
-        }: log_info("import_profession_assembled", context=context)
+        }: log_info("import_capabilities_assembled", context=context)
     )
 
 
@@ -247,9 +185,7 @@ def instantiate_character(
         # The validated record carries the lineage auto-seed normalization
         # (use-driven-skill-lineage DC6): ownership closure and exact seeded
         # proficiency. Instantiate exactly what was validated.
-        entity = _instantiate_validated_character(
-            report.record, typeclass, report.profession_row
-        )
+        entity = _instantiate_validated_character(report.record, typeclass)
     # Only after the transaction exited successfully (same contract as
     # load_batch's commit event).
     log_info(
@@ -277,26 +213,9 @@ def _resolve_affinity_elements(record: dict[str, Any]) -> list[str]:
     return list(record.get("affinity_elements") or ())
 
 
-def _profession_default_tier(
-    record: dict[str, Any],
-    profession_row: profession_config.Profession | None = None,
-) -> str | None:
-    """The row's default tier, visible only to the empty-stats trait path."""
-    profession_key = record.get("profession")
-    if not profession_key or record["stats"]:
-        return None
-    profession = (
-        profession_row
-        if profession_row is not None
-        else profession_config.get_profession(profession_key)
-    )
-    return profession.default_tier if profession is not None else None
-
-
 def _instantiate_validated_character(
     record: dict[str, Any],
     typeclass: type[LivingEntity] = NPC,
-    profession_row: profession_config.Profession | None = None,
 ) -> LivingEntity:
     # The title's second, fail-closed gate runs BEFORE construction (design
     # D3): a caller that reached this seam with an unvalidated record raises
@@ -328,13 +247,7 @@ def _instantiate_validated_character(
     entity.sex = record["sex"]
     if isinstance(entity, NPC):
         entity.npc_title = title
-    entity._apply_trait_config(
-        _trait_config(
-            _resolve_trait_values(
-                record, _profession_default_tier(record, profession_row)
-            )
-        )
-    )
+    entity._apply_trait_config(_trait_config(_resolve_trait_values(record)))
     entity.db.disguised_stats = record["disguised_stats"] or None
     if isinstance(entity, NPC):
         # The shared deterministic persona writer (npc-persona-import-cards
@@ -379,7 +292,7 @@ def _instantiate_validated_character(
     entity.db.age = record["age"]
     entity.db.apparent_age = record["apparent_age"]
     entity.db.portrait_policy = {"mode": "named", "stable_key": record["key"]}
-    _apply_profession(record, entity, typeclass, profession_row)
+    _apply_capabilities(record, entity, typeclass)
     return entity
 
 
@@ -407,9 +320,7 @@ def load_batch(
             _log_rejection(report, typeclass, "existing_npc_name")
             raise ImportRejected(report)
         entities = [
-            _instantiate_validated_character(
-                record_report.record, typeclass, record_report.profession_row
-            )
+            _instantiate_validated_character(record_report.record, typeclass)
             for record_report in report.character_reports
         ]
         # Post-commit portrait ensure, registered inside the all-or-nothing

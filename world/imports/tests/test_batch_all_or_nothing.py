@@ -436,12 +436,15 @@ class DuplicateIssuerKeyTests(BatchFileHarness, EvenniaTestCase):
     def _commissioner(self, key, service_id, issuer_key="grey_granny"):
         record = example_record()
         record["key"] = key
-        record["profession"] = "quest_issuer"
-        record["anchor_room"] = None  # person-bound: co-presence carries no anchor
+        # Person-bound: the commission travels with its carrier.
+        kwargs = {"service_id": service_id}
+        if issuer_key is not None:
+            kwargs["issuer_key"] = issuer_key
         record["components"] = [
             {
                 "type": "quest_issuer",
-                "kwargs": {"service_id": service_id, "issuer_key": issuer_key},
+                "kwargs": kwargs,
+                "binding": {"kind": "person"},
             },
         ]
         return record

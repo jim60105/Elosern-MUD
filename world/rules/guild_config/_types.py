@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Mapping
 from world.lore.guild import GUILD_RANK_REGISTRY
 
 if TYPE_CHECKING:
-    from world.rules.profession_config import Profession
+    from world.rules.npc_capabilities import CapabilityDeclaration
 
 
 class GuildConfigError(ValueError):
@@ -51,14 +51,12 @@ class ShopConfig:
 
 @dataclass(frozen=True)
 class ServiceHostRow:
-    """One declarative service-host roster row (declarative-service-hosts D7).
+    """One service-host roster row derived from its place declaration.
 
-    ``profession`` is the RESOLVED registry row, not a key: sync executes the
-    exact row config validation approved, so a rulebook reload between config
-    load and sync can never mix blueprints (the change-2 snapshot decision).
-    ``authored_kwargs`` holds the row's flat identity kwargs (``shop_key`` /
-    ``branch_key`` / ``dialogue_key``); the shared assembly helper projects
-    them per blueprint component.
+    ``components`` holds the place's validated, frozen capability
+    declarations — the complete set the sync assembles, with no blueprint
+    behind it. ``spawn_room`` is the interior room tag the host is created in
+    (and the anchor every place-bound component declares).
 
     ``host_key`` is the host's canonical stable authored identity: the place's
     ``host_profile_key``, which is also this row's ``profile_key``. It is the
@@ -69,10 +67,8 @@ class ServiceHostRow:
 
     name: str
     title: str
-    profession: "Profession"
-    anchor_room: str
-    service_id: str
-    authored_kwargs: "Mapping[str, str]"
+    spawn_room: str
+    components: "tuple[CapabilityDeclaration, ...]"
     profile_key: str
     host_key: str
 
@@ -85,3 +81,7 @@ class ServiceHostRow:
                 f"profile_key {self.profile_key!r}; the canonical host identity "
                 "is the authored profile key"
             )
+
+    def component_types(self) -> tuple[str, ...]:
+        """The declared capability type keys in declaration order."""
+        return tuple(component.type for component in self.components)

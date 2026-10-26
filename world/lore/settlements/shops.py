@@ -1,8 +1,8 @@
 """Derived shop identity registry (settlement-shops design §3.2).
 
 Shop identities are a view over the place registry: a place contributes a
-``ShopDefinition`` iff its authored kwargs carry a ``shop_key``, and the
-derived keys ARE those shop identities — every runtime consumer resolves
+``ShopDefinition`` iff it declares a merchant capability, and the
+derived keys ARE those merchant ``shop_key``s — every runtime consumer resolves
 ``SHOP_REGISTRY[merchant.shop_key]``. The goods a shop stocks are the union
 of the assortments its place references (settlement-shops design §3.1).
 Exact prices, hours, and stock quantities live in
@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 
 from world.lore.registry_refs import ref_many
 from world.lore.settlements.assortments import ASSORTMENT_REGISTRY
-from world.lore.settlements.places import PLACE_REGISTRY
+from world.lore.settlements.places import PLACE_REGISTRY, place_shop_identity
 
 
 @dataclass(frozen=True)
@@ -52,7 +52,7 @@ def _derive_shop_registry() -> dict[str, ShopDefinition]:
     """Project one ShopDefinition per place that authors a shop identity."""
     registry: dict[str, ShopDefinition] = {}
     for place in PLACE_REGISTRY.values():
-        shop_key = dict(place.authored_kwargs).get("shop_key")
+        shop_key = place_shop_identity(place)
         if shop_key is None:
             continue
         if shop_key in registry:

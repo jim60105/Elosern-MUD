@@ -128,69 +128,51 @@ non-empty authored `issuer_key` field SHALL resolve to `npc:<authored key>`, and
 
 ### Requirement: Commissioner authority is authorable through the import pipeline
 
-The import pipeline SHALL accept `quest_issuer` as an explicit per-record component entry whose
-`kwargs` carry the authored `issuer_key`, exactly as it accepts `branch_key` for `guild_staff` and
-`shop_key` for `merchant`. The loader SHALL never invent an `issuer_key`. `issuer_key` SHALL NOT join
-the closed set of REQUIRED identity kwargs the assembly helper enforces.
+NPC imports and source-host declarations SHALL accept direct quest-issuer configuration without a profession. issuer_key SHALL remain optional: nonempty authored keys use existing grammar and duplicate rejection, absent/empty keys use canonical NPC identity. No component is inferred or authority granted automatically.
 
 #### Scenario: An authored record gains the component with its identity
-- **WHEN** a character record declares an explicit `quest_issuer` component entry with an
-  `issuer_key`
-- **THEN** the loaded NPC carries `QuestIssuer` with exactly that authored identity
+- **WHEN** an NPC declares quest_issuer with valid issuer_key and binding
+- **THEN** exactly that authority is installed
 
 #### Scenario: A merchant can also be a commissioner
-- **WHEN** a record declares the `merchant` profession plus an explicit `quest_issuer` component
-  entry
-- **THEN** the loaded NPC carries both `Merchant` and `QuestIssuer`, each with its own authored
-  identity
+- **WHEN** an NPC directly declares merchant and person-bound quest_issuer
+- **THEN** both function independently with their own configured bindings
 
 #### Scenario: A roster-created commissioner resolves to its identity form
-- **WHEN** a commissioner host is created through the profession roster, which projects only the
-  required identity kwargs onto each component
-- **THEN** its `issuer_key` field is empty and it resolves to the identity form
+- **WHEN** its explicit issuer_key is absent/empty
+- **THEN** the current npc:#dbid identity is retained
 
 #### Scenario: No existing NPC gains issuing authority
-- **WHEN** the world is synchronized after this capability lands with no content authoring the
-  component
-- **THEN** no NPC carries `QuestIssuer` and no entity's behavior changes
+- **WHEN** a source record declares no quest_issuer
+- **THEN** sync does not infer or attach it
 
 #### Scenario: Two records cannot author the same commission identity
-- **WHEN** one batch declares two records whose explicit `quest_issuer` entries carry the same
-  non-empty `issuer_key`
-- **THEN** the batch is rejected naming the duplicate key, and no record of it is instantiated
+- **WHEN** two direct declarations claim the same nonempty issuer_key
+- **THEN** the complete batch rejects before writes
 
 #### Scenario: An imported commissioner survives the startup service sync
-- **WHEN** the guild-economy roster synchronization runs after a person-bound commissioner was
-  assembled through the import path with a service anchor the roster does not list
-- **THEN** the commissioner is not converged away, and its component and resolved key are intact
+- **WHEN** an unmanaged imported commissioner carries a service ID absent from roster
+- **THEN** source sync does not claim or delete it
 
 #### Scenario: The rulebook carries a commissioner blueprint
-- **WHEN** the profession rulebook is inspected
-- **THEN** it carries a commissioner blueprint row, and an explicit per-record entry is combinable
-  with another profession so one NPC can be both a merchant and a commissioner
+- **WHEN** commission authority is authored
+- **THEN** it uses direct quest_issuer configuration and no profession rulebook remains
 
 #### Scenario: An absent issuer_key is a valid identity, not a missing requirement
-- **WHEN** the meaning of the closed REQUIRED identity kwargs set is applied to `issuer_key`
-- **THEN** the set's "must be authored and non-empty" does not fit `issuer_key`: an absent value is
-  the valid identity form that resolves to the carrier's database identity
+- **WHEN** issuer_key is absent or empty on a valid direct declaration
+- **THEN** the existing npc:#dbid identity form remains valid
 
 #### Scenario: The roster/import split is explicit and accepted
-- **WHEN** authority is authored through each path
-- **THEN** a roster-created commissioner receives no authored `issuer_key` and resolves to its
-  identity form, while the import path, which passes authored kwargs through verbatim, is where an
-  authored content key is supplied
+- **WHEN** either roster or import supplies or omits issuer_key
+- **THEN** the same validator preserves its authored-key or canonical identity-form semantics
 
 #### Scenario: Batch uniqueness guards against a shared commission list
-- **WHEN** two carriers would share one authored content key, since the grammar validates shape and
-  not uniqueness
-- **THEN** the entity-key contract style rejects the batch naming the colliding key, because the two
-  carriers would share one commission list
+- **WHEN** two carriers claim one nonempty authored issuer_key
+- **THEN** the complete batch rejects the collision before persistence
 
 #### Scenario: The roster can never claim an imported commissioner's anchor
-- **WHEN** an imported commissioner carries a service anchor, because a person-bound component can
-  never anchor a roster row
-- **THEN** the roster can never claim or re-create that anchor, and the startup service-host
-  convergence SHALL NOT treat such a host as shrunken-away roster residue and SHALL NOT delete it
+- **WHEN** an unmanaged imported commissioner has component IDs matching or differing from roster rows
+- **THEN** sync does not claim/delete it by those IDs; explicit canonical source ownership controls host lifecycle
 
 ### Requirement: Escort issuer scope authorizes each distinct current commission
 Validated QuestIssuer scope SHALL name each distinct commission and group explicitly. Offer/acceptance SHALL revalidate the exact issuer, registered issuance, current phase and group availability. Protected/meeting roles, familial relation and prose SHALL grant no authority. Acceptance SHALL create no alternative record.

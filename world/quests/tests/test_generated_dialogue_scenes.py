@@ -34,6 +34,8 @@ from world.quests.tests._compile_helpers import _issuer_key
 from world.quests.tests._fixtures import RegistryIsolationMixin, register_catalog_once
 from world.quests.tests._scene_package_fixtures import (
     LONG_PROSE,
+    issuer_capabilities,
+    issuer_plan,
     dialogue as _dialogue,
     anchor_locator,
     guild_package,
@@ -1000,7 +1002,7 @@ class GeneratedEscortEffectRollbackTests(RegistryIsolationMixin, EvenniaTest):
         payload = _package(
             quest=quest,
             roles=[
-                role("issuer"),
+                role("issuer", capabilities=issuer_capabilities("story_issuer")),
                 role("protected", conversable=False),
                 role("meeting", conversable=False),
             ],
@@ -1098,7 +1100,9 @@ class GeneratedEscortEffectRollbackTests(RegistryIsolationMixin, EvenniaTest):
                 issuer, dialogue_key=f"scene_role:{published.package_id}:issuer"
             )
         )
-        issuer_key = provision_scoped_issuer(issuer, content_key="story_issuer")
+        issuer_key = provision_scoped_issuer(
+            issuer, content_key="story_issuer", plan=issuer_plan("story_issuer")
+        )
         register_quest_issuance(
             QuestIssuance(
                 definition_key=definition_key,

@@ -25,6 +25,8 @@ from world.rules.guild_config import get_catalog
 from world.rules.guild_config import load_catalog_into_cache
 from world.rules.guild_economy import ServiceHostIntegrityError
 from world.rules.guild_economy import sync_service_content
+from world.lore.settlements.places import place_shop_identity
+from world.rules.npc_capabilities import capability, place_bound, validate_capabilities
 from world.rules.npc_persona import provenance_profile_key
 from ._support import (
     GENERAL_STORE_TAG,
@@ -44,9 +46,9 @@ from ._support import (
     _settlements,
     _shops,
     _subraces,
-    before_row_profession,
+    before_row_components,
     canonical_host,
-    profession_with,
+    components_with,
     synthetic_profile,
 )
 
@@ -87,30 +89,34 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         # the first roster row, so no shipped row keeps a fixed index.
         guild_events = [
             event for event in events
-            if event.kwargs["context"]["service"] == GUILD_SERVICE_ID
+            if event.kwargs["context"]["host_key"] == GUILD_SERVICE_ID
         ]
         self.assertEqual(len(guild_events), 1)
         guild_event = guild_events[0]
         self.assertEqual(guild_event.kwargs["context"]["char"], _guild_host_name())
-        self.assertEqual(guild_event.kwargs["context"]["shop"], _guild_branch_key())
-        self.assertEqual(
-            guild_event.kwargs["context"]["profession"], _guild_row().profession.key
-        )
         self.assertEqual(guild_event.kwargs["context"]["profile"], GUILD_SERVICE_ID)
+        self.assertEqual(
+            sorted(guild_event.kwargs["context"]["components"]),
+            sorted(
+                declaration.type for declaration in _guild_row().components
+            ),
+        )
+        self.assertNotIn("service", guild_event.kwargs["context"])
+        self.assertNotIn("profession", guild_event.kwargs["context"])
         # The merchant hosts follow the roster order (PLACE_REGISTRY terrace-
         # slice order); every merchant reports its authored shop identity.
-        merchant_service_ids = [
-            row.service_id
+        other_host_keys = [
+            row.host_key
             for row in get_catalog().service_hosts
-            if row.service_id != GUILD_SERVICE_ID
+            if row.host_key != GUILD_SERVICE_ID
         ]
-        merchant_events = [
+        other_events = [
             event for event in events
-            if event.kwargs["context"]["service"] != GUILD_SERVICE_ID
+            if event.kwargs["context"]["host_key"] != GUILD_SERVICE_ID
         ]
         self.assertEqual(
-            [event.kwargs["context"]["service"] for event in merchant_events],
-            merchant_service_ids,
+            [event.kwargs["context"]["host_key"] for event in other_events],
+            other_host_keys,
         )
         # Merchants report their authored shop; every non-trading host — the
         # village's two (ciaran-village-commons), the upper terrace's 主祭
@@ -121,30 +127,13 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         # key: the sanctum 執事, a plain merchant since the owner decision,
         # reports her shop exactly like any merchant.
         trading = {
-            row.service_id
+            row.host_key
             for row in get_catalog().service_hosts
-            if any(
-                component.type_key == Merchant.name
-                for component in row.profession.components
-            )
+            if any(declaration.type == Merchant.name for declaration in row.components)
         }
-        non_trading = set(merchant_service_ids) - trading
+        non_trading = set(other_host_keys) - trading
         self.assertTrue(trading)
         self.assertTrue(non_trading)
-        self.assertTrue(
-            all(
-                event.kwargs["context"]["shop"]
-                for event in merchant_events
-                if event.kwargs["context"]["service"] in trading
-            )
-        )
-        self.assertTrue(
-            all(
-                event.kwargs["context"]["shop"] is None
-                for event in merchant_events
-                if event.kwargs["context"]["service"] in non_trading
-            )
-        )
         with self.captureOnCommitCallbacks(execute=True):
             sync_service_content()  # reuse fires nothing
         late = [
@@ -219,7 +208,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             profile_key="t_unresolved_profile_key",
             host_key="t_unresolved_profile_key",
         )
-        patched = tuple(broken_row if r.service_id == GUILD_SERVICE_ID else r for r in catalog.service_hosts)
+        patched = tuple(broken_row if r.host_key == GUILD_SERVICE_ID else r for r in catalog.service_hosts)
         self._patch_roster(patched)
         with self.assertRaises(ServiceHostIntegrityError):
             sync_service_content()
@@ -232,18 +221,17 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         # Simulate an author renaming the roster row: the canonical identity
         # keeps the host, and the display name is never a selector.
         catalog = get_catalog()
+        source_row = _guild_row()
         renamed_row = guild_config.ServiceHostRow(
             name="改名後",
             title=before.npc_title,
-            profession=before_row_profession(catalog),
-            anchor_room=_guild_row().anchor_room,
-            service_id=GUILD_SERVICE_ID,
-            authored_kwargs=dict(_guild_row().authored_kwargs),
-            profile_key=_guild_row().profile_key,
-            host_key=_guild_row().host_key,
+            spawn_room=source_row.spawn_room,
+            components=before_row_components(catalog),
+            profile_key=source_row.profile_key,
+            host_key=source_row.host_key,
         )
         rows = tuple(
-            renamed_row if row.service_id == GUILD_SERVICE_ID else row
+            renamed_row if row.host_key == GUILD_SERVICE_ID else row
             for row in catalog.service_hosts
         )
         patched = guild_config.GuildCatalog(
@@ -319,11 +307,16 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         # live general store's own (registry-derived at runtime, never a
         # shipped literal): two places may share a table — the anchor is the
         # row's service_id, not the dialogue key.
-        store_kwargs = dict(_place_by_kind("general_store").authored_kwargs)
+        store_row = _merchant_row()
+        store_shop_key = _merchant_shop_key()
+        store_dialogue_key = next(
+            declaration.kwargs["dialogue_key"]
+            for declaration in store_row.components
+            if declaration.type == "scripted_dialogue"
+        )
         new_place = dataclasses.replace(
             _place_by_kind("general_store"),
             key="t_trading_post",
-            service_id="t_altoria_trading_post",
             room_name_zh="測試交易站",
             room_desc_zh="A synthetic trading post with no module constant.",
             doorway_key_zh="測試交易站往來通道",
@@ -336,17 +329,26 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             # The stand-in place is its own person: borrowing a shipped host's
             # profile key would claim that host's canonical identity.
             host_profile_key="t_altoria_trading_post",
-            authored_kwargs=(
-                ("shop_key", "t_trading_post"),
-                ("dialogue_key", store_kwargs["dialogue_key"]),
+            components=(
+                capability(
+                    Merchant.name,
+                    binding=place_bound("t_trading_post"),
+                    service_id="t_altoria_trading_post",
+                    shop_key="t_trading_post",
+                ),
+                capability(
+                    "scripted_dialogue",
+                    binding=place_bound("t_trading_post"),
+                    dialogue_key=store_dialogue_key,
+                ),
             ),
         )
         # The stand-in shop sells exactly what the live merchant's shop sells:
         # the stock-identity assertion below then holds for any authored
         # assortment, with no shipped assortment key named.
-        general_store_shop = _shops()[_merchant_shop_key()]
+        general_store_shop = _shops()[store_shop_key]
         new_shop = ShopDefinition(
-            key="t_trading_post",
+            key=place_shop_identity(new_place),
             host_name="測試商人",
             host_title="測試交易站店主",
             assortment_keys=general_store_shop.assortment_keys,
@@ -416,9 +418,16 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         """
         row = row or _guild_row()
         legacy = create_object(NPC, key=key, location=self._guild_hallish())
+        staff_kwargs = next(
+            declaration.kwargs
+            for declaration in row.components
+            if declaration.type == GuildStaff.name
+        )
         legacy.components.add(
             GuildStaff.create(
-                legacy, service_id=row.service_id, branch_key=_guild_branch_key()
+                legacy,
+                service_id=staff_kwargs["service_id"],
+                branch_key=_guild_branch_key(),
             )
         )
         return canonical_host(legacy, row)
@@ -448,16 +457,14 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             host_race=None,
             host_subrace=None,
             host_sex=None,
-            profession=None,
-            service_id=None,
             host_profile_key=None,
             assortment_keys=(),
-            authored_kwargs=(),
+            components=(),
         )
         with patch.dict(_places(), {"t_forecourt": hostless}):
             load_catalog_into_cache()
             # The roster derivation skipped the row: no anchor, no service id.
-            self.assertNotIn("t_forecourt", {row.anchor_room for row in get_catalog().service_hosts})
+            self.assertNotIn("t_forecourt", {row.spawn_room for row in get_catalog().service_hosts})
             sync_service_interiors()
             sync_service_content()
 
@@ -641,8 +648,8 @@ class ServiceHostReconciliationTests(ServiceContentIsolation, EvenniaTestCase):
         # presentation, so it cannot select or create a person.
         self._patch_host_row(
             _guild_row().host_key,
-            profession=profession_with(
-                _guild_row().profession.key,
+            components=components_with(
+                _guild_row().components,
                 ScriptedDialogue.name,
                 GuildExamReception.name,
                 GuildStaff.name,
@@ -673,8 +680,10 @@ class ServiceHostReconciliationTests(ServiceContentIsolation, EvenniaTestCase):
         # Drop the reception capability from the declaration only.
         self._patch_host_row(
             _guild_row().host_key,
-            profession=profession_with(
-                _guild_row().profession.key, GuildStaff.name, ScriptedDialogue.name
+            components=components_with(
+                _guild_row().components,
+                GuildStaff.name,
+                ScriptedDialogue.name,
             ),
         )
         sync_service_content()
@@ -695,8 +704,7 @@ class ServiceHostReconciliationTests(ServiceContentIsolation, EvenniaTestCase):
         pk_before = before.pk
         name_before = before.key
         room_before = before.location
-        empty = dataclasses.replace(_guild_row().profession, components=())
-        self._patch_host_row(_guild_row().host_key, profession=empty)
+        self._patch_host_row(_guild_row().host_key, components=())
         sync_service_content()
         host = self._guild_host()
         self.assertEqual(host.pk, pk_before)
@@ -707,6 +715,9 @@ class ServiceHostReconciliationTests(ServiceContentIsolation, EvenniaTestCase):
     @covers_requirement(
         "npc-service-host-identity::canonical-source-identity-selects-one-host-independently-of-capabilities"
     )
+    @covers_requirement(
+        "quest-issuer-authorization::every-profession-row-anchors-on-a-component-that-carries-a-service-identity"
+    )
     def test_a_service_identity_edit_converges_on_the_same_person(self):
         from typeclasses.components import ScriptedDialogue
 
@@ -714,7 +725,18 @@ class ServiceHostReconciliationTests(ServiceContentIsolation, EvenniaTestCase):
         host = self._guild_host()
         pk_before = host.pk
         edited_service_id = f"t_{GUILD_SERVICE_ID}_edited"
-        self._patch_host_row(_guild_row().host_key, service_id=edited_service_id)
+        self._patch_host_row(
+            _guild_row().host_key,
+            components=tuple(
+                dataclasses.replace(
+                    declaration,
+                    kwargs={**declaration.kwargs, "service_id": edited_service_id},
+                )
+                if "service_id" in declaration.kwargs
+                else declaration
+                for declaration in _guild_row().components
+            ),
+        )
         sync_service_content()
         host = self._guild_host()
         self.assertEqual(host.pk, pk_before)
@@ -722,12 +744,16 @@ class ServiceHostReconciliationTests(ServiceContentIsolation, EvenniaTestCase):
         for slot in (
             GuildStaff.get_component_slot(),
             GuildExamReception.get_component_slot(),
-            ScriptedDialogue.get_component_slot(),
         ):
             with self.subTest(slot=slot):
                 component = host.components.get(slot)
                 self.assertIsNotNone(component)
                 self.assertEqual(component.service_id, edited_service_id)
+        # The dialogue declaration authors no service identity, so it keeps
+        # none: authored configuration is converged, never invented.
+        dialogue = host.components.get(ScriptedDialogue.get_component_slot())
+        self.assertIsNotNone(dialogue)
+        self.assertIsNone(dialogue.service_id)
 
     @covers_requirement(
         "npc-service-host-identity::canonical-source-identity-selects-one-host-independently-of-capabilities"
@@ -765,7 +791,15 @@ class ServiceHostReconciliationTests(ServiceContentIsolation, EvenniaTestCase):
         )
         self._patch_host_row(
             merchant_row.host_key,
-            authored_kwargs={**dict(merchant_row.authored_kwargs), "shop_key": other_shop_key},
+            components=tuple(
+                dataclasses.replace(
+                    declaration,
+                    kwargs={**declaration.kwargs, "shop_key": other_shop_key},
+                )
+                if declaration.type == Merchant.name
+                else declaration
+                for declaration in merchant_row.components
+            ),
         )
         sync_service_content()
         host = NPC.objects.filter(db_key=_merchant_host_name()).first()
@@ -784,8 +818,8 @@ class ServiceHostReconciliationTests(ServiceContentIsolation, EvenniaTestCase):
             row
             for row in get_catalog().service_hosts
             if any(
-                component.type_key == ChurchHost.name
-                for component in row.profession.components
+                component.type == ChurchHost.name
+                for component in row.components
             )
         )
         sync_service_content()
@@ -795,7 +829,7 @@ class ServiceHostReconciliationTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertTrue(sexual_before)
         self._patch_host_row(
             clergy_row.host_key,
-            profession=profession_with(clergy_row.profession.key, ScriptedDialogue.name),
+            components=components_with(clergy_row.components, ScriptedDialogue.name),
         )
         sync_service_content()
         host = NPC.objects.filter(pk=host.pk).first()
@@ -832,25 +866,21 @@ class ServiceHostAnchorReuseTests(ServiceContentIsolation, EvenniaTestCase):
         )
 
 class ServiceHostAnchorRoomTests(ServiceContentIsolation, EvenniaTestCase):
-    """Per-row anchor resolution: an unresolvable tag skips exactly one row."""
+    """Room resolution is complete and fail-closed for the whole batch."""
 
     @covers_requirement(
         "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
     )
-    def test_unresolvable_anchor_room_skips_only_its_row(self):
-        self._patch_host_row(_merchant_row().host_key, anchor_room="no_such_room_tag")
-        with patch("world.rules.guild_economy.log_warn") as warned:
+    def test_unresolvable_anchor_room_fails_the_whole_operation(self):
+        # No row is skipped and no first match is used: the batch rejects
+        # before any host is created or converged, naming the unresolved row.
+        self._patch_host_row(
+            _merchant_row().host_key, spawn_room="no_such_room_tag"
+        )
+        with self.assertRaises(ServiceHostIntegrityError) as caught:
             sync_service_content()
-        events = [
-            call for call in warned.call_args_list
-            if call.args and call.args[0] == "guild_service_host_anchor_room_missing"
-        ]
-        self.assertEqual(len(events), 1)
-        self.assertEqual(events[0].kwargs["context"]["service"], MERCHANT_SERVICE_ID)
-        self.assertEqual(events[0].kwargs["context"]["anchor_room"], "no_such_room_tag")
-        # The resolvable row processed exactly as before; nothing was created
-        # for the skipped row, and the skipped merchant's stock stayed absent.
-        self.assertIsNotNone(NPC.objects.filter(db_key=_guild_host_name()).first())
+        self.assertIn(MERCHANT_SERVICE_ID, str(caught.exception))
+        self.assertIsNone(NPC.objects.filter(db_key=_guild_host_name()).first())
         self.assertEqual(NPC.objects.filter(db_key=_merchant_host_name()).count(), 0)
 
 
@@ -900,9 +930,17 @@ class ServiceHostProvenanceTests(ServiceContentIsolation, EvenniaTestCase):
 
         roster_row = _guild_row()
         room = search_object_by_tag(GUILD_HALL_TAG)[0]
+        plan = validate_capabilities(
+            roster_row.components,
+            room_resolver=lambda tag: (
+                [room] if tag == roster_row.spawn_room else []
+            ),
+        )
         with self.assertRaises(RuntimeError):
             with transaction.atomic():
-                host = guild_economy._sync_service_host(roster_row, room, created=[])
+                host = guild_economy._sync_service_host(
+                    roster_row, room, plan, created=[]
+                )
                 self.assertEqual(
                     host.attributes.get(NPC_PROFILE_PROVENANCE_ATTRIBUTE),
                     roster_row.profile_key,

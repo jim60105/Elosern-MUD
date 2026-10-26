@@ -83,7 +83,6 @@ DISPLAY_FIELDS = frozenset(
 )
 RULEBOOK_CATALOG_KEYS = {
     "buffs.yaml": ("buffs",),
-    "professions.yaml": ("professions",),
     "clock.yaml": ("periods",),
     "npc_schedules.yaml": ("schedules",),
     "monster_behaviour.yaml": ("behaviours",),

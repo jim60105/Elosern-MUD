@@ -105,13 +105,16 @@ class ServiceGateVerdictTests(EvenniaTestCase):
     @covers_requirement(
         "service-anchoring::one-read-only-resolver-answers-service-availability-with-a-stable-vocabulary"
     )
-    def test_unset_binding_reads_as_the_default_co_presence(self):
-        # A component the roster never converged (hand-built NPC) has no
-        # authored binding: design D1 defaults it to person, never malformed.
+    def test_a_missing_binding_fails_closed(self):
+        # Every bound service capability carries an authored binding; an unset
+        # field describes state the assembly never produced, so the resolver
+        # refuses instead of defaulting open.
         actor = _actor(self.square)
-        self.assertTrue(
-            service_available(actor, self.host, _component(None, None)).allowed
-        )
+        with patch("world.rules.service_gate.log_warn") as warned:
+            verdict = service_available(actor, self.host, _component(None, None))
+        self.assertFalse(verdict.allowed)
+        self.assertEqual(verdict.reason, REASON_MALFORMED_BINDING)
+        warned.assert_called_once()
 
     @covers_requirement(
         "service-anchoring::one-read-only-resolver-answers-service-availability-with-a-stable-vocabulary"

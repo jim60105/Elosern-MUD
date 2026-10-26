@@ -12,7 +12,7 @@ from typeclasses.components import Merchant, QuestIssuer, ScriptedDialogue
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from world.rules.guild import GuildServiceError, resolve_local_service_host
-from world.rules.profession_config import PROFESSION_COMPONENT_TYPES
+from world.rules.npc_capabilities import COMPONENT_TYPES
 from world.rules.quest_issuance import (
     QUEST_ISSUANCE_REGISTRY,
     IssuerKeyError,
@@ -68,7 +68,7 @@ class QuestIssuerComponentShapeTests(unittest.TestCase):
         "quest-issuer-authorization::authority-to-issue-a-private-commission-is-authored-never-inferred"
     )
     def test_component_is_registered_under_its_declared_name(self):
-        self.assertIs(PROFESSION_COMPONENT_TYPES["quest_issuer"], QuestIssuer)
+        self.assertIs(COMPONENT_TYPES["quest_issuer"], QuestIssuer)
         self.assertEqual(QuestIssuer.name, "quest_issuer")
 
 

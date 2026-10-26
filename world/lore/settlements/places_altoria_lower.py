@@ -27,6 +27,10 @@ rules a parallel bounty system out at its line 410; the guild board and
 """
 
 from world.lore.settlements.places import PlaceDefinition, PlaceKind
+from world.lore.settlements.capability_declarations import (
+    capability,
+    place_bound,
+)
 
 ROWS: tuple[PlaceDefinition, ...] = (
     PlaceDefinition(
@@ -45,13 +49,20 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_race="human",
         host_subrace="human_plains",
         host_sex="male",
-        profession="merchant",
-        service_id="altoria_eatery_owner",
         host_profile_key="altoria_eatery_owner",
         assortment_keys=("staple_meals",),
-        authored_kwargs=(
-            ("shop_key", "altoria_eatery"),
-            ("dialogue_key", "altoria_eatery"),
+        components=(
+            capability(
+                "merchant",
+                binding=place_bound("altoria_eatery"),
+                service_id="altoria_eatery_owner",
+                shop_key="altoria_eatery",
+            ),
+            capability(
+                "scripted_dialogue",
+                binding=place_bound("altoria_eatery"),
+                dialogue_key="altoria_eatery",
+            ),
         ),
     ),
     # 蘿溫‧古橡's tavern is the lane's information room: the document's
@@ -76,11 +87,15 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_race="human",
         host_subrace=None,
         host_sex="female",
-        profession="attendant",
-        service_id="altoria_tavern_keeper",
         host_profile_key="altoria_tavern_keeper",
         assortment_keys=(),
-        authored_kwargs=(("dialogue_key", "altoria_tavern"),),
+        components=(
+            capability(
+                "scripted_dialogue",
+                binding=place_bound("altoria_tavern"),
+                dialogue_key="altoria_tavern",
+            ),
+        ),
     ),
     # 溫弗蕾德‧古林's inn shares the lane and its doorstep with the tavern.
     # Her rooms host rest, sleep and practice exactly as those commands
@@ -104,11 +119,15 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_race="human",
         host_subrace=None,
         host_sex="female",
-        profession="attendant",
-        service_id="altoria_innkeeper",
         host_profile_key="altoria_innkeeper",
         assortment_keys=(),
-        authored_kwargs=(("dialogue_key", "altoria_lodging"),),
+        components=(
+            capability(
+                "scripted_dialogue",
+                binding=place_bound("altoria_lodging"),
+                dialogue_key="altoria_lodging",
+            ),
+        ),
     ),
     # 伊莎貝爾‧葦沼's bathhouse is the document's contrast scene standing
     # ready: the human and beastfolk ethic of covered privacy against the
@@ -134,11 +153,15 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_race="human",
         host_subrace=None,
         host_sex="female",
-        profession="attendant",
-        service_id="altoria_bathhouse_keeper",
         host_profile_key="altoria_bathhouse_keeper",
         assortment_keys=(),
-        authored_kwargs=(("dialogue_key", "altoria_bathhouse"),),
+        components=(
+            capability(
+                "scripted_dialogue",
+                binding=place_bound("altoria_bathhouse"),
+                dialogue_key="altoria_bathhouse",
+            ),
+        ),
     ),
     # 聖潔王都衛兵駐所 — the guardhouse behind the south gate. The document
     # keeps its 懸賞任務板 〔提案〕 pointed at the guild board and private
@@ -163,10 +186,14 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_race="human",
         host_subrace=None,
         host_sex="male",
-        profession="attendant",
-        service_id="altoria_guard_captain",
         host_profile_key="altoria_guard_captain",
         assortment_keys=(),
-        authored_kwargs=(("dialogue_key", "altoria_guardhouse"),),
+        components=(
+            capability(
+                "scripted_dialogue",
+                binding=place_bound("altoria_guardhouse"),
+                dialogue_key="altoria_guardhouse",
+            ),
+        ),
     ),
 )

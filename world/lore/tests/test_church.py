@@ -4,7 +4,7 @@ The shipped OFFERING_CATALOG seeds resolve against the live sexual-act
 catalogue, the shipped REDEEM_CATALOG rows validate through the row
 validator (which rejects planted malformed rows by name), `saintess_vessel`
 never enters the redemption catalogue, and the church-place set is derived
-fail-closed from the place registry's authored `church` kwargs. The lore
+fail-closed from the place registry's authored `church` venue flag. The lore
 documents are realigned with the shipped mechanics: the once-per-generation
 Saintess framing is retired in favour of the no-uniqueness enrollment grant,
 and the 神殿／聖所 ministry counter carries the 〔已實作〕 status tag.
@@ -31,7 +31,7 @@ from world.lore.church.places import (
     CHURCH_VENUE_KEY,
     resolve_church_place_keys,
 )
-from world.lore.settlements.places import PLACE_REGISTRY
+from world.lore.settlements.places import PLACE_REGISTRY, validate_place_registry
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -186,45 +186,36 @@ class ChurchPlaceDerivationTests(TestCase):
     @covers_requirement(
         "church-ordination::church-venues-and-clergy-hosts-exist-as-authored-content"
     )
-    def test_a_conflicting_church_flag_fails_closed_at_derivation(self):
+    def test_the_derived_set_follows_the_authored_place_flag(self):
         temple = PLACE_REGISTRY["altoria_temple"]
-        conflicting = replace(
+        withdrawn = replace(
             temple,
-            key="t_conflicting_church_place",
-            service_id="t_conflicting_church_place",
-            authored_kwargs=(("church", "dark_church"),),
+            key="t_withdrawn_church_place",
+            church=False,
         )
-        with patch.dict(PLACE_REGISTRY, {"t_conflicting_church_place": conflicting}):
-            with self.assertRaisesRegex(ValueError, "t_conflicting_church_place"):
-                resolve_church_place_keys()
-        # The canonical identity itself names the church the venue belongs to.
+        with patch.dict(PLACE_REGISTRY, {"t_withdrawn_church_place": withdrawn}):
+            self.assertNotIn("t_withdrawn_church_place", resolve_church_place_keys())
+        flagged = replace(temple, key="t_flagged_church_place", church=True)
+        with patch.dict(PLACE_REGISTRY, {"t_flagged_church_place": flagged}):
+            self.assertIn("t_flagged_church_place", resolve_church_place_keys())
+        # The venue identity itself names the church the venue belongs to.
         self.assertEqual(CHURCH_VENUE_KEY, "light_church")
 
     @covers_requirement(
         "church-ordination::church-venues-and-clergy-hosts-exist-as-authored-content"
     )
-    def test_a_duplicate_church_flag_on_one_place_fails_closed(self):
-        # The delta's fail-closed rule covers DUPLICATE authoring too: a place
-        # listing the flag twice must raise regardless of whether the two
-        # values agree — dict() would silently keep the last one.
+    def test_a_non_boolean_church_flag_is_rejected_at_load(self):
+        # The venue flag is a boolean, so duplicate or conflicting kwarg
+        # authoring is not representable; a non-boolean value is the offense
+        # that remains nameable.
         temple = PLACE_REGISTRY["altoria_temple"]
-        for pairs in (
-            (("church", "light_church"), ("church", "light_church")),
-            (("church", "dark_church"), ("church", "light_church")),
-            (("church", "light_church"), ("church", "dark_church")),
-        ):
-            with self.subTest(pairs=pairs):
-                duplicate = replace(
-                    temple,
-                    key="t_duplicate_church_place",
-                    service_id="t_duplicate_church_place",
-                    authored_kwargs=pairs,
-                )
-                with patch.dict(
-                    PLACE_REGISTRY, {"t_duplicate_church_place": duplicate}
-                ):
-                    with self.assertRaisesRegex(ValueError, "more than once"):
-                        resolve_church_place_keys()
+        broken = replace(
+            temple,
+            key="t_broken_church_place",
+            church=CHURCH_VENUE_KEY,
+        )
+        with self.assertRaisesRegex(ValueError, "t_broken_church_place"):
+            validate_place_registry({"t_broken_church_place": broken})
 
 
 class ChurchLoreRealignmentTests(TestCase):

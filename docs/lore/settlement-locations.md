@@ -66,7 +66,7 @@
 
 ## NPC 命名與功能慣例
 
-每個地點的 NPC 分兩層。以下規範以 `world/rules/npc_identity.py`（npc-identity-titles 規格）、`world/lore/shops.py`／`world/lore/guild.py` 登錄表、`world/rules/rulebook/professions.yaml` 職業規則書、以及任務藍圖 `npc_req` 驗證（blueprint-portrait-policy／scenario-director 規格）為準，撰寫新聚落內容時必須逐條對齊。
+每個地點的 NPC 分兩層。以下規範以 `world/rules/npc_identity.py`（npc-identity-titles 規格）、`world/lore/shops.py`／`world/lore/guild.py` 登錄表、`world/rules/npc_capabilities.py` 能力詞彙與驗證、以及任務藍圖 `npc_req` 驗證（blueprint-portrait-policy／scenario-director 規格）為準，撰寫新聚落內容時必須逐條對齊。
 
 **功能性 NPC（登錄表背書的服務宿主）**
 
@@ -74,8 +74,8 @@
 - 身分欄位有硬性校驗規則（唯一驗證器 `validate_npc_name`／`validate_npc_title`）：姓名為 1～64 個字元，允許一般空格，但禁用全形空格 U+3000（它是顯示組合器保留的分隔符）、控制字元與 Evennia 標記字元 `|`；稱號為 1～32 個字元，不得含任何內部空白、控制字元或 `|`。稱號是**建立期屬性**，沒有任何執行期改稱號的指令或寫入面。
 - 玩家看到的完整身分由組合器 `npc_display_name` 產生，格式為「姓名　稱號」，中間以一個全形空格 U+3000 分隔（例如「瑪爾特‧金秤　阿爾托利亞雜貨商店老闆」）；這個組合格式只出現在房間角色行、`看` 標題列與網頁客戶端探索條目，其餘介面一律顯示純姓名。
 - **手寫（authored）身分不可更動**：登錄表採 never-rename／never-retitle 收斂契約，宿主重生時沿用原姓名與稱號；姓名必須在商店、公會分會、常駐冒險者三張登錄表的全域範圍內唯一，重複會在匯入期直接失敗。
-- 「職業」是封閉的組裝期詞彙（`professions.yaml`），現行只有 `merchant`、`guild_staff`、`guild_exam_reception`、`quest_issuer`、`attendant` 五項（`attendant` 是純交談藍圖，暗影谷村的刀術導師「泰莉爾‧菲溫德」與長老「艾莉妮斯‧達恩斯特瑞德爾」是首批使用它的登錄地點，兩位都只對話、不交易）。職業是**組裝藍圖**，不是世界觀上的行業標籤。NPC 建成後機制由掛上的元件決定，地點章節敘事裡寫的「鐵匠」「裁縫師」「鍊金師」目前都只是稱號與敘事身分，真正能掛機制的職業要等對應 profession 行經 OpenSpec 流程擴充。服務宿主的姓名、稱號、職業、anchor 房間、service_id 與種族／亞種／性別，全部由 `world/lore/settlements/places.py` 的地點登錄表單一宣告，服務宿主名冊與 `SHOP_REGISTRY` 都是由它推導出來的視圖，不另行授權；目前登錄了十六個地點，聖潔王都七處、暗影谷村九處。
-- 委託發放者（`quest_issuer`）是**人身綁定**的授權，跟著委託人移動、不綁房間；酒館委託人、商會會長這類「會發任務的角色」在世界觀上都對應這個職業。
+- 「能力」是封閉的元件詞彙（`world/rules/npc_capabilities.py`），現行只有 `merchant`、`guild_staff`、`guild_exam_reception`、`scripted_dialogue`、`quest_issuer`、`church_host` 六項。能力就是**直接宣告**，沒有職業藍圖、沒有展開；暗影谷村的刀術導師「泰莉爾‧菲溫德」與長老「艾莉妮斯‧達恩斯特瑞德爾」都只宣告 `scripted_dialogue`，只對話、不交易。地點章節敘事裡寫的「鐵匠」「裁縫師」「鍊金師」目前都只是稱號與敘事身分，真正要掛機制時才在該地點的 `components` 補上對應能力。每個地點服務宿主的姓名、稱號、`host_profile_key`、`components`（各自帶 `service_id` 與 `{"kind": "place", "anchor_room": <自己的房號>}` 綁定）與種族／性別，都寫在 `world/lore/settlements/places.py` 的地點宣告裡。
+- 委託發放者（`quest_issuer`）是**人身綁定**的授權（`{"kind": "person"}`），跟著委託人移動、不綁房間；酒館委託人、商會會長這類「會發任務的角色」在世界觀上都對應這項能力。
 
 **自由 NPC（場景常駐，不承載地點機制）**
 

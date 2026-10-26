@@ -111,7 +111,10 @@ def validate_adventurers(
             if not isinstance(value, str) or not value.strip():
                 raise GuildHostIntegrityError(f"profile {person.profile_key!r} lacks {field}")
             normalize_offline_greeting(value)
-        if person.home_key not in PLACE_REGISTRY or PLACE_REGISTRY[person.home_key].service_id is not None:
+        if (
+            person.home_key not in PLACE_REGISTRY
+            or PLACE_REGISTRY[person.home_key].host_profile_key is not None
+        ):
             raise GuildHostIntegrityError(f"person {key!r} needs a registered hostless home")
         if person.rank not in GUILD_RANK_REGISTRY or len(person.bases) != len(_BASE_KEYS):
             raise GuildHostIntegrityError(f"person {key!r} has invalid rank or bases")

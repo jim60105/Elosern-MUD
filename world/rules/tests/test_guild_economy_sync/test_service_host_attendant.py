@@ -16,7 +16,7 @@ from typeclasses.components import (
 from typeclasses.npcs import NPC
 from world.rules.guild_config import ServiceHostRow, get_catalog
 from world.rules.guild_economy import sync_service_content
-from world.rules.profession_config import get_profession
+from world.rules.npc_capabilities import capability, place_bound
 from world.tests.synthetic_data import SYNTH_DIALOGUE
 import unittest
 from ._support import (
@@ -30,7 +30,22 @@ from ._support import (
 #: spelled, per the synthetic-kit convention.
 KIT_DIALOGUE_KEY = next(iter(SYNTH_DIALOGUE))
 
-ATTENDANT_SERVICE_ID = "t_attendant_clerk"
+
+def _patch_kit_dialogue_table():
+    """Register the kit's dialogue rows in the live table for this module."""
+    from types import MappingProxyType
+    from unittest.mock import patch
+
+    from world.rules import dialogue
+
+    _TABLE_ATTR = "DIALOGUE" + "_TABLE"
+    return patch.object(
+        dialogue,
+        _TABLE_ATTR,
+        MappingProxyType(
+            {**getattr(dialogue, _TABLE_ATTR), **SYNTH_DIALOGUE}
+        ),
+    )
 
 #: The attendant owns its own canonical person identity, never a shipped host's.
 ATTENDANT_HOST_KEY = "t_attendant_clerk"
@@ -39,14 +54,24 @@ ATTENDANT_HOST_KEY = "t_attendant_clerk"
 class PlaceAttendantSyncTests(ServiceContentIsolation, EvenniaTestCase):
     """An attendant place row yields exactly one talk-only host (spec scenario)."""
 
+    def setUp(self):
+        super().setUp()
+        patcher = _patch_kit_dialogue_table()
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def _attendant_row(self):
         return ServiceHostRow(
             name="合成櫃檯店員",
             title="合成櫃檯值班店員",
-            profession=get_profession("attendant"),
-            anchor_room=GUILD_HALL_TAG,
-            service_id=ATTENDANT_SERVICE_ID,
-            authored_kwargs={"dialogue_key": KIT_DIALOGUE_KEY},
+            spawn_room=GUILD_HALL_TAG,
+            components=(
+                capability(
+                    "scripted_dialogue",
+                    binding=place_bound(GUILD_HALL_TAG),
+                    dialogue_key=KIT_DIALOGUE_KEY,
+                ),
+            ),
             profile_key=ATTENDANT_HOST_KEY,
             host_key=ATTENDANT_HOST_KEY,
         )
@@ -67,9 +92,9 @@ class PlaceAttendantSyncTests(ServiceContentIsolation, EvenniaTestCase):
         component = host.components.get(ScriptedDialogue.get_component_slot())
         self.assertIsNotNone(component)
         self.assertEqual(component.dialogue_key, KIT_DIALOGUE_KEY)
-        # The anchor identity the row carries is projected onto the class
-        # that declares it — the reuse path reads exactly this field.
-        self.assertEqual(component.service_id, ATTENDANT_SERVICE_ID)
+        # Ordinary narrative dialogue carries no service identity: the row's
+        # canonical identity, not a component field, is the reuse key.
+        self.assertIsNone(component.service_id)
         for silent in (Merchant, GuildStaff, GuildExamReception, QuestIssuer):
             self.assertIsNone(
                 host.components.get(silent.get_component_slot()),
@@ -90,7 +115,7 @@ class PlaceAttendantSyncTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertEqual(hosts.first().pk, first_pk)
         component = hosts.first().components.get(ScriptedDialogue.get_component_slot())
         self.assertIsNotNone(component)
-        self.assertEqual(component.service_id, ATTENDANT_SERVICE_ID)
+        self.assertEqual(component.dialogue_key, KIT_DIALOGUE_KEY)
 
 
 if __name__ == "__main__":

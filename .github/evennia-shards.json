@@ -194,7 +194,7 @@
         "world.rules.tests.test_overwhelm_compression",
         "world.rules.tests.test_overwhelm_resolution",
         "world.rules.tests.test_phase_spell_reactions",
-        "world.rules.tests.test_profession_config",
+        "world.rules.tests.test_npc_capabilities",
         "world.rules.tests.test_rules_observability",
         "world.rules.tests.test_service_binding_persistence",
         "world.rules.tests.test_service_gate",

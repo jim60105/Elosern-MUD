@@ -1,8 +1,8 @@
 """Persistence proof for assembly-written binding fields (tasks 4.1/4.2).
 
 The binding fields are ordinary ``DBField``s (AttributeProperty-backed), so the
-proof is: write them through the shared assembly, flush the idmapper cache
-exactly like a process reload, and re-read the SAME object row from the
+proof is: write them through the shared capability assembly, flush the idmapper
+cache exactly like a process reload, and re-read the SAME object row from the
 database to confirm the values come back and the resolver agrees with them.
 """
 
@@ -15,14 +15,16 @@ from evennia.utils.create import create_object
 from evennia.utils.idmapper.models import flush_cache
 from evennia.utils.test_resources import EvenniaTestCase
 
-from typeclasses.components import Merchant
+from typeclasses.components import Merchant, ScriptedDialogue
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
-from world.rules import profession_config
-from world.rules.profession_config import Profession, ProfessionComponent
-from world.rules.profession_assembly import (
-    ProfessionAssemblyError,
-    assemble_profession_components,
+from world.rules.npc_capabilities import (
+    CapabilityValidationError,
+    assemble_capabilities,
+    capability,
+    person_bound,
+    place_bound,
+    validate_capabilities,
 )
 from world.rules.service_gate import (
     REASON_OFF_ANCHOR,
@@ -30,35 +32,49 @@ from world.rules.service_gate import (
     service_available,
 )
 
-# Synthetic probe blueprint: the component type key is the vocabulary class's
-# own runtime name (never a shipped catalog token), and the profession key is
-# a synthetic probe identity — the patched table below is the only place it
-# lives. The authored shop identity is the kit's synthetic shop key.
-MERCHANT_PROBE = Profession(
-    key="t_probe_merchant",
-    components=(ProfessionComponent(Merchant.name, "place"),),
-    schedule_template=None,
-    default_tier=None,
-)
-PROBE_TABLE = MappingProxyType({Merchant.name: MERCHANT_PROBE})
+#: The kit's synthetic shop identity (never a shipped catalog token).
 _PROBE_SHOP_KEY = "t_mossgate_stall"
+#: One probe dialogue table, registered in the live table for this module only.
+_TABLE_ATTR = "DIALOGUE" + "_TABLE"
+_PROBE_DIALOGUE_KEY = "binding_probe_dialogue"
+_ANCHOR_TAG = "binding_probe_anchor"
+_SQUARE_TAG = "binding_probe_square"
+
+
+def _patch_dialogue_table():
+    from world.rules import dialogue
+
+    table = dict(getattr(dialogue, _TABLE_ATTR))
+    table[_PROBE_DIALOGUE_KEY] = next(iter(getattr(dialogue, _TABLE_ATTR).values()))
+    return patch.object(dialogue, _TABLE_ATTR, MappingProxyType(table))
 
 
 class ServiceBindingPersistenceTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
-        patcher = patch.object(profession_config, "TABLE", PROBE_TABLE)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-        self.anchor = create_object(Room, key="binding anchor")
-        self.square = create_object(Room, key="binding square")
+        dialogue_patcher = _patch_dialogue_table()
+        dialogue_patcher.start()
+        self.addCleanup(dialogue_patcher.stop)
+        self.anchor = create_object(Room, key="binding anchor", tags=[_ANCHOR_TAG])
+        self.square = create_object(Room, key="binding square", tags=[_SQUARE_TAG])
 
-    def _assemble(self, npc, room):
-        assemble_profession_components(
-            npc,
-            MERCHANT_PROBE,
-            {Merchant.name: {"service_id": "s", "shop_key": _PROBE_SHOP_KEY}},
-            anchor_room=room,
+    def _resolver(self, tag):
+        return {
+            _ANCHOR_TAG: [self.anchor],
+            _SQUARE_TAG: [self.square],
+        }.get(tag, [])
+
+    def _plan(self, tag=_ANCHOR_TAG, **kwargs):
+        return validate_capabilities(
+            [
+                capability(
+                    Merchant.name,
+                    binding=place_bound(tag),
+                    service_id="s",
+                    shop_key=kwargs.get("shop_key", _PROBE_SHOP_KEY),
+                )
+            ],
+            room_resolver=self._resolver,
         )
 
     @covers_requirement(
@@ -66,7 +82,7 @@ class ServiceBindingPersistenceTests(EvenniaTestCase):
     )
     def test_binding_and_anchor_survive_a_save_reload_round_trip(self):
         npc = create_object(NPC, key="binding merchant", location=self.anchor)
-        self._assemble(npc, self.anchor)
+        assemble_capabilities(npc, self._plan())
         component = npc.components.get(Merchant.get_component_slot())
         self.assertEqual(component.service_binding, "place")
         self.assertEqual(component.anchor_room_id, self.anchor.pk)
@@ -95,37 +111,38 @@ class ServiceBindingPersistenceTests(EvenniaTestCase):
         "service-anchoring::service-components-carry-an-authored-person-or-place-binding"
     )
     def test_person_bound_components_persist_no_anchor(self):
-        person_probe = Profession(
-            key="courier",
-            components=(ProfessionComponent("scripted_dialogue", "person"),),
-            schedule_template=None,
-            default_tier=None,
-        )
         npc = create_object(NPC, key="binding courier", location=self.square)
-        assemble_profession_components(
-            npc,
-            person_probe,
-            # service_id is identity the person-bound import authors like any
-            # other component's (place-attendant-profession: the dialogue
-            # class declares it for the anchor-read path).
-            {"scripted_dialogue": {"service_id": "s", "dialogue_key": "d"}},
-            # No anchor_room: person-bound plans never need one.
+        plan = validate_capabilities(
+            [
+                capability(
+                    "scripted_dialogue",
+                    binding=person_bound(),
+                    dialogue_key=_PROBE_DIALOGUE_KEY,
+                )
+            ]
         )
-        component = npc.components.get("scripted_dialogue")
+        assemble_capabilities(npc, plan)
+        component = npc.components.get(ScriptedDialogue.get_component_slot())
         self.assertEqual(component.service_binding, "person")
         self.assertIsNone(component.anchor_room_id)
 
     @covers_requirement(
         "service-anchoring::service-components-carry-an-authored-person-or-place-binding"
     )
-    def test_place_plan_without_an_anchor_room_never_creates_components(self):
+    def test_place_plan_without_a_resolved_anchor_never_creates_components(self):
         npc = create_object(NPC, key="unanchored merchant", location=self.square)
-        with self.assertRaises(ProfessionAssemblyError):
-            assemble_profession_components(
-                npc,
-                MERCHANT_PROBE,
-                {Merchant.name: {"service_id": "s", "shop_key": _PROBE_SHOP_KEY}},
-            )
+        unresolved = validate_capabilities(
+            [
+                capability(
+                    Merchant.name,
+                    binding=place_bound(_ANCHOR_TAG),
+                    service_id="s",
+                    shop_key=_PROBE_SHOP_KEY,
+                )
+            ]
+        )
+        with self.assertRaises(CapabilityValidationError):
+            assemble_capabilities(npc, unresolved)
         self.assertFalse(npc.components.has(Merchant.name))
 
     @covers_requirement(
@@ -133,12 +150,12 @@ class ServiceBindingPersistenceTests(EvenniaTestCase):
     )
     def test_reassembly_converges_bindings_without_touching_identity(self):
         npc = create_object(NPC, key="converged merchant", location=self.anchor)
-        self._assemble(npc, self.anchor)
+        assemble_capabilities(npc, self._plan())
         before = npc.components.get(Merchant.get_component_slot())
         before_id = (before.service_id, before.shop_key)
         # Re-running assembly (the sync's per-sync convergence) keeps the slot
         # and identity intact while re-writing the authored binding fields.
-        self._assemble(npc, self.square)
+        assemble_capabilities(npc, self._plan(_SQUARE_TAG))
         after = npc.components.get(Merchant.get_component_slot())
         self.assertEqual((after.service_id, after.shop_key), before_id)
         self.assertEqual(after.anchor_room_id, self.square.pk)
@@ -151,17 +168,12 @@ class ServiceBindingPersistenceTests(EvenniaTestCase):
         # lifecycle's own state (stock, restock day) is never written by
         # assembly, so a shop edit cannot reset progress.
         npc = create_object(NPC, key="configured merchant", location=self.anchor)
-        self._assemble(npc, self.anchor)
+        assemble_capabilities(npc, self._plan())
         component = npc.components.get(Merchant.get_component_slot())
         component.merchant_stock = {"t_probe_goods": 2}
         component.last_restock_day = 9
-        assemble_profession_components(
-            npc,
-            MERCHANT_PROBE,
-            {Merchant.name: {"service_id": "s2", "shop_key": "t_other_stall"}},
-            anchor_room=self.anchor,
-        )
+        assemble_capabilities(npc, self._plan(shop_key="t_other_stall"))
         after = npc.components.get(Merchant.get_component_slot())
-        self.assertEqual((after.service_id, after.shop_key), ("s2", "t_other_stall"))
+        self.assertEqual(after.shop_key, "t_other_stall")
         self.assertEqual(dict(after.merchant_stock), {"t_probe_goods": 2})
         self.assertEqual(after.last_restock_day, 9)

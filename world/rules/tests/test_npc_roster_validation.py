@@ -25,6 +25,7 @@ from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
 from world.lore.npc_profiles.shape import NpcProfile, NpcVoiceLines
 from world.lore.player_presets import PLAYER_PRESET_REGISTRY, StartingCompanion
 from world.lore.settlements.places import PLACE_REGISTRY
+from world.rules.npc_capabilities import capability, place_bound
 from world.rules.npc_roster_validation import (
     NpcRosterError,
     derive_shipped_sources,
@@ -46,8 +47,8 @@ def _make_valid_synthetic_universe(tmp_dir: Path):
     )
 
     profile_registry = {
-        "t_host_prof": NpcProfile(
-            key="t_host_prof",
+        "t_shop_service": NpcProfile(
+            key="t_shop_service",
             card=valid_card,
             age=40,
             apparent_age=40,
@@ -60,12 +61,20 @@ def _make_valid_synthetic_universe(tmp_dir: Path):
         "t_shop": replace(
             base_place,
             key="t_shop",
-            service_id="t_shop_service",
-            authored_kwargs=(
-                ("shop_key", "t_shop"),
-                ("dialogue_key", "t_dialogue"),
+            components=(
+                capability(
+                    "merchant",
+                    binding=place_bound("t_shop"),
+                    service_id="t_shop_service",
+                    shop_key="t_shop",
+                ),
+                capability(
+                    "scripted_dialogue",
+                    binding=place_bound("t_shop"),
+                    dialogue_key="t_dialogue",
+                ),
             ),
-            host_profile_key="t_host_prof",
+            host_profile_key="t_shop_service",
         )
     }
 
@@ -380,7 +389,7 @@ class SyntheticNpcRosterValidationTests(unittest.TestCase):
 
     def _add_persistent_person(self):
         profile = replace(
-            self.synth["profile_registry"]["t_host_prof"], key="t_normal_person",
+            self.synth["profile_registry"]["t_shop_service"], key="t_normal_person",
             voice=NpcVoiceLines(greeting="「你好。」", misunderstood="「再說一次吧。」"),
         )
         self.synth["profile_registry"][profile.key] = profile
@@ -404,15 +413,23 @@ class SyntheticNpcRosterValidationTests(unittest.TestCase):
         self.synth["places"]["t_shop_2"] = replace(
             base_place,
             key="t_shop_2",
-            service_id="t_shop_2_service",
-            host_profile_key="t_host_prof_2",
-            authored_kwargs=(
-                ("shop_key", "t_shop_2"),
-                ("dialogue_key", "t_dialogue_2"),
+            components=(
+                capability(
+                    "merchant",
+                    binding=place_bound("t_shop_2"),
+                    service_id="t_shop_2_service",
+                    shop_key="t_shop_2",
+                ),
+                capability(
+                    "scripted_dialogue",
+                    binding=place_bound("t_shop_2"),
+                    dialogue_key="t_dialogue_2",
+                ),
             ),
+            host_profile_key="t_shop_2_service",
         )
-        self.synth["profile_registry"]["t_host_prof_2"] = replace(
-            self.synth["profile_registry"]["t_host_prof"], key="t_host_prof_2"
+        self.synth["profile_registry"]["t_shop_2_service"] = replace(
+            self.synth["profile_registry"]["t_shop_service"], key="t_shop_2_service"
         )
         self.synth["dialogue_rows"]["t_dialogue_2"] = DialogueDefinition(
             greeting="「第二家店的問候語。」",
@@ -472,16 +489,16 @@ class SyntheticNpcRosterValidationTests(unittest.TestCase):
         "npc-profile-registry::the-shipped-npc-roster-is-validated-as-complete-before-the-game-starts"
     )
     def test_invalid_place_profile_card_is_reported(self):
-        invalid_card = replace(self.synth["profile_registry"]["t_host_prof"].card, personality="")
-        broken_prof = replace(self.synth["profile_registry"]["t_host_prof"], card=invalid_card)
-        self.synth["profile_registry"]["t_host_prof"] = broken_prof
+        invalid_card = replace(self.synth["profile_registry"]["t_shop_service"].card, personality="")
+        broken_prof = replace(self.synth["profile_registry"]["t_shop_service"], card=invalid_card)
+        self.synth["profile_registry"]["t_shop_service"] = broken_prof
 
         with self.assertRaises(NpcRosterError) as caught:
             validate_npc_roster(**self.synth)
         msg = str(caught.exception)
         self.assertIn("place_host", msg)
         self.assertIn("t_shop_service", msg)
-        self.assertIn("t_host_prof", msg)
+        self.assertIn("t_shop_service", msg)
 
     @covers_requirement(
         "npc-profile-registry::the-shipped-npc-roster-is-validated-as-complete-before-the-game-starts",
@@ -593,8 +610,8 @@ class SyntheticNpcRosterValidationTests(unittest.TestCase):
         # person case does: the roster gate must still catch it.
         for field, value in (("age", True), ("age", -1), ("apparent_age", 10001)):
             with self.subTest(field=field, value=value):
-                profile = self.synth["profile_registry"]["t_host_prof"]
-                self.synth["profile_registry"]["t_host_prof"] = SimpleNamespace(
+                profile = self.synth["profile_registry"]["t_shop_service"]
+                self.synth["profile_registry"]["t_shop_service"] = SimpleNamespace(
                     **{**vars(profile), field: value}
                 )
                 with self.assertRaises(NpcRosterError) as caught:
@@ -602,9 +619,9 @@ class SyntheticNpcRosterValidationTests(unittest.TestCase):
                 msg = str(caught.exception)
                 self.assertIn("place_host", msg)
                 self.assertIn("t_shop_service", msg)
-                self.assertIn("t_host_prof", msg)
+                self.assertIn("t_shop_service", msg)
                 self.assertIn(f"invalid {field}", msg)
-                self.synth["profile_registry"]["t_host_prof"] = profile
+                self.synth["profile_registry"]["t_shop_service"] = profile
 
     @covers_requirement(
         "npc-profile-registry::every-registry-derived-host-has-complete-individual-characterization"
@@ -615,8 +632,8 @@ class SyntheticNpcRosterValidationTests(unittest.TestCase):
         # a profile mapping whose reply violates the offline-greeting contract.
         from world.lore.npc_card import OFFLINE_GREETING_LIMIT
 
-        profile = self.synth["profile_registry"]["t_host_prof"]
-        self.synth["profile_registry"]["t_host_prof"] = SimpleNamespace(
+        profile = self.synth["profile_registry"]["t_shop_service"]
+        self.synth["profile_registry"]["t_shop_service"] = SimpleNamespace(
             **{
                 **vars(profile),
                 "voice": SimpleNamespace(
@@ -675,10 +692,13 @@ class SyntheticNpcRosterValidationTests(unittest.TestCase):
         second_place = replace(
             self.synth["places"]["t_shop"],
             key="t_shop_2",
-            service_id="t_shop_2_service",
-            host_profile_key="t_host_prof",
+            host_profile_key="t_shop_2_service",
         )
         self.synth["places"]["t_shop_2"] = second_place
+        self.synth["profile_registry"]["t_shop_2_service"] = replace(
+            self.synth["profile_registry"]["t_shop_service"],
+            key="t_shop_2_service",
+        )
         self.synth["inventory"] = (
             *self.synth["inventory"],
             NpcSource(kind="place_host", key="t_shop_2_service", owner="test_slice"),
@@ -696,9 +716,21 @@ class SyntheticNpcRosterValidationTests(unittest.TestCase):
         "npc-profile-registry::the-shipped-npc-roster-is-validated-as-complete-before-the-game-starts"
     )
     def test_unknown_dialogue_table_referenced_by_place_is_reported(self):
+        shop = self.synth["places"]["t_shop"]
         broken_place = replace(
-            self.synth["places"]["t_shop"],
-            authored_kwargs=(("dialogue_key", "nonexistent_table"),),
+            shop,
+            components=tuple(
+                replace(
+                    declaration,
+                    kwargs={
+                        **declaration.kwargs,
+                        "dialogue_key": "nonexistent_table",
+                    },
+                )
+                if declaration.type == "scripted_dialogue"
+                else declaration
+                for declaration in shop.components
+            ),
         )
         self.synth["places"]["t_shop"] = broken_place
 
@@ -714,17 +746,17 @@ class SyntheticNpcRosterValidationTests(unittest.TestCase):
     )
     def test_scripted_host_missing_misunderstood_is_reported(self):
         mute_prof = replace(
-            self.synth["profile_registry"]["t_host_prof"],
+            self.synth["profile_registry"]["t_shop_service"],
             voice=NpcVoiceLines(greeting=None, misunderstood=None),
         )
-        self.synth["profile_registry"]["t_host_prof"] = mute_prof
+        self.synth["profile_registry"]["t_shop_service"] = mute_prof
 
         with self.assertRaises(NpcRosterError) as caught:
             validate_npc_roster(**self.synth)
         msg = str(caught.exception)
         self.assertIn("place_host", msg)
         self.assertIn("t_shop_service", msg)
-        self.assertIn("t_host_prof", msg)
+        self.assertIn("t_shop_service", msg)
         self.assertIn("missing misunderstood", msg)
 
     @covers_requirement(
@@ -732,17 +764,17 @@ class SyntheticNpcRosterValidationTests(unittest.TestCase):
     )
     def test_scripted_host_authoring_greeting_is_reported(self):
         drifting_prof = replace(
-            self.synth["profile_registry"]["t_host_prof"],
+            self.synth["profile_registry"]["t_shop_service"],
             voice=NpcVoiceLines(greeting="「私自設定問候語。」", misunderstood="「聽不懂。」"),
         )
-        self.synth["profile_registry"]["t_host_prof"] = drifting_prof
+        self.synth["profile_registry"]["t_shop_service"] = drifting_prof
 
         with self.assertRaises(NpcRosterError) as caught:
             validate_npc_roster(**self.synth)
         msg = str(caught.exception)
         self.assertIn("place_host", msg)
         self.assertIn("t_shop_service", msg)
-        self.assertIn("t_host_prof", msg)
+        self.assertIn("t_shop_service", msg)
         self.assertIn("authors a greeting", msg)
 
     @covers_requirement(
@@ -905,7 +937,7 @@ class SyntheticNpcRosterValidationTests(unittest.TestCase):
     def test_orphan_profile_is_reported(self):
         self.synth["profile_registry"]["t_orphan_prof"] = NpcProfile(
             key="t_orphan_prof",
-            card=self.synth["profile_registry"]["t_host_prof"].card,
+            card=self.synth["profile_registry"]["t_shop_service"].card,
             age=30,
             apparent_age=30,
             voice=NpcVoiceLines(greeting=None, misunderstood=None),

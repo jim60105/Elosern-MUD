@@ -21,6 +21,7 @@ from evennia.typeclasses.attributes import Attribute
 from typeclasses.rooms import GridRoom
 from typeclasses.rooms import Room
 from world.rules.clock import WorldClock
+from world.lore.settlements.places import place_shop_identity
 from world.rules.guild_config import get_catalog
 from world.rules.economy import TradeError
 from world.rules.economy import TradeReason
@@ -92,9 +93,9 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
         """
         catalog = get_catalog()
         return {
-            place.key: catalog.shop_configs[dict(place.authored_kwargs)["shop_key"]]
+            place.key: catalog.shop_configs[place_shop_identity(place)]
             for place in _village_places()
-            if "shop_key" in dict(place.authored_kwargs)
+            if place_shop_identity(place) is not None
         }
 
     def _shared_settlement_goods(self):
@@ -119,10 +120,10 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
         catalog = get_catalog()
         capital_key = _place_by_kind("guild_hall").settlement_key
         return [
-            catalog.shop_configs[dict(place.authored_kwargs)["shop_key"]]
+            catalog.shop_configs[place_shop_identity(place)]
             for place in _places().values()
             if place.settlement_key == capital_key
-            and "shop_key" in dict(place.authored_kwargs)
+            and place_shop_identity(place) is not None
         ]
 
     @covers_requirement(
@@ -177,12 +178,12 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
                 self.assertEqual(host.race, place.host_race)
                 self.assertEqual(host.subrace, village_subrace)
                 self.assertEqual(host.sex, place.host_sex)
-                expected_profile = profiles[place.service_id]
+                expected_profile = profiles[place.host_profile_key]
                 self.assertEqual(int(host.attributes.get("age")), expected_profile.age)
                 self.assertEqual(int(host.attributes.get("apparent_age")), expected_profile.apparent_age)
-                if "shop_key" in dict(place.authored_kwargs):
+                if place_shop_identity(place) is not None:
                     merchant = host.components.get(Merchant.get_component_slot())
-                    self.assertEqual(merchant.shop_key, dict(place.authored_kwargs)["shop_key"])
+                    self.assertEqual(merchant.shop_key, place_shop_identity(place))
 
     @covers_requirement(
         "ciaran-village-commerce::a-settlement-without-shops-is-fully-playable"
@@ -272,7 +273,7 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
         place = next(
             place
             for place in _village_places()
-            if "shop_key" in dict(place.authored_kwargs)
+            if place_shop_identity(place) is not None
             if self._village_shops()[place.key] is village_config
         )
         village_store = self._village_interior(place)
@@ -280,7 +281,7 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
         capital_place = next(
             place
             for place in _places().values()
-            if dict(place.authored_kwargs).get("shop_key")
+            if place_shop_identity(place)
             and self._capital_config_for(place) is capital_config
         )
         capital_store = self._village_interior(capital_place)
@@ -388,7 +389,7 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
 
     def _capital_config_for(self, place):
         catalog = get_catalog()
-        shop_key = dict(place.authored_kwargs).get("shop_key")
+        shop_key = place_shop_identity(place)
         if shop_key is None or shop_key not in catalog.shop_configs:
             return None
         return catalog.shop_configs[shop_key]
@@ -405,7 +406,7 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
         place = next(
             place
             for place in _village_places()
-            if "shop_key" in dict(place.authored_kwargs)
+            if place_shop_identity(place) is not None
             if self._village_shops()[place.key] is village_config
         )
         store = self._village_interior(place)
@@ -439,7 +440,7 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
         place = next(
             place
             for place in _village_places()
-            if "shop_key" in dict(place.authored_kwargs)
+            if place_shop_identity(place) is not None
             if self._village_shops()[place.key] is village_config
         )
         host = self._village_host(place)
@@ -471,7 +472,11 @@ class CiaranVillageCommonsTests(ServiceContentIsolation, EvenniaTestCase):
         return next(p for p in _village_places() if p.kind == "commons")
 
     def _attendants(self):
-        return tuple(p for p in _village_places() if p.profession == "attendant")
+        return tuple(
+            p
+            for p in _village_places()
+            if [declaration.type for declaration in p.components] == ["scripted_dialogue"]
+        )
 
     def _interior(self, place):
         return search_object_by_tag(place.key)[0]
@@ -575,11 +580,11 @@ class CiaranVillageCommonsTests(ServiceContentIsolation, EvenniaTestCase):
         commons = self._commons()
         attendants = self._attendants()
         # Authored half: nothing in these rows names a shop or a service row.
-        self.assertIsNone(commons.service_id)
-        self.assertEqual(commons.authored_kwargs, ())
+        self.assertIsNone(commons.host_profile_key)
+        self.assertEqual(commons.components, ())
         for place in attendants:
             with self.subTest(place=place.key):
-                self.assertNotIn("shop_key", dict(place.authored_kwargs))
+                self.assertIsNone(place_shop_identity(place))
                 self.assertNotIn(place.key, catalog.shop_configs)
         self.assertNotIn(commons.key, catalog.shop_configs)
         # Surface baseline BEFORE any service content synchronizes: the

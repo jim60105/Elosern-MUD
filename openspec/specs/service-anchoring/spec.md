@@ -2,42 +2,33 @@
 
 ## Purpose
 
-The authored availability axis for services: every service component persists
-a `person | place` binding (copied by profession assembly from the blueprint
-row), `place` components additionally persist their anchor room, and one
-read-only resolver answers every service gate's availability question with a
-stable reason vocabulary (`remote | off_anchor | malformed_binding`) and a
-fail-closed posture.
+The authored availability axis for services: every bound service component
+persists its own `person | place` binding (written by the shared capability
+assembly from the declaration), `place` components additionally persist their
+anchor room, and one read-only resolver answers every service gate's
+availability question with a stable reason vocabulary
+(`remote | off_anchor | malformed_binding`) and a fail-closed posture.
 
 ## Requirements
 
 ### Requirement: Service components carry an authored person-or-place binding
-Each service component created through profession assembly SHALL persist `service_binding` (`person`
-or `place`, copied from the profession row's `default_binding`) and — only for `place` —
-`anchor_room_id` (the dbid of the resolved anchor room) as persistent component fields (Evennia
-contrib-components `DBField`s — not plain instance attributes), surviving a save/reload round-trip.
-The values SHALL be written only by the shared assembly (single writer).
+Each bound service capability SHALL persist its own explicit person/place binding and, for place only, the uniquely resolved anchor room. The shared assembly SHALL be the sole configuration writer. Narrative-only dialogue SHALL retain ordinary conversation gates without becoming a service.
 
 #### Scenario: Shipped place-bound hosts persist binding and anchor
-- **WHEN** the roster sync creates or reuses the guild master and merchant
-- **THEN** each service component carries `service_binding: "place"` and the anchor room's dbid,
-  and a `person`-bound test component carries no anchor attribute value
+- **WHEN** roster synchronization creates or reuses a declared service component
+- **THEN** its own authored binding and anchor persist independently of other components
 
 #### Scenario: Binding and anchor survive a save/reload round-trip
-- **WHEN** an assembled host's components are saved and re-read without the assembly having run
-  in the current process
-- **THEN** `service_binding` and `anchor_room_id` read back exactly as written and the resolver
-  reaches the same verdicts
+- **WHEN** component state is saved and reloaded
+- **THEN** the same explicit binding/anchor and availability verdict are observed
 
 #### Scenario: An invalid authored combination is rejected before construction
-- **WHEN** a roster row or import record declares a `person`-bound component with an anchor (or a
-  `place`-bound component whose authored sources supply no anchor)
-- **THEN** config/schema validation rejects it with a named error and no component is created
+- **WHEN** person has an anchor or place has no unique room
+- **THEN** the complete batch rejects and no component or entity persists
 
 #### Scenario: Reused hosts re-converge their binding at each sync
-- **WHEN** a host is reused by a later roster sync
-- **THEN** its binding values are re-converged from the roster — binding is authored config, not
-  runtime identity — and the never-rename/never-retitle contract is untouched
+- **WHEN** an authored binding changes
+- **THEN** only its configuration converges; identity, location and runtime state survive
 
 ### Requirement: One read-only resolver answers service availability with a stable vocabulary
 `world/rules/service_gate.py` SHALL provide `service_available(actor, host, component)` returning a
@@ -75,7 +66,7 @@ and component context.
 - **THEN** `remote` is returned when actor and host are not co-located; `off_anchor` when the
   component is `place`-bound and the host's location is not the anchor room; and
   `malformed_binding` when the stored binding is unknown, `place` lacks a resolvable anchor room,
-  or the attributes are missing on a component this change's sync has re-converged
+  or required binding attributes are missing on any bound service capability
 
 #### Scenario: Refusal message ownership is split between gate and callers
 - **WHEN** a caller renders a refusal for an `off_anchor` or `remote` verdict

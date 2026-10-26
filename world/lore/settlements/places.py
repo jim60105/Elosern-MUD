@@ -3,9 +3,9 @@
 A place is the single authored record of one service location: its interior
 room's identity and description, the exterior grid coordinate the interior
 attaches to (the z coordinate derives from the settlement), the doorway
-naming, its host's identity, the host's profession and that profession's
-component identity kwargs, and the assortments the place sells. Nothing a
-place declares is declared anywhere else.
+naming, its host's identity, the host's explicit capability declarations, and
+the assortments the place sells. Nothing a place declares is declared anywhere
+else.
 
 ``host_race`` / ``host_subrace`` / ``host_sex`` are creation-time authored
 identity: ``sync_service_content`` writes them once when it creates the host
@@ -13,10 +13,11 @@ and never rewrites them on a later sync, so an authored edit takes effect
 through roster convergence rather than a backfill.
 
 A place's host is optional as ONE indivisible group: a place either authors
-the complete host (name, title, race, sex, profession, service id — with
-subrace and component kwargs as its optional parts) or authors none of it,
+the complete host (name, title, race, sex, profile key — with a subrace and
+capability declarations as its optional parts) or authors none of it,
 describing a place that simply exists: a plaza, a forecourt, a quay. A
-partially authored host is a load error, not a half-built NPC.
+partially authored host is a load error, not a half-built NPC. A hosted place
+may declare zero capabilities: the person exists without offering a service.
 """
 
 from dataclasses import dataclass, field
@@ -26,6 +27,7 @@ from typing import Mapping
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.lore.registry_refs import ref, ref_many
 from world.lore.sex import SEX_VALUES
+from world.lore.settlements.capability_declarations import CapabilityDeclaration
 
 from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
 
@@ -96,21 +98,16 @@ class PlaceDefinition:
         default=None, metadata=ref("subraces", inverse="host_places", nullable=True)
     )
     host_sex: str | None = None  # SEX_VALUES member
-    profession: str | None = field(
-        default=None, metadata=ref("professions", inverse="places", nullable=True)
-    )
-    service_id: str | None = None
+    # The host's capabilities, declared directly and explicitly: each entry is
+    # exactly the JSON ``{type, kwargs, binding}`` shape (npc-capability-
+    # declarations). () reads as "declares no capability" and keeps the derived
+    # scans working against a host-less row without a guard.
+    components: tuple[CapabilityDeclaration, ...] = ()
     # The dataclass has no kw_only: every field after the first default needs
-    # one. () reads as "declares no goods" / "authors no component kwargs",
-    # and keeps ``dict(place.authored_kwargs)`` working against a host-less
-    # row (the shop-identity scan) without a guard.
+    # one.
     assortment_keys: tuple[str, ...] = field(
         default=(), metadata=ref_many("assortments", inverse="places")
     )
-    # The profession blueprint's authored component identity kwargs (shop_key /
-    # branch_key / dialogue_key), frozen as a mapping. Projected onto the
-    # blueprint exactly as validate_service_hosts projects roster kwargs today.
-    authored_kwargs: tuple[tuple[str, str], ...] = ()
     # Per-place assortment adjustments (settlement-shops design §4). Additions
     # stock items outside the referenced assortments — each addition MUST
     # carry a complete override in the shop row (the commerce rulebook slice) because it has
@@ -133,33 +130,51 @@ class PlaceDefinition:
     )
     # A place capability, independent of descriptive kind or host profession.
     letter_service: bool = False
+    # The venue flag (church-ordination §5.1): a PLACE-level authored fact the
+    # derived church venue set reads. It is not a capability and not a host
+    # datum; a church host's venue identity is its own ``church_host`` kwarg.
+    church: bool = False
 
 
-def _authored_kwargs_map(place: PlaceDefinition) -> dict[str, str]:
-    """Flatten the record's frozen kwargs mapping, rejecting silent collapse."""
-    if not isinstance(place.authored_kwargs, tuple):
-        raise ValueError(
-            f"place {place.key!r} authored_kwargs must be a tuple of (key, value) pairs"
-        )
-    authored: dict[str, str] = {}
-    for position, pair in enumerate(place.authored_kwargs):
-        if (
-            not isinstance(pair, tuple)
-            or len(pair) != 2
-            or not isinstance(pair[0], str)
-            or not pair[0].strip()
-            or not isinstance(pair[1], str)
-            or not pair[1].strip()
-        ):
-            raise ValueError(
-                f"place {place.key!r} authored_kwargs[{position}] must be a "
-                "(non-empty string key, non-empty string value) pair"
-            )
-        key, value = pair
-        if key in authored:
-            raise ValueError(f"place {place.key!r} authors kwarg {key!r} more than once")
-        authored[key] = value
-    return authored
+def place_capabilities(place: PlaceDefinition, type_key: str) -> tuple[CapabilityDeclaration, ...]:
+    """The declarations of one capability type this place authors."""
+    return tuple(
+        declaration
+        for declaration in place.components
+        if declaration.type == type_key
+    )
+
+
+def place_capability_kwargs(place: PlaceDefinition, type_key: str) -> Mapping[str, str]:
+    """The authored kwargs of one declared capability (empty when undeclared)."""
+    declarations = place_capabilities(place, type_key)
+    return {} if not declarations else declarations[0].kwargs
+
+
+def place_shop_identity(place: PlaceDefinition) -> str | None:
+    """The shop identity this place's merchant capability authors, if any."""
+    shop_key = place_capability_kwargs(place, "merchant").get("shop_key")
+    return shop_key if isinstance(shop_key, str) else None
+
+
+def place_dialogue_keys(place: PlaceDefinition) -> tuple[str, ...]:
+    """Every dialogue table this place's dialogue capability answers from."""
+    keys: list[str] = []
+    for declaration in place_capabilities(place, "scripted_dialogue"):
+        key = declaration.kwargs.get("dialogue_key")
+        if isinstance(key, str):
+            keys.append(key)
+    return tuple(keys)
+
+
+def place_service_ids(place: PlaceDefinition) -> tuple[str, ...]:
+    """Every authored service id this place's capabilities declare."""
+    service_ids: list[str] = []
+    for declaration in place.components:
+        service_id = declaration.kwargs.get("service_id")
+        if isinstance(service_id, str):
+            service_ids.append(service_id)
+    return tuple(service_ids)
 
 
 # The scalar host fields counted by the all-or-nothing rule. host_subrace is
@@ -170,8 +185,6 @@ HOST_IDENTITY_FIELDS: tuple[str, ...] = (
     "host_title",
     "host_race",
     "host_sex",
-    "profession",
-    "service_id",
     "host_profile_key",
 )
 
@@ -186,15 +199,15 @@ def place_is_hostless(place: PlaceDefinition) -> bool:
     The single definition of the group's ABSENCE, shared by the record
     validator and the roster derivation so the two never drift. A partially
     authored host is NOT hostless — malformed material must fall through to
-    validation, never to a silently empty room. A stray component-kwargs
-    tuple on an otherwise host-less row is likewise not hostless, and so is a
-    stray ``host_profile_key`` (npc-persona-profile-registry D2): naming a
-    host profile is host material, even alone.
+    validation, never to a silently empty room. A stray capability declaration
+    on an otherwise host-less row is likewise not hostless, and so is a stray
+    ``host_profile_key`` (npc-persona-profile-registry D2): naming a host
+    profile is host material, even alone.
     """
     return (
         all(getattr(place, field) is None for field in HOST_IDENTITY_FIELDS)
         and place.host_subrace is None
-        and place.authored_kwargs == ()
+        and place.components == ()
     )
 
 
@@ -202,16 +215,17 @@ def _validate_host_group(place: PlaceDefinition) -> None:
     """Reject a partially authored host, naming the fields that break the set.
 
     Reached only when the row is NOT hostless, so the legal shapes here are
-    exactly: every scalar authored (optionally with a subrace and kwargs), or
-    a row whose only offence is a stray subrace / kwargs on an otherwise
-    wholly absent group — each of which names the offending fields.
+    exactly: every scalar authored (optionally with a subrace and capability
+    declarations), or a row whose only offence is a stray subrace / capability
+    on an otherwise wholly absent group — each of which names the offending
+    fields.
     """
     found = [field for field in HOST_IDENTITY_FIELDS if getattr(place, field) is not None]
     missing = [field for field in HOST_IDENTITY_FIELDS if getattr(place, field) is None]
     if place.host_subrace is not None:
         found.append("host_subrace")
-    if place.authored_kwargs != ():
-        found.append("authored_kwargs")
+    if place.components != ():
+        found.append("components")
     if not missing:
         return
     raise ValueError(
@@ -221,22 +235,29 @@ def _validate_host_group(place: PlaceDefinition) -> None:
     )
 
 
-def validate_place_registry(places: Mapping[str, PlaceDefinition]) -> None:
+def validate_place_registry(
+    places: Mapping[str, PlaceDefinition], *, check_capabilities: bool = True
+) -> None:
     """Fail closed on a malformed place record, naming the place and rule.
 
     Record validity (design §3.2): the settlement must exist, the host race
     and sex must be registry members, a subrace must exist and belong to the
-    authored race, the exterior must be an (x, y) integer pair, and a place
-    declares assortments iff it authors a shop identity. Blueprint coverage
-    and dead-kwarg rejection are inherited unchanged from
-    ``validate_service_hosts`` at catalog load, not duplicated here.
+    authored race, the exterior must be an (x, y) integer pair, every
+    capability declaration is shape/vocabulary/reference-validated by the one
+    capability core, and a place declares assortments iff it declares a
+    merchant (shop) capability.
 
     The host is optional as one indivisible group (hostless-places): either
     every scalar host field is authored or none is, and a place authoring no
     host may declare no goods. A half-authored host names the fields found
     and the fields missing — that message is the point of the rule, because
-    the failure mode it replaces is a ``None`` profession key reaching
-    ``get_profession`` several layers away.
+    the failure mode it replaces is a half-authored host reaching the roster
+    derivation several layers away.
+
+    A hosted place anchors every capability it declares at itself: the row
+    that derives from the place spawns the host here, so a capability bound to
+    another room (or to the person) has no authored meaning on a place record.
+    A hosted place MAY declare zero capabilities.
 
     A named ``host_profile_key`` (npc-persona-profile-registry D2) is
     rejected on a hostless place, and otherwise must resolve in the NPC
@@ -308,7 +329,37 @@ def validate_place_registry(places: Mapping[str, PlaceDefinition]) -> None:
                 f"place {place.key!r} exterior_xy must be an (x, y) integer pair, "
                 f"got {place.exterior_xy!r}"
             )
-        authored = _authored_kwargs_map(place)
+        if type(place.church) is not bool:
+            raise ValueError(f"place {place.key!r} church must be a boolean")
+        if check_capabilities:
+            # The declaration vocabulary/configuration is validated by the one
+            # capability owner; this import is deferred so the place registry
+            # stays importable without an Evennia environment (the import-time
+            # self-check passes ``check_capabilities=False`` and the roster/
+            # catalog load owns the full check before any write).
+            from world.rules.npc_capabilities import (
+                CapabilityValidationError,
+                validate_capabilities,
+            )
+
+            try:
+                validate_capabilities(place.components)
+            except CapabilityValidationError as error:
+                raise ValueError(f"place {place.key!r} {error}") from error
+        for declaration in place.components:
+            binding = declaration.binding
+            if binding is None or binding.kind != "place":
+                raise ValueError(
+                    f"place {place.key!r} declares {declaration.type!r} without a "
+                    "place binding; an authored host anchors every capability at "
+                    f"its own room {place.key!r}"
+                )
+            if binding.anchor_room != place.key:
+                raise ValueError(
+                    f"place {place.key!r} declares {declaration.type!r} anchored at "
+                    f"{binding.anchor_room!r}; a place host anchors at its own room "
+                    f"{place.key!r}"
+                )
         if hostless and (
             place.assortment_keys or place.extra_item_keys or place.excluded_item_keys
         ):
@@ -317,15 +368,16 @@ def validate_place_registry(places: Mapping[str, PlaceDefinition]) -> None:
                 "(assortment_keys/extra_item_keys/excluded_item_keys); "
                 "goods require a merchant to sell them"
             )
-        has_shop_identity = "shop_key" in authored
+        has_shop_identity = place_shop_identity(place) is not None
         if bool(place.assortment_keys) != has_shop_identity:
             if place.assortment_keys:
                 raise ValueError(
                     f"place {place.key!r} declares assortments without a shop identity "
-                    "(shop_key)"
+                    "(a merchant capability authoring shop_key)"
                 )
             raise ValueError(
-                f"place {place.key!r} declares a shop identity (shop_key) without assortments"
+                f"place {place.key!r} declares a shop identity (merchant shop_key) "
+                "without assortments"
             )
         for field_name in ("extra_item_keys", "excluded_item_keys"):
             keys = getattr(place, field_name)
@@ -341,7 +393,7 @@ def validate_place_registry(places: Mapping[str, PlaceDefinition]) -> None:
         if (place.extra_item_keys or place.excluded_item_keys) and not has_shop_identity:
             raise ValueError(
                 f"place {place.key!r} declares extra_item_keys/excluded_item_keys "
-                "without a shop identity (shop_key)"
+                "without a shop identity (a merchant capability authoring shop_key)"
             )
 
     # Cross-record pass: one doorway name per exterior. Keyed by
@@ -411,4 +463,4 @@ PLACE_REGISTRY: dict[str, PlaceDefinition] = {
     )
 }
 
-validate_place_registry(PLACE_REGISTRY)
+validate_place_registry(PLACE_REGISTRY, check_capabilities=False)

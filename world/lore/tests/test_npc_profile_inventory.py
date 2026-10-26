@@ -121,7 +121,7 @@ class ShippedProfileRegistryImmutabilityTests(unittest.TestCase):
         host_keys = {
             place.host_profile_key
             for place in PLACE_REGISTRY.values()
-            if place.service_id is not None
+            if place.host_profile_key is not None
         }
         person_profiles = {row.profile_key for row in ADVENTURER_REGISTRY.values()}
         for profile_key in sorted(host_keys | person_profiles):

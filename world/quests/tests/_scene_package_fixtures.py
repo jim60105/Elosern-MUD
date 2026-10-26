@@ -64,6 +64,42 @@ def anchor_locator(**overrides) -> dict:
     return locator
 
 
+def issuer_capabilities(content_key: str) -> list[dict]:
+    """The direct capability declaration a commission role must author.
+
+    A generated commission role declares exactly one person-bound quest_issuer
+    whose issuer_key is its commission content key; the scoped service_id is
+    supplied by the deterministic boundary, so the fixture never authors it.
+    """
+    return [
+        {
+            "type": "quest_issuer",
+            "kwargs": {"issuer_key": content_key},
+            "binding": {"kind": "person"},
+        }
+    ]
+
+
+def issuer_plan(content_key: str, service_id: str = "t_generated_issuer"):
+    """The validated plan ``provision_scoped_issuer`` now requires."""
+    from world.rules.npc_capabilities import (
+        capability,
+        person_bound,
+        validate_capabilities,
+    )
+
+    return validate_capabilities(
+        [
+            capability(
+                "quest_issuer",
+                binding=person_bound(),
+                service_id=service_id,
+                issuer_key=content_key,
+            )
+        ]
+    )
+
+
 def role(role_id: str, **overrides) -> dict:
     entry = {
         "role_id": role_id,
@@ -138,7 +174,10 @@ def package(**overrides) -> dict:
         "display_name": "南門的相遇",
         "source_id": "synthetic-package-source",
         "quest": quest_payload(issuer="mother"),
-        "roles": [role("mother"), role("daughter")],
+        "roles": [
+            role("mother", capabilities=issuer_capabilities("story_mother")),
+            role("daughter"),
+        ],
         "relationships": [
             {"from_role": "mother", "to_role": "daughter", "kind": "parent_child"}
         ],
@@ -178,8 +217,12 @@ def package(**overrides) -> dict:
 
 
 def guild_package(**overrides) -> dict:
+    # A guild-branch package issues no commission, so no role declares a
+    # capability: the commission role's declaration belongs to the symbolic
+    # path only.
     return package(
         quest=quest_payload(issuer=_issuer_key()),
         commissions=[],
+        roles=[role("mother"), role("daughter")],
         **overrides,
     )

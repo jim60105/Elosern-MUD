@@ -1,77 +1,52 @@
 """The service-host roster derived from the place registry.
 
-Batch validation of the derived rows plus the two place lookups the shop join
-shares (``_require_place_kwargs`` / ``_place_for_shop``).
+One row per host-declaring place, carrying that place's validated direct
+capability declarations plus the place lookup the shop join shares
+(``_place_for_shop``). Nothing here consults a blueprint: a place's
+``components`` ARE the host's capabilities.
 """
 
-from typing import Any
-
-from world.lore.settlements.places import PLACE_REGISTRY
-from world.lore.settlements.places import place_is_hostless
+from world.lore.church.places import CHURCH_VENUE_KEY
+from world.lore.settlements.places import PLACE_REGISTRY, place_is_hostless
+from world.lore.settlements.places import place_shop_identity
+from world.rules.npc_capabilities import CapabilityValidationError, validate_capabilities
 
 from ._loaders import _commerce_error, _error, _require_text
 from ._types import ServiceHostRow
 
 
-#: Closed vocabulary of PLACE-level venue flags the lore layer derives from
-#: (design 2026-09-22-church-system-design §5.1). A venue flag marks the
-#: PLACE — the church-place set derives from it in ``world/lore/church/`` —
-#: never the service host, so no profession blueprint consumes it. The
-#: dead-kwarg contract stays intact: anything OUTSIDE this closed class is
-#: still rejected as a kwarg no component consumes.
-VENUE_FLAG_KWARGS = frozenset({"church"})
-
-
 def validate_service_hosts() -> tuple[ServiceHostRow, ...]:
-    """Batch-validate the service-host roster derived from the place registry (design §3.2).
+    """Batch-validate the service-host roster derived from the place registry.
 
-    The roster is no longer authored: each place that declares a host yields
-    one row declaring ``name``/``title`` (the host identity), ``profession``,
-    the interior room tag the place anchors to (its key), ``service_id``, and
-    the authored component identity kwargs. A place authors no host at all
-    (hostless-places) contributes no row — the projection covers exactly the
-    host-declaring places. Every rejection the hand-authored roster
-    carried runs unchanged over the derived rows: a profession naming no
-    registry row, a blueprint component whose identity kwargs the place fails
-    to supply, surplus kwargs no component consumes, a person-bound profession
-    anchored to a row, a duplicate service anchor, or a non-text field each
-    raise the catalog's named error family.
+    The roster is not authored separately: each place that declares a host
+    yields one row carrying the host identity (``name``/``title``), the
+    canonical authored profile identity, the interior room tag its host is
+    created in (the place key), and the place's direct capability
+    declarations.
 
-    Config load never touches the database: ``anchor_room`` is validated as a
-    non-empty tag string only (room existence is a sync-time fact), and the
-    profession prerequisite is the YAML-only profession registry. A malformed
-    professions rulebook surfaces inside this catalog's named error family
-    rather than escaping as ``ProfessionConfigError``.
+    Rejections are named and complete before any write: an incomplete host
+    identity, a duplicate canonical host identity, a capability declaration
+    the shared core rejects, a place-bound capability anchored anywhere but its
+    own place (or a person-bound/unbound one, which no authored host can
+    mean), a non-canonical church venue identity, and a service anchor two
+    rows both claim. A hosted place MAY declare zero capabilities.
+
+    Config load never touches the database: anchor rooms are validated as
+    their authored tags only (existence and uniqueness are facts the sync
+    resolves inside its transaction).
     """
-    from world.rules import profession_config
-    from world.rules.profession_assembly import identity_fields
-    from world.rules.dialogue import DIALOGUE_TABLE
-
     rows: list[ServiceHostRow] = []
-    seen_service_ids: set[str] = set()
     seen_host_keys: set[str] = set()
+    seen_service_ids: set[str] = set()
+    seen_issuer_keys: set[str] = set()
     for place in PLACE_REGISTRY.values():
-        # One row per host-declaring place: a place authors either a complete
-        # host or none of it (validate_place_registry), and the host-less
-        # rows contribute nothing to the roster.
         if place_is_hostless(place):
             continue
         what = f"place {place.key!r}"
         name = _require_text(place.host_name, f"{what}.host_name")
         title = _require_text(place.host_title, f"{what}.host_title")
-        anchor_room = _require_text(place.key, f"{what}.key (anchor room tag)")
-        service_id = _require_text(place.service_id, f"{what}.service_id")
-        profession_key = _require_text(place.profession, f"{what}.profession")
+        spawn_room = _require_text(place.key, f"{what}.key (spawn room tag)")
         profile_key = _require_text(place.host_profile_key, f"{what}.host_profile_key")
-        if service_id in seen_service_ids:
-            raise _error(
-                f"duplicate service_id {service_id!r} in the place registry; "
-                "one roster row per service anchor"
-            )
-        seen_service_ids.add(service_id)
-        # One canonical person, one host: the authored profile key is the
-        # stable identity every sync reuses, so two rows claiming it would make
-        # "which person is this?" unanswerable before any write happens.
         if profile_key in seen_host_keys:
             raise _error(
                 f"duplicate host_key {profile_key!r} in the place registry; "
@@ -79,71 +54,68 @@ def validate_service_hosts() -> tuple[ServiceHostRow, ...]:
             )
         seen_host_keys.add(profile_key)
         try:
-            profession = profession_config.get_profession(profession_key)
-        except profession_config.ProfessionConfigError as error:
-            raise _error(f"{what} profession {profession_key!r} cannot load: {error}") from error
-        if profession is None:
-            raise _error(
-                f"{what} profession {profession_key!r} "
-                "is not a profession rulebook row"
+            validate_capabilities(place.components)
+        except CapabilityValidationError as error:
+            raise _error(f"{what} declares unusable capabilities: {error}") from error
+        # merchant-dialogue: a shopkeeper who cannot be spoken to is the
+        # defect that rule removes, so a trading place must declare its
+        # dialogue capability beside the trade one.
+        if (
+            any(declaration.type == "merchant" for declaration in place.components)
+            and not any(
+                declaration.type == "scripted_dialogue"
+                for declaration in place.components
             )
-        # A roster row IS an anchor registration: its mandatory anchor_room
-        # only means something to ``place``-bound components. A ``person``
-        # component here would silently carry an anchor — the invalid
-        # combination the service-anchoring change forbids at authoring time.
-        person_bound = sorted(
-            component.type_key
-            for component in profession.components
-            if component.default_binding == "person"
-        )
-        if person_bound:
+        ):
             raise _error(
-                f"{what} profession {profession_key!r} "
-                f"component(s) {person_bound} are person-bound; a roster row "
-                "anchors only place-bound components"
+                f"{what} declares merchant without scripted_dialogue; every "
+                "merchant place authors the dialogue capability its host answers from"
             )
-        authored = _require_place_kwargs(place)
-        # Blueprint coverage: every component's identity fields except the
-        # row-level service_id anchor must be authored by the place.
-        consumed: set[str] = set()
-        for component in profession.components:
-            needed = set(identity_fields(component.type_key)) - {"service_id"}
-            lacking = sorted(needed - set(authored))
-            if lacking:
+        row_service_ids: set[str] = set()
+        for declaration in place.components:
+            binding = declaration.binding
+            if binding is None or binding.kind != "place":
                 raise _error(
-                    f"{what} profession {profession_key!r} "
-                    f"component {component.type_key!r} needs authored kwargs {lacking}"
+                    f"{what} declares {declaration.type!r} without a place "
+                    f"binding; a roster host anchors every capability at {place.key!r}"
                 )
-            consumed |= needed
-        dead = sorted(set(authored) - consumed - VENUE_FLAG_KWARGS)
-        if dead:
-            raise _error(
-                f"{what} authors kwargs {dead} that no component "
-                f"of profession {profession_key!r} consumes"
-            )
-        # Authored resolution (place-attendant-profession): a dialogue-bearing
-        # blueprint must bind to a table that EXISTS. Proving the kwarg was
-        # authored is not enough — a key resolving to nothing yields a host
-        # that greets no one, indistinguishable at runtime from an
-        # intentionally silent NPC. Runtime lookup keeps degrading to the
-        # no-understanding line; only the authored place row fails here.
-        if any(
-            component.type_key == "scripted_dialogue"
-            for component in profession.components
-        ) and (dialogue_key := authored.get("dialogue_key")) is not None:
-            if dialogue_key not in DIALOGUE_TABLE:
+            if binding.anchor_room != place.key:
                 raise _error(
-                    f"{what} authors dialogue_key {dialogue_key!r} that the "
-                    "dialogue registry does not carry"
+                    f"{what} declares {declaration.type!r} anchored at "
+                    f"{binding.anchor_room!r}, not at its own room {place.key!r}"
                 )
+            if declaration.type == "church_host":
+                venue = declaration.kwargs.get("church")
+                if venue != CHURCH_VENUE_KEY:
+                    raise _error(
+                        f"{what} declares church_host venue {venue!r}, expected the "
+                        f"canonical {CHURCH_VENUE_KEY!r}"
+                    )
+            service_id = declaration.kwargs.get("service_id")
+            if isinstance(service_id, str) and service_id:
+                row_service_ids.add(service_id)
+            issuer_key = declaration.kwargs.get("issuer_key")
+            if isinstance(issuer_key, str) and issuer_key:
+                if issuer_key in seen_issuer_keys:
+                    raise _error(
+                        f"{what} authors issuer_key {issuer_key!r} that another "
+                        "roster row already claims; one commission identity per "
+                        "authored key"
+                    )
+                seen_issuer_keys.add(issuer_key)
+        duplicated = sorted(row_service_ids & seen_service_ids)
+        if duplicated:
+            raise _error(
+                f"duplicate service_id {duplicated[0]!r} in the place registry; "
+                "one roster row per service anchor"
+            )
+        seen_service_ids |= row_service_ids
         rows.append(
             ServiceHostRow(
                 name=name,
                 title=title,
-                profession=profession,
-                anchor_room=anchor_room,
-                service_id=service_id,
-                authored_kwargs=authored,
+                spawn_room=spawn_room,
+                components=place.components,
                 profile_key=profile_key,
                 host_key=profile_key,
             )
@@ -151,24 +123,10 @@ def validate_service_hosts() -> tuple[ServiceHostRow, ...]:
     return tuple(rows)
 
 
-def _require_place_kwargs(place: Any) -> dict[str, str]:
-    """Flatten a place's authored kwargs, rejecting a non-mapping shape."""
-    authored = place.authored_kwargs
-    if not isinstance(authored, (tuple, list)):
-        raise _error(f"place {place.key!r} authored_kwargs must be a sequence of pairs")
-    out: dict[str, str] = {}
-    for position, pair in enumerate(authored):
-        if not isinstance(pair, (tuple, list)) or len(pair) != 2:
-            raise _error(f"place {place.key!r} authored_kwargs[{position}] must be a pair")
-        key, value = pair
-        out[key] = _require_text(value, f"place {place.key!r}.authored_kwargs[{position}]")
-    return out
-
-
 def _place_for_shop(shop_key: str):
-    """Return the place row authoring this shop identity (design §3.2).
+    """Return the place row declaring this shop identity.
 
-    A shop identity is authored on exactly one place (the derived
+    A shop identity is declared on exactly one place (the derived
     ``SHOP_REGISTRY`` fails a duplicate at load), so the first match is the
     owning place, and every place-level operation (display name, scale,
     additions, removals) always has a row to resolve against.
@@ -177,6 +135,6 @@ def _place_for_shop(shop_key: str):
     fail-closed rather than a user error.
     """
     for place in PLACE_REGISTRY.values():
-        if dict(place.authored_kwargs).get("shop_key") == shop_key:
+        if place_shop_identity(place) == shop_key:
             return place
     raise _commerce_error(f"shops.{shop_key} has no owning place row")

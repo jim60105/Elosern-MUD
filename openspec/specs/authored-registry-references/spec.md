@@ -18,7 +18,7 @@ The inventory SHALL use unique snake_case registry names, Traditional Chinese la
 
 #### Scenario: Full inventory coverage
 - **WHEN** the inventory is enumerated
-- **THEN** coverage includes all 21 startup-sync registries plus items, NPC profiles, dialogue rows, assortments, player presets, starting kits, NPC tiers, scene archetypes, skills, sexual acts, quest definitions, and keyed rulebook professions, guild exam profiles, shop configs, service host rows, and monster behaviour profiles
+- **THEN** coverage includes all 21 startup-sync registries plus items, NPC profiles, dialogue rows, assortments, player presets, starting kits, NPC tiers, scene archetypes, skills, sexual acts, quest definitions, and keyed guild exam profiles, shop configs, service host rows, and monster behaviour profiles
 
 #### Scenario: Parameter-only rulebooks are source-viewer-only
 - **WHEN** a parameter-only rulebook appears in the inventory

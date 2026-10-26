@@ -35,9 +35,11 @@ SYNTH_BRANCH = synthetic_branch_key()
 
 
 def _attach_staff(npc: NPC, branch_key: str = SYNTH_BRANCH) -> NPC:
-    npc.components.add(
-        GuildStaff.create(npc, service_id="staff", branch_key=branch_key)
-    )
+    # A serving host declares its authored availability binding: the gate fails
+    # closed on a missing one.
+    staff = GuildStaff.create(npc, service_id="staff", branch_key=branch_key)
+    staff.service_binding = "person"
+    npc.components.add(staff)
     return npc
 
 

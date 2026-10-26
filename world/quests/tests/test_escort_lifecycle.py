@@ -14,6 +14,10 @@ from world.quests.escort_lifecycle import EscortOperationError, accept_escort_co
 from world.quests.planner import quest_event_effect_planner
 from world.quests.runtime import accept_quest, abandon_quest, read_records
 from world.rules.party import is_companion, join_party, party_size, reasons_for
+from world.quests.tests._scene_package_fixtures import (
+    issuer_capabilities,
+    issuer_plan,
+)
 from world.rules.quest_issuance import (
     QuestIssuance, Settlement, provision_scoped_issuer, register_quest_issuance,
 )
@@ -60,7 +64,11 @@ class EscortFixtureMixin:
                 protected_role_refs=("protected",), meeting_role_refs=("meeting",),
             )),),
         ))
-        self.issuer_key = provision_scoped_issuer(self.issuer, content_key="synthetic_bound_issuer")
+        self.issuer_key = provision_scoped_issuer(
+            self.issuer,
+            content_key="synthetic_bound_issuer",
+            plan=issuer_plan("synthetic_bound_issuer"),
+        )
         register_quest_issuance(QuestIssuance(
             definition_key=self.definition.key, issuer_key=self.issuer_key,
             reward=QuestReward(copper=1, items=(), merit=0), settlement=Settlement.AUTO,
@@ -70,7 +78,16 @@ class EscortFixtureMixin:
         self.package, _ = scene_store.publish_package(
             package_id="synthetic_bound_package", source_id=None, owner_id="fixture",
             payload={
-                "roles": [{"role_id": role} for role in ("issuer", "protected", "meeting")],
+                "roles": [
+                    {
+                        "role_id": "issuer",
+                        "capabilities": issuer_capabilities(
+                            "synthetic_bound_issuer"
+                        ),
+                    },
+                    {"role_id": "protected"},
+                    {"role_id": "meeting"},
+                ],
                 "commissions": [{"role_id": "issuer", "issuer_content_key": "synthetic_bound_issuer"}],
                 "dialogue": [{"role_id": "issuer", "phases": [{
                     "phase_id": "offer",
@@ -543,9 +560,13 @@ class EscortCounterClaimTests(EscortTestBase):
 
         self.branch = synthetic_branch_key()
         self.staff = create_object(NPC, key="公會職員", location=self.room1)
-        self.staff.components.add(
-            GuildStaff.create(self.staff, service_id="staff", branch_key=self.branch)
+        staff_component = GuildStaff.create(
+            self.staff, service_id="staff", branch_key=self.branch
         )
+        # The availability gate fails closed on a missing binding, so a host
+        # that is expected to serve declares its authored one.
+        staff_component.service_binding = "person"
+        self.staff.components.add(staff_component)
         self.owner.race = "human"
         self.owner.apply_race_baseline()
         register_adventurer(self.owner, self.staff)

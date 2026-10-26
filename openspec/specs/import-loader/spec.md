@@ -30,46 +30,47 @@ run in one database transaction so a later runtime failure rolls back earlier ob
 - **THEN** it raises `ImportRejected` before creating an entity
 
 ### Requirement: Loaded trait values are the literal imported stats, merged onto the race floor for omitted keys, never re-derived or multiplied
-`loader.py` SHALL construct traits from `race_floor(RACE_REGISTRY[race])` updated by the record's
-literal `stats`, with no skill or profession multipliers and no re-derivation. The sole tier
-influence allowed: when the record declares `profession` whose registry row carries a non-null
-`default_tier` AND the record's own `stats` is empty, trait construction SHALL route through the
-race-baseline tiered construction (`initial_trait_config(race, subrace, tier)`) instead of the
-plain race floor.
+Loaded traits SHALL equal literal imported stats merged onto the race floor for omitted keys. Capability configuration SHALL apply no skill/profession multipliers or tier defaults. Explicit independently owned tier creation paths SHALL remain unchanged.
+
+#### Scenario: Literal values survive
+- **WHEN** an imported record supplies base values including magic_power
+- **THEN** all literal bases persist exactly and omitted keys use the race floor
+
+#### Scenario: Empty stats
+- **WHEN** an NPC declares capabilities and empty stats
+- **THEN** traits use the ordinary race floor without capability-derived tier inference
+
+#### Scenario: Rollback of traits
+- **WHEN** a later capability install fails
+- **THEN** all constructed traits and objects roll back with the batch
 
 #### Scenario: An explicitly imported stat value is used verbatim
-- **WHEN** a character record's `stats.atk_phys` is `88` and the record's `race` is `elf`
-- **THEN** the constructed entity's `entity.traits.atk_phys` base value equals exactly `88`, not a
-  value derived from `vital_baseline` or scaled by any multiplier
+- **WHEN** an elf record supplies stats.atk_phys 88
+- **THEN** its loaded base is exactly 88 with no derivation or multiplier
 
 #### Scenario: An omitted stat falls back to the race floor
-- **WHEN** a character record's `stats` object has no `guild_merit` key
-- **THEN** the constructed entity's `entity.traits.guild_merit` value equals
-  `race_floor(RACE_REGISTRY[record_race])["guild_merit"]`
+- **WHEN** a record omits guild_merit from stats
+- **THEN** the loaded value equals that race's ordinary floor
 
 #### Scenario: The loader never applies a skill multiplier
 - **WHEN** a warning-only out-of-band static value is loaded
-- **THEN** the resulting trait equals that literal imported value; the loader never multiplies or
-  scales it, while the validation warning remains visible
+- **THEN** that literal value persists without scaling and the validation warning remains
 
 #### Scenario: Literal stats beat any profession tier
-- **WHEN** a record with `"profession": "merchant"` (row tier non-null) also declares literal
-  `stats` values
-- **THEN** the constructed entity's traits equal the literal values merged onto the race floor,
-  exactly as before the profession field existed
+- **WHEN** a direct-capability record supplies literal stats
+- **THEN** they merge onto the race floor without capability-derived tier defaults
 
 #### Scenario: Empty stats with a tiered profession use the tiered baseline
-- **WHEN** a record declares `profession` naming a row whose `default_tier` is a real tier key and
-  declares `"stats": {}`
-- **THEN** the constructed traits equal `initial_trait_config(race, subrace, tier)` for that tier
+- **WHEN** a direct-capability NPC supplies empty stats
+- **THEN** it uses the ordinary race floor; legacy profession input rejects
 
 #### Scenario: No profession means no behavior change
-- **WHEN** a record omits `profession`
-- **THEN** trait construction is byte-identical to the pre-change loader for the same record
+- **WHEN** a valid record omits capabilities and profession
+- **THEN** its literal-stats construction remains unchanged
 
 #### Scenario: A null-tier profession row is a no-op
-- **WHEN** a record declares `profession` naming a registry row whose `default_tier` is null
-- **THEN** trait construction is byte-identical to the pre-change loader for the same record
+- **WHEN** an input includes a removed profession field
+- **THEN** the closed schema rejects it instead of consulting a default tier
 
 ### Requirement: Non-trait record fields are stored verbatim into the seam attributes without interpretation
 `loader.py` SHALL store `persona`, `sexual_baseline`, `skills`/`passives`, `equipment`, and
@@ -177,69 +178,40 @@ SHALL always read a value present in the validated record, never a missing key.
 - **THEN** those use the `entity.db.*` seam-attribute shape, unlike `sex`
 
 ### Requirement: A profession-bearing NPC record assembles blueprint components with explicit precedence
-When a validated NPC record declares `profession`, `loader.py` SHALL attach, inside the record's
-construction transaction, every blueprint component the record does NOT list explicitly in its
-own `components` (blueprint minus explicit types — an explicit entry of the same type replaces
-the blueprint entry entirely, design D5). Component kwargs SHALL come only from authored sources:
-the record's explicit `components` entry kwargs.
+The loader SHALL assemble exactly the validated direct NPC component plan inside the complete import transaction. All required configuration and binding/room references SHALL validate before persistence; assembly failure SHALL restore storage and handler caches.
 
 #### Scenario: Blueprint minus explicit components
-- **WHEN** a record declares a profession whose blueprint carries `guild_staff` and
-  `scripted_dialogue`, and its own `components` lists a `guild_staff` entry with full kwargs
-- **THEN** the constructed NPC carries the record's `guild_staff` kwargs, plus the blueprint's
-  `scripted_dialogue` component (kwargs from the record's same-type entry if present), and no
-  second `guild_staff`
+- **WHEN** a record declares two direct components
+- **THEN** exactly those components and kwargs are installed without expansion or override precedence
 
 #### Scenario: Missing identity kwargs reject the batch instead of guessing
-- **WHEN** a record declares `"profession": "merchant"` with no `components` entry supplying the
-  `merchant` component's `service_id` and `shop_key`
-- **THEN** the batch is rejected naming the record, the component, and the missing kwargs, and no
-  entity persists
-
-#### Scenario: Assembly rides the import transaction
-- **WHEN** component attachment fails midway (e.g. a duplicate component slot)
-- **THEN** `load_batch` persists nothing for the whole batch, matching the existing
-  all-or-nothing contract
-
-#### Scenario: Explicit entries the blueprint omits keep record order
-- **WHEN** the record's `components` lists an entry of a type the blueprint omits
-- **THEN** that entry is appended in record order
-
-#### Scenario: Identity resolution is fail-closed at two gates
-- **WHEN** a blueprint component's identity kwargs cannot be fully supplied from authored record data
-- **THEN** the shared batch validator owns the whole-batch rejection with a named issue BEFORE any
-  entity is constructed, and the loader re-runs the same resolution fail-closed as its second gate
-
-#### Scenario: The loader never invents an identity value
-- **WHEN** an identity kwarg (any of `service_id`, `shop_key`, `branch_key`, `dialogue_key`) is
-  unsupplied
-- **THEN** the loader never invents or defaults the value
-
-#### Scenario: Assembly reuses the guild economy attach path
-- **WHEN** assembled components are attached
-- **THEN** they attach through the same component-attach path `world/rules/guild_economy.py`'s
-  sync uses
+- **WHEN** a merchant entry omits service_id or shop_key
+- **THEN** the entire batch rejects naming the field and no entity persists
 
 #### Scenario: No profession means byte-identical construction
-- **WHEN** a record omits `profession`
-- **THEN** it constructs byte-identically to the pre-change loader
+- **WHEN** a record declares no components
+- **THEN** construction preserves unrelated import semantics
 
 #### Scenario: Each assembled NPC emits one assembly info event
-- **WHEN** an NPC record with `profession` finishes assembly
-- **THEN** it emits one `import_profession_assembled` info event (`char` = the record key,
-  `profession` = the row key)
+- **WHEN** a direct capability installation commits
+- **THEN** one import_capabilities_assembled event names the record and declared types with no profession field; a rollback emits none
 
-### Requirement: A blueprint schedule template is applied to assembled NPCs only
-When the profession row's `schedule_template` is non-null and the constructed entity is an `NPC`,
-the loader SHALL store the template-reference schedule (`{"schema_version": 1, "template": <key>}`)
-through `world/rules/npc_schedules.py::set_npc_schedule` inside the same transaction; a null
-template applies no schedule; the shipped professions (all null templates) therefore change
-nothing for shipped records.
+#### Scenario: Assembly rides the import transaction
+- **WHEN** component attachment fails midway
+- **THEN** the complete batch and handler caches roll back
 
-#### Scenario: A tiered-and-scheduled profession schedules the NPC
-- **WHEN** a test profession row carries `schedule_template: guard` and a record uses it
-- **THEN** the constructed NPC carries the validated template-reference schedule for `guard`
+#### Scenario: Explicit entries the blueprint omits keep record order
+- **WHEN** a direct component list is accepted
+- **THEN** exactly its unique entries retain record order without blueprint expansion
 
-#### Scenario: Null template stores nothing
-- **WHEN** a record uses a shipped profession (null template)
-- **THEN** the NPC carries no schedule attribute and settlement skips it exactly as today
+#### Scenario: Identity resolution is fail-closed at two gates
+- **WHEN** authored component identity/configuration is incomplete
+- **THEN** validation rejects before construction and assembly revalidates the complete plan before writes
+
+#### Scenario: The loader never invents an identity value
+- **WHEN** a required service_id, shop_key, branch_key or dialogue_key is absent
+- **THEN** validation rejects without inventing or defaulting that identifier
+
+#### Scenario: Assembly reuses the guild economy attach path
+- **WHEN** imports and roster hosts attach components
+- **THEN** both use the same deterministic validated-plan assembly owner

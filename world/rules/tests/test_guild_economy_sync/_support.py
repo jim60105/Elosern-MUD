@@ -43,8 +43,8 @@ from world.rules.guild_config import (
     load_catalog_into_cache,
 )
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY
-from world.rules.profession_assembly import assemble_profession_components
-from world.rules.profession_config import get_profession
+from world.lore.settlements.places import place_shop_identity
+from world.rules.npc_capabilities import capability, place_bound
 from world.rules.quest_issuance import resolve_issuer_key
 from world.rules.economy import (
     TradeError,
@@ -113,12 +113,17 @@ def canonical_host(npc, row):
     return npc
 
 
-def profession_with(profession_key: str, *type_keys: str):
-    """The named profession narrowed or reordered to ``type_keys``."""
-    profession = get_profession(profession_key)
-    by_type = {component.type_key: component for component in profession.components}
-    return dataclasses.replace(
-        profession, components=tuple(by_type[type_key] for type_key in type_keys)
+def components_with(type_keys: tuple, *keep_keys: str):
+    """The declarations narrowed or reordered to ``keep_keys``."""
+    by_type = {declaration.type: declaration for declaration in type_keys}
+    return tuple(by_type[type_key] for type_key in keep_keys)
+
+
+def component_kwargs(row, type_key: str):
+    """One declared capability's authored kwargs on a roster row."""
+    return next(
+        (declaration.kwargs for declaration in row.components if declaration.type == type_key),
+        {},
     )
 
 def _restore_places_snapshot(snapshot: dict) -> None:
@@ -139,9 +144,9 @@ def _restore_places_snapshot(snapshot: dict) -> None:
 # rows themselves are resolved BY KIND from the live registry, never by a
 # shipped key. The service ids are resolved the same way: a shipped service
 # id is also a shipped NPC profile key (npc-profile-registry).
-GUILD_SERVICE_ID = _place_by_kind("guild_hall").service_id
+GUILD_SERVICE_ID = _place_by_kind("guild_hall").host_profile_key
 
-MERCHANT_SERVICE_ID = _place_by_kind("general_store").service_id
+MERCHANT_SERVICE_ID = _place_by_kind("general_store").host_profile_key
 
 GUILD_HALL_TAG = _place_by_kind("guild_hall").key
 
@@ -174,9 +179,7 @@ def _village_trading_places():
     profession value literally.
     """
     return tuple(
-        place
-        for place in _village_places()
-        if "shop_key" in dict(place.authored_kwargs)
+        place for place in _village_places() if place_shop_identity(place) is not None
     )
 
 def _village_trading_place():
@@ -218,7 +221,7 @@ def _roster_row(service_id):
     named here, so the same assertions survive a roster re-author.
     """
     for row in get_catalog().service_hosts:
-        if row.service_id == service_id:
+        if row.host_key == service_id:
             return row
     raise AssertionError(f"roster lost the {service_id!r} row")
 
@@ -235,13 +238,13 @@ def _merchant_host_name():
     return _merchant_row().name
 
 def _guild_branch_key():
-    return _guild_row().authored_kwargs["branch_key"]
+    return component_kwargs(_guild_row(), GuildStaff.name)["branch_key"]
 
 def _guild_dialogue_key():
-    return _guild_row().authored_kwargs["dialogue_key"]
+    return component_kwargs(_guild_row(), "scripted_dialogue")["dialogue_key"]
 
 def _merchant_shop_key():
-    return _merchant_row().authored_kwargs["shop_key"]
+    return component_kwargs(_merchant_row(), Merchant.name)["shop_key"]
 
 class ServiceContentIsolation(QuestRegistryIsolation):
     def setUp(self):
@@ -272,7 +275,7 @@ class ServiceContentIsolation(QuestRegistryIsolation):
         """Patch the cached catalog with one roster row removed."""
         catalog = get_catalog()
         self._patch_roster(
-            tuple(row for row in catalog.service_hosts if row.service_id != service_id)
+            tuple(row for row in catalog.service_hosts if row.host_key != service_id)
         )
 
     def _patch_roster(self, rows):
@@ -309,10 +312,10 @@ class ServiceContentIsolation(QuestRegistryIsolation):
             )
         )
 
-def before_row_profession(catalog):
+def before_row_components(catalog):
     for row in catalog.service_hosts:
-        if row.service_id == GUILD_SERVICE_ID:
-            return row.profession
+        if row.host_key == GUILD_SERVICE_ID:
+            return row.components
     raise AssertionError("shipped roster lost the guild row")
 
 COMMISSIONER_NAME = "灰婆婆"

@@ -11,8 +11,8 @@ authors instead of a hard-coded default.
 Adding a place record and running synchronization SHALL produce the whole
 location with no other file edited: its interior room tagged and described,
 its doorways connecting it to its exterior in both directions, its host
-standing in it with the declared profession's components attached, and its
-goods purchasable.
+standing in it with the declared capabilities attached, and its goods
+purchasable.
 
 #### Scenario: One record yields a working location
 - **WHEN** a place record is added and synchronization runs

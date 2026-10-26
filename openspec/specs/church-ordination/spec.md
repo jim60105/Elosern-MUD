@@ -99,14 +99,14 @@ The system SHALL keep church membership state on the character attribute `db.chu
 - **THEN** the one-row-one-test correspondence gate applies exactly as it does for `combat_modifiers.yaml`
 
 ### Requirement: Church venues and clergy hosts exist as authored content
-Places whose authored kwargs carry the `church` flag SHALL form the derived church-place set in `world/lore/church/` (the `shop_key` derivation pattern), and the derivation SHALL fail closed on a duplicate-flagged authoring conflict. The `ChurchHost` typeclass component (sibling of `GuildStaff`, a zero-state capability adapter) SHALL be authored on the one registered clergy NPC roster row (艾莉安娜‧寒水 high celebrant) through her profession blueprint.
+Places whose explicit venue metadata carries the `church` flag SHALL form the derived church-place set in `world/lore/church/` (the `shop_key` derivation pattern), and the derivation SHALL fail closed on a duplicate-flagged authoring conflict. The `ChurchHost` typeclass component (sibling of `GuildStaff`, a zero-state capability adapter) SHALL be authored on the one registered clergy NPC roster row (艾莉安娜‧寒水 high celebrant) through her direct capability declaration.
 
 #### Scenario: The derived church set is complete and fail-closed
-- **WHEN** the lore package derives the church-place set from authored kwargs
-- **THEN** every `church`-flagged place appears exactly once, and a duplicate/conflicting church kwarg authoring raises at derivation instead of silently winning
+- **WHEN** the lore package derives the church-place set from the authored place flag
+- **THEN** every `church`-flagged place appears exactly once, and no duplicate or conflicting flag authoring is representable
 
 #### Scenario: The clergy host is authored and sync-idempotent
-- **WHEN** the profession-blueprint roster derivation and `place-driven-service-sync` converge with `ChurchHost` attached to the celebrant NPC
+- **WHEN** the direct-capability roster derivation and `place-driven-service-sync` converge with `ChurchHost` attached to the celebrant NPC
 - **THEN** she resolves through the local-service-host lookup, her spawn data carries the raised initial arousal, the sanctum steward resolves as a plain merchant without the component, and a second sync pass changes nothing
 
 #### Scenario: The clergy row carries the raised initial arousal

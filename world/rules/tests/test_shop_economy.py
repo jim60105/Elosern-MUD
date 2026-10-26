@@ -31,6 +31,7 @@ from world.quests.tests._fixtures import (
 )
 from world.lore.settlements.assortments import AssortmentDefinition
 from world.lore.settlements.shops import ShopDefinition
+from world.rules.npc_capabilities import place_bound
 from world.rules.clock import WorldClock
 from world.rules.economy import (
     TradeError,
@@ -161,6 +162,10 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
             service_id="store",
             shop_key=T_SHOP,
         )
+        # A merchant that serves declares its authored availability binding;
+        # the gate fails closed on a missing one.
+        self.merchant.service_binding = "place"
+        self.merchant.anchor_room_id = self.store.pk
         self.merchant_npc.components.add(self.merchant)
         self.merchant.merchant_stock = _stock()
         self.player = create_object(PlayerCharacter, key="shopper")
@@ -477,9 +482,9 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
         from typeclasses.monsters import Monster
 
         fake = create_object(Monster, key="fake merchant", location=self.store)
-        fake.components.add(
-            Merchant.create(fake, service_id="m", shop_key=T_SHOP)
-        )
+        fake_merchant = Merchant.create(fake, service_id="m", shop_key=T_SHOP)
+        fake_merchant.service_binding = "person"
+        fake.components.add(fake_merchant)
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
             with self.assertRaises(TradeError) as ctx:
                 buy(self.player, fake, _T_APPLE, 1, self.player.pk)
@@ -691,6 +696,10 @@ class PartyShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, Evenni
             service_id="party-store",
             shop_key=T_SHOP,
         )
+        # A merchant that serves declares its authored availability binding;
+        # the gate fails closed on a missing one.
+        self.merchant.service_binding = "place"
+        self.merchant.anchor_room_id = self.store.pk
         self.merchant_npc.components.add(self.merchant)
         self.merchant.merchant_stock = _stock()
         self.player = create_object(PlayerCharacter, key="party shopper")
@@ -1323,6 +1332,10 @@ class EquippedRemovalGuardTests(ShopRegistryIsolation, EvenniaCommandTestMixin, 
             service_id="guard-store",
             shop_key=T_SHOP,
         )
+        # A merchant that serves declares its authored availability binding;
+        # the gate fails closed on a missing one.
+        self.merchant.service_binding = "place"
+        self.merchant.anchor_room_id = self.store.pk
         self.merchant_npc.components.add(self.merchant)
         self.merchant.merchant_stock = {**_stock(), _T_KNIFE: 1}
         self.player = self.char1
@@ -1422,6 +1435,7 @@ class MerchantStockParsingTests(ShopRegistryIsolation, EvenniaTestCase):
 
         npc = create_object(NPC, key="bad merchant")
         merchant = MerchantComponent.create(npc, service_id="m", shop_key=T_SHOP)
+        merchant.service_binding = "person"
         npc.components.add(merchant)
         for bad in ({_T_APPLE: -1}, {_T_APPLE: 1.5}, {"no_such_item": 1}):
             merchant.merchant_stock = bad
@@ -1456,10 +1470,19 @@ _MOSSGATE_SCALES = {"t_mossgate": 100}
 def _place_row(shop_key: str) -> "PlaceDefinition":
     """A place row authoring ``shop_key`` (kit store template)."""
     base = SYNTH_PLACES["t_mossgate_store"]
+    merchant = next(
+        declaration for declaration in base.components if declaration.type == Merchant.name
+    )
     return replace(
         base,
         key=f"t_place_for_{shop_key}",
-        authored_kwargs=(("shop_key", shop_key),),
+        components=(
+            replace(
+                merchant,
+                kwargs={**merchant.kwargs, "shop_key": shop_key},
+                binding=place_bound(f"t_place_for_{shop_key}"),
+            ),
+        ),
         assortment_keys=("t_mossgate_goods",),
     )
 

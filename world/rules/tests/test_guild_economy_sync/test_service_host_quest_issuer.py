@@ -8,8 +8,13 @@ from typeclasses.components import QuestIssuer
 from typeclasses.npcs import NPC
 from world.rules.guild_config import ServiceHostRow
 from world.rules.guild_config import get_catalog
-from world.rules.profession_assembly import assemble_profession_components
-from world.rules.profession_config import get_profession
+from world.rules.npc_capabilities import (
+    assemble_capabilities,
+    capability,
+    person_bound,
+    place_bound,
+    validate_capabilities,
+)
 from world.rules.quest_issuance import resolve_issuer_key
 from world.rules.guild_economy import sync_service_content
 import unittest
@@ -37,10 +42,14 @@ class ServiceHostQuestIssuerSyncTests(ServiceContentIsolation, EvenniaTestCase):
         return ServiceHostRow(
             name=COMMISSIONER_NAME,
             title="委託人灰婆婆",
-            profession=get_profession("quest_issuer"),
-            anchor_room=GUILD_HALL_TAG,
-            service_id=COMMISSIONER_SERVICE_ID,
-            authored_kwargs={},
+            spawn_room=GUILD_HALL_TAG,
+            components=(
+                capability(
+                    "quest_issuer",
+                    binding=place_bound(GUILD_HALL_TAG),
+                    service_id=COMMISSIONER_SERVICE_ID,
+                ),
+            ),
             profile_key=COMMISSIONER_SERVICE_ID,
             host_key=COMMISSIONER_SERVICE_ID,
         )
@@ -97,16 +106,18 @@ class ServiceHostQuestIssuerSyncTests(ServiceContentIsolation, EvenniaTestCase):
         sync_service_content()
         hall = search_object_by_tag(GUILD_HALL_TAG)[0]
         commissioner = create_object(NPC, key=COMMISSIONER_NAME, location=hall)
-        assemble_profession_components(
+        assemble_capabilities(
             commissioner,
-            get_profession("quest_issuer"),
-            {
-                "quest_issuer": {
-                    "service_id": IMPORTED_COMMISSIONER_SERVICE_ID,
-                    "issuer_key": "grey_granny",
-                }
-            },
-            anchor_room=None,
+            validate_capabilities(
+                [
+                    capability(
+                        "quest_issuer",
+                        binding=person_bound(),
+                        service_id=IMPORTED_COMMISSIONER_SERVICE_ID,
+                        issuer_key="grey_granny",
+                    )
+                ]
+            ),
         )
 
         sync_service_content()

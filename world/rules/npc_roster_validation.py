@@ -104,8 +104,8 @@ def derive_shipped_sources(
     sources: set[tuple[str, str]] = set()
 
     for place in places.values():
-        if place.service_id is not None:
-            sources.add(("place_host", place.service_id))
+        if place.host_profile_key is not None:
+            sources.add(("place_host", place.host_profile_key))
 
     for key in dialogue_rows:
         sources.add(("dialogue_table", key))
@@ -169,19 +169,19 @@ def derive_shipped_source_owners(
         from world.lore.npc_profiles import PROFILE_KEY_SLICES
 
         profile_key_slices = PROFILE_KEY_SLICES
+    from world.lore.settlements.places import place_dialogue_keys
 
     owners: dict[tuple[str, str], str] = {}
     table_owners: dict[str, str] = {}
     for place in places.values():
-        if place.service_id is None:
+        if place.host_profile_key is None:
             continue
         owner = profile_key_slices.get(place.host_profile_key)
         if owner is None:
             continue
-        owners[("place_host", place.service_id)] = owner
-        for kwarg, value in place.authored_kwargs:
-            if kwarg == "dialogue_key":
-                table_owners.setdefault(value, owner)
+        owners[("place_host", place.host_profile_key)] = owner
+        for dialogue_key in place_dialogue_keys(place):
+            table_owners.setdefault(dialogue_key, owner)
     for table_key, owner in table_owners.items():
         owners[("dialogue_table", table_key)] = owner
     for person_key, person in adventurers.items():
@@ -329,7 +329,9 @@ def validate_npc_roster(
     # Persistent people have distinct profiles and both offline reply paths.
     person_profiles: set[str] = set()
     other_profiles = {
-        place.host_profile_key for place in places.values() if place.service_id is not None
+        place.host_profile_key
+        for place in places.values()
+        if place.host_profile_key is not None
     }
     for person_key, person in adventurers.items():
         profile_key = person.profile_key
@@ -369,62 +371,63 @@ def validate_npc_roster(
     # 4. Place hosts: valid profile, valid compact card, bounded age pair, one
     #    inventory assignment.
     for place in places.values():
-        if place.service_id is None:
+        if place.host_profile_key is None:
             continue
         profile_key = place.host_profile_key
         if not profile_key:
             violations.append(
-                f"source kind='place_host' key={place.service_id!r} has no host_profile_key"
+                f"place {place.key!r} authors no host_profile_key"
             )
             continue
         referenced_profiles.add(profile_key)
         profile = profile_registry.get(profile_key)
         if profile is None:
             violations.append(
-                f"source kind='place_host' key={place.service_id!r} references missing profile {profile_key!r}"
+                f"source kind='place_host' key={profile_key!r} references missing profile {profile_key!r}"
             )
             continue
         try:
             normalize_card(profile.card.to_record())
         except (NpcCardError, ValueError) as err:
             violations.append(
-                f"source kind='place_host' key={place.service_id!r} profile {profile_key!r} has invalid card: {err}"
+                f"source kind='place_host' key={profile_key!r} profile {profile_key!r} has invalid card: {err}"
             )
         for field in ("age", "apparent_age"):
             value = getattr(profile, field)
             if type(value) is not int or not 0 <= value <= 10000:
                 violations.append(
-                    f"source kind='place_host' key={place.service_id!r} "
+                    f"source kind='place_host' key={profile_key!r} "
                     f"profile {profile_key!r} has invalid {field}"
                 )
         assignments = [
             row for row in inventory
-            if row.kind == "place_host" and row.key == place.service_id
+            if row.kind == "place_host" and row.key == profile_key
         ]
         if len(assignments) != 1:
             violations.append(
-                f"source kind='place_host' key={place.service_id!r} "
+                f"source kind='place_host' key={profile_key!r} "
                 "has missing or stale inventory assignment"
             )
 
     # 5. Dialogue tables & scripted hosts
     # Map dialogue keys to hosted places
+    from world.lore.settlements.places import place_dialogue_keys
+
     table_hosts: dict[str, list[PlaceDefinition]] = {tk: [] for tk in dialogue_rows}
     scripted_hosts: list[PlaceDefinition] = []
 
     for place in places.values():
-        if place.service_id is None:
+        if place.host_profile_key is None:
             continue
-        for k, v in place.authored_kwargs:
-            if k == "dialogue_key":
-                scripted_hosts.append(place)
-                if v in table_hosts:
-                    table_hosts[v].append(place)
-                else:
-                    violations.append(
-                        f"source kind='place_host' key={place.service_id!r} "
-                        f"references unknown dialogue table {v!r}"
-                    )
+        for dialogue_key in place_dialogue_keys(place):
+            scripted_hosts.append(place)
+            if dialogue_key in table_hosts:
+                table_hosts[dialogue_key].append(place)
+            else:
+                violations.append(
+                    f"source kind='place_host' key={place.host_profile_key!r} "
+                    f"references unknown dialogue table {dialogue_key!r}"
+                )
 
     # Check cardinality for each dialogue table
     for table_key in sorted(dialogue_rows):
@@ -434,7 +437,7 @@ def validate_npc_roster(
                 f"source kind='dialogue_table' key={table_key!r} is answered by 0 hosted places"
             )
         elif len(hosts) > 1:
-            host_ids = [h.service_id for h in hosts]
+            host_ids = [h.host_profile_key for h in hosts]
             violations.append(
                 f"source kind='dialogue_table' key={table_key!r} is answered by {len(hosts)} "
                 f"hosted places: {host_ids!r}"
@@ -450,7 +453,7 @@ def validate_npc_roster(
             continue
         if not profile.voice.misunderstood or not profile.voice.misunderstood.strip():
             violations.append(
-                f"source kind='place_host' key={host.service_id!r} profile {profile_key!r} "
+                f"source kind='place_host' key={host.host_profile_key!r} profile {profile_key!r} "
                 "missing misunderstood reply"
             )
         else:
@@ -458,12 +461,12 @@ def validate_npc_roster(
                 normalize_offline_greeting(profile.voice.misunderstood)
             except (NpcCardError, ValueError) as err:
                 violations.append(
-                    f"source kind='place_host' key={host.service_id!r} "
+                    f"source kind='place_host' key={host.host_profile_key!r} "
                     f"profile {profile_key!r} invalid misunderstood reply: {err}"
                 )
         if profile.voice.greeting is not None:
             violations.append(
-                f"source kind='place_host' key={host.service_id!r} profile {profile_key!r} "
+                f"source kind='place_host' key={host.host_profile_key!r} profile {profile_key!r} "
                 "authors a greeting; table greeting is the single source for hosts"
             )
 
