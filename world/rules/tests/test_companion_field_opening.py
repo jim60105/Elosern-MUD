@@ -421,8 +421,13 @@ class CompanionOpeningRefusalTests(_CompanionOpeningCase):
     def test_an_injected_failure_restores_both_dialogue_surfaces(self):
         commander_host = self._outsider("開場對話者")
         caster_host = self._outsider("同伴對話者")
-        open_or_refresh_dialogue(self.commander, commander_host, "問候")
+        # A companion holds a dialogue only as the possessed acting body, and
+        # the possession transition itself ends the owner's conversation, so
+        # the caster's session opens first and the commander's own session is
+        # opened afterwards.
+        enter_possession(self.commander, self.aila)
         open_or_refresh_dialogue(self.aila, caster_host, "問候")
+        open_or_refresh_dialogue(self.commander, commander_host, "問候")
         commander_dialogue = dict(self.commander.db.dialogue_session)
         caster_dialogue = dict(self.aila.db.dialogue_session)
         with (

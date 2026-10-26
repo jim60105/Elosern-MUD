@@ -368,11 +368,14 @@ class DialogueRefreshLifecycleTests(_WatcherMixin, EvenniaTest):
         self.host.components.add(
             ScriptedDialogue.create(self.host, dialogue_key=_TABLE_KEY)
         )
-        self.host.components.add(
-            GuildStaff.create(
-                self.host, service_id="staff", branch_key=SYNTH_GUILD_BRANCH_KEY
-            )
+        staff_component = GuildStaff.create(
+            self.host, service_id="staff", branch_key=SYNTH_GUILD_BRANCH_KEY
         )
+        # A serving host declares its authored place binding: the shared gate
+        # fails closed on a component without one.
+        staff_component.service_binding = "place"
+        staff_component.anchor_room_id = self.room.pk
+        self.host.components.add(staff_component)
         self.registry = build_production_registry()
         self.companions: list[Any] = []
 

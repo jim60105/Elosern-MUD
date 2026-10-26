@@ -700,6 +700,11 @@ class ExposureConsumerAllowlistTests(unittest.TestCase):
             Path("world/lore/player_presets/data_pack_cards.py"),
             Path("world/lore/player_presets/data_story_cards.py"),
             Path("world/lore/player_presets/validation.py"),
+            # Declaration-vocabulary exemption: the authored-dialogue shape
+            # module names the ``exposure`` condition kind and the codec's
+            # allowed-key table lists it; neither reads live sexual state.
+            Path("world/lore/dialogue/codec.py"),
+            Path("world/lore/dialogue/conditions.py"),
         }
     )
     # Modules that must consume exposure through the effective overlay.
@@ -723,6 +728,10 @@ class ExposureConsumerAllowlistTests(unittest.TestCase):
             # the webclient presentation (``read_intimate_view``), so it
             # consumes the effective overlay, never the stored ordinal.
             Path("web/gm/readers/characters.py"),
+            # The authored-dialogue condition evaluator overlays the effective
+            # exposure for its ``exposure`` condition kind and never treats
+            # the stored ordinal as the presented level.
+            Path("world/rules/dialogue_conditions.py"),
         }
     )
 

@@ -66,7 +66,13 @@ class ChurchCombatMinistryLoopBase(EvenniaTest):
         self.char1.race = "human"
         self.char1.apply_race_baseline()
         self.celebrant = create_object(NPC, key="t_loop_celebrant", location=self.hall)
-        self.component = ChurchHost.create(self.celebrant, service_id="t_loop_celebrant")
+        self.component = ChurchHost.create(
+            self.celebrant, service_id="t_loop_celebrant"
+        )
+        # A serving host declares its authored place binding: the shared gate
+        # fails closed on a component without one.
+        self.component.service_binding = "place"
+        self.component.anchor_room_id = self.hall.pk
         self.celebrant.components.add(self.component)
         self.recipient = create_object(NPC, key="t_loop_recipient", location=self.hall)
         self.recipient.race = "human"

@@ -80,9 +80,14 @@ _SYNTH_RULEBOOK = ScheduleRulebook(
 
 
 def _attach_staff(npc) -> None:
-    npc.components.add(
-        GuildStaff.create(npc, service_id="staff", branch_key=ALTORIA_BRANCH)
+    component = GuildStaff.create(
+        npc, service_id="staff", branch_key=ALTORIA_BRANCH
     )
+    # A serving host declares its authored place binding: the shared gate
+    # fails closed on a component without one.
+    component.service_binding = "place"
+    component.anchor_room_id = npc.location.pk
+    npc.components.add(component)
 
 
 class CapBreakTurnInBase(EvenniaTest):

@@ -63,6 +63,10 @@ _ALLOWLIST = frozenset(
         Path("world/rules/buffs/rates.py"),
         Path("world/rules/buffs/surface.py"),
         Path("world/rules/items/planning.py"),
+        # The authored-dialogue condition evaluator reads the exposure overlay
+        # and the normalized equipment record to gate topics deterministically;
+        # it is a read-only condition reader, never a resolver of its own.
+        Path("world/rules/dialogue_conditions.py"),
         Path("commands/economy.py"),
         Path("commands/items.py"),
         Path("typeclasses/objects.py"),

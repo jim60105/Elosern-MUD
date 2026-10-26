@@ -1371,6 +1371,10 @@ class MilitaryRuntimeSmokeTests(EvenniaTest):
                 price = offer.buy_copper
                 host = create_object(NPC, key=f"synthetic {key} vendor", location=room)
                 merchant = Merchant.create(host, service_id=key, shop_key=config.shop_key)
+                # A serving host declares its authored place binding: the
+                # shared gate fails closed on a component without one.
+                merchant.service_binding = "place"
+                merchant.anchor_room_id = room.pk
                 host.components.add(merchant)
                 merchant.merchant_stock = {o.item_key: o.initial_stock for o in config.offers}
                 merchant.last_restock_day = 0

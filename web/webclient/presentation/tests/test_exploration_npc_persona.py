@@ -259,15 +259,23 @@ class ExplorationVisibilityTargetPublicationTest(EvenniaTest):
         from world.tests.synthetic_data import SYNTH_GUILD_BRANCH_KEY
 
         visible_merchant = create_object(NPC, key="看得見的商人", location=self.room)
-        visible_merchant.components.add(
-            Merchant.create(visible_merchant, service_id="shop", branch_key=SYNTH_GUILD_BRANCH_KEY)
+        visible_component = Merchant.create(
+            visible_merchant, service_id="shop", branch_key=SYNTH_GUILD_BRANCH_KEY
         )
+        # A serving host declares its authored place binding: the shared gate
+        # fails closed on a component without one.
+        visible_component.service_binding = "place"
+        visible_component.anchor_room_id = self.room.pk
+        visible_merchant.components.add(visible_component)
 
         hidden_merchant = create_object(NPC, key="隱藏的商人", location=self.room)
         hidden_merchant.locks.add("view:false()")
-        hidden_merchant.components.add(
-            Merchant.create(hidden_merchant, service_id="shop", branch_key=SYNTH_GUILD_BRANCH_KEY)
+        hidden_component = Merchant.create(
+            hidden_merchant, service_id="shop", branch_key=SYNTH_GUILD_BRANCH_KEY
         )
+        hidden_component.service_binding = "place"
+        hidden_component.anchor_room_id = self.room.pk
+        hidden_merchant.components.add(hidden_component)
 
         # _resolve_single_host finds the visible merchant uniquely
         host = _resolve_single_host(self.player, Merchant)

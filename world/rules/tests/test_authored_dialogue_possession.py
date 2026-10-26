@@ -372,11 +372,14 @@ class AuthoredDialoguePossessionTests(EvenniaTest):
         from world.rules.possession import POSSESSED_REFUSAL_MESSAGES
 
         staff = create_object(NPC, key="合成公會職員", location=self.room1)
-        staff.components.add(
-            GuildStaff.create(
-                staff, service_id="synth_staff", branch_key="synth_branch"
-            )
+        staff_component = GuildStaff.create(
+            staff, service_id="synth_staff", branch_key="synth_branch"
         )
+        # A serving host declares its authored place binding: the shared gate
+        # fails closed on a component without one.
+        staff_component.service_binding = "place"
+        staff_component.anchor_room_id = self.room1.pk
+        staff.components.add(staff_component)
         staff.components.add(
             ScriptedDialogue.create(staff, dialogue_key=GUILD_STAFF_DIALOGUE_KEY)
         )
@@ -536,6 +539,8 @@ class AuthoredDialoguePossessionTests(EvenniaTest):
         merchant = Merchant.create(
             merchant_host, service_id="possessed_dialogue_store", shop_key=shop_key
         )
+        merchant.service_binding = "place"
+        merchant.anchor_room_id = self.room1.pk
         merchant_host.components.add(merchant)
         merchant.merchant_stock = {potion: 5}
 

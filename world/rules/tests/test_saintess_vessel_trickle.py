@@ -268,6 +268,10 @@ class SaintessVesselEnrollmentSmokeTests(EvenniaTest):
         self.component = ChurchHost.create(
             self.celebrant, service_id="smoke_celebrant"
         )
+        # A serving host declares its authored place binding: the shared gate
+        # fails closed on a component without one.
+        self.component.service_binding = "place"
+        self.component.anchor_room_id = self.room1.pk
         self.celebrant.components.add(self.component)
 
     def test_enrollment_trickle_and_ward_cast_smoke(self):

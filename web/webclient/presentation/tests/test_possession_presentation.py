@@ -250,22 +250,26 @@ class PossessionPresentationTests(EvenniaTest):
         from world.rules.dialogue import GUILD_STAFF_DIALOGUE_KEY
 
         staff = create_object(NPC, key="公會職員", location=self.room1)
-        staff.components.add(
-            GuildStaff.create(
-                staff,
-                service_id="t_possession_staff",
-                branch_key="t_possession_branch",
-            )
+        staff_component = GuildStaff.create(
+            staff,
+            service_id="t_possession_staff",
+            branch_key="t_possession_branch",
         )
+        # A serving host declares its authored place binding: the shared gate
+        # fails closed on a component without one.
+        staff_component.service_binding = "place"
+        staff_component.anchor_room_id = self.room1.pk
+        staff.components.add(staff_component)
         staff.components.add(
             ScriptedDialogue.create(staff, dialogue_key=GUILD_STAFF_DIALOGUE_KEY)
         )
         shop = create_object(NPC, key="行商", location=self.room1)
-        shop.components.add(
-            Merchant.create(
-                shop, service_id="shop", shop_key="t_possession_shop"
-            )
+        shop_component = Merchant.create(
+            shop, service_id="shop", shop_key="t_possession_shop"
         )
+        shop_component.service_binding = "place"
+        shop_component.anchor_room_id = self.room1.pk
+        shop.components.add(shop_component)
         monster = create_object(Monster, key="哥布林", location=self.room1)
         enter_possession(self.player, self.npc)
 
@@ -537,6 +541,8 @@ class PossessionPresentationTests(EvenniaTest):
         merchant = Merchant.create(
             merchant_host, service_id="possession_store", shop_key=shop_key
         )
+        merchant.service_binding = "place"
+        merchant.anchor_room_id = self.room1.pk
         merchant_host.components.add(merchant)
         merchant.merchant_stock = {potion: 5}
         enter_possession(self.player, self.npc)

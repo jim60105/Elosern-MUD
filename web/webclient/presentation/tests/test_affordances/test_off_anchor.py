@@ -129,7 +129,7 @@ class OffAnchorServiceEntryTests(VocabularyTestCase):
     @covers_requirement(
         "exploration-affordances::navigation-entries-render-off-anchor-service-hosts-honestly"
     )
-    def test_at_anchor_and_default_bindings_stay_enabled(self):
+    def test_at_anchor_binding_stays_enabled(self):
         with self.subTest("place-bound host at its anchor"):
             self._merchant(
                 room=self.anchor, binding="place", anchor=self.anchor.pk
@@ -138,11 +138,18 @@ class OffAnchorServiceEntryTests(VocabularyTestCase):
             (entry,) = self._navigation()
             self.assertTrue(entry.enabled)
             self.assertIsNone(entry.disabled_reason)
-        with self.subTest("unset binding (hand-built default)"):
+        with self.subTest("unset binding is the gate's malformed verdict"):
+            # The gate fails closed on a component without a persisted
+            # binding, so a hand-built host with no binding is disabled with
+            # the same fixed message as any other malformed binding.
             self.player.location = self.square
             self._merchant(room=self.square, binding=None, anchor=None)
             (entry,) = self._navigation()
-            self.assertTrue(entry.enabled)
+            self.assertFalse(entry.enabled)
+            self.assertEqual(
+                entry.disabled_reason,
+                ("service_unavailable", "他的服務不在這裡營業。"),
+            )
 
     @covers_requirement(
         "exploration-affordances::navigation-entries-render-off-anchor-service-hosts-honestly"

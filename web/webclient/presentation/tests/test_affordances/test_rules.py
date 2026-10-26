@@ -237,13 +237,19 @@ class AffordanceRuleTests(VocabularyTestCase):
     @covers_requirement("exploration-affordances::the-shared-read-only-affordance-vocabulary-supports-possessed-shop-access")
     def test_service_entries_attach_to_the_exact_local_host(self):
         staff = create_object(NPC, key="公會職員", location=self.room)
-        staff.components.add(
-            GuildStaff.create(staff, service_id="staff", branch_key=SYNTH_GUILD_BRANCH_KEY)
+        staff_component = GuildStaff.create(
+            staff, service_id="staff", branch_key=SYNTH_GUILD_BRANCH_KEY
         )
+        staff_component.service_binding = "place"
+        staff_component.anchor_room_id = self.room.pk
+        staff.components.add(staff_component)
         shop = create_object(NPC, key="合成商", location=self.room)
-        shop.components.add(
-            Merchant.create(shop, service_id="shop", branch_key=SYNTH_GUILD_BRANCH_KEY)
+        shop_component = Merchant.create(
+            shop, service_id="shop", branch_key=SYNTH_GUILD_BRANCH_KEY
         )
+        shop_component.service_binding = "place"
+        shop_component.anchor_room_id = self.room.pk
+        shop.components.add(shop_component)
         monster = _monster()
         monster.location = self.room
         vocabulary = self._vocabulary()
