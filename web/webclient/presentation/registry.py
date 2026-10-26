@@ -8,7 +8,7 @@ panels or narrative output.
 """
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import secrets
 from typing import Any
 
@@ -44,6 +44,12 @@ class PresenterSpec:
             ``world_map``). Such a presenter never runs for an eager snapshot
             or refresh; it publishes only when a caller names it explicitly,
             and its body may travel as bounded parts.
+        validator: The panel's exact available-form validator, when the panel
+            module owns one. The publication codec re-validates every
+            transmitted value of a registered panel through it, so a supplied
+            candidate can never bypass the panel schema. ``None`` for a panel
+            with no server-side schema function (for example ``status``, whose
+            shape is owned by the frozen read model and the client mirror).
     """
 
     name: str
@@ -51,6 +57,7 @@ class PresenterSpec:
     unavailable_reason: tuple[str, str]
     presenter: Callable[[PresentationContext], dict[str, Any]]
     on_demand: bool = False
+    validator: Callable[[Any], Any] | None = None
 
 
 class PanelUnavailableError(RuntimeError):
@@ -120,6 +127,27 @@ class PresentationRegistry:
     def on_demand_panel_names(self) -> frozenset[str]:
         """Map panels published only when explicitly requested."""
         return frozenset(name for name, spec in self._specs.items() if spec.on_demand)
+
+    @property
+    def panel_validators(self) -> dict[str, tuple[Callable[[Any], Any], int]]:
+        """Registered eager panel validators with their schema versions.
+
+        Used by the publication codec to enforce panel schemas (and the local
+        byte limits they own) on the wire, including supplied candidates that
+        never passed through a presenter. On-demand map panels stay out: their
+        specialized transport validates them.
+        """
+        return {
+            name: (spec.validator, spec.schema_version)
+            for name, spec in self._specs.items()
+            if spec.validator is not None and not spec.on_demand
+        }
+
+    def attach_validator(
+        self, name: str, validator: Callable[[Any], Any]
+    ) -> None:
+        """Attach the exact available-form validator of one registered panel."""
+        self._specs[name] = replace(self.spec(name), validator=validator)
 
     def spec(self, panel_name: str) -> PresenterSpec:
         """Return the registered spec for ``panel_name`` or raise."""
@@ -539,4 +567,70 @@ def build_production_registry() -> PresentationRegistry:
         unavailable_reason=("not_sleeping", "目前沒有需要交接的睡眠"),
         presenter=sleep_handoff_presenter,
     ))
+    _attach_production_validators(registry)
     return registry
+
+
+def _attach_production_validators(registry: PresentationRegistry) -> None:
+    """Attach every registered panel's own available-form wire validator.
+
+    The publication codec re-validates each transmitted value of a panel that
+    owns a validator, so the panel schema (and the panel-local byte limit that
+    validator enforces) applies to supplied candidates too, not only to values
+    returned by a presenter. Panels without a server-side schema function --
+    ``status`` and ``dream`` -- are absent here and keep their read-model and
+    client-mirror contract.
+    """
+    from web.webclient.presentation.art import validate_art
+    from web.webclient.presentation.character import validate_character
+    from web.webclient.presentation.combat_beats import validate_combat_beats
+    from web.webclient.presentation.combat_panel import validate_context_actions
+    from web.webclient.presentation.creation import validate_creation
+    from web.webclient.presentation.dialogue import validate_dialogue
+    from web.webclient.presentation.exploration import validate_exploration
+    from web.webclient.presentation.gallery import validate_gallery
+    from web.webclient.presentation.item_holdings import validate_item_holdings
+    from web.webclient.presentation.lineage import validate_lineage
+    from web.webclient.presentation.lore_codex import validate_lore_codex
+    from web.webclient.presentation.local_map import validate_local_map
+    from web.webclient.presentation.objectives import validate_objectives
+    from web.webclient.presentation.party import validate_party
+    from web.webclient.presentation.party_inventory import validate_party_inventory
+    from web.webclient.presentation.party_member import validate_party_member
+    from web.webclient.presentation.possession_banner import validate_possession_banner
+    from web.webclient.presentation.quest_log import validate_quest_log
+    from web.webclient.presentation.roster import validate_roster
+    from web.webclient.presentation.services import validate_services
+    from web.webclient.presentation.skill_use import validate_skill_use
+    from web.webclient.presentation.sleep_handoff import validate_sleep_handoff
+    from web.webclient.presentation.title_ballot import validate_title_ballot
+    from web.webclient.presentation.title_codex import validate_title_codex
+
+    validators = {
+        "art": validate_art,
+        "character": validate_character,
+        "combat_beats": validate_combat_beats,
+        "context_actions": validate_context_actions,
+        "creation": validate_creation,
+        "dialogue": validate_dialogue,
+        "exploration": validate_exploration,
+        "gallery": validate_gallery,
+        "item_holdings": validate_item_holdings,
+        "lineage": validate_lineage,
+        "local_map": validate_local_map,
+        "lore_codex": validate_lore_codex,
+        "objectives": validate_objectives,
+        "party": validate_party,
+        "party_inventory": validate_party_inventory,
+        "party_member": validate_party_member,
+        "possession_banner": validate_possession_banner,
+        "quest_log": validate_quest_log,
+        "roster": validate_roster,
+        "services": validate_services,
+        "skill_use": validate_skill_use,
+        "sleep_handoff": validate_sleep_handoff,
+        "title_ballot": validate_title_ballot,
+        "title_codex": validate_title_codex,
+    }
+    for name, validator in validators.items():
+        registry.attach_validator(name, validator)

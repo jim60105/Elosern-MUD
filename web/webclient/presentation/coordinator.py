@@ -66,6 +66,7 @@ from web.webclient.presentation.protocol import (
     MAX_SAFE_INTEGER,
     PROTOCOL_VERSION,
     UI_ACTION_RESULT,
+    UI_PUBLICATION_PART,
     JSONSafetyError,
     ProtocolValidationError,
     check_envelope,
@@ -81,10 +82,15 @@ from web.webclient.presentation.map_panels import (
     check_world_map_envelope,
 )
 from web.webclient.presentation.publication import (
+    PreparedFrame,
     PublicationCompletion,
     PublicationReceipt,
     copy_json_value,
     json_value_equal,
+)
+from web.webclient.presentation.publication_parts import (
+    encode_publication,
+    validate_publication_panels,
 )
 from web.webclient.presentation.registry import PresentationRegistry
 
@@ -299,12 +305,16 @@ def _reactor_scheduler(callback: Callable[[], None]) -> Any:
 
 @dataclass(frozen=True)
 class _LogicalPublication:
-    """One logical publication: consecutive frames sharing one revision."""
+    """One logical publication: its exact prepared frames sharing one revision.
+
+    ``frames`` are :class:`PreparedFrame` values, so an intact logical document
+    and its bounded parts are both just frames of the same ordered batch; the
+    baseline is installed only after every one of them sent.
+    """
 
     snapshot: bool
-    message: str
     revision: int
-    frames: tuple[dict[str, Any], ...]
+    frames: tuple[PreparedFrame, ...]
     replacements: Mapping[str, Any]
     removed: tuple[str, ...]
     mode: str
@@ -839,7 +849,7 @@ class PresentationCoordinator:
             self._revision = plan.revision
             try:
                 for frame in plan.frames:
-                    self._send(plan.message, frame)
+                    self._send(frame.command, frame.envelope)
             except Exception:
                 # An escaped frame is on the wire, so these values can never be
                 # a delta base again; the issued target stays consumed.
@@ -858,7 +868,24 @@ class PresentationCoordinator:
                         },
                     )
                 else:
-                    self._log_intact_world_map(plan.frames[0])
+                    self._log_intact_world_map(plan.frames[0].envelope)
+            part_frames = [
+                frame
+                for frame in plan.frames
+                if frame.command == UI_PUBLICATION_PART
+            ]
+            if part_frames:
+                log_debug(
+                    "publication_parts_sent",
+                    context={
+                        "surface": "presentation",
+                        "kind": "snapshot" if plan.snapshot else "delta",
+                        "revision": plan.revision,
+                        "parts": len(part_frames),
+                        "bytes": part_frames[0].envelope["total_bytes"],
+                        "transfer_id": part_frames[0].envelope["transfer_id"],
+                    },
+                )
             log_info(
                 "presentation_published",
                 context={
@@ -906,13 +933,16 @@ class PresentationCoordinator:
             for name, value in self._render_all(context).items()
         }
         envelope = self._snapshot_envelope(panels, revision, mode, server_time)
-        check_envelope(envelope)
         validate_ui_snapshot(envelope, known_panels=set(self.registry.panel_names))
+        frames = encode_publication(
+            SNAPSHOT_MESSAGE,
+            envelope,
+            panel_validators=self.registry.panel_validators,
+        )
         return _LogicalPublication(
             snapshot=True,
-            message=SNAPSHOT_MESSAGE,
             revision=revision,
-            frames=(envelope,),
+            frames=frames,
             replacements=panels,
             removed=(),
             mode=mode,
@@ -987,6 +1017,9 @@ class PresentationCoordinator:
         if map_bodies:
             combined = dict(replacements)
             combined.update(map_bodies)
+            # Supplied eager candidates never bypass their panel schema, even
+            # when a fitting combined map frame carries them.
+            validate_publication_panels(replacements, self.registry.panel_validators)
             candidate = self._update_envelope(
                 combined, self._reserve(base + 1), base, removed, mode, server_time
             )
@@ -1000,9 +1033,8 @@ class PresentationCoordinator:
                 plans.append(
                     _LogicalPublication(
                         snapshot=False,
-                        message=UPDATE_MESSAGE,
                         revision=candidate["revision"],
-                        frames=(candidate,),
+                        frames=(PreparedFrame(UPDATE_MESSAGE, candidate),),
                         replacements=replacements,
                         removed=removed,
                         mode=mode,
@@ -1016,13 +1048,12 @@ class PresentationCoordinator:
                 eager = self._update_envelope(
                     replacements, eager_revision, base, removed, mode, server_time
                 )
-                self._checked_update(eager)
+                eager_frames = self._prepared_eager_frames(eager)
                 plans.append(
                     _LogicalPublication(
                         snapshot=False,
-                        message=UPDATE_MESSAGE,
                         revision=eager_revision,
-                        frames=(eager,),
+                        frames=eager_frames,
                         replacements=replacements,
                         removed=removed,
                         mode=mode,
@@ -1037,8 +1068,7 @@ class PresentationCoordinator:
                 plans.append(
                     _LogicalPublication(
                         snapshot=False,
-                        message=UPDATE_MESSAGE,
-                        revision=frames[0]["revision"],
+                        revision=frames[0].envelope["revision"],
                         frames=frames,
                         replacements={},
                         removed=(),
@@ -1048,7 +1078,7 @@ class PresentationCoordinator:
                         parts=parts,
                     )
                 )
-                base = frames[0]["revision"]
+                base = frames[0].envelope["revision"]
             return plans
 
         if not replacements and not removed and not metadata_changed:
@@ -1057,13 +1087,12 @@ class PresentationCoordinator:
         envelope = self._update_envelope(
             replacements, revision, base, removed, mode, server_time
         )
-        self._checked_update(envelope)
+        frames = self._prepared_eager_frames(envelope)
         return [
             _LogicalPublication(
                 snapshot=False,
-                message=UPDATE_MESSAGE,
                 revision=revision,
-                frames=(envelope,),
+                frames=frames,
                 replacements=replacements,
                 removed=removed,
                 mode=mode,
@@ -1088,26 +1117,34 @@ class PresentationCoordinator:
         """
         if name == WORLD_MAP_PANEL:
             frames = (
-                self._update_envelope(
-                    {name: body}, revision, base_revision, (), mode, server_time
+                PreparedFrame(
+                    UPDATE_MESSAGE,
+                    self._update_envelope(
+                        {name: body}, revision, base_revision, (), mode, server_time
+                    ),
                 ),
             )
-            check_world_map_envelope(frames[0])
+            check_world_map_envelope(frames[0].envelope)
         else:
             from web.webclient.presentation.map_parts import encode_map_parts
 
             frames = tuple(
-                self._update_envelope(
-                    {name: part}, revision, base_revision, (), mode, server_time
+                PreparedFrame(
+                    UPDATE_MESSAGE,
+                    self._update_envelope(
+                        {name: part}, revision, base_revision, (), mode, server_time
+                    ),
                 )
                 for part in encode_map_parts(name, body)
             )
         for frame in frames:
-            if carries_intact_world_map(frame):
-                check_world_map_envelope(frame)
+            if carries_intact_world_map(frame.envelope):
+                check_world_map_envelope(frame.envelope)
             else:
-                check_envelope(frame)
-            validate_ui_update(frame, known_panels=set(self.registry.panel_names))
+                check_envelope(frame.envelope)
+            validate_ui_update(
+                frame.envelope, known_panels=set(self.registry.panel_names)
+            )
         return frames, (len(frames) if name != WORLD_MAP_PANEL else 0)
 
     def _reserve(self, revision: int) -> int:
@@ -1158,10 +1195,16 @@ class PresentationCoordinator:
             "server_time": server_time,
         }
 
-    def _checked_update(self, envelope: dict[str, Any]) -> None:
-        """Prevalidate one delta against both the frame and the delta schema."""
-        check_envelope(envelope)
+    def _prepared_eager_frames(
+        self, envelope: dict[str, Any]
+    ) -> tuple[PreparedFrame, ...]:
+        """Prevalidate one eager delta and prepare its exact transport frames."""
         validate_ui_update(envelope, known_panels=set(self.registry.panel_names))
+        return encode_publication(
+            UPDATE_MESSAGE,
+            envelope,
+            panel_validators=self.registry.panel_validators,
+        )
 
     def _checked_map_body(self, name: str, payload: Any) -> dict[str, Any]:
         """Validate one map body, degrading a malformed one to unavailable.

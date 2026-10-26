@@ -28,14 +28,13 @@ from web.webclient.presentation.map_parts import decode_map_parts
 from web.webclient.presentation.protocol import (
     MAX_CANONICAL_JSON_BYTES,
     ProtocolValidationError,
+    UI_PUBLICATION_PART,
     check_envelope,
     json_byte_size,
 )
+from web.webclient.presentation.publication_parts import validate_publication_part
 from web.webclient.presentation.registry import PresenterSpec
-from web.webclient.presentation.tests._support import (
-    publication_failure,
-    publication_receipt,
-)
+from web.webclient.presentation.tests._support import publication_receipt
 from web.webclient.presentation.tests.test_map_panel_protocol import (
     _Session,
     _context,
@@ -263,22 +262,35 @@ class WorldMapCoordinatorTests(unittest.TestCase):
         self.assertEqual(set(frame["panels"]), {"world_map", "dialogue"})
 
     @covers_requirement("webclient-oob-protocol::elosern-oob-messages-use-exact-versioned-envelopes")
-    def test_an_oversized_companion_aborts_before_anything_is_sent(self):
+    def test_an_oversized_companion_travels_as_general_parts_before_the_map(self):
         session = _Session()
         registry = _world_registry(lambda: _copy("large"))
         coordinator = _coordinator(session, registry)
         coordinator.full_snapshot(_context())
         padded = _padded(_status(), 70_000)
-        before = coordinator.revision
         with mock.patch.object(registry, "render", side_effect=lambda name, ctx: padded if name == "status" else _copy("large")):
-            # The companion alone is over the generic frame: nothing is sent.
-            publication_failure(
+            publication_receipt(
                 coordinator.enqueue_publication(
                     lambda: _context(), affected_panels={"status", "world_map"}
                 )
-            ).trap(ProtocolValidationError)
-        self.assertEqual(coordinator.revision, before)
-        self.assertEqual(len(session.frames()), 1)
+            )
+        frames = session.frames()[1:]
+        general = [(name, frame) for name, frame in frames if name == UI_PUBLICATION_PART]
+        worlds = [(name, frame) for name, frame in frames if name == "ui_update"]
+        # The companion alone is over the generic frame, so it travels as a
+        # general bounded transfer; the world map keeps its scoped intact frame
+        # at a later revision and never wraps a general part.
+        self.assertGreater(len(general), 1)
+        self.assertEqual(len(worlds), 1)
+        self.assertEqual(list(worlds[0][1]["panels"]), ["world_map"])
+        self.assertGreater(worlds[0][1]["revision"], general[0][1]["revision"])
+        raw = b"".join(
+            validate_publication_part(frame)[1] for _, frame in general
+        )
+        logical = json.loads(raw.decode("utf-8"))
+        self.assertEqual(logical["panels"], {"status": padded})
+        self.assertEqual(logical["base_revision"], 1)
+        self.assertEqual(logical["revision"], general[0][1]["revision"])
 
     @covers_requirement("webclient-oob-protocol::elosern-oob-messages-use-exact-versioned-envelopes")
     @covers_requirement("webclient-oob-protocol::continental-map-transport-is-measured-end-to-end")

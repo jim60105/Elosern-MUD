@@ -29,6 +29,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Literal, Mapping
 
 __all__ = [
+    "PreparedFrame",
     "PublicationCompletion",
     "PublicationKind",
     "PublicationReceipt",
@@ -40,6 +41,23 @@ __all__ = [
 PublicationKind = Literal["snapshot", "delta", "unchanged"]
 
 _MISSING = object()
+
+
+@dataclass(frozen=True)
+class PreparedFrame:
+    """One exact transport frame of a prepared logical publication.
+
+    ``command`` is the Evennia OOB message name the frame travels under:
+    ``ui_snapshot``/``ui_update`` for an intact logical document, or
+    ``ui_publication_part`` for one bounded part of an oversized one.
+    ``canonical`` holds the reusable canonical UTF-8 JSON bytes of the whole
+    logical document only on an intact frame; a part frame owns no
+    whole-document bytes (its wire envelope carries base64 chunks instead).
+    """
+
+    command: str
+    envelope: dict[str, Any]
+    canonical: bytes | None = None
 
 
 def _category(value: Any) -> str:

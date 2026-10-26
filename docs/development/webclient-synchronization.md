@@ -65,6 +65,81 @@ Consecutive logical map publications have consecutive baselines; an eager delta
 before a map uses its own revision and the next map builds on that revision.
 A general part frame never embeds a specialized map-body part.
 
+### General publication parts
+
+An eager `ui_snapshot`/`ui_update` whose canonical document does not fit its
+intact envelope allowance travels as one bounded transfer of
+`ui_publication_part` frames. The sender is
+`web/webclient/presentation/publication_parts.py`; the shared limits are
+declared there and mirrored in
+`web/static/webclient/js/elosern/protocol/constants.js`. The browser assembler
+that consumes a transfer is delivered by the assembly change; this slice only
+declares the constants and sends the parts.
+
+Each part is exactly one JSON object in the first positional argument and
+carries:
+
+| Field | Meaning |
+|---|---|
+| `protocol_version` | integer `1` |
+| `presentation_epoch` | the logical document's 22-character epoch |
+| `revision` | the logical document's target revision |
+| `base_revision` | the delta's exact base; required for `delta`, forbidden for `snapshot` |
+| `publication_kind` | exactly `snapshot` or `delta` |
+| `transfer_id` | 32 lowercase hex characters from 128 random bits per logical publication |
+| `part_index` | zero-based index inside the transfer |
+| `part_count` | `ceil(total_bytes / 24,576)` |
+| `total_bytes` | canonical UTF-8 JSON byte length of the logical document |
+| `chunks` | 1..16 standard padded RFC 4648 base64 strings |
+
+Every part of a transfer repeats the same epoch, revision, kind, transfer id,
+count, total and (for a delta) base; no part carries `mode`, `panels` or time
+fields. The reassembled bytes must decode once as strict UTF-8 and the
+resulting document must match those headers and the kind's logical schema
+before adoption. No checksum field exists.
+
+The authoritative shared table:
+
+| Resource | Limit |
+|---|---|
+| Logical publication (canonical UTF-8 JSON, before fragmentation) | 16,777,216 bytes |
+| Raw bytes per part | 24,576 |
+| Raw bytes per base64 chunk | 1,536 (2,048 ASCII characters) |
+| Chunks per part | 16 |
+| Parts per transfer | 683 = `ceil(16,777,216 / 24,576)` |
+| Live general assembly per transport | 1 |
+| Assembly lifetime from the first accepted part | 30,000 ms |
+
+The first five are enforced here; the last two are receiver policy declared
+here and enforced by the browser assembler. At the maximum, the final part is
+16,384 raw bytes in 11 chunks (ten 1,536-byte chunks and one 1,024-byte chunk).
+Chunk base64 must be canonical: whitespace, alternate padding and non-standard
+encodings reject, and no string may exceed the generic 2,048-character limit.
+
+Encoding rules:
+
+- The logical document is validated once (global JSON safety measured from the
+  logical root, the exact envelope schema, registered panel schemas and their
+  local byte limits) and its canonical bytes are produced once, then reused for
+  sizing and splitting.
+- If the existing intact check accepts the document — including the
+  dialogue-carrying allowance of 98,304 whole / 24,576 dialogue / 65,536
+  dialogue-removed bytes — it is sent unchanged under `ui_snapshot`/`ui_update`.
+- Otherwise only a schema-valid document within the 16,777,216-byte logical
+  ceiling is split. The 65,536-byte generic frame ceiling is never raised, and
+  logical validation never reapplies that ceiling to the reassembled document.
+  The dialogue allowance never becomes a logical aggregate cap, while the
+  24,576-byte dialogue panel limit still applies after assembly.
+- Every part envelope is checked against the unchanged generic frame ceiling.
+  A UTF-8 code point may straddle a part boundary; the receiver concatenates
+  raw bytes before decoding.
+- A publication above the logical ceiling, a panel that violates its schema or
+  local byte limit, or an impossible part shape fails preflight: no frame from
+  that batch is sent, no revision is consumed, and nothing is truncated.
+- On-demand map bodies keep their specialized protocol (intact world map under
+  its scoped allowance, area map as bounded `ui_update` parts); a general part
+  never wraps them.
+
 ## Admission
 
 The browser reducer (`protocol/store.js`) admits a delta only for the live
@@ -108,6 +183,14 @@ complete snapshot; the mutation API still rejects an empty publication that
 names neither a replacement nor a removal. Server-selected removals are
 explicit: a planner passes `removed_panels`; an absent candidate never implies
 a removal.
+
+Every eager logical publication is prepared through
+`presentation.publication_parts.encode_publication`, which validates the whole
+logical document (including each transmitted panel through its registered
+validator, so a supplied candidate cannot bypass its schema) and returns either
+one intact frame or the complete tuple of bounded part frames before the first
+send. A batch that mixes an eager publication with specialized map plans is
+fully planned and validated before any of its frames leaves.
 
 ## Publication baseline and the one owner
 

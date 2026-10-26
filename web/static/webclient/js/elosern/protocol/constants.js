@@ -18,6 +18,23 @@ var MAX_PANEL_COUNT = 32;
 var MAX_LAYOUT_VERSION = 65535;
 var MAX_MESSAGE_CODE_POINTS = 512;
 var EPOCH_LENGTH = 22;
+// General publication parts (mirror of
+// web.webclient.presentation.publication_parts, OpenSpec change
+// webclient-publication-codec). One logical snapshot/delta above its intact
+// frame allowance travels as bounded parts of its single canonical UTF-8 JSON
+// byte sequence; each part is at most 16,384 raw bytes and never a giant
+// base64 string. The values must stay equal to the server table:
+// PUBLICATION_MAX_PARTS is derived (ceil(MAX_BYTES / PART_BYTES)) and the last
+// part at the maximum holds 16,384 raw bytes in 11 chunks. The assembly
+// timeout and live-assembly bound are receiver policy owned by the browser
+// assembler.
+var PUBLICATION_MAX_BYTES = 16777216;
+var PUBLICATION_PART_BYTES = 24576;
+var PUBLICATION_CHUNK_BYTES = 1536;
+var PUBLICATION_MAX_CHUNKS = 16;
+var PUBLICATION_MAX_PARTS = 683;
+var PUBLICATION_ASSEMBLY_TIMEOUT_MS = 30000;
+var PUBLICATION_MAX_ASSEMBLIES = 1;
 var MAX_RETIRED_EPOCHS = 8;
 var MAX_ACTOR_NAME = 256;
 var MAX_ACTOR_IDENTITY = 64;
@@ -565,6 +582,13 @@ module.exports = {
   MAX_LAYOUT_VERSION: MAX_LAYOUT_VERSION,
   MAX_MESSAGE_CODE_POINTS: MAX_MESSAGE_CODE_POINTS,
   EPOCH_LENGTH: EPOCH_LENGTH,
+  PUBLICATION_MAX_BYTES: PUBLICATION_MAX_BYTES,
+  PUBLICATION_PART_BYTES: PUBLICATION_PART_BYTES,
+  PUBLICATION_CHUNK_BYTES: PUBLICATION_CHUNK_BYTES,
+  PUBLICATION_MAX_CHUNKS: PUBLICATION_MAX_CHUNKS,
+  PUBLICATION_MAX_PARTS: PUBLICATION_MAX_PARTS,
+  PUBLICATION_ASSEMBLY_TIMEOUT_MS: PUBLICATION_ASSEMBLY_TIMEOUT_MS,
+  PUBLICATION_MAX_ASSEMBLIES: PUBLICATION_MAX_ASSEMBLIES,
   MAX_RETIRED_EPOCHS: MAX_RETIRED_EPOCHS,
   MAX_ACTOR_NAME: MAX_ACTOR_NAME,
   MAX_ACTOR_IDENTITY: MAX_ACTOR_IDENTITY,

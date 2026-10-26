@@ -450,7 +450,13 @@ class BaselineOwnershipTests(unittest.TestCase):
         "webclient-incremental-publication::publication-baseline-belongs-to-one-live-session-sequence"
     )
     def test_preflight_failure_sends_nothing_and_consumes_no_revision(self):
-        oversized = {"available": True, **{f"pad_{index}": "x" * 1500 for index in range(50)}}
+        # Over-budget aggregates now travel as bounded parts; a structurally
+        # invalid candidate (a 2,100-code-point string) still fails preflight.
+        oversized = {
+            "available": True,
+            **{f"pad_{index}": "x" * 1500 for index in range(50)},
+            "overflow": "x" * 2100,
+        }
         session = FakeSession()
         coordinator = _coordinator(
             session, _registry(_spec("status", lambda context: {"available": True}))
