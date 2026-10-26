@@ -101,7 +101,7 @@ class AssortmentRegistryTests(unittest.TestCase):
                 self.assertTrue(definition.allowed_item_kinds)
 
     @covers_requirement(
-        "sample-city-altoria::the-sample-city-s-xyzgrid-remains-thirteen-exterior-nodes-while-permanent-service-interiors-are-attached"
+        "sample-city-altoria::the-sample-city-s-declared-exterior-topology-remains-unchanged-while-permanent-service-interiors-are-attached"
     )
     def test_every_assortment_member_satisfies_its_declared_shelf_eligibility(self):
         # The partition RULE, computed from both sides: both the offered set
@@ -126,7 +126,7 @@ class AssortmentRegistryTests(unittest.TestCase):
                     )
 
     @covers_requirement(
-        "sample-city-altoria::the-sample-city-s-xyzgrid-remains-thirteen-exterior-nodes-while-permanent-service-interiors-are-attached"
+        "sample-city-altoria::the-sample-city-s-declared-exterior-topology-remains-unchanged-while-permanent-service-interiors-are-attached"
     )
     def test_a_shelf_rejects_a_mismatched_kind_or_slot(self):
         # File-local synthetic shelf and items: a non-accessory good is a
@@ -167,14 +167,14 @@ class AssortmentRegistryTests(unittest.TestCase):
             self.assertIsNone(assortment_membership_violation(open_shelf, item))
 
     @covers_requirement(
-        "sample-city-altoria::the-sample-city-s-xyzgrid-remains-thirteen-exterior-nodes-while-permanent-service-interiors-are-attached"
+        "sample-city-altoria::the-sample-city-s-declared-exterior-topology-remains-unchanged-while-permanent-service-interiors-are-attached"
     )
     def test_shop_offered_membership_is_derived_not_hand_listed(self):
         for field in dataclasses.fields(ShopDefinition):
             self.assertNotIn(field.name, {"items", "item_keys", "offers"})
 
     @covers_requirement(
-        "sample-city-altoria::the-sample-city-s-xyzgrid-remains-thirteen-exterior-nodes-while-permanent-service-interiors-are-attached"
+        "sample-city-altoria::the-sample-city-s-declared-exterior-topology-remains-unchanged-while-permanent-service-interiors-are-attached"
     )
     def test_capital_shop_membership_is_the_current_authored_union(self):
         # "Specialist shops do not narrow what the capital sells": the capital

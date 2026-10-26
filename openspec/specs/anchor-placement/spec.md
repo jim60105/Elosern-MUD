@@ -37,16 +37,12 @@ Every entry in `ANCHOR_PLACEMENT_REGISTRY` SHALL have an `anchor_key` that exist
 ### Requirement: ANCHOR_PLACEMENT_REGISTRY is intentionally partial
 `ANCHOR_PLACEMENT_REGISTRY` SHALL NOT be required to contain an entry for every key in
 `ANCHOR_REGISTRY`. It SHALL contain an entry for exactly those anchors that have a grid map built
-for them, and SHALL grow one entry per settlement as maps are added. It currently holds two,
-keyed `"capital_altoria"` and `"village_ciaran"`.
+for them, and SHALL grow one entry per settlement as maps are added.
 
-#### Scenario: The registry has exactly one entry after this change
-<!-- Scenario name retained verbatim: a MODIFIED block may not drop or rename an existing
-     scenario. The "exactly one" wording is historical, from the change that first populated
-     this registry; the assertion below is the current two-entry state. -->
+#### Scenario: The registry follows the built settlement maps
 - **WHEN** `ANCHOR_PLACEMENT_REGISTRY` is inspected
-- **THEN** it contains one entry per settlement with a built grid map — today exactly two,
-  `"capital_altoria"` and `"village_ciaran"` — and no test asserts that any other
+- **THEN** it contains one entry per settlement with a built grid map, including
+  `"capital_altoria"` and `"village_ciaran"`, and no test asserts that any other
   `ANCHOR_REGISTRY` key must also appear
 
 #### Scenario: capital_altoria's placement matches the sample city's spawned AnchorRoom
@@ -77,5 +73,5 @@ every other lore registry, including idempotency across repeated calls.
 
 #### Scenario: lore-startup-sync's own spec is unmodified
 - **WHEN** `openspec/specs/lore-startup-sync/spec.md` is inspected after this change lands
-- **THEN** its text is unchanged — this change extends `sync_all()`'s behavior without altering any
+- **THEN** its text is unchanged; this change extends `sync_all()`'s behavior without altering any
   requirement or scenario that spec already documents

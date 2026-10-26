@@ -74,7 +74,7 @@ class AdornmentsRemediesSyncTests(
         "sample-city-altoria::altoria-service-content-synchronizes-idempotently-without-resetting-live-state"
     )
     @covers_requirement(
-        "sample-city-altoria::the-sample-city-s-xyzgrid-remains-thirteen-exterior-nodes-while-permanent-service-interiors-are-attached"
+        "sample-city-altoria::the-sample-city-s-declared-exterior-topology-remains-unchanged-while-permanent-service-interiors-are-attached"
     )
     def test_specialist_interiors_are_permanent_reachable_and_hosted(self):
         sync_service_content()
@@ -96,7 +96,7 @@ class AdornmentsRemediesSyncTests(
         "sample-city-altoria::altoria-service-content-synchronizes-idempotently-without-resetting-live-state"
     )
     @covers_requirement(
-        "sample-city-altoria::the-sample-city-s-xyzgrid-remains-thirteen-exterior-nodes-while-permanent-service-interiors-are-attached"
+        "sample-city-altoria::the-sample-city-s-declared-exterior-topology-remains-unchanged-while-permanent-service-interiors-are-attached"
     )
     def test_specialist_shops_are_open_and_tradeable_from_the_counter(self):
         sync_service_content()

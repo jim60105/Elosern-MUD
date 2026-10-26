@@ -69,7 +69,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
             if exit_obj.location in targets or exit_obj.destination in targets
         ]
 
-    @covers_requirement("sample-city-altoria::the-sample-city-has-exactly-thirteen-rooms-in-a-fixed-connected-topology")
+    @covers_requirement("sample-city-altoria::the-sample-city-has-the-declared-rooms-in-a-connected-sparse-topology")
     @covers_requirement("grid-room-sync::a-single-authored-idempotent-exit-bridges-limbo-and-the-sample-city")
     def test_sync_grid_spawns_both_settlements_rooms_and_exits(self):
         create_object(Room, key=LIMBO_KEY, location=None)

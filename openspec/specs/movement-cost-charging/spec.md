@@ -5,7 +5,7 @@ distance-bearing outdoor traversal's physical duration from authored geometry an
 eligible source-present traveller's terrain speed (or a non-distance connector's authored
 `command_defaults` duration) and advances the world clock only for a player-driven traverser.
 Every non-teleport exit lineage charges successful player movement through it via
-`MovementCostMixin.at_post_traverse` — never through a bespoke, inline `advance()` call.
+`MovementCostMixin.at_post_traverse`, never through a bespoke, inline `advance()` call.
 
 ## Requirements
 
@@ -114,20 +114,20 @@ the followers the follow step moves from `source_location`.
 #### Scenario: A player traversal settles its co-located companions
 - **WHEN** `charge_movement(player_character, "move", source_location=room)` runs while companion 艾拉
   is in `room` and companion 卡恩 is elsewhere
-- **THEN** the single advance settles the player character and 艾拉, and 卡恩's state is unchanged
+- **THEN** the single advance settles the player character and the source-present companion; the remote companion's state is unchanged
 
 ### Requirement: MovementCostMixin charges via at_post_traverse, not at_traverse's return value
 `typeclasses/exits.py` SHALL define `MovementCostMixin`, a plain mixin carrying a class attribute
 `movement_cost_key: str` (default `"move"`) and overriding `at_post_traverse(traversing_object,
 source_location, **kwargs)` to call `super().at_post_traverse(...)` followed by
 `after_successful_movement(traversing_object, source_location, cost_key=self.movement_cost_key,
-destination=traversing_object.location)` — the shared movement-completion helper.
+destination=traversing_object.location)`, the shared movement-completion helper.
 
 #### Scenario: A successful traversal through a MovementCostMixin exit charges exactly once and records arrival
 - **WHEN** a `PlayerCharacter` successfully traverses an exit whose class includes
   `MovementCostMixin`
-- **THEN** `get_world_clock().tick` increases by exactly one `CLOCK_YAML["command_defaults"][
-  movement_cost_key]`, the traversing object's location is the exit's destination, and the traversing
+- **THEN** `get_world_clock().tick` increases by the resolved physical traversal duration
+  or the authored non-distance connector duration, the traversing object's location is the exit's destination, and the traversing
   character's map-knowledge record contains the destination's canonical node ID
 
 #### Scenario: A locked exit never charges and never records
@@ -177,14 +177,14 @@ destination=traversing_object.location)` — the shared movement-completion help
 
 #### Scenario: Map knowledge is recorded only after the movement transaction succeeded
 - **WHEN** `MovementCostMixin.at_post_traverse` fires
-- **THEN** it fires exclusively from the stock `DefaultExit.at_traverse` success branch — the same
-  structural guarantee that already makes the charge correct — so recording map knowledge happens
+- **THEN** it fires exclusively from the stock `DefaultExit.at_traverse` success branch,
+  which also governs the charge, so recording map knowledge happens
   only after the movement transaction has already succeeded
 
 #### Scenario: at_traverse never inspects or reinterprets super()'s return value
 - **WHEN** `MovementCostMixin.at_traverse` delegates the traversal to `super().at_traverse(...)`
   inside the settlement boundary
-- **THEN** it does not inspect or reinterpret any return value from that call — `at_traverse`'s
+- **THEN** it does not inspect or reinterpret any return value from that call; `at_traverse`'s
   return value remains `None` in both branches, and success detection stays with `at_post_traverse`
   and the callers' location checks
 
@@ -230,7 +230,7 @@ evennia.contrib.grid.xyzgrid.xyzroom.XYZExit)`, likewise with `movement_cost_key
 No call to `DefaultObject.move_to()` that is not routed through an `Exit`'s own `at_traverse` (for
 example, a `move_type="teleport"` call, or a raw `move_to(quiet=True)` relocation such as change 14's
 `_relocate_to_default_home()`) SHALL cause `charge_movement()` to be invoked, because
-`at_post_traverse` — the hook `MovementCostMixin` relies on — is only ever called from within
+`at_post_traverse`, the hook `MovementCostMixin` relies on, is only ever called from within
 `DefaultExit.at_traverse`'s own success branch.
 
 #### Scenario: A teleport-style move_to call does not advance the clock
@@ -267,7 +267,7 @@ specifically; the scenarios below are its continuation.
 (default `False`) on exit typeclasses using `MovementCostMixin`. An exit with `requires_flight=True`
 SHALL deny traversal (via its access-lock check, alongside any other existing lock) to a
 `PlayerCharacter` that owns neither `flight` nor `flash_step`. No exit shipped by this change sets
-`requires_flight=True` — the flag exists for future map content to opt into.
+`requires_flight=True`; the flag exists for future map content to opt into.
 
 #### Scenario: An entity without flight or flash_step cannot traverse a flight-required exit
 - **WHEN** a `PlayerCharacter` owning neither `flight` nor `flash_step` attempts to traverse an exit

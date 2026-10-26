@@ -280,7 +280,7 @@ class MapProviderTests(EvenniaTest):
         except LockException:
             return False
 
-    @covers_requirement("wilderness-map-provider::elosernwildernessmapprovider-bounds-the-map-to-a-224x224-grid-at-10-km-per-cell")
+    @covers_requirement("wilderness-map-provider::elosernwildernessmapprovider-bounds-the-map-to-the-declared-one-kilometer-frame")
     def test_coordinate_frame_and_sea_margin(self):
         # Delta scenario: outside the frame and the ocean margin are all
         # invalid, while land-side ordinary cells are valid. Frame corners
@@ -328,14 +328,14 @@ class MapProviderTests(EvenniaTest):
         self.assertEqual(len(calls), 100)
         self.assertEqual(TerrainRoom.objects.count(), 0)
 
-    @covers_requirement("wilderness-map-provider::elosernwildernessmapprovider-bounds-the-map-to-a-224x224-grid-at-10-km-per-cell")
+    @covers_requirement("wilderness-map-provider::elosernwildernessmapprovider-bounds-the-map-to-the-declared-one-kilometer-frame")
     def test_anchor_footprint_cells_are_invalid_and_approach_cells_are_valid(self):
         self.assertFalse(self.provider.is_valid_coordinates(None, CAPITAL_ANCHOR))
         self.assertFalse(self.provider.is_valid_coordinates(None, (857, 1076)))
         self.assertTrue(self.provider.is_valid_coordinates(None, SOUTH_APPROACH))
         self.assertTrue(self.provider.is_valid_coordinates(None, EAST_APPROACH))
 
-    @covers_requirement("wilderness-map-provider::elosernwildernessmapprovider-bounds-the-map-to-a-224x224-grid-at-10-km-per-cell")
+    @covers_requirement("wilderness-map-provider::elosernwildernessmapprovider-bounds-the-map-to-the-declared-one-kilometer-frame")
     def test_registry_patches_change_footprint_validity_without_patching_the_provider(self):
         # The kit's synthetic entry rows exercise the same shape rules: the
         # point-shaped t_split_cairn contributes no footprint, the 3x3-block
@@ -359,7 +359,7 @@ class MapProviderTests(EvenniaTest):
         self.assertFalse(self.provider.is_valid_coordinates(None, CAPITAL_ANCHOR))
         self.assertTrue(self.provider.is_valid_coordinates(None, (bx, by)))
 
-    @covers_requirement("wilderness-map-provider::elosernwildernessmapprovider-bounds-the-map-to-a-224x224-grid-at-10-km-per-cell")
+    @covers_requirement("wilderness-map-provider::elosernwildernessmapprovider-bounds-the-map-to-the-declared-one-kilometer-frame")
     def test_registry_rebinding_is_observed_by_the_provider(self):
         import world.lore.wilderness_entry as wilderness_entry_module
 

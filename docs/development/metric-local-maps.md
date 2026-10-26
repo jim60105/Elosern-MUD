@@ -2,20 +2,21 @@
 
 `project-metric-local-maps` cuts the `local_map` transport and client renderer
 over to physical coordinates. The wire payload carries canonical
-server-authoritative coordinates; the browser projects them at one uniform
-physical scale. The property that matters for play is that unequal distances
-stay unequal on screen: two nodes 100 m apart and two nodes 900 m apart draw at
-a 1:9 ratio at every zoom, and the ratio never changes per axis.
+server-authoritative coordinates. The area-map drawer projects them at one
+uniform physical scale, so gaps of 100 m and 900 m draw at a 1:9 ratio at every
+zoom, without per-axis distortion. The compact minimap may use its declared
+monotone compressed projection for readability; it never rewrites payload
+coordinates or supplies travel geometry.
 
 ## Unit and ownership contract
 
 | Layer | Unit | Owner |
 | --- | --- | --- |
 | Settlement node coordinates | integer metres in the settlement's local frame (`x` east, `y` north) | `world/maps/` (room lifecycle), declared by the settlement graph |
-| Wilderness node coordinates | integer one-kilometre cell indices (`0 <= x, y < 2700` once rescaling lands) | `world/maps/wilderness_provider.py` |
+| Wilderness node coordinates | integer one-kilometre cell indices (`0 <= x, y < 2700`) | `world/maps/wilderness_provider.py` |
 | `local_map` payload `x`/`y` | those same integers, unchanged | `web/webclient/presentation/local_map/` |
-| Lattice cell in the browser | the smallest positive in-view coordinate delta, one divisor for both axes | `web/static/webclient/js/elosern/local_map.js::layoutNodes` |
-| Canvas placement | presentation only (`col`/`row` × pitch) | `web/webclient-app/composables/use-map-lattice-geometry.js` |
+| Minimap projection | presentation-only positions derived from the payload | `web/webclient-app/lib/minimap_projection.js` |
+| Area/world viewport | uniform scale in the panel's declared physical units | `web/webclient-app/lib/map_viewport.js` |
 
 `z` stays the logical grid/layer key; it is never physical elevation. Interiors
 without coordinates stay coordinate-free connected scenes: their payload keeps

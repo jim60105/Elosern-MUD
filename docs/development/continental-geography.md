@@ -13,12 +13,12 @@ The provider owns one shared cell-validity rule
 (`is_valid_wilderness_cell`): inside the frame, inside the mainland polygon
 evaluated at the cell centre, off the cliff-walled central summit ridge, off
 the authored inland waterways, and outside every live anchor footprint. Sea,
-ridge and water are impassable on foot; three authored pass windows
+ridge and water are impassable on foot; the authored pass windows
 (`RIDGE_PASSES`, the principal one near `(1410, 980)`) and the declared
 `WATERWAY_FORDS` are ordinary walkable ground. Every query is bounded local
-arithmetic — no frame scan, no room materialization.
+arithmetic, with no frame scan or room materialization.
 
-`region_for_coordinates` classifies the whole frame into the seven registry
+`region_for_coordinates` classifies the whole frame into the declared registry
 regions with the authored bending mountain corridor, the meandering northern
 deep forest edge (`NORTH_FOREST_EDGE`, averaging about Y 1920 and covering
 about one fifth of the land) and the border river; `terrain_description`
@@ -86,11 +86,11 @@ has exactly one landmark and six fields: `key`, `district_name_zh`,
 
 ### Authored roster
 
-The registry holds 120 districts: the deep forest plus 119 Voronoi districts,
-split in proportion to each nominal nation's walkable land outside the forest
-(Altoria 45, Grandia 53, Valhalla 21). That is about 33,600 km² each, a hex
-roughly 197 km across. The authored Voronoi areas run from about 17,000 to
-44,000 km². Keep the total within 110–130.
+The current registry holds 120 districts, comprising 119 Voronoi districts and
+one deep-forest region district. This is an authoring snapshot, not a required
+count; the manually edited registry owns membership. Placement targets roughly
+200 km district width and distributes seeds across each nominal nation's
+walkable land outside the forest.
 
 - Placement. Seeds sit near the centroids of a relaxed layout computed per
   nation. The original seeds stay fixed at their authored cells. The
@@ -206,9 +206,9 @@ tile run.
 | --- | --- | --- |
 | `world/lore/wilderness_regions.py` | `MAINLAND_BOUNDARY_KM` | Ordered mainland boundary vertices in absolute `(east, north)` kilometres; implicitly closed. Shoelace area is exactly 5,000,000 km². |
 | `world/lore/wilderness_regions.py` | `CELL_CENTER_OFFSET_M`, `CONTINENT_FRAME_CELLS`, `CONTINENT_CELL_SIZE_KM` | Wilderness cells are logical one-kilometre areas; the frame is 2700 × 2700 cells (`0 <= X, Y < 2700`). |
-| `world/lore/wilderness_regions.py` | `HARBOR_SITE_REGISTRY` | Six reserved land-side harbor cells with their intended roles. A functional site is not a named anchor, city, quest or population. |
+| `world/lore/wilderness_regions.py` | `HARBOR_SITE_REGISTRY` | Reserved land-side harbor cells with their intended roles. A functional site is not a named anchor, city, quest or population. |
 | `world/lore/wilderness_regions.py` | `cell_center_m`, `is_wilderness_cell`, `mainland_area_km2`, `is_on_mainland` | Pure geometry helpers over the declarations above; boundary points count as land. |
-| `world/lore/anchors.py` | `ANCHOR_GEOGRAPHY_REGISTRY` | The canonical wilderness cell and geographic constraint of all nine lore anchors. Separate from both lore identity (`ANCHOR_REGISTRY`) and built grid rooms (`ANCHOR_PLACEMENT_REGISTRY`, deliberately still two entries). |
+| `world/lore/anchors.py` | `ANCHOR_GEOGRAPHY_REGISTRY` | The canonical wilderness cell and geographic constraint of every declared lore anchor. Separate from both lore identity (`ANCHOR_REGISTRY`) and built grid rooms (`ANCHOR_PLACEMENT_REGISTRY`). |
 | `world/lore/anchors.py` | `LOCAL_FRAME_ANCHOR_REGISTRY`, `world_position_m` | Settlement-local metre anchor bindings and the cross-layer transform. |
 | `world/lore/nations.py` | `CONTINENT_AREA_KM2`, `CONTINENT_POPULATION`, `ELVEN_POPULATION`, `NEUTRAL_LANDS_AREA_KM2`, `NEUTRAL_LANDS_POPULATION`, `CAPITAL_POPULATION_SHARE` | Rounded continental totals. The neutral lands have no separate regional population total. |
 | `world/lore/nations.py` | `Nation.territory_km2`, `CapitalSupport`, `CAPITAL_SUPPORT_REGISTRY` | National area targets and the authored regional food/storage/water support (Valhalla additionally declares pastoral production and trade). |
@@ -235,15 +235,14 @@ Nothing in the declarations creates per-cell population or resource state.
 
 ## Ownership boundary
 
-`world/lore/` stays read-only: the declarations are consumed by later changes
-(cost charging, local-map projection, settlement/wilderness rescaling) but this
-change neither relocates persistent rooms nor wires the declarations into
-movement, rendering, map knowledge or the lore codex. Declaring an anchor cell
-also reveals nothing: knowledge and visibility rules remain authoritative, and
+`world/lore/` owns read-only declarations. The runtime map, travel-cost and
+presentation owners consume them; persistent room relocation remains the
+responsibility of `world/maps` synchronization. Declaring an anchor cell
+reveals nothing; knowledge and visibility rules remain authoritative, and
 `ANCHOR_GEOGRAPHY_REGISTRY` is not a lore-codex category.
 
-The earlier two-entry `ANCHOR_PLACEMENT_REGISTRY` continues to describe exactly
-the anchors with a built grid map; all nine geographic cells live in
+`ANCHOR_PLACEMENT_REGISTRY` describes exactly
+the anchors with a built grid map; all geographic cells live in
 `ANCHOR_GEOGRAPHY_REGISTRY` instead.
 
 ## Quest destinations on the map
@@ -276,7 +275,7 @@ frame. The player's cell is their wilderness cell, their settlement's anchor
 cell, or the anchor cell of the room an instance was entered from; elsewhere
 it is unknown and a hunt resolves to nothing.
 
-Bound instances, tier hunts, acquire, deliver and rendezvous objectives, and
+Unbound instance destinations, tier hunts, acquire, deliver and rendezvous objectives, and
 any destination whose canonical source is missing, produce no node and no
 coordinate. Each quest-log entry is read and validated on its own, which is a
 deliberate read-only exception to the strict `read_records` reader: an

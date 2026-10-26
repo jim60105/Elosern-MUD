@@ -35,7 +35,7 @@ EXPECTED_KEYS = {
 
 
 class WildernessRegionRegistryTests(unittest.TestCase):
-    @covers_requirement("wilderness-terrain::wilderness-region-registry-covers-exactly-the-seven-world-info-md-terrain-regions")
+    @covers_requirement("wilderness-terrain::wilderness-region-registry-covers-the-authored-terrain-regions")
     def test_registry_has_exactly_seven_entries_with_unique_names(self):
         self.assertEqual(set(WILDERNESS_REGION_REGISTRY), EXPECTED_KEYS)
         names = [region.display_name_zh for region in WILDERNESS_REGION_REGISTRY.values()]

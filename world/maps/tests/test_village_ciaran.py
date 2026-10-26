@@ -167,7 +167,7 @@ class VillageCiaranMapTests(EvenniaTestCase):
         "village-ciaran-map::the-village-is-a-small-connected-grid-with-one-anchor"
     )
     @covers_requirement(
-        "sample-city-altoria::the-sample-city-s-twelve-intra-city-exits-spawn-as-costedxyzexit-not-the-bare-contrib-xyzexit"
+        "sample-city-altoria::the-sample-city-s-declared-intra-city-exits-spawn-as-costedxyzexit"
     )
     def test_village_movement_uses_the_costed_exit_override(self):
         wildcard = XYMAP_DATA["prototypes"].get(("*", "*", "*"))

@@ -126,7 +126,7 @@ class ServiceInteriorTests(EvenniaTestCase):
                 exterior, {exit_obj.destination for exit_obj in interior.exits}
             )
 
-    @covers_requirement("sample-city-altoria::the-sample-city-s-xyzgrid-remains-thirteen-exterior-nodes-while-permanent-service-interiors-are-attached")
+    @covers_requirement("sample-city-altoria::the-sample-city-s-declared-exterior-topology-remains-unchanged-while-permanent-service-interiors-are-attached")
     def test_grid_topology_is_unchanged(self):
         sync_service_interiors()
         # Two settlements are spawned (21 capital + 6 village nodes); the
@@ -205,7 +205,7 @@ class ServiceInteriorTests(EvenniaTestCase):
             )
             self.assertIn(exterior, {e.destination for e in interior.exits})
 
-    @covers_requirement("sample-city-altoria::the-sample-city-s-xyzgrid-remains-thirteen-exterior-nodes-while-permanent-service-interiors-are-attached")
+    @covers_requirement("sample-city-altoria::the-sample-city-s-declared-exterior-topology-remains-unchanged-while-permanent-service-interiors-are-attached")
     def test_one_exterior_carrying_two_places_yields_two_doorways(self):
         # The craft-alley scenario (altoria-capital-replan): one exterior with
         # two interiors is one street with two doors. Discovered dynamically

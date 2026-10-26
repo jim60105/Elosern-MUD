@@ -14,8 +14,8 @@ One resolver SHALL derive the arrival node from the current coordinates, directi
 registry's gateway rules, never from the pooled self-loop `exit_obj.destination`. It returns the
 gate's `grid:` node at a registered `approach_cell`/`return_direction`, `None` on a
 provider-invalid neighbor, else the adjacent `wild:` node. A point-shape entry answers only its
-`return_direction`. Coordinates stay logical until `activate-metric-settlements` performs the
-meter cutover.
+`return_direction`. Grid coordinates are integer meters in the settlement's local
+frame; wilderness coordinates remain one-kilometer cell indices.
 
 #### Scenario: Wilderness direction resolves to the true neighbor
 - **WHEN** the resolver is asked for the north direction from `wild:(500, 700)`
@@ -23,9 +23,9 @@ meter cutover.
 
 #### Scenario: A gate step resolves to its grid room
 - **WHEN** the resolver is asked for the north direction from the south approach cell `(860, 1077)`
-- **THEN** it returns the `grid:` node of the 南門 room `(3, 0, "capital_altoria")`, and the west
+- **THEN** it returns the `grid:` node of the 南門 room `(3050, 150, "capital_altoria")`, and the west
   direction from the east approach cell `(864, 1080)` returns the `grid:` node of the East Gate
-  room `(6, 3, "capital_altoria")`
+  room `(6500, 3010, "capital_altoria")`
 
 #### Scenario: The non-gate direction at an approach cell is an ordinary step
 - **WHEN** the resolver is asked for the south direction from `(860, 1077)` or the north direction
@@ -55,10 +55,10 @@ meter cutover.
 
 #### Scenario: Gateway lookup and validity rule are shared helpers
 - **WHEN** the gateway lookup or the neighbor-validity rule is invoked by any caller
-- **THEN** each is a single shared helper that `WildernessReturnExit` also uses — no duplicated per-call-site rule
+- **THEN** each is a single shared helper that `WildernessReturnExit` also uses, with no duplicated per-call-site rule
 
 #### Scenario: Provider-invalid spans out-of-rectangle and footprint cells
-- **WHEN** a neighbor cell is provider-invalid — outside the 2700-cell frame, at sea, on the
+- **WHEN** a neighbor cell is provider-invalid, outside the 2700-cell frame, at sea, on the
   closed ridge or an inland waterway, or an anchor footprint cell
 - **THEN** resolution returns `None`, mirroring the step refusal
 

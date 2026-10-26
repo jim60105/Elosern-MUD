@@ -239,7 +239,7 @@ class LocalMapPresenterTests(EvenniaTestCase):
             self.assertIn("exit_ref", move["action"])
             self.assertIn("destination", move["action"])
 
-    @covers_requirement("sample-city-altoria::the-sample-city-has-exactly-thirteen-rooms-in-a-fixed-connected-topology")
+    @covers_requirement("sample-city-altoria::the-sample-city-has-the-declared-rooms-in-a-connected-sparse-topology")
     def test_invalid_grid_options_fail_closed(self):
         from web.webclient.presentation.registry import PanelUnavailableError
         from unittest.mock import patch
@@ -271,7 +271,7 @@ class LocalMapPresenterTests(EvenniaTestCase):
 
                 local_map_presenter(_context(actor))
 
-    @covers_requirement("sample-city-altoria::the-sample-city-has-exactly-thirteen-rooms-in-a-fixed-connected-topology")
+    @covers_requirement("sample-city-altoria::the-sample-city-has-the-declared-rooms-in-a-connected-sparse-topology")
     def test_grid_anchor_flag_marks_the_plaza(self):
         actor = self.char1
         plaza = GridRoom.objects.filter_xyz(xyz=_T_PLAZA_XYZ).first()

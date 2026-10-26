@@ -142,7 +142,7 @@ class SampleCityCostedExitTests(EvenniaTest):
             get_world_clock().tick, before + HIDDEN_PATH_TO_PLAZA_SECONDS
         )
 
-    @covers_requirement("sample-city-altoria::the-sample-city-s-twelve-intra-city-exits-spawn-as-costedxyzexit-not-the-bare-contrib-xyzexit", "world-clock::move-and-converse-command-default-time-costs-are-declared-as-rulebook-data-only")
+    @covers_requirement("sample-city-altoria::the-sample-city-s-declared-intra-city-exits-spawn-as-costedxyzexit", "world-clock::move-and-converse-command-default-time-costs-are-declared-as-rulebook-data-only")
     def test_limbo_bridge_exit_advances_clock_on_successful_traversal(self):
         sync_grid()
         limbo = self.room2

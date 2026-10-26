@@ -38,7 +38,7 @@ non-negative integer ticks.
 
 #### Scenario: The record stores no duplicate geometry or room names
 - **WHEN** the knowledge record is inspected after several arrivals
-- **THEN** it contains only node IDs and observation ticks — no room names, descriptions, glyphs,
+- **THEN** it contains only node IDs and observation ticks, with no room names, descriptions, glyphs,
   exit keys, or coordinates as independent fields
 
 #### Scenario: The module exposes the full knowledge API
@@ -62,10 +62,14 @@ ordinary interior rooms. Grid/wilderness X and Y SHALL be integers within the pr
 `z-map-key` and `wilderness-name` SHALL be registered bounded strings; `room:<dbref>` SHALL be a
 positive integer dbref.
 
+These canonical knowledge IDs are distinct from a sparse settlement's stable
+English-slug `node_id` in `NODE_IDS` and from its Chinese prototype display `key`.
+Grid X and Y are settlement-local integer meters; wilderness X and Y are cell indices.
+
 #### Scenario: A valid grid node ID round-trips
-- **WHEN** a canonical node ID of the form `grid:capital_altoria:2:0` is decoded and re-encoded
+- **WHEN** a canonical node ID of the form `grid:capital_altoria:3050:150` is decoded and re-encoded
 - **THEN** the result equals the input and the decoded components are `z-map-key="capital_altoria"`,
-  `x=2`, `y=0`
+  `x=3050`, `y=150`
 
 #### Scenario: A valid wilderness node ID round-trips
 - **WHEN** a canonical node ID of the form `wild:elosern:10:15` is decoded and re-encoded
@@ -93,7 +97,7 @@ positive integer dbref.
 ### Requirement: Arrival recording happens only at existing successful-arrival seams
 `world/rules/map_knowledge.py`'s `record_arrival` SHALL be invoked only from the project's existing
 successful-arrival seams: the shared movement-completion helper
-`typeclasses.exits.after_successful_movement` — which `MovementCostMixin.at_post_traverse`, the
+`typeclasses.exits.after_successful_movement`, which `MovementCostMixin.at_post_traverse`, the
 success branch of `WildernessGateExit.at_traverse`, and both success branches of
 `WildernessReturnExit.at_traverse` all call after `charge_movement`.
 
@@ -134,7 +138,7 @@ success branch of `WildernessGateExit.at_traverse`, and both success branches of
 `world/rules/map_knowledge.py::prune_reclaimed_room(room_id)` SHALL remove `room:<room_id>` from every
 player's knowledge record. It SHALL select only `PlayerCharacter`s that already carry the knowledge
 attribute, SHALL strictly parse each selected record, and SHALL write back only records that actually
-contain the target node — never creating the attribute for a character that does not already have it.
+contain the target node, never creating the attribute for a character that does not already have it.
 
 #### Scenario: Reclaiming an instance room removes its node from affected players
 - **WHEN** `reclaim_due_instances()` reclaims (deletes) an `InstanceRoom` whose `room:<dbref>` appears

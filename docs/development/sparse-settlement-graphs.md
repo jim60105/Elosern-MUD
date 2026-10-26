@@ -26,11 +26,14 @@ Lore and quest modules read the declarations; they never write a graph. Only
 - A `SparseNode` has a stable authored `node_id`, an integer-metre `(x, y)`
   local-frame binding, and a room prototype. The identity, never the
   coordinate, is the matching authority.
+  `NODE_IDS` supplies an English slug such as `south_gate` or `quay`; the
+  prototype's Chinese `key`（南門 or 碼頭埠）is the display name. Renaming the
+  display key does not rename the node identity.
 - A `SparseRoad` has a stable ordered endpoint pair, an authored compass
   octant, optional bend points, and a length: the sum of Euclidean segment
   lengths. The octant is authored because an irregular metre layout is almost
   never axis-aligned; deriving it from the raw delta would turn every cardinal
-  street into a diagonal. The two settlements author straight segments.
+  street into a diagonal. The shipped settlements author straight segments.
 - `SparseSettlementGraph` validates at construction: duplicate identity,
   duplicate coordinate (two identities binding one destination), unknown
   endpoint, self-loop, duplicate ordered road, duplicate outgoing compass
@@ -41,18 +44,26 @@ Coordinates are the settlement's integer-metre local frame (`x` east, `y`
 north); `z` stays the logical map/layer key. A coordinate move is a declaration
 edit, not an identity change.
 
+Room and road counts belong to the manually edited settlement module.
+`ROADS` stores one entry per directed travel direction; a bidirectional street
+has a reverse entry as well. Canonical map-knowledge IDs such as
+`grid:capital_altoria:3050:150` encode the coordinate binding, not the sparse
+slug or Chinese display key.
+
 ## Synchronization contract
 
 `sync_grid()` plans every declared graph read-only before the first write. A
 conflict therefore refuses with no room, tag, reference or cached coordinate
 changed. It then applies all plans in one transaction:
 
-1. Rooms are matched by tag `sparse_node_<map>:<node_id>`, falling back once to
+1. Rooms are matched by tag `<map>:<node_id>` in category
+   `sparse_node_identity`, falling back once to
    the old coordinate for rooms spawned before identity binding existed.
 2. Coordinate tags are rewritten in place and every cached projection
    (`_xyz`, `_xyz_destination`, `_xymap`) is dropped. The room object, its
    occupants, `home` references and inbound object references are untouched.
-3. Exits are matched by tag `sparse_road_<map>:<road_id>`, falling back to the
+3. Exits are matched by tag `<map>:<road_id>` in category
+   `sparse_road_identity`, falling back to the
    legacy `(source room, English compass key)` pair. Source/destination
    relations and both coordinate tag sets are converged in place.
 4. Unbound legacy settlement rooms/exits that are no longer declared are
@@ -78,8 +89,8 @@ or test graph and returns a `SyncReport(created, updated, deleted)`.
 
 ## Route adapter
 
-`SparseSettlementGraph.route()` runs Dijkstra over the declared adjacency only
-— work and allocation are bounded by node/road count, never by coordinate
+`SparseSettlementGraph.route()` runs Dijkstra over the declared adjacency only;
+work and allocation are bounded by node/road count, never by coordinate
 span. `plan()` names each step's compass direction and spawned exit key;
 `plan_between_coordinates()` resolves the two coordinate bindings first.
 

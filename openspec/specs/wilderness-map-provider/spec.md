@@ -1,13 +1,13 @@
 ## Purpose
 
 The bounded `ElosernWildernessMapProvider` instantiating the deterministic terrain model on the
-wilderness/Virtual layer: a 224×224 grid at 10 km/cell approximating the continent's stated ~500萬 km²
-area, using the project-owned `TerrainRoom` and `WildernessReturnExit` typeclasses.
+wilderness/Virtual layer, using the 2700 × 2700 one-kilometer frame around the
+mainland polygon and the project-owned `TerrainRoom` and `WildernessReturnExit` typeclasses.
 
 ## Requirements
 
 
-### Requirement: ElosernWildernessMapProvider bounds the map to a 224x224 grid at 10 km per cell
+### Requirement: ElosernWildernessMapProvider bounds the map to the declared one-kilometer frame
 `world/maps/wilderness_provider.py` SHALL define `WILDERNESS_KM_PER_CELL = 1`,
 `WILDERNESS_MAX_X = 2699`, `WILDERNESS_MAX_Y = 2699`, and `ElosernWildernessMapProvider`,
 subclassing `WildernessMapProvider`, whose `is_valid_coordinates` accepts exactly `0 <= x <=
@@ -63,8 +63,10 @@ mainland, ridge, water, footprints).
 `WILDERNESS_REGION_REGISTRY[region_for_coordinates(*coordinates)].display_name_zh`.
 `at_prepare_room(coordinates, caller, room)` SHALL set
 `room.ndb.active_desc` from `terrain_description(*coordinates)` and `room.scene_archetype` from
-`region_for_coordinates(*coordinates)`, unconditionally, on every call. It SHALL additionally
-ensure the coordinate's deterministic monster population per the scenarios below.
+`REGION_SCENE_ARCHETYPES[region_for_coordinates(*coordinates)]`, unconditionally, on every call.
+It SHALL set `room.scene_identity` from the wilderness name and current coordinates,
+and clear `room.room_art_key` on every activation. It SHALL additionally
+initialize the coordinate's deterministic monster population per the scenarios below.
 
 #### Scenario: get_location_name matches the region registry
 - **WHEN** `get_location_name((x, y))` is called
@@ -74,13 +76,13 @@ ensure the coordinate's deterministic monster population per the scenarios below
 #### Scenario: at_prepare_room sets both the description and the scene_archetype seam
 - **WHEN** `at_prepare_room((x, y), caller, room)` is called on a `TerrainRoom`
 - **THEN** `room.ndb.active_desc == terrain_description(x, y)` and `room.scene_archetype ==
-  region_for_coordinates(x, y)`
+  REGION_SCENE_ARCHETYPES[region_for_coordinates(x, y)]`
 
 #### Scenario: scene_archetype is re-set, not left stale, when a pooled room is reused at a new coordinate
 - **WHEN** a `TerrainRoom` object previously activated at coordinates `(x1, y1)` (with
   `region_for_coordinates(x1, y1) != region_for_coordinates(x2, y2)`) is later reused by the
   wilderness system and activated at different coordinates `(x2, y2)`
-- **THEN** after the second activation, `room.scene_archetype == region_for_coordinates(x2, y2)`,
+- **THEN** after the second activation, `room.scene_archetype == REGION_SCENE_ARCHETYPES[region_for_coordinates(x2, y2)]`,
   not the value computed for `(x1, y1)`
 
 #### Scenario: at_prepare_room opens exactly the gate exit at an approach cell
@@ -93,9 +95,9 @@ ensure the coordinate's deterministic monster population per the scenarios below
 - **WHEN** `at_prepare_room` is called for an ordinary wilderness cell or for the opposite gate's
   approach cell `(864, 1080)`
 - **THEN** at the ordinary cell no exit's locks are modified, and at `(864, 1080)` only the
-  `"west"` exit's locks are opened — an approach cell never opens another gate's exit
+  `"west"` exit's locks are opened; an approach cell never opens another gate's exit
 
-#### Scenario: A point-shape anchor opens all eight exits
+#### Scenario: A point-shape anchor opens only its authored gate direction
 - **WHEN** the registry is patched with a point-shape entry anchored at `(500, 500)` and
   `at_prepare_room((500, 500), caller, room)` is called on a `TerrainRoom` carrying the eight
   directional exits, all initially closed
@@ -109,7 +111,7 @@ ensure the coordinate's deterministic monster population per the scenarios below
   validity before `at_prepare_room` runs, and after activation no exit carries a hook-opened
   lock
 
-#### Scenario: at_prepare_room ensures population when a wilderness script is attached
+#### Scenario: at_prepare_room initializes population when a wilderness script is attached
 - **WHEN** `at_prepare_room(coordinates, caller, room)` is called on a `TerrainRoom` whose
   `room.wilderness` is the live wilderness script
 - **THEN** `ensure_population(room.wilderness, coordinates)` is invoked for those coordinates
@@ -117,23 +119,23 @@ ensure the coordinate's deterministic monster population per the scenarios below
 #### Scenario: at_prepare_room is a population no-op without a wilderness script
 - **WHEN** `at_prepare_room(coordinates, caller, room)` is called on a `TerrainRoom` with no
   attached wilderness script (as in the provider's unit tests)
-- **THEN** only the description, scene archetype, and (at approach cells) gate locks are set, no
+- **THEN** the description, scene archetype, scene identity, cleared room-art key, and (at approach cells) gate locks are set, no
   exception is raised, and no monster is created
 
 #### Scenario: Population assurance calls the capability resolver
-- **WHEN** `at_prepare_room` ensures the coordinate's deterministic monster population — the
-  `wilderness-monster-population` capability
+- **WHEN** `at_prepare_room` initializes the coordinate's deterministic monster population
+  under the `wilderness-monster-population` capability
 - **THEN** it does so by calling
   `world.maps.wilderness_population.ensure_population(room.wilderness, coordinates)` when
   `room.wilderness` resolves to the wilderness script, and SHALL be a population no-op (setting
-  only the description and scene archetype) when no wilderness script is attached, so a pooled or
+  the scene metadata and any applicable gate locks) when no wilderness script is attached, so a pooled or
   unit-test `TerrainRoom` is never required to have one
 
 #### Scenario: Gate exit locks use the stock lock-string form
 - **WHEN** `coordinates` equal some registered gate's `approach_cell`
 - **THEN** `at_prepare_room` SHALL set that gate's `return_direction` long-form exit (the contrib's
-  normalized exit key) on the room to `traverse:true();view:true()` locks — the same lock-string
-  form the stock `set_active_coordinates` pass uses for valid neighbors — so the gate exit is
+  normalized exit key) on the room to `traverse:true();view:true()` locks, the same lock-string
+  form the stock `set_active_coordinates` pass uses for valid neighbors, so the gate exit is
   visible and offered from the approach cell even though the footprint cell beyond it is
   provider-invalid
 - **AND** the gateway step itself is performed by `WildernessReturnExit`'s registry branch, not by
@@ -143,11 +145,11 @@ ensure the coordinate's deterministic monster population per the scenarios below
 - **WHEN** `coordinates` name a coordinate that is not an approach cell
 - **THEN** `at_prepare_room` SHALL NOT touch any exit's locks
 
-#### Scenario: Point anchors open all eight exits to match the resolver
+#### Scenario: Point anchors open the authored direction to match the resolver
 - **WHEN** `coordinates` equal a point-shape entry's `anchor_cell`
 - **THEN** `at_prepare_room` SHALL open only the single gate's authored `return_direction` exit to
-  `traverse:true();view:true()` — the resolver advertises that one authored direction at a point
-  anchor, and every other direction stays ordinary terrain validity — so offered exits remain
+  `traverse:true();view:true()`; the resolver advertises that one authored direction at a point
+  anchor, and every other direction stays ordinary terrain validity, so offered exits remain
   identical to resolver truth
 
 ### Requirement: ElosernWildernessMapProvider uses TerrainRoom and WildernessReturnExit
@@ -168,11 +170,11 @@ The wilderness SHALL comprise 2700 by 2700 one-kilometer logical cells with east
 
 #### Scenario: Frame and sea margin
 - **WHEN** (-1,0), (2700,0), and ocean-margin (0,0) are queried
-- **THEN** all are invalid for foot movement; land-side ordinary cells are valid subject to local obstacles and footprints; seven million rooms are never pre-created.
+- **THEN** all are invalid for foot movement; land-side ordinary cells are valid subject to local obstacles and footprints; the frame is never pre-created as rooms.
 
 #### Scenario: Anchor and port land
-- **WHEN** all nine declared anchor centers and six harbor centers are evaluated
-- **THEN** all lie inside the mainland polygon while knowledge visibility remains authoritative and seven unbuilt anchors create no invented settlement maps.
+- **WHEN** all declared anchor centers and harbor centers are evaluated
+- **THEN** all lie inside the mainland polygon while knowledge visibility remains authoritative and unbuilt anchors create no invented settlement maps.
 
 #### Scenario: The closed ridge and waterways are impassable
 - **WHEN** a summit-ridge cell away from every authored pass, or an ordinary river cell, is queried

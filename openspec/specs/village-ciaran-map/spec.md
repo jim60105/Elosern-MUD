@@ -1,16 +1,16 @@
 # village-ciaran-map Specification
 
 ## Purpose
-Make 暗影谷村 a walkable place — a small concealed elven settlement with its
-own coordinate space, anchor and single way in — so settlement abstractions
+Make 暗影谷村 a walkable place, a small concealed elven settlement with its
+own coordinate space, anchor and single way in, so settlement abstractions
 are exercised against a second, deliberately unlike entry.
 
 ## Requirements
 
 ### Requirement: The village is a small connected grid with one anchor
 `world/maps/village_ciaran.py` SHALL declare map data for
-`zcoord="village_ciaran"` describing a ten-node connected tree: a single
-entrance node, a central plaza, and eight further exterior nodes reflecting
+`zcoord="village_ciaran"` describing the connected tree declared by `NODE_IDS`,
+`PROTOTYPES`, and `ROADS`, with a single entrance node, a central plaza, and exterior nodes reflecting
 the branch's culture and dwellings. The plaza SHALL spawn as the settlement's
 sole `AnchorRoom`, carrying `anchor_key="village_ciaran"`. Every
 intra-village link SHALL spawn as the project's costed grid exit so
@@ -18,7 +18,7 @@ movement inside the village charges the distance-derived move cost.
 
 #### Scenario: The village grid spawns connected with one anchor
 - **WHEN** grid synchronization runs
-- **THEN** the village's ten rooms exist in its own coordinate space, are
+- **THEN** the village's declared rooms exist in its own coordinate space, are
   mutually reachable, and exactly one of them is an `AnchorRoom` whose
   anchor key is the village's
 
@@ -36,17 +36,16 @@ movement inside the village charges the distance-derived move cost.
 - **THEN** there is exactly one fewer link than there are nodes, and removing
   any link disconnects the map
 
-#### Scenario: The six original coordinates are undisturbed
+#### Scenario: Existing location identities are undisturbed
 - **WHEN** the expanded map is parsed
-- **THEN** the entrance, the plaza and the four original dwelling approaches
+- **THEN** the entrance, the plaza and the existing dwelling approaches
   occupy the approved meter coordinates while their existing dbids and every landed place attachment remain intact
 
-#### Scenario: Growth adds leaves, never a loop or crossroads
+#### Scenario: Growth preserves branching paths without loops
 - **WHEN** the village map grows
-- **THEN** it remains a tree with no cycle and no crossroads — growth adds
-  leaves and short branches, never a loop — because a settlement of a
-  hundred people laid out with the branching street pattern of a town reads
-  as a town
+- **THEN** it remains a tree with no cycle; growth adds leaves and short
+  branches around the declared gathering places, without turning the village
+  into a town-like street network
 
 #### Scenario: Village text reads as a lived-in forest settlement
 - **WHEN** the village's room keys and descriptions are authored
@@ -113,7 +112,7 @@ entry that gives them a second entry to check against.
 - **THEN** they arrive at the village's entrance node
 
 ### Requirement: Ciaran uses metric skylit underground geography
-Ciaran SHALL retain its ten-node nine-road branching topology at the following meter positions, with roughly 0.4km² living space for 100 elves. Main living chambers SHALL remain underground; outdoor nodes SHALL occupy skylit collapse basins or ravines, retaining the concealed path without walls or city gates.
+Ciaran SHALL retain the branching topology and integer-meter positions declared in `world/maps/village_ciaran.py`, with its lore-defined living footprint and population. Main living chambers SHALL remain underground; outdoor nodes SHALL occupy skylit collapse basins or ravines, retaining the concealed path without walls or city gates.
 
 #### Scenario: Exact metric positions
 - **WHEN** village nodes synchronize

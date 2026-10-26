@@ -268,7 +268,7 @@ class CommerceRulebookSliceTests(unittest.TestCase):
             self.assertGreaterEqual(scale, 1)
 
     @covers_requirement(
-        "sample-city-altoria::the-sample-city-s-xyzgrid-remains-thirteen-exterior-nodes-while-permanent-service-interiors-are-attached"
+        "sample-city-altoria::the-sample-city-s-declared-exterior-topology-remains-unchanged-while-permanent-service-interiors-are-attached"
     )
     def test_at_par_slice_offers_travel_field_for_field(self):
         # "Moving a good between shelves does not change its price": where a

@@ -52,6 +52,12 @@ and the current node always counts as visited. Move actions appear only on
 the current node's traversable exits, which are resolved by the minimap
 helpers.
 
+For settlement graphs, `NODE_IDS` uses stable English slugs such as
+`south_gate` and `quay`, while the prototype's Chinese `key` supplies the
+display label（南門、碼頭埠）. Panel node IDs use the canonical coordinate-based
+`grid:<map>:<x>:<y>` grammar. These identities and labels serve separate roles;
+the settlement module owns the node and road set without a fixed panel-level count.
+
 ## The `world_map` publisher and discovery narrative
 
 `world_map.py` filters every response using the requesting actor's current
@@ -221,7 +227,7 @@ the UI scale, and a colliding lower-priority label is hidden, never shrunk.
   dotted border and the label `未探明`. No landmark, place, nation or name is
   drawn, hit-tested or read out for it.
 - Level of detail is inclusive. Nation names show at spans of 400 km and
-  wider (大陸 and 國). Lit district and place names show up to 1,000 km, and
+  wider（大陸 and 國）. Lit district and place names show up to 1,000 km, and
   `未探明` up to 450 km. The trail is a line until the 近郊 view (spans up to
   about 89 km). There it becomes cells of the payload's own
   `resolution_km`, so a downsampled history never implies 1 km precision.
@@ -404,16 +410,17 @@ the measurements here.
 
 `area_map` measurements (publish-area-map-panel):
 
-- The largest shipped settlement is 21 nodes and 26 roads, about 5.1 KB when
-  fully explored. The second is 10 nodes and 9 roads, about 2 KB.
+- Shipped settlement membership and road counts follow their authored modules.
+  Payload size depends on that data and the player's explored set; it is not
+  a fixed settlement contract.
 - The wilderness window is at most 225 cells. Its edge list is at most the
   eight neighbour steps, so a window usually fits one frame.
 - A synthetic grid at the new ceilings (512 nodes with 16-character labels,
   2,048 roads and 32 full-length markers) is 250,184 bytes, or 274,760 bytes
   with 32-character labels. It travels as bounded parts and round-trips
   intact. The 393,216-byte ceiling covers both with room to spare.
-- The ceilings leave about 24 times the largest settlement and twice the
-  wilderness window for future settlements and builder interiors. Every unrelated panel keeps its generic budget. That
+- The node ceiling exceeds twice the fixed wilderness window, leaving room
+  for settlements and builder interiors. Every unrelated panel keeps its generic budget. That
 includes `local_map` and its 65,536-byte envelope.
 
 `world_map` measurements (publish-world-map-panel). The measurement tool uses

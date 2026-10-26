@@ -1,6 +1,6 @@
 # Metric settlement cutover
 
-`activate-metric-settlements` moves the two authored outdoor settlements from
+`activate-metric-settlements` moves the authored outdoor settlements from
 their compact logical grid onto the approved integer-metre local frames
 (world-map-scale design §8/§9) and converges every identity consumer in place.
 There is no database migration, no compatibility alias and no second
@@ -26,20 +26,24 @@ without coordinates stay coordinate-free connected scenes.
 
 ## Authored tables
 
-- `PROTOTYPES`, `NODE_IDS` and `XYMAP_DATA["options"]`/`["prototypes"]` are
-  keyed by the metre coordinate. `XYMAP_DATA` carries no ASCII `map`: it is the
-  sparse declaration, not a contrib map.
+- `PROTOTYPES` and `NODE_IDS` are keyed by the metre coordinate;
+  `XYMAP_DATA["prototypes"]` includes those room prototypes and the wildcard
+  exit override. `XYMAP_DATA["options"]` holds map-wide visual-range settings,
+  not coordinate bindings. `XYMAP_DATA` carries no ASCII `map`.
+- `NODE_IDS` values are stable English slugs (`south_gate`, `quay`); the
+  corresponding prototype `key` is the Chinese display name（南門、碼頭埠）.
+  Counts and membership follow these manually edited tables.
 - `ROADS` entries are `(source identity, destination identity, compass octant)`.
-  The octant preserves every pre-cutover exit direction and the two capital
-  shortcuts (工匠巷↔校場外 `ne/sw`, 大神殿前↔東市 `se/nw`).
+  The octant preserves every pre-cutover exit direction and the authored capital
+  shortcuts（工匠巷↔校場外 `ne/sw`、大神殿前↔東市 `se/nw`）.
 - The measured baselines at the 1.25 m/s healthy settlement speed are 2,193 s
-  (南門→中央廣場, ~37 min), 5,618 s (南門→王宮前庭, ~94 min) and 431 s
-  (隱密小徑→長老古樹下, ~7 min). Unequal segment lengths charge and display
+  （南門→中央廣場，~37 min）, 5,618 s（南門→王宮前庭，~94 min）and 431 s
+  （隱密小徑→長老古樹下，~7 min）. Unequal segment lengths charge and display
   unequally.
 
 ## In-place cutover
 
-`sync_grid()` plans both graphs read-only, then applies one transaction:
+`sync_grid()` plans all declared graphs read-only, then applies one transaction:
 
 1. Rooms bind by their stable `sparse_node_identity` tag, never by coordinate.
    A moved room keeps its dbid, occupants, `home` references and inbound

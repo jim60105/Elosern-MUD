@@ -1,38 +1,37 @@
 ## Purpose
 
-Define the one sample city (聖潔王都 / `capital_altoria`) built as real, walkable xyzgrid rooms and
-exits: exactly thirteen rooms in a fixed tree topology, with a single `AnchorRoom` at the central
-plaza and one authored bridging exit to non-grid space.
+Define the sample city（聖潔王都 / `capital_altoria`）as real, walkable rooms and exits
+from its authored sparse graph, with a single `AnchorRoom` at the central plaza
+and one forward bridge from Limbo per city-gate registry row.
 
 ## Requirements
 
-### Requirement: The sample city has exactly thirteen rooms in a fixed, connected topology
+### Requirement: The sample city has the declared rooms in a connected sparse topology
 `world/maps/altoria_capital.py` SHALL declare the sparse map declaration for `zcoord="capital_altoria"` describing
-exactly twenty-one rooms on the approved metric coordinates and exactly twenty-six links such that every room is
+the rooms and directed roads declared by `PROTOTYPES`, `NODE_IDS`, and `ROADS` such that every room is
 reachable from every other room.
 
-#### Scenario: The map parses to exactly thirteen nodes
-<!-- Scenario name retained verbatim; the count it asserts is the one in the text above. -->
+The stable `node_id` SHALL be the English slug in `NODE_IDS`, such as `south_gate`
+or `quay`. The room prototype's Chinese `key`（南門、碼頭埠）SHALL be its
+display name, independent of that identity.
+
+#### Scenario: The map parses to the declared nodes
 - **WHEN** `world/maps/altoria_capital.py`'s sparse node/road declaration is parsed with
   the sparse graph validator
-- **THEN** exactly twenty-one nodes exist, at exactly the coordinates `(3050, 150)`, `(1250, 760)`, `(2150, 920)`, `(3140, 1050)`, `(3970, 1120)`, `(4830, 970)`, `(2350, 1900)`, `(3350, 1980)`, `(1300, 2600)`, `(2420, 2700)`, `(3500, 2850)`, `(4380, 3000)`, `(5380, 2850)`, `(6500, 3010)`, `(2300, 3820)`, `(3480, 3700)`, `(4560, 3920)`, `(3500, 4850)`, `(4690, 5010)`, `(5650, 5200)`, `(4500, 6350)`
+- **THEN** its nodes match the declared identities, prototypes, and metric coordinates without omissions or duplicates
 
 #### Scenario: Every room is reachable from every other room
 - **WHEN** sparse shortest-path calculation is run against the validated sparse graph
-- **THEN** a shortest path exists between every pair of the twenty-one coordinates
+- **THEN** a shortest path exists between every pair of declared nodes
 
-#### Scenario: The topology has no cycle
-<!-- Scenario name retained verbatim: the contract inverted, and a MODIFIED block may not rename
-     a scenario. The body states the current rule. -->
-- **WHEN** the twenty-six links in the validated sparse graph are inspected
-- **THEN** they connect the twenty-one nodes with exactly twenty-six edges, six more than a tree
-  would need, and at least one pair of rooms has two distinct routes between them
+#### Scenario: The topology contains cycles
+- **WHEN** the roads in the validated sparse graph are inspected
+- **THEN** they match the settlement module's declaration, and at least one pair of rooms has distinct routes between them
 
 #### Scenario: The map declares bounded visual-range options
-- **WHEN** `world/maps/altoria_capital.py`'s the sparse map declaration is inspected
+- **WHEN** `world/maps/altoria_capital.py`'s sparse map declaration is inspected
 - **THEN** its `options` contains a `map_visual_range` positive integer of at most 8 and a `map_mode`
-  equal to `nodes` or `scan`, and parsing the map still yields exactly twenty-one nodes and
-  twenty-six links
+  equal to `nodes` or `scan`, and parsing the map still yields the declared nodes and roads
 
 #### Scenario: The grid adapter reads the declared options and fails closed on invalid values
 - **WHEN** the grid layer adapter runs against the declared `options` and against a malformed or
@@ -40,17 +39,13 @@ reachable from every other room.
 - **THEN** the valid value is used as the visual range, and the invalid value produces the stable
   unavailable reason instead of a guessed default
 
-#### Scenario: The requirement name's "thirteen" is stale and the text is current
-<!-- Name-note moved out of the description unchanged in substance: a MODIFIED block may not
-     rename a requirement. -->
-- **WHEN** this requirement's name is compared with its contract text
-- **THEN** the historical "thirteen" in the title is recognized as stale, and the requirement text
-  is the current contract
+#### Scenario: The declared topology is authoritative
+- **WHEN** authored rooms or roads change
+- **THEN** synchronization follows the settlement module rather than a historical count in specification prose
 
 #### Scenario: The topology is not a tree
 - **WHEN** the topology is evaluated
-- **THEN** it SHALL NOT be a tree: it SHALL contain exactly six independent cycles, and it SHALL
-  include at least two diagonal links
+- **THEN** it SHALL contain cycles and authored diagonal shortcuts
 
 #### Scenario: The cycles and diagonals are load-bearing world-building
 - **WHEN** the cycles and diagonals are justified as world-building rather than incidentals
@@ -62,7 +57,7 @@ reachable from every other room.
 #### Scenario: The options set is exactly the two visual-range tokens
 - **WHEN** the map's declared `options` are inspected
 - **THEN** they SHALL contain exactly `map_visual_range`, a positive integer at most 8, and
-  `map_mode`, one of the closed tokens `nodes` or `scan` — the same closed values the xyzgrid
+  `map_mode`, one of the closed tokens `nodes` or `scan`, the same closed values the xyzgrid
   contrib's own `get_visual_range` accepts
 
 #### Scenario: The grid adapter reads the options as the configured visual range
@@ -80,15 +75,15 @@ reachable from every other room.
   capability
 
 ### Requirement: Exactly one room is the AnchorRoom, at the central plaza
-Of the twenty-one rooms, exactly one, at coordinate `(3500, 2850)`, SHALL spawn as an `AnchorRoom` with
-`anchor_key="capital_altoria"`. The remaining twenty SHALL spawn as plain `GridRoom`.
+Among the declared rooms, exactly one, the central plaza, SHALL spawn as an `AnchorRoom` with
+`anchor_key="capital_altoria"`. The remaining rooms SHALL spawn as plain `GridRoom`.
 
 #### Scenario: Only the plaza is an AnchorRoom
-- **WHEN** all twenty-one spawned rooms are inspected by typeclass
-- **THEN** exactly one, at `(3500, 2850)`, is an `AnchorRoom` instance, and the others are `GridRoom`
+- **WHEN** all declared spawned rooms are inspected by typeclass
+- **THEN** exactly one, at the declared plaza coordinate, is an `AnchorRoom` instance, and the others are `GridRoom`
   instances that are not `AnchorRoom` instances
 
-### Requirement: The sample city's xyzgrid remains thirteen exterior nodes while permanent service interiors are attached
+### Requirement: The sample city's declared exterior topology remains unchanged while permanent service interiors are attached
 Every notable building referenced by the xyzgrid SHALL remain represented by one exterior
 GridRoom in that map. Guild economy SHALL additionally create one ordinary permanent room outside the
 xyzgrid node count for each place the settlement's place registry declares, linked bidirectionally from
@@ -97,9 +92,9 @@ rather than being fixed by this requirement.
 
 #### Scenario: Grid topology is unchanged
 - **WHEN** the sparse map declaration is parsed after guild economy lands
-- **THEN** it still contains exactly the twenty-one grid nodes and twenty-six links
+- **THEN** it still contains the declared exterior nodes and roads, without service interiors becoming grid nodes
 
-#### Scenario: Both interiors are reachable and permanent
+#### Scenario: Declared interiors are reachable and permanent
 - **WHEN** map and guild-economy synchronization complete
 - **THEN** each interior exists once, has no expiry tick, and can be reached from and exited back to its
   documented exterior
@@ -115,7 +110,7 @@ rather than being fixed by this requirement.
 
 #### Scenario: Specialist shops do not narrow what the capital sells
 - **WHEN** offers across capital places are resolved
-- **THEN** each shop exposes precisely its current authored assortment union and allowed place-level additions/removals; no historical roster defines capital availability
+- **THEN** each shop exposes its current authored assortment union and allowed place-level additions/removals; no historical roster defines capital availability
 
 #### Scenario: One exterior carries two doors
 - **WHEN** two places declare the same exterior with different doorway names
@@ -135,7 +130,7 @@ rather than being fixed by this requirement.
 #### Scenario: An exterior may carry several doors or none
 - **WHEN** place declarations against grid exteriors are inspected
 - **THEN** one exterior MAY carry more than one interior, distinguished by their authored doorway
-  names — a craft alley with a forge and a tailor on it is one street with two doors — and some
+  names (a craft alley with a forge and a tailor on it is one street with two doors), and some
   exteriors SHALL carry none at all, since a capital contains squares, steps, ruins and quaysides
   that exist to be walked through rather than entered
 
@@ -143,7 +138,7 @@ rather than being fixed by this requirement.
 - **WHEN** the capital's goods are partitioned among places
 - **THEN** the partition follows what a shop is for, not which shop happened to stock an item first
 
-#### Scenario: The accessory-slot partition is exactly two bundles
+#### Scenario: The accessory-slot partition follows the declared bundles
 - **WHEN** accessory goods are assigned to authored specialist shelves
 - **THEN** every assignment follows explicit registry-owned shop-purpose and eligible-slot declarations; the number and identity of bundles are data
 
@@ -161,24 +156,23 @@ rather than being fixed by this requirement.
   by interior attachment
 
 ### Requirement: The sample city connects to the rest of the world through exactly one bridging exit
-The South Gate room, at `(3050, 150)`, SHALL be the sample city's sole connection point to non-grid space,
+The South Gate room, at `(3050, 150)`, SHALL be the sample city's entrance from Limbo,
 reached via the single forward bridging `Exit` from Limbo described by the `grid-room-sync`
-capability — exactly one forward bridging exit per `CITY_GATE_REGISTRY` row, of which
-`capital_altoria` is one. The East Gate room, at `(6500, 3010)`, SHALL carry the capital's
-second wilderness gate and SHALL NOT be a dead end.
+capability, exactly one forward bridging exit per `CITY_GATE_REGISTRY` row, of which
+`capital_altoria` is one. Wilderness gates and service interiors SHALL remain separate
+from that bridge. The East Gate room, at `(6500, 3010)`, SHALL carry its declared
+wilderness gate and SHALL NOT be a dead end.
 
 #### Scenario: The South Gate is the only room reachable from Limbo
 - **WHEN** Limbo's exits are inspected after `sync_grid()` runs
-- **THEN** they are exactly the registry's forward gate exits — one per `CITY_GATE_REGISTRY` row —
+- **THEN** they are exactly the registry's forward gate exits, one per `CITY_GATE_REGISTRY` row,
   and the `capital_altoria` row's exit leads into that map, at `(3050, 150)`
 
 #### Scenario: No city room leads back to Limbo
 - **WHEN** every exit of every spawned `capital_altoria` room is inspected after `sync_grid()` runs
 - **THEN** none of them has the Limbo starting room as its destination
 
-#### Scenario: The North Gate is a dead end, reserved for a future wilderness link
-<!-- Scenario name retained verbatim: the reserved dead end is now the East Gate and is no longer
-     reserved. The body states the current rule. -->
+#### Scenario: The East Gate connects the city and wilderness
 - **WHEN** the East Gate room's exits are inspected
 - **THEN** it holds its link west back into the city and the wilderness gate exit its
   `WILDERNESS_ENTRY_REGISTRY` row authorises, and no other exit
@@ -195,7 +189,7 @@ second wilderness gate and SHALL NOT be a dead end.
   the capital's connectivity only, and SHALL NOT be read as a claim about how many settlements the
   registry describes
 
-### Requirement: The sample city's twelve intra-city exits spawn as CostedXYZExit, not the bare contrib XYZExit
+### Requirement: The sample city's declared intra-city exits spawn as CostedXYZExit
 `world/maps/altoria_capital.py::XYMAP_DATA["prototypes"]` SHALL include exactly one
 wildcard link-prototype override, `("*", "*", "*"): {"prototype_parent": "xyz_exit", "typeclass":
 "typeclasses.exits.CostedXYZExit"}`, so that every one of the sample city's intra-city links
@@ -208,23 +202,22 @@ contrib's own bare `evennia.contrib.grid.xyzgrid.xyzroom.XYZExit`.
 
 #### Scenario: The topology and count required by this capability are unaffected
 - **WHEN** the sample city's rooms and exits are inspected after this change lands
-- **THEN** exactly twenty-one rooms and twenty-six intra-city links still exist, in the identical
-  topology this capability's other requirements already describe — only the exits' typeclass has
+- **THEN** the declared rooms and roads still exist, in the identical
+  topology this capability's other requirements already describe; only the exits' typeclass has
   changed
 
 #### Scenario: A successful traversal of an intra-city exit advances the clock
 - **WHEN** a `PlayerCharacter` successfully traverses any of the sample city's intra-city exits
 - **THEN** `get_world_clock().tick` increases by exactly the resolved physical edge duration
 
-#### Scenario: The requirement name's "twelve" is stale and the text is current
-<!-- Name-note moved out of the description unchanged in substance. -->
-- **WHEN** this requirement's name is compared with its contract text
-- **THEN** the count the name names is recognized as stale, and the text is current
+#### Scenario: Every declared travel direction has a costed exit
+- **WHEN** the module's `ROADS` entries are synchronized
+- **THEN** each directed road has a costed exit, without a specification-owned exit count
 
 #### Scenario: The override changes only the spawned typeclass, not the topology
 - **WHEN** the prototype override is evaluated against this capability's other requirements
 - **THEN** it SHALL NOT change the room or exit topology, count, or connectivity already required
-  by this capability's other requirements — it changes only which typeclass each link spawns as
+  by this capability's other requirements; it changes only which typeclass each link spawns as
 
 #### Scenario: The override covers diagonals exactly as cardinals
 - **WHEN** the wildcard link-prototype override's coverage is inspected
@@ -253,10 +246,6 @@ Startup SHALL create service hosts by stable service identity from every current
   every other shop uses
 
 #### Scenario: Interiors, doorways, and exam metadata are created exactly once
-<!-- The shipped text fixed the surface at ONE merchant NPC, TWO interiors and FOUR doorway
-     exits while the place registry already drove two, three and six. altoria-adornments-and-
-     remedies adds two more merchant places, so the quantities are restated as registry-driven
-     — the idempotence, no-reset and single-creation guarantees elsewhere are unchanged. -->
 - **WHEN** guild-economy startup runs against the place registry
 - **THEN** it SHALL create one permanent interior and its two directed doorway exits for each
   place-registry row, and exam spawn metadata, exactly once
@@ -265,7 +254,7 @@ Startup SHALL create service hosts by stable service identity from every current
 
 The system SHALL persist canonical `age`/`apparent_age` on the guild service host NPCs (guild master
 and merchant) created during `sync_guild_economy`. The hosts are identified by their service
-component anchors (`service_id`), not by their display keys — their display keys are the authored
+component anchors (`service_id`), not by their display keys; their display keys are the authored
 registry names. Each absent age attribute SHALL be initialized from the host's authored profile age pair,
 preserving any existing attribute value.
 
@@ -275,7 +264,7 @@ preserving any existing attribute value.
 - **THEN** both NPCs have integer `age` and `apparent_age` reflecting their authored profile canonical ages
 
 ### Requirement: Altoria uses approved metric outdoor positions
-Altoria SHALL use the following integer-meter node positions in its local logical layer, retaining 21 nodes, 26 undirected roads, six independent cycles and both diagonal shortcuts. Initial roads SHALL be straight; every existing compass octant and interior attachment SHALL persist.
+Altoria SHALL use the integer-meter node positions declared in `world/maps/altoria_capital.py`, retaining its authored roads, cycles and diagonal shortcuts. Initial roads SHALL be straight; every existing compass octant and interior attachment SHALL persist.
 
 #### Scenario: Exact metric positions
 - **WHEN** the authored city is synchronized

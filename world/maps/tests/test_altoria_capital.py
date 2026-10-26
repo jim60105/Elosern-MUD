@@ -128,7 +128,7 @@ class AltoriaCapitalMapTests(EvenniaTestCase):
             self.assertEqual(self.graph.node(identity).coordinate, coordinate)
 
     @covers_requirement(
-        "sample-city-altoria::the-sample-city-has-exactly-thirteen-rooms-in-a-fixed-connected-topology"
+        "sample-city-altoria::the-sample-city-has-the-declared-rooms-in-a-connected-sparse-topology"
     )
     def test_path_exists_between_every_pair_of_coordinates(self):
         for start in self.graph.nodes:
@@ -137,7 +137,7 @@ class AltoriaCapitalMapTests(EvenniaTestCase):
                     self.assertIsNotNone(self.graph.route(start, end))
 
     @covers_requirement(
-        "sample-city-altoria::the-sample-city-has-exactly-thirteen-rooms-in-a-fixed-connected-topology"
+        "sample-city-altoria::the-sample-city-has-the-declared-rooms-in-a-connected-sparse-topology"
     )
     def test_twenty_six_links_form_six_cycles_not_a_tree(self):
         edges = self._links()
@@ -157,7 +157,7 @@ class AltoriaCapitalMapTests(EvenniaTestCase):
         self.assertEqual(diagonals, EXPECTED_DIAGONALS)
 
     @covers_requirement(
-        "sample-city-altoria::the-sample-city-has-exactly-thirteen-rooms-in-a-fixed-connected-topology"
+        "sample-city-altoria::the-sample-city-has-the-declared-rooms-in-a-connected-sparse-topology"
     )
     def test_some_pair_of_rooms_has_two_distinct_routes(self):
         # A cycle exists iff some pair of rooms has two routes: walk an edge,
@@ -198,7 +198,7 @@ class AltoriaCapitalMapTests(EvenniaTestCase):
                 self.assertEqual(prototype["key"], GRID_KEYS[coordinate])
 
     @covers_requirement(
-        "sample-city-altoria::the-sample-city-has-exactly-thirteen-rooms-in-a-fixed-connected-topology"
+        "sample-city-altoria::the-sample-city-has-the-declared-rooms-in-a-connected-sparse-topology"
     )
     def test_options_declare_bounded_visual_range(self):
         options = XYMAP_DATA.get("options", {})
@@ -216,7 +216,7 @@ class AltoriaCapitalMapTests(EvenniaTestCase):
         self.assertEqual(len(self._links()), 26)
 
     @covers_requirement(
-        "sample-city-altoria::the-sample-city-s-twelve-intra-city-exits-spawn-as-costedxyzexit-not-the-bare-contrib-xyzexit"
+        "sample-city-altoria::the-sample-city-s-declared-intra-city-exits-spawn-as-costedxyzexit"
     )
     def test_the_declaration_carries_the_costed_exit_override(self):
         wildcard = XYMAP_DATA["prototypes"].get(("*", "*", "*"))

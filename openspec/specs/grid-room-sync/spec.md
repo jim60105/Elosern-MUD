@@ -15,10 +15,9 @@ explicit road into corresponding `XYZRoom`/`XYZExit` objects, without dense ASCI
 
 #### Scenario: sync_grid produces real, puppetable-adjacent room objects
 - **WHEN** `sync_grid()` runs against an empty database
-- **THEN** twenty-one `GridRoom`/`AnchorRoom` instances and fifty-two `XYZExit` instances exist in
-  the database for the `capital_altoria` map, each queryable via ordinary Evennia object search —
-  not `LoreRecord` Scripts. The fifty-two directed exits reflect the twenty-six map links spawning
-  one exit per travel direction.
+- **THEN** one `GridRoom`/`AnchorRoom` instance per declared node and one costed `XYZExit`
+  instance per declared directed road exist for `capital_altoria`, each queryable
+  via ordinary Evennia object search rather than as a `LoreRecord` Script
 
 #### Scenario: sync_all's own behavior is unaffected
 - **WHEN** `sync_all()` runs
@@ -50,7 +49,7 @@ city to exist after a fresh container boot.
 - **WHEN** the Evennia server starts against a fresh, migrated, empty database (as
   `docker-entrypoint.sh`'s `evennia migrate --noinput` followed by `evennia start --log` would
   produce)
-- **THEN** the `capital_altoria` sample city's twenty-one rooms and fifty-two intra-city exits exist
+- **THEN** the `capital_altoria` sample city's declared rooms and intra-city exits exist
   before the server accepts player connections, with no separate command having been issued
 
 #### Scenario: at_server_start calls sync_grid after sync_all, not before
@@ -64,20 +63,21 @@ city to exist after a fresh container boot.
 
 #### Scenario: The CLI subcommand is registered
 - **WHEN** `evennia xyzgrid list` is run against a server that has completed at least one start
-- **THEN** it lists the `capital_altoria` map without error, having been populated by `at_server_
-  start()`'s automatic `sync_grid()` call, not by the CLI itself
+- **THEN** the registered contrib command remains available for builder maps;
+  authored sparse settlements are synchronized independently and are not
+  required to appear in `XYZGrid.db.map_data` or its CLI listing
 
 #### Scenario: docker-entrypoint.sh contains no xyzgrid CLI invocation
 - **WHEN** `docker-entrypoint.sh` is inspected
-- **THEN** it contains no `evennia xyzgrid` invocation of any kind — grid provisioning happens
+- **THEN** it contains no `evennia xyzgrid` invocation of any kind; grid provisioning happens
   entirely inside the `evennia start` process via `at_server_start()`
 
 ### Requirement: A single authored, idempotent Exit bridges Limbo and the sample city
 `sync_grid()` SHALL locate the starting room through the shared `LIMBO_KEY` constant
-(`world/maps/bootstrap.py`) — never by dbref, never by a `"Limbo"` literal. When the room
+(`world/maps/bootstrap.py`), never by dbref or a `"Limbo"` literal. When the room
 is found, it SHALL author bridging exits exclusively from `CITY_GATE_REGISTRY`
 (`world/maps/city_gates.py`): for every registry row, exactly one ordinary (non-grid)
-`Exit` from the starting room to that row's gate coordinate, ensured idempotently —
+`Exit` from the starting room to that row's gate coordinate, created idempotently,
 never an exit back to the starting room, never duplicated on repeated calls.
 
 #### Scenario: The bridging exit exists after sync_grid runs
@@ -98,7 +98,7 @@ never an exit back to the starting room, never duplicated on repeated calls.
 
 #### Scenario: A missing Limbo degrades gracefully, without preventing the rest of sync_grid from running
 - **WHEN** `sync_grid()` runs against a database with no object keyed `LIMBO_KEY`
-- **THEN** the sample city's twenty-one rooms and fifty-two intra-city exits are still spawned, no
+- **THEN** the sample city's declared rooms and intra-city exits are still spawned, no
   bridging exit is created, and `sync_grid()` does not raise
 
 #### Scenario: The bridge exit carries zh-tw key and aliases from the registry
@@ -125,8 +125,8 @@ never an exit back to the starting room, never duplicated on repeated calls.
 
 #### Scenario: The forward pass ends with the prune invariant
 - **WHEN** the forward bridging pass of `sync_grid()` finishes
-- **THEN** `sync_grid()` deletes every persisted `Exit` whose destination is the starting room —
-  the `limbo-one-way-gates` capability's prune invariant — so a reverse exit seeded into the
+- **THEN** `sync_grid()` deletes every persisted `Exit` whose destination is the starting room,
+  following the `limbo-one-way-gates` capability's prune invariant, so a reverse exit seeded into the
   database converges away on the next sync
 
 #### Scenario: A missing Limbo logs a warning before skipping
@@ -134,7 +134,7 @@ never an exit back to the starting room, never duplicated on repeated calls.
 - **THEN** it logs a warning, skips creating the bridging exits, and does not raise
 
 ### Requirement: Authored room prose is Traditional Chinese
-Every authored room description the game ships SHALL be Traditional Chinese prose — both the
+Every authored room description the game ships SHALL be Traditional Chinese prose, including both the
 `desc` of a grid prototype and the interior description a place record carries. A room's name
 and its description SHALL be in the same language: a Chinese room name over an English body is
 the specific defect this rule exists to prevent. Authoring notes, specification identifiers and change names SHALL NOT appear
@@ -155,7 +155,7 @@ in a description; they are player-facing text. A guard SHALL check the corpus.
 
 #### Scenario: The name-language mismatch is the nobody-checking defect
 - **WHEN** an authored room pairs a Chinese room name with an English body
-- **THEN** it violates the same-language rule — this mismatch is the state the codebase reached
+- **THEN** it violates the same-language rule; this mismatch is the state the codebase reached
   by nobody checking
 
 #### Scenario: The guard stops English descriptions from accumulating

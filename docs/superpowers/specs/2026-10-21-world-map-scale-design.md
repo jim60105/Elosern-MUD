@@ -1,7 +1,7 @@
 # World Map Scale and Metric Settlement Design
 
 Date: 2026-10-21
-Status: Approved; OpenSpec proposals created (§16); not implemented.
+Status: Implemented through the archived OpenSpec changes listed in §16. Current runtime contracts live in the capability specs and developer references.
 Companion design: [Party Fatigue and Sleep](2026-10-21-party-fatigue-and-sleep-design.md).
 
 ## 1. Goal and authority
@@ -22,9 +22,9 @@ Excluded are vehicles, mounts, shipping gameplay, fast travel, new movement-enha
 
 The companion fatigue design supplies travel penalties and forced-sleep restrictions. It does not change the map units.
 
-## 3. Observed implementation baseline
+## 3. Historical pre-cutover implementation baseline
 
-Research inspected `world/maps/wilderness_provider.py`, `world/lore/wilderness_entry.py`, `world/lore/anchor_placement.py`, both authored outdoor maps, movement settlement, clock rules, and local-map presentation.
+The following observations record the research baseline before the metric cutover, not the current runtime. Research inspected `world/maps/wilderness_provider.py`, `world/lore/wilderness_entry.py`, `world/lore/anchor_placement.py`, both authored outdoor maps, movement settlement, clock rules, and local-map presentation.
 
 | Surface | Observed baseline | Consequence |
 | --- | --- | --- |
@@ -37,7 +37,7 @@ Research inspected `world/maps/wilderness_provider.py`, `world/lore/wilderness_e
 | Local-map protocol/layout | Coordinate bounds of -1,024 to 1,024; rank compression after a 64-cell lattice span | Meter coordinates can be rejected or have their unequal spacing erased |
 | Synchronization | Missing old grid coordinates can be deleted | A coordinate replacement must preserve existing room identities and references |
 
-The real ASCII parser was exercised for geometry using database-independent prototypes. Altoria has 21 nodes, 26 undirected roads, and 6 cycles. Ciaran has 10 nodes and 9 roads. Database room spawning was not exercised.
+The real ASCII parser was exercised for geometry using database-independent prototypes. The current node and directed-road sets belong to each settlement module's `NODE_IDS` and `ROADS`; the historical parser probe does not fix their counts. Database room spawning was not exercised by that probe.
 
 ## 4. Continental area and demographics
 
@@ -101,7 +101,7 @@ Cross-layer distances must use this transform and authored approach geometry. Ne
 
 The central mountain system follows a bending north-south corridor broadly around wilderness X 1,310 to 1,510. Its approximately 200 km width includes foothills, valleys, and subsidiary ridges, consistent with approximately 500,000 square kilometers of neutral mountain lands. It is not a continuous 200 km wall of summit terrain.
 
-Altoria occupies the southwestern hills and river valleys. Valhalla's controlled settlements lie in northwestern highland forest. Grandia's agricultural and political core lies in the eastern plains. Northern deep forest begins broadly around Y 2,200. Preserve the distinction between nominal political claims and actual control, especially in northern forest and neutral elven valleys.
+Altoria occupies the southwestern hills and river valleys. Valhalla's controlled settlements lie in northwestern highland forest. Grandia's agricultural and political core lies in the eastern plains. Northern deep forest follows the authored meandering edge around Y 1,920; the summit ridge retains its separate northern limit at Y 2,200. Preserve the distinction between nominal political claims and actual control, especially in northern forest and independent elven valleys.
 
 Territory shares are area targets, not instructions to draw straight rectangular national borders. Terrain and political ownership are separate authored layers. Do not preserve the current rectangular region classifier when it contradicts these anchor relationships.
 
@@ -144,9 +144,9 @@ All six cell centers are on the land side of the proposed coast. Further regiona
 
 ## 8. Metric Altoria layout
 
-Target approximately 40 square kilometers of built-up city, about 15,000 inhabitants per square kilometer for 600,000 people. The authored 21 nodes represent major streets/district locations across an irregular roughly seven-kilometer envelope. This area target includes housing and public space; it is not a sum of room squares or a claim that all housing has been authored.
+Target approximately 40 square kilometers of built-up city, about 15,000 inhabitants per square kilometer for 600,000 people. The authored nodes represent major streets/district locations across an irregular roughly seven-kilometer envelope. This area target includes housing and public space; it is not a sum of room squares or a claim that all housing has been authored.
 
-Preserve the riverbank lower city, central market belt, northward ascent through three terraces, and existing street connectivity. Small cross-axis offsets and unequal lengths remove the rigid rectangular alignment. Preserve the existing two diagonal shortcuts and all 26 undirected roads.
+Preserve the riverbank lower city, central market belt, northward ascent through three terraces, and existing street connectivity. Small cross-axis offsets and unequal lengths remove the rigid rectangular alignment. Preserve the authored diagonal shortcuts and roads.
 
 | Location | Old local coordinate | New local coordinate, meters |
 | --- | --- | --- |
@@ -176,7 +176,7 @@ The unmodified connectivity has no coordinate collisions or compass-octant chang
 
 ## 9. Metric Ciaran layout
 
-Target approximately 0.4 square kilometers of village living space for about 100 elves, with additional surrounding forest and gathering land outside that footprint. Preserve the ten-node, nine-edge branching path topology.
+Target approximately 0.4 square kilometers of village living space for about 100 elves, with additional surrounding forest and gathering land outside that footprint. Preserve the authored branching path topology.
 
 Reconcile the original underground setting with existing trees and daylight by placing the main living chambers under the mountain and the authored outdoor nodes in a small number of skylit collapse basins or ravine openings. The entire settlement must not become an ordinary exposed forest village. Preserve the hidden path rather than introducing city walls or gates.
 
@@ -273,7 +273,7 @@ Implementation acceptance includes the following consumer-visible scenarios:
 - A sleeping member in any posture blocks all party exits; possession cannot move the sleeping body through an exit.
 - Inject a failure after follower/location or mental writes and prove durable and cached state rolls back with the clock.
 
-The design research verified polygon arithmetic, land-side anchor/port centers, 31 distinct settlement node positions, and compass octants for 35 roads. These calculations and the parser probe are design evidence, not a claim of implemented movement or browser verification.
+The design research verified polygon arithmetic, land-side anchor/port centers, distinct settlement node positions, and authored road compass octants. These calculations and the parser probe are historical design evidence, separate from implementation verification.
 
 ## 14. Alternatives and evidence
 
@@ -291,9 +291,9 @@ Historical military daily rates informed the initial investigation, but the user
 
 This is a design specification. Implementation requires scoped OpenSpec changes that update the affected current capabilities and their behavior evidence together. Coordinate/rendering cutover and fatigue integration have separate ownership boundaries and must share the units, speed and forced-sleep contract above. Do not ship the meter-coordinate cutover while a consumer still assumes old unit hops. Do not add transport to shorten accepted geographic distances.
 
-## 16. Proposed changes
+## 16. Implemented changes
 
-This design is decomposed into seven dependency-ordered OpenSpec changes. Each is sized to about one workday, was validated with `openspec validate <change> --strict`, and records the exact branch and worktree its implementation worker must use. All are committed on the primary branch; none is implemented.
+This design was decomposed into dependency-ordered OpenSpec changes, now implemented and archived. The table records the proposal commits and original task totals as historical planning metadata, not current game-data counts.
 
 | Change | Commit | Scope | Tasks |
 | --- | --- | --- | ---: |
@@ -303,9 +303,9 @@ This design is decomposed into seven dependency-ordered OpenSpec changes. Each i
 | `charge-distance-based-travel` | `94ee6ae5` | Physical-edge terrain charging, slowest-member speed, diagonal legality and charge-once approaches | 16 |
 | `integrate-fatigue-aware-traversal` | `cf7b3a83` | External fatigue integration, piecewise prediction, pre-destination depletion refusal and atomic rollback | 15 |
 | `rescale-wilderness-geography` | `4e02ed96` | Virtual 2700 by 2700 one-kilometer wilderness, mainland validity, terrain relationships and physical gateways | 15 |
-| `activate-metric-settlements` | `bef9bced` | Exact 31-node coordinate cutover and identity, reference and knowledge consumer convergence | 21 |
+| `activate-metric-settlements` | `bef9bced` | Authored settlement coordinate cutover and identity, reference and knowledge consumer convergence | 21 |
 
-The implementation worker is **luna** for every change, using `feat/<change-slug>` on branch and `.worktrees/<change-slug>` as worktree.
+The implementation assignments used `feat/<change-slug>` branches and `.worktrees/<change-slug>` worktrees; those planning paths are not active implementation instructions.
 
 ### 16.1 Cross-batch dependency on the fatigue design
 
