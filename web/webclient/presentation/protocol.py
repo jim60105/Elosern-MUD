@@ -46,6 +46,8 @@ MAX_REQUEST_ID = 64
 MAX_IDENTIFIER = 64
 MAX_PANEL_NAME = 64
 MAX_PANEL_COUNT = 32
+# The update-only removal list is bounded by the same panel ceiling.
+MAX_REMOVED_PANELS = MAX_PANEL_COUNT
 MAX_MESSAGE_CODE_POINTS = 512
 MAX_CORRELATION_ID = 32
 CORRELATION_ID_LENGTH = 32
@@ -439,19 +441,28 @@ def _validate_panels(value: Any, field: str, *, nonempty: bool, known_panels: se
     return value
 
 
+# The exact top-level field sets of the two presentation envelopes.
+_SNAPSHOT_FIELDS = (
+    "protocol_version",
+    "presentation_epoch",
+    "revision",
+    "mode",
+    "panels",
+    "layout_version",
+    "server_time",
+)
+_UPDATE_FIELDS = (*_SNAPSHOT_FIELDS, "base_revision", "removed_panels")
+
+
 def _validate_common_metadata(
     payload: dict[str, Any],
     name: str,
     *,
     known_panels: set[str] | None,
     panels_nonempty: bool,
+    required_fields: set[str],
 ) -> dict[str, Any]:
-    _require_exact_fields(
-        payload,
-        name,
-        {"protocol_version", "presentation_epoch", "revision", "mode", "panels", "layout_version", "server_time"},
-        {},
-    )
+    _require_exact_fields(payload, name, required_fields, {})
     if _require_int(payload, "protocol_version", minimum=1, maximum=1) != PROTOCOL_VERSION:
         raise ProtocolValidationError("unsupported protocol_version")
     epoch = _validate_epoch(payload["presentation_epoch"])
@@ -477,18 +488,96 @@ def _validate_common_metadata(
     }
 
 
+def _on_demand_panel_names() -> frozenset[str]:
+    """Return the panel names delivered only on demand (never eager).
+
+    Imported lazily: ``map_panels`` builds on this module, so a module-level
+    import would be circular. The set mirrors the JavaScript validator's
+    ``MAP_PANEL_SCHEMAS`` check in ``protocol/envelope.js``.
+    """
+    from web.webclient.presentation.map_panels import MAP_PANEL_SCHEMAS
+
+    return frozenset(MAP_PANEL_SCHEMAS)
+
+
+def _validate_removed_panels(
+    value: Any,
+    *,
+    panels: dict[str, Any],
+    known_panels: set[str] | None,
+) -> list[str]:
+    """Validate the exact ``removed_panels`` list of one ``ui_update``."""
+    if not isinstance(value, list):
+        raise ProtocolValidationError("removed_panels must be a JSON array")
+    if len(value) > MAX_REMOVED_PANELS:
+        raise ProtocolValidationError(
+            f"removed_panels exceeds the maximum of {MAX_REMOVED_PANELS} panels"
+        )
+    removed: list[str] = []
+    seen: set[str] = set()
+    for item in value:
+        name = _validate_panel_name(item)
+        if name in seen:
+            raise ProtocolValidationError(
+                f"removed_panels contains the duplicate name {name!r}"
+            )
+        seen.add(name)
+        removed.append(name)
+    on_demand = seen & _on_demand_panel_names()
+    if on_demand:
+        raise ProtocolValidationError(
+            f"removed_panels never names an on-demand panel {sorted(on_demand)}"
+        )
+    if known_panels is not None:
+        unknown = seen - known_panels
+        if unknown:
+            raise ProtocolValidationError(
+                f"removed_panels contains unknown panel names {sorted(unknown)}"
+            )
+    overlap = seen & set(panels)
+    if overlap:
+        raise ProtocolValidationError(
+            f"removed_panels overlaps replaced panels {sorted(overlap)}"
+        )
+    return removed
+
+
 def validate_ui_snapshot(payload: Any, *, known_panels: set[str] | None = None) -> dict[str, Any]:
     """Validate a full snapshot envelope, returning a normalized dict."""
     return _validate_common_metadata(
-        payload, UI_SNAPSHOT, known_panels=known_panels, panels_nonempty=True
+        payload,
+        UI_SNAPSHOT,
+        known_panels=known_panels,
+        panels_nonempty=True,
+        required_fields=set(_SNAPSHOT_FIELDS),
     )
 
 
 def validate_ui_update(payload: Any, *, known_panels: set[str] | None = None) -> dict[str, Any]:
-    """Validate a panel-update envelope, returning a normalized dict."""
-    return _validate_common_metadata(
-        payload, UI_UPDATE, known_panels=known_panels, panels_nonempty=True
+    """Validate one exact-base delta envelope, returning a normalized dict.
+
+    A ``ui_update`` carries the seven snapshot fields plus the exact committed
+    ``base_revision`` and the explicit ``removed_panels`` list. ``panels`` may
+    be empty (a metadata-only delta); removals are disjoint from the replaced
+    names and never name an on-demand map panel.
+    """
+    meta = _validate_common_metadata(
+        payload,
+        UI_UPDATE,
+        known_panels=known_panels,
+        panels_nonempty=False,
+        required_fields=set(_UPDATE_FIELDS),
     )
+    base_revision = _validate_revision(
+        payload["base_revision"], "base_revision", minimum=1
+    )
+    if base_revision >= meta["revision"]:
+        raise ProtocolValidationError("base_revision must be older than revision")
+    meta["base_revision"] = base_revision
+    meta["removed_panels"] = _validate_removed_panels(
+        payload["removed_panels"], panels=meta["panels"], known_panels=known_panels
+    )
+    return meta
 
 
 def _validate_result_data(value: Any) -> dict[str, Any]:
