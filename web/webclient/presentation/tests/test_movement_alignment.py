@@ -17,8 +17,8 @@ synchronization design:
   by the checkpoint, an old epoch publishing nothing, Telnet receiving no
   graphical state, and an unopened on-demand map presenter never running.
 
-Requirement annotations are intentionally absent: this change's requirement IDs
-exist only after the archive sync, which attaches their traceability.
+Each test that establishes a clause of a requirement carries the requirement's
+canonical ``capability::requirement`` id from ``tools.spec_traceability``.
 """
 
 from types import SimpleNamespace
@@ -33,6 +33,7 @@ from evennia.contrib.grid.xyzgrid.xyzroom import (
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.exits import Exit
 from typeclasses.npcs import NPC
@@ -134,6 +135,10 @@ class AreaIdentityTests(EvenniaTest):
         self.room2.key = "同名房間"
         self.room2.save()
 
+    @covers_requirement(
+        "webclient-event-alignment::"
+        "committed-area-and-instance-transitions-replace-deltas-with-fresh-alignment"
+    )
     def test_grid_identity_is_the_map_key_not_the_label_or_coordinates(self):
         first = _grid_room("同名房間", (10, 20), "map_a")
         same_map = _grid_room("同名房間", (11, 20), "map_a")
@@ -154,6 +159,10 @@ class AreaIdentityTests(EvenniaTest):
         self.assertIsNone(read_alignment_identity(_actor(room)))
         self.assertTrue(is_alignment_boundary(None, None), "unknown is conservative")
 
+    @covers_requirement(
+        "webclient-event-alignment::"
+        "committed-area-and-instance-transitions-replace-deltas-with-fresh-alignment"
+    )
     def test_pooled_wilderness_reuse_and_object_identity_are_not_boundaries(self):
         room = _terrain_room("荒野", (3, 4))
         other = _terrain_room("荒野", (90, 91))
@@ -185,6 +194,10 @@ class AreaIdentityTests(EvenniaTest):
         self.assertEqual(set(rooms), {int(self.room1.pk), int(self.room2.pk)})
         self.assertEqual([int(item.pk) for item in exits], [int(self.exit.pk)])
 
+    @covers_requirement(
+        "webclient-event-alignment::"
+        "committed-area-and-instance-transitions-replace-deltas-with-fresh-alignment"
+    )
     def test_instance_identity_uses_the_component_root_and_scene_identity(self):
         first = _instance_room("洞窟", self.room1, "instance:first")
         replacement = _instance_room("洞窟", self.room1, "instance:second")
@@ -228,10 +241,18 @@ class AreaIdentityTests(EvenniaTest):
         self.assertIsNone(read_alignment_identity(_actor(first)))
         self.assertIsNone(read_alignment_identity(_actor(second)))
 
+    @covers_requirement(
+        "webclient-event-alignment::"
+        "committed-area-and-instance-transitions-replace-deltas-with-fresh-alignment"
+    )
     def test_an_unknown_position_has_no_identity(self):
         self.assertIsNone(read_alignment_identity(_actor(None)))
         self.assertIsNone(read_alignment_identity(_actor(SimpleNamespace())))
 
+    @covers_requirement(
+        "webclient-event-alignment::"
+        "one-serialized-settlement-has-one-final-publication-owner"
+    )
     def test_identity_never_runs_a_map_presenter(self):
         with mock.patch(
             "web.webclient.presentation.area_map.area_map_presenter"
@@ -275,6 +296,10 @@ class CommittedMovementFactTests(EvenniaTest):
             Exit, key="door", location=self.room1, destination=destination
         )
 
+    @covers_requirement(
+        "webclient-event-alignment::"
+        "committed-area-and-instance-transitions-replace-deltas-with-fresh-alignment"
+    )
     def test_text_traversal_into_an_instance_emits_one_boundary_fact(self):
         destination, exit_obj = self._instance_destination()
 
@@ -290,6 +315,10 @@ class CommittedMovementFactTests(EvenniaTest):
         self.assertEqual(fact.source.layer, "interior")
         self.assertEqual(fact.destination.layer, "instance")
 
+    @covers_requirement(
+        "webclient-event-alignment::"
+        "committed-area-and-instance-transitions-replace-deltas-with-fresh-alignment"
+    )
     def test_same_area_text_move_emits_no_fact(self):
         with self.captureOnCommitCallbacks(execute=True):
             self.char1.execute_cmd(self.exit.key, session=self.session)
@@ -297,6 +326,10 @@ class CommittedMovementFactTests(EvenniaTest):
         self.assertIs(self.char1.location, self.room2)
         self.assertEqual(self.recorder.facts, [])
 
+    @covers_requirement(
+        "webclient-event-alignment::"
+        "committed-area-and-instance-transitions-replace-deltas-with-fresh-alignment"
+    )
     def test_a_refused_traversal_emits_no_fact(self):
         destination, exit_obj = self._instance_destination()
         with mock.patch(
@@ -308,6 +341,10 @@ class CommittedMovementFactTests(EvenniaTest):
         self.assertIs(self.char1.location, self.room1)
         self.assertEqual(self.recorder.facts, [])
 
+    @covers_requirement(
+        "webclient-event-alignment::"
+        "committed-area-and-instance-transitions-replace-deltas-with-fresh-alignment"
+    )
     def test_a_rolled_back_settlement_emits_no_fact(self):
         destination, exit_obj = self._instance_destination()
         with mock.patch(
@@ -321,6 +358,10 @@ class CommittedMovementFactTests(EvenniaTest):
         self.assertIs(self.char1.location, self.room1, "the relocation compensated")
         self.assertEqual(self.recorder.facts, [])
 
+    @covers_requirement(
+        "webclient-event-alignment::"
+        "committed-area-and-instance-transitions-replace-deltas-with-fresh-alignment"
+    )
     def test_an_unreadable_destination_identity_still_aligns(self):
         destination, exit_obj = self._instance_destination()
         # A missing scene identity makes the destination untrustworthy.
@@ -332,6 +373,10 @@ class CommittedMovementFactTests(EvenniaTest):
         self.assertEqual(len(self.recorder.facts), 1)
         self.assertIsNone(self.recorder.facts[0].destination)
 
+    @covers_requirement(
+        "webclient-event-alignment::"
+        "committed-area-and-instance-transitions-replace-deltas-with-fresh-alignment"
+    )
     def test_a_mixed_instance_component_aligns_conservatively(self):
         destination, exit_obj = self._instance_destination()
         # A connected sibling spawned from the same origin with another scene
@@ -345,6 +390,10 @@ class CommittedMovementFactTests(EvenniaTest):
         self.assertEqual(len(self.recorder.facts), 1)
         self.assertIsNone(self.recorder.facts[0].destination)
 
+    @covers_requirement(
+        "webclient-event-alignment::"
+        "one-serialized-settlement-has-one-final-publication-owner"
+    )
     def test_the_settlement_owner_does_not_duplicate_the_player_hook_fact(self):
         destination, exit_obj = self._instance_destination()
         from world.rules import movement_settlement
@@ -361,6 +410,10 @@ class CommittedMovementFactTests(EvenniaTest):
         self.assertTrue(start.called, "the hook runs and stands down")
         self.assertIs(self.char1.location, destination)
 
+    @covers_requirement(
+        "webclient-event-alignment::"
+        "committed-area-and-instance-transitions-replace-deltas-with-fresh-alignment"
+    )
     def test_a_direct_player_move_publishes_its_own_boundary(self):
         destination = _instance_room("洞窟", self.room2, "instance:direct")
 
@@ -373,6 +426,10 @@ class CommittedMovementFactTests(EvenniaTest):
         self.assertEqual(fact.source.layer, "interior")
         self.assertEqual(fact.destination.layer, "instance")
 
+    @covers_requirement(
+        "webclient-event-alignment::"
+        "committed-area-and-instance-transitions-replace-deltas-with-fresh-alignment"
+    )
     def test_an_npc_move_uses_the_settlement_owner(self):
         npc = create_object(NPC, key="同伴", location=self.room1)
         destination = create_object(Room, key="洞窟", location=None)
@@ -383,6 +440,10 @@ class CommittedMovementFactTests(EvenniaTest):
         self.assertIs(npc.location, destination)
         self.assertEqual([fact.actor_id for fact in self.recorder.facts], [int(npc.pk)])
 
+    @covers_requirement(
+        "webclient-event-alignment::"
+        "committed-area-and-instance-transitions-replace-deltas-with-fresh-alignment"
+    )
     def test_a_console_relocation_between_interiors_is_a_boundary(self):
         destination = create_object(Room, key="同名房間", location=None)
         with self.captureOnCommitCallbacks(execute=True):
@@ -473,6 +534,12 @@ class WatcherAlignmentTests(EvenniaTest):
             },
         }
 
+    @covers_requirement(
+        "webclient-event-alignment::"
+        "committed-area-and-instance-transitions-replace-deltas-with-fresh-alignment",
+        "webclient-event-alignment::"
+        "one-serialized-settlement-has-one-final-publication-owner",
+    )
     def test_text_boundary_move_publishes_one_snapshot_and_no_delta(self):
         self._prime()
         destination = _instance_room("同名房間", self.room1, "instance:watcher")
@@ -495,6 +562,12 @@ class WatcherAlignmentTests(EvenniaTest):
             )
         self.assertEqual(self.telnet.sent, [], "Telnet receives no graphical state")
 
+    @covers_requirement(
+        "webclient-event-alignment::"
+        "committed-area-and-instance-transitions-replace-deltas-with-fresh-alignment",
+        "webclient-event-alignment::"
+        "one-serialized-settlement-has-one-final-publication-owner",
+    )
     def test_graphical_boundary_move_publishes_one_snapshot_then_its_result(self):
         self._prime()
         # Two registered grid maps: the same display label on another map key
@@ -533,6 +606,10 @@ class WatcherAlignmentTests(EvenniaTest):
         self.assertEqual(result["presentation_revision"], snapshot["revision"])
         self.assertEqual(session.frames("ui_update"), [])
 
+    @covers_requirement(
+        "webclient-event-alignment::"
+        "committed-area-and-instance-transitions-replace-deltas-with-fresh-alignment"
+    )
     def test_same_area_graphical_move_stays_incremental(self):
         self._prime()
         with self.captureOnCommitCallbacks(execute=True):
@@ -550,6 +627,10 @@ class WatcherAlignmentTests(EvenniaTest):
         self.assertNotIn("ui_snapshot", session.names())
         self.assertIn("ui_action_result", session.names())
 
+    @covers_requirement(
+        "webclient-event-alignment::"
+        "one-serialized-settlement-has-one-final-publication-owner"
+    )
     def test_a_companion_cleanup_push_coalesces_with_the_checkpoint(self):
         from world.rules.party import join_party
 
@@ -575,6 +656,10 @@ class WatcherAlignmentTests(EvenniaTest):
             self.assertEqual(session.names(), ["ui_snapshot"])
             self.assertEqual(session.frames("ui_update"), [])
 
+    @covers_requirement(
+        "webclient-event-alignment::"
+        "one-serialized-settlement-has-one-final-publication-owner"
+    )
     def test_a_retired_epoch_checkpoint_publishes_nothing(self):
         self._prime()
         destination = _instance_room("同名房間", self.room1, "instance:retired")
@@ -685,6 +770,10 @@ class CheckpointCompletenessTests(EvenniaTest):
         self.scheduler.run()
         self.web.sent.clear()
 
+    @covers_requirement(
+        "webclient-event-alignment::"
+        "one-serialized-settlement-has-one-final-publication-owner"
+    )
     def test_a_checkpoint_restores_a_deliberately_omitted_panel(self):
         self._prime()
         self.state["status"] = 2
@@ -718,6 +807,10 @@ class CheckpointCompletenessTests(EvenniaTest):
         self.assertEqual(self.web.frames("ui_update"), [])
         self.assertEqual(self.map_calls, [], "an unopened map presenter never runs")
 
+    @covers_requirement(
+        "webclient-event-alignment::"
+        "committed-area-and-instance-transitions-replace-deltas-with-fresh-alignment"
+    )
     def test_a_failed_move_publishes_no_frame(self):
         self._prime()
         destination = _instance_room("洞窟", self.room1, "instance:failed")
