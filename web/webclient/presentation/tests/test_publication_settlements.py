@@ -27,6 +27,7 @@ from twisted.python.failure import Failure
 
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from world.rules.presentation_events import (
     AlignmentIdentity,
     PresentationAlignmentFact,
@@ -216,7 +217,11 @@ class PublicationGroupApiTests(unittest.TestCase):
         self.assertEqual(seen, [None])
         self.assertNotEqual(resumed[0].id, captured.id)
 
+    @covers_requirement(
+        "webclient-publication-settlements::independent-pending-ingress-retains-ordinary-execution-semantics"
+    )
     def test_a_callback_returning_a_pending_deferred_does_not_leak_its_group(self):
+        """R1: a returned Deferred never carries the invocation's causal group."""
         def operation():
             with publication_group() as group:
                 return group, Deferred()
@@ -396,7 +401,11 @@ class CoordinatorGroupingTests(unittest.TestCase):
             coordinator.session.sent.clear()
         return state, sessions, coordinators, scheduled
 
+    @covers_requirement(
+        "webclient-publication-settlements::every-watcher-receives-one-final-checkpoint-publication-per-committed-group"
+    )
     def test_every_watcher_receives_one_snapshot_in_either_callback_order(self):
+        """R2: both callback orders coalesce to one snapshot per watcher."""
         for push_first in (True, False):
             with self.subTest(push_first=push_first):
                 state, sessions, coordinators, scheduled = self._two_watchers()
@@ -431,7 +440,11 @@ class CoordinatorGroupingTests(unittest.TestCase):
                     self.assertEqual(snapshot["revision"], 2)
                     self.assertEqual(snapshot["panels"]["status"]["value"], 2)
 
+    @covers_requirement(
+        "webclient-publication-settlements::queued-publication-returns-its-actual-completion-outcome"
+    )
     def test_every_waiter_resolves_with_the_same_actual_receipt(self):
+        """R3: group waiters share the actual receipt after the send."""
         state, sessions, coordinators, scheduled = self._two_watchers()
         coordinator = coordinators[0]
         state["value"] = 3
@@ -450,7 +463,11 @@ class CoordinatorGroupingTests(unittest.TestCase):
         self.assertTrue(first_receipt.published)
         self.assertEqual(sessions[0].frames("ui_update")[0]["base_revision"], 1)
 
+    @covers_requirement(
+        "webclient-publication-settlements::queued-publication-returns-its-actual-completion-outcome"
+    )
     def test_retirement_resolves_every_group_waiter_with_no_publication(self):
+        """R3: retirement resolves every waiter with no publication."""
         state, sessions, coordinators, scheduled = self._two_watchers()
         coordinator = coordinators[0]
         group = new_publication_group()
@@ -492,7 +509,11 @@ class CoordinatorGroupingTests(unittest.TestCase):
             sessions[0].frames()[0]["base_revision"], 1
         )
 
+    @covers_requirement(
+        "webclient-publication-settlements::queued-publication-returns-its-actual-completion-outcome"
+    )
     def test_preflight_failure_errbacks_every_group_waiter_and_sends_nothing(self):
+        """R3: a preflight failure errbacks every waiter and sends nothing."""
         state, sessions, coordinators, scheduled = self._two_watchers()
         coordinator = coordinators[0]
         group = new_publication_group()
@@ -510,7 +531,11 @@ class CoordinatorGroupingTests(unittest.TestCase):
         self.assertEqual(sessions[0].sent, [])
         self.assertEqual(coordinator.revision, 1)
 
+    @covers_requirement(
+        "webclient-publication-settlements::queued-publication-returns-its-actual-completion-outcome"
+    )
     def test_send_failure_errbacks_every_waiter_and_reports_the_real_error(self):
+        """R3: a send failure errbacks every waiter with the real error."""
         state, sessions, coordinators, scheduled = self._two_watchers()
         coordinator = coordinators[0]
         state["value"] = 2
@@ -536,7 +561,11 @@ class CoordinatorGroupingTests(unittest.TestCase):
         receipt = publication_receipt(recovery)
         self.assertEqual(receipt.kind, "snapshot", "an escaped frame forbids deltas")
 
+    @covers_requirement(
+        "webclient-publication-settlements::queued-publication-returns-its-actual-completion-outcome"
+    )
     def test_the_pending_bound_overflow_explicitly_in_one_group_or_many(self):
+        """R3: the bounded ceiling fails explicitly instead of losing a waiter."""
         for spread in (False, True):
             with self.subTest(spread=spread):
                 state, sessions, coordinators, scheduled = self._two_watchers()
@@ -579,7 +608,11 @@ class CoordinatorGroupingTests(unittest.TestCase):
         self.assertEqual(publication_receipt(deferred).kind, "snapshot")
         self.assertEqual(sessions[0].names(), ["ui_snapshot"])
 
+    @covers_requirement(
+        "webclient-publication-settlements::every-watcher-receives-one-final-checkpoint-publication-per-committed-group"
+    )
     def test_later_asynchronous_work_is_a_distinct_ordered_publication(self):
+        """R2: later asynchronous work is its own ordered publication."""
         state, sessions, coordinators, scheduled = self._two_watchers()
         coordinator = coordinators[0]
         group = new_publication_group()
@@ -618,7 +651,11 @@ class CoordinatorGroupingTests(unittest.TestCase):
         retire.advance(0)
         self.assertEqual(sessions[0].names(), ["ui_action_result"])
 
+    @covers_requirement(
+        "webclient-publication-settlements::queued-publication-returns-its-actual-completion-outcome"
+    )
     def test_reentrant_sync_during_a_send_receives_its_own_later_receipt(self):
+        """R3: reentrant sync resolves with its own later revision."""
         state, sessions, coordinators, scheduled = self._two_watchers()
         coordinator = coordinators[0]
         state["value"] = 2
@@ -661,7 +698,11 @@ class TextIngressIndependenceTests(unittest.TestCase):
         self.scheduler.run()
         self.session.sent.clear()
 
+    @covers_requirement(
+        "webclient-publication-settlements::independent-pending-ingress-retains-ordinary-execution-semantics"
+    )
     def test_two_text_commands_settle_in_reverse_order(self):
+        """R1: reverse-order completions refresh in completion order."""
         first = Deferred()
         second = Deferred()
         observe_command_settlement(first, self.session)
@@ -679,7 +720,11 @@ class TextIngressIndependenceTests(unittest.TestCase):
         self.assertEqual(len(updates), 1, "both refreshes compare the same current state")
         self.assertEqual(updates[0]["panels"]["status"]["value"], 3)
 
+    @covers_requirement(
+        "webclient-publication-settlements::independent-pending-ingress-retains-ordinary-execution-semantics"
+    )
     def test_a_failed_command_preserves_its_failure_and_still_refreshes(self):
+        """R1: a failed command keeps its Failure and still refreshes."""
         pending = Deferred()
         observe_command_settlement(pending, self.session)
         self.state["value"] = 2
@@ -692,7 +737,11 @@ class TextIngressIndependenceTests(unittest.TestCase):
         # non-consuming, so a real caller owns that error exactly as before.
         pending.addErrback(lambda failure: None)
 
+    @covers_requirement(
+        "webclient-publication-settlements::independent-pending-ingress-retains-ordinary-execution-semantics"
+    )
     def test_text_during_a_pending_graphical_adapter_stays_available(self):
+        """R1: text is never blocked or serialized behind graphical work."""
         graphical_group = new_publication_group()
         with publication_group(graphical_group):
             self.coordinator.enqueue_publication(
@@ -820,7 +869,11 @@ class DispatcherGroupTests(unittest.TestCase):
         retire.advance(0)
         self.assertEqual(self.session.sent, sent_before)
 
+    @covers_requirement(
+        "webclient-publication-settlements::independent-pending-ingress-retains-ordinary-execution-semantics"
+    )
     def test_a_pending_adapter_does_not_inherit_the_invocation_group(self):
+        """R1: a resumed adapter inherits no causal group from its invocation."""
         held = Deferred()
         seen: list = []
 
@@ -929,7 +982,11 @@ class AlignmentDeliveryTests(EvenniaTest):
         for scheduler in self.schedulers:
             scheduler.run()
 
+    @covers_requirement(
+        "webclient-publication-settlements::every-watcher-receives-one-final-checkpoint-publication-per-committed-group"
+    )
     def test_push_and_fact_coalesce_into_one_snapshot_per_watcher(self):
+        """R2: ordinary push and checkpoint fact coalesce in either order."""
         for push_first in (True, False):
             with self.subTest(push_first=push_first):
                 self._prime()
@@ -953,7 +1010,11 @@ class AlignmentDeliveryTests(EvenniaTest):
                         session.frames("ui_snapshot")[0]["revision"], previous + 1
                     )
 
+    @covers_requirement(
+        "webclient-publication-settlements::every-watcher-receives-one-final-checkpoint-publication-per-committed-group"
+    )
     def test_a_fact_only_group_still_publishes_one_snapshot(self):
+        """R2: a fact-only committed group publishes one snapshot."""
         self._prime()
         with self.captureOnCommitCallbacks(execute=True):
             with publication_group() as group:
