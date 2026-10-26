@@ -1,55 +1,112 @@
 schema_version: 1
-greeting: 場邊的木刀排成一列，泰莉爾‧菲溫德剛收完最後一組動作，額上的汗還沒乾。她看了一眼你的站姿：「來看練刀？場子在這裡，木刀在門邊。我這裡沒有東西要給你，也沒有捷徑。」
+greeting: 練刀場邊的木刀在木架上整齊排成一列，泰莉爾‧菲溫德剛收完一組動作，額角微汗，平穩調勻氣息。她赤足站在場地邊緣，抬眼打量你的步履與站姿：「來看練刀？場子隨時空著，木刀就在門邊。我這裡不收學生，也沒有捷徑可傳。想練就拿刀進場，站穩腳步。」
 topics:
 - topic_id: ciaran_teliel_home.topic_01
   keyword: 刀術
   label: 刀術
+  variants:
+  - variant_id: blade_practitioner
+    priority: 10
+    when:
+      kind: skill_owned
+      skill_key: basic_swordplay
+      min_proficiency: 1
+    scene:
+      scene_id: ciaran_teliel_home.topic_01_swordsman_scene
+      revision: r2
+      lines:
+      - kind: speech
+        speaker: actor
+        text: 導師，我看過外頭不少使劍的門道，但基亞蘭的刀法動靜之間截然不同。能否請教貴族的刀術究竟講究什麼？
+      - kind: narration
+        text: 泰莉爾‧菲溫德目光落在對方的握劍手繭與沉穩站姿上，神情淡然，語氣依舊平靜。
+      - kind: speech
+        speaker: host
+        text: 「手上有繭，肩膀沉得下來，看來你平時握慣了兵器。不過基亞蘭的刀路和外頭的劍路不同，外頭講究刺擊與格擋，我們講究藉勢與流轉。刀鋒掠出去的時候，手腕不要僵死，順著身軀轉動的勢頭走。」
+      - kind: speech
+        speaker: actor
+        text: 順著身軀的勢頭走？也就是說，比起手臂發力，更重視整體的協調？
+      - kind: speech
+        speaker: host
+        text: 「算你懂一點。別叫我導師，我只是看著場子的人。基亞蘭的孩子先認刀柄，再認刀鋒，刀是用來守護的手段。真要體會差別，自己拿木刀進場走上幾百遍，身體比耳朵更早記住。」
   fallback:
     scene_id: ciaran_teliel_home.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 刀術
+      text: 請問泰莉爾導師，基亞蘭一族的刀術有什麼獨到之處？我看場邊練習的族人，揮刀的架勢和平常在外頭見過的劍士很不一樣。
+    - kind: narration
+      text: 泰莉爾‧菲溫德目光掃過對方的身形，雙手抱臂，神色冷靜而淡漠。
     - kind: speech
       speaker: host
-      text: 「基亞蘭的孩子先認刀柄，再認刀鋒。刀是谷裡人說話的另一種方式，多半用來守護。看好林邊樹幹上的刀痕，一代人留一片。」
+      text: 「別叫我導師，我不教人。基亞蘭的孩子先認刀柄，再認刀鋒。刀是谷裡人說話的另一種方式，用來守護的時候比用來殺敵的時候多。外頭的人握劍總想著一招分勝負，我們用刀，講究的是呼吸和腳步的長久平穩。」
+    - kind: speech
+      speaker: actor
+      text: 刀是說話的另一種方式？那要怎麼樣才能領會這種感覺？
+    - kind: speech
+      speaker: host
+      text: 「看好林邊樹幹上的刻痕，一代人留一片，每一道痕跡都清楚分明。本事只能靠自己日復一日練出來，問再多話，不如跨進場子握緊刀柄。」
 - topic_id: ciaran_teliel_home.topic_02
   keyword: 練習
   label: 練習
   fallback:
     scene_id: ciaran_teliel_home.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 練習
+      text: 如果我想在這裡練習刀術，有什麼特殊的規矩需要遵守嗎？平時又是怎麼指點初學者的？
+    - kind: narration
+      text: 泰莉爾‧菲溫德伸手指向門邊排列整齊的練習木刀，神色平靜。
     - kind: speech
       speaker: host
-      text: 「谷裡沒有誰會手把手教你，刀得自己練熟。想練就來場上，練到手記得為止。腳站穩。肩放鬆。」
+      text: 「谷裡沒有人會手把手帶著你比劃，也沒有課堂。想練就自己進場，練到手掌和腳步都記住為止。腳站穩，膝蓋微屈，沉肩。只要不打擾旁人，隨你想練多久。」
+    - kind: speech
+      speaker: actor
+      text: 完全不指導具體動作嗎？要是姿勢走樣或練偏了，該怎麼辦？
+    - kind: speech
+      speaker: host
+      text: 「姿勢走樣了，場上的風聲與刀身的震顫會提醒你。要是逞強揮空，扭傷的也是自己的手腕。痛過幾次，動作自然會收斂。看好前面的空地，繼續練。」
 - topic_id: ciaran_teliel_home.topic_03
   keyword: 練刀場
   label: 練刀場
   fallback:
     scene_id: ciaran_teliel_home.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 練刀場
+      text: 這處練刀場看起來經歷過很長的歲月。場地平時都開放給哪些人使用？
+    - kind: narration
+      text: 泰莉爾‧菲溫德轉身倒了一杯清水飲盡，目光掃過被無數腳步磨平的堅實地面。
     - kind: speech
       speaker: host
-      text: 「場子日夜都在。孩子們從清晨練到日暮，入夜以後，誰想練就自己來。木刀擱在門邊，借還都不用說。要真刀，去找場子另一頭的海莉爾。」
+      text: 「這片場子日夜都在。孩子們從清晨練到日暮，入夜以後，誰睡不著想活動筋骨就自己過來。門邊的木刀借了就拿去用，練完放回原處，不用向誰報備。不過要是想要一把趁手的真鋼好刀，得去找住在場子另一頭的海莉爾。」
+    - kind: speech
+      speaker: actor
+      text: 鑄刃者海莉爾打出來的刀，平時也會拿到這個場地上試用嗎？
+    - kind: speech
+      speaker: host
+      text: 「海莉爾每次淬好新刀，都會先拿來讓我試握手感與重心。好刀配好手，刀鋒偏了一分，落點就能看出來。村裡用刀的人都在這片空地上長大，場子很寬，容得下每把認真揮動的刀。」
 - topic_id: ciaran_teliel_home.topic_04
   keyword: 比劃
   label: 比劃
   fallback:
     scene_id: ciaran_teliel_home.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 比劃
+      text: 既然你在這裡看了幾百年刀術，不知能否拔刀同我切磋幾回合？我想見識真正的基亞蘭刀法。
+    - kind: narration
+      text: 泰莉爾‧菲溫德眼神微凝，隨手將掛在腰間的練習木刀按住，腳步絲毫未動。
     - kind: speech
       speaker: host
-      text: 「谷裡沒有人陪外人對打，我也不陪。孩子們練的時候，我在旁邊看著。想試自己的刀路，對著林邊的樹幹練。」
+      text: 「谷裡沒有人陪外人對打，我也不陪。村裡孩子們對練的時候，我也只是站在旁邊看著，絕不輕易插手。我們握刀是為了活著守護村子，不是拿來給旅人當作餘興消遣。」
+    - kind: speech
+      speaker: actor
+      text: 抱歉，是我唐突了。那如果只是想印證自己的刀路，又該怎麼做？
+    - kind: speech
+      speaker: host
+      text: 「想試自己的刀路，對著林邊的枯木樹幹練。每一刀斬得正不正、勁力透不透，木頭的裂口會誠實告訴你。收起浮躁心思，腳踏實地進場練習吧。」
