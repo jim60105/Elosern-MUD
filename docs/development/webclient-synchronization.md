@@ -477,6 +477,42 @@ movement identity reader/first producer; S owns the terminal/skip producers. A
 later options/art generation completion forms a new standalone group and is
 never suppressed by an earlier one.
 
+### Settlement checkpoints
+
+`world/rules/settlement_alignment.py` is the whole producer API for the two
+nonmovement causes. `checkpoint_owner` binds one causal publication group
+around a whole synchronous owner *before* its transaction starts, so the
+clock effects, aftermath, exam restoration and any nested relocation it causes
+share the checkpoint's identity. The emission itself is registered on the
+owning commit, so a refused, rolled-back or replayed operation publishes
+nothing.
+
+| Fact | Owner | Qualifies when | Never qualifies |
+|---|---|---|---|
+| `combat_terminal` | `combat_session/settlement.py::settle_session` | a newly committed terminal settlement, after final clear, clock settlement, aftermath, exam restoration and terminal writes; one fact per acting character and recorded player participant | ordinary engagement and every nonterminal round; the durable `settled_tick` replay branch; a rejected, stale or already-committed exit confirmation |
+| `combat_terminal` | `combat_session/settlement.py::restore_active_session` | an unparseable payload whose cleanup actually retires the session, after the safe clear — acting identity only, because the payload is untrusted | the already-settled leftover cleanup; a corrupt read whose ownership stays unresolved; a mere corrupt-read rejection (no settlement is fabricated) |
+| `skip_completed` | `time_skip.py::advance_wait` | a successful nonreplayed advance that settled `elapsed_seconds > 0`, including a safety-truncated partial interval that ends the request | a zero-length wait; a safety refusal; a rolled-back advance; a duplicate operation receipt; a practice-booking-only action |
+| `skip_completed` | `time_skip.py::continue_sleep` | a newly committed result marking the accepted receipt completed, after the receipt and any continuation decision committed | sleep entry; an owner dream question; a retained (still sleeping) partial interval; a replayed receipt; an interval settled for an owner continuation |
+| `skip_completed` | `time_skip.py::continue_owner_sleep` | the continuation as a whole reached its completed result, after the final disposition committed — once, never per interval | a paused, interrupted or retained continuation; a replayed owner operation |
+
+Sleep entry is therefore never a checkpoint by itself: `enter_sleep`,
+`enter_party_sleep`, `sleep_control.begin_all_party_sleep` and the
+already-recovered `begin_sleep` branch publish nothing, and the dream
+question/handoff choice opening changes only ordinary candidates.
+`server/dream_service.py` registers its departure continuation through
+`on_publication_commit`, so the completion runs under the group of the action
+that authorized it even though it executes after that transaction commits; the
+dream adapter names that group in the private `publication_group_id` slot when
+the action already completed synchronously.
+
+A terminal combat result therefore declares the same bounded panel set as an
+ordinary round: the checkpoint, not an empty affected-panel declaration, owns
+completeness. Both transports agree — a text command publishes the checkpoint's
+own group and the ordinary post-command refresh then finds nothing left to
+compare, while a graphical action merges the checkpoint into its completion so
+each watcher receives one fresh complete snapshot followed by its matching
+`ui_action_result`.
+
 ### Movement identity and producers
 
 `world/maps/area_identity.py` is the read-only identity owner for the movement

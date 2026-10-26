@@ -71,6 +71,7 @@ from world.rules.player_messages import (
     PARTY_EXIT_CONSEQUENCE_LINES,
     PARTY_EXIT_OPERATION_LABELS,
 )
+from world.rules.settlement_alignment import checkpoint_owner
 
 PARTY_EXIT_RETREAT = "retreat"
 PARTY_EXIT_SURRENDER = "surrender"
@@ -510,6 +511,7 @@ def _settled_receipt_result(
     }
 
 
+@checkpoint_owner
 @serialized_combat_write
 def confirm_party_exit(
     commander: Any,

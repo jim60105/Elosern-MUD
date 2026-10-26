@@ -1511,6 +1511,12 @@ class ArtSnapshotIntegrationTests(BattlefieldIsolation, EvenniaTest):
         monster.location = room
         engage(self.char1, monster)
         envelope = self._sync()
+        # A committed checkpoint fans out through the live watcher registry, so
+        # this transport must really be a live session on the handler (the
+        # fixture session is constructed off-handler).
+        self.ws_session.sessid = 900
+        self.sessionhandler[self.ws_session.sessid] = self.ws_session
+        self.addCleanup(self.sessionhandler.__delitem__, 900)
         coordinator = __import__(
             "web.webclient.presentation.coordinator", fromlist=["attach_coordinator"]
         ).attach_coordinator(self.ws_session, build_production_registry())
@@ -1556,22 +1562,42 @@ class ArtSnapshotIntegrationTests(BattlefieldIsolation, EvenniaTest):
                 "confirmation_token": prompt["data"]["confirmation_token"],
             },
         }
-        handle_ui_action(
-            self.ws_session,
-            self.char1,
-            confirm_action,
-            build_production_action_registry(),
-            build_production_registry(),
-        )
+        # The terminal settlement's committed callbacks run here (a test
+        # transaction would otherwise discard them), which is what emits the
+        # terminal checkpoint.
+        from web.webclient.presentation import alignment
+
+        alignment.connect_alignment_observer()
+        with self.captureOnCommitCallbacks(execute=True):
+            handle_ui_action(
+                self.ws_session,
+                self.char1,
+                confirm_action,
+                build_production_action_registry(),
+                build_production_registry(),
+            )
         # A terminal outcome (the confirmed surrender) publishes the committed
-        # post-combat state through the one publication owner: the mode flips
-        # back to exploration, so the completion's exact-base delta carries
-        # every mode-relevant panel that changed, including the art catalog
-        # without the session's own monster.
+        # post-combat state through the one publication owner: the committed
+        # terminal checkpoint is one freshly rendered complete snapshot, so
+        # every mode-relevant panel is present and the art catalog never
+        # carries the ended session's own monster.
         recorded = [call.kwargs for call in self.sessionhandler.data_out.call_args_list]
         frames = recorded_frames(recorded)
         self.assertTrue(frames, "a terminal combat action must publish presentation")
         self.assertEqual(frames[-1]["mode"], "exploration")
+        # The terminal checkpoint is one freshly rendered complete snapshot; a
+        # later independent generation may still publish its own entry
+        # afterwards.
+        snapshots = [frame for frame in frames if "base_revision" not in frame]
+        self.assertEqual(
+            len(snapshots), 1, "the terminal checkpoint is never a partial delta"
+        )
+        terminal_result = [
+            call.kwargs["ui_action_result"][0][0]
+            for call in self.sessionhandler.data_out.call_args_list
+            if "ui_action_result" in call.kwargs
+        ][-1]
+        self.assertEqual(terminal_result["code"], "combat_terminal")
         committed = committed_view(recorded, base_panels=envelope["panels"])
         panels = committed["panels"]
         for name in ("status", "context_actions", "art", "exploration", "character", "services", "local_map"):

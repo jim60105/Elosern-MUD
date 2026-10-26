@@ -22,6 +22,7 @@ from world.narrative.authoring import (
     validate_direction,
 )
 from world.observability import log_info, log_warn
+from world.rules.presentation_events import on_publication_commit
 
 dream_state = surface.dream_state
 
@@ -125,7 +126,13 @@ def authorize_departure_continuation(actor) -> None:
         generation=generation,
     )
     if authorized is not None:
-        transaction.on_commit(
+        # The committed continuation is one settlement of the retained sleep,
+        # so it must publish under the causal group of the action that
+        # authorized it even though it runs after this transaction commits
+        # (webclient-settlement-alignment). A plain ``transaction.on_commit``
+        # would run outside that group and the checkpoint would arrive as a
+        # second publication.
+        on_publication_commit(
             lambda: _continue_owner_after_commit(
                 owner, authorized["sleep_id"], authorized["generation"]
             )

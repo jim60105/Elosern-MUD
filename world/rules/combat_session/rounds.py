@@ -35,6 +35,7 @@ from world.rules.combat_session.writer import (
 )
 from world.rules.combat_session.policies import _party_round_provider
 from world.rules.combat_session.lifecycle import _persist
+from world.rules.settlement_alignment import checkpoint_owner
 from world.rules.combat_session.records import (
     CombatSessionRecord,
     boundary_sleep_evidence,
@@ -556,6 +557,7 @@ def preflight_draft_entries(
     }
 
 
+@checkpoint_owner
 @serialized_combat_write
 def confirm_actor_command(
     commander: Any,
@@ -999,6 +1001,7 @@ def _finalize_resolved_round(
     return result, notifications
 
 
+@checkpoint_owner
 def _submit_request(
     actor: Any,
     record: CombatSessionRecord,

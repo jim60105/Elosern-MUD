@@ -24,6 +24,11 @@ from world.rules.combat_session.writer import serialized_combat_write
 from world.rules.overwhelm import classify_overwhelm
 from world.rules.combat_session.lifecycle import _persist, clear_session
 from world.rules.combat_session.records import CombatSessionRecord, read_session
+from world.rules.presentation_events import publication_group
+from world.rules.settlement_alignment import (
+    checkpoint_owner,
+    publish_combat_terminal,
+)
 from world.rules.skip_safety import register_active_battlefield
 
 _ROUND_SECONDS = int(COMBAT_YAML["round"]["seconds"])
@@ -379,6 +384,7 @@ def _continue_or_settle(
     )
 
 
+@checkpoint_owner
 @serialized_combat_write
 def settle_session(
     actor: Any,
@@ -406,6 +412,14 @@ def settle_session(
     step leaves the durable session intact for exactly one retry. The
     persistent exam host is restored inside the same transaction and is
     never deleted.
+
+    One committed terminal settlement is one alignment checkpoint
+    (webclient-settlement-alignment): the fact is registered after the final
+    clear, clock settlement, aftermath, exam restoration and terminal writes,
+    inside this transaction's causal publication group, so every watcher
+    receives one freshly rendered complete snapshot instead of this
+    settlement's delta. A replayed settlement (the durable ``settled_tick``
+    gate) and every nonterminal round publish no checkpoint at all.
     """
     from evennia.objects.models import ObjectDB
     from django.db import transaction
@@ -650,6 +664,13 @@ def settle_session(
                 # transaction, so restoration commits or rolls back with the
                 # exam outcome (persistent-guild-exam-lifecycle).
                 _restore_exam_participants(actor, record, battlefield)
+            # The committed terminal checkpoint: every terminal write above has
+            # landed, so this is the one place the fresh complete alignment is
+            # known to be truthful (webclient-settlement-alignment). It joins
+            # this transaction's causal publication group, so a nested
+            # relocation, aftermath push or clock effect coalesces into the
+            # same single final publication.
+            publish_combat_terminal(actor, record.player_ids)
             # Boundary event fires only on the OUTERMOST durable commit: a
             # settlement reached inside a round's transaction is a savepoint, and
             # a rolled-back attempt must emit nothing (spec scenario).
@@ -1203,7 +1224,14 @@ def restore_active_session(actor: Any) -> None:
         # own durable obligation and never blocks the session clear.
         retired = _retire_unidentified_exam(actor)
         if retired:
-            clear_session(actor, None, None)
+            # A cleanup that retires a previously active presentation is a
+            # committed combat termination too, but the payload is untrusted:
+            # only the acting character's own identity may name a target, and
+            # no participant id, outcome or settlement is inferred from it
+            # (webclient-settlement-alignment).
+            with publication_group():
+                clear_session(actor, None, None)
+                publish_combat_terminal(actor)
         return
     if record is None:
         return

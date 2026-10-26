@@ -4,16 +4,16 @@ All checkboxes are implementation work, not authorization to apply during propos
 
 ## 1. Authoritative completion hooks
 
-- [ ] 1.1 Write test_settlement_alignment graphical/text terminal cases, then emit combat_terminal from settle_session after final committed terminal writes and safe actual session-retirement cleanup. Exercise terminal opening, field-cast opening, successful exit, defeat/victory/exam and deduplicated replay. Keep start/nonterminal round incremental and terminal action-local round data intact. Update checkpoint docs.
-- [ ] 1.2 Write explicit rest/wait/sleep receipt cases, then emit skip_completed from successful advance_wait and completed nonreplayed sleep owners after final receipt/decision writes. Cover all exact caller routes listed in design including retained owner continuation/dream departure, zero-time entry/no receipt, partial retained, completed terminal, rollback and operation replay. Do not hook general WorldClock.advance or _record and do not classify action IDs.
+- [x] 1.1 Write test_settlement_alignment graphical/text terminal cases, then emit combat_terminal from settle_session after final committed terminal writes and safe actual session-retirement cleanup. Exercise terminal opening, field-cast opening, successful exit, defeat/victory/exam and deduplicated replay. Keep start/nonterminal round incremental and terminal action-local round data intact. Update checkpoint docs.
+- [x] 1.2 Write explicit rest/wait/sleep receipt cases, then emit skip_completed from successful advance_wait and completed nonreplayed sleep owners after final receipt/decision writes. Cover all exact caller routes listed in design including retained owner continuation/dream departure, zero-time entry/no receipt, partial retained, completed terminal, rollback and operation replay. Do not hook general WorldClock.advance or _record and do not classify action IDs.
 
 ## 2. Integration and ownership
 
-- [ ] 2.1 Enroll combat_result/action normalization and sleep/dream refreshes in P causal groups plus M facts without empty-scope forced snapshots; set private publication_group_id and attach terminal round context before drain. Assert nested movement/combat/skip reasons produce one final fresh snapshot for each watcher in both callback orders, its result names the actual receipt target and text/async no-ingress paths agree. Register test_settlement_alignment.py once, retain existing test_art_panel terminal no-partial assertions, and update traceability/checkpoint documentation.
+- [x] 2.1 Enroll combat_result/action normalization and sleep/dream refreshes in P causal groups plus M facts without empty-scope forced snapshots; set private publication_group_id and attach terminal round context before drain. Assert nested movement/combat/skip reasons produce one final fresh snapshot for each watcher in both callback orders, its result names the actual receipt target and text/async no-ingress paths agree. Register test_settlement_alignment.py once, retain existing test_art_panel terminal no-partial assertions, and update traceability/checkpoint documentation.
 
 ## 3. Focused integrated verification
 
-- [ ] 3.1 Run S-PY below after edits plus contract_gate. Preserve existing guild exam, skip safety, compensation, sleep and dialogue availability ownership; no persistent synchronization attributes or new player command syntax.
+- [x] 3.1 Run S-PY below after edits plus contract_gate. Preserve existing guild exam, skip safety, compensation, sleep and dialogue availability ownership; no persistent synchronization attributes or new player command syntax.
 
 ## Verification commands
 

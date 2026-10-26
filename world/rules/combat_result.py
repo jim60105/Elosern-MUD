@@ -86,12 +86,12 @@ def settle_to_oob_result(result: dict[str, Any]) -> dict[str, Any]:
     declares the affected panels so the dispatcher publishes canonical ``status``
     and ``context_actions`` replacements before unlocking the browser.
 
-    A terminal settlement declares an empty affected-panel set, which the
-    dispatcher interprets as a full-snapshot publication: the mode flips back
-    to exploration, so every mode-relevant panel (exploration, character,
-    services, local_map, status, context_actions, art) must be replaced with
-    post-settlement canonical state. Non-terminal rounds keep the small
-    four-panel update.
+    A terminal settlement declares the same bounded panel set as a round: the
+    committed terminal checkpoint publishes the fresh complete snapshot
+    (``world.rules.settlement_alignment``), so this declaration no longer
+    serves as an accidental "unknown scope" full re-render trigger. The
+    dispatcher still expands every mode-relevant panel when the mode flips
+    back to exploration.
 
     A success result that carries the completing action's frozen round record
     (``result["round_record"]``, attached by the ordinary-round path of
@@ -130,7 +130,7 @@ def settle_to_oob_result(result: dict[str, Any]) -> dict[str, Any]:
             "outcome": "success",
             "code": outcome,
             "message": terminal_outcome_message(outcome),
-            "affected_panels": (),
+            "affected_panels": AFFECTED_PANELS,
         }
     if round_record is not None:
         oob["combat_round"] = round_record

@@ -58,6 +58,11 @@ from world.rules.party_scope import (
     resolve_commander,
 )
 from world.rules.progression import proficiency_cap, skill_proficiency_level
+from world.rules.settlement_alignment import (
+    checkpoint_owner,
+    publish_awake_skip,
+    publish_completed_sleep,
+)
 from world.rules.sleep_receipt import (
     CONTINUATION_COMPLETE,
     CONTINUATION_NONE,
@@ -424,6 +429,7 @@ def unsafe_rejection(actor: Any) -> str | None:
     return _REJECTION_MESSAGES[reason]
 
 
+@checkpoint_owner
 def advance_wait(
     actor: Any,
     seconds: int,
@@ -441,6 +447,12 @@ def advance_wait(
     standing booking before the advance; an unlabeled wait writes no booking
     and leaves every member's standing booking to the clock's practice stage,
     which settles only members whose sampled initial activity was awake.
+
+    A successful advance that actually settled a positive interval is one
+    settled explicit skip, so it publishes the alignment checkpoint after the
+    clock and booking outcome committed (webclient-settlement-alignment). A
+    zero-length request, a refusal, a rolled-back advance and a duplicate
+    operation receipt publish none.
     """
     recorded = _recorded(operation_id)
     if recorded is not None:
@@ -481,6 +493,7 @@ def advance_wait(
         fatigue_commits=tuple(commits),
     )
     _record(result)
+    publish_awake_skip(actor, result)
     return result
 
 
@@ -766,6 +779,7 @@ def _replayed_result(receipt: SleepReceipt, body: Any) -> SkipResult:
     )
 
 
+@checkpoint_owner
 def continue_sleep(
     actor: Any,
     entry: SleepEntry | None = None,
@@ -794,6 +808,14 @@ def continue_sleep(
 
     A forced sleep is an accepted receipt too: its existing threshold target
     is continued without inventing a voluntary posture or a new plan.
+
+    A newly committed result that marks the accepted receipt completed is one
+    settled explicit skip and publishes its alignment checkpoint after the
+    receipt and any continuation decision committed
+    (webclient-settlement-alignment). A retained (still sleeping) interval, a
+    replayed receipt and an interval settled on behalf of an owner
+    continuation publish none: only the owner knows when that operation as a
+    whole completed.
     """
     recorded = _recorded(operation_id)
     if recorded is not None:
@@ -923,6 +945,8 @@ def continue_sleep(
         interrupted=any(event.interactive for event in events),
     )
     _record(result)
+    if continuation is None:
+        publish_completed_sleep(member, result)
     return result
 
 
@@ -1196,6 +1220,7 @@ def _party_progress_signature(commander: Any) -> tuple[tuple[int, str | None, in
 _CONTINUATION_INTERVAL_BOUND = 64
 
 
+@checkpoint_owner
 def continue_owner_sleep(
     actor: Any,
     *,
@@ -1213,6 +1238,12 @@ def continue_owner_sleep(
     safety gate, a control change or a corrupt/stale receipt pauses the
     continuation with its remaining target intact. A retried interval replays
     from its receipt identity instead of settling again.
+
+    The operation as a whole is one settlement, so the delegated intervals
+    publish no checkpoint of their own and the single freshly aligned
+    publication is registered here, after the final disposition and result
+    committed (webclient-settlement-alignment). A paused, interrupted,
+    retained or replayed continuation publishes none.
     """
     from world.rules.possession import current_possession
 
@@ -1319,13 +1350,19 @@ def continue_owner_sleep(
         all_events.extend(interval.events)
         if interval.summary:
             summaries.append(interval.summary)
+        after_receipt = _receipt_for(commander)
+        if after_receipt is None or not after_receipt.sleeping:
+            # The authoritative receipt reached completion in this very
+            # interval, which outranks an interactive event it coincided with
+            # (an event due exactly at the accepted target): there is no
+            # retained plan left to pause, and pausing would claim a
+            # continuation nothing could resume.
+            continuation = CONTINUATION_COMPLETE
+            interrupted = interrupted or interval.interrupted
+            break
         if interval.interrupted:
             continuation = CONTINUATION_PAUSED
             interrupted = True
-            break
-        after_receipt = _receipt_for(commander)
-        if after_receipt is None or not after_receipt.sleeping:
-            continuation = CONTINUATION_COMPLETE
             break
         if interval.elapsed_seconds <= 0 and (
             _party_progress_signature(commander) == before
@@ -1375,6 +1412,7 @@ def continue_owner_sleep(
         continuation=continuation,
     )
     _record(result)
+    publish_completed_sleep(commander, result)
     return result
 
 

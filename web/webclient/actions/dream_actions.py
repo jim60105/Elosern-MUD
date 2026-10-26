@@ -39,8 +39,23 @@ def validate(action, payload):
 
 
 def adapter(action, actor, payload, session=None):
+    from world.rules.presentation_events import current_publication_group
+
     from server.dream_service import act
+
     deferred = act(actor, action, session=session, **payload)
+    if deferred.called and isinstance(deferred.result, dict):
+        # A confirmation or awakening completes synchronously inside this call,
+        # so its committed sleep settlement belongs to the action's causal
+        # group (webclient-settlement-alignment). Naming it here lets the
+        # dispatcher attach the result to that group's single final
+        # publication; a genuine asynchronous completion has no live binding
+        # and keeps its own entry.
+        group = current_publication_group()
+        if group is not None:
+            from web.webclient.actions.dispatcher import PUBLICATION_GROUP_FIELD
+
+            deferred.result[PUBLICATION_GROUP_FIELD] = group.id
     if action == "say" and not deferred.called:
         # Generation completion refreshes the panel separately. Returning now
         # keeps draft/confirm/awakening dispatchable while a model is pending.

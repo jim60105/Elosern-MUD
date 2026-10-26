@@ -93,14 +93,29 @@ class CombatResultRenderingTests(unittest.TestCase):
         )
         self.assertNotIn("combat_round", rejected)
 
-    def test_oob_terminal_result_declares_no_affected_panels(self):
+    def test_oob_terminal_result_declares_the_bounded_panel_set(self):
         result = settle_to_oob_result({"outcome": "fled"})
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "fled")
         self.assertEqual(result["message"], terminal_outcome_message("fled"))
-        # A terminal outcome must publish a full snapshot, not a partial
-        # update: the mode flips back to exploration.
-        self.assertEqual(result["affected_panels"], ())
+        # A terminal outcome keeps the same bounded panel declaration as a
+        # round: the committed terminal checkpoint owns the fresh complete
+        # snapshot, so an empty "unknown scope" set is no longer the mechanism.
+        self.assertEqual(
+            result["affected_panels"],
+            (
+                "status",
+                "context_actions",
+                "art",
+                "party",
+                "services",
+                "objectives",
+                "quest_log",
+                "combat_beats",
+                "item_holdings",
+                "party_inventory",
+            ),
+        )
 
     def test_oob_rejected_result_maps_reason(self):
         result = settle_to_oob_result(
