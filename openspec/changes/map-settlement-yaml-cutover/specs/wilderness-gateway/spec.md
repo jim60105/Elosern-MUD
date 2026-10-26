@@ -14,11 +14,8 @@ Immutable game wilderness-entry views SHALL derive solely from settlement-owned 
   `ANCHOR_PLACEMENT_REGISTRY` key must also appear
 
 #### Scenario: Derived geometry matches the authored mask
-- **WHEN** `footprint_cells`, `anchor_cell`, and `approach_cell` are read for the
-  `"capital_altoria"` entry
-- **THEN** `footprint_cells` matches the authored mask at its declared origin, `anchor_cell`
-  is `(860, 1080)`, the `"n"` gate's approach cell is `(860, 1077)`, and the `"w"` gate's approach
-  cell is `(864, 1080)`
+- **WHEN** a synthetic mask with rows `###`, `.##`, `###` is placed at origin `(10,20)` with north and west return gates
+- **THEN** its midpoint anchor is `(11,21)`, its occupied cells exclude `(10,21)`, its north-return approach is `(11,19)` and its west-return approach is `(13,21)`; shipped-coordinate preservation belongs to temporary conversion evidence
 
 #### Scenario: Gate identity is globally unique
 
@@ -46,7 +43,7 @@ Immutable game wilderness-entry views SHALL derive solely from settlement-owned 
 - **WHEN** the footprint cells of every registry entry are collected
 - **THEN** no cell belongs to two entries
 
-#### Scenario: Gate and entry loaded values
+#### Scenario: Gate and entry dataclass fields
 - **WHEN** the dataclasses are defined
 - **THEN** entry/gate values are immutable and resolve direction, target, mask, origin and gates from the settlement document, with runtime coordinates derived from the qualified target
 

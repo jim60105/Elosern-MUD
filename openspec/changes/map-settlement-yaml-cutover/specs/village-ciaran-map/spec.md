@@ -49,3 +49,11 @@ Village geometry SHALL use integer metres from its settlement document while ret
 - **WHEN** the existing village map is converted or a bound node is moved
 - **THEN** node IDs, directions and room joins remain stable without inferring a new exit from coordinates; existing prose/population remain unchanged by conversion
 
+#### Scenario: Exact metric positions
+- **WHEN** a synthetic branching village document is loaded and a node is moved
+- **THEN** its integer-metre binding changes without coordinate collision, ID change or a recomputed authored compass direction
+
+#### Scenario: Underground setting and route
+- **WHEN** the village source is converted and a source-defined route is measured
+- **THEN** existing prose and concealed-entry semantics remain unchanged and route length uses its metre edges; underground setting fidelity is human-reviewed without a copied prose/duration approval table
+

@@ -101,3 +101,11 @@ Capital node positions SHALL be integer metres from the settlement document, wit
 - **WHEN** the existing capital declaration is converted without an authoring edit
 - **THEN** temporary comparison confirms no geography/topology/prose change and permanent tests establish unit, identity and consumer behavior without a duplicated coordinate approval table
 
+#### Scenario: Exact metric positions
+- **WHEN** a synthetic capital-format document declares integer-metre positions and directed roads
+- **THEN** loaded physical coordinates equal those inputs without collision, identity change or compass inference; production conversion preservation is temporary comparison evidence
+
+#### Scenario: Physical city interpretation
+- **WHEN** capital geometry is inspected and routes are measured
+- **THEN** scale and lengths use actual source metres, and geometry does not infer population or claim that all housing is authored; setting fidelity remains human-reviewed
+
