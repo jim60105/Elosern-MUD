@@ -5,6 +5,7 @@
 var C = require("./constants.js");
 var core = require("./core.js");
 var envelope = require("./envelope.js");
+var immutable = require("./immutable.js");
 var mapPanels = require("./panels/map_panels.js");
 var mapParts = require("./map_parts.js");
 var publicationParts = require("./publication_parts.js");
@@ -55,6 +56,13 @@ var incompatible = false;
 var lastActionResult = null;
 var listeners = [];
 var connected = false;
+// The one immutable committed record of the current committed state
+// (webclient-immutable-adoption). Every mutating transition ends in `notify`,
+// which rebuilds this record and hands the SAME object to every listener, so
+// a publication notifies once with one owned frozen value and ordinary reads
+// never clone the whole state. `null` means "not published yet" and is
+// resolved lazily by the first `getCommittedState` read.
+var committedState = null;
 
 function createPublicationAssembler() {
   var capturedGeneration = generation;
@@ -191,6 +199,9 @@ function settleRecovery(isSnapshot, committedRevision) {
   }
 }
 
+// The explicit detached snapshot (webclient-immutable-adoption): a deep mutable
+// copy, isolated from the reducer's internals and from every future commit. A
+// consumer may edit it freely and may retain it across later commits.
 function cloneState() {
   var panelCopy = {};
   Object.keys(panels).forEach(function (name) {
@@ -226,11 +237,58 @@ function cloneState() {
   };
 }
 
+// One frozen shallow dictionary over the owned values it names: a panel or map
+// member is a committed value already frozen by adoption, so the copy shares
+// it by reference and only the membership (keys) is new.
+function ownedDictionary(source) {
+  var copy = {};
+  Object.keys(source).forEach(function (name) {
+    copy[name] = source[name];
+  });
+  return Object.freeze(copy);
+}
+
+// The immutable committed record: the read contract consumers share. Built
+// once per publication from values the reducer already owns; nothing here is
+// copied deeply, so an unchanged panel keeps its identity through the delta
+// that replaced another one.
+function buildCommittedState() {
+  return Object.freeze({
+    generation: generation,
+    phase: phase,
+    activeEpoch: activeEpoch,
+    revision: revision,
+    mode: mode,
+    layoutVersion: layoutVersion,
+    serverTime: serverTime,
+    panels: ownedDictionary(panels),
+    maps: ownedDictionary(maps),
+    mapPublications: ownedDictionary(mapPublications),
+    recovery: Object.freeze({
+      status: recovery.status,
+      cause: recovery.cause,
+      generation: recovery.generation,
+      targetRevision: recovery.targetRevision,
+    }),
+    protocolIncompatible: protocolIncompatible(),
+    mutationsLocked: mutationsLocked,
+    protocolError: protocolError,
+    lastActionResult: lastActionResult,
+    retiredEpochCount: retired.size(),
+    connected: connected,
+  });
+}
+
 function notify() {
-  var snapshot = cloneState();
+  // Capture this publication's record in a local first: a listener may
+  // synchronously cause another notification (the app records a recovery
+  // episode from inside its own publish), and every listener of THIS
+  // publication must still receive this publication's record.
+  var published = buildCommittedState();
+  committedState = published;
   listeners.slice().forEach(function (listener) {
     try {
-      listener(snapshot);
+      listener(published);
     } catch (error) {
       // A broken renderer must never break the reducer.
     }
@@ -238,15 +296,20 @@ function notify() {
 }
 
 // Stage the eager panel map a presentation would commit, without touching the
-// committed state. An update keeps every unchanged committed panel, applies the
-// explicit removals, then replaces the named panels completely; a snapshot
-// keeps nothing. Every retained and staged value is cloned, so a rejected or
-// accepted presentation never aliases transport data or committed state.
+// committed state. An update keeps every unchanged committed panel by
+// reference, applies the explicit removals, then replaces the named panels
+// completely; a snapshot keeps nothing. Every staged replacement is adopted:
+// copied away from the transport's object graph and frozen once, so a rejected
+// or accepted presentation never aliases transport data and a later write
+// through the source envelope cannot reach committed state. A snapshot reuses
+// the committed value of a panel whose content is structurally identical
+// (`equalOwned`), so an equal complete alignment publishes unchanged data as
+// the same objects and no consumer replays it.
 function stagePanels(meta, isSnapshot) {
   var staged = {};
   if (!isSnapshot) {
     Object.keys(panels).forEach(function (name) {
-      staged[name] = JSON.parse(canonicalJson(panels[name]));
+      staged[name] = panels[name];
     });
     meta.removedPanels.forEach(function (name) {
       delete staged[name];
@@ -256,7 +319,16 @@ function stagePanels(meta, isSnapshot) {
     if (Object.prototype.hasOwnProperty.call(mapPanels.MAP_PANEL_SCHEMAS, name)) {
       return;
     }
-    staged[name] = JSON.parse(canonicalJson(meta.panels[name]));
+    var incoming = meta.panels[name];
+    if (
+      isSnapshot &&
+      Object.prototype.hasOwnProperty.call(panels, name) &&
+      immutable.equalOwned(panels[name], incoming)
+    ) {
+      staged[name] = panels[name];
+      return;
+    }
+    staged[name] = immutable.freezeOwned(immutable.copyOwned(incoming));
   });
   return staged;
 }
@@ -277,7 +349,9 @@ function commitPresentation(meta, isSnapshot, staged) {
   revision = meta.revision;
   mode = meta.mode;
   layoutVersion = meta.layoutVersion;
-  serverTime = meta.serverTime;
+  // `validateServerTime` already builds a fresh record from the payload's
+  // scalars; freezing it makes the adopted metadata immutable as well.
+  serverTime = immutable.freezeOwned(meta.serverTime);
   // A full snapshot replaces the complete eager store atomically, including
   // panels omitted from the new payload. An update replaces only the named
   // panels, each completely, never merges nested fields, and deletes exactly
@@ -288,7 +362,9 @@ function commitPresentation(meta, isSnapshot, staged) {
     if (!Object.prototype.hasOwnProperty.call(mapPanels.MAP_PANEL_SCHEMAS, name)) {
       return;
     }
-    maps[name] = JSON.parse(canonicalJson(meta.panels[name]));
+    // Each on-demand map is adopted once, on its own publication; every later
+    // commit carries the same frozen value by reference.
+    maps[name] = immutable.freezeOwned(immutable.copyOwned(meta.panels[name]));
     mapPublications[name] = meta.revision;
   });
   // An unfinished transfer at or below the committed revision can never be
@@ -509,7 +585,19 @@ function receivePublicationPart(payload) {
 }
 
 return {
+  // Two explicit read contracts on one reducer (webclient-immutable-adoption):
+  // `getState` is the detached mutable snapshot (a deep copy per call, for a
+  // consumer that needs to own or edit its view); `getCommittedState` is the
+  // owned frozen committed record that `subscribe` publishes, for ordinary
+  // reads that must not clone the whole state. Both read the same authoritative
+  // reducer; neither is a second store.
   getState: cloneState,
+  getCommittedState: function () {
+    if (committedState === null) {
+      committedState = buildCommittedState();
+    }
+    return committedState;
+  },
 
   // Diagnostics for the bounded assembly (tests and debugging only).
   mapAssemblyStats: function () {
@@ -533,6 +621,10 @@ return {
   failRecovery: failRecovery,
   resetRecoveryEpisode: resetRecoveryEpisode,
 
+  // Each listener receives the one immutable committed record of a
+  // publication: exactly one call per complete commit and none for a pending
+  // part. A subscriber must not mutate it (it is frozen); a consumer that
+  // needs an editable copy asks `getState` for a detached snapshot.
   subscribe: function (listener) {
     if (typeof listener !== "function") {
       throw new Error("subscribe requires a listener function");
@@ -751,7 +843,9 @@ return {
       ) {
         return { accepted: false, reason: "different_epoch" };
       }
-      lastActionResult = JSON.parse(canonicalJson(result));
+      // The result record (and its `data` slot, which the validator returns
+      // from the caller's envelope) is adopted as an owned frozen value.
+      lastActionResult = immutable.freezeOwned(immutable.copyOwned(result));
       notify();
       return { accepted: true };
     }
@@ -764,7 +858,7 @@ return {
     } catch (error) {
       return { accepted: false, reason: "invalid", detail: error.message };
     }
-    protocolError = JSON.parse(canonicalJson(protocolErrorPayload));
+    protocolError = immutable.freezeOwned(immutable.copyOwned(protocolErrorPayload));
     if (protocolErrorPayload.code === "no_puppet") {
       // The puppet detached (OOC): clear character panels, lock
       // mutations, and enter the detached phase. The active epoch is

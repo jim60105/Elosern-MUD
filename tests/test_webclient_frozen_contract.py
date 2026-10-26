@@ -59,6 +59,7 @@ OVERLAP_EXEMPT = {("inputfield", "inputfieldwrapper")}
 EXPECTED_PROTOCOL_COUNT = 142
 EXPECTED_PROTOCOL_CREATE_STORE_MEMBERS = (
     "getState",
+    "getCommittedState",
     "subscribe",
     "setConnected",
     "beginTransport",
