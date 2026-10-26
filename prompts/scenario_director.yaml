@@ -14,6 +14,12 @@ prompts:
     - 每個角色的 phases 至少一個，最多 16 個；恰好一個階段條件包含 {"default": true}，其餘階段的 conditions 只能使用既有的階段事實（例如 closure、reunion），不可混入話題條件。
     - 階段欄位固定為 phase_id、conditions、greeting、topics、freeform_situation、freeform_goals、offline_response，可選 topic_effects。greeting 最多 500 字，freeform_situation 與 freeform_goals 各最多 400 字，offline_response 最多 500 字。
 
+    角色能力
+    - 只有 commissions 指名的角色才宣告 roles[].capabilities，而且恰好一項：{"type": "quest_issuer", "kwargs": {"issuer_key": "與 commissions 相同的 issuer_content_key"}, "binding": {"kind": "person"}}。
+    - 其他角色省略 capabilities 或給空陣列；不可宣告買賣、公會、招待或地點綁定的能力。
+    - kwargs 只填 issuer_key，service_id 由伺服器依場景包內容自動填入，不要自行填寫；binding 只能是 person。
+    - commissions 指名的角色若缺少能力宣告、binding 不是 person、或 issuer_key 與該筆 commissions 的 issuer_content_key 不同，整個提案會被拒收，不會留下一半的委託授權。
+
     話題與場景
     - 每個階段最多 16 個 topic。topic_id、scene_id、variant_id 與 predecessors 使用本階段內的區域識別碼，符合 [a-z][a-z0-9_]{0,31}；同一階段內不得重複相同識別碼。
     - topic 的必要欄位是 topic_id、keyword、label、fallback。keyword 與 label 各最多 32 字。可選 variants、requires、unavailable（hidden 或 locked）、refusal、predecessors、disclosure（qualified 或 pure_chain）。

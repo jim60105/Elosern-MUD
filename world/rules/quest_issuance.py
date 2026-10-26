@@ -362,19 +362,49 @@ def issuer_key_owner(issuer_key: str, *, exclude: Any = None) -> Any | None:
     return None
 
 
-def provision_scoped_issuer(host: Any, *, content_key: str) -> str:
+def provision_scoped_issuer(host: Any, *, content_key: str, plan: Any) -> str:
     """Provision the private-commission authority of one generated role.
 
-    Rules-owned and scope-bearing (design §5.2): the exact host receives a
-    ``QuestIssuer`` component carrying only the validated declared
-    ``content_key``, and the function returns the host's actual grammar-valid
-    issuer key for the caller's strict registration. Display name, typeclass,
+    Rules-owned and scope-bearing (design §5.2): the exact host receives the
+    role's validated capability plan — one person-bound ``quest_issuer``
+    carrying the trusted scoped ``service_id`` and the declared
+    ``issuer_key`` — attached and configured by the shared capability
+    assembler, and the function returns the host's actual grammar-valid issuer
+    key for the caller's strict registration. Display name, typeclass,
     location, schedule, and dialogue prose confer nothing; an incompatible
     existing component, a differing authored key, or a key already owned by
     another actor raises ``QuestIssuanceError`` instead of overwriting authored
-    authority. The caller's surrounding transaction owns rollback.
+    authority. Every rejection happens BEFORE the plan is attached, and the
+    caller's surrounding transaction owns rollback.
+
+    ``plan`` is the complete immutable plan the publication boundary validated;
+    it must declare exactly one person-bound ``quest_issuer`` whose
+    ``issuer_key`` is ``content_key``. A plan missing it, carrying anything
+    else, or declaring another identity is refused rather than repaired.
     """
+    from world.rules.npc_capabilities import CapabilityPlan, assemble_capabilities
+
     key = npc_issuer_key(content_key)
+    if not isinstance(plan, CapabilityPlan):
+        raise QuestIssuanceError(
+            f"a generated issuer requires its validated capability plan, got "
+            f"{type(plan).__name__}"
+        )
+    if plan.type_keys() != frozenset({"quest_issuer"}):
+        raise QuestIssuanceError(
+            "a generated issuer plan must declare exactly one quest_issuer "
+            f"capability, got {sorted(plan.type_keys())}"
+        )
+    declared = plan.component("quest_issuer")
+    if declared.binding is None or declared.binding.kind != "person":
+        raise QuestIssuanceError(
+            "a generated issuer capability must be person-bound"
+        )
+    if declared.kwargs.get("issuer_key") != content_key:
+        raise QuestIssuanceError(
+            f"capability issuer_key {declared.kwargs.get('issuer_key')!r} does not "
+            f"match the declared content key {content_key!r}"
+        )
     holder = getattr(host, "components", None)
     if holder is None:
         raise QuestIssuanceError(
@@ -393,8 +423,7 @@ def provision_scoped_issuer(host: Any, *, content_key: str) -> str:
         raise QuestIssuanceError(
             f"issuer key {key!r} is already owned by {owner.key!r}"
         )
-    if existing is None:
-        holder.add(QuestIssuer.create(host, issuer_key=content_key))
+    assemble_capabilities(host, plan)
     actual = resolve_issuer_key(host)
     if actual != key:
         raise QuestIssuanceError(

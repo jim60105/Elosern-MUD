@@ -90,9 +90,24 @@ MAX_PHASE_FREEFORM = 400
 MAX_OFFLINE_RESPONSE = 500
 MAX_PHASE_GREETING = 500
 
+#: The capability types a generated package role may declare. A generated role
+#: exists to hold scene narrative and, when it issues a commission, exactly one
+#: scoped issuing authority; trade, guild, reception and place-anchored
+#: services have no authored place in a generated scene.
+GENERATED_CAPABILITY_TYPES = frozenset({"quest_issuer"})
+
+#: The optional authored kwargs a generated capability may carry beside its
+#: trusted scoped ``service_id``.
+GENERATED_CAPABILITY_KWARGS = frozenset({"issuer_key"})
+
 
 def _reject_package(message: str) -> None:
     raise ScenePackageError(message)
+
+
+def generated_role_service_id(package_id: str, role_id: str) -> str:
+    """The trusted scoped service identity of one generated role's capability."""
+    return f"scene_role:{package_id}:{role_id}"
 
 
 @dataclass(frozen=True)
@@ -106,6 +121,10 @@ class RoleDefinition:
     conversable: bool
     retention: RoomLocator
     existing_npc_pk: int | None = None
+    #: The role's explicit capability declarations (npc-capability-
+    #: declarations). Only a commission role declares one, and its scoped
+    #: ``service_id`` is the trusted identity the boundary supplies.
+    capabilities: tuple[Any, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -266,7 +285,86 @@ def _bounded_prose(field: str, value: Any, bound: int, *, required: bool) -> str
     return value
 
 
-def _validate_roles(entries: Any) -> tuple[RoleDefinition, ...]:
+def _compile_role_capabilities(
+    entries: Any, *, package_id: str, role_id: str
+) -> tuple[Any, ...]:
+    """Compile one role's explicit capability declarations, or reject them.
+
+    A generated role declares at most one capability of the supported
+    vocabulary, person-bound, and its scoped ``service_id`` is the TRUSTED
+    identity ``scene_role:<package_id>:<role_id>`` — the model cannot know the
+    content digest, so an absent value is supplied here and a differing
+    authored one is a rejection. ``issuer_key`` stays an authored value: the
+    commission cross-check requires it to equal the declared content key. The
+    compiled declarations still go through the shared capability core, so the
+    per-type vocabulary and required kwargs have exactly one owner.
+    """
+    from world.rules.npc_capabilities import (
+        CapabilityValidationError,
+        capability,
+        person_bound,
+        validate_capabilities,
+    )
+
+    if entries is None:
+        return ()
+    if not isinstance(entries, list):
+        _reject_package(f"role {role_id!r} capabilities must be an array")
+    trusted_service_id = generated_role_service_id(package_id, role_id)
+    compiled: list[Any] = []
+    for position, entry in enumerate(entries):
+        where = f"role {role_id!r} capabilities[{position}]"
+        entry = _require_mapping(entry, where)
+        unknown = set(entry) - {"type", "kwargs", "binding"}
+        missing = {"type", "kwargs", "binding"} - set(entry)
+        if unknown or missing:
+            _reject_package(
+                f"{where} must declare exactly type, kwargs and binding "
+                f"(unknown {sorted(unknown)}, missing {sorted(missing)})"
+            )
+        type_key = entry.get("type")
+        if type_key not in GENERATED_CAPABILITY_TYPES:
+            _reject_package(
+                f"{where} declares unsupported generated capability {type_key!r}; "
+                f"generated roles may declare {sorted(GENERATED_CAPABILITY_TYPES)}"
+            )
+        kwargs = _require_mapping(entry.get("kwargs"), f"{where}.kwargs")
+        unknown_kwargs = set(kwargs) - GENERATED_CAPABILITY_KWARGS - {"service_id"}
+        if unknown_kwargs:
+            _reject_package(
+                f"{where}.kwargs declares {sorted(unknown_kwargs)}, which a "
+                f"generated {type_key!r} does not accept"
+            )
+        authored_service_id = kwargs.get("service_id")
+        if authored_service_id is not None and authored_service_id != trusted_service_id:
+            _reject_package(
+                f"{where}.kwargs service_id {authored_service_id!r} is not the "
+                f"trusted scoped identity {trusted_service_id!r}"
+            )
+        binding = _require_mapping(entry.get("binding"), f"{where}.binding")
+        if binding != {"kind": "person"}:
+            _reject_package(
+                f"{where}.binding must be exactly {{'kind': 'person'}}; a "
+                "generated capability travels with its actor"
+            )
+        compiled.append(
+            capability(
+                type_key,
+                binding=person_bound(),
+                service_id=trusted_service_id,
+                **{key: value for key, value in kwargs.items() if key != "service_id"},
+            )
+        )
+    try:
+        validate_capabilities(compiled)
+    except CapabilityValidationError as error:
+        _reject_package(f"role {role_id!r} declares unusable capabilities: {error}")
+    return tuple(compiled)
+
+
+def _validate_roles(
+    entries: Any, *, package_id: str
+) -> tuple[RoleDefinition, ...]:
     if not isinstance(entries, list) or not entries:
         _reject_package("package.roles must be a non-empty array")
     roles: list[RoleDefinition] = []
@@ -281,6 +379,7 @@ def _validate_roles(entries: Any) -> tuple[RoleDefinition, ...]:
             "conversable",
             "retention",
             "existing_npc",
+            "capabilities",
         }
         if unknown:
             _reject_package(f"roles[{position}] has unknown fields {sorted(unknown)}")
@@ -329,6 +428,9 @@ def _validate_roles(entries: Any) -> tuple[RoleDefinition, ...]:
             existing_pk = _require_int(
                 existing.get("value"), f"role {role_id!r} existing_npc.value", minimum=1
             )
+        capabilities = _compile_role_capabilities(
+            entry.get("capabilities"), package_id=package_id, role_id=role_id
+        )
         roles.append(
             RoleDefinition(
                 role_id=role_id,
@@ -338,6 +440,7 @@ def _validate_roles(entries: Any) -> tuple[RoleDefinition, ...]:
                 conversable=conversable,
                 retention=retention,
                 existing_npc_pk=existing_pk,
+                capabilities=capabilities,
             )
         )
     return tuple(roles)
@@ -907,9 +1010,11 @@ def _validate_commissions(
 
     Each entry declares one exact role and its authored issuer content key; two
     entries may not name the same role (one role issues one commission identity
-    per package), and every issuer key must parse under the shared grammar. A
-    guild-branch package declares none. Identical structural validation as the
-    previous single-commission contract, extended to the declared set.
+    per package), and every issuer key must parse under the shared grammar. The
+    named role must ALSO declare exactly one person-bound ``quest_issuer``
+    capability whose authored ``issuer_key`` is that same content key: the
+    capability is what provisions the authority, so a commission without it
+    (or with a different identity) rejects before publication.
     """
     if entries is None:
         return ()
@@ -946,12 +1051,51 @@ def _validate_commissions(
             _reject_package(
                 f"package.commissions[{position}] issuer key is invalid: {error}"
             )
+        _require_commission_capability(
+            roles[role_id], content_key, position
+        )
         commissions.append(
             SymbolicIssuer(
                 role_id=role_id, issuer_key=issuer_key, definition_key=definition_key
             )
         )
     return tuple(commissions)
+
+
+def _require_commission_capability(role: RoleDefinition, content_key: str, position: int) -> None:
+    """Reject a commission role whose declared capability is missing/mismatched."""
+    from world.rules.npc_capabilities import REQUIRED_KWARGS
+
+    declarations = [item for item in role.capabilities if item.type == "quest_issuer"]
+    if len(declarations) != 1:
+        _reject_package(
+            f"package.commissions[{position}] role {role.role_id!r} must declare "
+            "exactly one quest_issuer capability"
+        )
+    declaration = declarations[0]
+    if declaration.binding is None or declaration.binding.kind != "person":
+        _reject_package(
+            f"package.commissions[{position}] role {role.role_id!r} declares a "
+            "quest_issuer capability that is not person-bound"
+        )
+    required = REQUIRED_KWARGS["quest_issuer"]
+    missing = sorted(
+        field
+        for field in required
+        if not isinstance(declaration.kwargs.get(field), str)
+        or not declaration.kwargs[field]
+    )
+    if missing:
+        _reject_package(
+            f"package.commissions[{position}] role {role.role_id!r} capability "
+            f"is missing {missing}"
+        )
+    if declaration.kwargs.get("issuer_key") != content_key:
+        _reject_package(
+            f"package.commissions[{position}] role {role.role_id!r} capability "
+            f"issuer_key {declaration.kwargs.get('issuer_key')!r} does not match "
+            f"its commission content key {content_key!r}"
+        )
 
 
 def _validate_outcome_groups(
@@ -1159,7 +1303,26 @@ def _validate_package_impl(payload: Any) -> ScenePackageDefinition:
     if source_id is not None and (not isinstance(source_id, str) or not source_id):
         _reject_package("package.source_id must be a non-empty string or None")
 
-    roles = _validate_roles(payload.get("roles"))
+    # The content identity is a pure digest of this proposal's immutable JSON
+    # and is independent of the namespaced IDs derived below, so it is computed
+    # first: a generated role's trusted scoped service identity derives from it.
+    # A revalidation of the stored payload reconstructs the byte-identical id.
+    package_id = scene_package_id(
+        {
+            "display_name": payload["display_name"],
+            "source_id": source_id,
+            "quest": payload.get("quest"),
+            "roles": payload["roles"],
+            "relationships": payload.get("relationships") or [],
+            "knowledge": payload.get("knowledge") or [],
+            "encounters": payload["encounters"],
+            "dialogue": payload["dialogue"],
+            "commissions": payload.get("commissions") or [],
+            "outcome_groups": payload.get("outcome_groups") or [],
+        }
+    )
+
+    roles = _validate_roles(payload.get("roles"), package_id=package_id)
     role_ids = {role.role_id for role in roles}
     role_index = {role.role_id: role for role in roles}
     relationships = _validate_relationships(payload.get("relationships"), role_ids)
@@ -1209,26 +1372,18 @@ def _validate_package_impl(payload: Any) -> ScenePackageDefinition:
         payload.get("outcome_groups"), role_ids, quest_core.definition
     )
 
+    commission_role_ids = frozenset(
+        commission.role_id for commission in commissions
+    )
+    for role in roles:
+        if role.capabilities and role.role_id not in commission_role_ids:
+            _reject_package(
+                f"role {role.role_id!r} declares capabilities but issues no "
+                "commission; a generated capability belongs to a commission role"
+            )
+
     definition_keys = {definition_key}
     encounters = _validate_encounters(payload.get("encounters"), role_ids)
-    # The content identity is a pure digest of this proposal's immutable JSON
-    # and is independent of the namespaced dialogue IDs derived below, so it is
-    # computed first and supplied to the common generated-local codec. A
-    # revalidation of the stored payload reconstructs byte-identical full IDs.
-    package_id = scene_package_id(
-        {
-            "display_name": payload["display_name"],
-            "source_id": source_id,
-            "quest": quest_payload,
-            "roles": payload["roles"],
-            "relationships": payload.get("relationships") or [],
-            "knowledge": payload.get("knowledge") or [],
-            "encounters": payload["encounters"],
-            "dialogue": payload["dialogue"],
-            "commissions": commission_entries or [],
-            "outcome_groups": payload.get("outcome_groups") or [],
-        }
-    )
     dialogue = _validate_dialogue(
         payload.get("dialogue"),
         role_index,

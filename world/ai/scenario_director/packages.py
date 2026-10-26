@@ -90,6 +90,48 @@ _ROLE = {
                 "value": {"type": "integer", "minimum": 1},
             },
         },
+        #: One role's explicit capability declarations. Only a role named by
+        #: ``commissions`` declares one, and only the issuing authority is
+        #: supported: exactly one person-bound ``quest_issuer`` whose
+        #: ``issuer_key`` equals that commission's ``issuer_content_key``. The
+        #: scoped service identity is supplied by the deterministic boundary,
+        #: never invented here.
+        "capabilities": {
+            "type": "array",
+            "maxItems": 1,
+            "items": {
+                "type": "object",
+                "required": ["type", "kwargs", "binding"],
+                "additionalProperties": False,
+                "properties": {
+                    "type": {"enum": ["quest_issuer"]},
+                    "kwargs": {
+                        "type": "object",
+                        "required": ["issuer_key"],
+                        "additionalProperties": False,
+                        "properties": {
+                            "issuer_key": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 60,
+                                "pattern": "^[^0-9][^:]*$",
+                            },
+                            "service_id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": MAX_ID_LENGTH,
+                            },
+                        },
+                    },
+                    "binding": {
+                        "type": "object",
+                        "required": ["kind"],
+                        "additionalProperties": False,
+                        "properties": {"kind": {"enum": ["person"]}},
+                    },
+                },
+            },
+        },
         "characterization": {
             "type": "object",
             "required": ["display_name", "title", "persona"],

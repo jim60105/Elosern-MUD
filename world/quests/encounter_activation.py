@@ -261,8 +261,9 @@ def _provision_role(
     actor: Any,
     *,
     tick: int,
+    plan: Any,
 ) -> str | None:
-    """Provision the declared scoped commission for one freshly spawned issuer."""
+    """Provision the declared scoped commission for one issuer actor."""
     commission = definition.commission_for_role(role_id)
     if commission is None:
         return None
@@ -273,7 +274,7 @@ def _provision_role(
         if isinstance(entry, dict) and entry.get("role_id") == role_id:
             content_key = entry.get("issuer_content_key")
             break
-    actual = provision_scoped_issuer(actor, content_key=content_key)
+    actual = provision_scoped_issuer(actor, content_key=content_key, plan=plan)
     scene_store.assign_grant_actor(
         row, role_id, commission.definition_key, int(actor.pk), tick=tick
     )
@@ -284,6 +285,21 @@ def _provision_role(
         row, role_id, commission.definition_key, True, tick=tick
     )
     return actual
+
+
+def _role_capability_plan(role: Any) -> Any:
+    """Validate one role's declared capabilities into its immutable plan.
+
+    A role declaring none carries no plan. A generated role's declarations
+    already passed publication validation; re-running the shared core here is
+    the fail-closed second gate, and it is room-free by construction (a
+    generated capability is person-bound).
+    """
+    if not role.capabilities:
+        return None
+    from world.rules.npc_capabilities import validate_capabilities
+
+    return validate_capabilities(role.capabilities)
 
 
 def ensure_package_role(
@@ -310,14 +326,15 @@ def ensure_package_role(
     idempotent. Returns ``(actor, commission_key_or_None)``.
     """
     binding = scene_store.get_role_binding(row.package_id, role_id)
+    role = definition.role(role_id)
+    if role is None:
+        raise EncounterUnavailable("unknown_role")
+    plan = _role_capability_plan(role)
     if binding is not None:
         actor, reason = _resolve_actor(binding.npc_id)
         if actor is None:
             raise EncounterUnavailable(reason)
     else:
-        role = definition.role(role_id)
-        if role is None:
-            raise EncounterUnavailable("unknown_role")
         role_dialogue = definition.role_dialogue(role_id)
         actor = spawn_role_actor(
             room,
@@ -332,6 +349,7 @@ def ensure_package_role(
                     if role.conversable
                     else None
                 ),
+                capabilities=plan,
             ),
             provenance,
         )
@@ -346,7 +364,7 @@ def ensure_package_role(
                 row, role_id, role_dialogue.initial_phase, tick=tick
             )
     _grant_role_knowledge(actor, definition, role_id, row.package_id, tick=tick)
-    key = _provision_role(definition, role_id, row, actor, tick=tick)
+    key = _provision_role(definition, role_id, row, actor, tick=tick, plan=plan)
     return actor, key
 
 

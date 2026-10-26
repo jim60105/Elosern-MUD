@@ -85,6 +85,11 @@ class RoleSpawn:
     every spawn path); ``conversable`` selects the whitelisted generative-NPC
     prototype and, when a ``dialogue_key`` is supplied, seeds the scripted
     dialogue component.
+
+    ``capabilities`` carries the role's complete validated capability plan
+    (npc-capability-declarations): the materializer attaches exactly that plan
+    through the shared assembler, so a generated commission role's authority is
+    never a second, code-side component literal.
     """
 
     role: str
@@ -93,6 +98,7 @@ class RoleSpawn:
     characterization: StageNpcCharacterization
     conversable: bool = False
     dialogue_key: str | None = None
+    capabilities: Any = None
 
 
 def scene_name(archetype_key: str | None) -> str:
@@ -219,7 +225,14 @@ def apply_characterization(
 
 
 def _install_scripted_dialogue(npc: NPC, dialogue_key: str) -> None:
-    """Grant one conversable generated role its scripted-dialogue capability."""
+    """Grant one conversable generated role its scripted-dialogue capability.
+
+    A role whose declared capability plan already assembled a dialogue slot
+    keeps it: authored configuration is never overwritten by the narrative
+    default path.
+    """
+    if npc.components.has(ScriptedDialogue.name):
+        return
     npc.components.add(ScriptedDialogue.create(npc, dialogue_key=dialogue_key))
 
 
@@ -266,6 +279,10 @@ def spawn_role_actor(
     npc.db.disposition = spawn_spec.disposition
     apply_characterization(npc, characterization, provenance)
     apply_lineage_auto_seed(npc)
+    if spawn_spec.capabilities is not None:
+        from world.rules.npc_capabilities import assemble_capabilities
+
+        assemble_capabilities(npc, spawn_spec.capabilities)
     if spawn_spec.dialogue_key:
         _install_scripted_dialogue(npc, spawn_spec.dialogue_key)
     return npc
