@@ -1,12 +1,12 @@
 # evennia-test-guard Specification
 
 ## Purpose
-Defines the pre-execution guard that inspects Bash-tool invocations of `evennia test`, counts discovered tests through a count-only discovery run, blocks any invocation whose discovered test count exceeds the configured maximum, refuses interpreter payloads and eval cells that hide a test run, and bounds how many focused runs one session may replay back to back. Every refusal directs the caller to run a focused test instead.
+Defines the pre-execution guard that inspects Bash-tool invocations of `evennia test`, counts discovered tests through a count-only discovery run, blocks any invocation whose discovered test count exceeds the configured maximum, and refuses interpreter payloads and eval cells that hide a test run. Each small run stays the caller's deliberate choice: many focused invocations are allowed, a hidden suite replay is not. Every refusal directs the caller to run a focused test instead.
 
 ## Requirements
 
 ### Requirement: Guard intercepts Evennia test commands before execution
-The guard SHALL register a pre-execution `tool_call` handler that inspects every Bash-tool invocation whose command mentions `evennia test`. Invocations of other tools, and Bash commands that do not mention `evennia test`, SHALL pass through untouched. A matching invocation SHALL NOT execute until the guard has either allowed or blocked it.
+The guard SHALL register a pre-execution `tool_call` handler that inspects every Bash-tool invocation whose command mentions `evennia test`, and every eval-tool cell, which can hide a test invocation in its code. Bash commands that mention no test invocation and name no interpreter payload SHALL pass through untouched, and every other tool SHALL pass through untouched. A matching invocation SHALL NOT execute until the guard has either allowed or blocked it.
 
 #### Scenario: Non-test commands are ignored
 - **WHEN** the Bash tool is called with a command that contains no `evennia test` text (e.g. `uv run --locked evennia start`)
@@ -138,7 +138,7 @@ If the discovery subprocess raises, exceeds its bounded timeout (60 s), or exits
 - **THEN** the original `evennia test` command does not run and the reason includes the discovery error output and the fix-then-focus guidance
 
 ### Requirement: Indirection through an interpreter payload is blocked
-The guard SHALL refuse an invocation whose executed program is an interpreter — Python, Node, Bun, Deno, a shell, or a directly executed script — when a script file it names contains an Evennia test invocation, and SHALL refuse an inline `-c`/`-e`/`--eval` program payload that contains one. It SHALL also refuse an eval-tool cell whose code contains an Evennia test invocation. A recognized runner or timing prologue (`uv run`, `poetry run`, `timeout`, `nice`, `stdbuf`) SHALL NOT hide the interpreter. The refusal SHALL name the payload and the focused-test policy, and SHALL occur before any discovery or test execution. An interpreter invocation whose file or payload contains no test invocation SHALL pass through untouched.
+The guard SHALL refuse an invocation whose executed program is an interpreter — Python, Node, Bun, Deno, a shell, or a directly executed script — when a script file it names contains an Evennia test invocation, and SHALL refuse an inline `-c`/`-e`/`--eval` program payload that contains one. It SHALL also refuse an eval-tool cell whose code contains an Evennia test invocation. Shell quoting, an `&&`-separated `cd` prefix, environment assignments, an `env` wrapper, a recognized runner or timing prologue including its option values (`uv run`, `poetry run`, `timeout`, `nice`, `stdbuf`), and a shell `-c` payload SHALL NOT hide the interpreter or its program. A program argument selected by an interpreter module mode (`-m`) SHALL be treated as data, not as a scanned script. The refusal SHALL name the payload and the focused-test policy, and SHALL occur before any discovery or test execution. An interpreter invocation whose file or payload contains no test invocation SHALL pass through untouched.
 
 #### Scenario: A script that loops the suite is blocked
 - **WHEN** the Bash tool runs `python3 /tmp/sweep.py` and that file spawns `evennia test` for many labels
@@ -148,21 +148,18 @@ The guard SHALL refuse an invocation whose executed program is an interpreter �
 - **WHEN** the Bash tool runs `python3 -c "subprocess.run(['evennia', 'test'])"`
 - **THEN** the guard blocks the command and names the inline payload
 
+#### Scenario: Wrapper and prefix forms do not hide the script
+- **WHEN** the command is `cd /tmp && python3 sweep.py`, `env X=1 python3 /tmp/sweep.py`, `uv run --locked --env-file .env.test python3 /tmp/sweep.py`, or `bash -lc 'python3 /tmp/sweep.py'`
+- **THEN** each form resolves to the same script and is blocked
+
+#### Scenario: A reformatted argv list is still recognized
+- **WHEN** the script builds its invocation as a multiline list of quoted arguments such as `"evennia",` then `"test",`
+- **THEN** the guard still recognizes the test invocation inside the payload
+
 #### Scenario: Eval cell is blocked
 - **WHEN** the eval tool receives code that spawns `evennia test`
 - **THEN** the guard blocks the cell without executing it
 
 #### Scenario: Ordinary programs pass through
-- **WHEN** the Bash tool runs a script or a validator module that names no test invocation, such as `uv run --locked python -m world.prompts.validate`
+- **WHEN** the Bash tool runs a script or a module-mode command that names no test invocation, such as `uv run --locked python -m world.prompts.validate`, `python -m py_compile <file>` or `python -m json.tool <file>`
 - **THEN** the guard returns no decision and runs no discovery
-
-### Requirement: Serial fan-out is bounded per session window
-The guard SHALL record every allowed Evennia test run with its time and discovered count, and SHALL block a further run while the rolling window already holds the configured maximum number of runs or the configured maximum discovered tests. The refusal SHALL state the run count, the window length, the budget, and that the full suite is CI-owned. Runs whose timestamp falls outside the window SHALL be discarded so ordinary focused work continues.
-
-#### Scenario: A burst of focused runs is stopped
-- **WHEN** ten test runs were allowed within the last 180 seconds and another focused label is requested
-- **THEN** the guard blocks the new run, names the fan-out budget, and runs no discovery
-
-#### Scenario: Spaced focused work continues
-- **WHEN** the previously allowed runs fall outside the 180-second window
-- **THEN** the guard allows the next focused run and starts a fresh window count

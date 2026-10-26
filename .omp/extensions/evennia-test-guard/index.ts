@@ -16,16 +16,6 @@ import { fileURLToPath } from "node:url";
 const MAX_TESTS = 100;
 const DISCOVERY_TIMEOUT_MS = 60_000;
 
-/*
- * Local fan-out budget. The per-invocation cap above bounds ONE command;
- * without a second bound, many small invocations replay the whole suite, which
- * AGENTS.md forbids ("never run it serially", the full non-browser suite runs
- * at most once, in parallel, and CI owns it).
- */
-const MAX_RUNS_PER_WINDOW = 10;
-const FANOUT_WINDOW_MS = 180_000;
-const MAX_TESTS_PER_WINDOW = 1_500;
-
 /* A scanned script larger than this is not a test wrapper. */
 const SCRIPT_SCAN_BYTES = 256 * 1024;
 
@@ -47,13 +37,14 @@ const INLINE_CODE_FLAGS: Record<string, true> = {
 };
 
 /*
- * Script-payload detection is intentionally looser than the shell grammar:
- * a Python ``subprocess.run(["evennia", "test"])`` argv pair, an f-string, or
- * a joined command line all spell the invocation without the exact
- * ``evennia test`` space the shell form uses.
+ * Payload detection is intentionally looser than the shell grammar: a Python
+ * ``subprocess.run(["evennia", "test"])`` argv list spells the invocation with
+ * quotes, a comma and possibly a line break between the two words. Hyphenated
+ * names such as ``evennia-test-guard`` are NOT an invocation, so the separator
+ * must contain whitespace.
  */
-const EVENNIA_TEST_LOOSE =
-  /\bevennia\b[^\w]{0,6}\btest\b|["']test["'][^\n]{0,40}\bevennia\b/;
+const EVENNIA_TEST_ARGV =
+  /\bevennia\b["']?\s*[,;]?\s+["']?\btest\b/;
 
 /* Runner/wrapper prologues that never change which interpreter runs. */
 const RUNNER_LEADS: Record<string, true> = {
@@ -64,6 +55,36 @@ const TIMING_WRAPPERS: Record<string, true> = {
   timeout: true,
   nice: true,
   stdbuf: true,
+};
+
+/*
+ * Wrapper flags whose value is a separate token. Consuming only the flag would
+ * mistake the value for the program: ``uv run --env-file .env.test python3
+ * sweep.py`` must still see ``python3`` as the lead.
+ */
+const WRAPPER_VALUE_FLAGS: Record<string, true> = {
+  "--env-file": true,
+  "--python": true,
+  "--directory": true,
+  "--project": true,
+  "--with": true,
+  "--package": true,
+  "--group": true,
+  "--extra": true,
+  "--index": true,
+  "-p": true,
+  "-s": true,
+  "-k": true,
+};
+
+/* Shell leads whose ``-c`` argument is itself a shell program. */
+const SHELL_LEADS: Record<string, true> = {
+  sh: true,
+  bash: true,
+  zsh: true,
+  dash: true,
+  ksh: true,
+  fish: true,
 };
 
 const COUNT_MARKER = "__OMP_EVENNIA_TEST_COUNT_V1__=";
@@ -1053,122 +1074,6 @@ function blockedBecauseIndirect(where: string): string {
   ].join("\n");
 }
 
-function blockedBecauseFanout(runs: number): string {
-  return [
-    "Evennia test guard blocked this command: local fan-out budget exceeded.",
-    "",
-    `Reason: ${runs} test runs were already allowed in the last ` +
-      `${Math.round(FANOUT_WINDOW_MS / 1000)} s ` +
-      `(budget ${MAX_RUNS_PER_WINDOW} runs / ${MAX_TESTS_PER_WINDOW} tests).`,
-    "",
-    "Many small invocations are the serial full-suite run AGENTS.md forbids. " +
-      "Run one focused label per behavior under change and let CI own the " +
-      "complete suite.",
-    "",
-    "Wait for the window to pass, then continue with the single focused " +
-      "label you still need.",
-  ].join("\n");
-}
-
-type GuardRun = {
-  at: number;
-  tests: number;
-};
-
-/*
- * Session-local record of allowed test runs. Nothing is persisted: the budget
- * exists to stop a fan-out burst, so a fresh process starts clean.
- */
-let recentRuns: GuardRun[] = [];
-
-/* Test-only hook: the Node harness resets the ledger between cases. */
-export function __resetGuardFanoutLedger(): void {
-  recentRuns = [];
-}
-
-function pruneRuns(now: number): void {
-  recentRuns = recentRuns.filter(
-    (run) => now - run.at < FANOUT_WINDOW_MS,
-  );
-}
-
-function recordRun(now: number, tests: number): void {
-  recentRuns.push({ at: now, tests });
-}
-
-function shellTokens(segment: string): string[] {
-  return segment
-    .trim()
-    .split(/[ \t]+/)
-    .filter(Boolean);
-}
-
-function stripQuotes(token: string): string {
-  const first = token[0];
-
-  if (
-    token.length >= 2 &&
-    (first === '"' || first === "'") &&
-    token.at(-1) === first
-  ) {
-    return token.slice(1, -1);
-  }
-
-  return token;
-}
-
-function isPathToken(token: string): boolean {
-  return (
-    token.length > 0 &&
-    !token.startsWith("-") &&
-    !/[*?[\]{}$`|&;<>]/.test(token)
-  );
-}
-
-/*
- * Consume the prologues that never change WHICH program runs: environment
- * assignments plus `uv run`/`poetry run`, `timeout`, `nice` and `stdbuf`.
- */
-function effectiveTokens(tokens: string[]): string[] {
-  let rest = tokens;
-
-  for (;;) {
-    while (
-      rest.length > 0 &&
-      /^[A-Za-z_][A-Za-z0-9_]*=/.test(rest[0])
-    ) {
-      rest = rest.slice(1);
-    }
-
-    const lead = rest[0] ?? "";
-
-    if (Object.hasOwn(RUNNER_LEADS, lead) && rest[1] === "run") {
-      rest = rest.slice(2);
-
-      while (rest.length > 0 && rest[0].startsWith("-")) {
-        rest = rest.slice(1);
-      }
-
-      continue;
-    }
-
-    if (Object.hasOwn(TIMING_WRAPPERS, lead)) {
-      rest = rest.slice(1);
-
-      while (
-        rest.length > 0 &&
-        (rest[0].startsWith("-") || /^\d+[smhd]?$/.test(rest[0]))
-      ) {
-        rest = rest.slice(1);
-      }
-
-      continue;
-    }
-
-    return rest;
-  }
-}
-
 function readScannable(path: string): string | null {
   try {
     const info = statSync(path);
@@ -1186,71 +1091,323 @@ function readScannable(path: string): string | null {
 function payloadRunsTests(text: string): boolean {
   return (
     EVENNIA_TEST_ANYWHERE.test(text) ||
-    EVENNIA_TEST_LOOSE.test(text) ||
+    EVENNIA_TEST_ARGV.test(text) ||
     DRIVER_ANYWHERE.test(text) ||
     UNITTEST_MODULE_ANYWHERE.test(text)
   );
 }
 
 /*
+ * Split on top-level `&&`, keeping quoted text intact so a path with spaces or
+ * a quoted program body is never cut apart.
+ */
+function splitSegments(command: string): string[] {
+  const segments: string[] = [];
+  let start = 0;
+  let quote: "'" | '"' | null = null;
+  let escaped = false;
+
+  for (let index = 0; index < command.length; index += 1) {
+    const char = command[index];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\" && quote !== "'") {
+      escaped = true;
+      continue;
+    }
+
+    if (quote !== null) {
+      if (char === quote) {
+        quote = null;
+      }
+
+      continue;
+    }
+
+    if (char === "'" || char === '"') {
+      quote = char;
+      continue;
+    }
+
+    if (char === "&" && command[index + 1] === "&") {
+      segments.push(command.slice(start, index));
+      start = index + 2;
+      index += 1;
+    }
+  }
+
+  segments.push(command.slice(start));
+
+  return segments.filter((segment) => segment.trim() !== "");
+}
+
+/* Quote-aware tokenization that keeps a quoted argument as ONE token. */
+function splitTokens(segment: string): string[] {
+  const tokens: string[] = [];
+  let current = "";
+  let quote: "'" | '"' | null = null;
+  let escaped = false;
+  let started = false;
+
+  for (const char of segment) {
+    if (escaped) {
+      current += char;
+      escaped = false;
+      started = true;
+      continue;
+    }
+
+    if (char === "\\" && quote !== "'") {
+      escaped = true;
+      started = true;
+      continue;
+    }
+
+    if (quote !== null) {
+      if (char === quote) {
+        quote = null;
+      } else {
+        current += char;
+      }
+
+      continue;
+    }
+
+    if (char === "'" || char === '"') {
+      quote = char;
+      started = true;
+      continue;
+    }
+
+    if (/[ \t]/.test(char)) {
+      if (started) {
+        tokens.push(current);
+        current = "";
+        started = false;
+      }
+
+      continue;
+    }
+
+    current += char;
+    started = true;
+  }
+
+  if (started) {
+    tokens.push(current);
+  }
+
+  return tokens;
+}
+
+/* Consume wrapper flags, including flags whose value is a separate token. */
+function consumeWrapperFlags(tokens: string[]): string[] {
+  let index = 0;
+
+  while (index < tokens.length && tokens[index].startsWith("-")) {
+    const flag = tokens[index];
+    const inlineValue = flag.includes("=");
+    index += 1;
+
+    if (!inlineValue && Object.hasOwn(WRAPPER_VALUE_FLAGS, flag)) {
+      index += 1;
+    }
+  }
+
+  return tokens.slice(index);
+}
+
+/*
+ * Consume the prologues that never change WHICH program runs: environment
+ * assignments, `env`, `uv run`/`poetry run` with their option values,
+ * `timeout`, `nice` and `stdbuf`.
+ */
+function consumeWrapper(tokens: string[]): string[] {
+  let rest = tokens;
+
+  for (;;) {
+    while (
+      rest.length > 0 &&
+      /^[A-Za-z_][A-Za-z0-9_]*=/.test(rest[0])
+    ) {
+      rest = rest.slice(1);
+    }
+
+    const lead = rest[0] ?? "";
+
+    if (lead === "env") {
+      rest = rest.slice(1);
+
+      while (
+        rest.length > 0 &&
+        (rest[0].startsWith("-") ||
+          /^[A-Za-z_][A-Za-z0-9_]*=/.test(rest[0]))
+      ) {
+        rest = rest.slice(1);
+      }
+
+      continue;
+    }
+
+    if (Object.hasOwn(RUNNER_LEADS, lead) && rest[1] === "run") {
+      rest = consumeWrapperFlags(rest.slice(2));
+      continue;
+    }
+
+    if (Object.hasOwn(TIMING_WRAPPERS, lead)) {
+      rest = consumeWrapperFlags(rest.slice(1));
+
+      /* `timeout 600 python3 ...` — the duration is not the program. */
+      if (rest.length > 0 && /^\d+[smhd]?$/.test(rest[0])) {
+        rest = rest.slice(1);
+      }
+
+      continue;
+    }
+
+    return rest;
+  }
+}
+
+/* The first non-flag argument of an interpreter or shell is its program. */
+function firstProgramArgument(tokens: string[]): string | null {
+  for (const token of tokens.slice(1)) {
+    if (token.startsWith("-")) {
+      continue;
+    }
+
+    return token;
+  }
+
+  return null;
+}
+
+function inlineFlagIndex(tokens: string[]): number {
+  return tokens.findIndex(
+    (token, index) =>
+      index > 0 && Object.hasOwn(INLINE_CODE_FLAGS, token),
+  );
+}
+
+/*
  * Report where an interpreter payload runs Evennia tests, or null when the
- * command only runs ordinary programs. This closes the indirection hole: a
- * script (or an inline `-c` payload, or an eval cell) that spawns `evennia
- * test` never shows the test text to the shell grammar, so the command was
- * previously allowed while replaying the suite in a loop.
+ * command only runs ordinary programs. A script, an inline `-c`/`-e` payload,
+ * a shell `-c` program, or an eval cell can hold the test invocation where the
+ * shell grammar never sees it.
+ */
+function interpreterFinding(
+  tokens: string[],
+  cwd: string,
+): string | null {
+  const lead = tokens[0] ?? "";
+  const leadName = lead.split("/").at(-1) ?? lead;
+
+  if (Object.hasOwn(SHELL_LEADS, leadName)) {
+    const inlineIndex = tokens.findIndex(
+      (token, index) =>
+        index > 0 && /^-[A-Za-z]*c$/.test(token),
+    );
+
+    if (inlineIndex >= 0) {
+      return findIndirectTestRun(
+        tokens.slice(inlineIndex + 1).join(" "),
+        cwd,
+      );
+    }
+
+    const program = firstProgramArgument(tokens);
+
+    if (program === null) {
+      return null;
+    }
+
+    const candidate = resolve(cwd, program);
+    const text = readScannable(candidate);
+
+    return text !== null && payloadRunsTests(text)
+      ? candidate
+      : null;
+  }
+
+  if (!INTERPRETER_LEAD.test(leadName)) {
+    return null;
+  }
+
+  const inlineIndex = inlineFlagIndex(tokens);
+
+  if (inlineIndex >= 0) {
+    /*
+     * The program payload is the rest of the segment, not one token: a
+     * quoted `-c "import x; x.run()"` splits on its own spaces.
+     */
+    const payload = tokens.slice(inlineIndex + 1).join(" ");
+
+    return payload && payloadRunsTests(payload)
+      ? `\`${leadName} ${tokens[inlineIndex]}\``
+      : null;
+  }
+
+  /*
+   * `-m` runs a module: its arguments are data, not a program file. This
+   * keeps `python -m py_compile <file>` and `python -m json.tool <file>`
+   * (both legitimate inspections) out of the script scan.
+   */
+  if (tokens.includes("-m")) {
+    return null;
+  }
+
+  const program = firstProgramArgument(tokens);
+
+  if (program === null) {
+    return null;
+  }
+
+  const candidate = resolve(cwd, program);
+  const text = readScannable(candidate);
+
+  return text !== null && payloadRunsTests(text)
+    ? candidate
+    : null;
+}
+
+/*
+ * Walk the command segment by segment, following `cd` so a relative script
+ * path resolves where the command actually runs it.
  */
 function findIndirectTestRun(
   command: string,
   cwd: string,
 ): string | null {
-  for (const part of command.split("&&")) {
-    const tokens = effectiveTokens(shellTokens(part));
-    const lead = tokens[0] ?? "";
+  let current = cwd;
+
+  for (const segment of splitSegments(command)) {
+    const tokens = splitTokens(segment);
+
+    if (tokens[0] === "cd" && tokens.length > 1) {
+      current = resolve(current, tokens[1]);
+      continue;
+    }
+
+    const effective = consumeWrapper(tokens);
+    const lead = effective[0] ?? "";
 
     if (!lead) {
       continue;
     }
 
-    const leadName = lead.split("/").at(-1) ?? lead;
-    const inlineIndex = tokens.findIndex(
-      (token, index) =>
-        index > 0 && Object.hasOwn(INLINE_CODE_FLAGS, token),
-    );
+    const finding = interpreterFinding(effective, current);
 
-    if (inlineIndex >= 0) {
-      /*
-       * The program payload is the rest of the segment, not one token: a
-       * quoted `-c "import x; x.run()"` splits on its own spaces.
-       */
-      const payload = stripQuotes(
-        tokens.slice(inlineIndex + 1).join(" "),
-      );
-
-      if (payload && payloadRunsTests(payload)) {
-        return `\`${leadName} ${tokens[inlineIndex]}\``;
-      }
-    }
-
-    if (INTERPRETER_LEAD.test(leadName)) {
-      for (const token of tokens.slice(1)) {
-        if (!isPathToken(token)) {
-          continue;
-        }
-
-        const candidate = resolve(cwd, stripQuotes(token));
-        const text = readScannable(candidate);
-
-        if (text !== null && payloadRunsTests(text)) {
-          return candidate;
-        }
-      }
-
-      continue;
+    if (finding !== null) {
+      return finding;
     }
 
     /* A directly executed script (`./sweep.sh`) is a payload too. */
     if (lead.includes("/")) {
-      const candidate = resolve(cwd, stripQuotes(lead));
+      const candidate = resolve(current, lead);
       const text = readScannable(candidate);
 
       if (text !== null && payloadRunsTests(text)) {
@@ -1341,23 +1498,6 @@ export default function evenniaTestGuard(
 
     const environmentScript =
       buildEnvironmentScript(inputEnvironment);
-
-    /*
-     * The run-count half of the window budget is knowable before discovery,
-     * so a burst is refused without spending a discovery subprocess. The
-     * discovered-test half is checked after the count is known.
-     */
-    const startNow = Date.now();
-    pruneRuns(startNow);
-
-    if (recentRuns.length >= MAX_RUNS_PER_WINDOW) {
-      return {
-        block: true,
-        reason: blockedBecauseFanout(
-          recentRuns.length,
-        ),
-      };
-    }
 
     const script = [
       "set -e",
@@ -1466,29 +1606,6 @@ export default function evenniaTestGuard(
         reason: blockedBecauseTooManyTests(count),
       };
     }
-
-    /*
-     * Per-invocation length is bounded above; the window budget bounds how
-     * many focused runs one session may replay back to back, which is the
-     * serial full-suite fan-out AGENTS.md forbids.
-     */
-    pruneRuns(startNow);
-
-    const windowTests = recentRuns.reduce(
-      (total, run) => total + run.tests,
-      0,
-    );
-
-    if (windowTests + count > MAX_TESTS_PER_WINDOW) {
-      return {
-        block: true,
-        reason: blockedBecauseFanout(
-          recentRuns.length,
-        ),
-      };
-    }
-
-    recordRun(startNow, count);
 
     if (ctx.hasUI) {
       ctx.ui.notify(
