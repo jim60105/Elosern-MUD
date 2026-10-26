@@ -1,55 +1,99 @@
 schema_version: 1
-greeting: 銀葉坡頂的屋裡，格威娜拉‧希爾維爾莉夫從工作檯後抬起頭，舉起兩朵銀絲絞花湊到你面前：「欸，你來得正好！這兩朵哪一朵比較好看？左邊這朵嘛……算了，我等一下再改。做好的都掛在窗邊繩上，喜歡哪件就跟我說；有東西壞了要修，也拿過來吧。」
+greeting: 銀葉坡頂的小屋窗扉敞開，格威娜拉‧希爾維爾莉夫正坐在工作檯後絞銀絲。她一抬頭看見有人進門，立刻舉起兩朵剛成形的銀絲小花湊上前來：「欸，你來得正巧！幫我評選哪一朵比較順眼？做好的飾品都掛在窗邊繩上，看中哪樣隨時跟我說；要是以前換走的小玩意鬆了線扣，也帶過來讓我檢查吧！」
 topics:
 - topic_id: ciaran_gwenaera_home.topic_01
   keyword: 綴飾
   label: 綴飾
   fallback:
     scene_id: ciaran_gwenaera_home.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 綴飾
+      text: 「屋裡到處閃著銀白光芒，桌上放著這麼多小鉗子，你平時都在這裡做些什麼飾品？」
+    - kind: narration
+      text: 格威娜拉‧希爾維爾莉夫眉開眼笑，晃了晃手腕上套著的一圈細銀絲。
     - kind: speech
       speaker: host
-      text: 「銀絲我自己絞，貝殼在溪邊撿，晶砂要磨一整晚才會亮。做好的都掛在窗邊那條繩上，族人喜歡就拿去戴。你喜歡哪件就跟我說，看著給點什麼都好嘛。」
+      text: 「銀絲全由我自己親手絞弄成形，貝殼也是在溪邊石縫細心挑揀，那些晶瑩晶砂更得用石臼研磨整晚才會放光呢！」
+    - kind: speech
+      speaker: host
+      text: 「我做這些純粹是因為看著心裡高興嘛。做好的手串、墜子和耳環全掛在窗邊那條細繩上，族人路過瞧著中意就順手拿去佩戴。」
+    - kind: speech
+      speaker: actor
+      text: 「窗邊那些綴飾確實做工細緻，外頭來的旅人若是喜歡，也能換一件帶走嗎？」
+    - kind: speech
+      speaker: host
+      text: 「當然可以呀！看中哪一件只管跟我開口。隨便拿些外頭有趣的小物件或銅幣來換都成，換多少我向來不計較，只要你懂得愛惜器物就好啦。」
 - topic_id: ciaran_gwenaera_home.topic_02
   keyword: 晶符
   label: 晶符
   fallback:
     scene_id: ciaran_gwenaera_home.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 晶符
+      text: 「窗前掛著的那枚透明晶石吊墜切面很多，迎著光還會折射出彩光，這是什麼寶物？」
+    - kind: narration
+      text: 格威娜拉‧希爾維爾莉夫掂起那枚晶石，就著窗外透進的光線略微轉動。
     - kind: speech
       speaker: host
-      text: 「三稜晶符用族裡傳下來的老方法磨，光照進去，會分成三種顏色跑出來，很漂亮對吧？欸，戴在脖子上就是好看而已，沒有什麼神奇的力量喔。村裡的孩子成年時，常來跟我討一枚。」
+      text: 「這叫三稜晶符，是用族裡傳下來的老法子打磨成形。光線透進去，能分出三種不同的斑斕顏色，好看吧？」
+    - kind: speech
+      speaker: host
+      text: 「欸，我可先說明喔，這枚晶符單純就是好看而已，裡頭可沒有封存什麼神秘的魔法力量。村裡的孩子滿了歲數成年時，總會跑來找我討一枚當作紀念。」
+    - kind: speech
+      speaker: actor
+      text: 「原來是成年時的紀念信物。光是這份晶瑩剔透的模樣，掛在頸間就足夠賞心悅目了。」
+    - kind: speech
+      speaker: host
+      text: 「對吧！好看就足夠讓人開心好幾天了。想戴著它去山外遠行，就挑一枚繩結順眼的款式帶走吧。」
 - topic_id: ciaran_gwenaera_home.topic_03
   keyword: 耳環
   label: 耳環
   fallback:
     scene_id: ciaran_gwenaera_home.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 耳環
+      text: 「你耳際懸著的那對月牙小環轉頭時耀眼奪目，繩上也掛著好幾對，這也是你常做的樣式嗎？」
+    - kind: narration
+      text: 格威娜拉‧希爾維爾莉夫側過臉，抬手指著自己耳垂上泛著銀光的小環。
     - kind: speech
       speaker: host
-      text: 「月牙耳環是我最常做的東西，一對接一對地絞，絞到閉著眼睛都會。瓦爾溫耳朵上那對也出自我手，跟我身上這幾枚同一批。合不合眼緣要你自己挑，我幫你舉著鏡子嘛。」
+      text: 「這款月牙耳環是我最順手的活計，幾百年來一對接著一對絞，閉上眼睛手指都能辨清弧度。」
+    - kind: speech
+      speaker: host
+      text: 「採集蛛絲的瓦爾溫耳上掛著的那對也是我親手編絞，和我身上這幾副出自同一批銀絲。晴天時我還會把它們攤在銀葉樹下，讓飾品沾染樹葉的銀光。」
+    - kind: speech
+      speaker: actor
+      text: 「彎曲的月牙弧度襯著銀葉的光澤，難怪村裡人都願意戴著它。」
+    - kind: speech
+      speaker: host
+      text: 「每副耳環的彎角和垂墜感都有細微差異呢。想挑的話就湊近繩子端詳，合不合眼緣全看你自己的心意啦。」
 - topic_id: ciaran_gwenaera_home.topic_04
   keyword: 舊飾
   label: 舊飾
   fallback:
     scene_id: ciaran_gwenaera_home.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 舊飾
+      text: 「要是佩戴時不小心扯斷了銀絲，或是舊飾品用不上了，該怎麼處理妥當？」
+    - kind: narration
+      text: 格威娜拉‧希爾維爾莉夫從桌角拿出一截細銀絲，靈巧地在指尖繞出一個小圈。
     - kind: speech
       speaker: host
-      text: 「斷掉的耳勾、鬆掉的絲結，拿來我幫你修，不用錢。東西壞了就丟，太可惜了嘛。用不到的晶符或耳環也可以拿回來，我會看銀的成色，回你一點東西。」
+      text: 「要是我親手做出的三稜晶符或月牙耳環，戴久了耳勾折斷、絲結鬆脫，隨時拿回來我這兒。親手做的東西就像自家的孩子，器物破損了隨便扔掉多可惜嘛。」
+    - kind: speech
+      speaker: host
+      text: 「若是真用不上了，帶回來還給我，我會看銀絲和晶砂的成色，折算些銅幣給你。這些拆下來的銀料熔融之後還能再絞成新的花飾。」
+    - kind: speech
+      speaker: actor
+      text: 「那要是從山外城鎮買來的首飾壞了，也能拿來讓你重新編絞嗎？」
+    - kind: speech
+      speaker: host
+      text: 「外頭那些金銀首飾摻了什麼雜質我摸不準，硬絞只會傷了我的夾鉗。外來的東西我就不碰了，我只侍弄自己做出的物件。」
