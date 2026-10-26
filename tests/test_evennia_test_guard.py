@@ -59,6 +59,7 @@ for (const testCase of cases) {
   const execCalls = [];
   const notifications = [];
   let handler;
+  let activeDiscovery = testCase.discovery;
 
   const api = {
     on: (_event, fn) => {
@@ -66,7 +67,7 @@ for (const testCase of cases) {
     },
     exec: async (command, args, options) => {
       execCalls.push({ command, args, options });
-      const discovery = testCase.discovery ?? {
+      const discovery = activeDiscovery ?? {
         code: 0,
         stdout: "",
         stderr: "",
@@ -84,6 +85,17 @@ for (const testCase of cases) {
 
   guard.default(api);
 
+  if (guard.__resetGuardFanoutLedger) {
+    guard.__resetGuardFanoutLedger();
+  }
+
+  const realNow = Date.now;
+
+  if (typeof testCase.now === "number") {
+    const fixedNow = testCase.now;
+    Date.now = () => fixedNow;
+  }
+
   const ctx = {
     cwd: testCase.cwd ?? "/repo",
     hasUI: testCase.hasUI ?? false,
@@ -94,23 +106,44 @@ for (const testCase of cases) {
     },
   };
 
-  let decision = null;
+  const steps =
+    testCase.commands ??
+    [{ toolName: testCase.toolName, input: testCase.input }];
+  const runs = [];
   let error = null;
 
   try {
-    const outcome = await handler(
-      {
-        toolName: testCase.toolName ?? "bash",
-        input: testCase.input ?? {},
-      },
-      ctx,
-    );
-    decision = outcome === undefined ? null : outcome;
+    for (const step of steps) {
+      activeDiscovery = step.discovery ?? testCase.discovery;
+
+      if (typeof step.now === "number") {
+        const stepNow = step.now;
+        Date.now = () => stepNow;
+      }
+
+      const outcome = await handler(
+        {
+          toolName: step.toolName ?? testCase.toolName ?? "bash",
+          input: step.input ?? testCase.input ?? {},
+        },
+        ctx,
+      );
+      runs.push(outcome === undefined ? null : outcome);
+    }
   } catch (cause) {
     error = String(cause);
   }
 
-  results.push({ id: testCase.id, decision, execCalls, notifications, error });
+  Date.now = realNow;
+
+  results.push({
+    id: testCase.id,
+    decision: runs.at(-1) ?? null,
+    runs,
+    execCalls,
+    notifications,
+    error,
+  });
 }
 
 process.stdout.write(JSON.stringify({ max: guard.MAX_TESTS, results }));
@@ -616,6 +649,110 @@ class DiscoveryFailureTests(_GuardHarnessTestCase):
         self.assertIn("settings fail to import", nonzero["decision"]["reason"], "discovery output included")
         self.assertIn("was not executed", nonzero["decision"]["reason"])
         self.assertIn("Run Focus Test", nonzero["decision"]["reason"])
+
+
+class IndirectionTests(_GuardHarnessTestCase):
+    @covers_requirement("evennia-test-guard::indirection-through-an-interpreter-payload-is-blocked")
+    def test_script_inline_payload_and_eval_cell_are_blocked(self):
+        """A payload that spawns tests is refused; ordinary programs pass through."""
+        sweep = self.harness_dir / "sweep.py"
+        sweep.write_text(
+            "import subprocess\n"
+            "for label in ('world.one', 'world.two'):\n"
+            "    subprocess.run(['uv', 'run', '--locked', 'evennia', 'test', label])\n",
+            encoding="utf-8",
+        )
+        plain = self.harness_dir / "plain.py"
+        plain.write_text("print('no suite here')\n", encoding="utf-8")
+
+        _, by_id = self._run_cases(
+            [
+                {"id": "script", "input": {"command": f"python3 {sweep}"}},
+                {
+                    "id": "inline",
+                    "input": {
+                        "command": (
+                            "python3 -c \"import subprocess; "
+                            "subprocess.run(['evennia', 'test'])\""
+                        )
+                    },
+                },
+                {
+                    "id": "eval",
+                    "toolName": "eval",
+                    "input": {"code": "subprocess.run(['evennia', 'test'])"},
+                },
+                {"id": "plain-script", "input": {"command": f"python3 {plain}"}},
+                {
+                    "id": "validator",
+                    "input": {"command": "uv run --locked python -m world.prompts.validate"},
+                },
+            ]
+        )
+
+        for case_id in ("script", "inline", "eval"):
+            entry = by_id[case_id]
+            self.assertIsNone(entry["error"], case_id)
+            self.assertIsNotNone(entry["decision"], f"{case_id} must not pass unguarded")
+            self.assertTrue(entry["decision"]["block"], case_id)
+            reason = entry["decision"]["reason"]
+            self.assertIn("interpreter payload", reason, case_id)
+            self.assertIn("CI-owned", reason, case_id)
+            self.assertEqual(entry["execCalls"], [], f"{case_id} must not spawn discovery")
+
+        self.assertIn(str(sweep), by_id["script"]["decision"]["reason"])
+
+        for case_id in ("plain-script", "validator"):
+            self.assertIsNone(by_id[case_id]["decision"], case_id)
+            self.assertEqual(by_id[case_id]["execCalls"], [], case_id)
+
+
+class FanoutBudgetTests(_GuardHarnessTestCase):
+    @covers_requirement("evennia-test-guard::serial-fan-out-is-bounded-per-session-window")
+    def test_burst_is_blocked_and_spaced_runs_continue(self):
+        """A back-to-back replay of many small runs is refused; spaced work is not."""
+        focused = {
+            "input": {"command": "evennia test world.tests"},
+            "discovery": self._marker_discovery(5),
+        }
+        burst_start = 1_000_000
+        _, by_id = self._run_cases(
+            [
+                {
+                    "id": "burst",
+                    "commands": [
+                        {**focused, "now": burst_start + index}
+                        for index in range(11)
+                    ],
+                },
+                {
+                    "id": "spaced",
+                    "commands": [
+                        {**focused, "now": burst_start + index}
+                        for index in range(10)
+                    ]
+                    + [{**focused, "now": burst_start + 180_001}],
+                },
+            ]
+        )
+
+        burst = by_id["burst"]
+        self.assertIsNone(burst["error"])
+        self.assertEqual(len(burst["runs"]), 11)
+        for index in range(10):
+            self.assertIsNone(burst["runs"][index], f"run {index} is within budget")
+        blocked = burst["runs"][10]
+        self.assertIsNotNone(blocked, "the eleventh run exceeds the budget")
+        self.assertTrue(blocked["block"])
+        self.assertIn("fan-out", blocked["reason"])
+        self.assertIn("180", blocked["reason"])
+        self.assertEqual(len(burst["execCalls"]), 10, "the blocked run never discovers")
+
+        spaced = by_id["spaced"]
+        self.assertIsNone(spaced["error"])
+        self.assertEqual(len(spaced["runs"]), 11)
+        for index, run in enumerate(spaced["runs"]):
+            self.assertIsNone(run, f"spaced run {index} stays inside the fresh window")
 
 
 class ClaudeHookAdapterTests(unittest.TestCase):

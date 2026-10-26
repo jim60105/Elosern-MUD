@@ -1,7 +1,7 @@
 # evennia-test-guard Specification
 
 ## Purpose
-Defines the pre-execution guard that inspects Bash-tool invocations of `evennia test`, counts discovered tests through a count-only discovery run, and blocks any invocation whose discovered test count exceeds the configured maximum, directing the caller to run a focused test instead.
+Defines the pre-execution guard that inspects Bash-tool invocations of `evennia test`, counts discovered tests through a count-only discovery run, blocks any invocation whose discovered test count exceeds the configured maximum, refuses interpreter payloads and eval cells that hide a test run, and bounds how many focused runs one session may replay back to back. Every refusal directs the caller to run a focused test instead.
 
 ## Requirements
 
@@ -136,3 +136,33 @@ If the discovery subprocess raises, exceeds its bounded timeout (60 s), or exits
 #### Scenario: Broken settings block the test run
 - **WHEN** discovery exits non-zero because settings fail to import
 - **THEN** the original `evennia test` command does not run and the reason includes the discovery error output and the fix-then-focus guidance
+
+### Requirement: Indirection through an interpreter payload is blocked
+The guard SHALL refuse an invocation whose executed program is an interpreter — Python, Node, Bun, Deno, a shell, or a directly executed script — when a script file it names contains an Evennia test invocation, and SHALL refuse an inline `-c`/`-e`/`--eval` program payload that contains one. It SHALL also refuse an eval-tool cell whose code contains an Evennia test invocation. A recognized runner or timing prologue (`uv run`, `poetry run`, `timeout`, `nice`, `stdbuf`) SHALL NOT hide the interpreter. The refusal SHALL name the payload and the focused-test policy, and SHALL occur before any discovery or test execution. An interpreter invocation whose file or payload contains no test invocation SHALL pass through untouched.
+
+#### Scenario: A script that loops the suite is blocked
+- **WHEN** the Bash tool runs `python3 /tmp/sweep.py` and that file spawns `evennia test` for many labels
+- **THEN** the guard blocks the command, names the script path, and runs no discovery
+
+#### Scenario: Inline interpreter payload is blocked
+- **WHEN** the Bash tool runs `python3 -c "subprocess.run(['evennia', 'test'])"`
+- **THEN** the guard blocks the command and names the inline payload
+
+#### Scenario: Eval cell is blocked
+- **WHEN** the eval tool receives code that spawns `evennia test`
+- **THEN** the guard blocks the cell without executing it
+
+#### Scenario: Ordinary programs pass through
+- **WHEN** the Bash tool runs a script or a validator module that names no test invocation, such as `uv run --locked python -m world.prompts.validate`
+- **THEN** the guard returns no decision and runs no discovery
+
+### Requirement: Serial fan-out is bounded per session window
+The guard SHALL record every allowed Evennia test run with its time and discovered count, and SHALL block a further run while the rolling window already holds the configured maximum number of runs or the configured maximum discovered tests. The refusal SHALL state the run count, the window length, the budget, and that the full suite is CI-owned. Runs whose timestamp falls outside the window SHALL be discarded so ordinary focused work continues.
+
+#### Scenario: A burst of focused runs is stopped
+- **WHEN** ten test runs were allowed within the last 180 seconds and another focused label is requested
+- **THEN** the guard blocks the new run, names the fan-out budget, and runs no discovery
+
+#### Scenario: Spaced focused work continues
+- **WHEN** the previously allowed runs fall outside the 180-second window
+- **THEN** the guard allows the next focused run and starts a fresh window count

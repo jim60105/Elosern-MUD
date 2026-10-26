@@ -1,5 +1,9 @@
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 
+import {
+  readFileSync,
+  statSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import {
   delimiter as pathDelimiter,
@@ -11,6 +15,56 @@ import { fileURLToPath } from "node:url";
 
 const MAX_TESTS = 100;
 const DISCOVERY_TIMEOUT_MS = 60_000;
+
+/*
+ * Local fan-out budget. The per-invocation cap above bounds ONE command;
+ * without a second bound, many small invocations replay the whole suite, which
+ * AGENTS.md forbids ("never run it serially", the full non-browser suite runs
+ * at most once, in parallel, and CI owns it).
+ */
+const MAX_RUNS_PER_WINDOW = 10;
+const FANOUT_WINDOW_MS = 180_000;
+const MAX_TESTS_PER_WINDOW = 1_500;
+
+/* A scanned script larger than this is not a test wrapper. */
+const SCRIPT_SCAN_BYTES = 256 * 1024;
+
+/*
+ * Interpreter leads whose arguments may name a script or an inline program.
+ * Running tests through one of these evades the per-command grammar, because
+ * the test text lives in a file or a string the shell command never shows.
+ */
+const INTERPRETER_LEAD =
+  /^(?:python[0-9.]*|pypy[0-9.]*|node|bun|deno|sh|bash|zsh|dash|ksh|fish|ruby|perl|php|lua)$/;
+
+/* Flags whose next token is a program payload rather than a file path. */
+const INLINE_CODE_FLAGS: Record<string, true> = {
+  "-c": true,
+  "-e": true,
+  "--eval": true,
+  "-p": true,
+  "--print": true,
+};
+
+/*
+ * Script-payload detection is intentionally looser than the shell grammar:
+ * a Python ``subprocess.run(["evennia", "test"])`` argv pair, an f-string, or
+ * a joined command line all spell the invocation without the exact
+ * ``evennia test`` space the shell form uses.
+ */
+const EVENNIA_TEST_LOOSE =
+  /\bevennia\b[^\w]{0,6}\btest\b|["']test["'][^\n]{0,40}\bevennia\b/;
+
+/* Runner/wrapper prologues that never change which interpreter runs. */
+const RUNNER_LEADS: Record<string, true> = {
+  uv: true,
+  poetry: true,
+};
+const TIMING_WRAPPERS: Record<string, true> = {
+  timeout: true,
+  nice: true,
+  stdbuf: true,
+};
 
 const COUNT_MARKER = "__OMP_EVENNIA_TEST_COUNT_V1__=";
 const COUNT_RUNNER =
@@ -979,10 +1033,261 @@ function blockedBecauseUnsupported(reason: string): string {
   ].join("\n");
 }
 
+function blockedBecauseIndirect(where: string): string {
+  return [
+    "Evennia test guard blocked this command.",
+    "",
+    `Reason: the interpreter payload ${where} runs Evennia tests, so the ` +
+      "test command is hidden from the guard's inspected shell segment.",
+    "",
+    "Running tests through a script, an inline interpreter payload, or the " +
+      "eval tool bypasses the focused-test policy: the full suite is CI-owned " +
+      "and must never be replayed locally in batches.",
+    "",
+    "Run the test directly, as a standalone command:",
+    "  evennia test <focused-test-label>",
+    "  uv run --locked --env-file=<file> evennia test <focused-test-label>",
+    "  uv run --locked python -m unittest <focused.module>",
+    "",
+    `The discovered test count of one command must be <= ${MAX_TESTS}.`,
+  ].join("\n");
+}
+
+function blockedBecauseFanout(runs: number): string {
+  return [
+    "Evennia test guard blocked this command: local fan-out budget exceeded.",
+    "",
+    `Reason: ${runs} test runs were already allowed in the last ` +
+      `${Math.round(FANOUT_WINDOW_MS / 1000)} s ` +
+      `(budget ${MAX_RUNS_PER_WINDOW} runs / ${MAX_TESTS_PER_WINDOW} tests).`,
+    "",
+    "Many small invocations are the serial full-suite run AGENTS.md forbids. " +
+      "Run one focused label per behavior under change and let CI own the " +
+      "complete suite.",
+    "",
+    "Wait for the window to pass, then continue with the single focused " +
+      "label you still need.",
+  ].join("\n");
+}
+
+type GuardRun = {
+  at: number;
+  tests: number;
+};
+
+/*
+ * Session-local record of allowed test runs. Nothing is persisted: the budget
+ * exists to stop a fan-out burst, so a fresh process starts clean.
+ */
+let recentRuns: GuardRun[] = [];
+
+/* Test-only hook: the Node harness resets the ledger between cases. */
+export function __resetGuardFanoutLedger(): void {
+  recentRuns = [];
+}
+
+function pruneRuns(now: number): void {
+  recentRuns = recentRuns.filter(
+    (run) => now - run.at < FANOUT_WINDOW_MS,
+  );
+}
+
+function recordRun(now: number, tests: number): void {
+  recentRuns.push({ at: now, tests });
+}
+
+function shellTokens(segment: string): string[] {
+  return segment
+    .trim()
+    .split(/[ \t]+/)
+    .filter(Boolean);
+}
+
+function stripQuotes(token: string): string {
+  const first = token[0];
+
+  if (
+    token.length >= 2 &&
+    (first === '"' || first === "'") &&
+    token.at(-1) === first
+  ) {
+    return token.slice(1, -1);
+  }
+
+  return token;
+}
+
+function isPathToken(token: string): boolean {
+  return (
+    token.length > 0 &&
+    !token.startsWith("-") &&
+    !/[*?[\]{}$`|&;<>]/.test(token)
+  );
+}
+
+/*
+ * Consume the prologues that never change WHICH program runs: environment
+ * assignments plus `uv run`/`poetry run`, `timeout`, `nice` and `stdbuf`.
+ */
+function effectiveTokens(tokens: string[]): string[] {
+  let rest = tokens;
+
+  for (;;) {
+    while (
+      rest.length > 0 &&
+      /^[A-Za-z_][A-Za-z0-9_]*=/.test(rest[0])
+    ) {
+      rest = rest.slice(1);
+    }
+
+    const lead = rest[0] ?? "";
+
+    if (Object.hasOwn(RUNNER_LEADS, lead) && rest[1] === "run") {
+      rest = rest.slice(2);
+
+      while (rest.length > 0 && rest[0].startsWith("-")) {
+        rest = rest.slice(1);
+      }
+
+      continue;
+    }
+
+    if (Object.hasOwn(TIMING_WRAPPERS, lead)) {
+      rest = rest.slice(1);
+
+      while (
+        rest.length > 0 &&
+        (rest[0].startsWith("-") || /^\d+[smhd]?$/.test(rest[0]))
+      ) {
+        rest = rest.slice(1);
+      }
+
+      continue;
+    }
+
+    return rest;
+  }
+}
+
+function readScannable(path: string): string | null {
+  try {
+    const info = statSync(path);
+
+    if (!info.isFile() || info.size > SCRIPT_SCAN_BYTES) {
+      return null;
+    }
+
+    return readFileSync(path, "utf8");
+  } catch {
+    return null;
+  }
+}
+
+function payloadRunsTests(text: string): boolean {
+  return (
+    EVENNIA_TEST_ANYWHERE.test(text) ||
+    EVENNIA_TEST_LOOSE.test(text) ||
+    DRIVER_ANYWHERE.test(text) ||
+    UNITTEST_MODULE_ANYWHERE.test(text)
+  );
+}
+
+/*
+ * Report where an interpreter payload runs Evennia tests, or null when the
+ * command only runs ordinary programs. This closes the indirection hole: a
+ * script (or an inline `-c` payload, or an eval cell) that spawns `evennia
+ * test` never shows the test text to the shell grammar, so the command was
+ * previously allowed while replaying the suite in a loop.
+ */
+function findIndirectTestRun(
+  command: string,
+  cwd: string,
+): string | null {
+  for (const part of command.split("&&")) {
+    const tokens = effectiveTokens(shellTokens(part));
+    const lead = tokens[0] ?? "";
+
+    if (!lead) {
+      continue;
+    }
+
+    const leadName = lead.split("/").at(-1) ?? lead;
+    const inlineIndex = tokens.findIndex(
+      (token, index) =>
+        index > 0 && Object.hasOwn(INLINE_CODE_FLAGS, token),
+    );
+
+    if (inlineIndex >= 0) {
+      /*
+       * The program payload is the rest of the segment, not one token: a
+       * quoted `-c "import x; x.run()"` splits on its own spaces.
+       */
+      const payload = stripQuotes(
+        tokens.slice(inlineIndex + 1).join(" "),
+      );
+
+      if (payload && payloadRunsTests(payload)) {
+        return `\`${leadName} ${tokens[inlineIndex]}\``;
+      }
+    }
+
+    if (INTERPRETER_LEAD.test(leadName)) {
+      for (const token of tokens.slice(1)) {
+        if (!isPathToken(token)) {
+          continue;
+        }
+
+        const candidate = resolve(cwd, stripQuotes(token));
+        const text = readScannable(candidate);
+
+        if (text !== null && payloadRunsTests(text)) {
+          return candidate;
+        }
+      }
+
+      continue;
+    }
+
+    /* A directly executed script (`./sweep.sh`) is a payload too. */
+    if (lead.includes("/")) {
+      const candidate = resolve(cwd, stripQuotes(lead));
+      const text = readScannable(candidate);
+
+      if (text !== null && payloadRunsTests(text)) {
+        return candidate;
+      }
+    }
+  }
+
+  return null;
+}
+
 export default function evenniaTestGuard(
   pi: ExtensionAPI,
 ): void {
   pi.on("tool_call", async (event, ctx) => {
+    /*
+     * The eval tool runs arbitrary Python/JavaScript in the session kernel.
+     * A cell that shells out to the test suite is the same indirection as a
+     * script file, so it is refused by content instead of by command text.
+     */
+    if (event.toolName === "eval") {
+      const input = event.input as Record<string, unknown>;
+      const code =
+        typeof input.code === "string" ? input.code : "";
+
+      if (code && payloadRunsTests(code)) {
+        return {
+          block: true,
+          reason: blockedBecauseIndirect(
+            "passed to the eval tool",
+          ),
+        };
+      }
+
+      return;
+    }
+
     if (event.toolName !== "bash") {
       return;
     }
@@ -998,9 +1303,26 @@ export default function evenniaTestGuard(
       return;
     }
 
+    const cwd = resolveWorkingDirectory(
+      ctx.cwd,
+      input.cwd,
+    );
+
     const analysis = analyzeCommand(command);
 
     if (analysis.kind === "not-evennia-test") {
+      const indirect = findIndirectTestRun(
+        command,
+        cwd,
+      );
+
+      if (indirect !== null) {
+        return {
+          block: true,
+          reason: blockedBecauseIndirect(indirect),
+        };
+      }
+
       return;
     }
 
@@ -1013,17 +1335,29 @@ export default function evenniaTestGuard(
       };
     }
 
-    const cwd = resolveWorkingDirectory(
-      ctx.cwd,
-      input.cwd,
-    );
-
     const inputEnvironment = readEnvironment(
       input.env,
     );
 
     const environmentScript =
       buildEnvironmentScript(inputEnvironment);
+
+    /*
+     * The run-count half of the window budget is knowable before discovery,
+     * so a burst is refused without spending a discovery subprocess. The
+     * discovered-test half is checked after the count is known.
+     */
+    const startNow = Date.now();
+    pruneRuns(startNow);
+
+    if (recentRuns.length >= MAX_RUNS_PER_WINDOW) {
+      return {
+        block: true,
+        reason: blockedBecauseFanout(
+          recentRuns.length,
+        ),
+      };
+    }
 
     const script = [
       "set -e",
@@ -1132,6 +1466,29 @@ export default function evenniaTestGuard(
         reason: blockedBecauseTooManyTests(count),
       };
     }
+
+    /*
+     * Per-invocation length is bounded above; the window budget bounds how
+     * many focused runs one session may replay back to back, which is the
+     * serial full-suite fan-out AGENTS.md forbids.
+     */
+    pruneRuns(startNow);
+
+    const windowTests = recentRuns.reduce(
+      (total, run) => total + run.tests,
+      0,
+    );
+
+    if (windowTests + count > MAX_TESTS_PER_WINDOW) {
+      return {
+        block: true,
+        reason: blockedBecauseFanout(
+          recentRuns.length,
+        ),
+      };
+    }
+
+    recordRun(startNow, count);
 
     if (ctx.hasUI) {
       ctx.ui.notify(
