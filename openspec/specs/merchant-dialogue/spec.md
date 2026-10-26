@@ -27,6 +27,10 @@ than a silent default.
 - **WHEN** stock is listed and goods are bought and sold from a merchant host
 - **THEN** the results are identical to before the dialogue capability was added
 
+#### Scenario: Direct authoring preserves merchant speech
+- **WHEN** shipped merchant rows are converted to direct components
+- **THEN** each retains its existing scripted dialogue without blueprint expansion
+
 ### Requirement: A trading host speaks as its settlement, not as a shop template
 A merchant host's authored dialogue SHALL match the register its settlement's culture
 establishes, not a single shopkeeper template applied everywhere. In a settlement whose

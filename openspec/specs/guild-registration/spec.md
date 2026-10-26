@@ -139,53 +139,43 @@ be granted at registration; it is granted by the first guild reward claim
 - **THEN** no title is granted
 
 ### Requirement: Service hosts are created and converged from a declarative YAML roster
-The service-host roster SHALL be derived from the place registry rather than hand-authored: each
-place yields one row declaring `name`, `title`, `profession`, a canonical host_key equal to profile_key and the initial spawn room tag,
-`service_id`, and the authored component identity kwargs.
-`world/rules/guild_economy.py::sync_service_content` SHALL interpret the roster and assemble
-components through the shared `world/rules/profession_assembly.py` helper, never a code-side
-component literal.
+The service roster SHALL derive from each hosted place's canonical identity, spawn room and direct capability declarations. Complete catalog and unique anchor validation SHALL precede atomic assembly. Reused hosts SHALL preserve location and subsystem state under canonical provenance ownership.
 
 #### Scenario: Shipped roster recreates today's two hosts bit-for-bit
-- **WHEN** all declared service hosts are deleted and sync runs
-- **THEN** each recreated host matches its live authored identity, provenance, canonical ages, anchor and blueprint component arguments
+- **WHEN** the current declared roster is rebuilt
+- **THEN** each host matches its current authored name/profile/age and explicit components without historical roster-count assumptions
 
 #### Scenario: Config-time roster validation rejects a nameable offense without DB access
-- **WHEN** a place declares `profession: blacksmith` (no such registry row) or omits the
-  merchant place's `shop_key`
-- **THEN** config loading raises the named catalog error and no host sync occurs
+- **WHEN** a direct component is unknown or missing configuration
+- **THEN** catalog loading rejects the complete candidate with named errors
 
 #### Scenario: An unresolvable anchor room fails sync closed and names the row
-- **WHEN** sync resolves a row whose room tag matches no room
-- **THEN** the complete operation fails before persistence and names the unresolved row
+- **WHEN** an anchor has zero/multiple/non-Room matches
+- **THEN** the complete operation rolls back, including prepared interiors
 
 #### Scenario: Assembly is the shared helper, not a code-side literal
-- **WHEN** `world/rules/guild_economy.py` is searched for `ComponentClass` literals or
-  `component_specs` tuples
-- **THEN** none remain; component attachment flows only through `profession_assembly`
+- **WHEN** imports and service hosts assemble declarations
+- **THEN** both use the same validated capability plan, with no second attach loop
 
 #### Scenario: Idempotent re-sync changes nothing
-- **WHEN** the roster-driven sync runs twice in a row
-- **THEN** the second run creates no host, renames nothing, attaches no duplicate component, and
-  deletes nothing
+- **WHEN** the same source synchronizes twice
+- **THEN** no host duplicates, runtime state resets or extra capability slots occur
 
 #### Scenario: A host is declared exactly once
-- **WHEN** the rulebook is searched for a hand-authored `service_hosts:` roster
-- **THEN** none remains, and every host's name, title and profession appear only on its place
+- **WHEN** host source definitions are enumerated
+- **THEN** each appears only on its canonical place, without a separate hand-authored roster
 
 #### Scenario: The derived roster reproduces the pre-change hosts
-- **WHEN** the place-derived roster is compared with current hosted place records
-- **THEN** one matching row exists per declared service identity, with no historical count, personal-name or two-host approval table
+- **WHEN** shipped definitions are converted
+- **THEN** each preserves its component functionality without profession fields
 
 #### Scenario: Config-time batch validation covers every named offense
-- **WHEN** a derived roster row has missing fields, a `profession` naming no registry row, a
-  blueprint component type whose identity kwargs the place fails to supply, or a non-string room tag
-- **THEN** `world/rules/guild_config.py` batch-validation raises the catalog's named error and
-  caches nothing, and config load never touches the database
+- **WHEN** required fields, duplicate types, refs or bindings are malformed
+- **THEN** nothing is cached or persisted from the rejected candidate
 
 #### Scenario: Sync resolves rows and reuses hosts under the unchanged contract
-- **WHEN** `sync_service_content` processes one roster row
-- **THEN** it resolves the spawn room uniquely and finds-or-creates the host by canonical npc_profile_key provenance, preserving reused location, identity and runtime state
+- **WHEN** a declaration is synchronized
+- **THEN** host_key uses unique canonical profile provenance and reused identity/location/state remain unchanged
 
 ### Requirement: Roster convergence deletes service hosts absent from the roster
 Only explicitly source-owned hosts whose complete host declaration is removed SHALL be retired through the existing host lifecycle. Capability removal or component service IDs SHALL NOT authorize deleting a host; unrelated NPCs SHALL survive.

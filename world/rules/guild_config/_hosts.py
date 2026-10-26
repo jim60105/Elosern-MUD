@@ -56,6 +56,20 @@ def validate_service_hosts() -> tuple[ServiceHostRow, ...]:
             validate_capabilities(place.components)
         except CapabilityValidationError as error:
             raise _error(f"{what} declares unusable capabilities: {error}") from error
+        # merchant-dialogue: a shopkeeper who cannot be spoken to is the
+        # defect that rule removes, so a trading place must declare its
+        # dialogue capability beside the trade one.
+        if (
+            any(declaration.type == "merchant" for declaration in place.components)
+            and not any(
+                declaration.type == "scripted_dialogue"
+                for declaration in place.components
+            )
+        ):
+            raise _error(
+                f"{what} declares merchant without scripted_dialogue; every "
+                "merchant place authors the dialogue capability its host answers from"
+            )
         row_service_ids: set[str] = set()
         for declaration in place.components:
             binding = declaration.binding
