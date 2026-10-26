@@ -690,6 +690,10 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
     # -- 1. graphical and text checkpoint sequence --------------------------
 
     @covers_requirement(
+        "webclient-incremental-sync-verification::"
+        "changed-synchronization-paths-have-actual-browser-functional-acceptance"
+    )
+    @covers_requirement(
         "webclient-incremental-publication::"
         "unknown-scope-recomputes-all-eager-panels-without-full-retransmission"
     )
@@ -883,6 +887,10 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
     # -- 2. oversized snapshot and delta ------------------------------------
 
     @covers_requirement(
+        "webclient-incremental-sync-verification::"
+        "changed-synchronization-paths-have-actual-browser-functional-acceptance"
+    )
+    @covers_requirement(
         "webclient-publication-assembly::"
         "general-assembly-adopts-one-complete-validated-publication"
     )
@@ -1065,6 +1073,10 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
         "webclient-sync-recovery::recovery-coalesces-failures-and-remains-bounded"
     )
     @covers_requirement(
+        "webclient-incremental-sync-verification::"
+        "changed-synchronization-paths-have-actual-browser-functional-acceptance"
+    )
+    @covers_requirement(
         "webclient-sync-recovery::"
         "action-results-cannot-claim-synchronization-before-adoption"
     )
@@ -1216,6 +1228,10 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
 
     @covers_requirement(
         "webclient-sync-recovery::recovery-coalesces-failures-and-remains-bounded"
+    )
+    @covers_requirement(
+        "webclient-incremental-sync-verification::"
+        "changed-synchronization-paths-have-actual-browser-functional-acceptance"
     )
     @covers_requirement(
         "webclient-immutable-presentation::"
