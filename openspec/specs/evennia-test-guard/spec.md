@@ -138,8 +138,19 @@ If the discovery subprocess raises, exceeds its bounded timeout (60 s), or exits
 - **THEN** the original `evennia test` command does not run and the reason includes the discovery error output and the fix-then-focus guidance
 
 ### Requirement: Indirection through an interpreter payload is blocked
-The guard SHALL refuse an invocation whose executed program is an interpreter — Python, Node, Bun, Deno, a shell, or a directly executed script — when a script file it names contains an Evennia test invocation, and SHALL refuse an inline `-c`/`-e`/`--eval` program payload that contains one. It SHALL also refuse an eval-tool cell whose code contains an Evennia test invocation. Shell quoting, an `&&`-separated `cd` prefix, environment assignments, an `env` wrapper, a recognized runner or timing prologue including its option values (`uv run`, `poetry run`, `timeout`, `nice`, `stdbuf`), and a shell `-c` payload SHALL NOT hide the interpreter or its program. A program argument selected by an interpreter module mode (`-m`) SHALL be treated as data, not as a scanned script. The refusal SHALL name the payload and the focused-test policy, and SHALL occur before any discovery or test execution. An interpreter invocation whose file or payload contains no test invocation SHALL pass through untouched.
+The guard SHALL refuse an interpreter invocation — or an eval-tool cell — whose named script file or inline program payload contains an Evennia test invocation, before any discovery or test execution, naming the payload and the focused-test policy.
 
+#### Scenario: Wrapper and prologue forms do not hide the payload
+- **WHEN** the interpreted program is reached through shell quoting, an `&&`-separated `cd` prefix, environment assignments, an `env` wrapper, a shell `-c` payload, or a recognized runner or timing prologue with its option values (`uv run`, `poetry run`, `timeout`, `nice`, `stdbuf`)
+- **THEN** the invocation resolves to the same script and is blocked
+
+#### Scenario: A module-mode argument is data
+- **WHEN** the interpreter selects its program with `-m`
+- **THEN** the guard treats that argument as data, not as a scanned script
+
+#### Scenario: A payload without a test invocation passes through
+- **WHEN** an interpreter invocation's file or payload contains no Evennia test invocation
+- **THEN** the guard blocks nothing and runs no discovery
 #### Scenario: A script that loops the suite is blocked
 - **WHEN** the Bash tool runs `python3 /tmp/sweep.py` and that file spawns `evennia test` for many labels
 - **THEN** the guard blocks the command, names the script path, and runs no discovery
