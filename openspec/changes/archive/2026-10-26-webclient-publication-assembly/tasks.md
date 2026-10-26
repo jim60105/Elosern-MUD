@@ -4,17 +4,17 @@ All checkboxes are implementation work, not authorization to apply during propos
 
 ## 1. Invisible bounded assembly
 
-- [ ] 1.1 Write new protocol_publication_parts.test.js with injected clock/timers, then implement publication_parts.js exact ordered append, derived lengths/count, canonical base64 and fixed first-part deadline. Test 683-part limit, byte overflow before allocation, corrupt headers/body, duplicate/skipped index, CJK strict decode and timeout without traffic. Document bounds and teardown.
-- [ ] 1.2 Connect general assembler to protocol/store.js receive, final logical validation/staged commit and prune lifecycle; initial multipart snapshot establishes epoch only after complete validation. Test pending returns accepted:false/pending:true, zero notification/revision changes before final part, base recheck and old generation/epoch discard.
+- [x] 1.1 Write new protocol_publication_parts.test.js with injected clock/timers, then implement publication_parts.js exact ordered append, derived lengths/count, canonical base64 and fixed first-part deadline. Test 683-part limit, byte overflow before allocation, corrupt headers/body, duplicate/skipped index, CJK strict decode and timeout without traffic. Document bounds and teardown.
+- [x] 1.2 Connect general assembler to protocol/store.js receive, final logical validation/staged commit and prune lifecycle; initial multipart snapshot establishes epoch only after complete validation. Test pending returns accepted:false/pending:true, zero notification/revision changes before final part, base recheck and old generation/epoch discard.
 
 ## 2. Transport routing and lifecycle
 
-- [ ] 2.1 Add ui_publication_part exports/OOB routing through protocol.js, app lib facade and app transport.js; add Python-encoder-to-Node-reducer fixture in test_publication_parts.py and app transport tests. Prove map parts coexist under separate bounds, newer snapshot supersedes old general transfer, later delta cannot skip incomplete predecessor, and disconnect/detach/reset frees both buffers/timers.
-- [ ] 2.2 Register any new Python labels once, attach assembly requirement assertions and update synchronization receiver documentation. Preserve existing scoped world-map/area-map tests and same-epoch complete-map references; partial frames must never clear rejection state or release action completion.
+- [x] 2.1 Add ui_publication_part exports/OOB routing through protocol.js, app lib facade and app transport.js; add Python-encoder-to-Node-reducer fixture in test_publication_parts.py and app transport tests. Prove map parts coexist under separate bounds, newer snapshot supersedes old general transfer, later delta cannot skip incomplete predecessor, and disconnect/detach/reset frees both buffers/timers.
+- [x] 2.2 Register any new Python labels once, attach assembly requirement assertions and update synchronization receiver documentation. Preserve existing scoped world-map/area-map tests and same-epoch complete-map references; partial frames must never clear rejection state or release action completion.
 
 ## 3. Focused integrated verification
 
-- [ ] 3.1 Run A-NODE, A-PY and A-VUE below after edits plus contract_gate. No polling-based deadline tests or browser timing benchmark; use deterministic fake scheduler assertions and actual codec fixture bytes.
+- [x] 3.1 Run A-NODE, A-PY and A-VUE below after edits plus contract_gate. No polling-based deadline tests or browser timing benchmark; use deterministic fake scheduler assertions and actual codec fixture bytes.
 
 ## Verification commands
 

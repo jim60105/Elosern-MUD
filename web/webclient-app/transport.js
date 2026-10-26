@@ -7,8 +7,9 @@
 // legacy Protocol store.
 //
 // Wiring contract:
-// - The `ui_snapshot` / `ui_update` / `ui_action_result` / `ui_protocol_error`
-//   OOB listeners are tagged with the transport generation and feed
+// - The `ui_snapshot` / `ui_update` / `ui_publication_part` /
+//   `ui_action_result` / `ui_protocol_error` OOB listeners are tagged with the
+//   transport generation and feed
 //   `store.receive(generation, name, args, kwargs)`. Because the evennia.js
 //   emitter keeps a single listener per message name, they are re-registered
 //   on every `connection_open` with the new generation, so a delayed
@@ -25,7 +26,13 @@
 import Protocol from "./lib/protocol.js";
 import { retireReplacedFallback } from "./fallback.js";
 
-const OOB_MESSAGES = ["ui_snapshot", "ui_update", "ui_action_result", "ui_protocol_error"];
+const OOB_MESSAGES = [
+  "ui_snapshot",
+  "ui_update",
+  "ui_publication_part",
+  "ui_action_result",
+  "ui_protocol_error",
+];
 
 export function wireTransport(store, consoleHandle) {
   const evennia = window.Evennia;

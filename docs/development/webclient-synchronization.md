@@ -73,8 +73,8 @@ intact envelope allowance travels as one bounded transfer of
 `web/webclient/presentation/publication_parts.py`; the shared limits are
 declared there and mirrored in
 `web/static/webclient/js/elosern/protocol/constants.js`. The browser assembler
-that consumes a transfer is delivered by the assembly change; this slice only
-declares the constants and sends the parts.
+`web/static/webclient/js/elosern/protocol/publication_parts.js` consumes a
+transfer invisibly and the reducer adopts the complete logical document once.
 
 Each part is exactly one JSON object in the first positional argument and
 carries:
@@ -139,6 +139,50 @@ Encoding rules:
 - On-demand map bodies keep their specialized protocol (intact world map under
   its scoped allowance, area map as bounded `ui_update` parts); a general part
   never wraps them.
+
+### Receiver assembly
+
+`protocol/store.js` routes `ui_publication_part` to one general assembler per
+transport, independently of `protocol/map_parts.js` (the specialized map
+transfer keeps its own buffers, bounds and lifecycle). Nothing a transfer
+carries becomes visible until:
+
+1. the frame is a transport-generation- and epoch-eligible part with the exact
+   nine-field shape (plus `base_revision` for a delta only), the generic frame
+   bounds and canonical base64 chunks of the derived sizes;
+2. the live transfer holds indices `0..N-1` exactly once, with identical
+   epoch/revision/kind/transfer/count/total (and base), in order;
+3. the reassembled bytes decode once as strict UTF-8 JSON;
+4. the logical document validates from its root — global JSON-safety limits,
+   the kind's exact envelope schema, every panel-local bound and the
+   24,576-byte dialogue panel cap — matching its headers and never reapplying
+   the 65,536-byte frame ceiling; and
+5. final baseline admission succeeds (active epoch, newer target, and for a
+   delta `base_revision === committed revision` at adoption).
+
+Pending parts return `{accepted: false, pending: true}` and change no
+presentation, metadata, revision, subscriber notification, mutation gate or
+recovery signal. Only the final admission triggers the one staged commit and
+notification.
+
+One transfer is live per transport (`<=16 MiB`, `<=683` parts) with a fixed
+30,000ms deadline from its first accepted part; later traffic never extends
+it, and a missing final part fails once without requiring another frame.
+Disconnect, a new transport generation, no-puppet detach, supersession and
+expiry release the buffers and cancel the timer. A newer same-epoch snapshot
+may supersede an incomplete lower-target transfer at part 0 (or arrive intact
+and prune it); a stale or malformed publication never destroys the last
+complete presentation. A delta arriving while an earlier general publication
+remains incomplete — as parts or intact — abandons that transfer and signals
+recovery instead of committing out of order.
+
+An assembly failure (timeout, contradiction, invalid body, or a logical
+document that fails validation) records one `recovery: needed` cause on the
+reducer and keeps graphical mutations locked; the recovery change owns the
+single `ui_sync` request sender. A valid complete snapshot clears that need; a
+delta neither clears nor bypasses it. On-demand map assembly is unaffected
+except that a completed general snapshot prunes a map transfer whose target is
+already committed and retains same-epoch complete maps.
 
 ## Admission
 

@@ -158,7 +158,7 @@ function makeConsoleHandle() {
 }
 
 describe("wireTransport", () => {
-  it("binds the four OOB listeners to store.receive with the generation", () => {
+  it("binds the five OOB listeners to store.receive with the generation", () => {
     const { evennia, listeners, emit } = makeFakeEvennia();
     const store = makeStubStore();
     window.Evennia = evennia;
@@ -166,15 +166,20 @@ describe("wireTransport", () => {
     const wired = wireTransport(store, makeConsoleHandle());
 
     expect(wired).toBe(true);
-    // The four OOB names are registered (single listener per name).
+    // The five OOB names are registered (single listener per name).
     expect(Object.keys(listeners).sort()).toEqual(
-      ["connection_close", "connection_open", "logged_in", "prompt", "text", "ui_action_result", "ui_protocol_error", "ui_snapshot", "ui_update"].sort()
+      ["connection_close", "connection_open", "logged_in", "prompt", "text", "ui_action_result", "ui_protocol_error", "ui_publication_part", "ui_snapshot", "ui_update"].sort()
     );
 
     // A delayed older-generation message is discarded by the generation gate.
     const snapshot = { protocol_version: 1, presentation_epoch: "epoch_a", revision: 1 };
     emit("ui_snapshot", [snapshot], {});
     expect(store.calls).toContainEqual(["receive", 0, "ui_snapshot", snapshot, {}]);
+
+    // A general publication part rides the same generation-tagged seam.
+    const part = { protocol_version: 1, presentation_epoch: "epoch_a", revision: 1 };
+    emit("ui_publication_part", [part], {});
+    expect(store.calls).toContainEqual(["receive", 0, "ui_publication_part", part, {}]);
   });
 
   it("re-registers OOB listeners and bumps generation on connection_open, resyncs on logged_in", () => {

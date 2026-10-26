@@ -381,6 +381,7 @@ var CREATION_AFFINITY_MAXIMUMS = { human: 2, beastfolk: 1, elf: 0 };
 var MESSAGE_NAMES = {
   ui_snapshot: true,
   ui_update: true,
+  ui_publication_part: true,
   ui_action_result: true,
   ui_protocol_error: true,
 };

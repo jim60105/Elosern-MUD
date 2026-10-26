@@ -274,6 +274,45 @@ function validateUpdate(payload) {
   return meta;
 }
 
+// Validate one reassembled general publication (ui_publication_part transfer).
+// The logical document is checked from its root against the global JSON-safety
+// limits, its kind's exact envelope schema and every panel-local bound, but
+// the single-frame 65,536-byte envelope ceiling is never reapplied: the
+// logical aggregate limit (16 MiB) belongs to the part codec. A general
+// publication never wraps an on-demand map body, and the dialogue panel's own
+// local byte cap survives assembly (it is not an intact-frame allowance).
+function validateAssembledPresentation(kind, logical) {
+  if (kind !== "snapshot" && kind !== "delta") {
+    throw new Error("publication kind must be snapshot or delta");
+  }
+  if (!isPlainObject(logical)) {
+    throw new Error("a logical publication must be a JSON object");
+  }
+  core.checkGlobalSafety(logical);
+  var meta = kind === "snapshot" ? validateSnapshot(logical) : validateUpdate(logical);
+  if (meta.part) {
+    throw new Error("a general publication never carries a specialized map-body part");
+  }
+  var names = Object.keys(meta.panels);
+  for (var index = 0; index < names.length; index++) {
+    if (Object.prototype.hasOwnProperty.call(MAP_PANEL_SCHEMAS, names[index])) {
+      throw new Error(
+        "a general publication never carries the on-demand panel " + names[index]
+      );
+    }
+  }
+  if (core.carriesAvailableDialogue(logical)) {
+    if (core.jsonByteSize(logical.panels.dialogue) > C.DIALOGUE_PANEL_MAX_BYTES) {
+      throw new Error(
+        "dialogue panel canonical JSON exceeds " +
+          C.DIALOGUE_PANEL_MAX_BYTES +
+          " bytes"
+      );
+    }
+  }
+  return meta;
+}
+
 function validateActionResult(payload) {
   requireExactFields(
     payload,
@@ -354,6 +393,7 @@ module.exports = {
   validatePanels: validatePanels,
   validateSnapshot: validateSnapshot,
   validateUpdate: validateUpdate,
+  validateAssembledPresentation: validateAssembledPresentation,
   validateActionResult: validateActionResult,
   validateProtocolError: validateProtocolError,
 };

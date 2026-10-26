@@ -7,6 +7,7 @@ var core = require("./core.js");
 var envelope = require("./envelope.js");
 var mapPanels = require("./panels/map_panels.js");
 var mapParts = require("./map_parts.js");
+var publicationParts = require("./publication_parts.js");
 
 var canonicalJson = core.canonicalJson;
 var checkEnvelope = core.checkEnvelope;
@@ -16,8 +17,10 @@ var validateSnapshot = envelope.validateSnapshot;
 var validateUpdate = envelope.validateUpdate;
 var validateActionResult = envelope.validateActionResult;
 var validateProtocolError = envelope.validateProtocolError;
+var validateAssembledPresentation = envelope.validateAssembledPresentation;
 
-function createStore() {
+function createStore(options) {
+options = options || {};
 var generation = 0;
 var phase = "idle"; // idle | awaiting_initial_snapshot | active | detached
 var activeEpoch = null;
@@ -32,12 +35,41 @@ var panels = {};
 var maps = {};
 var mapPublications = {};
 var assembler = mapParts.createMapAssembler();
+// General publication assembly (webclient-publication-assembly): one bounded
+// transfer independent of the specialized map assembler above.
+var recovery = { status: "idle", cause: null, generation: 0 };
+var publicationAssembler = createPublicationAssembler();
 var retired = createRetiredEpochSet();
 var mutationsLocked = true;
 var protocolError = null;
 var lastActionResult = null;
 var listeners = [];
 var connected = false;
+
+function createPublicationAssembler() {
+  var capturedGeneration = generation;
+  return publicationParts.createPublicationAssembler({
+    now: options.now,
+    setTimer: options.setTimer,
+    clearTimer: options.clearTimer,
+    onFailure: function (failure) {
+      // An old transport's expiry/contradiction callback never touches the
+      // live generation's state.
+      if (capturedGeneration !== generation) {
+        return;
+      }
+      recordRecovery(failure.reason);
+    },
+  });
+}
+
+// One explicit recovery-needed signal per failure. The single request sender
+// that turns it into a ui_sync belongs to the recovery change; here the
+// reducer records it and keeps graphical mutations locked.
+function recordRecovery(cause) {
+  recovery = { status: "needed", cause: cause, generation: generation };
+  mutationsLocked = true;
+}
 
 function cloneState() {
   var panelCopy = {};
@@ -59,6 +91,11 @@ function cloneState() {
     panels: panelCopy,
     maps: mapCopy,
     mapPublications: Object.assign({}, mapPublications),
+    recovery: {
+      status: recovery.status,
+      cause: recovery.cause,
+      generation: recovery.generation,
+    },
     mutationsLocked: mutationsLocked,
     protocolError: protocolError === null ? null : JSON.parse(canonicalJson(protocolError)),
     lastActionResult: lastActionResult === null ? null : JSON.parse(canonicalJson(lastActionResult)),
@@ -135,13 +172,220 @@ function commitPresentation(meta, isSnapshot, staged) {
   // An unfinished transfer at or below the committed revision can never be
   // adopted any more; free it now.
   assembler.pruneThrough(meta.revision);
+  publicationAssembler.pruneThrough(meta.revision);
   phase = "active";
+  // A valid complete snapshot is the one committed outcome that clears a
+  // recorded recovery need; a delta never clears or bypasses it.
+  if (isSnapshot && recovery.status === "needed") {
+    recovery = { status: "idle", cause: null, generation: generation };
+  }
   // A reload-required (incompatible) protocol error keeps the graphical
   // controls locked even while ordinary presentations keep committing;
-  // only a fresh transport generation (beginTransport) clears the error
-  // and releases the lock.
-  mutationsLocked = !!(protocolError && protocolError.reloadRequired);
+  // only a fresh transport generation (beginTransport) clears the error.
+  // Outstanding recovery keeps them locked too, even while an unrelated
+  // delta commits.
+  mutationsLocked =
+    !!(protocolError && protocolError.reloadRequired) || recovery.status === "needed";
   notify();
+}
+
+// Stage, validate the staged dialogue relationship and commit one admitted
+// candidate. One shared path for intact frames and completed assemblies.
+function commitCandidate(meta, messageName) {
+  var isSnapshot = messageName === "ui_snapshot";
+  var staged = stagePanels(meta, isSnapshot);
+  if (!dialogueConsistent(meta, staged)) {
+    return {
+      accepted: false,
+      reason: "invalid",
+      detail: "dialogue mode requires a committed dialogue panel",
+    };
+  }
+  commitPresentation(meta, isSnapshot, staged);
+  return { accepted: true, revision: meta.revision };
+}
+
+// Establish initial state (or re-establish after detachment) from one
+// complete validated snapshot. Only a snapshot may establish: the on-demand
+// store starts empty and any provisional assembly from another epoch is
+// released before the single commit.
+function establishSnapshot(meta) {
+  var staged = stagePanels(meta, true);
+  if (!dialogueConsistent(meta, staged)) {
+    return {
+      accepted: false,
+      reason: "invalid",
+      detail: "dialogue mode requires a committed dialogue panel",
+    };
+  }
+  maps = {};
+  mapPublications = {};
+  assembler.clear();
+  publicationAssembler.clear();
+  commitPresentation(meta, true, staged);
+  return { accepted: true, established: true, revision: meta.revision };
+}
+
+// One ui_publication_part frame: validate the exact wire shape, admit it for
+// the live generation/epoch, assemble invisibly, then validate, admit and
+// commit the complete logical publication exactly as its intact form would.
+function receivePublicationPart(payload) {
+  var inspected;
+  try {
+    inspected = publicationParts.inspectPublicationPart(payload);
+  } catch (error) {
+    // A frame whose own epoch identity is obsolete or foreign never disturbs
+    // the live generation: reject it inertly instead of attributing the
+    // corruption to the active epoch.
+    var epochHint =
+      payload !== null && typeof payload === "object" && typeof payload.presentation_epoch === "string"
+        ? payload.presentation_epoch
+        : null;
+    var revisionHint =
+      payload !== null &&
+      typeof payload === "object" &&
+      typeof payload.revision === "number" &&
+      Number.isInteger(payload.revision)
+        ? payload.revision
+        : null;
+    if (epochHint !== null) {
+      if (retired.has(epochHint)) {
+        return { accepted: false, reason: "retired_epoch" };
+      }
+      if (phase === "active" && epochHint !== activeEpoch) {
+        return { accepted: false, reason: "different_epoch" };
+      }
+      if (phase === "detached" && epochHint === activeEpoch) {
+        return { accepted: false, reason: "different_epoch" };
+      }
+    }
+    // An obsolete target stays an ordinary stale discard even when its chunks
+    // are corrupt: it must never disturb newer in-flight work or start
+    // recovery.
+    if (phase === "active" && revisionHint !== null && revisionHint <= revision) {
+      publicationAssembler.pruneThrough(revision);
+      return { accepted: false, reason: "not_newer" };
+    }
+    // Otherwise the corrupt transfer cannot be identified: discard the live
+    // assembly and record one recovery need.
+    publicationAssembler.clear();
+    recordRecovery("invalid");
+    return {
+      accepted: false,
+      reason: "invalid",
+      detail: error.message,
+      recovery: "needed",
+    };
+  }
+
+  var header = inspected.header;
+  if (retired.has(header.epoch)) {
+    return { accepted: false, reason: "retired_epoch" };
+  }
+  if (phase === "active") {
+    if (header.epoch !== activeEpoch) {
+      return { accepted: false, reason: "different_epoch" };
+    }
+  } else {
+    // A delta can never establish initial state (nor re-establish a
+    // detached store). A detached store accepts only a genuinely fresh epoch.
+    if (header.kind === "delta") {
+      return { accepted: false, reason: "update_cannot_establish_epoch" };
+    }
+    if (phase === "detached" && header.epoch === activeEpoch) {
+      return { accepted: false, reason: "different_epoch" };
+    }
+  }
+
+  // A trustworthy but obsolete header is rejected before its chunks are even
+  // decoded, so a corrupted replay can never destroy newer work.
+  if (phase === "active" && header.revision <= revision) {
+    publicationAssembler.pruneThrough(revision);
+    return { accepted: false, reason: "not_newer" };
+  }
+
+  var decoded;
+  try {
+    decoded = publicationParts.decodePublicationPartChunks(header, inspected.chunks);
+  } catch (error) {
+    // The epoch admitted this frame, so the corruption belongs to the live
+    // sequence: discard the in-flight transfer and record one recovery need.
+    publicationAssembler.clear();
+    recordRecovery("invalid");
+    return {
+      accepted: false,
+      reason: "invalid",
+      detail: error.message,
+      recovery: "needed",
+    };
+  }
+
+  var outcome = publicationAssembler.accept(header, decoded, {
+    phase: phase,
+    committedRevision: revision,
+  });
+  if (outcome.status === "pending") {
+    // A partial publication is invisible: no listener, revision, mutation
+    // gate or recovery signal changes until the complete logical document
+    // validates and commits.
+    return { accepted: false, pending: true, revision: header.revision };
+  }
+  if (outcome.status === "failed") {
+    var rejected = { accepted: false, reason: outcome.reason };
+    if (outcome.detail) {
+      rejected.detail = outcome.detail;
+    }
+    if (outcome.recover) {
+      rejected.recovery = "needed";
+    }
+    return rejected;
+  }
+
+  var meta;
+  try {
+    meta = validateAssembledPresentation(outcome.kind, outcome.logical);
+    if (meta.epoch !== header.epoch || meta.revision !== header.revision) {
+      throw new Error("logical metadata disagrees with its part headers");
+    }
+    if (outcome.kind === "delta" && meta.baseRevision !== header.baseRevision) {
+      throw new Error("logical base_revision disagrees with its part headers");
+    }
+  } catch (error) {
+    recordRecovery("invalid");
+    return {
+      accepted: false,
+      reason: "invalid",
+      detail: error.message,
+      recovery: "needed",
+    };
+  }
+
+  if (phase === "idle" || phase === "awaiting_initial_snapshot" || phase === "detached") {
+    var established = establishSnapshot(meta);
+    if (!established.accepted) {
+      recordRecovery("invalid");
+      established.recovery = "needed";
+    }
+    return established;
+  }
+  if (meta.revision <= revision) {
+    return { accepted: false, reason: "not_newer" };
+  }
+  if (outcome.kind === "delta" && meta.baseRevision !== revision) {
+    // The exact base is rechecked at final adoption: an intervening commit
+    // invalidates the assembled delta.
+    recordRecovery("base_mismatch");
+    return { accepted: false, reason: "base_mismatch", recovery: "needed" };
+  }
+  var committed = commitCandidate(
+    meta,
+    outcome.kind === "snapshot" ? "ui_snapshot" : "ui_update"
+  );
+  if (!committed.accepted) {
+    recordRecovery("invalid");
+    committed.recovery = "needed";
+  }
+  return committed;
 }
 
 return {
@@ -150,6 +394,12 @@ return {
   // Diagnostics for the bounded assembly (tests and debugging only).
   mapAssemblyStats: function () {
     return { live: assembler.liveCount(), bytes: assembler.bufferedBytes() };
+  },
+
+  // Bounded diagnostics for the general publication assembly (tests and
+  // debugging only; never buffered data).
+  publicationAssemblyStats: function () {
+    return publicationAssembler.stats();
   },
 
   subscribe: function (listener) {
@@ -168,6 +418,10 @@ return {
   setConnected: function (value) {
     connected = !!value;
     if (!value) {
+      // A closed transport will never deliver the missing parts: release both
+      // assembly owners and their timers independently of each other.
+      assembler.clear();
+      publicationAssembler.clear();
       mutationsLocked = true;
     }
     notify();
@@ -197,6 +451,9 @@ return {
     maps = {};
     mapPublications = {};
     assembler.clear();
+    publicationAssembler.clear();
+    publicationAssembler = createPublicationAssembler();
+    recovery = { status: "idle", cause: null, generation: generation };
     phase = "awaiting_initial_snapshot";
     mutationsLocked = true;
     protocolError = null;
@@ -218,6 +475,10 @@ return {
       return { accepted: false, reason: "missing_envelope" };
     }
     var payload = args[0];
+
+    if (messageName === "ui_publication_part") {
+      return receivePublicationPart(payload);
+    }
 
     if (messageName === "ui_snapshot" || messageName === "ui_update") {
       var meta;
@@ -259,11 +520,12 @@ return {
           return { accepted: false, reason: "different_epoch" };
         }
         // Establishing a sequence starts from an empty on-demand store.
-        maps = {};
-        mapPublications = {};
-        assembler.clear();
-        commitPresentation(meta, true, stagePanels(meta, true));
-        return { accepted: true, established: true, revision: meta.revision };
+        var established = establishSnapshot(meta);
+        if (!established.accepted) {
+          recordRecovery("invalid");
+          established.recovery = "needed";
+        }
+        return established;
       }
 
       // Active: same-epoch, strictly newer revisions only.
@@ -273,6 +535,18 @@ return {
       if (meta.revision <= revision) {
         return { accepted: false, reason: "not_newer" };
       }
+      if (messageName === "ui_update" && publicationAssembler.hasLive()) {
+        // A later delta never skips an incomplete general publication: the
+        // incomplete transfer is abandoned and one complete sync is
+        // requested instead of committing the delta.
+        publicationAssembler.clear();
+        recordRecovery("incomplete_predecessor");
+        return {
+          accepted: false,
+          reason: "incomplete_predecessor",
+          recovery: "needed",
+        };
+      }
       if (messageName === "ui_update" && meta.baseRevision !== revision) {
         // A delta is admitted only against the exact committed baseline. The
         // rejected publication commits nothing and locks mutations until the
@@ -281,7 +555,6 @@ return {
         mutationsLocked = true;
         return { accepted: false, reason: "base_mismatch" };
       }
-      var staged;
       if (meta.part) {
         // One bounded map part: nothing (metadata included) is adopted until
         // the whole transfer decoded and validated. Parts repeat the same
@@ -314,16 +587,7 @@ return {
       }
       // Stage every replacement, removal, and metadata field before one commit
       // and one notification; a rejected stage leaves committed state intact.
-      staged = stagePanels(meta, messageName === "ui_snapshot");
-      if (!dialogueConsistent(meta, staged)) {
-        return {
-          accepted: false,
-          reason: "invalid",
-          detail: "dialogue mode requires a committed dialogue panel",
-        };
-      }
-      commitPresentation(meta, messageName === "ui_snapshot", staged);
-      return { accepted: true, revision: meta.revision };
+      return commitCandidate(meta, messageName);
     }
 
     if (messageName === "ui_action_result") {
@@ -367,6 +631,7 @@ return {
       maps = {};
       mapPublications = {};
       assembler.clear();
+      publicationAssembler.clear();
       mutationsLocked = true;
     }
     if (

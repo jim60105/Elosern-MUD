@@ -44,6 +44,7 @@ var skill_use = require("./protocol/panels/skill_use.js");
 var sleep_handoff = require("./protocol/panels/sleep_handoff.js");
 var map_panels = require("./protocol/panels/map_panels.js");
 var map_parts = require("./protocol/map_parts.js");
+var publication_parts = require("./protocol/publication_parts.js");
 
 (function (root, factory) {
   "use strict";
@@ -337,8 +338,7 @@ var map_parts = require("./protocol/map_parts.js");
     MAP_PART_RAW_BYTES: map_parts.MAP_PART_RAW_BYTES,
     MAP_PART_CHUNK_CHARS: map_parts.MAP_PART_CHUNK_CHARS,
     // General publication parts (mirror of
-    // web.webclient.presentation.publication_parts). The browser assembler
-    // that consumes them belongs to the next delivered change.
+    // web.webclient.presentation.publication_parts).
     PUBLICATION_MAX_BYTES: C.PUBLICATION_MAX_BYTES,
     PUBLICATION_PART_BYTES: C.PUBLICATION_PART_BYTES,
     PUBLICATION_CHUNK_BYTES: C.PUBLICATION_CHUNK_BYTES,
@@ -346,6 +346,10 @@ var map_parts = require("./protocol/map_parts.js");
     PUBLICATION_MAX_PARTS: C.PUBLICATION_MAX_PARTS,
     PUBLICATION_ASSEMBLY_TIMEOUT_MS: C.PUBLICATION_ASSEMBLY_TIMEOUT_MS,
     PUBLICATION_MAX_ASSEMBLIES: C.PUBLICATION_MAX_ASSEMBLIES,
+    PUBLICATION_KINDS: publication_parts.PUBLICATION_KINDS.slice(),
+    validatePublicationPart: publication_parts.validatePublicationPart,
+    createPublicationAssembler: publication_parts.createPublicationAssembler,
+    validateAssembledPresentation: env.validateAssembledPresentation,
     validateAreaMapPanel: map_panels.validateAreaMapPanel,
     validateWorldMapPanel: map_panels.validateWorldMapPanel,
     validateMapPanel: map_panels.validateMapPanel,

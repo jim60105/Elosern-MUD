@@ -102,9 +102,14 @@ def _panel(filler: int = 24, width: int = 2_048) -> dict:
     }
 
 
-def _node(script: str) -> str:
+def _node(script: str, stdin: str = "") -> str:
     return subprocess.run(
-        ["node", "-e", script], capture_output=True, text=True, cwd=ROOT, check=True
+        ["node", "-e", script],
+        input=stdin,
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
+        check=True,
     ).stdout
 
 
@@ -991,6 +996,157 @@ class CoordinatorCodecTests(unittest.TestCase):
         self.assertEqual(receipt.kind, "snapshot")
         self.assertEqual(receipt.revision, escaped + 1)
         self.assertTrue(all(name == UI_PUBLICATION_PART for name in session.names()))
+
+
+class BrowserAssemblyFixtureTests(unittest.TestCase):
+    """Production-encoder bytes drive the real browser reducer once."""
+
+    def _parts(self, logical: dict, message: str, transfer: str) -> list[dict]:
+        raw = canonical_bytes(logical)
+        self.assertGreater(len(raw), MAX_CANONICAL_JSON_BYTES)
+        kind = "delta" if message == "ui_update" else "snapshot"
+        parts = encode_publication_parts(
+            raw,
+            presentation_epoch=logical["presentation_epoch"],
+            revision=logical["revision"],
+            publication_kind=kind,
+            base_revision=logical.get("base_revision"),
+            transfer_id=transfer,
+        )
+        self.assertGreater(len(parts), 1)
+        _, reassembled = _headers_and_raw(parts)
+        self.assertEqual(reassembled, raw)
+        return parts
+
+    @covers_requirement(
+        "webclient-publication-assembly::general-assembly-adopts-one-complete-validated-publication",
+    )
+    def test_the_encoder_bytes_commit_one_atomic_browser_state(self):
+        panel, _ = _near_cap_lore_codex()
+        snapshot = _snapshot({"lore_codex": panel})
+        changed = _changed_codex(panel)
+        delta = _delta({"lore_codex": changed}, revision=2, base_revision=1, mode="combat")
+        delta["server_time"]["hour"] = 15
+
+        snapshot_parts = self._parts(snapshot, "ui_snapshot", "ab" * 16)
+        delta_parts = self._parts(delta, "ui_update", "cd" * 16)
+        script = """
+const fs = require('node:fs');
+const P = require('./web/static/webclient/js/elosern/protocol.js');
+const input = JSON.parse(fs.readFileSync(0, 'utf8'));
+function summary(state) {
+  return {
+    phase: state.phase,
+    epoch: state.activeEpoch,
+    revision: state.revision,
+    mode: state.mode,
+    hour: state.serverTime === null ? null : state.serverTime.hour,
+    panelCount: Object.keys(state.panels).length,
+    hasCodex: Object.prototype.hasOwnProperty.call(state.panels, 'lore_codex'),
+  };
+}
+const store = P.createStore();
+let notified = 0;
+let notifiedAfterSnapshot = 0;
+store.subscribe(() => { notified += 1; });
+store.beginTransport(1);
+const baseline = notified;
+const initial = summary(store.getState());
+const snapshotIntermediates = [];
+const snapshotResults = input.snapshot.map((part) => {
+  const result = store.receive(1, 'ui_publication_part', [part], {});
+  snapshotIntermediates.push(summary(store.getState()));
+  return result;
+});
+const afterSnapshot = store.getState();
+notifiedAfterSnapshot = notified - baseline;
+const beforeDelta = summary(afterSnapshot);
+const deltaIntermediates = [];
+const deltaResults = input.delta.map((part) => {
+  const result = store.receive(1, 'ui_publication_part', [part], {});
+  deltaIntermediates.push(summary(store.getState()));
+  return result;
+});
+const afterDelta = store.getState();
+process.stdout.write(JSON.stringify({
+  initial: initial,
+  snapshotResults: snapshotResults,
+  snapshotIntermediates: snapshotIntermediates,
+  deltaResults: deltaResults,
+  deltaIntermediates: deltaIntermediates,
+  beforeDelta: beforeDelta,
+  notifiedAfterSnapshot: notifiedAfterSnapshot,
+  notified: notified - baseline,
+  snapshotState: {
+    phase: afterSnapshot.phase,
+    revision: afterSnapshot.revision,
+    epoch: afterSnapshot.activeEpoch,
+    mode: afterSnapshot.mode,
+    panel: afterSnapshot.panels.lore_codex,
+  },
+  deltaState: {
+    revision: afterDelta.revision,
+    mode: afterDelta.mode,
+    hour: afterDelta.serverTime.hour,
+    panel: afterDelta.panels.lore_codex,
+  },
+}));
+"""
+        outcome = json.loads(
+            _node(
+                script,
+                json.dumps({"snapshot": snapshot_parts, "delta": delta_parts}),
+            )
+        )
+
+        # Nothing is adopted or notified before the final snapshot part.
+        for result in outcome["snapshotResults"][:-1]:
+            self.assertEqual(result, {"accepted": False, "pending": True, "revision": 1})
+        # Every intermediate part leaves the committed state untouched.
+        self.assertEqual(
+            outcome["snapshotIntermediates"][:-1],
+            [outcome["initial"]] * (len(outcome["snapshotIntermediates"]) - 1),
+        )
+        self.assertEqual(
+            outcome["initial"],
+            {
+                "phase": "awaiting_initial_snapshot",
+                "epoch": None,
+                "revision": None,
+                "mode": None,
+                "hour": None,
+                "panelCount": 0,
+                "hasCodex": False,
+            },
+        )
+        self.assertEqual(
+            outcome["snapshotResults"][-1],
+            {"accepted": True, "established": True, "revision": 1},
+        )
+        self.assertEqual(outcome["notifiedAfterSnapshot"], 1)
+        self.assertEqual(outcome["snapshotState"]["phase"], "active")
+        self.assertEqual(outcome["snapshotState"]["epoch"], EPOCH)
+        self.assertEqual(outcome["snapshotState"]["revision"], 1)
+        self.assertEqual(
+            outcome["snapshotState"]["panel"], json.loads(json.dumps(validate_lore_codex(panel)))
+        )
+
+        # The fragmented delta commits exactly once, at its final part.
+        for result in outcome["deltaResults"][:-1]:
+            self.assertEqual(result, {"accepted": False, "pending": True, "revision": 2})
+        self.assertEqual(
+            outcome["deltaIntermediates"][:-1],
+            [outcome["beforeDelta"]] * (len(outcome["deltaIntermediates"]) - 1),
+        )
+        self.assertEqual(outcome["deltaResults"][-1], {"accepted": True, "revision": 2})
+        self.assertEqual(outcome["notified"], 2)
+        self.assertEqual(outcome["deltaState"]["revision"], 2)
+        self.assertEqual(outcome["deltaState"]["mode"], "combat")
+        self.assertEqual(outcome["deltaState"]["hour"], 15)
+        self.assertEqual(
+            outcome["deltaState"]["panel"],
+            json.loads(json.dumps(validate_lore_codex(changed))),
+        )
 
 
 class TransferIdTests(unittest.TestCase):
