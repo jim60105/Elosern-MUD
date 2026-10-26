@@ -1,5 +1,4 @@
 import unittest
-from unittest.mock import patch
 
 from tools.spec_traceability import covers_requirement
 
@@ -106,8 +105,7 @@ class NPCPanelRowsTests(BattlefieldIsolation, EvenniaTestCase):
     """Every entity and interact row carries the plain authored key.
 
     A stored title is inert on this panel: the row name comes from the shared
-    plain-key helper, bounds and schema version are unchanged, and a corrupt
-    title accessor cannot make the panel unavailable.
+    plain-key helper and bounds and schema version are unchanged.
     """
 
     def setUp(self):
@@ -160,7 +158,7 @@ class NPCPanelRowsTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement('npc-identity-titles::every-npc-identity-surface-uses-the-plain-authored-name')
     def test_npc_rows_read_with_the_plain_key_on_both_row_kinds(self):
         npc = create_object(NPC, key=_HUD_NAME, location=self.room1)
-        npc.npc_title = _HUD_SENTINEL
+        npc.attributes.add("npc_title", _HUD_SENTINEL)
         payload = self._render()
         self.assertTrue(payload["available"])
         pk = int(npc.pk)
@@ -184,7 +182,7 @@ class NPCPanelRowsTests(BattlefieldIsolation, EvenniaTestCase):
         from web.webclient.presentation.affordances import _bounded_display_name
 
         npc = create_object(NPC, key=_HUD_NAME, location=self.room1)
-        npc.npc_title = _HUD_SENTINEL
+        npc.attributes.add("npc_title", _HUD_SENTINEL)
         monster = create_object(Monster, key="野狼", location=self.room1)
         coin = create_object("typeclasses.objects.Object", key="銅幣", location=self.room1)
         destination = create_object(Room, key="南大道", location=None)
@@ -226,13 +224,7 @@ class NPCPanelRowsTests(BattlefieldIsolation, EvenniaTestCase):
         ambiguous.db.npc_title = "南門\u3000守衛"
         control = create_object(NPC, key="控制", location=self.room1)
         control.db.npc_title = "南門\x1b守衛"  # control character
-        raising = create_object(NPC, key="炸裂", location=self.room1)
-
-        def _raise() -> str:
-            raise RuntimeError("corrupt persisted attribute read")
-
-        with patch.object(NPC, "npc_title", new=property(lambda self: _raise())):
-            payload = self._render()
+        payload = self._render()
         self.assertTrue(payload["available"])
         expected = (
             (untitled, "布魯諾"),
@@ -241,7 +233,6 @@ class NPCPanelRowsTests(BattlefieldIsolation, EvenniaTestCase):
             (markup, "腐名"),
             (ambiguous, "含糊"),
             (control, "控制"),
-            (raising, "炸裂"),
         )
         for entity, plain in expected:
             with self.subTest(plain=plain):
@@ -254,7 +245,7 @@ class NPCPanelRowsTests(BattlefieldIsolation, EvenniaTestCase):
     def test_the_plain_name_bound_holds_for_an_overlong_key(self):
         long_npc = create_object(NPC, key="長" * 64, location=self.room1)
         overlong = create_object(NPC, key="毀" * 200, location=self.room1)
-        overlong.npc_title = _HUD_SENTINEL
+        overlong.attributes.add("npc_title", _HUD_SENTINEL)
         payload = self._render()
         self.assertEqual(
             self._entity_rows(payload, int(long_npc.pk))["display_name"],

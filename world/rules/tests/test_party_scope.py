@@ -552,7 +552,7 @@ class MemberTokenTests(PartyScopeTestCase):
     )
     def test_titled_companion_resolves_by_plain_key_only(self):
         companion = self._companion("艾拉")
-        companion.npc_title = "見習劍士"
+        companion.attributes.add("npc_title", "見習劍士")
 
         self.assertIs(resolve_member_token(self.char1, "艾拉"), companion)
         # The old composed alias is gone: no member answers to it, and the

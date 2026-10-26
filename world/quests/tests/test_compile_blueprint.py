@@ -115,7 +115,6 @@ class CompileQuestBlueprintTests(CompileRegistryIsolation, unittest.TestCase):
                 "tier": "civilian",
                 "disposition": "frightened",
                 "display_name": "受驚旅人",
-                "title": "邊境商隊腳伕",
                 "persona": occupant_card_record(),
             }
         ]
@@ -626,30 +625,38 @@ class CharacterizationCompileTests(CompileRegistryIsolation, unittest.TestCase):
         self.assertNotEqual(first.definition.key, second.definition.key)
 
     @covers_requirement("blueprint-portrait-policy::the-blueprint-lifecycle-preserves-the-characterization-fields")
-    def test_title_only_difference_changes_the_generated_key(self):
+    def test_persona_only_difference_changes_the_generated_key(self):
         base = _characterized_payload()
         first = compile_quest_blueprint(base)
         changed = json.loads(json.dumps(base))
-        changed["stages"][0]["npc_req"][0]["title"] = "另一段頭銜"
+        changed["stages"][0]["npc_req"][0]["persona"]["habit"] = "改為擦拭鐵壺"
         second = compile_quest_blueprint(changed)
         self.assertNotEqual(first.definition.key, second.definition.key)
 
     @covers_requirement("blueprint-portrait-policy::the-blueprint-lifecycle-preserves-the-characterization-fields")
     @covers_requirement("npc-identity-titles::the-blueprint-author-face-enforces-occupant-name-uniqueness")
     def test_missing_or_duplicate_identity_rejects_at_compile(self):
-        # Missing identity fields reject at BOTH layers with identical decisions.
+        # Missing identity rejects at BOTH layers with identical decisions.
         from world.ai.scenario_director import _VALIDATORS
 
-        for field in ("display_name", "title"):
-            with self.subTest(field=field):
-                bad = _characterized_payload()
-                del bad["stages"][0]["npc_req"][0][field]
-                with self.assertRaises(QuestCompileError):
-                    compile_quest_blueprint(bad)
-                guardrail_errors = []
-                for validator in _VALIDATORS.values():
-                    guardrail_errors.extend(validator(bad))
-                self.assertTrue(guardrail_errors, "guardrail rejects too")
+        bad = _characterized_payload()
+        del bad["stages"][0]["npc_req"][0]["display_name"]
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(bad)
+        guardrail_errors = []
+        for validator in _VALIDATORS.values():
+            guardrail_errors.extend(validator(bad))
+        self.assertTrue(guardrail_errors, "guardrail rejects too")
+
+        # A legacy title field rejects at BOTH layers too.
+        legacy = _characterized_payload()
+        legacy["stages"][0]["npc_req"][0]["title"] = "林間盜匪首領"
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(legacy)
+        guardrail_errors = []
+        for validator in _VALIDATORS.values():
+            guardrail_errors.extend(validator(legacy))
+        self.assertTrue(guardrail_errors, "guardrail rejects the legacy field")
 
         # Same-stage duplicate names reject (npc-identity-titles uniqueness).
         twin = _characterized_payload()
@@ -677,7 +684,7 @@ class CharacterizationCompileTests(CompileRegistryIsolation, unittest.TestCase):
             compile_quest_blueprint(base)
 
     @covers_requirement("blueprint-portrait-policy::the-blueprint-lifecycle-preserves-the-characterization-fields")
-    def test_restore_payload_without_title_raises_named_compile_error(self):
+    def test_restore_payload_with_a_legacy_title_raises_named_compile_error(self):
         from world.quests.compile import _characterization_from_payload
 
         payload = _characterized_payload()["stages"][0]["npc_req"][0]
@@ -688,6 +695,13 @@ class CharacterizationCompileTests(CompileRegistryIsolation, unittest.TestCase):
             "portrait_stable_key": payload["portrait"]["stable_key"],
             "persona": payload["persona"],
         }
+        # A title-free stored payload restores.
+        restored = _characterization_from_payload(
+            stored, quest="ai_stored", stage=0, occupant=0
+        )
+        self.assertEqual(restored.display_name, payload["display_name"])
+        # The removed field is rejected by name, never silently dropped.
+        stored["title"] = "林間盜匪首領"
         with self.assertRaisesRegex(QuestCompileError, "title"):
             _characterization_from_payload(
                 stored, quest="ai_stored", stage=0, occupant=0
@@ -739,7 +753,6 @@ class CharacterizationCompileTests(CompileRegistryIsolation, unittest.TestCase):
                 "tier": "bandit",
                 "disposition": None,
                 "display_name": "另一個人",
-                "title": "林間盜匪副手",
                 "persona": occupant_card_record(),
                 "age": 40,
                 "apparent_age": 40,

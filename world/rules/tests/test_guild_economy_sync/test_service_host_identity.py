@@ -64,6 +64,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
 
     @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
     @covers_requirement("npc-identity-titles::host-and-examiner-creation-emit-boundary-info-events")
+    @covers_requirement("npc-identity-titles::current-npc-authoring-has-no-independent-title-field")
     def test_first_sync_creates_the_authored_host_once(self):
         # The creation event is commit-bound (sync runs inside startup
         # transactions); execute the callbacks to observe it.
@@ -72,7 +73,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
                 sync_service_content()
         host = self._guild_host()
         self.assertIsNotNone(host)
-        self.assertEqual(host.npc_title, _guild_row().title)
+        self.assertIsNone(host.attributes.get("npc_title"))
         events = [
             call for call in logged.call_args_list
             if call.args and call.args[0] == "guild_service_host_created"
@@ -224,7 +225,6 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         source_row = _guild_row()
         renamed_row = guild_config.ServiceHostRow(
             name="改名後",
-            title=before.npc_title,
             spawn_room=source_row.spawn_room,
             components=before_row_components(catalog),
             profile_key=source_row.profile_key,
@@ -322,7 +322,6 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             doorway_key_zh="測試交易站往來通道",
             doorway_aliases=("test trading post",),
             host_name="測試商人",
-            host_title="測試交易站店主",
             host_race="human",
             host_subrace=None,
             host_sex="other",
@@ -350,7 +349,6 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         new_shop = ShopDefinition(
             key=place_shop_identity(new_place),
             host_name="測試商人",
-            host_title="測試交易站店主",
             assortment_keys=general_store_shop.assortment_keys,
         )
         commerce = guild_config.load_commerce_config()
@@ -453,7 +451,6 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             doorway_key_zh="測試宮前庭入口",
             doorway_aliases=("test forecourt",),
             host_name=None,
-            host_title=None,
             host_race=None,
             host_subrace=None,
             host_sex=None,
@@ -500,13 +497,13 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             self.assertEqual(NPC.objects.all_family().filter(db_location=interior).count(), 0)
 
     @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
-    def test_sync_never_backfills_a_title_into_a_reused_host(self):
+    def test_sync_never_writes_a_title_into_a_reused_host(self):
         legacy = self._canonical_legacy_host("舊公會管理人")
         sync_service_content()
         legacy.refresh_from_db()
-        # Reused as-is (its canonical identity keeps it): no runtime title write,
-        # no second authored host.
-        self.assertEqual(legacy.npc_title, "")
+        # Reused as-is (its canonical identity keeps it): no title write, no
+        # second authored host.
+        self.assertIsNone(legacy.attributes.get("npc_title"))
         self.assertEqual(NPC.objects.filter(db_key=_guild_host_name()).count(), 0)
 
     def test_an_untagged_residue_host_survives_without_reading_its_title(self):
@@ -514,7 +511,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         # service component. Neither grants ownership: it has no source tag, so
         # every sync leaves it exactly as it is and warns about nothing.
         residue = create_object(NPC, key="殘留公會管理人", location=self._guild_hallish())
-        residue.npc_title = "手工頭銜"
+        residue.attributes.add("npc_title", "手工頭銜")
         residue.save()
         residue.components.add(
             Merchant.create(
@@ -525,7 +522,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             sync_service_content()
         residue.refresh_from_db()
         self.assertIsNotNone(residue.components.get(Merchant.get_component_slot()))
-        self.assertEqual(residue.npc_title, "手工頭銜")
+        self.assertEqual(residue.attributes.get("npc_title"), "手工頭銜")
         self.assertFalse(
             [
                 call
@@ -622,7 +619,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             sync_service_content()  # roster restored
         recreated = self._guild_host()
         self.assertIsNotNone(recreated)
-        self.assertEqual(recreated.npc_title, _guild_row().title)
+        self.assertIsNone(recreated.attributes.get("npc_title"))
         self.assertIsNotNone(recreated.components.get(GuildStaff.get_component_slot()))
 
     def _guild_hallish(self):

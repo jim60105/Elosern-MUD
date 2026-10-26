@@ -191,7 +191,7 @@ place defining both the naming-guidance sentence and the `{name_inspiration}` to
 - **WHEN** the shipped `prompts/scenario_director.yaml` text is inspected
 - **THEN** it contains the `{name_inspiration}` token and the guidance that the names are
   inspiration only (directly usable or adjustable to sex and background) while `display_name` and
-  `title` are required on every `npc_req` entry, so the guidance text exists only in the prompt
+  `display_name` is required on every `npc_req` entry, so the guidance text exists only in the prompt
   folder and never as a Python constant
 
 #### Scenario: An out-of-allowlist placeholder typo is still rejected
@@ -206,11 +206,15 @@ place defining both the naming-guidance sentence and the `{name_inspiration}` to
 
 #### Scenario: The naming-guidance sentence states the inspiration-only rule and required identity fields
 - **WHEN** the naming-guidance sentence is inspected
-- **THEN** it states that the rolled names are 僅供靈感 — directly usable or adjustable to the character's sex and background, countering same-name bias — while every `npc_req` entry MUST carry the required identity fields `display_name` and `title`
+- **THEN** it states that the rolled names are 僅供靈感 — directly usable or adjustable to the character's sex and background, countering same-name bias — while every `npc_req` entry MUST carry the required identity fields `display_name`
 
 #### Scenario: An admin rewriting the text block without the token still loads cleanly
 - **WHEN** an admin rewrites the `text` block without the `{name_inspiration}` token
 - **THEN** it SHALL still load cleanly — a key renders with the tokens it declares
+
+#### Scenario: Title-free contract is complete
+- **WHEN** this source emits or validates an NPC characterization
+- **THEN** display_name/persona and applicable role/tier, age-pair/race-lifespan, portrait-key, uniqueness and immutable-digest rules remain; no title field is accepted, required, serialized, prompted or written
 
 ### Requirement: The NPC persona frame key is registered with exactly the block placeholder
 The prompt registry SHALL register `npc_dialogue.persona_frame` in `prompts/npc_dialogue.yaml` with an allowlist of exactly `block`. The NPC dialogue layer SHALL render it only when a persona block exists and SHALL pass the rendered frame as the `persona` value of `npc_dialogue.system`.

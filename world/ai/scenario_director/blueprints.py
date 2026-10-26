@@ -183,7 +183,7 @@ class BlueprintNpcReq:
     """One stage's NPC requirement: role, tier, disposition, and story-driven
     characterization (design D1).
 
-    ``display_name`` and ``title`` are the REQUIRED authored identity fields
+    ``display_name`` is the REQUIRED authored identity field
     (npc-title-authored-identities D5): the structural layer keeps the
     defaulted ``str | None`` shape so a missing field surfaces as the shared
     helper's named guardrail diagnostic instead of a constructor error. Paired
@@ -201,7 +201,6 @@ class BlueprintNpcReq:
     tier: str
     disposition: str | None = None
     display_name: str | None = None
-    title: str | None = None
     age: int | None = None
     apparent_age: int | None = None
     portrait: BlueprintPortrait | None = None
@@ -209,6 +208,39 @@ class BlueprintNpcReq:
 
     def __post_init__(self) -> None:
         _reject_mutable_containers(self, type(self).__name__)
+
+
+def _npc_req_from_payload(requirement: dict[str, Any]) -> BlueprintNpcReq:
+    """Rebuild one occupant requirement from a validated payload entry.
+
+    The independent NPC title field was removed end to end
+    (npc-title-authoring-removal), so a payload that still carries it is
+    rejected here by name rather than being silently decoded into a title-free
+    requirement the caller could not distinguish from current input.
+    """
+    if "title" in requirement:
+        raise ValueError(
+            "npc_req carries the removed NPC title field; authored identity is "
+            "display_name and persona only"
+        )
+    return BlueprintNpcReq(
+        role=requirement["role"],
+        tier=requirement["tier"],
+        disposition=requirement.get("disposition"),
+        display_name=requirement.get("display_name"),
+        age=requirement.get("age"),
+        apparent_age=requirement.get("apparent_age"),
+        portrait=(
+            BlueprintPortrait(stable_key=requirement["portrait"]["stable_key"])
+            if requirement.get("portrait") is not None
+            else None
+        ),
+        persona=(
+            BlueprintPersona.from_record(requirement["persona"])
+            if requirement.get("persona") is not None
+            else None
+        ),
+    )
 
 
 @dataclass(frozen=True)
@@ -467,11 +499,6 @@ class QuestBlueprint:
                                 else {}
                             ),
                             **(
-                                {"title": requirement.title}
-                                if requirement.title is not None
-                                else {}
-                            ),
-                            **(
                                 {"age": requirement.age}
                                 if requirement.age is not None
                                 else {}
@@ -560,27 +587,7 @@ class QuestBlueprint:
                     )
                 ),
                 npc_reqs=tuple(
-                    BlueprintNpcReq(
-                        role=requirement["role"],
-                        tier=requirement["tier"],
-                        disposition=requirement.get("disposition"),
-                        display_name=requirement.get("display_name"),
-                        title=requirement.get("title"),
-                        age=requirement.get("age"),
-                        apparent_age=requirement.get("apparent_age"),
-                        portrait=(
-                            BlueprintPortrait(
-                                stable_key=requirement["portrait"]["stable_key"]
-                            )
-                            if requirement.get("portrait") is not None
-                            else None
-                        ),
-                        persona=(
-                            BlueprintPersona.from_record(requirement["persona"])
-                            if requirement.get("persona") is not None
-                            else None
-                        ),
-                    )
+                    _npc_req_from_payload(requirement)
                     for requirement in stage.get("npc_req") or ()
                 ),
             )

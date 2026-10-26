@@ -18,7 +18,7 @@ from world.lore.npc_card import normalize_card
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.observability import log_info, log_warn
 from world.rules.fatigue import initialize_fatigue_state
-from world.rules.npc_identity import validate_npc_title
+
 from world.rules.npc_capabilities import (
     CapabilityValidationError,
     assemble_capabilities,
@@ -53,7 +53,7 @@ def _flag_existing_npc_names(report: BatchReport) -> list[str]:
     """Attach a ``key`` rejection to every valid record colliding with a persisted NPC.
 
     The author-supplied name at the import face is the record ``key`` -- the
-    value every display surface composes with the title -- and NPC names are
+    plain name every display surface renders -- and NPC names are
     world-unique (npc-identity-titles). The check lives here, not in the CLI:
     a file linter cannot answer "is this name taken right now", and the query
     only carries meaning inside the load transaction (design D4). The check is
@@ -217,18 +217,7 @@ def _instantiate_validated_character(
     record: dict[str, Any],
     typeclass: type[LivingEntity] = NPC,
 ) -> LivingEntity:
-    # The title's second, fail-closed gate runs BEFORE construction (design
-    # D3): a caller that reached this seam with an unvalidated record raises
-    # here instead of leaving a constructed entity behind. The stripped
-    # canonical form returned by the validator is what gets persisted.
-    # ``npc_title`` is declared as an AttributeProperty on ``NPC`` alone; for
-    # any other target typeclass the record's title stays inert — assigning it
-    # there would create a plain instance attribute that never survives a
-    # reload (silent data loss).
-    title = (
-        validate_npc_title(record["title"]) if issubclass(typeclass, NPC) else ""
-    )
-    # The compact card's second, fail-closed gate also runs before
+    # The compact card's second, fail-closed gate runs before
     # construction (npc-persona-import-cards D3): an unvalidated NPC record
     # with a non-card persona raises ``NpcCardError`` here instead of leaving
     # a half-built NPC behind for a caller outside the batch transaction.
@@ -245,8 +234,6 @@ def _instantiate_validated_character(
     entity.race = record["race"]
     entity.subrace = record.get("subrace")
     entity.sex = record["sex"]
-    if isinstance(entity, NPC):
-        entity.npc_title = title
     entity._apply_trait_config(_trait_config(_resolve_trait_values(record)))
     entity.db.disguised_stats = record["disguised_stats"] or None
     if isinstance(entity, NPC):

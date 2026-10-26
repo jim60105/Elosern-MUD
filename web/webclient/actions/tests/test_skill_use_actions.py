@@ -347,7 +347,7 @@ class SkillPreviewActionTests(_SkillUseCase):
     @covers_requirement('npc-identity-titles::every-npc-identity-surface-uses-the-plain-authored-name')
     def test_target_labels_carry_the_plain_key_and_keep_the_label_bound(self):
         sentinel = self._npc("sentinel villager")
-        sentinel.npc_title = "合成稱號"
+        sentinel.attributes.add("npc_title", "合成稱號")
         long_npc = self._npc("長" * 80)
         self._act("explore.skill_preview", {"skill_key": _T_HEAL})
         targets = self._panel()["skill"]["targets"]

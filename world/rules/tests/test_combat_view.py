@@ -448,7 +448,7 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         companion.apply_race_baseline()
         companion.traits.hp.base = 100
         companion.traits.hp.current = 100
-        companion.npc_title = "南門守衛"
+        companion.attributes.add("npc_title", "南門守衛")
         join_party(companion, self.player)
         engage(self.player, self.monster)
         view = build_combat_view(self.player)

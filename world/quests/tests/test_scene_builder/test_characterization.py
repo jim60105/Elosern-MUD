@@ -67,7 +67,6 @@ from ._support import (
     _instance_bound_payload,
     SceneBuilderTestBase,
     SYNTH_OCCUPANT_NAME,
-    SYNTH_OCCUPANT_TITLE,
 )
 
 class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
@@ -90,28 +89,27 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
         npc = self._spawned_npc(
             self._characterized(
                 display_name=f"  {SYNTH_OCCUPANT_NAME}  ",
-                title=f" {SYNTH_OCCUPANT_TITLE} ",
             )
         )
         self.assertEqual(npc.key, SYNTH_OCCUPANT_NAME)
         self.assertEqual(npc.db.display_name, SYNTH_OCCUPANT_NAME)
-        self.assertEqual(npc.npc_title, SYNTH_OCCUPANT_TITLE)
+        self.assertIsNone(npc.attributes.get("npc_title"))
 
     @covers_requirement("npc-identity-titles::blueprint-scene-occupants-spawn-under-the-authored-name-with-the-authored-title")
+    @covers_requirement("npc-identity-titles::current-npc-authoring-has-no-independent-title-field")
     def test_full_characterization_is_materialized_fully(self):
         npc = self._spawned_npc(
             self._characterized(
                 display_name=SYNTH_OCCUPANT_NAME,
-                title=SYNTH_OCCUPANT_TITLE,
                 age=68,
                 apparent_age=68,
                 portrait={"stable_key": "forest_bandit_chief"},
             )
         )
-        # The authored name IS the key; the title lands as the validated form.
+        # The authored name IS the key; no title is written.
         self.assertEqual(npc.key, SYNTH_OCCUPANT_NAME)
         self.assertEqual(npc.db.display_name, SYNTH_OCCUPANT_NAME)
-        self.assertEqual(npc.npc_title, SYNTH_OCCUPANT_TITLE)
+        self.assertIsNone(npc.attributes.get("npc_title"))
         self.assertEqual(npc.db.age, 68)
         self.assertEqual(npc.db.apparent_age, 68)
         self.assertEqual(
@@ -217,7 +215,6 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
                         characterizations=(
                             StageNpcCharacterization(
                                 display_name="偽造者",
-                                title="偽造測試員",
                                 persona=persona,
                             ),
                         ),
@@ -286,9 +283,7 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
     @covers_requirement("spawn-named-portraits::the-scenebuilder-applies-blueprint-characterization-to-named-occupants")
     def test_name_only_occupant_is_named_but_portrait_less(self):
         npc = self._spawned_npc(
-            self._characterized(
-                display_name=SYNTH_OCCUPANT_NAME, title=SYNTH_OCCUPANT_TITLE
-            )
+            self._characterized(display_name=SYNTH_OCCUPANT_NAME)
         )
         self.assertEqual(npc.db.display_name, SYNTH_OCCUPANT_NAME)
         self.assertIsNone(npc.db.age)
@@ -323,7 +318,6 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
                 characterizations=(
                     StageNpcCharacterization(
                         display_name="偽造者",
-                        title="偽造測試員",
                         portrait_stable_key="forged_key",
                         persona=occupant_card(),
                     ),
@@ -353,7 +347,6 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
         """
         _ids = {
             "display_name": "偽造者",
-            "title": "偽造測試員",
             "persona": occupant_card(),
         }
         forged_shapes = (
@@ -362,9 +355,8 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
             StageNpcCharacterization(**_ids, age=30, apparent_age=None),
             StageNpcCharacterization(**_ids, age=True, apparent_age=30),
             # Missing identity fields are themselves fail-closed (design D6):
-            # a nameless or titleless forged occupant never spawns.
-            StageNpcCharacterization(title="缺名", persona=occupant_card()),
-            StageNpcCharacterization(display_name="缺銜", persona=occupant_card()),
+            # a nameless forged occupant never spawns.
+            StageNpcCharacterization(persona=occupant_card()),
             None,
         )
         record, _ = self._accept(_instance_bound_payload())

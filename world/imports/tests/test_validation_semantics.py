@@ -16,21 +16,18 @@ from unittest.mock import patch
 
 from tools.spec_traceability import covers_requirement
 
-from world.imports.schema import MAX_NPC_TITLE_CODE_POINTS
 from world.imports.tests.helpers import example_record
 from world.imports.validate import (
     _check_affinity_elements,
     _check_disguised_stats_race,
     _check_disguised_stats_subset,
     _check_race_subrace,
-    _check_npc_title,
     _check_skills,
     _check_stats_band,
     collect_degraded_checks,
     validate_batch,
     validate_character,
 )
-from world.rules.npc_identity import validate_npc_title
 from world.tests.synthetic_data import (
     SYNTH_RACES,
     SYNTH_SKILLS,
@@ -452,85 +449,24 @@ class DivineArtsSeedingGuardTests(TestCase):
             self.assertEqual(_check_skills(record), [])
 
 
-class TitleSemanticTests(TestCase):
-    """npc-title-import-pipeline: the shared validator owns the whole rule set."""
+class RemovedTitleFieldTests(TestCase):
+    """npc-title-authoring-removal: legacy title input rejects, never converts."""
 
-    def _issue(self, title):
+    def test_a_title_free_record_validates_clean(self):
         record = example_record()
-        record["title"] = title
-        return _check_npc_title(record)
-
-    def test_prohibited_characters_reject_with_the_validator_message(self):
-        for title, fragment in (
-            ("南門 衛", "whitespace"),
-            ("南門\u3000衛", "whitespace"),
-            ("南門\x07衛", "control character"),
-            ("南門|衛", "markup delimiter"),
-        ):
-            with self.subTest(title=title):
-                issues = self._issue(title)
-                self.assertEqual([issue.field for issue in issues], ["title"])
-                self.assertIn(fragment, issues[0].message)
-                # Stable identifier: the Issue message is the validator's own.
-                with self.assertRaises(ValueError) as ctx:
-                    validate_npc_title(title)
-                self.assertEqual(issues[0].message, str(ctx.exception))
-
-    def test_empty_whitespace_only_and_overlong_titles_reject(self):
-        for title in ("", "   ", "\u3000\u3000", "衛" * 33):
-            with self.subTest(title=repr(title)):
-                issues = self._issue(title)
-                self.assertEqual([issue.field for issue in issues], ["title"])
-
-    def test_non_string_title_produces_no_issue_here(self):
-        # The structural phase owns shape; the semantic check stays silent.
-        self.assertEqual(self._issue(None), [])
-        self.assertEqual(self._issue(["南門守衛"]), [])
-
-    def test_legal_title_passes_both_phases(self):
-        record = example_record()
-        record["title"] = "南門守衛"
+        self.assertNotIn("title", record)
         report = validate_character(record)
-        self.assertTrue(report.is_valid)
+        self.assertTrue(report.is_valid, report.rejections)
         self.assertFalse(report.warnings)
 
-    def test_surrounding_whitespace_passes_validation(self):
-        # Stripping is the validator's job; persistence form is loader-owned.
-        record = example_record()
-        record["title"] = " 南門守衛 "
-        self.assertTrue(validate_character(record).is_valid)
-
-    def test_validator_equivalence_raw_overlong_stripped_legal_passes(self):
-        # Structural phase must NOT reject what the validator canonicalizes.
-        record = example_record()
-        record["title"] = " " * 40 + "衛"
-        report = validate_character(record)
-        self.assertTrue(report.is_valid)
-        self.assertEqual(report.rejections, [])
-        self.assertEqual(report.warnings, [])
-
-    def test_missing_title_rejects_naming_the_field_without_construction(self):
-        record = example_record()
-        del record["title"]
-        report = validate_character(record)
-        self.assertFalse(report.is_valid)
-        self.assertTrue(
-            any(issue.field == "title" for issue in report.rejections)
-        )
-
-    def test_illegal_title_forms_reject_through_the_full_validator(self):
-        # Record-level behavior through the real two-phase boundary (empty
-        # and whitespace-only forms are rejected structurally BEFORE the
-        # semantic helper runs; the overlong stripped form is the semantic
-        # phase's own decision — every form must land an invalid report
-        # naming `title` regardless of which phase owns it).
-        for bad in ("", "   ", "\u3000\u3000", "衛" * (MAX_NPC_TITLE_CODE_POINTS + 1)):
-            with self.subTest(title=repr(bad)):
+    def test_a_legacy_title_rejects_through_the_full_validator(self):
+        for legacy in ("南門守衛", "", 5, None):
+            with self.subTest(title=repr(legacy)):
                 record = example_record()
-                record["title"] = bad
+                record["title"] = legacy
                 report = validate_character(record)
                 self.assertFalse(report.is_valid)
                 self.assertTrue(
-                    any(issue.field == "title" for issue in report.rejections),
+                    any("title" in issue.message for issue in report.rejections),
                     report.rejections,
                 )

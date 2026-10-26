@@ -48,7 +48,7 @@ class StageNpcCharacterization:
     """Frozen characterization of one spawned occupant.
 
     Carries the validated per-occupant characterization fields in deterministic
-    order (design D5): the required authored ``display_name``/``title``, paired
+    order (design D5): the required authored ``display_name``, paired
     ``age``/``apparent_age``, the named portrait ``stable_key``, and the
     required normalized compact ``persona`` card
     (npc-persona-generated-quest-cards D1). The structural layer keeps
@@ -58,7 +58,6 @@ class StageNpcCharacterization:
     """
 
     display_name: str | None = None
-    title: str | None = None
     age: int | None = None
     apparent_age: int | None = None
     portrait_stable_key: str | None = None

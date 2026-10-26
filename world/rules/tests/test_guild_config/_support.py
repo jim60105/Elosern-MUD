@@ -165,7 +165,6 @@ def _price_shop_env(
     shop = ShopDefinition(
         key=shop_key,
         host_name="合成價格攤主",
-        host_title="合成價格攤主",
         assortment_keys=(assortment_key,),
     )
     place = PlaceDefinition(
@@ -178,7 +177,6 @@ def _price_shop_env(
         doorway_key_zh="合成價格入口",
         doorway_aliases=("probe store",),
         host_name="合成價格店主",
-        host_title="合成價格雜貨店主",
         host_race="human",
         host_subrace=None,
         host_sex="other",

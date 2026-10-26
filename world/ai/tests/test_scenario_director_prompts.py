@@ -92,7 +92,8 @@ class ScenarioDirectorPromptTests(unittest.TestCase):
         self.assertEqual(system["content"].count(bank), 1)
         self.assertIn("僅供靈感", system["content"])
         # Required-identity guidance ships in the prompt library only.
-        self.assertIn("必須附帶 display_name 與 title", system["content"])
+        self.assertIn("必須附帶 display_name", system["content"])
+        self.assertNotIn("與 title", system["content"])
         self.assertNotIn("仍為選填", system["content"])
 
     @covers_requirement("scenario-director::scenariodirector-prompt-construction-is-deterministic-bounded-and-faithful")
@@ -114,11 +115,11 @@ class ScenarioDirectorPromptTests(unittest.TestCase):
             ["properties"]["npc_req"]["items"]
         )
         self.assertIn("display_name", npc_req["required"])
-        self.assertIn("title", npc_req["required"])
+        self.assertNotIn("title", npc_req["required"])
+        self.assertNotIn("title", npc_req["properties"])
         self.assertEqual(
             npc_req["properties"]["display_name"]["type"], ["string", "null"]
         )
-        self.assertEqual(npc_req["properties"]["title"]["type"], ["string", "null"])
         system, user = build_scenario_prompt(_context())
         for name in _expected_bank(user["content"]).split("、"):
             self.assertNotIn(name, json.dumps(SCENARIO_DIRECTOR_OUTPUT_SCHEMA, ensure_ascii=False))
@@ -147,7 +148,6 @@ class ScenarioDirectorPromptTests(unittest.TestCase):
                 _payload(
                     {
                         "display_name": "非庫名‧自取",
-                        "title": "邊境嚮導",
                         "persona": occupant_card_record(),
                     }
                 )

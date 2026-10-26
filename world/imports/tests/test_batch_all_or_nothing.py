@@ -397,7 +397,7 @@ class ImportBoundaryEventTests(BatchFileHarness, EvenniaTestCase):
 
     def test_single_record_entries_warn_at_both_rejection_sites(self):
         bad = example_record()
-        del bad["title"]
+        bad["age"] = 10001
         with patch("world.imports.loader.log_warn") as warn:
             with self.assertRaises(ImportRejected):
                 instantiate_character(bad)
@@ -525,7 +525,9 @@ class DuplicateIssuerKeyTests(BatchFileHarness, EvenniaTestCase):
             "granny_one.json", self._commissioner("granny_one", "slot_one")
         )
         invalid = self._commissioner("granny_two", "slot_two")
-        invalid["title"] = 12345  # own-ground rejection, not the issuer scan
+        # Own-ground rejection (the removed title field is an unknown property),
+        # never the issuer scan.
+        invalid["title"] = 12345
         invalid_path = self.write("granny_two.json", invalid)
         report = validate_batch([valid_path, invalid_path, world_path])
         self.assertFalse(report.all_valid)

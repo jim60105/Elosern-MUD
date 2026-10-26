@@ -171,7 +171,6 @@ class PreAmendmentPayloadFailClosedTests(EvenniaTest):
                     "characterizations": [
                         {
                             "display_name": "黑鬍",
-                            "title": "林間盜匪首領",
                             "age": 35,
                             "apparent_age": 35,
                             "portrait_stable_key": "forest_bandit_chief",

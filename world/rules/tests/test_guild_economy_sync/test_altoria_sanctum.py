@@ -289,12 +289,11 @@ class AltoriaSanctumTests(ServiceContentIsolation, EvenniaTestCase):
         offered = _shops()[_authored(sanctum)["shop_key"]].offered_item_keys
         self.assertEqual(set(stock), set(offered), "first-request stock is not the offer set")
         self.assertTrue(all(count > 0 for count in stock.values()))
-        # The prose scan: no room description, host title or dialogue line
+        # The prose scan: no room description or dialogue line
         # of this building frames the ministry or its shop as concealed.
         prose = "".join(
             (
                 temple.room_desc_zh, sanctum.room_desc_zh,
-                temple.host_title, sanctum.host_title,
                 _table_text(temple), _table_text(sanctum),
             )
         )

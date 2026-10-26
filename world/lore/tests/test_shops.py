@@ -16,26 +16,11 @@ from world.lore.settlements.shops import (
 class ShopNPCIdentityTests(unittest.TestCase):
     """Authored host identities fail closed at load (design D4)."""
 
-    @covers_requirement("npc-identity-titles::shop-and-guild-registries-author-host-and-examiner-identities-validated-at-load")
-    def test_invalid_host_title_is_named_by_row_and_field(self):
-        row = SHOP_REGISTRY["altoria_general_store"]
-        bad = {
-            "s": ShopDefinition(
-                "s", row.host_name,
-                "含　全形分隔符的稱號", row.assortment_keys,
-            )
-        }
-        with self.assertRaises(ValueError) as caught:
-            validate_shop_npc_identities(bad)
-        message = str(caught.exception)
-        self.assertIn("shop s", message)
-        self.assertIn("host_title", message)
-
     def test_invalid_host_name_is_named_by_row_and_field(self):
         row = SHOP_REGISTRY["altoria_general_store"]
         bad = {
             "s": ShopDefinition(
-                "s", "", row.host_title,
+                "s", "",
                 row.assortment_keys,
             )
         }
@@ -51,7 +36,6 @@ class ShopNPCIdentityTests(unittest.TestCase):
 
         fields = {field.name: None for field in dataclasses.fields(ShopDefinition)}
         fields.pop("host_name")
-        fields.pop("host_title")
         with self.assertRaises(TypeError):
             ShopDefinition(**fields)
 

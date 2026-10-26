@@ -194,7 +194,6 @@ def _compile_characterization(
             ) from error
     return StageNpcCharacterization(
         display_name=requirement.get("display_name"),
-        title=requirement.get("title"),
         age=requirement.get("age"),
         apparent_age=requirement.get("apparent_age"),
         portrait_stable_key=stable_key,

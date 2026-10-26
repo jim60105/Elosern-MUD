@@ -742,7 +742,7 @@ class NPCTitleAppearanceTests(EvenniaCommandTestMixin, EvenniaTest):
 
     A stored title is inert: the room character line, the look header, the
     webclient ``explore.look`` seam and the real 「看 <目標>」 command all read
-    the plain key, and a corrupt title accessor cannot take any of them down.
+    the plain key, and no reader consults the stored attribute at all.
     """
 
     def setUp(self):
@@ -754,19 +754,13 @@ class NPCTitleAppearanceTests(EvenniaCommandTestMixin, EvenniaTest):
         self.sentinel = create_object(
             "typeclasses.npcs.NPC", key="塞提斯", location=self.room1
         )
-        self.sentinel.npc_title = "南門守衛"
+        self.sentinel.attributes.add("npc_title", "南門守衛")
         self.plain = create_object(
             "typeclasses.npcs.NPC", key="布魯諾", location=self.room1
         )
         self.monster = create_object(
             "typeclasses.monsters.Monster", key="野狼", location=self.room1
         )
-
-    def _raising_title(self):
-        def _raise() -> str:
-            raise RuntimeError("corrupt persisted attribute read")
-
-        return patch.object(NPC, "npc_title", new=property(lambda self: _raise()))
 
     @covers_requirement('npc-identity-titles::every-npc-identity-surface-uses-the-plain-authored-name')
     def test_room_character_line_renders_plain_names_only(self):
@@ -803,14 +797,6 @@ class NPCTitleAppearanceTests(EvenniaCommandTestMixin, EvenniaTest):
         # same way so the three paths compare on identical rendered text.
         self.assertEqual(ansi.parse_ansi(text, strip_ansi=True).strip(), command)
 
-    def test_a_raising_title_accessor_leaves_every_surface_plain(self):
-        with self._raising_title():
-            room = self.char1.at_look(self.room1)
-            header = self.char1.at_look(self.sentinel)
-        self.assertIn("塞提斯", room)
-        self.assertIn("塞提斯", header)
-        self.assertNotIn("南門守衛", room + header)
-
     def test_untitled_and_plain_targets_keep_their_headers(self):
         self.assertIn("布魯諾", self.char1.at_look(self.plain))
         self.assertNotIn("\u3000", self.char1.at_look(self.plain))
@@ -827,9 +813,8 @@ class NPCTitleAppearanceTests(EvenniaCommandTestMixin, EvenniaTest):
 class NPCTitleEchoRegressionTests(EvenniaCommandTestMixin, EvenniaTest):
     """Process text (move/say/whisper/get/give) names the NPC by plain key only.
 
-    Each case renders once with a sentinel title stored and once behind a
-    raising title accessor, asserting byte equality between the two and that
-    no title text or separator reaches the echo.
+    Each case renders once with a historical title stored in the raw attribute,
+    asserting no title text or separator reaches the echo.
     """
 
     def setUp(self):
@@ -848,24 +833,15 @@ class NPCTitleEchoRegressionTests(EvenniaCommandTestMixin, EvenniaTest):
             texts.append(str(payload))
         return texts
 
-    def _both_ways(self, emit, receiver=None):
-        """Capture ``emit`` with a sentinel title and behind a raising accessor."""
+    def _with_stored_title(self, emit, receiver=None):
+        """Capture ``emit`` with a historical stored title on the speaker."""
         receiver = receiver if receiver is not None else self.char1
-        self.npc.npc_title = "南門守衛"
+        self.npc.attributes.add("npc_title", "南門守衛")
         with patch.object(receiver, "msg") as sentinel_msg:
             emit()
-        sentinel = self._texts(sentinel_msg)
-
-        def _raise() -> str:
-            raise RuntimeError("corrupt persisted attribute read")
-
-        with patch.object(NPC, "npc_title", new=property(lambda self: _raise())):
-            with patch.object(receiver, "msg") as broken_msg:
-                emit()
-        broken = self._texts(broken_msg)
-        self.assertEqual(sentinel, broken)
-        self.assertTrue(sentinel, "the echo captured no message at all")
-        for text in sentinel:
+        texts = self._texts(sentinel_msg)
+        self.assertTrue(texts, "the echo captured no message at all")
+        for text in texts:
             self.assertNotIn("南門守衛", text)
             self.assertNotIn("\u3000", text)
 
@@ -874,7 +850,7 @@ class NPCTitleEchoRegressionTests(EvenniaCommandTestMixin, EvenniaTest):
             self.npc.move_to(self.room2)
             self.npc.move_to(self.room1)
 
-        self._both_ways(move_round_trip)
+        self._with_stored_title(move_round_trip)
 
     def test_say_location_echo_stays_plain(self):
         def say():
@@ -882,7 +858,7 @@ class NPCTitleEchoRegressionTests(EvenniaCommandTestMixin, EvenniaTest):
                 "這裡有動靜。", msg_self=None, msg_location="{object} 說：「{speech}」"
             )
 
-        self._both_ways(say)
+        self._with_stored_title(say)
 
     def test_whisper_receiver_echo_stays_plain(self):
         def whisper():
@@ -895,7 +871,7 @@ class NPCTitleEchoRegressionTests(EvenniaCommandTestMixin, EvenniaTest):
                 whisper=True,
             )
 
-        self._both_ways(whisper)
+        self._with_stored_title(whisper)
 
     def test_pickup_echo_stays_plain(self):
         # The localized 拿 command's room echo is the observed surface (the
@@ -908,7 +884,7 @@ class NPCTitleEchoRegressionTests(EvenniaCommandTestMixin, EvenniaTest):
             coin.location = self.room1
             self.call(CmdGet(), "銅幣", caller=self.npc)
 
-        self._both_ways(pickup)
+        self._with_stored_title(pickup)
 
     def test_give_echo_stays_plain(self):
         # The receiver's echo renders the giver's display name (the localized
@@ -922,4 +898,4 @@ class NPCTitleEchoRegressionTests(EvenniaCommandTestMixin, EvenniaTest):
             coin.location = self.npc
             self.call(CmdGive(), f"銅幣 = {self.char2.key}", caller=self.npc)
 
-        self._both_ways(give, receiver=self.char2)
+        self._with_stored_title(give, receiver=self.char2)

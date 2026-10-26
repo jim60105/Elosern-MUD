@@ -221,7 +221,6 @@ class BlueprintCharacterizationTypeTests(unittest.TestCase):
                 "tier": "bandit",
                 "disposition": None,
                 "display_name": "黑鬍",
-                "title": "無portrait頭目",
                 "persona": occupant_card_record(),
             }
         ]
@@ -231,7 +230,6 @@ class BlueprintCharacterizationTypeTests(unittest.TestCase):
         changed["stages"][0]["npc_req"][0].update(
             {
                 "display_name": "黑鬍",
-                "title": "林間盜匪首領",
                 "age": 35,
                 "apparent_age": 35,
                 "portrait": {"stable_key": "forest_bandit_chief"},

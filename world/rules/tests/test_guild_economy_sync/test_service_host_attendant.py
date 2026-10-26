@@ -63,7 +63,6 @@ class PlaceAttendantSyncTests(ServiceContentIsolation, EvenniaTestCase):
     def _attendant_row(self):
         return ServiceHostRow(
             name="合成櫃檯店員",
-            title="合成櫃檯值班店員",
             spawn_room=GUILD_HALL_TAG,
             components=(
                 capability(

@@ -43,7 +43,7 @@
 
 ## 2. 事前決定：寫卡之前要回答的五個問題
 
-1. **這是永久服務主人嗎？** 是 → 走地點登錄表：在 `world/lore/settlements/places.py` 的 `PlaceDefinition` 宣告 `host_name`／`host_title`／`host_race`／`host_subrace`／`host_sex`／`host_profile_key` 與 `components`（直接能力宣告），啟動 `sync_service_content` 依登錄表推導名冊、find-or-create 主人並組裝能力。**不要**用匯入卡建永久主人。
+1. **這是永久服務主人嗎？** 是 → 走地點登錄表：在 `world/lore/settlements/places.py` 的 `PlaceDefinition` 宣告 `host_name`／`host_race`／`host_subrace`／`host_sex`／`host_profile_key` 與 `components`（直接能力宣告），啟動 `sync_service_content` 依登錄表推導名冊、find-or-create 主人並組裝能力。**不要**用匯入卡建永久主人。
 
    主人的身分是 **canonical authored identity**：名冊列（`ServiceHostRow.host_key`）與活體 NPC 身上的 `npc_profile_key` 取自同一個 `host_profile_key`。同步只憑這個鍵找人，**不再**看元件的排列順序、元件的 `service_id`、顯示名或位置；因此調換／增減能力、或改寫 `service_id`，都不會生出第二個人。同一個 host key 若被兩個活體 NPC 或兩列名冊同時宣稱，整批在寫入前就以具名完整性錯誤拒收；若該身分屬於常駐冒險者（`guild_adventurer_person_key`），同步也拒收、絕不接管。
 
@@ -51,7 +51,7 @@
 
    整批（身分預檢 → 室內準備與**完整**房間解析 → 能力組裝 → 初次庫存 → 整列退役）在同一個交易內執行。房間解析必須全部成功：tag 對不到房間、對到多個房間、或對到非 Room 物件，都以具名完整性錯誤拒絕**整個**操作，不會略過單列，已準備的室內也一起回滾；任何一步失敗都回滾資料列，並還原重用主人的屬性／標籤／元件快取、清掉本批建立的實例、補回已執行退役所動到的隊伍／附身狀態。
 
-   名冊列被整列移除時，才由 `content_source` 類別下的 `service_host` 標籤授權**整列退役**：只有「正常同步套用過該列」的主人帶有此標籤，且只有在其 canonical identity 不再被任何列宣告時才刪除；刪除走既有 `NPC.at_object_delete` 生命週期。沒有標籤的 NPC（不論帶著什麼舊標題或舊 `service_id`）永不被同步刪除，標題本身也永不構成任何查詢或刪除依據。
+   名冊列被整列移除時，才由 `content_source` 類別下的 `service_host` 標籤授權**整列退役**：只有「正常同步套用過該列」的主人帶有此標籤，且只有在其 canonical identity 不再被任何列宣告時才刪除；刪除走既有 `NPC.at_object_delete` 生命週期。沒有標籤的 NPC（不論帶著什麼舊屬性殘留或舊 `service_id`）永不被同步刪除，舊資料也永不構成任何查詢或刪除依據。
 2. **需要什麼能力？** 能力就是**直接宣告**在該人物身上的元件，沒有職業藍圖、沒有展開、沒有隱含預設。每個能力一筆 `{type, kwargs, binding}`，同一型別只能一筆：
 
    | 能力型別 | 必填 kwargs | 選填 kwargs | 綁定 |
@@ -94,10 +94,9 @@ for declaration semantics.
 
 ### Step 1 — 寫 JSON 角色卡
 
-複製 `world/imports/examples/example_character.json`，欄位語意見[角色建立與匯入](/gm/characters)。NPC 特有的五條規則：
+複製 `world/imports/examples/example_character.json`，欄位語意見[角色建立與匯入](/gm/characters)。NPC 特有的四條規則：
 
-- **`key` 就是遊戲內顯示名。** 載入器以 `key` 建立 Evennia 物件，`display_name` 目前不被使用；要讓人物列顯示中文姓名，`key` 就寫中文。房間人物列、`看` 標題、探索面板、對話、隊伍與 GM 檢視一律只顯示這個純姓名；`title` 是建立期資料，不會被組成顯示字串。
-- **`title` 對 NPC 必填**，規則是 `world/rules/npc_identity.validate_npc_title` 的單一 validator 契約：去首尾空白後 1–32 碼點、無任何空白（含 U+3000）、無控制字元、無 `|`。落庫的是驗證器回傳的正規形（已去空白）。
+- **`key` 就是遊戲內顯示名。** 載入器以 `key` 建立 Evennia 物件，`display_name` 目前不被使用；要讓人物列顯示中文姓名，`key` 就寫中文。房間人物列、`看` 標題、探索面板、對話、隊伍與 GM 檢視一律只顯示這個純姓名。角色定位請寫在 `persona` 與描述文字裡，沒有獨立的 NPC 稱號欄位。
 - **`age`／`apparent_age` 各自獨立**，0–10000 整數（拒絕布林值）。常駐 host 與考官由 `NpcProfile` 作者宣告明確定案數值（`age` 與 `apparent_age` 必填），落庫與同步時優先使用 profile 定義的年齡；未指定 profile 或無作者年齡的路徑由 `ensure_npc_canonical_age` 獨立補 `NPC_DEFAULT_AGE`（18）。既有欄位值永不覆寫，重用與重啟時保留玩家編輯的 persona 與既有年齡。既有開發世界若需完整套用作者年齡，請依照 reset runbook 重設資料庫。
 - **`persona` 必須是完整的精簡 NPC 角色卡**：恰好 `identity{public,hidden}`、`appearance`、`personality`、`speech_style`、`life_story`、`habit`、`social_connection` 七欄，全為純文字（`identity.hidden` 與 `social_connection` 可空，其餘必填）；沒有 `background`。契約由 `world/lore/npc_card.py::normalize_card` 唯一執行（單欄 600、身分段 600、整卡 2000 碼點；身分段與整卡都以渲染後的區塊計算，含「性格：」等標籤與換行，不只是欄位文字）。判斷依據是傳給 `validate_character`／載入器的目標型別（`issubclass(typeclass, NPC)`，預設即 NPC），絕不看記錄內容；`PlayerCharacter` 目標的 `persona` 仍不透明、原樣落庫。落庫走 `world/rules/npc_persona.py::initialize_npc_persona`，寫入正規化後的卡與版本 1 中繼資料（來源 `{"kind": "import", "record": <key>}`），與整批同一筆交易。
 - **`disguised_stats` 非空時種族必須能用神之秘法**，同[新增角色模板指南](/development/adding-player-presets) §4 的不變式；`_check_disguised_stats_subset` 另要求偽裝鍵是 `stats` 子集。
@@ -108,7 +107,6 @@ for declaration semantics.
 {
   "key": "old_pike",
   "display_name": "老柏克",
-  "title": "渡口管事",
   "age": 57,
   "apparent_age": 54,
   "race": "human",
@@ -379,7 +377,7 @@ uv run --locked python -m tools.spec_traceability check
 | 檢查 | 觸發於 | 何時爆 |
 |---|---|---|
 | `CHARACTER_SCHEMA_V1` 結構（必填欄、`additionalProperties: False`、`age`/`apparent_age` 0–10000、`stats` 封閉欄位） | CLI 驗證／`load_batch` 驗證階段 | 整批具名拒收 |
-| `title` 語意規則（單一 validator `validate_npc_title`） | 語意驗證＋構造前第二道 fail-closed 閘 | 拒收；構造前攔下不留半成品 |
+| 已移除的 `title` 欄位（結構為 `additionalProperties: False`） | 結構驗證 | 整批拒收；不做任何轉換 |
 | NPC 目標的 `persona` 精簡角色卡契約（`normalize_card`；`PlayerCharacter` 目標不檢查） | 語意驗證＋構造前第二道 fail-closed 閘 | 整批具名拒收（`persona.<欄位>`＋原因碼）；構造前攔下不留半成品 |
 | 批次內重名 | CLI／驗證階段 | 整批拒收 |
 | 與資料庫既有 NPC 重名 | `load_batch`／`instantiate_character` 載入時（`_flag_existing_npc_names`） | 整批拒收，reason=`existing_npc_name` |
@@ -402,7 +400,7 @@ uv run --locked python -m tools.spec_traceability check
 |---|---|
 | 用匯入卡建永久服務主人（店主、公會主管） | 匯入卡建的主人不帶 `content_source`／`service_host` 標籤，同步永不接管也不會刪除它，於是世上多了一個同名卻不受名冊管轄的人；永久主人只能宣告在 `places.py` |
 | `key` 寫英文卻期待人物列顯示中文名 | 載入器用 `key` 建物件，`display_name` 不參與顯示；顯示名就是 `key` |
-| `title` 帶空白、全形空格、`|` 或超過 32 碼點 | 語意驗證拒收；U+3000 全形空格永不允許出現在名字或稱號裡 |
+| 匯入卡仍帶著已移除的 `title` 欄位 | 結構驗證以未知欄位拒收；把角色定位寫進 `persona` 與描述即可 |
 | place-bound 元件卻漏寫或寫錯 `anchor_room` | tag 解析不到唯一房間→整批拒收；person-bound（`quest_issuer`）反過來帶 anchor 也被拒 |
 | merchant 職業不寫 `dialogue_key` | 藍圖覆蓋檢查具名拒收。無問候語的店主是 `merchant-dialogue` 移除的缺陷，永不作為預設 |
 | 自創能力型別或綁定種類 | 兩者都是閉合詞彙；新能力屬規格驅動變更，見 §6 |

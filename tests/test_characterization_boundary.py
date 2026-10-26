@@ -23,9 +23,7 @@ SHARED_VALIDATOR_MODULE = "world.rules.npc_identity"
 MODULE_BOUND_SYMBOLS = ("MAX_NPC_NAME_CODE_POINTS",)
 DEFERRED_VALIDATOR_SYMBOLS = (
     "NPCNameError",
-    "NPCTitleError",
     "validate_npc_name",
-    "validate_npc_title",
 )
 RULE_SYMBOLS = (
     "characterize_errors",
@@ -145,7 +143,7 @@ class SharedCharacterizationHelperGuardTests(unittest.TestCase):
             self.assertNotIn(fragment, source)
         tree = ast.parse(source)
         imported = _imported_module_names(tree)
-        # The synced spec mandates delegating the name/title rules to exactly
+        # The synced spec mandates delegating the name rule to exactly
         # one world.rules module; every other rules import stays banned and
         # the delegation itself is required, so this exception can never be
         # silently widened or dropped.
@@ -180,7 +178,7 @@ class SharedCharacterizationHelperGuardTests(unittest.TestCase):
         }
         self.assertTrue(
             required_deferred <= function_scope,
-            "the shared name/title validators must be deferred-imported inside "
+            "the shared name validator must be deferred-imported inside "
             f"{SHARED_VALIDATOR_MODULE.rsplit('.', 1)[-1]} functions",
         )
         # The occupant card delegates to the pure compact-card contract

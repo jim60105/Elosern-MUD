@@ -2,7 +2,9 @@
 
 ## Purpose
 Defines CHARACTER_SCHEMA_V1 and WORLD_SCHEMA_V1, dispatched solely by an explicit record_type discriminator. Covers the 0-10000 age ranges, documented base-value stats restricted to eight trait keys, typed disguised_stats/persona/sexual_baseline fields, safe-key character sets, optional affinity elements, canonical sex values, and the optional profession/components fields.
+
 ## Requirements
+
 ### Requirement: Both schemas require an explicit record_type discriminator, not implicit field sniffing
 `CHARACTER_SCHEMA_V1` SHALL require a `record_type` property constrained to the literal value
 `"character"`, and `WORLD_SCHEMA_V1` SHALL require a `record_type` property constrained to the
@@ -304,3 +306,13 @@ The character schema SHALL accept optional independent components entries with e
 - **WHEN** a player-target record declares components
 - **THEN** the NPC-only semantic gate rejects the batch
 
+### Requirement: Character records exclude the removed NPC title property
+Character input records SHALL exclude the removed NPC title field for both NPC and player targets. The JSON Schema document title metadata SHALL remain and unrelated closed-schema validation SHALL be unchanged.
+
+#### Scenario: Absent title accepted
+- **WHEN** an otherwise valid NPC or player input omits title
+- **THEN** validation succeeds subject to its existing target-specific rules
+
+#### Scenario: Historical title input rejects
+- **WHEN** an input record includes title
+- **THEN** additional-property validation rejects it without writing a title

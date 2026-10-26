@@ -1,8 +1,8 @@
 """Adventurer guild rank registry from design section 5.1 and lore-world-data.
 
-Rank rows also carry the examiner's authored NPC identity (name + title) used
-by the exam opponent spawn (npc-title-authored-identities D5); branch rows
-carry the guild-host's authored identity. Load-time validation fails closed.
+Branch rows carry the host's authored NPC name used by the service-host sync;
+rank rows carry progression and fixed-title metadata only (npc-identity-titles).
+Load-time validation fails closed.
 """
 
 from dataclasses import dataclass
@@ -32,7 +32,6 @@ class GuildBranch:
     display_name_zh: str
     # Authored NPC identity of the branch's service host (guild-economy sync).
     host_name: str
-    host_title: str
     anchor_key: str | None = None
 
 
@@ -51,27 +50,22 @@ GUILD_BRANCH_REGISTRY: dict[str, GuildBranch] = {
         "guild_branch_altoria",
         "埃洛西恩冒險者公會 阿爾托利亞分會",
         "葛里安‧衛登",
-        "阿爾托利亞分會會長",
         "capital_altoria",
     ),
 }
 
 
 def _validated_identity(
-    what: str, row_key: str, name: object, title: object, *, name_field: str, title_field: str
+    what: str, row_key: str, name: object, *, name_field: str
 ) -> None:
-    """Run both shared validators over one authored identity, naming row and field."""
+    """Run the shared name validator over one authored identity, naming row and field."""
     # Function-local import keeps lore import-light and test-injectable.
-    from world.rules.npc_identity import validate_npc_name, validate_npc_title
+    from world.rules.npc_identity import validate_npc_name
 
     try:
         validate_npc_name(name)
     except ValueError as error:
         raise ValueError(f"{what} {row_key} has an invalid {name_field}: {error}") from error
-    try:
-        validate_npc_title(title)
-    except ValueError as error:
-        raise ValueError(f"{what} {row_key} has an invalid {title_field}: {error}") from error
 
 
 
@@ -87,8 +81,7 @@ def validate_guild_npc_identities(
     """
     for branch in (GUILD_BRANCH_REGISTRY if branches is None else branches).values():
         _validated_identity(
-            "guild branch", branch.key, branch.host_name, branch.host_title,
-            name_field="host_name", title_field="host_title",
+            "guild branch", branch.key, branch.host_name, name_field="host_name",
         )
 
 

@@ -78,7 +78,7 @@ def exam_scope_extra() -> dict[str, dict[str, object]]:
 def install_exam_host_policies(test, branch_key: str) -> None:
     """Patch restriction profiles, equipment rules and the qualification table."""
     person = GuildAdventurer(
-        HOST_PERSON_KEY, HOST_NAME, "合成常駐冒險者", "t_exam_person_profile",
+        HOST_PERSON_KEY, HOST_NAME, "t_exam_person_profile",
         "t_exam_home", "B", "t_coastal", (200, 120, 120, 40, 40, 40, 40),
         EXAM_ROOT.key, (NORMAL_BLADE.key, NORMAL_ARMOR.key), "t_exam_routine",
         branch_key=branch_key,

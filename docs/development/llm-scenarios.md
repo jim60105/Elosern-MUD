@@ -131,7 +131,7 @@ LLM 必須輸出 JSON 格式：
 輸出必須為吻合 `QuestBlueprint` 的 JSON 物件：
 * `stages`：階段目標（擊敗怪物、到達地點、護送 NPC、取得道具）。
 * `location_req`：場景階層與原型需求（Anchor、Grid 或動態 Instance）。
-* `npc_req`：目標 NPC 之角色階層、署名身分（`display_name`、`title`），以及必填的精簡人物卡 `persona`（`identity` 含 `public`／`hidden`、`appearance`、`personality`、`speech_style`、`life_story`、`habit`、`social_connection` 七欄）；整份藍圖所有階段的 `npc_req` 合計最多 3 個。
+* `npc_req`：目標 NPC 之角色階層、署名身分（必填 `display_name`；沒有獨立的稱號欄位），以及必填的精簡人物卡 `persona`（`identity` 含 `public`／`hidden`、`appearance`、`personality`、`speech_style`、`life_story`、`habit`、`social_connection` 七欄）；整份藍圖所有階段的 `npc_req` 合計最多 3 個。
 * `reward`：銅幣（整數）、物品清單與公會功績點（Merit）。
 * `failure`：期限時數與失敗代價。
 

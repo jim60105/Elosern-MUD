@@ -104,8 +104,8 @@ class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertEqual(int(guild_host.attributes.get("apparent_age")), 50)
         self.assertEqual(int(merchant_host.attributes.get("age")), 44)
         self.assertEqual(int(merchant_host.attributes.get("apparent_age")), 44)
-        self.assertEqual(guild_host.npc_title, _guild_row().title)
-        self.assertEqual(merchant_host.npc_title, _merchant_row().title)
+        self.assertIsNone(guild_host.attributes.get("npc_title"))
+        self.assertIsNone(merchant_host.attributes.get("npc_title"))
 
     def test_hosts_are_in_the_right_interiors(self):
         sync_service_content()

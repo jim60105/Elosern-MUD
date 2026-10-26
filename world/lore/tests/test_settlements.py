@@ -29,7 +29,7 @@ from world.rules.npc_capabilities import capability, place_bound
 def _place_fields(place) -> tuple:
     """The place's own authored data, in the capture's shape.
 
-    Deliberately excludes the host's name/title, profession, service identity,
+    Deliberately excludes the host's name, profession, service identity,
     profile key and the offered-item keys: those follow the current place-to-
     roster correspondence and the shop registry, and belong to no snapshot.
     """
@@ -148,7 +148,7 @@ class PlaceRegistryTests(unittest.TestCase):
     # above owns that change. If a row disappears, duplicates, or drifts a
     # place field during the move, this fails.
     #
-    # What is deliberately NOT here: the host's name and title, the host's
+    # What is deliberately NOT here: the host's name, the host's
     # profession, service identity and profile key, and the offered-item keys.
     # Those belong to the current place-to-roster correspondence (checked in
     # test_guild_config/test_service_host_roster.py) and to the shop registry,
@@ -383,7 +383,7 @@ class PlaceRegistryTests(unittest.TestCase):
         # The altoria-capital-replan neutrality gate: only exterior_xy moved.
         # Each capital place's room name, exterior and doorway name are pinned
         # to their pre-replan values, with the exteriors carrying the new
-        # teardrop addresses. The host's name, title, service identity and
+        # teardrop addresses. The host's name, service identity and
         # offered goods are deliberately NOT pinned here: they follow the
         # current place declaration (checked by the place-to-roster
         # correspondence test) and the derived shop registry, so a valid later
@@ -408,10 +408,7 @@ class PlaceRegistryTests(unittest.TestCase):
                 if shop_key is None:
                     continue
                 shop = SHOP_REGISTRY[shop_key]
-                self.assertEqual(
-                    (shop.host_name, shop.host_title),
-                    (place.host_name, place.host_title),
-                )
+                self.assertEqual(shop.host_name, place.host_name)
                 self.assertEqual(shop.assortment_keys, place.assortment_keys)
 
     def _plant(self, place, **changes):
@@ -507,7 +504,6 @@ class PlaceRegistryTests(unittest.TestCase):
         base = dict(
             key=key,
             host_name=None,
-            host_title=None,
             host_race=None,
             host_subrace=None,
             host_sex=None,
@@ -537,15 +533,12 @@ class PlaceRegistryTests(unittest.TestCase):
         # A name without a profession is an unfinished record, not an empty
         # room: the error names the place, the fields found and the fields
         # missing — that message is the point of the rule.
-        name_only = replace(
-            self._hostless(), host_name="測試街長", host_title="測試頭銜"
-        )
+        name_only = replace(self._hostless(), host_name="測試街長")
         with self.assertRaises(ValueError) as caught:
             validate_place_registry({"t_plaza_place": name_only})
         message = str(caught.exception)
         self.assertIn("t_plaza_place", message)
-        for field in ("host_name", "host_title"):
-            self.assertIn(field, message)
+        self.assertIn("host_name", message)
         for field in ("host_race", "host_sex"):
             self.assertIn(field, message)
         self.assertIn("host_profile_key", message)
@@ -750,7 +743,6 @@ class DerivedShopRegistryTests(unittest.TestCase):
         store = PLACE_REGISTRY["altoria_general_store"]
         self.assertEqual(shop.key, place_shop_identity(store))
         self.assertEqual(shop.host_name, store.host_name)
-        self.assertEqual(shop.host_title, store.host_title)
         self.assertEqual(shop.assortment_keys, store.assortment_keys)
         # The non-trading guild hall contributes no shop identity.
         self.assertNotIn(PLACE_REGISTRY["altoria_guild_hall"].key, SHOP_REGISTRY)

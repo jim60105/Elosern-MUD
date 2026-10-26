@@ -575,7 +575,7 @@ class PartyPresenterTests(EvenniaTest):
         )
         self.assertTrue(outcome.applied)
         affinity_value = first.relations.affinity_for(self.player)
-        first.npc_title = "合成稱號"
+        first.attributes.add("npc_title", "合成稱號")
 
         payload = self._render()
         self.assertNotIn("合成稱號", str(payload["slots"]))

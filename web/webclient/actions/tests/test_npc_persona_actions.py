@@ -67,7 +67,7 @@ class _NpcPersonaActionsFixture:
         self.player.location = self.room
 
         self.npc = create_object(NPC, key="接待員愛麗絲")
-        self.npc.npc_title = "資深接待員"
+        self.npc.attributes.add("npc_title", "資深接待員")
         self.npc.location = self.room
         initialize_npc_persona(
             self.npc,

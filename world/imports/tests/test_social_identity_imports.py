@@ -24,7 +24,6 @@ class ImportSocialIdentitiesTests(EvenniaTestCase):
             "schema_version": 1,
             "key": "test_social_npc",
             "display_name": "測試身分者",
-            "title": "測試職稱",
             "age": 30,
             "apparent_age": 30,
             "race": "human",

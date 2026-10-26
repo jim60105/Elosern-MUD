@@ -3,12 +3,12 @@
 Change 22's mirror-validation rule source: both the scenario-director guardrail
 (``world/ai``) and the deterministic compile boundary (``world/quests``)
 validate the per-occupant characterization fields -- the required authored
-``display_name``/``title``, paired ``age``/``apparent_age``, the named
+``display_name``, paired ``age``/``apparent_age``, the named
 ``portrait.stable_key``, and the required compact ``persona`` card -- through
 this one module, so the two layers cannot
 drift. The module never mutates state, and its only world.rules dependency is
 the single shared identity validator in ``world/rules/npc_identity.py``
-(npc-title-authored-identities D3: the name and title character rules delegate
+(npc-title-authored-identities D3: the name character rules delegate
 to that one module through function-local deferred imports, so this helper
 never inlines or duplicates the character-set rules; the bound constant is a
 plain immutable read). ``world/ai`` imports it read-only, the same direction it
@@ -34,7 +34,7 @@ from world.lore.npc_card import NpcCardError, normalize_card
 
 # Bounded text/key caps for the characterization fields. The authored-name cap
 # is the shared NPC name bound itself (npc-title-authored-identities D3): the
-# name/title character rules live in exactly one module. ``stable_key`` obeys
+# name character rules live in exactly one module. ``stable_key`` obeys
 # the single shared art-side subject-key contract (fix-art-pipeline-contracts
 # D1): non-empty, no reserved separators, no control characters, at most 64
 # code points and at most 200 UTF-8 bytes -- exactly what
@@ -78,10 +78,13 @@ def characterize_errors(
     Returns a list of human-readable problems (empty when valid). The rules
     mirror design D2/D3/D4 and the art-side subject-key contract:
 
-    - ``display_name`` and ``title`` are REQUIRED authored identity fields
+    - ``display_name`` is the REQUIRED authored identity field
       (npc-title-authored-identities D5): missing or empty rejects, never
       defaulted, and the character rules delegate to the single shared
-      validators in ``world/rules/npc_identity.py``.
+      validator in ``world/rules/npc_identity.py``.
+    - ``title`` was removed with the independent NPC title field; a present
+      key is a shape violation, never silently dropped (npc-title-authoring-
+      removal).
     - ``age``/``apparent_age``, when declared, are paired and each satisfies
       ``type(value) is int`` (so booleans, floats, and ``None`` reject) with
       ``AGE_FLOOR <= value <= lifespan_upper_bound``. A key present with a
@@ -99,31 +102,28 @@ def characterize_errors(
     """
     errors: list[str] = []
 
-    from world.rules.npc_identity import (
-        NPCNameError,
-        NPCTitleError,
-        validate_npc_name,
-        validate_npc_title,
-    )
+    from world.rules.npc_identity import NPCNameError, validate_npc_name
 
-    for field, validator_error in (
-        ("display_name", (NPCNameError, validate_npc_name)),
-        ("title", (NPCTitleError, validate_npc_title)),
-    ):
-        error_type, validator = validator_error
-        if field not in entry:
-            errors.append(
-                f"{field} is required (authored identity is never defaulted)"
-            )
-            continue
+    field = "display_name"
+    if field not in entry:
+        errors.append(f"{field} is required (authored identity is never defaulted)")
+    else:
         value = entry[field]
         if value is None or not isinstance(value, str) or not value.strip():
             errors.append(f"{field} must be non-empty text")
-            continue
-        try:
-            validator(value)
-        except error_type as error:
-            errors.append(f"{field} is not a valid authored {field}: {error}")
+        else:
+            try:
+                validate_npc_name(value)
+            except NPCNameError as error:
+                errors.append(f"{field} is not a valid authored {field}: {error}")
+    if "title" in entry:
+        # The independent NPC title field was removed end to end
+        # (npc-title-authoring-removal). A legacy key is a shape violation: it
+        # is never accepted, converted, or folded into the name.
+        errors.append(
+            "title is not part of the occupant shape; the independent NPC "
+            "title field was removed"
+        )
 
     age_present = "age" in entry
     apparent_present = "apparent_age" in entry

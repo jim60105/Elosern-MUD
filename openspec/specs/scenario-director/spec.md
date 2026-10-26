@@ -91,13 +91,13 @@ SHALL always produce byte-identical prompts.
 - **WHEN** the system message is inspected
 - **THEN** the bank is presented with the library text marking the names as 僅供靈感 (directly
   usable or adjustable to sex and background) and stating that `npc_req` entries carry the required
-  `display_name` and `title`
+  `display_name`
 
 #### Scenario: The injection changes no output-schema field
 - **WHEN** a blueprint uses a bank name verbatim as `display_name`, adapts a bank name, or declares
   a name absent from the bank
 - **THEN** the validator's decision depends only on the shared identity rules — a bank-external name
-  is accepted, an omitted `display_name` or `title` is rejected — and the injection adds no schema
+  is accepted, an omitted display_name is rejected and a supplied title field is rejected — and the injection adds no schema
   field of its own
 
 #### Scenario: An oversized context produces a bounded prompt
@@ -141,8 +141,13 @@ SHALL always produce byte-identical prompts.
 - **THEN** the rolled names are never a fallback final name written by the system
 
 #### Scenario: Identity requiredness is the validator's job, not the prompt's
-- **WHEN** the prompt states that every `npc_req` entry MUST carry the required identity fields `display_name` and `title`
-- **THEN** the injection itself adds no output-schema field, and the requiredness of `display_name` and `title` is enforced by the shared characterization validator, not by the prompt
+- **WHEN** the prompt states that every `npc_req` entry MUST carry the required identity fields `display_name`
+- **THEN** the injection itself adds no output-schema field, and the requiredness of `display_name` is enforced by the shared characterization validator, not by the prompt
+
+#### Scenario: Title-free contract is complete
+- **WHEN** this source emits or validates an NPC characterization
+- **THEN** display_name/persona and applicable role/tier, age-pair/race-lifespan, portrait-key, uniqueness and immutable-digest rules remain; no title field is accepted, required, serialized, prompted or written
+
 
 ### Requirement: generate_quest_blueprint runs the guarded pipeline and enforces the request context
 `world/ai/scenario_director.py::generate_quest_blueprint(client, *, context)` SHALL require the
@@ -259,19 +264,18 @@ rejected attempt SHALL append a concrete validation message before retrying.
 - **THEN** the validators reject it
 
 ### Requirement: Blueprint validation accepts and bounds the optional npc characterization fields
-The scenario director's blueprint validator SHALL require three per-occupant characterization
-fields — `display_name`, `title`, and `persona` — on every `npc_req` entry, in addition to the
+The scenario director's blueprint validator SHALL require two per-occupant characterization
+fields (`display_name` and `persona`) on every `npc_req` entry, in addition to the
 existing role/tier/disposition checks, and SHALL accept the two optional fields `age`/`apparent_age`
 (paired) and `portrait: {stable_key}`, with every field validated through the shared bound helper
 under `world/quests/` — the single rule source.
 
 #### Scenario: A valid named occupant with a title and ages passes validation
-- **WHEN** a blueprint's `npc_req` entry declares a known tier plus `display_name`, `title`, a
-  valid compact card, paired ages within the race band, and a valid `portrait.stable_key`
-- **THEN** the blueprint passes semantic validation and proceeds to compile
+- **WHEN** a title-free `npc_req` entry declares a known tier, `display_name`, a valid compact persona card, paired ages within the race band, and a valid portrait `stable_key`
+- **THEN** it passes semantic validation and proceeds to compile, while a removed title field on the same entry is rejected instead
 
 #### Scenario: A missing identity field is rejected and retried
-- **WHEN** an `npc_req` entry omits `display_name` or `title`
+- **WHEN** an `npc_req` entry omits display_name
 - **THEN** the output is treated as a validation failure, the named error is appended, and the
   pipeline retries within the budget
 
@@ -303,12 +307,12 @@ under `world/quests/` — the single rule source.
 #### Scenario: The shared helper is the sole rule implementation
 - **WHEN** a blueprint's per-occupant fields are validated
 - **THEN** the checks execute through the shared `world/quests/` helper, which applies the compact
-  card contract, and no inline duplicate of the age/name/title/key/card rules exists in the
+  card contract, and no inline duplicate of the age/name/key/card rules exists in the
   scenario director
 
 #### Scenario: The required fields carry their shared shapes
 - **WHEN** the required characterization fields are validated
-- **THEN** `display_name` is authored name as bounded non-empty text through the shared bound helper and `title` is authored NPC title as single-line plain text through the shared bound helper, each required with its shared character-set rules
+- **THEN** `display_name` is authored name as bounded non-empty text through the shared bound helper with its shared character-set rules; the removed title field is rejected
 
 #### Scenario: The persona card obeys the compact card contract
 - **WHEN** `persona` is validated
@@ -327,12 +331,17 @@ under `world/quests/` — the single rule source.
 - **THEN** neither is part of the proposal shape
 
 #### Scenario: Every characterization violation retries then degrades
-- **WHEN** a payload's tier is unknown, its occupant is missing `display_name`, `title`, or `persona`, its card violates the contract, its ages are unpaired, non-integer, negative, or beyond the race lifespan, or its portrait key is malformed
+- **WHEN** a payload's tier is unknown, its occupant is missing display_name or persona, its card violates the contract, its ages are unpaired, non-integer, negative, or beyond the race lifespan, or its portrait key is malformed
 - **THEN** it is rejected and retried within the budget exactly like today's other semantic failures, and on budget exhaustion the call degrades to the offline template pool
 
 #### Scenario: The occupant total is capped at three
 - **WHEN** a blueprint declares `npc_req` occupants across its stages
 - **THEN** it declares at most three in total across all of its stages, so its occupant cards fit one bounded model response, and a blueprint exceeding that total is rejected and retried like any other semantic failure
+
+#### Scenario: Title-free contract is complete
+- **WHEN** this source emits or validates an NPC characterization
+- **THEN** display_name/persona and applicable role/tier, age-pair/race-lifespan, portrait-key, uniqueness and immutable-digest rules remain; no title field is accepted, required, serialized, prompted or written
+
 
 ### Requirement: The director prompt asks for a complete card per occupant
 The `scenario_director.system` prompt-library text SHALL instruct the model to give every
@@ -520,7 +529,7 @@ The compiler SHALL revalidate shared schema and immutable lore constraints befor
   spawn requirements
 
 #### Scenario: Compiled requirements carry the characterization fields
-- **WHEN** an accepted blueprint's `npc_req` entry declares the required `display_name` and `title`
+- **WHEN** an accepted blueprint's `npc_req` entry declares the required `display_name`
   plus paired ages and a portrait `stable_key`
 - **THEN** the compiled per-stage spawn requirements expose all four in deterministic order
 
@@ -531,7 +540,7 @@ The compiler SHALL revalidate shared schema and immutable lore constraints befor
 #### Scenario: An option-field-less blueprint compiles with the identity-bearing digest
 - **WHEN** an accepted blueprint declares no optional characterization fields (no ages, no portrait)
 - **THEN** it compiles with the same deterministic registration behavior, and its digest includes
-  the required `display_name` and `title` of every occupant
+  the required `display_name` of every occupant
 
 #### Scenario: Spawn requirements are registered with the publication
 - **WHEN** a compiled quest is registered and `scene_requirements_for(definition_key)` is read
@@ -591,7 +600,7 @@ The compiler SHALL revalidate shared schema and immutable lore constraints befor
 
 #### Scenario: The definition key digests runtime content plus scene requirements
 - **WHEN** a `QuestDefinition.key` is generated
-- **THEN** it is a stable content digest over the canonical runtime definition serialization plus the canonical serialization of the compiled per-stage spawn requirements, so two blueprints with identical runtime stages but different scene requirements (archetype, `anchor_near`, `scene_sentence`, or `npc_reqs`, or any carried characterization field; the required `display_name` and `title`, the optional paired `age`/`apparent_age`, or portrait `stable_key`) always yield different keys and equal content always yields an equal key
+- **THEN** it is a stable content digest over the canonical runtime definition serialization plus the canonical serialization of the compiled per-stage spawn requirements, so two blueprints with identical runtime stages but different scene requirements (archetype, `anchor_near`, `scene_sentence`, or `npc_reqs`, or any carried characterization field; the required `display_name`, the optional paired `age`/`apparent_age`, or portrait `stable_key`) always yield different keys and equal content always yields an equal key
 
 #### Scenario: Registration publishes definition, issuance, and requirements atomically
 - **WHEN** `register_generated_quest(...)` runs
@@ -618,6 +627,10 @@ The compiler SHALL revalidate shared schema and immutable lore constraints befor
 - **THEN** The existing rule set SHALL remain: contiguous indices, supported kinds, quantity/deadline, item/tier/archetype, characterization, age, rank reward band, zero private merit, empty unsupported failure clause and bound-target quantity rules.
 - **THEN** Permanent occupants SHALL retain validated package ownership/retention. Whole-package validation SHALL retain unambiguous locators, exact role/scene references, reciprocal relations, provenance-bearing knowledge, reachable dialogue, scoped authority and registered effects.
 - **THEN** Registration SHALL remain atomic, conflict-rejecting and idempotent, using stable runtime/scene characterization digests extended with the new completion/group fields. Separate issuer identities SHALL coexist and raw proposal mappings SHALL never enter runtime registries.
+
+#### Scenario: Title-free contract is complete
+- **WHEN** this source emits or validates an NPC characterization
+- **THEN** display_name/persona and applicable role/tier, age-pair/race-lifespan, portrait-key, uniqueness and immutable-digest rules remain; no title field is accepted, required, serialized, prompted or written
 
 ### Requirement: Scene-bound proposal stages are validated before publication
 Semantic validators and deterministic compilation SHALL enforce the same validated package ownership/retention, bound-target quantity, registry locator/anchor and escort-binding rules. ESCORT SHALL permit exactly the implemented destination or rendezvous contract with complete protected roles and validated meeting/relation references. Escort participants SHALL resolve existing published roles without destination auto-spawn or invented nearby actors.

@@ -71,8 +71,6 @@ def _npc_req_canonical(
     if characterization is not None:
         if characterization.display_name is not None:
             canonical["display_name"] = characterization.display_name
-        if characterization.title is not None:
-            canonical["title"] = characterization.title
         if characterization.age is not None:
             canonical["age"] = characterization.age
         if characterization.apparent_age is not None:

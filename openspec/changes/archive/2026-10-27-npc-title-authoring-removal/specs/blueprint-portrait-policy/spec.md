@@ -17,8 +17,8 @@ and a `portrait` object with exactly one bounded `stable_key` field.
 - **THEN** the values validate because 300 does not exceed the elf lifespan upper bound (1200)
 
 #### Scenario: A missing authored name or title is rejected
-- **WHEN** a current characterization input carries the removed title field
-- **THEN** it is rejected by the closed schema before compile or template registration, while the title-free form retains all name/age/portrait/persona checks
+- **WHEN** a current `npc_req` entry carries the removed title field or omits `display_name`/`persona`
+- **THEN** the shared characterization validation rejects it before compile or template registration, while the title-free form retains all name/age/portrait/persona checks
 
 #### Scenario: An unpaired age is rejected
 - **WHEN** an `npc_req` entry declares `age` without `apparent_age`, or vice versa, or declares
@@ -53,8 +53,8 @@ and a `portrait` object with exactly one bounded `stable_key` field.
 - **THEN** the blueprint is rejected
 
 #### Scenario: An invalid authored title is rejected
-- **WHEN** a current characterization input carries the removed title field
-- **THEN** it is rejected by the closed schema before compile or template registration, while the title-free form retains all name/age/portrait/persona checks
+- **WHEN** a current `npc_req` entry carries the removed title field with any value
+- **THEN** the shared characterization validation rejects it as a shape violation before compile or template registration, never converting it into identity text
 
 #### Scenario: Duplicate stable keys must agree on characterization
 - **WHEN** one blueprint declares two `npc_req` entries with the same `stable_key` but different
@@ -110,8 +110,8 @@ SHALL reconstruct them into the frozen value object, rejecting removed title fie
 - **THEN** their canonical digest keys differ
 
 #### Scenario: Restoring a payload without the title fails with a named error
-- **WHEN** a current characterization input carries the removed title field
-- **THEN** it is rejected by the closed schema before compile or template registration, while the title-free form retains all name/age/portrait/persona checks
+- **WHEN** a stored characterization payload carries the removed title field
+- **THEN** `from_payload()` raises the named compile error instead of dropping the field, while a title-free payload restores unchanged
 
 #### Scenario: Characterization-only differences yield different digest keys
 - **WHEN** two blueprints differ only in characterization (including only in display_name)
@@ -138,8 +138,8 @@ helper; neither SHALL inline the age/name/key checks itself.
 - **THEN** both validation layers adopt the new bound on next import with no other code change
 
 #### Scenario: Title rules live in exactly one module
-- **WHEN** a current characterization input carries the removed title field
-- **THEN** it is rejected by the closed schema before compile or template registration, while the title-free form retains all name/age/portrait/persona checks
+- **WHEN** a current characterization carries the removed title field
+- **THEN** the shared characterization helper is the one place that rejects it, on every path that validates an occupant
 
 #### Scenario: The helper carries the full rule set
 - **WHEN** the shared helper validates entries
@@ -149,7 +149,7 @@ helper; neither SHALL inline the age/name/key checks itself.
 
 #### Scenario: Name and title rules come from the shared validators
 - **WHEN** a current characterization input carries the removed title field
-- **THEN** it is rejected by the closed schema before compile or template registration, while the title-free form retains all name/age/portrait/persona checks
+- **THEN** the shared characterization helper rejects it, and the surviving name rule still comes only from `world.rules.npc_identity`
 
 #### Scenario: The scenario director imports the helper read-only
 - **WHEN** the scenario director calls the shared helper
@@ -177,8 +177,8 @@ order.
   in deterministic order
 
 #### Scenario: A title-only difference stays distinguishable after compile
-- **WHEN** a current characterization input carries the removed title field
-- **THEN** it is rejected by the closed schema before compile or template registration, while the title-free form retains all name/age/portrait/persona checks
+- **WHEN** two inputs differ only by the removed title field
+- **THEN** the title-bearing input is rejected before compile, so no removed field can influence the compiled digest
 
 #### Scenario: The compiled digest includes the characterization
 - **WHEN** the canonical content digest is computed over the compiled requirements
@@ -201,8 +201,8 @@ registration rather than producing a broken quest.
 - **THEN** the template registers and its quests carry the identity and characterization fields
 
 #### Scenario: A template without an authored title is rejected at registration
-- **WHEN** a current characterization input carries the removed title field
-- **THEN** it is rejected by the closed schema before compile or template registration, while the title-free form retains all name/age/portrait/persona checks
+- **WHEN** a hand-written template occupant carries the removed title field
+- **THEN** template registration rejects it before any quest can use it
 
 #### Scenario: A template with a negative-age entry is rejected at registration
 - **WHEN** a template declares `age: -1`

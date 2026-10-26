@@ -110,7 +110,6 @@ def _offline_kit_blueprint():
                             "tier": _T_NPC_TIER,
                             "disposition": None,
                             "display_name": _OFFLINE_NPC_NAME,
-                            "title": "苔徑盜匪首領",
                             "persona": _OFFLINE_NPC_CARD,
                             "age": 35,
                             "apparent_age": 35,
@@ -444,7 +443,6 @@ class SceneSpawnLineageSeedTests(SceneBuilderIsolation, EvenniaTest):
             characterizations=(
                 StageNpcCharacterization(
                     display_name="深skills盜匪",
-                    title="試煉佔用者",
                     persona=occupant_card(),
                 ),
             ),
@@ -473,7 +471,6 @@ class SceneSpawnLineageSeedTests(SceneBuilderIsolation, EvenniaTest):
             characterizations=(
                 StageNpcCharacterization(
                     display_name="無skills盜匪",
-                    title="試煉佔用者",
                     persona=occupant_card(),
                 ),
             ),
@@ -490,8 +487,8 @@ class SceneSpawnLineageSeedTests(SceneBuilderIsolation, EvenniaTest):
 class SceneOccupantProvenanceTests(SceneBuilderIsolation, EvenniaTest):
     """A generated occupant records no authored official-content provenance.
 
-    The compiled-characterization contract is closed over display name, title,
-    the age pair, an optional stable portrait key, the persona card, and combat
+    The compiled-characterization contract is closed over display name, the
+    age pair, an optional stable portrait key, the persona card, and combat
     traits, so no blueprint names a profile identity; the persona provenance
     stamped here is ``generated_quest``. A generated channel can never be an
     authored one, so nothing on this path records ``npc_profile_key`` and
@@ -509,7 +506,6 @@ class SceneOccupantProvenanceTests(SceneBuilderIsolation, EvenniaTest):
 
         entry = {
             "display_name": _OFFLINE_NPC_NAME,
-            "title": "試煉佔用者",
             "age": 35,
             "apparent_age": 35,
             "persona": _OFFLINE_NPC_CARD,
@@ -567,7 +563,6 @@ class SceneOccupantProvenanceTests(SceneBuilderIsolation, EvenniaTest):
             {field.name for field in dataclasses.fields(characterization)},
             {
                 "display_name",
-                "title",
                 "age",
                 "apparent_age",
                 "portrait_stable_key",

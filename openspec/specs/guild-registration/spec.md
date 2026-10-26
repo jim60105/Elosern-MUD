@@ -177,6 +177,10 @@ The service roster SHALL derive from each hosted place's canonical identity, spa
 - **WHEN** a declaration is synchronized
 - **THEN** host_key uses unique canonical profile provenance and reused identity/location/state remain unchanged
 
+#### Scenario: Host authoring has no title
+- **WHEN** a current place/roster identity is declared
+- **THEN** it has a validated name and profile and no title/host_title field
+
 ### Requirement: Roster convergence deletes service hosts absent from the roster
 Only explicitly source-owned hosts whose complete host declaration is removed SHALL be retired through the existing host lifecycle. Capability removal or component service IDs SHALL NOT authorize deleting a host; unrelated NPCs SHALL survive.
 

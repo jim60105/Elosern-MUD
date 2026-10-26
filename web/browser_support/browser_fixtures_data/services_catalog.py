@@ -143,7 +143,7 @@ def graft_synth_exam_host_policies() -> None:
         ),
     })
     person = GuildAdventurer(
-        SYNTH_EXAM_HOST_PERSON_KEY, SYNTH_EXAM_HOST_NAME, "合成考核主持人",
+        SYNTH_EXAM_HOST_PERSON_KEY, SYNTH_EXAM_HOST_NAME,
         "t_synth_exam_profile", "t_synth_exam_home", next_rank, "t_synth",
         (100, 100, 100, 10, 10, 10, 10), INNATE_SKILL_ORDER[-1], (),
         "t_synth_exam_routine", branch_key=SYNTH_GUILD_BRANCH_KEY,

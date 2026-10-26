@@ -32,7 +32,7 @@ from world.lore.npc_tiers import NPC_TIER_REGISTRY
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.quests.characterization import characterize_errors, race_lifespan_upper_bound
 from world.quests.compile.contracts import StageNpcCharacterization
-from world.rules.npc_identity import validate_npc_name, validate_npc_title
+from world.rules.npc_identity import validate_npc_name
 from world.rules.npc_persona import NpcPersonaStorageError, initialize_npc_persona
 from world.rules.progression import apply_lineage_auto_seed
 from world.rules.traits import build_initial_traits, trait_config_for_values
@@ -146,7 +146,7 @@ def validate_characterization(
     The compile boundary already validated the accepted blueprint, but a forged
     requirement or package could bypass it and write a negative or non-integer
     canonical age, a malformed policy, or an occupant WITHOUT the authored
-    identity. Every occupant MUST carry a valid ``display_name``, ``title`` and
+    identity. Every occupant MUST carry a valid ``display_name`` and
     complete compact ``persona`` card: re-running the same shared rules keeps
     the age-bounds rule, the authored-identity invariant and the card contract
     hard floors on every spawn path (design D6).
@@ -159,8 +159,6 @@ def validate_characterization(
     entry: dict[str, Any] = {}
     if characterization.display_name is not None:
         entry["display_name"] = characterization.display_name
-    if characterization.title is not None:
-        entry["title"] = characterization.title
     if characterization.age is not None:
         entry["age"] = characterization.age
     if characterization.apparent_age is not None:
@@ -198,8 +196,6 @@ def apply_characterization(
     """
     if characterization.display_name is not None:
         npc.db.display_name = validate_npc_name(characterization.display_name)
-    if characterization.title is not None:
-        npc.npc_title = validate_npc_title(characterization.title)
     if characterization.age is not None and characterization.apparent_age is not None:
         npc.db.age = characterization.age
         npc.db.apparent_age = characterization.apparent_age

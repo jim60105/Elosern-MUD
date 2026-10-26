@@ -89,8 +89,8 @@ existing role/tier/disposition checks, and SHALL accept the two optional fields 
 under `world/quests/` — the single rule source.
 
 #### Scenario: A valid named occupant with a title and ages passes validation
-- **WHEN** a current characterization input carries the removed title field
-- **THEN** it is rejected by the closed schema before compile or template registration, while the title-free form retains all name/age/portrait/persona checks
+- **WHEN** a title-free `npc_req` entry declares a known tier, `display_name`, a valid compact persona card, paired ages within the race band, and a valid portrait `stable_key`
+- **THEN** it passes semantic validation and proceeds to compile, while a removed title field on the same entry is rejected instead
 
 #### Scenario: A missing identity field is rejected and retried
 - **WHEN** an `npc_req` entry omits display_name

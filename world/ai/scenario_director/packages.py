@@ -134,11 +134,10 @@ _ROLE = {
         },
         "characterization": {
             "type": "object",
-            "required": ["display_name", "title", "persona"],
+            "required": ["display_name", "persona"],
             "additionalProperties": False,
             "properties": {
                 "display_name": {"type": "string", "minLength": 1, "maxLength": 64},
-                "title": {"type": "string", "minLength": 1, "maxLength": 64},
                 "age": {"type": ["integer", "null"], "minimum": 0, "maximum": 10000},
                 "apparent_age": {
                     "type": ["integer", "null"],
