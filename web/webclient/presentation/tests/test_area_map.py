@@ -913,7 +913,9 @@ class MapViewDispatchTests(EvenniaTestCase):
         )
         self.assertIs(self.char.location, self.rooms[1], "the move committed")
         self.coordinator.synchronize(_context(self.char))
-        self.coordinator._publish_presentation(_context(self.char), {"status"})
+        self.coordinator.enqueue_publication(
+            lambda: _context(self.char), affected_panels={"status"}
+        )
         self.assertEqual(self.calls, [])
         for name in ("ui_snapshot", "ui_update"):
             for frame in self.session.frames(name):

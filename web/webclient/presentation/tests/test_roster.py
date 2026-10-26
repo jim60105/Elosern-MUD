@@ -5,6 +5,7 @@ import base64
 import hashlib
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import PropertyMock, patch
 
@@ -25,6 +26,7 @@ from web.webclient.presentation.registry import (
     UNAVAILABLE_REASON,
     build_production_registry,
 )
+from web.webclient.presentation.tests._support import last_frame
 from web.webclient.presentation.roster import (
     MAX_ROSTER_ROWS,
     ROSTER_LOCK_REASON,
@@ -116,6 +118,18 @@ def _descriptor(**overrides):
 class RosterPresenterTests(EvenniaTest):
     account_typeclass = Account
     character_typeclass = PlayerCharacter
+
+    class _RecordingSession:
+        """A minimal transport that keeps every published envelope."""
+
+        def __init__(self, actor):
+            self.puppet = actor
+            self.sent = []
+            self.ndb = SimpleNamespace()
+            self.sessid = 17
+
+        def msg(self, **kwargs):
+            self.sent.append(kwargs)
 
     def setUp(self):
         super().setUp()
@@ -442,8 +456,9 @@ class RosterPresenterTests(EvenniaTest):
             year, season_index, season_name = 1204, 1, "初春"
             day_in_season, hour, minute, second = 1, 12, 0, 0
 
+        session = self._RecordingSession(self.char1)
         coordinator = PresentationCoordinator(
-            self.session,
+            session,
             registry=self.registry,
             calendar_provider=lambda: FakeClock(),
         )
@@ -451,7 +466,8 @@ class RosterPresenterTests(EvenniaTest):
         # 1. Exploration mode
         self.char1.db.creation_pending = False
         ctx_exp = PresentationContext(actor=self.char1, protocol_version=1)
-        snap_exp = coordinator.full_snapshot(ctx_exp)
+        coordinator.full_snapshot(ctx_exp)
+        snap_exp = last_frame(session, "ui_snapshot")
         self.assertEqual(snap_exp["mode"], "exploration")
         self.assertIn("roster", snap_exp["panels"])
         self.assertTrue(snap_exp["panels"]["roster"]["available"])
@@ -459,7 +475,8 @@ class RosterPresenterTests(EvenniaTest):
         # 2. Creation mode
         self.char1.db.creation_pending = True
         ctx_creation = PresentationContext(actor=self.char1, protocol_version=1)
-        snap_creation = coordinator.full_snapshot(ctx_creation)
+        coordinator.full_snapshot(ctx_creation)
+        snap_creation = last_frame(session, "ui_snapshot")
         self.assertEqual(snap_creation["mode"], "creation")
         self.assertIn("roster", snap_creation["panels"])
         self.assertTrue(snap_creation["panels"]["roster"]["available"])
@@ -471,7 +488,8 @@ class RosterPresenterTests(EvenniaTest):
             patch("world.rules.account_roster.is_in_active_session", return_value=True),
         ):
             ctx_combat = PresentationContext(actor=self.char1, protocol_version=1)
-            snap_combat = coordinator.full_snapshot(ctx_combat)
+            coordinator.full_snapshot(ctx_combat)
+            snap_combat = last_frame(session, "ui_snapshot")
             self.assertEqual(snap_combat["mode"], "combat")
             self.assertIn("roster", snap_combat["panels"])
             self.assertTrue(snap_combat["panels"]["roster"]["available"])

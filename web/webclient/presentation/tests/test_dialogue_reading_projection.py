@@ -297,7 +297,6 @@ class DialogueReadingProjectionTests(EvenniaTest):
         "formal-reading-is-persistent-owner-shared-narrative-state"
     )
     def test_fan_out_reaches_one_owner_controls_only(self):
-        self._select()
         first, first_output = self._register_watcher(self.owner, 971)
         self._register_watcher(self.owner, 972)
         # Another character of the same account is not the owner.
@@ -307,6 +306,9 @@ class DialogueReadingProjectionTests(EvenniaTest):
         sibling.location = self.room
         _sibling_session, sibling_output = self._register_watcher(sibling, 973)
 
+        # The reading state changes after every committed baseline, so the push
+        # really has a difference for the owner's own connections.
+        self._select()
         push_dialogue_reading(self.owner)
 
         def panels(output):

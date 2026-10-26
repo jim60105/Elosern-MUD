@@ -150,6 +150,8 @@ class CoordinatorBasicsTests(unittest.TestCase):
     def test_over_budget_envelope_rejects_before_revision_consumption_or_send(self):
         from web.webclient.presentation.protocol import JSONSafetyError
 
+        from web.webclient.presentation.tests._support import publication_failure
+
         session = FakeSession()
         over_spec = PresenterSpec(
             name="status",
@@ -159,15 +161,15 @@ class CoordinatorBasicsTests(unittest.TestCase):
         )
         coordinator = _coordinator(session, _registry(over_spec))
         self.assertEqual(coordinator.revision, 0)
-        with self.assertRaises(JSONSafetyError):
-            coordinator.full_snapshot(_context())
+        publication_failure(coordinator.full_snapshot(_context())).trap(JSONSafetyError)
         self.assertEqual(coordinator.revision, 0)
         self.assertEqual(len(session.sent), 0)
 
-        with self.assertRaises(JSONSafetyError):
+        publication_failure(
             coordinator.panel_update(
                 _context(), {"status": {f"pad_{i}": "x" * 1500 for i in range(50)}}
             )
+        ).trap(JSONSafetyError)
         self.assertEqual(coordinator.revision, 0)
         self.assertEqual(len(session.sent), 0)
 
@@ -199,6 +201,12 @@ class CoordinatorBasicsTests(unittest.TestCase):
         self.assertEqual(envelope["removed_panels"], [])
 
     def test_panel_update_removals_are_explicit_and_disjoint(self):
+        from web.webclient.presentation.tests._support import (
+            last_frame,
+            publication_failure,
+            publication_receipt,
+        )
+
         session = FakeSession()
         coordinator = _coordinator(
             session,
@@ -214,38 +222,48 @@ class CoordinatorBasicsTests(unittest.TestCase):
         )
         coordinator.full_snapshot(_context())
         session.sent.clear()
-        envelope = coordinator.panel_update(
-            _context(), {}, removed_panels=("other",)
+        receipt = publication_receipt(
+            coordinator.panel_update(_context(), {}, removed_panels=("other",))
         )
+        envelope = last_frame(session, "ui_update")
+        self.assertEqual(receipt.kind, "delta")
+        self.assertTrue(receipt.published)
+        self.assertEqual(receipt.revision, envelope["revision"])
         self.assertEqual(envelope["removed_panels"], ["other"])
         self.assertEqual(envelope["panels"], {})
         self.assertEqual(envelope["base_revision"], 1)
         self.assertEqual(envelope["revision"], 2)
-        with self.assertRaises(ValueError):
+        publication_failure(
             coordinator.panel_update(
                 _context(),
                 {"status": _available_payload(value=1)},
                 removed_panels=("status",),
             )
-        with self.assertRaises(ValueError):
+        ).trap(ValueError)
+        publication_failure(
             coordinator.panel_update(_context(), {}, removed_panels=("unknown",))
-        with self.assertRaises(ValueError):
+        ).trap(ValueError)
+        publication_failure(
             coordinator.panel_update(_context(), {}, removed_panels=("area_map",))
+        ).trap(ValueError)
         self.assertEqual(coordinator.revision, 2)
 
     def test_panel_update_rejects_empty_and_unknown(self):
+        from web.webclient.presentation.tests._support import publication_failure
+
         session = FakeSession()
         coordinator = _coordinator(session, _registry(_status_spec()))
-        with self.assertRaises(ValueError):
-            coordinator.panel_update(_context(), {})
-        with self.assertRaises(ValueError):
+        publication_failure(coordinator.panel_update(_context(), {})).trap(ValueError)
+        publication_failure(
             coordinator.panel_update(_context(), {"unknown": {}})
+        ).trap(ValueError)
 
     def test_missing_clock_raises(self):
+        from web.webclient.presentation.tests._support import publication_failure
+
         session = FakeSession()
         coordinator = _coordinator(session, _registry(_status_spec()), calendar_provider=lambda: None)
-        with self.assertRaises(ClockUnavailable):
-            coordinator.full_snapshot(_context())
+        publication_failure(coordinator.full_snapshot(_context())).trap(ClockUnavailable)
 
 
 class IsolationTests(unittest.TestCase):

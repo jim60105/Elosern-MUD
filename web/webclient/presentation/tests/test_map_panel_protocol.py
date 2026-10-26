@@ -39,6 +39,10 @@ from web.webclient.presentation.protocol import (
     check_envelope,
 )
 from web.webclient.presentation.registry import PresenterSpec, PresentationRegistry
+from web.webclient.presentation.tests._support import (
+    publication_failure,
+    publication_receipt,
+)
 from world.rules.map_knowledge import encode_grid, encode_room, encode_wild
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -364,14 +368,25 @@ class _Calendar:
     year, season_index, season_name, day_in_season, hour, minute, second = 1204, 2, "仲夏", 17, 14, 30, 5
 
 
-def _registry(map_body, calls, *, dialogue=False):
+def _registry(map_body, calls, *, dialogue=False, state=None):
+    """A synthetic registry whose eager payloads a test can change.
+
+    ``state`` models canonical state the eager presenters read: mutating it
+    between the priming snapshot and a publication is how a test says "this
+    panel changed", which is the only reason the comparison transmits it.
+    """
+    values = {"status": 0, "dialogue": 0} if state is None else state
     registry = PresentationRegistry("test")
     registry.register(
         PresenterSpec(
             name="status",
             schema_version=1,
             unavailable_reason=("missing_data", "無法讀取"),
-            presenter=lambda ctx: {"schema_version": 1, "available": True},
+            presenter=lambda ctx: {
+                "schema_version": 1,
+                "available": True,
+                "value": values["status"],
+            },
         )
     )
     if dialogue:
@@ -380,7 +395,11 @@ def _registry(map_body, calls, *, dialogue=False):
                 name="dialogue",
                 schema_version=2,
                 unavailable_reason=("dialogue_unavailable", "對話"),
-                presenter=lambda ctx: {"schema_version": 2, "available": True},
+                presenter=lambda ctx: {
+                    "schema_version": 2,
+                    "available": True,
+                    "value": values["dialogue"],
+                },
             )
         )
 
@@ -463,9 +482,15 @@ class OnDemandCoordinatorTests(unittest.TestCase):
     )
     def test_eager_publication_never_runs_map_presenters(self):
         calls, session = [], _Session()
-        coordinator = _coordinator(session, _registry(lambda: _copy("grid"), calls))
+        state = {"status": 0, "dialogue": 0}
+        coordinator = _coordinator(
+            session, _registry(lambda: _copy("grid"), calls, state=state)
+        )
         coordinator.full_snapshot(_context())
-        coordinator._publish_presentation(_context(), {"status"})
+        state["status"] = 1
+        publication_receipt(
+            coordinator.enqueue_publication(lambda: _context(), affected_panels={"status"})
+        )
         self.assertEqual(calls, [])
         frames = session.frames()
         self.assertEqual([name for name, _ in frames], ["ui_snapshot", "ui_update"])
@@ -479,12 +504,14 @@ class OnDemandCoordinatorTests(unittest.TestCase):
         calls, session = [], _Session()
         coordinator = _coordinator(session, _registry(lambda: _copy("grid"), calls))
         coordinator.full_snapshot(_context())
-        revision = coordinator._publish_presentation(_context(), {"area_map"})
+        receipt = publication_receipt(
+            coordinator.enqueue_publication(lambda: _context(), affected_panels={"area_map"})
+        )
         self.assertEqual(len(calls), 1)
         (name, frame), = session.frames()[1:]
         self.assertEqual(name, "ui_update")
         self.assertEqual(frame["panels"]["area_map"], validate_area_map(_copy("grid")))
-        self.assertEqual(frame["revision"], revision)
+        self.assertEqual(frame["revision"], receipt.revision)
 
     @covers_requirement(
         "webclient-map-panel-protocol::map-delivery-replaces-only-complete-epoch-safe-logical-panels"
@@ -497,7 +524,7 @@ class OnDemandCoordinatorTests(unittest.TestCase):
         coordinator = _coordinator(session, _registry(_dense_grid, []))
         coordinator.full_snapshot(_context())
         with mock.patch("web.webclient.presentation.coordinator.log_debug") as log_debug:
-            coordinator._publish_presentation(_context(), {"area_map"})
+            coordinator.enqueue_publication(lambda: _context(), affected_panels={"area_map"})
         frames = [frame for _, frame in session.frames()[1:]]
         self.assertGreater(len(frames), 0)
         self.assertEqual({frame["revision"] for frame in frames}, {coordinator.revision})
@@ -524,7 +551,9 @@ class OnDemandCoordinatorTests(unittest.TestCase):
         )
         coordinator = _coordinator(session, registry)
         coordinator.full_snapshot(_context())
-        coordinator._publish_presentation(_context(), {"area_map", "world_map"})
+        coordinator.enqueue_publication(
+            lambda: _context(), affected_panels={"area_map", "world_map"}
+        )
         frames = [frame for _, frame in session.frames()[1:]]
         by_revision: dict[int, list] = {}
         for frame in frames:
@@ -549,8 +578,12 @@ class OnDemandCoordinatorTests(unittest.TestCase):
         before = (len(session.sent), coordinator.revision)
         with mock.patch(
             "web.webclient.presentation.map_parts.encode_map_parts", side_effect=MapPanelError("boom")
-        ), self.assertRaises(MapPanelError):
-            coordinator._publish_presentation(_context(), {"status", "area_map"})
+        ):
+            publication_failure(
+                coordinator.enqueue_publication(
+                    lambda: _context(), affected_panels={"status", "area_map"}
+                )
+            ).trap(MapPanelError)
         self.assertEqual((len(session.sent), coordinator.revision), before)
 
     @covers_requirement(
@@ -558,9 +591,15 @@ class OnDemandCoordinatorTests(unittest.TestCase):
     )
     def test_dialogue_companion_precedes_the_transfer(self):
         session = _Session()
-        coordinator = _coordinator(session, _registry(_dense_grid, [], dialogue=True), mode="dialogue")
+        state = {"status": 0, "dialogue": 0}
+        coordinator = _coordinator(
+            session, _registry(_dense_grid, [], dialogue=True, state=state), mode="dialogue"
+        )
         coordinator.full_snapshot(_context())
-        coordinator._publish_presentation(_context(), {"area_map"})
+        # The conversation changed: the dialogue companion is a real
+        # difference of the same publication, so it precedes the transfer.
+        state["dialogue"] = 1
+        coordinator.enqueue_publication(lambda: _context(), affected_panels={"area_map"})
         frames = [frame for _, frame in session.frames()[1:]]
         self.assertEqual(set(frames[0]["panels"]), {"dialogue"})
         self.assertTrue(all(list(frame["panels"]) == ["area_map"] for frame in frames[1:]))
@@ -574,7 +613,7 @@ class OnDemandCoordinatorTests(unittest.TestCase):
         coordinator = _coordinator(session, _registry(lambda: {**_copy("grid"), "secret": 1}, []))
         coordinator.full_snapshot(_context())
         with mock.patch("web.webclient.presentation.coordinator.log_error") as log_error:
-            coordinator._publish_presentation(_context(), {"area_map"})
+            coordinator.enqueue_publication(lambda: _context(), affected_panels={"area_map"})
         _, frame = session.frames()[-1]
         self.assertIs(frame["panels"]["area_map"]["available"], False)
         self.assertEqual(frame["panels"]["area_map"]["reason"]["code"], "internal_presenter_error")

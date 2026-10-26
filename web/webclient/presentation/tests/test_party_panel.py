@@ -47,6 +47,7 @@ from web.webclient.presentation.protocol import (
     ProtocolValidationError,
     json_byte_size,
     validate_ui_snapshot,
+    validate_ui_update,
 )
 from web.webclient.presentation.party import (
     PARTY_GENERAL_LIMIT,
@@ -58,6 +59,11 @@ from web.webclient.presentation.party import (
 )
 from web.webclient.presentation.party_view_selection import PartyViewSelection
 from web.webclient.presentation.registry import build_production_registry
+from web.webclient.presentation.tests._support import (
+    committed_view,
+    last_frame,
+    recorded_frames,
+)
 from world.quests.catalog import register_catalog
 from world.art import official, official_refs
 from world.art.gallery import (
@@ -346,7 +352,8 @@ class PartyPresenterTests(EvenniaTest):
         coordinator = PresentationCoordinator(
             session, self.registry, calendar_provider=lambda: _CALENDAR
         )
-        return coordinator.full_snapshot(self.context)["panels"]
+        coordinator.full_snapshot(self.context)
+        return last_frame(session, "ui_snapshot")["panels"]
 
     def _official_companion(self, key="測試官方隊友"):
         """A present, joined, preset-born companion with a named portrait."""
@@ -1540,7 +1547,7 @@ class PartyPushTests(BattlefieldIsolation, EvenniaTest):
     @covers_requirement(
         "webclient-party-panel::party-presentation-stays-current-across-membership-and-combat-changes"
     )
-    def test_party_leave_action_publishes_full_snapshot_without_the_companion(self):
+    def test_party_leave_action_publishes_without_the_companion_before_the_result(self):
         companion = _companion("薇拉", self.room)
         join_party(companion, self.player)
         session = _RecordingSession(self.player)
@@ -1569,32 +1576,31 @@ class PartyPushTests(BattlefieldIsolation, EvenniaTest):
         )
 
         results = self._messages(session, "ui_action_result")
-        snapshots = self._messages(session, "ui_snapshot")
         self.assertEqual(results[-1]["outcome"], "success")
-        # The leave seam publishes a full snapshot (membership can pair with
-        # anything), and the presentation publication precedes the result.
-        self.assertTrue(snapshots, "party_leave must publish a full snapshot")
-        last = snapshots[-1]
-        identities = [row["identity"] for row in last["panels"]["party"]["slots"]]
+        # The leave seam publishes the canonical post-leave state through the
+        # one publication owner: whatever the committed view needs (a changed
+        # party panel here) reaches the client before the result.
+        committed = committed_view(session.sent)
+        identities = [row["identity"] for row in committed["panels"]["party"]["slots"]]
         self.assertNotIn(int(companion.pk), identities)
-        # Scripted protocol probe (task 5.2 evidence): the published envelope
-        # is the exact wire form — full snapshot validated against the
-        # registered panel allowlist, party included.
-        normalized = validate_ui_snapshot(
-            last, known_panels=set(self.registry.panel_names)
-        )
-        self.assertIn("party", normalized["panels"])
-        self.assertEqual(normalized["panels"]["party"], last["panels"]["party"])
-        sequence = [
+        last = recorded_frames(session.sent)[-1]
+        # Scripted protocol probe (task 5.2 evidence): the published envelope is
+        # the exact wire form validated against the registered allowlist.
+        if "base_revision" in last:
+            validate_ui_update(last, known_panels=set(self.registry.panel_names))
+        else:
+            validate_ui_snapshot(last, known_panels=set(self.registry.panel_names))
+        self.assertIn("party", last["panels"])
+        names = [
             name
             for call in session.sent
-            for name in ("ui_snapshot", "ui_action_result")
+            for name in ("ui_snapshot", "ui_update", "ui_action_result")
             if name in call
         ]
         self.assertLess(
-            len(sequence) - 1 - sequence[::-1].index("ui_snapshot"),
-            len(sequence) - 1 - sequence[::-1].index("ui_action_result"),
-            "the post-leave snapshot must precede the action result",
+            max(index for index, name in enumerate(names) if name != "ui_action_result"),
+            max(index for index, name in enumerate(names) if name == "ui_action_result"),
+            "the post-leave presentation must precede the action result",
         )
 
     @covers_requirement(
@@ -1817,9 +1823,10 @@ class PartyCombatJoinTests(BattlefieldIsolation, EvenniaTest):
             session, self.registry, calendar_provider=lambda: _CALENDAR
         )
         session.ndb.elosern_coordinator = coordinator
-        priming = coordinator.full_snapshot(
+        coordinator.full_snapshot(
             PresentationContext(actor=self.player, protocol_version=1)
         )
+        priming = last_frame(session, "ui_snapshot")
         priming_hp = next(
             row["hp_current"]
             for row in priming["panels"]["party"]["slots"]

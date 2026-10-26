@@ -43,7 +43,7 @@ CARDS = [
         "kind": "known_action",
         "action_code": "explore.talk_scripted",
         "label": "向店員問候",
-        "params": {"npc_id": 7, "keyword_id": "問候"},
+        "params": {"npc_id": 7, "topic_id": "問候", "context_id": "ctx-1"},
     },
 ]
 
@@ -228,6 +228,14 @@ class PublicationPathSnapshotTests(EvenniaTest):
         )
 
     def test_completion_publication_carries_the_ready_suggestions(self):
+        # A fresh generation result replaced the cards after the committed
+        # baseline, so the completion publication really has a difference to
+        # transmit (an unchanged panel is never retransmitted).
+        updated = [dict(card) for card in CARDS]
+        updated[2]["params"] = {"npc_id": 8, "topic_id": "問候", "context_id": "ctx-1"}
+        self.session.ndb.options_state = _options_state(
+            str(self.player.pk), self.fingerprint, displayed=updated
+        )
         coordinator = attach_coordinator(self.session, self.registry)
         state = dispatcher._sequence_state(self.session)
         state.in_flight = True
@@ -235,7 +243,12 @@ class PublicationPathSnapshotTests(EvenniaTest):
         dispatcher._publish_completion(
             self.session,
             self.player,
-            {"outcome": "success", "affected_panels": ["context_actions"]},
+            {
+                "outcome": "success",
+                "code": "ok",
+                "message": "完成",
+                "affected_panels": ["context_actions"],
+            },
             self.registry,
             "r1",
             coordinator.epoch,
@@ -244,7 +257,9 @@ class PublicationPathSnapshotTests(EvenniaTest):
         self.assertTrue(updates)
         panel = updates[-1]["panels"]["context_actions"]
         self.assertEqual(panel["suggestions"]["status"], "ready")
-        self.assertEqual(panel["suggestions"]["cards"], _wire_cards())
+        self.assertEqual(
+            panel["suggestions"]["cards"], [{**card, "hint": None} for card in updated]
+        )
 
     def test_internal_error_publication_carries_the_ready_suggestions(self):
         coordinator = attach_coordinator(self.session, self.registry)

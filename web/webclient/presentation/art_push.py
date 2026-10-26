@@ -26,6 +26,8 @@ that only the current scene references cannot widen the publication.
 
 from typing import Any
 
+from twisted.python.failure import Failure
+
 from world.observability import log_info, log_warn
 
 from web.webclient.presentation.context import PresentationContext
@@ -174,15 +176,45 @@ def _push_for_subject(session: Any, actor: Any, subject_key: str) -> None:
     if not matching_panels:
         return
 
-    envelope = coordinator.panel_update(context, matching_panels)
-    log_info(
-        "art_completion_push",
-        context={
-            "subject": subject_key,
-            "session": getattr(session, "sessid", "?"),
-            "panels": list(envelope.get("panels", matching_panels).keys()),
-        },
+    deferred = coordinator.enqueue_publication(
+        lambda: build_presentation_context(session, actor),
+        candidate_panels=matching_panels,
     )
+
+    def _published(receipt: Any) -> None:
+        if receipt is None:
+            # The session's sequence retired between scheduling and the drain;
+            # nothing was published and nothing is logged as if it were.
+            return None
+        log_info(
+            "art_completion_push",
+            context={
+                "subject": subject_key,
+                "session": getattr(session, "sessid", "?"),
+                # The candidate panels this completion considered: a panel the
+                # comparison suppressed is still reported as covered.
+                "panels": sorted(matching_panels),
+                "revision": receipt.revision,
+                "kind": receipt.kind,
+                "published": receipt.published,
+            },
+        )
+        return None
+
+    def _failed(failure: Any) -> None:
+        error = failure.value if isinstance(failure, Failure) else failure
+        log_warn(
+            "art_push_unavailable",
+            context={
+                "surface": "art",
+                "session": getattr(session, "sessid", "?"),
+                "subject": subject_key,
+            },
+            exc=error,
+        )
+        return None
+
+    deferred.addCallbacks(_published, _failed)
 
 
 def on_asset_completed(**kwargs: Any) -> None:

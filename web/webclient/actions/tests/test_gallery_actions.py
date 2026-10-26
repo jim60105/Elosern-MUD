@@ -307,12 +307,22 @@ class GalleryActionIntegrationTests(EvenniaTest):
                 self.assertEqual(rej["outcome"], "rejected")
 
     def panel(self):
+        """The committed gallery panel after this action's publication.
+
+        Only differences are transmitted, so an action that leaves every
+        declared panel equal to the committed baseline sends no presentation
+        frame at all; the committed panel is what the client holds either way.
+        """
         updates = [call["ui_update"][0][0] for call in self.sent if "ui_update" in call]
-        self.assertEqual(len(updates), 1)
+        self.assertLessEqual(len(updates), 1, "one publication per action at most")
         self.assertNotIn("ui_snapshot", self.sent[0])
-        self.assertEqual(set(updates[0]["panels"]), {"gallery", "art", "roster"})
-        self.assertEqual(updates[0]["revision"], self.sent[-1]["ui_action_result"][0][0]["presentation_revision"])
-        return updates[0]["panels"]["gallery"]
+        if updates:
+            self.assertIn("gallery", updates[0]["panels"])
+            self.assertEqual(
+                updates[0]["revision"],
+                self.sent[-1]["ui_action_result"][0][0]["presentation_revision"],
+            )
+        return self.coordinator.committed_panels["gallery"]
 
     @staticmethod
     def card_geometry(row):
@@ -635,10 +645,17 @@ class GalleryActionIntegrationTests(EvenniaTest):
                 result = self.dispatch(action, payload)
                 self.assertEqual(result["outcome"], "success")
                 updates = [call["ui_update"][0][0] for call in self.sent if "ui_update" in call]
-                self.assertEqual(len(updates), 1)
+                self.assertLessEqual(len(updates), 1)
                 self.assertNotIn("ui_snapshot", self.sent[0])
-                self.assertEqual(set(updates[0]["panels"].keys()), {"gallery", "art", "roster"})
-                self.assertEqual(updates[0]["revision"], result["presentation_revision"])
+                if updates:
+                    # The delta carries only what changed, always including the
+                    # affected gallery panel it belongs to.
+                    self.assertIn("gallery", updates[0]["panels"])
+                    self.assertEqual(updates[0]["revision"], result["presentation_revision"])
+                else:
+                    self.assertEqual(
+                        result["presentation_revision"], self.coordinator.revision
+                    )
                 self.assertEqual(info.call_count, 1)
                 self.assertEqual(info.call_args.args, ("gallery_action",))
                 context = info.call_args.kwargs["context"]
@@ -789,11 +806,13 @@ class OfficialPreferenceActionTests(EvenniaTest):
         return result
 
     def _panel(self):
+        """The committed gallery panel; see the integration helper's contract."""
         updates = [call["ui_update"][0][0] for call in self.sent if "ui_update" in call]
-        self.assertEqual(len(updates), 1)
+        self.assertLessEqual(len(updates), 1, "one publication per action at most")
         self.assertNotIn("ui_snapshot", self.sent[0])
-        self.assertEqual(set(updates[0]["panels"]), {"gallery", "art", "roster"})
-        return updates[0]["panels"]["gallery"]
+        if updates:
+            self.assertIn("gallery", updates[0]["panels"])
+        return self.coordinator.committed_panels["gallery"]
 
     def _world(self):
         """Every byte and every record the refusal must leave untouched."""

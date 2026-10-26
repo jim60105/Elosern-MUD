@@ -251,11 +251,11 @@ The presentation registry SHALL reject duplicate panel names and SHALL expose on
 - **THEN** it SHALL derive the registered version from the panel schema's single server-side constant in its presenter module, and the client's panel allowlist and per-panel schema-version re-checks SHALL mirror the same value under a dual-direction parity contract so the two never diverge
 
 ### Requirement: WebClient text commands refresh presentation after completion
-The project `text` input function SHALL preserve Evennia's ordinary command semantics and SHALL observe both callback and errback settlement without replacing the original Deferred value or Failure. It SHALL attempt a full snapshot from then-current canonical state only after a WebClient command settles and SHALL NOT emit graphical state for Telnet commands. Idle handling, nickname replacement, command output, session counters, and text access SHALL remain functional.
+The project `text` input function SHALL preserve ordinary command semantics and observe both callback and errback settlement without replacing the original Deferred value or Failure. Only after a WebClient command settles SHALL it compare all eager candidates from then-current canonical state, using a fresh complete snapshot when a semantic checkpoint or recovery requires it, and it SHALL emit no graphical state for Telnet commands.
 
 #### Scenario: A completed WebClient command refreshes state
 - **WHEN** a puppeted WebClient submits an ordinary synchronous text command that changes canonical state
-- **THEN** normal command output is delivered and a full snapshot reflecting the committed state is emitted after command completion
+- **THEN** normal command output is delivered and changed content/metadata is published after command completion using a delta, a qualifying checkpoint uses one fresh full snapshot, and wholly unchanged presentation consumes no revision
 
 #### Scenario: A Telnet command remains text-only
 - **WHEN** a Telnet player executes the same command
@@ -270,8 +270,12 @@ The project `text` input function SHALL preserve Evennia's ordinary command sema
 - **THEN** the wrapper preserves the original Failure and ordinary error output while attempting at most one safe post-settlement refresh
 
 #### Scenario: Presentation failure never consumes a command failure
-- **WHEN** the post-settlement snapshot attempt fails
+- **WHEN** the post-settlement publication attempt fails
 - **THEN** the presentation failure SHALL be logged separately and SHALL NOT consume a command failure
+
+#### Scenario: Ordinary text behaviour is untouched
+- **WHEN** a puppeted WebClient submits any ordinary text command
+- **THEN** idle handling, nickname replacement, command output, session counters, and text access SHALL keep working as they do without the publication wrapper
 
 ### Requirement: Protocol failures degrade without disabling text play
 Before a valid full snapshot, the WebClient SHALL disable graphical mutation controls. A malformed panel SHALL disable only that renderer and request at most one full resynchronization for the same failure episode. An incompatible protocol SHALL disable all graphical mutation controls and offer reload. OOB initialization failure SHALL leave narrative output and ordinary text input usable.

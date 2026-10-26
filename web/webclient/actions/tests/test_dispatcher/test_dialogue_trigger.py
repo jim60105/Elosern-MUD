@@ -27,9 +27,9 @@ class DialogueTriggerTests(unittest.TestCase):
     successful talk completion, after both sends (action-options-trigger-hooks
     D3); rejected and non-talk completions stay silent."""
 
-    def _session_with_coordinator(self):
+    def _session_with_coordinator(self, presentation=None):
         session = FakeSession()
-        _coordinator(session)
+        _coordinator(session, presentation)
         session.puppet = FakeActor()
         return session
 
@@ -55,8 +55,8 @@ class DialogueTriggerTests(unittest.TestCase):
         )
         return registry
 
-    def _traced_session(self):
-        session = self._session_with_coordinator()
+    def _traced_session(self, presentation=None):
+        session = self._session_with_coordinator(presentation)
         order = []
         original_msg = session.msg
 
@@ -75,7 +75,9 @@ class DialogueTriggerTests(unittest.TestCase):
 
         from server import option_proposal_service as service
 
-        session, order = self._traced_session()
+        state = {"value": 1}
+        presentation = _presenter_registry(state)
+        session, order = self._traced_session(presentation)
         registry = self._talk_registry(
             "explore.talk_scripted",
             lambda actor, payload, session=None: {
@@ -88,6 +90,9 @@ class DialogueTriggerTests(unittest.TestCase):
         coordinator = session.ndb.elosern_coordinator
         coordinator.full_snapshot(SimpleNamespace(actor=session.puppet, protocol_version=1))
         order.clear()  # the snapshot priming send is not part of the trigger sequence
+        # The completed conversation changed the canonical status value, so the
+        # completion really has a difference to publish.
+        state["value"] = 2
         envelope = self._envelope(
             epoch=coordinator.epoch,
             base_revision=coordinator.revision,
@@ -101,7 +106,7 @@ class DialogueTriggerTests(unittest.TestCase):
             return None
 
         with patch.object(service, "schedule_action_options", side_effect=_spy):
-            handle_ui_action(session, session.puppet, envelope, registry, _presenter_registry())
+            handle_ui_action(session, session.puppet, envelope, registry, presentation)
 
         self.assertEqual(len(calls), 1)
         self.assertIs(calls[0][0], session.puppet)
@@ -124,7 +129,9 @@ class DialogueTriggerTests(unittest.TestCase):
 
         from server import option_proposal_service as service
 
-        session, order = self._traced_session()
+        state = {"value": 1}
+        presentation = _presenter_registry(state)
+        session, order = self._traced_session(presentation)
         held = Deferred()
         registry = self._talk_registry(
             "explore.talk_freeform",
@@ -133,6 +140,7 @@ class DialogueTriggerTests(unittest.TestCase):
         coordinator = session.ndb.elosern_coordinator
         coordinator.full_snapshot(SimpleNamespace(actor=session.puppet, protocol_version=1))
         order.clear()  # the snapshot priming send is not part of the trigger sequence
+        state["value"] = 2
         envelope = self._envelope(
             epoch=coordinator.epoch,
             base_revision=coordinator.revision,
@@ -147,7 +155,7 @@ class DialogueTriggerTests(unittest.TestCase):
             return None
 
         with patch.object(service, "schedule_action_options", side_effect=_spy):
-            handle_ui_action(session, session.puppet, envelope, registry, _presenter_registry())
+            handle_ui_action(session, session.puppet, envelope, registry, presentation)
             self.assertEqual(calls, [], "nothing schedules before the Deferred settles")
             held.callback(
                 {"outcome": "success", "code": "talked", "message": "對方回應了你的話。", "affected_panels": ("status",)}

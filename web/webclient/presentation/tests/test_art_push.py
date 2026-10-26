@@ -227,14 +227,17 @@ class ArtPushPureGateTests(unittest.TestCase):
         self.assertEqual(len(contexts_sess1), 3)
         self.assertIs(contexts_sess1[0], contexts_sess1[1])
         self.assertIs(contexts_sess1[1], contexts_sess1[2])
-        coord1.panel_update.assert_called_once()
-        self.assertIs(coord1.panel_update.call_args[0][0], contexts_sess1[0])
-        self.assertEqual(list(coord1.panel_update.call_args[0][1].keys()), ["art"])
+        # The push hands its rendered candidates to the coordinator's single
+        # publication owner (never a second publisher path).
+        coord1.enqueue_publication.assert_called_once()
+        self.assertEqual(
+            list(coord1.enqueue_publication.call_args.kwargs["candidate_panels"]), ["art"]
+        )
 
         self.assertEqual(len(contexts_sess2), 3)
         self.assertIs(contexts_sess2[0], contexts_sess2[1])
         self.assertIsNot(contexts_sess1[0], contexts_sess2[0])
-        coord2.panel_update.assert_not_called()
+        coord2.enqueue_publication.assert_not_called()
 
 
 class ArtPushBoundaryTests(EvenniaTestCase):
@@ -514,11 +517,6 @@ class ArtPushPresenterTests(EvenniaTestCase):
         self.assertIn("roster", panels)
         self.assertEqual(panels["gallery"]["selected"], other_key)
         self.assertEqual(len(panels["gallery"]["cards"]), 1)
-        # The completed subject is a CURRENT portrait-catalog member of the
-        # exploring session, so the SAME update carries the freshly rendered
-        # exploration panel whose descriptor names the admitted image
-        # (design D3): one revision, no second update.
-        self.assertIn("exploration", panels)
         catalog_key = str(other_char.pk)
         self.assertIsNotNone(
             panels["art"]["portrait_catalog"][catalog_key]["artwork"]["attempts"][0][
@@ -526,13 +524,25 @@ class ArtPushPresenterTests(EvenniaTestCase):
             ]["url"],
             "the art catalog entry for the completed subject carries its image",
         )
+        # The completed subject is a CURRENT portrait-catalog member of the
+        # exploring session, so the exploration companion is a candidate of the
+        # SAME publication (design D3). Its wire content did not change — the
+        # admitted reference was already committed — so the comparison omits it
+        # instead of retransmitting an identical panel.
+        self.assertNotIn("exploration", panels)
+        exploration = session.ndb.elosern_coordinator.registry.render(
+            "exploration", build_presentation_context(session, self.player)
+        )
         self.assertEqual(
-            self._exploration_row(panels["exploration"], other_char.pk)["portrait_ref"],
+            self._exploration_row(exploration, other_char.pk)["portrait_ref"],
             catalog_key,
+            "the current descriptor names the admitted catalog image",
         )
         ctx = info_mock.call_args.kwargs["context"]
         self.assertEqual(ctx["session"], session.sessid)
         self.assertEqual(set(ctx["panels"]), {"gallery", "art", "roster", "exploration"})
+        self.assertTrue(ctx["published"])
+        self.assertEqual(ctx["revision"], updates[0]["revision"])
 
     @covers_requirement("webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update")
     def test_selected_gallery_refreshes_without_art_or_roster_match(self):
@@ -598,22 +608,61 @@ class ArtPushPresenterTests(EvenniaTestCase):
         sibling_key = ArtSubject(ArtSubjectKind.CHARACTER, str(sibling.pk)).full()
 
         session = self._make_session()
-        with patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]), patch("web.webclient.presentation.ingress.is_webclient", return_value=True):
+        with (
+            patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]),
+            patch("web.webclient.presentation.ingress.is_webclient", return_value=True),
+            patch("web.webclient.presentation.art_push.log_info") as info_mock,
+        ):
             on_asset_completed(subject_key=sibling_key)
 
-        updates = [k["ui_update"][0][0] for k in session.sent if "ui_update" in k]
-        self.assertEqual(len(updates), 1)
-        panels = updates[0]["panels"]
-        self.assertEqual(set(panels.keys()), {"roster"})
+        # Only the roster references the sibling, so it is the single compared
+        # candidate; the rendered content equals the committed baseline, so the
+        # push publishes nothing at all.
+        ctx = info_mock.call_args.kwargs["context"]
+        self.assertEqual(ctx["panels"], ["roster"])
+        self.assertFalse(ctx["published"])
+        self.assertEqual(ctx["kind"], "unchanged")
+        self.assertEqual(
+            [k for k in session.sent if "ui_update" in k],
+            [],
+            "an unchanged candidate never costs a revision",
+        )
 
     @covers_requirement("webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update")
     def test_unavailable_art_cannot_suppress_gallery_or_roster_match(self):
         from evennia.utils.create import create_account
+        from world.art.queue import claim, settle_gallery_generated
+        from world.art.service import request_gallery_image
+
         account = create_account("test_acct_3", "t3@example.test", "testpassword", typeclass=Account)
         account.characters.add(self.player)
         self.player.account = account
         char_key = ArtSubject(ArtSubjectKind.CHARACTER, str(self.player.pk)).full()
         session = self._make_session()
+        coordinator = session.ndb.elosern_coordinator
+        # A gallery image settles after the committed baseline and the session
+        # selects its subject, so the gallery panel really has new content.
+        image_id = request_gallery_image(self.player, fields=[], custom_prompt="")
+        job = next(
+            j for j in claim(10) if j.db.gallery_image_id == image_id
+        )
+        identity = f"gallery/character/{self.player.pk}/{image_id}.png"
+        target = self.root / identity
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"portrait")
+        settle_gallery_generated(
+            job.key,
+            generation_token=job.db.generation_token,
+            output_identity=identity,
+            tmp_path=str(target),
+            prompt={"positive": "self", "negative": ""},
+            seed=1,
+            checkpoint="sd_v1-5",
+            image_size={"width": 1000, "height": 1000},
+        )
+        session.ndb.gallery_selection = GallerySelection(
+            self.player.pk, coordinator.epoch, char_key
+        )
         # Patch art presenter in registry to return unavailable
         orig_render = session.ndb.elosern_coordinator.registry.render
         def fake_render(name, ctx):
@@ -624,6 +673,7 @@ class ArtPushPresenterTests(EvenniaTestCase):
         with (
             patch.object(session.ndb.elosern_coordinator.registry, "render", side_effect=fake_render),
             patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]),
+            patch("web.webclient.presentation.art_push.log_info") as info_mock,
         ):
             on_asset_completed(subject_key=char_key)
 
@@ -632,7 +682,11 @@ class ArtPushPresenterTests(EvenniaTestCase):
         panels = updates[0]["panels"]
         self.assertNotIn("art", panels)
         self.assertIn("gallery", panels)
-        self.assertIn("roster", panels)
+        self.assertEqual(panels["gallery"]["selected"], char_key)
+        self.assertEqual(len(panels["gallery"]["cards"]), 1)
+        # The roster matched too: it is a compared candidate whose content did
+        # not change, so the unavailable art payload suppresses neither match.
+        self.assertEqual(set(info_mock.call_args.kwargs["context"]["panels"]), {"gallery", "roster"})
 
     @covers_requirement("webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update")
     def test_referencing_session_receives_one_newer_art_update(self):
@@ -688,7 +742,9 @@ class ArtPushPresenterTests(EvenniaTestCase):
         ally_key = ArtSubject(ArtSubjectKind.CHARACTER, "synthetic-ally").full()
         session = self._make_session()
         context = build_presentation_context(session, self.player)
-        before = session.ndb.elosern_coordinator.full_snapshot(context)
+        coordinator = session.ndb.elosern_coordinator
+        coordinator.full_snapshot(context)
+        before = [k["ui_snapshot"][0][0] for k in session.sent if "ui_snapshot" in k][-1]
 
         panel_before = before["panels"]["exploration"]
         # Admission, not imagery, owns the reference: the named-policy ally is
@@ -719,7 +775,10 @@ class ArtPushPresenterTests(EvenniaTestCase):
 
         subject_key, identity = self._settle_named_portrait("synthetic-ally")
         self.assertEqual(subject_key, ally_key)
-        with patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]):
+        with (
+            patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]),
+            patch("web.webclient.presentation.art_push.log_info") as info_mock,
+        ):
             on_asset_completed(subject_key=ally_key)
 
         envelope = self._first_update(session)
@@ -730,7 +789,13 @@ class ArtPushPresenterTests(EvenniaTestCase):
         )
         self.assertEqual(envelope["revision"], before["revision"] + 1)
         panels = envelope["panels"]
-        self.assertEqual(set(panels), {"art", "exploration"})
+        # The exploration companion is a candidate of this publication, but its
+        # wire content is unchanged (the admitted reference was already
+        # committed), so only the art catalog is transmitted.
+        self.assertEqual(set(panels), {"art"})
+        self.assertEqual(
+            set(info_mock.call_args.kwargs["context"]["panels"]), {"art", "exploration"}
+        )
         catalog_key = str(ally.pk)
         self.assertEqual(
             panels["art"]["portrait_catalog"][catalog_key]["artwork"]["attempts"][0][
@@ -738,13 +803,16 @@ class ArtPushPresenterTests(EvenniaTestCase):
             ]["url"],
             f"/art/{identity}",
         )
+        exploration = coordinator.registry.render(
+            "exploration", build_presentation_context(session, self.player)
+        )
         self.assertEqual(
-            self._interact_row(panels["exploration"], ally.pk)["portrait_ref"],
+            self._interact_row(exploration, ally.pk)["portrait_ref"],
             catalog_key,
             "the target descriptor now names the current catalog image",
         )
         self.assertEqual(
-            self._look_row(panels["exploration"], ally.pk)["portrait_ref"],
+            self._look_row(exploration, ally.pk)["portrait_ref"],
             catalog_key,
             "both descriptor paths carry the same server-authored key",
         )

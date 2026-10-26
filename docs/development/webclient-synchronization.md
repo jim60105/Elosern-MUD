@@ -109,6 +109,91 @@ names neither a replacement nor a removal. Server-selected removals are
 explicit: a planner passes `removed_panels`; an absent candidate never implies
 a removal.
 
+## Publication baseline and the one owner
+
+Each live session sequence keeps **one** isolated ephemeral baseline: the epoch,
+the revision the client can hold, the owned eager panel values it was last
+given, and the mode, layout version and server time published with them.
+Nothing is persisted, and no second store exists — every publisher (graphical
+action completion and the stale/internal recovery paths, explicit
+`ui_sync`/login/reconnect/puppet sync, text-command settlement, art completion,
+the party/dialogue/lore-codex pushes, the action-options and title-ballot
+generations, the scene-activation and dream refreshes, and the on-demand map
+request) hands the same coordinator an intent:
+
+```python
+coordinator.enqueue_publication(
+    context_factory,            # rebuilds the canonical read context at drain time
+    *,
+    affected_panels=None,       # absent/empty/invalid ⇒ unknown eager scope
+    candidate_panels=None,      # already-rendered push payloads (isolated here)
+    removed_panels=(),
+    force_snapshot=False,
+    expected_epoch=None,
+    completion=None,            # dispatcher-owned result published with the batch
+)  # -> Deferred[PublicationReceipt | None]
+```
+
+The call always returns a `Deferred`, including work that is rejected
+immediately. It resolves with a `PublicationReceipt(epoch, revision, kind,
+published)` after the whole batch — every presentation frame and, when present,
+the matching action result — has been sent; `kind` is `snapshot`, `delta` or
+`unchanged`, and `published` is `False` for an unchanged publication. A sequence
+that retires before its intent executes resolves `None`. Preflight or send
+failures errback with the real error (`PresentationQueueFull` for the bounded
+intent queue, `ResultDeliveryError` when only the action result failed after a
+complete publication); a guarded push logs and resolves `None` instead of
+raising into its async caller.
+
+### What is transmitted
+
+- Candidates are compared against the committed baseline value with JSON value
+  semantics: object key order is irrelevant, array order is significant,
+  `true`/`1` differ, `1`/`1.0` are equal. Only unequal (or previously absent)
+  panels are transmitted; an unchanged panel costs no bytes and no copy.
+- An absent, empty or invalid `affected_panels` declaration is *unknown scope*:
+  every eager panel is re-rendered and only real differences are sent. On-demand
+  map panels are never rendered by that path.
+- A mode transition recomputes every eager panel, so mode-dependent payloads
+  (dialogue above all) are compared together and the staged mode/dialogue pair
+  can never diverge. In dialogue mode a fresh dialogue render is always a
+  candidate; it is still omitted when its content is unchanged.
+- A changed common-metadata field alone (mode, layout version, server time) is
+  one metadata-only delta with empty `panels` and `removed_panels`.
+- A snapshot checkpoint (`force_snapshot`, the first publication, a recovery
+  outcome, or a repaired sequence) renders all eager panels and consumes one
+  revision even when the content equals the baseline.
+- Adopted values are owned plain-JSON copies made **before** the first send, so
+  a presenter that reuses a mutable container can never change what was
+  published; unchanged baseline values are kept by reference.
+
+### Serialized batches, revisions and failure
+
+One synchronous publication critical section sends a prepared batch, with no
+await between frames, so no reentrant sync or push can appear between an
+action's presentation frames and its result. Public enqueues run at the existing
+serialized reactor boundary (scheduled for the reactor's next turn when it is
+running, inline when nothing is running); reentrant work joins the same queue
+and drains immediately after the current batch, in order. At most 64 intents
+may be pending for one sequence.
+
+Planning reserves the next target revision without consuming it: all frames and
+the action-result envelope are validated first, so a preflight failure sends no
+presentation bytes and consumes no revision. The issued revision advances at the
+first attempted send, so an escaped target is never reused; the baseline is
+installed only after a logical publication's frames all succeeded. A send
+failure after a frame escaped keeps the values for diagnostics but marks the
+baseline invalid and requires a fresh snapshot at a later revision before any
+delta. A failure of the action result alone (after a complete presentation)
+leaves the baseline valid and published.
+
+Map plans keep their specialized delivery: an eager companion delta, then one
+logical publication per requested map with consecutive baselines, a world map
+intact under its scoped allowance and an area map as bounded parts that repeat
+the same `base_revision`/`revision`. Every frame of every logical publication is
+prevalidated before any is sent, and an on-demand body never enters the eager
+baseline.
+
 ## Fixtures
 
 Test fixtures derive each delta's `base_revision` from that fixture's actual
