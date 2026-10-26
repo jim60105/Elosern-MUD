@@ -1,55 +1,87 @@
 schema_version: 1
-greeting: 裡廳櫃檯後的羅海西亞‧芬威克執事把帳頁翻了個面，抬頭笑了笑：「歡迎喔！是自己用，還是要送人呢？聖水、禮器、貼身用的都有，價錢寫在櫃邊的牌子上，隨意挑。聖所那邊的安排，也可以問我。」
+greeting: 裡廳櫃檯後的羅海西亞‧芬威克執事把帳頁翻了個面，抬頭笑著招呼：「歡迎呀！是自己用，還是要替同伴挑選呢？受洗聖水、禮儀器皿與各類貼身器具都在架上，價錢清楚刻在櫃邊牌子，隨心挑選。若是想詢問聖所那邊的服事安排，我也能為你說明白喔。」
 topics:
 - topic_id: altoria_sanctum.topic_01
   keyword: 賣什麼
   label: 賣什麼
   fallback:
     scene_id: altoria_sanctum.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 賣什麼
+      text: 「想請問一下，這座櫃檯主要販售哪些器物？各類用具有什麼分別？」
+    - kind: narration
+      text: 羅海西亞‧芬威克把手中的炭筆擱在帳簿旁，轉身指向身後分層排列的精巧木架。
     - kind: speech
       speaker: host
-      text: 「架上分兩邊喔。戴在身上的有花蒂銀夾、暖蜜魔導珠、恆溫魔法卵、尖銳觸感之飾；貼身藏著的有恆振晶；拿來用的有催情浴鹽、女神之吻聖霧、情欲香爐、史萊姆潤滑凝膠、熱吻藥水，還有纏枝魔藤和微電跳蛋糖。受洗聖水也在這裡。看上哪樣，拿到櫃上來就好。」
+      text: 「架上的物件分得很清楚喔。配戴的有花蒂銀夾、暖蜜魔導珠、恆溫魔法卵與尖銳觸感之飾；貼身用的備有恆振晶；調劑情致的則有催情浴鹽、女神之吻聖霧、情欲香爐、史萊姆潤滑凝膠與熱吻藥水，還有纏枝魔藤和微電跳蛋糖。」
+    - kind: speech
+      speaker: host
+      text: 「主祭祝聖過的受洗聖水也收在最上層。每樣器物都是工坊精工打磨，材料與用途全標在小籤上。看中哪一樣，拿到櫃檯前由我為你包好就行。」
+    - kind: speech
+      speaker: host
+      text: 「牌子上的價錢都是公道定價，不二價也不短少分毫。用得舒心最要緊，拿不定主意的話儘管開口問我。」
 - topic_id: altoria_sanctum.topic_02
   keyword: 聖水
   label: 聖水
   fallback:
     scene_id: altoria_sanctum.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 聖水
+      text: 「我想了解架上的受洗聖水，出城帶在身上該如何使用？真能驅散晦氣嗎？」
+    - kind: narration
+      text: 羅海西亞‧芬威克從頂層取下一只晶瑩的細頸琉璃瓶，就著光線向客人展示瓶身封蠟。
     - kind: speech
       speaker: host
-      text: 「受洗聖水是主祭親自祝禱過的水，能洗淨身上沾的邪氣，用法寫在瓶標上喔。要的話，拿到櫃上來就好。」
+      text: 「這瓶受洗聖水是艾莉安娜主祭親自引導光魔法祝聖的純水，封口蓋著神殿日輪印記。涉足沼澤或地底時若是沾了陰穢氣息，開瓶擦拭額頭與手腕，便能洗淨滯礙。」
+    - kind: speech
+      speaker: host
+      text: 「細部的使用步驟和保存忌諱，瓶籤上都用正楷寫得十分清楚。遠行前備上一瓶在背包裡，涉險時心裡也踏實。」
+    - kind: speech
+      speaker: host
+      text: 「若打算請主祭當面祈求庇護，祈禱在大殿進行且不收費用；想把祝聖淨水帶在身邊，就直接在櫃檯結算帶走。」
 - topic_id: altoria_sanctum.topic_03
   keyword: 禮器
   label: 禮器
   fallback:
     scene_id: altoria_sanctum.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 禮器
+      text: 「櫃上這些香爐與聖霧飾品，平日裡都是如何搭配禮儀使用的？」
+    - kind: narration
+      text: 羅海西亞‧芬威克撫平袖口的小日輪刺繡，捧出一具雕花細緻的銅香爐展示給客人。
     - kind: speech
       speaker: host
-      text: 「香爐、聖霧、祝禱掛飾這些，是禮儀正經用的東西，信眾買回家自己用，拿來送禮也很體面呢。用料寫在籤上，價錢看牌子。櫃上有的東西，用舊了洗乾淨拿來，我也收。」
+      text: 「情欲香爐與女神之吻聖霧，既是聖所事工中的莊重禮器，也是信眾迎請回家的供奉之物。霧氣瀰漫時能喚醒肌膚歡愉，平心靜氣感應女神賜予的生命喜悅。」
+    - kind: speech
+      speaker: host
+      text: 「做工用料都是上乘成色，無論是自用還是贈予伴侶都格外體面。用料寫在貼籤上，價碼全對照邊上的木牌。」
+    - kind: speech
+      speaker: host
+      text: 「若是從前在我這兒請回去的器皿，用舊了洗滌潔淨帶回櫃上，我也按成色折算收回。好物件長久相承，也是一份虔敬心思。」
 - topic_id: altoria_sanctum.topic_04
   keyword: 聖所事務
   label: 聖所事務
   fallback:
     scene_id: altoria_sanctum.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 聖所事務
+      text: 「若是想尋求聖所內的修道服事，具體的安排流程該如何接洽？」
+    - kind: narration
+      text: 羅海西亞‧芬威克合上攤開的帳簿，指尖輕巧地引向通往側殿的靜謐廊道。
     - kind: speech
       speaker: host
-      text: 「聖所的事呀，進門左轉就有修女接待。房間、時段、你想要什麼樣的服事，都當面講好，雙方都願意才開始。要祝禱就回大殿找艾莉安娜主祭，要買東西就留在我這兒。」
+      text: 「聖所的事工安排很明快喔。順著廊道進門左轉，就有專職修女在靜室迎候。房舍環境、時段安排以及你期盼的服事方式，都在那裡由雙方坦誠相談。」
+    - kind: speech
+      speaker: host
+      text: 「彼此心意相合方才成行，這是教會傳承已久的規矩，修女們皆以光魔法調養身軀與避孕，純淨而尊貴。」
+    - kind: speech
+      speaker: host
+      text: 「純粹祈禱就回正殿尋主祭，想挑選輔助器具便留在我這兒。門庭分明，隨你的心意自在走動。」

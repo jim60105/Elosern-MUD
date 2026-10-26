@@ -1,55 +1,111 @@
 schema_version: 1
-greeting: 講台邊的艾莉安娜‧寒水主祭合上經冊，晨光從她背後的高窗落進大殿：「願平安與你同在，旅人。日課、祝禱，或是想問的事，都可以在這裡說。這座神殿同時是禮拜堂、聖所與聖所的商店，三處都敞開著，你想問哪一處，我都會回答。」
+greeting: 講台邊的艾莉安娜‧寒水主祭合上經冊，晨光從她背後的高窗灑落在大理石地面上。她抬起眼簾，神情溫和：「願平安與你同在，旅人。日課、祝禱，或是對聖所與商店有所疑惑，都請直說無妨。光明照臨之處坦蕩無遮，此處的三扇門扉皆同等敞開，你想了解哪一處，我都如實為你解答。」
 topics:
 - topic_id: altoria_temple.topic_01
   keyword: 禮拜
   label: 禮拜
+  variants:
+  - variant_id: elf_kin_worship
+    priority: 10
+    when:
+      kind: race_is
+      race_key: elf
+    scene:
+      scene_id: altoria_temple.topic_01_scene_elf
+      revision: r2
+      lines:
+      - kind: speech
+        speaker: actor
+        text: 「我想了解大殿日課的安排，不同出身的人前來參拜，是否也依循相同的禮儀？」
+      - kind: narration
+        text: 艾莉安娜‧寒水注視著來客的面龐，雙手交疊置於胸前，躬身致以莊重的敬意。
+      - kind: speech
+        speaker: host
+        text: 「願光明照拂你的前路，尊貴的精靈旅人。教會聖典記載，始祖女神將自由與生之歡愉賜予斐歐恩之民，這座大殿的日課正是傳承自這份古老恩澤。」
+      - kind: speech
+        speaker: host
+        text: 「晨鐘與日落之際，長椅之間向來不分族類與身家，任何人皆可入座。精靈長者若願駐足聆聽，是大殿的榮光；若想隨心漫步或於光中靜思，亦全然由你心意。」
+      - kind: speech
+        speaker: host
+        text: 「凡世的階位在此皆退於光後。無論是晨曦的頌歌還是薄暮的祝願，講台之側始終留有你的席位。」
   fallback:
     scene_id: altoria_temple.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 禮拜
+      text: 「我想了解大殿的日課與禮拜規矩，若想前來聽講，需要先行登記或稟報身分嗎？」
+    - kind: narration
+      text: 艾莉安娜‧寒水步下講台的石階，步伐從容舒緩，目光掃過長椅間斑駁的晨光。
     - kind: speech
       speaker: host
-      text: 「日課在晨鐘之後與日落之前，都在講台前舉行，任何人都有座位。不必受洗，也不必報上身家，進門坐下就算參與。想聽講道，就留到鐘響；想單獨說話，光明聽得見，我也聽得見。」
+      text: 「無須登記，亦不必報上門第與名號。晨鐘鳴響與暮光合攏之時，大殿的兩扇木門皆敞開迎人，只要步入殿堂、在長椅尋個空位坐下，便算共赴日課。」
+    - kind: speech
+      speaker: host
+      text: 「想聽講道，便安心留至鐘歇；若心有煩憂想單獨傾訴，講台旁隨時能駐足交談。光明察知萬象，我也會在此耐心傾聽。」
+    - kind: speech
+      speaker: host
+      text: 「若有朝一日願正式歸信教會，只要心意決絕，大殿亦會為你舉行受洗之儀。在此之前，只管放寬心境隨眾人靜心聆賞。」
 - topic_id: altoria_temple.topic_02
   keyword: 祝禱
   label: 祝禱
   fallback:
     scene_id: altoria_temple.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 祝禱
+      text: 「出城遠行前若是想在殿內求得平安，向主祭請求祝禱需要奉獻多少銀錢？」
+    - kind: narration
+      text: 艾莉安娜‧寒水搖了搖頭，指尖拂過腰間垂掛的念珠，神情肅穆而坦誠。
     - kind: speech
       speaker: host
-      text: 「祝禱、祝福，為遠行的人祈求平安，都在講台邊進行，不收分文。若身上沾了邪氣，可以用受洗聖水洗淨，聖水擺在聖所的櫃上，由執事經手。想正式入教的人，也可以在這裡向我請求入教儀式。」
+      text: 「神殿的祈福與平安祝禱從不收取分文。光芒普照大地何曾向草木索取代價？只要踏上講台旁，我便會為你誦念祈文，祈願旅途免受邪祟侵擾。」
+    - kind: speech
+      speaker: host
+      text: 「若是涉足深林荒丘，沾染了難以驅散的陰暗瘴氣，可至隔壁廊廳尋求受洗聖水洗滌身軀。聖水皆由我親手引導光魔法祝聖，再交由聖所櫃檯保管。」
+    - kind: speech
+      speaker: host
+      text: 「純粹的祝福在此處領受，器物用度則交由執事打理。心懷坦蕩前行，平安自然與你同在。」
 - topic_id: altoria_temple.topic_03
   keyword: 聖所
   label: 聖所
   fallback:
     scene_id: altoria_temple.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 聖所
+      text: 「殿側那處被稱作聖所的地方，平日究竟如何運作？聽聞信眾在其中有著特殊的修道儀軌。」
+    - kind: narration
+      text: 艾莉安娜‧寒水轉向左側通連的廊柱，神色坦然大方，絲毫未有迴避之意。
     - kind: speech
       speaker: host
-      text: 「聖所就在這棟建築裡，左手邊，同一片屋頂、同一排窗。本會以性愛為修道之途，聖所公開服事，這件事在大陸上無人不知，和酒館供酒一樣平常。禮拜、聖所與商店是同一份信仰生活的三處櫃檯，你想問哪一處，我都照實回答。」
+      text: 「聖所就在大殿左側，同一道屋頂之下，同一列明亮高窗迎納陽光。光明教會恪守聖典，視軀體交融與歡愉為生命本源，修女與修士便以肉身侍奉作為崇神之道。」
+    - kind: speech
+      speaker: host
+      text: 「這份事工在全大陸皆是公開營生，如同酒館供酒一般平常自然。侍奉皆以光魔法調護身心並行避孕，尊嚴而潔淨，絕無半分遮掩隱諱之處。」
+    - kind: speech
+      speaker: host
+      text: 「大殿的禮拜、聖所的奉獻與前廳的商鋪，實為一體的三面。若想求取服事，穿過廊柱便有修女引領。」
 - topic_id: altoria_temple.topic_04
   keyword: 商店
   label: 商店
   fallback:
     scene_id: altoria_temple.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 商店
+      text: 「神殿裡似乎附設了販售器物的櫃檯，請問主祭那處櫃檯擺放著哪些物品？」
+    - kind: narration
+      text: 艾莉安娜‧寒水斂容微笑，伸手引向廊道盡頭排列齊整的陳列木架。
     - kind: speech
       speaker: host
-      text: 「商店在裡廳，由聖所執事羅海西亞‧芬威克看管。受洗聖水、禮儀器物與修道用的物件，都在她的櫃上。挑選物品請問她，祝禱的事再回來問我。」
+      text: 「穿過左側迴廊便是商鋪櫃檯，由聖所執事羅海西亞‧芬威克掌管。受洗聖水、敬神禮器與修道合用的各類器物，皆陳列在她的櫃架上。」
+    - kind: speech
+      speaker: host
+      text: 「羅海西亞精通各類器皿用法與用料，每樣物件皆明碼標價。挑選合適的器物請向她垂詢，若需祈福祝禱，再隨時回到大殿找我即可。」
+    - kind: speech
+      speaker: host
+      text: 「各安其職方能使聖所運轉不息。請放心前往挑選，她自會為你細緻分說。」
