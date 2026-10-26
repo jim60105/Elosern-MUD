@@ -32,6 +32,18 @@ run in one database transaction so a later runtime failure rolls back earlier ob
 ### Requirement: Loaded trait values are the literal imported stats, merged onto the race floor for omitted keys, never re-derived or multiplied
 Loaded traits SHALL equal literal imported stats merged onto the race floor for omitted keys. Capability configuration SHALL apply no skill/profession multipliers or tier defaults. Explicit independently owned tier creation paths SHALL remain unchanged.
 
+#### Scenario: Literal values survive
+- **WHEN** an imported record supplies base values including magic_power
+- **THEN** all literal bases persist exactly and omitted keys use the race floor
+
+#### Scenario: Empty stats
+- **WHEN** an NPC declares capabilities and empty stats
+- **THEN** traits use the ordinary race floor without capability-derived tier inference
+
+#### Scenario: Rollback of traits
+- **WHEN** a later capability install fails
+- **THEN** all constructed traits and objects roll back with the batch
+
 #### Scenario: An explicitly imported stat value is used verbatim
 - **WHEN** an elf record supplies stats.atk_phys 88
 - **THEN** its loaded base is exactly 88 with no derivation or multiplier

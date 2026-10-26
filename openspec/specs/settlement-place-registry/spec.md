@@ -12,6 +12,10 @@ edit rather than a code edit across four files.
      archived after it. -->
 Each place SHALL own its geometry, naming, optional complete host identity and direct capability declarations and assortments. Hostless places SHALL remain valid without host/capability/goods fields. A host SHALL allow zero capabilities without implying a profession.
 
+#### Scenario: One source record
+- **WHEN** a hosted location is authored
+- **THEN** geometry, identity, direct components and goods are declared there once
+
 #### Scenario: One record carries a whole location
 - **WHEN** a place record is loaded
 - **THEN** it alone supplies the interior's identity and description, the exterior it attaches to, the doorway naming, the host's identity, direct capability declarations and the goods — and no second file declares any of them
