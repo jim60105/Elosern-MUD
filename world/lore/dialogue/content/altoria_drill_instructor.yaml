@@ -15,7 +15,7 @@ topics:
       text: 伊沃‧高丘用手中粗糙的木棍敲了敲腳邊夯實的泥土，咧嘴笑了笑。
     - kind: speech
       speaker: host
-      text: 「白天王都徵兵操練，傍晚留給冒險者，空下來的時間你愛怎麼練就怎麼練啦。」
+      text: 「場地開著、木樁立著，誰來了都能下場練，哪來那麼多規矩和時段限制啦。」
     - kind: speech
       speaker: host
       text: 「場邊的練習樁隨你擊打，打壞了我來換。這裡沒人嫌吵，身旁有人揮劍流汗，你正好見識別人練得多勤快。」
@@ -42,7 +42,7 @@ topics:
       text: 「報名得去中央廣場東邊的公會櫃檯，我這裡不代辦考核，也給不了你保證通過的憑證。」
     - kind: speech
       speaker: host
-      text: 「先把基礎底子磨紮實，免得站到考官面前連三個回合都撐不住，那才叫丟臉哪。」
+      text: 「先把基礎底子磨紮實，免得站到考官面前連幾個照面都撐不住，那才叫丟臉哪。」
 - topic_id: altoria_drill_yard.topic_03
   keyword: 切磋
   label: 切磋
@@ -73,7 +73,7 @@ topics:
     lines:
     - kind: speech
       speaker: actor
-      text: 「身為王都校場的教頭，平時會傳授特定的武藝步伐，或是指點發力訣竅嗎？」
+      text: 「你在這片校場當教頭，平時會教特定的步伐，或是指點發力訣竅嗎？」
     - kind: narration
       text: 伊沃‧高丘蹲下身子，順手拿起木棍在泥地上隨意劃了兩道平整的步線。
     - kind: speech

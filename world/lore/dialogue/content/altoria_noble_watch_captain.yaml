@@ -16,15 +16,15 @@ topics:
       lines:
       - kind: speech
         speaker: actor
-        text: 「身為貴族，進出這片街區是否需要衛所查驗封邑紋章，或是先行登記名銜？」
+        text: 「身為貴族，進入這片街區是否需要衛所查驗身分，或是先行登記名銜？」
       - kind: narration
         text: 古利安‧鷹守站直身子撫平披風，態度恭謹有度，語氣依舊平穩。
       - kind: speech
         speaker: host
-        text: 「閣下多慮了。本衛所巡守街面，從不過問各家名銜，亦不設路卡阻攔任何來客。」
+        text: 「閣下多慮了。本衛所巡守街面，從不過問各家名銜，也不設路卡阻攔任何來客。」
       - kind: speech
         speaker: host
-        text: 「街面上的石板路所有人皆可通行，各座府邸自有門房核驗拜帖。請自便。」
+        text: 「街面上的石板路所有人都可以通行，各座府邸自有門房核驗拜帖。請自便。」
   fallback:
     scene_id: altoria_noble_watch.topic_01_scene
     revision: r2
@@ -96,7 +96,7 @@ topics:
       text: 古利安‧鷹守合上登記簿，目光掃過潔淨無物的白石牆面，搖了搖頭。
     - kind: speech
       speaker: host
-      text: 「本衛所從不張貼懸賞，亦不對外發布任何討伐或護衛委託。」
+      text: 「本衛所從不張貼懸賞，也不對外發布任何討伐或護衛委託。」
     - kind: speech
       speaker: host
       text: 「若打算承接冒險差事，冒險者公會設於中央廣場東側，大廳告示板每日更新委託。」

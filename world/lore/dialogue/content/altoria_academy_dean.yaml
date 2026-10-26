@@ -17,7 +17,7 @@ topics:
       lines:
       - kind: speech
         speaker: actor
-        text: 「我已涉獵過魔法陣的基礎構造，不知在法術位階的攀登中，法術消耗與系譜的前置要求究竟如何劃分？」
+        text: 「我學過一些魔法陣的基礎。想請問在法術位階裡，不同階層的魔力消耗到底差多少？」
       - kind: narration
         text: 奧德溫‧薩契推了推鼻樑上的圓框眼鏡，眼神中流露出一絲讚許的笑意。
       - kind: speech
@@ -28,14 +28,14 @@ topics:
         text: 「典籍記載的法術位階依消耗劃分為學徒、術師、大師、賢者與主宰，乃至極限的雙路匯流神格。」
       - kind: speech
         speaker: host
-        text: 「書庫深處的圖書皆依此順序陳列，但學院只解明法理，想要掌握更高深的系譜，仍需在實踐中日積月累地磨練。」
+        text: 「書庫深處的圖書都依這個順序陳列，但學院只解明法理，想要掌握更高深的系譜，仍需在實踐中日積月累地磨練。」
   fallback:
     scene_id: altoria_academy.topic_01_scene
     revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「初涉法術之理，想請教典籍中常提到的法術位階究竟是如何劃分的？」
+      text: 「初學魔法，想請問典籍裡常說的法術位階，究竟是怎麼劃分的？」
     - kind: narration
       text: 奧德溫‧薩契拿起板擦輕拍兩下，指著身後條理分明的板書。
     - kind: speech
@@ -46,7 +46,7 @@ topics:
       text: 「學徒階有火焰箭、水箭術與風刃術等基石；術師階則能駕馭火焰風暴或飛行術；大師階方能施展暴風雪或高階治癒。」
     - kind: speech
       speaker: host
-      text: 「至於賢者乃至主宰級法術，所需的魔力消耗極為龐大。學院書庫依階序藏書，任何訪客皆可自由閱覽探究。」
+      text: 「至於賢者乃至主宰級法術，所需的魔力消耗極為龐大。學院書庫依階序藏書，任何訪客都可以自由閱覽探究。」
 - topic_id: altoria_academy.topic_02
   keyword: 元素
   label: 元素
@@ -56,12 +56,12 @@ topics:
     lines:
     - kind: speech
       speaker: actor
-      text: 「世間流轉的元素共有哪幾種？各類元素在法理與作用上有何不同？」
+      text: 「世上流轉的元素共有哪幾種？施展起來各有什麼不同？」
     - kind: narration
       text: 奧德溫‧薩契在示範桌前站定，掌心泛起一團溫和微弱的白色光輝。
     - kind: speech
       speaker: host
-      text: 「元素共有八種，乃是學院入門的第一堂課。」
+      text: 「元素共有八種，是學院入門的第一堂課。」
     - kind: speech
       speaker: host
       text: 「火擅長爆發與灼燒；水牽動魔力潮汐；風司掌迅捷與身法；土主管地勢與護體；雷注重先發制人；冰則帶來靜止與封阻。」
@@ -80,7 +80,7 @@ topics:
     lines:
     - kind: speech
       speaker: actor
-      text: 「常聽人提及不同生靈對魔法的親和各有不同，這種差異是如何產生的？」
+      text: 「常聽人說每個人對魔法的親和不同，這種差別是怎麼來的？」
     - kind: narration
       text: 奧德溫‧薩契雙手負於身後，神情變得嚴肅而專注。
     - kind: speech
@@ -91,10 +91,10 @@ topics:
       text: 「第一層是種族稟賦。精靈一族天生親近魔力之源，研習各系法理的領悟節奏遠非尋常生靈可比，獸人則體魄強健而親和有限。」
     - kind: speech
       speaker: host
-      text: 「第二層是個人的屬性偏向。若體質與特定元素相契合，引導對應咒文時便更加順暢；若是缺乏親和，修煉起來便倍加艱辛。」
+      text: 「第二層是個人的屬性偏向。若體質與特定元素相契合，引導對應咒文時就更加順暢；若是缺乏親和，修煉起來就倍加艱辛。」
     - kind: speech
       speaker: host
-      text: 「天資乃生來既定，學院無法憑空賜予親和，但能引導你認清自身的長處與道路。」
+      text: 「天資是生來既定之物，學院無法憑空賜予親和，但能引導你認清自身的長處與道路。」
 - topic_id: altoria_academy.topic_04
   keyword: 傳承
   label: 傳承
@@ -104,15 +104,15 @@ topics:
     lines:
     - kind: speech
       speaker: actor
-      text: 「學院名聲斐然，不知是否有開門收徒、由導師親自傳授秘術的門路？」
+      text: 「學院名聲這麼大，不知有沒有由導師單獨收徒、親自指點高深秘術的門路？」
     - kind: narration
       text: 奧德溫‧薩契整了整衣袍，扶正眼鏡，神色格外坦率平靜。
     - kind: speech
       speaker: host
-      text: 「學院是探求真理之所，並無私相收徒的規矩，亦不提供任何一蹴可幾的捷徑。」
+      text: 「學院是探求真理之所，並沒有私相收徒的規矩，也不提供任何一蹴可幾的捷徑。」
     - kind: speech
       speaker: host
-      text: 「無論咒文或是戰陣之藝，皆需自身在日復一日的研讀與實踐中磨礪而出。學院只授予學識，無法代人修煉。」
+      text: 「無論咒文或是戰陣之藝，都需要自身在日復一日的研讀與實踐中磨礪而出。學院只授予學識，無法代人修煉。」
     - kind: speech
       speaker: host
       text: 「若想驗證自身的實力位階，應當前往中央廣場東側的冒險者公會參加考核，那裡才有評定能力的權限。」
