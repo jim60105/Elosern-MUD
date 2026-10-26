@@ -1350,13 +1350,19 @@ def continue_owner_sleep(
         all_events.extend(interval.events)
         if interval.summary:
             summaries.append(interval.summary)
+        after_receipt = _receipt_for(commander)
+        if after_receipt is None or not after_receipt.sleeping:
+            # The authoritative receipt reached completion in this very
+            # interval, which outranks an interactive event it coincided with
+            # (an event due exactly at the accepted target): there is no
+            # retained plan left to pause, and pausing would claim a
+            # continuation nothing could resume.
+            continuation = CONTINUATION_COMPLETE
+            interrupted = interrupted or interval.interrupted
+            break
         if interval.interrupted:
             continuation = CONTINUATION_PAUSED
             interrupted = True
-            break
-        after_receipt = _receipt_for(commander)
-        if after_receipt is None or not after_receipt.sleeping:
-            continuation = CONTINUATION_COMPLETE
             break
         if interval.elapsed_seconds <= 0 and (
             _party_progress_signature(commander) == before

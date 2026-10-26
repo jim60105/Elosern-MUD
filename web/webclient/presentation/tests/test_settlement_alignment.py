@@ -44,10 +44,16 @@ from web.webclient.presentation.ingress import (
 )
 from web.webclient.presentation.registry import PresenterSpec, PresentationRegistry
 from web.webclient.presentation.watchers import clear_watchers, register_watcher
-from world.rules.clock import _EVENT_SOURCES, get_world_clock
+from world.rules.clock import (
+    _EVENT_SOURCES,
+    ScheduledEvent,
+    get_world_clock,
+    register_event_source,
+)
 from world.rules.combat_session import (
     BASIC_ATTACK_KEY,
     PARTY_EXIT_SURRENDER,
+    confirm_actor_command,
     engage,
     read_session,
     reconstruct_battlefield,
@@ -61,6 +67,7 @@ from world.rules.fatigue import SleepPosture, write_fatigue_state
 from world.rules.party import join_party
 from world.rules.presentation_events import (
     clear_alignment_observers,
+    current_publication_group,
     publication_group,
     register_alignment_observer,
 )
@@ -87,6 +94,7 @@ from .test_publication_settlements import FakeSession, QueuedScheduler, _coordin
 
 
 _T_SINGLE = SYNTH_SKILLS["t_ember_burst"].key
+_T_AREA = SYNTH_SKILLS["t_glowmire_bloom"].key
 
 
 class _FactRecorder:
@@ -403,6 +411,55 @@ class SkipCheckpointTests(CheckpointTestBase):
         with self.captureOnCommitCallbacks(execute=True):
             continue_sleep(self.player, entry, operation_id="synthetic-interval")
         self.assertEqual(self.recorder.facts, [])
+
+    def test_a_sleep_completing_on_an_interactive_boundary_publishes_the_checkpoint(
+        self,
+    ):
+        # An interactive event due exactly at the accepted target coincides with
+        # completion. The authoritative receipt outranks the pause disposition,
+        # so the operation is a completed settlement and must align.
+        self._fill_gauges()
+        write_fatigue_state(self.player, 180000, SleepPosture.AWAKE)
+        with self.captureOnCommitCallbacks(execute=True):
+            begin_sleep(self.player)
+        state = owner_sleep_view_state(self.player)
+        decline_owner_sleep_dream(
+            self.player,
+            sleep_id=state["sleep_id"],
+            revision=state["revision"],
+            generation=state["generation"],
+        )
+        # The fixture's full gauges and half reserve accept 15,000 seconds, and
+        # the registered interactive stage is due inside that same interval.
+        previous = _EVENT_SOURCES.get("shop_hours")
+        register_event_source(
+            "shop_hours",
+            lambda start, end: [
+                ScheduledEvent(
+                    "synthetic_interactive", start + 14999, {}
+                )
+            ],
+            next_boundary=lambda start, end: start + 15000,
+        )
+        self.addCleanup(
+            lambda: (
+                _EVENT_SOURCES.pop("shop_hours", None)
+                if previous is None
+                else _EVENT_SOURCES.__setitem__("shop_hours", previous)
+            )
+        )
+        self.assertEqual(self.recorder.facts, [])
+
+        with self.captureOnCommitCallbacks(execute=True):
+            result = continue_owner_sleep(
+                self.player,
+                sleep_id=state["sleep_id"],
+                expected_generation=state["generation"],
+            )
+        self.assertEqual(result.elapsed_seconds, 15000)
+        self.assertTrue(result.interrupted, "the event coincided with completion")
+        self.assertTrue(result.completed, result)
+        self.assertEqual(self.recorder.causes(), [AWAKENED_SKIP])
 
 
 class _WatcherFixture:
@@ -732,6 +789,87 @@ class NonterminalRoundPublicationTests(BattlefieldIsolation, _WatcherFixture, Ev
             self._result(session)["presentation_revision"],
             session.ndb.elosern_coordinator.revision,
         )
+
+
+class TextTerminalRoundPublicationTests(BattlefieldIsolation, _WatcherFixture, EvenniaTest):
+    """A text terminal round coalesces its preterminal work with the checkpoint."""
+
+    character_typeclass = PlayerCharacter
+    room_typeclass = Room
+
+    def setUp(self):
+        open_synthetic_scope(self, "skills", extra=synth_innate_overlay())
+        super().setUp()
+        self._prepare_player()
+        grant_lineage(self.char1, [_T_SINGLE])
+        self._install_watchers()
+        self.recorder = _FactRecorder()
+        register_alignment_observer(self.recorder)
+
+    def test_a_text_terminal_round_coalesces_its_preterminal_work(self):
+        from world.rules.combat_session import rounds as rounds_module
+
+        self._prime()
+        # The round's consequence scans run before the terminal settlement and
+        # register their committed effects there, so they must already be in the
+        # round owner's causal group.
+        monster = self._spawn()
+        monster.traits.hp.current = 1
+        engage(self.char1, monster)
+        record = read_session(self.char1)
+
+        seen = {}
+        real_scan = rounds_module._scan_friendly_fire
+
+        def spy(*args, **kwargs):
+            seen.setdefault("group", current_publication_group())
+            return real_scan(*args, **kwargs)
+
+        with (
+            mock.patch.object(rounds_module, "_scan_friendly_fire", spy),
+            mock.patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            mock.patch("world.rules.combat.damage.roll_d100", return_value=100),
+            mock.patch("world.rules.combat.rounds.roll_d100", return_value=100),
+            mock.patch("world.rules.action.gates.roll_d100", return_value=100),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            # The text owner: no dispatcher action group is active here.
+            result = confirm_actor_command(
+                self.char1,
+                record.session_id,
+                record.round_revision,
+                record.draft_version,
+                int(self.char1.pk),
+                {
+                    "kind": "skill",
+                    "payload": {
+                        "skill_key": _T_SINGLE,
+                        "targets_or_shorthand": [int(monster.pk)],
+                        "scale": 1.0,
+                    },
+                },
+            )
+        self.assertEqual(result.get("outcome"), "victory", result)
+        self.assertIsNone(read_session(self.char1))
+        self._drain()
+
+        group = seen.get("group")
+        self.assertIsNotNone(
+            group, "the preterminal consequence work runs in the causal group"
+        )
+        self.assertEqual(
+            [fact.group_id for fact in self.recorder.facts],
+            [group.id],
+            "the terminal checkpoint joins the round's own causal group",
+        )
+        for session in self.sessions:
+            snapshots = session.frames("ui_snapshot")
+            self.assertEqual(len(snapshots), 1, session.names())
+            self.assertEqual(
+                session.frames("ui_update"),
+                [],
+                "the settlement never separates its preterminal delta",
+            )
 
 
 class TerminalOpeningPublicationTests(BattlefieldIsolation, _WatcherFixture, EvenniaTest):
