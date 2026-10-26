@@ -65,7 +65,7 @@ All three hosts maintain their canonical place assortment bindings without alter
 4. `ciaran_hailiel_home.topic_03` (`keyword`: `鐵料`, `label`: `鐵料`):
    - Fallback `ciaran_hailiel_home.topic_03_scene` (`revision`: `r2`): Actor asks whether host buys outside raw ores. Host explains she exclusively shovels and pans iron sand from the valley floor, buying back only intact blades of her own make.
 5. `ciaran_hailiel_home.topic_04` (`keyword`: `用刀`, `label`: `用刀`):
-   - Fallback `ciaran_hailiel_home.topic_04_scene` (`revision`: `r2`): Actor asks about wielding techniques observed from the drill field. Host references neighbor Teliel (`泰莉爾‧菲溫德`), highlighting practical movement coordination between twin blades and warning that unfitted blades hinder their wielder.
+   - Fallback `ciaran_hailiel_home.topic_04_scene` (`revision`: `r2`): Actor asks about wielding techniques observed from the drill field. Host references neighbor Teliel (`泰莉爾‧菲溫德`) keeping the field and having the final say on blade balance, highlighting practical movement coordination between twin blades and warning that unfitted blades hinder their wielder.
 
 ### B. ciaran_vethiel_home (`維特希爾‧威爾德布瑞亞爾`)
 1. **Opening Greeting**: Vethiel pauses her wooden loom shuttle, turns from the warp threads with dyed purple silk around her fingers, and asks what color the traveler favors.
@@ -79,11 +79,11 @@ All three hosts maintain their canonical place assortment bindings without alter
    - Fallback `ciaran_vethiel_home.topic_04_scene` (`revision`: `r2`): Actor asks about buy-back of worn garments. Host confirms taking back her own woven robes to unpick intact threads for re-spinning, refusing outside clothing.
 
 ### C. ciaran_gwenaera_home (`格威娜拉‧希爾維爾莉夫`)
-1. **Opening Greeting**: Gwenaera sits behind her work table atop silver-leaf slope twisting silver wire, enthusiastically presenting two newly finished silver floral coils for the guest to evaluate.
+1. **Opening Greeting**: Gwenaera sits behind her work table atop silver-leaf slope twisting silver wire, enthusiastically presenting two newly finished silver floral coils and inviting the guest to inspect her window cord ornaments.
 2. `ciaran_gwenaera_home.topic_01` (`keyword`: `綴飾`, `label`: `綴飾`):
-   - Fallback `ciaran_gwenaera_home.topic_01_scene` (`revision`: `r2`): Actor asks about the craftswoman's ornaments. Host explains hand-twisting silver wire, gathering shells from creeks, and grinding crystal sand, hanging finished pieces along the window cord for villagers and travelers.
+   - Fallback `ciaran_gwenaera_home.topic_01_scene` (`revision`: `r2`): Actor asks about the craftswoman's ornaments. Host explains hand-twisting silver wire, gathering shells from creeks, and grinding crystal sand; welcomes curious outside trinkets while settlement occurs at village standard exchange value without haggling.
 3. `ciaran_gwenaera_home.topic_02` (`keyword`: `晶符`, `label`: `晶符`):
-   - Fallback `ciaran_gwenaera_home.topic_02_scene` (`revision`: `r2`): Actor inquires about the prismatic crystal pendant (`三稜晶符`). Host explains it refracts incident light into three distinct bands using ancestral grinding methods, clarifying that it carries aesthetic beauty rather than mystical magic.
+   - Fallback `ciaran_gwenaera_home.topic_02_scene` (`revision`: `r2`): Actor inquires about the prismatic crystal pendant (`三稜晶符`). Host explains it refracts incident light into three distinct bands using ancestral grinding methods; clarifies that while not an ancestral spirit-sealed talisman, the light it gathers aids casters in channeling magic smoothly, given to youth at coming of age.
 4. `ciaran_gwenaera_home.topic_03` (`keyword`: `耳環`, `label`: `耳環`):
    - Fallback `ciaran_gwenaera_home.topic_03_scene` (`revision`: `r2`): Actor asks about the crescent earrings (`月牙耳環`). Host notes this is her most practiced craft, mentioning that silk-gatherer Valwyn wears earrings from the same batch, and describes airing them under silver leaves to catch their luster.
 5. `ciaran_gwenaera_home.topic_04` (`keyword`: `舊飾`, `label`: `舊飾`):
