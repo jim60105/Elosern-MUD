@@ -28,3 +28,7 @@ Object deletion SHALL require no map-internal incoming references and current ex
 - **WHEN** the index is missing, stale or incompatible
 - **THEN** deletion is disabled with a reason while non-destructive inspection/placement/property edits remain possible
 
+#### Scenario: Freshness is checked at execution
+- **WHEN** an external source changes after inspection but before a delete or object-removing undo executes
+- **THEN** current dependency membership/hashes are rechecked and stale evidence refuses the operation without disk or history changes
+
