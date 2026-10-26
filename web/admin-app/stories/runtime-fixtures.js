@@ -453,8 +453,6 @@ export const LIST_PAGE = {
       dbref: 12,
       label: "合成守衛",
       fields: [
-        { key: "職業", label: "職業", value: "公會櫃檯、腳本對話" },
-        { key: "稱號", label: "稱號", value: "合成頭銜" },
         { key: "所在房間", label: "所在房間", value: "合成廣場" },
       ],
     },
@@ -464,8 +462,6 @@ export const LIST_PAGE = {
       dbref: 13,
       label: "合成商人",
       fields: [
-        { key: "職業", label: "職業", value: "商人" },
-        { key: "稱號", label: "稱號", value: "—" },
         { key: "所在房間", label: "所在房間", value: "合成市集" },
       ],
     },

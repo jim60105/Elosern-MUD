@@ -1,11 +1,11 @@
 """NPC inspection reader: character fields plus the NPC-only surfaces.
 
 Everything a player character shows (through the shared
-:mod:`web.gm.readers.characters` projection) plus title, profession, service
-components, the seven-section persona card with its version, today's schedule
-and the current slot, and the dialogue key. The 記憶 and 對話 tabs read through
-their own list/detail families (``memories``/``snapshots``/``dialogue``), which
-this reader only links to.
+:mod:`web.gm.readers.characters` projection) plus service components, the
+seven-section persona card with its version, today's schedule and the current
+slot, and the dialogue key. The 記憶 and 對話 tabs read through their own
+list/detail families (``memories``/``snapshots``/``dialogue``), which this
+reader only links to.
 """
 
 from __future__ import annotations
@@ -63,12 +63,6 @@ def _day_seconds() -> int:
     return int(CLOCK_YAML["seconds_per_hour"]) * int(CLOCK_YAML["hours_per_day"])
 
 
-def _professions(npc: Any) -> list[str]:
-    labels = _component_labels()
-    names = [name for name in component_names(npc) if name in labels]
-    return [labels[name] for name in names]
-
-
 def _dialogue_key(npc: Any) -> str | None:
     from world.rules.dialogue import dialogue_key_for
 
@@ -76,18 +70,12 @@ def _dialogue_key(npc: Any) -> str | None:
 
 
 def identity_section(npc: Any) -> dict[str, Any]:
-    from world.rules import npc_identity
-
     rows = [
-        row("名稱", npc_identity.npc_display_name(npc)),
+        row("名稱", label_of(npc)),
         row("物件鍵", label_of(npc)),
         row("識別碼", f"#{dbref_of(npc)}", mono=True),
         row("型別", typeclass_of(npc), mono=True),
     ]
-    title = npc_identity.npc_title_value(npc)
-    rows.append(row("稱號", title or "—"))
-    professions = _professions(npc)
-    rows.append(row("職業", "、".join(professions) or "—"))
     key = _dialogue_key(npc)
     rows.append(row("對話鍵", key or "—", mono=True))
     location = getattr(npc, "location", None)
@@ -262,7 +250,7 @@ def detail(npc: Any) -> dict[str, Any]:
     return {
         "id": str(dbref),
         "kind": KIND,
-        "label": npc_identity.npc_display_name(npc),
+        "label": label_of(npc),
         "dbref": dbref,
         "typeclass": typeclass_of(npc),
         "sections": sections,
@@ -271,18 +259,13 @@ def detail(npc: Any) -> dict[str, Any]:
 
 def item_of(npc: Any) -> dict[str, Any]:
     """One NPC list row (summary fields only)."""
-    from world.rules import npc_identity
-
     dbref = dbref_of(npc)
-    professions = _professions(npc)
     return {
         "id": str(dbref),
         "kind": KIND,
         "dbref": dbref,
-        "label": npc_identity.npc_display_name(npc),
+        "label": label_of(npc),
         "fields": [
-            row("職業", "、".join(professions) or "—"),
-            row("稱號", npc_identity.npc_title_value(npc) or "—"),
             row(
                 "所在房間",
                 label_of(npc.location) if npc.location is not None else "—",
