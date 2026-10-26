@@ -150,12 +150,25 @@ class PlayerCharacter(LivingEntity):
         return super().at_cmdset_get(**kwargs)
 
     def at_pre_move(self, destination, move_type="move", **kwargs) -> bool:
-        """Block every traversal while an active combat session is running."""
+        """Block traversal in combat and copy the source identity of a move.
+
+        Every player relocation passes this hook, including a direct
+        ``move_to()`` that no movement settlement owns. The authoritative
+        source identity is copied here, after admission, because the move may
+        mutate the room being left (a pooled terrain room is recycled). A move
+        the settlement owns is published by the settlement instead, so this
+        capture stands down for that actor.
+        """
         from world.rules.combat_session import is_in_active_session
 
         if is_in_active_session(self):
             return False
-        return super().at_pre_move(destination, move_type=move_type, **kwargs)
+        admitted = super().at_pre_move(destination, move_type=move_type, **kwargs)
+        if admitted:
+            from world.rules.movement_settlement import note_direct_move_start
+
+            note_direct_move_start(self)
+        return admitted
 
     def at_post_move(self, source_location, **kwargs) -> None:
         """Schedule fresh action options after every committed player move.
@@ -164,20 +177,29 @@ class PlayerCharacter(LivingEntity):
         and a direct ``move_to()`` alike — lands here; the trigger registers
         through ``transaction.on_commit`` so an aborted movement publishes
         nothing, and rollback compensations (``move_hooks=False``) never reach
-        this hook. NPC and monster moves never run this override.
+        this hook. NPC and monster moves never run this override. The whole
+        post-move boundary runs in one causal publication group, so a direct
+        move's checkpoint and its action-option/arrival effects coalesce into
+        one final publication (an exit traversal simply reuses the movement
+        settlement's group).
         """
-        super().at_post_move(source_location, **kwargs)
-        _schedule_action_options_after_move(self)
-        from world.quests.room_observation import observe_arrival_lore
+        from world.rules.presentation_events import publication_group
+        from world.rules.movement_settlement import note_direct_move_end
 
-        observe_arrival_lore(self, self.location)
-        # Published story encounters whose declared locator covers this actual
-        # position activate at the real room-entry boundary (dream-story-dispatch
-        # §7). The call is skipped while the settled traversal boundary owns the
-        # movement, and it never raises into the move hook.
-        from world.quests.encounter_dispatch import activate_for_move
+        with publication_group():
+            super().at_post_move(source_location, **kwargs)
+            note_direct_move_end(self)
+            _schedule_action_options_after_move(self)
+            from world.quests.room_observation import observe_arrival_lore
 
-        activate_for_move(self)
+            observe_arrival_lore(self, self.location)
+            # Published story encounters whose declared locator covers this actual
+            # position activate at the real room-entry boundary (dream-story-dispatch
+            # §7). The call is skipped while the settled traversal boundary owns the
+            # movement, and it never raises into the move hook.
+            from world.quests.encounter_dispatch import activate_for_move
+
+            activate_for_move(self)
 
     def at_post_puppet(self, **kwargs) -> None:
         """Synchronize the returning owner's eligible encounters.

@@ -477,6 +477,53 @@ movement identity reader/first producer; S owns the terminal/skip producers. A
 later options/art generation completion forms a new standalone group and is
 never suppressed by an earlier one.
 
+### Movement identity and producers
+
+`world/maps/area_identity.py` is the read-only identity owner for the movement
+producer. It reads only committed map/instance facts and never calls a map
+presenter, so a position has an identity whether or not anyone opened a map:
+
+| Layer | `layer` | `area_key` | `instance_key` |
+|---|---|---|---|
+| grid (`GridRoom`/`AnchorRoom`) | `grid` | the z map key (`location.xyz[2]`) | — |
+| wilderness (`TerrainRoom`) | `wilderness` | the registered wilderness map key the room belongs to | — |
+| coordinate-free interior (`Room`) | `interior` | `room:<minimum connected same-family dbref>` | — |
+| instance (`InstanceRoom`) | `instance` | `instance:<minimum connected dbref>` | `(root dbref, root scene_identity)` |
+
+Coordinates, display labels, terrain/district names, room-object identity and
+`scene_archetype` are deliberately excluded, so a pooled `TerrainRoom` reused at
+another cell — or two rooms that share a label — can neither fake nor hide a
+boundary. Movement inside one continuous area (one settlement map, the one
+wilderness map, one interior component, one instance) stays incremental. The
+interior/instance component is the same `room_component` walk the on-demand area
+map graph uses (one definition, shared); an instance component whose rooms do
+not share their authoritative spawn `origin_room`, or a room whose map key,
+wilderness script or `scene_identity` cannot be read, has **no** comparable
+identity and therefore aligns completely instead of guessing.
+
+The deterministic owner produces the fact:
+
+- `world/rules/movement_settlement.py::settle_movement` copies the source
+  identity before the traversal, wraps the settlement in one causal publication
+  group, and — only for a settled relocation, after any compensation — copies
+  the destination identity and registers the emission on the owning commit. A
+  refusal, a rollback or a compensated falsy wilderness return publishes
+  nothing; a same-area move publishes nothing.
+- `settle_relocation` (the operator-console relocation) does the same with the
+  registration as the last step inside its owning transaction.
+- `PlayerCharacter.at_pre_move`/`at_post_move` capture a direct `move_to()` the
+  settlement does not own, with a per-actor settlement scope suppressing the
+  duplicate fact; the post-move boundary runs inside one causal group so the
+  checkpoint, the action-options trigger and the arrival effects coalesce.
+- `NPC.move_to` already routes through `settle_movement`, so NPC and possessed
+  body moves use the same owner.
+
+`explore.move` names the group it captured in the private
+`publication_group_id` slot, and the text path needs no token at all: the fact
+carries its own group, so both paths produce one final complete snapshot for
+every watcher and the ordinary text refresh afterwards finds nothing left to
+compare.
+
 ### Outcomes and bounds
 
 Every public queueing entry returns `Deferred[PublicationReceipt | None]`. All
