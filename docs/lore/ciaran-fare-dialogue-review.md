@@ -79,7 +79,7 @@ All service functionality is preserved without change:
 3. `ciaran_nireth_home.topic_02` (keyword: `重傷`, label: `重傷`):
    - Actor asks about remedies for severe beast or blade wounds. Host points to red-corded `greater_healing_potion` for deep trauma, warning against wasting it on minor scratches; confirms coin exchange for emergency defense.
 4. `ciaran_nireth_home.topic_03` (keyword: `魔力`, label: `魔力`):
-   - Actor asks about restoring exhausted mana. Host points to blue-corded `mana_potion` for easing fatigue and replenishing depleted mana pools; notes that what outsiders treat as a rare luxury is simply careful brewing in the valley.
+   - Actor asks about garden care and preparation for brewing pure mana potions. Host describes harvesting fresh shoots of mana grass at early dawn and simmering on low residual hearth heat, noting that healthy garden tending provides steady supplies for those in need.
 5. `ciaran_nireth_home.topic_04` (keyword: `藥草`, label: `藥草`):
    - Actor asks about selling outside wild herbs. Host strictly refuses unknown outside herbs to preserve medicinal reliability; confirms buy-back for intact, unopened remedy jars.
 
@@ -91,7 +91,7 @@ All service functionality is preserved without change:
    - Actor asks about `elven_spider_silk`. Host explains deep-forest spider silk braided into durable cords resisting storms; confirms exchanging braided bundles for copper coins.
 4. `ciaran_valwyn_home.topic_03` (keyword: `耳環`, label: `耳環`):
    - **Variant `familiar_visitor`** (`affinity_at_least`: `familiar`, priority 10):
-     - Host recognises a familiar visitor who has seen the earrings before.
+     - Host recognises a familiar visitor who has seen the earrings before: `「哎，是你呀！這對月牙耳環你之前見過吧……」`.
      - **Possession Safety**: The actor line is neutral with no references to the speaker's race, sex, guild, or gear, and never uses possession-breaking terms. The condition evaluates the owner's affinity; the host's recognition addresses the familiar visitor without assuming physical traits of the acting body.
      - Directs the visitor to Gwenaera at `銀葉坡`.
    - **Fallback `ciaran_valwyn_home.topic_03_scene`**:
