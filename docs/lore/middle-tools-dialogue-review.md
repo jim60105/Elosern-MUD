@@ -63,7 +63,7 @@ Adopted verbatim from the refined model draft `/var/home/jim60105/repos/MUD/tmp/
 Aligned to the refined standard with complete turns, grounded explanations, and laconic blacksmith attitude.
 1. **Opening Greeting**: Short, blunt. Asks what weapon the actor wields and dominant hand amidst striking anvil sparks.
 2. `altoria_forge.topic_01` (keyword: 兵器):
-   - Actor asks about weapons. Host lists common swords, daggers, throwing axes, longbows, and apprentice staves, noting the plain water quenching and sturdy grip.
+   - Actor asks about weapons. Host lists common swords, daggers, throwing axes, longbows, and apprentice staves, noting river water quenching and sturdy grip.
 3. `altoria_forge.topic_02` (keyword: 好貨):
    - Actor asks for premium equipment. Host highlights the knight's service blade made for the training grounds and the element-infused magic sword.
 4. `altoria_forge.topic_03` (keyword: 賣鐵):
