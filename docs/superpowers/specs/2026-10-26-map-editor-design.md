@@ -85,9 +85,9 @@ NumPy/SciPy are optional generation dependencies of the core. The editor install
 | Source | Owned data |
 | --- | --- |
 | `content/maps/continent.yaml` | Wilderness frame, mainland boundary, terrain-region declarations and descriptions, classifier parameters, waterways, forest boundaries, ridge/pass/ford declarations, and reserved geographic sites. |
-| `content/maps/locations.yaml` | Static geographic location identities, map-facing kinds/names/descriptions, geographic cells, and optional links to authored local maps. |
+| `content/maps/locations.yaml` | Static geographic location identities, map-facing kinds/names/descriptions, and geographic cells. Local-map associations are derived from map-owned location references. |
 | `content/maps/districts.yaml` | District identities/names, kinds, region membership, and stable landmark references. |
-| `content/maps/settlements/<map_id>.yaml` | Settlement/map identity, local-frame binding, footprint and wilderness entrances, room nodes/prototypes, roads, map options, and map-owned scene references. |
+| `content/maps/settlements/<map_id>.yaml` | Settlement/map identity and location reference, local-frame binding, footprint and wilderness entrances, room nodes/prototypes, roads, map options, and map-owned scene references. |
 | `content/maps/interiors/<interior_id>.yaml` | Permanent room identities, names/descriptions, internal connections, scene references, and exterior entrance relationships. |
 | `content/map-editor-layouts/<interior_id>.yaml` | Editor-only room layout positions. Excluded from gameplay geometry and runtime snapshots. |
 | `world/maps/data/district_partition.json` | Existing generated, read-only district partition artifact. Never an alternative editable map source. |
@@ -102,6 +102,8 @@ Every world-data document has schema version `1`. A machine-readable schema is o
 World objects use stable English-slug identifiers, independent of Chinese display names and coordinate bindings. New authored identifiers use lower-case ASCII letters, digits, and underscores, beginning with a letter. The qualified reference distinguishes its domain and map, such as a settlement plus node or an interior plus room.
 
 A directed road retains its ordered endpoint identity; two-way streets contain two directed road entries in the same settlement document. Direction and optional bend points are authored fields. An entrance relationship owns both endpoints and both directional labels where applicable. It is stored once in its owning settlement or interior document, without a mirrored reverse record elsewhere.
+
+A settlement owns its geographic location reference. Location-to-local-map navigation is derived from those references, with no reverse list authored in the location document. Creating a local map for an existing location therefore writes only the new settlement document.
 
 Existing identities are retained during migration. Existing service-place keys that already identify permanent rooms remain the joins for those rooms; do not create replacement identities just because the data moves to YAML. Standalone interiors do not require a service/economy declaration.
 
