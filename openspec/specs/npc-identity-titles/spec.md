@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define the immutable, author-supplied NPC identity title's validation and storage contract: the single validator every authored write path validates against, the creation-time attribute it persists, and the plain authored name every presentation, targeting and dialogue-prompt surface renders without composing that title. Zero coupling with the player title system.
+Define the plain authored-name contract for NPC identity: the shared name validator every authored write path uses, the absence of any independent NPC title field in authoring, imports, creation and generated characterization, and the plain name every presentation, targeting and dialogue-prompt surface renders. Historical stored title-like attributes are inert and unread. Zero coupling with the player title system.
 
 ## Requirements
 
