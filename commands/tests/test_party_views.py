@@ -49,7 +49,7 @@ from world.rules.tests._combat_session_helpers import (
     live_skill_registry,
     open_synthetic_scope,
 )
-from world.rules.tests.combat_fixtures import grant_lineage
+from world.rules.tests.combat_fixtures import BattlefieldIsolation, grant_lineage
 from world.rules.unlock_notices import MemberUnlocks, unlock_flags
 from world.skills.registry import validate_prerequisite_graph
 from world.tests.synthetic_data import SYNTH_BUFFS, SYNTH_RACES, SYNTH_SKILLS
@@ -101,7 +101,9 @@ def _attribute_state(entity):
     )
 
 
-class MemberViewCommandTests(EvenniaCommandTestMixin, EvenniaTest):
+class MemberViewCommandTests(
+    BattlefieldIsolation, EvenniaCommandTestMixin, EvenniaTest
+):
     def setUp(self):
         self.addCleanup(_revalidate_lineage)
         open_synthetic_scope(

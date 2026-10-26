@@ -39,7 +39,7 @@ from world.rules.tests._combat_session_helpers import (
     open_synthetic_scope,
     synth_innate_overlay,
 )
-from world.rules.tests.combat_fixtures import grant_lineage
+from world.rules.tests.combat_fixtures import BattlefieldIsolation, grant_lineage
 
 _HEAL = make_skill(
     "t_companion_heal",
@@ -75,7 +75,9 @@ _EXTRA = {
 }
 
 
-class CastMemberSuffixTests(EvenniaCommandTestMixin, EvenniaTest):
+class CastMemberSuffixTests(
+    BattlefieldIsolation, EvenniaCommandTestMixin, EvenniaTest
+):
     """A commander, two companions and an owned settlement clock."""
 
     def setUp(self):
