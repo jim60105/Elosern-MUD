@@ -1,55 +1,126 @@
 schema_version: 1
-greeting: 海莉爾‧斯塔爾法爾把剛淬好的刀按進油槽，白煙竄了起來。她抬眼看了一下你的手：「來看刀吧。砧邊那對剛打好，可以拿起來試。先讓我瞧一下你平常怎麼握刀。」
+greeting: 爐火在矮屋深處燃著暗紅光芒，海莉爾‧斯塔爾法爾正握著鐵鉗將剛淬火的刀刃浸入冷水，激起一陣細碎聲響。她轉過身，目光落在來訪者的雙手與步伐上：「進來吧。窗外就是練刀場，想看刀就到砧邊來。先讓我瞧一下你平常用哪隻手使刀，握得穩不穩。」
 topics:
 - topic_id: ciaran_hailiel_home.topic_01
   keyword: 鍛刀
   label: 鍛刀
+  variants:
+  - variant_id: human_guest
+    priority: 10
+    when:
+      kind: race_is
+      race_key: human
+    scene:
+      scene_id: ciaran_hailiel_home.topic_01_human
+      revision: r2
+      lines:
+      - kind: speech
+        speaker: actor
+        text: 「久聞精靈工藝天下少有，我特地循著山徑前來，想向閣下請教暗影鋼刀的鍛造之法。」
+      - kind: narration
+        text: 海莉爾‧斯塔爾法爾聽見來人的措辭，眼神掠過一絲疑惑，隨即在石凳坐下。
+      - kind: speech
+        speaker: host
+        text: 「站直說話吧，不必這樣躬著身子。暗影谷底沒有大殿上那一套禮數，在我眼裡，拿刀的人就只有手腕穩固與步履沉著。」
+      - kind: speech
+        speaker: host
+        text: 「谷底挖來的鐵砂性子烈，打成暗影鋼得反覆折疊錘打。這不是供在架上的神物，純粹是打磨給獵手與戰士護身幹活的器具。」
+      - kind: speech
+        speaker: actor
+        text: 「外頭都把精靈鑄造的兵刃當成難以企及的寶物，沒想到在你這裡全憑雙手踏實打磨。」
+      - kind: speech
+        speaker: host
+        text: 「兵刃造出來就是拿來使用，放著積灰塵才是糟蹋。砧邊那對暗影鋼刀剛成形，想試就直接拿去掂量分量吧。」
   fallback:
     scene_id: ciaran_hailiel_home.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 鍛刀
+      text: 「這屋裡的爐火一直燃著，我想請教你，暗影鋼刀究竟是如何鍛造出來的？」
+    - kind: narration
+      text: 海莉爾‧斯塔爾法爾放下手裡的鐵鉗，指節拂過鐵砧上粗糙的錘痕。
     - kind: speech
       speaker: host
-      text: 「谷底的鐵砂性子烈，要反覆鍛打，打到鋼性均勻才叫暗影鋼。砧邊那對暗影鋼刀剛完成。外人難得來，你要是真用得上，拿銅幣來換，我也肯割愛。」
+      text: 「谷底挖出來的鐵砂性子烈，雜質多，得反覆折疊鍛打好幾天，火候拿捏妥當了，打出來的鋼質才勻稱。」
+    - kind: speech
+      speaker: host
+      text: 「鍛打成形的刀胚得在冷水裡淬透，刃身才會泛起暗沉的色澤。砧邊那對暗影鋼刀剛做完，若是真有心用刀，拿合適的物件來換，我也肯割愛。」
+    - kind: speech
+      speaker: actor
+      text: 「原來暗影鋼的成色全靠這反覆鍛打的手藝。我能先握著體會手感嗎？」
+    - kind: speech
+      speaker: host
+      text: 「拿起來握吧。掂量重心在不在手腕前方，揮動幾下細聽風聲，合不合手要掌心自己說話。」
 - topic_id: ciaran_hailiel_home.topic_02
   keyword: 影刀
   label: 影刀
   fallback:
     scene_id: ciaran_hailiel_home.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 影刀
+      text: 「我在砧旁看見兩柄長短相襯的佩刀，長的那柄是主手刀，短的這一柄又有什麼講究？」
+    - kind: narration
+      text: 海莉爾‧斯塔爾法爾拿起那柄短刃，指腹拂過深黑的刀脊。
     - kind: speech
       speaker: host
-      text: 「暗影鋼刀‧影是副手刀，跟主手刀成對打。刃身淬過谷底的第一道霜，靜止時看起來一片黑，揮起來才看得到那道影子。我一次只做一對，砧邊還有沒有，你自己去瞧吧。」
+      text: 「這柄短的是暗影鋼刀‧影，專門配在副手。我和長輩學手藝時就立了規矩，主手刀與副手影刀向來成對鍛造，一次只打一對。」
+    - kind: speech
+      speaker: host
+      text: 「這柄影刀淬過谷底第一道霜降時的泉水，收在鞘裡時通體墨黑，只有在半空揮動時，才會看見刀鋒後頭拖著一層若隱若現的暗影。」
+    - kind: speech
+      speaker: actor
+      text: 「一長一短成對使喚，在山林或是險地裡周旋確實更加靈便。」
+    - kind: speech
+      speaker: host
+      text: 「沒錯。主手主攻，副手防身引導，兩柄刀配合得好，步調才不會亂。要挑就整對帶走，留下一把單落著，這刀就失去原本的用意了。」
 - topic_id: ciaran_hailiel_home.topic_03
   keyword: 鐵料
   label: 鐵料
   fallback:
     scene_id: ciaran_hailiel_home.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 鐵料
+      text: 「鍛造這類暗影鋼刀需要不少上好原料吧？如果從外頭帶些粗鐵或礦石過來，你收不收？」
+    - kind: narration
+      text: 海莉爾‧斯塔爾法爾搖了搖頭，目光移向牆角幾袋深黑的沙粒。
     - kind: speech
       speaker: host
-      text: 「鐵料就不用了，鐵砂我自己去谷底挖。我打的刀用舊了、用不到了，拿回來給我，還能用的我收下。」
+      text: 「外頭送來的粗鐵礦石，我這裡全用不上。打暗影鋼要用的鐵砂，全是我自己拿著鐵鏟去谷底溪灘淘選出來的料子。」
+    - kind: speech
+      speaker: host
+      text: 「這片山谷的水土自己養出來的砂質，我摸了幾百年，最清楚它的火候。外來的雜鐵性子雜，混進爐裡反而壞了整槽鋼料。」
+    - kind: speech
+      speaker: actor
+      text: 「那要是先前換走的暗影鋼刀磨損了，或是用不上了，該怎麼處理？」
+    - kind: speech
+      speaker: host
+      text: 「若是我親手打出去的刀，用舊了拿回來，只要鋼骨沒裂，我會按成色換些銅幣給你。至於別人打造的兵器，就別往我這屋裡送了。」
 - topic_id: ciaran_hailiel_home.topic_04
   keyword: 用刀
   label: 用刀
   fallback:
     scene_id: ciaran_hailiel_home.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 用刀
+      text: 「窗外的練刀場整天都有刀刃破風的聲音，你在這裡鍛刀多年，對用刀有什麼心得？」
+    - kind: narration
+      text: 海莉爾‧斯塔爾法爾側過頭望向窗外躍動的身影，眼神隨之舒展幾分。
     - kind: speech
       speaker: host
-      text: 「打獵有打獵的刀，剝皮有剝皮的刀，別想拿一把刀應付所有事。暗影鋼刀當主手，影刀當副手，兩把一起用最順。合不合你的手，我會直說。」
+      text: 「隔壁的泰莉爾常年守著場子看族人練刀，一把刀的平衡合不合手，全由她說了算。她試刀時常找我過去看，看久了就明白，刀法好不好在於身形是否扎實，不在於擺出多好看的花樣。」
+    - kind: speech
+      speaker: host
+      text: 「打獵有打獵的短刃，劈柴有劈柴的厚刀。暗影鋼刀配上影刀是為了步法流轉，雙手同使才能發揮用處，若是只想胡亂揮砍，這對刀反倒會絆住手腳。」
+    - kind: speech
+      speaker: actor
+      text: 「照你這麼說，刀若是不趁手，反而容易傷著自己。」
+    - kind: speech
+      speaker: host
+      text: 「確實是這個道理。你想帶刀走，我會先看你的腕力和步距。要是真不合手，我會當面直說，絕不會隨便把刀交到不對的人手裡。」
