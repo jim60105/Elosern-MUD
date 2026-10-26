@@ -346,7 +346,7 @@ The batches permit parallel implementation only where the listed boundaries rema
 
 ### 12.3 Frontend specialist coordination
 
-**Update (2026-10-26):** the specialist deliverable is [the frontend design](2026-10-26-map-editor-frontend-design.md) with its `docs/design/map-editor/` Storybook prototype, and P11–P20 plus the shared worker contract and batch plan have been reconciled with it (P13 renamed to `map-editor-file-following`). The approval gate below remains: the written frontend design still needs user review before B10.
+**Update (2026-10-26):** the specialist deliverable is [the frontend design](2026-10-26-map-editor-frontend-design.md) with its `docs/design/map-editor/` Storybook prototype, and P11–P20 plus the shared worker contract and batch plan have been reconciled with it (P13 renamed to `map-editor-file-following`). The user approved the written frontend design and prototype on 2026-10-26, satisfying the design-approval part of the gate below; B10 still waits for its implementation prerequisites.
 
 Frontend visual design remains unassigned implementation work. The specialist receives the companion frontend requirements and this architecture, then produces annotated screens, interaction/state flows, component specifications, and keyboard/focus behavior for user review. The specialist does not need to create duplicate functional OpenSpec proposals.
 

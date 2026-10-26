@@ -1,7 +1,7 @@
 # Standalone Map Editor Frontend Design
 
 **Date:** 2026-10-26
-**Status:** Visual and interaction direction approved section by section in conversation; written-spec review pending.
+**Status:** Approved by the user on 2026-10-26 (sections approved in conversation; written spec and prototype reviewed).
 **Authority:** Amends the [architecture design](2026-10-26-map-editor-design.md) and the [frontend requirements](2026-10-26-map-editor-frontend-requirements.md) where this document says so. On every other point those documents still govern.
 **Prototype:** `docs/design/map-editor/` (Storybook title `Design/MapEditor`). It is a reference prototype with mock data, outside the component-coverage manifest.
 **Implementation status:** Not implemented by this document.
