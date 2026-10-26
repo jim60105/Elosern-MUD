@@ -17,7 +17,7 @@ topics:
       lines:
       - kind: speech
         speaker: actor
-        text: 導師，我看過外頭不少使劍的門道，但基亞蘭的刀法動靜之間截然不同。能否請教貴族的刀術究竟講究什麼？
+        text: 導師，我看過外頭不少使劍的門道，但基亞蘭的刀法動靜之間截然不同。能否請教你們的刀術究竟講究什麼？
       - kind: narration
         text: 泰莉爾‧菲溫德目光落在對方的握劍手繭與沉穩站姿上，神情淡然，語氣依舊平靜。
       - kind: speech
@@ -98,7 +98,7 @@ topics:
     lines:
     - kind: speech
       speaker: actor
-      text: 既然你在這裡看了幾百年刀術，不知能否拔刀同我切磋幾回合？我想見識真正的基亞蘭刀法。
+      text: 既然你在這裡看了幾百年刀術，不知能否拔刀同我比劃幾下？我想見識真正的基亞蘭刀法。
     - kind: narration
       text: 泰莉爾‧菲溫德眼神微凝，隨手將掛在腰間的練習木刀按住，腳步絲毫未動。
     - kind: speech
