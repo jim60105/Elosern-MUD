@@ -172,7 +172,17 @@ class PossessedGridFollowTests(PossessedFollowTestCase):
         self.assertIs(body_move.call_args.kwargs["move_hooks"], False)
         post_move.assert_not_called()
         pre_move.assert_not_called()
-        dialogue.assert_not_called()
+        # The hook-free owner-body relocation never enters the movement
+        # settlement, so it clears no conversation of its own. The traversing
+        # puppet and the companions it brings along each drop the conversation
+        # they left behind in the source room (webclient-align-07).
+        for call in dialogue.call_args_list:
+            self.assertIsNot(call.args[0], self.char1)
+        self.assertIn(
+            self.npc,
+            {call.args[0] for call in dialogue.call_args_list},
+            "the traversing puppet drops the conversation it left",
+        )
         for call in encounter.call_args_list:
             self.assertIsNot(call.args[0], self.char1)
         for call in lore.call_args_list:

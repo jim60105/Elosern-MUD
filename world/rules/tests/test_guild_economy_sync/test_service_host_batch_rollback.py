@@ -32,6 +32,17 @@ from world.rules.npc_capabilities import COMPONENT_TYPES
 
 from ._support import ServiceContentIsolation
 
+def _cold_identity_map() -> None:
+    """Force-flush the identity maps this slice reloads through.
+
+    ``flush_cache()`` keeps "safe" instances, so the durable-state half of the
+    assertion could pass on retained object-handler state instead of on what
+    the database actually holds.
+    """
+    for model in (ObjectDB, Attribute):
+        model.flush_instance_cache(force=True)
+
+
 def _slot(type_key: str) -> str:
     """The component slot one declared capability type occupies."""
     return COMPONENT_TYPES[type_key].get_component_slot()
@@ -266,6 +277,11 @@ class ServiceHostBatchRollbackTests(ServiceContentIsolation, EvenniaTestCase):
         # shrinks the same party list, so compensation must replay the earliest
         # snapshot last.
         player = create_object(PlayerCharacter, key="retirement owner")
+        # Persist the holder's component listing up front. Evennia writes it
+        # lazily on the first read, and a lazy write while the instance is
+        # still materializing would add the row before the host carries its
+        # database alias.
+        player.attributes.add("component_names", [])
         player.race = "human"
         player.apply_race_baseline()
         for host in hosts:
@@ -302,6 +318,6 @@ class ServiceHostBatchRollbackTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertEqual(party_ids(player), pks)
         self.assertEqual(sorted(party_meta(player)), sorted(str(pk) for pk in pks))
         self._assert_snapshot(before)
-        flush_cache()
+        _cold_identity_map()
         self.assertEqual(party_ids(player), pks)
         self._assert_snapshot(before)

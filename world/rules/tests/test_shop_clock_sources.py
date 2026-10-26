@@ -338,7 +338,14 @@ class StageOrderAndRegistrationTests(ClockStageOrderIsolation, EvenniaTestCase):
 
         # This clock-registration fixture has no map. Normal-person assembly
         # is independently exercised against real residences in the roster smoke.
-        with patch("world.rules.human_guild_hosts.sync_persistent_adventurers") as sync_people:
+        with patch(
+            "world.rules.human_guild_hosts.sync_persistent_adventurers"
+        ) as sync_people, patch(
+            # The service-content stage resolves every roster anchor room and
+            # fails closed without a map; this fixture owns clock registration
+            # only, so the map-dependent stage is stubbed like the roster one.
+            "world.rules.guild_economy.sync_service_content"
+        ):
             sync_guild_economy()
         sync_people.assert_called_once_with()
         self.assertIn("caravan_arrivals", _EVENT_SOURCES)
