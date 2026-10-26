@@ -7,6 +7,17 @@
 
 ---
 
+> **Superseded in part (2026-10-26, `webclient-delta-contract`).** §“The exact
+> server envelope shapes” below describes `ui_update` as a nonempty registered
+> panel subset with no baseline. The current wire requires every `ui_update` to
+> carry the exact committed `base_revision` and an explicit `removed_panels`
+> list, permits an empty panel map, and admits a delta only against the exact
+> committed revision. The current contract lives in
+> `docs/development/webclient-synchronization.md` and in the
+> `webclient-oob-protocol` main spec; this document stays as the historical
+> foundation record and its revision-ordering statement (“discards every
+> snapshot or update with revision `<= N`”) still holds.
+
 ## 1. Intent
 
 This is the load-bearing first delivery unit for every graphical panel. It establishes one versioned,
