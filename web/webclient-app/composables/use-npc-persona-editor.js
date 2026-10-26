@@ -37,7 +37,7 @@ const EDITABLE_MODES = new Set(["exploration", "dialogue"]);
 export function useNpcPersonaEditor(store, { shellRef = null } = {}) {
   const binding = ref(null);
   const pending = ref(null);
-  const header = ref({ displayName: "", npcTitle: "" });
+  const header = ref({ displayName: "" });
   const version = ref(null);
   const baseline = ref(null);
   const draft = reactive(emptyDraft());
@@ -68,7 +68,7 @@ export function useNpcPersonaEditor(store, { shellRef = null } = {}) {
   function resetState() {
     binding.value = null;
     pending.value = null;
-    header.value = { displayName: "", npcTitle: "" };
+    header.value = { displayName: "" };
     version.value = null;
     baseline.value = null;
     Object.assign(draft, emptyDraft());
@@ -179,7 +179,7 @@ export function useNpcPersonaEditor(store, { shellRef = null } = {}) {
       return;
     }
     const fresh = draftFromData(data);
-    header.value = { displayName: data.display_name || "", npcTitle: data.npc_title || "" };
+    header.value = { displayName: data.display_name || "" };
     defaultGreeting.value = typeof data.default_greeting === "string" ? data.default_greeting : "";
     readFailure.value = null;
     resyncFailure.value = null;
@@ -561,7 +561,6 @@ export function useNpcPersonaEditor(store, { shellRef = null } = {}) {
     state: state.value,
     npcId: binding.value ? binding.value.npcId : null,
     displayName: header.value.displayName,
-    npcTitle: header.value.npcTitle,
     version: version.value,
     draft: { ...draft },
     baseline: baseline.value,

@@ -278,7 +278,6 @@ class NpcPersonaEditorEdgesBrowserTest(ManagedServerTearDownMixin, BrowserAccept
                 data: {
                     npc_id: id,
                     display_name: '已關閉的NPC',
-                    npc_title: '',
                     persona_version: 1,
                     persona: {
                         identity: { public: '偽造', hidden: '' },

@@ -48,9 +48,7 @@ const identityFields = CARD_FIELDS.filter((field) => field.section === "identity
 const leafFields = CARD_FIELDS.filter((field) => field.section !== "identity");
 
 const drawerTitle = computed(() => ed.value.displayName || "編輯人物設定");
-const drawerSubtitle = computed(() =>
-  !ready.value ? "" : ed.value.npcTitle ? `編輯人物設定 ‧ ${ed.value.npcTitle}` : "編輯人物設定",
-);
+const drawerSubtitle = computed(() => (!ready.value ? "" : "編輯人物設定"));
 
 function domKey(key) {
   return key.replace(/\./g, "-");
@@ -266,7 +264,6 @@ const saveLabel = computed(() => (state.value === "saving" ? "儲存中……" :
           <div class="npe-dossier">
             <p class="npe-eyebrow">作者模式</p>
             <p class="npe-name">{{ ed.displayName || "　" }}</p>
-            <p v-if="ed.npcTitle" class="npe-npc-title">{{ ed.npcTitle }}</p>
             <div class="npe-meta">
               <span v-if="ed.version != null" class="npe-version" data-testid="npc-persona-editor-version">第 {{ ed.version }} 版</span>
               <span class="npe-pill" :data-tone="status.tone" data-testid="npc-persona-editor-state-pill">

@@ -8,7 +8,6 @@ import { changedFields, draftFromData, validateDraft } from "../components/npc-p
 export const NPC_PERSONA_READ_SAMPLE = {
   npc_id: 4127,
   display_name: "葛蘭特",
-  npc_title: "灰石渡口的擺渡人",
   persona_version: 3,
   persona: {
     identity: {
@@ -43,7 +42,6 @@ function baseEditor(overrides = {}) {
     state,
     npcId: data.npc_id,
     displayName: loaded ? data.display_name : "",
-    npcTitle: loaded ? data.npc_title : "",
     version: loaded ? data.persona_version : null,
     draft: loaded ? draft : { ...baseline },
     baseline: loaded ? baseline : null,
@@ -125,7 +123,6 @@ export const npcPersonaEditorStates = {
         ...NPC_PERSONA_READ_SAMPLE,
         npc_id: 5003,
         display_name: "無名旅人",
-        npc_title: "",
         persona_version: 1,
         default_greeting: "",
         offline_greeting: "「……路過而已，別在意。」",

@@ -59,7 +59,6 @@ test("maximal-card success envelope passes Node protocol mirror", () => {
     data: {
       npc_id: 10,
       display_name: "接待員",
-      npc_title: "資深接待員",
       persona_version: 2,
       persona: {
         identity: {
