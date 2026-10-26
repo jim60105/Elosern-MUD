@@ -16,6 +16,8 @@ from world.rules.npc_identity import (
     validate_unique_npc_names,
 )
 
+_FULL_WIDTH_SPACE = "\u3000"
+
 
 class ValidateNPCNameTests(unittest.TestCase):
     """The shared authored-name rule (npc-title-authored-identities).
