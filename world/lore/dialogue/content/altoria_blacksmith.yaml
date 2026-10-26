@@ -1,55 +1,106 @@
 schema_version: 1
-greeting: 鍛造鋪裡砧聲沒停，維爾登‧黑潭頭也沒抬：「用什麼兵器？哪隻手？說。」
+greeting: 鍛造鋪裡爐火正旺，維爾登‧黑潭手裡的鐵錘敲在砧上，火星四濺。他頭也沒抬，嗓音混著鐵聲：「打算挑哪種兵器？平常用哪隻手揮刃？直接說吧。」
 topics:
 - topic_id: altoria_forge.topic_01
   keyword: 兵器
   label: 兵器
   fallback:
     scene_id: altoria_forge.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 兵器
+      text: 師傅，我想挑一把防身兼出城作戰的隨身兵刃。鋪子裡主要備了哪些傢伙？
+    - kind: narration
+      text: 維爾登‧黑潭收起手中的鐵鉗，朝石牆那一整排排列整齊的兵器架偏了偏下巴。
     - kind: speech
       speaker: host
-      text: 「牆上那排。普通劍、鐵短刀、狩獵擲斧。弓和法杖在左邊，獵手長弓、見習術師法杖。價錢看門邊木牌。拿下來試手感，別揮到人。」
+      text: 「牆上掛著的都可以挑。近身用的普通劍、鐵短刀，還有沉鐵打的狩獵擲斧，分量足、好上手。習慣使長距離傢伙的話，左邊掛著獵手長弓與見習術師法杖。價錢都刻在門邊木牌上，試手感時握穩點，可別揮到爐邊的學徒。」
+    - kind: speech
+      speaker: actor
+      text: 這些兵刃鋼火如何？劈砍時順手嗎？
+    - kind: speech
+      speaker: host
+      text: 「這批兵刃全從河裡打水淬火，鋼質厚實，握柄裹了硬皮，出汗也不打滑。每一把出爐前我都用拇指甲刮過刃口，聽敲打聲音清脆透亮才掛上牆。這把劍只要握在你手裡，就絕不會平白誤事。」
 - topic_id: altoria_forge.topic_02
   keyword: 好貨
   label: 好貨
   fallback:
     scene_id: altoria_forge.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 好貨
+      text: 如果想找真正能扛大陣仗的好貨，鋪子裡有壓箱底的稱手兵器嗎？
+    - kind: narration
+      text: 維爾登‧黑潭目光微凝，轉身指向爐台最深處特地架著的兩柄長刃。
     - kind: speech
       speaker: host
-      text: 「最裡面那把。騎士制式長劍，我親手打，校場的見習騎士都用它。旁邊那把魔導長劍，刃裡導過元素，貴。錢夠再看。」
+      text: 「真正的好貨都在裡頭。最裡面那把是騎士制式長劍，校場向我訂的配劍全出自這座爐子。鋼火經過千百遍折疊鍛打，韌性最佳，專供王都騎士團的見習騎士出陣佩帶。」
+    - kind: speech
+      speaker: actor
+      text: 旁邊那把泛著隱隱火光的長劍呢？看起來很不尋常。
+    - kind: speech
+      speaker: host
+      text: 「那是魔導長劍，請城裡的附魔師親自導過元素火紋。刃身能貫通魔力，劈斬時自帶火勁，但價錢也矜貴。腰包夠鼓再來摸它，手上還沒練出真本領的人握著也是糟蹋好鐵。」
 - topic_id: altoria_forge.topic_03
   keyword: 賣鐵
   label: 賣鐵
   fallback:
     scene_id: altoria_forge.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 賣鐵
+      text: 冒險途中如果換下了舊的刀劍與兵器，你這裡收購嗎？我想折點盤纏。
+    - kind: narration
+      text: 維爾登‧黑潭拿粗棉布擦拭手套上的煤灰，目光落在客人腰間的舊兵刃上。
     - kind: speech
       speaker: host
-      text: 「我只收牆上掛著那幾樣。用不著的劍、斧、弓拿回來，還能用，我就收。礦石、碎鐵別往這擱，拿去市場街的雜貨店。」
+      text: 「只要是牆上有掛的這幾種兵器，我都收。劍身沒斷、刀柄沒散、刃口沒磨損過半，拿回來我都按成色折算現錢給你。收回來的舊鐵重新熔進爐裡，照樣能打出好鋼。」
+    - kind: speech
+      speaker: actor
+      text: 那要是在迷宮坑道裡挖到了粗鐵礦或碎鐵，也能直接賣給你嗎？
+    - kind: speech
+      speaker: host
+      text: 「未經精煉的粗鐵礦別往我這堆，我這只收能用的成刃。要賣原礦，出巷子順著市場街走，雜貨店的瑪爾特手上有大黃銅秤，找他按斤兩過磅最合適。」
 - topic_id: altoria_forge.topic_04
   keyword: 保養
   label: 保養
+  variants:
+  - variant_id: swordsman_advice
+    priority: 10
+    when:
+      kind: skill_owned
+      skill_key: basic_swordplay
+      min_proficiency: 1
+    scene:
+      scene_id: altoria_forge.topic_04_swordsman_scene
+      revision: r2
+      lines:
+      - kind: speech
+        speaker: actor
+        text: 剛開始專心研習劍術，常覺得刃口磨損得快。想向師傅請教，長劍平日該如何養護？
+      - kind: narration
+        text: 維爾登‧黑潭聽見內行步法，目光掃過對方持握劍柄的老繭，剛硬的嘴角微微鬆動。
+      - kind: speech
+        speaker: host
+        text: 「身形站得穩當，握劍的手勢也算扎實。每天收劍入鞘前，第一要緊的事是用乾布抹淨血污與汗漬，再拿動物油推勻抹開，防著鏽斑咬進鋼肉深處。」
+      - kind: speech
+        speaker: host
+        text: 「隨身揣一塊細磨石，刃口剛生微卷時就要輕推正位，千萬別拿好劍硬去劈砍硬石。要是碰上劍脊被震出生鐵內傷，二話不說立馬換新，接回來的劍在生死搏殺時隨時會要了你的命。」
   fallback:
-    scene_id: altoria_forge.topic_04_scene
-    revision: r1
+    scene_id: altoria_forge.topic_04_fallback_scene
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 保養
+      text: 買了這柄兵器回去，平日該怎麼照料才能讓它經久耐用？
+    - kind: narration
+      text: 維爾登‧黑潭一錘砸在紅透的鐵胚上，頭也沒抬，聲音沉穩如雷。
     - kind: speech
       speaker: host
-      text: 「磨刀石自己帶。鈍了就磨，別拿去砍石頭。收劍前擦乾，上油。斷了就換一把，接回去的劍不可靠。」
+      text: 「隨身備妥粗細兩面磨石。刃口鈍了就順著原先的刃線勻勻推磨，少拿劍鋒當撬棍胡亂撬動。每次回鞘前務必擦乾水分，抹上一層薄油防生鏽。」
+    - kind: speech
+      speaker: host
+      text: 「萬一兵刃真的折斷，當場丟掉換一把新品，別想著花錢熔接。接回來的斷劍筋骨已散，關鍵時候最先崩斷。照這幾句好好善待你的傢伙，它才能保住你的性命。」

@@ -37,6 +37,7 @@ class DialogueSourcesTests(unittest.TestCase):
         "authored-dialogue-selection::scene-selection-is-independent-of-content-provider",
         "authored-dialogue-content::lower-hospitality-content-has-exclusive-profile-key-yaml-ownership",
         "authored-dialogue-content::lower-civic-content-has-exclusive-profile-key-yaml-ownership",
+        "authored-dialogue-content::middle-tools-content-has-exclusive-profile-key-yaml-ownership",
     )
     def test_complete_inventory_of_25_tables(self):
         bindings = canonical_dialogue_bindings()
