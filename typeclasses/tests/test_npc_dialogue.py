@@ -28,7 +28,13 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.characters import PlayerCharacter
 from typeclasses.accounts import Account
 from typeclasses.components import ScriptedDialogue
-from typeclasses.npcs import LLMNPC, STALE_PERSONA, STALE_PHASE, DialogueExchangeResult
+from typeclasses.npcs import (
+    LLMNPC,
+    NPC,
+    STALE_PERSONA,
+    STALE_PHASE,
+    DialogueExchangeResult,
+)
 from world.ai import guardrail
 from world.ai.fake_client import FakeLLMClient
 from world.ai.npc_dialogue import (
@@ -1047,7 +1053,7 @@ class NPCTitleDialogueContextTests(EvenniaTest):
         def _raise() -> str:
             raise RuntimeError("corrupt persisted attribute read")
 
-        with patch.object(LLMNPC, "npc_title", new=property(lambda self: _raise())):
+        with patch.object(NPC, "npc_title", new=property(lambda self: _raise())):
             context = dict(self.npc._npc_context())
             self.assertEqual(_system_message(context), rendered)
         self.assertEqual(context, baseline)

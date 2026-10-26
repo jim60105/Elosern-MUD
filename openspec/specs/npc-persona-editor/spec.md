@@ -74,10 +74,6 @@ The `npc.persona.read` and `npc.persona.update` actions SHALL resolve the actor 
 - **WHEN** a co-located NPC has persona version 3 and stored/table greetings
 - **THEN** the title-free result has exactly six fields: npc_id, display_name, persona_version, persona, offline_greeting and default_greeting; version/private identity/greetings retain their actual canonical values
 
-#### Scenario: The stored title is inert on the private snapshot
-- **WHEN** the read NPC carries a stored title attribute
-- **THEN** the success data carries no title field and never reads that attribute
-
 #### Scenario: An invalid card is unavailable, never repaired
 - **WHEN** the actor reads an NPC whose card or persona metadata is missing or invalid
 - **THEN** the read is rejected with `npc_persona.unavailable` and the card is never initialized or repaired

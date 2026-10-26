@@ -7,7 +7,7 @@
 
 #### Scenario: A read returns the title-free snapshot
 - **WHEN** the actor reads a co-located table-backed NPC whose card is at version 3, whose offline-greeting field holds an authored line, and whose dialogue table authors a greeting
-- **THEN** the success data has exactly the seven fields with `persona_version` 3, `persona.identity.hidden` the stored hidden identity, `offline_greeting` the stored field text, and `default_greeting` the table greeting
+- **THEN** the success data has exactly the six fields with `persona_version` 3, `persona.identity.hidden` the stored hidden identity, `offline_greeting` the stored field text, and `default_greeting` the table greeting
 
 #### Scenario: A profile-backed NPC previews its profile greeting
 - **WHEN** the actor reads an NPC with no dialogue table whose profile provenance names a profile authoring a greeting, and whose field is empty
@@ -39,7 +39,7 @@
 
 #### Scenario: The result stays inside protocol limits
 - **WHEN** a read result is serialized
-- **THEN** the seven-key result stays within the protocol's result-data field maximum of eight, and every valid payload including CJK and escape-heavy text stays within the protocol's per-string and envelope byte limits
+- **THEN** the six-key result stays within the protocol's result-data field maximum of eight, and every valid payload including CJK and escape-heavy text stays within the protocol's per-string and envelope byte limits
 
 #### Scenario: An invalid card is unavailable, never repaired
 - **WHEN** the actor reads an NPC whose card or persona metadata is missing or invalid
@@ -49,6 +49,6 @@
 - **WHEN** a read returns either greeting key
 - **THEN** both greeting keys are editor data under the existing privacy rule: only the requesting session's result carries them, ordinary snapshots do not, and no card or greeting prose enters logs or narrative output
 
-#### Scenario: A read returns the seven-key snapshot
+#### Scenario: A read returns the six-key snapshot
 - **WHEN** a co-located NPC has persona version 3 and stored/table greetings
 - **THEN** the title-free result has exactly six fields: npc_id, display_name, persona_version, persona, offline_greeting and default_greeting; version/private identity/greetings retain their actual canonical values

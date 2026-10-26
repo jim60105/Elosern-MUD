@@ -84,8 +84,9 @@ class NpcReaderTests(EvenniaTest):
         # never the title and never a duplicate profession summary row.
         self.assertEqual(row_value(identity, "名稱"), self.npc.key)
         self.assertNotIn("合成頭銜", str(identity))
-        self.assertIsNone(row_value(identity, "稱號"))
-        self.assertIsNone(row_value(identity, "職業"))
+        labels = [entry["label"] for entry in identity["rows"]]
+        self.assertNotIn("稱號", labels)
+        self.assertNotIn("職業", labels)
         self.assertEqual(row_value(identity, "對話鍵"), "t_reader_dialogue")
 
     def test_labels_agree_with_the_text_and_exploration_name(self):
