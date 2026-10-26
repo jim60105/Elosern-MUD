@@ -108,7 +108,10 @@ describe("store dispatch + focus", () => {
             outcome: "rejected",
             code: "no_puppet",
             message: "前一個操作的結果無法確認",
-            presentation_revision: 2,
+            // The server echoes the request's own base revision, never a
+            // revision the client has not committed (webclient-sync-recovery:
+            // a future claim can never release the matched action).
+            presentation_revision: 1,
           }),
         ],
         {},

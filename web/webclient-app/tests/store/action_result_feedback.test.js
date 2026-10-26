@@ -266,7 +266,10 @@ describe("action-result narrative feedback", () => {
           outcome: "rejected",
           code: "no_puppet",
           message: "你已離開角色。",
-          presentation_revision: 2,
+          // A no_puppet rejection echoes the request's own base revision
+          // (webclient-sync-recovery: a future claim would be an unadopted
+          // publication, which can never release the matched action).
+          presentation_revision: 1,
         }),
       ],
       {},
@@ -352,5 +355,76 @@ describe("action-result narrative feedback", () => {
     );
     expect(rejected.accepted).toBe(false);
     expect(store.view.lastActionResult).toBe(null);
+  });
+
+  // webclient-sync-recovery: ordered publication means a matching result naming
+  // a revision this client never committed implies a publication it did not
+  // adopt. The result is recorded once (message/data deduplication) but it can
+  // never release the matched action; one complete repair is recorded and the
+  // mutation lock holds until that revision (or a complete snapshot) arrives.
+  it("a result claiming an unadopted revision starts one repair and keeps the lock", () => {
+    openSession();
+    const panels = store.view.panels;
+    const requestId = store.dispatchAction("explore.wait", { daypart: "dusk" });
+    store.receive(
+      1,
+      "ui_action_result",
+      [fx.actionResult({ request_id: requestId, presentation_revision: 2 })],
+      {},
+    );
+    expect(store.view.dispatch.inFlight).not.toBe(null);
+    expect(store.view.recovery.status).toBe("needed");
+    expect(store.view.recovery.cause).toBe("unadopted_result");
+    expect(store.view.mutationsLocked).toBe(true);
+    expect(store.view.revision).toBe(1);
+    expect(store.view.panels).toEqual(panels);
+    expect(store.dispatchAction("explore.wait", { sleep: true })).toBe(null);
+
+    // Re-delivery of the identical result is deduplicated: the reducer state
+    // does not change into a terminal episode.
+    store.receive(
+      1,
+      "ui_action_result",
+      [fx.actionResult({ request_id: requestId, presentation_revision: 2 })],
+      {},
+    );
+    expect(store.view.recovery.status).toBe("needed");
+
+    // The missed publication arriving satisfies the claim and releases.
+    store.receive(1, "ui_update", [fx.update({ revision: 2, base_revision: 1 })], {});
+    expect(store.view.dispatch.inFlight).toBe(null);
+    expect(store.view.recovery.status).toBe("idle");
+    expect(store.view.mutationsLocked).toBe(false);
+  });
+
+  it("an older result never rolls the presentation back", () => {
+    openSession();
+    store.receive(1, "ui_update", [fx.update({ revision: 3, base_revision: 1 })], {});
+    expect(store.view.revision).toBe(3);
+    const requestId = store.dispatchAction("explore.wait", { daypart: "dusk" });
+    store.receive(
+      1,
+      "ui_action_result",
+      [fx.actionResult({ request_id: requestId, presentation_revision: 2 })],
+      {},
+    );
+    // Published after the delta: only the matched action completes.
+    expect(store.view.revision).toBe(3);
+    expect(store.view.recovery.status).toBe("idle");
+    expect(store.view.dispatch.inFlight).toBe(null);
+  });
+
+  it("a foreign result neither unlocks this request nor starts recovery", () => {
+    openSession();
+    const requestId = store.dispatchAction("explore.wait", { daypart: "dusk" });
+    store.receive(
+      1,
+      "ui_action_result",
+      [fx.actionResult({ request_id: "session:9", presentation_revision: 40 })],
+      {},
+    );
+    expect(store.view.dispatch.inFlight.requestId).toBe(requestId);
+    expect(store.view.recovery.status).toBe("idle");
+    expect(store.view.mutationsLocked).toBe(false);
   });
 });

@@ -64,6 +64,21 @@ function makeStubStore() {
     getSender() {
       return sender;
     },
+    subscribe(listener) {
+      calls.push(["subscribe"]);
+      return () => {};
+    },
+    recoveryStatus() {
+      return "idle";
+    },
+    requestPresentationSync(mode) {
+      calls.push(["requestPresentationSync", mode]);
+      const s = store.getSender();
+      if (s && typeof s.sendSync === "function") {
+        s.sendSync();
+      }
+      return true;
+    },
     appendText(kind, text) {
       calls.push(["appendText", kind, text]);
       store.narrative.push({ kind, text });
@@ -304,5 +319,81 @@ describe("wireTransport", () => {
     // Only one setSender call total (idempotent re-call does not re-attach).
     const setSenderCalls = store.calls.filter((c) => c[0] === "setSender");
     expect(setSenderCalls.length).toBe(1);
+  });
+
+  it("bounds one complete repair with a 30000ms response deadline", async () => {
+    // The deadline belongs to the requested episode: it starts with the
+    // request frame, expiring it fails the episode, and any commit that ends
+    // the episode cancels it.
+    vi.useFakeTimers();
+    try {
+      setActivePinia(createPinia());
+      const { evennia, emit, sent } = makeFakeEvennia();
+      window.Evennia = evennia;
+      const store = useElosernStore();
+      wireTransport(store, makeConsoleHandle());
+      const syncs = () => sent.filter((message) => message[0] === "ui_sync").length;
+
+      emit("connection_open");
+      emit("ui_snapshot", [fx.snapshot()], {});
+      expect(store.view.mutationsLocked).toBe(false);
+      expect(syncs()).toBe(1);
+
+      // One failure episode: the automatic repair request starts the bound.
+      emit("ui_update", [fx.update({ revision: 3, base_revision: 2, panels: {} })], {});
+      expect(store.requestPresentationSync("auto")).toBe(true);
+      expect(syncs()).toBe(2);
+      expect(store.view.recovery.status).toBe("requested");
+      await vi.advanceTimersByTimeAsync(29999);
+      expect(store.view.recovery.status).toBe("requested");
+      expect(store.view.mutationsLocked).toBe(true);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(store.view.recovery.status).toBe("failed");
+      expect(store.view.mutationsLocked).toBe(true);
+      // A failed episode sends nothing further, however much time passes.
+      await vi.advanceTimersByTimeAsync(120000);
+      expect(syncs()).toBe(2);
+      expect(store.requestPresentationSync("auto")).toBe(false);
+      expect(syncs()).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("cancels the recovery deadline when the repair commits or the transport closes", async () => {
+    vi.useFakeTimers();
+    try {
+      setActivePinia(createPinia());
+      const { evennia, emit, sent } = makeFakeEvennia();
+      window.Evennia = evennia;
+      const store = useElosernStore();
+      wireTransport(store, makeConsoleHandle());
+      const syncs = () => sent.filter((message) => message[0] === "ui_sync").length;
+
+      emit("connection_open");
+      emit("ui_snapshot", [fx.snapshot()], {});
+      emit("ui_update", [fx.update({ revision: 3, base_revision: 2, panels: {} })], {});
+      expect(store.requestPresentationSync("auto")).toBe(true);
+      expect(syncs()).toBe(2);
+      // The repair arrives complete: the deadline is cancelled, so its expiry
+      // can never fail the healthy sequence.
+      emit("ui_snapshot", [fx.snapshot({ revision: 2 })], {});
+      expect(store.view.recovery.status).toBe("idle");
+      expect(store.view.mutationsLocked).toBe(false);
+      await vi.advanceTimersByTimeAsync(60000);
+      expect(store.view.recovery.status).toBe("idle");
+      expect(store.view.mutationsLocked).toBe(false);
+
+      // A closing transport cancels the pending deadline: the reconnect's own
+      // initial-sync lifecycle owns the next request.
+      emit("ui_update", [fx.update({ revision: 4, base_revision: 3, panels: {} })], {});
+      expect(store.requestPresentationSync("auto")).toBe(true);
+      emit("connection_close");
+      await vi.advanceTimersByTimeAsync(60000);
+      expect(store.view.recovery.status).not.toBe("failed");
+      expect(syncs()).toBe(3);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

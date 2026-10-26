@@ -92,13 +92,12 @@ export function createWindowBridge(store) {
   }
 
   function sync() {
-    const s = store.getSender();
-    if (s && typeof s.sendSync === "function") {
-      // The live `ui_sync` re-sync request goes out through the C3 transport
-      // seam; until the transport attaches, sync is a guarded no-op (the
-      // store re-syncs through the next accepted snapshot, C1 contract).
-      s.sendSync();
-    }
+    // The player's own explicit synchronize: it may spend one further attempt
+    // after a failed automatic repair, and it never resubmits a mutation. The
+    // live `ui_sync` request goes out through the C3 transport seam; until the
+    // transport attaches, sync is a guarded no-op (the store re-syncs through
+    // the next accepted snapshot, C1 contract).
+    return store.requestPresentationSync("manual");
   }
 
   function toWireActionResult(result) {
@@ -183,32 +182,20 @@ export function createWindowBridge(store) {
     lastResult: () => store.view.lastActionResult,
   };
 
-  // One-sync-per-episode resync guard (the legacy requestResync contract):
-  // a renderer that cannot render a panel requests exactly one `ui_sync` for
-  // the same failure episode; a second request in the same episode is blocked
-  // so a malformed panel cannot create a sync loop. The episode resets on a
-  // new transport generation (a reconnect re-arms it).
-  const resyncGuard = {};
-
+  // One-sync-per-episode resync (the legacy requestResync contract): a renderer
+  // that cannot render a panel requests at most one `ui_sync` for the same
+  // failure episode. The reducer owns the episode and is the only authority
+  // (webclient-sync-recovery); the argument is retained for the frozen façade
+  // signature because an episode is per transport, not per panel.
   function requestResync(panelName) {
-    const generation = currentGeneration();
-    let entry = resyncGuard[panelName];
-    if (!entry || entry.episode !== generation) {
-      entry = { episode: generation, requested: false };
-      resyncGuard[panelName] = entry;
-    }
-    if (entry.requested) {
-      return false;
-    }
-    entry.requested = true;
-    sync();
-    return true;
+    return store.requestPresentationSync("auto");
   }
 
   function resetResyncEpisode(panelName) {
-    // Re-arm the one-sync guard for a panel: the harness uses this to allow
-    // a fresh resync after a reconnect re-armed the transport generation.
-    delete resyncGuard[panelName];
+    // Re-arm the one request permission without ending the episode: the
+    // mutation lock and the obligation to adopt a complete snapshot survive,
+    // so a re-arm can never unlock a stale presentation.
+    return store.resetRecoveryEpisode();
   }
 
   const actions = {
