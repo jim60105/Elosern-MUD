@@ -22,7 +22,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
-from typeclasses.components import GuildExaminer, GuildStaff, Merchant
+from typeclasses.components import GuildExamReception, GuildStaff, Merchant
 from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
@@ -479,17 +479,17 @@ class ScheduleGateCommandTests(CommandIsolation, EvenniaCommandTestMixin, Evenni
         self.assertEqual(read_records(self.char1), [completed])
 
     @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
-    def test_busy_examiner_blocks_the_exam_command_without_a_session(self):
-        from typeclasses.components import GuildExaminer
+    def test_busy_reception_counter_blocks_the_exam_command_without_a_session(self):
+        from typeclasses.components import GuildExamReception
 
         self.char1.location = self.hall
-        examiner = create_object(NPC, key="examiner", location=self.hall)
-        examiner.components.add(
-            GuildExaminer.create(
-                examiner, service_id="examiner", branch_key=BRANCH
+        reception = create_object(NPC, key="reception", location=self.hall)
+        reception.components.add(
+            GuildExamReception.create(
+                reception, service_id="reception", branch_key=BRANCH
             )
         )
-        examiner.db.schedule_state = "busy"
+        reception.db.schedule_state = "busy"
         self.call(CmdGuildExam(), "E", self.BLOCKED)
         self.assertIsNone(self.char1.db.active_combat)
 

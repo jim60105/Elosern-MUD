@@ -10,7 +10,7 @@ The top-level ``host`` is display-only reconciliation metadata and never an
 availability authority or an action payload field.
 
 Host resolution is per service class: ``guild``/``rank`` resolve ``GuildStaff``
-and the ``GuildExaminer`` exam counter respectively and ``shop`` resolves
+and the ``GuildExamReception`` exam counter respectively and ``shop`` resolves
 ``Merchant``, each
 through the same ``resolve_local_service_host`` rule the commands use. Zero or
 multiple hosts of the class a surface requires make that surface unavailable;
@@ -37,7 +37,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from typeclasses.components import GuildExaminer, GuildStaff, Merchant
+from typeclasses.components import GuildExamReception, GuildStaff, Merchant
 from world.lore.guild import GUILD_BRANCH_REGISTRY, GUILD_RANK_REGISTRY
 from world.lore.items import ITEM_REGISTRY, ItemPresentation
 from world.quests.definitions import QUEST_DEFINITION_REGISTRY, QuestType
@@ -521,7 +521,7 @@ def _exam_request_reason(
     """
     if interaction_reason(counter, "service_guild") is not None:
         return "schedule_blocked"
-    component = counter.components.get(GuildExaminer.get_component_slot())
+    component = counter.components.get(GuildExamReception.get_component_slot())
     verdict = service_available(actor, counter, component)
     if not verdict.allowed:
         return "remote_examiner" if verdict.reason == REASON_REMOTE else "service_unavailable"
@@ -568,7 +568,7 @@ def _build_guild(
     actor: Any,
     staff: Any,
     staff_reason: str | None,
-    examiner: Any,
+    reception: Any,
     catalog: Any,
     tick: int,
 ) -> tuple[GuildSectionView | None, str | None]:
@@ -596,7 +596,7 @@ def _build_guild(
     registered = registration is not None
     board = _build_board(records, offers)
     quests = _build_quests(actor, records, claims, registration, tick)
-    rank = _build_rank(actor, examiner, registration, catalog)
+    rank = _build_rank(actor, reception, registration, catalog)
     register_reason = None if not registered else "already_registered"
     section = GuildSectionView(
         branch_label=GUILD_BRANCH_REGISTRY[
@@ -907,10 +907,10 @@ def build_services_view(actor: Any, viewed: Any = None) -> ServicesView:
             host = _build_host(None, merchant_host)
         else:
             staff, staff_reason = _resolve_host(actor, GuildStaff)
-            examiner, _ = _resolve_host(actor, GuildExaminer)
+            reception, _ = _resolve_host(actor, GuildExamReception)
             host = _build_host(staff, merchant_host)
             guild, guild_reason = _build_guild(
-                actor, staff, staff_reason, examiner, catalog, tick
+                actor, staff, staff_reason, reception, catalog, tick
             )
         shop, shop_reason = _build_shop(
             actor,

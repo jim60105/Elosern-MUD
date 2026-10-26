@@ -20,7 +20,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
-from typeclasses.components import GuildExaminer, GuildStaff, Merchant
+from typeclasses.components import GuildExamReception, GuildStaff, Merchant
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from web.webclient.actions.dispatcher import handle_ui_action
@@ -234,10 +234,10 @@ class ServiceActionBase(BattlefieldIsolation, EvenniaTest):
         self.staff.components.add(
             GuildStaff.create(self.staff, service_id="staff", branch_key=BRANCH)
         )
-        self.examiner = create_object(NPC, key="guild examiner", location=self.hall)
-        self.examiner.components.add(
-            GuildExaminer.create(
-                self.examiner, service_id="examiner", branch_key=BRANCH
+        self.reception = create_object(NPC, key="guild reception", location=self.hall)
+        self.reception.components.add(
+            GuildExamReception.create(
+                self.reception, service_id="counter", branch_key=BRANCH
             )
         )
         self.merchant_npc = create_object(NPC, key="store keeper", location=self.store)
@@ -386,7 +386,7 @@ class ServiceAdapterTests(ServiceActionBase):
     @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
     def test_busy_counter_rejects_exam_request_without_a_session(self):
         self._register()
-        self.examiner.db.schedule_state = "busy"
+        self.reception.db.schedule_state = "busy"
         result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "schedule_blocked")
@@ -1023,7 +1023,7 @@ class ExamRequestTests(ServiceActionBase):
         self.assertEqual(result["code"], "unregistered")
         self.assertIsNone(self.player.db.active_combat)
 
-    def test_exam_request_rejects_without_local_examiner(self):
+    def test_exam_request_rejects_without_local_reception(self):
         self._register()
         write_counter_trait(self.player, "guild_merit", _T_MERIT_THRESHOLD)
         self.player.location = self.store

@@ -9,7 +9,7 @@ from evennia.utils.search import search_object_by_tag
 from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import (
-    GuildExaminer,
+    GuildExamReception,
     GuildStaff,
     Merchant,
     QuestIssuer,
@@ -610,7 +610,7 @@ class CiaranVillageCommonsTests(ServiceContentIsolation, EvenniaTestCase):
                 host = next(
                     obj for obj in self._interior(place).contents if isinstance(obj, NPC)
                 )
-                for capability in (Merchant, GuildStaff, GuildExaminer, QuestIssuer):
+                for capability in (Merchant, GuildStaff, GuildExamReception, QuestIssuer):
                     self.assertIsNone(
                         host.components.get(capability.get_component_slot()),
                         capability.name,

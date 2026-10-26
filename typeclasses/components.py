@@ -42,10 +42,10 @@ class ChurchHost(Component):
     anchor_room_id = DBField(default=None)
 
 
-class GuildExaminer(Component):
-    """Capability marker and branch identity of one guild examiner host."""
+class GuildExamReception(Component):
+    """Capability marker and branch identity of one guild examination counter."""
 
-    name = "guild_examiner"
+    name = "guild_exam_reception"
     service_id = DBField(default=None)
     branch_key = DBField(default=None)
     service_binding = DBField(default=None)

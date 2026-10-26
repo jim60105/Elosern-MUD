@@ -7,7 +7,7 @@ from evennia.utils.create import create_object
 from evennia.utils.search import search_object_by_tag
 from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.characters import PlayerCharacter
-from typeclasses.components import GuildExaminer
+from typeclasses.components import GuildExamReception
 from typeclasses.components import GuildStaff
 from typeclasses.components import Merchant
 from typeclasses.npcs import NPC
@@ -392,7 +392,9 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             GuildStaff.create(legacy, service_id=GUILD_SERVICE_ID, branch_key=_guild_branch_key())
         )
         legacy.components.add(
-            GuildExaminer.create(legacy, service_id=GUILD_SERVICE_ID, branch_key=_guild_branch_key())
+            GuildExamReception.create(
+                legacy, service_id=GUILD_SERVICE_ID, branch_key=_guild_branch_key()
+            )
         )
         return legacy
 

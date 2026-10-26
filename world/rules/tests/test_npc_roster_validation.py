@@ -490,11 +490,11 @@ class SyntheticNpcRosterValidationTests(unittest.TestCase):
     def test_stale_temporary_rank_examiner_source_fails(self):
         # Rank-owned temporary examiners were cut over to persistent people:
         # an inventory row still naming one is a stale source.
-        self.synth["inventory"] += (NpcSource("guild_examiner", "F", "test_slice"),)
+        self.synth["inventory"] += (NpcSource("guild_exam_reception", "F", "test_slice"),)
         with self.assertRaises(NpcRosterError) as caught:
             validate_npc_roster(**self.synth)
         msg = str(caught.exception)
-        self.assertIn("guild_examiner", msg)
+        self.assertIn("guild_exam_reception", msg)
         self.assertIn("missing from registries", msg)
 
     @covers_requirement(

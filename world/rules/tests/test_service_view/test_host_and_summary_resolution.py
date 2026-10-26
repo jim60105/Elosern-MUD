@@ -4,7 +4,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 from tools.spec_traceability import covers_requirement
-from typeclasses.components import GuildExaminer, GuildStaff, Merchant
+from typeclasses.components import GuildExamReception, GuildStaff, Merchant
 from world.lore.items import (
     EquipmentModifierKey,
     ItemDefinition,
@@ -68,7 +68,7 @@ from ._support import (
     ServiceRegistryIsolation,
     TICK_NOON,
     actor,
-    guild_examiner,
+    exam_reception,
     guild_staff,
     merchant,
     registration,
@@ -77,7 +77,7 @@ from ._support import (
 
 class HostResolutionTests(ServiceRegistryIsolation):
     def _staff_room(self):
-        staff = FakeHost("公會長", 10, guild_staff(), guild_examiner(), location=None)
+        staff = FakeHost("公會長", 10, guild_staff(), exam_reception(), location=None)
         room = FakeRoom(staff)
         staff.location = room
         return room, staff

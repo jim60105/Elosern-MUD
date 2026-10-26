@@ -18,7 +18,7 @@ def _services_fixture_synth(character, mode: str) -> None:
     """
     from evennia.utils.create import create_object
     from evennia.utils.search import search_object_by_tag
-    from typeclasses.components import GuildExaminer, GuildStaff, Merchant
+    from typeclasses.components import GuildExamReception, GuildStaff, Merchant
     from typeclasses.npcs import NPC, ensure_npc_canonical_age
     from world.rules.clock import get_world_clock
     from world.rules.guild import register_adventurer
@@ -105,8 +105,8 @@ def _services_fixture_synth(character, mode: str) -> None:
             for rule in catalog.shop_configs[SYNTH_SHOP_KEY].offers
         },
     )
-    examiner = _make_host("合成公會考官", hall)
-    _ensure_component(examiner, GuildExaminer, branch_key=SYNTH_GUILD_BRANCH_KEY)
+    reception = _make_host("合成考核櫃檯", hall)
+    _ensure_component(reception, GuildExamReception, branch_key=SYNTH_GUILD_BRANCH_KEY)
 
     def _make_exam_host(room):
         # The examination fights the branch-qualified persistent host the

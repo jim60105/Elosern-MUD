@@ -49,8 +49,8 @@
    | 職業列 | 元件組 | 綁定 | 用途 |
    |---|---|---|---|
    | `merchant` | `merchant` + `scripted_dialogue` | place | 會交易也會說話的店主；`dialogue_key` **必須**手寫，無問候語的店主屬作者錯誤 |
-   | `guild_staff` | `guild_staff` + `guild_examiner` + `scripted_dialogue` | place | 公會主管（註冊＋考核＋回報） |
-   | `guild_examiner` | `guild_examiner` + `scripted_dialogue` | place | 純考核官 |
+   | `guild_staff` | `guild_staff` + `guild_exam_reception` + `scripted_dialogue` | place | 公會主管（註冊＋考核接待＋回報） |
+   | `guild_exam_reception` | `guild_exam_reception` + `scripted_dialogue` | place | 純考核接待櫃檯 |
    | `quest_issuer` | `quest_issuer` | person | 私人委託發包人；身分隨人走，**不得**釘房 |
    | `attendant` | `scripted_dialogue` | place | 對話即服務的管事（旅店老闆、衛兵隊長、教官）；職業在 `host_title` 與對話表裡，不另設列 |
 
@@ -114,7 +114,7 @@ for declaration semantics.
 組裝語意（`world/imports/loader.py::_apply_profession`）：
 
 - `components` 只能與 `profession` 併用；同型條目**完全取代**藍圖條目（kwargs 只取記錄值），藍圖未列的詞彙型別可按記錄順序附加。
-- 身分辨識一律手寫，匯入器絕不憑空補值：`shop_key`（Merchant）、`branch_key`（GuildStaff/GuildExaminer）、`dialogue_key`（ScriptedDialogue）、`issuer_key`（QuestIssuer，缺席時解析為 `npc:#<pk>`）。解析後仍缺身份的規畫整批具名拒收。
+- 身分辨識一律手寫，匯入器絕不憑空補值：`shop_key`（Merchant）、`branch_key`（GuildStaff/GuildExamReception）、`dialogue_key`（ScriptedDialogue）、`issuer_key`（QuestIssuer，缺席時解析為 `npc:#<pk>`）。解析後仍缺身份的規畫整批具名拒收。
 - `anchor_room` 是錨定房間的 **room tag**，恰好等於「規畫含 place-bound 元件」時必填、含 person-bound 元件時 forbidden。載入器在同一筆交易內解析：tag 解析不到房間、或解析到多個房間、或 tag 落在非 Room 物件上，都整批拒收並點名記錄與 tag。
 - 職業列的 `default_tier` 只在 `stats` 為空時作為特質基準；卡宣告任何字面數值時職業不影響特質。
 
@@ -402,12 +402,15 @@ uv run --locked python -m tools.spec_traceability check
 
 `world/lore/guild_adventurers.py` owns normal person identities and separate
 branch/rank qualifications. `world/rules/human_guild_hosts.py` validates and
-assembles these people as `LLMNPC` instances. The profession value describes
-their occupation; it is not a new component blueprint in `professions.yaml`.
-Qualification selection requires one exact branch/target binding and one
-persistent person dbref. It never selects by display key or summons an absent
-person. Rank rows carry no examiner identity and no temporary opponent factory
-exists; examinations always fight the qualified persistent person.
+assembles these people as `LLMNPC` instances. A person row carries no
+profession value and assembly writes no `db.profession`: occupation and
+examination authority stay with the independent qualification table, never
+with a new component blueprint in `professions.yaml`. Qualification selection
+requires one exact branch/target binding and one persistent person dbref. It
+never selects by display key or summons an absent person. Qualification alone
+never attaches an examination-reception capability to the adventurer. Rank
+rows carry no examiner identity and no temporary opponent factory exists;
+examinations always fight the qualified persistent person.
 
 Each normal person has a distinct profile, bounded canonical ages, both offline
 voice replies, literal bases, registered military equipment, and complete sword
@@ -443,7 +446,7 @@ directly: they go through the presence-first coordinator
 `world.rules.guild_exam_request.request_guild_exam(actor, target_rank, speaker=None,
 requested_by=...)`. It resolves the target with
 `resolve_exam_request_target`, which derives the branch from the single
-co-located `GuildExaminer` counter (or the speaking counter), refuses a busy
+co-located `GuildExamReception` counter (or the speaking counter), refuses a busy
 counter (`schedule_blocked`), and selects the person from the qualification
 binding. A speaking NPC that is neither the counter nor the qualified person
 grants no authority. If the person is not standing in the counter's room, the

@@ -23,7 +23,7 @@ import yaml
 
 from typeclasses.components import (
     ChurchHost,
-    GuildExaminer,
+    GuildExamReception,
     GuildStaff,
     Merchant,
     QuestIssuer,
@@ -41,7 +41,7 @@ SCHEMA_VERSION = 1
 #: ``world/rules/tests/test_profession_config.py`` names any drift.
 PROFESSION_COMPONENT_TYPES: dict[str, type] = {
     "guild_staff": GuildStaff,
-    "guild_examiner": GuildExaminer,
+    "guild_exam_reception": GuildExamReception,
     "merchant": Merchant,
     "scripted_dialogue": ScriptedDialogue,
     "quest_issuer": QuestIssuer,

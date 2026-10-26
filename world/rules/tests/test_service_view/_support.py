@@ -15,7 +15,7 @@ from unittest.mock import patch
 from tools.spec_traceability import covers_requirement
 
 
-from typeclasses.components import GuildExaminer, GuildStaff, Merchant
+from typeclasses.components import GuildExamReception, GuildStaff, Merchant
 
 
 from world.lore.items import (
@@ -255,9 +255,9 @@ def guild_staff(**fields):
     return FakeComponent(GuildStaff.name, branch_key=BRANCH, **fields)
 
 
-def guild_examiner(**fields):
+def exam_reception(**fields):
     fields.setdefault("branch_key", BRANCH)
-    return FakeComponent(GuildExaminer.name, **fields)
+    return FakeComponent(GuildExamReception.name, **fields)
 
 
 def merchant(**fields):

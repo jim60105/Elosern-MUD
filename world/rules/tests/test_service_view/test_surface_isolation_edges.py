@@ -4,7 +4,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 from tools.spec_traceability import covers_requirement
-from typeclasses.components import GuildExaminer, GuildStaff, Merchant
+from typeclasses.components import GuildExamReception, GuildStaff, Merchant
 from world.lore.items import (
     EquipmentModifierKey,
     ItemDefinition,
@@ -76,7 +76,7 @@ from ._support import (
     T_PASS,
     T_SPRAY,
     actor,
-    guild_examiner,
+    exam_reception,
     guild_staff,
     merchant,
     quest_record,
@@ -215,7 +215,7 @@ class MeritAndRankEdgeTests(ServiceRegistryIsolation):
                 build_services_view(player)
 
     def test_top_rank_exam_request_reports_no_next_target(self):
-        room = FakeRoom(FakeHost("a", 1, guild_staff(), guild_examiner(), location=None))
+        room = FakeRoom(FakeHost("a", 1, guild_staff(), exam_reception(), location=None))
         player = actor(location=room, wallet=5, registration=registration(), guild_rank="S", merit=999999)
         with patch(
             "world.rules.service_view.read_world_clock",
@@ -229,7 +229,7 @@ class MeritAndRankEdgeTests(ServiceRegistryIsolation):
         self.assertEqual(rank.exam_request.reason_code, "top_rank")
 
     def test_active_session_blanks_remote_surfaces(self):
-        room = FakeRoom(FakeHost("a", 1, guild_staff(), guild_examiner(), location=None))
+        room = FakeRoom(FakeHost("a", 1, guild_staff(), exam_reception(), location=None))
         player = actor(location=room, wallet=5, registration=registration(), guild_rank="F", merit=50)
         player.db.active_combat = {
             "session_id": "hostile:1:0",

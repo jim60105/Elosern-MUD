@@ -22,7 +22,7 @@ from typing import Any
 from django.db import transaction
 
 from typeclasses.characters import PlayerCharacter
-from typeclasses.components import GuildExaminer
+from typeclasses.components import GuildExamReception
 from typeclasses.npcs import NPC
 from world.rules.clock import get_world_clock
 from world.observability import log_info, log_warn
@@ -90,7 +90,8 @@ class ExamReason(StrEnum):
     NO_EXAMINER = "no_examiner"
     REMOTE_EXAMINER = "remote_examiner"
     # Co-located but the shared anchoring gate refused (off-anchor place
-    # examiner or malformed stored binding); the line is the gate's message.
+    # reception counter or malformed stored binding); the line is the gate's
+    # message.
     SERVICE_UNAVAILABLE = "service_unavailable"
     UNREGISTERED = "unregistered"
     WRONG_BRANCH = "wrong_branch"
@@ -253,29 +254,30 @@ def _valid_age(value: Any) -> bool:
 def _local_exam_counter(actor: Any) -> tuple[Any, Any]:
     """Return the single co-located guild counter carrying examination service.
 
-    The counter (the branch's GuildExaminer component holder) owns the place
-    gate and branch identity; the persistent adventurer who fights carries no
-    service component of its own.
+    The counter (the branch's ``GuildExamReception`` component holder) owns the
+    place gate and branch identity; the persistent adventurer who fights
+    carries no service component of its own.
     """
     from world.rules.guild import GuildServiceError, resolve_local_service_host
 
     try:
-        counter = resolve_local_service_host(actor, GuildExaminer)
+        counter = resolve_local_service_host(actor, GuildExamReception)
     except GuildServiceError as error:
         raise GuildExamError(ExamReason.NO_EXAMINER) from error
-    return counter, counter.components.get(GuildExaminer.get_component_slot())
+    return counter, counter.components.get(GuildExamReception.get_component_slot())
 
 
 def _counter_branch(actor: Any, counter: Any = None) -> str:
     """Validate the exam counter's shared gate and return its branch key.
 
-    ``counter`` defaults to the single co-located GuildExaminer holder; an
-    explicit counter (the NPC speaking an exam intent) is gated identically.
+    ``counter`` defaults to the single co-located ``GuildExamReception``
+    holder; an explicit counter (the NPC speaking an exam intent) is gated
+    identically.
     """
     if counter is None:
         counter, component = _local_exam_counter(actor)
     else:
-        component = counter.components.get(GuildExaminer.get_component_slot())
+        component = counter.components.get(GuildExamReception.get_component_slot())
     verdict = service_available(actor, counter, component)
     if not verdict.allowed:
         if verdict.reason == REASON_REMOTE:
@@ -303,7 +305,7 @@ def _require_next_rank(actor: Any, target_rank: str) -> None:
 
 def _is_exam_counter(npc: Any) -> bool:
     components = getattr(npc, "components", None)
-    return components is not None and components.has(GuildExaminer.name)
+    return components is not None and components.has(GuildExamReception.name)
 
 
 @dataclass(frozen=True)
@@ -323,7 +325,7 @@ def resolve_exam_request_target(
     Read-only identity selection shared by the request coordinator: the
     branch comes from the exam counter, the person from the qualification
     binding and the object from persistent provenance, never from a
-    display-name search or a generic examiner component. ``speaker`` (an NPC
+    display-name search or a generic reception component. ``speaker`` (an NPC
     voicing an exam intent) grants no authority: it must stand beside the
     actor and be either the counter itself or the qualified host. The
     counter's own schedule gate applies; no merit, battle, attendance or

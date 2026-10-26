@@ -7,7 +7,7 @@ suite proves the SHAPE of the blueprint, not any shipped content.
 from evennia.utils.test_resources import EvenniaTestCase
 from tools.spec_traceability import covers_requirement
 from typeclasses.components import (
-    GuildExaminer,
+    GuildExamReception,
     GuildStaff,
     Merchant,
     QuestIssuer,
@@ -60,7 +60,7 @@ class PlaceAttendantSyncTests(ServiceContentIsolation, EvenniaTestCase):
         # The anchor identity the row carries is projected onto the class
         # that declares it — the reuse path reads exactly this field.
         self.assertEqual(component.service_id, ATTENDANT_SERVICE_ID)
-        for silent in (Merchant, GuildStaff, GuildExaminer, QuestIssuer):
+        for silent in (Merchant, GuildStaff, GuildExamReception, QuestIssuer):
             self.assertIsNone(
                 host.components.get(silent.get_component_slot()),
                 f"attendant host must not carry {silent.name}",

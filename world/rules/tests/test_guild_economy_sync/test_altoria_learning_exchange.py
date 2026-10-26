@@ -48,7 +48,7 @@ from tests.test_command_docs import EXPECTED_COMMANDS, mounted_command_classes
 from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import (
-    GuildExaminer,
+    GuildExamReception,
     GuildStaff,
     Merchant,
     QuestIssuer,
@@ -458,7 +458,7 @@ class AltoriaLearningExchangeTests(ServiceContentIsolation, EvenniaTestCase):
                 for component_class in (
                     QuestIssuer,
                     GuildStaff,
-                    GuildExaminer,
+                    GuildExamReception,
                     Merchant,
                 ):
                     self.assertIsNone(

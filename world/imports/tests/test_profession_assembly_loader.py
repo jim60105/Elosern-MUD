@@ -20,7 +20,7 @@ from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
 from typeclasses.components import (
-    GuildExaminer,
+    GuildExamReception,
     GuildStaff,
     Merchant,
     QuestIssuer,
@@ -38,7 +38,7 @@ from world.rules.traits import initial_trait_config
 # resolved through the classes themselves — never renamed, never literal.
 _MERCHANT = Merchant.name
 _GUILD_STAFF = GuildStaff.name
-_GUILD_EXAMINER = GuildExaminer.name
+_GUILD_EXAM_RECEPTION = GuildExamReception.name
 _SCRIPTED_DIALOGUE = ScriptedDialogue.name
 _QUEST_ISSUER = QuestIssuer.name
 
@@ -89,7 +89,7 @@ STAFF_PROBE = Profession(
     key="t_guildcrew",
     components=(
         ProfessionComponent(_GUILD_STAFF, "place"),
-        ProfessionComponent(_GUILD_EXAMINER, "place"),
+        ProfessionComponent(_GUILD_EXAM_RECEPTION, "place"),
         ProfessionComponent(_SCRIPTED_DIALOGUE, "place"),
     ),
     schedule_template=None,
@@ -182,7 +182,7 @@ class ExplicitPrecedenceTests(ProfessionAssemblyHarness):
         record["components"] = [
             staff_entry(),
             {
-                "type": _GUILD_EXAMINER,
+                "type": _GUILD_EXAM_RECEPTION,
                 "kwargs": {"service_id": "silver_scales", "branch_key": "plaza_stall"},
             },
             {
@@ -192,7 +192,7 @@ class ExplicitPrecedenceTests(ProfessionAssemblyHarness):
         ]
         npc = self.assembled(record)
         self.assertTrue(npc.components.has(_GUILD_STAFF))
-        self.assertTrue(npc.components.has(_GUILD_EXAMINER))
+        self.assertTrue(npc.components.has(_GUILD_EXAM_RECEPTION))
         self.assertTrue(npc.components.has(_SCRIPTED_DIALOGUE))
         staff = npc.components.get(_GUILD_STAFF)
         self.assertEqual(staff.service_id, "silver_scales")
@@ -200,12 +200,12 @@ class ExplicitPrecedenceTests(ProfessionAssemblyHarness):
         dialogue = npc.components.get(_SCRIPTED_DIALOGUE)
         self.assertEqual(dialogue.dialogue_key, "dock_gossip")
         self.assertEqual(dialogue.service_id, "silver_scales")
-        examiner = npc.components.get(_GUILD_EXAMINER)
-        self.assertEqual(examiner.branch_key, "plaza_stall")
+        reception = npc.components.get(_GUILD_EXAM_RECEPTION)
+        self.assertEqual(reception.branch_key, "plaza_stall")
         # Exactly one component instance per slot.
         slots = [
             name
-            for name in (_GUILD_STAFF, _GUILD_EXAMINER, _SCRIPTED_DIALOGUE)
+            for name in (_GUILD_STAFF, _GUILD_EXAM_RECEPTION, _SCRIPTED_DIALOGUE)
             if npc.components.has(name)
         ]
         self.assertEqual(len(slots), 3)
@@ -213,7 +213,7 @@ class ExplicitPrecedenceTests(ProfessionAssemblyHarness):
             sum(
                 1
                 for n in npc.components.db_names
-                if n in (_GUILD_STAFF, _GUILD_EXAMINER, _SCRIPTED_DIALOGUE)
+                if n in (_GUILD_STAFF, _GUILD_EXAM_RECEPTION, _SCRIPTED_DIALOGUE)
             ),
             3,
         )
@@ -227,7 +227,7 @@ class ExplicitPrecedenceTests(ProfessionAssemblyHarness):
         record["components"] = [
             staff_entry(),
             {
-                "type": _GUILD_EXAMINER,
+                "type": _GUILD_EXAM_RECEPTION,
                 "kwargs": {"service_id": "silver_scales", "branch_key": "hall"},
             },
             {
@@ -259,7 +259,7 @@ class ExplicitPrecedenceTests(ProfessionAssemblyHarness):
         record["components"] = [
             staff_entry(),
             {
-                "type": _GUILD_EXAMINER,
+                "type": _GUILD_EXAM_RECEPTION,
                 "kwargs": {"service_id": "silver_scales", "branch_key": "hall"},
             },
         ]
@@ -334,7 +334,7 @@ class IdentityGateTests(ProfessionAssemblyHarness):
         record["components"] = [
             staff_entry(),
             {
-                "type": _GUILD_EXAMINER,
+                "type": _GUILD_EXAM_RECEPTION,
                 "kwargs": {"service_id": "silver_scales", "branch_key": "hall"},
             },
             {
@@ -352,7 +352,7 @@ class IdentityGateTests(ProfessionAssemblyHarness):
             nonlocal calls
             if component.name not in (
                 _GUILD_STAFF,
-                _GUILD_EXAMINER,
+                _GUILD_EXAM_RECEPTION,
                 _SCRIPTED_DIALOGUE,
             ):
                 return real_add(self, component)

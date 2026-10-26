@@ -14,7 +14,7 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
-from typeclasses.components import GuildExaminer
+from typeclasses.components import GuildExamReception
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from world.rules.combat_session import read_session
@@ -118,6 +118,28 @@ class ExamRequestCoordinatorTests(ExamHostFixture, EvenniaTestCase):
         self.assertEqual(read_session(self.player).enemy_ids, (self.host.pk,))
         self.assertEqual(NPC.objects.count(), hosts_before)
 
+    @covers_requirement("guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself")
+    @covers_requirement("guild-exam-requests::all-examination-requests-resolve-attendance-before-merit-and-start-conditions")
+    def test_reception_resolves_the_separately_qualified_adventurer(self):
+        reception_slot = GuildExamReception.get_component_slot()
+        self.assertTrue(self.counter.components.has(reception_slot))
+        self.assertFalse(self.host.components.has(reception_slot))
+
+        # Schedule-only answer names the qualified adventurer, never the counter.
+        self._send_host_home_on_weekly_visits()
+        planned = request_guild_exam(self.player, "E", requested_by="command")
+        self.assertEqual(planned.kind, OUTCOME_SCHEDULE)
+        self.assertEqual(planned.host_name, self.host.key)
+        self.assertNotEqual(planned.host_name, self.counter.key)
+
+        # The actual start opposes that same adventurer's dbref.
+        self.host.location = self.hall
+        self._give_merit(50)
+        started = request_guild_exam(self.player, "E", requested_by="command")
+        self.assertEqual(started.kind, OUTCOME_STARTED)
+        self.assertEqual(started.record.opponent_id, self.host.pk)
+        self.assertNotEqual(started.record.opponent_id, self.counter.pk)
+
     @covers_requirement(
         "guild-rank-exams::rank-promotion-requires-cumulative-merit-and-exactly-the-next-examination"
     )
@@ -171,8 +193,10 @@ class ExamRequestCoordinatorTests(ExamHostFixture, EvenniaTestCase):
             with self.assertRaises(GuildExamError) as ctx:
                 request_guild_exam(stranger, "E", requested_by="command")
             self.assertEqual(ctx.exception.args[0], ExamReason.UNREGISTERED)
-            examiner = self.counter.components.get(GuildExaminer.get_component_slot())
-            examiner.branch_key = "t_other_branch"
+            reception = self.counter.components.get(
+                GuildExamReception.get_component_slot()
+            )
+            reception.branch_key = "t_other_branch"
             self._assert_rejected_unchanged(ExamReason.WRONG_BRANCH)
         reader.assert_not_called()
         self.assertIsNone(stranger.db.guild_exams)
@@ -202,4 +226,4 @@ class ExamRequestCoordinatorTests(ExamHostFixture, EvenniaTestCase):
         top.guild_rank = "S"
         self.assertIsNone(next_exam_rank(top))
         self.assertEqual(EXAM_BRANCH, self.counter.components.get(
-            GuildExaminer.get_component_slot()).branch_key)
+            GuildExamReception.get_component_slot()).branch_key)

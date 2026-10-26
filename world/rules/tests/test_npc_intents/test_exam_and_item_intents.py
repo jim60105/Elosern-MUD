@@ -6,7 +6,7 @@ import unittest
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.characters import PlayerCharacter
-from typeclasses.components import GuildExaminer, GuildStaff, QuestIssuer
+from typeclasses.components import GuildExamReception, GuildStaff, QuestIssuer
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from world.quests.catalog import register_catalog
@@ -88,11 +88,11 @@ class ExamIntentTests(BattlefieldIsolation, ExamRegistryIsolation, EvenniaTestCa
                 self.staff, service_id="staff", branch_key=BRANCH
             )
         )
-        self.examiner = create_object(NPC, key="examiner", location=self.hall)
-        self.examiner.components.add(
-            GuildExaminer.create(
-                self.examiner,
-                service_id="examiner",
+        self.reception = create_object(NPC, key="reception", location=self.hall)
+        self.reception.components.add(
+            GuildExamReception.create(
+                self.reception,
+                service_id="counter",
                 branch_key=BRANCH,
             )
         )
@@ -119,7 +119,7 @@ class ExamIntentTests(BattlefieldIsolation, ExamRegistryIsolation, EvenniaTestCa
     @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
     def test_valid_exam_intent_starts_the_exam_with_requested_by_npc_intent(self):
         self._give_merit(50)
-        outcome = apply_npc_intent(self.examiner, self.player, _exam_intent("E"))
+        outcome = apply_npc_intent(self.reception, self.player, _exam_intent("E"))
         self.assertIsInstance(outcome, IntentOutcome)
         self.assertTrue(outcome.applied)
         records = _read_exams(self.player)
@@ -128,15 +128,15 @@ class ExamIntentTests(BattlefieldIsolation, ExamRegistryIsolation, EvenniaTestCa
         self.assertIsNotNone(read_session(self.player))
 
     @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
-    def test_remote_examiner_discards_only_the_intent(self):
+    def test_remote_reception_discards_only_the_intent(self):
         other = create_object(Room, key="elsewhere")
-        far = create_object(NPC, key="far examiner", location=other)
+        far = create_object(NPC, key="far reception", location=other)
         far.components.add(
-            GuildExaminer.create(far, service_id="far", branch_key=BRANCH)
+            GuildExamReception.create(far, service_id="far", branch_key=BRANCH)
         )
         self._give_merit(50)
         # The completion gate is bypassed so this test exercises the exam
-        # gate's own remote-examiner check: the gate is the first line of
+        # gate's own remote-reception check: the gate is the first line of
         # defense and per-kind domain checks stay in force below it (F22).
         outcome = apply_npc_intent(
             far, self.player, _exam_intent("E"), context_ok=lambda npc, player: True
@@ -148,15 +148,15 @@ class ExamIntentTests(BattlefieldIsolation, ExamRegistryIsolation, EvenniaTestCa
         self.assertEqual(self.player.guild_rank, "F")
 
     @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
-    def test_wrong_branch_examiner_discards_only_the_intent(self):
-        examiner = create_object(NPC, key="other branch examiner", location=self.hall)
-        examiner.components.add(
-            GuildExaminer.create(
-                examiner, service_id="other", branch_key="t_other_branch"
+    def test_wrong_branch_reception_discards_only_the_intent(self):
+        reception = create_object(NPC, key="other branch reception", location=self.hall)
+        reception.components.add(
+            GuildExamReception.create(
+                reception, service_id="other", branch_key="t_other_branch"
             )
         )
         self._give_merit(50)
-        outcome = apply_npc_intent(examiner, self.player, _exam_intent("E"))
+        outcome = apply_npc_intent(reception, self.player, _exam_intent("E"))
         self.assertFalse(outcome.applied)
         self.assertEqual(outcome.reason, "wrong_branch")
         self.assertEqual(_read_exams(self.player), [])
@@ -165,7 +165,7 @@ class ExamIntentTests(BattlefieldIsolation, ExamRegistryIsolation, EvenniaTestCa
     @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
     def test_wrong_next_rank_discards_only_the_intent(self):
         self._give_merit(150)
-        outcome = apply_npc_intent(self.examiner, self.player, _exam_intent("D"))
+        outcome = apply_npc_intent(self.reception, self.player, _exam_intent("D"))
         self.assertFalse(outcome.applied)
         self.assertEqual(outcome.reason, "not_next_rank")
         self.assertEqual(_read_exams(self.player), [])
@@ -173,7 +173,7 @@ class ExamIntentTests(BattlefieldIsolation, ExamRegistryIsolation, EvenniaTestCa
 
     @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
     def test_below_merit_threshold_discards_only_the_intent(self):
-        outcome = apply_npc_intent(self.examiner, self.player, _exam_intent("E"))
+        outcome = apply_npc_intent(self.reception, self.player, _exam_intent("E"))
         self.assertFalse(outcome.applied)
         self.assertEqual(outcome.reason, "below_threshold")
         self.assertEqual(_read_exams(self.player), [])
@@ -182,9 +182,9 @@ class ExamIntentTests(BattlefieldIsolation, ExamRegistryIsolation, EvenniaTestCa
     @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
     def test_active_exam_discards_only_the_intent(self):
         self._give_merit(50)
-        first = apply_npc_intent(self.examiner, self.player, _exam_intent("E"))
+        first = apply_npc_intent(self.reception, self.player, _exam_intent("E"))
         self.assertTrue(first.applied)
-        second = apply_npc_intent(self.examiner, self.player, _exam_intent("E"))
+        second = apply_npc_intent(self.reception, self.player, _exam_intent("E"))
         self.assertFalse(second.applied)
         self.assertEqual(second.reason, "active_combat")
         records = _read_exams(self.player)
@@ -205,7 +205,7 @@ class ExamIntentTests(BattlefieldIsolation, ExamRegistryIsolation, EvenniaTestCa
             {"kind": "request_guild_exam", "target_rank": "E", "threshold": 0},
         ):
             with self.subTest(intent=intent):
-                outcome = apply_npc_intent(self.examiner, self.player, intent)
+                outcome = apply_npc_intent(self.reception, self.player, intent)
                 self.assertFalse(outcome.applied)
                 self.assertIsNotNone(outcome.reason)
                 self.assertEqual(_read_exams(self.player), [])
@@ -229,11 +229,11 @@ class ExamIntentTests(BattlefieldIsolation, ExamRegistryIsolation, EvenniaTestCa
         })
         before = (
             self.player.db.guild_exams, self.player.db.active_combat,
-            dict(self.player.traits.trait_data), self.examiner.relations.has_record(self.player),
+            dict(self.player.traits.trait_data), self.reception.relations.has_record(self.player),
             self.host.relations.has_record(self.player), self.host.location.pk,
         )
         with patch.object(type(self.player), "msg") as msg:
-            outcome = apply_npc_intent(self.examiner, self.player, _exam_intent("E"))
+            outcome = apply_npc_intent(self.reception, self.player, _exam_intent("E"))
         # Planned information is an applied, read-only answer: the caller
         # keeps the in-character speech and the player receives the note.
         self.assertTrue(outcome.applied)
@@ -241,14 +241,14 @@ class ExamIntentTests(BattlefieldIsolation, ExamRegistryIsolation, EvenniaTestCa
         self.assertIn(self.host.key, msg.call_args.args[0])
         after = (
             self.player.db.guild_exams, self.player.db.active_combat,
-            dict(self.player.traits.trait_data), self.examiner.relations.has_record(self.player),
+            dict(self.player.traits.trait_data), self.reception.relations.has_record(self.player),
             self.host.relations.has_record(self.player), self.host.location.pk,
         )
         self.assertEqual(after, before)
 
     @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
     def test_unknown_kind_is_rejected_defensively(self):
-        outcome = apply_npc_intent(self.examiner, self.player, {"kind": "bogus"})
+        outcome = apply_npc_intent(self.reception, self.player, {"kind": "bogus"})
         self.assertFalse(outcome.applied)
         self.assertIn("unknown intent kind", outcome.reason)
 
@@ -257,13 +257,13 @@ class ExamIntentTests(BattlefieldIsolation, ExamRegistryIsolation, EvenniaTestCa
         self._give_merit(50)
         self.player.db.guild_registration = {"branch_key": 123}
         with self.assertRaises(GuildDataError):
-            apply_npc_intent(self.examiner, self.player, _exam_intent("E"))
+            apply_npc_intent(self.reception, self.player, _exam_intent("E"))
         self.assertEqual(_read_exams(self.player), [])
         self.assertIsNone(read_session(self.player))
 
     @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
     def test_none_intent_is_an_applied_noop(self):
-        outcome = apply_npc_intent(self.examiner, self.player, {"kind": "none"})
+        outcome = apply_npc_intent(self.reception, self.player, {"kind": "none"})
         self.assertTrue(outcome.applied)
         self.assertEqual(_read_exams(self.player), [])
         self.assertIsNone(read_session(self.player))
