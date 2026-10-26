@@ -37,8 +37,10 @@ export const decorators = [
 ];
 
 function gameStory(story, context) {
+  // The standalone map editor prototype (docs/design/map-editor/) never
+  // renders under the game shell root; it keeps the live --ui-scale only.
   return {
-    render: () => context.title === "Core/AppShell"
+    render: () => context.title === "Core/AppShell" || context.title === "Design/MapEditor"
       ? h(story())
       : h("div", {
         class: "elosern elosern-root",
