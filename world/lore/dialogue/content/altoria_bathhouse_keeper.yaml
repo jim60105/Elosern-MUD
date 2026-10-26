@@ -1,5 +1,5 @@
 schema_version: 1
-greeting: 浴場管理員伊莎貝爾‧葦沼抱著一疊摺妥的乾淨布巾從水氣深處走出來，嗓門清脆：「新來的吧！男左女右，各自走各自的門，池水引自河水燒得滾燙。要問浴場的規矩就快點問，我後頭還有一大疊布巾等著摺呢！」
+greeting: 浴場櫃檯後頭，伊莎貝爾‧葦沼正把剛烘熱的布巾逐條撫平。一見有人跨進門檻，她便抱著一整疊布巾快步迎上來：「剛進城來洗去一身灰塵啊？男左女右，各自走各自的通道，池水引自清澈河水燒得滾燙。想問規矩就爽快開口，我後頭還有一大疊布巾等著摺呢！」
 topics:
 - topic_id: altoria_bathhouse.topic_01
   keyword: 規矩
@@ -16,18 +16,18 @@ topics:
       lines:
       - kind: speech
         speaker: actor
-        text: 「進這座浴場，有什麼我該照著做的規矩？」
-      - kind: speech
-        speaker: host
-        text: 「哎呀，是精靈客人！規矩很簡單，男左女右，兩邊各走各的門。」
-      - kind: speech
-        speaker: host
-        text: 「我們王都的人族跟獸人習慣遮掩身子進池子，要是看見精靈不遮不掩，大家只敢低頭避開視線，心裡敬畏得很，可不敢多說一句話。」
+        text: 進這座浴場沐浴，有什麼我該照著做的規矩？
       - kind: narration
-        text: 伊莎貝爾把懷裡的布巾往上托了托，眼神裡滿是好奇。
+        text: 伊莎貝爾‧葦沼手裡的布巾猛地一頓，眼睛亮了起來，連忙把手在皮圍裙上擦乾淨。
       - kind: speech
         speaker: host
-        text: 「要是覺得那道隔牆礙事，挑個人少的時候進去，隨心所欲泡個痛快就好啦！」
+        text: 「哎呀，真是難得一見的精靈貴客！浴場的門路很簡單，男左女右，兩邊各走各的門簾，水池也是分開建造。」
+      - kind: speech
+        speaker: host
+        text: 「王都的人族跟獸人向來習慣把身子遮掩得十分嚴密，要是看見精靈貴客袒胸露體走進來，大家心裡只有敬畏，全都會自覺低下頭避開視線，絕沒有人敢隨便議論半句。」
+      - kind: speech
+        speaker: host
+        text: 「要是覺得那道厚牆隔著顯得多餘，挑個午後人少的時辰過來，池子寬敞又清靜，隨心所欲泡個痛快就好啦！」
   - variant_id: high_exposure
     priority: 10
     when:
@@ -39,28 +39,30 @@ topics:
       lines:
       - kind: speech
         speaker: actor
-        text: 「這裡更衣和入池有什麼講究？」
-      - kind: speech
-        speaker: host
-        text: 「哎唷！衣裳都褪成這樣了才來問規矩？快把布巾圍上！」
+        text: 請問這裡更衣入池有什麼講究？隨身衣物該放在哪裡？
       - kind: narration
-        text: 伊莎貝爾手腳俐落抽出大布巾遞過來，順手往兩側通道指了指。
+        text: 伊莎貝爾‧葦沼抬眼一瞧，俐落抽出一條寬大厚實的長布巾遞了過來。
       - kind: speech
         speaker: host
-        text: 「男左女右，門簾後頭有木櫃能放隨身物件。在外頭大道上露著走會惹衛兵盤問，進了這扇門，就快點進池子暖身子吧！」
+        text: 「哎唷，衣裳穿得這麼單薄就闖進來了！快把這條乾布巾圍在肩上，別著了門縫透進來的涼風。」
+      - kind: speech
+        speaker: host
+        text: 「男左女右，穿過厚布簾子就是更衣間，裡頭整排木櫃都能存放隨身佩物。在大道上露出肌膚容易引來城門衛兵盤問，既然進了這扇門，就快進溫暖的水池舒坦泡個透吧！」
   fallback:
     scene_id: altoria_bathhouse.topic_01_scene
     revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「請問這座浴場有什麼規矩？」
+      text: 請問這座公共浴場有什麼規矩？初次過來該注意些什麼？
+    - kind: narration
+      text: 伊莎貝爾‧葦沼把懷裡的布巾往臂彎上托了托，抬手指向通往深處的兩扇厚布門簾。
     - kind: speech
       speaker: host
-      text: 「規矩就一條，男左女右，中間一道厚實磚牆隔開，各走各的門！」
+      text: 「規矩就一條，男左女右，中央一道厚實石牆隔開，各自走各自的通道，二十年來向來分明清楚。」
     - kind: speech
       speaker: host
-      text: 「今天水氣重，我已經在門口叫回來好幾個差點走錯邊的新面孔了。門後有木格能放布鞋與外衣，可別把泥巴踩進池子裡去喔！」
+      text: 「今天水氣熏人，我已經在門口喊回來好幾位走錯通道的冒險者了。更衣處有木格擺放鞋襪外衣，脫妥了再踏進池子，可別把外頭的泥濘帶進水裡去喔！」
 - topic_id: altoria_bathhouse.topic_02
   keyword: 精靈
   label: 精靈
@@ -70,18 +72,18 @@ topics:
     lines:
     - kind: speech
       speaker: actor
-      text: 「聽說浴場偶爾會有精靈過來？」
-    - kind: speech
-      speaker: host
-      text: 「精靈客人幾個月難得遇上一次，全大陸據說也就幾百位呢！看待身子的想法跟我們完全不同。」
-    - kind: speech
-      speaker: host
-      text: 「我們平原民跟獸人脫了衣裳都要遮掩，彼此避開視線。精靈可不一樣，袒胸露體如同吹風喝水般自然，根本沒有羞恥觀念。」
+      text: 聽說浴場偶爾會有精靈客人前來？他們沐浴也有不同習俗嗎？
     - kind: narration
-      text: 伊莎貝爾放慢了說話節奏，目光饒富興味。
+      text: 伊莎貝爾‧葦沼拉過櫃檯邊的矮木凳坐下，嗓音放柔了些許，眼裡滿是興致。
     - kind: speech
       speaker: host
-      text: 「而且大家見了精靈，敬畏都來不及了，哪有人敢多嘴？進了水池各泡各處，相安無事就好啦！」
+      text: 「幾個月難得遇上一回呢！全大陸據說也就三百位精靈，能走進我這間浴場更是天大的稀罕事。他們看待軀體的觀念跟我們完全不一樣。」
+    - kind: speech
+      speaker: host
+      text: 「我們平原民與獸人寬衣入浴時都要小心遮掩，唯恐失了禮貌。精靈視身子與呼吸吹風一樣自然，全無半分羞恥觀念。其他種族見了精靈，敬畏尊崇都來不及，哪有人敢多嘴議論？」
+    - kind: speech
+      speaker: host
+      text: 「誰對誰錯我顧店二十年也說不準，反正進了浴池各自溫暖身軀，彼此相安無事，這便是最好的規律啦！」
 - topic_id: altoria_bathhouse.topic_03
   keyword: 泡湯
   label: 泡湯
@@ -91,13 +93,15 @@ topics:
     lines:
     - kind: speech
       speaker: actor
-      text: 「這池水泡起來感覺如何？」
+      text: 這座大池的水質泡起來感覺如何？在外奔波久了真能舒緩疲勞嗎？
+    - kind: narration
+      text: 伊莎貝爾‧葦沼拍了拍手邊擦得潔淨的木桶，神情頗為自豪。
     - kind: speech
       speaker: host
-      text: 「水溫燒得夠熱，引的是乾淨河水。泡到額頭冒汗再爬起來，拿木桶舀水沖個涼，骨頭裡的酸痛就散了大半！」
+      text: 「水溫燒得極足，引的是城外清澈活水，池底鋪滿洗淨的圓卵石。泡到額頭沁出細汗再起身，舀一桶涼水從頭澆下，骨頭深處的沉重酸脹頓時煙消雲散！」
     - kind: speech
       speaker: host
-      text: 「不過可別聽信外頭的傳言，說什麼泡湯能治刀傷箭傷。真受了重傷就去找治療師施法或是買藥水，我的池子可沒有神力喔！」
+      text: 「不過外頭那些誇張傳聞可別輕信，常有人吹噓泡溫水能癒合刀傷箭痕，那是胡謅。要是真受了皮肉重傷，快去東市找鍊金術士買療傷藥劑，我的池子可沒有神聖奇蹟喔！」
 - topic_id: altoria_bathhouse.topic_04
   keyword: 歇息
   label: 歇息
@@ -107,10 +111,12 @@ topics:
     lines:
     - kind: speech
       speaker: actor
-      text: 「泡完湯之後，這裡有地方歇會兒嗎？」
+      text: 泡完熱水之後，這裡有長凳或是通鋪能躺下小憩片刻嗎？
+    - kind: narration
+      text: 伊莎貝爾‧葦沼指向前堂兩排磨得光滑的長靠椅，順手遞上一只盛滿清泉的陶杯。
     - kind: speech
       speaker: host
-      text: 「前堂擺著兩排長凳，擦乾身子坐著吹風、喝口清水很舒服。不過這邊水氣暖熱，坐久了眼皮直打架。」
+      text: 「前堂擺著兩列長靠椅，擦乾了身子坐在那兒迎著涼風喝口清水，整個人通體舒暢。只是屋裡水氣氤氳，坐久了眼皮難免發沉。」
     - kind: speech
       speaker: host
-      text: 「真要找張舒服的床躺下睡一整夜，順著客棧巷走兩步去爐火旅店找溫弗蕾德，她那邊棉被曬得乾鬆，睡起來才踏實呢！」
+      text: 「真想舒展四肢睡上一整夜，順著客棧巷往前走幾步就是爐火旅店。女主人溫弗蕾德準備的鵝絨被曬得乾燥鬆軟，在那裡安睡才算真正卸下旅途重擔呢！」

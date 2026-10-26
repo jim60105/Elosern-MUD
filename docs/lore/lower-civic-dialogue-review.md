@@ -22,33 +22,33 @@ Review date: 2026-10-26.
    - `skill://chinese-content-writing-guideline`
    - `skill://writing-style-guideline`
 
-## 2. Topic Inventory and Intent
+## 2. Topic Inventory and Refined Prose Intent
 
 ### `altoria_bathhouse_keeper.yaml` (`altoria_bathhouse`)
 
-- Opening (`greeting`): Isabel emerges from steam with folded towels, brisk and welcoming, stating the core rule and asking visitors to be concise as she has towels to fold.
+- Opening (`greeting`): Isabel emerges briskly from the steam with folded towels, welcoming guests warmly while keeping her brisk, busy attitude ("想問規矩就爽快開口，我後頭還有一大疊布巾等著摺呢！").
 - `altoria_bathhouse.topic_01` (`規矩`):
-  - `fallback` (`scene_id: altoria_bathhouse.topic_01_scene`, `revision: r2`): 3 lines. Explains gender-divided entrances ("男左女右"), brick wall separation, and exterior mud-shoe storage.
-  - Variant `elf_guest` (`variant_id: elf_guest`, `priority: 20`, `when: {kind: race_is, race_key: elf}`): 5 lines. Isabel welcomes an elf guest, notes how humans and beastfolk look away out of awe without daring to judge, and invites them to enjoy the bath when fewer patrons are present if the wall is bothersome. Priority 20 ensures this combined/specific ethnic reaction takes precedence.
-  - Variant `high_exposure` (`variant_id: high_exposure`, `priority: 10`, `when: {kind: exposure, minimum: 3}`): 4 lines. Isabel acts briskly to offer a towel and direct the underdressed guest inside to prevent guard scrutiny outside.
+  - `fallback` (`scene_id: altoria_bathhouse.topic_01_scene`, `revision: r2`): 4 lines. Actor asks a genuine spoken question about first-time bath rules. Isabel gestures to the two curtained entrances, explaining the stone wall division and clean shoe storage with concrete reasoning.
+  - Variant `elf_guest` (`variant_id: elf_guest`, `priority: 20`, `when: {kind: race_is, race_key: elf}`): 5 lines. Isabel pauses in awe at seeing an elf guest. Explains how humans and beastfolk look away out of deep reverence without daring to judge, and warmly invites the guest to enjoy a quiet, uninhibited soak during less busy hours. Priority 20 ensures this combined ethnic reaction takes precedence.
+  - Variant `high_exposure` (`variant_id: high_exposure`, `priority: 10`, `when: {kind: exposure, minimum: 3}`): 4 lines. Isabel acts promptly with hospitality, handing over a thick towel to protect from drafts and gate guard scrutiny, guiding them to warm private lockers.
 - `altoria_bathhouse.topic_02` (`精靈`):
   - `fallback` (`scene_id: altoria_bathhouse.topic_02_scene`, `revision: r2`): 5 lines. Explains elven rarity (~300 on the continent), their natural attitude toward the body without shame, and other races' awe-inspired acceptance.
 - `altoria_bathhouse.topic_03` (`泡湯`):
-  - `fallback` (`scene_id: altoria_bathhouse.topic_03_scene`, `revision: r2`): 3 lines. Describes heated river water relaxing soreness, while explicitly refusing the myth that baths heal weapon wounds (referring players to healers/potions).
+  - `fallback` (`scene_id: altoria_bathhouse.topic_03_scene`, `revision: r2`): 4 lines. Describes clean heated river water over round stones soothing travel exhaustion, while firmly disclaiming myths about magical healing (redirecting wound treatment to East Market alchemists).
 - `altoria_bathhouse.topic_04` (`歇息`):
-  - `fallback` (`scene_id: altoria_bathhouse.topic_04_scene`, `revision: r2`): 3 lines. Benches in the hall are for cooling down; overnight sleep is directed to Winnifred at Hearthstone Inn in Inn Lane.
+  - `fallback` (`scene_id: altoria_bathhouse.topic_04_scene`, `revision: r2`): 4 lines. Offers hall benches and spring water for cooling down; directs overnight travelers seeking comfortable feather beds to Winnifred at Hearthstone Inn.
 
 ### `altoria_guard_captain.yaml` (`altoria_guardhouse`)
 
-- Opening (`greeting`): Thorwald turns from the window in chainmail, formal and clear, setting boundaries: directions and security are answered; no commissions or bounties exist here.
+- Opening (`greeting`): Thorwald turns sharply from inspecting the south gate, chainmail gleaming, stating duties clearly: directions and security are answered; no commissions or bounties exist here.
 - `altoria_guardhouse.topic_01` (`進城`):
-  - `fallback` (`scene_id: altoria_guardhouse.topic_01_scene`, `revision: r2`): 5 lines. Clear 1st/2nd sequence following South Boulevard to Central Plaza, Guild Front, Market Street, and Holy Steps, pointing at the wall map.
+  - `fallback` (`scene_id: altoria_guardhouse.topic_01_scene`, `revision: r2`): 5 lines. Uses wall map and points out South Boulevard, Central Plaza, Guild Front, Market Street, and Holy Steps with firm spatial orientation.
 - `altoria_guardhouse.topic_02` (`找活`):
-  - `fallback` (`scene_id: altoria_guardhouse.topic_02_scene`, `revision: r2`): 5 lines. Guardhouse issues zero commissions; directs travelers to the Adventurers Guild bulletin board via Central Plaza.
+  - `fallback` (`scene_id: altoria_guardhouse.topic_02_scene`, `revision: r2`): 5 lines. Guardhouse issues zero commissions; explains the civic principle of public defense vs. private mutual aid, directing work-seekers to guild hall boards.
 - `altoria_guardhouse.topic_03` (`治安`):
-  - `fallback` (`scene_id: altoria_guardhouse.topic_03_scene`, `revision: r2`): 5 lines. Explains guard patrols in blue tabards; specifies guard jurisdiction (street defense and order) while disclaiming private trade or gambling disputes.
+  - `fallback` (`scene_id: altoria_guardhouse.topic_03_scene`, `revision: r2`): 5 lines. Explains patrolling guards in blue tabards; clarifies guard jurisdiction (defense against theft, brawls, beasts) while disclaiming private merchant price disputes.
 - `altoria_guardhouse.topic_04` (`過夜`):
-  - `fallback` (`scene_id: altoria_guardhouse.topic_04_scene`, `revision: r2`): 5 lines. Values order; guardhouse only has bare wooden benches with no beds or locks; directs travelers to Hearthstone Inn and Moonlit Tavern in Inn Lane.
+  - `fallback` (`scene_id: altoria_guardhouse.topic_04_scene`, `revision: r2`): 5 lines. Value of order; guardhouse only has bare wooden benches with no beds or locks; directs travelers to Hearthstone Inn and Moonlit Tavern in Inn Lane.
 
 ## 3. Retained Service Behaviours and Exclusions
 

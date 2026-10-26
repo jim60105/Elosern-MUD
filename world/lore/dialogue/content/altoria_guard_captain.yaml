@@ -1,5 +1,5 @@
 schema_version: 1
-greeting: 衛兵隊長托瓦德‧鄧堡從值房窗邊轉過身，鎖子甲隨動作發出輕微的金屬摩擦聲，神情嚴整：「剛從南門進城？這一帶由我負責。問路與治安，我說明得十分清楚。另外先說在前頭，駐所牆上沒有任何告示或懸賞單，要找委託請移步至冒險者公會。」
+greeting: 衛兵駐所的值房內，托瓦德‧鄧堡正立於窗前巡視門洞通道。聽見腳步聲，他俐落轉過身來，鎖子甲在火盆映照下泛著冷光，神情嚴整：「剛自南門踏入王都？這一帶市街的防務由我掌管。問路指引與街面秩序，我說明得十分清楚。另外先說在前頭，本駐所牆面絕不張貼任何委託或懸賞，若想尋求差事請移步至冒險者公會。」
 topics:
 - topic_id: altoria_guardhouse.topic_01
   keyword: 進城
@@ -10,18 +10,18 @@ topics:
     lines:
     - kind: speech
       speaker: actor
-      text: 「衛兵隊長，請問進城之後主要市街該怎麼走？」
-    - kind: speech
-      speaker: host
-      text: 「聽好，路線很明確。第一，腳下這條是南大道，筆直往北走，穿過大道北段便抵達中央廣場。」
-    - kind: speech
-      speaker: host
-      text: 「第二，到了中央廣場，東側是公會前與冒險者公會，西側是市場街，北側石階則通往上層城區。」
+      text: 衛兵隊長，我初次抵達這座王都，請問主要市街該順著哪條路前進？
     - kind: narration
-      text: 托瓦德抬手指向牆上懸掛的輿圖，指尖俐落劃過主要街道的走向。
+      text: 托瓦德‧鄧堡抬手指向牆上懸掛的羊皮紙輿圖，指尖沉穩劃過主要市街的走向。
     - kind: speech
       speaker: host
-      text: 「各處岔路都設有木質路牌。記住這幾處地標，便不會在城裡迷路。」
+      text: 「聽好，城內路線極為規整。第一，腳下這條寬闊石板路是南大道，筆直往北穿過大道北段，便能抵達中央廣場。」
+    - kind: speech
+      speaker: host
+      text: 「第二，抵達中央廣場後，東側是公會前與冒險者公會，西側連接著商販雲集的市場街，北側石階則直通上層城區。」
+    - kind: speech
+      speaker: host
+      text: 「重要路口皆立有王國工坊精製的木質路牌。牢記這幾處核心地標，便絕不會在下城區走岔迷途。」
 - topic_id: altoria_guardhouse.topic_02
   keyword: 找活
   label: 找活
@@ -31,18 +31,18 @@ topics:
     lines:
     - kind: speech
       speaker: actor
-      text: 「駐所這邊有能接洽的工作或是差事嗎？」
-    - kind: speech
-      speaker: host
-      text: 「駐所職責在於防務與維持秩序，一概不發放任何委託，以後也不會例外。」
-    - kind: speech
-      speaker: host
-      text: 「需要找差事賺取酬勞，順著南大道往北前往中央廣場，再轉往東側的冒險者公會大廳。告示板上張貼著各類委託，看妥了就找公會辦事員登記辦理。」
+      text: 衛兵駐所這邊是否有公家派發的討伐或是巡守差事能夠接洽？
     - kind: narration
-      text: 托瓦德神色肅穆，左眉傷疤在火盆光芒映照下顯得格外剛硬。
+      text: 托瓦德‧鄧堡按著腰間佩劍的黃銅柄首，左眉舊傷在火光中顯得格外剛毅。
     - kind: speech
       speaker: host
-      text: 「如果是街坊鄰里私下託付，屬於雙方私下約定，駐所一概不過問。」
+      text: 「衛兵隊職責在於守衛城門與防衛公眾秩序，駐所一概不派發委託差事，以後也絕無例外。」
+    - kind: speech
+      speaker: host
+      text: 「若想接洽委託換取賞金，沿著南大道往北抵達中央廣場，轉向東側即可見到冒險者公會大廳。告示板上排列著各階層委託，挑選合適的便找公會辦事員辦理登記。」
+    - kind: speech
+      speaker: host
+      text: 「至於街坊鄰里私下拜託的雜務，純屬市民之間的互助約定，駐所一概不過問。公私分明，方能守住王都法度。」
 - topic_id: altoria_guardhouse.topic_03
   keyword: 治安
   label: 治安
@@ -52,18 +52,18 @@ topics:
     lines:
     - kind: speech
       speaker: actor
-      text: 「城裡的治安狀況如何，遇到麻煩該找誰處置？」
-    - kind: speech
-      speaker: host
-      text: 「南門一帶由衛兵隊輪值巡邏。巡街時若是遇上竊盜或械鬥，找身穿藍色罩袍佩戴銅牌的衛兵求援。」
-    - kind: speech
-      speaker: host
-      text: 「我們只管街面秩序與公眾防衛。如果是買賣上的價碼糾紛或是私下賭約，不屬於駐所受理範圍，請自行協商。」
+      text: 請問南門一帶的治安狀況如何？如果在街面遇上爭端或是竊案該找誰處置？
     - kind: narration
-      text: 托瓦德按著佩劍長柄，目光冷靜掃向拱門通道下來往的人流。
+      text: 托瓦德‧鄧堡微仰起頭，目光自城門洞下的石板通道冷靜掠過。
     - kind: speech
       speaker: host
-      text: 「王都講求秩序。只要安分守己，城裡各處街區皆有衛兵隊確保平安。」
+      text: 「南門一帶由衛兵隊日夜輪流值更。巡街時若遭遇竊盜、械鬥或魔獸驚擾，儘管尋找身著藍色罩袍、佩戴銅牌的執勤衛兵前來彈壓。」
+    - kind: speech
+      speaker: host
+      text: 「我們掌管的是城區安全防衛與公眾秩序。若是店鋪買賣的價碼分歧，或是私下博弈造成的糾紛，概由雙方自行協商解決，不歸駐所受理範圍。」
+    - kind: speech
+      speaker: host
+      text: 「阿爾托利亞王國崇尚騎士精神與律法。只要安分守己遵循法度，巡邏衛兵便會確保你在城內的平安。」
 - topic_id: altoria_guardhouse.topic_04
   keyword: 過夜
   label: 過夜
@@ -73,15 +73,15 @@ topics:
     lines:
     - kind: speech
       speaker: actor
-      text: 「天色若晚了，南門附近哪裡方便投宿落腳？」
-    - kind: speech
-      speaker: host
-      text: 「要找地方過夜，趁天黑前順著南大道往北，右手邊轉進客棧巷，那裡有爐火旅店，隔壁則是醉月酒館。」
-    - kind: speech
-      speaker: host
-      text: 「爐火旅店有乾淨床位與厚實門閂，價錢合宜，剛抵達王都的旅客多半在那裡歇宿。」
+      text: 如果天色漸暗想在南門附近投宿，不知哪裡有整潔且安全的客棧？
     - kind: narration
-      text: 托瓦德朝值房內側兩條粗木長凳示意。
+      text: 托瓦德‧鄧堡朝值房角落兩張擦得光潔的硬木長凳示意，語氣平靜且不容置疑。
     - kind: speech
       speaker: host
-      text: 「衛兵值房只有硬木長凳，既無被褥也沒有門閂，更不提供旅人過夜。去客棧巷安頓才是明智之舉。」
+      text: 「想找舒適安歇的地方，趁著日落前順著南大道往北走，右手邊拐進客棧巷，那裡座落著爐火旅店，鄰近則是醉月酒館。」
+    - kind: speech
+      speaker: host
+      text: 「爐火旅店備有厚實木門閂與乾燥床鋪，收費公道，遠道而來的商旅多半選擇在那裡落腳。」
+    - kind: speech
+      speaker: host
+      text: 「這間衛兵值房只有硬木長凳與執勤兵器，既無棉被亦無防護門閂，絕不對外開放留宿。動身前往客棧巷才是妥當抉擇。」
