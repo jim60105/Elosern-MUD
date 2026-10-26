@@ -181,18 +181,22 @@ Each change lives under `openspec/changes/<change>/` and contains its proposal, 
 
 The shared wire contract, source-design traceability, detailed dependency/conflict matrix, and independent-review disposition are in [the delta-contract design](../../../openspec/changes/webclient-delta-contract/design.md). Use each change's CLI status and artifact paths at apply time; this inventory does not assert that any implementation is complete.
 
-| ID | Change | Implementation scope | Direct prerequisites |
-|---|---|---|---|
-| D | [webclient-delta-contract](../../../openspec/changes/webclient-delta-contract/proposal.md) | Exact-base delta envelopes, explicit removals, metadata-only updates, staged atomic admission, and producer/fixture migration | None |
-| B | [webclient-publication-baseline](../../../openspec/changes/webclient-publication-baseline/proposal.md) | Isolated JSON-aware candidate comparison, unchanged completion, one publication owner, always-Deferred receipts, and complete publisher cutover | D |
-| P | [webclient-publication-settlements](../../../openspec/changes/webclient-publication-settlements/proposal.md) | Causal synchronous commit groups, overlapping text/graphical ingress, and all-watcher callback ordering | B |
-| C | [webclient-publication-codec](../../../openspec/changes/webclient-publication-codec/proposal.md) | Bounded server multipart encoding, shared constants, and complete preflight before sending | B |
-| A | [webclient-publication-assembly](../../../openspec/changes/webclient-publication-assembly/proposal.md) | Atomic browser assembly, transport routing, bounded buffers, supersession, and lifecycle teardown | C |
-| R | [webclient-sync-recovery](../../../openspec/changes/webclient-sync-recovery/proposal.md) | Coalesced full recovery, action-result revision safety, mutation locking, and bounded recovery failure | A |
-| M | [webclient-movement-alignment](../../../openspec/changes/webclient-movement-alignment/proposal.md) | Authoritative area/instance identity and committed movement checkpoints through graphical/text paths | P |
-| S | [webclient-settlement-alignment](../../../openspec/changes/webclient-settlement-alignment/proposal.md) | Terminal combat and completed rest/sleep/explicit-skip checkpoints with causal grouping | M |
-| I | [webclient-immutable-adoption](../../../openspec/changes/webclient-immutable-adoption/proposal.md) | Immutable committed reads, unchanged reference retention, detached snapshot isolation, consumer migration, and local UI preservation | R |
-| F | [webclient-sync-functional-smoke](../../../openspec/changes/webclient-sync-functional-smoke/proposal.md) | Real socket/browser scenarios for incremental updates, checkpoints, oversized delivery, and forced recovery | S and I |
+| ID | Change | Implementation scope | Frontend surface | Direct prerequisites |
+|---|---|---|---|---|
+| D | [webclient-delta-contract](../../../openspec/changes/webclient-delta-contract/proposal.md) | Exact-base delta envelopes, explicit removals, metadata-only updates, staged atomic admission, and producer/fixture migration | Browser protocol JS plus Vue fixture/story updates; no visual change | None |
+| B | [webclient-publication-baseline](../../../openspec/changes/webclient-publication-baseline/proposal.md) | Isolated JSON-aware candidate comparison, unchanged completion, one publication owner, always-Deferred receipts, and complete publisher cutover | None; server publication logic | D |
+| P | [webclient-publication-settlements](../../../openspec/changes/webclient-publication-settlements/proposal.md) | Causal synchronous commit groups, overlapping text/graphical ingress, and all-watcher callback ordering | None; server grouping logic | B |
+| C | [webclient-publication-codec](../../../openspec/changes/webclient-publication-codec/proposal.md) | Bounded server multipart encoding, shared constants, and complete preflight before sending | Browser protocol constants/exports only; sender stays server-side | B |
+| A | [webclient-publication-assembly](../../../openspec/changes/webclient-publication-assembly/proposal.md) | Atomic browser assembly, transport routing, bounded buffers, supersession, and lifecycle teardown | Browser protocol/transport logic only; assembly is invisible to users | C |
+| R | [webclient-sync-recovery](../../../openspec/changes/webclient-sync-recovery/proposal.md) | Coalesced full recovery, action-result revision safety, mutation locking, and bounded recovery failure | Browser state logic plus the existing view failure/lock surface; no new visual design | A |
+| M | [webclient-movement-alignment](../../../openspec/changes/webclient-movement-alignment/proposal.md) | Authoritative area/instance identity and committed movement checkpoints through graphical/text paths | None; server movement identity/checkpoint logic | P |
+| S | [webclient-settlement-alignment](../../../openspec/changes/webclient-settlement-alignment/proposal.md) | Terminal combat and completed rest/sleep/explicit-skip checkpoints with causal grouping | None; server settlement logic | M |
+| I | [webclient-immutable-adoption](../../../openspec/changes/webclient-immutable-adoption/proposal.md) | Immutable committed reads, unchanged reference retention, detached snapshot isolation, consumer migration, and local UI preservation | Frontend UI behavior (component consumers, focus/menu/form/animation preservation); no visual redesign | R |
+| F | [webclient-sync-functional-smoke](../../../openspec/changes/webclient-sync-functional-smoke/proposal.md) | Real socket/browser scenarios for incremental updates, checkpoints, oversized delivery, and forced recovery | Browser test code only; no shipped UI | S and I |
+
+### Frontend and visual scope
+
+No proposal adds, restyles, or relayouts UI; the frontend split is about where code changes land, not about visual design. Four changes are server-only logic: B, P, M, and S. D, C, A, and R touch browser JavaScript (protocol, transport, state, and the existing failure/lock projection) without changing rendering. I is the only change whose acceptance criteria are about frontend UI behavior: it preserves focus, open menus, unsaved forms, playback, and animations across alignment while migrating Vue consumers to committed reads, and it explicitly forbids menu redesign. F only adds browser tests. Any future visual work would need a separate design.
 
 ### Panel inventory ownership
 
