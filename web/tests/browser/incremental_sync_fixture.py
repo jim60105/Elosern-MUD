@@ -278,10 +278,11 @@ def run(caller: Any, case: str) -> str:
         return _report(case, receipt, panel)
     if case == "delta":
         panel = oversized_payload(DELTA_MARKER, DELTA_PANEL_BYTES)
+        before = coordinator.published_revision
         receipt = _publish_candidates(
             session, caller, coordinator, {OVERSIZED_PANEL: panel}
         )
-        return _report(case, receipt, panel)
+        return _report(case, receipt, panel, extra=str(before))
     if case == "omit":
         mutated = _mutate_canonical_hp(caller)
         panel = oversized_payload(SNAPSHOT_MARKER, SNAPSHOT_PANEL_BYTES)
@@ -294,7 +295,9 @@ def run(caller: Any, case: str) -> str:
 
     context = build_presentation_context(session, caller)
     panel = coordinator.registry.render(OVERSIZED_PANEL, context)
+    before = coordinator.published_revision
     receipt = _publish_candidates(
         session, caller, coordinator, {OVERSIZED_PANEL: panel}
     )
-    return _report(case, receipt, panel)
+    after = coordinator.published_revision
+    return _report(case, receipt, panel, extra=f"{before}:{after}")

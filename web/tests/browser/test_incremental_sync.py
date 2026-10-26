@@ -36,6 +36,7 @@ Run one journey at a time (the full browser suite is CI-owned)::
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 
@@ -51,11 +52,12 @@ from .browser_helpers import (
     open_command_line,
     outbound_messages,
     store_state,
+    wait_for_shell_active,
     wait_for_presentation_settled,
     wait_for_store_state,
 )
 from .harness import ManagedServer, ManagedServerTearDownMixin
-from .incremental_sync_fixture import second_map_xyz, xyz_arg
+from .incremental_sync_fixture import first_gate_xyz, second_map_xyz, xyz_arg
 
 SNAPSHOT = "ui_snapshot"
 UPDATE = "ui_update"
@@ -123,12 +125,10 @@ _INSTALL_GATE = """() => {
   const root = window.Evennia;
   const original = root.emit;
   const gate = {
-    dropRevision: null,
-    holdSnapshot: false,
-    corruptSnapshot: false,
-    dropped: [],
-    held: [],
+    corruptDeltaBase: null,
+    corruptSnapshotAbove: null,
     corrupted: [],
+    received: [],
   };
   const matches = (name, args) => {
     const envelope = args && args[0];
@@ -140,18 +140,24 @@ _INSTALL_GATE = """() => {
   root.emit = function (name, args, kwargs) {
     if (name === 'ui_snapshot' || name === 'ui_update' || name === 'ui_publication_part') {
       const seen = matches(name, args);
-      if (gate.dropRevision !== null && seen.revision === gate.dropRevision) {
-        gate.dropRevision = null;
-        gate.dropped.push(name);
-        return undefined;
+      if (gate.corruptDeltaBase !== null && name === 'ui_update') {
+        const value = gate.corruptDeltaBase;
+        gate.corruptDeltaBase = null;
+        const broken = {};
+        if (seen.envelope && typeof seen.envelope === 'object') {
+          for (const key of Object.keys(seen.envelope)) { broken[key] = seen.envelope[key]; }
+        }
+        broken.base_revision = value;
+        gate.corrupted.push('ui_update');
+        return original.call(root, name, [broken], kwargs);
       }
-      if (gate.holdSnapshot && name === 'ui_snapshot') {
-        gate.holdSnapshot = false;
-        gate.held.push([name, args, kwargs]);
-        return undefined;
-      }
-      if (gate.corruptSnapshot && name === 'ui_snapshot') {
-        gate.corruptSnapshot = false;
+      if (
+        gate.corruptSnapshotAbove !== null &&
+        name === 'ui_snapshot' &&
+        typeof seen.revision === 'number' &&
+        seen.revision > gate.corruptSnapshotAbove
+      ) {
+        gate.corruptSnapshotAbove = null;
         const broken = {};
         if (seen.envelope && typeof seen.envelope === 'object') {
           for (const key of Object.keys(seen.envelope)) { broken[key] = seen.envelope[key]; }
@@ -168,26 +174,41 @@ _INSTALL_GATE = """() => {
     Object.assign(gate, options || {});
     return true;
   };
-  window.__syncGateRelease = function () {
-    const held = gate.held.splice(0, gate.held.length);
-    for (const entry of held) { original.call(root, entry[0], entry[1], entry[2]); }
-    return held.length;
-  };
   window.__syncGateState = function () {
     return {
-      dropped: gate.dropped.length,
-      held: gate.held.length,
       corrupted: gate.corrupted.length,
+      received: gate.received.slice(),
     };
   };
   window.__syncGateRestore = function () {
     root.emit = original;
+    if (gate.patchedReceive) {
+      window.__elosernBridge.store.receive = gate.originalReceive;
+    }
     delete window.__syncGate;
     delete window.__syncGateArm;
-    delete window.__syncGateRelease;
     delete window.__syncGateState;
     delete window.__syncGateRestore;
     return true;
+  };
+  // Record the reducer's own verdict per presentation frame: a rejected frame
+  // is the difference between "the server published X" and "the browser
+  // adopted X", which is exactly what a fault scenario must tell apart.
+  const store = window.__elosernBridge.store;
+  gate.originalReceive = store.receive;
+  gate.patchedReceive = true;
+  store.receive = function (generation, name, args, kwargs) {
+    const result = gate.originalReceive.call(this, generation, name, args, kwargs);
+    if (typeof name === 'string' && name.indexOf('ui_') === 0) {
+      const envelope = args && args[0];
+      gate.received.push([
+        name,
+        envelope && typeof envelope === 'object' ? envelope.revision : null,
+        result && result.accepted,
+        result && result.reason,
+      ]);
+    }
+    return result;
   };
   return true;
 }"""
@@ -196,7 +217,8 @@ _INSTALL_GATE = """() => {
 # write attempt changed anything, and the authoritative values afterwards.
 _PROBE_COMMITTED = """() => {
   const store = window.__elosernBridge.store;
-  const record = store.getCommittedState();
+  const records = window.__syncTrace.records;
+  const record = records[records.length - 1];
   const panel = record.panels && record.panels.status ? record.panels.status : null;
   const before = {
     revision: record.revision,
@@ -207,7 +229,7 @@ _PROBE_COMMITTED = """() => {
   let panelWriteThrew = false;
   try { record.revision = 999999999; } catch (error) { revisionWriteThrew = true; }
   try { if (panel !== null) { panel.available = false; } } catch (error) { panelWriteThrew = true; }
-  const after = store.getCommittedState();
+  const after = store.view;
   return {
     frozen: Object.isFrozen(record),
     panelFrozen: panel === null ? null : Object.isFrozen(panel),
@@ -286,6 +308,30 @@ def _results(frames: list[dict], mark: int, revision: int | None = None) -> list
     return matched
 
 
+def _hp_trait(state: dict) -> int:
+    """The committed ``character`` panel's current hp value."""
+    for row in state["panels"]["character"]["traits"]:
+        if row["key"] == "hp":
+            return int(row["current"])
+    raise AssertionError("the character panel carries no hp trait")
+
+
+def _hp_at(page, revision: int) -> int | None:
+    """The current hp value in the traced committed record at ``revision``."""
+    return page.evaluate(
+        """([revision]) => {
+          const records = window.__syncTrace.records.filter(
+            (record) => record.revision === revision);
+          if (records.length === 0) { return null; }
+          const panel = records[records.length - 1].panels.character || null;
+          if (!panel || !Array.isArray(panel.traits)) { return null; }
+          const row = panel.traits.find((trait) => trait.key === 'hp');
+          return row ? row.current : null;
+        }""",
+        [revision],
+    )
+
+
 class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     """Real publication-path journeys against one dedicated managed runtime."""
 
@@ -309,13 +355,91 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
 
     def _open(self):
         """A logged-in page with the outbound recorder, frame capture and trace."""
-        page = self.logged_in_page()
-        install_outbound_recorder(page)
+        # The socket is created during login, so the frame capture has to be
+        # armed on the page before the first navigation; a listener attached
+        # afterwards would only see sockets opened by a later reconnect.
+        page = self.new_page()
         frames = _capture_frames(page)
+        self._login(page)
+        install_outbound_recorder(page)
+        # The trace is installed as soon as the bridge exists, so the initial
+        # snapshot (the journey's baseline) is one of its committed records.
+        page.wait_for_function(
+            "() => !!(window.__elosernBridge && window.__elosernBridge.store)",
+            timeout=60000,
+        )
         page.evaluate(_INSTALL_TRACE)
+        wait_for_shell_active(page)
         wait_for_store_state(page, _store_active, timeout=60000)
         wait_for_presentation_settled(page)
+        self._settle_episode(page)
+        # The initial snapshot may already have committed before the bridge
+        # existed, so the journey opens with the player's own explicit
+        # synchronize: one real complete checkpoint that the trace certainly
+        # records, and the baseline every later identity comparison uses.
+        baseline = store_state(page)["revision"]
+        page.evaluate("() => Elosern.actions.client.sync()")
+        wait_for_store_state(page, lambda s: s["revision"] > baseline, timeout=90000)
+        wait_for_presentation_settled(page)
+        self.assertEqual(
+            store_state(page)["recovery"]["status"], "idle",
+            "the journey starts from a clean recovery state",
+        )
+        self.assertIsNot(store_state(page).get("mutationsLocked"), True)
         return page, frames
+
+    def _settle_episode(self, page) -> None:
+        """Start from a generation whose recovery state is idle.
+
+        The managed runtime's one-time initial-setup restart can leave a login
+        with a terminal recovery episode (a frame of the retired sequence was
+        rejected while the portal re-attached). That is setup, not a scenario
+        condition: the journey reconnects once, which is the client's own
+        documented exit from a terminal episode, and then requires a clean
+        state before any fault is injected.
+        """
+        from .browser_helpers import suppress_one_shot_recovery_reload
+
+        state = store_state(page)
+        if state["recovery"]["status"] == "idle" and state.get("mutationsLocked") is not True:
+            return
+        suppress_one_shot_recovery_reload(page)
+        generation = state.get("generation") or 1
+        page.evaluate("() => { if (window.__elosernWs) window.__elosernWs.close(4001); }")
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("generation") or 0) > generation
+            and s.get("recovery", {}).get("status") == "idle"
+            and _store_active(s),
+            timeout=90000,
+        )
+        wait_for_presentation_settled(page)
+
+    def _login(self, page) -> None:
+        """Authenticate and open the WebClient without waiting for the shell.
+
+        ``login_and_open`` waits for the active shell before returning, which
+        would install the commit trace after the journey's baseline snapshot
+        published. This mirrors its navigation and its bounded retry over the
+        one-time initial-setup restart, and leaves the shell wait to ``_open``.
+        """
+        from .browser_helpers import BROWSER_ACCOUNT, BROWSER_PASSWORD
+
+        login_url = f"{self.base_url}/auth/login/"
+        for attempt in range(4):
+            page.goto(login_url)
+            try:
+                page.wait_for_selector("#id_username", timeout=20000)
+                break
+            except Exception:
+                if attempt == 3:
+                    raise
+                page.wait_for_timeout(1500)
+        page.fill("#id_username", BROWSER_ACCOUNT)
+        page.fill("#id_password", BROWSER_PASSWORD)
+        page.click('input[type="submit"]')
+        page.wait_for_load_state("networkidle")
+        page.goto(self.webclient_url)
 
     def _install_gate(self, page) -> None:
         page.evaluate(_INSTALL_GATE)
@@ -446,6 +570,30 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
         )
         return envelope
 
+    def _assert_locked_episode(self, page, base: int, panel_names: set) -> None:
+        """Assert the recorded episode kept the prior state and locked mutations.
+
+        The subscriber's records are the contract's own read of every
+        transition, so the locked window is asserted from them rather than by
+        delaying a live frame.
+        """
+        episodes = page.evaluate(
+            """() => window.__syncTrace.records.map((record) => [
+                 record.revision,
+                 record.recovery.status,
+                 record.mutationsLocked,
+                 Object.keys(record.panels || {}).sort(),
+               ])"""
+        )
+        window = [entry for entry in episodes if entry[1] in ("needed", "requested")]
+        self.assertTrue(window, f"no recovery episode was recorded: {episodes}")
+        for revision, status, locked, names in window:
+            self.assertEqual(revision, base, f"the {status} episode kept the revision")
+            self.assertIs(locked, True, f"the {status} episode locked mutations")
+            self.assertEqual(
+                set(names), panel_names, f"the {status} episode kept the panels"
+            )
+
     def _assert_preserved(self, page, base: int, revision: int, excluded) -> None:
         """Assert every panel the delta did not name kept its committed identity."""
         comparison = page.evaluate(_COMPARE_RECORDS, [base, revision])
@@ -462,8 +610,42 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
                     preserved, f"the untouched panel {name!r} was replaced"
                 )
 
+    def _assert_checkpoint(self, frames: list[dict], mark: int, *, revision=None) -> tuple:
+        """Assert one complete checkpoint and no delta at or below it.
+
+        A settlement publishes exactly one fresh complete snapshot and no
+        intermediate delta for the same commit. Later asynchronous
+        publications are excluded by their own revision, never by a fixed
+        frame count.
+        """
+        window = _presentation(frames, mark)
+        snapshots = [frame for frame in window if frame["name"] == SNAPSHOT]
+        self.assertEqual(
+            len(snapshots), 1, "a settlement publishes exactly one complete checkpoint"
+        )
+        checkpoint = snapshots[0]
+        committed = _revision_of(checkpoint)
+        self.assertIsNotNone(committed)
+        if revision is not None:
+            self.assertEqual(committed, revision)
+        # The settlement's own publication is replaced by this checkpoint:
+        # nothing may carry a delta *at* the checkpoint revision. Deltas at
+        # earlier revisions are the same flow's ordinary steps (a confirmation
+        # request, for one) and are identified by their own revisions.
+        competing = [
+            frame
+            for frame in window
+            if frame["name"] == UPDATE and _revision_of(frame) == committed
+        ]
+        self.assertEqual(
+            competing, [], "the checkpoint replaced that revision's delta"
+        )
+        return checkpoint, committed
+
     def _committed_epoch(self, page) -> str:
-        return store_state(page)["activeEpoch"]
+        # The view exposes the live epoch as ``epoch``; the committed record
+        # (read by the in-page trace) names the same value ``activeEpoch``.
+        return store_state(page)["epoch"]
 
     # -- 1. graphical and text checkpoint sequence --------------------------
 
@@ -552,27 +734,29 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
         wait_for_presentation_settled(page)
         settled = store_state(page)["revision"]
         self.assertGreater(settled, base)
-        at_settlement = _presentation(frames, mark, settled)
-        self.assertEqual(
-            [frame["name"] for frame in at_settlement],
-            [SNAPSHOT],
-            "a terminal settlement publishes one fresh complete checkpoint",
+        # The confirming action's own result names the revision its
+        # presentation committed, so it identifies the completing publication
+        # independently of any later asynchronous push.
+        confirming = _results(frames, mark)
+        self.assertTrue(confirming, "the settlement published no action result")
+        checkpoint_revision = confirming[-1]["args"][0]["presentation_revision"]
+        self.assertGreater(checkpoint_revision, base)
+        checkpoint_frame, _revision = self._assert_checkpoint(
+            frames, mark, revision=checkpoint_revision
         )
-        checkpoint = at_settlement[0]["args"][0]
+        checkpoint = checkpoint_frame["args"][0]
         self.assertEqual(checkpoint["presentation_epoch"], epoch)
         self.assertEqual(set(checkpoint["panels"]), set(store_state(page)["panels"]))
         self.assertGreater(
             len(checkpoint["panels"]), len(delta["panels"]), "the checkpoint is complete"
         )
-        confirming = _results(frames, mark, settled)
-        self.assertEqual(len(confirming), 1, "the settlement's result names its revision")
-        self.assertEqual(
-            [frame["name"] for frame in frames[mark:] if frame["name"] in PRESENTATION][0],
-            SNAPSHOT,
-            "the checkpoint replaces the settlement's delta instead of following it",
+        self.assertLess(
+            frames.index(checkpoint_frame),
+            frames.index(confirming[-1]),
+            "the checkpoint is sent before the result that names it",
         )
+        self.assertGreaterEqual(settled, checkpoint_revision)
         narrative = narrative_log_text(page)
-        self.assertIn("exploration", "exploration")
         self.assertTrue(narrative.strip(), "the command produced narrative output")
 
         # -- same-area graphical move: delta only, exact base ---------------
@@ -591,13 +775,34 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
         self.assertIn("local_map", delta["panels"])
         self._assert_preserved(page, base, moved, set(delta["panels"]))
 
-        # -- unchanged read action: no revision is consumed -----------------
+        # -- read action: incremental only, never a checkpoint --------------
+        # A read command may refresh a derived panel; what it must never do is
+        # cost a complete checkpoint or fragment. The unchanged-publication
+        # skip is proven through the coordinator itself below.
+        narrative = narrative_log_text(page)
         mark = len(frames)
-        quiet = store_state(page)["revision"]
         self._send_text(page, "look")
-        page.wait_for_timeout(1500)
-        self.assertEqual(store_state(page)["revision"], quiet, "a read action consumes no revision")
-        self.assertEqual(_presentation(frames, mark), [], "a read action publishes nothing")
+        wait_for_store_state(
+            page,
+            lambda s: len(narrative_log_text(page)) > len(narrative),
+            timeout=30000,
+        )
+        wait_for_presentation_settled(page)
+        quiet = store_state(page)["revision"]
+        read_frames = _presentation(frames, mark)
+        self.assertEqual(
+            {frame["name"] for frame in read_frames},
+            {UPDATE},
+            f"a read action publishes only deltas, observed {read_frames}",
+        )
+        chain = moved
+        for frame in read_frames:
+            envelope = frame["args"][0]
+            self.assertEqual(
+                envelope["base_revision"], chain, "each read delta keeps the exact base"
+            )
+            chain = envelope["revision"]
+        self.assertEqual(chain, quiet, "the last read delta is the committed revision")
 
         # -- authoritative different-map boundary through text --------------
         mark = len(frames)
@@ -608,24 +813,26 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
         wait_for_presentation_settled(page)
         crossed = store_state(page)["revision"]
         self.assertGreater(crossed, base)
-        frames_at_crossing = _presentation(frames, mark, crossed)
+        crossing_frame, crossing_revision = self._assert_checkpoint(frames, mark)
+        self.assertGreater(crossing_revision, base)
+        self.assertLessEqual(crossing_revision, crossed)
+        self.assertEqual(crossing_frame["args"][0]["presentation_epoch"], epoch)
         self.assertEqual(
-            [frame["name"] for frame in frames_at_crossing],
-            [SNAPSHOT],
-            "a map boundary publishes one fresh complete checkpoint",
+            set(crossing_frame["args"][0]["panels"]), set(store_state(page)["panels"])
         )
-        self.assertEqual(frames_at_crossing[0]["args"][0]["presentation_epoch"], epoch)
-        self.assertEqual(set(frames_at_crossing[0]["args"][0]["panels"]), set(store_state(page)["panels"]))
         self.assertGreaterEqual(set(store_state(page)["panels"]), before_panels)
 
         # -- metadata-only skip control through the real coordinator --------
-        mark = len(frames)
-        quiet = store_state(page)["revision"]
         match = self._fixture(page, "nochange")
         self.assertEqual(match[3], "unchanged", f"the identical publication was not skipped: {match}")
         self.assertEqual(match[4], "0", "a skipped publication sends no frame")
-        self.assertEqual(store_state(page)["revision"], quiet)
-        self.assertEqual(_presentation(frames, mark), [])
+        # The coordinator's own published revision is unchanged by the
+        # identical candidate: the skip consumed no revision and sent nothing.
+        before, after = (int(part) for part in match[7].split(":"))
+        self.assertEqual(
+            before, after, "an identical candidate consumes no revision"
+        )
+        self.assertEqual(int(match[2]), before)
 
     # -- 2. oversized snapshot and delta ------------------------------------
 
@@ -651,15 +858,19 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
         self._assert_part_transfer(
             page, frames, mark=0, revision=revision, kind="snapshot", base=None
         )
-        self._assert_adopted_panel(page, "lore_codex", payload_bytes, digest)
+        self._assert_adopted_panel(page, revision, "lore_codex", payload_bytes, digest)
 
-        snapshot_revision = store_state(page)["revision"]
+        snapshot_revision = revision
         mark = len(frames)
         match = self._fixture(page, "delta")
         revision = int(match[2])
         payload_bytes = int(match[5])
         digest = match[6]
+        delta_base = int(match[7])
         self.assertEqual(match[3], "delta")
+        self.assertGreaterEqual(
+            delta_base, snapshot_revision, "the delta builds on the committed snapshot"
+        )
         self.assertLessEqual(
             payload_bytes, FRAME_CEILING, "the panel itself stays inside its own cap"
         )
@@ -671,11 +882,11 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
             mark=mark,
             revision=revision,
             kind="delta",
-            base=snapshot_revision,
+            base=delta_base,
         )
-        self._assert_adopted_panel(page, "lore_codex", payload_bytes, digest)
+        self._assert_adopted_panel(page, revision, "lore_codex", payload_bytes, digest)
         state = store_state(page)
-        self.assertEqual(state["revision"], revision)
+        self.assertGreaterEqual(state["revision"], revision)
         self.assertEqual(state["recovery"]["status"], "idle")
         self.assertIsNot(state.get("mutationsLocked"), True)
 
@@ -725,12 +936,20 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
         )
 
     def _assert_adopted_panel(
-        self, page, name: str, payload_bytes: int, digest: str
+        self, page, revision: int, name: str, payload_bytes: int, digest: str
     ) -> None:
+        """Assert the commit at ``revision`` adopted exactly the fixture payload.
+
+        The committed record at that revision is read (not the latest view):
+        a later legitimate publication may re-render the panel, so the
+        adoption is identified by its own revision.
+        """
         adopted = page.evaluate(
-            """async ([name]) => {
-              const store = window.__elosernBridge.store;
-              const panel = store.getCommittedState().panels[name];
+            """async ([revision, name]) => {
+              const records = window.__syncTrace.records.filter(
+                (record) => record.revision === revision);
+              if (records.length === 0) { return null; }
+              const panel = records[records.length - 1].panels[name];
               if (!panel) { return null; }
               const canonical = (value) => {
                 if (value === null || typeof value !== 'object') { return JSON.stringify(value); }
@@ -747,9 +966,9 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
                   .map((b) => b.toString(16).padStart(2, '0')).join(''),
               };
             }""",
-            [name],
+            [revision, name],
         )
-        self.assertIsNotNone(adopted, f"the {name} panel was not adopted")
+        self.assertIsNotNone(adopted, f"no commit at {revision} carried the {name} panel")
         self.assertEqual(adopted["bytes"], payload_bytes)
         self.assertEqual(adopted["sha256"], digest)
 
@@ -772,73 +991,78 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
         self._install_gate(page)
         base = store_state(page)["revision"]
         before = store_state(page)
+        sent_mark = len(outbound_messages(page))
 
-        # Withhold exactly the next genuine delta: the matching action result
-        # then claims a revision this client never adopted.
-        self._arm_gate(page, dropRevision=base + 1, holdSnapshot=True)
+        # One genuine delta arrives with a baseline this client never
+        # committed: the transport fault that stands for a publication this
+        # client missed. The locked window is read from the subscriber's own
+        # records, so no frame is delayed and the live sequence keeps its
+        # ordering.
+        self._arm_gate(page, corruptDeltaBase=base - 1)
         activate_first_compass_exit(page)
+        page.wait_for_function(
+            "() => window.__syncGateState().corrupted === 1", timeout=60000
+        )
+        # The episode is transient by design (the repair lands immediately), so
+        # the locked window and the single request are read from the
+        # subscriber's recorded transitions and the outbound recorder.
         wait_for_store_state(
-            page, lambda s: s.get("recovery", {}).get("status") in ("requested", "failed"),
+            page,
+            lambda s: s["revision"] > base
+            and s.get("recovery", {}).get("status") == "idle"
+            and _unlocked(s),
             timeout=60000,
         )
+        self._assert_locked_episode(page, base, set(before["panels"]))
         self.assertEqual(
-            page.evaluate("() => window.__syncGateState().dropped"), 1,
-            "one genuine delta was withheld",
-        )
-        wait_for_store_state(page, lambda s: s["revision"] == base, timeout=5000)
-        locked = store_state(page)
-        self.assertIs(locked["mutationsLocked"], True, "a missed publication locks mutations")
-        self.assertEqual(locked["panels"], before["panels"], "the prior complete state remains")
-        self.assertEqual(
-            page.evaluate("() => Elosern.actions.submit('proof.noop', {})"),
-            None,
-            "no mutation is admitted while the repair is owed",
-        )
-        self.assertEqual(
-            [name for name, _args, _kwargs in outbound_messages(page) if name == "ui_sync"],
-            ["ui_sync"],
+            self._syncs_since(page, sent_mark),
+            1,
             "exactly one synchronization request leaves the client",
         )
-        self.assertEqual(
-            page.evaluate("() => window.__syncGateState().held"), 1,
-            "the repair snapshot is in flight",
-        )
-        page.evaluate("() => window.__syncGateRelease()")
-        wait_for_store_state(page, _unlocked, timeout=60000)
         wait_for_presentation_settled(page)
         repaired = store_state(page)
         self.assertEqual(repaired["recovery"]["status"], "idle")
         self.assertGreater(repaired["revision"], base)
         self.assertEqual(set(repaired["panels"]), set(before["panels"]))
         self.assertEqual(
-            len([name for name, _args, _kwargs in outbound_messages(page) if name == "ui_sync"]),
+            self._syncs_since(page, sent_mark),
             1,
             "the repair never repeats",
         )
 
         # A test-scope publication changes a canonical field but omits its
-        # owning panel; only the next real checkpoint restores it.
-        hp_row = lambda state: next(
-            row for row in state["panels"]["character"]["traits"] if row["key"] == "hp"
-        )
-        stale_hp = hp_row(store_state(page))["current"]
-        before_publish = store_state(page)["revision"]
+        # owning panel; only the next real checkpoint restores it. The
+        # publication is identified by the receipt's own revision, so a later
+        # legitimate re-render cannot mask what it carried.
+        stale_hp = _hp_trait(store_state(page))
+        mark = len(frames)
         match = self._fixture(page, "omit")
         mutated_hp = int(match[7])
+        omit_revision = int(match[2])
         self.assertNotEqual(mutated_hp, stale_hp)
-        wait_for_store_state(page, lambda s: s["revision"] > before_publish, timeout=90000)
+        wait_for_store_state(
+            page, lambda s: s["revision"] >= omit_revision, timeout=90000
+        )
         wait_for_presentation_settled(page)
-        omitted = store_state(page)
+        published = _presentation(frames, mark, omit_revision)
+        self.assertTrue(published, "the omission publication produced no frame")
+        self.assertNotIn(
+            "character",
+            published[0]["args"][0]["panels"],
+            "the publication deliberately omitted the changed panel",
+        )
         self.assertEqual(
-            hp_row(omitted)["current"], stale_hp,
-            "the published delta deliberately omitted the changed panel",
+            _hp_at(page, omit_revision),
+            stale_hp,
+            "the committed panel stayed stale at the omitting revision: "
+            f"gate={page.evaluate('() => window.__syncGateState()')}",
         )
         page.evaluate("() => Elosern.actions.client.sync()")
-        wait_for_store_state(page, lambda s: s["revision"] > omitted["revision"], timeout=90000)
+        wait_for_store_state(page, lambda s: s["revision"] > omit_revision, timeout=90000)
         wait_for_presentation_settled(page)
         restored = store_state(page)
         self.assertEqual(
-            hp_row(restored)["current"], mutated_hp,
+            _hp_trait(restored), mutated_hp,
             "the fresh checkpoint restored the omitted canonical field",
         )
         self.assertEqual(restored["recovery"]["status"], "idle")
@@ -861,10 +1085,11 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
         self._install_gate(page)
         base = store_state(page)["revision"]
         before = store_state(page)
+        sent_mark = len(outbound_messages(page))
 
         # The one automatic repair is delivered corrupted: the episode becomes
         # terminal instead of requesting again.
-        self._arm_gate(page, dropRevision=base + 1, corruptSnapshot=True)
+        self._arm_gate(page, corruptDeltaBase=base - 1, corruptSnapshotAbove=base)
         activate_first_compass_exit(page)
         wait_for_store_state(
             page, lambda s: s.get("recovery", {}).get("status") == "failed", timeout=60000
@@ -874,11 +1099,14 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
         self.assertEqual(failed["recovery"]["status"], "failed")
         self.assertIs(failed["mutationsLocked"], True, "graphical mutations stay locked")
         self.assertEqual(failed["panels"], before["panels"], "nothing is erased")
-        syncs = [name for name, _args, _kwargs in outbound_messages(page) if name == "ui_sync"]
-        self.assertEqual(len(syncs), 1, "the failed repair is never retried automatically")
+        self.assertEqual(
+            self._syncs_since(page, sent_mark),
+            1,
+            "the failed repair is never retried automatically",
+        )
         page.wait_for_timeout(2000)
         self.assertEqual(
-            len([name for name, _args, _kwargs in outbound_messages(page) if name == "ui_sync"]),
+            self._syncs_since(page, sent_mark),
             1,
             "no synchronization loop follows the terminal episode",
         )
@@ -902,7 +1130,7 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
         recovered = store_state(page)
         self.assertEqual(recovered["recovery"]["status"], "idle")
         self.assertGreater(recovered["revision"], base)
-        self.assertEqual(recovered["activeEpoch"], before["activeEpoch"], "same live epoch")
+        self.assertEqual(recovered["epoch"], before["epoch"], "same live epoch")
         self.assertEqual(set(recovered["panels"]), set(before["panels"]))
 
         # -- valid local UI state survives a same-mode checkpoint -----------
@@ -914,12 +1142,23 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
             "() => window.__elosernBridge.store.openHudDrawer('quest')"
         )
         page.wait_for_selector('[data-testid="quest-drawer"]', timeout=30000)
-        page.locator(
-            '[data-testid="quest-drawer__top-tabs"] [data-tab-key="counter"]'
-        ).click()
+        focused_tab = page.evaluate(
+            """() => {
+              const tabs = Array.from(document.querySelectorAll(
+                '[data-testid="quest-drawer__top-tabs"] [role="tab"]'));
+              const enabled = tabs.find(
+                (tab) => tab.getAttribute('aria-disabled') !== 'true');
+              if (!enabled) { return null; }
+              enabled.focus();
+              enabled.click();
+              return document.activeElement.getAttribute('data-testid');
+            }"""
+        )
+        self.assertIsNotNone(focused_tab, "the drawer offers no enabled tab")
         self.assertEqual(
-            page.evaluate("() => document.activeElement.getAttribute('data-tab-key')"),
-            "counter",
+            page.evaluate("() => document.activeElement.getAttribute('data-testid')"),
+            focused_tab,
+            "the drawer item holds focus",
         )
         drawer_handle = page.evaluate_handle(
             "() => document.querySelector('[data-testid=\"hud-drawer\"]')"
@@ -948,13 +1187,23 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
             "the drawer is not remounted",
         )
         self.assertEqual(
-            page.evaluate("() => document.activeElement.getAttribute('data-tab-key')"),
-            "counter",
+            page.evaluate("() => document.activeElement.getAttribute('data-testid')"),
+            focused_tab,
             "the focused item keeps focus",
         )
         self.assertEqual(page.input_value("#inputfield"), typed)
 
         # -- an actual mode change runs the existing teardown --------------
+        # The fault window's compass step left the room, so return to the gate
+        # (where the seeded monsters are) before engaging.
+        self._send_text(page, f"teleport {xyz_arg(first_gate_xyz())}")
+        wait_for_store_state(
+            page,
+            lambda s: s.get("mode") == "exploration"
+            and (s.get("dispatch") or {}).get("inFlight") is None,
+            timeout=60000,
+        )
+        wait_for_presentation_settled(page)
         self._engage(page)
         page.wait_for_function(
             "() => document.querySelector('[data-testid=\"hud-drawer\"]') === null",
@@ -978,6 +1227,17 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
             "(revision) => window.__syncTrace.records.filter("
             "(record) => record.revision === revision).length",
             revision,
+        )
+
+    @staticmethod
+    def _syncs_since(page, mark: int) -> int:
+        """How many ``ui_sync`` requests left the client after ``mark``."""
+        return len(
+            [
+                name
+                for name, _args, _kwargs in outbound_messages(page)[mark:]
+                if name == "ui_sync"
+            ]
         )
 
 
