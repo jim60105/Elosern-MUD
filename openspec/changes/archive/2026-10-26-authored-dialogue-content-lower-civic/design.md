@@ -46,13 +46,23 @@ Use conditions only with concrete existing canonical keys reviewed at implementa
 
 ### Validation ownership
 
-Add tagged `world/lore/tests/test_authored_dialogue_content_lower_civic.py` data-contract tests naming ONLY owned host keys; supply the exact test label/tag entries to the integration owner for serialized updates to tools/test_data_freeze.json and .github/evennia-shards.json; do not edit shared manifests in the parallel content worktree. Keep mechanism tests synthetic. Assertions cover complete topic inventory, stable IDs, actor-first multi-line attribution, all declaration references/bounds/fallbacks, no OOC/backticks/commands/mechanic names, host-specific canonical office/assortment facts and no old speech-only conversion. Do not freeze exact prose in behavior assertions or add a duplicate mutable balance table. Editorial review must check every line and record line-specific findings; green schema tests alone cannot establish in-character quality or mandatory-source fidelity.
+Tests cover logic only; prose is not tested. This slice therefore adds no test module and no
+manifest entry. Ownership is established by the existing shared loader contract — filename-stem
+discovery against registered profile keys, rejection of explicit owner fields, duplicate
+mapping-key/unsafe-tag/schema/reference rejection, bidirectional binding completeness and
+all-or-nothing snapshot publication — exercised by `world.lore.tests.test_dialogue_assembly`,
+`world.rules.tests.test_dialogue_sources` and `world.rules.tests.test_authored_dialogue_runtime`.
+Stable topic IDs and the four-topic inventory per host are asserted there through the canonical
+`dialogue_key` binding. Do not freeze exact prose in assertions or add a duplicate mutable balance
+table. Editorial review must check every line and record line-specific findings in
+`docs/lore/lower-civic-dialogue-review.md`; green schema tests alone cannot establish in-character
+quality or mandatory-source fidelity.
 
-Exercise one real constructed owned host through browser manual playback and the identical topic offline via CmdTalk, comparing scene identity/attribution and deterministic effect counts, not exact prose echo. Existing shared synthetic browser mechanics stay in owning engine changes; use a per-slice data-contract smoke/test so simultaneous content workers do not edit the shared browser fixture. Ensure replay gives no second effect and text emission records formal read. Update affected docs/lore review/authoring notes and any command-topic examples changed; preserve command syntax and service settlement. This slice completes only after every owned YAML contains all four rewritten baseline topics, all declared variants/refusals and its rewritten opening. Across the ten slices, acceptance covers all 25 hosts, 100 baseline topics and all 25 openings; no catch-all final prose replacement is deferred.
+Exercise one real constructed owned host through browser manual playback and the identical topic offline via CmdTalk, comparing scene identity/attribution and deterministic effect counts, not exact prose echo. Existing shared synthetic browser mechanics stay in owning engine changes; content slices add no browser fixture or smoke test of their own. Ensure replay gives no second effect and text emission records formal read. Update affected docs/lore review/authoring notes and any command-topic examples changed; preserve command syntax and service settlement. This slice completes only after every owned YAML contains all four rewritten baseline topics, all declared variants/refusals and its rewritten opening. Across the ten slices, acceptance covers all 25 hosts, 100 baseline topics and all 25 openings; no catch-all final prose replacement is deferred.
 
 ## Implementation handoff constraints
 
-This proposed slice is capped at one engineer-day. Each numbered task is intended as a 45-120 minute implementation-and-focused-test unit; tests/docs land with their owning behavior. Use a local untracked `.env.test` containing `MUD_TEST_SETTINGS=1` for the commands below (create that environment file only at apply time). Run focused commands from the repository root; new test labels are explicitly proposed, existing labels are regression targets. Also run `uv run --locked python -m tools.contract_gate` before implementation handoff, with test ownership updates in the same feature commit. No live external model/image requests. Planning created no production code or test results.
+This proposed slice is capped at one engineer-day. Each numbered task is intended as a 45-120 minute implementation-and-review unit; docs land with their owning behavior. Use a local untracked `.env.test` containing `MUD_TEST_SETTINGS=1` for the commands below (create that environment file only at apply time). Run focused commands from the repository root; existing labels are regression targets and this slice proposes no new label. Also run `uv run --locked python -m tools.contract_gate` before implementation handoff. No live external model/image requests. Planning created no production code or test results.
 
 Boundary events use the existing world.observability facade with available owner/actor/npc/topic/context identifiers; exceptions rethrow or log once with exc. No new telemetry subsystem. No compatibility shim, legacy aliases, data backfill or migration. No executable dialogue scripts, mid-scene choice tree, per-line server stepping/persistence or new gameplay effects.
 
@@ -61,22 +71,21 @@ Boundary events use the existing world.observability facade with available owner
 
 - `world/lore/dialogue/content/altoria_bathhouse_keeper.yaml` (exclusive content ownership)
 - `world/lore/dialogue/content/altoria_guard_captain.yaml` (exclusive content ownership)
-- `world/lore/tests/test_authored_dialogue_content_lower_civic.py (new)`
 - `docs/lore/lower-civic-dialogue-review.md (new)`
 
-Canonical npc_profiles and settlement sources listed above are read-only authoring prerequisites. Shared manifests are integration-owned as described under validation ownership.
-
-This slice registers its own new test module label in `.github/evennia-shards.json` (one label added inside one existing shard's `labels` list) and its own tagged entries in `tools/test_data_freeze.json`, in the same commit as the new test module, touching no other change's entries; that is what makes `contract_gate` pass here. Where the tasks speak of handing manifest entries to the integration owner, this paragraph is authoritative: edit only your own one-entry hunks, and the integration owner serializes their merge when slices land in parallel worktrees. No other shared-manifest edit belongs to this slice.
+Canonical npc_profiles and settlement sources listed above are read-only authoring prerequisites. Shared manifests are untouched by this slice: it adds no test module, so `.github/evennia-shards.json` and `tools/test_data_freeze.json` need no entry, and `contract_gate` passes without one.
 
 ## Risks / Trade-offs
 
-Content slices exclusively own their per-NPC YAML files and unique test/review files; they do not edit shared region Python modules, profile definitions, loader code or a registration list. Profiles and place bindings are read-only canonical inputs. The integration owner serializes test-manifest entries in tools/test_data_freeze.json and .github/evennia-shards.json, runs the combined gate, and serializes archive into the shared authored-dialogue-content spec. No manual content registration is added. Keep authored source validation separate from runtime eligibility. A failed post-commit push recovers on the next canonical sync, without reversing a successful owning commit. Read the approved design and dependency artifacts before edits; no interface decision is left open.
+Content slices exclusively own their per-NPC YAML files and unique review documents; they do not edit shared region Python modules, profile definitions, loader code or a registration list. Profiles and place bindings are read-only canonical inputs. The integration owner runs the combined gate and serializes archive into the shared authored-dialogue-content spec. No manual content registration is added. Keep authored source validation separate from runtime eligibility. A failed post-commit push recovers on the next canonical sync, without reversing a successful owning commit. Read the approved design and dependency artifacts before edits; no interface decision is left open.
 
 ## Focused verification at implementation time
 
 ```text
-uv run --locked --env-file=.env.test evennia test --settings test_settings.py --keepdb world.lore.tests.test_authored_dialogue_content_lower_civic
+uv run --locked --env-file=.env.test evennia test --settings test_settings.py --keepdb world.lore.tests.test_dialogue_assembly
+uv run --locked --env-file=.env.test evennia test --settings test_settings.py --keepdb world.rules.tests.test_dialogue_sources
+uv run --locked --env-file=.env.test evennia test --settings test_settings.py --keepdb world.rules.tests.test_authored_dialogue_runtime
 uv run --locked python -m tools.contract_gate
 ```
 
-Run only focused test labels/methods within the repository time limits. Full managed browser and evidence suites remain CI-owned. These commands are planned acceptance, not results from proposal creation.
+Run only focused test labels/methods within the repository time limits. Full managed browser and evidence suites remain CI-owned.
