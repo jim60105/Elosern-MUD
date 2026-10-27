@@ -239,7 +239,8 @@ class InspectionEntryPointTests(unittest.TestCase):
         observed = json.loads(completed.stdout)
         self.assertEqual(observed["status"], "loaded")
         self.assertEqual(observed["diagnostics"], [])
-        self.assertTrue(observed["runtime_ready"])
+        self.assertTrue(observed["semantic_ready"])
+        self.assertIsNone(observed["runtime_ready"])
         self.assertEqual(
             [entry["relative_path"] for entry in observed["documents"]],
             sorted(

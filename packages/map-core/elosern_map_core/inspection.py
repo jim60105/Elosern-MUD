@@ -62,7 +62,11 @@ def _inspect(root: Path) -> tuple[int, str]:
                 for document in world.documents
             ],
             "diagnostics": [item.as_dict() for item in diagnostics],
-            "runtime_ready": not diagnostics,
+            # Runtime readiness additionally needs the authoritative external
+            # result and current partition artifact, which inspection does not
+            # receive; it stays explicitly unknown here.
+            "semantic_ready": not diagnostics,
+            "runtime_ready": None,
         },
         ensure_ascii=False,
         indent=2,

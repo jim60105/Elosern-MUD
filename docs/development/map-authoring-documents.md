@@ -110,9 +110,10 @@ landmark:
 `rooms.<room_id>`: `name_zh`, `desc_zh`, `scene_archetype` (nullable);
 `connections[]` (`source`, `destination`, `label`); optional `interior_links[]`
 (`source_room`, `target_interior`, `target_room`, `label`, `return_label`);
-optional `exterior{settlement, node, doorway_key, doorway_aliases[]}`. Interiors
-carry no physical coordinates; external entrance relationships are stored once,
-in the owning interior document.
+optional `exterior{settlement, node, room, doorway_key, doorway_aliases[]}`.
+`room` names the interior room the doorway opens into. Interiors carry no
+physical coordinates; external entrance relationships are stored once, in the
+owning interior document.
 
 ### layout
 
@@ -138,12 +139,15 @@ accepts only data-only values. It rejects:
 
 Comments attached to retained stable-ID objects (mapping keys such as nodes and
 typed objects in identified lists such as roads), multiline prose, footprint
-masks and road bends survive a serialize round trip. Whitespace and formatting
-may be normalized. When an object is removed, its comments may be removed with
-it. `serialize_document` validates first, works on a copy of the retained tree,
-emits readable literal blocks for multiline strings, and re-parses its own
-output; a candidate that would be lossy or unsupported produces no text and
-leaves the caller's baseline unchanged.
+masks and road bends survive a serialize round trip. An unchanged sequence --
+including one nested inside an identified object -- keeps its retained tree, so
+comments inside unchanged bends and masks are preserved. Whitespace and
+formatting may be normalized. When an object or an unidentified sequence is
+changed, its comments may be removed with it. `serialize_document` validates
+first, works on a copy of the retained tree, emits readable literal blocks for
+multiline strings, and re-parses its own output; a candidate that would be
+lossy or unsupported produces no text and leaves the caller's baseline
+unchanged.
 
 ## Gates and diagnostics
 
@@ -181,8 +185,14 @@ uv run --locked python -m elosern_map_core inspect <workspace-root>
 ```
 
 `inspect` discovers the supported sources, loads the candidate and prints the
-sorted document identities, fingerprints, diagnostics and `runtime_ready` flag
-as JSON. It writes nothing to the inspected workspace.
+sorted document identities, fingerprints and diagnostics as JSON. It reports
+`semantic_ready` from the authored diagnostics only; `runtime_ready` stays
+`null` because inspection receives neither the authoritative external result
+nor the partition freshness. It writes nothing to the inspected workspace.
+
+Source provenance is derived during parsing (the only authority for line and
+column) and carried on every typed document and diagnostic; a `SourceDocument`
+envelope carries the canonical path, text and content fingerprint.
 
 ## Checks
 

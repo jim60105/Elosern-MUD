@@ -162,6 +162,82 @@ def test_interiors_load_and_resolve_their_references():
     assert interior.exterior.settlement == "demo_map"
 
 
+def _interior_landmark_districts() -> dict:
+    districts = fixtures.districts_data()
+    districts["districts"]["demo_district"]["landmark"] = {
+        "domain": "interior_room",
+        "map_id": "demo_interior",
+        "object_id": "inner",
+        "cell": None,
+    }
+    return districts
+
+
+def test_reachable_interior_room_landmark_compiles():
+    world = load_authoring_world(
+        fixtures.custom_sources(
+            settlement=fixtures.settlement_data(),
+            districts=_interior_landmark_districts(),
+            interiors={"demo_interior": fixtures.interior_data()},
+        )
+    )
+    assert world.diagnostics == ()
+    compile_runtime(
+        world,
+        fixtures.valid_external(world),
+        fixtures.current_freshness(world),
+    )
+
+
+def test_disconnected_interior_room_landmark_is_saveable_but_rejected():
+    interior = fixtures.interior_data()
+    interior["connections"] = []
+    world = load_authoring_world(
+        fixtures.custom_sources(
+            settlement=fixtures.settlement_data(),
+            districts=_interior_landmark_districts(),
+            interiors={"demo_interior": interior},
+        )
+    )
+    assert "unreachable_landmark" in {item.code for item in world.diagnostics}
+    serialize_document(world.interiors["demo_interior"])
+    with pytest.raises(RuntimeRejection) as captured:
+        compile_runtime(
+            world,
+            fixtures.valid_external(world),
+            fixtures.current_freshness(world),
+        )
+    assert "unreachable_landmark" in {
+        item.code for item in captured.value.diagnostics
+    }
+
+
+def test_entrance_less_interior_room_landmark_is_rejected():
+    interior = fixtures.interior_data()
+    interior["exterior"] = None
+    world = load_authoring_world(
+        fixtures.custom_sources(
+            settlement=fixtures.settlement_data(),
+            districts=_interior_landmark_districts(),
+            interiors={"demo_interior": interior},
+        )
+    )
+    assert "unreachable_landmark" in {item.code for item in world.diagnostics}
+
+
+def test_exterior_room_must_belong_to_the_interior():
+    interior = fixtures.interior_data()
+    interior["exterior"]["room"] = "nowhere"
+    with pytest.raises(AuthoringError) as captured:
+        load_authoring_world(
+            fixtures.custom_sources(
+                settlement=fixtures.settlement_data(),
+                interiors={"demo_interior": interior},
+            )
+        )
+    assert "unknown_reference" in _codes(captured.value)
+
+
 def _bad_settlement(mutator) -> dict:
     data = fixtures.settlement_data()
     mutator(data)

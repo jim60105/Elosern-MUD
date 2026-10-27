@@ -347,6 +347,7 @@ _EXTERIOR = _mapping(
     {
         "settlement": _str(pattern=IDENTIFIER_PATTERN, reference="settlements"),
         "node": _str(pattern=IDENTIFIER_PATTERN, reference="settlement_nodes_of"),
+        "room": _str(pattern=IDENTIFIER_PATTERN, reference="interior_rooms"),
         "doorway_key": _str(min_length=1),
         "doorway_aliases": _list(_str(), required=False),
     },
@@ -621,6 +622,21 @@ def _is_int(value: Any) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
 
 
+def _hashable_identity(values) -> tuple | None:
+    """The identity tuple, or ``None`` when a value cannot key a uniqueness check.
+
+    Malformed values already produce their own type diagnostics; a uniqueness
+    check must never raise on them.
+    """
+
+    identity = tuple(values)
+    try:
+        hash(identity)
+    except TypeError:
+        return None
+    return identity
+
+
 def _value_type_name(value: Any) -> str:
     return type(value).__name__
 
@@ -833,7 +849,11 @@ def _validate_list_rules(
             for index, item in enumerate(value):
                 if not isinstance(item, Mapping):
                     continue
-                key = tuple(item.get(name) for name in rule["fields"])
+                key = _hashable_identity(
+                    item.get(name) for name in rule["fields"]
+                )
+                if key is None:
+                    continue
                 if key in seen:
                     _problem(
                         diagnostics,
@@ -850,7 +870,11 @@ def _validate_list_rules(
             for index, item in enumerate(value):
                 if not isinstance(item, Mapping):
                     continue
-                key = (item.get(rule["field"]), item.get(rule["other"]))
+                key = _hashable_identity(
+                    (item.get(rule["field"]), item.get(rule["other"]))
+                )
+                if key is None:
+                    continue
                 if key in seen_direction:
                     _problem(
                         diagnostics,
@@ -1021,7 +1045,11 @@ def _validate_value(
             for key, item in value.items():
                 if not isinstance(item, Mapping):
                     continue
-                identity = tuple(item.get(name) for name in unique)
+                identity = _hashable_identity(
+                    item.get(name) for name in unique
+                )
+                if identity is None:
+                    continue
                 if identity in seen_values:
                     _problem(
                         diagnostics,
@@ -1035,6 +1063,7 @@ def _validate_value(
                     )
                 else:
                     seen_values[identity] = key
+        seen.discard(marker)
         return
     if kind == "list":
         if not isinstance(value, (list, tuple)):
@@ -1094,6 +1123,7 @@ def _validate_value(
             relative_path=relative_path,
             provenance=provenance,
         )
+        seen.discard(marker)
         return
     _problem(
         diagnostics,

@@ -92,6 +92,32 @@ def test_document_depth_is_bounded():
     assert "invalid_document_depth" in _codes(text)
 
 
+def test_malformed_yaml_is_a_structured_rejection_with_location():
+    with pytest.raises(AuthoringError) as captured:
+        parse_document(SETTLEMENT_PATH, "nodes: [\n")
+    diagnostic = captured.value.diagnostics[0]
+    assert diagnostic.code == "invalid_yaml"
+    assert diagnostic.relative_path == SETTLEMENT_PATH
+    assert diagnostic.line is not None
+    assert diagnostic.column is not None
+
+
+@pytest.mark.parametrize(
+    "mutator",
+    [
+        lambda data: data["nodes"]["plaza"].__setitem__("x_m", []),
+        lambda data: data["roads"][0].__setitem__("source", []),
+        lambda data: data["roads"][0].__setitem__("direction", []),
+    ],
+)
+def test_malformed_uniqueness_operands_are_rejected_not_crashes(mutator):
+    data = _bad_data(mutator)
+    with pytest.raises(AuthoringError):
+        document_from_data(SETTLEMENT_PATH, data)
+    with pytest.raises(AuthoringError):
+        parse_document(SETTLEMENT_PATH, fixtures.yaml_text(data))
+
+
 def _bad_data(mutator):
     data = copy.deepcopy(fixtures.settlement_data())
     mutator(data)
@@ -217,6 +243,19 @@ def test_round_trip_retains_prose_masks_bends_and_comments():
     )
 
 
+def test_unchanged_nested_sequence_keeps_its_comments():
+    text = ROUND_TRIP_TEXT.replace(
+        "      - {x_m: 50, y_m: 10}",
+        "      - {x_m: 50, y_m: 10}  # retained bend comment",
+    )
+    parsed = parse_document(SETTLEMENT_PATH, text)
+    data = fixtures.plain_data(parsed.document.data)
+    data["nodes"]["plaza"]["desc"] = "Only the prose changed."
+    candidate = document_from_data(SETTLEMENT_PATH, data)
+    emitted = serialize_document(candidate, parsed.round_trip)
+    assert "# retained bend comment" in emitted
+
+
 def test_reordering_identified_road_objects_keeps_their_comment():
     parsed = parse_document(SETTLEMENT_PATH, ROUND_TRIP_TEXT)
     data = fixtures.plain_data(parsed.document.data)
@@ -234,13 +273,22 @@ def test_reordering_identified_road_objects_keeps_their_comment():
 
 def test_a_failed_candidate_does_not_mutate_the_retained_tree():
     parsed = parse_document(SETTLEMENT_PATH, ROUND_TRIP_TEXT)
-    before = repr(parsed.round_trip)
+    def emit_tree():
+        from io import StringIO
+
+        from ruamel.yaml import YAML
+
+        output = StringIO()
+        YAML(typ="rt", pure=True).dump(parsed.round_trip, output)
+        return output.getvalue()
+
+    before = emit_tree()
     bad_data = dict(parsed.document.data)
     bad_data["mystery"] = 1
     bad = dataclasses.replace(parsed.document, data=bad_data)
     with pytest.raises(AuthoringError):
         serialize_document(bad, parsed.round_trip)
-    assert repr(parsed.round_trip) == before
+    assert emit_tree() == before
 
 
 def test_serializer_reparses_its_own_output():

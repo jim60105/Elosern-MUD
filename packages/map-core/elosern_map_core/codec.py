@@ -517,6 +517,10 @@ def _merge_sequence(
         or not all(isinstance(item, Mapping) for item in value)
         or not all(isinstance(item, Mapping) for item in existing)
     ):
+        if _plain(existing) == _plain(value):
+            # An unchanged sequence keeps its retained tree, including comments
+            # inside bends, masks and other unidentified nested lists.
+            return existing
         return _build_value(value, spec)
 
     old_index: dict[tuple, int] = {}
@@ -595,8 +599,8 @@ def parse_document(relative_path: str, text: str) -> ParsedDocument:
                 relative_path=relative_path,
             )
         )
-    _scan_events(text, relative_path)
     try:
+        _scan_events(text, relative_path)
         tree = _yaml_loader().load(text)
     except DuplicateKeyError as error:
         mark = getattr(error, "problem_mark", None) or getattr(error, "context_mark", None)
@@ -722,16 +726,16 @@ def serialize_document(document: Any, retained_tree: Mapping[str, Any] | None = 
     caller's baseline untouched.
     """
 
-    data = _thaw(document.data)
     diagnostics = schema_module.validate_document(
         document.kind,
-        data,
+        document.data,
         relative_path=document.relative_path,
         expected_identity=document.identity,
         provenance=document.provenance,
     )
     if diagnostics:
         raise AuthoringError(diagnostics)
+    data = _thaw(document.data)
     meta = schema_module.document_meta(document.kind)
     if meta is None:
         raise _single(

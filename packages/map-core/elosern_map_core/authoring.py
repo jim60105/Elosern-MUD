@@ -572,6 +572,18 @@ def _structural_diagnostics(
                     )
                 )
         if interior.exterior is not None:
+            if interior.exterior.room not in room_ids:
+                diagnostics.append(
+                    _diagnostic(
+                        "unknown_reference",
+                        STRUCTURE,
+                        f"exterior room {interior.exterior.room!r} is not an "
+                        f"authored room of {interior_id!r}",
+                        document=interior,
+                        field_path="exterior.room",
+                        object_id=interior_id,
+                    )
+                )
             settlement = settlements.get(interior.exterior.settlement)
             if settlement is None:
                 diagnostics.append(
@@ -712,6 +724,8 @@ def _semantic_diagnostics(world: AuthoringWorld) -> list[Diagnostic]:
                             )
                         )
 
+    interior_reachable = _reachable_interior_rooms(world, reachable_cache)
+
     for district_id, district in world.districts.districts.items():
         landmark = district.landmark
         if landmark.domain == "settlement_node" and landmark.map_id is not None:
@@ -743,6 +757,20 @@ def _semantic_diagnostics(world: AuthoringWorld) -> list[Diagnostic]:
                         object_id=district_id,
                     )
                 )
+        elif landmark.domain == "interior_room" and landmark.map_id is not None:
+            reachable = interior_reachable.get(landmark.map_id, frozenset())
+            if landmark.object_id not in reachable:
+                diagnostics.append(
+                    _diagnostic(
+                        "unreachable_landmark",
+                        SEMANTIC,
+                        f"landmark room {landmark.object_id!r} is not reachable "
+                        f"from an authored entrance of {landmark.map_id!r}",
+                        document=world.districts,
+                        field_path=f"districts.{district_id}.landmark",
+                        object_id=district_id,
+                    )
+                )
     return diagnostics
 
 
@@ -759,6 +787,52 @@ def _reachable_nodes(settlement: SettlementDocument) -> frozenset[str]:
         reachable.add(node_id)
         pending.extend(adjacency.get(node_id, ()))
     return frozenset(reachable)
+
+
+def _reachable_interior_rooms(
+    world: AuthoringWorld,
+    settlement_reachable: Mapping[str, frozenset[str]],
+) -> dict[str, frozenset[str]]:
+    """Rooms reachable from a settlement entrance or a reachable interior link."""
+
+    reachable: dict[str, set[str]] = {
+        interior_id: set() for interior_id in world.interiors
+    }
+    changed = True
+    while changed:
+        changed = False
+        for interior_id, interior in world.interiors.items():
+            pending: list[str] = []
+            exterior = interior.exterior
+            if (
+                exterior is not None
+                and exterior.node
+                in settlement_reachable.get(exterior.settlement, frozenset())
+            ):
+                pending.append(exterior.room)
+            for source_id, source in world.interiors.items():
+                for link in source.interior_links:
+                    if (
+                        link.source_room in reachable[source_id]
+                        and link.target_interior == interior_id
+                    ):
+                        pending.append(link.target_room)
+            while pending:
+                room_id = pending.pop()
+                if room_id in reachable[interior_id]:
+                    continue
+                if room_id not in interior.rooms:
+                    continue
+                reachable[interior_id].add(room_id)
+                changed = True
+                pending.extend(
+                    connection.destination
+                    for connection in interior.connections
+                    if connection.source == room_id
+                )
+    return {
+        interior_id: frozenset(rooms) for interior_id, rooms in reachable.items()
+    }
 
 
 def diagnose_world(

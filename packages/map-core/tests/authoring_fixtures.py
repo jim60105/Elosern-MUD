@@ -272,6 +272,7 @@ def interior_data(interior_id: str = "demo_interior") -> dict:
         "exterior": {
             "settlement": "demo_map",
             "node": "plaza",
+            "room": "hall",
             "doorway_key": "Door",
             "doorway_aliases": ["door"],
         },

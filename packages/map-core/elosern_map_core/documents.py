@@ -232,6 +232,7 @@ class InteriorLinkDeclaration:
 class ExteriorDeclaration:
     settlement: str
     node: str
+    room: str
     doorway_key: str
     doorway_aliases: tuple[str, ...]
 
@@ -513,6 +514,7 @@ class InteriorDocument(AuthoringDocument):
             exterior = ExteriorDeclaration(
                 settlement=str(exterior_data["settlement"]),
                 node=str(exterior_data["node"]),
+                room=str(exterior_data["room"]),
                 doorway_key=str(exterior_data["doorway_key"]),
                 doorway_aliases=tuple(
                     str(alias) for alias in exterior_data.get("doorway_aliases", ())
