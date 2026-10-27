@@ -35,7 +35,7 @@ The production presentation registry SHALL register panel name `exploration` at 
 
 #### Scenario: A delivery affordance carries its normalized dispatch payload
 - **WHEN** the room contains a co-located bound delivery recipient and the full `exploration` panel is rendered through the production presenter
-- **THEN** the target descriptor carries the `explore.deliver` affordance with exactly the normalized `params` (`npc_id` and `item_key`), and no other action affordance carries a `params` field
+- **THEN** the target descriptor carries the `explore.deliver` affordance with exactly the normalized `params` (`npc_id` and `item_key`), and no other ordinary action affordance carries a params field
 
 #### Scenario: In-conversation codes and keyword lists are rejected
 - **WHEN** the server validator or the client mirror receives an exploration payload whose target carries a `keywords` list, or an affordance naming `explore.talk_scripted` or `explore.talk_freeform`, or whose `schema_version` is 2 or 3
@@ -57,9 +57,8 @@ The production presentation registry SHALL register panel name `exploration` at 
 
 #### Scenario: Interact targets carry exactly their four fields and a bounded affordance list
 - **WHEN** the presenter builds `interact`
-- **THEN** it is a bounded list of at most 32 present target descriptors, each carrying exactly `identity`, `display_name`, nullable `portrait_ref`, `services` and a bounded `affordances` list of at most 8 descriptors
-- **AND** `services` carries state `none|ready|unreadable` and at most 16 entries with exact `key`, `label`, `enabled`, `disabled_reason` and selected-provider `route`, independently of general affordances
-- **AND** topic bodies reach the browser only through the `dialogue` panel after opening
+- **THEN** it is a bounded list of at most 32 present target descriptors, each carrying exactly `identity`, `display_name`, nullable `portrait_ref`, services, and a bounded `affordances` list of at most 8 descriptors
+- **AND** a target descriptor carries no keyword list beyond its declared services routes, because a conversation's topics reach the browser only through the `dialogue` panel's `choices` once the conversation is open
 
 #### Scenario: An action affordance carries exactly its five fields
 - **WHEN** the presenter serializes an action affordance
@@ -76,8 +75,8 @@ The production presentation registry SHALL register panel name `exploration` at 
 
 #### Scenario: A navigation affordance carries exactly its five fields and opens only a drawer
 - **WHEN** the presenter serializes a navigation affordance
-- **THEN** it contains exactly `kind` (`"navigate"`), `surface` (`"npc_persona"`), `label`, `enabled`, and nullable `disabled_reason`
-- **AND** navigation affordances open the author editor; selected-provider services use their separate route union and never grant execution authority
+- **THEN** it contains exactly `kind` (`"navigate"`), `surface` (only npc_persona for an ordinary NPC editor), `label`, `enabled`, and nullable `disabled_reason`
+- **AND** navigation affordances are dock-navigation descriptors only; they are NOT registered action adapters, never enter a `ui_action` payload, and only open the ordinary author editor; supported services use the separate exact target-bound route union
 
 #### Scenario: Availability entries carry only the available boolean
 - **WHEN** the presenter builds `character`, `quests`, and `inventory`
@@ -94,6 +93,10 @@ The production presentation registry SHALL register panel name `exploration` at 
 #### Scenario: Available schema versions cut over together
 - **WHEN** either validator receives an available exploration panel with schema version 5, and then otherwise identical panels with version 4 or another unsupported version
 - **THEN** only version 5 is accepted, including its non-null reference fields, and no dual-version conversion is performed
+
+#### Scenario: Bounded independent services field
+- **WHEN** an NPC interact descriptor is serialized
+- **THEN** services has exact state none/ready/unreadable and at most 16 stable-key label/enabled/reason/route entries, independent of the eight general-affordance limit; Python and browser accept only schema 5
 
 ### Requirement: explore.talk_open opens a conversation with the host's greeting
 The production action registry SHALL register `explore.talk_open`, whose payload SHALL accept exactly `npc_id` (a positive integer). The adapter SHALL obtain the actor from the authenticated session and SHALL reject, before writing anything: an unlawful possessed actor, an unresolvable `npc_id`, a schedule-blocked host, and a non-conversable host. On success it SHALL record the session through the deterministic dialogue-session seam and publish a full snapshot at one newer revision.
@@ -234,7 +237,7 @@ Existing exploration affordances SHALL remain server-authored. Party invite SHAL
 
 #### Scenario: A navigate service affordance needs an unambiguous usable host
 - **WHEN** the presenter decides whether to offer a `navigate`-kind service affordance (`surface` `"guild"` or `"shop"`)
-- **THEN** no coarse guild/shop navigation is emitted; each selected NPC's independent services retain exact provider identity, even with multiple same-class hosts
+- **THEN** the old guild/shop navigation descriptors are absent; the separate contextual services field targets this NPC with availability reasons and opens its existing selected-provider flow
 
 #### Scenario: No affordance references a remote, absent, or ambiguous target
 - **WHEN** the presenter builds any interact affordance
@@ -248,6 +251,10 @@ Existing exploration affordances SHALL remain server-authored. Party invite SHAL
 #### Scenario: Dual membership preserves one row and independent controls
 - **WHEN** a same-owner temporary-only actor is normally recruited and later has its general identity removed
 - **THEN** its one effective roster row and escort controls remain until all valid escort reasons end
+
+#### Scenario: Selected-provider services replace coarse navigation
+- **WHEN** an NPC has supported services
+- **THEN** the services field derives all route entries for that selected host; guild/shop navigate affordances are no longer emitted and another same-class bystander does not hide its entries
 
 ### Requirement: The character panel is an exact read-only version-9 panel
 The production registry SHALL register `character` at schema version 9 with `available` true and `kind` `character`, built for the viewed member (commander when unset) in exploration and combat. Its payload SHALL contain exactly `schema_version`, `available`, `kind`, `member_id`, `traits`, `conditions`, `actives`, `passives`, `equipment`, `disguise`, `guild`, `wallet`, `selected_skill`, plus optional `full_title`. Persona prose and intimate state SHALL NOT appear; `party_member` publishes them.

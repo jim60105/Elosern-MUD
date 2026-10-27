@@ -17,7 +17,7 @@ Static dialogue SHALL be discovered from the flat `world/lore/dialogue/content/<
 - **THEN** loading rejects that file with an identity-named error
 
 ### Requirement: Unsafe or invalid content rejects the whole candidate snapshot
-Loading SHALL reject duplicate mapping keys, unsafe YAML constructs, unknown profiles, duplicate bindings, schema/reference errors and exceeded bounds before publishing any candidate entries. Successful publication SHALL expose one deeply immutable snapshot. Generated/private package dialogue SHALL remain outside this static snapshot. Optional exact `services` rows SHALL reject duplicate, unsupported, dangling or cross-phase associations atomically; host assembly SHALL reject native plus associated entry overflow before persistence.
+Loading SHALL reject duplicate mapping keys, unsafe YAML constructs, unknown profiles, duplicate bindings, schema/reference errors and exceeded bounds before publishing any candidate entries. Successful publication SHALL expose one deeply immutable snapshot. Generated/private package dialogue SHALL remain outside this static snapshot.
 
 #### Scenario: One invalid neighbor prevents partial publication
 - **WHEN** several valid files and one invalid file are loaded together
@@ -34,3 +34,7 @@ Loading SHALL reject duplicate mapping keys, unsafe YAML constructs, unknown pro
 #### Scenario: A bound host cannot lose its file silently
 - **WHEN** a supplied canonical dialogue binding has no discovered file, a discovered file names no registered profile, or a discovered file has no canonical binding
 - **THEN** the whole candidate rejects with the binding identity instead of publishing a host with no dialogue
+
+#### Scenario: Service association validation is batch atomic
+- **WHEN** one static file or generated package has invalid service metadata
+- **THEN** the entire candidate rejects before publication without mutating the previously accepted source or producing partial service entries

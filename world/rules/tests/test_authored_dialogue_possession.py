@@ -223,6 +223,9 @@ class AuthoredDialoguePossessionTests(EvenniaTest):
             self.companion.db.possessed_by = int(self.char1.pk)
             remote.delete()
 
+    @covers_requirement(
+        "npc-contextual-services::selections-always-revalidate-the-exact-provider"
+    )
     def test_stale_control_identity_retires_the_live_session(self):
         select_authored_topic(
             self.companion,

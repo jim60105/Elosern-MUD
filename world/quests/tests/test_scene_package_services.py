@@ -12,6 +12,7 @@ player's separate explicit activation.
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import AnchorRoom
 from world.quests.encounters import publish_scene_package
@@ -164,6 +165,9 @@ class GeneratedServicePackageTests(RegistryIsolationMixin, EvenniaTest):
         with self.assertRaises(ScenePackageError):
             validate_scene_package(payload)
 
+    @covers_requirement(
+        "npc-contextual-services::explicit-dialogue-services-retain-source-and-execution-authority"
+    )
     def test_a_narrative_only_role_stays_unbound(self):
         definition = validate_scene_package(self.payload)
         self.assertEqual(definition.role("daughter").capabilities, ())
@@ -231,6 +235,9 @@ class GeneratedServiceActivationTests(RegistryIsolationMixin, EvenniaTest):
         (service,) = source.dialogue.services
         self.assertEqual(service.topic_id, offer.topic_id)
 
+    @covers_requirement(
+        "npc-contextual-services::explicit-dialogue-services-retain-source-and-execution-authority"
+    )
     def test_opening_and_explicit_activation_have_separate_effect_authority(self):
         from web.webclient.actions.exploration_actions import _talk_open_adapter
         from world.rules.dialogue import live_dialogue_session, select_authored_topic
@@ -249,6 +256,9 @@ class GeneratedServiceActivationTests(RegistryIsolationMixin, EvenniaTest):
         )
         self.assertTrue(read_records(self.player))
 
+    @covers_requirement(
+        "npc-contextual-services::selections-always-revalidate-the-exact-provider"
+    )
     def test_departed_service_host_is_never_replaced_by_a_bystander(self):
         from web.webclient.actions.exploration_actions import _talk_open_adapter
         from typeclasses.npcs import NPC
@@ -260,6 +270,9 @@ class GeneratedServiceActivationTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(read_records(self.player), [])
 
+    @covers_requirement(
+        "npc-contextual-services::explicit-dialogue-services-retain-source-and-execution-authority"
+    )
     def test_reactivation_rejects_conflicting_dialogue_binding_without_rewriting(self):
         from typeclasses.components import ScriptedDialogue
 

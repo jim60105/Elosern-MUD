@@ -518,6 +518,9 @@ class CommandDocsContractTests(unittest.TestCase):
     @covers_requirement(
         "church-ordination::the-church-join-command-is-documented-in-the-docs-trio"
     )
+    @covers_requirement(
+        "game-command-docs::church-enrollment-routing-documents-the-selected-provider"
+    )
     def test_church_join_entry_is_documented(self):
         entry = self.entries["church join"]
         self.assertEqual(entry["指令"], "church join")

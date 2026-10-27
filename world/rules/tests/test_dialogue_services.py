@@ -14,6 +14,7 @@ import unittest
 from pathlib import Path
 
 from evennia.utils.test_resources import EvenniaTest
+from tools.spec_traceability import covers_requirement
 from typeclasses.components import GuildStaff
 
 from world.lore.dialogue import loader
@@ -162,6 +163,9 @@ class DialogueServicePolicyTests(unittest.TestCase):
                 supported_topic_ids=supported,
             )
 
+    @covers_requirement(
+        "npc-contextual-services::service-discovery-derives-from-selected-provider-capabilities"
+    )
     def test_an_informational_topic_is_never_a_service(self):
         dialogue = parse_dialogue(
             _static_payload(
@@ -175,6 +179,9 @@ class DialogueServicePolicyTests(unittest.TestCase):
             native_supported_topic_ids(GUILD_STAFF_DIALOGUE_KEY, dialogue), set()
         )
 
+    @covers_requirement(
+        "npc-contextual-services::service-discovery-derives-from-selected-provider-capabilities"
+    )
     def test_a_narrative_dialogue_source_has_no_native_support(self):
         dialogue = parse_dialogue(
             _static_payload(services=[], topic_id="t_narrative.topic_01"),
@@ -187,6 +194,9 @@ class DialogueServicePolicyTests(unittest.TestCase):
         self.assertEqual(required_capability_types(GUILD_STAFF_DIALOGUE_KEY), {GuildStaff.name})
         self.assertEqual(required_capability_types("t_narrative"), set())
 
+    @covers_requirement(
+        "npc-contextual-services::explicit-dialogue-services-retain-source-and-execution-authority"
+    )
     def test_a_dangling_reference_rejects_the_source(self):
         with self.assertRaises(ValueError):
             parse_dialogue(
@@ -246,6 +256,9 @@ class StaticLoaderAtomicityTests(EvenniaTest):
             "  label: 交談回報委託\n"
         )
 
+    @covers_requirement(
+        "npc-contextual-services::explicit-dialogue-services-retain-source-and-execution-authority"
+    )
     def test_one_unsupported_association_rejects_the_candidate(self):
         with tempfile.TemporaryDirectory() as raw:
             directory = Path(raw)

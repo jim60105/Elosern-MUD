@@ -182,7 +182,7 @@ A non-empty per-instance offline greeting SHALL be plain text on all no-keyword 
 - **THEN** known keywords and misunderstanding replies remain authored-only
 
 ### Requirement: Dialogue tables are immutable, keyed, and registry-backed
-Static/generated dialogue SHALL use immutable stable topic identities and complete linear scenes with greetings. Source-aware resolution SHALL read scanner-published static YAML or permitted immutable DB phases without global registry mutation. Every permitted topic up to sixteen SHALL be reachable, preserving guild, greeting, fallback and command-discovery semantics. Optional explicit service associations SHALL reference supported deterministic topics in the same source and phase; opening a service SHALL focus its disclosed topic without selecting it or completing reading.
+Static/generated dialogue SHALL use immutable stable topic identities and complete linear scenes with greetings. Source-aware resolution SHALL read scanner-published static YAML or permitted immutable DB phases without global registry mutation. Every permitted topic up to sixteen SHALL be reachable, preserving guild, greeting, fallback and command-discovery semantics.
 
 #### Scenario: Authored table behavior remains unchanged
 - **WHEN** an authored guild host is queried through the resolver
@@ -224,3 +224,7 @@ Static/generated dialogue SHALL use immutable stable topic identities and comple
 - **WHEN** players need to discover guild commands
 - **THEN** command discoverability belongs to help, documentation and the interface, not to the
   dialogue table's prose
+
+#### Scenario: Explicit supported service associations
+- **WHEN** immutable source dialogue declares services metadata
+- **THEN** each association names an existing same-source supported deterministic entry and validation rejects unknown, duplicate, dangling or cross-phase references; ordinary topics remain ordinary dialogue

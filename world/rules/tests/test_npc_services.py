@@ -12,6 +12,7 @@ from unittest.mock import patch
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import (
     ChurchHost,
@@ -149,6 +150,9 @@ class _ProjectionBase(EvenniaTest):
 
 
 class NativeProjectionTests(_ProjectionBase):
+    @covers_requirement(
+        "npc-contextual-services::service-discovery-derives-from-selected-provider-capabilities"
+    )
     def test_mapping_order_and_exact_routes(self):
         host = self._host("t_全服務")
         self._merchant(host)
@@ -185,6 +189,9 @@ class NativeProjectionTests(_ProjectionBase):
         )
         self.assertTrue(all(entry.enabled for entry in services.entries))
 
+    @covers_requirement(
+        "npc-contextual-services::service-discovery-derives-from-selected-provider-capabilities"
+    )
     def test_a_bystander_never_contributes_entries(self):
         host = self._host("t_櫃檯")
         self._staff(host)
@@ -197,12 +204,18 @@ class NativeProjectionTests(_ProjectionBase):
             ["guild.register", "guild.board", "guild.report"],
         )
 
+    @covers_requirement(
+        "npc-contextual-services::empty-service-information-and-unreadable-information-are-distinct"
+    )
     def test_a_plain_host_reports_no_services(self):
         host = self._host("t_路人")
         services = self._project(host)
         self.assertEqual(services.state, STATE_NONE)
         self.assertEqual(services.entries, ())
 
+    @covers_requirement(
+        "npc-contextual-services::service-availability-differs-from-operation-eligibility"
+    )
     def test_off_anchor_place_binding_keeps_its_entry_with_a_reason(self):
         anchor = create_object(Room, key="t_anchor")
         host = self._host("t_行商")
@@ -238,6 +251,9 @@ class NativeProjectionTests(_ProjectionBase):
 
 
 class EntryVersusOperationTests(_ProjectionBase):
+    @covers_requirement(
+        "npc-contextual-services::service-availability-differs-from-operation-eligibility"
+    )
     def test_an_unaffordable_shopper_still_gets_the_shop_entry(self):
         host = self._host("t_商")
         self._merchant(host)
@@ -245,6 +261,9 @@ class EntryVersusOperationTests(_ProjectionBase):
         (entry,) = self._project(host).entries
         self.assertTrue(entry.enabled)
 
+    @covers_requirement(
+        "npc-contextual-services::service-availability-differs-from-operation-eligibility"
+    )
     def test_the_exam_entry_never_depends_on_registration_merit_or_host(self):
         host = self._host("t_考官")
         self._reception(host)
@@ -307,6 +326,9 @@ class DialogueAssociationProjectionTests(_ProjectionBase):
         ):
             return project_npc_services(actor, actor, self.host)
 
+    @covers_requirement(
+        "npc-contextual-services::explicit-dialogue-services-retain-source-and-execution-authority"
+    )
     def test_an_open_association_is_a_dialogue_route_entry(self):
         services = self._project_with(
             source=_dialogue_source([self.service]), rows=[_row("t_synth.offer")]
@@ -324,12 +346,18 @@ class DialogueAssociationProjectionTests(_ProjectionBase):
             },
         )
 
+    @covers_requirement(
+        "npc-contextual-services::explicit-dialogue-services-retain-source-and-execution-authority"
+    )
     def test_a_hidden_association_is_omitted_entirely(self):
         services = self._project_with(
             source=_dialogue_source([self.service]), rows=[]
         )
         self.assertEqual(services.state, STATE_NONE)
 
+    @covers_requirement(
+        "npc-contextual-services::explicit-dialogue-services-retain-source-and-execution-authority"
+    )
     def test_schedule_refusal_never_discloses_a_hidden_association(self):
         self.host.db.schedule_state = "busy"
         services = self._project_with(source=_dialogue_source([self.service]), rows=[])
@@ -347,6 +375,9 @@ class DialogueAssociationProjectionTests(_ProjectionBase):
 
 
 class ProjectionFailureTests(_ProjectionBase):
+    @covers_requirement(
+        "npc-contextual-services::empty-service-information-and-unreadable-information-are-distinct"
+    )
     def test_a_projection_failure_is_the_distinct_unreadable_state(self):
         host = self._host("t_壞掉")
         self._merchant(host)
@@ -416,6 +447,9 @@ class ServiceCapacityTests(EvenniaTest):
             native_entry_count({Merchant.name, GuildStaff.name, ChurchHost.name}), 5
         )
 
+    @covers_requirement(
+        "npc-contextual-services::explicit-dialogue-services-retain-source-and-execution-authority"
+    )
     def test_capacity_rejects_overflow_instead_of_truncating(self):
         validate_service_capacity({GuildStaff.name}, 13)  # 3 + 13 == 16
         with self.assertRaises(ValueError):
