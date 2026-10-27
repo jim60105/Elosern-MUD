@@ -11,7 +11,8 @@
 | [`進入`](/game/command-reference?id=進入) | 進入任務場景。 |
 | [`前往`](/game/command-reference?id=前往) | 沿最短路徑自動移動。 |
 | [`地圖`](/game/command-reference?id=地圖) | 檢視地圖。 |
-| [`看`](/game/command-reference?id=看) | 觀察所在位置或對象；房間外觀只顯示名稱、描述、內容物與出口，不再自動附上文字小地圖（網頁客戶端另以地圖面板呈現）。查看對象時顯示對方當前所見的戰鬥數值，查看自己時顯示含來源明細的完整數值構成。 |
+| [`看`](/game/command-reference?id=看) | 觀察所在位置或對象；房間外觀只顯示名稱、描述、內容物與出口，不再自動附上文字小地圖（網頁客戶端另以地圖面板呈現）。查看對象時顯示對方當前所見的戰鬥數值，查看自己時顯示含來源明細的完整數值構成；查看 NPC 時另附上與 `services` 相同的唯讀服務資訊。 |
+| [`services`](/game/command-reference?id=services) | 查看指定對象目前提供的服務（別名 `服務`）：穩定代號、名稱、是否可用與原因，以及前往該服務的既有文字指令；可用名字、別名或 `#<編號>` 指定對象，只看這一位，不會改變任何狀態。 |
 | [`回家`](/game/command-reference?id=回家) | 返回重生點。 |
 
 ## 說明與幫助
@@ -101,18 +102,18 @@
 
 | 指令 | 說明 |
 | --- | --- |
-| [`guild register`](/game/command-reference?id=guild-register) | 註冊為冒險者。 |
-| [`guild list`](/game/command-reference?id=guild-list) | 查看任務板與每個委託的第一目標說明；任務板只列出目前能完成的委託。 |
-| [`guild accept`](/game/command-reference?id=guild-accept) | 接取委託。 |
+| [`guild register`](/game/command-reference?id=guild-register) | 註冊為冒險者；結尾可用 `@#<編號>` 指定這一位服務人員。 |
+| [`guild list`](/game/command-reference?id=guild-list) | 查看任務板與每個委託的第一目標說明；任務板只列出目前能完成的委託；結尾可用 `@#<編號>` 指定這一位服務人員。 |
+| [`guild accept`](/game/command-reference?id=guild-accept) | 接取委託；結尾可用 `@#<編號>` 指定這一位服務人員。 |
 | [`guild log`](/game/command-reference?id=guild-log) | 查看任務記錄。 |
 | [`guild show`](/game/command-reference?id=guild-show) | 查看任務詳情（含階級、評價理由與背景）。 |
-| [`guild abandon`](/game/command-reference?id=guild-abandon) | 放棄任務。 |
-| [`guild turnin`](/game/command-reference?id=guild-turnin) | 回報任務並領取報酬。 |
+| [`guild abandon`](/game/command-reference?id=guild-abandon) | 放棄任務；結尾可用 `@#<編號>` 指定這一位服務人員。 |
+| [`guild turnin`](/game/command-reference?id=guild-turnin) | 回報任務並領取報酬；結尾可用 `@#<編號>` 指定這一位服務人員。 |
 | [`guild merit`](/game/command-reference?id=guild-merit) | 查看階級與功績。 |
 | [`guild request`](/game/command-reference?id=guild-request) | 委託公會規劃任務（護衛委託需完整契約，角色須來自已發布套件）。 |
-| [`guild exam`](/game/command-reference?id=guild-exam) | 預約升等考核：考官在場時開始考核，不在時告知預定到場時間。 |
+| [`guild exam`](/game/command-reference?id=guild-exam) | 預約升等考核：考官在場時開始考核，不在時告知預定到場時間；結尾可用 `@#<編號>` 指定這一位考核櫃台。 |
 
-文字指令以房間裡唯一符合的服務人員辦事。同一個房間有兩位公會職員或兩位店主時，指令會說明無法判定對象並拒絕，不會替你挑一位；瀏覽器面板由你選定的對象開啟，該次操作只送往那一位。
+文字指令預設以房間裡唯一符合的服務人員辦事。同一個房間有兩位公會職員或兩位店主時，指令會說明無法判定對象並拒絕，不會替你挑一位；在指令結尾加上 `@#<編號>` 則只認那一位眼前的服務人員，即使旁邊還有同類對象也一樣，該對象離開或不再符合時直接拒絕，不會改找別人。瀏覽器面板由你選定的對象開啟，該次操作同樣只送往那一位。`guild log`、`guild show`、`guild merit` 只讀你自己的記錄，不需要服務人員。
 
 ## 教會
 
@@ -146,9 +147,9 @@ NPC 可選擇回信，送達不代表必定收到回覆。回信寄出後另需�
 
 | 指令 | 說明 |
 | --- | --- |
-| [`shop stock`](/game/command-reference?id=shop-stock) | 查看商店庫存（標題冠以商店名稱）。 |
-| [`buy`](/game/command-reference?id=buy) | 購買物品（別名 `買`），可用 `= <成員>` 指定同行的隊伍成員收下物品；未指定成員時由目前操作的隊伍成員收下；費用由隊伍錢袋（指揮者的錢包）支付；附身中仍可購買。 |
-| [`sell`](/game/command-reference?id=sell) | 販賣物品（別名 `賣`），可用 `= <成員>` 指定同行的隊伍成員出賣其未裝備的物品；未指定成員時賣出目前操作成員的物品；所得進入隊伍錢袋；附身中仍可販賣。 |
+| [`shop stock`](/game/command-reference?id=shop-stock) | 查看商店庫存（標題冠以商店名稱）；結尾可用 `@#<編號>` 指定這一位商人。 |
+| [`buy`](/game/command-reference?id=buy) | 購買物品（別名 `買`），可用 `= <成員>` 指定同行的隊伍成員收下物品；未指定成員時由目前操作的隊伍成員收下；費用由隊伍錢袋（指揮者的錢包）支付；附身中仍可購買；結尾可用 `@#<編號>` 指定這一位商人。 |
+| [`sell`](/game/command-reference?id=sell) | 販賣物品（別名 `賣`），可用 `= <成員>` 指定同行的隊伍成員出賣其未裝備的物品；未指定成員時賣出目前操作成員的物品；所得進入隊伍錢袋；附身中仍可販賣；結尾可用 `@#<編號>` 指定這一位商人。 |
 | [`inventory`](/game/command-reference?id=inventory) | 查看錢包、背包與角色數值構成（與角色面板同源）；附身時顯示隊伍錢袋，背包仍屬於目前操作的角色。 |
 | [`使用`](/game/command-reference?id=使用) | 使用一件持有物品，可帶一個目標名稱，並可用 `= <成員>` 指定同行的隊伍成員（物品從該成員自己的背包消耗、自身效果綁定該成員，倒地的同伴會被拒絕）；戰鬥中只存入該成員的那筆指令（未指定時是你自己的），完整回合確認後才在結算時消耗道具與一個回合。 |
 | [`裝備`](/game/command-reference?id=裝備) | 裝備或卸下裝備，物品可用登錄鍵或顯示名稱指定，並可用 `= <成員>` 指定同行的隊伍成員（倒地的同伴也可以）；免費動作，飾品上限 5 件。 |

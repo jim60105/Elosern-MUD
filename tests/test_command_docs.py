@@ -125,12 +125,15 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
         "context": "戰鬥（需在進行中的戰鬥）",
     },
     "guild register": {
-        "syntax": "guild register",
+        "syntax": "guild register [@#<編號>]",
         "context": "公會（需當地公會服務人員）",
     },
-    "guild list": {"syntax": "guild list", "context": "公會（需當地公會服務人員）"},
+    "guild list": {
+        "syntax": "guild list [@#<編號>]",
+        "context": "公會（需當地公會服務人員）",
+    },
     "guild accept": {
-        "syntax": "guild accept <definition_key>",
+        "syntax": "guild accept <definition_key> [@#<編號>]",
         "context": "公會（需當地公會服務人員）",
     },
     "guild log": {"syntax": "guild log", "context": "公會（需當地公會服務人員）"},
@@ -139,11 +142,11 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
         "context": "公會（需當地公會服務人員）",
     },
     "guild abandon": {
-        "syntax": "guild abandon <quest_id>",
+        "syntax": "guild abandon <quest_id> [@#<編號>]",
         "context": "公會（需當地公會服務人員）",
     },
     "guild turnin": {
-        "syntax": "guild turnin <quest_id>",
+        "syntax": "guild turnin <quest_id> [@#<編號>]",
         "context": "公會（需當地公會服務人員）",
     },
     "guild merit": {"syntax": "guild merit", "context": "公會（需當地公會服務人員）"},
@@ -152,7 +155,7 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
         "context": "公會（需已註冊冒險者）",
     },
     "guild exam": {
-        "syntax": "guild exam [<rank>]",
+        "syntax": "guild exam [<rank>] [@#<編號>]",
         "context": "公會（需在所屬分部的公會櫃台前，且已註冊為冒險者）",
     },
     "church join": {
@@ -175,13 +178,16 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
         "syntax": "church merit",
         "context": "教會（需已入教）",
     },
-    "shop stock": {"syntax": "shop stock", "context": "經濟（需當地商人）"},
+    "shop stock": {
+        "syntax": "shop stock [@#<編號>]",
+        "context": "經濟（需當地商人）",
+    },
     "buy": {
-        "syntax": "buy <item_key> [數量] [= <成員>]",
+        "syntax": "buy <item_key> [數量] [= <成員>] [@#<編號>]",
         "context": "經濟（需當地商人）",
     },
     "sell": {
-        "syntax": "sell <item_key> [數量] [= <成員>]",
+        "syntax": "sell <item_key> [數量] [= <成員>] [@#<編號>]",
         "context": "經濟（需當地商人）",
     },
     "inventory": {"syntax": "inventory", "context": "一般（隨時可用）"},
@@ -218,7 +224,8 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
         "context": "一般（探索與移動）",
     },
     "地圖": {"syntax": "地圖 [Z 座標]、地圖 list", "context": "一般（探索，需建造者權限）"},
-    "看": {"syntax": "看、look", "context": "一般（隨時可用）"},
+    "看": {"syntax": "看、看 <對象>", "context": "一般（隨時可用）"},
+    "services": {"syntax": "services <npc>", "context": "一般（需在場對象）"},
     "說明": {"syntax": "說明 [<主題>]", "context": "一般（隨時可用）"},
     "說": {"syntax": "說 <訊息>", "context": "一般"},
     "動作": {"syntax": "動作 <動作描述>", "context": "一般"},
