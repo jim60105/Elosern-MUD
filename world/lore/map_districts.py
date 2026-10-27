@@ -31,6 +31,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Protocol
 
+from elosern_map_core.geometry import cell_center_m
+
 #: The two district kinds.
 DISTRICT_KINDS: tuple[str, ...] = ("voronoi", "region")
 
@@ -105,12 +107,6 @@ class DistrictTerrain(Protocol):
 def cell_of_position(position_m: tuple[int, int]) -> tuple[int, int]:
     """The one-kilometre wilderness cell containing an absolute metre point."""
     return (position_m[0] // 1000, position_m[1] // 1000)
-
-
-def _cell_center_m(cell: tuple[int, int]) -> tuple[int, int]:
-    from world.lore.wilderness_regions import cell_center_m
-
-    return cell_center_m(cell)
 
 
 class _ProductionTerrain:
@@ -223,7 +219,7 @@ def _landmark_position(
         if not terrain.is_reachable(cell):
             fail(district.key, f"landmark {node!r} is unreachable")
             return None
-        return _cell_center_m(cell)
+        return cell_center_m(cell)
     grid = _GRID_RE.match(node)
     if grid is not None:
         map_key, x, y = grid.group(1), int(grid.group(2)), int(grid.group(3))

@@ -2,15 +2,18 @@
 
 `world/lore/` owns the frozen physical geography of the known continent. These
 declarations are authoring contracts only: they spawn no rooms and are
-independent of persistent room lifecycle. `rescale-wilderness-geography`
-activates them in `world/maps/wilderness_provider.py`: the runtime provider is
-now the same 2700 by 2700 one-kilometre frame, and the variable cell span the
-travel-cost core reads is `WILDERNESS_KM_PER_CELL = 1`.
+independent of persistent room lifecycle. `world/maps/wilderness_provider.py`
+hands them to the pure rules in `packages/map-core/elosern_map_core/terrain.py`
+through one explicit ``TERRAIN`` snapshot: the runtime provider is the same
+2700 by 2700 one-kilometre frame, and the variable cell span the travel-cost
+core reads is `WILDERNESS_KM_PER_CELL = 1`.
 
 ## Runtime terrain and validity
 
-The provider owns one shared cell-validity rule
-(`is_valid_wilderness_cell`): inside the frame, inside the mainland polygon
+One shared cell-validity rule (`is_valid_wilderness_cell`, a
+`world/maps/wilderness_provider.py` wrapper binding the live footprint
+registry and the authored `TERRAIN` snapshot into the core rule) decides
+validity: inside the frame, inside the mainland polygon
 evaluated at the cell centre, off the cliff-walled central summit ridge, off
 the authored inland waterways, and outside every live anchor footprint. Sea,
 ridge and water are impassable on foot; the authored pass windows
@@ -205,11 +208,11 @@ tile run.
 | Module | Declaration | Contract |
 | --- | --- | --- |
 | `world/lore/wilderness_regions.py` | `MAINLAND_BOUNDARY_KM` | Ordered mainland boundary vertices in absolute `(east, north)` kilometres; implicitly closed. Shoelace area is exactly 5,000,000 km². |
-| `world/lore/wilderness_regions.py` | `CELL_CENTER_OFFSET_M`, `CONTINENT_FRAME_CELLS`, `CONTINENT_CELL_SIZE_KM` | Wilderness cells are logical one-kilometre areas; the frame is 2700 × 2700 cells (`0 <= X, Y < 2700`). |
+| `world/lore/wilderness_regions.py` | `CONTINENT_FRAME_CELLS`, `CONTINENT_CELL_SIZE_KM` | Wilderness cells are logical one-kilometre areas; the frame is 2700 × 2700 cells (`0 <= X, Y < 2700`). The cell-centre arithmetic and its `500` metre offset live in `elosern_map_core.geometry`. |
 | `world/lore/wilderness_regions.py` | `HARBOR_SITE_REGISTRY` | Reserved land-side harbor cells with their intended roles. A functional site is not a named anchor, city, quest or population. |
-| `world/lore/wilderness_regions.py` | `cell_center_m`, `is_wilderness_cell`, `mainland_area_km2`, `is_on_mainland` | Pure geometry helpers over the declarations above; boundary points count as land. |
+| `world/lore/wilderness_regions.py` | `is_wilderness_cell`, `mainland_area_km2`, `is_on_mainland` | Thin bindings of the declarations above into `elosern_map_core.geometry`; boundary points count as land. |
 | `world/lore/anchors.py` | `ANCHOR_GEOGRAPHY_REGISTRY` | The canonical wilderness cell and geographic constraint of every declared lore anchor. Separate from both lore identity (`ANCHOR_REGISTRY`) and built grid rooms (`ANCHOR_PLACEMENT_REGISTRY`). |
-| `world/lore/anchors.py` | `LOCAL_FRAME_ANCHOR_REGISTRY`, `world_position_m` | Settlement-local metre anchor bindings and the cross-layer transform. |
+| `world/lore/anchors.py` | `LOCAL_FRAME_ANCHOR_REGISTRY`, `world_position_m` | Settlement-local metre anchor bindings; the transform itself is `elosern_map_core.geometry.local_to_world_m`. |
 | `world/lore/nations.py` | `CONTINENT_AREA_KM2`, `CONTINENT_POPULATION`, `ELVEN_POPULATION`, `NEUTRAL_LANDS_AREA_KM2`, `NEUTRAL_LANDS_POPULATION`, `CAPITAL_POPULATION_SHARE` | Rounded continental totals. The neutral lands have no separate regional population total. |
 | `world/lore/nations.py` | `Nation.territory_km2`, `CapitalSupport`, `CAPITAL_SUPPORT_REGISTRY` | National area targets and the authored regional food/storage/water support (Valhalla additionally declares pastoral production and trade). |
 
@@ -221,7 +224,8 @@ Nothing in the declarations creates per-cell population or resource state.
 ## Coordinate units
 
 - A wilderness cell is an area. Its representative center in absolute metres is
-  `E = 1000 * X + 500`, `N = 1000 * Y + 500` (`cell_center_m`).
+  `E = 1000 * X + 500`, `N = 1000 * Y + 500`
+  (`elosern_map_core.geometry.cell_center_m`).
 - Settlement positions are integer metres east/north. Their `z` coordinate
   remains the logical grid/layer and is never physical elevation.
 - Cross-layer geometry uses the bound local anchor:

@@ -52,6 +52,12 @@ jobs:
       - name: Run test-data independence lint
         run: uv run --locked python -m tools.test_data_lint check
 
+      - name: Run map-core package tests
+        # The pure map package keeps its own project and lock; it must stay
+        # importable and green without Evennia or Django in the environment.
+        working-directory: packages/map-core
+        run: uv run --locked python -m pytest tests
+
       - name: Run Node DOM-independent test suite
         run: node --test web/static/webclient/js/tests/*.test.js
 

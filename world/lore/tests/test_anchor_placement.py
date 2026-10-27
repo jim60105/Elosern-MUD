@@ -115,6 +115,9 @@ class AnchorPlacementRegistryTests(unittest.TestCase):
     @covers_requirement(
         "continental-geography::coordinate-frames-have-explicit-physical-units"
     )
+    @covers_requirement(
+        "map-geometry-model::geometry-is-explicit-and-snapshot-scoped"
+    )
     def test_world_position_transform_adds_the_cell_center_not_the_cell_index(self):
         geography = {"t_frame_anchor": GeographicAnchor("t_frame_anchor", (2, 3), "synthetic")}
         frames = {"t_frame_anchor": LocalFrameAnchor("t_frame_anchor", (100, 200))}

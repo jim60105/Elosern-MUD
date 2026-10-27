@@ -18,19 +18,15 @@ from __future__ import annotations
 
 import math
 
+from elosern_map_core import terrain as core_terrain
+
 from world.lore import wilderness_entry as _wilderness_entry_module
-from world.lore.wilderness_regions import MAINLAND_BOUNDARY_KM
-from world.maps.wilderness_provider import (
-    WATERWAY_ROUTES,
-    WILDERNESS_MAX_X,
-    WILDERNESS_MAX_Y,
-    _rasterize_routes,
-    _ridge_span,
-    is_land_cell,
-    is_valid_wilderness_cell,
-)
+from world.maps.wilderness_provider import TERRAIN
 
 _INDEX_CACHE: dict[tuple[tuple[str, object], ...], "WalkableComponents"] = {}
+
+_MAX_X = TERRAIN.max_x
+_MAX_Y = TERRAIN.max_y
 
 
 def _mainland_row_intervals(y: int) -> list[tuple[int, int]]:
@@ -42,7 +38,7 @@ def _mainland_row_intervals(y: int) -> list[tuple[int, int]]:
     own answer, never disagree with it.
     """
     north = y + 0.5
-    vertices = MAINLAND_BOUNDARY_KM
+    vertices = TERRAIN.mainland_boundary_km
     crossings: list[float] = []
     for index, (start_east, start_north) in enumerate(vertices):
         end_east, end_north = vertices[(index + 1) % len(vertices)]
@@ -56,14 +52,14 @@ def _mainland_row_intervals(y: int) -> list[tuple[int, int]]:
     intervals: list[tuple[int, int]] = []
     for west, east in zip(crossings[::2], crossings[1::2]):
         low = max(math.ceil(west - 0.5), 0)
-        high = min(math.floor(east - 0.5), WILDERNESS_MAX_X)
-        while low <= high and not is_land_cell((low, y)):
+        high = min(math.floor(east - 0.5), _MAX_X)
+        while low <= high and not core_terrain.is_land_cell(TERRAIN, (low, y)):
             low += 1
-        while low > 0 and is_land_cell((low - 1, y)):
+        while low > 0 and core_terrain.is_land_cell(TERRAIN, (low - 1, y)):
             low -= 1
-        while high >= low and not is_land_cell((high, y)):
+        while high >= low and not core_terrain.is_land_cell(TERRAIN, (high, y)):
             high -= 1
-        while high < WILDERNESS_MAX_X and is_land_cell((high + 1, y)):
+        while high < _MAX_X and core_terrain.is_land_cell(TERRAIN, (high + 1, y)):
             high += 1
         if low <= high:
             intervals.append((low, high))
@@ -82,8 +78,9 @@ class WalkableComponents:
     """Connected components of valid wilderness cells, stored as row runs."""
 
     def __init__(self, footprints: frozenset[tuple[int, int]]) -> None:
+        self._footprints = footprints
         candidates: dict[int, set[int]] = {}
-        for x, y in _rasterize_routes(WATERWAY_ROUTES):
+        for x, y in core_terrain.rasterize_routes(TERRAIN.waterway_routes):
             candidates.setdefault(y, set()).add(x)
         for x, y in footprints:
             candidates.setdefault(y, set()).add(x)
@@ -91,15 +88,18 @@ class WalkableComponents:
         self._parent: list[int] = []
         self._row_runs: dict[int, list[int]] = {}
         previous: list[int] = []
-        for y in range(WILDERNESS_MAX_Y + 1):
-            low, high = _ridge_span(y)
+        for y in range(_MAX_Y + 1):
+            low, high = core_terrain.ridge_span(TERRAIN, y)
             row_candidates = candidates.get(y, set()) | set(range(low, high + 1))
             current: list[int] = []
             for west, east in _mainland_row_intervals(y):
                 blocked = sorted(
                     x
                     for x in row_candidates
-                    if west <= x <= east and not is_valid_wilderness_cell((x, y))
+                    if west <= x <= east
+                    and not core_terrain.is_valid_wilderness_cell(
+                        TERRAIN, self._footprints, (x, y)
+                    )
                 )
                 start = west
                 for x in [*blocked, east + 1]:

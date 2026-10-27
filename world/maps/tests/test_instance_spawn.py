@@ -70,6 +70,20 @@ class InstanceSpawnTests(EvenniaTest):
         self.assertIsInstance(room, InstanceRoom)
         self.assertIs(room.db.origin_room, self.origin_room)
 
+    def test_spawned_interior_carries_no_physical_map_coordinate(self):
+        # Interiors stay coordinate-free: they are neither grid rooms nor
+        # sparse settlement nodes, so no metric transform ever applies to them
+        # and none is synthesised here.
+        room = spawn_instance_room(
+            self.origin_room,
+            WHITELISTED_PROTOTYPE,
+            exit_key="into the mist",
+            return_key="back",
+        )
+        self.assertIsNone(getattr(room, "xyz", None))
+        self.assertIsNone(getattr(room, "coordinates", None))
+        self.assertIsNone(room.tags.get(category="sparse_node_identity"))
+
     def test_spawn_rejects_non_whitelisted_before_spawning(self):
         before = InstanceRoom.objects.all().count()
         with (

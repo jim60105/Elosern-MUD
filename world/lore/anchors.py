@@ -9,7 +9,7 @@ and neither spawns rooms.
 from dataclasses import dataclass
 from enum import StrEnum
 
-from .wilderness_regions import cell_center_m
+from elosern_map_core.geometry import local_to_world_m
 
 
 class AnchorKind(StrEnum):
@@ -151,8 +151,4 @@ def world_position_m(
     """
     geography = ANCHOR_GEOGRAPHY_REGISTRY[anchor_key]
     frame = LOCAL_FRAME_ANCHOR_REGISTRY[anchor_key]
-    center_east, center_north = cell_center_m(geography.cell)
-    return (
-        center_east + local_position_m[0] - frame.local_anchor_m[0],
-        center_north + local_position_m[1] - frame.local_anchor_m[1],
-    )
+    return local_to_world_m(geography.cell, frame.local_anchor_m, local_position_m)

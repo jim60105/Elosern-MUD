@@ -35,9 +35,13 @@ from world.lore.map_districts import (
     validate_map_districts,
 )
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
-from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY, cell_center_m
+from elosern_map_core.geometry import cell_center_m
+from elosern_map_core.terrain import ridge_center_x
+
+from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
 from world.maps.map_data import settlement_graph
 from world.maps.wilderness_provider import (
+    TERRAIN,
     WATERWAY_FORDS,
     WILDERNESS_MAX_X,
     WILDERNESS_MAX_Y,
@@ -180,9 +184,7 @@ class ShippedDistrictContractTests(unittest.TestCase):
         # A cell across the summit ridge away from any pass is valid ground of
         # the same component (joined through the passes), while the ridge wall
         # cell itself belongs to none.
-        from world.maps.wilderness_provider import _ridge_center_x
-
-        wall = (_ridge_center_x(1200), 1200)
+        wall = (ridge_center_x(TERRAIN, 1200), 1200)
         self.assertIsNone(components.component(wall))
         self.assertEqual(
             components.component((wall[0] - 3, 1200)), components.component((wall[0] + 3, 1200))

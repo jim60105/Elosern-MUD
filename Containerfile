@@ -44,8 +44,12 @@ ENV UV_LINK_MODE=copy \
 WORKDIR /build
 
 COPY --chown=root:0 pyproject.toml uv.lock ./
+# The pure map package is a locked local path dependency; its source must be
+# present for the wheel build. `--no-editable` installs it into /venv, so the
+# runtime image needs no package source of its own.
+COPY --chown=root:0 packages/map-core/ packages/map-core/
 RUN --mount=type=cache,id=uv-$TARGETARCH$TARGETVARIANT,sharing=locked,target=/root/.cache/uv \
-    uv sync --locked --no-dev --no-install-project
+    uv sync --locked --no-dev --no-install-project --no-editable
 
 # The sole background-removal weight — the locked rembg default `bria-rmbg`
 # (BRIA RMBG-2.0) — is acquired HERE, in the reusable locked-dependency layer:

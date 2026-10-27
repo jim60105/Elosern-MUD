@@ -312,7 +312,7 @@ class TerrainCalibrationTests(EvenniaTest):
 
     @covers_requirement("movement-cost-charging::distance-bearing-traversal-uses-authored-physical-geometry")
     def test_straight_and_bent_physical_edges_cost_their_polyline_length(self):
-        from world.maps.sparse_graph import (
+        from elosern_map_core.sparse import (
             SparseNode,
             SparseRoad,
             SparseSettlementGraph,
@@ -814,7 +814,7 @@ class GateApproachCostTests(EvenniaTest):
         from world.lore import wilderness_entry as wilderness_entry_module
         from world.lore.wilderness_entry import WildernessEntryPoint, WildernessGate
         from world.maps import map_data
-        from world.maps.sparse_graph import SparseNode, SparseSettlementGraph
+        from elosern_map_core.sparse import SparseNode, SparseSettlementGraph
         from world.rules import travel_cost
         from world.rules.travel_cost import gate_approach_cost
 

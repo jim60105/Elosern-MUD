@@ -1,22 +1,28 @@
-"""Sparse authored settlement graphs and their deterministic route adapter.
+"""Sparse authored settlement graphs and their deterministic route planner.
 
 A settlement is declared as stable identity nodes (``SparseNode``) at integer
-coordinates plus explicit roads (``SparseRoad``) between them. Route finding
-walks only those declared nodes and roads: memory and work scale with the graph,
-never with the coordinate span, so meter-scale coordinates never allocate a
-meter-sized lattice (world-map-scale design §11).
+metre coordinates plus explicit roads (``SparseRoad``) between them. Route
+finding walks only those declared nodes and roads: memory and work scale with
+the graph, never with the coordinate span, so metre-scale coordinates never
+allocate a metre-sized lattice.
 
-The module is pure Python: no Django or Evennia imports, so lore/quest modules
-may read the declarations without touching the database. The map layer
-(``world.maps.bootstrap``) owns the persistent ``XYZRoom``/``XYZExit``
-convergence built on top of these declarations.
+Units. ``SparseNode.x``/``SparseNode.y`` are integer metres in the settlement's
+local frame (``x`` east, ``y`` north); ``SparseNode.physical`` is an optional
+separate authored metre position, and ``SparseRoad.bend_points`` are
+intermediate metre points. Every ``SparseEdge.length`` and ``RouteStep.length``
+is a physical polyline length in metres (``hypot`` over the integer points),
+never a cell count.
+
+The module is pure Python: no Django, Evennia or ``world`` imports, so
+declarations can be read and routed without a game environment. The persistent
+``XYZRoom``/``XYZExit`` convergence and the contrib ``XYMap`` adapters stay in
+the game package.
 
 Stable identity is the synchronizer's matching authority. A node's identity is
 its authored ``node_id``; its coordinate is a mutable binding. A road's identity
 is its ordered endpoint pair. Coordinates are never used as runtime aliases:
 they are only the deterministic one-time convergence input for rooms that were
-spawned before identity binding existed (design decision: "stable authored node
-keys are added as the synchronizer's matching authority").
+spawned before identity binding existed.
 """
 
 from __future__ import annotations
@@ -630,54 +636,4 @@ def build_sparse_graph(
     )
 
 
-def graph_from_xymap(xymap) -> SparseSettlementGraph | None:
-    """Adapt a live contrib ``XYMap`` for maps without a sparse declaration.
 
-    Synthetic test maps and builder-authored maps still arrive as parsed ASCII.
-    This transient adapter gives route planning the same sparse graph contract
-    without persisting or caching a second authority. Identity is the map's
-    node index, which is only valid for the lifetime of the loaded map.
-    """
-
-    if xymap is None or not getattr(xymap, "node_index_map", None):
-        return None
-    prototypes = getattr(xymap, "prototypes", None) or {}
-    nodes = []
-    for node in sorted(xymap.node_index_map.values(), key=lambda item: item.node_index):
-        prototype = prototypes.get((node.X, node.Y))
-        if not prototype:
-            prototype = {"key": getattr(node, "key", str(node.node_index))}
-        nodes.append(
-            SparseNode(
-                node_id=str(node.node_index),
-                x=node.X,
-                y=node.Y,
-                prototype=dict(prototype),
-            )
-        )
-    roads = []
-    seen = set()
-    for node in xymap.node_index_map.values():
-        for direction, neighbor in node.links.items():
-            pair = (node.node_index, neighbor.node_index)
-            if pair in seen:
-                continue
-            seen.add(pair)
-            roads.append(
-                SparseRoad(
-                    road_id=f"{node.node_index}>{neighbor.node_index}",
-                    source_id=str(node.node_index),
-                    destination_id=str(neighbor.node_index),
-                    direction_hint=direction,
-                )
-            )
-    try:
-        return SparseSettlementGraph(
-            str(xymap.Z),
-            nodes,
-            roads,
-            options=getattr(xymap, "options", None),
-            exit_prototype=prototypes.get(("*", "*", "*"), {}),
-        )
-    except SparseGraphError:
-        return None

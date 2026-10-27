@@ -17,6 +17,8 @@ from unittest.mock import patch
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from elosern_map_core.terrain import rasterize_routes, ridge_center_x, route_row_at
+
 from typeclasses.rooms import TerrainRoom
 from world.art.scene_definitions import ROOM_ART_KEY_SET
 from world.maps.room_art import (
@@ -26,15 +28,13 @@ from world.maps.room_art import (
 from world.maps.wilderness_provider import (
     LONG_DIRECTIONS,
     REGION_SEARCH_BOXES,
+    TERRAIN,
     WILDERNESS_NAME,
     WATERWAY_FORDS,
     WILDERNESS_KM_PER_CELL,
     WILDERNESS_MAX_X,
     WILDERNESS_MAX_Y,
     ElosernWildernessMapProvider,
-    _rasterize_routes,
-    _ridge_center_x,
-    _route_row_at,
     border_river_row,
     forest_edge_row,
     is_valid_wilderness_cell,
@@ -131,7 +131,7 @@ class TerrainModelTests(unittest.TestCase):
         # region key that is, is authored data (geography contract module).
         corridor = set()
         for y in (150, 700, 1200, 1800):
-            centre = _ridge_center_x(y)
+            centre = ridge_center_x(TERRAIN, y)
             region = region_for_coordinates(centre, y)
             corridor.add(region)
             self.assertNotEqual(
@@ -142,7 +142,7 @@ class TerrainModelTests(unittest.TestCase):
             )
         self.assertEqual(len(corridor), 1, corridor)
         self.assertIn(next(iter(corridor)), live_region_registry())
-        self.assertNotEqual(_ridge_center_x(100), _ridge_center_x(1200))
+        self.assertNotEqual(ridge_center_x(TERRAIN, 100), ridge_center_x(TERRAIN, 1200))
 
     @covers_requirement("wilderness-map-provider::the-continent-remains-virtual-with-bounded-local-lookup")
     def test_region_search_windows_cover_their_region(self):
@@ -156,9 +156,9 @@ class TerrainModelTests(unittest.TestCase):
             (x, y)
             for y in range(0, 2200, 137)
             for x in (
-                _ridge_center_x(y) - 100,
-                _ridge_center_x(y),
-                _ridge_center_x(y) + 100,
+                ridge_center_x(TERRAIN, y) - 100,
+                ridge_center_x(TERRAIN, y),
+                ridge_center_x(TERRAIN, y) + 100,
             )
         ] + [
             # Both sides of the meandering forest edge and the border river,
@@ -184,14 +184,14 @@ class TerrainModelTests(unittest.TestCase):
             ((10, 50), (40, 41), (70, 58), (95, 58)),
             ((95, 20), (60, 33), (31, 7), (5, 12)),
         ):
-            cells = _rasterize_routes({"synthetic": route})
+            cells = rasterize_routes({"synthetic": route})
             xs = sorted({x for x, _ in cells})
             self.assertEqual(xs, list(range(min(xs), max(xs) + 1)))
             for x, y in cells:
-                self.assertEqual(_route_row_at(route, x), y, (route, x))
+                self.assertEqual(route_row_at(route, x), y, (route, x))
             west, east = sorted((route[0], route[-1]))
-            self.assertEqual(_route_row_at(route, west[0] - 9), west[1])
-            self.assertEqual(_route_row_at(route, east[0] + 9), east[1])
+            self.assertEqual(route_row_at(route, west[0] - 9), west[1])
+            self.assertEqual(route_row_at(route, east[0] + 9), east[1])
 
     def test_nominal_claim_is_total_over_the_frame(self):
         nations = set()
@@ -218,8 +218,8 @@ class TerrainModelTests(unittest.TestCase):
         )
         y = 900
         self.assertNotEqual(
-            nominal_nation_for_coordinates(_ridge_center_x(y), y),
-            nominal_nation_for_coordinates(_ridge_center_x(y) + 1, y),
+            nominal_nation_for_coordinates(ridge_center_x(TERRAIN, y), y),
+            nominal_nation_for_coordinates(ridge_center_x(TERRAIN, y) + 1, y),
         )
 
     def test_description_always_matches_its_regions_variants(self):
@@ -297,7 +297,7 @@ class MapProviderTests(EvenniaTest):
         # A summit-ridge cell away from every pass is refused; the pass cell is
         # walked; a river cell is refused and its ford is walked.
         self.assertFalse(
-            self.provider.is_valid_coordinates(None, (_ridge_center_x(1200), 1200))
+            self.provider.is_valid_coordinates(None, (ridge_center_x(TERRAIN, 1200), 1200))
         )
         self.assertTrue(self.provider.is_valid_coordinates(None, (1410, 980)))
         self.assertFalse(self.provider.is_valid_coordinates(None, (900, 1042)))
@@ -313,18 +313,18 @@ class MapProviderTests(EvenniaTest):
         # One validity answer costs one mainland solve plus constant-time
         # ridge/water/footprint lookups -- never a frame scan or room
         # materialization.
-        from world.maps import wilderness_provider as provider_module
+        from elosern_map_core import terrain as terrain_module
 
-        original = provider_module.is_land_cell
+        original = terrain_module.is_land_cell
         calls = []
 
-        def counted(cell):
+        def counted(definition, cell):
             calls.append(cell)
-            return original(cell)
+            return original(definition, cell)
 
-        with patch.object(provider_module, "is_land_cell", counted):
+        with patch.object(terrain_module, "is_land_cell", counted):
             for index in range(100):
-                provider_module.is_valid_wilderness_cell((LAND_A[0] + index, LAND_A[1]))
+                is_valid_wilderness_cell((LAND_A[0] + index, LAND_A[1]))
         self.assertEqual(len(calls), 100)
         self.assertEqual(TerrainRoom.objects.count(), 0)
 
