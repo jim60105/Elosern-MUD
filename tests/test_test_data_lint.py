@@ -152,12 +152,19 @@ class ScannerTests(unittest.TestCase):
         document = parse_document("content/maps/districts.yaml", text).document
         key = next(iter(document.districts))
         self.assertIn(key, UNIVERSE.tokens)
-        findings = lint._string_findings(
-            ast.parse(f'DISTRICT = "{key}"\n'),
-            UNIVERSE,
-            "world/lore/tests/test_probe.py",
-        )
-        self.assertEqual([finding.kind for finding in findings], ["token"])
+        names = {
+            document.districts[key].district_name_zh,
+            document.districts[key].landmark_name_zh,
+        }
+        for token in {key} | names:
+            with self.subTest(token=token):
+                self.assertIn(token, UNIVERSE.tokens)
+                findings = lint._string_findings(
+                    ast.parse(f'PROBE = "{token}"\n'),
+                    UNIVERSE,
+                    "world/lore/tests/test_probe.py",
+                )
+                self.assertEqual([finding.kind for finding in findings], ["token"])
 
     def test_deny_list_regressions(self):
         """Every deny entry: rule-bound admission is mechanically checkable, and

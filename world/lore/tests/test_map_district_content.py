@@ -294,16 +294,19 @@ class SyntheticConsumerEvidenceTests(unittest.TestCase):
         )
         self.assertEqual(tuple(before.districts), ("alpha_seed",))
         self.assertEqual(tuple(after.districts), ("alpha_seed", "beta_seed"))
+        self.assertEqual(after.diagnostics, ())
         beta = after.districts["beta_seed"]
         node_id = landmark_node_id(beta)
         self.assertEqual(
             node_id, encode_wild(wilderness_provider.WILDERNESS_NAME, 300, 200)
         )
         visit = NodeVisit(node_id, 1, 1)
-        self.assertEqual(
-            lit_district_keys_from_visits([visit], after.districts),
-            frozenset({"beta_seed"}),
-        )
+        with mock.patch.object(map_districts, "_PUBLISHED", after):
+            # Lighting reads the published snapshot by default: the new
+            # declaration needs no code registration.
+            self.assertEqual(
+                lit_district_keys_from_visits([visit]), frozenset({"beta_seed"})
+            )
 
     @covers_requirement(
         "map-districts::the-authored-continent-has-a-complete-discoverable-landmark-roster"
@@ -346,25 +349,30 @@ class SyntheticConsumerEvidenceTests(unittest.TestCase):
             return _district_name(cell)
 
     @covers_requirement(
+        "map-districts::the-authored-continent-has-a-complete-discoverable-landmark-roster"
+    )
+    @covers_requirement(
         "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
     )
     def test_discovered_districts_seed_the_existing_partition_algorithm(self):
-        snapshot = _synthetic_districts({"west_seed": (1, 1), "east_seed": (8, 1)})
-        seeds = []
-        for district in snapshot.districts.values():
-            parts = decode_node(landmark_node_id(district))
-            seeds.append(
-                generator.DistrictSeed(
-                    district.district_id, district.kind, (parts["x"], parts["y"])
-                )
-            )
-        size = 10
+        # 180 km apart: the declared 100 km minimum holds, so the candidate is
+        # diagnostic-free and publishable.
+        snapshot = _synthetic_districts({"west_seed": (10, 10), "east_seed": (190, 10)})
+        self.assertEqual(snapshot.diagnostics, ())
+        size = 205
+        with mock.patch.object(map_districts, "_PUBLISHED", snapshot):
+            # The production input adapter reads the published district world:
+            # no test-side seed construction and no registration.
+            seeds = generator._production_districts(size)
+        self.assertEqual(
+            {seed.key for seed in seeds}, set(snapshot.districts)
+        )
         land = np.ones((size, size), dtype=bool)
         walkable = np.ones((size, size), dtype=bool)
         nation = np.zeros((size, size), dtype=np.uint8)
-        nation[:, :5] = 1
-        nation[:, 5:] = 2
-        walkable[:, 4] = False
+        nation[:, :101] = 1
+        nation[:, 101:] = 2
+        walkable[:, 100] = False
         region = np.full((size, size), 1, dtype=np.uint8)
         inp = generator.PartitionInput(
             size,
@@ -374,13 +382,20 @@ class SyntheticConsumerEvidenceTests(unittest.TestCase):
             ("altoria", "grandia"),
             region,
             ("plain",),
-            tuple(seeds),
+            seeds,
         )
         partition = generator.compute_partition(inp)
         self.assertEqual(partition.keys, tuple(sorted(snapshot.districts)))
         self.assertTrue(np.all(partition.owner[land] > 0))
-        self.assertEqual(partition.owner_at((1, 1)), "west_seed")
-        self.assertEqual(partition.owner_at((8, 1)), "east_seed")
+        self.assertEqual(partition.owner_at((10, 10)), "west_seed")
+        self.assertEqual(partition.owner_at((190, 10)), "east_seed")
+        # The blocked border column stays with the nearer same-nation seed and
+        # no district owns land in both nations.
+        self.assertEqual(partition.owner_at((100, 10)), "west_seed")
+        for code, key in enumerate(partition.keys, start=1):
+            with self.subTest(district=key):
+                nations = np.unique(nation[partition.owner == code])
+                self.assertEqual(nations.size, 1)
 
 
 class WalkableComponentContractTests(unittest.TestCase):

@@ -454,7 +454,7 @@ class DistrictSourceBoundaryTests(unittest.TestCase):
             map_districts.publish(clean)
             with tempfile.TemporaryDirectory() as root:
                 with self.assertRaises(DistrictError) as caught:
-                    map_districts.load_districts(Path(root))
+                    map_districts.load_and_publish(Path(root))
             self.assertEqual(
                 [item.code for item in caught.exception.diagnostics],
                 ["missing_document"],

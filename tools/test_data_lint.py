@@ -318,7 +318,15 @@ def _harvest_districts(root: Path, out: set[str]) -> None:
         districts_module.publish(districts_module.load_districts(root))
     districts = districts_module.current().districts
     out.update(key for key in districts if isinstance(key, str) and key)
-    _harvest_display(districts, set(), out)
+    for district in districts.values():
+        out.update(
+            value
+            for value in (
+                getattr(district, "district_name_zh", None),
+                getattr(district, "landmark_name_zh", None),
+            )
+            if isinstance(value, str) and value
+        )
 
 
 #: Wire schema version for the cold-derivation subprocess payload.
