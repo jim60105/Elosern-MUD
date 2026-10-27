@@ -34,6 +34,36 @@ import {
 } from "../stories/fixtures/party_panels.js";
 import { CHARACTER_SKILL_COMPANION_SAMPLE } from "../stories/fixtures/skill_tab_panels.js";
 
+// A provider drawer dispatches one `services.open` on entry. Answer it with
+// the exact targeted snapshot so the drawer renders its selection and the
+// single-dispatch gate reopens before the test acts.
+function settleServicesReads(store, sender, answered) {
+  for (const envelope of sender.sent.actions.filter((item) => item.action_id === "services.open")) {
+    if (answered.has(envelope.request_id)) continue;
+    answered.add(envelope.request_id);
+    const providerId = envelope.payload.npc_id;
+    const services = { ...store.view.panels.services, pagination: { ...store.view.panels.services.pagination } };
+    if (services.guild && services.guild.provider_id !== providerId) {
+      services.guild = null;
+      services.pagination.board_total = 0;
+      services.pagination.quest_total = 0;
+    }
+    if (services.rank && services.rank.provider_id !== providerId) services.rank = null;
+    if (services.shop && services.shop.provider_id !== providerId) {
+      services.shop = null;
+      services.pagination.stock_total = 0;
+      services.pagination.sellable_total = 0;
+    }
+    store.receive(1, "ui_action_result", [
+      fx.actionResult({
+        request_id: envelope.request_id,
+        presentation_revision: store.view.revision,
+        data: { npc_id: providerId, services },
+      }),
+    ]);
+  }
+}
+
 describe("H4 reference-drawer layer (task 7.7)", () => {
   let store;
   let wrapper;
@@ -500,6 +530,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
   it("hosts the book and the counter as tabs without listing a quest twice", async () => {
     const sender = fx.createFakeSender();
     store.setSender(sender);
+    const answered = new Set();
     mountAppClient();
     await wrapper.vm.$nextTick();
     store.beginTransport(1);
@@ -524,6 +555,8 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     await wrapper.vm.$nextTick();
     store.openHudDrawer("quest");
     await wrapper.vm.$nextTick();
+    settleServicesReads(store, sender, answered);
+    await wrapper.vm.$nextTick();
     const body = wrapper.get('[data-testid="quest-drawer"]');
     expect(body.findAll('[data-testid^="quest-drawer__row--"]').map((n) => n.attributes("data-testid"))).toEqual([
       "quest-drawer__row--q_1042",
@@ -532,10 +565,11 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     expect(body.find('[data-testid="quest-drawer__counter"]').exists()).toBe(false);
     // The matched counter abandon reaches the wire only after confirmation.
     await body.get('[data-testid="quest-drawer__abandon"]').trigger("click");
-    expect(sender.sent.actions).toHaveLength(0);
+    const mutations = () => sender.sent.actions.filter((envelope) => envelope.action_id !== "services.open");
+    expect(mutations()).toHaveLength(0);
     await body.get('[data-testid="quest-drawer__abandon-confirm-yes"]').trigger("click");
-    expect(sender.sent.actions).toHaveLength(1);
-    expect(sender.sent.actions[0]).toMatchObject({ action_id: "guild.quest_abandon", payload: { quest_id: "q_1042" } });
+    expect(mutations()).toHaveLength(1);
+    expect(mutations()[0]).toMatchObject({ action_id: "guild.quest_abandon", payload: { quest_id: "q_1042" } });
 
     await body.get('[data-testid="quest-drawer__top-tabs"] [data-tab-key="counter"]').trigger("click");
     // The counter tab lists board offers only: no row is a held quest.
@@ -715,6 +749,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
    mountAppClient();
    const sender = fx.createFakeSender();
    store.setSender(sender);
+   const answered = new Set();
    store.beginTransport(1);
    store.setConnected(true);
    store.receive(
@@ -768,11 +803,12 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
    };
 
    for (const [name, closeAction] of Object.entries(closeRoutes)) {
-     const actionsCountBefore = sender.sent.actions.length;
-
      // The verb card's service-shop row
      expect(store.activatePresenceVerb("service-shop").handled).toBe(true);
      await wrapper.vm.$nextTick();
+     settleServicesReads(store, sender, answered);
+     await wrapper.vm.$nextTick();
+     const actionsCountBefore = sender.sent.actions.length;
 
      expect(store.view.hudDrawer, name).toBe("shop");
      expect(wrapper.find('[data-testid="shop-window"]').exists(), name).toBe(true);
@@ -798,6 +834,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
    mountAppClient();
    const sender = fx.createFakeSender();
    store.setSender(sender);
+   const answered = new Set();
    store.beginTransport(1);
    store.setConnected(true);
    store.receive(
@@ -851,11 +888,12 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
    };
 
    for (const [name, closeAction] of Object.entries(closeRoutes)) {
-     const actionsCountBefore = sender.sent.actions.length;
-
      // The verb card's service-guild row
      expect(store.activatePresenceVerb("service-guild").handled).toBe(true);
      await wrapper.vm.$nextTick();
+     settleServicesReads(store, sender, answered);
+     await wrapper.vm.$nextTick();
+     const actionsCountBefore = sender.sent.actions.length;
 
      expect(store.view.hudDrawer, name).toBe("quest");
      expect(wrapper.find('[data-testid="quest-drawer"]').exists(), name).toBe(true);

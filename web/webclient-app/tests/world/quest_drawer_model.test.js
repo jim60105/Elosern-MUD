@@ -266,13 +266,14 @@ describe("quest-drawer-model: the action bar", () => {
     expect(untracked).toMatchObject({ pressed: false, label: "追蹤", payload: { quest_id: "q_1042", tracked: true } });
   });
 
-  it("mirrors an enabled abandon and drops it away from the counter", () => {
-    expect(bookActions(inProgress, counterRow("q_1042")).abandon).toEqual({
+  it("mirrors an enabled abandon naming its counter provider and drops it away from the counter", () => {
+    const providerId = SERVICES_PANEL_SAMPLE.guild.provider_id;
+    expect(bookActions(inProgress, counterRow("q_1042"), providerId).abandon).toEqual({
       action_id: "guild.quest_abandon",
       label: "放棄任務",
-      payload: { quest_id: "q_1042" },
+      payload: { quest_id: "q_1042", npc_id: providerId },
     });
-    const away = bookActions(inProgress, null);
+    const away = bookActions(inProgress, null, providerId);
     expect(away.abandon).toBeNull();
     expect(away.turnin).toBeNull();
     expect(away.reason).toBeNull();
@@ -285,10 +286,19 @@ describe("quest-drawer-model: the action bar", () => {
   });
 
   it("offers an enabled turn-in on a completed row and no tracking", () => {
-    const actions = bookActions(completed, counterRow("q_0301", { turnin: descriptor("guild.quest_turnin", "交派任務") }));
+    const providerId = SERVICES_PANEL_SAMPLE.guild.provider_id;
+    const actions = bookActions(
+      completed,
+      counterRow("q_0301", { turnin: descriptor("guild.quest_turnin", "交派任務") }),
+      providerId,
+    );
     expect(actions.track).toBeNull();
     expect(actions.abandon).toBeNull();
-    expect(actions.turnin).toEqual({ action_id: "guild.quest_turnin", label: "交派任務", payload: { quest_id: "q_0301" } });
+    expect(actions.turnin).toEqual({
+      action_id: "guild.quest_turnin",
+      label: "交派任務",
+      payload: { quest_id: "q_0301", npc_id: providerId },
+    });
     expect(actions.reason).toBeNull();
   });
 
@@ -375,7 +385,10 @@ describe("quest-drawer-model: board grades", () => {
   });
 
   it("reads the holder's rank from the player summary", () => {
-    const disagreeing = { ...SERVICES_PANEL_GUILD_BOARD_SAMPLE, guild: { ...BOARD_GUILD, rank: { ...BOARD_GUILD.rank, rank: "F" } } };
+    const disagreeing = {
+      ...SERVICES_PANEL_GUILD_BOARD_SAMPLE,
+      rank: { ...SERVICES_PANEL_GUILD_BOARD_SAMPLE.rank, rank: "F" },
+    };
     expect(holderRank(disagreeing)).toBe("E");
     expect(holderRank(SERVICES_PANEL_MINIMAL_SAMPLE)).toBe(null);
     expect(holderRank(null)).toBe(null);
@@ -472,8 +485,8 @@ describe("quest-drawer-model: board offers", () => {
     expect(detail.issuer).toMatchObject({ letter: null, fallback: "委託人沒有留下說明。" });
   });
 
-  it("makes the accept descriptor the primary action with exactly the definition key", () => {
-    expect(offerActions(withDeadline)).toEqual({
+  it("makes the accept descriptor the primary action with exactly the definition key and provider", () => {
+    expect(offerActions(withDeadline, BOARD_GUILD.provider_id)).toEqual({
       track: null,
       abandon: null,
       turnin: null,
@@ -481,7 +494,7 @@ describe("quest-drawer-model: board offers", () => {
         enabled: true,
         label: withDeadline.accept.label,
         action_id: "guild.quest_accept",
-        payload: { definition_key: withDeadline.definition_key },
+        payload: { definition_key: withDeadline.definition_key, npc_id: BOARD_GUILD.provider_id },
       },
       reason: null,
     });

@@ -287,7 +287,7 @@ describe("ShopWindow (webclient-shop-window)", () => {
     expect(get("action-bar__btn--trade").text()).toBe("買給艾拉");
     await get("action-bar__btn--trade").trigger("click");
     expect(wrapper.emitted("trade")).toEqual([
-      [{ action_id: "shop.buy", payload: { item_key: "potion_heal", quantity: 3, recipient_id: SHOP_ELLA_ID } }],
+      [{ action_id: "shop.buy", payload: { item_key: "potion_heal", quantity: 3, recipient_id: SHOP_ELLA_ID, npc_id: SHOP_SERVICES_SAMPLE.shop.provider_id } }],
     ]);
   });
 
@@ -309,7 +309,7 @@ describe("ShopWindow (webclient-shop-window)", () => {
     expect(get("shop-window").text()).not.toContain("售價");
     await get("action-bar__btn--trade").trigger("click");
     expect(wrapper.emitted("trade")).toEqual([
-      [{ action_id: "shop.sell", payload: { item_key: "rusty_sword", quantity: 2, seller_id: SHOP_KAHN_ID } }],
+      [{ action_id: "shop.sell", payload: { item_key: "rusty_sword", quantity: 2, seller_id: SHOP_KAHN_ID, npc_id: SHOP_SERVICES_SELLER_SAMPLE.shop.provider_id } }],
     ]);
   });
 
@@ -330,7 +330,7 @@ describe("ShopWindow (webclient-shop-window)", () => {
     expect(get("action-bar__btn--trade").text()).toBe("買給艾拉");
     await get("action-bar__btn--trade").trigger("click");
     expect(wrapper.emitted("trade")).toEqual([
-      [{ action_id: "shop.buy", payload: { item_key: "potion_heal", quantity: 3, recipient_id: SHOP_ELLA_ID } }],
+      [{ action_id: "shop.buy", payload: { item_key: "potion_heal", quantity: 3, recipient_id: SHOP_ELLA_ID, npc_id: SHOP_SERVICES_SAMPLE.shop.provider_id } }],
     ]);
   });
 
@@ -356,7 +356,7 @@ describe("ShopWindow (webclient-shop-window)", () => {
     expect(get("shop-window__remaining").text()).toBe("剩餘 1,246 銅");
     await get("action-bar__btn--trade").trigger("click");
     expect(wrapper.emitted("trade")).toEqual([
-      [{ action_id: "shop.sell", payload: { item_key: "potion_heal", quantity: 1, seller_id: SHOP_KAHN_ID } }],
+      [{ action_id: "shop.sell", payload: { item_key: "potion_heal", quantity: 1, seller_id: SHOP_KAHN_ID, npc_id: SHOP_SERVICES_SELLER_SAMPLE.shop.provider_id } }],
     ]);
   });
 

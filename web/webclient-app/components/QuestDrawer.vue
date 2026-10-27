@@ -138,11 +138,22 @@ function selectRow(id) {
 
 const detail = computed(() => (selectedRow.value ? bookDetail(selectedRow.value) : null));
 const actions = computed(() =>
-  bookActions(selectedRow.value, selectedRow.value ? counterRows.value.get(selectedRow.value.quest_id) : null),
+  bookActions(
+    selectedRow.value,
+    selectedRow.value ? counterRows.value.get(selectedRow.value.quest_id) : null,
+    guild.value?.provider_id ?? null,
+  ),
 );
 
 // ── Counter: registration or the grade-tabbed board ───────────────────
 const guild = computed(() => (counter.value.enabled ? props.services.guild : null));
+// The independent rank surface (schema 8): present with its own reception
+// provider, with or without guild staff.
+const rankSection = computed(() => (counter.value.enabled ? (props.services?.rank ?? null) : null));
+const counterProviderId = computed(() => {
+  const providerId = guild.value?.provider_id;
+  return Number.isSafeInteger(providerId) && providerId > 0 ? providerId : null;
+});
 const registration = computed(() => guild.value?.registration ?? null);
 const registered = computed(() => registration.value?.registered !== false);
 const register = computed(() => registration.value?.register ?? null);
@@ -194,8 +205,8 @@ function selectOffer(id) {
   memory.selectedByTab = { ...memory.selectedByTab, [offerKey.value]: id };
 }
 
-const offerView = computed(() => (selectedOffer.value ? offerDetail(selectedOffer.value, guild.value.branch_label) : null));
-const offerBar = computed(() => offerActions(selectedOffer.value));
+const offerView = computed(() => (selectedOffer.value ? offerDetail(selectedOffer.value, guild.value?.branch_label ?? "") : null));
+const offerBar = computed(() => offerActions(selectedOffer.value, counterProviderId.value));
 
 // A commit can unmount the focused control (the register button, or an
 // accepted offer's detail). Focus then lands on <body>; return it to the
@@ -215,7 +226,11 @@ watch(
     if (!focusWasInside) return;
     const active = document.activeElement;
     if (active && active !== document.body) return;
-    const rail = top.value === "counter" && registered.value ? "grade-rail" : top.value === "book" ? "state-rail" : "top-tabs";
+    const rail = top.value === "counter" && registered.value && guild.value
+      ? "grade-rail"
+      : top.value === "book"
+        ? "state-rail"
+        : "top-tabs";
     root.value?.querySelector(`[data-testid="quest-drawer__${rail}"] [role="tab"][tabindex="0"]`)?.focus();
   },
   { flush: "post" },
@@ -226,7 +241,9 @@ function forward(intent) {
 }
 
 function registerNow() {
-  if (register.value?.enabled) forward({ action_id: register.value.action_id, payload: {} });
+  if (register.value?.enabled) {
+    forward({ action_id: register.value.action_id, payload: { npc_id: counterProviderId.value } });
+  }
 }
 </script>
 
@@ -277,7 +294,7 @@ function registerNow() {
     </div>
 
     <div
-      v-else-if="registered"
+      v-else-if="registered && guild"
       :id="panelId('counter')"
       class="quest-drawer__body quest-drawer__body--board"
       role="tabpanel"
@@ -309,11 +326,29 @@ function registerNow() {
         :data-locked="String(locked)"
         @select="selectOffer"
       >
-        <template v-if="guild.rank" #lead>
-          <GuildRankCard class="quest-drawer__rank" :rank="guild.rank" @exam_request="forward" />
+        <template v-if="rankSection" #lead>
+          <GuildRankCard class="quest-drawer__rank" :rank="rankSection" @exam_request="forward" />
         </template>
       </QuestList>
       <QuestDetail :detail="offerView" :actions="offerBar" @action="forward" />
+    </div>
+
+    <!-- A reception-only counter (schema 8): the independent rank surface is
+         reachable without guild staff, board or registration. -->
+    <div
+      v-else-if="!guild && rankSection"
+      :id="panelId('counter')"
+      class="quest-drawer__body quest-drawer__body--reception"
+      role="tabpanel"
+      aria-label="公會櫃檯"
+      data-testid="quest-drawer__counter"
+    >
+      <GuildRankCard
+        class="quest-drawer__rank quest-drawer__rank--reception"
+        data-testid="quest-drawer__reception-rank"
+        :rank="rankSection"
+        @exam_request="forward"
+      />
     </div>
 
     <div
@@ -409,6 +444,17 @@ function registerNow() {
   place-items: center;
   overflow-y: auto;
   padding: var(--sp-8) var(--sp-5);
+}
+
+.quest-drawer__body--reception {
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  padding: var(--sp-8) var(--sp-5);
+}
+
+.quest-drawer__rank--reception {
+  width: min(100%, calc(520px * var(--ui-scale)));
 }
 
 .quest-drawer__register-card {

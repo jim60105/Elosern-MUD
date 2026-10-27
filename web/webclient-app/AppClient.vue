@@ -45,6 +45,7 @@ import { companionRows, portraitFor } from "./components/party-helpers.js";
 import PartyWindow from "./components/PartyWindow.vue";
 import { usePartyWindow } from "./composables/use-party-window.js";
 import { useMapDrawer } from "./composables/use-map-drawer.js";
+import { useServicesOpen } from "./composables/use-services-open.js";
 import { useWindowHotkeys } from "./composables/use-window-hotkeys.js";
 import ObjectiveTracker from "./components/ObjectiveTracker.vue";
 import DesktopNavigation from "./components/DesktopNavigation.vue";
@@ -124,6 +125,54 @@ const {
 const {
   mapTab, mapMemory, mapEpoch, mapBusy, mapOpening, mapWorldReady, onMapDrawerMove,
 } = useMapDrawer(store, { onMapMove });
+// The two provider drawers (npc-targeted-service-flows): each opened drawer
+// reads its selected provider once through `services.open` and renders that
+// correlated snapshot. The room-wide summary stands in only until the read is
+// adopted — and once adopted it is the whole panel, so a section the selected
+// provider does not carry stays null instead of borrowing another NPC's
+// surface. A refused read drops the snapshot and the drawer falls back to the
+// room summary rather than to the provider the client guessed.
+const { openServices, closeServices, snapshots: servicesSnapshots } =
+  useServicesOpen(store, { dispatchIntent });
+const shopServices = computed(() => servicesSnapshots.value.shop ?? panel("services"));
+const counterServices = computed(() => servicesSnapshots.value.counter ?? panel("services"));
+// The provider the room summary cannot name (two merchants, or a reception
+// without guild staff) is the NPC whose verb card opened the drawer. It is a
+// selection hint for the read only; the server revalidates the exact target.
+function presenceProviderId() {
+  const identity = store.view.presenceCard?.identity;
+  return Number.isSafeInteger(identity) && identity > 0 ? identity : null;
+}
+watch(
+  () => store.view.hudDrawer,
+  (drawer) => {
+    if (drawer === "shop") {
+      const provider = panel("services")?.shop?.provider_id;
+      openServices(
+        "shop",
+        Number.isSafeInteger(provider) ? provider : presenceProviderId(),
+      );
+      closeServices("counter");
+      return;
+    }
+    if (drawer === "quest") {
+      const guildProvider = panel("services")?.guild?.provider_id;
+      const rankProvider = panel("services")?.rank?.provider_id;
+      const summaryProvider = Number.isSafeInteger(guildProvider)
+        ? guildProvider
+        : rankProvider;
+      openServices(
+        "counter",
+        Number.isSafeInteger(summaryProvider) ? summaryProvider : presenceProviderId(),
+      );
+      closeServices("shop");
+      return;
+    }
+    closeServices("shop");
+    closeServices("counter");
+  },
+  { immediate: true },
+);
 // The party window (webclient-party-window-member-tab): its openers, the one
 // `party.view_member` per rail or bag item selection (webclient-party-bag-
 // tab) and the pending entry or item.
@@ -1452,7 +1501,7 @@ const rootStyle = computed(() => {
          member. -->
     <ShopWindow
       v-if="store.view.hudDrawer === 'shop'"
-      :services="panel('services')"
+      :services="shopServices"
       :party="panel('party')"
       :item-holdings="panel('item_holdings')"
       :character="panel('character')"
@@ -1479,7 +1528,7 @@ const rootStyle = computed(() => {
       <QuestDrawer
         v-else-if="store.view.hudDrawer === 'quest'"
         :quest-log="panel('quest_log')"
-        :services="panel('services')"
+        :services="counterServices"
         :memory-scope="`${store.view.generation}|${store.view.epoch}`"
         @action="onQuestAction"
       />

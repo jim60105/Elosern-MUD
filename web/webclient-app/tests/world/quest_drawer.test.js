@@ -248,7 +248,10 @@ describe("QuestDrawer (quest-drawer-book-tab)", () => {
       await wrapper.get('[data-testid="quest-drawer__abandon"]').trigger("click");
       await wrapper.get('[data-testid="quest-drawer__abandon-confirm-yes"]').trigger("click");
       expect(wrapper.emitted("action")).toEqual([
-        [{ action_id: "guild.quest_abandon", payload: { quest_id: "q_1042" } }],
+        [{
+          action_id: "guild.quest_abandon",
+          payload: { quest_id: "q_1042", npc_id: SERVICES_PANEL_SAMPLE.guild.provider_id },
+        }],
       ]);
     });
 
@@ -276,7 +279,10 @@ describe("QuestDrawer (quest-drawer-book-tab)", () => {
       await stateTab("completed").trigger("click");
       await wrapper.get('[data-testid="quest-drawer__turnin"]').trigger("click");
       expect(wrapper.emitted("action")).toEqual([
-        [{ action_id: "guild.quest_turnin", payload: { quest_id: "q_0301" } }],
+        [{
+          action_id: "guild.quest_turnin",
+          payload: { quest_id: "q_0301", npc_id: SERVICES_PANEL_SAMPLE.guild.provider_id },
+        }],
       ]);
     });
 
@@ -425,12 +431,15 @@ describe("QuestDrawer (quest-drawer-book-tab)", () => {
       await openCounter();
       await wrapper.get('[data-testid="guild-counter__exam"]').trigger("click");
       expect(wrapper.emitted("action")).toEqual([
-        [{ action_id: "guild.exam_request", payload: { target_rank: BOARD.guild.rank.next_rank } }],
+        [{
+          action_id: "guild.exam_request",
+          payload: { target_rank: BOARD.rank.next_rank, npc_id: BOARD.rank.provider_id },
+        }],
       ]);
     });
 
-    it("renders no rank card when the guild section carries none", async () => {
-      await openCounter({ services: withBoard(BOARD.guild.board, { rank: null }) });
+    it("renders no rank card when the panel carries no rank surface", async () => {
+      await openCounter({ services: { ...BOARD, rank: null } });
       expect(wrapper.find('[data-testid="guild-rank-card"]').exists()).toBe(false);
       expect(rowIds().length).toBeGreaterThan(0);
     });
@@ -467,7 +476,10 @@ describe("QuestDrawer (quest-drawer-book-tab)", () => {
       await wrapper.get(`[data-testid="quest-drawer__row--${offer.definition_key}"]`).trigger("click");
       await find("accept").trigger("click");
       expect(wrapper.emitted("action")).toEqual([
-        [{ action_id: offer.accept.action_id, payload: { definition_key: offer.definition_key } }],
+        [{
+          action_id: offer.accept.action_id,
+          payload: { definition_key: offer.definition_key, npc_id: BOARD.guild.provider_id },
+        }],
       ]);
     });
 
@@ -521,7 +533,9 @@ describe("QuestDrawer (quest-drawer-book-tab)", () => {
       await openCounter({ services: SERVICES_PANEL_GUILD_UNREGISTERED_SAMPLE });
       find("register").element.focus();
       await find("register").trigger("click");
-      expect(wrapper.emitted("action")).toEqual([[{ action_id: "guild.register", payload: {} }]]);
+      expect(wrapper.emitted("action")).toEqual([[
+        { action_id: "guild.register", payload: { npc_id: SERVICES_PANEL_GUILD_UNREGISTERED_SAMPLE.guild.provider_id } },
+      ]]);
       expect(find("grade-rail").exists()).toBe(false);
       await wrapper.setProps({ services: BOARD });
       await nextTick();

@@ -20,7 +20,7 @@ describe("GuildRankCard (quest-drawer-ui-primitives)", () => {
   });
 
   function mountCard(services = SERVICES_PANEL_SAMPLE) {
-    wrapper = mount(GuildRankCard, { props: { rank: services.guild.rank } });
+    wrapper = mount(GuildRankCard, { props: { rank: services.rank } });
     return wrapper;
   }
 
@@ -48,7 +48,10 @@ describe("GuildRankCard (quest-drawer-ui-primitives)", () => {
     expect(w.find('[data-testid="guild-counter__exam-reason"]').exists()).toBe(false);
     await exam.trigger("click");
     expect(w.emitted("exam_request")).toEqual([
-      [{ action_id: "guild.exam_request", payload: { target_rank: "B" } }],
+      [{
+        action_id: "guild.exam_request",
+        payload: { target_rank: "B", npc_id: SERVICES_PANEL_SAMPLE.rank.provider_id },
+      }],
     ]);
   });
 

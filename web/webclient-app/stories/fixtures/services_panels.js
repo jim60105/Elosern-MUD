@@ -5,7 +5,7 @@
 // viewed party member `shop.member_id`. Every entry mirrors the exact bounded schema; the integer
 // copper currency is display-formatted, never float money.
 export const SERVICES_PANEL_SAMPLE = {
-  schema_version: 7,
+  schema_version: 8,
   available: true,
   kind: "services",
   host: { identity: "host_altoria", display_name: "霧骨渡口的服務門戶" },
@@ -18,6 +18,7 @@ export const SERVICES_PANEL_SAMPLE = {
     next_threshold: 300,
   },
   guild: {
+    provider_id: 6101,
     branch_label: "埃洛西恩冒險者公會 阿爾托利亞分會",
     rank_ladder: ["F", "E", "D", "C", "B", "A", "S"],
     registration: {
@@ -101,16 +102,18 @@ export const SERVICES_PANEL_SAMPLE = {
         tracked: true,
       },
     ],
-    rank: {
-      rank: "C",
-      merit: 140,
-      next_rank: "B",
-      next_threshold: 300,
-      merit_qualified: false,
-      exam_request: { action_id: "guild.exam_request", label: "預約升等考核", enabled: true, disabled_reason: null, quantity: null },
-    },
+  },
+  rank: {
+    provider_id: 6102,
+    rank: "C",
+    merit: 140,
+    next_rank: "B",
+    next_threshold: 300,
+    merit_qualified: false,
+    exam_request: { action_id: "guild.exam_request", label: "預約升等考核", enabled: true, disabled_reason: null, quantity: null },
   },
   shop: {
+    provider_id: 6201,
     open: true,
     member_id: 7,
     stock: [
@@ -172,7 +175,9 @@ export const SERVICES_PANEL_SHOP_ROWS_SAMPLE = {
   ...SERVICES_PANEL_SAMPLE,
   host: { identity: "smith_ottar", display_name: "鐵砧鍛造鋪" },
   guild: null,
+  rank: null,
   shop: {
+    provider_id: 6202,
     open: true,
     member_id: 102,
     stock: [
@@ -205,7 +210,7 @@ export const SERVICES_PANEL_SHOP_ROWS_SAMPLE = {
 // `{available: false, reason}` envelope (webclient-oob-protocol), carrying
 // the panel-stable reason — no invented sections or default values.
 export const SERVICES_PANEL_UNAVAILABLE_SAMPLE = {
-  schema_version: 7,
+  schema_version: 8,
   available: false,
   reason: { code: "services_unavailable", message: "服務選單目前無法顯示" },
 };
@@ -213,7 +218,7 @@ export const SERVICES_PANEL_UNAVAILABLE_SAMPLE = {
 // The reduced services payload: no host, no guild/shop sections (both null
 // with zero pagination totals), a bare player summary.
 export const SERVICES_PANEL_MINIMAL_SAMPLE = {
-  schema_version: 7,
+  schema_version: 8,
   available: true,
   kind: "services",
   host: null,
@@ -226,6 +231,7 @@ export const SERVICES_PANEL_MINIMAL_SAMPLE = {
     next_threshold: null,
   },
   guild: null,
+  rank: null,
   shop: null,
     pagination: {
       board_total: 0,
@@ -234,8 +240,8 @@ export const SERVICES_PANEL_MINIMAL_SAMPLE = {
       sellable_total: 0,
     },
 };
-// Guild rank-block variants (services v7): each swaps only the guild
-// section's `rank` object (and, for the unregistered holder, the
+// Guild rank-block variants (services v8): each swaps only the independent
+// top-level `rank` object (and, for the unregistered holder, the
 // registration row) on top of the full sample. `merit_qualified` is the
 // merit verdict; `exam_request.enabled` is independent of it.
 const examRequest = (enabled, disabledReason = null) => ({
@@ -248,7 +254,11 @@ const examRequest = (enabled, disabledReason = null) => ({
 
 const withGuildRank = (rank, guildOverrides = {}) => ({
   ...SERVICES_PANEL_SAMPLE,
-  guild: { ...SERVICES_PANEL_SAMPLE.guild, ...guildOverrides, rank },
+  guild: { ...SERVICES_PANEL_SAMPLE.guild, ...guildOverrides },
+  rank: {
+    provider_id: SERVICES_PANEL_SAMPLE.rank.provider_id,
+    ...rank,
+  },
 });
 
 // Merit already meets the threshold: the counter takes the request.
@@ -370,14 +380,15 @@ export const SERVICES_PANEL_GUILD_BOARD_SAMPLE = {
         },
       },
     ],
-    rank: {
-      rank: "E",
-      merit: 140,
-      next_rank: "D",
-      next_threshold: 500,
-      merit_qualified: false,
-      exam_request: examRequest(true),
-    },
+  },
+  rank: {
+    provider_id: SERVICES_PANEL_SAMPLE.rank.provider_id,
+    rank: "E",
+    merit: 140,
+    next_rank: "D",
+    next_threshold: 500,
+    merit_qualified: false,
+    exam_request: examRequest(true),
   },
   pagination: { ...SERVICES_PANEL_SAMPLE.pagination, board_total: 4 },
 };

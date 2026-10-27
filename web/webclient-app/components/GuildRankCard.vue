@@ -4,16 +4,16 @@
 // drawer's guild counter tab hosts it at the top of the board list column. It shows
 // the rank crest, the merit meter with an explicit met / short status
 // (merit_qualified), and the 預約升等考核 request, whose enabled state is
-// independent of merit. It renders only the committed `services` v5
-// payload's `guild.rank` object and invents nothing; the exam request emits
-// the exact OOB action intent.
+// independent of merit. It renders only the committed `services` v8
+// payload's independent top-level `rank` object and invents nothing; the exam
+// request emits the exact OOB action intent naming that reception provider.
 //
 // It keeps every `guild-counter__*` class name and data-testid, so the rank
 // card's tests and browser selectors keep matching.
 import { computed, useId } from "vue";
 
 const props = defineProps({
-  // The `services` v5 payload's `guild.rank` object.
+  // The `services` v8 payload's independent top-level `rank` object.
   rank: { type: Object, required: true },
 });
 
@@ -69,7 +69,7 @@ function requestExam() {
   if (!examEnabled.value) return;
   emit("exam_request", {
     action_id: examRequest.value.action_id,
-    payload: { target_rank: rank.value.next_rank },
+    payload: { target_rank: rank.value.next_rank, npc_id: rank.value.provider_id },
   });
 }
 </script>

@@ -157,6 +157,9 @@
     // `map.view` is a pure read of the on-demand map panel with no typed
     // equivalent: opening or refreshing the map drawer echoes nothing.
     "map.view",
+    // `services.open` is a pure read of one selected provider's snapshot; it
+    // is a private correlated result and never a typed command.
+    "services.open",
   ];
 
   function isSilentPresentationControl(actionId) {

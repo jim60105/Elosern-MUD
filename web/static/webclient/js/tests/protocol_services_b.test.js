@@ -1,6 +1,6 @@
 /*
- * services panel v7 shop rows (presentation, viewed facts, one price per row
- * kind), versioned rejection, allowlist atomicity.
+ * services panel v8 (provider ids, independent top-level rank, shop rows with
+ * presentation/viewed facts), versioned rejection, allowlist atomicity.
  *
  * Split sibling of the original protocol.test.js; shared fixtures live in
  * ./protocol_support.js and ./protocol_fixtures.js.
@@ -15,7 +15,7 @@ const Protocol = require("../elosern/protocol.js");
 const { T_MEAL_SUMMARY, VALID_EPOCH, serverTime } = require("./protocol_support.js");
 const { validServicesAction, validServicesBoardRow, validServicesPanel, validServicesQuestRow, validServicesSellableRow, validServicesStockRow } = require("./protocol_fixtures.js");
 
-test("services v7 rejects stale facts and reward overflow", () => {
+test("services v8 rejects stale facts and reward overflow", () => {
   const item = { item_key: "synthetic_item", display_name: "合成物品", quantity: 1 };
   for (const overrides of [
     { reward_summary: "舊獎勵" },
@@ -32,7 +32,7 @@ test("services v7 rejects stale facts and reward overflow", () => {
   }
 });
 
-test("services v7 validates ladder bounds and all section rank memberships", () => {
+test("services v8 validates ladder bounds and all section rank memberships", () => {
   for (const ladder of [[], ["F", "F"], ["E"], ["F", "x".repeat(9)], Array.from({ length: 17 }, (_, i) => String(i))]) {
     const panel = validServicesPanel();
     panel.guild.board = [validServicesBoardRow()];
@@ -68,21 +68,23 @@ test("a structurally maximal realistic services payload fits the envelope", () =
   }
   const panel = validServicesPanel({
     guild: {
+      provider_id: 61,
       branch_label: "合成公會分行",
       rank_ladder: ["F", "E", "D", "C", "B", "A", "S"],
       registration: { registered: true, register: validServicesAction({ enabled: false, disabled_reason: { code: "already_registered", message: "你已經是冒險者了。" } }) },
       board: board,
       quests: quests,
-      rank: {
-        rank: "F",
-        merit: 60,
-        next_rank: "E",
-        next_threshold: 50,
-        merit_qualified: true,
-        exam_request: validServicesAction({ action_id: "guild.exam_request", label: "預約升等考核" }),
-      },
     },
-    shop: { open: true, member_id: 12345, stock: stock, sellable: sellable },
+    rank: {
+      provider_id: 63,
+      rank: "F",
+      merit: 60,
+      next_rank: "E",
+      next_threshold: 50,
+      merit_qualified: true,
+      exam_request: validServicesAction({ action_id: "guild.exam_request", label: "預約升等考核" }),
+    },
+    shop: { provider_id: 62, open: true, member_id: 12345, stock: stock, sellable: sellable },
     pagination: {
       board_total: Protocol.SERVICES_MAX_BOARD_ROWS,
       quest_total: Protocol.SERVICES_MAX_QUEST_ROWS,
@@ -187,6 +189,7 @@ test("services payload maximizing every string field fails the byte gate", () =>
       next_threshold: 1,
     },
     guild: {
+      provider_id: 61,
       branch_label: "獎".repeat(256),
       rank_ladder: ["F", "E", max64.slice(0, Protocol.SERVICES_MAX_RANK_KEY)],
       registration: {
@@ -198,20 +201,21 @@ test("services payload maximizing every string field fails the byte gate", () =>
       },
       board: board,
       quests: quests,
-      rank: {
-        rank: "F",
-        merit: 0,
-        next_rank: "E",
-        next_threshold: 1,
-        merit_qualified: false,
-        exam_request: validServicesAction({
-          action_id: "guild.exam_request",
-          enabled: false,
-          disabled_reason: { code: "wrong_branch", message: max64 },
-        }),
-      },
     },
-    shop: { open: false, member_id: 1, stock: stock, sellable: sellable },
+    rank: {
+      provider_id: 63,
+      rank: "F",
+      merit: 0,
+      next_rank: "E",
+      next_threshold: 1,
+      merit_qualified: false,
+      exam_request: validServicesAction({
+        action_id: "guild.exam_request",
+        enabled: false,
+        disabled_reason: { code: "wrong_branch", message: max64 },
+      }),
+    },
+    shop: { provider_id: 62, open: false, member_id: 1, stock: stock, sellable: sellable },
     pagination: {
       board_total: Protocol.SERVICES_MAX_BOARD_ROWS,
       quest_total: Protocol.SERVICES_MAX_QUEST_ROWS,
@@ -224,7 +228,7 @@ test("services payload maximizing every string field fails the byte gate", () =>
 
 function shopPanel(stock, sellable) {
   return validServicesPanel({
-    shop: { open: true, member_id: 7, stock: stock, sellable: sellable || [] },
+    shop: { provider_id: 62, open: true, member_id: 7, stock: stock, sellable: sellable || [] },
     pagination: {
       ...validServicesPanel().pagination,
       stock_total: stock.length,
@@ -233,7 +237,7 @@ function shopPanel(stock, sellable) {
   });
 }
 
-test("services v7 accepts registered and unknown-key presentation rows", () => {
+test("services v8 accepts registered and unknown-key presentation rows", () => {
   const panel = shopPanel(
     [validServicesStockRow(), validServicesStockRow({ item_key: "mystery_relic", display_name: "mystery_relic", presentation: null })],
     [validServicesSellableRow()]
@@ -258,7 +262,7 @@ test("services v7 accepts registered and unknown-key presentation rows", () => {
   assert.doesNotThrow(() => Protocol.validateServicesPanel(boundary));
 });
 
-test("services v7 rejects invalid presentation fields", () => {
+test("services v8 rejects invalid presentation fields", () => {
   const mutate = (presentation) => shopPanel([validServicesStockRow({ presentation: presentation })]);
   assert.throws(() => Protocol.validateServicesPanel(mutate({ kind: "food", icon_key: "food", summary: T_MEAL_SUMMARY })), /rarity/);
   assert.throws(
@@ -281,7 +285,7 @@ test("services v7 rejects invalid presentation fields", () => {
   );
 });
 
-test("services v7 shop rows carry one price per row kind and the viewed member", () => {
+test("services v8 shop rows carry one price per row kind and the viewed member", () => {
   assert.doesNotThrow(() => Protocol.validateServicesPanel(shopPanel([validServicesStockRow()], [validServicesSellableRow()])));
   const cases = [
     shopPanel([validServicesStockRow({ sell_copper: 5 })]),
@@ -320,7 +324,7 @@ test("services v7 shop rows carry one price per row kind and the viewed member",
   );
 });
 
-test("services v7 carries no inventory section or total", () => {
+test("services v8 carries no inventory section or total", () => {
   assert.throws(() => Protocol.validateServicesPanel({ ...validServicesPanel(), inventory: null }));
   assert.throws(() =>
     Protocol.validateServicesPanel({
@@ -342,7 +346,7 @@ test("services v2 payload is rejected by the v3 validator", () => {
 });
 
 test("services is in the production panel allowlist and a bad panel rejects atomically", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.services, 7);
+  assert.equal(Protocol.PANEL_ALLOWLIST.services, 8);
   const envelope = {
     protocol_version: 1,
     presentation_epoch: VALID_EPOCH,
@@ -362,10 +366,41 @@ test("services is in the production panel allowlist and a bad panel rejects atom
   assert.equal(store.getState().phase, "awaiting_initial_snapshot");
 });
 
+test("services v8 names every provider and keeps rank independent of guild staff", () => {
+  // The retired nested rank section rejects at the guild level.
+  assert.throws(() =>
+    Protocol.validateServicesPanel({
+      ...validServicesPanel(),
+      guild: { ...validServicesPanel().guild, rank: belowMeritRank() },
+    })
+  );
+  for (const providerId of [0, -1, true, "61", null]) {
+    const panel = shopPanel([validServicesStockRow()]);
+    panel.shop.provider_id = providerId;
+    assert.throws(() => Protocol.validateServicesPanel(panel), /provider_id/);
+  }
+  // Each section's provider id is required, never defaulted.
+  const rankless = rankedServicesPanel(belowMeritRank());
+  delete rankless.rank.provider_id;
+  assert.throws(() => Protocol.validateServicesPanel(rankless));
+  const guildless = rankedServicesPanel(belowMeritRank());
+  delete guildless.guild.provider_id;
+  assert.throws(() => Protocol.validateServicesPanel(guildless));
+  // A reception-only snapshot is valid: no guild staff is required.
+  assert.doesNotThrow(() =>
+    Protocol.validateServicesPanel(validServicesPanel({ guild: null, rank: belowMeritRank() }))
+  );
+  // When both ship, the rank's grades belong to the branch ladder.
+  assert.throws(() =>
+    Protocol.validateServicesPanel(rankedServicesPanel(belowMeritRank({ rank: "Z" })))
+  );
+});
+
 
 function rankedServicesPanel(rank) {
   return validServicesPanel({
     guild: {
+      provider_id: 61,
       branch_label: "合成公會分行",
       rank_ladder: ["F", "E", "D", "C", "B", "A", "S"],
       registration: {
@@ -377,8 +412,8 @@ function rankedServicesPanel(rank) {
       },
       board: [],
       quests: [],
-      rank: rank,
     },
+    rank: rank,
     pagination: {
       board_total: 0,
       quest_total: 0,
@@ -391,6 +426,7 @@ function rankedServicesPanel(rank) {
 function belowMeritRank(overrides) {
   return Object.assign(
     {
+      provider_id: 63,
       rank: "F",
       merit: 30,
       next_rank: "E",

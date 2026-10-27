@@ -68,6 +68,7 @@
     "party.view_member",
     "shop.buy",
     "shop.sell",
+    "services.open",
     "title.accept",
     "title.decline",
     "title.equip",
@@ -100,6 +101,7 @@
     "options.dismiss",
     "party.transfer",
     "party.view_member",
-    "map.view"
+    "map.view",
+    "services.open"
   ]
 }
