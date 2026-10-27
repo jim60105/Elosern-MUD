@@ -223,27 +223,8 @@ def _component_group(npc: Any, slot: str) -> dict[str, Any]:
     else:
         report = read_service_binding(component)
         rows.append(row("綁定", report.binding or "未設定", mono=bool(report.binding)))
-        if report.anchor_room is not None:
-            rows.append(
-                row(
-                    "錨點",
-                    f"#{report.anchor_room_id}",
-                    mono=True,
-                    link_to=link("rooms", report.anchor_room_id, label_of(report.anchor_room)),
-                )
-            )
-        elif report.anchor_room_id is not None:
-            rows.append(
-                row("錨點", f"#{report.anchor_room_id}（無法解析為房間）", mono=True)
-            )
-        else:
-            rows.append(row("錨點", "—"))
-        if report.gate_malformed:
-            problems.append(
-                "錨點無法解析" if report.binding == "place" else "綁定值無效"
-            )
-        if report.anchor_on_person:
-            problems.append("person 綁定不應帶錨點")
+        rows.append(_anchor_row(report))
+        narrative_only = False
         if report.binding is None:
             if slot != ScriptedDialogue.name:
                 problems.append("缺少綁定")
@@ -254,7 +235,16 @@ def _component_group(npc: Any, slot: str) -> dict[str, Any]:
                 elif source is not None and source.dialogue.services:
                     problems.append("對話服務關聯缺少綁定")
                 else:
+                    narrative_only = True
                     rows.append(row("服務", "純敘事對話（不使用服務綁定）"))
+        # An unset binding on narrative-only dialogue is the authored shape, not
+        # a malformed configuration.
+        if report.gate_malformed and not narrative_only:
+            problems.append(
+                "錨點無法解析" if report.binding == "place" else "綁定值無效"
+            )
+        if report.anchor_on_person:
+            problems.append("person 綁定不應帶錨點")
     rows.append(
         row(
             "設定",
@@ -268,6 +258,26 @@ def _component_group(npc: Any, slot: str) -> dict[str, Any]:
         else row("狀態", "正常", tone="ok")
     )
     return group(slot, rows)
+
+
+def _anchor_row(report: Any) -> dict[str, Any]:
+    """One component's stored anchor reference, without inventing a failure."""
+    raw = report.anchor_raw
+    if report.anchor_room is not None:
+        return row(
+            "錨點",
+            f"#{report.anchor_room_id}",
+            mono=True,
+            link_to=link("rooms", report.anchor_room_id, label_of(report.anchor_room)),
+        )
+    if raw is None:
+        return row("錨點", "—")
+    shown = f"#{raw}" if isinstance(raw, int) and not isinstance(raw, bool) else repr(raw)
+    if report.binding == "place":
+        return row("錨點", f"{shown}（無法解析為房間）", mono=True)
+    # A person/unknown binding never uses its anchor, so this reports the
+    # stored reference without claiming it failed to resolve.
+    return row("錨點", f"{shown}（目前綁定不使用錨點）", mono=True)
 
 
 def _dialogue_association_group(npc: Any) -> dict[str, Any] | None:

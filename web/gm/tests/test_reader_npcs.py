@@ -273,6 +273,45 @@ class NpcReaderTests(EvenniaTest):
         self.assertEqual(section_of(detail, "capability_diagnostics")["type"], "empty")
         self.assertEqual(failed_sections(detail), {})
 
+    def test_narrative_only_dialogue_is_not_a_configuration_error(self):
+        narrative = AuthoredDialogue(greeting=None, topics=(), services=())
+        with patch(
+            "world.rules.dialogue.DIALOGUE_TABLE",
+            {"t_reader_dialogue": DIALOGUE, "t_reader_narrative": narrative},
+        ):
+            host = create.create_object(NPC, key="t_reader_narrative", location=self.room1)
+            host.race = SYNTH_RACE
+            host.apply_race_baseline()
+            restore_gauges_to_full(host)
+            dialogue = ScriptedDialogue.create(host, dialogue_key="t_reader_narrative")
+            host.components.add(dialogue)
+            diagnostics = section_of(npcs.detail(host), "capability_diagnostics")
+        group_ = _group(diagnostics, ScriptedDialogue.name)
+        self.assertEqual(row_value(group_, "狀態"), "正常")
+        self.assertIn("純敘事", str(group_))
+
+    def test_a_person_binding_reports_its_stored_anchor_without_a_false_failure(self):
+        self.dialogue.anchor_room_id = self.room1.pk
+        diagnostics = section_of(npcs.detail(self.npc), "capability_diagnostics")
+        group_ = _group(diagnostics, ScriptedDialogue.name)
+        anchor = row_value(group_, "錨點")
+        self.assertIn(f"#{self.room1.pk}", anchor)
+        self.assertNotIn("無法解析", anchor)
+        self.assertIn("person 綁定不應帶錨點", row_value(group_, "狀態"))
+
+    def test_a_malformed_declared_dialogue_key_is_unreadable_not_empty(self):
+        host = create.create_object(NPC, key="t_reader_broken_key", location=self.room1)
+        host.components.add(
+            ScriptedDialogue.create(host, dialogue_key="scene_role:broken")
+        )
+        detail = npcs.detail(host)
+        services = section_of(detail, "services")
+        self.assertEqual(services["error"]["code"], "source_unavailable")
+        associations = _group(
+            section_of(detail, "capability_diagnostics"), "對話服務關聯"
+        )
+        self.assertIn("無法解析", row_value(associations, "狀態"))
+
     def test_item_fields_keep_only_the_room_summary(self):
         item = npcs.item_of(self.npc)
         labels = [field["label"] for field in item["fields"]]
