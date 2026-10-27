@@ -181,6 +181,7 @@ def _terrain_definition(continent: ContinentDocument) -> TerrainDefinition:
 def _compose_regions(
     continent: ContinentDocument, problems: list[str]
 ) -> Mapping[str, WildernessRegion]:
+    from world.lore.nations import NATION_REGISTRY
     from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 
     missing = sorted(REGION_KEYS - set(continent.regions))
@@ -197,6 +198,16 @@ def _compose_regions(
             problems.append(
                 f"region {key!r} names unregistered scene archetype {scene!r}"
             )
+        declared_nations = [
+            name
+            for name in (declaration.nation_key, *declaration.nominal_nation_keys)
+            if name is not None
+        ]
+        for name in declared_nations:
+            if name not in NATION_REGISTRY:
+                problems.append(
+                    f"region {key!r} names unknown nation {name!r}"
+                )
         composed[key] = WildernessRegion(
             key,
             declaration.display_name_zh,
@@ -389,6 +400,19 @@ def build_geography(
             "a reserved harbor site and a geographic location share an identity: "
             f"{sorted(set(anchors) & set(harbor_sites))}"
         )
+    # Gateway footprints, anchors and approaches are terrain-dependent, so the
+    # candidate's own frame and walkability must be checked here: publication
+    # must never precede a rejection that a later sync would raise.
+    from elosern_map_core.terrain import is_walkable_cell as _core_is_walkable
+    from world.lore.wilderness_entry import validate_wilderness_entries
+
+    try:
+        validate_wilderness_entries(
+            bounds=(terrain.max_x, terrain.max_y),
+            walkable=lambda cell: _core_is_walkable(terrain, cell),
+        )
+    except ValueError as error:
+        problems.append(str(error))
     try:
         snapshot = GeographySnapshot(
             continent=continent,

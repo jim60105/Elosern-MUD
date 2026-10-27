@@ -112,6 +112,26 @@ class ShippedGeographyPublicationTests(EvenniaTest):
                                       fingerprints=dict(before.fingerprints))
         self.assertIn("cell_size_km", str(captured.exception))
 
+    def test_gateway_approach_is_validated_before_publication(self):
+        before = geography.current()
+        identities = before.identity
+        data = _plain(before.continent.data)
+        data["terrain"]["waterways"]["t_approach_water"] = {
+            "route": [
+                {"cell_x": 864, "cell_y": 1080},
+                {"cell_x": 864, "cell_y": 1079},
+            ],
+            "fords": [],
+        }
+        candidate = document_from_data(geography.CONTINENT_PATH, data)
+        with self.assertRaises(geography.GeographyError) as captured:
+            geography.build_geography(
+                candidate, before.locations, fingerprints=dict(before.fingerprints)
+            )
+        self.assertIn("not provider-valid", str(captured.exception))
+        self.assertIs(geography.current(), before)
+        self.assertEqual(geography.current().identity, identities)
+
 
 class SnapshotIsolationTests(unittest.TestCase):
     @classmethod
@@ -185,6 +205,13 @@ class SnapshotIsolationTests(unittest.TestCase):
         )
         # The stale world's index still answers for its own snapshot.
         self.assertIsNotNone(first_components.component((500, 700)))
+        # The occupancy memo is keyed by the authored world, so both searches
+        # leave their own entries instead of sharing one.
+        from web.webclient.presentation import map_quest_destinations
+
+        identities = {key[0] for key in map_quest_destinations._OCCUPANCY}
+        self.assertIn(first.identity, identities)
+        self.assertIn(second.identity, identities)
 
     def test_local_lookup_does_not_build_a_world_scan(self):
         from world.maps import wilderness_reachability
@@ -202,6 +229,28 @@ class SnapshotIsolationTests(unittest.TestCase):
             wilderness_provider.is_land_cell((1000, 1000))
         finally:
             wilderness_reachability.walkable_components = original
+
+    def test_retained_adapter_keeps_its_snapshot_coordinates(self):
+        from world.lore.map_districts import _ProductionTerrain
+
+        first = geography.current()
+        retained = _ProductionTerrain(first)
+        before = retained.grid_site("capital_altoria", (3500, 2850))
+        self.assertIsNotNone(before)
+        data = _plain(first.locations.data)
+        data["locations"]["capital_altoria"]["cell"] = {
+            "cell_x": 861,
+            "cell_y": 1080,
+        }
+        moved = document_from_data(geography.LOCATIONS_PATH, data)
+        second = geography.build_geography(
+            first.continent, moved, fingerprints=dict(first.fingerprints)
+        )
+        geography.publish(second)
+        after = retained.grid_site("capital_altoria", (3500, 2850))
+        self.assertEqual(after.position_m, before.position_m)
+        fresh = _ProductionTerrain(second).grid_site("capital_altoria", (3500, 2850))
+        self.assertEqual(fresh.position_m[0] - before.position_m[0], 1000)
 
     def test_candidate_without_a_classifier_region_is_rejected(self):
         data = _plain(self._shipped.continent.data)

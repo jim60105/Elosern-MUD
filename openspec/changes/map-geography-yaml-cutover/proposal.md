@@ -23,6 +23,9 @@ Source documents are `docs/superpowers/specs/2026-10-26-map-editor-design.md` an
 - `wilderness-terrain`: amend the complete affected requirement blocks for this ownership cutover.
 - `continental-geography`: amend the complete affected requirement blocks for this ownership cutover.
 - `lore-registries`: amend the complete affected requirement blocks for this ownership cutover.
+- `wilderness-map-provider`: the provider's region label and scene association now read the published continent views.
+- `lore-knowledge`: the codex's map-owned categories resolve the published composed views at call time.
+- `anchor-placement`: placements resolve against the published location views rather than a removed module registry.
 
 ## Impact
 

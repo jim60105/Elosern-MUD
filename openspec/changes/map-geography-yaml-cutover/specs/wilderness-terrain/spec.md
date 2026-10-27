@@ -21,6 +21,34 @@ Game terrain views SHALL expose immutable schema-valid region values loaded from
 - **WHEN** a region has fewer than two typed nonblank description variants
 - **THEN** authoring validation rejects that region rather than coercing or fabricating prose
 
+### Requirement: region_for_coordinates is a pure, deterministic function covering the whole bounded map
+`world/maps/wilderness_provider.py` SHALL define `region_for_coordinates(x: int, y: int) -> str`,
+returning a key that exists in the published region views, for every `(x, y)` pair within the
+map's valid coordinate bounds. The function SHALL read the published snapshot's explicit terrain
+definition, no database state, no network state, and no random or wall-clock input, and SHALL
+return the same value for the same input on every call.
+
+#### Scenario: Same input always returns the same output
+- **WHEN** `region_for_coordinates(x, y)` is called twice with the same `(x, y)` in the same process
+- **THEN** both calls return the identical string
+
+#### Scenario: Every region key is reachable
+- **WHEN** `region_for_coordinates` is evaluated across the full valid coordinate range
+- **THEN** every declared region key is returned by at least one coordinate
+
+#### Scenario: The central mountain band spans the full valid Y range
+- **WHEN** `region_for_coordinates(x, y)` is evaluated around the declared corridor's X band below
+  the northern forest
+- **THEN** the mountain region follows the authored bending corridor (its centre shifts per row)
+  instead of a fixed rectangular band, and it is never a continuous summit wall: the closed ridge
+  is a one-cell cliff wall broken only at the authored passes
+
+#### Scenario: capital_altoria's derived anchor cells resolve to Altoria's own territory
+- **WHEN** `region_for_coordinates` is called with `capital_altoria`'s declared cell and with every
+  gate's derived `approach_cell`
+- **THEN** every call returns `"western_hills_valleys"`, matching `world/lore/nations.py`'s own
+  statement that Altoria's territory is "西部丘陵、谷地與西南海岸"
+
 ### Requirement: terrain_description is a pure, deterministic function with no LLM or randomness
 `world/maps/wilderness_provider.py` SHALL define `terrain_description(x: int, y: int) -> str`,
 selecting one of `region_for_coordinates(x, y)`'s region's declared `terrain_flavor_zh` variants via

@@ -17,6 +17,11 @@ from tools.spec_traceability import covers_requirement
 from web.webclient.presentation import map_panels
 from web.webclient.presentation.map_panels import check_world_map_envelope, validate_world_map
 from web.webclient.presentation.protocol import MAX_CANONICAL_JSON_BYTES
+from world.tests.geography_fixture import publish_shipped_geography
+
+
+def setUpModule():
+    publish_shipped_geography()
 
 
 def _frame(body: dict) -> dict:

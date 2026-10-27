@@ -143,15 +143,19 @@ class _ProductionTerrain:
             if (component := self._components.component(approach)) is not None
         )
 
-    @staticmethod
-    def _gateway_entries():
-        """``(z_map_key, gate grid_xy, approach cell)`` of every registered gate."""
+    def _gateway_entries(self):
+        """``(z_map_key, gate grid_xy, approach cell)`` of every registered gate.
+
+        Approaches are derived against this adapter's own frame bounds, so a
+        retained adapter never borrows another world's rectangle.
+        """
         from world.lore import wilderness_entry
         from world.maps.static_references import settlement_node_xy
 
+        bounds = (self._geography.max_x, self._geography.max_y)
         for entry in wilderness_entry.WILDERNESS_ENTRY_REGISTRY.values():
             for gate in entry.gates:
-                approach = entry.approach_cell(gate)
+                approach = entry.approach_cell(gate, bounds=bounds)
                 if approach is not None:
                     yield (
                         gate.z_map_key,
@@ -181,8 +185,9 @@ class _ProductionTerrain:
         return core_terrain.region_for_coordinates(self._terrain, *cell)
 
     def grid_site(self, map_key, xy):
+        from elosern_map_core.geometry import local_to_world_m
         from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
-        from world.lore.anchors import LOCAL_FRAME_ANCHOR_REGISTRY, world_position_m
+        from world.lore.anchors import LOCAL_FRAME_ANCHOR_REGISTRY
         from world.maps.map_data import settlement_graph
 
         graph = settlement_graph(map_key)
@@ -200,7 +205,11 @@ class _ProductionTerrain:
         )
         if anchor_key is None:
             return None
-        position = world_position_m(anchor_key, node.physical_coordinate)
+        position = local_to_world_m(
+            self._geography.anchor_geography[anchor_key].cell,
+            LOCAL_FRAME_ANCHOR_REGISTRY[anchor_key].local_anchor_m,
+            node.physical_coordinate,
+        )
         reachable = False
         for gate_map, gate_xy, approach in self._entries:
             gate_node = graph.node_at(gate_xy) if gate_map == map_key else None
