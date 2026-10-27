@@ -146,7 +146,7 @@ def _art_panel(*, with_candidate: bool = True) -> dict:
 
 def _exploration_panel() -> dict:
     return {
-        "schema_version": 4,
+        "schema_version": 5,
         "available": True,
         "kind": "exploration",
         "move": [],
@@ -166,6 +166,7 @@ def _exploration_panel() -> dict:
                 "identity": 7,
                 "display_name": "店長",
                 "portrait_ref": "7",
+                "services": {"state": "none", "entries": []},
                 "affordances": [
                     {
                         "kind": "action",
@@ -180,6 +181,7 @@ def _exploration_panel() -> dict:
                 "identity": 8,
                 "display_name": "旅人",
                 "portrait_ref": "8",
+                "services": {"state": "none", "entries": []},
                 "affordances": [
                     {
                         "kind": "action",

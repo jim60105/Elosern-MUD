@@ -645,7 +645,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         """A schema-valid available exploration panel carrying exactly the
         named rows — the fabricated room a real commit would produce."""
         return {
-            "schema_version": 4,
+            "schema_version": 5,
             "available": True,
             "kind": "exploration",
             "move": list(move),
@@ -680,6 +680,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "identity": identity,
             "display_name": name,
             "portrait_ref": None,
+            "services": {"state": "none", "entries": []},
             "affordances": [
                 {
                     "kind": "action",
@@ -852,7 +853,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         withdrawn = "這片區域暫時無法操作"
         accepted = self._inject_panels(page, {
             "exploration": {
-                "schema_version": 4,
+                "schema_version": 5,
                 "available": False,
                 "reason": {"code": "exploration.unavailable", "message": withdrawn},
             },
