@@ -5,59 +5,27 @@ Provide immutable physical geography and demographic authoring contracts for the
 ## Requirements
 
 ### Requirement: The known continent has frozen geographic declarations
-The system SHALL declare one known continent with an irregular mainland, rounded demographics, canonical anchor cells and unnamed reserved harbor sites. Declarations SHALL be immutable and independent of temporary source files and of room lifecycle.
+Geographic consumers SHALL read immutable continent and location values from the shared map source while non-map demographic declarations retain their existing authority.
+
+#### Scenario: Mainland and reserved sites
+- **WHEN** a synthetic irregular mainland with reserved geographic sites is loaded
+- **THEN** geometry uses its declared kilometre frame and sites create no settlement, population or knowledge
+
+#### Scenario: Location without a local map
+- **WHEN** a known location has no settlement document
+- **THEN** its geographic identity remains available without fabricating local content
 
 #### Scenario: Mainland control polygon
-- **WHEN** the boundary is inspected
-- **THEN** it closes the ordered kilometer-boundary vertices below and has shoelace area 5,000,000 km²; raster counts need not equal vector area.
-
-| Vertex | East, km | North, km |
-| --- | --- | --- |
-| 1 | 450 | 100 |
-| 2 | 1850 | 100 |
-| 3 | 2400 | 450 |
-| 4 | 2600 | 1350 |
-| 5 | 1930 | 2250 |
-| 6 | 1800 | 2600 |
-| 7 | 750 | 2550 |
-| 8 | 200 | 2050 |
-| 9 | 100 | 1050 |
-| 10 | 300 | 350 |
-
-
+- **WHEN** an irregular mainland is loaded from explicitly labelled kilometre vertices
+- **THEN** geometry uses its declared closed boundary and independently tested polygon/cell-centre rules; source conversion preserves existing vertices through temporary comparison
 
 #### Scenario: Nine geographic anchors
-- **WHEN** canonical positions are resolved
-- **THEN** they equal this table, their cell centers are on land, and placement does not spawn rooms or reveal hidden knowledge.
-
-| Registry key | Canonical name | X | Y | Geographic constraint |
-| --- | --- | --- | --- | --- |
-| `capital_altoria` | 聖潔王都 | 860 | 1080 | Western river valley and hills; riverfront below northern terraces |
-| `capital_grandia` | 輝煌帝都 | 1970 | 1280 | Eastern agricultural plain and major river supply |
-| `capital_valhalla` | 咆哮王城 | 780 | 1910 | Northwestern highland forest and tribal routes |
-| `village_ciaran` | 暗影谷村 | 1340 | 1220 | Underground settlement on the western flank of the central mountains |
-| `village_fionnen` | 翠綠森林村 | 1490 | 1510 | Forest on the eastern mountain flank |
-| `village_eolas` | 幽月谷村 | 1410 | 2150 | Hidden northern mountain valley near deep forest |
-| `dungeon_eternal_night` | 永夜迷宮 | 900 | 2350 | Northern deep forest under nominal Valhalla jurisdiction |
-| `dungeon_dragon_nest` | 龍之巢穴 | 2340 | 1220 | Remote eastern Grandia |
-| `dungeon_arcane_ruins` | 魔導遺跡 | 480 | 1160 | Western Altoria hills and ancient/mineral sites |
-
-
+- **WHEN** discovered locations are loaded and resolved by stable identity
+- **THEN** every declared geographic cell remains available without room spawning or knowledge revelation; roster size is authored data rather than a fixed-count assertion
 
 #### Scenario: Six reserved harbor sites
-- **WHEN** functional ports are inspected
-- **THEN** all centers lie on land at the following cells; none creates named anchors, cities, quests or population.
-
-| Functional site | X | Y | Intended role |
-| --- | --- | --- | --- |
-| Kingdom southwestern main port | 301 | 350 | River/sea transfer and foreign trade |
-| Kingdom western secondary port | 201 | 700 | Western mining and craft exports |
-| Kingdom southern secondary port | 600 | 101 | Southern coastal supply |
-| Imperial southeastern main port | 2070 | 241 | Agricultural and magical-goods exports |
-| Imperial southeastern secondary port | 2400 | 454 | Eastern coastal collection |
-| Imperial southern secondary port | 1700 | 101 | Southern coastal transfer |
-
-
+- **WHEN** reserved geographic sites are loaded from the continent document
+- **THEN** each uses its declared cell and role without creating a named location, settlement, quest or population; the source owns membership rather than a specification-owned count
 
 ### Requirement: Population and territory targets preserve authored settlement scale
 The continent SHALL retain approximately 30,000,000 inhabitants on approximately 5,000,000 km², including approximately 300 elves as rounded totals. National territory shares SHALL be area targets separate from terrain and actual control.

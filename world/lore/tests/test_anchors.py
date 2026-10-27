@@ -78,6 +78,9 @@ class AnchorRegistryTests(unittest.TestCase):
                 self.assertTrue(entry.geographic_constraint)
                 self.assertTrue(geography.current().locations.locations[key].cell == entry.cell)
 
+    @covers_requirement(
+        "map-geographic-sources::geographic-yaml-is-the-sole-map-facing-authority"
+    )
     def test_composition_distinguishes_a_new_location_from_absent_lore(self):
         from elosern_map_core.codec import document_from_data
         from world.maps.geography import build_geography, current

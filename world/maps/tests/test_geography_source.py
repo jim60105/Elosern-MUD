@@ -15,6 +15,8 @@ from types import MappingProxyType
 from evennia.objects.models import ObjectDB
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
+
 from elosern_map_core.codec import document_from_data
 from elosern_map_core.terrain import region_for_coordinates as core_region_for
 
@@ -64,6 +66,9 @@ class ShippedGeographyPublicationTests(EvenniaTest):
             anchors()["capital_altoria"].display_name_zh = "changed"
         self.assertIsInstance(geography.current().terrain.region_search_boxes, MappingProxyType)
 
+    @covers_requirement(
+        "map-geographic-sources::geographic-yaml-is-the-sole-map-facing-authority"
+    )
     def test_an_unbuilt_location_is_displayable_without_local_content(self):
         key = "dungeon_arcane_ruins"
         rooms = ObjectDB.objects.count()

@@ -21,6 +21,8 @@ import textwrap
 import unittest
 from pathlib import Path
 
+from tools.spec_traceability import covers_requirement
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = REPO_ROOT / "packages" / "map-core"
 
@@ -160,6 +162,9 @@ class MapGeographicSourcesContractTests(unittest.TestCase):
     def setUpClass(cls):
         cls.geography = _load_geography()
 
+    @covers_requirement(
+        "map-geographic-sources::geographic-yaml-is-the-sole-map-facing-authority"
+    )
     def test_the_core_loads_both_canonical_documents_without_game_imports(self):
         identity = self.geography["identity"]
         self.assertEqual(len(identity), 2)
