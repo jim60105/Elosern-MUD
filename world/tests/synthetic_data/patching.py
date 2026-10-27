@@ -310,12 +310,16 @@ def _late_binder_sweep(logical: str, replacement: object, original: object) -> N
 
 
 def _consumer_bindings(logical: str) -> tuple[tuple[str, str], ...]:
-    owner = REGISTRY_TARGETS[logical]
+    owner = REGISTRY_TARGETS.get(logical)
+    if owner is None:
+        return ()
     return discover_consumer_bindings().get(owner, ())
 
 
 def _import_time_derivations(logical: str) -> tuple[str, ...]:
-    owner = REGISTRY_TARGETS[logical]
+    owner = REGISTRY_TARGETS.get(logical)
+    if owner is None:
+        return ()
     return discover_import_time_derivations().get(owner, ())
 
 
@@ -331,7 +335,7 @@ def _resolve_import_time_derivations(logicals: tuple[str, ...]) -> None:
     every live binding still sees the scope's synthetic content.
     """
     for logical in logicals:
-        if logical in GEOGRAPHY_TARGETS:
+        if logical in GEOGRAPHY_TARGETS or logical in SETTLEMENT_TARGETS:
             continue
         for module_name in _import_time_derivations(logical):
             try:

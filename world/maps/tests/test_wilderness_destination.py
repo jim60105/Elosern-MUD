@@ -17,6 +17,8 @@ import types
 import unittest
 import dataclasses
 import importlib
+from dataclasses import replace
+from types import MappingProxyType
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -236,9 +238,8 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
         # the diagonal destination is open ground while one orthogonal
         # neighbour is a footprint cell. The shared neighbour rule refuses that
         # corner cut, and the canonical resolver refuses it identically.
-        from world.lore import wilderness_entry as wilderness_entry_module
         from world.lore.wilderness_entry import WildernessEntryPoint
-        from world.maps import wilderness_provider
+        from world.maps import map_data, wilderness_provider
 
         entry = WildernessEntryPoint(
             anchor_key="t_l_shape",
@@ -246,27 +247,27 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
             origin_xy=(500, 600),
             gates=(),
         )
-        with patch.dict(
-            getattr(wilderness_entry_module, "WILDERNESS_ENTRY" + "_REGISTRY"),
-            {"t_l_shape": entry},
-        ), patch.object(
-            wilderness_provider,
-            "_FOOTPRINT_CACHE",
-            {},
-        ):
-            # West orthogonal (501,600) is a footprint cell.
-            self.assertIsNone(wilderness_neighbor(502, 600, "nw"))
-            # South orthogonal (500,601) is a footprint cell on the other axis.
-            self.assertIsNone(wilderness_neighbor(500, 602, "se"))
-            # A cardinal step along the open side stays legal.
-            self.assertEqual(wilderness_neighbor(502, 600, "n"), (502, 601))
-            self.assertIsNone(
-                resolve_wilderness_destination(self._terrain(502, 600), "nw")
-            )
-            self.assertEqual(
-                resolve_wilderness_destination(self._terrain(502, 600), "n"),
-                encode_wild(WILDERNESS_NAME, 502, 601),
-            )
+        previous = map_data.current()
+        entries = dict(previous.wilderness_entries)
+        entries["t_l_shape"] = entry
+        map_data.publish(replace(previous, wilderness_entries=MappingProxyType(entries)))
+        try:
+            with patch.object(wilderness_provider, "_FOOTPRINT_CACHE", {}):
+                # West orthogonal (501,600) is a footprint cell.
+                self.assertIsNone(wilderness_neighbor(502, 600, "nw"))
+                # South orthogonal (500,601) is a footprint cell on the other axis.
+                self.assertIsNone(wilderness_neighbor(500, 602, "se"))
+                # A cardinal step along the open side stays legal.
+                self.assertEqual(wilderness_neighbor(502, 600, "n"), (502, 601))
+                self.assertIsNone(
+                    resolve_wilderness_destination(self._terrain(502, 600), "nw")
+                )
+                self.assertEqual(
+                    resolve_wilderness_destination(self._terrain(502, 600), "n"),
+                    encode_wild(WILDERNESS_NAME, 502, 601),
+                )
+        finally:
+            map_data.publish(previous)
 
     @covers_requirement("canonical-wilderness-destination::wilderness-destination-resolution-is-canonical-shared-and-registry-driven")
     def test_south_away_from_any_gateway_is_an_ordinary_step(self):
