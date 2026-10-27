@@ -224,6 +224,17 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       },
     },
     {
+      // services.open is the selected provider's private correlated read: no
+      // typed command exists and its result never enters the narrative.
+      id: "EXPECTED SILENCE: services.open selected provider read",
+      ids: ["services.open"],
+      silence: true,
+      prepare() {
+        openExploration();
+        store.dispatchAction("services.open", { npc_id: 61 });
+      },
+    },
+    {
       id: "EXPECTED SILENCE: party.transfer item hand-over",
       ids: ["party.transfer"],
       silence: true,
@@ -618,19 +629,19 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       ids: ["guild.register", "guild.quest_abandon", "guild.quest_turnin", "guild.quest_track", "guild.exam_request"],
       prepare() {
         openExploration();
-        store.dispatchAction("guild.register", {});
+        store.dispatchAction("guild.register", { npc_id: 61 });
         store.receive(1, "ui_action_result", [fx.actionResult()], {});
         store.receive(1, "ui_update", [fx.update({ revision: 2 })], {});
-        store.dispatchAction("guild.quest_abandon", { quest_id: "q_1042" });
+        store.dispatchAction("guild.quest_abandon", { quest_id: "q_1042", npc_id: 61 });
         store.receive(1, "ui_action_result", [fx.actionResult({ request_id: "session:2" })], {});
         store.receive(1, "ui_update", [fx.update({ revision: 3 })], {});
-        store.dispatchAction("guild.quest_turnin", { quest_id: "q_1042" });
+        store.dispatchAction("guild.quest_turnin", { quest_id: "q_1042", npc_id: 61 });
         store.receive(1, "ui_action_result", [fx.actionResult({ request_id: "session:3" })], {});
         store.receive(1, "ui_update", [fx.update({ revision: 4 })], {});
         store.dispatchAction("guild.quest_track", { quest_id: "q_1042", tracked: true });
         store.receive(1, "ui_action_result", [fx.actionResult({ request_id: "session:4" })], {});
         store.receive(1, "ui_update", [fx.update({ revision: 5 })], {});
-        store.dispatchAction("guild.exam_request", { target_rank: "B" });
+        store.dispatchAction("guild.exam_request", { target_rank: "B", npc_id: 61 });
       },
       expected: ["guild register", "guild abandon q_1042", "guild turnin q_1042", "guild track q_1042", "guild exam B"],
     },

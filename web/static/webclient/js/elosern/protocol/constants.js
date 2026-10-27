@@ -222,6 +222,7 @@ var NODE_ID_RE = /^(grid|wild|room):[^:]+(?::[^:]+)*$/;
 // services panel bounds (mirror of web.webclient.presentation.services,
 // design D4). These constants are shared with the server through a
 // dual-direction parity test.
+var SERVICES_SCHEMA_VERSION = 8;
 var SERVICES_MAX_BOARD_ROWS = 12;
 var SERVICES_MAX_QUEST_ROWS = 12;
 var SERVICES_MAX_STOCK_ROWS = 12;
@@ -544,7 +545,7 @@ var PANEL_ALLOWLIST = {
   party_inventory: PARTY_INVENTORY_SCHEMA_VERSION,
   item_holdings: ITEM_HOLDINGS_SCHEMA_VERSION,
   objectives: 1,
-  services: 7,
+  services: SERVICES_SCHEMA_VERSION,
   creation: 6,
   exploration: 4,
   character: 9,
@@ -682,6 +683,7 @@ module.exports = {
   LOCAL_MAP_LAYERS: LOCAL_MAP_LAYERS,
   LOCAL_MAP_ACTION_KINDS: LOCAL_MAP_ACTION_KINDS,
   NODE_ID_RE: NODE_ID_RE,
+  SERVICES_SCHEMA_VERSION: SERVICES_SCHEMA_VERSION,
   SERVICES_MAX_BOARD_ROWS: SERVICES_MAX_BOARD_ROWS,
   SERVICES_MAX_QUEST_ROWS: SERVICES_MAX_QUEST_ROWS,
   SERVICES_MAX_STOCK_ROWS: SERVICES_MAX_STOCK_ROWS,

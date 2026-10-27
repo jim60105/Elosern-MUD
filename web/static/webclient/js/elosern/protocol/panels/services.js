@@ -43,6 +43,12 @@ var SERVICES_SELL = C.SERVICES_SELL;
 // design D4). Shared bounds are guarded by a dual-direction parity test.
 // -------------------------------------------------------------------------
 
+// One section's exact provider dbref: a positive JavaScript-safe integer that
+// names the NPC the section was built for, never a display-only identity.
+function requireProviderId(value, section) {
+  requireInt(value.provider_id, section + " provider_id", 1, MAX_SAFE_INTEGER);
+}
+
 function validateServicesAction(value) {
   requireExactFields(
     value,
@@ -246,9 +252,10 @@ function validateServicesRank(value) {
   requireExactFields(
     value,
     "rank",
-    ["rank", "merit", "next_rank", "next_threshold", "merit_qualified", "exam_request"],
+    ["provider_id", "rank", "merit", "next_rank", "next_threshold", "merit_qualified", "exam_request"],
     []
   );
+  requireProviderId(value, "rank");
   if (value.rank !== null) {
     var rankKey = requireString(value.rank, "rank", SERVICES_MAX_RANK_KEY);
     if (!rankKey.trim()) {
@@ -278,7 +285,8 @@ function validateServicesRank(value) {
 }
 
 function validateServicesGuild(value) {
-  requireExactFields(value, "guild", ["branch_label", "rank_ladder", "registration", "board", "quests", "rank"], []);
+  requireExactFields(value, "guild", ["provider_id", "branch_label", "rank_ladder", "registration", "board", "quests"], []);
+  requireProviderId(value, "guild");
   var branchLabel = requireString(value.branch_label, "branch_label", SERVICES_MAX_HOST_DISPLAY_NAME);
   if (!branchLabel.trim()) throw new Error("branch_label must be non-empty");
   if (!Array.isArray(value.rank_ladder) || value.rank_ladder.length < 1 || value.rank_ladder.length > C.SERVICES_MAX_RANK_LADDER) {
@@ -299,11 +307,7 @@ function validateServicesGuild(value) {
     throw new Error("quests must be a list of at most " + SERVICES_MAX_QUEST_ROWS + " rows");
   }
   value.quests.forEach(validateServicesQuestRow);
-  if (value.rank !== null) {
-    validateServicesRank(value.rank);
-  }
   var rankKeys = value.board.map(function (row) { return row.rank; });
-  if (value.rank !== null) rankKeys.push(value.rank.rank, value.rank.next_rank);
   rankKeys.forEach(function (key) {
     if (key !== null && value.rank_ladder.indexOf(key) === -1) throw new Error("guild ranks must belong to rank_ladder");
   });
@@ -368,7 +372,8 @@ function validateServicesSellableRow(value) {
 }
 
 function validateServicesShop(value) {
-  requireExactFields(value, "shop", ["open", "member_id", "stock", "sellable"], []);
+  requireExactFields(value, "shop", ["provider_id", "open", "member_id", "stock", "sellable"], []);
+  requireProviderId(value, "shop");
   requireBool(value.open, "open");
   requireInt(value.member_id, "member_id", 1, MAX_SAFE_INTEGER);
   if (!Array.isArray(value.stock) || value.stock.length > SERVICES_MAX_STOCK_ROWS) {
@@ -438,8 +443,9 @@ function validateServicesPagination(value) {
   return value;
 }
 
-// Exact available services panel v7 schema (design D4; services-shop-
-// structured-rows: no inventory section, viewed-member shop rows).
+// Exact available services panel v8 schema (design D4; npc-targeted-service-
+// flows: every section names its provider, and rank is an independent
+// top-level surface).
 function validateServicesPanel(payload) {
   requireExactFields(
     payload,
@@ -451,13 +457,16 @@ function validateServicesPanel(payload) {
       "host",
       "player",
       "guild",
+      "rank",
       "shop",
       "pagination",
     ],
     []
   );
   requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-  if (payload.schema_version !== 7) {
+  // The mirrored C.SERVICES_SCHEMA_VERSION value; the literal form is the
+  // re-check the schema-version parity contract reads.
+  if (payload.schema_version !== 8) {
     throw new Error("unsupported services schema_version");
   }
   if (payload.available !== true || payload.kind !== "services") {
@@ -513,9 +522,22 @@ function validateServicesPanel(payload) {
   }
 
   var guild = payload.guild;
+  var rank = payload.rank;
   var shop = payload.shop;
   if (guild !== null) {
     validateServicesGuild(guild);
+  }
+  if (rank !== null) {
+    validateServicesRank(rank);
+  }
+  if (guild !== null && rank !== null) {
+    // The rank surface is independent of guild staff; when both ship, its
+    // grades still belong to the branch's ladder.
+    [rank.rank, rank.next_rank].forEach(function (key) {
+      if (key !== null && guild.rank_ladder.indexOf(key) === -1) {
+        throw new Error("rank grades must belong to the guild rank_ladder");
+      }
+    });
   }
   if (shop !== null) {
     validateServicesShop(shop);
@@ -524,7 +546,7 @@ function validateServicesPanel(payload) {
   validateServicesPaginationTotals(pagination, guild, shop);
 
   var result = {
-    schema_version: 7,
+    schema_version: 8,
     available: true,
     kind: "services",
     host: payload.host,
@@ -537,6 +559,7 @@ function validateServicesPanel(payload) {
       next_threshold: player.next_threshold,
     },
     guild: guild,
+    rank: rank,
     shop: shop,
     pagination: pagination,
   };

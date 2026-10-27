@@ -10,9 +10,10 @@ from ._support import UNREGISTERED_PLAYER, _MEMBER_ID, _T_MEAL, _T_MEAL_DISPLAY,
 
 
 # The measured canonical byte size of the realistic maximal payload with twelve
-# all-ceiling board rows (services v7: twelve three-trait-delta stock rows and
-# twelve sellable rows of representative content, no inventory section).
-BOARD_CEILING_BYTES = 63749
+# all-ceiling board rows (services v8: twelve three-trait-delta stock rows and
+# twelve sellable rows of representative content, no inventory section, and the
+# three provider ids the sections now name).
+BOARD_CEILING_BYTES = 63800
 
 
 class ServicesSchemaTests(unittest.TestCase):
@@ -162,9 +163,9 @@ class ServicesSchemaTests(unittest.TestCase):
 
 
     @covers_requirement("webclient-service-menus::the-services-panel-is-an-exact-read-only-exploration-mode-panel")
-    def test_version_seven_carries_no_inventory_section_or_total(self):
+    def test_version_eight_carries_no_inventory_section_or_total(self):
         payload = _valid_payload()
-        self.assertEqual(validate_services(payload)["schema_version"], 7)
+        self.assertEqual(validate_services(payload)["schema_version"], 8)
         for extra in (
             {"inventory": None},
             {"inventory": {"rows": [], "wallet": 0}},
@@ -186,7 +187,7 @@ class ServicesSchemaTests(unittest.TestCase):
             pagination={**_valid_payload()["pagination"], "stock_total": 1, "sellable_total": 1},
         )
         shop = validate_services(payload)["shop"]
-        self.assertEqual(set(shop), {"open", "member_id", "stock", "sellable"})
+        self.assertEqual(set(shop), {"provider_id", "open", "member_id", "stock", "sellable"})
         self.assertEqual(shop["member_id"], _MEMBER_ID)
         self.assertEqual(
             set(shop["stock"][0]),

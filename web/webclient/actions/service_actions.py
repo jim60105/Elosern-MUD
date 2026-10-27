@@ -2,31 +2,46 @@
 
 The seven production service actions are ``guild.register``,
 ``guild.quest_accept``, ``guild.quest_abandon``, ``guild.quest_turnin``,
-``guild.exam_request``, ``shop.buy``, and ``shop.sell``. Each validator enforces
-an exact bounded payload shape; each adapter re-resolves the local
-``GuildStaff`` / ``Merchant`` host (the exam request re-resolves its counter
-and qualified host through the shared request coordinator) and every referenced
-identity against current canonical state, calls only the listed public
-deterministic APIs, and never assigns ``.db`` attributes, traits, registration,
-rank, merit, quest log, wallet, inventory, merchant stock, or location
-directly. No payload accepts an actor, host, branch, session, price, stock, or
-wallet field; a party member reference appears only in the exact member field
-its owning capability defines (``inventory.use`` and
-``inventory.toggle_equip`` ``actor_id``, ``shop.buy`` ``recipient_id``,
-``shop.sell`` ``seller_id``), and no action routes through the text command
-parser.
+``guild.exam_request``, ``shop.buy``, and ``shop.sell``; the read-only
+``services.open`` names one selected provider. Each validator enforces an exact
+bounded payload shape. Each provider mutation requires its exact ``npc_id``:
+the adapter resolves that identity through
+:func:`world.rules.service_targets.require_service_mutation` (visibility,
+co-presence, capability, binding, schedule, combat and possession) and passes
+the resolved host to the deterministic domain API, which validates it again
+and owns every write. No room-wide discovery, substitution, or client flag
+participates. Private escort abandonment keeps its host-free ``{quest_id}``
+shape and ordinary guild abandonment requires its staff; the canonical quest
+record decides which shape applies, so a missing ``npc_id`` can never turn an
+ordinary record into host-free abandonment.
+
+Adapters never assign ``.db`` attributes, traits, registration, rank, merit,
+quest log, wallet, inventory, merchant stock, or location directly. No payload
+accepts an actor, host, branch, session, price, stock, or wallet field; a party
+member reference appears only in the exact member field its owning capability
+defines (``inventory.use`` and ``inventory.toggle_equip`` ``actor_id``,
+``shop.buy`` ``recipient_id``, ``shop.sell`` ``seller_id``), and no action
+routes through the text command parser.
 """
 
 from typing import Any
 
-from typeclasses.components import GuildStaff, Merchant
-from web.webclient.presentation.protocol import MAX_SAFE_INTEGER
+from typeclasses.components import GuildExamReception, GuildStaff, Merchant
+from web.webclient.presentation.protocol import (
+    MAX_RESULT_DATA_BYTES,
+    MAX_SAFE_INTEGER,
+    json_byte_size,
+)
 from world.quests.runtime import (
     QuestAlreadyActive,
     QuestDataError,
     QuestNotFound,
+    QuestState,
     QuestTargetsUnavailable,
     QuestTransitionError,
+    abandon_quest,
+    find_record,
+    read_records,
     set_quest_tracked,
 )
 from world.rules.combat_session import SessionReason
@@ -36,10 +51,8 @@ from world.rules.event_log import render_plain_text
 from world.rules.guild import (
     GuildDataError,
     GuildError,
-    GuildServiceError,
     RewardClaimError,
     register_adventurer,
-    resolve_local_service_host,
     turn_in_quest,
 )
 from world.rules.guild_exam_request import OUTCOME_SCHEDULE, request_guild_exam
@@ -50,7 +63,6 @@ from world.rules.guild_offers import (
     accept_guild_offer,
     abandon_guild_quest,
 )
-from world.rules.npc_schedules import interaction_reason
 from world.rules.party_inventory import toggle_member_equipment, use_member_item
 from world.rules.party_scope import (
     PURPOSE_ACT,
@@ -65,6 +77,10 @@ from world.rules.service_messages import (
     exam_started_message,
     rejection_code,
     rejection_message,
+)
+from world.rules.service_targets import (
+    ServiceTargetError,
+    require_service_mutation,
 )
 from world.rules.unlock_notices import deliver_unlocks, notices_from_events
 
@@ -105,6 +121,13 @@ AFFECTED_TRADE = (
     "party_inventory",
 )
 AFFECTED_TRACK = ("services", "objectives", "quest_log")
+#: The exact abandonment shape mismatch: the canonical record kind and the
+#: supplied payload disagree. Never a fallback to the other shape.
+REASON_ABANDON_SHAPE = "abandon_target_mismatch"
+#: ``services.open`` cannot build a conforming payload for a mode that has no
+#: player to read for.
+REASON_NOT_ALLOWED_MODE = "not_allowed_mode"
+REASON_SERVICES_TOO_LARGE = "services_too_large"
 
 
 class ServiceActionError(ValueError):
@@ -127,48 +150,91 @@ def _require_quantity(value: Any) -> int:
     return value
 
 
-def _exact_single_field(payload: dict[str, Any], field: str) -> dict[str, Any]:
+def _require_npc_identifier(value: Any) -> int:
+    """Require one positive safe integer provider identity."""
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or not 1 <= value <= MAX_SAFE_INTEGER
+    ):
+        raise ServiceActionError("npc_id must be a positive safe integer")
+    return value
+
+
+def _validate_provider_payload(
+    payload: dict[str, Any], action_id: str, required: set[str]
+) -> dict[str, Any]:
+    """Validate one exact provider-mutation payload.
+
+    ``required`` names the action's own bounded fields; ``npc_id`` is required
+    on top of them and nothing else may appear.
+    """
     if not isinstance(payload, dict):
-        raise ServiceActionError("payload must be an object")
-    unknown = set(payload) - {field}
+        raise ServiceActionError(f"{action_id} payload must be an object")
+    expected = required | {"npc_id"}
+    unknown = set(payload) - expected
     if unknown:
         raise ServiceActionError(f"payload has unknown fields {sorted(unknown)}")
-    if field not in payload:
-        raise ServiceActionError(f"payload requires {field}")
+    missing = expected - set(payload)
+    if missing:
+        raise ServiceActionError(f"payload requires {sorted(missing)}")
     return payload
 
 
 def validate_guild_register_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """Validate the exact empty ``guild.register`` payload."""
-    if not isinstance(payload, dict):
-        raise ServiceActionError("guild.register payload must be an object")
-    if payload:
-        raise ServiceActionError("guild.register requires an empty payload")
-    return {}
+    """Validate the exact ``guild.register`` payload (one provider identity)."""
+    _validate_provider_payload(payload, "guild.register", set())
+    return {"npc_id": _require_npc_identifier(payload["npc_id"])}
 
 
 def validate_quest_accept_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """Validate the exact ``guild.quest_accept`` payload (one definition key)."""
-    body = _exact_single_field(payload, "definition_key")
-    return {"definition_key": _require_non_empty_string(
-        body["definition_key"], "definition_key", MAX_KEY_CODE_POINTS
-    )}
+    """Validate the exact ``guild.quest_accept`` payload."""
+    _validate_provider_payload(
+        payload, "guild.quest_accept", {"definition_key"}
+    )
+    return {
+        "definition_key": _require_non_empty_string(
+            payload["definition_key"], "definition_key", MAX_KEY_CODE_POINTS
+        ),
+        "npc_id": _require_npc_identifier(payload["npc_id"]),
+    }
 
 
 def validate_quest_abandon_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """Validate the exact ``guild.quest_abandon`` payload (one quest ID)."""
-    body = _exact_single_field(payload, "quest_id")
-    return {"quest_id": _require_non_empty_string(
-        body["quest_id"], "quest_id", MAX_KEY_CODE_POINTS
-    )}
+    """Validate one of the two exact ``guild.quest_abandon`` payloads.
+
+    Ordinarily ``{quest_id, npc_id}``; a private escort keeps the host-free
+    ``{quest_id}``. The validator admits exactly those shapes and nothing else;
+    the adapter decides which one the canonical record kind requires.
+    """
+    if not isinstance(payload, dict):
+        raise ServiceActionError("payload must be an object")
+    unknown = set(payload) - {"quest_id", "npc_id"}
+    if unknown:
+        raise ServiceActionError(
+            f"payload has unknown fields {sorted(unknown)}"
+        )
+    if "quest_id" not in payload:
+        raise ServiceActionError("payload requires ['quest_id']")
+    validated = {
+        "quest_id": _require_non_empty_string(
+            payload["quest_id"], "quest_id", MAX_KEY_CODE_POINTS
+        )
+    }
+    if "npc_id" in payload:
+        validated["npc_id"] = _require_npc_identifier(payload["npc_id"])
+    return validated
 
 
 def validate_quest_turnin_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """Validate the exact ``guild.quest_turnin`` payload (one quest ID)."""
-    body = _exact_single_field(payload, "quest_id")
-    return {"quest_id": _require_non_empty_string(
-        body["quest_id"], "quest_id", MAX_KEY_CODE_POINTS
-    )}
+    """Validate the exact ``guild.quest_turnin`` payload."""
+    _validate_provider_payload(payload, "guild.quest_turnin", {"quest_id"})
+    return {
+        "quest_id": _require_non_empty_string(
+            payload["quest_id"], "quest_id", MAX_KEY_CODE_POINTS
+        ),
+        "npc_id": _require_npc_identifier(payload["npc_id"]),
+    }
 
 
 def validate_quest_track_payload(payload: dict[str, Any]) -> dict[str, Any]:
@@ -185,26 +251,33 @@ def validate_quest_track_payload(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def validate_exam_request_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """Validate the exact ``guild.exam_request`` payload (one next-rank key).
+    """Validate the exact ``guild.exam_request`` payload.
 
-    Host, branch, clock and threshold fields are unknown fields and reject
-    here, before the request coordinator runs.
+    Branch, examiner, clock and threshold fields are unknown fields and reject
+    here, before the request coordinator runs; ``npc_id`` names the selected
+    reception.
     """
-    body = _exact_single_field(payload, "target_rank")
-    return {"target_rank": _require_non_empty_string(
-        body["target_rank"], "target_rank", MAX_RANK_KEY_CODE_POINTS
-    )}
+    _validate_provider_payload(payload, "guild.exam_request", {"target_rank"})
+    return {
+        "target_rank": _require_non_empty_string(
+            payload["target_rank"], "target_rank", MAX_RANK_KEY_CODE_POINTS
+        ),
+        "npc_id": _require_npc_identifier(payload["npc_id"]),
+    }
+
+
+def validate_services_open_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Validate the exact ``services.open`` payload (one selected provider)."""
+    _validate_provider_payload(payload, "services.open", set())
+    return {"npc_id": _require_npc_identifier(payload["npc_id"])}
 
 
 def _validate_trade_payload(
     payload: dict[str, Any], action_id: str, member_field: str
 ) -> dict[str, Any]:
-    if not isinstance(payload, dict):
-        raise ServiceActionError(f"{action_id} payload must be an object")
-    if set(payload) != {"item_key", "quantity", member_field}:
-        raise ServiceActionError(
-            f"{action_id} requires exactly item_key, quantity and {member_field}"
-        )
+    _validate_provider_payload(
+        payload, action_id, {"item_key", "quantity", member_field}
+    )
     return {
         "item_key": _require_non_empty_string(
             payload["item_key"], "item_key", MAX_KEY_CODE_POINTS
@@ -213,6 +286,7 @@ def _validate_trade_payload(
         member_field: _require_member_identifier(
             payload[member_field], member_field
         ),
+        "npc_id": _require_npc_identifier(payload["npc_id"]),
     }
 
 
@@ -320,15 +394,21 @@ def validate_inventory_toggle_equip_payload(payload: dict[str, Any]) -> dict[str
 # ---------------------------------------------------------------------------
 
 
-def _resolve_local(actor: Any, component_class: type, absent: str, ambiguous: str):
-    """Return ``(host, None)`` or ``(None, stable_reason)`` for one host class."""
+def _resolve_target(
+    actor: Any, payload: dict[str, Any], component_class: type
+) -> tuple[Any, dict[str, Any] | None]:
+    """Return ``(provider, None)`` or ``(None, rejection)`` for one exact npc.
+
+    Admission revalidates the whole selection against committed state at
+    submit time; the host it returns is the only host the domain API receives.
+    """
     try:
-        return resolve_local_service_host(actor, component_class), None
-    except GuildServiceError as error:
-        message = str(error.args[0]) if error.args else ""
-        if message == "multiple local service hosts":
-            return None, ambiguous
-        return None, absent
+        npc, _component = require_service_mutation(
+            actor, payload["npc_id"], component_class
+        )
+    except ServiceTargetError as error:
+        return None, _rejected(error)
+    return npc, None
 
 
 def _rejected(reason: Any) -> dict[str, Any]:
@@ -339,19 +419,6 @@ def _rejected(reason: Any) -> dict[str, Any]:
 def _session_rejected(reason: Any) -> dict[str, Any]:
     code = str(reason)
     return {"outcome": "rejected", "code": code, "message": session_reason_message(code)}
-
-
-def _schedule_rejected(host: Any, interaction_kind: str) -> dict[str, Any] | None:
-    """Return the stable schedule-gate rejection for ``host``, or ``None``.
-
-    Mirrors the Telnet surfaces: a schedule-blocked host (a busy or resting
-    NPC) refuses the service with the gate's stable Traditional Chinese line
-    under the stable ``schedule_blocked`` code, and no transaction occurs.
-    """
-    reason = interaction_reason(host, interaction_kind)
-    if reason is None:
-        return None
-    return {"outcome": "rejected", "code": "schedule_blocked", "message": reason}
 
 
 def _success(code: str, message: str, affected: tuple[str, ...]) -> dict[str, Any]:
@@ -369,14 +436,11 @@ def _success(code: str, message: str, affected: tuple[str, ...]) -> dict[str, An
 
 
 def _guild_register_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
-    """Resolve the local staff host and register the actor at rank F."""
-    del payload, session
-    staff, reason = _resolve_local(actor, GuildStaff, "no_staff", "ambiguous_staff")
-    if staff is None:
-        return _rejected(reason)
-    blocked = _schedule_rejected(staff, "service_guild")
-    if blocked is not None:
-        return blocked
+    """Register the actor at rank F through the exact selected staff host."""
+    del session
+    staff, rejection = _resolve_target(actor, payload, GuildStaff)
+    if rejection is not None:
+        return rejection
     try:
         record = register_adventurer(actor, staff)
     except (GuildDataError, GuildError) as error:
@@ -392,12 +456,9 @@ def _quest_accept_adapter(actor: Any, payload: dict[str, Any], session: Any = No
     """Revalidate board eligibility and delegate acceptance to the quest runtime."""
     del session
     definition_key = payload["definition_key"]
-    staff, reason = _resolve_local(actor, GuildStaff, "no_staff", "ambiguous_staff")
-    if staff is None:
-        return _rejected(reason)
-    blocked = _schedule_rejected(staff, "service_guild")
-    if blocked is not None:
-        return blocked
+    staff, rejection = _resolve_target(actor, payload, GuildStaff)
+    if rejection is not None:
+        return rejection
     try:
         record = accept_guild_offer(actor, staff, definition_key)
     except (
@@ -415,15 +476,40 @@ def _quest_accept_adapter(actor: Any, payload: dict[str, Any], session: Any = No
 
 
 def _quest_abandon_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
-    """Delegate abandonment of the exact quest ID to the quest runtime."""
+    """Abandon one record in the shape its canonical kind requires.
+
+    An ordinary guild record needs its exact selected staff host; a private
+    escort accepted under a published package keeps the host-free shape. The
+    canonical record decides, so neither payload can stand in for the other.
+    """
     del session
     quest_id = payload["quest_id"]
-    staff, reason = _resolve_local(actor, GuildStaff, "no_staff", "ambiguous_staff")
-    if staff is None:
-        return _rejected(reason)
-    blocked = _schedule_rejected(staff, "service_guild")
-    if blocked is not None:
-        return blocked
+    try:
+        records = read_records(actor)
+    except QuestDataError as error:
+        return _rejected(error)
+    record = find_record(records, quest_id)
+    if record is None:
+        return _rejected(QuestNotFound(quest_id))
+    if record.state is not QuestState.IN_PROGRESS:
+        # A terminal record (including an invalidated escort) is never
+        # abandoned again, in either shape.
+        return _rejected(QuestTransitionError("quest_transition"))
+    if record.package_id is not None:
+        if "npc_id" in payload:
+            return _rejected(REASON_ABANDON_SHAPE)
+        try:
+            failed = abandon_quest(actor, quest_id)
+        except (QuestNotFound, QuestDataError) as error:
+            return _rejected(error)
+        message = f"你放棄了任務 {failed.quest_id}。"
+        actor.msg(message)
+        return _success("abandoned", message, AFFECTED_ABANDON)
+    if "npc_id" not in payload:
+        return _rejected(REASON_ABANDON_SHAPE)
+    staff, rejection = _resolve_target(actor, payload, GuildStaff)
+    if rejection is not None:
+        return rejection
     try:
         record = abandon_guild_quest(actor, staff, quest_id)
     except (QuestNotFound, QuestDataError) as error:
@@ -437,12 +523,9 @@ def _quest_turnin_adapter(actor: Any, payload: dict[str, Any], session: Any = No
     """Claim one completed quest reward exactly once through the local staff."""
     del session
     quest_id = payload["quest_id"]
-    staff, reason = _resolve_local(actor, GuildStaff, "no_staff", "ambiguous_staff")
-    if staff is None:
-        return _rejected(reason)
-    blocked = _schedule_rejected(staff, "service_guild")
-    if blocked is not None:
-        return blocked
+    staff, rejection = _resolve_target(actor, payload, GuildStaff)
+    if rejection is not None:
+        return rejection
     try:
         result = turn_in_quest(actor, staff, quest_id)
     except (RewardClaimError, GuildDataError, GuildError, QuestDataError) as error:
@@ -485,15 +568,21 @@ def _quest_track_adapter(actor: Any, payload: dict[str, Any], session: Any = Non
 def _exam_request_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Ask the shared coordinator for planned attendance or the exam start.
 
-    The counter, branch, next-rank target and qualified persistent host are
-    all derived server-side; merit and host presence never gate the request
-    itself. ``exam_schedule`` is read-only planned information (no panel
-    changes), ``exam_started`` hands the shell to combat.
+    The selected reception is the request's speaker, so the counter is the
+    exact NPC the client opened; the branch, next-rank target and qualified
+    persistent adventurer are derived server-side and merit/host presence
+    never gate the request itself. ``exam_schedule`` is read-only planned
+    information (no panel changes), ``exam_started`` hands the shell to combat.
     """
     del session
     target_rank = payload["target_rank"]
+    reception, rejection = _resolve_target(actor, payload, GuildExamReception)
+    if rejection is not None:
+        return rejection
     try:
-        outcome = request_guild_exam(actor, target_rank, requested_by="webclient")
+        outcome = request_guild_exam(
+            actor, target_rank, speaker=reception, requested_by="webclient"
+        )
     except GuildExamError as error:
         return _rejected(error)
     if outcome.kind == OUTCOME_SCHEDULE:
@@ -520,14 +609,9 @@ def _buy_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> di
     del session
     item_key = payload["item_key"]
     quantity = payload["quantity"]
-    merchant_host, reason = _resolve_local(
-        actor, Merchant, "no_merchant", "ambiguous_merchant"
-    )
-    if merchant_host is None:
-        return _rejected(reason)
-    blocked = _schedule_rejected(merchant_host, "service_shop")
-    if blocked is not None:
-        return blocked
+    merchant_host, rejection = _resolve_target(actor, payload, Merchant)
+    if rejection is not None:
+        return rejection
     try:
         result = buy(
             actor, merchant_host, item_key, quantity, payload["recipient_id"]
@@ -559,14 +643,9 @@ def _sell_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> d
     del session
     item_key = payload["item_key"]
     quantity = payload["quantity"]
-    merchant_host, reason = _resolve_local(
-        actor, Merchant, "no_merchant", "ambiguous_merchant"
-    )
-    if merchant_host is None:
-        return _rejected(reason)
-    blocked = _schedule_rejected(merchant_host, "service_shop")
-    if blocked is not None:
-        return blocked
+    merchant_host, rejection = _resolve_target(actor, payload, Merchant)
+    if rejection is not None:
+        return rejection
     try:
         result = sell(
             actor, merchant_host, item_key, quantity, payload["seller_id"]
@@ -608,6 +687,46 @@ def _resolve_inventory_target(actor: Any, target_key: str) -> Any:
             if getattr(obj, "key", None) == target_key:
                 return obj
     return target_key
+
+
+def _services_open_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
+    """Read one selected provider's services snapshot as a private result.
+
+    Read-only: it resolves the exact selected NPC, serializes the schema-8
+    snapshot that targets it and returns it in the result's own data slot
+    (``{npc_id, services}``). Nothing is published, no clock or effect runs,
+    and every rejection keeps the same private, presentation-free shape so a
+    stale or unauthorized provider never reopens UI through a side channel.
+    """
+    npc_id = payload["npc_id"]
+    if bool(getattr(actor, "creation_pending", False)):
+        return {**_rejected(REASON_NOT_ALLOWED_MODE), "no_presentation": True}
+    from web.webclient.presentation.party_view_selection import (
+        resolve_session_viewed_member,
+    )
+    from web.webclient.presentation.services import build_services_payload
+    from world.rules.service_view import ServicesViewError
+
+    try:
+        viewed = resolve_session_viewed_member(session, actor)
+        snapshot = build_services_payload(actor, viewed, provider_id=npc_id)
+    except ServiceTargetError as error:
+        return {**_rejected(error), "no_presentation": True}
+    except ServicesViewError:
+        return {**_rejected("services_unavailable"), "no_presentation": True}
+    data = {"npc_id": npc_id, "services": snapshot}
+    if json_byte_size(data) > MAX_RESULT_DATA_BYTES:
+        # Over the private result budget: refuse with a bounded result rather
+        # than truncating rows or relaxing a transport limit.
+        return {**_rejected(REASON_SERVICES_TOO_LARGE), "no_presentation": True}
+    return {
+        "outcome": "success",
+        "code": "services_open",
+        "message": "已讀取服務資訊。",
+        "data": data,
+        "affected_panels": (),
+        "no_presentation": True,
+    }
 
 
 def _inventory_use_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
@@ -695,6 +814,7 @@ def _inventory_toggle_equip_adapter(actor: Any, payload: dict[str, Any], session
 
 
 __all__ = [
+    "REASON_ABANDON_SHAPE",
     "ServiceActionError",
     "validate_buy_payload",
     "validate_exam_request_payload",
@@ -706,4 +826,5 @@ __all__ = [
     "validate_quest_track_payload",
     "validate_quest_turnin_payload",
     "validate_sell_payload",
+    "validate_services_open_payload",
 ]

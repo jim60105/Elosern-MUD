@@ -12,7 +12,7 @@ import { partyWindowTab } from "../../components/party-window-memory.js";
 // A minimal services panel exposing a guild quest log.
 function servicesPanel() {
   return {
-    schema_version: 7,
+    schema_version: 8,
     available: true,
     kind: "services",
     host: null,
@@ -25,6 +25,7 @@ function servicesPanel() {
       next_threshold: 10,
     },
     guild: {
+      provider_id: 61,
       branch_label: "合成公會分行",
       rank_ladder: ["novice", "adept"],
       registration: {
@@ -66,8 +67,8 @@ function servicesPanel() {
           tracked: false,
         },
       ],
-      rank: null,
     },
+    rank: null,
     shop: null,
     pagination: {
       board_total: 0,

@@ -86,6 +86,7 @@ def _valid_payload(**overrides):
         "host": None,
         "player": dict(UNREGISTERED_PLAYER),
         "guild": None,
+        "rank": None,
         "shop": None,
         "pagination": {
             "board_total": 0,
@@ -100,6 +101,7 @@ def _valid_payload(**overrides):
 
 def _valid_guild(**overrides):
     value = {
+        "provider_id": 61,
         "branch_label": "合成公會分行",
         "rank_ladder": ["F", "E", "D", "C", "B", "A", "S"],
         "registration": {"registered": True, "register": _action(enabled=False)},
@@ -119,7 +121,6 @@ def _valid_guild(**overrides):
             }
         ],
         "quests": [],
-        "rank": None,
     }
     value.update(overrides)
     return value
@@ -155,6 +156,7 @@ def _sellable_row(**overrides):
 
 def _valid_shop(**overrides):
     value = {
+        "provider_id": 62,
         "open": True,
         "member_id": _MEMBER_ID,
         "stock": [_stock_row()],
@@ -274,6 +276,7 @@ def _all_ceilings_payload():
             "next_threshold": 1,
         },
         guild={
+            "provider_id": MAX_SAFE_INTEGER,
             "branch_label": _max_string(256),
             "rank_ladder": [_max_string(MAX_RANK_KEY_CODE_POINTS)],
             "registration": {
@@ -289,23 +292,24 @@ def _all_ceilings_payload():
             },
             "board": board,
             "quests": quest,
-            "rank": {
-                "rank": _max_string(MAX_RANK_KEY_CODE_POINTS),
-                "merit": 0,
-                "next_rank": _max_string(MAX_RANK_KEY_CODE_POINTS),
-                "next_threshold": 1,
-                "merit_qualified": False,
-                "exam_request": _action(
-                    "guild.exam_request",
-                    enabled=False,
-                    disabled_reason={
-                        "code": "wrong_branch",
-                        "message": _max_string(MAX_REASON_MESSAGE_CODE_POINTS),
-                    },
-                ),
-            },
         },
-        shop={"open": False, "member_id": MAX_SAFE_INTEGER, "stock": stock, "sellable": sellable},
+        rank={
+            "provider_id": MAX_SAFE_INTEGER - 1,
+            "rank": _max_string(MAX_RANK_KEY_CODE_POINTS),
+            "merit": 0,
+            "next_rank": _max_string(MAX_RANK_KEY_CODE_POINTS),
+            "next_threshold": 1,
+            "merit_qualified": False,
+            "exam_request": _action(
+                "guild.exam_request",
+                enabled=False,
+                disabled_reason={
+                    "code": "wrong_branch",
+                    "message": _max_string(MAX_REASON_MESSAGE_CODE_POINTS),
+                },
+            ),
+        },
+        shop={"provider_id": MAX_SAFE_INTEGER - 2, "open": False, "member_id": MAX_SAFE_INTEGER, "stock": stock, "sellable": sellable},
         pagination={
             "board_total": MAX_BOARD_ROWS,
             "quest_total": MAX_QUEST_ROWS,
@@ -403,6 +407,7 @@ def _realistic_maximal_payload(*, summary=_REPRESENTATIVE_SUMMARY, delta_traits=
             "next_threshold": 50,
         },
         guild={
+            "provider_id": 61,
             "branch_label": "合成公會分行",
             "rank_ladder": ["F", "E", "D", "C", "B", "A", "S"],
             "registration": {
@@ -419,16 +424,17 @@ def _realistic_maximal_payload(*, summary=_REPRESENTATIVE_SUMMARY, delta_traits=
             },
             "board": board,
             "quests": quest,
-            "rank": {
-                "rank": "F",
-                "merit": 60,
-                "next_rank": "E",
-                "next_threshold": 50,
-                "merit_qualified": True,
-                "exam_request": _action("guild.exam_request", label="預約升等考核"),
-            },
         },
-        shop={"open": True, "member_id": 12345, "stock": stock, "sellable": sellable},
+        rank={
+            "provider_id": 63,
+            "rank": "F",
+            "merit": 60,
+            "next_rank": "E",
+            "next_threshold": 50,
+            "merit_qualified": True,
+            "exam_request": _action("guild.exam_request", label="預約升等考核"),
+        },
+        shop={"provider_id": 62, "open": True, "member_id": 12345, "stock": stock, "sellable": sellable},
         pagination={
             "board_total": MAX_BOARD_ROWS,
             "quest_total": MAX_QUEST_ROWS,

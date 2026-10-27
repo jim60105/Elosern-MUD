@@ -77,3 +77,4 @@
   - [GM 世界資料瀏覽](/development/gm-portal-world-data)
   - [WebClient Phase-0 契約審查](/development/webclient-vue-frozen-contract-audit)
   - [對話協定與發布預算](/development/dialogue-panel-protocol)
+  - [服務面板協定與指定服務者讀取](/development/services-panel-protocol)

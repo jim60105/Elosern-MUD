@@ -26,6 +26,7 @@ describe("the shop window in AppClient (webclient-shop-window)", () => {
   let store;
   let wrapper;
   let sender;
+  let answeredReads;
 
   beforeEach(() => {
     setActivePinia(createPinia());
@@ -33,6 +34,7 @@ describe("the shop window in AppClient (webclient-shop-window)", () => {
     resetPartyWindowMemory();
     sender = fx.createFakeSender();
     store.setSender(sender);
+    answeredReads = new Set();
   });
 
   afterEach(() => {
@@ -53,10 +55,49 @@ describe("the shop window in AppClient (webclient-shop-window)", () => {
     ]);
     store.openHudDrawer("shop");
     await wrapper.vm.$nextTick();
+    settleServicesReads();
+    await wrapper.vm.$nextTick();
   }
 
   const sent = (id) => sender.sent.actions.filter((envelope) => envelope.action_id === id);
   const get = (id) => wrapper.get(`[data-testid="${id}"]`);
+
+  // The drawer's entry read is one `services.open`; answer it with the exact
+  // targeted snapshot so the drawer renders its selection and the dispatch
+  // gate reopens.
+  function targetedServices(services, providerId) {
+    const next = { ...services, pagination: { ...services.pagination } };
+    if (next.guild && next.guild.provider_id !== providerId) {
+      next.guild = null;
+      next.pagination.board_total = 0;
+      next.pagination.quest_total = 0;
+    }
+    if (next.rank && next.rank.provider_id !== providerId) next.rank = null;
+    if (next.shop && next.shop.provider_id !== providerId) {
+      next.shop = null;
+      next.pagination.stock_total = 0;
+      next.pagination.sellable_total = 0;
+    }
+    return next;
+  }
+
+  function settleServicesReads() {
+    for (const envelope of sent("services.open")) {
+      if (answeredReads.has(envelope.request_id)) continue;
+      answeredReads.add(envelope.request_id);
+      const providerId = envelope.payload.npc_id;
+      store.receive(1, "ui_action_result", [
+        fx.actionResult({
+          request_id: envelope.request_id,
+          presentation_revision: store.view.revision,
+          data: {
+            npc_id: providerId,
+            services: targetedServices(store.view.panels.services, providerId),
+          },
+        }),
+      ]);
+    }
+  }
 
   function bagFor(memberId, potionHeld, purse) {
     return {
@@ -99,6 +140,8 @@ describe("the shop window in AppClient (webclient-shop-window)", () => {
     ]);
     store.receive(1, "ui_action_result", [fx.actionResult({ request_id: sent("party.view_member")[0].request_id, presentation_revision: 2 })]);
     await wrapper.vm.$nextTick();
+    settleServicesReads();
+    await wrapper.vm.$nextTick();
     await get(`member-rail__entry--${SHOP_KAHN_ID}`).trigger("click");
     expect(sent("party.view_member").at(-1).payload).toEqual({
       member_id: SHOP_KAHN_ID,
@@ -117,7 +160,7 @@ describe("the shop window in AppClient (webclient-shop-window)", () => {
     await input.trigger("change");
     await get("action-bar__btn--trade").trigger("click");
     expect(sent("shop.buy").map((envelope) => envelope.payload)).toEqual([
-      { item_key: "potion_heal", quantity: 3, recipient_id: SHOP_ELLA_ID },
+      { item_key: "potion_heal", quantity: 3, recipient_id: SHOP_ELLA_ID, npc_id: SHOP_SERVICES_SAMPLE.shop.provider_id },
     ]);
     expect(get("action-bar__btn--trade").attributes("aria-busy")).toBe("true");
     const requestId = sent("shop.buy")[0].request_id;
@@ -128,6 +171,8 @@ describe("the shop window in AppClient (webclient-shop-window)", () => {
       },
       party_inventory: bagFor(SHOP_ELLA_ID, 5, 1120),
     });
+    await wrapper.vm.$nextTick();
+    settleServicesReads();
     await wrapper.vm.$nextTick();
     expect(get("shop-window__purse").text()).toBe("1,120 銅");
     expect(store.view.panels.party_inventory.purse).toBe(1120);
@@ -151,7 +196,7 @@ describe("the shop window in AppClient (webclient-shop-window)", () => {
     await input.trigger("change");
     await get("action-bar__btn--trade").trigger("click");
     expect(sent("shop.sell").map((envelope) => envelope.payload)).toEqual([
-      { item_key: "rusty_sword", quantity: 2, seller_id: SHOP_KAHN_ID },
+      { item_key: "rusty_sword", quantity: 2, seller_id: SHOP_KAHN_ID, npc_id: SHOP_SERVICES_SELLER_SAMPLE.shop.provider_id },
     ]);
     const requestId = sent("shop.sell")[0].request_id;
     commitTrade(requestId, {
@@ -166,6 +211,8 @@ describe("the shop window in AppClient (webclient-shop-window)", () => {
         rows: [],
       },
     });
+    await wrapper.vm.$nextTick();
+    settleServicesReads();
     await wrapper.vm.$nextTick();
     expect(get("shop-window__purse").text()).toBe("1,330 銅");
     expect(store.view.panels.party_inventory.purse).toBe(1330);
@@ -196,5 +243,66 @@ describe("the shop window in AppClient (webclient-shop-window)", () => {
     await wrapper.vm.$nextTick();
     expect(store.view.hudDrawer).toBe(null);
     expect(wrapper.find('[data-testid="shop-window"]').exists()).toBe(false);
+  });
+
+  it("reads the provider whose card opened the drawer, not the summary's other NPC", async () => {
+    await mountWith({ services: SHOP_SERVICES_SAMPLE, party: SHOP_PARTY_SAMPLE });
+    await get("hud-drawer-close").trigger("click");
+    await wrapper.vm.$nextTick();
+    // The room summary names one merchant; the presence card names another.
+    const summaryProvider = store.view.panels.services.shop.provider_id;
+    expect(summaryProvider).not.toBe(7);
+    store.activatePresence("target-7");
+    await wrapper.vm.$nextTick();
+    expect(store.view.presenceCard).toMatchObject({ kind: "verbs", identity: 7 });
+    const before = sent("services.open").length;
+    store.openHudDrawer("shop");
+    await wrapper.vm.$nextTick();
+    expect(sent("services.open").slice(before).map((envelope) => envelope.payload)).toEqual([
+      { npc_id: 7 },
+    ]);
+  });
+
+  it("states a pending surface while its first read waits for the single-action store", async () => {
+    await mountWith({ services: SHOP_SERVICES_SAMPLE, party: SHOP_PARTY_SAMPLE });
+    await get("hud-drawer-close").trigger("click");
+    await wrapper.vm.$nextTick();
+    // Another action holds the store, so the entry read cannot dispatch yet.
+    expect(store.dispatchAction("explore.wait", { daypart: "dusk" })).not.toBe(null);
+    await wrapper.vm.$nextTick();
+    const before = sent("services.open").length;
+    store.openHudDrawer("shop");
+    await wrapper.vm.$nextTick();
+    expect(sent("services.open")).toHaveLength(before);
+    const unavailable = get("shop-window__unavailable");
+    expect(unavailable.attributes("data-reason-code")).toBe("services_pending");
+    // The room summary's rows are never offered for a targeted drawer.
+    expect(wrapper.find('[data-testid="shop-rows__row--steel_shortsword"]').exists()).toBe(false);
+  });
+
+  it("states a refused provider read instead of the room summary's other provider", async () => {
+    await mountWith({ services: SHOP_SERVICES_SAMPLE, party: SHOP_PARTY_SAMPLE });
+    expect(wrapper.find('[data-testid="shop-rows__row--steel_shortsword"]').exists()).toBe(true);
+    // A purchase commits, so the open drawer reads its provider again…
+    const revision = store.view.revision + 1;
+    store.receive(1, "ui_update", [fx.update({ revision, panels: {} })]);
+    await wrapper.vm.$nextTick();
+    const refresh = sent("services.open").at(-1);
+    // …and the provider has left: the drawer states that refusal and never
+    // falls back to the room summary the committed panels still carry.
+    store.receive(1, "ui_action_result", [
+      fx.actionResult({
+        request_id: refresh.request_id,
+        outcome: "rejected",
+        code: "no_such_target",
+        message: "這裡沒有這個對象。",
+        presentation_revision: revision,
+      }),
+    ]);
+    await wrapper.vm.$nextTick();
+    const unavailable = get("shop-window__unavailable");
+    expect(unavailable.attributes("data-reason-code")).toBe("no_such_target");
+    expect(unavailable.text()).toBe("這裡沒有這個對象。");
+    expect(wrapper.find('[data-testid="shop-rows__row--steel_shortsword"]').exists()).toBe(false);
   });
 });

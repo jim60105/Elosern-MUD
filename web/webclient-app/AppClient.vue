@@ -45,6 +45,8 @@ import { companionRows, portraitFor } from "./components/party-helpers.js";
 import PartyWindow from "./components/PartyWindow.vue";
 import { usePartyWindow } from "./composables/use-party-window.js";
 import { useMapDrawer } from "./composables/use-map-drawer.js";
+import { useServicesOpen } from "./composables/use-services-open.js";
+import Protocol from "../static/webclient/js/elosern/protocol.js";
 import { useWindowHotkeys } from "./composables/use-window-hotkeys.js";
 import ObjectiveTracker from "./components/ObjectiveTracker.vue";
 import DesktopNavigation from "./components/DesktopNavigation.vue";
@@ -124,6 +126,72 @@ const {
 const {
   mapTab, mapMemory, mapEpoch, mapBusy, mapOpening, mapWorldReady, onMapDrawerMove,
 } = useMapDrawer(store, { onMapMove });
+// The two provider drawers (npc-targeted-service-flows): each opened drawer
+// reads its selected provider once through `services.open` and renders that
+// correlated snapshot. A drawer that is not targeted (no NPC to name) keeps
+// the room summary; a targeted one shows only its own read — while the first
+// read is in flight and after a refusal it states an unavailable surface
+// instead, so a flow opened for one provider can never be completed against
+// another.
+const { openServices, closeServices, slots: servicesSlots } =
+  useServicesOpen(store, { dispatchIntent });
+function servicesFor(slot) {
+  const state = servicesSlots.value[slot];
+  if (!state) return panel("services");
+  if (state.snapshot) return state.snapshot;
+  const reason = state.refusal ?? {
+    code: "services_pending",
+    message: "正在讀取服務資訊。",
+  };
+  return {
+    schema_version: Protocol.SERVICES_SCHEMA_VERSION,
+    available: false,
+    kind: "services",
+    reason: {
+      code: reason.code || "services_unavailable",
+      message: reason.message || "服務資訊暫時無法讀取。",
+    },
+  };
+}
+const shopServices = computed(() => servicesFor("shop"));
+const counterServices = computed(() => servicesFor("counter"));
+// The NPC whose verb card opened the drawer is the selected provider; the
+// room summary's own discovery stands in only when no card named one. The
+// identity is a selection hint for the read; the server revalidates it.
+function presenceProviderId() {
+  const identity = store.view.presenceCard?.identity;
+  return Number.isSafeInteger(identity) && identity > 0 ? identity : null;
+}
+watch(
+  () => store.view.hudDrawer,
+  (drawer) => {
+    if (drawer === "shop") {
+      const provider = panel("services")?.shop?.provider_id;
+      openServices(
+        "shop",
+        presenceProviderId() ?? (Number.isSafeInteger(provider) ? provider : null),
+      );
+      closeServices("counter");
+      return;
+    }
+    if (drawer === "quest") {
+      const guildProvider = panel("services")?.guild?.provider_id;
+      const rankProvider = panel("services")?.rank?.provider_id;
+      const summaryProvider = Number.isSafeInteger(guildProvider)
+        ? guildProvider
+        : rankProvider;
+      openServices(
+        "counter",
+        presenceProviderId() ?? (Number.isSafeInteger(summaryProvider) ? summaryProvider : null),
+      );
+      closeServices("shop");
+      return;
+    }
+    closeServices("shop");
+    closeServices("counter");
+  },
+  { immediate: true },
+);
 // The party window (webclient-party-window-member-tab): its openers, the one
 // `party.view_member` per rail or bag item selection (webclient-party-bag-
 // tab) and the pending entry or item.
@@ -1452,7 +1520,7 @@ const rootStyle = computed(() => {
          member. -->
     <ShopWindow
       v-if="store.view.hudDrawer === 'shop'"
-      :services="panel('services')"
+      :services="shopServices"
       :party="panel('party')"
       :item-holdings="panel('item_holdings')"
       :character="panel('character')"
@@ -1479,7 +1547,7 @@ const rootStyle = computed(() => {
       <QuestDrawer
         v-else-if="store.view.hudDrawer === 'quest'"
         :quest-log="panel('quest_log')"
-        :services="panel('services')"
+        :services="counterServices"
         :memory-scope="`${store.view.generation}|${store.view.epoch}`"
         @action="onQuestAction"
       />

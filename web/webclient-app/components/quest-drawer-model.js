@@ -88,8 +88,10 @@ export function turninHot(groups, counterRows) {
   return (groups.completed ?? []).some((row) => counterRows.get(row.quest_id)?.turnin?.enabled === true);
 }
 
-// The guild counter tab: enabled only with a usable guild section; otherwise
-// disabled with the panel's own reason or the fixed clerk line.
+// The guild counter tab: enabled with a usable guild section OR an independent
+// rank surface (a reception-only counter has no board, but its rank card and
+// exam request are still reachable); otherwise disabled with the panel's own
+// reason or the fixed clerk line.
 export function counterTab(services) {
   if (services && services.available === false) {
     return {
@@ -98,7 +100,7 @@ export function counterTab(services) {
       reasonCode: services.reason?.code ?? null,
     };
   }
-  if (services && services.guild != null) {
+  if (services && (services.guild != null || services.rank != null)) {
     return { enabled: true, reason: null, reasonCode: null };
   }
   return { enabled: false, reason: COUNTER_CLERK_REASON, reasonCode: null };
@@ -207,15 +209,19 @@ export function bookDetail(row) {
   };
 }
 
-function mirrored(descriptor, questId) {
-  return { action_id: descriptor.action_id, label: descriptor.label, payload: { quest_id: questId } };
+// One counter-row action names its exact provider; without one (a private
+// escort's own descriptor) the payload stays host-free.
+function mirrored(descriptor, questId, providerId) {
+  const payload = { quest_id: questId };
+  if (Number.isSafeInteger(providerId) && providerId > 0) payload.npc_id = providerId;
+  return { action_id: descriptor.action_id, label: descriptor.label, payload };
 }
 
 // The action bar (design §3.8). Tracking renders for in-progress rows from
 // the row's own descriptor; abandon and turn-in render only from the matched
 // counter row's enabled descriptor. A row without an enabled action states
 // why, from the counter's reason first.
-export function bookActions(row, counterRow) {
+export function bookActions(row, counterRow, counterProviderId = null) {
   const result = { track: null, abandon: null, turnin: null, accept: null, reason: null };
   if (!row) return result;
   if (row.state === "in_progress") {
@@ -230,12 +236,15 @@ export function bookActions(row, counterRow) {
         reason: row.track.enabled ? null : (row.track.disabled_reason?.message ?? null),
       };
     }
-    // A host-independent private-escort abandon rides the row itself; an
-    // ordinary guild counter quest keeps its service-owned descriptor.
-    const abandon = row.abandon ?? counterRow?.abandon;
-    if (abandon?.enabled) {
-      result.abandon = mirrored(abandon, row.quest_id);
-    } else if (abandon) {
+    // A host-independent private-escort abandon rides the row itself and keeps
+    // its `{quest_id}` shape; an ordinary guild counter quest uses its
+    // service-owned descriptor, which names that staff provider.
+    if (row.abandon?.enabled) {
+      result.abandon = mirrored(row.abandon, row.quest_id, null);
+    } else if (counterRow?.abandon?.enabled) {
+      result.abandon = mirrored(counterRow.abandon, row.quest_id, counterProviderId);
+    } else if (row.abandon || counterRow?.abandon) {
+      const abandon = row.abandon ?? counterRow?.abandon;
       result.reason = abandon.disabled_reason?.message ?? null;
     }
     if (!result.reason && result.track?.reason) result.reason = result.track.reason;
@@ -250,7 +259,7 @@ export function bookActions(row, counterRow) {
   if (row.state === "completed") {
     const turnin = counterRow?.turnin;
     if (turnin?.enabled) {
-      result.turnin = mirrored(turnin, row.quest_id);
+      result.turnin = mirrored(turnin, row.quest_id, counterProviderId);
     } else if (turnin?.disabled_reason?.message) {
       result.reason = turnin.disabled_reason.message;
     } else if (row.reward_claimed === true) {
@@ -376,9 +385,10 @@ export function offerDetail(row, branchLabel) {
   };
 }
 
-// The offer's accept descriptor as the primary action; a disabled one keeps
-// its control (aria-disabled) and states its reason.
-export function offerActions(row) {
+// The offer's accept descriptor as the primary action, naming its exact staff
+// provider; a disabled one keeps its control (aria-disabled) and states its
+// reason.
+export function offerActions(row, providerId = null) {
   const result = { track: null, abandon: null, turnin: null, accept: null, reason: null };
   const accept = row?.accept;
   if (!accept) return result;
@@ -386,7 +396,9 @@ export function offerActions(row) {
     enabled: accept.enabled === true,
     label: accept.label,
     action_id: accept.action_id,
-    payload: { definition_key: row.definition_key },
+    payload: Number.isSafeInteger(providerId) && providerId > 0
+      ? { definition_key: row.definition_key, npc_id: providerId }
+      : { definition_key: row.definition_key },
   };
   if (!result.accept.enabled) result.reason = accept.disabled_reason?.message ?? null;
   return result;

@@ -1,4 +1,4 @@
-"""Exact schema-version-7 ``services`` panel and presenter (webclient-service-menus).
+"""Exact schema-version-8 ``services`` panel and presenter (webclient-service-menus).
 
 The presenter serializes the frozen no-mutation services view owned by
 ``world.rules.service_view`` and validates its own output against the exact
@@ -9,11 +9,11 @@ summary) cannot be read without mutation, it raises
 form; a failure confined to one surface is serialized as that surface's
 ``null`` while the rest of the panel stays available.
 
-Version 7 (services-shop-structured-rows) carries no personal inventory (the
-``party_inventory`` panel owns it): the shop section names the session's
-viewed party member, stock rows carry the registry presentation, the buy price
-only, and that member's held count and server equipment delta, and sellable
-rows list that member's unequipped copies with the sell price only.
+Version 8 (npc-targeted-service-flows) keeps the shop rows of version 7 and
+makes every service section name its exact provider: ``guild``, ``rank`` and
+``shop`` each carry a positive ``provider_id`` dbref, and the rank surface is
+an independent top-level section (it requires only its examination reception,
+never guild staff). No section is derived from display-only host metadata.
 
 The payload shape and the exact shared bounds are mirrored by the client
 validator in ``web/static/webclient/js/elosern/protocol.js`` and guarded by a
@@ -60,7 +60,7 @@ from world.rules.service_view import (
     build_services_view,
 )
 
-SERVICES_SCHEMA_VERSION = 7
+SERVICES_SCHEMA_VERSION = 8
 
 # Exact shared bounds (design D4) -- must stay equal in the JS validator.
 MAX_BOARD_ROWS = 12
@@ -128,6 +128,12 @@ def _validate_host_identity(value: Any) -> str:
     if not value.isascii():
         raise ProtocolValidationError("host.identity must be ASCII")
     return value
+
+
+def _validate_provider_id(value: dict[str, Any], section: str) -> int:
+    """Validate one section's positive JavaScript-safe provider dbref."""
+    del section
+    return _require_int(value, "provider_id", minimum=1, maximum=MAX_SAFE_INTEGER)
 
 
 def _validate_action(value: Any) -> dict[str, Any]:
@@ -358,9 +364,18 @@ def _validate_rank(value: Any) -> dict[str, Any]:
     _require_exact_fields(
         value,
         "rank",
-        {"rank", "merit", "next_rank", "next_threshold", "merit_qualified", "exam_request"},
+        {
+            "provider_id",
+            "rank",
+            "merit",
+            "next_rank",
+            "next_threshold",
+            "merit_qualified",
+            "exam_request",
+        },
         {},
     )
+    provider_id = _validate_provider_id(value, "rank")
     rank = value["rank"]
     if rank is not None:
         rank = _require_str(value, "rank", maximum=MAX_RANK_KEY_CODE_POINTS)
@@ -382,6 +397,7 @@ def _validate_rank(value: Any) -> dict[str, Any]:
     if exam_request["action_id"] != EXAM_ACTION:
         raise ProtocolValidationError("rank exam_request must be guild.exam_request")
     return {
+        "provider_id": provider_id,
         "rank": rank,
         "merit": merit,
         "next_rank": next_rank,
@@ -392,7 +408,13 @@ def _validate_rank(value: Any) -> dict[str, Any]:
 
 
 def _validate_guild(value: Any) -> dict[str, Any]:
-    _require_exact_fields(value, "guild", {"branch_label", "rank_ladder", "registration", "board", "quests", "rank"}, {})
+    _require_exact_fields(
+        value,
+        "guild",
+        {"provider_id", "branch_label", "rank_ladder", "registration", "board", "quests"},
+        {},
+    )
+    provider_id = _validate_provider_id(value, "guild")
     branch_label = _require_str(value, "branch_label", maximum=256)
     if not branch_label.strip():
         raise ProtocolValidationError("branch_label must be non-empty")
@@ -414,15 +436,16 @@ def _validate_guild(value: Any) -> dict[str, Any]:
     if not isinstance(quests, list) or len(quests) > MAX_QUEST_ROWS:
         raise ProtocolValidationError(f"quests must be a list of at most {MAX_QUEST_ROWS} rows")
     quests = [_validate_quest_row(row) for row in quests]
-    rank = value["rank"]
-    if rank is not None:
-        rank = _validate_rank(rank)
-    rank_keys = [row["rank"] for row in board]
-    if rank is not None:
-        rank_keys.extend(key for key in (rank["rank"], rank["next_rank"]) if key is not None)
-    if any(key not in ladder for key in rank_keys):
+    if any(row["rank"] not in ladder for row in board):
         raise ProtocolValidationError("guild ranks must belong to rank_ladder")
-    return {"branch_label": branch_label, "rank_ladder": list(ladder), "registration": registration, "board": board, "quests": quests, "rank": rank}
+    return {
+        "provider_id": provider_id,
+        "branch_label": branch_label,
+        "rank_ladder": list(ladder),
+        "registration": registration,
+        "board": board,
+        "quests": quests,
+    }
 
 
 def _validate_row_identity(value: Any, row: str) -> tuple[str, str]:
@@ -509,7 +532,13 @@ def _validate_sellable_row(value: Any) -> dict[str, Any]:
 
 
 def _validate_shop(value: Any) -> dict[str, Any]:
-    _require_exact_fields(value, "shop", {"open", "member_id", "stock", "sellable"}, {})
+    _require_exact_fields(
+        value,
+        "shop",
+        {"provider_id", "open", "member_id", "stock", "sellable"},
+        {},
+    )
+    provider_id = _validate_provider_id(value, "shop")
     open_now = _require_bool(value, "open")
     member_id = _require_int(value, "member_id", minimum=1, maximum=MAX_SAFE_INTEGER)
     stock = value["stock"]
@@ -522,7 +551,13 @@ def _validate_shop(value: Any) -> dict[str, Any]:
             f"sellable must be a list of at most {MAX_SELLABLE_ROWS} rows"
         )
     sellable = [_validate_sellable_row(row) for row in sellable]
-    return {"open": open_now, "member_id": member_id, "stock": stock, "sellable": sellable}
+    return {
+        "provider_id": provider_id,
+        "open": open_now,
+        "member_id": member_id,
+        "stock": stock,
+        "sellable": sellable,
+    }
 
 
 def _validate_presentation_identifier(value: dict[str, Any], field: str) -> str:
@@ -591,6 +626,7 @@ def validate_services(payload: Any) -> dict[str, Any]:
             "host",
             "player",
             "guild",
+            "rank",
             "shop",
             "pagination",
         },
@@ -645,6 +681,15 @@ def validate_services(payload: Any) -> dict[str, Any]:
         )
 
     guild = None if payload["guild"] is None else _validate_guild(payload["guild"])
+    rank = None if payload["rank"] is None else _validate_rank(payload["rank"])
+    if guild is not None and rank is not None:
+        # The rank surface is independent of guild staff; when both ship, its
+        # grades still belong to the branch's ladder.
+        for key in (rank["rank"], rank["next_rank"]):
+            if key is not None and key not in guild["rank_ladder"]:
+                raise ProtocolValidationError(
+                    "rank grades must belong to the guild rank_ladder"
+                )
     shop = None if payload["shop"] is None else _validate_shop(payload["shop"])
     pagination = _validate_pagination(payload["pagination"])
     _validate_pagination_totals(pagination, guild, shop)
@@ -663,6 +708,7 @@ def validate_services(payload: Any) -> dict[str, Any]:
             "next_threshold": next_threshold,
         },
         "guild": guild,
+        "rank": rank,
         "shop": shop,
         "pagination": pagination,
     }
@@ -767,6 +813,7 @@ def _serialize_quest_row(row: QuestRowView) -> dict[str, Any]:
 
 def _serialize_rank(rank: RankView) -> dict[str, Any]:
     return {
+        "provider_id": rank.provider_id,
         "rank": rank.rank,
         "merit": rank.merit,
         "next_rank": rank.next_rank,
@@ -778,12 +825,12 @@ def _serialize_rank(rank: RankView) -> dict[str, Any]:
 
 def _serialize_guild(guild: GuildSectionView) -> dict[str, Any]:
     return {
+        "provider_id": guild.provider_id,
         "branch_label": guild.branch_label,
         "rank_ladder": list(guild.rank_ladder),
         "registration": _serialize_registration(guild.registration),
         "board": [_serialize_board_row(row) for row in guild.board],
         "quests": [_serialize_quest_row(row) for row in guild.quests],
-        "rank": None if guild.rank is None else _serialize_rank(guild.rank),
     }
 
 
@@ -816,6 +863,7 @@ def _serialize_sellable_row(row: SellableRowView) -> dict[str, Any]:
 
 def _serialize_shop(shop: ShopSectionView) -> dict[str, Any]:
     return {
+        "provider_id": shop.provider_id,
         "open": shop.open,
         "member_id": shop.member_id,
         "stock": [_serialize_stock_row(row) for row in shop.stock],
@@ -863,6 +911,7 @@ def _serialize(view: ServicesView) -> dict[str, Any]:
         ),
         "player": _serialize_player(view.player),
         "guild": None if view.guild is None else _serialize_guild(view.guild),
+        "rank": None if view.rank is None else _serialize_rank(view.rank),
         "shop": None if view.shop is None else _serialize_shop(view.shop),
         "pagination": {
             "board_total": view.pagination.board_total,
@@ -873,23 +922,17 @@ def _serialize(view: ServicesView) -> dict[str, Any]:
     }
 
 
-def services_presenter(context: PresentationContext) -> dict[str, Any]:
-    """Return the exact available ``services`` panel for the authenticated puppet.
+def build_services_payload(
+    actor: Any, viewed: Any = None, *, provider_id: int | None = None
+) -> dict[str, Any]:
+    """Serialize and validate one exact services payload.
 
-    Exploration mode ships every surface normally; an active combat session
-    keeps the canonical player summary while the read model itself forces
-    host, guild, and shop null. The shop rows follow the session's viewed
-    party member (``party.view_member``), falling back to the commander.
-    Creation-pending puppets and read-model failures use the common
-    unavailable form.
+    ``provider_id`` selects one exact NPC (the ``services.open`` read); without
+    it the room's providers are discovered as before. A surface failure
+    degrades alone, and an over-envelope shop degrades on its own rather than
+    taking the guild, rank and summary down with it.
     """
-    actor = context.actor
-    if bool(getattr(actor, "creation_pending", False)):
-        raise PanelUnavailableError
-    try:
-        view = build_services_view(actor, viewed=resolve_viewed_member(context))
-    except ServicesViewError:
-        raise PanelUnavailableError
+    view = build_services_view(actor, viewed=viewed, provider_id=provider_id)
     payload = _serialize(view)
     if view.shop is not None and json_byte_size(payload) > MAX_CANONICAL_JSON_BYTES:
         # A full guild board beside twelve rich shop rows can exceed the OOB
@@ -903,6 +946,25 @@ def services_presenter(context: PresentationContext) -> dict[str, Any]:
         )
         payload = _serialize(view)
     return validate_services(payload)
+
+
+def services_presenter(context: PresentationContext) -> dict[str, Any]:
+    """Return the exact available ``services`` panel for the authenticated puppet.
+
+    Exploration mode ships every surface normally; an active combat session
+    keeps the canonical player summary while the read model itself forces
+    host, guild, rank, and shop null. The shop rows follow the session's viewed
+    party member (``party.view_member``), falling back to the commander.
+    Creation-pending puppets and read-model failures use the common
+    unavailable form.
+    """
+    actor = context.actor
+    if bool(getattr(actor, "creation_pending", False)):
+        raise PanelUnavailableError
+    try:
+        return build_services_payload(actor, viewed=resolve_viewed_member(context))
+    except ServicesViewError:
+        raise PanelUnavailableError
 
 
 __all__ = [
@@ -933,6 +995,7 @@ __all__ = [
     "ServicesPanelError",
     "TRACK_ACTION",
     "TURNIN_ACTION",
+    "build_services_payload",
     "services_presenter",
     "serialize_item_presentation",
     "validate_services",

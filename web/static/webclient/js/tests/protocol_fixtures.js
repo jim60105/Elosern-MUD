@@ -273,7 +273,7 @@ function validServicesSellableRow(overrides) {
 function validServicesPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 7,
+      schema_version: 8,
       available: true,
       kind: "services",
       host: null,
@@ -286,6 +286,7 @@ function validServicesPanel(overrides) {
         next_threshold: null,
       },
       guild: {
+        provider_id: 61,
         branch_label: "合成公會分行",
         rank_ladder: ["F", "E", "D", "C", "B", "A", "S"],
         registration: {
@@ -294,8 +295,8 @@ function validServicesPanel(overrides) {
         },
         board: [],
         quests: [],
-        rank: null,
       },
+      rank: null,
       shop: null,
       pagination: {
         board_total: 0,

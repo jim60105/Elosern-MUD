@@ -21,7 +21,7 @@ test("validates the services panel available/unavailable discriminator", () => {
     validServicesPanel()
   );
   const unavailable = {
-    schema_version: 7,
+    schema_version: 8,
     available: false,
     reason: { code: "services_unavailable", message: "服務選單目前無法顯示" },
   };
@@ -63,6 +63,7 @@ test("services panel rejects unknown-surface and malformed fields", () => {
 test("services panel enforces quantity bounds and unknown-node-style rejection", () => {
   const panel = validServicesPanel({
     shop: {
+      provider_id: 62,
       open: true,
       member_id: 7,
       stock: [validServicesStockRow({ buy: validServicesAction({ action_id: "shop.buy" }) })],
@@ -73,6 +74,7 @@ test("services panel enforces quantity bounds and unknown-node-style rejection",
   assert.throws(() => Protocol.validateServicesPanel(panel), /quantity bounds/);
   const panel2 = validServicesPanel({
     shop: {
+      provider_id: 62,
       open: true,
       member_id: 7,
       stock: [
@@ -90,6 +92,7 @@ test("services panel enforces quantity bounds and unknown-node-style rejection",
   assert.throws(() => Protocol.validateServicesPanel(panel2), /quantity/);
   const booleanQuantity = validServicesPanel({
     shop: {
+      provider_id: 62,
       open: true,
       member_id: 7,
       stock: [
@@ -124,7 +127,7 @@ test("services panel enforces row ceilings for every surface", () => {
   assert.throws(() =>
     Protocol.validateServicesPanel(
       validServicesPanel({
-        shop: { open: true, member_id: 7, stock, sellable: [] },
+        shop: { provider_id: 62, open: true, member_id: 7, stock, sellable: [] },
         pagination: { ...validServicesPanel().pagination, stock_total: stock.length },
       })
     )
@@ -141,12 +144,12 @@ test("services panel pagination must match shipped rows and null surfaces", () =
   );
   const withRows = validServicesPanel({
     guild: {
+      provider_id: 61,
       branch_label: "合成公會分行",
       rank_ladder: ["F", "E", "D", "C", "B", "A", "S"],
       registration: { registered: true, register: validServicesAction({ enabled: false, disabled_reason: { code: "already_registered", message: "你已經是冒險者了。" } }) },
       board: [validServicesBoardRow()],
       quests: [validServicesQuestRow()],
-      rank: null,
     },
     player: {
       wallet: 1000,

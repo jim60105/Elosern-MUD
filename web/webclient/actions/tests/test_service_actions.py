@@ -1,6 +1,6 @@
 """Service action adapter and dispatcher integration tests (tasks 3.3-3.4).
 
-Exercises every one of the seven production service adapters against real
+Exercises every one of the eight production service adapters against real
 Evennia state: success, every deterministic domain rejection, idempotent
 re-registration, tampered identities rejected before the domain API,
 dispatcher-level stale and duplicate handling, host disappearance between
@@ -300,7 +300,7 @@ class ServiceActionBase(BattlefieldIsolation, EvenniaTest):
 class ServiceAdapterTests(ServiceActionBase):
     @covers_requirement("webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative")
     def test_guild_register_success(self):
-        result = _guild_register_adapter(self.player, {})
+        result = _guild_register_adapter(self.player, {"npc_id": self.staff.pk})
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "registered")
         self.assertEqual(result["affected_panels"], ("status", "services"))
@@ -309,19 +309,19 @@ class ServiceAdapterTests(ServiceActionBase):
 
     @covers_requirement("webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative")
     def test_guild_register_is_idempotent(self):
-        first = _guild_register_adapter(self.player, {})
+        first = _guild_register_adapter(self.player, {"npc_id": self.staff.pk})
         self.assertEqual(first["outcome"], "success")
         before = dict(self.player.db.guild_registration or {})
         self.player.db.wallet = 500
-        second = _guild_register_adapter(self.player, {})
+        second = _guild_register_adapter(self.player, {"npc_id": self.staff.pk})
         self.assertEqual(second["outcome"], "success")
         self.assertEqual(self.player.db.guild_registration, before)
 
     def test_guild_register_rejects_without_local_staff(self):
         self.player.location = self.store
-        result = _guild_register_adapter(self.player, {})
+        result = _guild_register_adapter(self.player, {"npc_id": self.staff.pk})
         self.assertEqual(result["outcome"], "rejected")
-        self.assertEqual(result["code"], "no_staff")
+        self.assertEqual(result["code"], "no_such_target")
         self.assertIsNone(self.player.db.guild_registration)
 
     @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
@@ -330,7 +330,7 @@ class ServiceAdapterTests(ServiceActionBase):
         self.merchant_npc.db.schedule_state = "busy"
         result = _buy_adapter(
             self.player,
-            {"item_key": _T_MEAL, "quantity": 2, "recipient_id": self.player.pk},
+            {"item_key": _T_MEAL, "quantity": 2, "recipient_id": self.player.pk, "npc_id": self.merchant_npc.pk},
         )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "schedule_blocked")
@@ -345,7 +345,7 @@ class ServiceAdapterTests(ServiceActionBase):
         self.merchant_npc.db.schedule_state = "resting"
         result = _sell_adapter(
             self.player,
-            {"item_key": _T_MEAL, "quantity": 1, "seller_id": self.player.pk},
+            {"item_key": _T_MEAL, "quantity": 1, "seller_id": self.player.pk, "npc_id": self.merchant_npc.pk},
         )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "schedule_blocked")
@@ -357,7 +357,7 @@ class ServiceAdapterTests(ServiceActionBase):
     @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
     def test_busy_staff_rejects_register_without_state_change(self):
         self.staff.db.schedule_state = "busy"
-        result = _guild_register_adapter(self.player, {})
+        result = _guild_register_adapter(self.player, {"npc_id": self.staff.pk})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "schedule_blocked")
         self.assertIsNone(self.player.db.guild_registration)
@@ -374,7 +374,7 @@ class ServiceAdapterTests(ServiceActionBase):
 
         apply_quest_log_replacement(self.player, [completed])
         self.staff.db.schedule_state = "busy"
-        result = _quest_turnin_adapter(self.player, {"quest_id": record.quest_id})
+        result = _quest_turnin_adapter(self.player, {"quest_id": record.quest_id, "npc_id": self.staff.pk})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "schedule_blocked")
         self.assertEqual(self.player.db.wallet, 1000)
@@ -385,7 +385,7 @@ class ServiceAdapterTests(ServiceActionBase):
         self._register()
         self.staff.db.schedule_state = "resting"
         result = _quest_accept_adapter(
-            self.player, {"definition_key": _T_BOARD_QUEST}
+            self.player, {"definition_key": _T_BOARD_QUEST, "npc_id": self.staff.pk}
         )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "schedule_blocked")
@@ -395,14 +395,14 @@ class ServiceAdapterTests(ServiceActionBase):
     def test_busy_counter_rejects_exam_request_without_a_session(self):
         self._register()
         self.reception.db.schedule_state = "busy"
-        result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK})
+        result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK, "npc_id": self.reception.pk})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "schedule_blocked")
         self.assertIsNone(self.player.db.active_combat)
 
     def test_quest_accept_success_and_log_update(self):
         self._register()
-        result = _quest_accept_adapter(self.player, {"definition_key": _T_BOARD_QUEST})
+        result = _quest_accept_adapter(self.player, {"definition_key": _T_BOARD_QUEST, "npc_id": self.staff.pk})
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(
             result["affected_panels"], ("services", "objectives", "quest_log")
@@ -413,13 +413,13 @@ class ServiceAdapterTests(ServiceActionBase):
 
     def test_quest_accept_rejects_unknown_definition(self):
         self._register()
-        result = _quest_accept_adapter(self.player, {"definition_key": "nope"})
+        result = _quest_accept_adapter(self.player, {"definition_key": "nope", "npc_id": self.staff.pk})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "board_access")
         self.assertEqual(read_records(self.player), [])
 
     def test_quest_accept_rejects_unregistered(self):
-        result = _quest_accept_adapter(self.player, {"definition_key": _T_BOARD_QUEST})
+        result = _quest_accept_adapter(self.player, {"definition_key": _T_BOARD_QUEST, "npc_id": self.staff.pk})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "board_access")
         self.assertEqual(read_records(self.player), [])
@@ -427,7 +427,7 @@ class ServiceAdapterTests(ServiceActionBase):
     def test_quest_abandon_fails_active_quest(self):
         self._register()
         record = accept_guild_offer(self.player, self.staff, _T_BOARD_QUEST)
-        result = _quest_abandon_adapter(self.player, {"quest_id": record.quest_id})
+        result = _quest_abandon_adapter(self.player, {"quest_id": record.quest_id, "npc_id": self.staff.pk})
         self.assertEqual(result["outcome"], "success")
         records = read_records(self.player)
         self.assertEqual(records[0].state, QuestState.FAILED)
@@ -435,7 +435,7 @@ class ServiceAdapterTests(ServiceActionBase):
     def test_quest_abandon_unknown_quest_rejected_without_mutation(self):
         self._register()
         before = list(self.player.db.quest_log or [])
-        result = _quest_abandon_adapter(self.player, {"quest_id": "missing:1"})
+        result = _quest_abandon_adapter(self.player, {"quest_id": "missing:1", "npc_id": self.staff.pk})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "quest_not_found")
         self.assertEqual(list(self.player.db.quest_log or []), before)
@@ -450,13 +450,13 @@ class ServiceAdapterTests(ServiceActionBase):
         completed = fulfill_record(record, definition_for(record))
         self.player.db.quest_log = [to_storage(completed)]
         before_wallet = self.player.db.wallet
-        result = _quest_turnin_adapter(self.player, {"quest_id": completed.quest_id})
+        result = _quest_turnin_adapter(self.player, {"quest_id": completed.quest_id, "npc_id": self.staff.pk})
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "claimed")
         self.assertEqual(self.player.db.wallet, before_wallet + _T_OFFER_REWARD.copper)
         self.assertEqual(read_counter_trait(self.player, "guild_merit"), _T_OFFER_REWARD.merit)
         # A duplicate claim rejects without a second payout.
-        result = _quest_turnin_adapter(self.player, {"quest_id": completed.quest_id})
+        result = _quest_turnin_adapter(self.player, {"quest_id": completed.quest_id, "npc_id": self.staff.pk})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "already_claimed")
         self.assertEqual(self.player.db.wallet, before_wallet + _T_OFFER_REWARD.copper)
@@ -464,7 +464,7 @@ class ServiceAdapterTests(ServiceActionBase):
     def test_turnin_unknown_quest_rejected_without_mutation(self):
         self._register()
         before = self.player.db.wallet
-        result = _quest_turnin_adapter(self.player, {"quest_id": "ghost:1"})
+        result = _quest_turnin_adapter(self.player, {"quest_id": "ghost:1", "npc_id": self.staff.pk})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "no_completed_record")
         self.assertEqual(self.player.db.wallet, before)
@@ -481,7 +481,7 @@ class ServiceAdapterTests(ServiceActionBase):
             record = read_records(self.player)[0]
             completed = fulfill_record(record, definition_for(record))
             self.player.db.quest_log = [to_storage(completed)]
-            result = _quest_turnin_adapter(self.player, {"quest_id": completed.quest_id})
+            result = _quest_turnin_adapter(self.player, {"quest_id": completed.quest_id, "npc_id": self.staff.pk})
             self.assertEqual(result["code"], "claimed")
             # Ordered echo: reward summary first, then the grant line.
             self.assertIn("你回報了任務", messages[0])
@@ -498,7 +498,7 @@ class ServiceAdapterTests(ServiceActionBase):
             second_completed = fulfill_record(second, definition_for(second))
             self.player.db.quest_log = [to_storage(second_completed)]
             messages.clear()
-            result = _quest_turnin_adapter(self.player, {"quest_id": second_completed.quest_id})
+            result = _quest_turnin_adapter(self.player, {"quest_id": second_completed.quest_id, "npc_id": self.staff.pk})
             self.assertEqual(result["code"], "claimed")
         self.assertTrue(any("你回報了任務" in text for text in messages))
         self.assertFalse(any("獲得異名" in text for text in messages))
@@ -509,7 +509,7 @@ class ServiceAdapterTests(ServiceActionBase):
         self.player.db.wallet = 1000
         result = _buy_adapter(
             self.player,
-            {"item_key": _T_MEAL, "quantity": 2, "recipient_id": self.player.pk},
+            {"item_key": _T_MEAL, "quantity": 2, "recipient_id": self.player.pk, "npc_id": self.merchant_npc.pk},
         )
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "bought")
@@ -527,7 +527,7 @@ class ServiceAdapterTests(ServiceActionBase):
         before = list(self.player.db.inventory or [])
         result = _buy_adapter(
             self.player,
-            {"item_key": _T_MEAL, "quantity": 1, "recipient_id": self.player.pk},
+            {"item_key": _T_MEAL, "quantity": 1, "recipient_id": self.player.pk, "npc_id": self.merchant_npc.pk},
         )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "insufficient_funds")
@@ -539,7 +539,7 @@ class ServiceAdapterTests(ServiceActionBase):
         self.player.db.wallet = 10000
         result = _buy_adapter(
             self.player,
-            {"item_key": _T_POTION, "quantity": 4, "recipient_id": self.player.pk},
+            {"item_key": _T_POTION, "quantity": 4, "recipient_id": self.player.pk, "npc_id": self.merchant_npc.pk},
         )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "insufficient_stock")
@@ -549,7 +549,7 @@ class ServiceAdapterTests(ServiceActionBase):
         get_world_clock()._persist(TICK_NIGHT)
         result = _buy_adapter(
             self.player,
-            {"item_key": _T_MEAL, "quantity": 1, "recipient_id": self.player.pk},
+            {"item_key": _T_MEAL, "quantity": 1, "recipient_id": self.player.pk, "npc_id": self.merchant_npc.pk},
         )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "closed")
@@ -560,7 +560,7 @@ class ServiceAdapterTests(ServiceActionBase):
         self.player.db.inventory = [_T_MEAL, _T_MEAL]
         result = _sell_adapter(
             self.player,
-            {"item_key": _T_MEAL, "quantity": 1, "seller_id": self.player.pk},
+            {"item_key": _T_MEAL, "quantity": 1, "seller_id": self.player.pk, "npc_id": self.merchant_npc.pk},
         )
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "sold")
@@ -575,7 +575,7 @@ class ServiceAdapterTests(ServiceActionBase):
         self.player.db.inventory = [_T_MEAL]
         result = _sell_adapter(
             self.player,
-            {"item_key": _T_MEAL, "quantity": 2, "seller_id": self.player.pk},
+            {"item_key": _T_MEAL, "quantity": 2, "seller_id": self.player.pk, "npc_id": self.merchant_npc.pk},
         )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "insufficient_items")
@@ -586,7 +586,7 @@ class ServiceAdapterTests(ServiceActionBase):
         self.player.db.inventory = [_T_SWORD, _T_SWORD]
         result = _sell_adapter(
             self.player,
-            {"item_key": _T_SWORD, "quantity": 1, "seller_id": self.player.pk},
+            {"item_key": _T_SWORD, "quantity": 1, "seller_id": self.player.pk, "npc_id": self.merchant_npc.pk},
         )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "stock_overflow")
@@ -596,10 +596,10 @@ class ServiceAdapterTests(ServiceActionBase):
         self.player.location = self.hall
         result = _buy_adapter(
             self.player,
-            {"item_key": _T_MEAL, "quantity": 1, "recipient_id": self.player.pk},
+            {"item_key": _T_MEAL, "quantity": 1, "recipient_id": self.player.pk, "npc_id": self.merchant_npc.pk},
         )
         self.assertEqual(result["outcome"], "rejected")
-        self.assertEqual(result["code"], "no_merchant")
+        self.assertEqual(result["code"], "no_such_target")
 
     @covers_requirement(
         "webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative"
@@ -616,7 +616,7 @@ class ServiceAdapterTests(ServiceActionBase):
         join_party(companion, self.player)
         result = _buy_adapter(
             self.player,
-            {"item_key": _T_MEAL, "quantity": 2, "recipient_id": companion.pk},
+            {"item_key": _T_MEAL, "quantity": 2, "recipient_id": companion.pk, "npc_id": self.merchant_npc.pk},
         )
         self.assertEqual(result["outcome"], "success")
         floor, _ceiling = price_band(_T_MEAL)
@@ -630,7 +630,7 @@ class ServiceAdapterTests(ServiceActionBase):
         wallet_before = self.player.db.wallet
         result = _buy_adapter(
             self.player,
-            {"item_key": _T_MEAL, "quantity": 1, "recipient_id": outsider.pk},
+            {"item_key": _T_MEAL, "quantity": 1, "recipient_id": outsider.pk, "npc_id": self.merchant_npc.pk},
         )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "not_party_member")
@@ -655,7 +655,7 @@ class ServiceAdapterTests(ServiceActionBase):
         companion.db.inventory = [_T_MEAL, _T_MEAL]
         result = _sell_adapter(
             self.player,
-            {"item_key": _T_MEAL, "quantity": 1, "seller_id": companion.pk},
+            {"item_key": _T_MEAL, "quantity": 1, "seller_id": companion.pk, "npc_id": self.merchant_npc.pk},
         )
         self.assertEqual(result["outcome"], "success")
         floor, _ceiling = price_band(_T_MEAL)
@@ -679,6 +679,7 @@ class ServiceAdapterTests(ServiceActionBase):
                 "item_key": _T_MEAL,
                 "quantity": 2,
                 "recipient_id": companion.pk,
+                "npc_id": self.merchant_npc.pk,
             },
         )
         self.assertEqual(result["outcome"], "success")
@@ -705,6 +706,7 @@ class ServiceAdapterTests(ServiceActionBase):
                 "item_key": _T_MEAL,
                 "quantity": 1,
                 "recipient_id": self.player.pk,
+                "npc_id": self.merchant_npc.pk,
             },
         )
         self.assertEqual(result["outcome"], "success")
@@ -731,6 +733,7 @@ class ServiceAdapterTests(ServiceActionBase):
                 "item_key": _T_MEAL,
                 "quantity": 1,
                 "seller_id": companion.pk,
+                "npc_id": self.merchant_npc.pk,
             },
         )
         self.assertEqual(result["outcome"], "success")
@@ -761,6 +764,7 @@ class ServiceAdapterTests(ServiceActionBase):
                 "item_key": _T_MEAL,
                 "quantity": 1,
                 "recipient_id": outsider.pk,
+                "npc_id": self.merchant_npc.pk,
             },
         )
         self.assertEqual(forged["outcome"], "rejected")
@@ -771,6 +775,7 @@ class ServiceAdapterTests(ServiceActionBase):
                 "item_key": _T_MEAL,
                 "quantity": 1,
                 "recipient_id": companion.pk,
+                "npc_id": self.merchant_npc.pk,
             },
         )
         self.assertEqual(broke["outcome"], "rejected")
@@ -815,20 +820,23 @@ class ServiceAdapterTests(ServiceActionBase):
         commander_before = _state(self.player)
         companion_before = _state(companion)
         results = (
-            _guild_register_adapter(companion, {}),
-            _exam_request_adapter(companion, {"target_rank": _T_EXAM_RANK}),
+            _guild_register_adapter(companion, {"npc_id": self.staff.pk}),
+            _exam_request_adapter(companion, {"target_rank": _T_EXAM_RANK, "npc_id": self.reception.pk}),
             _quest_accept_adapter(
-                companion, {"definition_key": _T_BOARD_QUEST}
+                companion, {"definition_key": _T_BOARD_QUEST, "npc_id": self.staff.pk}
             ),
-            _quest_abandon_adapter(companion, {"quest_id": active_id}),
+            _quest_abandon_adapter(companion, {"quest_id": active_id, "npc_id": self.staff.pk}),
             _quest_track_adapter(companion, {"quest_id": active_id, "tracked": True}),
         )
+        # The mutation admission refuses a possessed body before any domain
+        # call: guild and reception operations are the player's own. Tracking
+        # is host-independent and simply finds nothing in the companion's log.
         self.assertEqual(
             [result["code"] for result in results],
             [
-                "not_a_player",
-                "not_a_player",
-                "board_access",
+                "possessed_service",
+                "possessed_service",
+                "possessed_service",
                 "quest_not_found",
                 "quest_not_found",
             ],
@@ -847,9 +855,9 @@ class ServiceAdapterTests(ServiceActionBase):
         completed = fulfill_record(records[0], definition_for(records[0]))
         self.player.db.quest_log = [to_storage(completed)]
         fulfilled_before = _state(self.player)
-        turnin = _quest_turnin_adapter(companion, {"quest_id": active_id})
+        turnin = _quest_turnin_adapter(companion, {"quest_id": active_id, "npc_id": self.staff.pk})
         self.assertEqual(turnin["outcome"], "rejected")
-        self.assertEqual(turnin["code"], "not_a_player")
+        self.assertEqual(turnin["code"], "possessed_service")
         self.assertEqual(_state(self.player), fulfilled_before)
         self.assertEqual(read_records(self.player)[0].quest_id, active_id)
         self.assertEqual(_state(companion), companion_before)
@@ -893,7 +901,7 @@ class ServiceAdapterTests(ServiceActionBase):
     def test_quest_track_rejects_terminal_quest(self):
         self._register()
         record = accept_guild_offer(self.player, self.staff, _T_BOARD_QUEST)
-        _quest_abandon_adapter(self.player, {"quest_id": record.quest_id})
+        _quest_abandon_adapter(self.player, {"quest_id": record.quest_id, "npc_id": self.staff.pk})
         result = _quest_track_adapter(
             self.player, {"quest_id": record.quest_id, "tracked": True}
         )
@@ -924,16 +932,16 @@ class ServiceAdapterTests(ServiceActionBase):
             {"item_key": _T_MEAL, "quantity": 1, "recipient_id": 1, "price": 5},
             {"item_key": _T_MEAL, "quantity": 1, "recipient_id": 1, "actor": "player"},
             {"item_key": _T_MEAL},
-            {"item_key": _T_MEAL, "quantity": 0, "recipient_id": 1},
-            {"item_key": _T_MEAL, "quantity": 1001, "recipient_id": 1},
-            {"item_key": _T_MEAL, "quantity": True, "recipient_id": 1},
-            {"item_key": _T_MEAL, "quantity": "3", "recipient_id": 1},
+            {"item_key": _T_MEAL, "quantity": 0, "recipient_id": 1, "npc_id": self.merchant_npc.pk},
+            {"item_key": _T_MEAL, "quantity": 1001, "recipient_id": 1, "npc_id": self.merchant_npc.pk},
+            {"item_key": _T_MEAL, "quantity": True, "recipient_id": 1, "npc_id": self.merchant_npc.pk},
+            {"item_key": _T_MEAL, "quantity": "3", "recipient_id": 1, "npc_id": self.merchant_npc.pk},
             {"item_key": _T_MEAL, "quantity": 1},
         ):
             with self.assertRaises(ServiceActionError, msg=bad):
                 validate_buy_payload(bad)
         for bad in (
-            {"item_key": _T_MEAL, "quantity": 1, "recipient_id": 1},
+            {"item_key": _T_MEAL, "quantity": 1, "recipient_id": 1, "npc_id": self.merchant_npc.pk},
             {"item_key": _T_MEAL, "quantity": 1, "seller_id": 1, "wallet": 5},
             {"item_key": _T_MEAL, "quantity": 1},
         ):
@@ -951,7 +959,7 @@ class ExamRequestTests(ServiceActionBase):
     def test_exam_request_fights_the_qualified_persistent_host(self):
         self._register()
         write_counter_trait(self.player, "guild_merit", _T_MERIT_THRESHOLD)
-        result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK})
+        result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK, "npc_id": self.reception.pk})
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(read_session(self.player).enemy_ids, (self.host.pk,))
 
@@ -981,7 +989,7 @@ class ExamRequestTests(ServiceActionBase):
             dict(self.player.traits.trait_data), self.host.relations.has_record(self.player),
             self.host.location.pk, self.host.attributes.get("exam_schedule_hold"),
         )
-        result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK})
+        result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK, "npc_id": self.reception.pk})
         self.assertEqual((result["outcome"], result["code"]), ("success", "exam_schedule"))
         # Read-only information: only the unchanged services panel republishes.
         self.assertEqual(result["affected_panels"], ("services",))
@@ -1006,27 +1014,27 @@ class ExamRequestTests(ServiceActionBase):
     def test_absent_host_without_a_confirmable_time_rejects(self):
         self._register()
         self.host.location = self.store
-        result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK})
+        result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK, "npc_id": self.reception.pk})
         self.assertEqual((result["outcome"], result["code"]), ("rejected", "attendance_unknown"))
         self.assertIsNone(self.player.db.active_combat)
 
     def test_exam_request_rejects_non_next_rank_before_domain(self):
         self._register()
         write_counter_trait(self.player, "guild_merit", 50)
-        result = _exam_request_adapter(self.player, {"target_rank": _T_LATER_EXAM_RANK})
+        result = _exam_request_adapter(self.player, {"target_rank": _T_LATER_EXAM_RANK, "npc_id": self.reception.pk})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "not_next_rank")
         self.assertIsNone(self.player.db.active_combat)
 
     def test_exam_request_rejects_below_threshold(self):
         self._register()
-        result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK})
+        result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK, "npc_id": self.reception.pk})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "below_threshold")
         self.assertIsNone(self.player.db.active_combat)
 
     def test_exam_request_rejects_unregistered(self):
-        result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK})
+        result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK, "npc_id": self.reception.pk})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "unregistered")
         self.assertIsNone(self.player.db.active_combat)
@@ -1035,15 +1043,15 @@ class ExamRequestTests(ServiceActionBase):
         self._register()
         write_counter_trait(self.player, "guild_merit", _T_MERIT_THRESHOLD)
         self.player.location = self.store
-        result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK})
+        result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK, "npc_id": self.reception.pk})
         self.assertEqual(result["outcome"], "rejected")
-        self.assertEqual(result["code"], "no_examiner")
+        self.assertEqual(result["code"], "no_such_target")
 
     @covers_requirement("webclient-service-menus::service-action-completion-updates-canonical-panels-and-preserves-narrative")
     def test_exam_request_transitions_to_guild_exam_combat_session(self):
         self._register()
         write_counter_trait(self.player, "guild_merit", _T_MERIT_THRESHOLD)
-        result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK})
+        result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK, "npc_id": self.reception.pk})
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "exam_started")
         self.assertEqual(
@@ -1058,8 +1066,8 @@ class ExamRequestTests(ServiceActionBase):
     def test_exam_request_rejects_while_active_session(self):
         self._register()
         write_counter_trait(self.player, "guild_merit", _T_MERIT_THRESHOLD)
-        _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK})
-        result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK})
+        _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK, "npc_id": self.reception.pk})
+        result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK, "npc_id": self.reception.pk})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "active_combat")
 
@@ -1118,7 +1126,7 @@ class ServiceDispatchTests(ServiceActionBase):
                 self._envelope(
                     coordinator,
                     "guild.register",
-                    {},
+                    {"npc_id": self.staff.pk},
                     base_revision=coordinator.revision - 1,
                 ),
                 self.action_registry,
@@ -1139,14 +1147,14 @@ class ServiceDispatchTests(ServiceActionBase):
             handle_ui_action(
                 self.session,
                 self.player,
-                self._envelope(coordinator, "guild.register", {}, request_id="dup1"),
+                self._envelope(coordinator, "guild.register", {"npc_id": self.staff.pk}, request_id="dup1"),
                 self.action_registry,
                 self.registry,
             )
             handle_ui_action(
                 self.session,
                 self.player,
-                self._envelope(coordinator, "guild.register", {}, request_id="dup1"),
+                self._envelope(coordinator, "guild.register", {"npc_id": self.staff.pk}, request_id="dup1"),
                 self.action_registry,
                 self.registry,
             )
@@ -1180,7 +1188,7 @@ class ServiceDispatchTests(ServiceActionBase):
             self._envelope(
                 coordinator,
                 "shop.buy",
-                {"item_key": _T_MEAL, "quantity": 2, "recipient_id": companion.pk},
+                {"item_key": _T_MEAL, "quantity": 2, "recipient_id": companion.pk, "npc_id": self.merchant_npc.pk},
             ),
             self.action_registry,
             self.registry,
@@ -1210,14 +1218,14 @@ class ServiceDispatchTests(ServiceActionBase):
             self._envelope(
                 coordinator,
                 "shop.buy",
-                {"item_key": _T_MEAL, "quantity": 1, "recipient_id": self.player.pk},
+                {"item_key": _T_MEAL, "quantity": 1, "recipient_id": self.player.pk, "npc_id": self.merchant_npc.pk},
             ),
             self.action_registry,
             self.registry,
         )
         result = self._last_result()
         self.assertEqual(result["outcome"], "rejected")
-        self.assertEqual(result["code"], "no_merchant")
+        self.assertEqual(result["code"], "no_such_target")
         self.assertEqual(self.player.db.wallet, 1000)
         self.assertEqual(list(self.player.db.inventory or []), [])
 
@@ -1242,6 +1250,7 @@ class ServiceDispatchTests(ServiceActionBase):
                     "item_key": _T_POTION,
                     "quantity": 1,
                     "recipient_id": self.player.pk,
+                    "npc_id": self.merchant_npc.pk,
                 },
             ),
             self.action_registry,
@@ -1267,7 +1276,7 @@ class ServiceDispatchTests(ServiceActionBase):
             self._envelope(
                 coordinator,
                 "shop.buy",
-                {"item_key": _T_MEAL, "quantity": 1, "recipient_id": self.player.pk},
+                {"item_key": _T_MEAL, "quantity": 1, "recipient_id": self.player.pk, "npc_id": self.merchant_npc.pk},
             ),
             self.action_registry,
             self.registry,
@@ -1354,3 +1363,286 @@ class ServiceDispatchTests(ServiceActionBase):
         self.assertTrue(rows[0]["tracked"])
         self.assertEqual(rows[0]["issuer"]["kind"], "guild")
         self.assertEqual(rows[0]["issuer"]["key"], f"guild:{BRANCH}")
+
+
+class TargetedSubmissionTests(ServiceActionBase):
+    """Provider-bound submissions revalidate the exact target at submit time."""
+
+    def _private_record(self, quest_id="t_private_escort:1"):
+        """One canonical private-escort record (a published package acceptance)."""
+        from world.quests.runtime import to_storage
+
+        accepted = accept_guild_offer(self.player, self.staff, _T_BOARD_QUEST)
+        return to_storage(
+            replace(
+                accepted,
+                quest_id=quest_id,
+                package_id="t_package",
+                group_id=None,
+                acceptance_sequence=None,
+            )
+        )
+
+    def _set_log(self, records):
+        self.player.db.quest_log = list(records)
+
+    @covers_requirement(
+        "webclient-service-menus::service-actions-reject-stale-duplicate-and-tampered-input-without-mutation"
+    )
+    def test_an_ordinary_record_refuses_the_host_free_shape(self):
+        self._register()
+        record = accept_guild_offer(self.player, self.staff, _T_BOARD_QUEST)
+        before = list(self.player.db.quest_log or [])
+        result = _quest_abandon_adapter(self.player, {"quest_id": record.quest_id})
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "abandon_target_mismatch")
+        self.assertEqual(list(self.player.db.quest_log or []), before)
+        self.assertIs(read_records(self.player)[0].state, QuestState.IN_PROGRESS)
+
+    @covers_requirement(
+        "webclient-service-menus::service-actions-reject-stale-duplicate-and-tampered-input-without-mutation"
+    )
+    def test_a_private_escort_refuses_the_provider_shape_and_keeps_its_host_free_path(self):
+        self._register()
+        self._set_log([self._private_record()])
+        before = list(self.player.db.quest_log or [])
+        refused = _quest_abandon_adapter(
+            self.player,
+            {"quest_id": "t_private_escort:1", "npc_id": int(self.staff.pk)},
+        )
+        self.assertEqual(refused["outcome"], "rejected")
+        self.assertEqual(refused["code"], "abandon_target_mismatch")
+        self.assertEqual(list(self.player.db.quest_log or []), before)
+        allowed = _quest_abandon_adapter(
+            self.player, {"quest_id": "t_private_escort:1"}
+        )
+        self.assertEqual(allowed["outcome"], "success")
+        self.assertIs(read_records(self.player)[0].state, QuestState.FAILED)
+
+    @covers_requirement(
+        "webclient-service-menus::service-actions-reject-stale-duplicate-and-tampered-input-without-mutation"
+    )
+    def test_an_ordinary_abandon_names_one_of_two_present_clerks(self):
+        self._register()
+        record = accept_guild_offer(self.player, self.staff, _T_BOARD_QUEST)
+        second = create_object(NPC, key="second clerk", location=self.hall)
+        second_component = GuildStaff.create(
+            second, service_id="staff_two", branch_key=BRANCH
+        )
+        second_component.service_binding = "place"
+        second_component.anchor_room_id = self.hall.pk
+        second.components.add(second_component)
+        result = _quest_abandon_adapter(
+            self.player, {"quest_id": record.quest_id, "npc_id": int(self.staff.pk)}
+        )
+        self.assertEqual(result["outcome"], "success")
+        self.assertIs(read_records(self.player)[0].state, QuestState.FAILED)
+
+    @covers_requirement(
+        "webclient-service-menus::service-actions-reject-stale-duplicate-and-tampered-input-without-mutation"
+    )
+    def test_a_departed_clerk_is_refused_even_with_another_clerk_present(self):
+        self._register()
+        record = accept_guild_offer(self.player, self.staff, _T_BOARD_QUEST)
+        second = create_object(NPC, key="second clerk", location=self.hall)
+        second_component = GuildStaff.create(
+            second, service_id="staff_two", branch_key=BRANCH
+        )
+        second_component.service_binding = "place"
+        second_component.anchor_room_id = self.hall.pk
+        second.components.add(second_component)
+        departed = int(self.staff.pk)
+        self.staff.location = self.store
+        before = list(self.player.db.quest_log or [])
+        result = _quest_abandon_adapter(
+            self.player, {"quest_id": record.quest_id, "npc_id": departed}
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "no_such_target")
+        self.assertEqual(list(self.player.db.quest_log or []), before)
+        # The second clerk is a different provider and never stands in.
+        self.assertEqual(
+            _quest_abandon_adapter(
+                self.player, {"quest_id": record.quest_id, "npc_id": int(second.pk)}
+            )["outcome"],
+            "success",
+        )
+
+    @covers_requirement(
+        "webclient-service-menus::service-actions-reject-stale-duplicate-and-tampered-input-without-mutation"
+    )
+    def test_a_provider_that_loses_its_capability_between_open_and_submit_is_refused(self):
+        self._register()
+        record = accept_guild_offer(self.player, self.staff, _T_BOARD_QUEST)
+        component = self.staff.components.get(GuildStaff.get_component_slot())
+        self.staff.components.remove(component)
+        before = list(self.player.db.quest_log or [])
+        result = _quest_turnin_adapter(
+            self.player, {"quest_id": record.quest_id, "npc_id": int(self.staff.pk)}
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "wrong_capability")
+        self.assertEqual(list(self.player.db.quest_log or []), before)
+        # Re-attaching the identical component restores the same target.
+        self.staff.components.add(component)
+        self.assertIsNotNone(
+            self.staff.components.get(GuildStaff.get_component_slot())
+        )
+
+    @covers_requirement(
+        "webclient-service-menus::service-actions-reject-stale-duplicate-and-tampered-input-without-mutation"
+    )
+    def test_a_failed_binding_between_open_and_submit_is_refused(self):
+        self._register()
+        record = accept_guild_offer(self.player, self.staff, _T_BOARD_QUEST)
+        component = self.staff.components.get(GuildStaff.get_component_slot())
+        component.service_binding = "place"
+        component.anchor_room_id = None
+        before = list(self.player.db.quest_log or [])
+        result = _quest_abandon_adapter(
+            self.player,
+            {"quest_id": record.quest_id, "npc_id": int(self.staff.pk)},
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "malformed_binding")
+        self.assertEqual(list(self.player.db.quest_log or []), before)
+
+    @covers_requirement(
+        "webclient-service-menus::service-actions-reject-stale-duplicate-and-tampered-input-without-mutation"
+    )
+    def test_a_combat_session_refuses_every_provider_mutation(self):
+        self._register()
+        record = accept_guild_offer(self.player, self.staff, _T_BOARD_QUEST)
+        self.player.db.active_combat = {
+            "session_id": "hostile:1:0",
+            "mode": "hostile",
+            "room_id": 1,
+            "player_ids": [int(self.player.pk)],
+            "enemy_ids": [2],
+            "fled_ids": [],
+            "knocked_out_ids": [],
+            "rounds_elapsed": 0,
+            "exam_id": None,
+            "engagement_id": "hostile:1:0:1",
+            "round_revision": 0,
+            "draft_version": 0,
+            "draft_entries": {},
+            "confirmed_actors": [],
+        }
+        before = list(self.player.db.quest_log or [])
+        wallet_before = int(self.player.db.wallet or 0)
+        result = _quest_turnin_adapter(
+            self.player, {"quest_id": record.quest_id, "npc_id": int(self.staff.pk)}
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "active_combat")
+        self.assertEqual(list(self.player.db.quest_log or []), before)
+        self.assertEqual(int(self.player.db.wallet or 0), wallet_before)
+
+    @covers_requirement(
+        "webclient-service-menus::service-actions-reject-stale-duplicate-and-tampered-input-without-mutation"
+    )
+    def test_stock_tampered_between_open_and_submit_is_refused(self):
+        self.player.location = self.store
+        # The shelf emptied after the shop read that offered two units.
+        self.merchant.merchant_stock = {_T_MEAL: 0}
+        wallet_before = int(self.player.db.wallet)
+        inventory_before = list(self.player.db.inventory or [])
+        stock_before = dict(self.merchant.merchant_stock)
+        result = _buy_adapter(
+            self.player,
+            {
+                "item_key": _T_MEAL,
+                "quantity": 2,
+                "recipient_id": int(self.player.pk),
+                "npc_id": int(self.merchant_npc.pk),
+            },
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "insufficient_stock")
+        self.assertEqual(int(self.player.db.wallet), wallet_before)
+        self.assertEqual(list(self.player.db.inventory or []), inventory_before)
+        self.assertEqual(dict(self.merchant.merchant_stock), stock_before)
+
+    @covers_requirement(
+        "webclient-service-menus::service-actions-reject-stale-duplicate-and-tampered-input-without-mutation"
+    )
+    def test_an_explicit_merchant_receives_the_trade_of_two_present_keepers(self):
+        self.player.location = self.store
+        second = create_object(NPC, key="second keeper", location=self.store)
+        second_component = Merchant.create(
+            second, service_id="store_two", shop_key=T_SHOP
+        )
+        second_component.service_binding = "place"
+        second_component.anchor_room_id = self.store.pk
+        second.components.add(second_component)
+        second_component.merchant_stock = {_T_MEAL: 7, _T_POTION: 3, _T_SWORD: 1}
+        first_before = dict(self.merchant.merchant_stock)
+        second_before = dict(second_component.merchant_stock)
+        self.player.db.wallet = 1000
+        result = _buy_adapter(
+            self.player,
+            {
+                "item_key": _T_MEAL,
+                "quantity": 2,
+                "recipient_id": int(self.player.pk),
+                "npc_id": int(second.pk),
+            },
+        )
+        self.assertEqual(result["outcome"], "success")
+        # Only the named keeper's shelf moved; the other one still holds its
+        # whole stock and the purse paid one merchant's price once.
+        self.assertEqual(dict(self.merchant.merchant_stock), first_before)
+        self.assertEqual(
+            second_component.merchant_stock[_T_MEAL],
+            second_before[_T_MEAL] - 2,
+        )
+        floor, _ceiling = price_band(_T_MEAL)
+        self.assertEqual(int(self.player.db.wallet), 1000 - 2 * (floor + 2))
+
+    @covers_requirement(
+        "webclient-service-menus::service-actions-reject-stale-duplicate-and-tampered-input-without-mutation"
+    )
+    def test_a_tampered_member_reference_is_refused_without_a_substitute(self):
+        self.player.location = self.store
+        outsider = create_object(PlayerCharacter, key="outsider buyer")
+        outsider.race = "human"
+        outsider.apply_race_baseline()
+        outsider.location = self.store
+        wallet_before = int(self.player.db.wallet)
+        stock_before = dict(self.merchant.merchant_stock)
+        result = _buy_adapter(
+            self.player,
+            {
+                "item_key": _T_MEAL,
+                "quantity": 1,
+                "recipient_id": int(outsider.pk),
+                "npc_id": int(self.merchant_npc.pk),
+            },
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "not_party_member")
+        # Neither the forged member nor the commander receives the goods.
+        self.assertEqual(list(outsider.db.inventory or []), [])
+        self.assertEqual(list(self.player.db.inventory or []), [])
+        self.assertEqual(int(self.player.db.wallet), wallet_before)
+        self.assertEqual(dict(self.merchant.merchant_stock), stock_before)
+
+    @covers_requirement(
+        "webclient-service-menus::service-actions-reject-stale-duplicate-and-tampered-input-without-mutation"
+    )
+    def test_a_tampered_registration_branch_is_refused_at_the_counter(self):
+        self._register()
+        write_counter_trait(self.player, "guild_merit", _T_MERIT_THRESHOLD)
+        registration = dict(self.player.db.guild_registration)
+        registration["branch_key"] = "t_elsewhere_branch"
+        self.player.db.guild_registration = registration
+        before = dict(self.player.db.guild_registration)
+        result = _exam_request_adapter(
+            self.player,
+            {"target_rank": _T_EXAM_RANK, "npc_id": int(self.reception.pk)},
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "wrong_branch")
+        self.assertIsNone(self.player.db.active_combat)
+        self.assertEqual(dict(self.player.db.guild_registration), before)

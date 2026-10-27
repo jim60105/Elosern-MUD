@@ -88,6 +88,12 @@ const view = computed(() => tab.value);
 const servicesReason = computed(() => panelReason(props.services));
 const shop = computed(() => shopSection(props.services));
 const purse = computed(() => servicesPurse(props.services));
+// The exact merchant this surface was read for; a trade without it would be
+// refused server-side, so the row stays untradeable instead.
+const providerId = computed(() => {
+  const value = shop.value?.provider_id;
+  return Number.isSafeInteger(value) && value > 0 ? value : null;
+});
 const title = computed(() => {
   const name = props.services?.available === true ? props.services.host?.display_name : null;
   return typeof name === "string" && name.trim() !== "" ? name : "商店";
@@ -232,6 +238,7 @@ const canTrade = computed(
     !!bounds.value &&
     sendQuantity.value !== null &&
     memberId.value !== null &&
+    providerId.value !== null &&
     consistent.value &&
     !memberPending.value &&
     !props.tradePending,
@@ -263,7 +270,12 @@ function onBarAction(key) {
   const field = view.value === "sell" ? "seller_id" : "recipient_id";
   emit("trade", {
     action_id: action.value.action_id,
-    payload: { item_key: row.item_key, quantity: qty, [field]: memberId.value },
+    payload: {
+      item_key: row.item_key,
+      quantity: qty,
+      [field]: memberId.value,
+      npc_id: providerId.value,
+    },
   });
 }
 

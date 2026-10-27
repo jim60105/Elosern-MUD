@@ -1367,3 +1367,14 @@ with `--parallel 16 --noinput`, never serially. Complete managed-browser runs,
 successful-execution traceability evidence and combined branch coverage belong
 to CI. Local handoff runs `tools.contract_gate` and `tools.spec_traceability
 check`; neither establishes the CI-owned aggregate coverage result.
+
+## 新增測試模組的分片擁有權（npc-targeted-service-flows）
+
+`world/rules/tests/test_service_targets.py` 是獨立模組，僅登記於
+`.github/evennia-shards.json` 的 `rules-b`（索引 2）清單。另外兩個新模組落在
+既有的套件 label 之下，`web/webclient/actions/tests/test_services_open.py`
+由 `web.webclient.actions` 遞迴涵蓋（`webclient-actions` 分片），
+`world/rules/tests/test_service_view/test_targeted_provider.py` 由
+`world.rules.tests.test_service_view` 涵蓋（`rules-c` 分片）。套件 label
+已擁有這兩個模組，不得再為它們加上重疊的 module label；
+`tests/test_evennia_test_optimization_contract.py` 會拒絕重複或落空的所有權。

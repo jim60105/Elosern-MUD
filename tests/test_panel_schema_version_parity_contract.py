@@ -69,8 +69,8 @@ _PANEL_MODULES = (
 
 class PanelSchemaVersionParityContract(unittest.TestCase):
     def test_structured_services_version_and_shared_bounds(self):
-        self.assertEqual(self._module_value("services.py", "SERVICES_SCHEMA_VERSION"), 7)
-        self.assertEqual(self._js_allowlist_value(protocol_client_source(), "services"), 7)
+        self.assertEqual(self._module_value("services.py", "SERVICES_SCHEMA_VERSION"), 8)
+        self.assertEqual(self._js_allowlist_value(protocol_client_source(), "services"), 8)
         js_source = protocol_client_source()
         shared_source = (REPO_ROOT / "web/webclient/presentation/quest_facts.py").read_text()
         for python_name, js_name, expected in (

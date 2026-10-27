@@ -6,9 +6,9 @@ The read-only version-2 `services` panel payload (host resolution, player summar
 
 ### Requirement: The services panel is an exact read-only exploration-mode panel
 
-The production presentation registry SHALL register `services` schema version 7. Its available payload SHALL
-contain exactly `schema_version`, `available`, `kind`, `host`, `player`, `guild`, `shop`, and
-`pagination`; `available` SHALL be true, `kind` SHALL be `services`, and `schema_version` SHALL be integer 7.
+The presentation registry SHALL register `services` schema version 8. Its available payload SHALL
+contain exactly `schema_version`, `available`, `kind`, `host`, `player`, `guild`, `rank`, `shop`, and
+`pagination`; `available` SHALL be true, `kind` SHALL be `services`, and `schema_version` SHALL be integer 8.
 Personal inventory SHALL NOT appear; the `party_inventory` panel owns it.
 The presenter SHALL strictly read canonical records and registries through the no-mutation service read model.
 
@@ -87,69 +87,71 @@ The presenter SHALL strictly read canonical records and registries through the n
 - **WHEN** the services read model sees an active combat session, including an actor carrying a possession binding
 - **THEN** host, guild and shop remain null with all four pagination totals zero, while the canonical player summary remains available
 
-### Requirement: Service presentation resolves hosts per service class and a stable player summary
+#### Scenario: Exact selected-provider snapshot
+- **WHEN** services.open reads a visible co-present selected NPC
+- **THEN** schema 8 reports only that provider's guild/shop/rank sections with their provider_id, leaves unsupported sections null, preserves all existing row limits and eligibility, and writes no state
 
-Outside combat each available service surface SHALL resolve its local host independently from the actor's current room under the same deterministic rule as commands. Guild and rank use their normal staff and examination-counter classes; shop uses a merchant. Zero or multiple hosts SHALL make only that surface unavailable. While possessed, guild and rank SHALL be omitted without resolving their services; the merchant SHALL still resolve normally and supply host metadata.
+### Requirement: Service presentation resolves hosts per service class and a stable player summary
+Service reads SHALL support exact selected-provider views and retain implicit room discovery only for untargeted summaries. A targeted read SHALL use only the selected visible co-present NPC. Player summary, combat suppression, possession rules and per-surface failure isolation SHALL remain unchanged.
 
 #### Scenario: Guild hall resolves one guild host and its examiner
-- **WHEN** an unpossessed actor stands in a room containing exactly one `GuildStaff` host that also carries `GuildExamReception`
-- **THEN** `host` names that host, `guild` and `rank` surfaces are present, and `shop` is null
+- **WHEN** a targeted NPC carries staff and reception
+- **THEN** guild and independent top-level rank use that same selected provider
 
 #### Scenario: General store resolves one merchant
-- **WHEN** the actor stands in a room containing exactly one `Merchant` host and no `GuildStaff`
-- **THEN** `host` names that merchant, `shop` is present, and `guild` is null
+- **WHEN** a merchant is selected while another merchant is nearby
+- **THEN** only selected stock/shop identity is returned
 
 #### Scenario: Co-located different service classes stay independent
-- **WHEN** an unpossessed actor's room contains exactly one `GuildStaff` and exactly one `Merchant`
-- **THEN** both the guild and shop surfaces render their own host data and neither availability is affected by the other class
+- **WHEN** a selected NPC lacks a different capability present on another NPC
+- **THEN** the missing selected surface remains null without substitution
 
 #### Scenario: Ambiguous hosts close only the affected surface
-- **WHEN** an unpossessed actor's room contains two `GuildStaff` hosts and one `Merchant`
-- **THEN** the guild surface is unavailable with a stable reason while the shop surface remains available, and no adapter can address either guild host
+- **WHEN** an untargeted room summary sees two staff and one merchant
+- **THEN** staff discovery remains ambiguous while targeted staff and the merchant resolve independently
 
-#### Scenario: Unregistered summary is honest
-- **WHEN** an unpossessed actor has no `guild_registration`
-- **THEN** `player` reports `guild_registered` false, `guild_rank` null, and the board section renders no offers while the registration surface offers the register action
-
-#### Scenario: Disguised elf does not distort the summary
-- **WHEN** an elf with true rank F and true merit 0 holds a disguise
-- **THEN** `player` reports rank F, merit 0, and no displayed-stat value, and no surface derives eligibility from the disguise
-
-#### Scenario: Below merit request stays enabled
-- **WHEN** an unpossessed registered next-rank member below true merit threshold stands at a functioning guild counter and the qualified host is absent
-- **THEN** merit_qualified is false, exam_request is enabled and dispatch returns exam_schedule without mutation
-
-#### Scenario: Different host classes never create cross-class ambiguity
-- **WHEN** different host classes are present in the same room for an unpossessed actor
-- **THEN** they create no cross-class ambiguity, and the co-location of `GuildStaff` with `GuildExamReception` makes
-  both the guild and rank surfaces available
-
-#### Scenario: Top-level host follows the guild-then-merchant preference
-- **WHEN** the top-level `host` field is computed outside combat for an unpossessed actor
-- **THEN** it is the display-only reconciliation identity of the resolved single local `GuildStaff` host when
-  exactly one exists, else the resolved single local `Merchant` host when exactly one exists, else null
-
-#### Scenario: Host is metadata, never authority or payload field
-- **WHEN** any surface availability is computed or any action is dispatched
-- **THEN** the top-level `host` is not the availability authority for any surface and is never submitted in an
-  action payload
+#### Scenario: Possession omits only guild services
+- **WHEN** a lawful possessed body selects a merchant
+- **THEN** merchant/member/purse semantics remain while guild/reception are suppressed
 
 #### Scenario: Player summary derives only from canonical sources
-- **WHEN** the `player` summary is built
-- **THEN** it derives from canonical wallet, parsed guild registration, canonical `guild_rank`, the true
-  `guild_merit` counter, and the catalog's merit thresholds, and never reads `disguised_stats` or registration
-  snapshot values for wallet, rank, merit, or eligibility; while possessed these sources belong to the owner
+- **WHEN** a disguised registered player opens services
+- **THEN** wallet/rank/merit remain canonical true values, independent of displayed disguise
+
+#### Scenario: Host is metadata, never authority or payload field
+- **WHEN** top-level host metadata is present
+- **THEN** it remains display-only; mutations use their explicit validated npc_id
+
+#### Scenario: Unregistered summary is honest
+- **WHEN** the actor has no registration
+- **THEN** registered is false/rank null and board offers remain absent while registration is offered under its existing gates
+
+#### Scenario: Disguised elf does not distort the summary
+- **WHEN** true rank F/merit 0 are disguised
+- **THEN** the summary still reports canonical F/0 and no eligibility derives from disguise
+
+#### Scenario: Below merit request stays enabled
+- **WHEN** a registered below-threshold actor uses functioning selected reception with absent qualified adventurer
+- **THEN** exam_request remains enabled and schedule-only response has no mutation
+
+#### Scenario: Different host classes never create cross-class ambiguity
+- **WHEN** staff, reception and merchant capabilities coexist
+- **THEN** their surfaces remain independent; selected reception rank does not require selected staff
+
+#### Scenario: Top-level host follows the guild-then-merchant preference
+- **WHEN** untargeted top-level host metadata is computed
+- **THEN** its existing single-staff-then-single-merchant preference remains; a targeted read instead names its selected provider and neither metadata path grants authority
 
 #### Scenario: A possessed actor ignores a co-located guild host
-- **WHEN** a possessed companion stands beside both guild staff and a merchant outside combat
-- **THEN** `host` names only the merchant and the normal shop renders, while guild and rank service sections and guild navigation remain absent
+- **WHEN** a lawful possessed actor stands near staff and merchant
+- **THEN** only the merchant service/member/purse surface remains, with guild/rank suppressed
 
 #### Scenario: A possessed actor with no merchant has no service host
-- **WHEN** a possessed companion stands beside guild staff with no merchant
-- **THEN** `host`, `guild` and `shop` are null, all service pagination totals are zero, and no guild failure reason is invented
+- **WHEN** a lawful possessed actor has staff but no merchant nearby
+- **THEN** host/guild/rank/shop are null with zero service totals and no invented guild failure reason
 
 ### Requirement: The guild surface covers registration, board, quest log, and rank examination
-The guild section SHALL retain its existing exact branch/rank/registration/board/quests/exam shape, local GuildStaff gate and read-only ownership. Quest rows SHALL accept invalidated and add nullable bounded terminal_reason; invalidated rows SHALL have disabled abandon/turn-in. Private escort abandonment is a separate host-independent quest_log descriptor using the same action ID, and SHALL not make a guild section available without staff.
+The guild section SHALL retain its existing branch/registration/board/quests fields plus required provider_id and its selected GuildStaff gate. Rank SHALL independently require the selected GuildExamReception, with its own provider_id and no GuildStaff requirement. Quest rows retain invalidated/terminal_reason semantics. Ordinary guild abandonment SHALL require its selected staff; private escort abandonment retains its host-free quest_log descriptor.
 
 #### Scenario: Unregistered player can register
 - **WHEN** an unregistered actor stands in the guild hall
@@ -173,7 +175,7 @@ The guild section SHALL retain its existing exact branch/rank/registration/board
 
 #### Scenario: Exam eligibility shows the exact next rank only
 - **WHEN** a registered F member has merit at or above the E threshold and no active session
-- **THEN** `rank` reports the exact next rank E and enables `exam_request` with payload `{target_rank: "E"}`, and no other rank can be selected
+- **THEN** `rank` reports the exact next rank E and enables `exam_request` with payload {npc_id: selected_reception_id, target_rank: "E"}, and no other rank can be selected
 
 #### Scenario: Guild surface stays read-only
 - **WHEN** the guild section is built for an actor with registration, an active quest, and eligible exam state
@@ -186,7 +188,7 @@ The guild section SHALL retain its existing exact branch/rank/registration/board
 #### Scenario: Registration section shape and enablement gate
 - **WHEN** the `registration` section is built
 - **THEN** it contains exactly `registered` (boolean) and `register` (an action descriptor), and `register` is
-  enabled only for an unregistered actor with one local `GuildStaff` host and otherwise carries a stable disabled
+  enabled only for an unregistered actor with the selected eligible local GuildStaff (or one unambiguous host for implicit discovery) and otherwise carries a stable disabled
   reason
 
 #### Scenario: Board rows carry their exact fields in board API order
@@ -205,7 +207,7 @@ The guild section SHALL retain its existing exact branch/rank/registration/board
 
 #### Scenario: Abandon enables only for an in-progress record at a staff host
 - **WHEN** a guild-section quest row abandon descriptor is computed
-- **THEN** the existing guild counter descriptor retains its active-record/local-staff gate; private escort quest_log descriptors separately require owned active escort state and no staff
+- **THEN** ordinary abandonment carries quest_id and npc_id and retains its active-record/selected-local-staff gate; private escort quest_log descriptors carry quest_id only and separately require owned active escort state and no staff
 
 #### Scenario: Turn-in requires an unclaimed completed record at a staff host
 - **WHEN** a guild quest row turnin descriptor is computed
@@ -213,24 +215,27 @@ The guild section SHALL retain its existing exact branch/rank/registration/board
 
 #### Scenario: Rank section presence and exact fields
 - **WHEN** the `rank` section is computed
-- **THEN** it is present only when exactly one local examination counter (the `GuildExamReception` counter of the
-  hall) resolves, whether or not the qualified persistent host is present, and contains exactly `rank`, `merit`,
-  `next_rank`, `next_threshold`, `merit_qualified`, and `exam_request`
+- **THEN** it is present when the exact selected GuildExamReception resolves, independently of GuildStaff and other local receptions; implicit discovery still requires one unambiguous counter. Qualified persistent host attendance does not gate its presence. It contains exactly `rank`, `merit`,
+  `next_rank`, `next_threshold`, `merit_qualified`, `exam_request` and provider_id
 
 #### Scenario: Exam start requires every condition and the next-rank payload
 - **WHEN** `exam_request` is computed
 - **THEN** it is enabled only when the actor is registered at the counter's branch, an exact next rank exists,
   and the local counter passes its service and schedule gates; merit and host presence never disable it, and its
-  action payload carries exactly the next-rank key
+  action payload carries exactly npc_id and the next-rank key
 
 #### Scenario: Unregistered and top-rank actors receive stable target reasons
 - **WHEN** the actor is unregistered or already holds the top rank
 - **THEN** `exam_request` is disabled with the stable `unregistered` or `top_rank` reason and never with a merit
   reason
 
+#### Scenario: Exact selected-provider snapshot
+- **WHEN** services.open reads a visible co-present selected NPC
+- **THEN** schema 8 reports only that provider's guild/shop/rank sections with their provider_id, leaves unsupported sections null, preserves all existing row limits and eligibility, and writes no state
+
 ### Requirement: The shop surface covers stock, quantity, buy, sell, and sellable inventory
-The `shop` section SHALL contain exactly `open`, `member_id`, `stock`, and `sellable` and SHALL be present only in
-exploration mode when exactly one local `Merchant` host resolves. `member_id` SHALL be the viewed member (else the
+The `shop` section SHALL contain exactly `open`, `member_id`, `stock`, `sellable` and `provider_id` and SHALL be present only in
+exploration mode when the selected Merchant resolves. `member_id` SHALL be the viewed member (else the
 commander), the default recipient and seller. Prices SHALL be exact integer copper, buy-only on stock rows and
 sell-only on sellable rows, and `buy`/`sell` SHALL be enabled only when the shop is open and the trade is legal,
 else carrying a stable disabled reason.
@@ -285,7 +290,7 @@ else carrying a stable disabled reason.
   member holds at least one unequipped copy, and the merchant's stock cap is not already at maximum
 
 #### Scenario: Inventory section carries its exact two fields
-- **WHEN** a version-7 services payload is built
+- **WHEN** a version-8 services payload is built
 - **THEN** it contains no `inventory` section; personal rows and the purse are published by `party_inventory`
 
 #### Scenario: Inventory rows preserve duplicates and aggregate honestly
@@ -308,15 +313,19 @@ else carrying a stable disabled reason.
 - **THEN** it exposes no effect amount, condition threshold, consumable flag, slot choice, target, drag, or drop
   action, and its only member reference is the panel's `member_id`
 
+#### Scenario: Exact selected-provider snapshot
+- **WHEN** services.open reads a visible co-present selected NPC
+- **THEN** schema 8 reports only that provider's guild/shop/rank sections with their provider_id, leaves unsupported sections null, preserves all existing row limits and eligibility, and writes no state
+
 ### Requirement: Service actions are exact, allowlisted, and server-authoritative
-The existing service action allowlist and exact bounded payloads SHALL remain. Party member references SHALL appear only in the exact member-scoped fields their owning capabilities define, reauthorized by the rules and never replaced by the commander. `guild.quest_abandon` SHALL revalidate the authenticated owner and record; private escort abandonment needs no host, while ordinary guild actions retain their gates. No other action ID or host field SHALL be added.
+Service actions SHALL remain exact and server-authoritative. The six existing provider mutations and ordinary guild abandonment SHALL require npc_id. Private escort abandonment SHALL retain quest_id alone and tracking SHALL remain host-independent. Domain record classification SHALL decide which abandonment shape applies. Existing member fields and ownership SHALL remain unchanged; services.open SHALL add only a private read.
 
 #### Scenario: Existing registration reaches its deterministic API once
-- **WHEN** an unregistered actor submits an empty `guild.register` at the local guild hall
-- **THEN** the adapter resolves the local staff host and calls `register_adventurer`, and the snapshot thereafter reports rank F with the recorded branch
+- **WHEN** an unregistered actor submits guild.register with exactly npc_id at the local guild hall
+- **THEN** the adapter resolves only the explicitly selected staff host and calls `register_adventurer`, and the snapshot thereafter reports rank F with the recorded branch
 
 #### Scenario: Repeated registration is idempotent
-- **WHEN** a registered actor submits an empty `guild.register` again after a state change between render and submit
+- **WHEN** a registered actor submits guild.register with exactly npc_id again after a state change between render and submit
 - **THEN** the adapter returns the original record without replacing branch, tick, or snapshot, reports success, and refreshes canonical services/status panels
 
 #### Scenario: Quest accept is board-gated
@@ -333,10 +342,10 @@ The existing service action allowlist and exact bounded payloads SHALL remain. P
 
 #### Scenario: Exam start cannot choose an examiner or rank
 - **WHEN** a client submits a non-next rank or includes a host, examiner, branch, clock or threshold field
-- **THEN** exact validation or the coordinator rejects before any exam creation and only the exact next-rank payload is accepted
+- **THEN** exact validation or the coordinator rejects before any exam creation and only npc_id plus the exact next-rank key is accepted
 
 #### Scenario: Existing buy and sell submit only item and quantity
-- **WHEN** a client submits `shop.buy` with item key, quantity and `recipient_id` only
+- **WHEN** a client submits `shop.buy` with item key, quantity, recipient_id and npc_id only
 - **THEN** the adapter re-resolves and rechecks the local merchant and reauthorizes the recipient before calling deterministic economy settlement
 
 #### Scenario: Inventory use submits only item key
@@ -357,9 +366,8 @@ The existing service action allowlist and exact bounded payloads SHALL remain. P
 
 #### Scenario: Payload schemas are exact and bounded
 - **WHEN** any service action payload is validated
-- **THEN** `guild.register` accepts exactly an empty payload, guild quest and exam actions retain their exact
-  bounded identifiers, `guild.quest_track` accepts exactly `quest_id` (the shared bounded quest identifier) and
-  boolean `tracked`, `shop.buy` accepts exactly bounded `item_key`, integer `quantity` and `recipient_id`, and `shop.sell` accepts exactly bounded `item_key`, integer `quantity` and `seller_id`
+- **THEN** guild.register accepts exactly npc_id; guild.quest_accept, guild.quest_turnin and guild.exam_request add required npc_id to their existing bounded identifiers. guild.quest_abandon accepts exactly quest_id and npc_id for ordinary guild records, or quest_id alone for private escort records; the adapter revalidates the authoritative record kind and rejects the wrong shape. `guild.quest_track` accepts exactly `quest_id` (the shared bounded quest identifier) and
+  boolean `tracked`, `shop.buy` accepts exactly bounded `item_key`, integer quantity, recipient_id and npc_id, and `shop.sell` accepts exactly bounded `item_key`, integer quantity, seller_id and npc_id
 
 #### Scenario: Registration idempotency is retained
 - **WHEN** registration is submitted again after the actor is already registered
@@ -394,6 +402,14 @@ The existing service action allowlist and exact bounded payloads SHALL remain. P
 #### Scenario: Forged terminal or foreign abandonment is refused
 - **WHEN** a stale, invalidated, non-owned or foreign quest ID is submitted as a private escort abandonment
 - **THEN** current domain authorization refuses without control, membership, quest or reward mutation
+
+#### Scenario: Targeted stale submission never substitutes
+- **WHEN** a selected provider leaves, loses capability or fails binding/control after render while another valid provider remains
+- **THEN** the action rejects without state changes and never chooses the other provider
+
+#### Scenario: Ordinary abandonment keeps its provider
+- **WHEN** ordinary guild abandonment opened at clerk A is submitted after A departs while clerk B remains
+- **THEN** the required npc_id still names A and the operation rejects without quest changes; the host-free escort payload cannot be used for that ordinary record
 
 ### Requirement: Service actions reject stale, duplicate, and tampered input without mutation
 Every service and inventory action SHALL pass the existing dispatcher's epoch, base revision, in-flight, and
@@ -631,3 +647,18 @@ quest book.
 #### Scenario: The client mirror rejects a stale board row
 - **WHEN** a board row carrying `reward_summary`, an unknown category, or a ninth reward item reaches the client validator
 - **THEN** the client rejects the services payload rather than rendering it
+
+### Requirement: Opening selected-provider services is read-only and correlated
+A service opening SHALL identify the selected NPC explicitly and return only its current supported surfaces. Opening SHALL perform no gameplay mutation, retain target correlation, and reject a stale or unauthorized provider without substituting another NPC.
+
+#### Scenario: Two merchants
+- **WHEN** a player opens the second of two present merchants
+- **THEN** the read shows that merchant and purchases retain its explicit identity
+
+#### Scenario: Late response
+- **WHEN** a read response arrives after actor/transport/card/provider changes
+- **THEN** the client discards it without reopening stale UI
+
+#### Scenario: Examination reception only
+- **WHEN** a selected NPC carries reception without guild staff
+- **THEN** the independent rank surface remains discoverable and targets that reception while qualification selects the real adventurer
