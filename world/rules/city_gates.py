@@ -38,8 +38,17 @@ def reanchor_home_on_gate_arrival(character: Any, destination: Any | None) -> No
         return
 
     from world.maps.city_gates import CITY_GATE_REGISTRY
+    from world.maps.static_references import settlement_node_xyz
 
-    if not any(row.gate_xyz == gate_xyz for row in CITY_GATE_REGISTRY.values()):
+    matched = next(
+        (
+            row
+            for row in CITY_GATE_REGISTRY.values()
+            if settlement_node_xyz(row.gate, source="city gate") == gate_xyz
+        ),
+        None,
+    )
+    if matched is None:
         return
 
     from world.maps.bootstrap import find_starting_rooms
@@ -57,11 +66,7 @@ def reanchor_home_on_gate_arrival(character: Any, destination: Any | None) -> No
         context={
             "char": character.key,
             "char_dbref": character.dbref,
-            "gate_map_id": next(
-                row.map_id
-                for row in CITY_GATE_REGISTRY.values()
-                if row.gate_xyz == gate_xyz
-            ),
+            "gate_map_id": matched.gate.map_id,
             "action": "first_gate_traversal",
         },
     )

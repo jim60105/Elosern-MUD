@@ -10,6 +10,9 @@ from the authored mask — consumers never re-derive it.
 from collections.abc import Mapping
 from dataclasses import dataclass
 
+from elosern_map_core.documents import QualifiedRef
+from elosern_map_core.references import ReferenceError, settlement_node_ref, settlement_position
+
 # Canonical wilderness directions, short form (matches the resolver's
 # DIRECTION_DELTAS keys and the wilderness-gateway spec vocabulary).
 CANONICAL_DIRECTIONS = ("n", "ne", "e", "se", "s", "sw", "w", "nw")
@@ -54,13 +57,20 @@ class WildernessGate:
 
     ``return_direction`` is named from the wilderness side: standing on the
     gate's exterior approach cell, the exit with that direction traverses to
-    the grid room ``(grid_xy, z_map_key)``. The gate's face is the opposite
-    direction (the footprint side it sits on).
+    the authored settlement node ``destination``. The gate's face is the
+    opposite direction (the footprint side it sits on). The destination room's
+    current address is derived from the settlement graph at the consumer
+    boundary; it is never stored here.
     """
 
     return_direction: str
-    grid_xy: tuple[int, int]
-    z_map_key: str
+    destination: QualifiedRef
+
+    @property
+    def z_map_key(self) -> str:
+        """The map coordinate space of the destination identity."""
+
+        return self.destination.map_id or ""
 
 
 @dataclass(frozen=True)
@@ -214,17 +224,26 @@ def _is_walkable_terrain(cell: tuple[int, int]) -> bool:
 
 def validate_wilderness_entries(
     registry: Mapping[str, WildernessEntryPoint] | None = None,
+    *,
+    index=None,
 ) -> None:
     """Pure, DB-free validation of the whole authored registry (design D5).
 
     Raises ``ValueError`` naming the offending entry and the rejected rule.
     Called by ``world.lore.sync.sync_all()`` before mirroring so malformed
-    authored data fails at startup.
+    authored data fails at startup. ``index`` is the current settlement-node
+    binding snapshot; production builds it from the live graphs, while a
+    synthetic candidate passes its own so validation never reads a partially
+    assembled registry.
     """
     if registry is None:
         registry = WILDERNESS_ENTRY_REGISTRY
 
     from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
+    from world.maps.static_references import settlement_reference_index
+
+    if index is None:
+        index = settlement_reference_index()
 
     def fail(anchor_key: str, rule: str) -> None:
         raise ValueError(f"WILDERNESS_ENTRY_REGISTRY[{anchor_key!r}]: {rule}")
@@ -312,17 +331,26 @@ def validate_wilderness_entries(
                     f"gate {gate.return_direction!r} approach ray crosses no footprint cell",
                 )
 
-        # -- grid destination inside its map's extent.
+        # -- grid destination resolves to an authored node inside its map's
+        #    extent.
         extents = None  # lazily loaded once per validated registry
         for gate in entry.gates:
             if extents is None:
                 extents = _iter_map_extents()
+            try:
+                position = settlement_position(
+                    index,
+                    gate.destination,
+                    source=f"gate {gate.return_direction!r}",
+                )
+            except ReferenceError as error:
+                fail(anchor_key, str(error))
             if gate.z_map_key not in extents:
                 fail(anchor_key, f"gate {gate.return_direction!r}: unknown z_map_key {gate.z_map_key!r}")
-            if gate.grid_xy not in extents[gate.z_map_key]:
+            if position not in extents[gate.z_map_key]:
                 fail(
                     anchor_key,
-                    f"gate {gate.return_direction!r}: grid_xy {gate.grid_xy} outside extent of {gate.z_map_key!r}",
+                    f"gate {gate.return_direction!r}: destination {position} outside extent of {gate.z_map_key!r}",
                 )
 
     # -- global cross-entry rules.
@@ -332,7 +360,7 @@ def validate_wilderness_entries(
         return not any(cell in other for other in all_footprints.values())
 
     seen_gate_keys: set[tuple[tuple[int, int], str]] = set()
-    seen_gate_rooms: set[tuple[tuple[int, int], str]] = set()
+    seen_gate_rooms: set[tuple[str, tuple[int, int]]] = set()
     gate_rooms: list[tuple[str, WildernessGate]] = []
     for anchor_key, entry in registry.items():
         footprint = all_footprints[anchor_key]
@@ -409,7 +437,7 @@ def validate_wilderness_entries(
     #    one gate unprovisionable. Checked after the per-entry rules so every
     #    more precise collision rule keeps naming its own cause.
     for anchor_key, gate in gate_rooms:
-        gate_room = (gate.grid_xy, gate.z_map_key)
+        gate_room = (gate.z_map_key, settlement_position(index, gate.destination))
         if gate_room in seen_gate_rooms:
             fail(anchor_key, f"gate {gate.return_direction!r} shares destination room {gate_room} with another gate")
         seen_gate_rooms.add(gate_room)
@@ -438,9 +466,9 @@ WILDERNESS_ENTRY_REGISTRY: dict[str, WildernessEntryPoint] = {
         origin_xy=(857, 1076),
         gates=(
             # 南門: a traveler at (860, 1077) heading north enters the city.
-            WildernessGate("n", (3050, 150), "capital_altoria"),
+            WildernessGate("n", settlement_node_ref("capital_altoria", "south_gate")),
             # 東門: a traveler at (864, 1080) heading west enters the city.
-            WildernessGate("w", (6500, 3010), "capital_altoria"),
+            WildernessGate("w", settlement_node_ref("capital_altoria", "east_gate")),
         ),
     ),
     "village_ciaran": WildernessEntryPoint(
@@ -455,7 +483,7 @@ WILDERNESS_ENTRY_REGISTRY: dict[str, WildernessEntryPoint] = {
             # 隱密小徑: a traveler at the anchor cell heading north follows the
             # concealed path into the village. No other direction is a
             # gateway.
-            WildernessGate("n", (35, 270), "village_ciaran"),
+            WildernessGate("n", settlement_node_ref("village_ciaran", "hidden_path")),
         ),
     ),
 }

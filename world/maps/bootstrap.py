@@ -38,7 +38,6 @@ from typeclasses.exits import Exit, WildernessGateExit
 from typeclasses.rooms import GridRoom, Room
 from world.lore.wilderness_entry import OPPOSITE_DIRECTION, WILDERNESS_ENTRY_REGISTRY
 from world.lore.settlements.places import PLACE_REGISTRY
-from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
 from world.maps.map_data import SETTLEMENT_GRAPHS
 from elosern_map_core.sparse import (
     SparseGraphError,
@@ -58,6 +57,11 @@ from world.maps.room_art import (
     PLACE_SCENE_ARCHETYPES,
     grid_scene_identity,
     place_scene_identity,
+)
+from world.maps.static_references import (
+    place_exterior_xyz,
+    settlement_node_xyz,
+    validate_static_references,
 )
 from world.maps.wilderness_provider import (
     LONG_DIRECTIONS,
@@ -138,14 +142,15 @@ def sync_service_interiors() -> None:
     """
     from collections import defaultdict
 
+    validate_static_references()
+
     by_settlement: dict[str, list] = defaultdict(list)
     for place in PLACE_REGISTRY.values():
         by_settlement[place.settlement_key].append(place)
 
     for settlement_key, places in by_settlement.items():
-        zcoord = SETTLEMENT_REGISTRY[settlement_key].zcoord
         for place in places:
-            exterior_xyz = (*place.exterior_xy, zcoord)
+            exterior_xyz = place_exterior_xyz(place)
             exterior = _find_exterior(exterior_xyz)
             if exterior is None:
                 log_warn(
@@ -195,7 +200,7 @@ def resolve_residence_route(home_key: str, guild_key: str) -> dict:
     guild_place = PLACE_REGISTRY[guild_key]
     if (
         home_place.settlement_key != guild_place.settlement_key
-        or home_place.exterior_xy != guild_place.exterior_xy
+        or home_place.exterior != guild_place.exterior
     ):
         raise ValueError(f"residence {home_key!r} and guild {guild_key!r} need one frontage")
     rooms = {}
@@ -204,8 +209,7 @@ def resolve_residence_route(home_key: str, guild_key: str) -> dict:
         if len(matches) != 1:
             raise ValueError(f"place {key!r} resolves to {len(matches)} rooms")
         rooms[role] = matches[0]
-    zcoord = SETTLEMENT_REGISTRY[home_place.settlement_key].zcoord
-    frontage = list(GridRoom.objects.filter_xyz(xyz=(*home_place.exterior_xy, zcoord)))
+    frontage = list(GridRoom.objects.filter_xyz(xyz=place_exterior_xyz(home_place)))
     if len(frontage) != 1:
         raise ValueError(f"residence {home_key!r} frontage resolves to {len(frontage)} rooms")
     rooms["frontage"] = frontage[0]
@@ -891,6 +895,8 @@ def sync_grid() -> SyncReport:
     room is missing warns and is skipped; other rows still converge.
     """
 
+    validate_static_references()
+
     graphs = tuple(SETTLEMENT_GRAPHS.values())
     plans = tuple(_plan_settlement_graph(graph) for graph in graphs)
     report = SyncReport()
@@ -915,13 +921,14 @@ def sync_grid() -> SyncReport:
             limbo = limbo[0]
 
             for row in CITY_GATE_REGISTRY.values():
-                gate = GridRoom.objects.filter_xyz(xyz=row.gate_xyz).first()
+                gate_xyz = settlement_node_xyz(row.gate, source="city gate")
+                gate = GridRoom.objects.filter_xyz(xyz=gate_xyz).first()
                 if gate is None:
                     log_warn(
                         "bootstrap_grid_gate_missing",
                         context={
-                            "map_id": row.map_id,
-                            "xyz": row.gate_xyz,
+                            "map_id": row.gate.map_id,
+                            "xyz": gate_xyz,
                             "action": "skip_gate_row",
                         },
                     )
@@ -950,12 +957,30 @@ def _sync_grid_room_art() -> None:
 
     A boot re-applies the authored table to the real rooms (an already-spawned
     node is never re-created by the contrib), so startup is idempotent. A node
-    with no materialized room warns naming the coordinate and is skipped; the
-    remaining nodes still converge. Every ``scene_archetype`` written here is a
-    registered scene archetype, every ``room_art_key`` is cleared (authored
-    grid nodes declare none), and the identity is the authored coordinate.
+    with no materialized room warns naming the current coordinate and is
+    skipped; the remaining nodes still converge. Every ``scene_archetype``
+    written here is a registered scene archetype, every ``room_art_key`` is
+    cleared (authored grid nodes declare none), and the scene identity is the
+    authored node's current coordinate.
     """
-    for (map_key, x, y), scene_archetype in GRID_NODE_SCENE_ARCHETYPES.items():
+    from elosern_map_core.references import ReferenceError
+    from world.maps.static_references import settlement_reference_index
+
+    index = settlement_reference_index()
+    for reference, scene_archetype in GRID_NODE_SCENE_ARCHETYPES.items():
+        try:
+            x, y, map_key = settlement_node_xyz(reference, index=index, source="grid art")
+        except ReferenceError as error:
+            log_warn(
+                "bootstrap_grid_room_art_missing_room",
+                exc=error,
+                context={
+                    "map_id": reference.map_id,
+                    "node": reference.object_id,
+                    "action": "skip_grid_node",
+                },
+            )
+            continue
         room = GridRoom.objects.filter_xyz((x, y, map_key)).first()
         if room is None:
             log_warn(
@@ -1032,6 +1057,8 @@ def sync_wilderness() -> None:
     refresh pass.
     """
 
+    validate_static_references()
+
     create_wilderness(name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider())
 
     script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
@@ -1045,12 +1072,13 @@ def sync_wilderness() -> None:
 
 def _provision_gate_exit(anchor_key: str, gate) -> None:
     """Ensure the one gate exit for ``(anchor_key, gate)`` on its destination room."""
-    gate_room = GridRoom.objects.filter_xyz((*gate.grid_xy, gate.z_map_key)).first()
+    gate_xyz = settlement_node_xyz(gate.destination, source=f"wilderness gate {anchor_key}")
+    gate_room = GridRoom.objects.filter_xyz(gate_xyz).first()
     if gate_room is None:
         log_warn(
             "bootstrap_gate_destination_room_missing",
             context={
-                "xyz": (*gate.grid_xy, gate.z_map_key),
+                "xyz": gate_xyz,
                 "gate_direction": gate.return_direction,
                 "anchor_key": anchor_key,
                 "action": "skip_gate_exit",

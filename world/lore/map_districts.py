@@ -1,7 +1,10 @@
 """Frozen map-district registry and its authoring validation (map-districts).
 
 Each district of the world map has exactly one landmark (world-map drawer
-design §4.1). A district is lit for a player only when that landmark's exact
+design §4.1). The landmark is a qualified authored identity (a settlement
+node, an authored location or an explicit wilderness cell); its canonical
+``grid:``/``wild:`` node is derived from the current binding by
+:func:`landmark_node_ids`. A district is lit for a player only when that
 canonical node is in the player's visited map knowledge; the read-only
 lighting rule lives in ``world.rules.map_district_lighting``. The world map
 starts nearly empty and grows as landmarks are reached.
@@ -31,7 +34,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Protocol
 
+from elosern_map_core.documents import QualifiedRef
 from elosern_map_core.geometry import cell_center_m
+from elosern_map_core.references import ReferenceError, resolve_reference, settlement_node_ref, wilderness_cell_ref
 
 #: The two district kinds.
 DISTRICT_KINDS: tuple[str, ...] = ("voronoi", "region")
@@ -43,25 +48,24 @@ DISTRICT_KINDS: tuple[str, ...] = ("voronoi", "region")
 MIN_VORONOI_SPACING_KM = 100
 
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
-_NUMBER = r"(0|[1-9][0-9]*)"
-_WILD_RE = re.compile(rf"^wild:([^:]+):{_NUMBER}:{_NUMBER}$")
-_GRID_RE = re.compile(rf"^grid:([^:]+):{_NUMBER}:{_NUMBER}$")
 
 
 @dataclass(frozen=True)
 class MapDistrict:
     """One map district and its single discovery landmark.
 
-    ``landmark_node`` is a canonical map-knowledge node ID:
-    ``wild:elosern:<x>:<y>`` or an existing ``grid:<map>:<x>:<y>``.
-    ``region_key`` names the terrain region a ``region`` district covers and
-    is ``None`` for a ``voronoi`` district.
+    ``landmark`` is a qualified authored reference: an existing settlement
+    node, an authored location, or an explicitly typed wilderness cell. The
+    canonical map-knowledge node ID (``wild:``/``grid:``) is derived from the
+    current binding at the consumer boundary (``landmark_node_ids``), never
+    stored here. ``region_key`` names the terrain region a ``region`` district
+    covers and is ``None`` for a ``voronoi`` district.
     """
 
     key: str
     district_name_zh: str
     landmark_name_zh: str
-    landmark_node: str
+    landmark: QualifiedRef
     kind: str
     region_key: str | None = None
 
@@ -137,12 +141,17 @@ class _ProductionTerrain:
     def _gateway_entries():
         """``(z_map_key, gate grid_xy, approach cell)`` of every registered gate."""
         from world.lore import wilderness_entry
+        from world.maps.static_references import settlement_node_xy
 
         for entry in wilderness_entry.WILDERNESS_ENTRY_REGISTRY.values():
             for gate in entry.gates:
                 approach = entry.approach_cell(gate)
                 if approach is not None:
-                    yield gate.z_map_key, gate.grid_xy, approach
+                    yield (
+                        gate.z_map_key,
+                        settlement_node_xy(gate.destination, source="wilderness gate"),
+                        approach,
+                    )
 
     def is_land(self, cell):
         return self._provider.is_land_cell(cell)
@@ -194,70 +203,151 @@ def production_terrain() -> DistrictTerrain:
     return _ProductionTerrain()
 
 
+def landmark_node_ids(
+    districts: Mapping[str, MapDistrict] | None = None,
+    *,
+    index=None,
+) -> dict[str, str]:
+    """Every district's canonical map-knowledge node ID at its current binding.
+
+    The wire form stays exactly the existing grammar (``wild:<name>:<x>:<y>``
+    or ``grid:<map>:<x>:<y>``); only its source changes from a stored string to
+    the landmark's resolved identity. A landmark that cannot produce a
+    canonical visited node (an invalid or interior-room reference in a patched
+    registry) is omitted here -- validation is the gate that rejects it.
+    """
+
+    from elosern_map_core.references import ReferenceError
+    from world.maps.static_references import reference_index, resolve_static
+    from world.maps.wilderness_provider import WILDERNESS_NAME
+    from world.rules.map_knowledge import encode_grid, encode_wild
+
+    registry = MAP_DISTRICT_REGISTRY if districts is None else districts
+    current = index if index is not None else reference_index()
+    result: dict[str, str] = {}
+    for key, district in registry.items():
+        try:
+            resolved = resolve_static(
+                district.landmark, index=current, source=f"district {key}"
+            )
+        except ReferenceError:  # observability: ignore R2: validation owns rejection; a presenter never invents a node id
+            continue
+        landmark = district.landmark
+        if landmark.domain == "settlement_node" and resolved.position_m is not None:
+            result[key] = encode_grid(
+                landmark.map_id, resolved.position_m[0], resolved.position_m[1]
+            )
+        elif landmark.domain in ("wilderness_cell", "location") and resolved.cell is not None:
+            result[key] = encode_wild(
+                WILDERNESS_NAME, resolved.cell[0], resolved.cell[1]
+            )
+    return result
+
+
+def landmark_node_id(district: MapDistrict) -> str | None:
+    """One district's canonical map-knowledge node ID, or ``None``."""
+
+    resolved = landmark_node_ids({district.key: district})
+    return resolved.get(district.key)
+
+
 def _landmark_position(
-    district: MapDistrict, terrain: DistrictTerrain, fail
+    district: MapDistrict, terrain: DistrictTerrain, index, fail
 ) -> tuple[int, int] | None:
-    """Check one landmark node and return its absolute metre position."""
-    node = district.landmark_node
-    if not isinstance(node, str):
-        fail(district.key, f"landmark_node {node!r} is not a string")
+    """Resolve one qualified landmark and return its absolute metre position."""
+    landmark = district.landmark
+    if not isinstance(landmark, QualifiedRef):
+        fail(district.key, f"landmark {landmark!r} is not a qualified reference")
         return None
-    wild = _WILD_RE.match(node)
-    if wild is not None:
-        name, x, y = wild.group(1), int(wild.group(2)), int(wild.group(3))
+    if landmark.domain == "interior_room":
+        fail(
+            district.key,
+            f"landmark {landmark.object_id!r} is an interior room with no "
+            "continental map position",
+        )
+        return None
+    try:
+        resolved = resolve_reference(index, landmark, source=f"district {district.key}")
+    except ReferenceError as error:
+        fail(district.key, str(error))
+        return None
+    if resolved.cell is not None:
+        cell = resolved.cell
         max_x, max_y = terrain.max_cell
-        if name != terrain.wilderness_name or x > max_x or y > max_y:
-            fail(district.key, f"landmark_node {node!r} is not a canonical wilderness node")
+        if cell[0] > max_x or cell[1] > max_y:
+            fail(
+                district.key,
+                f"landmark {landmark.object_id or cell!r} is outside the "
+                "wilderness frame",
+            )
             return None
-        cell = (x, y)
         if not terrain.is_land(cell):
-            fail(district.key, f"landmark {node!r} lies in the sea")
+            fail(district.key, f"landmark {landmark.object_id or cell!r} lies in the sea")
             return None
         if not terrain.is_walkable(cell):
-            fail(district.key, f"landmark {node!r} lies on blocked terrain")
+            fail(
+                district.key,
+                f"landmark {landmark.object_id or cell!r} lies on blocked terrain",
+            )
             return None
         if not terrain.is_reachable(cell):
-            fail(district.key, f"landmark {node!r} is unreachable")
+            fail(district.key, f"landmark {landmark.object_id or cell!r} is unreachable")
             return None
         return cell_center_m(cell)
-    grid = _GRID_RE.match(node)
-    if grid is not None:
-        map_key, x, y = grid.group(1), int(grid.group(2)), int(grid.group(3))
-        site = terrain.grid_site(map_key, (x, y))
-        if site is None:
-            fail(district.key, f"landmark {node!r} is not an existing grid node")
-            return None
-        if not terrain.is_land(cell_of_position(site.position_m)):
-            fail(district.key, f"landmark {node!r} lies in the sea")
-            return None
-        if not site.reachable:
-            fail(district.key, f"landmark {node!r} is unreachable")
-            return None
-        return site.position_m
-    fail(district.key, f"landmark_node {node!r} is not a canonical wild: or grid: node")
-    return None
+    position = resolved.position_m
+    if position is None:
+        fail(district.key, f"landmark {landmark.object_id!r} has no map position")
+        return None
+    site = terrain.grid_site(landmark.map_id, position)
+    if site is None:
+        fail(
+            district.key,
+            f"landmark {landmark.map_id}:{landmark.object_id} is not an existing grid node",
+        )
+        return None
+    if not terrain.is_land(cell_of_position(site.position_m)):
+        fail(
+            district.key,
+            f"landmark {landmark.map_id}:{landmark.object_id} lies in the sea",
+        )
+        return None
+    if not site.reachable:
+        fail(
+            district.key,
+            f"landmark {landmark.map_id}:{landmark.object_id} is unreachable",
+        )
+        return None
+    return site.position_m
 
 
 def validate_map_districts(
     registry: Mapping[str, MapDistrict] | None = None,
     terrain: DistrictTerrain | None = None,
+    *,
+    index=None,
 ) -> None:
     """Validate a district registry, raising :class:`MapDistrictError`.
 
     Every fault is collected and reported with its district key: identity and
-    field shape, kind/region pairing, duplicate keys, landmark nodes and names,
-    canonical landmark grammar, sea, blocked terrain, absent grid nodes,
+    field shape, kind/region pairing, duplicate keys, landmark identities and
+    names, reference resolution, sea, blocked terrain, absent grid nodes,
     unreachable landmarks, region membership and the Voronoi spacing rule.
+    ``index`` is the current settlement-node binding snapshot; production
+    builds it from the live graphs, while a synthetic candidate passes its own.
     """
     districts = MAP_DISTRICT_REGISTRY if registry is None else registry
     land = production_terrain() if terrain is None else terrain
+    if index is None:
+        from world.maps.static_references import reference_index
+
+        index = reference_index()
     problems: list[str] = []
 
     def fail(key: str, rule: str) -> None:
         problems.append(f"{key}: {rule}")
 
     seen: dict[str, dict[object, str]] = {
-        "landmark_node": {},
+        "landmark": {},
         "district_name_zh": {},
         "landmark_name_zh": {},
         "region_key": {},
@@ -293,7 +383,7 @@ def validate_map_districts(
                 fail(district.key, f"duplicate {field} {value!r} (also {owners[value]!r})")
             else:
                 owners[value] = district.key
-        position = _landmark_position(district, land, fail)
+        position = _landmark_position(district, land, index, fail)
         if position is not None:
             positions.append((district, position))
 
@@ -333,490 +423,490 @@ MAP_DISTRICT_REGISTRY: dict[str, MapDistrict] = {
     # north coast, about 500 km beyond the forest edge.
     "north_deep_forest": MapDistrict(
         "north_deep_forest", "北部深林", "古樹之心",
-        "wild:elosern:1250:2420", "region", "north_deep_forest",
+        wilderness_cell_ref((1250, 2420)), "region", "north_deep_forest",
     ),
     # Altoria: the western hills and river valleys south of the border
     # river, the southwest coast and the western flank of the central range.
     "border_source_highlands": MapDistrict(
         "border_source_highlands", "界源高地", "源泉石龕",
-        "wild:elosern:1302:1318", "voronoi",
+        wilderness_cell_ref((1302, 1318)), "voronoi",
     ),
     "march_watch_hills": MapDistrict(
         "march_watch_hills", "守界丘陵", "古哨塔遺址",
-        "wild:elosern:1065:1303", "voronoi",
+        wilderness_cell_ref((1065, 1303)), "voronoi",
     ),
     "north_road_uplands": MapDistrict(
         "north_road_uplands", "北道高原", "白石里程碑",
-        "wild:elosern:854:1282", "voronoi",
+        wilderness_cell_ref((854, 1282)), "voronoi",
     ),
     "rune_stone_hills": MapDistrict(
         "rune_stone_hills", "古符丘陵", "符文巨石",
-        "wild:elosern:442:1258", "voronoi",
+        wilderness_cell_ref((442, 1258)), "voronoi",
     ),
     "maple_vale": MapDistrict(
         "maple_vale", "楓紅谷地", "紅葉瀑布",
-        "wild:elosern:655:1225", "voronoi",
+        wilderness_cell_ref((655, 1225)), "voronoi",
     ),
     "mistbell_heights": MapDistrict(
         "mistbell_heights", "霧角高原", "霧鐘石塔",
-        "wild:elosern:232:1199", "voronoi",
+        wilderness_cell_ref((232, 1199)), "voronoi",
     ),
     "vineyard_slopes": MapDistrict(
         "vineyard_slopes", "葡萄坡地", "老橡木酒窖",
-        "wild:elosern:996:1161", "voronoi",
+        wilderness_cell_ref((996, 1161)), "voronoi",
     ),
     "white_ram_foothills": MapDistrict(
         "white_ram_foothills", "白羊山麓", "牧羊人石屋",
-        "wild:elosern:1177:1150", "voronoi",
+        wilderness_cell_ref((1177, 1150)), "voronoi",
     ),
     "eyrie_cliffs": MapDistrict(
         "eyrie_cliffs", "鷹巢峭壁", "蒼鷹岩",
-        "wild:elosern:1345:1133", "voronoi",
+        wilderness_cell_ref((1345, 1133)), "voronoi",
     ),
     "amethyst_mine_vale": MapDistrict(
         "amethyst_mine_vale", "紫晶礦谷", "廢棄紫晶坑",
-        "wild:elosern:491:1090", "voronoi",
+        wilderness_cell_ref((491, 1090)), "voronoi",
     ),
     # The royal valley's landmark is the capital's central plaza, a
     # settlement grid node placed on the continent through its local frame.
     "royal_river_valley": MapDistrict(
         "royal_river_valley", "王都河谷", "王都中央廣場",
-        "grid:capital_altoria:3500:2850", "voronoi",
+        settlement_node_ref("capital_altoria", "central_plaza"), "voronoi",
     ),
     "royal_hunting_park": MapDistrict(
         "royal_hunting_park", "王家獵苑", "白鹿石雕",
-        "wild:elosern:677:1029", "voronoi",
+        wilderness_cell_ref((677, 1029)), "voronoi",
     ),
     "westwind_downs": MapDistrict(
         "westwind_downs", "西風丘原", "風琴石林",
-        "wild:elosern:182:1013", "voronoi",
+        wilderness_cell_ref((182, 1013)), "voronoi",
     ),
     "western_ore_hills": MapDistrict(
         "western_ore_hills", "西陲礦丘", "灰岩礦塔",
-        "wild:elosern:330:1000", "voronoi",
+        wilderness_cell_ref((330, 1000)), "voronoi",
     ),
     "east_river_fields": MapDistrict(
         "east_river_fields", "東河沃野", "古水車",
-        "wild:elosern:1054:997", "voronoi",
+        wilderness_cell_ref((1054, 997)), "voronoi",
     ),
     "westpass_uplands": MapDistrict(
         "westpass_uplands", "隘西高地", "西隘道標石",
-        "wild:elosern:1281:972", "voronoi",
+        wilderness_cell_ref((1281, 972)), "voronoi",
     ),
     "ironpine_woods": MapDistrict(
         "ironpine_woods", "鐵杉林地", "千年鐵杉",
-        "wild:elosern:496:890", "voronoi",
+        wilderness_cell_ref((496, 890)), "voronoi",
     ),
     "bell_vale": MapDistrict(
         "bell_vale", "鐘聲谷", "荒廢修道院",
-        "wild:elosern:887:886", "voronoi",
+        wilderness_cell_ref((887, 886)), "voronoi",
     ),
     "mill_reach": MapDistrict(
         "mill_reach", "磨坊河灣", "河畔舊磨坊",
-        "wild:elosern:680:871", "voronoi",
+        wilderness_cell_ref((680, 871)), "voronoi",
     ),
     "oak_knolls": MapDistrict(
         "oak_knolls", "古橡丘陵", "巨橡樹",
-        "wild:elosern:1122:850", "voronoi",
+        wilderness_cell_ref((1122, 850)), "voronoi",
     ),
     "limestone_terrace": MapDistrict(
         "limestone_terrace", "石灰岩台地", "白灰窯遺址",
-        "wild:elosern:265:805", "voronoi",
+        wilderness_cell_ref((265, 805)), "voronoi",
     ),
     "icespring_gorge": MapDistrict(
         "icespring_gorge", "冰泉峽谷", "冰泉瀑布",
-        "wild:elosern:1334:801", "voronoi",
+        wilderness_cell_ref((1334, 801)), "voronoi",
     ),
     "bramble_moor": MapDistrict(
         "bramble_moor", "荊棘荒原", "荊棘石環",
-        "wild:elosern:433:713", "voronoi",
+        wilderness_cell_ref((433, 713)), "voronoi",
     ),
     "honey_vale": MapDistrict(
         "honey_vale", "蜜蜂谷地", "千巢岩壁",
-        "wild:elosern:991:711", "voronoi",
+        wilderness_cell_ref((991, 711)), "voronoi",
     ),
     "silverbrook_vale": MapDistrict(
         "silverbrook_vale", "銀溪谷地", "銀溪石橋",
-        "wild:elosern:800:696", "voronoi",
+        wilderness_cell_ref((800, 696)), "voronoi",
     ),
     "red_earth_hills": MapDistrict(
         "red_earth_hills", "赤土丘陵", "赤岩拱門",
-        "wild:elosern:1181:688", "voronoi",
+        wilderness_cell_ref((1181, 688)), "voronoi",
     ),
     "bluebell_meadows": MapDistrict(
         "bluebell_meadows", "藍鈴草原", "藍鈴石井",
-        "wild:elosern:606:685", "voronoi",
+        wilderness_cell_ref((606, 685)), "voronoi",
     ),
     "rift_scarp_plateau": MapDistrict(
         "rift_scarp_plateau", "斷崖高原", "裂岩斷崖",
-        "wild:elosern:1326:586", "voronoi",
+        wilderness_cell_ref((1326, 586)), "voronoi",
     ),
     "gullcry_hills": MapDistrict(
         "gullcry_hills", "灰鷗丘陵", "鷗鳴石塔",
-        "wild:elosern:319:581", "voronoi",
+        wilderness_cell_ref((319, 581)), "voronoi",
     ),
     "chalk_giant_downs": MapDistrict(
         "chalk_giant_downs", "白堊丘陵", "白堊巨人像",
-        "wild:elosern:908:539", "voronoi",
+        wilderness_cell_ref((908, 539)), "voronoi",
     ),
     "old_battlefield": MapDistrict(
         "old_battlefield", "古戰場原", "騎士墓碑群",
-        "wild:elosern:1114:525", "voronoi",
+        wilderness_cell_ref((1114, 525)), "voronoi",
     ),
     "olive_slopes": MapDistrict(
         "olive_slopes", "橄欖坡地", "古榨油石臼",
-        "wild:elosern:702:515", "voronoi",
+        wilderness_cell_ref((702, 515)), "voronoi",
     ),
     "anvil_vale": MapDistrict(
         "anvil_vale", "鐵砧谷地", "巨鐵砧岩",
-        "wild:elosern:518:503", "voronoi",
+        wilderness_cell_ref((518, 503)), "voronoi",
     ),
     "south_pass_west_slopes": MapDistrict(
         "south_pass_west_slopes", "南隘西麓", "南隘古道碑",
-        "wild:elosern:1314:414", "voronoi",
+        wilderness_cell_ref((1314, 414)), "voronoi",
     ),
     "estuary_flats": MapDistrict(
         "estuary_flats", "河口平原", "潮汐石閘",
-        "wild:elosern:389:381", "voronoi",
+        wilderness_cell_ref((389, 381)), "voronoi",
     ),
     "salt_road_hills": MapDistrict(
         "salt_road_hills", "鹽道丘陵", "鹽商界石",
-        "wild:elosern:980:370", "voronoi",
+        wilderness_cell_ref((980, 370)), "voronoi",
     ),
     "seabreeze_pasture": MapDistrict(
         "seabreeze_pasture", "海風牧原", "風鈴石柱",
-        "wild:elosern:797:367", "voronoi",
+        wilderness_cell_ref((797, 367)), "voronoi",
     ),
     "amber_slopes": MapDistrict(
         "amber_slopes", "琥珀坡地", "琥珀泉",
-        "wild:elosern:1158:343", "voronoi",
+        wilderness_cell_ref((1158, 343)), "voronoi",
     ),
     "salt_cliff_coast": MapDistrict(
         "salt_cliff_coast", "鹽崖海岸", "白鹽崖",
-        "wild:elosern:620:300", "voronoi",
+        wilderness_cell_ref((620, 300)), "voronoi",
     ),
     "thunder_peak_range": MapDistrict(
         "thunder_peak_range", "雷鳴山嶺", "雷鳴峰",
-        "wild:elosern:1338:211", "voronoi",
+        wilderness_cell_ref((1338, 211)), "voronoi",
     ),
     "fishers_cove_coast": MapDistrict(
         "fishers_cove_coast", "漁灣海岸", "漁人守望塔",
-        "wild:elosern:478:206", "voronoi",
+        wilderness_cell_ref((478, 206)), "voronoi",
     ),
     "keelwood_forest": MapDistrict(
         "keelwood_forest", "船木林地", "龍骨巨杉",
-        "wild:elosern:836:192", "voronoi",
+        wilderness_cell_ref((836, 192)), "voronoi",
     ),
     "tidesong_dunes": MapDistrict(
         "tidesong_dunes", "潮音沙原", "潮音洞窟",
-        "wild:elosern:1006:190", "voronoi",
+        wilderness_cell_ref((1006, 190)), "voronoi",
     ),
     "pearl_bay_coast": MapDistrict(
         "pearl_bay_coast", "珍珠灣岸", "珍珠貝塚",
-        "wild:elosern:1177:176", "voronoi",
+        wilderness_cell_ref((1177, 176)), "voronoi",
     ),
     "white_sand_coast": MapDistrict(
         "white_sand_coast", "白沙海岸", "海蝕拱門",
-        "wild:elosern:662:167", "voronoi",
+        wilderness_cell_ref((662, 167)), "voronoi",
     ),
     # Grandia: the eastern plains, the southeast coast and the eastern
     # flank of the central range, north to the deep forest edge.
     "forest_rim_heath": MapDistrict(
         "forest_rim_heath", "林緣荒原", "守林人石標",
-        "wild:elosern:1625:1845", "voronoi",
+        wilderness_cell_ref((1625, 1845)), "voronoi",
     ),
     "moonlit_fields": MapDistrict(
         "moonlit_fields", "月光原野", "月光石圈",
-        "wild:elosern:1941:1836", "voronoi",
+        wilderness_cell_ref((1941, 1836)), "voronoi",
     ),
     "whalebone_heath": MapDistrict(
         "whalebone_heath", "鯨骨荒原", "鯨骨拱門",
-        "wild:elosern:2110:1834", "voronoi",
+        wilderness_cell_ref((2110, 1834)), "voronoi",
     ),
     "reed_marsh": MapDistrict(
         "reed_marsh", "蘆風沼澤", "沼中石塔",
-        "wild:elosern:1782:1809", "voronoi",
+        wilderness_cell_ref((1782, 1809)), "voronoi",
     ),
     "north_pass_east_slopes": MapDistrict(
         "north_pass_east_slopes", "北隘東麓", "北隘風蝕岩",
-        "wild:elosern:1486:1784", "voronoi",
+        wilderness_cell_ref((1486, 1784)), "voronoi",
     ),
     "sunken_bell_lake": MapDistrict(
         "sunken_bell_lake", "沉鐘湖區", "沉鐘湖",
-        "wild:elosern:2224:1723", "voronoi",
+        wilderness_cell_ref((2224, 1723)), "voronoi",
     ),
     "stag_plateau": MapDistrict(
         "stag_plateau", "狩鹿高原", "獵鹿石陣",
-        "wild:elosern:1669:1633", "voronoi",
+        wilderness_cell_ref((1669, 1633)), "voronoi",
     ),
     "crystal_plains": MapDistrict(
         "crystal_plains", "魔晶平原", "魔晶尖塔",
-        "wild:elosern:1871:1633", "voronoi",
+        wilderness_cell_ref((1871, 1633)), "voronoi",
     ),
     "starfall_plain": MapDistrict(
         "starfall_plain", "星落原", "隕星坑",
-        "wild:elosern:2069:1633", "voronoi",
+        wilderness_cell_ref((2069, 1633)), "voronoi",
     ),
     "bluemaple_hills": MapDistrict(
         "bluemaple_hills", "藍楓丘陵", "藍楓古樹",
-        "wild:elosern:2286:1581", "voronoi",
+        wilderness_cell_ref((2286, 1581)), "voronoi",
     ),
     "spruce_foothills": MapDistrict(
         "spruce_foothills", "雲杉山麓", "雲杉石階",
-        "wild:elosern:1487:1564", "voronoi",
+        wilderness_cell_ref((1487, 1564)), "voronoi",
     ),
     "harvest_north_plain": MapDistrict(
         "harvest_north_plain", "金麥北原", "豐收女神像",
-        "wild:elosern:1987:1468", "voronoi",
+        wilderness_cell_ref((1987, 1468)), "voronoi",
     ),
     "sunrise_downs": MapDistrict(
         "sunrise_downs", "日出丘原", "日出岩",
-        "wild:elosern:2394:1464", "voronoi",
+        wilderness_cell_ref((2394, 1464)), "voronoi",
     ),
     "orchard_plain": MapDistrict(
         "orchard_plain", "果園平原", "千年蘋果樹",
-        "wild:elosern:1805:1437", "voronoi",
+        wilderness_cell_ref((1805, 1437)), "voronoi",
     ),
     "black_soil_plain": MapDistrict(
         "black_soil_plain", "黑土平原", "豐饒石壇",
-        "wild:elosern:1623:1428", "voronoi",
+        wilderness_cell_ref((1623, 1428)), "voronoi",
     ),
     "poplar_plain": MapDistrict(
         "poplar_plain", "白楊平原", "白楊林蔭道",
-        "wild:elosern:2164:1418", "voronoi",
+        wilderness_cell_ref((2164, 1418)), "voronoi",
     ),
     "hawkwing_heath": MapDistrict(
         "hawkwing_heath", "鷹翼荒原", "鷹翼石",
-        "wild:elosern:2502:1330", "voronoi",
+        wilderness_cell_ref((2502, 1330)), "voronoi",
     ),
     "echo_canyon": MapDistrict(
         "echo_canyon", "回音峽谷", "回音石門",
-        "wild:elosern:1490:1308", "voronoi",
+        wilderness_cell_ref((1490, 1308)), "voronoi",
     ),
     "scorched_hills": MapDistrict(
         "scorched_hills", "焦岩丘陵", "焦黑石林",
-        "wild:elosern:2303:1287", "voronoi",
+        wilderness_cell_ref((2303, 1287)), "voronoi",
     ),
     "imperial_capital_plain": MapDistrict(
         "imperial_capital_plain", "帝都平原", "帝都凱旋門",
-        "wild:elosern:1970:1280", "voronoi",
+        wilderness_cell_ref((1970, 1280)), "voronoi",
     ),
     "canal_plain": MapDistrict(
         "canal_plain", "運河平原", "古運河閘門",
-        "wild:elosern:1738:1246", "voronoi",
+        wilderness_cell_ref((1738, 1246)), "voronoi",
     ),
     "rose_plain": MapDistrict(
         "rose_plain", "玫瑰平原", "玫瑰石園",
-        "wild:elosern:2124:1196", "voronoi",
+        wilderness_cell_ref((2124, 1196)), "voronoi",
     ),
     "tide_wind_downs": MapDistrict(
         "tide_wind_downs", "潮風丘地", "海神祭壇",
-        "wild:elosern:2460:1163", "voronoi",
+        wilderness_cell_ref((2460, 1163)), "voronoi",
     ),
     "gargoyle_plateau": MapDistrict(
         "gargoyle_plateau", "石像鬼高原", "石像鬼岩",
-        "wild:elosern:1549:1132", "voronoi",
+        wilderness_cell_ref((1549, 1132)), "voronoi",
     ),
     "imperial_river_reach": MapDistrict(
         "imperial_river_reach", "帝河流域", "七拱石橋",
-        "wild:elosern:1939:1103", "voronoi",
+        wilderness_cell_ref((1939, 1103)), "voronoi",
     ),
     "sundial_plain": MapDistrict(
         "sundial_plain", "金陽平原", "日晷石",
-        "wild:elosern:2269:1088", "voronoi",
+        wilderness_cell_ref((2269, 1088)), "voronoi",
     ),
     "imperial_wheatlands": MapDistrict(
         "imperial_wheatlands", "帝國麥原", "風車古道",
-        "wild:elosern:1760:1050", "voronoi",
+        wilderness_cell_ref((1760, 1050)), "voronoi",
     ),
     "stormrock_heath": MapDistrict(
         "stormrock_heath", "東岬荒原", "風暴岩",
-        "wild:elosern:2439:991", "voronoi",
+        wilderness_cell_ref((2439, 991)), "voronoi",
     ),
     "wizard_tower_plain": MapDistrict(
         "wizard_tower_plain", "法師平原", "傾斜法師塔",
-        "wild:elosern:2097:968", "voronoi",
+        wilderness_cell_ref((2097, 968)), "voronoi",
     ),
     "great_pass_east": MapDistrict(
         "great_pass_east", "大隘東原", "大隘道標",
-        "wild:elosern:1502:962", "voronoi",
+        wilderness_cell_ref((1502, 962)), "voronoi",
     ),
     "emerald_lake_plain": MapDistrict(
         "emerald_lake_plain", "翡翠湖原", "翡翠湖",
-        "wild:elosern:1896:906", "voronoi",
+        wilderness_cell_ref((1896, 906)), "voronoi",
     ),
     "eastern_pasture": MapDistrict(
         "eastern_pasture", "東陲牧野", "孤石望台",
-        "wild:elosern:2300:900", "voronoi",
+        wilderness_cell_ref((2300, 900)), "voronoi",
     ),
     "horse_plain": MapDistrict(
         "horse_plain", "駿馬原野", "奔馬石雕",
-        "wild:elosern:1687:864", "voronoi",
+        wilderness_cell_ref((1687, 864)), "voronoi",
     ),
     "golden_dune_downs": MapDistrict(
         "golden_dune_downs", "金沙丘原", "沙中古塔",
-        "wild:elosern:2402:797", "voronoi",
+        wilderness_cell_ref((2402, 797)), "voronoi",
     ),
     "flax_plain": MapDistrict(
         "flax_plain", "亞麻平原", "藍花石橋",
-        "wild:elosern:2191:777", "voronoi",
+        wilderness_cell_ref((2191, 777)), "voronoi",
     ),
     "mithril_foothills": MapDistrict(
         "mithril_foothills", "銀礦山麓", "秘銀礦坑",
-        "wild:elosern:1504:761", "voronoi",
+        wilderness_cell_ref((1504, 761)), "voronoi",
     ),
     "river_isle_flats": MapDistrict(
         "river_isle_flats", "河洲平原", "白鷺沙洲",
-        "wild:elosern:2015:751", "voronoi",
+        wilderness_cell_ref((2015, 751)), "voronoi",
     ),
     "herbal_plain": MapDistrict(
         "herbal_plain", "藥草原野", "賢者石圃",
-        "wild:elosern:1842:711", "voronoi",
+        wilderness_cell_ref((1842, 711)), "voronoi",
     ),
     "griffin_plateau": MapDistrict(
         "griffin_plateau", "獅鷲高原", "獅鷲巢岩",
-        "wild:elosern:1667:651", "voronoi",
+        wilderness_cell_ref((1667, 651)), "voronoi",
     ),
     "bluewave_downs": MapDistrict(
         "bluewave_downs", "藍浪丘原", "浪花石",
-        "wild:elosern:2343:642", "voronoi",
+        wilderness_cell_ref((2343, 642)), "voronoi",
     ),
     "confluence_vale": MapDistrict(
         "confluence_vale", "雙河谷地", "匯流巨石",
-        "wild:elosern:2144:598", "voronoi",
+        wilderness_cell_ref((2144, 598)), "voronoi",
     ),
     "cloudsea_foothills": MapDistrict(
         "cloudsea_foothills", "雲海山麓", "雲海觀星台",
-        "wild:elosern:1503:569", "voronoi",
+        wilderness_cell_ref((1503, 569)), "voronoi",
     ),
     "east_branch_ford": MapDistrict(
         "east_branch_ford", "渡口原野", "東支流古渡",
-        "wild:elosern:2300:526", "voronoi",
+        wilderness_cell_ref((2300, 526)), "voronoi",
     ),
     "spice_road_plain": MapDistrict(
         "spice_road_plain", "香料原野", "香料古道碑",
-        "wild:elosern:1976:522", "voronoi",
+        wilderness_cell_ref((1976, 522)), "voronoi",
     ),
     "orange_blossom_plain": MapDistrict(
         "orange_blossom_plain", "橙花平原", "橙花古泉",
-        "wild:elosern:1805:518", "voronoi",
+        wilderness_cell_ref((1805, 518)), "voronoi",
     ),
     "giants_stair_highlands": MapDistrict(
         "giants_stair_highlands", "南嶺高地", "巨人階梯",
-        "wild:elosern:1660:419", "voronoi",
+        wilderness_cell_ref((1660, 419)), "voronoi",
     ),
     "caravan_hills": MapDistrict(
         "caravan_hills", "商隊丘陵", "商隊泉",
-        "wild:elosern:2147:402", "voronoi",
+        wilderness_cell_ref((2147, 402)), "voronoi",
     ),
     "south_pass_east_slopes": MapDistrict(
         "south_pass_east_slopes", "南隘東麓", "南隘石門",
-        "wild:elosern:1490:371", "voronoi",
+        wilderness_cell_ref((1490, 371)), "voronoi",
     ),
     "imperial_south_shore": MapDistrict(
         "imperial_south_shore", "帝國南岸", "燈塔岬",
-        "wild:elosern:1850:320", "voronoi",
+        wilderness_cell_ref((1850, 320)), "voronoi",
     ),
     "imperial_delta": MapDistrict(
         "imperial_delta", "帝河三角洲", "三角洲古碑",
-        "wild:elosern:2007:303", "voronoi",
+        wilderness_cell_ref((2007, 303)), "voronoi",
     ),
     "sea_serpent_slopes": MapDistrict(
         "sea_serpent_slopes", "海蛇坡地", "海蛇化石",
-        "wild:elosern:1668:211", "voronoi",
+        wilderness_cell_ref((1668, 211)), "voronoi",
     ),
     "obsidian_ridge": MapDistrict(
         "obsidian_ridge", "火山岩嶺", "黑曜石峰",
-        "wild:elosern:1503:184", "voronoi",
+        wilderness_cell_ref((1503, 184)), "voronoi",
     ),
     "mermaid_cove_coast": MapDistrict(
         "mermaid_cove_coast", "人魚灣岸", "人魚雕像",
-        "wild:elosern:1840:177", "voronoi",
+        wilderness_cell_ref((1840, 177)), "voronoi",
     ),
     # Valhalla: the northwest highland forest between the border river and
     # the deep forest edge, and the range's western flank north of the river.
     "howling_capital_woods": MapDistrict(
         "howling_capital_woods", "王城森林", "萬獸圖騰柱",
-        "wild:elosern:780:1910", "voronoi",
+        wilderness_cell_ref((780, 1910)), "voronoi",
     ),
     "bear_claw_woods": MapDistrict(
         "bear_claw_woods", "熊爪林地", "熊王岩",
-        "wild:elosern:992:1851", "voronoi",
+        wilderness_cell_ref((992, 1851)), "voronoi",
     ),
     "stag_call_highlands": MapDistrict(
         "stag_call_highlands", "鹿鳴高地", "鹿角聖樹",
-        "wild:elosern:469:1850", "voronoi",
+        wilderness_cell_ref((469, 1850)), "voronoi",
     ),
     "north_pass_west_slopes": MapDistrict(
         "north_pass_west_slopes", "北隘西麓", "雪豹岩",
-        "wild:elosern:1326:1837", "voronoi",
+        wilderness_cell_ref((1326, 1837)), "voronoi",
     ),
     "shaman_cave_woods": MapDistrict(
         "shaman_cave_woods", "巫醫林地", "巫醫石窟",
-        "wild:elosern:1168:1816", "voronoi",
+        wilderness_cell_ref((1168, 1816)), "voronoi",
     ),
     "frost_heath": MapDistrict(
         "frost_heath", "霜風荒原", "冰河巨石",
-        "wild:elosern:262:1814", "voronoi",
+        wilderness_cell_ref((262, 1814)), "voronoi",
     ),
     "war_drum_highlands": MapDistrict(
         "war_drum_highlands", "戰鼓高地", "戰鼓岩",
-        "wild:elosern:648:1808", "voronoi",
+        wilderness_cell_ref((648, 1808)), "voronoi",
     ),
     "beast_trail_woods": MapDistrict(
         "beast_trail_woods", "獸徑林地", "飲獸泉",
-        "wild:elosern:857:1713", "voronoi",
+        wilderness_cell_ref((857, 1713)), "voronoi",
     ),
     "pine_hunting_grounds": MapDistrict(
         "pine_hunting_grounds", "松濤獵場", "獵人祭壇",
-        "wild:elosern:1050:1700", "voronoi",
+        wilderness_cell_ref((1050, 1700)), "voronoi",
     ),
     "hot_spring_foothills": MapDistrict(
         "hot_spring_foothills", "溫泉山麓", "赤霧溫泉",
-        "wild:elosern:1331:1670", "voronoi",
+        wilderness_cell_ref((1331, 1670)), "voronoi",
     ),
     "bison_plateau": MapDistrict(
         "bison_plateau", "野牛高原", "野牛頭骨塚",
-        "wild:elosern:391:1661", "voronoi",
+        wilderness_cell_ref((391, 1661)), "voronoi",
     ),
     "howling_highlands": MapDistrict(
         "howling_highlands", "狼嚎高地", "灰狼石柱",
-        "wild:elosern:560:1640", "voronoi",
+        wilderness_cell_ref((560, 1640)), "voronoi",
     ),
     "iron_vein_highlands": MapDistrict(
         "iron_vein_highlands", "鐵脈高地", "赤鐵岩壁",
-        "wild:elosern:1175:1605", "voronoi",
+        wilderness_cell_ref((1175, 1605)), "voronoi",
     ),
     "ancestor_cairn_hills": MapDistrict(
         "ancestor_cairn_hills", "先祖丘陵", "先祖石冢",
-        "wild:elosern:729:1595", "voronoi",
+        wilderness_cell_ref((729, 1595)), "voronoi",
     ),
     "mossy_coast_woods": MapDistrict(
         "mossy_coast_woods", "苔林海岸", "苔蘚巨木",
-        "wild:elosern:240:1583", "voronoi",
+        wilderness_cell_ref((240, 1583)), "voronoi",
     ),
     "grizzly_vale": MapDistrict(
         "grizzly_vale", "灰熊谷", "灰熊洞穴",
-        "wild:elosern:896:1489", "voronoi",
+        wilderness_cell_ref((896, 1489)), "voronoi",
     ),
     "giant_rockfall_slopes": MapDistrict(
         "giant_rockfall_slopes", "落石坡地", "巨人落石",
-        "wild:elosern:1310:1480", "voronoi",
+        wilderness_cell_ref((1310, 1480)), "voronoi",
     ),
     "falcon_rise": MapDistrict(
         "falcon_rise", "獵鷹高原", "獵鷹台",
-        "wild:elosern:1093:1455", "voronoi",
+        wilderness_cell_ref((1093, 1455)), "voronoi",
     ),
     "blood_moon_vale": MapDistrict(
         "blood_moon_vale", "血月谷", "血月石",
-        "wild:elosern:447:1450", "voronoi",
+        wilderness_cell_ref((447, 1450)), "voronoi",
     ),
     "rivers_watch_woods": MapDistrict(
         "rivers_watch_woods", "界北林地", "望河岩",
-        "wild:elosern:670:1416", "voronoi",
+        wilderness_cell_ref((670, 1416)), "voronoi",
     ),
     "wolf_fang_coast": MapDistrict(
         "wolf_fang_coast", "狼牙海岸林", "狼牙巨石",
-        "wild:elosern:238:1388", "voronoi",
+        wilderness_cell_ref((238, 1388)), "voronoi",
     ),
 }
