@@ -29,18 +29,22 @@ import MapLattice from "../../components/MapLattice.vue";
 import MapNodeGlyph from "../../components/MapNodeGlyph.vue";
 import AreaMapView from "../../components/AreaMapView.vue";
 import WorldMapView from "../../components/WorldMapView.vue";
-import { AREA_CELL_GLYPH_SCALE, ISLAND_GLYPH_SCALE, gatePath } from "../../lib/map_marker_geometry.js";
-import { spanLimits, wildernessStops } from "../../lib/map_viewport.js";
+import { gatePath, spanLimits } from "@elosern/map-view";
+import { usableRect } from "../../lib/map_chrome.js";
+import { AREA_CELL_GLYPH_SCALE, ISLAND_GLYPH_SCALE } from "../../lib/map_glyphs.js";
+import { wildernessStops } from "../../lib/map_stops.js";
 import { viewSignature } from "../../lib/area_map_view.js";
 import OverlayHost from "../../components/OverlayHost.vue";
 import { areaMemoryKey, scopeForLayer, useMapDrawer } from "../../composables/use-map-drawer.js";
-import { project, usableRect } from "../../lib/map_viewport.js";
+import { project } from "@elosern/map-view";
 import MapPanels from "../../../static/webclient/js/elosern/protocol/panels/map_panels.js";
 import { TOWN_IDS, WILD_GATE_ID, dungeonArea, interiorArea, townArea, townFromEastArea, wildernessArea } from "../../stories/fixtures/area_map.js";
 import { QUEST_IDS, newLight, worldBase, worldNewLight } from "../../stories/fixtures/world_map.js";
 
 const { validateAreaMapPanel, validateWorldMapPanel } = MapPanels;
 const APP_DIR = resolve(__dirname, "../..");
+// The shared primitives live in the repository's own workspace package.
+const MAP_VIEW_SRC = resolve(APP_DIR, "../../packages/map-view/src");
 
 // Importing AppClient puts the whole component library's stylesheets in jsdom
 // (93 here, against 16 without it), so one computed-style read costs ~31 ms
@@ -1245,7 +1249,7 @@ describe("every map surface draws a shared map concept from its one glyph source
     expect(holders(/world-map__hatch-line/)).toEqual(["WorldHatchPattern.vue"]);
     // The gate arch comes only from gatePath(); no component spells an arch.
     expect(holders(/A8 8 0 0 1|A7 7 0 0 1/)).toEqual([]);
-    expect(readFileSync(resolve(APP_DIR, "lib/map_marker_geometry.js"), "utf-8")).toMatch(/export function gatePath\(\)/);
+    expect(readFileSync(resolve(MAP_VIEW_SRC, "glyph.js"), "utf-8")).toMatch(/export function gatePath\(\)/);
     // The commission diamond lives only in MapCommissionGlyph.
     expect(holders(/M0 -7\.5 L5\.5 0/)).toEqual(["MapCommissionGlyph.vue"]);
     // The road ink lives only in area-map-ink.css.

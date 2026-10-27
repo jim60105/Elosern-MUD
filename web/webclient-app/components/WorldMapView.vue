@@ -46,9 +46,10 @@ import WorldMapGlyph from "./WorldMapGlyph.vue";
 import WorldHatchPattern from "./WorldHatchPattern.vue";
 import WorldMapDetail from "./WorldMapDetail.vue";
 import {
-  DETAIL_DRAWER_WIDTH,
   DRAG_THRESHOLD_PX,
+  UNITS,
   centreOn,
+  estimateTextWidth,
   nearestStop,
   nextStop,
   panByPixels,
@@ -56,12 +57,12 @@ import {
   project,
   scaleBar,
   spanLimits,
-  usableRect,
   wheelFactor,
   zoomAt,
   zoomBy,
-  UNITS,
-} from "../lib/map_viewport.js";
+} from "@elosern/map-view";
+import { DETAIL_DRAWER_WIDTH, usableRect } from "../lib/map_chrome.js";
+import { GAME_MAP_THEME_VARS } from "../lib/map_theme.js";
 import { readMotionMs } from "../lib/motion_tokens.js";
 import {
   APPROXIMATE_MIN_RADIUS_PX,
@@ -70,7 +71,6 @@ import {
   NATION_FONT_PX,
   REVEAL_TOKEN,
   WORLD_SIGNATURE,
-  estimateTextWidth,
   featureDetail,
   featureKeys,
   featureName,
@@ -712,7 +712,13 @@ const litCount = computed(() => litDistricts.value.length);
 </script>
 
 <template>
-  <div class="world-map" :class="{ 'has-detail': detailShown }" data-testid="world-map" @keydown="onRootKeydown">
+  <div
+    class="world-map"
+    :class="{ 'has-detail': detailShown }"
+    :style="GAME_MAP_THEME_VARS"
+    data-testid="world-map"
+    @keydown="onRootKeydown"
+  >
     <div
       ref="surface"
       class="world-map__surface"

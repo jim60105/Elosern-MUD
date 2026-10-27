@@ -18,7 +18,8 @@ import {
   LOCAL_MAP_CROWDED_LABELS_SAMPLE,
   localMapModelFor,
 } from "../../stories/fixtures.js";
-import { ISLAND_GLYPH_SCALE, HALO_R, gatePath } from "../../lib/map_marker_geometry.js";
+import { HALO_R, gatePath } from "@elosern/map-view";
+import { ISLAND_GLYPH_SCALE } from "../../lib/map_glyphs.js";
 import { spreadExits } from "../../lib/minimap_projection.js";
 import { MARKER_CURRENT_RING_R } from "../../composables/use-map-lattice-geometry.js";
 import {
@@ -426,7 +427,7 @@ describe("the minimap island draws the area map's node glyphs", () => {
 
   it("rescales glyph, footprint, label clearance, stub start and aim ring from the one constant", async () => {
     vi.resetModules();
-    vi.doMock("../../lib/map_marker_geometry.js", async (importOriginal) => ({
+    vi.doMock("../../lib/map_glyphs.js", async (importOriginal) => ({
       ...(await importOriginal()),
       ISLAND_GLYPH_SCALE: 0.5,
     }));
@@ -462,7 +463,7 @@ describe("the minimap island draws the area map's node glyphs", () => {
       expect(exits[0].bearing).toBe(0);
       expect(exits[1].bearing).toBe(theta);
     } finally {
-      vi.doUnmock("../../lib/map_marker_geometry.js");
+      vi.doUnmock("../../lib/map_glyphs.js");
       vi.resetModules();
     }
   });

@@ -4,7 +4,7 @@
 // `area_map` / `world_map` body or from arithmetic on its coordinates; no
 // route, place or precision is ever invented. No Vue, no DOM.
 
-import { formatDistance, project } from "./map_viewport.js";
+import { formatDistance, project } from "@elosern/map-view";
 import { areaUnit, compassWord, isRadialLayer, placeNodes } from "./area_map_view.js";
 import { farPointAlongBearing } from "./map_edge_pointers.js";
 

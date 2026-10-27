@@ -12,7 +12,8 @@ import LocalMap from "../lib/local_map.js";
 import { CELL_EM, charCells, textCells } from "../lib/mono_cells.js";
 import { CANVAS_SIZE, CENTRE, R_MAX, projectIsland } from "../lib/minimap_projection.js";
 import { ASCENT, DESCENT, placeIslandLabels } from "../lib/island_labels.js";
-import { HALO_R, ISLAND_GLYPH_SCALE, paintedMarkerFootprint } from "../lib/map_marker_geometry.js";
+import { HALO_R } from "@elosern/map-view";
+import { ISLAND_GLYPH_SCALE, paintedMarkerFootprint } from "../lib/map_glyphs.js";
 
 export const MARKER_DIAMOND_HALF = 9;
 // The graph variant's label baseline half-extent: the largest base footprint

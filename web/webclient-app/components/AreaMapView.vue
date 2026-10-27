@@ -3,7 +3,7 @@
 // docs/superpowers/specs/2026-10-22-world-map-drawer-design.md §6.2-§6.5).
 // It draws one validated `area_map` v1 body and nothing else:
 //   - grid: the settlement's metre coordinates at one uniform scale under
-//     pan and zoom (map_viewport.js), with no compressed mode;
+//     pan and zoom (@elosern/map-view), with no compressed mode;
 //   - instance / interior: coordinate-free rooms on the minimap's radial
 //     placement (no metric position is ever fabricated);
 //   - wilderness: the provider's 15 x 15 cell window and current district.
@@ -34,41 +34,41 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import AreaMapDetail from "./AreaMapDetail.vue";
 import MapNodeGlyph from "./MapNodeGlyph.vue";
 import MapCommissionGlyph from "./MapCommissionGlyph.vue";
-import { AREA_CELL_GLYPH_SCALE } from "../lib/map_marker_geometry.js";
 import {
-  DETAIL_DRAWER_WIDTH,
   DRAG_THRESHOLD_PX,
   cellRect,
+  cellOf,
   centreOn,
+  estimateTextWidth,
+  nearestStop,
   nextStop,
   panByPixels,
+  placeLabels,
   previousStop,
   project,
-  usableRect,
+  scaleBar,
+  spanLimits,
   wheelFactor,
   zoomAt,
   zoomBy,
-} from "../lib/map_viewport.js";
+} from "@elosern/map-view";
+import { DETAIL_DRAWER_WIDTH, usableRect } from "../lib/map_chrome.js";
+import { AREA_CELL_GLYPH_SCALE } from "../lib/map_glyphs.js";
+import { GAME_MAP_THEME_VARS } from "../lib/map_theme.js";
 import {
   DOT_MIN_GAP_PX,
   LABEL_FONT_PX,
   adjacentIds,
+  areaDotField,
   areaStops,
   areaUnit,
-  cellOf,
-  dotField,
-  estimateTextWidth,
   isRadialLayer,
   labelCandidates,
   leadsToOf,
-  nearestStop,
   nodeAccessibleName,
   nodeDetail,
   openingView,
-  placeLabels,
   placeNodes,
-  scaleBar,
-  spanLimits,
   travelAction,
   viewSignature,
   wholeView,
@@ -341,9 +341,7 @@ const edgeDraws = computed(() => {
     .filter(Boolean);
 });
 
-const dots = computed(() =>
-  dotField(view.value, frame.value, unit.value, DOT_MIN_GAP_PX * uiScale.value, isWild.value ? unit.value.metres : 0),
-);
+const dots = computed(() => areaDotField(props.area, view.value, frame.value, DOT_MIN_GAP_PX * uiScale.value));
 const scale = computed(() => (unit.value ? scaleBar(view.value, frame.value, unit.value, 120 * uiScale.value) : null));
 
 // ── labels ──────────────────────────────────────────────────────────────
@@ -681,6 +679,7 @@ onBeforeUnmount(() => {
   <div
     class="area-map"
     :class="[`area-map--${area.layer}`, { 'has-detail': detailShown }]"
+    :style="GAME_MAP_THEME_VARS"
     data-testid="area-map"
     :data-layer="area.layer"
     @keydown="onRootKeydown"

@@ -18,7 +18,10 @@ import unittest
 from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-VIEWPORT_SUITE = REPO_ROOT / "web/webclient-app/tests/world/map_viewport.test.js"
+# The neutral viewport primitives moved into the local @elosern/map-view
+# package (map-view-shared-foundations); this suite now proves the game's own
+# stop/chrome policy wired through them.
+VIEWPORT_SUITE = REPO_ROOT / "web/webclient-app/tests/world/map_view_policy.test.js"
 AREA_VIEW_SUITE = REPO_ROOT / "web/webclient-app/tests/world/area_map_view.test.js"
 WORLD_VIEW_SUITE = REPO_ROOT / "web/webclient-app/tests/world/world_map_view.test.js"
 DRAWER_SUITE = REPO_ROOT / "web/webclient-app/tests/world/map_drawer.test.js"
@@ -130,10 +133,10 @@ class VitestContractMixin:
 
 
 class ViewportContracts(VitestContractMixin, unittest.TestCase):
-    """Runs ``map_viewport.test.js`` once; one method per requirement."""
+    """Runs ``map_view_policy.test.js`` once; one method per requirement."""
 
     SUITE = VIEWPORT_SUITE
-    SUITE_NAME = "map viewport"
+    SUITE_NAME = "map view policy"
 
     @covers_requirement(
         "webclient-map-viewport::map-navigation-preserves-uniform-geometry-and-the-zoom-anchor"

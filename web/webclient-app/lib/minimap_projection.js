@@ -100,7 +100,8 @@
 //   those nearest it; each ring clears every other by RING_MIN_GAP units, at
 //   most MAX_RINGS of them, returned in ascending distance.
 import LocalMap from "./local_map.js";
-import { ISLAND_GLYPH_SCALE, paintedMarkerFootprint } from "./map_marker_geometry.js";
+import { formatDistance } from "@elosern/map-view";
+import { ISLAND_GLYPH_SCALE, paintedMarkerFootprint } from "./map_glyphs.js";
 
 export const CANVAS_SIZE = 240;
 export const CENTRE = CANVAS_SIZE / 2;
@@ -140,10 +141,6 @@ export function previousLevelFor(memory, currentId) {
 
 export function rememberLevel(currentId, projection) {
   return { mapKey: mapKeyOf(currentId), level: projection ? projection.level : null };
-}
-
-export function formatDistance(metres) {
-  return metres >= 1000 ? `${metres / 1000} km` : `${metres} m`;
 }
 
 function finitePoint(node) {
