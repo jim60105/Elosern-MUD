@@ -65,9 +65,48 @@ describe("the interaction card's row model", () => {
     expect(rows[1].key).toBe("look-target");
   });
 
-  it("synthesizes a never-callable 交談 for a target with no talk descriptor", () => {
-    const rows = card(target({ affordances: [action("explore.engage", "戰鬥")] }));
-    expect(rows.map((row) => row.key)).toEqual(["talk-open", "look-target", "engage", "back"]);
+  it("leaves a non-NPC target's card as it was: no common slots, no groups", () => {
+    // The payload carries no entity kind; the server publishes 交談 only for
+    // an NPC, so a monster's engage-only card keeps its own row first and its
+    // own reason. 查看 stays last, exactly as before this slice.
+    const rows = card(
+      target({
+        services: { state: "none", entries: [] },
+        affordances: [
+          action("explore.engage", "戰鬥", {
+            enabled: false,
+            disabled_reason: { code: "dead", message: "牠已經死亡。" },
+          }),
+        ],
+      }),
+    );
+    expect(rows.map((row) => row.key)).toEqual(["engage", "look-target", "back"]);
+    expect(rows[0].disabledReason.message).toBe("牠已經死亡。");
+    expect(rows.map((row) => row.group)).toEqual([undefined, undefined, undefined]);
+  });
+
+  it("synthesizes a never-callable 交談 for an NPC card with no talk descriptor", () => {
+    // An NPC that carries the author editor is unambiguously an NPC card, so
+    // the fixed common slot is filled even though no talk row was published.
+    const rows = card(
+      target({
+        affordances: [
+          {
+            kind: "navigate",
+            surface: "npc_persona",
+            label: "編輯人物設定",
+            enabled: true,
+            disabled_reason: null,
+          },
+        ],
+      }),
+    );
+    expect(rows.map((row) => row.key)).toEqual([
+      "talk-open",
+      "look-target",
+      "service-npc_persona",
+      "back",
+    ]);
     expect(rows[0]).toMatchObject({ enabled: false, actionId: null, payload: null });
     expect(rows[0].disabledReason.code).toBe("not_conversable");
   });

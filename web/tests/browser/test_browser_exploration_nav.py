@@ -262,18 +262,19 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         host_identity = panel["interact"][0]["identity"]
         open_verb_card(page, host_identity)
         self.assertEqual(page.evaluate("window.__elosernBridge.router.depth()"), 1)
-        # The host's verb card: the 交談 conversation entry, the author
-        # editor entry, the host's own authored dialogue service
-        # (npc-contextual-service-projection ships the guild report
-        # association on this host), 查看, and the trailing ✕ 返回, centred
-        # over the stage. The coarse guild/shop navigate rows are gone.
+        # The host's interaction card, in the grouped order slice U ships:
+        # 交談 at slot 1, 查看 at slot 2, the conditional author-editor entry,
+        # the host's own authored dialogue service (npc-contextual-service-
+        # projection ships the guild report association on this host), and the
+        # trailing ✕ 返回, centred over the stage. The coarse guild/shop
+        # navigate rows are gone.
         self.assertEqual(
             card_row_keys(page),
             [
                 "talk-open",
+                "look-target",
                 "service-npc_persona",
                 "service-dialogue.guild_report_dialogue",
-                "look-target",
                 "back",
             ],
             "the verb card's rows",

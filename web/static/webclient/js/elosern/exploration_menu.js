@@ -582,8 +582,63 @@
     return items;
   }
 
+  // An NPC card is the one the grouped composition owns (slice U). The
+  // interact payload carries no entity kind, and the server publishes 交談
+  // only for an NPC: an NPC with no supported conversation now gets a
+  // disabled not-conversable row, and only an NPC carries contextual
+  // services or the author editor. Those three rows are the card's own
+  // proof of its kind, so a monster or another non-NPC target keeps its
+  // previous composition (its affordances, then 查看, then the return) and
+  // its own reason -- a monster's disabled 戰鬥 stays the row the player
+  // reads, never a 交談 the server never published.
+  function isNpcCard(items) {
+    return items.some(function (item) {
+      return (
+        item.key === "talk-open" ||
+        item.key === "service-npc_persona" ||
+        item.group === GROUP_SERVICES
+      );
+    });
+  }
+
+  // The pre-slice-U card a non-NPC target keeps: its own rows in the
+  // server's order, then 查看, then the unnumbered return.
+  function plainVerbMenuFor(base, target) {
+    var items = base.items
+      .filter(function (item) {
+        return item.key !== "target-empty" && item.key !== "back";
+      })
+      .map(function (item) {
+        // The grouped composition's identity does not belong to this card:
+        // its rows render without headings, exactly as before the slice.
+        var plain = Object.assign({}, item);
+        delete plain.group;
+        delete plain.groupLabel;
+        return plain;
+      });
+    items.push({
+      key: "look-target",
+      label: "查看",
+      enabled: true,
+      actionId: "explore.look",
+      payload: { target_id: identityOf(target) },
+      description: null,
+      commandDisplay: { targetLabel: targetName(target) },
+    });
+    items.push(backItem());
+    return {
+      items: items,
+      focusKey: null,
+      target: target,
+      title: targetName(target) || "互動",
+    };
+  }
+
   function verbMenuFor(model, target) {
     var base = targetMenuFor(model, target);
+    if (!isNpcCard(base.items)) {
+      return plainVerbMenuFor(base, target);
+    }
     var conditional = base.items
       .filter(function (item) {
         return item.group === GROUP_CONDITIONAL && item.key !== "target-empty";

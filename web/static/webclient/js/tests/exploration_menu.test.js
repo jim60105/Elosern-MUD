@@ -914,13 +914,40 @@ test("a possess row submits explore.possess with the target identity", () => {
   assert.deepEqual(row.payload, { npc_id: target.identity });
 });
 
-test("a target with no talk row keeps a disabled 交談 at slot 1 and 查看 at slot 2", () => {
+test("a target with no NPC row keeps its previous card: 查看 last, no common slots", () => {
+  // The server publishes 交談 only for an NPC, so a target with no talk row,
+  // no contextual services and no author editor is not an NPC card: it keeps
+  // the pre-slice composition (its own rows, then 查看, then the return).
   const panel = overviewPanel();
   const model = ExplorationMenu.buildMenus(panel, { currentNode: "room:3" });
   const menu = ExplorationMenu.verbMenuFor(model, panel.interact[0]);
+  assert.deepEqual(menu.items.map((item) => item.key), ["look-target", "back"]);
+  assert.deepEqual(menu.items.map((item) => item.group), [undefined, undefined]);
+  assert.equal(menu.items[0].actionId, "explore.look");
+});
+
+test("an NPC card with no talk row keeps a disabled 交談 at slot 1", () => {
+  // The author editor is the NPC marker here: such a card is grouped, so the
+  // common slot is filled by the never-callable row instead of being taken by
+  // the conditional operation.
+  const panel = overviewPanel();
+  const target = Object.assign({}, panel.interact[0], {
+    affordances: [
+      {
+        kind: "navigate",
+        surface: "npc_persona",
+        label: "編輯人物設定",
+        enabled: true,
+        disabled_reason: null,
+      },
+    ],
+    services: { state: "none", entries: [] },
+  });
+  const model = ExplorationMenu.buildMenus(panel, { currentNode: "room:3" });
+  const menu = ExplorationMenu.verbMenuFor(model, target);
   assert.deepEqual(
     menu.items.map((item) => item.key),
-    ["talk-open", "look-target", "back"],
+    ["talk-open", "look-target", "service-npc_persona", "back"],
     "the fixed common slots are never taken by another row"
   );
   const talk = menu.items[0];
@@ -928,7 +955,6 @@ test("a target with no talk row keeps a disabled 交談 at slot 1 and 查看 at 
   assert.equal(talk.actionId, null, "the fallback slot is never callable");
   assert.equal(talk.payload, null);
   assert.equal(talk.disabledReason.code, "not_conversable");
-  assert.ok(talk.description && talk.description.trim());
 });
 
 // npc-persona-editor-window D1: the 編輯人物設定 navigate row opens the author

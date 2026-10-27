@@ -254,10 +254,10 @@ describe("the presence slice (exploration-presence-rail)", () => {
     expect(sender.sent.actions).toHaveLength(0);
   });
 
-  // slice U: the fixed common slots stay in place for a target whose
-  // descriptor carries no talk row of its own, and the fallback is never
-  // callable.
-  it("a target with no talk row keeps a disabled 交談 at slot 1 and 查看 at 2", () => {
+  // slice U: the grouped card is an NPC card. The server publishes 交談 only
+  // for an NPC, so a monster target keeps its own card -- engage first, its
+  // own reason, 查看 last -- rather than a 交談 the server never published.
+  it("a non-NPC target keeps its own card and its own reason", () => {
     const goblin = {
       identity: 11,
       display_name: "哥布林",
@@ -268,9 +268,38 @@ describe("the presence slice (exploration-presence-rail)", () => {
     open([goblin]);
     store.activatePresence("target-11");
     expect(store.view.presenceVerbs.map((item) => item.key)).toEqual([
+      "engage",
+      "look-target",
+      "back",
+    ]);
+    expect(store.view.presenceVerbs[0].actionId).toBe("explore.engage");
+    expect(store.view.presenceVerbs[0].group).toBeUndefined();
+  });
+
+  // slice U: an NPC card whose descriptor carries no talk row of its own still
+  // keeps the fixed common slot, and the fallback is never callable.
+  it("an NPC card with no talk row keeps a disabled 交談 at slot 1", () => {
+    const host = {
+      identity: 11,
+      display_name: "記錄員",
+      portrait_ref: null,
+      services: { state: "none", entries: [] },
+      affordances: [
+        {
+          kind: "navigate",
+          surface: "npc_persona",
+          label: "編輯人物設定",
+          enabled: true,
+          disabled_reason: null,
+        },
+      ],
+    };
+    open([host]);
+    store.activatePresence("target-11");
+    expect(store.view.presenceVerbs.map((item) => item.key)).toEqual([
       "talk-open",
       "look-target",
-      "engage",
+      "service-npc_persona",
       "back",
     ]);
     expect(store.view.presenceVerbs[0]).toMatchObject({ enabled: false, actionId: null });
