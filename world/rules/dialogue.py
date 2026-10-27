@@ -48,11 +48,16 @@ from world.lore.scenes import Narration, Scene, Speech, scene_canonical_bytes
 from typeclasses.components import ScriptedDialogue
 
 from world.lore.dialogue import DIALOGUE_ROWS
+from world.lore.dialogue.services import (
+    GUILD_STAFF_DIALOGUE_KEY,
+    GUILD_STAFF_TURNIN_KEYWORD,
+)
 from world.lore.dialogue.shape import DialogueDefinition, KeywordResponse
 from world.observability import log_error, log_info
 
-GUILD_STAFF_DIALOGUE_KEY = "guild_staff"
-GUILD_STAFF_TURNIN_KEYWORD = "回報"
+#: The guild counter's dialogue key and deterministic report keyword are owned
+#: by the dialogue-service association contract (``world.lore.dialogue.
+#: services``) and re-exported here for every historical import path.
 
 # A generated story role's dialogue identity names its package and role, e.g.
 # ``scene_role:pkg_ab12:mother``. The shared resolver reads the role's current

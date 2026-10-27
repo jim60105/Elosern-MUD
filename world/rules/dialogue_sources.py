@@ -125,6 +125,7 @@ def resolve_dialogue_source(context: Any) -> ResolvedDialogueSource | None:
             dialogue=AuthoredDialogue(
                 greeting=phase.greeting,
                 topics=tuple(phase.topics),
+                services=tuple(getattr(phase, "services", ()) or ()),
             ),
             phase_revision=binding.revision,
             effects={effect.topic_id: effect for effect in phase.topic_effects},
