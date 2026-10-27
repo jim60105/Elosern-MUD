@@ -258,14 +258,20 @@ class TerrainDefinition:
             raise ValueError("ridge_period and ridge_step must be positive")
         if self.ridge_min_x > self.ridge_max_x:
             raise ValueError("ridge_min_x must not exceed ridge_max_x")
-        passes = tuple(self.ridge_passes)
-        for window in passes:
+        # Each window is re-built as a tuple: a caller-supplied list must not
+        # stay reachable, or a later mutation would silently open or close the
+        # ridge wall of an already constructed definition.
+        passes: list[tuple[int, int]] = []
+        for window in self.ridge_passes:
+            if not isinstance(window, (tuple, list)) or len(window) != 2:
+                raise ValueError(f"ridge pass window {window!r} must be two rows")
             low, high = window
             _int(low, "ridge pass low")
             _int(high, "ridge pass high")
             if low > high:
                 raise ValueError(f"ridge pass window {window!r} is inverted")
-        object.__setattr__(self, "ridge_passes", passes)
+            passes.append((low, high))
+        object.__setattr__(self, "ridge_passes", tuple(passes))
 
         flavors = self.region_flavors
         if not isinstance(flavors, Mapping):

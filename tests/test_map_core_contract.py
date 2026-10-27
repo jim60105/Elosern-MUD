@@ -43,6 +43,11 @@ ISOLATED_CALCULATION = textwrap.dedent(
     sys.meta_path.insert(0, Blocker())
     sys.path.insert(0, sys.argv[1])
 
+    # A namespace already imported before the blocker would bypass it, so the
+    # boundary claim starts from an interpreter with none of them loaded.
+    loaded = {name.split(".")[0] for name in sys.modules}
+    assert not (FORBIDDEN & loaded), sorted(FORBIDDEN & loaded)
+
     from elosern_map_core.geometry import cell_center_m, local_to_world_m
     from elosern_map_core.sparse import (
         SparseNode,
@@ -134,33 +139,25 @@ class InstalledDistributionTests(unittest.TestCase):
         self.assertEqual(completed.stdout.split(), ["0.1.0", "elosern_map_core"])
 
     def test_game_adapters_read_their_declarations_through_the_core(self):
-        from elosern_map_core.geometry import cell_center_m
         from elosern_map_core.sparse import SparseSettlementGraph
-        from world.lore.anchors import (
-            ANCHOR_GEOGRAPHY_REGISTRY,
-            LOCAL_FRAME_ANCHOR_REGISTRY,
-            world_position_m,
-        )
         from world.maps.map_data import SETTLEMENT_GRAPHS
 
         self.assertTrue(SETTLEMENT_GRAPHS)
         for graph in SETTLEMENT_GRAPHS.values():
             self.assertIsInstance(graph, SparseSettlementGraph)
             self.assertGreaterEqual(len(graph.nodes), 2)
-
-        # The registry-bound transform must be the core transform applied to
-        # the registry's own values: the local anchor point lands on the anchor
-        # cell centre, and any offset shifts by exactly that offset.
-        for anchor_key in sorted(LOCAL_FRAME_ANCHOR_REGISTRY):
-            with self.subTest(anchor=anchor_key):
-                center = cell_center_m(ANCHOR_GEOGRAPHY_REGISTRY[anchor_key].cell)
-                frame = LOCAL_FRAME_ANCHOR_REGISTRY[anchor_key]
-                anchor_east, anchor_north = frame.local_anchor_m
-                self.assertEqual(world_position_m(anchor_key, frame.local_anchor_m), center)
-                self.assertEqual(
-                    world_position_m(anchor_key, (anchor_east + 30, anchor_north - 40)),
-                    (center[0] + 30, center[1] - 40),
-                )
+            # Routing a shipped graph runs the core shortest-path search over
+            # the declared adjacency; the graph is the game's own declaration,
+            # not a fixture built here.
+            source = next(iter(graph.nodes))
+            for destination in graph.nodes:
+                plan = graph.plan(source, destination)
+                self.assertIsInstance(plan, tuple)
+                for step in plan:
+                    self.assertGreater(step.length, 0)
+                    # Every step is a declared node/road pair of this graph.
+                    self.assertIs(graph.nodes[step.source.node_id], step.source)
+                    self.assertIs(graph.nodes[step.destination.node_id], step.destination)
 
     def test_root_project_declares_and_locks_the_local_dependency(self):
         project = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text())

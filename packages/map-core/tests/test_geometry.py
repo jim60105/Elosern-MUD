@@ -166,6 +166,10 @@ class TestDirectedRoutes:
         assert len({round(edge.length, 6) for edge in graph.edges}) == 3
 
     def test_shortest_route_prefers_the_shorter_polyline(self):
+        # The direct road is bent far north, so its physical length (about 42 m)
+        # exceeds the three-edge southern path (30 m). A hop-minimising search
+        # would still choose the single edge, so this distinguishes length
+        # weighting from hop counting.
         graph = SparseSettlementGraph(
             "t_map",
             [
@@ -178,13 +182,16 @@ class TestDirectedRoutes:
                 _road("a", "b"),
                 _road("b", "c"),
                 _road("c", "d"),
-                _road("a", "d"),
+                _road("a", "d", bend_points=((0, 20),), direction_hint="e"),
             ],
         )
+        direct = graph.edge("a", "d")
+        assert direct is not None
+        assert direct.length == pytest.approx(20 + math.hypot(10, 20))
         route = graph.route("a", "d")
         assert route is not None
-        assert [edge.destination.node_id for edge in route] == ["d"]
-        assert sum(edge.length for edge in route) == 10
+        assert [edge.destination.node_id for edge in route] == ["b", "c", "d"]
+        assert sum(edge.length for edge in route) == 30
         assert graph.route("a", "a") == ()
         assert graph.route("a", "missing") is None
 

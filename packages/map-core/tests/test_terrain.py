@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from elosern_map_core.geometry import is_on_mainland
 from elosern_map_core.terrain import (
     REGION_KEYS,
     TerrainDefinition,
@@ -121,20 +122,56 @@ class TestSnapshotIsolation:
         routes = {"border_river": ((20, 20), (0, 20))}
         fords = {"border_river": ((10, 20),)}
         flavors = dict(_flavors("a"))
+        passes = [[4, 5]]
         world = _world_a(
-            waterway_routes=routes, waterway_fords=fords, region_flavors=flavors
+            waterway_routes=routes,
+            waterway_fords=fords,
+            region_flavors=flavors,
+            ridge_passes=passes,
         )
         before_region = region_for_coordinates(world, 15, 12)
         before_water = is_inland_water_cell(world, (15, 20))
+        before_text = terrain_description(world, 15, 12)
+        before_ridge = is_closed_ridge_cell(world, (8, 0))
         before_borders = world.national_borders
 
         routes["border_river"] = ((5, 5), (0, 5))
         fords["border_river"] = ()
         flavors["eastern_plains"] = ("mutated",)
+        # A list window must not stay reachable: widening it here would have
+        # opened the ridge wall at row 0.
+        passes[0][0] = 0
 
         assert region_for_coordinates(world, 15, 12) == before_region
         assert is_inland_water_cell(world, (15, 20)) == before_water
+        assert terrain_description(world, 15, 12) == before_text
+        assert is_closed_ridge_cell(world, (8, 0)) == before_ridge
+        assert before_ridge is True
         assert world.national_borders == before_borders
+
+    def test_same_sized_worlds_keep_separate_tables(self):
+        # Equal frame sizes remove the accidental protection that different
+        # table lengths would give; only per-instance ownership can pass this.
+        world_a = _world_a()
+        world_a.national_borders  # force every A cache
+        world_b = _world_a(
+            forest_edge=((0, 20), (39, 20)),
+            waterway_routes={"border_river": ((30, 26), (0, 26))},
+            waterway_fords={},
+            coastal_y_max=6,
+            region_flavors=_flavors("b"),
+        )
+
+        assert region_for_coordinates(world_a, 15, 12) == "eastern_plains"
+        assert region_for_coordinates(world_b, 15, 12) == "eastern_plains"
+        assert region_for_coordinates(world_a, 15, 25) == "eastern_plains"
+        assert region_for_coordinates(world_b, 15, 25) == "north_deep_forest"
+        assert forest_edge_row(world_a, 5) == 30
+        assert forest_edge_row(world_b, 5) == 20
+        assert border_river_row(world_a, 5) == 20
+        assert border_river_row(world_b, 5) == 26
+        assert terrain_description(world_a, 15, 12).startswith("a-")
+        assert terrain_description(world_b, 15, 12).startswith("b-")
 
 
 class TestClassification:
@@ -204,6 +241,14 @@ class TestTerrainFeatures:
         world = _world_a()
         assert is_land_cell(world, (20, 20))
         assert not is_land_cell(world, (45, 20))
+        # A sloped shore distinguishes the centre sample from the cell corner:
+        # the corner (2, 2) is land, the centre (2.5, 2.5) is sea.
+        sloped = _world_a(
+            mainland_boundary_km=((0, 0), (4, 0), (4, 1), (0, 4)),
+        )
+        assert is_on_mainland(sloped.mainland_boundary_km, 2, 2)
+        assert not is_land_cell(sloped, (2, 2))
+        assert is_land_cell(sloped, (0, 0))
 
     def test_walkability_combines_frame_land_and_terrain(self):
         world = _world_a()
@@ -219,16 +264,22 @@ class TestTerrainFeatures:
         assert is_valid_wilderness_cell(world, footprints, (6, 25))
 
     def test_region_search_boxes_cover_every_region(self):
-        world = _world_a()
-        boxes = world.region_search_boxes
-        assert set(boxes) == REGION_KEYS
-        for key, (x_min, x_max, y_min, y_max) in boxes.items():
-            found = any(
-                region_for_coordinates(world, x, y) == key
-                for x in range(x_min, x_max + 1)
-                for y in range(y_min, y_max + 1)
-            )
-            assert found, key
+        for world in (_world_a(), _world_b()):
+            boxes = world.region_search_boxes
+            assert set(boxes) == REGION_KEYS
+            # Every classified cell of the frame lies inside its region's box,
+            # so a sparse-index consumer can never miss valid terrain.
+            for x in range(world.frame_cells):
+                for y in range(world.frame_cells):
+                    key = region_for_coordinates(world, x, y)
+                    x_min, x_max, y_min, y_max = boxes[key]
+                    assert x_min <= x <= x_max and y_min <= y <= y_max, (key, x, y)
+            for key, (x_min, x_max, y_min, y_max) in boxes.items():
+                assert any(
+                    region_for_coordinates(world, x, y) == key
+                    for x in range(x_min, x_max + 1)
+                    for y in range(y_min, y_max + 1)
+                ), key
 
     def test_national_borders_are_derived_from_the_river_and_the_ridge(self):
         world = _world_a()
@@ -280,6 +331,8 @@ class TestRasterizer:
             _world_a(ridge_period=0)
         with pytest.raises(ValueError):
             _world_a(ridge_passes=((6, 5),))
+        with pytest.raises(ValueError):
+            _world_a(ridge_passes=((4, 5, 6),))
         with pytest.raises(ValueError):
             _world_a(mainland_boundary_km=((0, 0), (1, 1)))
         with pytest.raises(ValueError):
