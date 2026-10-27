@@ -22,6 +22,7 @@ from world.maps.bootstrap import sync_grid, sync_limbo, sync_wilderness
 from world.maps.limbo import LIMBO_ALIAS, LIMBO_DESC, LIMBO_KEY, LIMBO_LEGACY_KEY
 from world.maps.map_data import SETTLEMENT_GRAPHS
 from world.maps.static_references import (
+    StaticReferenceError,
     anchor_entrance_xyz,
     place_exterior_xyz,
     settlement_node_xyz,
@@ -439,7 +440,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
             )
 
     @covers_requirement("limbo-one-way-gates::a-registry-row-whose-gate-room-is-missing-warns-and-is-skipped-without-blocking-other-rows")
-    def test_missing_gate_room_row_warns_and_skips_without_blocking(self):
+    def test_absent_authored_gate_target_rejects_before_bridging(self):
         limbo = create_object(Room, key=LIMBO_KEY, location=None)
         broken_row = CityGateDef(
             gate=settlement_node_ref("nowhere_city", "missing"),
@@ -450,7 +451,36 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         rebound["nowhere_city"] = broken_row
 
         with (
+            patch("world.maps.city_gates.CITY_GATE_REGISTRY", rebound),
             patch("world.maps.bootstrap.CITY_GATE_REGISTRY", rebound),
+        ):
+            with self.assertRaises(StaticReferenceError):
+                sync_grid()
+        self.assertEqual(list(limbo.exits), [])
+
+    @covers_requirement("limbo-one-way-gates::a-registry-row-whose-gate-room-is-missing-warns-and-is-skipped-without-blocking-other-rows")
+    def test_missing_gate_room_row_warns_and_skips_without_blocking(self):
+        # A valid authored identity whose materialized room is absent keeps
+        # the convergence warn-and-skip contract; only resolution failures
+        # are rejected by the preflight.
+        limbo = create_object(Room, key=LIMBO_KEY, location=None)
+        broken_row = CityGateDef(
+            gate=settlement_node_ref("capital_altoria", "east_gate"),
+            exit_key="空門",
+            exit_aliases=("不存在",),
+        )
+        rebound = dict(CITY_GATE_REGISTRY)
+        rebound["missing_room"] = broken_row
+        real_resolve = settlement_node_xyz
+
+        def resolve(reference, **kwargs):
+            if reference == broken_row.gate:
+                return (999, 999, "capital_altoria")
+            return real_resolve(reference, **kwargs)
+
+        with (
+            patch("world.maps.bootstrap.CITY_GATE_REGISTRY", rebound),
+            patch("world.maps.bootstrap.settlement_node_xyz", side_effect=resolve),
             patch("world.maps.bootstrap.log_warn") as warn,
         ):
             sync_grid()
@@ -461,12 +491,12 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
             if call.args and call.args[0] == "bootstrap_grid_gate_missing"
         ]
         self.assertEqual(len(missing), 1)
-        self.assertEqual(missing[0].kwargs["context"]["map_id"], "nowhere_city")
+        self.assertEqual(missing[0].kwargs["context"]["map_id"], "capital_altoria")
         self.assertEqual(missing[0].kwargs["context"]["action"], "skip_gate_row")
         # The healthy rows still converged; the broken row created nothing.
         self.assertEqual(
             sorted(exit_obj.key for exit_obj in limbo.exits),
-            sorted(row.exit_key for row in CITY_GATE_REGISTRY.values()),
+            sorted(row.exit_key for key, row in CITY_GATE_REGISTRY.items()),
         )
 
     @covers_requirement("limbo-one-way-gates::adding-a-city-means-adding-a-registry-row-with-no-bootstrap-code-change")

@@ -271,6 +271,36 @@ def _missing(
     return ReferenceError(UNKNOWN_REFERENCE, _with_source(reason, source))
 
 
+def _validate_values(reference: QualifiedRef, source: str) -> None:
+    """Reject malformed scalar values before any lookup or tuple operation."""
+
+    for label, value in (
+        ("map_id", reference.map_id),
+        ("object_id", reference.object_id),
+    ):
+        if value is not None and (not isinstance(value, str) or not value):
+            raise ReferenceError(
+                INVALID_REFERENCE,
+                _with_source(f"{label} must be a non-empty string", source),
+            )
+    if reference.cell is not None:
+        cell = reference.cell
+        if (
+            not isinstance(cell, tuple)
+            or len(cell) != 2
+            or any(type(axis) is not int for axis in cell)
+        ):
+            raise ReferenceError(
+                INVALID_REFERENCE,
+                _with_source("cell must be an integer pair", source),
+            )
+        if cell[0] < 0 or cell[1] < 0:
+            raise ReferenceError(
+                INVALID_REFERENCE,
+                _with_source(f"cell {cell!r} axes must be non-negative", source),
+            )
+
+
 def resolve_reference(
     world: ReferenceWorld,
     reference: QualifiedRef,
@@ -306,6 +336,7 @@ def resolve_reference(
                 source,
             ),
         )
+    _validate_values(reference, source)
 
     needs_map, needs_object, needs_cell = _DOMAIN_FIELDS[domain]
     if needs_map and reference.map_id is None:

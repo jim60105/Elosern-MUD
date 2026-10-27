@@ -8,6 +8,7 @@ a synthetic settlement graph, never shipped geography or copy.
 from __future__ import annotations
 
 import unittest
+from contextlib import ExitStack
 from unittest import mock
 
 from evennia.utils.create import create_object
@@ -31,18 +32,24 @@ from typeclasses.exits import Exit
 from typeclasses.rooms import GridRoom, Room
 
 from world.lore.map_districts import MapDistrict, landmark_node_id, landmark_node_ids
+from world.lore.settlements.places import PlaceDefinition, PlaceKind
 from world.maps import map_data
 from world.maps.bootstrap import (
     sync_grid,
     sync_service_interiors,
     sync_settlement_graph,
 )
+from world.maps.city_gates import CityGateDef
+from world.maps.limbo import LIMBO_KEY
+from world.maps.room_art import grid_scene_identity
 from world.maps.static_references import (
     StaticReferenceError,
+    binding_signature,
     place_exterior_xyz,
     settlement_node_xyz,
     validate_static_references,
 )
+from world.rules.map_district_lighting import lit_district_keys
 from world.rules.map_knowledge import KNOWLEDGE_ATTR, encode_grid, parse_knowledge
 
 MAP = "t_ref_map"
@@ -172,6 +179,24 @@ class StaticFamilyMovementTests(EvenniaTest):
         self.assertIn("city gate t_broken", str(captured.exception))
         self.assertIn("no authored node", str(captured.exception))
 
+    def test_binding_signature_tracks_geography_and_road_geometry(self):
+        from elosern_map_core.sparse import SparseRoad
+
+        graph = _graph(10, 10)
+        bent = build_sparse_graph(
+            map_id=MAP,
+            prototypes={(10, 10): _prototype("Anchor"), (20, 10): _prototype("Shop")},
+            node_ids={(10, 10): "anchor", (20, 10): "shop"},
+            roads=[
+                SparseRoad("anchor>shop", "anchor", "shop", bend_points=((15, 12),)),
+                ("shop", "anchor", "w"),
+            ],
+        )
+        with mock.patch.object(map_data, "SETTLEMENT_GRAPHS", {MAP: graph}):
+            straight = binding_signature()
+        with mock.patch.object(map_data, "SETTLEMENT_GRAPHS", {MAP: bent}):
+            self.assertNotEqual(binding_signature(), straight)
+
 
 class SyncPreservationTests(EvenniaTest):
     def test_repeated_synchronization_creates_no_duplicate_objects(self):
@@ -242,3 +267,210 @@ class SyncPreservationTests(EvenniaTest):
         self.assertEqual([visit.node_id for visit in visits], [encode_grid(MAP, 20, 20)])
         self.assertEqual(visits[0].first_seen_tick, 3)
         self.assertEqual(visits[0].last_seen_tick, 9)
+
+
+class PreflightPolicyTests(EvenniaTest):
+    def test_a_wrong_domain_target_is_rejected_before_any_write(self):
+        from world.lore.settlements import places
+        from world.maps import city_gates
+        from world.maps import room_art
+
+        broken = {
+            "t_wrong_domain": CityGateDef(
+                gate=wilderness_cell_ref((1, 2)),
+                exit_key="測試門",
+                exit_aliases=(),
+            )
+        }
+        with (
+            mock.patch.object(city_gates, "CITY_GATE_REGISTRY", broken),
+            mock.patch.object(places, "PLACE_REGISTRY", {}),
+            mock.patch.object(room_art, "GRID_NODE_SCENE_ARCHETYPES", {}),
+        ):
+            with self.assertRaises(StaticReferenceError) as captured:
+                validate_static_references()
+        self.assertIn("city gate t_wrong_domain", str(captured.exception))
+        self.assertIn("not a settlement_node", str(captured.exception))
+
+    def test_sync_all_rejects_before_mirroring_any_registry(self):
+        from evennia.objects.models import ObjectDB
+        from evennia.utils.search import search_script
+        from world.lore import sync
+        from world.maps import city_gates
+
+        broken = {
+            "t_broken": CityGateDef(
+                gate=settlement_node_ref(MAP, "nowhere"), exit_key="x", exit_aliases=()
+            )
+        }
+        before = (ObjectDB.objects.count(), len(search_script("lore:anchor_placements:capital_altoria")))
+        with (
+            mock.patch.object(city_gates, "CITY_GATE_REGISTRY", broken),
+            mock.patch.object(sync, "sync_one") as sync_one,
+        ):
+            with self.assertRaises(StaticReferenceError):
+                sync.sync_all()
+        sync_one.assert_not_called()
+        self.assertEqual(
+            (ObjectDB.objects.count(), len(search_script("lore:anchor_placements:capital_altoria"))),
+            before,
+        )
+
+    def test_startup_rejects_before_creating_the_world_clock(self):
+        from evennia.objects.models import ObjectDB
+        from server.conf.at_server_startstop import at_server_start
+        from world.maps import city_gates
+
+        broken = {
+            "t_broken": CityGateDef(
+                gate=settlement_node_ref(MAP, "nowhere"), exit_key="x", exit_aliases=()
+            )
+        }
+        before = ObjectDB.objects.count()
+        with (
+            mock.patch.object(city_gates, "CITY_GATE_REGISTRY", broken),
+            mock.patch("world.rules.clock.get_world_clock") as clock,
+        ):
+            with self.assertRaises(StaticReferenceError):
+                at_server_start()
+        clock.assert_not_called()
+        self.assertEqual(ObjectDB.objects.count(), before)
+
+
+class IntegratedMovedNodeTests(EvenniaTest):
+    """One moved identity reaches every synchronizer and cached consumer."""
+
+    def _place(self):
+        return PlaceDefinition(
+            key="t_ref_place",
+            settlement_key="t_settlement",
+            kind=PlaceKind.HOME,
+            room_name_zh="合成參照室",
+            room_desc_zh="Synthetic reference interior.",
+            exterior=settlement_node_ref(MAP, "shop"),
+            doorway_key_zh="測試門",
+            doorway_aliases=(),
+        )
+
+    def _district(self):
+        return MapDistrict(
+            "t_ref_district",
+            "測試區",
+            "測試碑",
+            settlement_node_ref(MAP, "anchor"),
+            "voronoi",
+        )
+
+    def _apply(self, graph, place, district):
+        import world.maps.bootstrap as bootstrap_module
+        import world.lore.map_districts as districts_module
+        import world.maps.city_gates as gates_module
+        import world.maps.room_art as room_art
+        from world.lore import anchor_placement, wilderness_entry
+
+        gates = {
+            "t_gate": CityGateDef(
+                gate=settlement_node_ref(MAP, "anchor"),
+                exit_key="測試門",
+                exit_aliases=(),
+            )
+        }
+        art = {settlement_node_ref(MAP, "anchor"): "t_synthetic_scene"}
+        stack = ExitStack()
+        for entry in (
+            (map_data, "SETTLEMENT_GRAPHS", {MAP: graph}),
+            (bootstrap_module, "SETTLEMENT_GRAPHS", {MAP: graph}),
+            (gates_module, "CITY_GATE_REGISTRY", gates),
+            (bootstrap_module, "CITY_GATE_REGISTRY", gates),
+            (anchor_placement, "ANCHOR_PLACEMENT_REGISTRY", {}),
+            (wilderness_entry, "WILDERNESS_ENTRY_REGISTRY", {}),
+            (
+                "world.lore.settlements.places.PLACE" + "_REGISTRY",
+                {place.key: place},
+            ),
+            (bootstrap_module, "PLACE" + "_REGISTRY", {place.key: place}),
+            (districts_module, "MAP_DISTRICT_REGISTRY", {district.key: district}),
+            (room_art, "GRID_NODE_SCENE_ARCHETYPES", art),
+            (bootstrap_module, "GRID_NODE_SCENE_ARCHETYPES", art),
+        ):
+            if isinstance(entry[0], str):
+                path, value = entry
+                stack.enter_context(mock.patch(path, value))
+                continue
+            target, attribute, value = entry
+            if isinstance(target, str):
+                stack.enter_context(mock.patch(target, value))
+            else:
+                stack.enter_context(mock.patch.object(target, attribute, value))
+        return stack
+
+    def test_moved_node_follows_gate_art_service_and_lighting(self):
+        place, district = self._place(), self._district()
+        create_object(Room, key=LIMBO_KEY)
+        traveller = create_object(PlayerCharacter, key="traveller")
+        traveller.attributes.add(
+            KNOWLEDGE_ATTR,
+            {
+                "schema_version": 1,
+                "visited": {encode_grid(MAP, 10, 10): {"first_seen_tick": 1, "last_seen_tick": 2}},
+            },
+        )
+
+        with self._apply(_graph(10, 10), place, district):
+            sync_grid()
+            sync_service_interiors()
+            anchor = GridRoom.objects.filter_xyz(xyz=(10, 10, MAP)).first()
+            shop = GridRoom.objects.filter_xyz(xyz=(20, 10, MAP)).first()
+            self.assertEqual(anchor.scene_archetype, "t_synthetic_scene")
+            self.assertEqual(anchor.scene_identity, grid_scene_identity(MAP, 10, 10))
+            limbo = Room.objects.filter(db_key=LIMBO_KEY).first()
+            self.assertEqual(
+                [exit_obj.destination.pk for exit_obj in limbo.exits],
+                [anchor.pk],
+            )
+            from evennia.utils.search import search_object_by_tag
+
+            interiors = search_object_by_tag(place.key)
+            self.assertEqual(len(interiors), 1)
+            interior = interiors[0]
+            self.assertTrue(
+                any(exit_obj.destination.pk == shop.pk for exit_obj in interior.exits)
+            )
+            self.assertEqual(
+                lit_district_keys(traveller, {district.key: district}),
+                frozenset({district.key}),
+            )
+            first_signature = binding_signature()
+
+            moved = _graph(40, 40)
+            with self._apply(moved, place, district):
+                sync_grid()
+                sync_service_interiors()
+                # The declarations never changed; every consumer followed the
+                # same stable node to its new binding.
+                self.assertNotEqual(binding_signature(), first_signature)
+                moved_anchor = GridRoom.objects.get(pk=anchor.pk)
+                moved_shop = GridRoom.objects.get(pk=shop.pk)
+                self.assertEqual(moved_anchor.xyz, (40, 40, MAP))
+                self.assertEqual(moved_shop.xyz, (50, 40, MAP))
+                self.assertEqual(
+                    moved_anchor.scene_identity, grid_scene_identity(MAP, 40, 40)
+                )
+                self.assertEqual(
+                    [exit_obj.destination.pk for exit_obj in limbo.exits],
+                    [moved_anchor.pk],
+                )
+                self.assertTrue(
+                    any(
+                        exit_obj.destination.pk == moved_shop.pk
+                        for exit_obj in interior.exits
+                    )
+                )
+                self.assertEqual(
+                    [visit.node_id for visit in parse_knowledge(traveller)],
+                    [encode_grid(MAP, 40, 40)],
+                )
+                self.assertEqual(
+                    lit_district_keys(traveller, {district.key: district}),
+                    frozenset({district.key}),
+                )

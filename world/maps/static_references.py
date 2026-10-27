@@ -174,6 +174,7 @@ def binding_signature() -> str:
     """
 
     from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
+    from world.lore.anchors import ANCHOR_GEOGRAPHY_REGISTRY, LOCAL_FRAME_ANCHOR_REGISTRY
     from world.lore.map_districts import MAP_DISTRICT_REGISTRY
     from world.lore.settlements.places import PLACE_REGISTRY
     from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
@@ -190,11 +191,33 @@ def binding_signature() -> str:
             (
                 map_id,
                 tuple(
-                    (node_id, node.x, node.y)
+                    (node_id, node.x, node.y, node.physical)
                     for node_id, node in sorted(graph.nodes.items())
+                ),
+                tuple(
+                    (
+                        road.road_id,
+                        road.source_id,
+                        road.destination_id,
+                        road.direction_hint,
+                        road.bend_points,
+                    )
+                    for road in sorted(graph.roads, key=lambda item: item.road_id)
                 ),
             )
         )
+    parts.append(
+        tuple(
+            (key, tuple(geography.cell))
+            for key, geography in sorted(ANCHOR_GEOGRAPHY_REGISTRY.items())
+        )
+    )
+    parts.append(
+        tuple(
+            (key, frame.local_anchor_m)
+            for key, frame in sorted(LOCAL_FRAME_ANCHOR_REGISTRY.items())
+        )
+    )
     parts.append(
         tuple(
             (key, ref(placement.node))
@@ -252,28 +275,47 @@ def validate_static_references(*, index: ReferenceIndex | None = None) -> None:
     from world.maps.city_gates import CITY_GATE_REGISTRY
     from world.maps.room_art import GRID_NODE_SCENE_ARCHETYPES
 
-    current = index if index is not None else map_reference_index()
+    current = index if index is not None else reference_index()
     problems: list[str] = []
 
-    def check(source: str, reference: QualifiedRef) -> None:
+    def check_node(source: str, reference: QualifiedRef) -> None:
+        """One settlement-node consumer: domain policy plus existence."""
+
+        try:
+            settlement_position(current, reference, source=source)
+        except ReferenceError as error:
+            problems.append(str(error))
+
+    def check_landmark(source: str, reference: QualifiedRef) -> None:
+        """A district landmark may use any domain that projects a map position."""
+
+        allowed = ("settlement_node", "wilderness_cell", "location")
+        if reference.domain not in allowed:
+            problems.append(
+                f"{source}: {reference.domain!r} is not one of {allowed}"
+            )
+            return
         try:
             resolve_static(reference, index=current, source=source)
         except ReferenceError as error:
             problems.append(str(error))
 
     for key, row in CITY_GATE_REGISTRY.items():
-        check(f"city gate {key}", row.gate)
+        check_node(f"city gate {key}", row.gate)
     for key, placement in ANCHOR_PLACEMENT_REGISTRY.items():
-        check(f"anchor placement {key}", placement.node)
+        check_node(f"anchor placement {key}", placement.node)
     for key, entry in WILDERNESS_ENTRY_REGISTRY.items():
         for gate in entry.gates:
-            check(f"wilderness entry {key} gate {gate.return_direction}", gate.destination)
+            check_node(
+                f"wilderness entry {key} gate {gate.return_direction}",
+                gate.destination,
+            )
     for key, place in PLACE_REGISTRY.items():
-        check(f"place {key} exterior", place.exterior)
+        check_node(f"place {key} exterior", place.exterior)
     for key, district in MAP_DISTRICT_REGISTRY.items():
-        check(f"district {key} landmark", district.landmark)
+        check_landmark(f"district {key} landmark", district.landmark)
     for reference in GRID_NODE_SCENE_ARCHETYPES:
-        check(
+        check_node(
             f"grid art {reference.map_id}:{reference.object_id}",
             reference,
         )

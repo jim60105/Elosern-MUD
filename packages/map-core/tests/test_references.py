@@ -116,6 +116,33 @@ def test_cell_outside_the_frame_is_rejected():
     assert "outside the 40-cell frame" in str(error)
 
 
+@pytest.mark.parametrize(
+    "reference",
+    [
+        QualifiedRef(domain="wilderness_cell", cell=("x", "y")),
+        QualifiedRef(domain="wilderness_cell", cell=(-1, 0)),
+        QualifiedRef(domain="wilderness_cell", cell=(1, 2, 3)),
+        QualifiedRef(domain="settlement_node", map_id=5, object_id="plaza"),
+        QualifiedRef(domain="settlement_node", map_id="demo_map", object_id=""),
+        QualifiedRef(domain="location", object_id=7),
+    ],
+)
+def test_malformed_values_are_named_invalid_references(reference):
+    error = _rejected(INVALID_REFERENCE, reference)
+    assert error.code == INVALID_REFERENCE
+
+
+def test_negative_cells_are_rejected_without_an_upper_frame():
+    index = ReferenceIndex.build(
+        settlement_nodes=[("demo_map", "plaza", (1, 1))],
+        frame_cells=None,
+    )
+    with pytest.raises(ReferenceError) as captured:
+        resolve_reference(index, wilderness_cell_ref((-1, 0)))
+    assert captured.value.code == INVALID_REFERENCE
+    assert "non-negative" in str(captured.value)
+
+
 def test_duplicate_bindings_are_rejected_while_building_the_index():
     with pytest.raises(ReferenceError) as captured:
         ReferenceIndex.build(
