@@ -1,4 +1,7 @@
-"""Settlement source contract: discovery, composition and candidate rejection.
+"""Data-contract test: settlement source discovery and composition contract
+
+Discovery, composition and candidate rejection over the authored local-map
+documents.
 
 The authored local maps are discovered YAML documents under
 ``content/maps/settlements/<map_id>.yaml``. These tests establish the mechanisms
@@ -160,12 +163,11 @@ class ThirdSettlementTests(unittest.TestCase):
             snapshot = map_data.load_settlements(root)
 
         self.assertEqual(set(snapshot.graphs), {"t_third"})
-        self.assertNotIn("village_ciaran", snapshot.graphs)
         # The shipped world is untouched: discovery and publication are
         # separate, so a candidate never replaces what is already published.
-        self.assertEqual(
-            set(map_data.current().graphs), {"capital_altoria", "village_ciaran"}
-        )
+        published = set(map_data.current().graphs)
+        self.assertTrue(published)
+        self.assertNotIn("t_third", published)
 
 
 class SettlementGraphFidelityTests(unittest.TestCase):

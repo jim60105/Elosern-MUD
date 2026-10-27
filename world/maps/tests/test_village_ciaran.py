@@ -1,4 +1,4 @@
-"""Data-contract test: village ciaran map document contract
+"""Data-contract test: village ciaran settlement document contract
 
 Establishes the mechanisms the village's authored settlement document must
 satisfy: a connected branching tree in its own metre frame with one anchor, the

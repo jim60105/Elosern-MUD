@@ -1,4 +1,4 @@
-"""Data-contract test: capital map document contract
+"""Data-contract test: capital settlement document contract
 
 Establishes the mechanisms the capital's authored settlement document must
 satisfy: its nodes and directed roads are exactly the validated sparse graph,
