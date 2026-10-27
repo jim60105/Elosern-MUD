@@ -12,6 +12,7 @@ service action: it exists to prove the grouped card and its keyboard reach.
 
 from __future__ import annotations
 
+from tools.spec_traceability import covers_requirement
 from .browser_base import ACCEPTANCE_VIEWPORTS
 from .browser_helpers import (
     CARD_SELECTOR,
@@ -111,6 +112,9 @@ class MerchantServiceCardJourneys(ServicesBrowserTest):
         page.wait_for_selector(CARD_SELECTOR, timeout=30000)
         return lookup
 
+    @covers_requirement(
+        "webclient-presence-rail::service-return-and-departure-use-valid-focus-origins",
+    )
     def test_merchant_purchase_returns_focus_to_its_service_row(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -181,6 +185,9 @@ class MerchantServiceCardJourneys(ServicesBrowserTest):
             int(lookup["target"].split("-", 1)[1]),
         )
 
+    @covers_requirement(
+        "webclient-presence-rail::service-return-and-departure-use-valid-focus-origins",
+    )
     def test_a_departed_provider_retires_the_card_and_its_drawer(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -305,6 +312,9 @@ class GroupedCardOverflowJourneys(ServicesBrowserTest):
         inject_update(page, {"exploration": injected})
         return crowded
 
+    @covers_requirement(
+        "webclient-presence-rail::npc-cards-preserve-common-slots-and-grouped-service-order",
+    )
     def test_the_card_groups_eleven_services_and_digits_stop_at_nine(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)

@@ -1832,6 +1832,8 @@ class PresenceRailEvidenceTest(unittest.TestCase):
         "webclient-presence-rail::the-person-focus-verb-card-is-client-local-and-replaces-the-verb-popover",
         "webclient-presence-rail::verb-card-rows-submit-the-payloads-the-popover-rows-submitted",
         "webclient-presence-rail::a-departed-person-closes-the-card",
+        "webclient-presence-rail::menu-refresh-requires-a-fresh-selection-against-the-current-mapping",
+        "webclient-presence-rail::service-return-and-departure-use-valid-focus-origins",
         "webclient-presence-rail::rail-entries-activate-by-the-payload-each-entry-already-carries",
     )
     def test_presence_card_store_vitest_evidence_passes(self):
@@ -1850,11 +1852,27 @@ class PresenceRailEvidenceTest(unittest.TestCase):
     @covers_requirement(
         "webclient-presence-rail::choicecard-is-the-one-centred-card-shell",
         "webclient-presence-rail::the-dialogue-screen-does-not-change-when-it-renders-through-choicecard",
+        "webclient-presence-rail::service-return-and-departure-use-valid-focus-origins",
     )
     def test_choice_card_vitest_evidence_passes(self):
         self._run_vitest(
             "web/webclient-app/tests/components/choice_card.test.js",
             "web/webclient-app/tests/app_client_dialogue_choices.test.js",
+        )
+
+    @covers_requirement(
+        "webclient-presence-rail::npc-cards-preserve-common-slots-and-grouped-service-order",
+    )
+    def test_grouped_interaction_card_vitest_evidence_passes(self):
+        # The card's own row model (npc-interaction-service-card, slice U): the
+        # fixed common slots keep 交談 at 1 and 查看 at 2 with their reasons, the
+        # conditional operations keep their deterministic order, the services
+        # group follows, the return stays unnumbered, only positions 1 through 9
+        # carry a digit badge, and the rendered groups are real labelled
+        # sections whose headings are not rows.
+        self._run_vitest(
+            "web/webclient-app/tests/npc_service_card.test.js",
+            "web/webclient-app/tests/components/choice_card.test.js",
         )
 
     @covers_requirement(

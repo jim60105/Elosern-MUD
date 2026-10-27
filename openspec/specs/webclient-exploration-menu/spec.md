@@ -201,7 +201,7 @@ Existing exploration affordances SHALL remain server-authored. Party invite SHAL
 
 #### Scenario: No affordance is fabricated for a plain NPC
 - **WHEN** a present NPC carries neither a dialogue component nor an eligible free-form surface nor a party binding
-- **THEN** its interact descriptor contains no 交談, invite, leave, or service affordance, and the browser renders only the descriptors the server sent
+- **THEN** its descriptor retains disabled talk with a server reason and contains no fabricated invite/leave/service; the card retains fixed talk/look slots
 
 #### Scenario: A scripted host without a resolvable table shows a disabled 交談
 - **WHEN** a present NPC carries a `ScriptedDialogue` component whose authored table cannot be resolved and is not an `LLMNPC`
@@ -209,11 +209,11 @@ Existing exploration affordances SHALL remain server-authored. Party invite SHAL
 
 #### Scenario: Every NPC target offers the author editor last
 - **WHEN** the room holds a scripted host with a valid card, a plain NPC whose card was never initialized, and a living monster
-- **THEN** the host's descriptor ends with an enabled 編輯人物設定 `npc_persona` navigation, the uninitialized NPC's ends with a disabled one carrying the `npc_persona.unavailable` reason, and the monster carries none
+- **THEN** the host's conditional descriptors include an enabled 編輯人物設定 npc_persona navigation before the separate services group, the uninitialized NPC's ends with a disabled one carrying the `npc_persona.unavailable` reason, and the monster carries none
 
 #### Scenario: The editor row survives the descriptor bound
 - **WHEN** a target's other affordances already fill the eight-descriptor bound
-- **THEN** the descriptor keeps the 編輯人物設定 navigation as its last entry and drops the lowest-priority other affordance
+- **THEN** the descriptor keeps the 編輯人物設定 conditional navigation before the separate services group and drops the lowest-priority other affordance
 
 #### Scenario: A scripted host whose table cannot be resolved carries a disabled 交談
 - **WHEN** a present NPC carries a resolved `ScriptedDialogue` component whose authored table cannot be resolved
@@ -237,7 +237,7 @@ Existing exploration affordances SHALL remain server-authored. Party invite SHAL
 
 #### Scenario: A navigate service affordance needs an unambiguous usable host
 - **WHEN** the presenter decides whether to offer a `navigate`-kind service affordance (`surface` `"guild"` or `"shop"`)
-- **THEN** the old guild/shop navigation descriptors are absent; the separate contextual services field targets this NPC with availability reasons and opens its existing selected-provider flow
+- **THEN** old guild/shop navigate descriptors stay removed after P; selected-provider entries use the services field
 
 #### Scenario: No affordance references a remote, absent, or ambiguous target
 - **WHEN** the presenter builds any interact affordance
@@ -252,9 +252,13 @@ Existing exploration affordances SHALL remain server-authored. Party invite SHAL
 - **WHEN** a same-owner temporary-only actor is normally recruited and later has its general identity removed
 - **THEN** its one effective roster row and escort controls remain until all valid escort reasons end
 
+#### Scenario: Disabled common talk for plain NPC
+- **WHEN** a visible NPC has no supported conversation
+- **THEN** its server-authored talk descriptor is disabled with an inline not-conversable reason, preserving common slot 1 without granting talk authority
+
 #### Scenario: Selected-provider services replace coarse navigation
 - **WHEN** an NPC has supported services
-- **THEN** the services field derives all route entries for that selected host; guild/shop navigate affordances are no longer emitted and another same-class bystander does not hide its entries
+- **THEN** the services field derives all route entries for that selected host; guild/shop navigate affordances remain removed and another same-class bystander does not hide its entries
 
 ### Requirement: The character panel is an exact read-only version-9 panel
 The production registry SHALL register `character` at schema version 9 with `available` true and `kind` `character`, built for the viewed member (commander when unset) in exploration and combat. Its payload SHALL contain exactly `schema_version`, `available`, `kind`, `member_id`, `traits`, `conditions`, `actives`, `passives`, `equipment`, `disguise`, `guild`, `wallet`, `selected_skill`, plus optional `full_title`. Persona prose and intimate state SHALL NOT appear; `party_member` publishes them.

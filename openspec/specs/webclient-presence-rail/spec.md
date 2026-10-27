@@ -117,7 +117,7 @@ Activating an interact target SHALL open the person focus with no server request
 - **THEN** exploration emphasis clears without retaining the former selected slot, while existing store lifecycle and focus-restoration rules remain authoritative
 
 ### Requirement: Verb card rows submit the payloads the popover rows submitted
-Each verb row SHALL submit exactly the payload the former popover row submitted: 交談 submits one `explore.talk_open`, 交易 and 公會服務 open their drawer without a frame, 戰鬥 submits `explore.engage`, 查看 submits `explore.look` for the target and closes the card, and a disabled row stays focusable with its server-authored reason and submits nothing.
+Each verb row SHALL submit exactly the payload the former popover row submitted: 交談 submits one `explore.talk_open`, contextual service rows open the exact selected-provider existing flow without a frame, 戰鬥 submits `explore.engage`, 查看 submits `explore.look` for the target and closes the card, and a disabled row stays focusable with its server-authored reason and submits nothing.
 
 #### Scenario: 交談 enters dialogue continuously
 - **WHEN** the player activates 交談 on the verb card
@@ -125,7 +125,7 @@ Each verb row SHALL submit exactly the payload the former popover row submitted:
 
 #### Scenario: A navigate verb opens its drawer
 - **WHEN** the player activates a guild clerk's 公會服務 row
-- **THEN** the quest drawer opens from the unchanged `services` payload and no router frame is pushed
+- **THEN** the existing drawer opens from a correlated services.open snapshot for that exact provider and no router frame is pushed
 
 #### Scenario: 戰鬥 submits engage
 - **WHEN** the player activates an enabled 戰鬥 row
@@ -137,7 +137,7 @@ Each verb row SHALL submit exactly the payload the former popover row submitted:
 
 #### Scenario: An affordance-less target still gets a card
 - **WHEN** an interact target has no mapped affordance
-- **THEN** its card holds 查看 and `✕ 返回`
+- **THEN** its card retains disabled talk at 1, look at 2 and unnumbered return
 
 #### Scenario: A generative host offers one 交談 row
 - **WHEN** the card of an `LLMNPC` host opens
@@ -156,22 +156,22 @@ Each verb row SHALL submit exactly the payload the former popover row submitted:
 - **THEN** existing action feedback is shown and that card and companion emphasis remain without resubmitting or mutating party/control state
 
 ### Requirement: A departed person closes the card
-When presence is available and submission is unlocked, a missing focused interact identity SHALL close its card in that commit, restore the rail and flash `<name> 已經離開了。`; otherwise closure SHALL await normal settlement. Missing committed targets SHALL immediately lose derived standee/focus emphasis. A committed location change SHALL close the card regardless of that departure gate.
+Committed loss of the focused interact identity or its readable availability SHALL immediately retire the card and pending service correlation regardless of submission locks. Actual departure SHALL restore the existing presence fallback and flash its departure message once. Unreadable presence SHALL close without claiming departure. A committed location change SHALL also close the card.
 
 #### Scenario: The focused person leaves
-- **WHEN** the verb card is open and a commit removes that person from the room while presence is available and submission is unlocked
+- **WHEN** the verb card is open and a committed readable presence update removes that person, including while submission is locked
 - **THEN** the card closes in that commit and the readout flashes `<name> 已經離開了。`
 
 #### Scenario: A locked departure waits for normal settlement
-- **WHEN** the committed target disappears while submission is locked or presence entries are unavailable, then an available unlocked commit still lacks that target
-- **THEN** the first commit removes derived actor-right focus or lineup emphasis without prematurely closing the card or flashing departure; the later normal settlement closes the card, restores the rail and flashes the departure message once
+- **WHEN** the target disappears or presence becomes unreadable while a service read or mutation is pending
+- **THEN** that first committed availability loss closes the card and removes correlation/emphasis immediately; late responses cannot reopen it, and later settlement does not flash a duplicate departure message
 
 #### Scenario: Companion focus leaves no stale elevation
 - **WHEN** the normal committed presence settlement closes a companion card after departure, or a committed movement closes the card
 - **THEN** every remaining non-controlled figure returns to the current lineup baseline dim/z, the existing departure message occurs only for departure, and no temporary right-side figure survives
 
 ### Requirement: ChoiceCard is the one centred card shell
-`ChoiceCard` SHALL render the card frame, digit-badged rows, the rule before a trailing row, the active-row fill and caret, and the staggered entrance with motion-level handling, as one keyboard composite with one tab stop (ArrowUp and ArrowDown wrap, Home and End, digits 1–N, Enter and Space, Escape, `aria-activedescendant`). New consumers SHALL append a trailing `✕ 返回` row and emit `pick(key)` and `back`, and the card SHALL trap focus and return it to its opener on close.
+`ChoiceCard` SHALL render the card frame, digit-badged rows, the rule before a trailing row, the active-row fill and caret, and the staggered entrance with motion-level handling, as one keyboard composite with one tab stop (ArrowUp and ArrowDown wrap, Home and End, digits 1–9 only, Enter and Space, Escape, `aria-activedescendant`). New consumers SHALL append a trailing `✕ 返回` row and emit `pick(key)` and `back`, and the card SHALL trap focus and return it to its opener on close.
 
 #### Scenario: Keys and digits
 - **WHEN** a card with four rows has focus and the player presses `3`, then ArrowDown, then Enter
@@ -184,6 +184,10 @@ When presence is available and submission is unlocked, a missing focused interac
 #### Scenario: Focus is trapped and restored
 - **WHEN** a card opens from a rail medallion and then closes
 - **THEN** Tab does not leave the card while open, and focus returns to that medallion on close
+
+#### Scenario: Accessible groups and paused focus
+- **WHEN** the NPC card contains grouped disabled services
+- **THEN** real labeled group headings are nonselectable, every disabled row remains focusable with aria-disabled and inline described reasons, End selects return, and activation sends nothing
 
 ### Requirement: The dialogue screen does not change when it renders through ChoiceCard
 `DialogueChoices` SHALL keep its view-model logic (picks, `⌨ 自由對話`, `↦ 移動…`, `✕ 結束對話`, and the exits view) and render through `ChoiceCard`, with no visual or behavioral change to the dialogue screen.
@@ -232,3 +236,48 @@ A focused target rendered outside the companion lineup SHALL use its server-auth
 #### Scenario: Current art refresh reaches an open card
 - **WHEN** one newer committed update supplies a usable reference and image for the still-focused target, or replaces its prior catalog image URL
 - **THEN** that open card's figure renders the new admitted image, its target identity and verb order remain unchanged, and no focus message is sent
+
+### Requirement: NPC cards preserve common slots and grouped service order
+NPC cards SHALL retain talk at 1 and look at 2, including disabled reasons, followed by deterministic conditional operations, contextual services and unnumbered return. Only positions 1 through 9 SHALL advertise digit shortcuts; later entries SHALL remain keyboard/scroll reachable.
+
+#### Scenario: Unavailable talk
+- **WHEN** the selected NPC cannot converse
+- **THEN** talk remains disabled at 1 and look remains at 2; services do not take those slots
+
+#### Scenario: Paused numbering
+- **WHEN** a service becomes paused without removal
+- **THEN** it retains its semantic identity/position and inline reason
+
+#### Scenario: Overflow
+- **WHEN** a test fixture contains more than nine rows
+- **THEN** digits activate only their labeled first nine rows; later rows work with arrows/Enter and return remains unnumbered
+
+### Requirement: Menu refresh requires a fresh selection against the current mapping
+Activation SHALL be correlated to the rendered stable entry mapping and SHALL reject an obsolete mapping before submission. Equal-content publications SHALL preserve valid focus and local state; a changed entry set, target, route or availability SHALL require a fresh selection.
+
+#### Scenario: Old digit cannot select new row
+- **WHEN** a row set changes between render and queued activation
+- **THEN** the queued activation is consumed without sending and the user selects again against current rows
+
+#### Scenario: Pointer uses same safety
+- **WHEN** a stale click names an entry whose route changed
+- **THEN** no old or replacement route is executed
+
+#### Scenario: Equal alignment
+- **WHEN** an unchanged presentation arrives with a newer revision
+- **THEN** the valid card, selection and drawer input survive
+
+### Requirement: Service return and departure use valid focus origins
+Closing a service flow SHALL restore its originating service entry while the actor, NPC, card and entry remain valid. Otherwise the card's valid fallback or existing presence fallback SHALL apply. A departed/invisible target SHALL close the card and invalidate pending routes.
+
+#### Scenario: Service return
+- **WHEN** an existing shop drawer closes while its origin still exists
+- **THEN** focus returns to the originating shop row
+
+#### Scenario: Departure while opening
+- **WHEN** the selected NPC departs before a service read returns
+- **THEN** the card closes, the late response is discarded and existing rail fallback owns focus
+
+#### Scenario: Origin disappears
+- **WHEN** a service disappears before flow close
+- **THEN** focus uses a valid surviving card row or presence fallback without stale selection
