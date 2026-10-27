@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { nextTick } from "vue";
 import PresenceRail from "../../components/PresenceRail.vue";
 import ExplorationMenu from "../../lib/exploration_menu.js";
-import { explorationPanelFixture, AFFORDANCES } from "../../stories/fixtures/scene_overview.js";
+import { explorationPanelFixture, AFFORDANCES, serviceFixture } from "../../stories/fixtures/scene_overview.js";
 import {
   fixtureDigest,
   artworkDescriptor,
@@ -68,7 +68,7 @@ function entriesFor(options) {
 
 const ROOM = {
   targets: [
-    { identity: 11, name: "合成職員", affordances: [AFFORDANCES.talk, AFFORDANCES.guild] },
+    { identity: 11, name: "合成職員", affordances: [AFFORDANCES.talk], services: serviceFixture(11, "board", "公會服務") },
     { identity: 12, name: "霧狼", affordances: [AFFORDANCES.engage] },
   ],
   entities: [{ identity: 21, name: "旅人" }],

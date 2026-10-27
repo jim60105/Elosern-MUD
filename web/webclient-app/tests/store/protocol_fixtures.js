@@ -108,9 +108,9 @@ export function explorationActions(overrides = undefined) {
 }
 
 export function explorationPanel(overrides = undefined) {
-  return deepMerge(
+  const panel = deepMerge(
     {
-      schema_version: 4,
+      schema_version: 5,
       available: true,
       kind: "exploration",
       move: [
@@ -139,6 +139,7 @@ export function explorationPanel(overrides = undefined) {
           identity: 7,
           display_name: "店長",
           portrait_ref: null,
+          services: { state: "none", entries: [] },
           affordances: [
             { kind: "action", action_id: "explore.talk_open", label: "交談", enabled: true, disabled_reason: null },
           ],
@@ -150,6 +151,11 @@ export function explorationPanel(overrides = undefined) {
     },
     overrides,
   );
+  panel.interact = panel.interact.map((target) => ({
+    services: { state: "none", entries: [] },
+    ...target,
+  }));
+  return panel;
 }
 
 export function combatActions(overrides = undefined) {

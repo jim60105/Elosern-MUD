@@ -78,6 +78,17 @@ const currentArtwork = computed(() => currentCharacter.value?.portrait ?? null);
 // through this handle — SceneBackdrop's exposed setPriorImage).
 const shellRef = ref(null);
 const sceneBackdropRef = ref(null);
+// The still-pending dialogue topic focus of a contextual service route: it
+// belongs to the host the route opened, so a committed panel for any other
+// host never matches and never steals the list's own initial highlight.
+const dialogueFocusTopicId = computed(() => {
+  const pending = store.view.dialogueFocusTopic;
+  const host = dialogueVM.value?.host;
+  if (!pending || !host || host.identity !== pending.npcId) {
+    return null;
+  }
+  return pending.topicId;
+});
 // The behavior groups composed in use-app-client.js: every binding below is
 // a group's verbatim state/handler, destructured so the template is unchanged.
 const {
@@ -163,8 +174,16 @@ function presenceProviderId() {
   return Number.isSafeInteger(identity) && identity > 0 ? identity : null;
 }
 watch(
-  () => store.view.hudDrawer,
-  (drawer) => {
+  () => [store.view.hudDrawer, store.view.serviceReadRequest?.seq],
+  ([drawer, seq], previous) => {
+    if (previous && drawer === previous[0] && seq === previous[1]) return;
+    const request = store.view.serviceReadRequest;
+    if (request && seq !== previous?.[1] &&
+        drawer === (request.slot === "shop" ? "shop" : "quest")) {
+      openServices(request.slot, request.npcId);
+      closeServices(request.slot === "shop" ? "counter" : "shop");
+      return;
+    }
     if (drawer === "shop") {
       const provider = panel("services")?.shop?.provider_id;
       openServices(
@@ -821,6 +840,7 @@ const rootStyle = computed(() => {
         :text-to-html="store.view.textToHtml"
         :command-accepts="store.view.commandAccepts"
         :completion-candidates="completionCandidates"
+        :command-prefill="store.view.commandPrefill"
         :roster-available="store.rosterAvailable"
         :roster-characters="store.rosterCharacters"
         :roster-can-create="store.rosterCanCreate"
@@ -1238,6 +1258,8 @@ const rootStyle = computed(() => {
             :local-map="store.view.localMapModel"
             :locked="store.view.dispatch.inFlight !== null"
             :before-activate="beforeChoiceActivate"
+            :focus-topic="dialogueFocusTopicId"
+            @focus-applied="store.clearDialogueFocus($event)"
             @pick="onDialoguePick"
             @freeform="onDialogueFreeform"
             @move="onDialogueMove"
@@ -1548,6 +1570,7 @@ const rootStyle = computed(() => {
         v-else-if="store.view.hudDrawer === 'quest'"
         :quest-log="panel('quest_log')"
         :services="counterServices"
+        :route-request="store.view.serviceReadRequest"
         :memory-scope="`${store.view.generation}|${store.view.epoch}`"
         @action="onQuestAction"
       />

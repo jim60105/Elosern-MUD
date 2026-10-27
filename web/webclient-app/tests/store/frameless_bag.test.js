@@ -116,13 +116,13 @@ describe("frameless 背包 drawer (store contract)", () => {
 
   it("activating the service-guild navigate row on the verb card opens the quest drawer with router unchanged", () => {
     const snap = snapshotWithServices();
-    snap.panels.exploration.interact[0].affordances.push({
-      kind: "navigate",
-      surface: "guild",
+    snap.panels.exploration.interact[0].services = { state: "ready", entries: [{
+      key: "guild",
+      route: { kind: "services", npc_id: 7, section: "board" },
       label: "公會服務",
       enabled: true,
       disabled_reason: null,
-    });
+    }] };
     store.beginTransport(1);
     store.setConnected(true);
     expect(store.receive(1, "ui_snapshot", [snap], {}).accepted).toBe(true);
@@ -165,13 +165,13 @@ describe("frameless 背包 drawer (store contract)", () => {
 
   it("activating the service-shop navigate row on the verb card opens the shop drawer with router unchanged", () => {
    const snap = snapshotWithServices();
-   snap.panels.exploration.interact[0].affordances.push({
-     kind: "navigate",
-     surface: "shop",
+   snap.panels.exploration.interact[0].services = { state: "ready", entries: [{
+     key: "shop",
+     route: { kind: "services", npc_id: 7, section: "shop" },
      label: "商店",
      enabled: true,
      disabled_reason: null,
-  });
+  }] };
    store.beginTransport(1);
    store.setConnected(true);
    expect(store.receive(1, "ui_snapshot", [snap], {}).accepted).toBe(true);

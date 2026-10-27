@@ -352,6 +352,7 @@ function validExplorationTarget(overrides) {
       identity: 5,
       display_name: "南門守衛",
       portrait_ref: null,
+      services: { state: "none", entries: [] },
       affordances: [validExplorationAffordance()],
     },
     overrides || {}
@@ -361,7 +362,7 @@ function validExplorationTarget(overrides) {
 function validExplorationPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 4,
+      schema_version: 5,
       available: true,
       kind: "exploration",
       move: [validExplorationMoveRow()],

@@ -235,7 +235,7 @@ class AffordanceRuleTests(VocabularyTestCase):
         )
 
     @covers_requirement("exploration-affordances::the-shared-read-only-affordance-vocabulary-supports-possessed-shop-access")
-    def test_service_entries_attach_to_the_exact_local_host(self):
+    def test_service_hosts_carry_no_navigation_affordances(self):
         staff = create_object(NPC, key="公會職員", location=self.room)
         staff_component = GuildStaff.create(
             staff, service_id="staff", branch_key=SYNTH_GUILD_BRANCH_KEY
@@ -253,27 +253,14 @@ class AffordanceRuleTests(VocabularyTestCase):
         monster = _monster()
         monster.location = self.room
         vocabulary = self._vocabulary()
-        navigation = [entry for entry in vocabulary if entry.navigation]
-        self.assertEqual(
-            {(entry.surface, entry.label) for entry in navigation},
-            {("guild", "公會服務"), ("shop", "商店")},
-        )
-        self.assertTrue(all(entry.enabled for entry in navigation))
-        for entry in navigation:
-            self.assertIsNone(entry.action_id)
-            self.assertIsNone(entry.params)
-            self.assertIsNone(entry.freeform)
-        self.assertEqual(
-            [entry.surface for entry in navigation], ["guild", "shop"]
-        )
-        # Navigation entries are dock openers, never suggestions.
-        self.assertNotIn(
-            "guild",
-            [entry.action_id for entry in suggestible_candidates(vocabulary)],
-        )
-        self.assertNotIn(
-            "shop",
-            [entry.action_id for entry in suggestible_candidates(vocabulary)],
+        # Schema 5: a service host's entries live in the exploration panel's
+        # own target-bound `services` field, never as coarse navigation rows.
+        self.assertEqual([entry for entry in vocabulary if entry.navigation], [])
+        # The vocabulary still carries the hosts' ordinary action codes, so the
+        # absence above is a service-contract property, not an empty room.
+        action_ids = {entry.action_id for entry in vocabulary if entry.action_id}
+        self.assertTrue(
+            {"explore.look", "explore.engage"} <= action_ids, action_ids
         )
 
     @covers_requirement("exploration-affordances::the-shared-read-only-affordance-vocabulary-supports-possessed-shop-access")

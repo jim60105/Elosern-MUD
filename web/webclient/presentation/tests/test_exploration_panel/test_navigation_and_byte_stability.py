@@ -22,11 +22,11 @@ from ._support import T_DIALOGUE_KEY, _context
 
 
 class OffAnchorNavigationPanelTests(BattlefieldIsolation, EvenniaTestCase):
-    """The v1 panel serializer carries the disabled navigate descriptor.
+    """An off-anchor host renders honestly as a disabled service entry.
 
-    The shared emitter's off-anchor disabled state flows through the
-    version-1 descriptor shape untouched (kind navigate, enabled false,
-    the gate's fixed registry message) — the presenter needed no edits.
+    The coarse guild/shop navigation rows are gone (schema 5): the target's own
+    ``services`` field carries the paused entry with the gate's fixed registry
+    message, in the host's place, and no substitute provider is invented.
     """
 
     def setUp(self):
@@ -45,28 +45,39 @@ class OffAnchorNavigationPanelTests(BattlefieldIsolation, EvenniaTestCase):
         component.service_binding = "place"
         component.anchor_room_id = self.anchor.pk
 
-    def _navigate_entries(self):
+    def _services(self):
         payload = build_production_registry().render("exploration", _context(self.player))
         target = next(
             t for t in payload["interact"] if t["identity"] == int(self.merchant.pk)
         )
-        return [a for a in target["affordances"] if a["kind"] == "navigate"]
+        return target["services"]
 
     @covers_requirement(
         "exploration-affordances::navigation-entries-render-off-anchor-service-hosts-honestly"
     )
-    def test_off_anchor_merchant_serializes_disabled_navigate_entry(self):
-        entry = next(a for a in self._navigate_entries() if a.get("surface") == "shop")
-        self.assertEqual(entry["surface"], "shop")
+    def test_off_anchor_merchant_serializes_a_disabled_shop_entry(self):
+        services = self._services()
+        self.assertEqual(services["state"], "ready")
+        (entry,) = services["entries"]
+        self.assertEqual(entry["key"], "shop")
+        self.assertEqual(
+            entry["route"],
+            {"kind": "services", "npc_id": int(self.merchant.pk), "section": "shop"},
+        )
         self.assertFalse(entry["enabled"])
         self.assertEqual(
             entry["disabled_reason"],
             {
-                "code": "service_unavailable",
+                "code": "off_anchor",
                 "message": "他的服務不在這裡營業。",
             },
         )
-        self.assertNotIn("action_id", entry)
+        # No coarse guild/shop navigation row survives anywhere in the panel.
+        payload = build_production_registry().render("exploration", _context(self.player))
+        for target in payload["interact"]:
+            for affordance in target["affordances"]:
+                if affordance["kind"] == "navigate":
+                    self.assertEqual(affordance["surface"], "npc_persona")
 
     @covers_requirement(
         "exploration-affordances::navigation-entries-render-off-anchor-service-hosts-honestly"
@@ -79,10 +90,9 @@ class OffAnchorNavigationPanelTests(BattlefieldIsolation, EvenniaTestCase):
         payload = build_production_registry().render("exploration", _context(watcher))
         self.assertEqual(
             [
-                a
+                entry
                 for target in payload["interact"]
-                for a in target["affordances"]
-                if a["kind"] == "navigate"
+                for entry in target["services"]["entries"]
             ],
             [],
         )
@@ -169,12 +179,12 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
     def _render(self):
         return build_production_registry().render("exploration", _context(self.player))
 
-    def test_rule_table_fixture_payload_is_byte_identical_to_v3(self):
+    def test_rule_table_fixture_payload_is_byte_identical_to_v5(self):
         payload = self._render()
         self.assertEqual(
             payload,
             {
-                "schema_version": 4,
+                "schema_version": 5,
                 "available": True,
                 "kind": "exploration",
                 "move": [
@@ -240,6 +250,7 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
                         "identity": int(self.host.pk),
                         "display_name": "公會職員",
                         "portrait_ref": portrait_catalog_key(self.host.pk),
+                        "services": {"state": "none", "entries": []},
                         "affordances": [
                             {
                                 "kind": "action",
@@ -264,6 +275,7 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
                         "identity": int(self.bard.pk),
                         "display_name": "吟遊詩人",
                         "portrait_ref": None,
+                        "services": {"state": "none", "entries": []},
                         "affordances": [
                             {
                                 "kind": "action",
@@ -295,6 +307,7 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
                         "identity": int(self.passerby.pk),
                         "display_name": "路人",
                         "portrait_ref": None,
+                        "services": {"state": "none", "entries": []},
                         "affordances": [
                             {
                                 "kind": "navigate",
@@ -312,6 +325,7 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
                         "identity": int(self.goblin.pk),
                         "display_name": "哥布林",
                         "portrait_ref": None,
+                        "services": {"state": "none", "entries": []},
                         "affordances": [
                             {
                                 "kind": "action",

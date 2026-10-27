@@ -28,6 +28,12 @@ const EDITOR_PRESENTED_ACTIONS = new Set(["npc.persona.read", "npc.persona.updat
 
 export function applyTransport(ctx) {
   ctx.handleTransportLifecycle = function handleTransportLifecycle(prev, rs) {
+    if (rs.generation !== prev.generation || rs.activeEpoch !== prev.epoch ||
+        rs.phase === "detached") {
+      ctx.clearDialogueFocus();
+      ctx.serviceReadRequest = null;
+      ctx.commandPrefill = null;
+    }
     if (rs.generation !== prev.generation) {
       ctx.inFlight = null;
       ctx.requestCounter = 0;
@@ -85,6 +91,17 @@ export function applyTransport(ctx) {
     }
     ctx.inFlight.handledResult = fingerprint;
     ctx.inFlight.presentationRevision = result.presentationRevision;
+    // A dialogue service route recorded a topic focus for this exact opening.
+    // A recognized non-success result (a refusal, a stale host, an error) means
+    // the conversation never arrived, so the pending focus is dropped instead
+    // of waiting for a later, unrelated panel.
+    if (
+      ctx.dialogueFocusTopic &&
+      ctx.dialogueFocusTopic.requestId === result.requestId &&
+      NON_SUCCESS_OUTCOMES.indexOf(result.outcome) !== -1
+    ) {
+      ctx.clearDialogueFocus();
+    }
     // webclient-action-result-feedback: a recognized non-success result
     // (rejected / stale / error) speaks exactly once as one narrative error
     // line carrying the server-authored message verbatim. The match guards

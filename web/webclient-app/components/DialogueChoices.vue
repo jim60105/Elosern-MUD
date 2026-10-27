@@ -51,7 +51,7 @@
 // Passive: activation calls `beforeActivate` (the shell parks focus on the
 // message page so the list's removal never drops it) and emits the row's
 // intent; the parent owns every dispatch.
-import { computed, ref } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import ChoiceCard from "./ChoiceCard.vue";
 import { directionGlyph, disabledRowReason, exitLabel } from "./dock-exits.js";
 
@@ -71,9 +71,13 @@ const props = defineProps({
   // Whether the list animates in when it mounts (false in the frame a
   // reconnect renders, webclient-mode-transitions D2). Read once, at mount.
   entrance: { type: Boolean, default: true },
+  // The topic a contextual service route asked to FOCUS (npc-contextual-
+  // service-projection): the row is highlighted exactly like keyboard focus,
+  // and it is never activated, selected, or read. Null when no route asked.
+  focusTopic: { type: String, default: null },
 });
 
-const emit = defineEmits(["pick", "freeform", "move", "leave"]);
+const emit = defineEmits(["pick", "freeform", "move", "leave", "focus-applied"]);
 
 const cardRef = ref(null);
 const view = ref("choices");
@@ -175,6 +179,27 @@ function onBack() {
 function focus() {
   cardRef.value?.focus();
 }
+
+// Apply the requested topic focus once its row exists. The request comes from
+// the server-authored route, so a topic the projection no longer discloses
+// simply never matches: nothing is highlighted and nothing else happens.
+function applyFocusTopic() {
+  const topicId = props.focusTopic;
+  if (!topicId || view.value !== "choices") {
+    return;
+  }
+  const index = props.picks.findIndex((pick) => pick.topicId === topicId);
+  if (index < 0) {
+    return;
+  }
+  cardRef.value?.setActive(index);
+  emit("focus-applied", topicId);
+}
+
+onMounted(() => {
+  nextTick(applyFocusTopic);
+});
+watch(() => [props.focusTopic, props.picks], applyFocusTopic, { flush: "post" });
 
 defineExpose({ focus });
 </script>

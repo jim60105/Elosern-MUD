@@ -23,9 +23,9 @@ test("validates the exploration panel available/unavailable discriminator", () =
     Protocol.validatePanel(
       "exploration",
       Protocol.PANEL_ALLOWLIST.exploration,
-      unavailableStatusPanel({ schema_version: 4 })
+      unavailableStatusPanel({ schema_version: 5 })
     ),
-    unavailableStatusPanel({ schema_version: 4 })
+    unavailableStatusPanel({ schema_version: 5 })
   );
   assert.doesNotThrow(() => Protocol.validateExplorationPanel(validExplorationPanel()));
   assert.throws(() => Protocol.validateExplorationPanel(validExplorationPanel({ extra: 1 })));

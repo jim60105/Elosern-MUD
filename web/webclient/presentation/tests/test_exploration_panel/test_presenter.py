@@ -446,7 +446,7 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertNotIn("explore.party_invite", action_ids)
 
     @covers_requirement("webclient-exploration-menu::exploration-affordances-are-server-authored-never-inferred-from-prose")
-    def test_service_affordance_is_navigate_kind_and_host_bound(self):
+    def test_services_field_is_target_bound_and_never_an_affordance(self):
         # The staff host binds the kit branch row; scope the branch registry
         # so the binding resolves against a registered synthetic identity.
         open_synthetic_scope(self, "guild_branches")
@@ -464,14 +464,34 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         monster_target = next(
             t for t in payload["interact"] if t["identity"] == int(monster.pk)
         )
-        service = next(
-            a for a in staff_target["affordances"] if a["kind"] == "navigate"
+        services = staff_target["services"]
+        self.assertEqual(services["state"], "ready")
+        self.assertEqual(
+            [entry["key"] for entry in services["entries"]],
+            ["guild.register", "guild.board", "guild.report"],
         )
-        self.assertEqual(service["surface"], "guild")
-        self.assertEqual(service["action_id"] if "action_id" in service else None, None)
-        # The navigate affordance is dock-navigation only: never an action_id,
-        # never submitted as an action, and never on an unrelated target.
-        self.assertNotIn("action_id", service)
+        for entry in services["entries"]:
+            self.assertEqual(
+                entry["route"]["npc_id"], int(staff.pk), "the route names the host"
+            )
+            self.assertEqual(entry["route"]["kind"], "services")
+            self.assertNotIn("action_id", entry)
+        # The service field never occupies the general affordance list, and a
+        # non-provider target carries the truthful empty state.
+        self.assertEqual(
+            {
+                a["surface"]
+                for a in staff_target["affordances"]
+                if a["kind"] == "navigate"
+            },
+            {"npc_persona"},
+        )
+        self.assertNotIn(
+            "services", {a.get("surface") for a in staff_target["affordances"]}
+        )
+        self.assertEqual(
+            monster_target["services"], {"state": "none", "entries": []}
+        )
         self.assertFalse(
             any(a["kind"] == "navigate" for a in monster_target["affordances"])
         )

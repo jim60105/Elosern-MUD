@@ -245,16 +245,17 @@ test("combat menus carry fixed breadcrumb titles", () => {
   assert.equal(target.title, "目標");
 });
 
-test("exploration target menu: shop and guild navigate rows carry openDrawer and no openServiceSubmenu", () => {
+test("exploration service rows carry exact provider routes without a coarse drawer hint", () => {
    const panel = explorationPanel();
    panel.interact = [
      {
        identity: 8,
        display_name: "測試店主",
-       affordances: [
-         { kind: "navigate", surface: "shop", label: "商店", enabled: true, disabled_reason: null },
-         { kind: "navigate", surface: "guild", label: "公會服務", enabled: true, disabled_reason: null },
-       ],
+       affordances: [],
+       services: { state: "ready", entries: [
+         { key: "shop", label: "商店", enabled: true, disabled_reason: null, route: { kind: "services", npc_id: 8, section: "shop" } },
+         { key: "guild", label: "公會服務", enabled: true, disabled_reason: null, route: { kind: "services", npc_id: 8, section: "board" } },
+       ] },
      },
    ];
    const model = ExplorationMenu.buildMenus(panel, {});
@@ -263,10 +264,12 @@ test("exploration target menu: shop and guild navigate rows carry openDrawer and
    const shopRow = menu.items.find((it) => it.key === "service-shop");
    const guildRow = menu.items.find((it) => it.key === "service-guild");
    assert.ok(shopRow);
-   assert.equal(shopRow.openDrawer, "shop");
+   assert.deepEqual(shopRow.serviceRoute, { kind: "services", npc_id: 8, section: "shop" });
+   assert.equal(shopRow.openDrawer, undefined);
    assert.equal(shopRow.openServiceSubmenu, undefined);
    assert.ok(guildRow);
-   assert.equal(guildRow.openDrawer, "quest");
+   assert.deepEqual(guildRow.serviceRoute, { kind: "services", npc_id: 8, section: "board" });
+   assert.equal(guildRow.openDrawer, undefined);
    assert.equal(guildRow.openServiceSubmenu, undefined);
 });
 

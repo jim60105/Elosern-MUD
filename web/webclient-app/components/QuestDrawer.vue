@@ -56,11 +56,22 @@ const props = defineProps({
   services: { type: Object, default: null },
   // `<generation>|<epoch>`: a change discards the session memory.
   memoryScope: { type: String, default: "" },
+  routeRequest: { type: Object, default: null },
 });
 
 const emit = defineEmits(["action"]);
 
 const memory = useQuestDrawerMemory(props.memoryScope);
+watch(
+  () => props.routeRequest?.seq,
+  () => {
+    const request = props.routeRequest;
+    if (!request || request.slot !== "counter") return;
+    memory.top = request.section === "report" ? "book" : "counter";
+    if (request.section === "report") memory.bookState = "completed";
+  },
+  { immediate: true },
+);
 watch(
   () => props.memoryScope,
   (scope) => syncQuestDrawerMemoryScope(scope),

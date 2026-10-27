@@ -21,10 +21,12 @@ const CLERK = {
   identity: 7,
   display_name: "店長",
   portrait_ref: null,
+  services: { state: "ready", entries: [
+    { key: "shop", label: "交易", enabled: true, disabled_reason: null, route: { kind: "services", npc_id: 7, section: "shop" } },
+    { key: "guild", label: "公會服務", enabled: true, disabled_reason: null, route: { kind: "services", npc_id: 7, section: "board" } },
+  ] },
   affordances: [
     action("explore.talk_open", "交談"),
-    { kind: "navigate", surface: "shop", label: "交易", enabled: true, disabled_reason: null },
-    { kind: "navigate", surface: "guild", label: "公會服務", enabled: true, disabled_reason: null },
     action("explore.engage", "戰鬥"),
     action("explore.party_invite", "邀請"),
     action("explore.deliver", "交付 藥草 給 店長", { params: { npc_id: 7, item_key: "herb" } }),
@@ -113,16 +115,54 @@ describe("the presence slice (exploration-presence-rail)", () => {
     expect(store.view.railVisible).toBe(true);
   });
 
+  it("keeps a service read bound to the selected host among same-class hosts", () => {
+    const other = { ...CLERK, identity: 8, services: { state: "none", entries: [] } };
+    open([CLERK, other]);
+    store.activatePresence("target-7");
+    store.activatePresenceVerb("service-shop");
+    expect(store.view.serviceReadRequest).toMatchObject({ slot: "shop", npcId: 7, section: "shop" });
+    expect(sender.sent.actions).toHaveLength(0);
+  });
+
+  it("routes enrollment to input only and clears it across transport replacement", () => {
+    const host = { ...CLERK, services: { state: "ready", entries: [{
+      key: "church.enroll", label: "入教", enabled: true, disabled_reason: null,
+      route: { kind: "command", npc_id: 7, command: "church join" },
+    }] } };
+    open([host]);
+    store.activatePresence("target-7");
+    store.activatePresenceVerb("service-church.enroll");
+    expect(store.view.commandPrefill.text).toBe("church join #7");
+    expect(sender.sent.actions).toHaveLength(0);
+    store.beginTransport(2);
+    expect(store.view.commandPrefill).toBeNull();
+  });
+
+  it("opens the exact dialogue host and retains only a local topic focus", () => {
+    const host = { ...CLERK, services: { state: "ready", entries: [{
+      key: "dialogue.offer", label: "委託", enabled: true, disabled_reason: null,
+      route: { kind: "dialogue", npc_id: 7, topic_id: "t_offer" },
+    }] } };
+    open([host]);
+    store.activatePresence("target-7");
+    store.activatePresenceVerb("service-dialogue.offer");
+    expect(sender.sent.actions).toHaveLength(1);
+    expect(sender.sent.actions[0]).toMatchObject({ action_id: "explore.talk_open", payload: { npc_id: 7 } });
+    expect(store.view.dialogueFocusTopic).toMatchObject({ npcId: 7, topicId: "t_offer" });
+    store.beginTransport(2);
+    expect(store.view.dialogueFocusTopic).toBeNull();
+  });
+
   it("verb rows are verbMenuFor's rows in payload order, ending in 查看 and the back row", () => {
     open();
     store.activatePresence("target-7");
     expect(store.view.presenceVerbs.map((item) => item.key)).toEqual([
       "talk-open",
-      "service-shop",
-      "service-guild",
       "engage",
       "party-invite",
       "deliver",
+      "service-shop",
+      "service-guild",
       "look-target",
       "back",
     ]);
@@ -269,7 +309,7 @@ describe("the presence slice (exploration-presence-rail)", () => {
     it("an unavailable panel never reads as a departure", () => {
       open();
       store.activatePresence("target-7");
-      const result = commit({ schema_version: 4, available: false, reason: { code: "scene_lost", message: "暫時不可用。" } });
+      const result = commit({ schema_version: 5, available: false, reason: { code: "scene_lost", message: "暫時不可用。" } });
       expect(result.accepted).toBe(true);
       expect(store.view.presenceCard).toMatchObject({ kind: "verbs", identity: 7 });
       expect(store.view.presenceNotice).toBe(null);

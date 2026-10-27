@@ -272,8 +272,7 @@
   // One contextual service entry as a flat card row (npc-contextual-service-
   // projection; U later groups these rows). The row carries the server-authored
   // route verbatim; the store consumes it and the renderer never parses a
-  // label. `openDrawer` is the derived local drawer name so a row can also be
-  // opened by surfaces that only understand drawer names.
+  // label. The route retains the provider through every consumer.
   function serviceItem(entry) {
     var route = entry && entry.route ? entry.route : null;
     var reason = (entry && entry.disabled_reason) || null;
@@ -288,7 +287,6 @@
       serviceRoute: route,
     };
     if (route && route.kind === "services") {
-      item.openDrawer = route.section === "shop" ? "shop" : "quest";
       item.serviceSection = route.section;
     } else if (route && route.kind === "dialogue") {
       item.dialogueRoute = { npcId: route.npc_id, topicId: route.topic_id };

@@ -14,6 +14,7 @@ import { ART_PANEL_SAMPLE } from "../fixtures.js";
 import { localMapAround, localMapModelFor } from "../fixtures/local_map.js";
 import {
   AFFORDANCES,
+  serviceFixture,
   compassArgs,
   explorationPanelFixture,
   presenceArgs,
@@ -41,7 +42,7 @@ const ROOM = explorationPanelFixture({
     { ref: "door", label: "酒館門", destination: "interior:tavern", enabled: false, reason: "酒館打烊了，門從裡面上了閂。" },
   ],
   targets: [
-    { identity: 11, name: "葛里安‧衛登", affordances: [AFFORDANCES.talk, AFFORDANCES.guild] },
+    { identity: 11, name: "葛里安‧衛登", affordances: [AFFORDANCES.talk], services: serviceFixture(11, "board", "公會服務") },
     { identity: 12, name: "霧狼", kind: "monster", affordances: [AFFORDANCES.engage] },
   ],
   entities: [{ identity: 21, name: "旅人艾拉" }],

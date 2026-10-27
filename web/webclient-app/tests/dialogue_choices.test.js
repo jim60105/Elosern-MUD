@@ -75,6 +75,20 @@ describe("DialogueChoices", () => {
   const badges = (w) => rows(w).map((row) => row.get(".dialogue-choices__badge").attributes("data-badge"));
   const activeRow = (w) => document.getElementById(list(w).attributes("aria-activedescendant"));
 
+  it("focuses only a disclosed requested topic without activating it", async () => {
+    const w = mountList({ focusTopic: PICKS[1].topicId });
+    await nextTick();
+    await nextTick();
+    expect(activeRow(w)).toBe(rows(w)[1].element);
+    expect(w.emitted("pick")).toBeUndefined();
+    expect(w.emitted("focus-applied")).toEqual([[PICKS[1].topicId]]);
+    await w.setProps({ focusTopic: "undisclosed-topic" });
+    expect(w.emitted("pick")).toBeUndefined();
+    expect(w.emitted("focus-applied")).toHaveLength(1);
+    await key(w, "Enter");
+    expect(w.emitted("pick")).toEqual([[PICKS[1]]]);
+  });
+
   async function key(w, name, init = {}) {
     list(w).element.dispatchEvent(new KeyboardEvent("keydown", { key: name, bubbles: true, cancelable: true, ...init }));
     await nextTick();
