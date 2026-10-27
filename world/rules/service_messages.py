@@ -64,6 +64,8 @@ SERVICE_REASON_MESSAGES: dict[str, str] = {
     # Shared anchoring-gate refusal; the prose is owned by service_gate.
     "service_unavailable": MESSAGE_OFF_ANCHOR,
     "already_registered": "你已經是冒險者了。",
+    "already_enrolled": "你已經入教了。",
+    "topic_locked": "這個話題目前還不能深入。",
     "malformed_registration": "公會資料有誤。",
     "guild_data_error": "公會資料有誤。",
     "guild_service_error": "公會服務目前無法使用。",
