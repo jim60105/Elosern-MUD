@@ -8,12 +8,7 @@ are exercised against a second, deliberately unlike entry.
 ## Requirements
 
 ### Requirement: The village is a small connected grid with one anchor
-`world/maps/village_ciaran.py` SHALL declare map data for `zcoord="village_ciaran"` describing the
-connected tree declared by `NODE_IDS`, `PROTOTYPES`, and `ROADS`, with a single entrance node, a
-central plaza, and exterior nodes reflecting the branch's culture and dwellings. The plaza SHALL
-spawn as the settlement's sole `AnchorRoom`, carrying `anchor_key="village_ciaran"`. Every
-intra-village link SHALL spawn as the costed grid exit, so village movement charges its
-distance-derived cost.
+The village settlement document SHALL define a connected branching graph in its own metre coordinate space with one anchor and costed directed travel, retaining its existing identities and attachments.
 
 #### Scenario: The village grid spawns connected with one anchor
 - **WHEN** grid synchronization runs
@@ -111,27 +106,16 @@ entry that gives them a second entry to check against.
 - **THEN** they arrive at the village's entrance node
 
 ### Requirement: Ciaran uses metric skylit underground geography
-Ciaran SHALL retain the branching topology and integer-meter positions declared in `world/maps/village_ciaran.py`, with its lore-defined living footprint and population. Main living chambers SHALL remain underground; outdoor nodes SHALL occupy skylit collapse basins or ravines, retaining the concealed path without walls or city gates.
+Village geometry SHALL use integer metres from its settlement document while retaining branching topology, qualified attachments and the separation of physical map data from non-map lore.
+
+#### Scenario: Metric identity preservation
+- **WHEN** the existing village map is converted or a bound node is moved
+- **THEN** node IDs, directions and room joins remain stable without inferring a new exit from coordinates; existing prose/population remain unchanged by conversion
 
 #### Scenario: Exact metric positions
-- **WHEN** village nodes synchronize
-- **THEN** old-to-new bindings equal this table, without collisions or compass-octant changes.
-
-| Location | Old local coordinate | New local coordinate, meters |
-| --- | --- | --- |
-| 隱密小徑 | (0, 1) | (35, 270) |
-| 村中廣場 | (1, 1) | (220, 305) |
-| 溪畔小徑 | (1, 0) | (245, 135) |
-| 溪畔下游 | (2, 0) | (430, 85) |
-| 練刀場 | (2, 1) | (405, 335) |
-| 藥草園 | (3, 1) | (590, 300) |
-| 村北古樹下 | (1, 2) | (200, 465) |
-| 長老古樹下 | (1, 3) | (165, 650) |
-| 織房坡 | (2, 2) | (390, 495) |
-| 銀葉坡 | (2, 3) | (440, 665) |
-
-
+- **WHEN** a synthetic branching village document is loaded and a node is moved
+- **THEN** its integer-metre binding changes without coordinate collision, ID change or a recomputed authored compass direction
 
 #### Scenario: Underground setting and route
-- **WHEN** the village and entrance-to-elder route are inspected
-- **THEN** surrounding forest/gathering land lies beyond the living footprint, daylight/trees occur at openings, the village is never an ordinary exposed forest settlement, and the healthy straight-edge route is approximately seven minutes.
+- **WHEN** the village source is converted and a source-defined route is measured
+- **THEN** existing prose and concealed-entry semantics remain unchanged and route length uses its metre edges; underground setting fidelity is human-reviewed without a copied prose/duration approval table

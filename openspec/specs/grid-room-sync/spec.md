@@ -6,7 +6,6 @@ pair and the `evennia xyzgrid` CLI registration.
 
 ## Requirements
 
-
 ### Requirement: sync_grid() is distinct from sync_all() and instantiates real rooms and exits
 `world/maps/bootstrap.py` SHALL provide a `sync_grid()` function, distinct in name and module from
 `world/lore/sync.py::sync_all()`. `sync_grid()` SHALL synchronize every declared sparse node and
@@ -25,9 +24,7 @@ explicit road into corresponding `XYZRoom`/`XYZExit` objects, without dense ASCI
   creates no `GridRoom`, `AnchorRoom`, or `XYZExit`
 
 ### Requirement: sync_grid() is idempotent across repeated calls and server starts
-Running `sync_grid()` more than once, including across separate Evennia server starts, SHALL NOT
-create duplicate rooms or exits at any coordinate, and SHALL leave exactly the declared topology in
-place.
+Repeated grid synchronization SHALL reuse stable declared rooms/exits and converge to the loaded settlement topology without duplicate objects.
 
 #### Scenario: Running sync_grid twice creates no duplicate rooms
 - **WHEN** `sync_grid()` is called, and then called a second time with no map data changed
@@ -35,7 +32,7 @@ place.
   count after the first call, and the total count of `XYZExit` instances is likewise unchanged
 
 #### Scenario: A room's Attributes are updated in place, not duplicated, when its prototype changes
-- **WHEN** `world/maps/altoria_capital.py`'s prototype for one coordinate changes (for example, its
+- **WHEN** `content/maps/settlements/capital_altoria.yaml`'s prototype for one coordinate changes (for example, its
   `desc`) and `sync_grid()` is called again
 - **THEN** the existing room at that coordinate is updated to the new `desc`, and no second room is
   created at the same coordinate

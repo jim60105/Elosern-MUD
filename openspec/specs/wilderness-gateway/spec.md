@@ -10,12 +10,7 @@ provisioning wired into server startup.
 ## Requirements
 
 ### Requirement: WILDERNESS_ENTRY_REGISTRY links a grid-placed anchor to an authored wilderness footprint and gates
-`world/lore/wilderness_entry.py` SHALL define the frozen `WildernessGate` and
-`WildernessEntryPoint` dataclasses and `WILDERNESS_ENTRY_REGISTRY: dict[str, WildernessEntryPoint]`,
-exposing `footprint_cells`, `anchor_cell`, and `approach_cell(gate)` as the geometry source. A
-point-shape entry's approach cell IS its anchor; only its `return_direction` is a gateway. `grid_xy`
-uses integer meters in the settlement's local frame, and entrance geometry comes
-from the sparse graph.
+Immutable game wilderness-entry views SHALL derive solely from settlement-owned footprint and qualified gate relationships, retaining point-entry, approach, uniqueness and lore-mirroring semantics.
 
 #### Scenario: The registry declares settlement footprints and gate destinations
 - **WHEN** `WILDERNESS_ENTRY_REGISTRY` is inspected
@@ -26,11 +21,8 @@ from the sparse graph.
   `ANCHOR_PLACEMENT_REGISTRY` key must also appear
 
 #### Scenario: Derived geometry matches the authored mask
-- **WHEN** `footprint_cells`, `anchor_cell`, and `approach_cell` are read for the
-  `"capital_altoria"` entry
-- **THEN** `footprint_cells` matches the authored mask at its declared origin, `anchor_cell`
-  is `(860, 1080)`, the `"n"` gate's approach cell is `(860, 1077)`, and the `"w"` gate's approach
-  cell is `(864, 1080)`
+- **WHEN** a synthetic mask with rows `###`, `.##`, `###` is placed at origin `(10,20)` with north and west return gates
+- **THEN** its midpoint anchor is `(11,21)`, its occupied cells exclude `(10,21)`, its north-return approach is `(11,19)` and its west-return approach is `(13,21)`; shipped-coordinate preservation belongs to temporary conversion evidence
 
 #### Scenario: Gate identity is globally unique
 
@@ -60,9 +52,7 @@ from the sparse graph.
 
 #### Scenario: Gate and entry dataclass fields
 - **WHEN** the dataclasses are defined
-- **THEN** `WildernessGate` is frozen with `return_direction: str`, `grid_xy: tuple[int, int]`,
-  `z_map_key: str`, and `WildernessEntryPoint` is frozen with `anchor_key: str`,
-  `shape: tuple[str, ...]`, `origin_xy: tuple[int, int]`, `gates: tuple[WildernessGate, ...]`
+- **THEN** entry/gate values are immutable and resolve direction, target, mask, origin and gates from the settlement document, with runtime coordinates derived from the qualified target
 
 #### Scenario: Shape mask placement convention
 - **WHEN** an entry's `shape` is authored

@@ -55,6 +55,9 @@ class SettlementPythonAuthorityTests(unittest.TestCase):
                         offenders.append(f"{path.relative_to(REPO_ROOT)}: {name}")
         self.assertEqual(offenders, [])
 
+    @covers_requirement(
+        "map-settlement-sources::settlement-documents-own-complete-local-map-declarations"
+    )
     def test_the_map_package_declares_no_settlement_data_table(self):
         offenders = []
         for path in sorted((REPO_ROOT / "world" / "maps").rglob("*.py")):
@@ -76,6 +79,9 @@ class SettlementPythonAuthorityTests(unittest.TestCase):
 
 
 class SettlementDocumentSetTests(unittest.TestCase):
+    @covers_requirement(
+        "map-settlement-sources::settlement-documents-own-complete-local-map-declarations"
+    )
     def test_every_discovered_document_composes_and_binds_one_location(self):
         from world.maps import map_data
 

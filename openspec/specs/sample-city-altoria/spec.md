@@ -7,16 +7,10 @@ and one forward bridge from Limbo per city-gate registry row.
 ## Requirements
 
 ### Requirement: The sample city has the declared rooms in a connected sparse topology
-`world/maps/altoria_capital.py` SHALL declare the sparse map declaration for `zcoord="capital_altoria"` describing
-the rooms and directed roads declared by `PROTOTYPES`, `NODE_IDS`, and `ROADS` such that every room is
-reachable from every other room.
-
-The stable `node_id` SHALL be the English slug in `NODE_IDS`, such as `south_gate`
-or `quay`. The room prototype's Chinese `key`（南門、碼頭埠）SHALL be its
-display name, independent of that identity.
+The capital settlement document SHALL define stable node identities, prototypes, bounded visual options and a connected sparse directed graph with its authored cycles and diagonal shortcuts.
 
 #### Scenario: The map parses to the declared nodes
-- **WHEN** `world/maps/altoria_capital.py`'s sparse node/road declaration is parsed with
+- **WHEN** `content/maps/settlements/capital_altoria.yaml`'s sparse node/road declaration is parsed with
   the sparse graph validator
 - **THEN** its nodes match the declared identities, prototypes, and metric coordinates without omissions or duplicates
 
@@ -26,10 +20,10 @@ display name, independent of that identity.
 
 #### Scenario: The topology contains cycles
 - **WHEN** the roads in the validated sparse graph are inspected
-- **THEN** they match the settlement module's declaration, and at least one pair of rooms has distinct routes between them
+- **THEN** they match the settlement document's declaration, and at least one pair of rooms has distinct routes between them
 
 #### Scenario: The map declares bounded visual-range options
-- **WHEN** `world/maps/altoria_capital.py`'s sparse map declaration is inspected
+- **WHEN** `content/maps/settlements/capital_altoria.yaml`'s sparse map declaration is inspected
 - **THEN** its `options` contains a `map_visual_range` positive integer of at most 8 and a `map_mode`
   equal to `nodes` or `scan`, and parsing the map still yields the declared nodes and roads
 
@@ -41,7 +35,7 @@ display name, independent of that identity.
 
 #### Scenario: The declared topology is authoritative
 - **WHEN** authored rooms or roads change
-- **THEN** synchronization follows the settlement module rather than a historical count in specification prose
+- **THEN** synchronization follows the settlement document rather than a historical count in specification prose
 
 #### Scenario: The topology is not a tree
 - **WHEN** the topology is evaluated
@@ -190,11 +184,7 @@ wilderness gate and SHALL NOT be a dead end.
   registry describes
 
 ### Requirement: The sample city's declared intra-city exits spawn as CostedXYZExit
-`world/maps/altoria_capital.py::XYMAP_DATA["prototypes"]` SHALL include exactly one
-wildcard link-prototype override, `("*", "*", "*"): {"prototype_parent": "xyz_exit", "typeclass":
-"typeclasses.exits.CostedXYZExit"}`, so that every one of the sample city's intra-city links
-spawns as `typeclasses.exits.CostedXYZExit` (the `movement-cost-charging` capability) instead of the
-contrib's own bare `evennia.contrib.grid.xyzgrid.xyzroom.XYZExit`.
+Every declared capital road SHALL spawn as a costed grid exit using its YAML exit prototype without changing topology, including diagonal travel.
 
 #### Scenario: Every intra-city exit is a CostedXYZExit instance
 - **WHEN** `sync_grid()` runs and the sample city's intra-city exits are inspected by typeclass
@@ -211,7 +201,7 @@ contrib's own bare `evennia.contrib.grid.xyzgrid.xyzroom.XYZExit`.
 - **THEN** `get_world_clock().tick` increases by exactly the resolved physical edge duration
 
 #### Scenario: Every declared travel direction has a costed exit
-- **WHEN** the module's `ROADS` entries are synchronized
+- **WHEN** the settlement document's roads are synchronized
 - **THEN** each directed road has a costed exit, without a specification-owned exit count
 
 #### Scenario: The override changes only the spawned typeclass, not the topology
@@ -268,36 +258,16 @@ preserving any existing attribute value.
 - **THEN** both NPCs have integer `age` and `apparent_age` reflecting their authored profile canonical ages
 
 ### Requirement: Altoria uses approved metric outdoor positions
-Altoria SHALL use the integer-meter node positions declared in `world/maps/altoria_capital.py`, retaining its authored roads, cycles and diagonal shortcuts. Initial roads SHALL be straight; every existing compass octant and interior attachment SHALL persist.
+Capital node positions SHALL be integer metres from the settlement document, with stable identities, authored direction choices, roads/cycles/shortcuts and current interior attachments preserved during source conversion.
+
+#### Scenario: Metric source conversion
+- **WHEN** the existing capital declaration is converted without an authoring edit
+- **THEN** temporary comparison confirms no geography/topology/prose change and permanent tests establish unit, identity and consumer behavior without a duplicated coordinate approval table
 
 #### Scenario: Exact metric positions
-- **WHEN** the authored city is synchronized
-- **THEN** its old-to-new coordinate bindings equal this table with no collisions.
-
-| Location | Old local coordinate | New local coordinate, meters |
-| --- | --- | --- |
-| 南門 | (3, 0) | (3050, 150) |
-| 碼頭埠 | (1, 1) | (1250, 760) |
-| 河岸道 | (2, 1) | (2150, 920) |
-| 南大道 | (3, 1) | (3140, 1050) |
-| 客棧巷 | (4, 1) | (3970, 1120) |
-| 浴場前 | (5, 1) | (4830, 970) |
-| 舊城牆遺跡 | (2, 2) | (2350, 1900) |
-| 大道北段 | (3, 2) | (3350, 1980) |
-| 工匠巷 | (1, 3) | (1300, 2600) |
-| 市場街 | (2, 3) | (2420, 2700) |
-| 中央廣場 | (3, 3) | (3500, 2850) |
-| 公會前 | (4, 3) | (4380, 3000) |
-| 東市 | (5, 3) | (5380, 2850) |
-| 東門 | (6, 3) | (6500, 3010) |
-| 校場外 | (2, 4) | (2300, 3820) |
-| 聖階 | (3, 4) | (3480, 3700) |
-| 大神殿前 | (4, 4) | (4560, 3920) |
-| 貴族區前 | (3, 5) | (3500, 4850) |
-| 上城門 | (4, 5) | (4690, 5010) |
-| 學院前 | (5, 5) | (5650, 5200) |
-| 王宮前庭 | (4, 6) | (4500, 6350) |
+- **WHEN** a synthetic capital-format document declares integer-metre positions and directed roads
+- **THEN** loaded physical coordinates equal those inputs without collision, identity change or compass inference; production conversion preservation is temporary comparison evidence
 
 #### Scenario: Physical city interpretation
-- **WHEN** settlement and routes are inspected
-- **THEN** built-up area targets approximately 40km² for 600000 residents across roughly 7km; riverfront lower city, market belt and three northern terraces persist; healthy south-gate-to-plaza and palace routes are approximately 37 and 94 minutes, with no claim all housing is authored.
+- **WHEN** capital geometry is inspected and routes are measured
+- **THEN** scale and lengths use actual source metres, and geometry does not infer population or claim that all housing is authored; setting fidelity remains human-reviewed

@@ -6,56 +6,53 @@ xyzgrid layer, kept separate from the frozen `Anchor` lore dataclass.
 ## Requirements
 
 ### Requirement: AnchorPlacement is a frozen dataclass separate from Anchor
-`world/lore/anchor_placement.py` SHALL define a frozen `AnchorPlacement` dataclass with fields
-`anchor_key: str`, `zcoord: str`, and `entrance_xy: tuple[int, int]`, and a module-level
-`ANCHOR_PLACEMENT_REGISTRY: dict[str, AnchorPlacement]`. `world/lore/anchors.py`'s frozen `Anchor`
-dataclass (change 2) SHALL NOT be modified to add any placement, coordinate, or grid field.
+Game placement views SHALL derive immutable location-to-settlement bindings from settlement documents without adding placement fields to non-map lore.
+
+#### Scenario: Spatial ownership
+- **WHEN** a settlement names a location and anchor node
+- **THEN** the composed placement follows the current qualified node binding while political/population/floor lore is unchanged
 
 #### Scenario: Anchor dataclass is untouched
-- **WHEN** `world/lore/anchors.py` is inspected after this change lands
-- **THEN** the `Anchor` dataclass still has exactly the fields `key`, `kind`, `display_name_zh`,
-  `nation_key`, `population`, `floors`, `description`, with no new field added
+- **WHEN** settlement placement is composed with non-map location lore
+- **THEN** placement adds no coordinate fields or duplicate political/population/floor facts to the non-map lore record
 
 #### Scenario: AnchorPlacement carries no lore fact
-- **WHEN** `AnchorPlacement` is inspected
-- **THEN** it has exactly the fields `anchor_key`, `zcoord`, `entrance_xy`, and none of `Anchor`'s
-  lore fields (`population`, `floors`, `nation_key`, `description`, `display_name_zh`) are duplicated
-  onto it
+- **WHEN** the immutable placement projection is read
+- **THEN** it contains only resolved location/map/node binding facts, with lore supplied by its separate identity join
 
 ### Requirement: Every placement's anchor_key resolves against ANCHOR_REGISTRY
-Every entry in `ANCHOR_PLACEMENT_REGISTRY` SHALL have an `anchor_key` that exists as a key in the
-published geography's composed location views (the map-owned replacement for the former module
-registry).
+Every derived placement SHALL resolve an existing geographic location and a node in its declared settlement.
+
+#### Scenario: Missing location or node
+- **WHEN** a settlement binding names an absent location or anchor node
+- **THEN** validation names the broken source field and rejects runtime publication
 
 #### Scenario: capital_altoria's placement resolves
-- **WHEN** `ANCHOR_PLACEMENT_REGISTRY["capital_altoria"]` is inspected
-- **THEN** its `anchor_key` (`"capital_altoria"`) exists as a key in the published location views
+- **WHEN** the capital's discovered settlement binding is resolved
+- **THEN** its qualified location and anchor node exist in the current snapshot, without a fixed coordinate assertion
 
 #### Scenario: No placement references a nonexistent anchor
-- **WHEN** every entry in `ANCHOR_PLACEMENT_REGISTRY` is inspected
-- **THEN** each entry's `anchor_key` exists in the published location views
+- **WHEN** any derived placement names an absent location
+- **THEN** validation rejects before publishing placements or mirroring lore
 
 ### Requirement: ANCHOR_PLACEMENT_REGISTRY is intentionally partial
-`ANCHOR_PLACEMENT_REGISTRY` SHALL NOT be required to contain an entry for every published location.
-It SHALL contain an entry for exactly those locations that have a grid map built for them, and
-SHALL grow one entry per settlement as maps are added.
+Placement views SHALL contain exactly authored local-map associations derived from settlement-owned location references without requiring a local map for every location.
+
+#### Scenario: Unbuilt and newly built location
+- **WHEN** one location has no local map and another gains a discovered settlement document
+- **THEN** only the built association appears and no reverse location document edit or Python registration is needed
 
 #### Scenario: The registry follows the built settlement maps
-- **WHEN** `ANCHOR_PLACEMENT_REGISTRY` is inspected
-- **THEN** it contains one entry per settlement with a built grid map, including
-  `"capital_altoria"` and `"village_ciaran"`, and no test asserts that any other published location
-  key must also appear
+- **WHEN** settlement source membership changes
+- **THEN** placement membership derives from those supported documents, and unbuilt locations need no placeholder placement
 
 #### Scenario: capital_altoria's placement matches the sample city's spawned AnchorRoom
-- **WHEN** `sync_grid()` (the `grid-room-sync` capability) has run and the spawned `AnchorRoom` for
-  `capital_altoria` is inspected
-- **THEN** `ANCHOR_PLACEMENT_REGISTRY["capital_altoria"].zcoord` equals that room's `.xyz[2]` and
-  `ANCHOR_PLACEMENT_REGISTRY["capital_altoria"].entrance_xy` equals `(room.xyz[0], room.xyz[1])`
+- **WHEN** the loaded capital anchor is synchronized
+- **THEN** its placement resolves the same stable AnchorRoom at that node's current binding
 
 #### Scenario: Every placement matches its settlement's spawned AnchorRoom
-- **WHEN** `sync_grid()` has run and each registered placement's settlement is inspected
-- **THEN** every entry's `zcoord` and `entrance_xy` equal its settlement's sole spawned
-  `AnchorRoom` coordinates, and no two entries name the same `zcoord`
+- **WHEN** multiple settlement anchors synchronize
+- **THEN** each placement resolves its own stable room/map binding without collisions or cross-map substitution
 
 ### Requirement: ANCHOR_PLACEMENT_REGISTRY is mirrored into LoreRecord Scripts idempotently
 `world/lore/sync.py::_ALL_REGISTRIES` SHALL include `ANCHOR_PLACEMENT_REGISTRY` under the category

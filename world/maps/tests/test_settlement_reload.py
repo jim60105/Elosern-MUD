@@ -12,6 +12,7 @@ from __future__ import annotations
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.rooms import GridRoom, Room
 from world.maps import map_data
 from world.maps.bootstrap import sync_settlement_graph
@@ -126,6 +127,9 @@ class SettlementReloadTests(EvenniaTestCase):
         report = sync_settlement_graph(snapshot.graphs["t_reload"])
         return report
 
+    @covers_requirement(
+        "map-settlement-sources::settlement-documents-own-complete-local-map-declarations"
+    )
     def test_a_moved_node_keeps_identity_and_the_authored_direction(self):
         first = self._sync(_DOCUMENT)
         # Two rooms and two directed roads.

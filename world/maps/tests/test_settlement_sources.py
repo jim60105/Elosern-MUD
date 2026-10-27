@@ -20,6 +20,7 @@ from pathlib import Path
 from elosern_map_core.codec import parse_document
 from elosern_map_core.diagnostics import AuthoringError
 from elosern_map_core.sources import make_source_document
+from tools.spec_traceability import covers_requirement
 from world.maps import map_data
 from world.tests.geography_fixture import publish_shipped_settlements
 
@@ -129,6 +130,9 @@ def _write_root(directory: str, settlement_text: str) -> Path:
 
 
 class ThirdSettlementTests(unittest.TestCase):
+    @covers_requirement(
+        "map-settlement-sources::settlement-documents-own-complete-local-map-declarations"
+    )
     def test_a_third_document_is_discovered_and_composed_without_registration(self):
         with tempfile.TemporaryDirectory() as directory:
             root = _write_root(directory, _THIRD)
@@ -162,6 +166,9 @@ class ThirdSettlementTests(unittest.TestCase):
         self.assertNotIn("t_third", snapshot.wilderness_entries)
         self.assertIn(entry.anchor_key, snapshot.anchor_placements)
 
+    @covers_requirement(
+        "map-settlement-sources::settlement-documents-own-complete-local-map-declarations"
+    )
     def test_the_discovered_document_is_the_only_local_map_of_its_location(self):
         with tempfile.TemporaryDirectory() as directory:
             root = _write_root(directory, _THIRD)
@@ -176,6 +183,9 @@ class ThirdSettlementTests(unittest.TestCase):
 
 
 class SettlementGraphFidelityTests(unittest.TestCase):
+    @covers_requirement(
+        "map-settlement-sources::settlement-documents-own-complete-local-map-declarations"
+    )
     def test_shipped_documents_compose_exactly_their_declared_graph(self):
         snapshot = map_data.current()
         self.assertTrue(snapshot.settlements)
@@ -202,6 +212,9 @@ class SettlementGraphFidelityTests(unittest.TestCase):
                     dict(graph.exit_prototype), dict(document.exit_prototype)
                 )
 
+    @covers_requirement(
+        "map-settlement-sources::settlement-documents-own-complete-local-map-declarations"
+    )
     def test_moving_a_bound_node_changes_the_binding_not_the_identity(self):
         moved = _THIRD.replace("x_m: 120", "x_m: 220")
         snapshot = _build([_document(moved)])
