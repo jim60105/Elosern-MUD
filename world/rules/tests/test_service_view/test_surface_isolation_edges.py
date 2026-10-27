@@ -222,7 +222,7 @@ class MeritAndRankEdgeTests(ServiceRegistryIsolation):
             return_value=SimpleNamespace(tick=TICK_NOON),
         ):
             view = build_services_view(player)
-        rank = view.guild.rank
+        rank = view.rank
         self.assertFalse(rank.merit_qualified)
         self.assertIsNone(rank.next_rank)
         self.assertFalse(rank.exam_request.enabled)

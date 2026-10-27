@@ -320,7 +320,7 @@ class QuestRenderingTests(ServiceRegistryIsolation):
             "world.rules.service_view.read_world_clock",
             return_value=SimpleNamespace(tick=TICK_NOON),
         ):
-            return build_services_view(player).guild.rank
+            return build_services_view(player).rank
 
     @covers_requirement("webclient-service-menus::the-guild-surface-covers-registration-board-quest-log-and-rank-examination")
     def test_exam_eligibility_shows_exact_next_rank_only(self):
@@ -390,4 +390,7 @@ class QuestRenderingTests(ServiceRegistryIsolation):
             return_value=SimpleNamespace(tick=TICK_NOON),
         ):
             view = build_services_view(player)
-        self.assertIsNone(view.guild.rank)
+        # The rank surface is independent of guild staff: no reception means
+        # no rank section, while the guild section still ships.
+        self.assertIsNotNone(view.guild)
+        self.assertIsNone(view.rank)

@@ -24,12 +24,12 @@ class ServicesSchemaEdgeTests(unittest.TestCase):
 
     def _guild(self, **overrides):
         value = {
+            "provider_id": 61,
             "branch_label": "合成公會分行",
             "rank_ladder": ["F", "E", "D", "C", "B", "A", "S"],
             "registration": {"registered": False, "register": self._action()},
             "board": [],
             "quests": [],
-            "rank": None,
         }
         value.update(overrides)
         return value
@@ -83,7 +83,7 @@ class ServicesSchemaEdgeTests(unittest.TestCase):
                 with self.assertRaises(ProtocolValidationError):
                     validate_services(
                         _valid_payload(
-                            shop={"open": True, "member_id": _MEMBER_ID, "stock": [_stock_row(buy=self._action(action_id))], "sellable": []},
+                            shop={"provider_id": 62, "open": True, "member_id": _MEMBER_ID, "stock": [_stock_row(buy=self._action(action_id))], "sellable": []},
                             pagination={**_valid_payload()["pagination"], "stock_total": 1},
                         )
                     )
@@ -182,7 +182,7 @@ class ServicesSchemaEdgeTests(unittest.TestCase):
 
     def _rank_payload(self, rank):
         return _valid_payload(
-            guild=self._guild(rank=rank),
+            rank=dict(provider_id=63, **rank),
             pagination={**_valid_payload()["pagination"]},
         )
 
@@ -224,9 +224,9 @@ class ServicesSchemaEdgeTests(unittest.TestCase):
         )
         for rank in (below_merit_enabled, qualified_disabled):
             validated = validate_services(self._rank_payload(rank))
-            self.assertEqual(validated["guild"]["rank"]["merit_qualified"], rank["merit_qualified"])
+            self.assertEqual(validated["rank"]["merit_qualified"], rank["merit_qualified"])
             self.assertEqual(
-                validated["guild"]["rank"]["exam_request"]["enabled"], rank["exam_request"]["enabled"]
+                validated["rank"]["exam_request"]["enabled"], rank["exam_request"]["enabled"]
             )
 
 
@@ -290,14 +290,14 @@ class ServicesSchemaEdgeTests(unittest.TestCase):
         with self.assertRaises(ProtocolValidationError):
             validate_services(
                 _valid_payload(
-                    shop={"open": True, "member_id": _MEMBER_ID, "stock": [], "sellable": []},
+                    shop={"provider_id": 62, "open": True, "member_id": _MEMBER_ID, "stock": [], "sellable": []},
                     pagination={**_valid_payload()["pagination"], "stock_total": 1},
                 )
             )
         with self.assertRaises(ProtocolValidationError):
             validate_services(
                 _valid_payload(
-                    shop={"open": True, "member_id": _MEMBER_ID, "stock": [], "sellable": []},
+                    shop={"provider_id": 62, "open": True, "member_id": _MEMBER_ID, "stock": [], "sellable": []},
                     pagination={**_valid_payload()["pagination"], "sellable_total": 1},
                 )
             )

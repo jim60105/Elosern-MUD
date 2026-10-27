@@ -96,7 +96,7 @@ class HostResolutionTests(ServiceRegistryIsolation):
         self.assertEqual(view.host.identity, "10")
         self.assertEqual(view.host.display_name, "公會長")
         self.assertIsNotNone(view.guild)
-        self.assertIsNotNone(view.guild.rank)
+        self.assertIsNotNone(view.rank)
         self.assertIsNone(view.shop)
 
     def test_general_store_resolves_one_merchant_and_names_it(self):

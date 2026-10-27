@@ -358,7 +358,7 @@ class ViewedMemberShopTests(BattlefieldIsolation, EvenniaTest):
             int(self.commander.pk), int(self.aila.pk), "shop"
         )
         payload = self._render(selection)
-        self.assertEqual(payload["schema_version"], 7)
+        self.assertEqual(payload["schema_version"], 8)
         self.assertNotIn("inventory", payload)
         self.assertNotIn("inventory_total", payload["pagination"])
         shop = payload["shop"]

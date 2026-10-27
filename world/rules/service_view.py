@@ -968,9 +968,14 @@ def build_services_view(
         shop, shop_reason = None, None
         host = None
     elif targeted:
-        staff = _carries(provider, GuildStaff)
-        reception = _carries(provider, GuildExamReception)
-        merchant = _carries(provider, Merchant)
+        # The section builders take the host object and read its own
+        # component, so a targeted read hands them the selected NPC or
+        # nothing — never a neighbouring host.
+        staff = provider if _carries(provider, GuildStaff) is not None else None
+        reception = (
+            provider if _carries(provider, GuildExamReception) is not None else None
+        )
+        merchant = provider if _carries(provider, Merchant) is not None else None
         host = _build_host(provider, None)
         if owner is not None:
             guild, guild_reason = None, None

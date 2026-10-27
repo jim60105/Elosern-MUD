@@ -62,6 +62,15 @@ from world.rules.tests._combat_session_helpers import (
     open_synthetic_scope,
 )
 
+# The read model imports the combat-session predicate lazily, so a caller that
+# never reads a session never loads the combat graph. The package's own
+# synthetic scope replaces the live monster tiers, and the combat graph's
+# module-level rulebook load validates against them — importing it here, at
+# collection time and before any scope opens, keeps every slice of this
+# package runnable on its own (the same idiom as
+# ``world.rules.tests._combat_session_helpers``).
+import world.rules.combat_session  # noqa: F401
+
 
 from world.rules.tests._guild_service_probes import (
     a_live_monster_tier_key,
@@ -213,13 +222,26 @@ class FakeHost:
 
 
 class FakeRoom:
-    def __init__(self, *contents):
+    def __init__(self, *contents, hidden=()):
         self.contents = list(contents)
+        # The exploration visibility rule the exact service-target resolver
+        # shares: an object listed here is only a candidate while the viewer
+        # may see it.
+        self.hidden = tuple(hidden)
         # A host listed in the room stands in it (the shared service gate
         # compares the host's and the actor's locations).
         for obj in self.contents:
             if getattr(obj, "location", self) is None:
                 obj.location = self
+
+    def filter_visible(self, candidates, looker):
+        del looker
+        return [
+            obj
+            for obj in candidates
+            if obj not in self.hidden
+            and bool(getattr(obj, "visible", True))
+        ]
 
 
 class FakeTraitSurface:
