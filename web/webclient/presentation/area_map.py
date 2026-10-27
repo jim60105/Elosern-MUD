@@ -349,11 +349,11 @@ def _room_graph_area(actor: Any, location: Any, visit_ids: set[str], *, is_insta
 
 
 def _district_name(cell: tuple[int, int]) -> str:
-    from world.lore.map_districts import MAP_DISTRICT_REGISTRY
+    from world.lore.map_districts import current
     from world.maps.district_partition import district_at
 
     key = district_at(cell)
-    district = MAP_DISTRICT_REGISTRY.get(key) if key is not None else None
+    district = current().districts.get(key) if key is not None else None
     if district is None:
         return _wild_region_label(*cell)
     return district.district_name_zh

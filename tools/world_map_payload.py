@@ -25,8 +25,8 @@ def wire_bytes(envelope):
 
 
 def district_keys():
-    from world.lore.map_districts import MAP_DISTRICT_REGISTRY
-    return tuple(sorted(MAP_DISTRICT_REGISTRY))
+    from world.lore.map_districts import current
+    return tuple(sorted(current().districts))
 
 
 def _markers():
@@ -52,11 +52,11 @@ def _assemble(visits,markers):
 
 def representative_payload():
     from web.webclient.presentation.world_map_geometry import world_node_point
-    from world.lore.map_districts import MAP_DISTRICT_REGISTRY, landmark_node_ids
+    from world.lore.map_districts import current, landmark_node_ids
     landmarks=landmark_node_ids()
-    districts=sorted(MAP_DISTRICT_REGISTRY.values(),key=lambda row:sum(
-        (a-b)**2 for a,b in zip(world_node_point(landmarks[row.key]),(860.5,1080.5))))
-    return _assemble({landmarks[row.key] for row in districts[:REPRESENTATIVE_LIT_DISTRICTS]},[])
+    districts=sorted(current().districts.values(),key=lambda row:sum(
+        (a-b)**2 for a,b in zip(world_node_point(landmarks[row.district_id]),(860.5,1080.5))))
+    return _assemble({landmarks[row.district_id] for row in districts[:REPRESENTATIVE_LIT_DISTRICTS]},[])
 
 
 def one_km_payload():
@@ -115,9 +115,13 @@ def main(argv=None):
     parser.add_argument("--json",action="store_true")
     args=parser.parse_args(argv)
     _bootstrap()
+    from world.lore.map_districts import load_and_publish as publish_districts
+    from world.maps.map_data import load_and_publish as publish_settlements
     from world.maps.geography import load_and_publish
 
+    publish_settlements()
     load_and_publish()
+    publish_districts()
     results=measure()
     if args.json:
         print(json.dumps(results,indent=2,sort_keys=True))

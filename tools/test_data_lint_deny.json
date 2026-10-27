@@ -241,12 +241,6 @@
       "token": "potion"
     },
     {
-      "evidence": "catalog payload / import-schema field names present in the derived universe",
-      "reason": "import-schema field name colliding with a map catalog key",
-      "rule": "schema-structural",
-      "token": "prototypes"
-    },
-    {
       "evidence": "world/rules/rulebook/defeat_aftermath.yaml section key 'recovery'",
       "reason": "structural schema key of defeat aftermath rulebook colliding with generic recovery rate profile keyword",
       "rule": "schema-structural",
@@ -335,12 +329,6 @@
       "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol/constants.js:319); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "wind"
-    },
-    {
-      "evidence": "catalog payload / import-schema field names present in the derived universe",
-      "reason": "map payload field name (generic client coordinate vocabulary)",
-      "rule": "schema-structural",
-      "token": "zcoord"
     }
   ]
 }

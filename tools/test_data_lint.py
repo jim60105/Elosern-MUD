@@ -299,6 +299,36 @@ def _harvest_geography(root: Path, out: set[str]) -> None:
         _harvest_display(view, set(), out)
 
 
+def _harvest_districts(root: Path, out: set[str]) -> None:
+    """Harvest the YAML-authored district document's keys and display fields.
+
+    ``content/maps/districts.yaml`` is the district authority, so its ids and
+    Traditional Chinese names must stay in the token universe exactly like a
+    Python catalog's. The harvest follows the game adapter (which composes the
+    published bindings the document is validated against), not a private
+    parser, so it cannot drift from what consumers read.
+    """
+
+    from world.lore import map_districts as districts_module
+    from world.maps import map_data as map_data_module
+
+    if not map_data_module.is_published():
+        map_data_module.publish(map_data_module.load_settlements(root))
+    if not districts_module.is_published():
+        districts_module.publish(districts_module.load_districts(root))
+    districts = districts_module.current().districts
+    out.update(key for key in districts if isinstance(key, str) and key)
+    for district in districts.values():
+        out.update(
+            value
+            for value in (
+                getattr(district, "district_name_zh", None),
+                getattr(district, "landmark_name_zh", None),
+            )
+            if isinstance(value, str) and value
+        )
+
+
 #: Wire schema version for the cold-derivation subprocess payload.
 UNIVERSE_WIRE_VERSION = 1
 UNIVERSE_WIRE_FIELDS = (
@@ -450,6 +480,7 @@ def _derive_universe(root: Path) -> Universe:
                     symbols.add(attr)
                 _harvest_display(value, set(), tokens)
     _harvest_geography(root, tokens)
+    _harvest_districts(root, tokens)
     tokens.update(_rulebook_keys(root))
 
     deny_path = root / DENY_PATH

@@ -296,7 +296,6 @@ def _validate_game_joins(
     geography candidate is validated against its own inputs.
     """
 
-    from world.lore.map_districts import MAP_DISTRICT_REGISTRY
     from world.lore.monster_placement import (
         AMBIENT_PLACEMENT_REGISTRY,
         MONSTER_SITE_REGISTRY,
@@ -331,12 +330,6 @@ def _validate_game_joins(
             problems.append(
                 f"wilderness entry {key!r} joins no geographic location "
                 f"({entry.anchor_key!r})"
-            )
-    for key, district in sorted(MAP_DISTRICT_REGISTRY.items()):
-        region_key = getattr(district, "region_key", None)
-        if region_key is not None and region_key not in regions:
-            problems.append(
-                f"district {key!r} names unknown terrain region {region_key!r}"
             )
     for key, species in sorted(MONSTER_SPECIES_REGISTRY.items()):
         for tag in getattr(species, "habitat_tags", ()):

@@ -27,8 +27,8 @@ PUBLIC="VISIBLE_PORT_329"
 
 def fixtures():
     stack=ExitStack()
-    stack.enter_context(patch("world.lore.map_districts.MAP_DISTRICT_REGISTRY",{
-        SECRET:NS(landmark=wilderness_cell_ref((12, 13)))}))
+    stack.enter_context(patch("world.lore.map_districts.current",new=lambda: NS(districts={
+        SECRET:NS(landmark=wilderness_cell_ref((12, 13)))})))
     stack.enter_context(patch.object(panel.geometry,"common_layer",return_value=dict(coastline=RING,borders=[],nations=[])))
     stack.enter_context(patch.object(panel.geometry,"district_geometry",return_value={SECRET:dict(
         name=SECRET,outline=[RING],landmark=dict(name="SECRET_LANDMARK_632",x=12.5,y=13.5),

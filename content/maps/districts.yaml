@@ -1,0 +1,1456 @@
+# Map district authored source (schema version 1).
+# Converted once from the retired Python roster; this document is the sole
+# authority for district identity, names, kind, region membership and stable
+# landmark references. Landmarks are qualified authored identities, never
+# coordinates; the canonical visited node is derived from the current binding.
+version: 1
+kind: districts
+id: districts
+districts:
+# The single region district: the whole northern deep forest, across the
+# Valhalla and Grandia nominal claims, lit only at its heart near the
+# north coast, about 500 km beyond the forest edge.
+  north_deep_forest:
+    district_name_zh: 北部深林
+    landmark_name_zh: 古樹之心
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1250
+        cell_y: 2420
+    kind: region
+    region_key: north_deep_forest
+# Altoria: the western hills and river valleys south of the border
+# river, the southwest coast and the western flank of the central range.
+  border_source_highlands:
+    district_name_zh: 界源高地
+    landmark_name_zh: 源泉石龕
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1302
+        cell_y: 1318
+    kind: voronoi
+    region_key:
+  march_watch_hills:
+    district_name_zh: 守界丘陵
+    landmark_name_zh: 古哨塔遺址
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1065
+        cell_y: 1303
+    kind: voronoi
+    region_key:
+  north_road_uplands:
+    district_name_zh: 北道高原
+    landmark_name_zh: 白石里程碑
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 854
+        cell_y: 1282
+    kind: voronoi
+    region_key:
+  rune_stone_hills:
+    district_name_zh: 古符丘陵
+    landmark_name_zh: 符文巨石
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 442
+        cell_y: 1258
+    kind: voronoi
+    region_key:
+  maple_vale:
+    district_name_zh: 楓紅谷地
+    landmark_name_zh: 紅葉瀑布
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 655
+        cell_y: 1225
+    kind: voronoi
+    region_key:
+  mistbell_heights:
+    district_name_zh: 霧角高原
+    landmark_name_zh: 霧鐘石塔
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 232
+        cell_y: 1199
+    kind: voronoi
+    region_key:
+  vineyard_slopes:
+    district_name_zh: 葡萄坡地
+    landmark_name_zh: 老橡木酒窖
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 996
+        cell_y: 1161
+    kind: voronoi
+    region_key:
+  white_ram_foothills:
+    district_name_zh: 白羊山麓
+    landmark_name_zh: 牧羊人石屋
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1177
+        cell_y: 1150
+    kind: voronoi
+    region_key:
+  eyrie_cliffs:
+    district_name_zh: 鷹巢峭壁
+    landmark_name_zh: 蒼鷹岩
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1345
+        cell_y: 1133
+    kind: voronoi
+    region_key:
+  amethyst_mine_vale:
+    district_name_zh: 紫晶礦谷
+    landmark_name_zh: 廢棄紫晶坑
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 491
+        cell_y: 1090
+    kind: voronoi
+    region_key:
+  royal_river_valley:
+    district_name_zh: 王都河谷
+    landmark_name_zh: 王都中央廣場
+    landmark:
+      domain: settlement_node
+      map_id: capital_altoria
+      object_id: central_plaza
+      cell:
+    kind: voronoi
+    region_key:
+  royal_hunting_park:
+    district_name_zh: 王家獵苑
+    landmark_name_zh: 白鹿石雕
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 677
+        cell_y: 1029
+    kind: voronoi
+    region_key:
+  westwind_downs:
+    district_name_zh: 西風丘原
+    landmark_name_zh: 風琴石林
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 182
+        cell_y: 1013
+    kind: voronoi
+    region_key:
+  western_ore_hills:
+    district_name_zh: 西陲礦丘
+    landmark_name_zh: 灰岩礦塔
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 330
+        cell_y: 1000
+    kind: voronoi
+    region_key:
+  east_river_fields:
+    district_name_zh: 東河沃野
+    landmark_name_zh: 古水車
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1054
+        cell_y: 997
+    kind: voronoi
+    region_key:
+  westpass_uplands:
+    district_name_zh: 隘西高地
+    landmark_name_zh: 西隘道標石
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1281
+        cell_y: 972
+    kind: voronoi
+    region_key:
+  ironpine_woods:
+    district_name_zh: 鐵杉林地
+    landmark_name_zh: 千年鐵杉
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 496
+        cell_y: 890
+    kind: voronoi
+    region_key:
+  bell_vale:
+    district_name_zh: 鐘聲谷
+    landmark_name_zh: 荒廢修道院
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 887
+        cell_y: 886
+    kind: voronoi
+    region_key:
+  mill_reach:
+    district_name_zh: 磨坊河灣
+    landmark_name_zh: 河畔舊磨坊
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 680
+        cell_y: 871
+    kind: voronoi
+    region_key:
+  oak_knolls:
+    district_name_zh: 古橡丘陵
+    landmark_name_zh: 巨橡樹
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1122
+        cell_y: 850
+    kind: voronoi
+    region_key:
+  limestone_terrace:
+    district_name_zh: 石灰岩台地
+    landmark_name_zh: 白灰窯遺址
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 265
+        cell_y: 805
+    kind: voronoi
+    region_key:
+  icespring_gorge:
+    district_name_zh: 冰泉峽谷
+    landmark_name_zh: 冰泉瀑布
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1334
+        cell_y: 801
+    kind: voronoi
+    region_key:
+  bramble_moor:
+    district_name_zh: 荊棘荒原
+    landmark_name_zh: 荊棘石環
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 433
+        cell_y: 713
+    kind: voronoi
+    region_key:
+  honey_vale:
+    district_name_zh: 蜜蜂谷地
+    landmark_name_zh: 千巢岩壁
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 991
+        cell_y: 711
+    kind: voronoi
+    region_key:
+  silverbrook_vale:
+    district_name_zh: 銀溪谷地
+    landmark_name_zh: 銀溪石橋
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 800
+        cell_y: 696
+    kind: voronoi
+    region_key:
+  red_earth_hills:
+    district_name_zh: 赤土丘陵
+    landmark_name_zh: 赤岩拱門
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1181
+        cell_y: 688
+    kind: voronoi
+    region_key:
+  bluebell_meadows:
+    district_name_zh: 藍鈴草原
+    landmark_name_zh: 藍鈴石井
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 606
+        cell_y: 685
+    kind: voronoi
+    region_key:
+  rift_scarp_plateau:
+    district_name_zh: 斷崖高原
+    landmark_name_zh: 裂岩斷崖
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1326
+        cell_y: 586
+    kind: voronoi
+    region_key:
+  gullcry_hills:
+    district_name_zh: 灰鷗丘陵
+    landmark_name_zh: 鷗鳴石塔
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 319
+        cell_y: 581
+    kind: voronoi
+    region_key:
+  chalk_giant_downs:
+    district_name_zh: 白堊丘陵
+    landmark_name_zh: 白堊巨人像
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 908
+        cell_y: 539
+    kind: voronoi
+    region_key:
+  old_battlefield:
+    district_name_zh: 古戰場原
+    landmark_name_zh: 騎士墓碑群
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1114
+        cell_y: 525
+    kind: voronoi
+    region_key:
+  olive_slopes:
+    district_name_zh: 橄欖坡地
+    landmark_name_zh: 古榨油石臼
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 702
+        cell_y: 515
+    kind: voronoi
+    region_key:
+  anvil_vale:
+    district_name_zh: 鐵砧谷地
+    landmark_name_zh: 巨鐵砧岩
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 518
+        cell_y: 503
+    kind: voronoi
+    region_key:
+  south_pass_west_slopes:
+    district_name_zh: 南隘西麓
+    landmark_name_zh: 南隘古道碑
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1314
+        cell_y: 414
+    kind: voronoi
+    region_key:
+  estuary_flats:
+    district_name_zh: 河口平原
+    landmark_name_zh: 潮汐石閘
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 389
+        cell_y: 381
+    kind: voronoi
+    region_key:
+  salt_road_hills:
+    district_name_zh: 鹽道丘陵
+    landmark_name_zh: 鹽商界石
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 980
+        cell_y: 370
+    kind: voronoi
+    region_key:
+  seabreeze_pasture:
+    district_name_zh: 海風牧原
+    landmark_name_zh: 風鈴石柱
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 797
+        cell_y: 367
+    kind: voronoi
+    region_key:
+  amber_slopes:
+    district_name_zh: 琥珀坡地
+    landmark_name_zh: 琥珀泉
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1158
+        cell_y: 343
+    kind: voronoi
+    region_key:
+  salt_cliff_coast:
+    district_name_zh: 鹽崖海岸
+    landmark_name_zh: 白鹽崖
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 620
+        cell_y: 300
+    kind: voronoi
+    region_key:
+  thunder_peak_range:
+    district_name_zh: 雷鳴山嶺
+    landmark_name_zh: 雷鳴峰
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1338
+        cell_y: 211
+    kind: voronoi
+    region_key:
+  fishers_cove_coast:
+    district_name_zh: 漁灣海岸
+    landmark_name_zh: 漁人守望塔
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 478
+        cell_y: 206
+    kind: voronoi
+    region_key:
+  keelwood_forest:
+    district_name_zh: 船木林地
+    landmark_name_zh: 龍骨巨杉
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 836
+        cell_y: 192
+    kind: voronoi
+    region_key:
+  tidesong_dunes:
+    district_name_zh: 潮音沙原
+    landmark_name_zh: 潮音洞窟
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1006
+        cell_y: 190
+    kind: voronoi
+    region_key:
+  pearl_bay_coast:
+    district_name_zh: 珍珠灣岸
+    landmark_name_zh: 珍珠貝塚
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1177
+        cell_y: 176
+    kind: voronoi
+    region_key:
+  white_sand_coast:
+    district_name_zh: 白沙海岸
+    landmark_name_zh: 海蝕拱門
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 662
+        cell_y: 167
+    kind: voronoi
+    region_key:
+# Grandia: the eastern plains, the southeast coast and the eastern
+# flank of the central range, north to the deep forest edge.
+  forest_rim_heath:
+    district_name_zh: 林緣荒原
+    landmark_name_zh: 守林人石標
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1625
+        cell_y: 1845
+    kind: voronoi
+    region_key:
+  moonlit_fields:
+    district_name_zh: 月光原野
+    landmark_name_zh: 月光石圈
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1941
+        cell_y: 1836
+    kind: voronoi
+    region_key:
+  whalebone_heath:
+    district_name_zh: 鯨骨荒原
+    landmark_name_zh: 鯨骨拱門
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 2110
+        cell_y: 1834
+    kind: voronoi
+    region_key:
+  reed_marsh:
+    district_name_zh: 蘆風沼澤
+    landmark_name_zh: 沼中石塔
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1782
+        cell_y: 1809
+    kind: voronoi
+    region_key:
+  north_pass_east_slopes:
+    district_name_zh: 北隘東麓
+    landmark_name_zh: 北隘風蝕岩
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1486
+        cell_y: 1784
+    kind: voronoi
+    region_key:
+  sunken_bell_lake:
+    district_name_zh: 沉鐘湖區
+    landmark_name_zh: 沉鐘湖
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 2224
+        cell_y: 1723
+    kind: voronoi
+    region_key:
+  stag_plateau:
+    district_name_zh: 狩鹿高原
+    landmark_name_zh: 獵鹿石陣
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1669
+        cell_y: 1633
+    kind: voronoi
+    region_key:
+  crystal_plains:
+    district_name_zh: 魔晶平原
+    landmark_name_zh: 魔晶尖塔
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1871
+        cell_y: 1633
+    kind: voronoi
+    region_key:
+  starfall_plain:
+    district_name_zh: 星落原
+    landmark_name_zh: 隕星坑
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 2069
+        cell_y: 1633
+    kind: voronoi
+    region_key:
+  bluemaple_hills:
+    district_name_zh: 藍楓丘陵
+    landmark_name_zh: 藍楓古樹
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 2286
+        cell_y: 1581
+    kind: voronoi
+    region_key:
+  spruce_foothills:
+    district_name_zh: 雲杉山麓
+    landmark_name_zh: 雲杉石階
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1487
+        cell_y: 1564
+    kind: voronoi
+    region_key:
+  harvest_north_plain:
+    district_name_zh: 金麥北原
+    landmark_name_zh: 豐收女神像
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1987
+        cell_y: 1468
+    kind: voronoi
+    region_key:
+  sunrise_downs:
+    district_name_zh: 日出丘原
+    landmark_name_zh: 日出岩
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 2394
+        cell_y: 1464
+    kind: voronoi
+    region_key:
+  orchard_plain:
+    district_name_zh: 果園平原
+    landmark_name_zh: 千年蘋果樹
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1805
+        cell_y: 1437
+    kind: voronoi
+    region_key:
+  black_soil_plain:
+    district_name_zh: 黑土平原
+    landmark_name_zh: 豐饒石壇
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1623
+        cell_y: 1428
+    kind: voronoi
+    region_key:
+  poplar_plain:
+    district_name_zh: 白楊平原
+    landmark_name_zh: 白楊林蔭道
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 2164
+        cell_y: 1418
+    kind: voronoi
+    region_key:
+  hawkwing_heath:
+    district_name_zh: 鷹翼荒原
+    landmark_name_zh: 鷹翼石
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 2502
+        cell_y: 1330
+    kind: voronoi
+    region_key:
+  echo_canyon:
+    district_name_zh: 回音峽谷
+    landmark_name_zh: 回音石門
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1490
+        cell_y: 1308
+    kind: voronoi
+    region_key:
+  scorched_hills:
+    district_name_zh: 焦岩丘陵
+    landmark_name_zh: 焦黑石林
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 2303
+        cell_y: 1287
+    kind: voronoi
+    region_key:
+  imperial_capital_plain:
+    district_name_zh: 帝都平原
+    landmark_name_zh: 帝都凱旋門
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1970
+        cell_y: 1280
+    kind: voronoi
+    region_key:
+  canal_plain:
+    district_name_zh: 運河平原
+    landmark_name_zh: 古運河閘門
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1738
+        cell_y: 1246
+    kind: voronoi
+    region_key:
+  rose_plain:
+    district_name_zh: 玫瑰平原
+    landmark_name_zh: 玫瑰石園
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 2124
+        cell_y: 1196
+    kind: voronoi
+    region_key:
+  tide_wind_downs:
+    district_name_zh: 潮風丘地
+    landmark_name_zh: 海神祭壇
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 2460
+        cell_y: 1163
+    kind: voronoi
+    region_key:
+  gargoyle_plateau:
+    district_name_zh: 石像鬼高原
+    landmark_name_zh: 石像鬼岩
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1549
+        cell_y: 1132
+    kind: voronoi
+    region_key:
+  imperial_river_reach:
+    district_name_zh: 帝河流域
+    landmark_name_zh: 七拱石橋
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1939
+        cell_y: 1103
+    kind: voronoi
+    region_key:
+  sundial_plain:
+    district_name_zh: 金陽平原
+    landmark_name_zh: 日晷石
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 2269
+        cell_y: 1088
+    kind: voronoi
+    region_key:
+  imperial_wheatlands:
+    district_name_zh: 帝國麥原
+    landmark_name_zh: 風車古道
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1760
+        cell_y: 1050
+    kind: voronoi
+    region_key:
+  stormrock_heath:
+    district_name_zh: 東岬荒原
+    landmark_name_zh: 風暴岩
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 2439
+        cell_y: 991
+    kind: voronoi
+    region_key:
+  wizard_tower_plain:
+    district_name_zh: 法師平原
+    landmark_name_zh: 傾斜法師塔
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 2097
+        cell_y: 968
+    kind: voronoi
+    region_key:
+  great_pass_east:
+    district_name_zh: 大隘東原
+    landmark_name_zh: 大隘道標
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1502
+        cell_y: 962
+    kind: voronoi
+    region_key:
+  emerald_lake_plain:
+    district_name_zh: 翡翠湖原
+    landmark_name_zh: 翡翠湖
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1896
+        cell_y: 906
+    kind: voronoi
+    region_key:
+  eastern_pasture:
+    district_name_zh: 東陲牧野
+    landmark_name_zh: 孤石望台
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 2300
+        cell_y: 900
+    kind: voronoi
+    region_key:
+  horse_plain:
+    district_name_zh: 駿馬原野
+    landmark_name_zh: 奔馬石雕
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1687
+        cell_y: 864
+    kind: voronoi
+    region_key:
+  golden_dune_downs:
+    district_name_zh: 金沙丘原
+    landmark_name_zh: 沙中古塔
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 2402
+        cell_y: 797
+    kind: voronoi
+    region_key:
+  flax_plain:
+    district_name_zh: 亞麻平原
+    landmark_name_zh: 藍花石橋
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 2191
+        cell_y: 777
+    kind: voronoi
+    region_key:
+  mithril_foothills:
+    district_name_zh: 銀礦山麓
+    landmark_name_zh: 秘銀礦坑
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1504
+        cell_y: 761
+    kind: voronoi
+    region_key:
+  river_isle_flats:
+    district_name_zh: 河洲平原
+    landmark_name_zh: 白鷺沙洲
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 2015
+        cell_y: 751
+    kind: voronoi
+    region_key:
+  herbal_plain:
+    district_name_zh: 藥草原野
+    landmark_name_zh: 賢者石圃
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1842
+        cell_y: 711
+    kind: voronoi
+    region_key:
+  griffin_plateau:
+    district_name_zh: 獅鷲高原
+    landmark_name_zh: 獅鷲巢岩
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1667
+        cell_y: 651
+    kind: voronoi
+    region_key:
+  bluewave_downs:
+    district_name_zh: 藍浪丘原
+    landmark_name_zh: 浪花石
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 2343
+        cell_y: 642
+    kind: voronoi
+    region_key:
+  confluence_vale:
+    district_name_zh: 雙河谷地
+    landmark_name_zh: 匯流巨石
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 2144
+        cell_y: 598
+    kind: voronoi
+    region_key:
+  cloudsea_foothills:
+    district_name_zh: 雲海山麓
+    landmark_name_zh: 雲海觀星台
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1503
+        cell_y: 569
+    kind: voronoi
+    region_key:
+  east_branch_ford:
+    district_name_zh: 渡口原野
+    landmark_name_zh: 東支流古渡
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 2300
+        cell_y: 526
+    kind: voronoi
+    region_key:
+  spice_road_plain:
+    district_name_zh: 香料原野
+    landmark_name_zh: 香料古道碑
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1976
+        cell_y: 522
+    kind: voronoi
+    region_key:
+  orange_blossom_plain:
+    district_name_zh: 橙花平原
+    landmark_name_zh: 橙花古泉
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1805
+        cell_y: 518
+    kind: voronoi
+    region_key:
+  giants_stair_highlands:
+    district_name_zh: 南嶺高地
+    landmark_name_zh: 巨人階梯
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1660
+        cell_y: 419
+    kind: voronoi
+    region_key:
+  caravan_hills:
+    district_name_zh: 商隊丘陵
+    landmark_name_zh: 商隊泉
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 2147
+        cell_y: 402
+    kind: voronoi
+    region_key:
+  south_pass_east_slopes:
+    district_name_zh: 南隘東麓
+    landmark_name_zh: 南隘石門
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1490
+        cell_y: 371
+    kind: voronoi
+    region_key:
+  imperial_south_shore:
+    district_name_zh: 帝國南岸
+    landmark_name_zh: 燈塔岬
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1850
+        cell_y: 320
+    kind: voronoi
+    region_key:
+  imperial_delta:
+    district_name_zh: 帝河三角洲
+    landmark_name_zh: 三角洲古碑
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 2007
+        cell_y: 303
+    kind: voronoi
+    region_key:
+  sea_serpent_slopes:
+    district_name_zh: 海蛇坡地
+    landmark_name_zh: 海蛇化石
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1668
+        cell_y: 211
+    kind: voronoi
+    region_key:
+  obsidian_ridge:
+    district_name_zh: 火山岩嶺
+    landmark_name_zh: 黑曜石峰
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1503
+        cell_y: 184
+    kind: voronoi
+    region_key:
+  mermaid_cove_coast:
+    district_name_zh: 人魚灣岸
+    landmark_name_zh: 人魚雕像
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1840
+        cell_y: 177
+    kind: voronoi
+    region_key:
+# Valhalla: the northwest highland forest between the border river and
+# the deep forest edge, and the range's western flank north of the river.
+  howling_capital_woods:
+    district_name_zh: 王城森林
+    landmark_name_zh: 萬獸圖騰柱
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 780
+        cell_y: 1910
+    kind: voronoi
+    region_key:
+  bear_claw_woods:
+    district_name_zh: 熊爪林地
+    landmark_name_zh: 熊王岩
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 992
+        cell_y: 1851
+    kind: voronoi
+    region_key:
+  stag_call_highlands:
+    district_name_zh: 鹿鳴高地
+    landmark_name_zh: 鹿角聖樹
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 469
+        cell_y: 1850
+    kind: voronoi
+    region_key:
+  north_pass_west_slopes:
+    district_name_zh: 北隘西麓
+    landmark_name_zh: 雪豹岩
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1326
+        cell_y: 1837
+    kind: voronoi
+    region_key:
+  shaman_cave_woods:
+    district_name_zh: 巫醫林地
+    landmark_name_zh: 巫醫石窟
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1168
+        cell_y: 1816
+    kind: voronoi
+    region_key:
+  frost_heath:
+    district_name_zh: 霜風荒原
+    landmark_name_zh: 冰河巨石
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 262
+        cell_y: 1814
+    kind: voronoi
+    region_key:
+  war_drum_highlands:
+    district_name_zh: 戰鼓高地
+    landmark_name_zh: 戰鼓岩
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 648
+        cell_y: 1808
+    kind: voronoi
+    region_key:
+  beast_trail_woods:
+    district_name_zh: 獸徑林地
+    landmark_name_zh: 飲獸泉
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 857
+        cell_y: 1713
+    kind: voronoi
+    region_key:
+  pine_hunting_grounds:
+    district_name_zh: 松濤獵場
+    landmark_name_zh: 獵人祭壇
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1050
+        cell_y: 1700
+    kind: voronoi
+    region_key:
+  hot_spring_foothills:
+    district_name_zh: 溫泉山麓
+    landmark_name_zh: 赤霧溫泉
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1331
+        cell_y: 1670
+    kind: voronoi
+    region_key:
+  bison_plateau:
+    district_name_zh: 野牛高原
+    landmark_name_zh: 野牛頭骨塚
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 391
+        cell_y: 1661
+    kind: voronoi
+    region_key:
+  howling_highlands:
+    district_name_zh: 狼嚎高地
+    landmark_name_zh: 灰狼石柱
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 560
+        cell_y: 1640
+    kind: voronoi
+    region_key:
+  iron_vein_highlands:
+    district_name_zh: 鐵脈高地
+    landmark_name_zh: 赤鐵岩壁
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1175
+        cell_y: 1605
+    kind: voronoi
+    region_key:
+  ancestor_cairn_hills:
+    district_name_zh: 先祖丘陵
+    landmark_name_zh: 先祖石冢
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 729
+        cell_y: 1595
+    kind: voronoi
+    region_key:
+  mossy_coast_woods:
+    district_name_zh: 苔林海岸
+    landmark_name_zh: 苔蘚巨木
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 240
+        cell_y: 1583
+    kind: voronoi
+    region_key:
+  grizzly_vale:
+    district_name_zh: 灰熊谷
+    landmark_name_zh: 灰熊洞穴
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 896
+        cell_y: 1489
+    kind: voronoi
+    region_key:
+  giant_rockfall_slopes:
+    district_name_zh: 落石坡地
+    landmark_name_zh: 巨人落石
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1310
+        cell_y: 1480
+    kind: voronoi
+    region_key:
+  falcon_rise:
+    district_name_zh: 獵鷹高原
+    landmark_name_zh: 獵鷹台
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 1093
+        cell_y: 1455
+    kind: voronoi
+    region_key:
+  blood_moon_vale:
+    district_name_zh: 血月谷
+    landmark_name_zh: 血月石
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 447
+        cell_y: 1450
+    kind: voronoi
+    region_key:
+  rivers_watch_woods:
+    district_name_zh: 界北林地
+    landmark_name_zh: 望河岩
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 670
+        cell_y: 1416
+    kind: voronoi
+    region_key:
+  wolf_fang_coast:
+    district_name_zh: 狼牙海岸林
+    landmark_name_zh: 狼牙巨石
+    landmark:
+      domain: wilderness_cell
+      map_id:
+      object_id:
+      cell:
+        cell_x: 238
+        cell_y: 1388
+    kind: voronoi
+    region_key:

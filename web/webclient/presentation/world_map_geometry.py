@@ -223,14 +223,15 @@ def district_lines():
 
 @cache
 def _district_geometry(_signature):
-    from world.lore.map_districts import MAP_DISTRICT_REGISTRY
+    from world.lore.map_districts import current as current_districts
     from world.maps.district_partition import district_outlines
 
     terrain,nations = terrain_layers()
     lines = district_lines()
     result = {}
+    districts = current_districts().districts
     for key,rings in district_outlines().items():
-        district = MAP_DISTRICT_REGISTRY[key]
+        district = districts[key]
         outline = []
         for ring in rings:
             converted = [point(ring[i]/1000, ring[i+1]/1000) for i in range(0,len(ring),2)]

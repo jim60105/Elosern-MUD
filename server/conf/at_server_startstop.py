@@ -48,6 +48,7 @@ def _late(module: str, name: str):
 STARTUP_STEP_ORDER: tuple[str, ...] = (
     "geography_source_publication",
     "settlement_source_publication",
+    "district_source_publication",
     "static_map_reference_validation",
     "world_clock_init",
     "equipment_rulebook_validation",
@@ -467,6 +468,15 @@ def at_server_start():
     _startup_step(
         "settlement_source_publication",
         lambda: _late("world.maps.map_data", "load_and_publish"),
+    )
+    # The authored district document is published next: its loader validates
+    # every district against the published terrain/sub-region keys, has the
+    # qualified landmarks resolved against the published bindings, and rejects
+    # a candidate carrying any diagnostic, so a failed candidate aborts boot
+    # before the static-reference gate or any persistent synchronization.
+    _startup_step(
+        "district_source_publication",
+        lambda: _late("world.lore.map_districts", "load_and_publish"),
     )
     # Fail-loud static map-reference gate: every authored static target
     # (gates, anchor placements, wilderness gates, place exteriors, district

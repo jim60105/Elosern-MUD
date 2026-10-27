@@ -16,18 +16,19 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from typing import Any
 
-from world.lore.map_districts import MAP_DISTRICT_REGISTRY, MapDistrict
+from elosern_map_core.documents import DistrictDeclaration
+from world.lore.map_districts import current
 from world.rules.map_knowledge import KNOWLEDGE_ATTR, NodeVisit, parse_knowledge
 
 
 def lit_district_keys_from_visits(
     visits: Iterable[NodeVisit],
-    registry: Mapping[str, MapDistrict] | None = None,
+    registry: Mapping[str, DistrictDeclaration] | None = None,
 ) -> frozenset[str]:
     """The keys of the districts whose exact landmark node was visited."""
     from world.lore.map_districts import landmark_node_ids
 
-    districts = MAP_DISTRICT_REGISTRY if registry is None else registry
+    districts = current().districts if registry is None else registry
     visited = {visit.node_id for visit in visits}
     landmarks = landmark_node_ids(districts)
     return frozenset(
@@ -37,7 +38,7 @@ def lit_district_keys_from_visits(
 
 def lit_district_keys(
     character: Any,
-    registry: Mapping[str, MapDistrict] | None = None,
+    registry: Mapping[str, DistrictDeclaration] | None = None,
 ) -> frozenset[str]:
     """The keys of the districts the character has lit.
 

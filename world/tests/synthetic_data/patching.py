@@ -97,10 +97,12 @@ class synthetic_registries(ContextDecorator):
             # before any catalog is swapped.
             from world.maps import geography as geography_module
             from world.maps import map_data as map_data_module
+            from world.lore import map_districts as districts_module
 
             map_data_module.ensure_published()
             if not geography_module.is_published():
                 geography_module.publish(geography_module.load_geography())
+            districts_module.ensure_published()
             _resolve_import_time_derivations(self._logicals)
             for logical in _dependency_order(self._logicals):
                 if logical in GEOGRAPHY_TARGETS or logical in SETTLEMENT_TARGETS:

@@ -176,7 +176,7 @@ def binding_signature() -> str:
     from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
     from world.lore.anchors import LOCAL_FRAME_ANCHOR_REGISTRY, anchor_geography
     from world.maps.geography import current
-    from world.lore.map_districts import MAP_DISTRICT_REGISTRY
+    from world.lore import map_districts
     from world.lore.settlements.places import PLACE_REGISTRY
     from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
     from world.maps.city_gates import CITY_GATE_REGISTRY
@@ -235,12 +235,17 @@ def binding_signature() -> str:
             for key, place in sorted(PLACE_REGISTRY.items())
         )
     )
+    districts = map_districts.current()
     parts.append(
         tuple(
             (key, ref(district.landmark))
-            for key, district in sorted(MAP_DISTRICT_REGISTRY.items())
+            for key, district in sorted(districts.districts.items())
         )
     )
+    # A name-only authored edit changes no landmark reference, so the district
+    # source digest is part of the signature: cached presentation never serves
+    # a retired district or landmark name.
+    parts.append(districts.identity)
     parts.append(
         tuple(
             (ref(reference), scene)
@@ -274,7 +279,7 @@ def validate_static_references(*, index: ReferenceIndex | None = None) -> None:
     """
 
     from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
-    from world.lore.map_districts import MAP_DISTRICT_REGISTRY
+    from world.lore import map_districts
     from world.lore.settlements.places import PLACE_REGISTRY
     from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
     from world.maps.city_gates import CITY_GATE_REGISTRY
@@ -317,7 +322,7 @@ def validate_static_references(*, index: ReferenceIndex | None = None) -> None:
             )
     for key, place in PLACE_REGISTRY.items():
         check_node(f"place {key} exterior", place.exterior)
-    for key, district in MAP_DISTRICT_REGISTRY.items():
+    for key, district in map_districts.current().districts.items():
         check_landmark(f"district {key} landmark", district.landmark)
     for reference in GRID_NODE_SCENE_ARCHETYPES:
         check_node(
