@@ -14,14 +14,24 @@ from world.lore.wilderness_entry import (
     WildernessGate,
     validate_wilderness_entries,
 )
+from world.tests.geography_fixture import publish_shipped_geography
 
-CAPITAL = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
+
+def setUpModule():
+    # The provider frame bounds and the gate approach walks read the published
+    # geography; the registry itself is the published settlement world.
+    publish_shipped_geography()
+
+
+def _capital():
+    """The shipped capital entry, read after the settlement world is published."""
+    return WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
 
 
 def _point_entry(anchor_key="capital_altoria", anchor=(500, 500), gates=None):
     """A throwaway point-shape (cave) entry for helper/validation tests."""
     if gates is None:
-        gates = (WildernessGate("n", CAPITAL.gate_for("n").destination),)
+        gates = (WildernessGate("n", _capital().gate_for("n").destination),)
     return WildernessEntryPoint(anchor_key, ("#",), anchor, gates)
 
 
@@ -37,13 +47,13 @@ class WildernessEntryRegistryShapeTests(unittest.TestCase):
             list(WILDERNESS_ENTRY_REGISTRY),
             ["capital_altoria", "village_ciaran"],
         )
-        self.assertEqual(CAPITAL.anchor_key, "capital_altoria")
-        self.assertEqual(CAPITAL.hash_cell_count, 40)
-        self.assertEqual(CAPITAL.origin_xy, (857, 1076))
+        self.assertEqual(_capital().anchor_key, "capital_altoria")
+        self.assertEqual(_capital().hash_cell_count, 40)
+        self.assertEqual(_capital().origin_xy, (857, 1076))
         self.assertEqual(
             [
                 (gate.return_direction, gate.z_map_key, gate.destination.object_id)
-                for gate in CAPITAL.gates
+                for gate in _capital().gates
             ],
             [
                 ("n", "capital_altoria", "south_gate"),
@@ -52,7 +62,7 @@ class WildernessEntryRegistryShapeTests(unittest.TestCase):
         )
         village = WILDERNESS_ENTRY_REGISTRY["village_ciaran"]
         self.assertEqual(village.anchor_key, "village_ciaran")
-        self.assertLess(village.hash_cell_count, CAPITAL.hash_cell_count)
+        self.assertLess(village.hash_cell_count, _capital().hash_cell_count)
         self.assertTrue(village.is_point_shape)
         self.assertEqual(
             [
@@ -90,7 +100,7 @@ class WildernessEntryRegistryShapeTests(unittest.TestCase):
         # The authored mask rows are contract: 40 km² inside a 7x9 km box, the
         # plaza cell as derived anchor, and one exterior approach per gate ray.
         self.assertEqual(
-            CAPITAL.shape,
+            _capital().shape,
             (
                 "#.....#",
                 "##...##",
@@ -103,32 +113,32 @@ class WildernessEntryRegistryShapeTests(unittest.TestCase):
                 "..##...",
             ),
         )
-        self.assertEqual(CAPITAL.hash_cell_count, 40)
-        self.assertEqual(CAPITAL.anchor_cell, (860, 1080))
-        self.assertIn(CAPITAL.anchor_cell, CAPITAL.footprint_cells)
+        self.assertEqual(_capital().hash_cell_count, 40)
+        self.assertEqual(_capital().anchor_cell, (860, 1080))
+        self.assertIn(_capital().anchor_cell, _capital().footprint_cells)
         self.assertEqual(
-            CAPITAL.footprint_cells,
+            _capital().footprint_cells,
             frozenset(
-                (CAPITAL.origin_xy[0] + col, CAPITAL.origin_xy[1] + row)
-                for row, line in enumerate(CAPITAL.shape)
+                (_capital().origin_xy[0] + col, _capital().origin_xy[1] + row)
+                for row, line in enumerate(_capital().shape)
                 for col, char in enumerate(line)
                 if char == "#"
             ),
         )
-        self.assertEqual(CAPITAL.approach_cell(CAPITAL.gate_for("n")), (860, 1077))
-        self.assertEqual(CAPITAL.approach_cell(CAPITAL.gate_for("w")), (864, 1080))
-        self.assertFalse(CAPITAL.is_point_shape)
+        self.assertEqual(_capital().approach_cell(_capital().gate_for("n")), (860, 1077))
+        self.assertEqual(_capital().approach_cell(_capital().gate_for("w")), (864, 1080))
+        self.assertFalse(_capital().is_point_shape)
         # 4-connected: every mask cell is reachable from the anchor cell.
-        seen = {CAPITAL.anchor_cell}
-        frontier = [CAPITAL.anchor_cell]
+        seen = {_capital().anchor_cell}
+        frontier = [_capital().anchor_cell]
         while frontier:
             cx, cy = frontier.pop()
             for dx, dy in ((0, 1), (0, -1), (1, 0), (-1, 0)):
                 neighbour = (cx + dx, cy + dy)
-                if neighbour in CAPITAL.footprint_cells and neighbour not in seen:
+                if neighbour in _capital().footprint_cells and neighbour not in seen:
                     seen.add(neighbour)
                     frontier.append(neighbour)
-        self.assertEqual(seen, set(CAPITAL.footprint_cells))
+        self.assertEqual(seen, set(_capital().footprint_cells))
 
     def test_point_shape_entry_expresses_cave_semantics(self):
         point = _point_entry()
@@ -146,12 +156,12 @@ class WildernessEntryRegistryShapeTests(unittest.TestCase):
             self.assertIn(entry.anchor_key, ANCHOR_PLACEMENT_REGISTRY)
 
     def test_gate_lookup_by_return_direction(self):
-        self.assertEqual(CAPITAL.gate_for("n").destination.object_id, "south_gate")
-        self.assertEqual(CAPITAL.gate_for("w").destination.object_id, "east_gate")
+        self.assertEqual(_capital().gate_for("n").destination.object_id, "south_gate")
+        self.assertEqual(_capital().gate_for("w").destination.object_id, "east_gate")
         # The capital's second gate is the 東門 since the replan; the old
         # 北門 directions are authored nowhere.
-        self.assertIsNone(CAPITAL.gate_for("s"))
-        self.assertIsNone(CAPITAL.gate_for("e"))
+        self.assertIsNone(_capital().gate_for("s"))
+        self.assertIsNone(_capital().gate_for("e"))
 
     @covers_requirement(
         "village-ciaran-map::the-village-has-a-wilderness-footprint-disjoint-from-every-other-settlement"
@@ -189,27 +199,28 @@ class WildernessEntryValidationTests(unittest.TestCase):
 
     def _assert_rejected(self, key, entry, fragment):
         # The probe entry keys its own anchor so the anchor_key rule is not
-        # the first rejection it trips; the unknown-anchor probe patches a
-        # key absent here on purpose.
-        with (
-            patch.dict(ANCHOR_PLACEMENT_REGISTRY, {key: ANCHOR_PLACEMENT_REGISTRY["capital_altoria"]}),
-            patch.dict(WILDERNESS_ENTRY_REGISTRY, {key: entry}),
-        ):
-            with self.assertRaises(ValueError) as caught:
-                validate_wilderness_entries()
+        # the first rejection it trips; the unknown-anchor probe supplies a
+        # key absent from the candidate placements on purpose.
+        registry = {**dict(WILDERNESS_ENTRY_REGISTRY), key: entry}
+        placements = {
+            **dict(ANCHOR_PLACEMENT_REGISTRY),
+            key: ANCHOR_PLACEMENT_REGISTRY["capital_altoria"],
+        }
+        with self.assertRaises(ValueError) as caught:
+            validate_wilderness_entries(registry, placements=placements)
         self.assertIn(fragment, str(caught.exception))
 
     def _assert_capital_rejected(self, entry, fragment):
-        with patch.dict(WILDERNESS_ENTRY_REGISTRY, {"capital_altoria": entry}):
-            with self.assertRaises(ValueError) as caught:
-                validate_wilderness_entries()
+        registry = {**dict(WILDERNESS_ENTRY_REGISTRY), "capital_altoria": entry}
+        with self.assertRaises(ValueError) as caught:
+            validate_wilderness_entries(registry)
         self.assertIn(fragment, str(caught.exception))
 
     @covers_requirement(
         "wilderness-gateway::wilderness-entry-registry-authored-data-is-validated-before-persistence"
     )
     def test_malformed_entries_are_each_rejected(self):
-        gate = WildernessGate("n", CAPITAL.gate_for("n").destination)
+        gate = WildernessGate("n", _capital().gate_for("n").destination)
         cases = [
             ("empty mask", "x", WildernessEntryPoint("x", (), (0, 0), (gate,)), "empty mask"),
             (
@@ -234,7 +245,7 @@ class WildernessEntryValidationTests(unittest.TestCase):
                 "non-canonical return_direction",
                 "x",
                 WildernessEntryPoint(
-                    "x", ("#####",) * 5, (600, 600), (WildernessGate("q", CAPITAL.gate_for("n").destination),)
+                    "x", ("#####",) * 5, (600, 600), (WildernessGate("q", _capital().gate_for("n").destination),)
                 ),
                 "non-canonical return_direction",
             ),
@@ -245,7 +256,7 @@ class WildernessEntryValidationTests(unittest.TestCase):
                     "x",
                     ("#####",) * 5,
                     (600, 600),
-                    (gate, WildernessGate("n", CAPITAL.gate_for("w").destination)),
+                    (gate, WildernessGate("n", _capital().gate_for("w").destination)),
                 ),
                 "duplicated return_direction",
             ),
@@ -256,7 +267,7 @@ class WildernessEntryValidationTests(unittest.TestCase):
                     "x",
                     ("#", "#", "#"),
                     (1390, 1200),
-                    (WildernessGate("e", CAPITAL.gate_for("n").destination),),
+                    (WildernessGate("e", _capital().gate_for("n").destination),),
                 ),
                 "is not walkable terrain",
             ),
@@ -271,8 +282,8 @@ class WildernessEntryValidationTests(unittest.TestCase):
                 "x",
                 _point_entry(
                     gates=(
-                        WildernessGate("n", CAPITAL.gate_for("n").destination),
-                        WildernessGate("w", CAPITAL.gate_for("w").destination),
+                        WildernessGate("n", _capital().gate_for("n").destination),
+                        WildernessGate("w", _capital().gate_for("w").destination),
                     )
                 ),
                 "exactly one gate",
@@ -313,7 +324,7 @@ class WildernessEntryValidationTests(unittest.TestCase):
                 "ragged mask rows",
                 "x",
                 WildernessEntryPoint(
-                    "x", ("###", "##"), (600, 640), (WildernessGate("n", CAPITAL.gate_for("n").destination),)
+                    "x", ("###", "##"), (600, 640), (WildernessGate("n", _capital().gate_for("n").destination),)
                 ),
                 "ragged mask",
             ),
@@ -321,7 +332,7 @@ class WildernessEntryValidationTests(unittest.TestCase):
                 "illegal mask character",
                 "x",
                 WildernessEntryPoint(
-                    "x", ("#X#", "#.#", "#.#"), (600, 660), (WildernessGate("n", CAPITAL.gate_for("n").destination),)
+                    "x", ("#X#", "#.#", "#.#"), (600, 660), (WildernessGate("n", _capital().gate_for("n").destination),)
                 ),
                 "illegal mask character",
             ),
@@ -332,7 +343,7 @@ class WildernessEntryValidationTests(unittest.TestCase):
                     "capital_altoria",
                     ("###", "#.#", "###"),
                     (600, 680),
-                    (WildernessGate("n", CAPITAL.gate_for("n").destination),),
+                    (WildernessGate("n", _capital().gate_for("n").destination),),
                 ),
                 "is not a '#' footprint cell",
             ),
@@ -340,7 +351,7 @@ class WildernessEntryValidationTests(unittest.TestCase):
                 "overlapping footprints",
                 "x",
                 WildernessEntryPoint(
-                    "x", ("#", "#"), (860, 1080), (WildernessGate("e", CAPITAL.gate_for("n").destination),)
+                    "x", ("#", "#"), (860, 1080), (WildernessGate("e", _capital().gate_for("n").destination),)
                 ),
                 "footprint overlaps",
             ),
@@ -348,7 +359,7 @@ class WildernessEntryValidationTests(unittest.TestCase):
                 "footprint contains another entry's gate approach cell",
                 "x",
                 WildernessEntryPoint(
-                    "x", ("##",), (859, 1077), (WildernessGate("w", CAPITAL.gate_for("n").destination),)
+                    "x", ("##",), (859, 1077), (WildernessGate("w", _capital().gate_for("n").destination),)
                 ),
                 "lies inside footprint",
             ),
@@ -391,8 +402,8 @@ class WildernessEntryBoundsTests(unittest.TestCase):
     def test_entry_cells_are_within_provider_bounds(self):
         from world.maps.wilderness_provider import WILDERNESS_MAX_X, WILDERNESS_MAX_Y
 
-        for cell in CAPITAL.footprint_cells | {
-            CAPITAL.approach_cell(gate) for gate in CAPITAL.gates
+        for cell in _capital().footprint_cells | {
+            _capital().approach_cell(gate) for gate in _capital().gates
         }:
             x, y = cell
             self.assertGreaterEqual(x, 0)

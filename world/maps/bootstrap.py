@@ -896,7 +896,9 @@ def sync_grid() -> SyncReport:
     """
 
     from world.maps.geography import ensure_published
+    from world.maps.map_data import ensure_published as ensure_settlements_published
 
+    ensure_settlements_published()
     ensure_published()
     validate_static_references()
 
@@ -1072,7 +1074,9 @@ def sync_wilderness() -> None:
     """
 
     from world.maps.geography import ensure_published
+    from world.maps.map_data import ensure_published as ensure_settlements_published
 
+    ensure_settlements_published()
     ensure_published()
     validate_static_references()
 

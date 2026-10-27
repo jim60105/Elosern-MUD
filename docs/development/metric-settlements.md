@@ -10,9 +10,10 @@ authoritative map.
 
 | Concern | Unit / owner |
 | --- | --- |
-| Settlement node coordinate | integer metres in the settlement's local frame (`x` east, `y` north), declared in `world/maps/altoria_capital.py` / `world/maps/village_ciaran.py` |
+| Settlement node coordinate | integer metres in the settlement's local frame (`x` east, `y` north), declared in `content/maps/settlements/<map_id>.yaml` |
 | Road length | Euclidean distance between the authored endpoints, owned by `packages/map-core/elosern_map_core/sparse.py` |
-| Road compass exit | authored per directed road (`ROADS` third field); an oblique metre delta never renames an exit |
+| Road compass exit | authored per directed road (`direction`); an oblique metre delta never renames an exit |
+| Source discovery and publication | `world/maps/map_data.py` (sorted discovery, validated candidate, immutable snapshot) |
 | Room/exit lifecycle | `world/maps/bootstrap.py::sync_grid` / `sync_settlement_graph` |
 | Map knowledge | `world/rules/map_knowledge.py` (sole writer) |
 | Gate placement (identity) | `world/maps/city_gates.py::CITY_GATE_REGISTRY`, `world/lore/wilderness_entry.py` |
@@ -33,16 +34,17 @@ closure that does not resolve before startup synchronization writes anything.
 
 ## Authored tables
 
-- `PROTOTYPES` and `NODE_IDS` are keyed by the metre coordinate;
-  `XYMAP_DATA["prototypes"]` includes those room prototypes and the wildcard
-  exit override. `XYMAP_DATA["options"]` holds map-wide visual-range settings,
-  not coordinate bindings. `XYMAP_DATA` carries no ASCII `map`.
-- `NODE_IDS` values are stable English slugs (`south_gate`, `quay`); the
-  corresponding prototype `key` is the Chinese display name（南門、碼頭埠）.
-  Counts and membership follow these manually edited tables.
-- `ROADS` entries are `(source identity, destination identity, compass octant)`.
-  The octant preserves every pre-cutover exit direction and the authored capital
-  shortcuts（工匠巷↔校場外 `ne/sw`、大神殿前↔東市 `se/nw`）.
+- The `nodes` block is keyed by each node's stable English slug (`south_gate`,
+  `quay`) and carries its integer-metre `x_m`/`y_m`, room prototype fields and
+  the optional scene archetype. There is no coordinate-keyed prototype table and
+  no ASCII `map`.
+- The node's `key` is the Chinese display name（南門、碼頭埠）. Counts and
+  membership follow the authored document.
+- The `roads` list entries are `{source, destination, direction}` with an
+  authored compass octant. The octant preserves every pre-cutover exit
+  direction and the authored capital shortcuts（工匠巷↔校場外 `ne/sw`、
+  大神殿前↔東市 `se/nw`). `options` holds the map-wide visual-range settings and
+  `exit_prototype` the wildcard exit override.
 - The measured baselines at the 1.25 m/s healthy settlement speed are 2,193 s
   （南門→中央廣場，~37 min）, 5,618 s（南門→王宮前庭，~94 min）and 431 s
   （隱密小徑→長老古樹下，~7 min）. Unequal segment lengths charge and display

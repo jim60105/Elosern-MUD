@@ -8,43 +8,43 @@ back into the starting room, and the hard gate that admits no character into
 ## Requirements
 
 ### Requirement: The city-gate registry is the sole authored source of 虛境 city gates
-`world/maps/city_gates.py` SHALL define a frozen, slotted `CityGateDef` dataclass with the fields
-`map_id` (str), `gate_xyz` (a `(int, int, str)` grid coordinate), `exit_key` (str), and
-`exit_aliases` (a tuple of strings), and SHALL expose `CITY_GATE_REGISTRY` as a
-`MappingProxyType` keyed by map id. `world/maps/bootstrap.py` SHALL author gate exits
-exclusively from this registry, with no reverse-direction gate data authored anywhere.
+Immutable game gate views SHALL derive solely from settlement-owned starting-room entry relationships with qualified targets and authored labels, without reverse entry declarations.
+
+#### Scenario: Forward gates and immutability
+- **WHEN** two synthetic settlement entries are loaded and synchronized twice
+- **THEN** each yields one forward exit with its authored labels, the view rejects mutation, and no reverse entry is created
+
+#### Scenario: Concealed path
+- **WHEN** an entry targets a settlement without a walled gate
+- **THEN** its authored concealed-path naming is preserved without a bootstrap naming constant
 
 #### Scenario: The registry pins the single capital row
-- **WHEN** `CITY_GATE_REGISTRY` is inspected
-- **THEN** its `capital_altoria` row carries `gate_xyz` `(3050, 150, "capital_altoria")`, `exit_key` 「南門」, and `exit_aliases` `("王都", "城門")`
+- **WHEN** the capital's loaded starting-room relationship is resolved
+- **THEN** its current qualified node and authored labels supply the immutable gate view; conversion preserves existing values without a second coordinate/copy approval table
 
 #### Scenario: Every registry row yields exactly one forward exit
-- **WHEN** `sync_grid()` runs against a database holding every registered map
-- **THEN** the starting room has exactly one forward exit per registry row, each leading to its row's `gate_xyz`, and no two rows' exit keys or aliases collide
+- **WHEN** every loaded entry has a materialized target and synchronization runs twice
+- **THEN** each entry yields exactly one forward exit and colliding exit keys/aliases reject
 
 #### Scenario: The registry cannot be mutated at runtime
-- **WHEN** a caller attempts to insert, replace, or delete a `CITY_GATE_REGISTRY` entry
-- **THEN** the attempt raises and the registry contents are unchanged
+- **WHEN** a consumer attempts to insert, replace or delete a loaded gate-view entry
+- **THEN** mutation fails and the view remains unchanged
 
 #### Scenario: Bootstrap carries no gate surface of its own
-- **WHEN** `world/maps/bootstrap.py` is inspected for gate exit authoring
-- **THEN** no `EXIT_TO_CITY` or `EXIT_TO_LIMBO` constant exists and the only gate keys, aliases, and coordinates it uses are read from `CITY_GATE_REGISTRY` rows
+- **WHEN** a synthetic settlement entry's labels and target change
+- **THEN** synchronization follows the loaded values without a competing bootstrap constant
 
 #### Scenario: The registry carries exactly two rows today
-- **WHEN** `CITY_GATE_REGISTRY` is inspected
-- **THEN** it carries exactly two rows today: `capital_altoria` with `gate_xyz`
-  `(3050, 150, "capital_altoria")`, `exit_key` 「南門」, and `exit_aliases` `("王都", "城門")`, and
-  `village_ciaran` with `gate_xyz` at the village's entrance node, `exit_key` 「隱密小徑」, and
-  its own aliases
+- **WHEN** supported settlement files are added or removed
+- **THEN** the derived entry set follows source membership rather than a fixed production count; no Python gate roster must be edited
 
 #### Scenario: A row may name a concealed path, not a walled gate
-- **WHEN** a registry row is authored for a destination with no gate
-- **THEN** the row is not assumed to describe a walled settlement: the registry slot expresses
-  "the authored way in from 虛境", and the entry may name a concealed path
+- **WHEN** the loaded entry names a concealed path
+- **THEN** that authored label is retained without assuming a walled gate
 
 #### Scenario: Bootstrap duplicates no gate data
-- **WHEN** gate exit authoring under `world/maps/bootstrap.py` is reviewed
-- **THEN** no gate exit key, alias, or coordinate is duplicated as a bootstrap constant
+- **WHEN** gate views are rebuilt from modified source relationships
+- **THEN** bootstrap uses those current labels and qualified targets rather than a duplicated declaration
 
 ### Requirement: sync_grid creates exactly one forward gate exit per registry row and converges it idempotently
 For every row of `CITY_GATE_REGISTRY`, `sync_grid()` SHALL idempotently ensure exactly one ordinary (non-grid) `Exit` from the starting room to that row's `gate_xyz` exists, carrying the row's `exit_key` and `exit_aliases`, without duplicating it on repeated calls. `sync_grid()` SHALL NOT create any exit leading from a gate room back to the starting room.
@@ -96,15 +96,19 @@ When the grid room at a registry row's `gate_xyz` does not exist, `sync_grid()` 
 - **THEN** the existing row's forward exit is created and the missing row only produces its warning
 
 ### Requirement: Adding a city means adding a registry row, with no bootstrap code change
-The gate sync SHALL be registry-driven end to end: supporting an additional city SHALL require adding one `CityGateDef` row to `CITY_GATE_REGISTRY` and the city's map data only. `sync_grid()` SHALL converge however many rows the registry carries — the starting room holding exactly one forward exit per row — and the prune invariant SHALL keep all of them one-way. Race-based selection of which gate a new character takes is explicitly out of scope and SHALL NOT be implemented.
+Adding a discovered settlement document with a starting-room entry SHALL extend gate synchronization without code registration and retain forward-only entry and reverse pruning.
+
+#### Scenario: Additional source
+- **WHEN** a supported settlement document with an entry is added
+- **THEN** its forward gate appears after synchronization without Python roster changes and any reverse exit is pruned
 
 #### Scenario: An injected second row gains its own forward exit
-- **WHEN** the registry is rebound in a test to carry a second row whose gate room exists and `sync_grid()` runs
-- **THEN** the starting room has exactly one forward exit per row, each keyed from its own row, and no exit leads back to the starting room from either gate room
+- **WHEN** a second synthetic settlement source supplies a distinct valid entry
+- **THEN** it gains exactly its own forward exit without bootstrap registration
 
 #### Scenario: Registry growth never reintroduces a reverse exit
-- **WHEN** a reverse exit into the starting room exists for either gate and `sync_grid()` runs with multiple rows
-- **THEN** the reverse exit is pruned and every remaining starting-room exit is a forward gate exit
+- **WHEN** a reverse exit exists while multiple loaded settlement entries synchronize
+- **THEN** the reverse exit is pruned and all remaining starting-room entries are forward-only
 
 ### Requirement: 虛境 admits no character by any path
 The starting room SHALL be converged by `sync_limbo()` onto a dedicated `LimboRoom` typeclass

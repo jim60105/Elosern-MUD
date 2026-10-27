@@ -478,10 +478,11 @@ PLACE_REGISTRY: dict[str, PlaceDefinition] = {
     )
 }
 
-from world.maps.static_references import settlement_reference_index  # noqa: E402
-
+# The exterior bindings are resolved by the explicit static-reference gate
+# (``world.maps.static_references.validate_static_references``) once the
+# settlement world is published, not at import: the settlement domain is
+# discovered YAML with no import-time publication.
 validate_place_registry(
     PLACE_REGISTRY,
     check_capabilities=False,
-    index=settlement_reference_index(),
 )

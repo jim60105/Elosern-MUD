@@ -67,6 +67,9 @@ from world.rules.presentation_events import (
 )
 
 from .test_publication_settlements import FakeSession, QueuedScheduler, _coordinator
+from world.tests.geography_fixture import publish_shipped_geography
+
+publish_shipped_geography()
 
 
 # ---------------------------------------------------------------------------

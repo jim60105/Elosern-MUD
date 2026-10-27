@@ -46,6 +46,9 @@ from world.quests.definitions import (
 from world.quests.runtime import QuestRecord, QuestState, to_storage
 from world.quests.tests._fixtures import TEST_ISSUER_KEY, RegistryIsolationMixin
 from world.rules.map_knowledge import encode_room
+from world.tests.geography_fixture import publish_shipped_geography
+
+publish_shipped_geography()
 
 # --- Synthetic geography -------------------------------------------------------
 

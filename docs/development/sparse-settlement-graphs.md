@@ -16,8 +16,9 @@ through the locked local dependency declared in the root `pyproject.toml`.
 | --- | --- |
 | Sparse nodes, explicit roads, validation, route planning | `packages/map-core/elosern_map_core/sparse.py` |
 | Contrib `XYMap` adaptation for synthetic/builder maps | `world/maps/xymap_graph.py` |
-| Settlement identity tables (`NODE_IDS`, `ROADS`) and rooms' prototypes | `world/maps/altoria_capital.py`, `world/maps/village_ciaran.py` |
-| Shared assembly (`SETTLEMENT_GRAPHS`, `KNOWN_GRID_MAP_KEYS`) | `world/maps/map_data.py` |
+| Authored settlement documents (nodes, roads, prototypes, options, binding, entrances) | `content/maps/settlements/<map_id>.yaml` |
+| Explicit load, cross-document validation and immutable publication | `world/maps/map_data.py` |
+| Read-only registry views over the published snapshot | `world/maps/published.py` plus the owning registry modules |
 | Persistent room/exit convergence | `world/maps/bootstrap.py::sync_grid` |
 | Stable room identity attribute | `typeclasses/rooms.py::GridRoom.sparse_node_id` |
 | Grid/anchor map knowledge bounds | `world/rules/map_knowledge.py` |
@@ -31,9 +32,9 @@ Lore and quest modules read the declarations; they never write a graph. Only
 - A `SparseNode` has a stable authored `node_id`, an integer-metre `(x, y)`
   local-frame binding, and a room prototype. The identity, never the
   coordinate, is the matching authority.
-  `NODE_IDS` supplies an English slug such as `south_gate` or `quay`; the
-  prototype's Chinese `key`（南門 or 碼頭埠）is the display name. Renaming the
-  display key does not rename the node identity.
+  The document's node map key supplies an English slug such as `south_gate`
+  or `quay`; the node's Chinese `key`（南門 or 碼頭埠）is the display name.
+  Renaming the display key does not rename the node identity.
 - A `SparseRoad` has a stable ordered endpoint pair, an authored compass
   octant, optional bend points, and a length: the sum of Euclidean segment
   lengths. The octant is authored because an irregular metre layout is almost
@@ -49,9 +50,38 @@ Coordinates are the settlement's integer-metre local frame (`x` east, `y`
 north); `z` stays the logical map/layer key. A coordinate move is a declaration
 edit, not an identity change.
 
-Room and road counts belong to the manually edited settlement module.
-`ROADS` stores one entry per directed travel direction; a bidirectional street
-has a reverse entry as well. Canonical map-knowledge IDs such as
+## Source discovery and publication
+
+`content/maps/settlements/<map_id>.yaml` is discovered in sorted path order; a
+document's `id` must equal the file stem, and its `location_ref` binds it to one
+authored geographic location. That reference is the only reverse link: a
+location's local map, anchor placement, frame anchor and wilderness gateway all
+derive from it, so adding a map for an existing location is a source edit with
+no Python registration and no reverse location list.
+
+`world/maps/map_data.py` reads the documents and `content/maps/locations.yaml`,
+validates every settlement's own declaration (one anchor room whose
+`anchor_key` is the `location_ref`, a binding that agrees with that node and
+with the location cell, authored gate/wilderness destinations, registered scene
+archetypes) and the cross-document rules (no duplicate location binding, the
+terrain-independent wilderness footprint/gate rules), then publishes one
+immutable `SettlementSnapshot`. A rejected candidate raises `SettlementError`
+and leaves the previously published snapshot exactly as it was; reading before
+any publication raises `SettlementNotLoaded`. Nothing loads at import.
+
+`SETTLEMENT_GRAPHS`, `KNOWN_GRID_MAP_KEYS`, `ANCHOR_PLACEMENT_REGISTRY`,
+`LOCAL_FRAME_ANCHOR_REGISTRY`, `CITY_GATE_REGISTRY`,
+`WILDERNESS_ENTRY_REGISTRY` and `GRID_NODE_SCENE_ARCHETYPES` are read-only views
+over the published snapshot, so a replacement reaches every consumer that
+already holds them. The composition roots (`settlement_source_publication` and
+`geography_source_publication` at startup, `sync_grid`, `sync_wilderness`,
+`sync_all`) publish explicitly. The one-time conversion compared the emitted
+documents against the retired Python declarations; that comparison is evidence
+of preservation, not a permanent approval corpus.
+
+Room and road counts belong to the authored settlement document. Its `roads`
+list stores one entry per directed travel direction; a bidirectional street has
+a reverse entry as well. Canonical map-knowledge IDs such as
 `grid:capital_altoria:3050:150` encode the coordinate binding, not the sparse
 slug or Chinese display key.
 
@@ -134,7 +164,7 @@ lattice.
 ## Display surface
 
 There is no ASCII authoring source and no dense lattice. The settlement
-declaration is the sparse table set (`PROTOTYPES`, `NODE_IDS`, `ROADS`); the
+declaration is the authored document's `nodes`/`roads` blocks; the
 localized `地圖`/`map` command lists a declared settlement's nodes, metre
 coordinates and outgoing compass exits, and still renders an ASCII map for a
 synthetic/builder map loaded in the contrib. `sync_grid()` removes any

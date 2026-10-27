@@ -14,6 +14,9 @@ from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from world.rules.map_knowledge import _derive_node_id, parse_knowledge
 from world.tests.synthetic_grid_map import load_synthetic_grid, synthetic_rooms
+from world.tests.geography_fixture import publish_shipped_geography
+
+publish_shipped_geography()
 
 
 class LandmarkArrivalTests(EvenniaTest):

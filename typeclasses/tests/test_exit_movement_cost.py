@@ -13,6 +13,9 @@ from typeclasses.exits import CostedXYZExit, Exit, MovementCostMixin
 from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom, Room
 from world.rules.clock import CLOCK_YAML, get_world_clock
+from world.tests.geography_fixture import publish_shipped_geography
+
+publish_shipped_geography()
 
 MOVE = CLOCK_YAML["command_defaults"]["move"]
 

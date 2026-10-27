@@ -146,7 +146,9 @@ class InstalledDistributionTests(unittest.TestCase):
     def test_game_adapters_read_their_declarations_through_the_core(self):
         from elosern_map_core.sparse import SparseSettlementGraph
         from world.maps.map_data import SETTLEMENT_GRAPHS
+        from world.tests.geography_fixture import publish_shipped_settlements
 
+        publish_shipped_settlements()
         self.assertTrue(SETTLEMENT_GRAPHS)
         for graph in SETTLEMENT_GRAPHS.values():
             self.assertIsInstance(graph, SparseSettlementGraph)

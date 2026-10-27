@@ -194,7 +194,7 @@
     },
     {
       "path": "world/maps/tests/test_altoria_capital.py",
-      "reason": "capital xymap data contract"
+      "reason": "capital settlement document contract"
     },
     {
       "path": "world/maps/tests/test_bootstrap.py",
@@ -218,7 +218,7 @@
     },
     {
       "path": "world/maps/tests/test_village_ciaran.py",
-      "reason": "village ciaran map data contract"
+      "reason": "village ciaran settlement document contract"
     },
     {
       "path": "world/maps/tests/test_wilderness_geography_contract.py",
@@ -451,6 +451,14 @@
     {
       "path": "world/skills/tests/test_spell_catalogs.py",
       "reason": "spell catalog content contract"
+    },
+    {
+      "path": "world/maps/tests/test_settlement_sources.py",
+      "reason": "settlement source discovery and composition contract"
+    },
+    {
+      "path": "world/maps/tests/test_settlement_reload.py",
+      "reason": "settlement reload convergence contract"
     }
   ],
   "seedDebtPaths": [

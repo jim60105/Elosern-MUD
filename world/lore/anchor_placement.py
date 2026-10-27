@@ -4,12 +4,19 @@ A placement names the authored settlement node an anchor was built into. It
 holds a qualified identity, never a grid coordinate: the current entrance room
 address is derived from the settlement graph at the consumer boundary
 (``world/maps/static_references.py``).
+
+The authored declaration lives in the settlement document: its ``location_ref``
+names the anchor and its ``anchor_room`` node is the placement. This module
+exposes the composed view of the published settlement world, keyed by that
+location identity, so a location with no local map simply has no placement.
 """
 
 from dataclasses import dataclass
+from typing import Mapping
 
 from elosern_map_core.documents import QualifiedRef
-from elosern_map_core.references import settlement_node_ref
+
+from world.maps.published import PublishedView
 
 
 @dataclass(frozen=True)
@@ -32,13 +39,11 @@ class AnchorPlacement:
         return self.node.map_id or ""
 
 
-# Kept deliberately partial: only anchors built into the grid so far get an
-# entry. Future changes (13/14 and later world-building passes) add more.
-ANCHOR_PLACEMENT_REGISTRY: dict[str, AnchorPlacement] = {
-    "capital_altoria": AnchorPlacement(
-        "capital_altoria", settlement_node_ref("capital_altoria", "central_plaza")
-    ),
-    "village_ciaran": AnchorPlacement(
-        "village_ciaran", settlement_node_ref("village_ciaran", "village_plaza")
-    ),
-}
+# Kept deliberately partial: only anchors with a discovered settlement document
+# get a placement. A location with no local map needs no placeholder row.
+ANCHOR_PLACEMENT_REGISTRY: Mapping[str, AnchorPlacement] = PublishedView(
+    "anchor_placements"
+)
+
+
+__all__ = ["ANCHOR_PLACEMENT_REGISTRY", "AnchorPlacement"]

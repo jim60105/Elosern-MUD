@@ -162,7 +162,9 @@ def sync_all() -> None:
     # map-facing consumer or mirror reads it (startup publishes it first; a
     # direct call must not observe an empty world).
     from world.maps.geography import ensure_published
+    from world.maps.map_data import ensure_published as ensure_settlements_published
 
+    ensure_settlements_published()
     ensure_published()
     # Every authored static map target resolves against one current binding
     # snapshot before the first mirrored Script is created or updated

@@ -14,9 +14,10 @@ import unittest
 
 from world.lore.settlements._prose_lang import english_prose_defects
 from world.lore.settlements.places import PLACE_REGISTRY
-from world.maps.altoria_capital import PROTOTYPES as CAPITAL_PROTOTYPES
 from world.maps.limbo import LIMBO_DESC, LIMBO_KEY
-from world.maps.village_ciaran import PROTOTYPES as VILLAGE_PROTOTYPES
+from world.tests.geography_fixture import publish_shipped_settlements
+
+publish_shipped_settlements()
 
 
 def _is_han(char: str) -> bool:
@@ -27,18 +28,12 @@ def _shipped_authored_rooms():
     """(label, name, description) for every authored room description shipped."""
     for place in PLACE_REGISTRY.values():
         yield place.key, place.room_name_zh, place.room_desc_zh
-    for map_name, prototypes in (
-        ("capital_altoria", CAPITAL_PROTOTYPES),
-        ("village_ciaran", VILLAGE_PROTOTYPES),
-    ):
-        for coordinate, prototype in prototypes.items():
-            desc = prototype.get("desc")
-            if desc:
-                yield (
-                    f"{map_name}{coordinate}",
-                    prototype.get("key", ""),
-                    desc,
-                )
+    from world.maps.map_data import current
+
+    for settlement_id, document in current().settlements.items():
+        for node in document.nodes.values():
+            if node.desc:
+                yield f"{settlement_id}:{node.node_id}", node.key, node.desc
     yield "limbo", LIMBO_KEY, LIMBO_DESC
 
 

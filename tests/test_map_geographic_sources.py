@@ -213,18 +213,28 @@ class MapGeographicSourcesContractTests(unittest.TestCase):
                 self.assertTrue(0 <= cell[1] < self.geography["frame_cells"])
         self.assertFalse(set(locations) & set(self.geography["harbor_cells"]))
 
-    def test_unbuilt_locations_have_no_local_map_document(self):
+    def test_every_local_map_document_binds_an_authored_location(self):
+        # A local map is discovered from its own ``location_ref``; it may never
+        # fabricate the location it claims to build, and no location is bound by
+        # two documents (its reverse navigation must be unambiguous).
+        from elosern_map_core.codec import parse_document
+
         settlements = REPO_ROOT / "content" / "maps" / "settlements"
-        interiors = REPO_ROOT / "content" / "maps" / "interiors"
-        authored = set()
-        for directory in (settlements, interiors):
-            if directory.is_dir():
-                for path in directory.glob("*.yaml"):
-                    authored.add(path.stem)
-        self.assertFalse(
-            authored & set(self.geography["locations"]),
-            "a geographic location must not fabricate a settlement or interior",
-        )
+        locations = set(self.geography["locations"])
+        bound: dict[str, str] = {}
+        for path in sorted(settlements.glob("*.yaml")):
+            with self.subTest(document=path.stem):
+                document = parse_document(
+                    f"content/maps/settlements/{path.name}",
+                    path.read_text(encoding="utf-8"),
+                ).document
+                self.assertIn(document.location_ref, locations)
+                self.assertNotIn(
+                    document.location_ref,
+                    bound,
+                    "a location must be bound by one local map document",
+                )
+                bound[document.location_ref] = path.stem
 
 
 if __name__ == "__main__":

@@ -71,6 +71,10 @@ from ._fixtures import (
     register,
 )
 
+from world.tests.geography_fixture import publish_shipped_geography
+
+publish_shipped_geography()
+
 
 class QuestRoomMroTests(unittest.TestCase):
     def test_mixin_adoption_and_wilderness_exclusion(self):

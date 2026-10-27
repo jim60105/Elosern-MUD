@@ -31,11 +31,11 @@ from collections.abc import Mapping
 from types import MappingProxyType
 
 from elosern_map_core.documents import QualifiedRef
-from elosern_map_core.references import settlement_node_ref
 
 from world.art.scene_definitions import is_registered_room_art_key
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.lore.settlements.places import PLACE_REGISTRY
+from world.maps.published import PublishedView
 
 # The bound that keeps a logical scene identity within the descriptor's subject
 # ceiling. Every identity this module produces is an authored short key plus at
@@ -84,51 +84,11 @@ def instance_scene_identity(identity: object) -> str:
 # ``world.maps.geography`` after validating them against the scene catalog.
 # They are deliberately not duplicated here.
 #
-# Authored grid node identity -> registered scene archetype. Every walkable
-# node of every declared settlement graph is listed so the art panel resolves
-# a real registered archetype on a fresh boot; the node's current coordinate is
-# derived at the consumer boundary, never stored here.
-_GRID_NODE_SCENE_ARCHETYPES: dict[QualifiedRef, str] = {
-    # 聖潔王都 (capital_altoria): the river town's streets, plazas, gates and
-    # quays are all the town street.
-    settlement_node_ref("capital_altoria", "south_gate"): "city_street",
-    settlement_node_ref("capital_altoria", "quay"): "city_street",
-    settlement_node_ref("capital_altoria", "riverbank_road"): "city_street",
-    settlement_node_ref("capital_altoria", "south_avenue"): "city_street",
-    settlement_node_ref("capital_altoria", "inn_lane"): "city_street",
-    settlement_node_ref("capital_altoria", "bath_forecourt"): "city_street",
-    settlement_node_ref("capital_altoria", "old_wall_ruins"): "city_street",
-    settlement_node_ref("capital_altoria", "north_avenue"): "city_street",
-    settlement_node_ref("capital_altoria", "craft_alley"): "city_street",
-    settlement_node_ref("capital_altoria", "market_street"): "city_street",
-    settlement_node_ref("capital_altoria", "central_plaza"): "city_street",
-    settlement_node_ref("capital_altoria", "guild_forecourt"): "city_street",
-    settlement_node_ref("capital_altoria", "east_market"): "city_street",
-    settlement_node_ref("capital_altoria", "east_gate"): "city_street",
-    settlement_node_ref("capital_altoria", "training_ground"): "city_street",
-    settlement_node_ref("capital_altoria", "holy_steps"): "city_street",
-    settlement_node_ref("capital_altoria", "great_temple"): "city_street",
-    settlement_node_ref("capital_altoria", "noble_quarter"): "city_street",
-    settlement_node_ref("capital_altoria", "upper_gate"): "city_street",
-    settlement_node_ref("capital_altoria", "academy"): "city_street",
-    settlement_node_ref("capital_altoria", "palace_forecourt"): "city_street",
-    # 暗影谷村 (village_ciaran): the forest village's paths and groves are the
-    # forest path, the cleared plaza and drill ground the town street, and the
-    # stream approaches the wilderness path.
-    settlement_node_ref("village_ciaran", "hidden_path"): "forest_path",
-    settlement_node_ref("village_ciaran", "village_plaza"): "city_street",
-    settlement_node_ref("village_ciaran", "training_clearing"): "city_street",
-    settlement_node_ref("village_ciaran", "stream_path"): "wilderness_path",
-    settlement_node_ref("village_ciaran", "old_tree_north"): "forest_path",
-    settlement_node_ref("village_ciaran", "weaving_slope"): "forest_path",
-    settlement_node_ref("village_ciaran", "elder_tree"): "forest_path",
-    settlement_node_ref("village_ciaran", "silver_leaf_slope"): "forest_path",
-    settlement_node_ref("village_ciaran", "herb_garden"): "forest_path",
-    settlement_node_ref("village_ciaran", "stream_bend"): "wilderness_path",
-}
-
-GRID_NODE_SCENE_ARCHETYPES: Mapping[QualifiedRef, str] = MappingProxyType(
-    _GRID_NODE_SCENE_ARCHETYPES
+# Authored grid node identity -> registered scene archetype, composed from each
+# settlement document's per-node ``scene_archetype`` field. A node's current
+# coordinate is derived at the consumer boundary, never stored here.
+GRID_NODE_SCENE_ARCHETYPES: Mapping[QualifiedRef, str] = PublishedView(
+    "grid_node_scene_archetypes"
 )
 
 # Authored permanent interior place -> registered scene archetype. Keys are the
@@ -158,18 +118,14 @@ PLACE_SCENE_ARCHETYPES: Mapping[str, str] = MappingProxyType(_PLACE_SCENE_ARCHET
 def validate_room_art_registries() -> None:
     """Fail closed on any mapped key this contract requires to be registered.
 
-    Called at import: a mapped scene archetype must be a registered scene
-    archetype, every authored place key must be a registered room-art key, and
-    every authored place must be declared here. A defect names the offending
-    key so a bad edit cannot silently degrade a room to no scene art.
+    Called at import for the interior family this module still authors: every
+    authored place key must be a registered room-art key, its scene archetype
+    must be registered, and every authored place must be declared here. The
+    grid family is validated by the settlement publication instead, because its
+    keys are composed from the discovered settlement documents. A defect names
+    the offending key so a bad edit cannot silently degrade a room to no scene
+    art.
     """
-    for node, scene in GRID_NODE_SCENE_ARCHETYPES.items():
-        if not isinstance(node, QualifiedRef) or node.domain != "settlement_node":
-            raise ValueError(f"grid art key {node!r} is not a settlement_node reference")
-        if scene not in SCENE_ARCHETYPE_REGISTRY:
-            raise ValueError(
-                f"grid node {node!r} maps to unregistered scene archetype {scene!r}"
-            )
     for place_key, scene in PLACE_SCENE_ARCHETYPES.items():
         if place_key not in PLACE_REGISTRY:
             raise ValueError(f"place {place_key!r} is not an authored place")

@@ -285,11 +285,15 @@ def _validate_cells(snapshot_terrain: TerrainDefinition, **groups: Mapping[str, 
 
 def _validate_game_joins(
     snapshot: GeographySnapshot,
+    settlements,
 ) -> list[str]:
     """Every cross-domain join this geography holds, checked before publication.
 
     The non-map catalogs keep their own ownership; they are read here only to
-    prove their stable keys still resolve against the published geography.
+    prove their stable keys still resolve against the published geography. The
+    settlement-owned placements and wilderness gateways come from the candidate
+    settlement world passed in by the caller, never from the live registry: a
+    geography candidate is validated against its own inputs.
     """
 
     from world.lore.map_districts import MAP_DISTRICT_REGISTRY
@@ -299,9 +303,7 @@ def _validate_game_joins(
     )
     from world.lore.monster_species import MONSTER_SPECIES_REGISTRY
     from world.lore.nations import NATION_REGISTRY
-    from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
     from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
-    from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
     from world.rules.travel_cost import validate_wilderness_region_coverage
 
     problems: list[str] = []
@@ -321,10 +323,10 @@ def _validate_game_joins(
     for key in sorted(SETTLEMENT_REGISTRY):
         if key not in anchors:
             problems.append(f"settlement {key!r} joins no geographic location")
-    for key in sorted(ANCHOR_PLACEMENT_REGISTRY):
+    for key in sorted(settlements.anchor_placements):
         if key not in anchors:
             problems.append(f"anchor placement {key!r} joins no geographic location")
-    for key, entry in sorted(WILDERNESS_ENTRY_REGISTRY.items()):
+    for key, entry in sorted(settlements.wilderness_entries.items()):
         if getattr(entry, "anchor_key", None) not in anchors:
             problems.append(
                 f"wilderness entry {key!r} joins no geographic location "
@@ -362,6 +364,7 @@ def _validate_game_joins(
 def build_geography(
     continent: ContinentDocument,
     locations: LocationsDocument,
+    settlements,
     *,
     fingerprints: Mapping[str, str] | None = None,
 ) -> GeographySnapshot:
@@ -370,6 +373,9 @@ def build_geography(
     Every fallible derivation a published consumer needs (terrain tables,
     national borders, search windows, region flavours, cross-domain joins) is
     completed here; nothing is deferred into the published snapshot.
+    ``settlements`` is the candidate settlement world this geography must join
+    (``world.maps.map_data.SettlementSnapshot``); it supplies the anchor
+    placements, the wilderness gateways and their settlement-node bindings.
     """
 
     problems: list[str] = []
@@ -408,6 +414,10 @@ def build_geography(
 
     try:
         validate_wilderness_entries(
+            settlements.wilderness_entries,
+            index=settlements.reference_index,
+            placements=settlements.anchor_placements,
+            extents=settlements.node_extents,
             bounds=(terrain.max_x, terrain.max_y),
             walkable=lambda cell: _core_is_walkable(terrain, cell),
         )
@@ -434,7 +444,7 @@ def build_geography(
         raise GeographyError(
             [*problems, f"the authored terrain derivation failed: {error}"]
         ) from error
-    problems.extend(_validate_game_joins(snapshot))
+    problems.extend(_validate_game_joins(snapshot, settlements))
     if problems:
         raise GeographyError(problems)
     return snapshot
@@ -457,6 +467,8 @@ def parse_geography_documents(
 def load_geography(root: str | Path | None = None) -> GeographySnapshot:
     """Read, validate and compose the shipped geography from ``root``."""
 
+    from world.maps.map_data import load_settlements
+
     base = Path(root) if root is not None else REPOSITORY_ROOT
     continent_source = read_source_document(base, CONTINENT_PATH)
     locations_source = read_source_document(base, LOCATIONS_PATH)
@@ -465,6 +477,7 @@ def load_geography(root: str | Path | None = None) -> GeographySnapshot:
     return build_geography(
         continent.document,
         locations.document,
+        load_settlements(base),
         fingerprints={
             continent_source.relative_path: continent_source.fingerprint,
             locations_source.relative_path: locations_source.fingerprint,

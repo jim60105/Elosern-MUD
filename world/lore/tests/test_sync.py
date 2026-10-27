@@ -4,6 +4,7 @@ Evennia integration checks for idempotent lore synchronization."""
 from tools.spec_traceability import covers_requirement
 
 from dataclasses import replace
+from types import MappingProxyType
 
 from evennia.scripts.models import ScriptDB
 from evennia.utils.search import search_script
@@ -110,13 +111,11 @@ class LoreSyncTests(EvenniaTestCase):
         "wilderness-gateway::wilderness-entry-registry-links-a-grid-placed-anchor-to-an-authored-wilderness-footprint-and-gates"
     )
     def test_wilderness_entry_v2_payload_is_mirrored_in_primitive_shape(self):
-        from unittest.mock import patch
-
         from world.lore.wilderness_entry import (
-            WILDERNESS_ENTRY_REGISTRY,
             WildernessEntryPoint,
             WildernessGate,
         )
+        from world.maps import map_data
         from elosern_map_core.references import settlement_node_ref
 
         # A v2-typed extra entry proves the mirror preserves the NESTED dataclass
@@ -128,17 +127,19 @@ class LoreSyncTests(EvenniaTestCase):
             (860, 1080),
             (WildernessGate("n", settlement_node_ref("capital_altoria", "south_gate")),),
         )
-        with (
-            patch.dict(
-                ANCHOR_PLACEMENT_REGISTRY,
-                {"capital_altoria": ANCHOR_PLACEMENT_REGISTRY["capital_altoria"]},
-            ),
-            patch.dict(WILDERNESS_ENTRY_REGISTRY, {"capital_altoria": probe}),
-        ):
+        previous = map_data.current()
+        entries = dict(previous.wilderness_entries)
+        entries["capital_altoria"] = probe
+        map_data.publish(
+            replace(previous, wilderness_entries=MappingProxyType(entries))
+        )
+        try:
             sync_all()
             first = search_script("lore:wilderness_entries:capital_altoria")
             sync_all()
             second = search_script("lore:wilderness_entries:capital_altoria")
+        finally:
+            map_data.publish(previous)
         self.assertEqual(len(first), 1)
         self.assertEqual(len(second), 1)
         self.assertEqual(first[0].id, second[0].id)
@@ -163,14 +164,21 @@ class LoreSyncTests(EvenniaTestCase):
         "wilderness-gateway::wilderness-entry-registry-authored-data-is-validated-before-persistence"
     )
     def test_sync_all_refuses_to_mirror_a_malformed_registry(self):
-        from unittest.mock import patch
-
-        from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY, WildernessEntryPoint
+        from world.lore.wilderness_entry import WildernessEntryPoint
+        from world.maps import map_data
 
         malformed = WildernessEntryPoint("capital_altoria", (), (0, 0), ())
-        with patch.dict(WILDERNESS_ENTRY_REGISTRY, {"capital_altoria": malformed}):
+        previous = map_data.current()
+        entries = dict(previous.wilderness_entries)
+        entries["capital_altoria"] = malformed
+        map_data.publish(
+            replace(previous, wilderness_entries=MappingProxyType(entries))
+        )
+        try:
             with self.assertRaises(ValueError):
                 sync_all()
+        finally:
+            map_data.publish(previous)
         # Nothing was created: the validation error precedes every mirror write.
         self.assertEqual(
             ScriptDB.objects.filter(db_key__startswith="lore:wilderness_entries:").count(), 0

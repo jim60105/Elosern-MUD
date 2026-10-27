@@ -19,6 +19,14 @@ composition root loads and publishes at startup
 (`geography_source_publication`, the first startup step); tests and tools
 call `load_and_publish()` explicitly. Nothing loads or validates at import.
 
+The settlement local maps are published by the next startup step,
+`settlement_source_publication`: discovered YAML under
+`content/maps/settlements/<map_id>.yaml` composed by `world/maps/map_data.py`.
+The geography candidate is validated against that candidate settlement world
+(`build_geography(continent, locations, settlements)`), so its wilderness
+footprint and gateway checks read explicit inputs rather than a live registry.
+See `docs/development/sparse-settlement-graphs.md`.
+
 Political affiliation, population and dungeon floor counts are *not* map
 fields: they stay in `world/lore/anchors.py::ANCHOR_LORE` and are joined by the
 same stable location identity. Settlement graphs, bindings, districts and
@@ -241,7 +249,7 @@ tile run.
 | `content/maps/locations.yaml` | `locations` | Every static geographic location's kind, name, description, cell and geographic constraint, including locations with no built settlement or interior. |
 | `world/maps/geography.py` | `load_geography`, `publish`, `current` | Explicit document load, cross-domain validation and atomic publication of the immutable `GeographySnapshot`; every consumer reads `current()`. |
 | `world/lore/wilderness_regions.py` | `regions`, `harbor_sites`, `frame_cells`, `mainland_boundary_km`, `is_wilderness_cell`, `mainland_area_km2`, `is_on_mainland` | Thin read-only accessors over the published snapshot, bound into `elosern_map_core.geometry`; boundary points count as land. |
-| `world/lore/anchors.py` | `anchors`, `anchor_geography`, `ANCHOR_LORE` | The composed location views (map-facing fields plus the non-map nation/population/floor lore joined by identity). `LOCAL_FRAME_ANCHOR_REGISTRY` and `world_position_m` stay settlement-local frame declarations; the transform itself is `elosern_map_core.geometry.local_to_world_m`. |
+| `world/lore/anchors.py` | `anchors`, `anchor_geography`, `ANCHOR_LORE`, `LOCAL_FRAME_ANCHOR_REGISTRY`, `world_position_m` | The composed location views (map-facing fields plus the non-map nation/population/floor lore joined by identity). The frame anchors are the published settlement documents' anchor bindings, keyed by `location_ref`; the transform itself is `elosern_map_core.geometry.local_to_world_m`. |
 | `world/lore/nations.py` | `CONTINENT_AREA_KM2`, `CONTINENT_POPULATION`, `ELVEN_POPULATION`, `NEUTRAL_LANDS_AREA_KM2`, `NEUTRAL_LANDS_POPULATION`, `CAPITAL_POPULATION_SHARE` | Rounded continental totals. The neutral lands have no separate regional population total. |
 | `world/lore/nations.py` | `Nation.territory_km2`, `CapitalSupport`, `CAPITAL_SUPPORT_REGISTRY` | National area targets and the authored regional food/storage/water support (Valhalla additionally declares pastoral production and trade). |
 

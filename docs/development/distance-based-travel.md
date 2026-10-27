@@ -14,7 +14,7 @@ design §10）。它說明移動耗時如何由作者宣告的物理幾何與地
 | Concern | Owner |
 | --- | --- |
 | 地形速度表、區域→地形對照、單次向上取整的耗時計算 | `world/rules/travel_cost.py`、`world/rules/rulebook/movement.yaml` |
-| 聚落道路的公尺座標、作者宣告的羅盤方位與路段長度 | `world/maps/altoria_capital.py`、`world/maps/village_ciaran.py`、`packages/map-core/elosern_map_core/sparse.py` |
+| 聚落道路的公尺座標、作者宣告的羅盤方位與路段長度 | `content/maps/settlements/<map_id>.yaml`、`packages/map-core/elosern_map_core/sparse.py` |
 | 荒野格距、區域判定 | `world/maps/wilderness_provider.py`（`WILDERNESS_KM_PER_CELL`、`region_for_coordinates`） |
 | 城門絕對公尺幾何與聚落錨點轉換 | `world/maps/wilderness_destination.py::settlement_world_position_m`、`gate_approach_distance_m` |
 | 移動前預檢與單一充能入口 | `world/rules/travel_cost.py::preflight_movement_cost`、`world/rules/movement.py::charge_movement` |
@@ -32,11 +32,11 @@ design §10）。它說明移動耗時如何由作者宣告的物理幾何與地
 - 聚落節點座標本身就是聚落區域座標系中的整數公尺位置（`x` 向東、`y` 向北）；
   `z` 仍是邏輯地圖／圖層鍵，不是海拔。路段長度取兩端公尺座標的歐氏距離（含作者
   宣告的彎道折線全長）。羅盤方位由每條有向道路作者宣告，因為不規則的公尺佈局幾
-  乎不會與軸對齊；由原始座標差推導會把所有主要街道誤判為斜向。`NODE_IDS`、
-  `PROTOTYPES` 與 `ROADS` 必須描述同一組節點，否則 `build_sparse_graph()` 在寫
-  入前拒絕。
-  `NODE_IDS` 使用 `south_gate`、`quay` 等穩定英文識別字；原型的 `key` 則是
-  南門、碼頭埠等中文顯示名稱。節點與道路數量以聚落模組的人工宣告為準。
+  乎不會與軸對齊；由原始座標差推導會把所有主要街道誤判為斜向。聚落文件中的
+  `nodes` 與 `roads` 必須描述同一組節點，否則圖形建構在寫入前拒絕。
+  節點鍵使用 `south_gate`、`quay` 等穩定英文識別字；節點的 `key` 則是
+  南門、碼頭埠等中文顯示名稱。節點與道路數量以
+  `content/maps/settlements/<map_id>.yaml` 的宣告為準。
 - 荒野距離 = 歐氏格距 × 宣告格距（`WILDERNESS_KM_PER_CELL × 1000` 公尺；自
   `rescale-wilderness-geography` 起為每格 1 公里）。斜向不是一格：`(1,1)` 格的
   斜向距離是 `√2 × 格距`。地形取兩端較慢者，因此同一條邊雙向同價。荒野格是否
@@ -124,4 +124,4 @@ uv run --locked openspec validate integrate-fatigue-aware-traversal --strict
 疲勞感知的長途視窗與回滾在 `test_movement_settlement.py` 與 `test_clock.py`；
 隊伍耗時與實際城門／荒野路段秒數由 `test_party_time_settlement.py`、
 `test_party_follow_possession.py`、`world/maps/tests/test_city_movement_cost.py`
-與 `test_altoria_capital.py` 釘值。
+與 `test_altoria_capital.py`／`test_settlement_reload.py` 的機制斷言（路段長度即端點距離、耗時與距離成正比）。
