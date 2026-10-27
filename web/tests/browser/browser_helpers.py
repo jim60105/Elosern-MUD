@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import time
+from typing import Any, Callable
 
 from playwright.sync_api import Error, Page
 
@@ -169,6 +170,147 @@ def sent_action_count(page: Page, action_id: str | None = None) -> int:
         if action_id is None or args[0].get("action_id") == action_id:
             count += 1
     return count
+
+
+def install_result_recorder(page: Page) -> None:
+    """Record every committed action result in ``window.__elosernResults``.
+
+    ``lastActionResult`` holds only the newest committed result, and a
+    conversation's reading acknowledgement commits one of its own, so a
+    journey that waits for "the next result" can observe another action's
+    answer. The recorder subscribes to the store's publications and keeps each
+    distinct result by request id, which is what correlates an answer with the
+    envelope that asked for it. Re-call after navigation; the flag lives on the
+    page.
+    """
+    page.evaluate(
+        """() => {
+      window.__elosernResults = window.__elosernResults || [];
+      if (window.__elosernResultRecorder) { return; }
+      window.__elosernResultRecorder = true;
+      window.__elosernBridge.store.subscribe((state) => {
+        const result = state && state.lastActionResult;
+        if (!result || !result.requestId) { return; }
+        const seen = window.__elosernResults;
+        const last = seen[seen.length - 1];
+        if (last && last.requestId === result.requestId) { return; }
+        seen.push(result);
+      });
+    }"""
+    )
+
+
+def wait_for_submit_ready(page: Page, timeout: int = 30000) -> None:
+    """Wait until a fresh submit can actually be dispatched and admitted.
+
+    The client sends nothing while an earlier request is in flight, while the
+    mutation lock is held, or before the first snapshot commits; and a submit
+    naming a revision older than the committed one is refused as ``stale``
+    before any adapter runs. So the previous action's own publication revision
+    must already be committed (``presentationRevision``), nothing may be in
+    flight, no repair episode may be open, and the transport must be active.
+    """
+
+    def _ready(state: dict) -> bool:
+        if not state.get("connected") or state.get("mutationsLocked"):
+            return False
+        if state.get("phase") != "active":
+            return False
+        if (state.get("recovery") or {}).get("status") not in (None, "idle"):
+            return False
+        dispatch = state.get("dispatch") or {}
+        if dispatch.get("inFlight") is not None or dispatch.get("uncertain"):
+            return False
+        target = (state.get("lastActionResult") or {}).get("presentationRevision")
+        if target is None:
+            return True
+        return int(state.get("revision") or 0) >= int(target)
+
+    wait_for_store_state(page, _ready, timeout=timeout)
+
+
+def _wait_for_dispatched(
+    page: Page, action_id: str, expected: int, timeout: int
+) -> str:
+    """Return the request id of the activation's own envelope.
+
+    ``expected`` is cumulative for the whole retry episode, so an envelope the
+    control sent without an activation (a delayed duplicate, an automatic
+    resend) makes the next observation overshoot and fails instead of hiding in
+    a fresh per-attempt baseline.
+    """
+    deadline = time.monotonic() + timeout / 1000
+    while time.monotonic() < deadline:
+        matching = [
+            args[0]
+            for cmdname, args, _kwargs in outbound_messages(page)
+            if cmdname == "ui_action"
+            and args
+            and args[0].get("action_id") == action_id
+        ]
+        if len(matching) > expected:
+            raise AssertionError(
+                "one activation must dispatch %r exactly once (%d envelopes sent)"
+                % (action_id, len(matching))
+            )
+        if len(matching) == expected:
+            return str(matching[-1].get("request_id"))
+        page.wait_for_timeout(25)
+    raise AssertionError(
+        "no %r envelope was sent for the activation within %dms" % (action_id, timeout)
+    )
+
+
+def _wait_for_recorded_result(page: Page, request_id: str, timeout: int) -> dict:
+    """Return the recorded result whose request id matches the envelope."""
+    deadline = time.monotonic() + timeout / 1000
+    while time.monotonic() < deadline:
+        for result in page.evaluate("window.__elosernResults || []"):
+            if result.get("requestId") == request_id:
+                return result
+        page.wait_for_timeout(25)
+    raise AssertionError(
+        "no result was recorded for request %r within %dms" % (request_id, timeout)
+    )
+
+
+def submit_until_admitted(
+    page: Page,
+    activate: Callable[[], None],
+    *,
+    action_id: str,
+    attempts: int = 3,
+    timeout: int = 30000,
+) -> dict[str, Any]:
+    """Activate one control, repeating it only while the server answers stale.
+
+    The dispatcher admits a ``ui_action`` against the newest committed revision
+    exactly, and an asynchronous publication — the action-options generation, an
+    art delivery, a worker settlement — can advance that revision after the
+    activation read it and before the server admits it. The server then answers
+    ``stale`` without applying anything and the client asks the player to
+    operate again, so a journey repeats the same activation, bounded, instead
+    of depending on a quiet window. Every other outcome returns immediately.
+
+    Each activation must dispatch ``action_id`` exactly once, counted over the
+    whole episode; and the answer is correlated by the activation's own request
+    id, so an unrelated result (a reading acknowledgement) can never stand in
+    for this one.
+    """
+    install_result_recorder(page)
+    dispatched = sent_action_count(page, action_id)
+    for attempt in range(1, attempts + 1):
+        wait_for_submit_ready(page, timeout=timeout)
+        dispatched += 1
+        activate()
+        request_id = _wait_for_dispatched(page, action_id, dispatched, timeout)
+        result = _wait_for_recorded_result(page, request_id, timeout)
+        if result.get("outcome") != "stale":
+            return result
+    raise AssertionError(
+        "%d consecutive %r activations were all answered stale"
+        % (attempts, action_id)
+    )
 
 
 def login_and_open(

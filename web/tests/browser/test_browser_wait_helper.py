@@ -16,7 +16,7 @@ import unittest
 from playwright.sync_api import Error
 from tools.spec_traceability import covers_requirement
 
-from .browser_helpers import wait_for_store_state
+from .browser_helpers import submit_until_admitted, wait_for_store_state
 
 _REQUIREMENT_ID = "webclient-browser-verification::browser-test-waits-gate-on-deterministic-state-within-a-bounded-deadline"
 
@@ -194,6 +194,146 @@ class WaitForStoreStateTest(unittest.TestCase):
             wait_for_store_state(page, lambda s: True, dom_readiness=dom, timeout=300)
         message = str(ctx.exception)
         self.assertIn("DOM predicate evaluate error", message)
+
+
+class _ScriptedSubmitPage:
+    """Scripted page for ``submit_until_admitted``'s three reads.
+
+    ``evaluate`` serves the outbound envelope list, the recorded results and the
+    committed store view (as JSON, like the real bridge read). Activation itself
+    is the test's own callable, so each case decides how many envelopes one
+    activation sends and what the server answers.
+    """
+
+    def __init__(self) -> None:
+        self.sent: list[list] = []
+        self.results: list[dict] = []
+        self.state: dict = {
+            "connected": True,
+            "phase": "active",
+            "mutationsLocked": False,
+            "revision": 9,
+            "recovery": {"status": "idle"},
+            "dispatch": {"inFlight": None, "uncertain": False},
+            "lastActionResult": {"requestId": "session:0", "presentationRevision": 9},
+        }
+
+    def evaluate(self, expression: str, arg=None):
+        if "window.__elosernSent" in expression:
+            return self.sent
+        if "window.__elosernResults" in expression:
+            return list(self.results)
+        if "__elosernBridge" in expression:
+            return json.dumps(self.state)
+        return None
+
+    def wait_for_timeout(self, ms: int) -> None:
+        time.sleep(min(ms, 5) / 1000)
+
+
+def _scripted_activation(page: _ScriptedSubmitPage, outcomes: list[str], *, per_activation: int = 1):
+    """Return an ``activate`` callable answering ``outcomes`` in order."""
+    calls = {"n": 0}
+
+    def activate() -> None:
+        calls["n"] += 1
+        outcome = outcomes[calls["n"] - 1]
+        for index in range(per_activation):
+            request_id = "session:%d:%d" % (calls["n"], index)
+            page.sent.append(
+                [
+                    "ui_action",
+                    [{"action_id": "explore.dialogue_leave", "request_id": request_id}],
+                    {},
+                ]
+            )
+            page.results.append(
+                {
+                    "protocolVersion": 1,
+                    "requestId": request_id,
+                    "outcome": outcome,
+                    "code": outcome,
+                    "presentationRevision": 9,
+                }
+            )
+
+    return activate
+
+
+class SubmitUntilAdmittedTest(unittest.TestCase):
+    """Unit tests for the bounded stale re-activation submit helper."""
+
+    def test_stale_activation_is_repeated_once_and_admitted(self) -> None:
+        page = _ScriptedSubmitPage()
+        activate = _scripted_activation(page, ["stale", "success"])
+        result = submit_until_admitted(
+            page, activate, action_id="explore.dialogue_leave", timeout=1000
+        )
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(len(page.sent), 2, "the stale activation was repeated once")
+
+    def test_three_consecutive_stale_answers_fail_the_journey(self) -> None:
+        page = _ScriptedSubmitPage()
+        activate = _scripted_activation(page, ["stale", "stale", "stale"])
+        with self.assertRaises(AssertionError) as ctx:
+            submit_until_admitted(
+                page, activate, action_id="explore.dialogue_leave", timeout=1000
+            )
+        self.assertIn("all answered stale", str(ctx.exception))
+        self.assertEqual(len(page.sent), 3, "the retry is bounded to three activations")
+
+    def test_an_unrelated_result_never_stands_in_for_the_activation(self) -> None:
+        page = _ScriptedSubmitPage()
+        # A reading acknowledgement commits its own result while the leave is in
+        # flight; the newest committed result is then not the leave's answer.
+        page.results.append(
+            {"requestId": "reading:1", "outcome": "stale", "presentationRevision": 9}
+        )
+
+        def activate() -> None:
+            page.sent.append(
+                [
+                    "ui_action",
+                    [
+                        {
+                            "action_id": "explore.dialogue_leave",
+                            "request_id": "session:1",
+                        }
+                    ],
+                    {},
+                ]
+            )
+            page.results.append(
+                {
+                    "requestId": "session:1",
+                    "outcome": "success",
+                    "presentationRevision": 9,
+                }
+            )
+
+        result = submit_until_admitted(
+            page, activate, action_id="explore.dialogue_leave", timeout=1000
+        )
+        self.assertEqual(result["requestId"], "session:1")
+        self.assertEqual(len(page.sent), 1)
+
+    def test_one_activation_that_dispatches_twice_fails(self) -> None:
+        page = _ScriptedSubmitPage()
+        activate = _scripted_activation(page, ["success", "success"], per_activation=2)
+        with self.assertRaises(AssertionError) as ctx:
+            submit_until_admitted(
+                page, activate, action_id="explore.dialogue_leave", timeout=1000
+            )
+        self.assertIn("exactly once", str(ctx.exception))
+
+    def test_a_domain_rejection_returns_without_reactivation(self) -> None:
+        page = _ScriptedSubmitPage()
+        activate = _scripted_activation(page, ["refused"])
+        result = submit_until_admitted(
+            page, activate, action_id="explore.dialogue_leave", timeout=1000
+        )
+        self.assertEqual(result["outcome"], "refused")
+        self.assertEqual(len(page.sent), 1, "only stale answers are retried")
 
 
 if __name__ == "__main__":
