@@ -135,30 +135,57 @@ def require_service_target(
     return npc, _admit(actor, npc, component_class)
 
 
-def require_service_provider(actor: Any, npc_id: Any) -> Any:
-    """Return the exact selected NPC when it carries any supported surface.
+def admitted_service_components(actor: Any, npc: Any) -> dict[type, Any]:
+    """Return every capability on ``npc`` that this actor may use right now.
 
-    The read path's identity admission: it proves the selected NPC is real,
-    visible, co-present and authorised for at least one service surface, and
-    leaves each surface's own gates to the read model.
+    One selected NPC can carry several capabilities with different outcomes:
+    a functioning reception beside a merchant whose binding is broken. Each
+    capability answers for itself through the same gate and schedule check a
+    targeted flow applies, so an admitted capability never authorizes the
+    presentation of another one.
     """
-    npc = visible_room_entity(actor, npc_id)
-    if npc is None:
-        raise ServiceTargetError(ServiceTargetReason.UNKNOWN_TARGET)
-    reasons: list[ServiceTargetReason] = []
+    admitted: dict[type, Any] = {}
     for component_class in SERVICE_COMPONENT_CLASSES:
         component = _service_component(npc, component_class)
         if component is None:
             continue
+        if not service_available(actor, npc, component).allowed:
+            continue
+        if interaction_reason(npc, _SCHEDULE_KINDS[component_class.name]) is not None:
+            continue
+        admitted[component_class] = component
+    return admitted
+
+
+def require_service_provider(actor: Any, npc_id: Any) -> Any:
+    """Return the exact selected NPC when it carries any supported surface.
+
+    The read path's identity admission: it proves the selected NPC is real,
+    visible, co-present and authorised for at least one service surface. The
+    read model then admits each surface on its own, so a capability the actor
+    may not use never ships its section.
+    """
+    npc = visible_room_entity(actor, npc_id)
+    if npc is None:
+        raise ServiceTargetError(ServiceTargetReason.UNKNOWN_TARGET)
+    carried = [
+        component_class
+        for component_class in SERVICE_COMPONENT_CLASSES
+        if _service_component(npc, component_class) is not None
+    ]
+    if not carried:
+        raise ServiceTargetError(ServiceTargetReason.WRONG_CAPABILITY)
+    if admitted_service_components(actor, npc):
+        return npc
+    reasons: list[ServiceTargetReason] = []
+    for component_class in carried:
+        component = _service_component(npc, component_class)
         verdict = service_available(actor, npc, component)
         if verdict.allowed:
-            return npc
+            # The gate admits it; only the schedule refused.
+            raise ServiceTargetError(ServiceTargetReason.SCHEDULE_BLOCKED)
         reasons.append(_verdict_reason(verdict.reason))
-    if reasons:
-        # Every carried capability refused: the first refusal is stable and
-        # independent of declaration order for one-capability providers.
-        raise ServiceTargetError(reasons[0])
-    raise ServiceTargetError(ServiceTargetReason.WRONG_CAPABILITY)
+    raise ServiceTargetError(reasons[0])
 
 
 def require_service_mutation(
@@ -186,6 +213,7 @@ __all__ = [
     "SERVICE_COMPONENT_CLASSES",
     "ServiceTargetError",
     "ServiceTargetReason",
+    "admitted_service_components",
     "require_service_mutation",
     "require_service_provider",
     "require_service_target",

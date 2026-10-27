@@ -901,14 +901,6 @@ def _sellable_rows(
     return tuple(rows)
 
 
-def _carries(npc: Any, component_class: type) -> Any | None:
-    """Return ``npc``'s component of the class, or ``None``."""
-    components = getattr(npc, "components", None)
-    if components is None or not components.has(component_class.name):
-        return None
-    return components.get(component_class.get_component_slot())
-
-
 def build_services_view(
     actor: Any, viewed: Any = None, *, provider_id: int | None = None
 ) -> ServicesView:
@@ -918,12 +910,13 @@ def build_services_view(
     it through ``resolve_viewed_member``); ``None`` means the commander. It
     chooses only whose facts the shop rows present and never authorizes.
 
-    ``provider_id`` selects one exact NPC: only that NPC's capabilities become
-    the guild, rank and shop sections, and no other room provider contributes
-    (a capability the selected NPC lacks stays null). It never supplies
-    authority — mutations carry their own exact ``npc_id`` — and no room
-    provider is ever substituted. Without it the room's single provider per
-    class is discovered as before.
+    ``provider_id`` selects one exact NPC: only that NPC's *admitted*
+    capabilities become the guild, rank and shop sections, and no other room
+    provider contributes (a capability the selected NPC lacks, or one whose
+    own binding, anchor or schedule refuses this actor, stays null). It never
+    supplies authority — mutations carry their own exact ``npc_id`` — and no
+    room provider is ever substituted. Without it the room's single provider
+    per class is discovered as before.
 
     A missing world-clock singleton or an unreadable player summary raises
     ``ServicesViewError`` so the caller can choose the whole-panel unavailable
@@ -956,7 +949,10 @@ def build_services_view(
     targeted = provider_id is not None
     provider = None
     if targeted:
-        from world.rules.service_targets import require_service_provider
+        from world.rules.service_targets import (
+            admitted_service_components,
+            require_service_provider,
+        )
 
         # Identity admission runs for every targeted read, combat included: an
         # unusable selection is rejected, never silently read as an empty
@@ -968,14 +964,16 @@ def build_services_view(
         shop, shop_reason = None, None
         host = None
     elif targeted:
-        # The section builders take the host object and read its own
-        # component, so a targeted read hands them the selected NPC or
-        # nothing — never a neighbouring host.
-        staff = provider if _carries(provider, GuildStaff) is not None else None
-        reception = (
-            provider if _carries(provider, GuildExamReception) is not None else None
-        )
-        merchant = provider if _carries(provider, Merchant) is not None else None
+        # Each capability answers for itself: one whose binding, anchor or
+        # schedule refuses this actor ships no section, so an admitted
+        # capability can never present or enable another one's rows. The
+        # section builders take the host object and read its own component, so
+        # a targeted read hands them the selected NPC or nothing — never a
+        # neighbouring host.
+        admitted = admitted_service_components(actor, provider)
+        staff = provider if GuildStaff in admitted else None
+        reception = provider if GuildExamReception in admitted else None
+        merchant = provider if Merchant in admitted else None
         host = _build_host(provider, None)
         if owner is not None:
             guild, guild_reason = None, None

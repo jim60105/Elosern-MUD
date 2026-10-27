@@ -1567,6 +1567,42 @@ class TargetedSubmissionTests(ServiceActionBase):
     @covers_requirement(
         "webclient-service-menus::service-actions-reject-stale-duplicate-and-tampered-input-without-mutation"
     )
+    def test_an_explicit_merchant_receives_the_trade_of_two_present_keepers(self):
+        self.player.location = self.store
+        second = create_object(NPC, key="second keeper", location=self.store)
+        second_component = Merchant.create(
+            second, service_id="store_two", shop_key=T_SHOP
+        )
+        second_component.service_binding = "place"
+        second_component.anchor_room_id = self.store.pk
+        second.components.add(second_component)
+        second_component.merchant_stock = {_T_MEAL: 7, _T_POTION: 3, _T_SWORD: 1}
+        first_before = dict(self.merchant.merchant_stock)
+        second_before = dict(second_component.merchant_stock)
+        self.player.db.wallet = 1000
+        result = _buy_adapter(
+            self.player,
+            {
+                "item_key": _T_MEAL,
+                "quantity": 2,
+                "recipient_id": int(self.player.pk),
+                "npc_id": int(second.pk),
+            },
+        )
+        self.assertEqual(result["outcome"], "success")
+        # Only the named keeper's shelf moved; the other one still holds its
+        # whole stock and the purse paid one merchant's price once.
+        self.assertEqual(dict(self.merchant.merchant_stock), first_before)
+        self.assertEqual(
+            second_component.merchant_stock[_T_MEAL],
+            second_before[_T_MEAL] - 2,
+        )
+        floor, _ceiling = price_band(_T_MEAL)
+        self.assertEqual(int(self.player.db.wallet), 1000 - 2 * (floor + 2))
+
+    @covers_requirement(
+        "webclient-service-menus::service-actions-reject-stale-duplicate-and-tampered-input-without-mutation"
+    )
     def test_a_tampered_member_reference_is_refused_without_a_substitute(self):
         self.player.location = self.store
         outsider = create_object(PlayerCharacter, key="outsider buyer")

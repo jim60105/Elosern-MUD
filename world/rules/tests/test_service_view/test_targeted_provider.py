@@ -179,3 +179,78 @@ class TargetedReadTests(ServiceRegistryIsolation):
         self.assertEqual(
             [row.quest_id for row in view.guild.quests], [f"{BOARD_QUEST}:1"]
         )
+
+    def test_each_selected_capability_passes_its_own_gate(self):
+        # One provider carrying a working reception and a malformed merchant
+        # binding: the admitted rank surface ships and the shop does not.
+        reception_component = exam_reception()
+        merchant_component = merchant(service_binding=None)
+        provider = FakeHost(
+            "mixed provider",
+            _MERCHANT,
+            reception_component,
+            merchant_component,
+            location=None,
+        )
+        player = actor(
+            location=FakeRoom(provider),
+            registration=registration(),
+            guild_rank="F",
+            merit=50,
+        )
+        view = _build(player, provider.pk)
+        self.assertIsNone(view.guild)
+        self.assertIsNotNone(view.rank)
+        self.assertEqual(view.rank.provider_id, int(provider.pk))
+        self.assertIsNone(view.shop)
+        self.assertEqual((view.pagination.stock_total, view.pagination.sellable_total), (0, 0))
+
+    def test_a_provider_without_an_admitted_capability_is_refused(self):
+        from world.rules.service_targets import ServiceTargetError, ServiceTargetReason
+
+        malformed = FakeHost(
+            "malformed keeper", _MERCHANT, merchant(service_binding=None), location=None
+        )
+        busy = FakeHost("busy keeper", _SECOND_STAFF, merchant(), location=None)
+        busy.db = SimpleNamespace(schedule_state="resting")
+        room = FakeRoom(malformed, busy)
+        player = actor(location=room)
+        with self.assertRaises(ServiceTargetError) as caught:
+            _build(player, malformed.pk)
+        self.assertEqual(caught.exception.args[0], ServiceTargetReason.MALFORMED_BINDING)
+        with self.assertRaises(ServiceTargetError) as caught:
+            _build(player, busy.pk)
+        self.assertEqual(caught.exception.args[0], ServiceTargetReason.SCHEDULE_BLOCKED)
+
+    def test_untargeted_discovery_rejects_two_counters(self):
+        first = FakeHost("counter one", _RECEPTION, exam_reception(), location=None)
+        second = FakeHost("counter two", _SECOND_STAFF, exam_reception(), location=None)
+        player = actor(
+            location=FakeRoom(first, second),
+            registration=registration(),
+            guild_rank="F",
+            merit=50,
+        )
+        view = _build(player)
+        self.assertIsNone(view.rank)
+        self.assertIsNone(view.guild)
+
+    def test_combat_nulls_every_targeted_surface(self):
+        room, _first, _second, counter, keeper = self._guild_room()
+        player = actor(location=room, registration=registration(), guild_rank="F", merit=50)
+        with patch("world.rules.combat_session.is_in_active_session", return_value=True):
+            view = _build(player, keeper.pk)
+        self.assertIsNone(view.host)
+        self.assertIsNone(view.guild)
+        self.assertIsNone(view.rank)
+        self.assertIsNone(view.shop)
+        self.assertEqual(
+            (
+                view.pagination.board_total,
+                view.pagination.quest_total,
+                view.pagination.stock_total,
+                view.pagination.sellable_total,
+            ),
+            (0, 0, 0, 0),
+        )
+        self.assertEqual(view.player.wallet, player.db.wallet)
