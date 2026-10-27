@@ -156,7 +156,7 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
         "context": "公會（需在所屬分部的公會櫃台前，且已註冊為冒險者）",
     },
     "church join": {
-        "syntax": "church join",
+        "syntax": "church join <npc>",
         "context": "教會（需當地教會神職人員）",
     },
     "church pray": {
@@ -531,8 +531,16 @@ class CommandDocsContractTests(unittest.TestCase):
         )
         self.assertIn("教會", entry["說明"])
         self.assertIn("已入教者會被拒絕", entry["說明"])
+        # The explicit selected provider is documented, and the input accepts
+        # the exact local name/alias or the browser route's ``#<id>`` form.
+        self.assertIn("<npc>", entry["說明"])
+        self.assertIn("#<編號>", entry["說明"])
         overview = parse_overview_links(self.overview)
         self.assertEqual(overview["church join"], "church-join")
+        self.assertIn(
+            "church join <npc>",
+            self.overview,
+        )
 
     @covers_requirement(
         "church-ordination::the-church-pray-and-offer-commands-are-documented-in-the-docs-trio"
