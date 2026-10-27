@@ -5,7 +5,7 @@ from tools.spec_traceability import covers_requirement
 
 import unittest
 
-from world.lore.anchors import ANCHOR_REGISTRY, AnchorKind
+from world.lore.anchors import AnchorKind, anchors
 from world.lore.nations import (
     CAPITAL_POPULATION_SHARE,
     CAPITAL_SUPPORT_REGISTRY,
@@ -17,13 +17,18 @@ from world.lore.nations import (
     NATION_REGISTRY,
     SupplyBasis,
 )
+from world.tests.geography_fixture import publish_shipped_geography
+
+
+def setUpModule():
+    publish_shipped_geography()
 
 
 class NationRegistryTests(unittest.TestCase):
     def test_three_nations_and_capitals(self):
         self.assertEqual(set(NATION_REGISTRY), {"grandia", "altoria", "valhalla"})
         for nation in NATION_REGISTRY.values():
-            anchor = ANCHOR_REGISTRY[nation.capital_anchor_key]
+            anchor = anchors()[nation.capital_anchor_key]
             self.assertEqual(anchor.kind, AnchorKind.CAPITAL)
             self.assertEqual(anchor.nation_key, nation.key)
 
@@ -75,7 +80,7 @@ class NationRegistryTests(unittest.TestCase):
     def test_capitals_hold_six_percent_with_authored_regional_support(self):
         capitals = {
             key: anchor
-            for key, anchor in ANCHOR_REGISTRY.items()
+            for key, anchor in anchors().items()
             if anchor.kind == AnchorKind.CAPITAL
         }
         self.assertEqual(
@@ -117,7 +122,7 @@ class NationRegistryTests(unittest.TestCase):
     def test_elven_population_is_the_three_village_rounded_total(self):
         elven = [
             anchor
-            for anchor in ANCHOR_REGISTRY.values()
+            for anchor in anchors().values()
             if anchor.kind == AnchorKind.ELVEN_VILLAGE
         ]
         self.assertEqual(len(elven), 3)

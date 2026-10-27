@@ -19,6 +19,10 @@ from __future__ import annotations
 
 import importlib
 
+from world.tests.geography_fixture import publish_shipped_geography
+
+publish_shipped_geography()
+
 from world.quests.definitions import KNOWN_GRID_MAP_KEYS
 
 
@@ -48,7 +52,9 @@ def live_nation_registry():
 
 
 def live_region_registry():
-    return live_registry("world.lore.wilderness_regions", "WILDERNESS_REGION" + "_REGISTRY")
+    from world.lore.wilderness_regions import regions
+
+    return regions()
 
 
 def live_monster_tier_registry():
@@ -64,7 +70,9 @@ def live_magic_tier_registry():
 
 
 def live_anchor_registry():
-    return live_registry("world.lore.anchors", "ANCHOR" + "_REGISTRY")
+    from world.lore.anchors import anchors
+
+    return anchors()
 
 
 def live_guild_rank_registry():

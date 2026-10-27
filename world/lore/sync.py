@@ -158,6 +158,12 @@ def sync_all() -> None:
     :func:`sync_monster_placement` for the same reason.
     """
 
+    # This is a world composition root: establish the geography before any
+    # map-facing consumer or mirror reads it (startup publishes it first; a
+    # direct call must not observe an empty world).
+    from world.maps.geography import ensure_published
+
+    ensure_published()
     # Every authored static map target resolves against one current binding
     # snapshot before the first mirrored Script is created or updated
     # (all-or-nothing import convention). This also covers a direct

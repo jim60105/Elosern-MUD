@@ -43,7 +43,7 @@ from world.lore.monster_placement import (
     variant_species_key,
 )
 from world.lore.monsters import MONSTER_TIER_REGISTRY
-from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+from world.lore import wilderness_entry as _wilderness_entry_module
 from world.rules.monster_individual import construct_species_individual
 from world.maps.wilderness_provider import region_for_coordinates
 from world.lore.monster_visuals import BASELINE_VISUAL_ROWS
@@ -55,9 +55,22 @@ from world.lore.monster_visuals import BASELINE_VISUAL_ROWS
 # a footprint cell the provider refuses, and the capital's second gate is the
 # 東門 since altoria-capital-replan, so the hunting band centers here; the
 # introductory hunt stays reliably completable straight outside the East Gate.
-# Read by both the model (band membership) and the tests.
-_capital_entry = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
-CAPITAL_ENTRY_XY = _capital_entry.approach_cell(_capital_entry.gate_for("w"))
+# Read by both the model (band membership) and the tests. The gate approach
+# cell needs the published frame bounds, so it is resolved on first use
+# (``CAPITAL_ENTRY_XY`` stays the module attribute consumers read) instead of
+# deriving map state at import.
+def capital_entry_xy() -> tuple[int, int]:
+    """The hunting-band centre: the capital's east-gate approach cell."""
+
+    entry = _wilderness_entry_module.WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
+    return entry.approach_cell(entry.gate_for("w"))
+
+
+def __getattr__(name: str):
+    if name == "CAPITAL_ENTRY_XY":
+        return capital_entry_xy()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 # D-2: immutable region tables, covering every key of WILDERNESS_REGION_REGISTRY.
 # MappingProxyType enforces the spec's "immutable mapping" contract at runtime,
@@ -112,7 +125,7 @@ def _coordinate_hash(x: int, y: int) -> int:
 
 def _in_hunting_band(x: int, y: int) -> bool:
     """Return whether ``(x, y)`` is within Chebyshev distance 3 of the entry."""
-    entry_x, entry_y = CAPITAL_ENTRY_XY
+    entry_x, entry_y = capital_entry_xy()
     return max(abs(x - entry_x), abs(y - entry_y)) <= _HUNTING_BAND_DISTANCE
 
 

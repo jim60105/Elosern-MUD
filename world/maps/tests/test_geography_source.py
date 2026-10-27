@@ -9,11 +9,13 @@ from __future__ import annotations
 
 import copy
 import unittest
+from dataclasses import FrozenInstanceError
 from types import MappingProxyType
 
 from evennia.objects.models import ObjectDB
+from evennia.utils.test_resources import EvenniaTest
 
-from elosern_map_core.codec import document_from_data, parse_document
+from elosern_map_core.codec import document_from_data
 from elosern_map_core.terrain import region_for_coordinates as core_region_for
 
 import world.maps.geography as geography
@@ -42,9 +44,10 @@ def _continent_variant(**terrain_overrides):
     return document_from_data(geography.CONTINENT_PATH, data)
 
 
-class ShippedGeographyPublicationTests(unittest.TestCase):
+class ShippedGeographyPublicationTests(EvenniaTest):
     @classmethod
     def setUpClass(cls):
+        super().setUpClass()
         if not geography.is_published():
             geography.publish(geography.load_geography())
 
@@ -57,7 +60,7 @@ class ShippedGeographyPublicationTests(unittest.TestCase):
     def test_the_published_views_are_immutable(self):
         with self.assertRaises(TypeError):
             regions()["eastern_plains"] = regions()["central_mountains"]
-        with self.assertRaises(TypeError):
+        with self.assertRaises(FrozenInstanceError):
             anchors()["capital_altoria"].display_name_zh = "changed"
         self.assertIsInstance(geography.current().terrain.region_search_boxes, MappingProxyType)
 
@@ -200,22 +203,15 @@ class SnapshotIsolationTests(unittest.TestCase):
         finally:
             wilderness_reachability.walkable_components = original
 
-    def test_parse_rejects_a_document_without_a_classifier_region(self):
+    def test_candidate_without_a_classifier_region_is_rejected(self):
         data = _plain(self._shipped.continent.data)
         data["regions"].pop("central_mountains")
-        with self.assertRaises(Exception):
-            parse_document(geography.CONTINENT_PATH, _yaml_text(data))
-
-
-def _yaml_text(data) -> str:
-    from io import StringIO
-
-    from ruamel.yaml import YAML
-
-    dumper = YAML(typ="rt", pure=True)
-    output = StringIO()
-    dumper.dump(data, output)
-    return output.getvalue()
+        candidate = document_from_data(geography.CONTINENT_PATH, data)
+        with self.assertRaises(geography.GeographyError) as captured:
+            geography.build_geography(
+                candidate, self._locations, fingerprints=self._fingerprints
+            )
+        self.assertIn("central_mountains", str(captured.exception))
 
 
 if __name__ == "__main__":

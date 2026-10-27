@@ -929,8 +929,9 @@ class UpkeepDefeatPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
 # ---------------------------------------------------------------------------
 def _live_region_keys() -> tuple[str, ...]:
     """The live terrain region keys, in registry order (no literal here)."""
-    module = importlib.import_module(".".join(("world", "lore", "wilderness_regions")))
-    return tuple(getattr(module, "WILDERNESS_REGION" + "_REGISTRY"))
+    from world.lore.wilderness_regions import regions
+
+    return tuple(regions())
 
 
 _HUNT_SPECIES = next(iter(SYNTH_MONSTER_SPECIES))
@@ -945,6 +946,9 @@ _HUNT_ORDINARY = next(
 _HUNT_STRONGER = next(
     key for key in _HUNT_VARIANTS if not SYNTH_MONSTER_VARIANTS[key].ordinary_variant
 )
+from world.tests.geography_fixture import publish_shipped_geography
+
+publish_shipped_geography()
 _HUNT_REGION, _OTHER_REGION = _live_region_keys()[:2]
 _HUNT_RATIONALE = "合成評價理由：合成強勢型護巢時會成群衝撞，落單者風險極高。"
 _HUNT_FLAVOR = "合成背景：合成村落的糧倉連年受擾，合成獵人因此發出委託。"

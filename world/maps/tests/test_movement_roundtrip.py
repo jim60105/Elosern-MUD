@@ -13,6 +13,11 @@ from world.maps.limbo import LIMBO_KEY
 from world.maps.static_references import settlement_node_xyz
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.clock import CLOCK_YAML, get_world_clock
+from world.tests.geography_fixture import publish_shipped_geography
+
+
+publish_shipped_geography()
+
 
 MOVE = CLOCK_YAML["command_defaults"]["move"]
 

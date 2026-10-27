@@ -895,6 +895,9 @@ def sync_grid() -> SyncReport:
     room is missing warns and is skipped; other rows still converge.
     """
 
+    from world.maps.geography import ensure_published
+
+    ensure_published()
     validate_static_references()
 
     graphs = tuple(SETTLEMENT_GRAPHS.values())
@@ -1068,6 +1071,9 @@ def sync_wilderness() -> None:
     refresh pass.
     """
 
+    from world.maps.geography import ensure_published
+
+    ensure_published()
     validate_static_references()
 
     create_wilderness(name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider())

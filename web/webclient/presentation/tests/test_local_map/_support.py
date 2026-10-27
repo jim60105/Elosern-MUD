@@ -5,6 +5,13 @@ import unittest
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.local_map import LEGEND_LABELS
 from world.maps.bootstrap import sync_grid, sync_wilderness
+from world.tests.geography_fixture import publish_shipped_geography
+
+
+# The map presenters read the published continental geography; the whole
+# local-map test package shares one shipped publication, exactly as startup
+# publishes it.
+publish_shipped_geography()
 
 
 def _live(module: str, attribute: str):
@@ -121,7 +128,9 @@ def _t_wild_id(x: int, y: int) -> str:
 
 def _t_anchor_display(anchor_key: str) -> str:
     """The anchor registry's display name, probed at runtime."""
-    return _live("world.lore.anchors", "ANCHOR" + "_REGISTRY")[anchor_key].display_name_zh
+    from world.lore.anchors import anchors
+
+    return anchors()[anchor_key].display_name_zh
 
 
 def _t_region_display_for(x: int, y: int) -> str:
@@ -129,10 +138,9 @@ def _t_region_display_for(x: int, y: int) -> str:
     of the presenter's own labelling helper (probe + coordinate resolver)."""
     from world.maps.wilderness_provider import region_for_coordinates
 
-    regions = _live(
-        "world.lore.wilderness_regions", "WILDERNESS" + "_REGION_REGISTRY"
-    )
-    return regions[region_for_coordinates(x, y)].display_name_zh
+    from world.lore.wilderness_regions import regions
+
+    return regions()[region_for_coordinates(x, y)].display_name_zh
 
 
 def _context(actor):

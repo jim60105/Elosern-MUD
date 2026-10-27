@@ -16,6 +16,11 @@ from world.maps.wilderness_provider import (
     terrain_description,
 )
 from world.rules.clock import get_world_clock
+from world.tests.geography_fixture import publish_shipped_geography
+
+
+publish_shipped_geography()
+
 
 
 #: Live-catalog resolvers read the region registry through an attribute string
@@ -24,10 +29,9 @@ from world.rules.clock import get_world_clock
 def live_region_registry():
     import importlib
 
-    return getattr(
-        importlib.import_module(".".join(("world", "lore", "wilderness_regions"))),
-        "WILDERNESS_REGION" + "_REGISTRY",
-    )
+    from world.lore.wilderness_regions import regions
+
+    return regions()
 
 
 def live_gateway_entry():

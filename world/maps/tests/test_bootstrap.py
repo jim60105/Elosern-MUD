@@ -30,6 +30,10 @@ from world.maps.static_references import (
 from elosern_map_core.references import settlement_node_ref
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
+from world.tests.geography_fixture import publish_shipped_geography
+
+
+publish_shipped_geography()
 
 _CAPITAL_ENTRY = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
 SOUTH_GATE_XYZ = settlement_node_xyz(_CAPITAL_ENTRY.gate_for("n").destination)
@@ -796,10 +800,8 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
             enter_wilderness,
         )
 
-        from world.maps.room_art import (
-            REGION_SCENE_ARCHETYPES,
-            wilderness_scene_identity,
-        )
+        from world.maps.room_art import wilderness_scene_identity
+        from world.lore.wilderness_regions import regions
         from world.maps.wilderness_provider import (
             region_for_coordinates,
             terrain_description,
@@ -818,7 +820,7 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         self.assertEqual(room.ndb.active_desc, terrain_description(864, 1080))
         self.assertEqual(
             room.scene_archetype,
-            REGION_SCENE_ARCHETYPES[region_for_coordinates(864, 1080)],
+            regions()[region_for_coordinates(864, 1080)].scene_archetype,
         )
         self.assertEqual(
             room.scene_identity,

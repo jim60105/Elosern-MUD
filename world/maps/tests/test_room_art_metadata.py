@@ -30,17 +30,23 @@ from world.maps.instance import spawn_instance_room
 from world.maps.room_art import (
     GRID_NODE_SCENE_ARCHETYPES,
     PLACE_SCENE_ARCHETYPES,
-    REGION_SCENE_ARCHETYPES,
     grid_scene_identity,
     instance_scene_identity,
     place_scene_identity,
     wilderness_scene_identity,
 )
+from world.lore.wilderness_regions import regions
 from world.maps.wilderness_provider import (
     WILDERNESS_NAME,
     ElosernWildernessMapProvider,
     region_for_coordinates,
 )
+from world.tests.geography_fixture import publish_shipped_geography
+
+
+def setUpModule():
+    publish_shipped_geography()
+
 
 
 def _live_places():
@@ -172,8 +178,8 @@ class PooledWildernessRoomArtTests(EvenniaTest):
         # Same region, distinct coordinates: the archetype is equal while the
         # logical identity must still differ.
         self.assertEqual(
-            REGION_SCENE_ARCHETYPES[region_for_coordinates(*place_a)],
-            REGION_SCENE_ARCHETYPES[region_for_coordinates(*place_b)],
+            regions()[region_for_coordinates(*place_a)].scene_archetype,
+            regions()[region_for_coordinates(*place_b)].scene_archetype,
         )
 
         self.provider.at_prepare_room(place_a, None, room)

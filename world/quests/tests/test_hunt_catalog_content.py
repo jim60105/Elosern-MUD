@@ -63,7 +63,8 @@ from world.lore.monster_species import (
     MONSTER_SPECIES_REGISTRY,
     MONSTER_VARIANT_REGISTRY,
 )
-from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
+from world.lore.wilderness_regions import regions
+from world.tests.geography_fixture import publish_shipped_geography
 from world.quests.catalog import QUEST_CATALOG, register_catalog
 from world.quests.definitions import (
     MAX_DEFINITION_PROSE_LENGTH,
@@ -74,6 +75,11 @@ from world.quests.definitions import (
 )
 from world.quests.tests._fixtures import RegistryIsolationMixin
 from world.rules.guild_config import load_guild_catalog
+
+
+def setUpModule():
+    publish_shipped_geography()
+
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -352,7 +358,7 @@ class RegionalHuntProvisionabilityTests(_ShippedCatalogTestCase):
         # A region with no authored placement could never satisfy a hunt, so the
         # board must not offer one there.
         self.assertNotIn(UNPLACED_REGION_KEY, AMBIENT_PLACEMENT_REGISTRY)
-        self.assertIn(UNPLACED_REGION_KEY, WILDERNESS_REGION_REGISTRY)
+        self.assertIn(UNPLACED_REGION_KEY, regions())
         self.assertNotIn(UNPLACED_REGION_KEY, _hunt_regions())
 
     @covers_requirement(
@@ -559,7 +565,7 @@ class SiteClearOutContentTests(_ShippedCatalogTestCase):
             site = _declared_site(definition)
             species_keys = _placed_species(site)
             with self.subTest(clear_out=key):
-                self.assertIn(site.region_key, WILDERNESS_REGION_REGISTRY)
+                self.assertIn(site.region_key, regions())
                 self.assertTrue(species_keys)
                 for species_key in sorted(species_keys):
                     self.assertIn(

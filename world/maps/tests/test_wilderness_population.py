@@ -26,13 +26,12 @@ from world.lore.sync import sync_all
 from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.maps.static_references import settlement_node_xyz
 from world.maps.wilderness_population import (
-    CAPITAL_ENTRY_XY,
     ensure_population,
     population_for_coordinates,
 )
+from world.maps import wilderness_provider
+from world.tests.geography_fixture import publish_shipped_geography
 from world.maps.wilderness_provider import (
-    WILDERNESS_MAX_X,
-    WILDERNESS_MAX_Y,
     WILDERNESS_NAME,
     ElosernWildernessMapProvider,
     region_for_coordinates,
@@ -44,6 +43,10 @@ from world.quests.tests._fixtures import RegistryIsolationMixin
 from world.rules.combat_session import engage
 from world.rules.guild_economy import sync_guild_economy
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
+
+
+publish_shipped_geography()
+CAPITAL_ENTRY_XY = wilderness_population_module.capital_entry_xy()
 
 #: Live-catalog resolvers read the registries through attribute strings
 #: assembled at call time, so this file never names a shipped catalog symbol
@@ -71,10 +74,9 @@ def live_place_registry():
 
 
 def live_region_registry():
-    return _live_registry(
-        ".".join(("world", "lore", "wilderness_regions")),
-        "WILDERNESS_REGION" + "_REGISTRY",
-    )
+    from world.lore.wilderness_regions import regions
+
+    return regions()
 
 
 def live_anchor_entry():
@@ -109,6 +111,10 @@ ENTRY_POPULATION_KEY = f"wilderness:{ENTRY_XY[0]}:{ENTRY_XY[1]}"
 NEARBY_BAND_XY = (ENTRY_XY[0] + 1, ENTRY_XY[1])
 
 
+def setUpModule():
+    publish_shipped_geography()
+
+
 class TerrainPopulationModelTests(unittest.TestCase):
     @covers_requirement("wilderness-monster-population::population-for-coordinates-is-a-pure-deterministic-function-over-the-bounded-map")
     def test_same_input_returns_same_output(self):
@@ -120,8 +126,8 @@ class TerrainPopulationModelTests(unittest.TestCase):
 
     @covers_requirement("wilderness-monster-population::population-for-coordinates-is-a-pure-deterministic-function-over-the-bounded-map")
     def test_returned_tiers_and_names_are_known(self):
-        for x in (0, 400, 800, 1200, 1600, 2000, 2400, WILDERNESS_MAX_X):
-            for y in (0, 400, 800, 1200, 1600, 2000, 2400, WILDERNESS_MAX_Y):
+        for x in (0, 400, 800, 1200, 1600, 2000, 2400, wilderness_provider.WILDERNESS_MAX_X):
+            for y in (0, 400, 800, 1200, 1600, 2000, 2400, wilderness_provider.WILDERNESS_MAX_Y):
                 population = population_for_coordinates(x, y)
                 if population is None:
                     continue

@@ -19,12 +19,7 @@ import unittest
 from collections import Counter
 
 from tools.spec_traceability import covers_requirement
-from world.lore.anchors import (
-    ANCHOR_GEOGRAPHY_REGISTRY,
-    ANCHOR_REGISTRY,
-    AnchorKind,
-    world_position_m,
-)
+from world.lore.anchors import AnchorKind, anchor_geography, anchors, world_position_m
 from world.lore.map_districts import (
     MAP_DISTRICT_REGISTRY,
     MIN_VORONOI_SPACING_KM,
@@ -40,13 +35,11 @@ from elosern_map_core.geometry import cell_center_m
 from elosern_map_core.references import settlement_node_ref, wilderness_cell_ref
 from elosern_map_core.terrain import ridge_center_x
 
-from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
+from world.lore.wilderness_regions import regions
+from world.maps import geography
+from world.maps import wilderness_provider
 from world.maps.map_data import settlement_graph
 from world.maps.wilderness_provider import (
-    TERRAIN,
-    WATERWAY_FORDS,
-    WILDERNESS_MAX_X,
-    WILDERNESS_MAX_Y,
     border_river_row,
     forest_edge_row,
     is_valid_wilderness_cell,
@@ -55,6 +48,11 @@ from world.maps.wilderness_provider import (
 )
 from world.maps.wilderness_reachability import walkable_components
 from world.rules.map_knowledge import decode_node, encode_grid, encode_wild
+from world.tests.geography_fixture import publish_shipped_geography
+
+
+def setUpModule():
+    publish_shipped_geography()
 
 
 class ShippedDistrictContractTests(unittest.TestCase):
@@ -102,9 +100,11 @@ class ShippedDistrictContractTests(unittest.TestCase):
 
     @covers_requirement("map-districts::every-map-district-has-one-canonical-reachable-landmark")
     def test_deep_forest_is_one_region_district_lit_at_its_heart(self):
-        regions = [d for d in MAP_DISTRICT_REGISTRY.values() if d.kind == "region"]
-        self.assertEqual([d.region_key for d in regions], ["north_deep_forest"])
-        forest = regions[0]
+        region_districts = [
+            d for d in MAP_DISTRICT_REGISTRY.values() if d.kind == "region"
+        ]
+        self.assertEqual([d.region_key for d in region_districts], ["north_deep_forest"])
+        forest = region_districts[0]
         self.assertEqual(forest.landmark.domain, "wilderness_cell")
         self.assertEqual(forest.landmark.cell, (1250, 2420))
         self.assertEqual(
@@ -113,7 +113,7 @@ class ShippedDistrictContractTests(unittest.TestCase):
         )
         # One district covers both nominal claims: no per-nation duplicate.
         self.assertEqual(
-            WILDERNESS_REGION_REGISTRY["north_deep_forest"].nominal_nation_keys,
+            regions()["north_deep_forest"].nominal_nation_keys,
             ("grandia", "valhalla"),
         )
         self.assertEqual(region_for_coordinates(1250, 2420), "north_deep_forest")
@@ -160,7 +160,7 @@ class ShippedDistrictContractTests(unittest.TestCase):
         # A grid landmark and a wilderness cell share the absolute metre frame:
         # Altoria's plaza is the centre of its anchor cell.
         plaza = self.terrain.grid_site("capital_altoria", (3500, 2850))
-        anchor_cell = ANCHOR_GEOGRAPHY_REGISTRY["capital_altoria"].cell
+        anchor_cell = anchor_geography()["capital_altoria"].cell
         self.assertEqual(plaza.position_m, cell_center_m(anchor_cell))
         self.assertEqual(plaza.position_m, world_position_m("capital_altoria", (3500, 2850)))
         self.assertTrue(plaza.reachable)
@@ -202,7 +202,7 @@ class ShippedDistrictContractTests(unittest.TestCase):
         # A cell across the summit ridge away from any pass is valid ground of
         # the same component (joined through the passes), while the ridge wall
         # cell itself belongs to none.
-        wall = (ridge_center_x(TERRAIN, 1200), 1200)
+        wall = (ridge_center_x(geography.current().terrain, 1200), 1200)
         self.assertIsNone(components.component(wall))
         self.assertEqual(
             components.component((wall[0] - 3, 1200)), components.component((wall[0] + 3, 1200))
@@ -289,8 +289,8 @@ class ShippedDistrictContractTests(unittest.TestCase):
         # Elven villages and dungeons appear only after a visit, so no
         # landmark (whose name a lit district shows) sits on their cell.
         hidden = {
-            ANCHOR_GEOGRAPHY_REGISTRY[key].cell
-            for key, anchor in ANCHOR_REGISTRY.items()
+            anchor_geography()[key].cell
+            for key, anchor in anchors().items()
             if anchor.kind in (AnchorKind.ELVEN_VILLAGE, AnchorKind.DUNGEON)
         }
         self.assertTrue(hidden)
@@ -313,10 +313,10 @@ class WalkableComponentContractTests(unittest.TestCase):
         # included) plus every cell around each ford.
         cells = [
             (x, y)
-            for y in range(0, WILDERNESS_MAX_Y + 1, 37)
-            for x in range(0, WILDERNESS_MAX_X + 1, 37)
+            for y in range(0, wilderness_provider.WILDERNESS_MAX_Y + 1, 37)
+            for x in range(0, wilderness_provider.WILDERNESS_MAX_X + 1, 37)
         ]
-        for fords in WATERWAY_FORDS.values():
+        for fords in geography.current().terrain.waterway_fords.values():
             for fx, fy in fords:
                 cells += [(fx + dx, fy + dy) for dx in (-2, -1, 0, 1, 2) for dy in (-2, -1, 0, 1, 2)]
         for cell in cells:

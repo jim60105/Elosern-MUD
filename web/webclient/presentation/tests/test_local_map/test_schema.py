@@ -295,13 +295,11 @@ class LocalMapSchemaTests(unittest.TestCase):
                 )
             ],
         )
-        # Same split for the wilderness frame: the payload envelope already
-        # admits 0..2699; the shipped provider still bounds identity at its
-        # pre-rescale 10 km cell count, and `rescale-wilderness-geography`
-        # owns that provider change.
+        # The wilderness frame bounds identity through the published provider
+        # projection; the envelope admits exactly those coordinates.
         with (
-            patch("world.rules.map_knowledge.WILDERNESS_MAX_X", 2699),
-            patch("world.rules.map_knowledge.WILDERNESS_MAX_Y", 2699),
+            patch("world.maps.wilderness_provider.WILDERNESS_MAX_X", 2699),
+            patch("world.maps.wilderness_provider.WILDERNESS_MAX_Y", 2699),
         ):
             self.assertTrue(validate_local_map(wilderness)["available"])
 

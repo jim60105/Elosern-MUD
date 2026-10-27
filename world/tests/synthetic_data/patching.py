@@ -288,6 +288,8 @@ def _resolve_import_time_derivations(logicals: tuple[str, ...]) -> None:
     every live binding still sees the scope's synthetic content.
     """
     for logical in logicals:
+        if logical in GEOGRAPHY_TARGETS:
+            continue
         for module_name in _import_time_derivations(logical):
             try:
                 importlib.import_module(module_name)

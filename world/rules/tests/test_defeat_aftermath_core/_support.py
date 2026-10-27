@@ -25,7 +25,12 @@ from world.maps.wilderness_provider import (
     WILDERNESS_NAME,
     ElosernWildernessMapProvider,
 )
-from world.maps.wilderness_population import CAPITAL_ENTRY_XY
+import world.maps.wilderness_population as wilderness_population_module
+from world.tests.geography_fixture import publish_shipped_geography
+
+publish_shipped_geography()
+CAPITAL_ENTRY_XY = wilderness_population_module.capital_entry_xy()
+
 from world.rules.caravan_arrivals import register_caravan_arrivals
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 from world.rules.tests._guild_service_probes import (

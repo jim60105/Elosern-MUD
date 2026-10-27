@@ -26,6 +26,7 @@ tests) call :func:`load_and_publish`, and every read-only consumer goes through
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
@@ -88,12 +89,15 @@ class GeographySnapshot:
     anchors: Mapping[str, Anchor]
     anchor_geography: Mapping[str, GeographicAnchor]
     fingerprints: Mapping[str, str] = field(default_factory=dict)
+    content_signature: str = ""
 
     @property
     def identity(self) -> str:
         """A stable digest of the authored source set this snapshot came from."""
 
         digest = hashlib.sha256()
+        digest.update(self.content_signature.encode("utf-8"))
+        digest.update(b"\0")
         for path in sorted(self.fingerprints):
             digest.update(path.encode("utf-8"))
             digest.update(b"\0")
@@ -124,6 +128,28 @@ class GeographySnapshot:
     @property
     def region_search_boxes(self) -> Mapping[str, tuple[int, int, int, int]]:
         return self.terrain.region_search_boxes
+
+
+def _plain_data(value: Any) -> Any:
+    """A JSON-serializable copy of one typed document's authored data."""
+
+    if isinstance(value, Mapping):
+        return {str(key): _plain_data(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_plain_data(item) for item in value]
+    return value
+
+
+def _content_signature(
+    continent: ContinentDocument, locations: LocationsDocument
+) -> str:
+    payload = json.dumps(
+        [_plain_data(continent.data), _plain_data(locations.data)],
+        sort_keys=True,
+        ensure_ascii=False,
+        default=str,
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _terrain_definition(continent: ContinentDocument) -> TerrainDefinition:
@@ -371,6 +397,7 @@ def build_geography(
             anchors=anchors,
             anchor_geography=anchor_geography,
             fingerprints=MappingProxyType(dict(fingerprints or {})),
+            content_signature=_content_signature(continent, locations),
         )
         # Force the fallible derived views an immutable snapshot must already
         # hold, so publication never defers a rejection to the first reader.
@@ -438,6 +465,19 @@ def load_and_publish(root: str | Path | None = None) -> GeographySnapshot:
     return publish(load_geography(root))
 
 
+def ensure_published(root: str | Path | None = None) -> GeographySnapshot:
+    """Publish the shipped geography when a composition root has none yet.
+
+    Only bootstrap/synchronization entry points call this: they are the
+    explicit composition roots that establish the world before any consumer
+    reads it. Read-only accessors never load implicitly.
+    """
+
+    if _PUBLISHED is None:
+        return load_and_publish(root)
+    return _PUBLISHED
+
+
 def current() -> GeographySnapshot:
     """The published geography.
 
@@ -471,6 +511,7 @@ __all__ = [
     "SUPPORTED_CELL_SIZE_KM",
     "build_geography",
     "current",
+    "ensure_published",
     "is_published",
     "load_and_publish",
     "load_geography",

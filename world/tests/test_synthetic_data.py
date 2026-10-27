@@ -246,6 +246,20 @@ class SyntheticCatalogShapeTests(unittest.TestCase):
                 module = importlib.import_module(module_name)
                 self.assertTrue(hasattr(module, attribute), f"{logical} unresolved")
 
+    def test_geography_scope_publishes_and_restores_the_snapshot(self):
+        from world.lore import anchors, wilderness_regions
+        from world.maps import geography
+        from world.tests.geography_fixture import publish_shipped_geography
+
+        publish_shipped_geography()
+        shipped = geography.current()
+        with kit.synthetic_registries("regions", "anchors"):
+            current = geography.current()
+            self.assertIsNot(current, shipped)
+            self.assertEqual(set(wilderness_regions.regions()), set(kit.SYNTH_REGIONS))
+            self.assertEqual(set(anchors.anchors()), set(kit.SYNTH_ANCHORS))
+        self.assertIs(geography.current(), shipped)
+
     def test_starting_kit_scope_covers_every_synthetic_subrace(self):
         """Custom activation must find a kit for any scoped synthetic subrace."""
         self.assertEqual(
