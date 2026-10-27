@@ -352,28 +352,30 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         # The actor has no active session, so no engage disablement is offered.
         self.assertIsNone(engage["disabled_reason"])
 
-    def test_no_affordance_is_fabricated_for_a_plain_npc(self):
+    def test_a_plain_npc_keeps_a_disabled_talk_slot_and_no_fabricated_action(self):
+        # slice U: the card's fixed common slot 1 is the server-authored
+        # disabled 交談 with its stable reason; nothing else is fabricated.
         plain = create_object(NPC, key="路人", location=self.south_gate)
         payload = self._render()
         target = next(t for t in payload["interact"] if t["identity"] == int(plain.pk))
-        self.assertEqual(
-            target["affordances"],
-            [
-                {
-                    "kind": "navigate",
-                    "surface": "npc_persona",
-                    "label": "編輯人物設定",
-                    "enabled": False,
-                    "disabled_reason": {
-                        "code": "npc_persona.unavailable",
-                        "message": "此角色的設定目前無法編輯或尚未初始化。",
-                    },
-                }
-            ],
+        talk = next(
+            a for a in target["affordances"] if a.get("action_id") == "explore.talk_open"
         )
+        self.assertIs(target["affordances"][0], talk)
+        self.assertFalse(talk["enabled"])
+        self.assertEqual(talk["disabled_reason"]["code"], "not_conversable")
+        self.assertTrue(talk["disabled_reason"]["message"].strip())
+        persona = next(
+            a for a in target["affordances"] if a.get("surface") == "npc_persona"
+        )
+        self.assertIs(target["affordances"][-1], persona)
+        self.assertFalse(persona["enabled"])
+        self.assertEqual(persona["disabled_reason"]["code"], "npc_persona.unavailable")
+        self.assertEqual(len(target["affordances"]), 2)
         action_ids = {
             a.get("action_id") for a in target["affordances"] if a.get("action_id")
         }
+        self.assertEqual(action_ids, {"explore.talk_open"})
         self.assertNotIn("explore.party_invite", action_ids)
         self.assertNotIn("explore.party_leave", action_ids)
 

@@ -395,6 +395,7 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 | `dream-panel`、`dream-reply`、`dream-scene-art`、`dream-art-control`、`dream-art-failure`、`dream-art-view`、`dream-art-view-image`、`dream-art-view-failure`、`data-row`（夢境舞台：對話 modal 的根節點與其回覆列、舞台上唯一的畫面層、該畫面的全圖控制與在地狀態標記、全圖對話方塊與其中的影像／狀態，以及念頭列的列屬性識別——覺醒步驟以該屬性選擇器鎖定。前兩者與列屬性為既有掛鉤，受管旅程 `test_browser_dream_artwork.py` 首次鎖定；其餘由 unified-dream-rendering 隨共用場景載入整合一併加入） | unified-dream-rendering | REMAP-TO-TESTID |
 | `choice-card-lock`、`choice-card-tip`、`choice-card-tip-text`（對話選項卡上可見鎖定話題的掛鎖圖示、指標懸停或鍵盤焦點時顯示於卡片旁的伺服器需求提示框，以及以 aria-describedby 指向的隱藏提示文字；由 authored-dialogue-locked-ui 變更加入，受管旅程 `test_browser_exploration_dialogue.py` 首次鎖定） | authored-dialogue-locked-ui | REMAP-TO-TESTID |
 | `dialogue-reading-status`（選項清單上方、只在回到選項邊界顯示的閱讀同步狀態列，帶 data-state 屬性的 pending／failed 兩態）、`dialogue-reading-retry`（failed 狀態下唯一的明確重試控制；由 authored-dialogue-reading-client 變更加入，受管旅程 test_browser_exploration_dialogue.py 的 test_dialogue_completion_retry_without_rereading 與 test_dialogue_completion_reload_discards_pending 首次鎖定） | authored-dialogue-reading-client | REMAP-TO-TESTID |
+| `choice-card-group-heading`（互動卡片上真實的分組標題：`role="heading"` 的不可選取文字，所屬 `role="group"` 以 `aria-labelledby` 指向它，列的索引不含標題；由 npc-interaction-service-card 變更加入，受管旅程 `test_browser_npc_services.py` 首次鎖定） | npc-interaction-service-card | REMAP-TO-TESTID |
 
 **CSS class hooks the managed browser suite targets**（重新對應至穩定掛鉤，無主要需求文字命名這些項目，故無規格增量）：
 
@@ -758,4 +759,9 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 
 - **§1 介面補登：** `Protocol` 的 `create_store_members` 加入 `getCommittedState`（同一份 reducer 的唯讀契約：該次發布唯一一份遞迴凍結的已認可記錄，`subscribe` 交付同一個物件）。`getState` 的分離可變快照契約、不可部分發布的採用語意、epoch 與修訂版本門控，以及每次認可一次通知的既有行為皆未改變；未變動的面板、同一 epoch 的隨選地圖與等值的完整對齊以同一參照沿用，屬既有行為的實作方式，不新增對外識別碼。
 - **§2.3、§3：** 未新增或移除任何受管瀏覽器目標、hook 或增量項目；本變更不觸及 OOB 線路與面板序列化。
+- **§5 完整性聲明維持成立：** 未遺留未註冊的受管目標；`tests/test_webclient_frozen_contract.py` 維持綠燈。
+
+### npc-interaction-service-card — 2026-10-27
+
+- **§2.3 補登 hook：** 加入 `choice-card-group-heading`（互動卡片的分組標題，`role="heading"`、不可選取、不佔列索引，所屬 `role="group"` 以其為無障礙名稱）。既有的 `presence-card`、`presence-entry`、`choice-card-back`、`choice-card-reason` 掛鉤沿用不變：卡片列的鍵仍是穩定的 `data-row-key`，受管套件以 `activate_card_row` 的鍵盤走訪鎖定它們。
 - **§5 完整性聲明維持成立：** 未遺留未註冊的受管目標；`tests/test_webclient_frozen_contract.py` 維持綠燈。

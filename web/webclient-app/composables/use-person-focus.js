@@ -34,11 +34,15 @@ export const BACK_ROW = Object.freeze({
 });
 
 function digitBadge(index) {
-  return index < 9 ? String(index + 1) : "·";
+  // Only positions 1 through 9 advertise a digit shortcut (slice U). A later
+  // row carries no badge at all — it stays reachable by arrows and scrolling,
+  // never by a second numbering scheme and never by a digit that would
+  // activate a different row.
+  return index < 9 ? String(index + 1) : null;
 }
 
 // The verb card's rows: `verbMenuFor`'s rows (its own back row dropped) with
-// digit badges, then the trailing `✕ 返回` row.
+// digit badges and their group identity, then the trailing `✕ 返回` row.
 export function verbCardRows(items) {
   const rows = (items || [])
     .filter((item) => !item.goBack)
@@ -49,6 +53,9 @@ export function verbCardRows(items) {
       kind: "verb",
       enabled: item.enabled !== false,
       reason: disabledRowReason(item),
+      // The row's group identity and its real heading (a grouped card).
+      group: item.group || null,
+      groupLabel: item.groupLabel || null,
       testId: "verb-card-row",
     }));
   return [...rows, BACK_ROW];
@@ -70,6 +77,8 @@ export function overflowCardRows(entries) {
 
 export function usePersonFocus(store, { panel, compassRef, onRailHover, showReadoutFlash }) {
   const railRef = ref(null);
+  // The interaction card itself: its rows and the mapping they draw.
+  const cardRef = ref(null);
 
   const card = computed(() => (store.view.mode === "exploration" ? store.view.presenceCard : null));
   const cardOpen = computed(() => !!card.value);
@@ -132,20 +141,97 @@ export function usePersonFocus(store, { panel, compassRef, onRailHover, showRead
     store.activatePresence(key);
   }
 
+  // The card element's mapping token: the DOM copy of the mapping the rows
+  // were drawn from. Reading it at activation time is what makes an
+  // activation name what the player saw, not what the store has just
+  // published.
+  function renderedMappingToken() {
+    if (typeof document === "undefined") {
+      return null;
+    }
+    const el = document.querySelector('[data-anchor="choices"] [data-testid="presence-card"]');
+    return el ? el.getAttribute("data-mapping-token") : null;
+  }
+
+  // The card's mapping as published for the rows currently drawn.
+  const cardMappingToken = computed(() =>
+    card.value ? (store.view.presenceMapping?.token ?? null) : null,
+  );
+
+  // The render that drew a mapping acknowledges it: a store-held digit press
+  // (focus elsewhere) validates against the mapping the card shows.
+  watch(
+    cardMappingToken,
+    (token) => {
+      store.acknowledgePresenceMapping(token);
+    },
+    { flush: "post" },
+  );
+
   function onCardPick(key) {
     if (!card.value) {
       return;
     }
     if (card.value.kind === "verbs") {
-      store.activatePresenceVerb(key);
+      store.activatePresenceVerb(key, renderedMappingToken());
     } else {
-      store.activatePresence(key);
+      store.activatePresence(key, renderedMappingToken());
     }
   }
 
   function onCardBack() {
     store.closePresenceCard();
   }
+
+  // The entry a service flow was opened from, while the card still owns it.
+  function serviceOriginKey() {
+    const origin = store.view.presenceCard?.serviceOrigin;
+    return personFocus.value && origin ? origin : null;
+  }
+
+  // Closing a service flow returns focus to its originating entry while the
+  // actor, the card and that entry remain valid (slice U). Otherwise the
+  // card's first valid row takes it; when the card itself is gone the
+  // existing rail/compass fallback owns focus and this does nothing. Focus
+  // that belongs to another valid surface is never stolen.
+  async function returnToServiceOrigin() {
+    const origin = serviceOriginKey();
+    if (!origin || store.view.hudDrawer) {
+      return false;
+    }
+    await nextTick();
+    if (serviceOriginKey() !== origin || typeof document === "undefined") {
+      return false;
+    }
+    const cardEl = cardRef.value?.$el ?? null;
+    if (!cardEl) {
+      return false;
+    }
+    const active = document.activeElement;
+    const insideCard = !!active && (active === cardEl || cardEl.contains(active));
+    const lost =
+      !active || active === document.body || active === document.documentElement || !active.isConnected;
+    if (!insideCard && !lost) {
+      return false;
+    }
+    // A flow opened by a different acting body returns to the card's first
+    // valid row instead of that entry.
+    cardRef.value?.focusRow(store.presenceServiceOriginValid?.() === false ? null : origin);
+    store.claimPresenceServiceOrigin();
+    return true;
+  }
+
+  // The service drawer the card's own entry opened has closed: hand focus
+  // back to that entry.
+  watch(
+    () => store.view.hudDrawer,
+    (next, previous) => {
+      if (next || !previous) {
+        return;
+      }
+      void returnToServiceOrigin();
+    },
+  );
 
   // Focus restoration (redesign §4.3/§5.4): when a card closes, focus that
   // sat on it (now removed) or fell out of the layout returns to the rail
@@ -207,6 +293,7 @@ export function usePersonFocus(store, { panel, compassRef, onRailHover, showRead
 
   return {
     railRef,
+    cardRef,
     railMounted,
     railShown,
     presenceCardOpen: cardOpen,
@@ -217,9 +304,11 @@ export function usePersonFocus(store, { panel, compassRef, onRailHover, showRead
     cardKey,
     cardCaption,
     cardLabel,
+    cardMappingToken,
     speaker,
     onRailActivate,
     onCardPick,
     onCardBack,
+    returnToServiceOrigin,
   };
 }

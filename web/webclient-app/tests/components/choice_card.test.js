@@ -215,6 +215,107 @@ describe("ChoiceCard", () => {
     expect(wrapper.get('[data-active="true"]').attributes("data-row-key")).toBe("c");
   });
 
+  // slice U: the interaction card's real labelled groups, the digit badges
+  // that stop at position 9, and a service flow's return to its originating
+  // entry.
+  it("renders real labelled groups whose headings are not rows", async () => {
+    const grouped = [
+      { key: "talk-open", label: "交談", badge: "1", kind: "verb", enabled: false, reason: "對方無法交談。", group: "common", groupLabel: "一般" },
+      { key: "look-target", label: "查看", badge: "2", kind: "verb", enabled: true, group: "common", groupLabel: "一般" },
+      { key: "service-shop", label: "交易", badge: "3", kind: "verb", enabled: true, group: "services", groupLabel: "服務" },
+      { key: "back", label: "返回", badge: "✕", icon: "close", kind: "back", enabled: true, back: true },
+    ];
+    const w = mountCard({ rows: grouped, trailingIndex: 3 });
+    const groups = w.findAll('[role="group"]');
+    expect(groups.map((group) => group.attributes("data-group"))).toEqual(["common", "services"]);
+    const headings = w.findAll('[data-testid="choice-card-group-heading"]');
+    expect(headings.map((heading) => heading.text())).toEqual(["一般", "服務"]);
+    // The group's accessible name is the heading it references, and the
+    // heading is not selectable, not a row, and adds no tab stop.
+    expect(groups[0].attributes("aria-labelledby")).toBe(headings[0].attributes("id"));
+    expect(groups[1].attributes("aria-labelledby")).toBe(headings[1].attributes("id"));
+    expect(headings[0].attributes("role")).toBe("heading");
+    expect(headings[0].attributes("tabindex")).toBeUndefined();
+    expect(rows(w)).toHaveLength(4);
+    expect(w.findAll("[tabindex]")).toHaveLength(1);
+    // The card opens on the first enabled row (the disabled 交談 is skipped);
+    // arrows then cross a group boundary without ever landing on a heading,
+    // because the index counts rows only.
+    expect(activeRow(w)).toBe(rows(w)[1].element);
+    await key(w, "ArrowDown");
+    await nextTick();
+    expect(activeRow(w)).toBe(rows(w)[2].element);
+    await key(w, "ArrowDown");
+    await nextTick();
+    expect(activeRow(w)).toBe(rows(w)[3].element);
+    // The disabled common row keeps its inline described reason.
+    expect(rows(w)[0].attributes("aria-disabled")).toBe("true");
+    const described = rows(w)[0].attributes("aria-describedby");
+    expect(document.getElementById(described).textContent).toBe("對方無法交談。");
+    // End selects the trailing return, Home the first row.
+    await key(w, "Home");
+    await nextTick();
+    expect(activeRow(w)).toBe(rows(w)[0].element);
+    await key(w, "End");
+    await nextTick();
+    expect(activeRow(w)).toBe(rows(w)[3].element);
+  });
+
+  it("badges and digits stop at position 9 and later rows stay reachable", async () => {
+    const many = Array.from({ length: 12 }, (_, index) => ({
+      key: `row-${index + 1}`,
+      label: `列 ${index + 1}`,
+      badge: index < 9 ? String(index + 1) : null,
+      kind: "verb",
+      enabled: true,
+      group: "services",
+      groupLabel: "服務",
+    }));
+    const w = mountCard({ rows: [...many, ROWS[4]], trailingIndex: 12 });
+    const all = rows(w);
+    expect(all).toHaveLength(13);
+    // No digit badge past the ninth row, and no alternate numbering scheme.
+    expect(all.slice(9, 12).map((row) => row.find(".choice-card__badge").exists())).toEqual([
+      false,
+      false,
+      false,
+    ]);
+    expect(all[12].text()).toBe("返回");
+    await key(w, "9");
+    expect(w.emitted("pick").at(-1)).toEqual(["row-9"]);
+    // Digits never address a later row.
+    await key(w, "1");
+    expect(w.emitted("pick")).toHaveLength(2);
+    // Arrows reach every row after the ninth and Enter activates it.
+    await key(w, "Home");
+    for (let step = 0; step < 10; step += 1) {
+      await key(w, "ArrowDown");
+    }
+    await nextTick();
+    expect(activeRow(w)).toBe(all[10].element);
+    await key(w, "Enter");
+    expect(w.emitted("pick").at(-1)).toEqual(["row-11"]);
+  });
+
+  it("focusRow returns focus to a surviving entry, else to the first valid row", async () => {
+    const grouped = [
+      { key: "talk-open", label: "交談", badge: "1", kind: "verb", enabled: false, reason: "不可。", group: "common" },
+      { key: "look-target", label: "查看", badge: "2", kind: "verb", enabled: true, group: "common" },
+      { key: "service-shop", label: "交易", badge: "3", kind: "verb", enabled: true, group: "services" },
+      ROWS[4],
+    ];
+    const w = mountCard({ rows: grouped, trailingIndex: 3 });
+    document.body.focus?.();
+    w.vm.focusRow("service-shop");
+    await nextTick();
+    expect(document.activeElement).toBe(card(w).element);
+    expect(activeRow(w)).toBe(rows(w)[2].element);
+    // An entry that disappeared falls back to the first enabled row.
+    w.vm.focusRow("service-gone");
+    await nextTick();
+    expect(activeRow(w)).toBe(rows(w)[1].element);
+  });
+
   // authored-dialogue-locked-ui (web/webclient-app/AGENTS.md styling
   // pitfall): the card's own style block is the one source of its rules.
   // app-shell.css carries no `.elosern-root` duplicate or override of a

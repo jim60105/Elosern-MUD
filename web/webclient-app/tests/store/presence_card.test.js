@@ -81,11 +81,18 @@ describe("the presence slice (exploration-presence-rail)", () => {
   }
 
   function commit(exploration, extra = {}) {
+    const { panels: extraPanels, ...rest } = extra;
     revision += 1;
     return store.receive(
       1,
       "ui_update",
-      [fx.update({ revision, panels: { exploration, local_map: fx.localMapPanel() }, ...extra })],
+      [
+        fx.update({
+          revision,
+          panels: { exploration, local_map: fx.localMapPanel(), ...(extraPanels || {}) },
+          ...rest,
+        }),
+      ],
       {},
     );
   }
@@ -153,19 +160,31 @@ describe("the presence slice (exploration-presence-rail)", () => {
     expect(store.view.dialogueFocusTopic).toBeNull();
   });
 
-  it("verb rows are verbMenuFor's rows in payload order, ending in 查看 and the back row", () => {
+  it("the card groups the fixed common slots, the conditional rows and the services", () => {
     open();
     store.activatePresence("target-7");
     expect(store.view.presenceVerbs.map((item) => item.key)).toEqual([
       "talk-open",
-      "engage",
+      "look-target",
       "party-invite",
       "deliver",
+      "engage",
       "service-shop",
       "service-guild",
-      "look-target",
       "back",
     ]);
+    expect(store.view.presenceVerbs.map((item) => item.group)).toEqual([
+      "common",
+      "common",
+      "conditional",
+      "conditional",
+      "conditional",
+      "services",
+      "services",
+      undefined,
+    ]);
+    // The trailing row is the unnumbered return.
+    expect(store.view.presenceVerbs.at(-1).goBack).toBe(true);
   });
 
   describe("payloads byte-identical to the retired popover rows", () => {
@@ -235,6 +254,163 @@ describe("the presence slice (exploration-presence-rail)", () => {
     expect(sender.sent.actions).toHaveLength(0);
   });
 
+  // slice U: the fixed common slots stay in place for a target whose
+  // descriptor carries no talk row of its own, and the fallback is never
+  // callable.
+  it("a target with no talk row keeps a disabled 交談 at slot 1 and 查看 at 2", () => {
+    const goblin = {
+      identity: 11,
+      display_name: "哥布林",
+      portrait_ref: null,
+      services: { state: "none", entries: [] },
+      affordances: [action("explore.engage", "戰鬥")],
+    };
+    open([goblin]);
+    store.activatePresence("target-11");
+    expect(store.view.presenceVerbs.map((item) => item.key)).toEqual([
+      "talk-open",
+      "look-target",
+      "engage",
+      "back",
+    ]);
+    expect(store.view.presenceVerbs[0]).toMatchObject({ enabled: false, actionId: null });
+    expect(store.view.presenceVerbs[0].disabledReason.code).toBe("not_conversable");
+    expect(store.activatePresenceVerb("talk-open")).toMatchObject({ sent: false, reason: "disabled" });
+    expect(sender.sent.actions).toHaveLength(0);
+  });
+
+  describe("the rendered mapping", () => {
+    it("an equal-content re-publication keeps the card and its mapping", () => {
+      open();
+      store.activatePresence("target-7");
+      const token = store.view.presenceMapping.token;
+      commit(panelWith([CLERK]));
+      expect(store.view.presenceCard).toMatchObject({ kind: "verbs", identity: 7 });
+      expect(store.view.presenceMapping.token).toBe(token);
+    });
+
+    it("a changed entry set consumes an activation made against the previous mapping", () => {
+      open();
+      store.activatePresence("target-7");
+      const rendered = store.view.presenceMapping.token;
+      const paused = {
+        ...CLERK,
+        services: {
+          state: "ready",
+          entries: [
+            {
+              key: "guild",
+              label: "公會服務",
+              enabled: false,
+              disabled_reason: { code: "paused", message: "公會服務暫時停止。" },
+              route: { kind: "services", npc_id: 7, section: "board" },
+            },
+          ],
+        },
+      };
+      commit(panelWith([paused]));
+      // The queued activation still names the rows the player saw: it is
+      // consumed without sending, and never reaches the row that now sits
+      // at that key.
+      expect(store.activatePresenceVerb("service-guild", rendered)).toMatchObject({
+        sent: false,
+        handled: true,
+        reason: "stale",
+      });
+      expect(sender.sent.actions).toHaveLength(0);
+      expect(store.view.presenceCard).toMatchObject({ kind: "verbs", identity: 7 });
+      // A fresh selection against the current mapping acts on this row.
+      expect(store.activatePresenceVerb("service-guild", store.view.presenceMapping.token)).toMatchObject({
+        sent: false,
+        reason: "disabled",
+      });
+    });
+
+    it("a digit press against an obsolete mapping is consumed without acting", () => {
+      open();
+      store.activatePresence("target-7");
+      store.acknowledgePresenceMapping(store.view.presenceMapping.token);
+      const paused = {
+        ...CLERK,
+        services: {
+          state: "ready",
+          entries: [
+            {
+              key: "guild",
+              label: "公會服務",
+              enabled: true,
+              disabled_reason: null,
+              route: { kind: "services", npc_id: 7, section: "board" },
+            },
+          ],
+        },
+      };
+      commit(panelWith([paused]));
+      // Slot 6 named 交易 before the commit; without a fresh render the press
+      // must not open the row that took the position.
+      expect(store.focusPress("6")).toBe(true);
+      expect(store.view.hudDrawer).toBe(null);
+      expect(sender.sent.actions).toHaveLength(0);
+      // Once the card has drawn its current mapping, the digit acts again.
+      store.acknowledgePresenceMapping(store.view.presenceMapping.token);
+      expect(store.focusPress("6")).toBe(true);
+      expect(store.view.hudDrawer).toBe("quest");
+    });
+  });
+
+  describe("the service origin", () => {
+    it("records the entry that opened the flow and yields it once", () => {
+      open();
+      store.activatePresence("target-7");
+      expect(store.activatePresenceVerb("service-shop").handled).toBe(true);
+      expect(store.view.presenceCard.serviceOrigin).toBe("service-shop");
+      expect(store.view.presenceCard.serviceDrawer).toBe("shop");
+      expect(store.claimPresenceServiceOrigin()).toBe("service-shop");
+      expect(store.claimPresenceServiceOrigin()).toBe(null);
+    });
+
+    it("a departed provider closes its drawer with the card", () => {
+      open();
+      store.activatePresence("target-7");
+      store.activatePresenceVerb("service-guild");
+      expect(store.view.hudDrawer).toBe("quest");
+      commit(panelWith([], { look: { entities: [] } }));
+      expect(store.view.presenceCard).toBe(null);
+      expect(store.view.hudDrawer).toBe(null);
+      expect(store.view.presenceNotice).toMatchObject({ name: "店長" });
+    });
+  });
+
+  it("a possession swap keeps the card and makes a pre-swap selection stale", () => {
+    open();
+    store.activatePresence("target-7");
+    const rendered = store.view.presenceMapping.token;
+    commit(panelWith([CLERK]), {
+      panels: {
+        status: fx.statusPanel({
+          actor: { name: "影行者", identity: "77", location: { label: "測試起點", identity: "17" } },
+        }),
+      },
+    });
+    // The same player keeps the card across a control swap; nobody left the
+    // room, so there is no departure message.
+    expect(store.view.presenceCard).toMatchObject({ kind: "verbs", identity: 7 });
+    expect(store.view.presenceNotice).toBe(null);
+    // The acting body is part of the mapping: the selection made for the old
+    // body is consumed and a fresh one acts.
+    expect(store.view.presenceMapping.token).not.toBe(rendered);
+    expect(store.activatePresenceVerb("service-shop", rendered)).toMatchObject({
+      sent: false,
+      handled: true,
+      reason: "stale",
+    });
+    expect(store.activatePresenceVerb("service-shop", store.view.presenceMapping.token)).toMatchObject({
+      sent: false,
+      handled: true,
+    });
+    expect(store.view.hudDrawer).toBe("shop");
+  });
+
   it("every consumer is suppressed while a submission is in flight or awaiting its revision", () => {
     open([CLERK]);
     store.activatePresence("target-7");
@@ -291,30 +467,49 @@ describe("the presence slice (exploration-presence-rail)", () => {
       expect(store.view.presenceCard).toMatchObject({ kind: "verbs", identity: 7 });
     });
 
-    it("a departure while an unrelated submission is pending closes the card once the lock releases", () => {
+    it("a departure while an unrelated submission is pending closes the card in that commit", () => {
       open();
       store.activatePresence("object-3");
       store.activatePresence("target-7");
-      // The look is in flight: the departure waits.
+      // The look is in flight, but the committed availability loss is the
+      // first and final word: the card retires at once, correlation and
+      // emphasis with it, and the departure is flashed exactly once.
       commit(panelWith([], { look: { entities: [] } }));
-      expect(store.view.presenceCard).toMatchObject({ kind: "verbs", identity: 7 });
-      // The look is rejected: the release publishes, and the settle closes
-      // the card with the notice.
+      expect(store.view.presenceCard).toBe(null);
+      expect(store.view.presenceNotice).toMatchObject({ name: "店長" });
+      const seq = store.view.presenceNotice.seq;
+      // Later settlement does not flash a duplicate.
       store.receive(1, "ui_action_result", [fx.actionResult({ outcome: "rejected", code: "invalid", message: "不行。" })], {});
       expect(store.view.dispatch.inFlight).toBe(null);
       expect(store.view.presenceCard).toBe(null);
-      expect(store.view.presenceNotice).toMatchObject({ name: "店長" });
+      expect(store.view.presenceNotice.seq).toBe(seq);
     });
 
-    it("an unavailable panel never reads as a departure", () => {
+    it("unreadable presence retires the card quietly, not as a departure", () => {
       open();
       store.activatePresence("target-7");
       const result = commit({ schema_version: 5, available: false, reason: { code: "scene_lost", message: "暫時不可用。" } });
       expect(result.accepted).toBe(true);
-      expect(store.view.presenceCard).toMatchObject({ kind: "verbs", identity: 7 });
+      // The committed presentation can no longer establish the target, so the
+      // card and its mapping go; nobody is reported as departed.
+      expect(store.view.presenceCard).toBe(null);
+      expect(store.view.presenceMapping).toBe(null);
       expect(store.view.presenceNotice).toBe(null);
+      // A later available commit does not resurrect it.
       commit(panelWith([CLERK]));
-      expect(store.view.presenceCard).toMatchObject({ kind: "verbs", identity: 7 });
+      expect(store.view.presenceCard).toBe(null);
+      expect(store.view.presenceNotice).toBe(null);
+    });
+
+    it("unreadable presence closes the flow the card opened and drops its route", () => {
+      open([CLERK]);
+      store.activatePresence("target-7");
+      store.activatePresenceVerb("service-guild");
+      expect(store.view.hudDrawer).toBe("quest");
+      commit({ schema_version: 5, available: false, reason: { code: "scene_lost", message: "暫時不可用。" } });
+      expect(store.view.presenceCard).toBe(null);
+      expect(store.view.hudDrawer).toBe(null);
+      expect(store.view.presenceNotice).toBe(null);
     });
 
     it("交談's intermediate commit without the host waits for the dialogue commit", () => {
@@ -451,6 +646,32 @@ describe("the presence slice (exploration-presence-rail)", () => {
       store.activatePresence("presence-more");
       expect(store.activatePresence("object-3").sent).toBe(true);
       expect(store.view.presenceCard).toBe(null);
+    });
+
+    it("a pick against a changed fold is consumed without acting", () => {
+      open(crowd(7));
+      store.activatePresence("presence-more");
+      const rendered = store.view.presenceMapping.token;
+      store.acknowledgePresenceMapping(rendered);
+      // One entry arrives at the front: every folded slot now names another
+      // person, and the card still has something to fold.
+      const newcomer = { identity: 200, display_name: "新來者", portrait_ref: null, affordances: [] };
+      commit(panelWith([newcomer, ...crowd(7)]));
+      expect(store.view.presenceCard).toMatchObject({ kind: "overflow" });
+      // The pick still names the mapping the player saw.
+      expect(store.activatePresence("target-106", rendered)).toMatchObject({
+        sent: false,
+        handled: true,
+        reason: "stale",
+      });
+      expect(store.view.presenceCard).toMatchObject({ kind: "overflow" });
+      expect(sender.sent.actions).toHaveLength(0);
+      // Against the current fold the same key opens that person's card.
+      expect(store.activatePresence("target-106", store.view.presenceMapping.token)).toMatchObject({
+        sent: false,
+        handled: true,
+        reason: "local",
+      });
     });
 
     it("a verb card opened from ＋N survives the fold disappearing", () => {

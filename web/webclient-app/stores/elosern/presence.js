@@ -41,15 +41,35 @@ function isMove(from, to) {
 }
 
 export function applyPresence(ctx) {
-  // null | {kind: "verbs", identity, name, openerKey, location}
+  // null | {kind: "verbs", identity, name, openerKey, location, actor,
+  //         serviceOrigin, serviceDrawer, talkRequestId}
   //      | {kind: "overflow", openerKey, location}
   ctx.presenceCard = null;
+  // The mapping the open card's rows were rendered from (slice U):
+  // `{token, keys}`. `token` is the interaction signature — actor, target,
+  // room, the ordered stable row keys, each row's route identity and its
+  // enabled/reason facts. It is client-local menu state, never a server
+  // authorization token and never part of a committed panel.
+  ctx.presenceMapping = null;
+  // The token the rendered card actually shows (acknowledged after a render).
+  // An activation that names anything else is stale.
+  ctx.presenceAcknowledged = null;
   // The readout's departed flash: null | {seq, name}.
   ctx.presenceNotice = null;
   ctx.presenceNoticeSeq = 0;
 
   function currentLocation(rs) {
     return locationOf(rs, ctx.frameResolver.explorationExits().currentNode);
+  }
+
+  // The actor the card belongs to (the status panel's own identity), or null
+  // while that panel is absent.
+  function actorIdentity(rs) {
+    const status = (rs && rs.panels && rs.panels.status) || null;
+    const actor = (status && status.actor) || null;
+    return actor && actor.identity !== undefined && actor.identity !== null
+      ? String(actor.identity)
+      : null;
   }
 
   // The committed entries, or null when the panel is unavailable.
@@ -98,15 +118,117 @@ export function applyPresence(ctx) {
       return false;
     }
     ctx.presenceCard = null;
+    ctx.presenceMapping = null;
+    ctx.presenceAcknowledged = null;
     ctx.publishView();
     return true;
   };
 
+  // One card row's stable route identity: the exact thing activating it
+  // would open or submit. A change here is a changed mapping even when the
+  // row keeps its key.
+  function routeIdentity(item) {
+    if (item.serviceRoute) {
+      return { service: item.serviceRoute };
+    }
+    if (item.dialogueRoute) {
+      return { dialogue: item.dialogueRoute };
+    }
+    if (item.commandPrefill) {
+      return { command: item.commandPrefill };
+    }
+    if (item.openNpcPersona !== undefined && item.openNpcPersona !== null) {
+      return { persona: item.openNpcPersona };
+    }
+    return { action: item.actionId || null, payload: item.payload || null };
+  }
+
+  function mappingToken(parts) {
+    return JSON.stringify(parts);
+  }
+
+  // A verb card's mapping, resolved from the committed panels RIGHT NOW.
+  function verbsMapping(card, rs) {
+    const menu = ctx.frameResolver.explorationVerbs(card.identity);
+    const items = ((menu && Array.isArray(menu.items) ? menu.items : []) || []).filter(
+      (item) => !item.goBack,
+    );
+    const location = currentLocation(rs);
+    const rows = items.map((item) => ({
+      key: item.key,
+      route: routeIdentity(item),
+      enabled: item.enabled !== false,
+      reason: (item.disabledReason && item.disabledReason.code) || null,
+    }));
+    return {
+      token: mappingToken({
+        kind: "verbs",
+        actor: actorIdentity(rs),
+        target: card.identity === undefined ? null : card.identity,
+        room: location ? location.room : null,
+        node: location ? location.node : null,
+        rows,
+      }),
+      keys: rows.map((row) => row.key),
+    };
+  }
+
+  // The overflow card's mapping: the folded entries, in rail order.
+  function overflowMapping(card) {
+    const keys = railOverflow(ctx.presenceEntries() || []).map((entry) => entry.key);
+    return {
+      token: mappingToken({ kind: "overflow", opener: card.openerKey || null, keys }),
+      keys,
+    };
+  }
+
+  // The open card's mapping as the committed panels resolve it now.
+  function cardMapping(rs) {
+    const card = ctx.presenceCard;
+    if (!card) {
+      return null;
+    }
+    return card.kind === "verbs" ? verbsMapping(card, rs) : overflowMapping(card);
+  }
+
+  // The token the drawn card shows. The card element carries its mapping, so
+  // a DOM read is the exact answer; `AppClient` also acknowledges every
+  // published mapping after the render that drew it, and before the first
+  // acknowledgement the published mapping is the only one that can have been
+  // drawn.
+  function renderedToken() {
+    if (typeof document !== "undefined" && typeof document.querySelector === "function") {
+      const el = document.querySelector('[data-anchor="choices"] [data-testid="presence-card"]');
+      const rendered = el ? el.getAttribute("data-mapping-token") : null;
+      if (rendered !== null) {
+        return rendered;
+      }
+    }
+    if (ctx.presenceAcknowledged !== null) {
+      return ctx.presenceAcknowledged;
+    }
+    return ctx.presenceMapping ? ctx.presenceMapping.token : null;
+  }
+
+  ctx.acknowledgePresenceMapping = function acknowledgePresenceMapping(token) {
+    ctx.presenceAcknowledged = token === undefined ? null : token;
+  };
+
+  // A stale activation is consumed without sending: the card keeps its
+  // target, the rows are rebuilt and the player selects again against the
+  // current mapping. Never let an old digit or an old row's route execute a
+  // new row.
+  function staleMapping() {
+    ctx.publishView();
+    return { sent: false, handled: true, reason: "stale" };
+  }
+
   // A rail slot's activation (§4.1): an interact target opens its verb card,
   // `＋N` opens the overflow card, and a bystander or an object submits its
   // look row. The overflow card's picks come back through here, so there is
-  // one activation path.
-  ctx.activatePresence = function activatePresence(key) {
+  // one activation path — and, while that card is open, they are validated
+  // against the mapping it drew, exactly like a digit or a verb row.
+  ctx.activatePresence = function activatePresence(key, token) {
     const rs = ctx.reducer.getCommittedState();
     if (rs.mode !== "exploration") {
       return { sent: false, handled: false, reason: "mode" };
@@ -116,6 +238,13 @@ export function applyPresence(ctx) {
       return { sent: false, handled: false, reason: "unavailable" };
     }
     const fromOverflow = ctx.presenceCard !== null && ctx.presenceCard.kind === "overflow";
+    if (fromOverflow) {
+      const current = overflowMapping(ctx.presenceCard);
+      const rendered = token === undefined || token === null ? renderedToken() : token;
+      if (rendered !== current.token) {
+        return staleMapping();
+      }
+    }
     const location = currentLocation(rs);
     if (key === RAIL_MORE_KEY) {
       if (entries.length <= RAIL_MAX) {
@@ -139,22 +268,27 @@ export function applyPresence(ctx) {
         // A person picked on the overflow card returns to its `＋N` slot.
         openerKey: fromOverflow ? RAIL_MORE_KEY : entry.key,
         location,
+        // The acting body the card belongs to: a control swap retires it.
+        actor: actorIdentity(rs),
       };
       ctx.publishView();
       return { sent: false, handled: true, reason: "local" };
     }
     const outcome = ctx.activateExplorationRow(entry);
     if (outcome.sent && fromOverflow) {
-      ctx.presenceCard = null;
+      closeCard();
       ctx.publishView();
     }
     return outcome;
   };
 
   // A verb card row (§4.3): the focused target's `verbMenuFor` rows,
-  // re-resolved now. 查看 closes the card once it is sent; the back row closes
-  // it; a row that vanished does nothing.
-  ctx.activatePresenceVerb = function activatePresenceVerb(key) {
+  // re-resolved now. `token` is the mapping the rendered card showed (the DOM
+  // copy on the card); `undefined` falls back to the acknowledged one. An
+  // activation that does not name the current mapping is consumed without
+  // sending. 查看 closes the card once it is sent; the back row closes it; a
+  // row that vanished does nothing.
+  ctx.activatePresenceVerb = function activatePresenceVerb(key, token) {
     const card = ctx.presenceCard;
     if (!card || card.kind !== "verbs") {
       return { sent: false, handled: false, reason: "missing" };
@@ -163,31 +297,71 @@ export function applyPresence(ctx) {
       ctx.closePresenceCard();
       return { sent: false, handled: true, reason: "local" };
     }
+    const current = verbsMapping(card, ctx.reducer.getCommittedState());
+    const rendered = token === undefined || token === null ? renderedToken() : token;
+    if (rendered !== current.token) {
+      return staleMapping();
+    }
     const menu = ctx.frameResolver.explorationVerbs(card.identity);
     const row = menu && Array.isArray(menu.items) ? menu.items.find((item) => item.key === key && !item.goBack) : null;
     if (!row) {
       return { sent: false, handled: false, reason: "missing" };
     }
     const outcome = ctx.activateExplorationRow(row);
+    if (outcome.sent && row.actionId === "explore.talk_open") {
+      // This card's own handover: an intermediate exploration commit that
+      // still lacks the host waits for the dialogue commit instead of reading
+      // as a departure.
+      card.talkRequestId = outcome.requestId;
+    }
+    if (outcome.handled && row.serviceRoute) {
+      // The originating entry, so closing the flow can return focus to it
+      // (slice U). A drawer flow also records which drawer it owns, and the
+      // acting body that opened it: a control swap retires the origin even
+      // though the card itself survives.
+      card.serviceOrigin = key;
+      card.serviceOriginActor = actorIdentity(ctx.reducer.getCommittedState());
+      card.serviceDrawer =
+        row.serviceRoute.kind === "services"
+          ? row.serviceRoute.section === "shop"
+            ? "shop"
+            : "quest"
+          : null;
+      ctx.publishView();
+    }
     if (outcome.sent && row.key === "look-target") {
       ctx.closePresenceCard();
     }
     return outcome;
   };
 
-  // The rows a card lists, in its order (the trailing back row excluded):
-  // the digits address them.
-  function cardPickKeys() {
+  // Take the recorded service origin (the entry a service flow was opened
+  // from) once, for the focus return. Null when the card owns none.
+  ctx.claimPresenceServiceOrigin = function claimPresenceServiceOrigin() {
     const card = ctx.presenceCard;
-    if (!card) {
-      return [];
+    if (!card || !card.serviceOrigin) {
+      return null;
     }
-    if (card.kind === "verbs") {
-      const menu = ctx.frameResolver.explorationVerbs(card.identity);
-      return ((menu && menu.items) || []).filter((item) => !item.goBack).map((item) => item.key);
+    const origin = card.serviceOrigin;
+    card.serviceOrigin = null;
+    card.serviceOriginActor = undefined;
+    card.serviceDrawer = null;
+    ctx.publishView();
+    return origin;
+  };
+
+  // Whether the recorded origin still belongs to the acting body that opened
+  // it: a control swap keeps the card but makes the old flow's return invalid.
+  ctx.presenceServiceOriginValid = function presenceServiceOriginValid() {
+    const card = ctx.presenceCard;
+    if (!card || !card.serviceOrigin) {
+      return false;
     }
-    return railOverflow(ctx.presenceEntries() || []).map((entry) => entry.key);
-  }
+    return (
+      card.serviceOriginActor === undefined ||
+      card.serviceOriginActor === actorIdentity(ctx.reducer.getCommittedState())
+    );
+  };
 
   // Whether the rail is on the stage: exploration with an available panel
   // that lists someone or something, no card open (a presence card or a room
@@ -237,10 +411,18 @@ export function applyPresence(ctx) {
         return false;
       }
       if (!repeat) {
-        const keys = cardPickKeys();
+        // The digit addresses the mapping the card draws, never a re-resolved
+        // position: a changed entry set consumes the press instead of
+        // activating whatever now stands in that slot.
+        const current = cardMapping(rs);
+        if (!current || renderedToken() !== current.token) {
+          ctx.publishView();
+          return true;
+        }
+        const keys = current.keys;
         if (slot < keys.length) {
           if (ctx.presenceCard.kind === "verbs") {
-            ctx.activatePresenceVerb(keys[slot]);
+            ctx.activatePresenceVerb(keys[slot], current.token);
           } else {
             ctx.activatePresence(keys[slot]);
           }
@@ -268,24 +450,32 @@ export function applyPresence(ctx) {
   // The commit-time settle (design D2; redesign §7): run at every publish,
   // after the frame stack settles. In order: a mode other than exploration
   // closes the card; a committed move closes it; then, only against an
-  // available panel, a verb card whose person is no longer an interact
-  // target closes with the `<name> 已經離開了。` flash, and an overflow card
-  // with nothing left to fold closes quietly. While a submission is in
-  // flight or awaiting its revision the departure check waits: 交談 can
-  // commit an intermediate exploration state before the dialogue commit, and
-  // the card (with its standee) must hold until that settles.
+  // available panel, a verb card whose person is no longer an interact target
+  // closes with the `<name> 已經離開了。` flash -- in that commit, whatever else
+  // is in flight, so no late service route can act for a provider that left --
+  // and an overflow card with nothing left to fold closes quietly. The one
+  // exception is this card's own 交談 handover: an intermediate exploration
+  // commit that still lacks the host waits for the dialogue commit, and the
+  // card (with its standee) holds until it settles. A possession swap is not a
+  // departure: the same player keeps the card, and the changed acting body
+  // only changes the mapping signature, so a selection made before the swap
+  // is re-made rather than executed.
+  //
+  // Unreadable presence retires the card quietly: the committed presentation
+  // can no longer establish the target's availability, so the card and its
+  // pending route go, but nobody is reported as departed.
   ctx.settlePresence = function settlePresence(rs) {
     const card = ctx.presenceCard;
     if (card === null) {
       return;
     }
     if (rs.mode !== "exploration") {
-      ctx.presenceCard = null;
+      closeCard();
       return;
     }
     const location = currentLocation(rs);
     if (isMove(card.location, location)) {
-      ctx.presenceCard = null;
+      closeCard(true);
       return;
     }
     if (location !== null) {
@@ -297,28 +487,61 @@ export function applyPresence(ctx) {
     }
     const entries = ctx.presenceEntries();
     if (entries === null) {
+      closeCard(true);
       return;
     }
     if (card.kind === "overflow") {
       if (entries.length <= RAIL_MAX) {
-        ctx.presenceCard = null;
+        closeCard();
       }
-      return;
-    }
-    if (ctx.explorationSubmitLocked()) {
       return;
     }
     const present = entries.some((entry) => entry.presence === "target" && entry.identity === card.identity);
     if (!present) {
-      ctx.presenceCard = null;
+      if (ctx.explorationSubmitLocked() && card.talkRequestId != null) {
+        // This card's own talk handover is still in flight: the dialogue
+        // commit owns the close.
+        return;
+      }
+      closeCard(true);
       ctx.presenceNoticeSeq += 1;
       ctx.presenceNotice = { seq: ctx.presenceNoticeSeq, name: card.name };
+      return;
+    }
+    if (card.talkRequestId != null) {
+      // The host is back in a committed commit: the handover no longer defers.
+      card.talkRequestId = null;
     }
   };
+
+  // Retire the card and its mapping, and close the service drawer the card's
+  // own entry opened (a departed provider's flow goes with it). Focus is the
+  // card-close watcher's and then the existing rail/compass fallback's.
+  // `invalidateRoutes` also drops a pending dialogue route this card opened,
+  // so a late dialogue presentation cannot apply a focus the card no longer
+  // owns; the mode handover (a committed dialogue) is NOT an invalidation and
+  // keeps its route.
+  function closeCard(invalidateRoutes) {
+    const card = ctx.presenceCard;
+    ctx.presenceCard = null;
+    ctx.presenceMapping = null;
+    ctx.presenceAcknowledged = null;
+    if (!card) {
+      return;
+    }
+    if (invalidateRoutes && ctx.dialogueFocusTopic && ctx.dialogueFocusTopic.npcId === card.identity) {
+      ctx.clearDialogueFocus();
+    }
+    if (card.serviceDrawer && ctx.hudDrawer.value === card.serviceDrawer) {
+      ctx.closeHudDrawer();
+    }
+  }
 
   // Drop the slice without publishing (a root reset or a new transport).
   ctx.resetPresence = function resetPresence() {
     ctx.presenceCard = null;
+    ctx.presenceMapping = null;
+    ctx.presenceAcknowledged = null;
   };
 
   // The view slice.
@@ -330,10 +553,14 @@ export function applyPresence(ctx) {
       const menu = ctx.frameResolver.explorationVerbs(card.identity);
       verbs = menu && Array.isArray(menu.items) ? menu.items : null;
     }
+    ctx.presenceMapping = card ? cardMapping(rs) : null;
     return {
       presenceEntries: entries || [],
       presenceCard: card ? { ...card } : null,
       presenceVerbs: verbs,
+      // The mapping these rows were rendered from (slice U): the card draws
+      // its token, and an activation names it back.
+      presenceMapping: ctx.presenceMapping,
       presenceNotice: ctx.presenceNotice,
       railVisible: ctx.railVisible(rs),
     };

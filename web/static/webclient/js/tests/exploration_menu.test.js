@@ -833,15 +833,27 @@ test("every available panel carries the room row the place card reads", () => {
   assert.ok(ExplorationMenu.lookItems(panel).some((item) => item.key === "look-room"));
 });
 
-test("verbMenuFor keeps payload order and appends 查看 then back", () => {
+test("verbMenuFor keeps the common slots, then services, then back", () => {
   const panel = validPanel();
   const model = ExplorationMenu.buildMenus(panel, { currentNode: "room:3" });
   const menu = ExplorationMenu.verbMenuFor(model, panel.interact[0]);
   assert.deepEqual(
     menu.items.map((item) => item.key),
-    ["talk-open", "service-shop", "service-guild.register", "look-target", "back"]
+    ["talk-open", "look-target", "service-shop", "service-guild.register", "back"]
   );
-  const look = menu.items[3];
+  assert.deepEqual(
+    menu.items.map((item) => item.group),
+    ["common", "common", "services", "services", undefined],
+    "the card groups the common slots, then the contextual services"
+  );
+  // Each row carries its group's heading; the copy itself is presentation, so
+  // only the grouping contract is asserted here.
+  const labels = menu.items.map((item) => item.groupLabel);
+  assert.ok(labels.slice(0, 4).every((label) => typeof label === "string" && label.trim().length > 0));
+  assert.equal(labels[0], labels[1], "the common rows share one heading");
+  assert.notEqual(labels[1], labels[2], "the services group has its own heading");
+  assert.equal(labels[4], undefined, "the return row is in no group");
+  const look = menu.items[1];
   assert.equal(look.label, "查看");
   assert.equal(look.actionId, "explore.look");
   assert.deepEqual(look.payload, { target_id: 5 });
@@ -850,11 +862,73 @@ test("verbMenuFor keeps payload order and appends 查看 then back", () => {
   assert.equal(menu.grid, undefined, "the popover is a vertical list");
 });
 
-test("verbMenuFor yields 查看 and back for a target with no mapped affordance", () => {
+test("the conditional group follows its fixed order whatever the descriptor order", () => {
+  const panel = validPanel();
+  const persona = {
+    kind: "navigate",
+    surface: "npc_persona",
+    label: "編輯人物設定",
+    enabled: true,
+    disabled_reason: null,
+  };
+  const target = Object.assign({}, panel.interact[0], {
+    affordances: [
+      persona,
+      { kind: "action", action_id: "explore.possess", label: "附身", enabled: true, disabled_reason: null },
+      { kind: "action", action_id: "explore.party_leave", label: "解散", enabled: true, disabled_reason: null },
+      { kind: "action", action_id: "explore.party_invite", label: "邀請", enabled: true, disabled_reason: null },
+    ],
+    services: { state: "none", entries: [] },
+  });
+  const model = ExplorationMenu.buildMenus(panel, { currentNode: "room:3" });
+  const menu = ExplorationMenu.verbMenuFor(model, target);
+  assert.deepEqual(
+    menu.items.map((item) => item.key),
+    ["talk-open", "look-target", "party-invite", "party-leave", "possess", "service-npc_persona", "back"]
+  );
+  assert.deepEqual(
+    menu.items.slice(2, 6).map((item) => item.group),
+    ["conditional", "conditional", "conditional", "conditional"]
+  );
+});
+
+test("a possess row submits explore.possess with the target identity", () => {
+  const panel = validPanel();
+  const target = Object.assign({}, panel.interact[0], {
+    affordances: [
+      {
+        kind: "action",
+        action_id: "explore.possess",
+        label: "附身",
+        enabled: true,
+        disabled_reason: null,
+      },
+    ],
+    services: { state: "none", entries: [] },
+  });
+  const model = ExplorationMenu.buildMenus(panel, { currentNode: "room:3" });
+  const row = ExplorationMenu.verbMenuFor(model, target).items.find(
+    (item) => item.key === "possess"
+  );
+  assert.equal(row.actionId, "explore.possess");
+  assert.deepEqual(row.payload, { npc_id: target.identity });
+});
+
+test("a target with no talk row keeps a disabled 交談 at slot 1 and 查看 at slot 2", () => {
   const panel = overviewPanel();
   const model = ExplorationMenu.buildMenus(panel, { currentNode: "room:3" });
   const menu = ExplorationMenu.verbMenuFor(model, panel.interact[0]);
-  assert.deepEqual(menu.items.map((item) => item.key), ["look-target", "back"]);
+  assert.deepEqual(
+    menu.items.map((item) => item.key),
+    ["talk-open", "look-target", "back"],
+    "the fixed common slots are never taken by another row"
+  );
+  const talk = menu.items[0];
+  assert.equal(talk.enabled, false);
+  assert.equal(talk.actionId, null, "the fallback slot is never callable");
+  assert.equal(talk.payload, null);
+  assert.equal(talk.disabledReason.code, "not_conversable");
+  assert.ok(talk.description && talk.description.trim());
 });
 
 // npc-persona-editor-window D1: the 編輯人物設定 navigate row opens the author
@@ -875,6 +949,7 @@ test("verbMenuFor maps the npc_persona affordance to a bound editor row", () => 
   assert.equal(row.openNpcPersona, target.identity);
   assert.equal(row.actionId, null, "opening the editor dispatches nothing itself");
   assert.equal(row.openDrawer, undefined);
+  assert.equal(row.group, "conditional");
 
   const reason = { code: "npc_persona.unavailable", message: "此角色的設定目前無法編輯或尚未初始化。" };
   const disabledTarget = Object.assign({}, target, {

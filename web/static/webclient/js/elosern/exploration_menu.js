@@ -5,14 +5,14 @@
  * builders the exploration screen reads outside the keyboard router: the
  * bounded exit list and look room/entity/object rows, the suggestions card's
  * rows, and each interact target's server-authored
- * affordances (交談, engage, party, delivery, or a navigate-kind guild/shop
- * service entry). Move payloads carry the canonical
+ * affordances (交談, engage, party, possession, delivery, or the author
+ * editor) plus its contextual services. Move payloads carry the canonical
  * `current_node` supplied by the local-map panel so `explore.move` passes its
  * stale guard.
  *
- * The `navigate`-kind service affordance is dock-navigation only: it opens a
- * frameless drawer (guild -> quest, shop -> shop) and is never
- * submitted as an action. Disabled entries stay focusable so their
+ * A contextual service entry carries its own route and identity: it opens the
+ * selected provider's existing drawer, dialogue or command pre-fill and is
+ * never submitted as an action. Disabled entries stay focusable so their
  * server-provided reason is readable, and every server string is display
  * text -- never parsed narrative.
  *
@@ -28,7 +28,10 @@
  * (`lookItems`) and the suggestions rows (`suggestionsMenu`) are the place
  * card's and the suggestions card's (exploration-room-actions); the place
  * card's rest entry reads no builder rows (redesign-rest-entry). `verbMenuFor` is an
- * interact target's verb card (the target's affordances plus 查看).
+ * interact target's interaction card: the common group (交談 at slot 1,
+ * 查看 at slot 2, both kept when unavailable), the conditional operations in
+ * their fixed order, the contextual services, then the unnumbered return
+ * (slice U). Every row carries its stable identity and group.
  *
  * No `document` or `window` access at load time; Node tests exercise the model
  * directly and the GoldenLayout exploration dock binds it to the keyboard
@@ -269,14 +272,74 @@
   // text says so instead of silently disappearing.
   var SERVICES_UNREADABLE = "服務資訊暫時無法讀取。";
 
+  // The interaction card's row groups (slice U): the common interactions keep
+  // the first two slots, the conditional operations follow in their fixed
+  // order, and the contextual services come last before the unnumbered
+  // return. The labels are the card's real, labelled group headings; nothing
+  // derives them from CSS.
+  var GROUP_COMMON = "common";
+  var GROUP_CONDITIONAL = "conditional";
+  var GROUP_SERVICES = "services";
+  var GROUP_LABELS = {
+    common: "一般",
+    conditional: "互動",
+    services: "服務"
+  };
+
+  // The deterministic conditional order (§8.1): invite, leave, possess,
+  // possess release, deliver, then the author editor last. A key outside the
+  // table sorts after the table in its descriptor order.
+  var CONDITIONAL_RANK = {
+    "party-invite": 0,
+    "party-leave": 1,
+    possess: 2,
+    "possess-release": 3,
+    deliver: 4,
+    "service-npc_persona": 5
+  };
+  var CONDITIONAL_KEYS = Object.keys(CONDITIONAL_RANK);
+
+  function conditionalRank(key) {
+    return Object.prototype.hasOwnProperty.call(CONDITIONAL_RANK, key)
+      ? CONDITIONAL_RANK[key]
+      : CONDITIONAL_KEYS.length;
+  }
+
+  function grouped(item, group) {
+    item.group = group;
+    item.groupLabel = GROUP_LABELS[group];
+    return item;
+  }
+
+  // The one disabled 交談 row a target whose descriptor carries no talk row of
+  // its own still keeps in slot 1. It is never callable: no action id, no
+  // payload, so it grants no talk authority.
+  var NOT_CONVERSABLE = "對方無法交談。";
+
+  function fallbackTalkItem(target) {
+    return {
+      key: "talk-open",
+      label: "交談",
+      enabled: false,
+      actionId: null,
+      payload: null,
+      description: NOT_CONVERSABLE,
+      disabledReason: { code: "not_conversable", message: NOT_CONVERSABLE },
+      commandDisplay: { npcLabel: (target && target.display_name) || "" }
+    };
+  }
+
   // One contextual service entry as a flat card row (npc-contextual-service-
-  // projection; U later groups these rows). The row carries the server-authored
+  // projection; U groups these rows under the services heading). The row
+  // carries the server-authored
   // route verbatim; the store consumes it and the renderer never parses a
   // label. The route retains the provider through every consumer.
   function serviceItem(entry) {
     var route = entry && entry.route ? entry.route : null;
     var reason = (entry && entry.disabled_reason) || null;
     var item = {
+      // The stable entry identity addresses the row: a service is selected by
+      // its own key, never by a ring position.
       key: "service-" + (entry && entry.key ? entry.key : "unknown"),
       label: (entry && entry.label) || "",
       enabled: !!(entry && entry.enabled),
@@ -305,10 +368,15 @@
     }
     if (services.state === "unreadable") {
       return [
-        disabledItem("services-unreadable", SERVICES_UNREADABLE, SERVICES_UNREADABLE),
+        grouped(
+          disabledItem("services-unreadable", SERVICES_UNREADABLE, SERVICES_UNREADABLE),
+          GROUP_SERVICES
+        )
       ];
     }
-    return (services.entries || []).map(serviceItem);
+    return (services.entries || []).map(function (entry) {
+      return grouped(serviceItem(entry), GROUP_SERVICES);
+    });
   }
 
   function targetMenuFor(model, target) {
@@ -320,7 +388,7 @@
           // The one 交談 row per conversable host: it opens the conversation
           // (the dialogue variant carries the keyword choices and the free
           // row), so the row dispatches explore.talk_open directly.
-          items.push({
+          items.push(grouped({
             key: "talk-open",
             label: affordance.label || "交談",
             enabled: !!affordance.enabled,
@@ -331,9 +399,9 @@
               : (affordance.disabled_reason && affordance.disabled_reason.message) || null,
             disabledReason: affordance.disabled_reason || null,
             commandDisplay: { npcLabel: target.display_name },
-          });
+          }, GROUP_COMMON));
         } else if (affordance.action_id === "explore.party_invite") {
-          items.push({
+          items.push(grouped({
             key: "party-invite",
             label: affordance.label || "邀請",
             enabled: !!affordance.enabled,
@@ -343,14 +411,14 @@
               ? null
               : (affordance.disabled_reason && affordance.disabled_reason.message) || null,
             disabledReason: affordance.disabled_reason || null,
-          });
+          }, GROUP_CONDITIONAL));
           if (affordance.enabled) {
             items[items.length - 1].commandDisplay = {
               targetLabel: target.display_name,
             };
           }
         } else if (affordance.action_id === "explore.party_leave") {
-          items.push({
+          items.push(grouped({
             key: "party-leave",
             label: affordance.label || "解散",
             enabled: !!affordance.enabled,
@@ -360,14 +428,31 @@
               ? null
               : (affordance.disabled_reason && affordance.disabled_reason.message) || null,
             disabledReason: affordance.disabled_reason || null,
-          });
+          }, GROUP_CONDITIONAL));
+          if (affordance.enabled) {
+            items[items.length - 1].commandDisplay = {
+              targetLabel: target.display_name,
+            };
+          }
+        } else if (affordance.action_id === "explore.possess") {
+          items.push(grouped({
+            key: "possess",
+            label: affordance.label || "附身",
+            enabled: !!affordance.enabled,
+            actionId: affordance.enabled ? "explore.possess" : null,
+            payload: affordance.enabled ? { npc_id: target.identity } : null,
+            description: affordance.enabled
+              ? null
+              : (affordance.disabled_reason && affordance.disabled_reason.message) || null,
+            disabledReason: affordance.disabled_reason || null,
+          }, GROUP_CONDITIONAL));
           if (affordance.enabled) {
             items[items.length - 1].commandDisplay = {
               targetLabel: target.display_name,
             };
           }
         } else if (affordance.action_id === "explore.engage") {
-          items.push({
+          items.push(grouped({
             key: "engage",
             label: affordance.label || "戰鬥",
             enabled: !!affordance.enabled,
@@ -377,7 +462,7 @@
               ? null
               : (affordance.disabled_reason && affordance.disabled_reason.message) || null,
             disabledReason: affordance.disabled_reason || null,
-          });
+          }, GROUP_CONDITIONAL));
           if (affordance.enabled) {
             items[items.length - 1].commandDisplay = {
               targetLabel: target.display_name,
@@ -387,7 +472,7 @@
           // The delivery payload is the server-normalized affordance params
           // (npc_id + item_key) forwarded byte-for-byte; the menu never
           // reconstructs a bound quest payload from the target identity.
-          items.push({
+          items.push(grouped({
             key: "deliver",
             label: affordance.label || "交付",
             enabled: !!affordance.enabled,
@@ -402,7 +487,7 @@
               ? null
               : (affordance.disabled_reason && affordance.disabled_reason.message) || null,
             disabledReason: affordance.disabled_reason || null,
-          });
+          }, GROUP_CONDITIONAL));
           if (affordance.enabled) {
             items[items.length - 1].commandDisplay = {
               // The echo is the server-authored affordance label ("交付
@@ -421,7 +506,7 @@
         // as its explanation. Supported services are the target's separate
         // `services` field below, never a coarse surface opener.
         if (affordance.surface === "npc_persona") {
-          items.push({
+          items.push(grouped({
             key: "service-npc_persona",
             label: affordance.label || "編輯人物設定",
             enabled: !!affordance.enabled,
@@ -432,13 +517,13 @@
               ? null
               : (affordance.disabled_reason && affordance.disabled_reason.message) || null,
             disabledReason: affordance.disabled_reason || null,
-          });
+          }, GROUP_CONDITIONAL));
         }
       }
     });
     items = items.concat(serviceItems(target));
      if (items.length === 0) {
-       items.push(disabledItem("target-empty", "此對象沒有可用的互動。", null));
+       items.push(grouped(disabledItem("target-empty", "此對象沒有可用的互動。", null), GROUP_CONDITIONAL));
      }
      items.push(backItem());
      // The breadcrumb's current segment is the target's own display name
@@ -455,34 +540,76 @@
 
   // -------------------------------------------------------------------------
   // Verb card (exploration-presence-rail; webclient-scene-overview-component
-  // design D2): the target's
-  // affordance rows in payload order (the same mapping as `targetMenuFor`),
-  // then 查看, then the back row. A target with no mapped affordance yields
-  // 查看 and back only. A vertical list: no grid geometry.
+  // design D2; grouped by slice U): the fixed common slots, then the
+  // conditional operations in their deterministic order, then the contextual
+  // services, then the unnumbered return. Talk stays at slot 1 and 查看 at
+  // slot 2 for every target, both kept (disabled, with their reason) when
+  // unavailable, so no other row ever takes them. A vertical list: no grid
+  // geometry.
   // -------------------------------------------------------------------------
 
-  function verbMenuFor(model, target) {
-    var base = targetMenuFor(model, target);
-    var items = base.items.filter(function (item) {
-      return item.key !== "target-empty" && item.key !== "back";
+  function identityOf(target) {
+    return target && target.identity;
+  }
+
+  function targetName(target) {
+    return (target && target.display_name) || "";
+  }
+
+  // The common group: the server's own 交談 row when the target carries one,
+  // else the fixed disabled slot (never callable), then 查看.
+  function commonItems(target) {
+    var base = targetMenuFor(null, target);
+    var talk = null;
+    var items = [];
+    base.items.forEach(function (item) {
+      if (!talk && item.key === "talk-open") {
+        talk = item;
+      }
     });
-    var identity = target && target.identity;
-    var name = (target && target.display_name) || "";
+    items.push(talk || grouped(fallbackTalkItem(target), GROUP_COMMON));
     items.push({
       key: "look-target",
       label: "查看",
       enabled: true,
       actionId: "explore.look",
-      payload: { target_id: identity },
+      payload: { target_id: identityOf(target) },
       description: null,
-      commandDisplay: { targetLabel: name },
+      commandDisplay: { targetLabel: targetName(target) },
+      group: GROUP_COMMON,
+      groupLabel: GROUP_LABELS[GROUP_COMMON],
     });
+    return items;
+  }
+
+  function verbMenuFor(model, target) {
+    var base = targetMenuFor(model, target);
+    var conditional = base.items
+      .filter(function (item) {
+        return item.group === GROUP_CONDITIONAL && item.key !== "target-empty";
+      })
+      .map(function (item, index) {
+        // A stable rank keeps the fixed conditional order whatever order the
+        // descriptor listed them in.
+        return { item: item, index: index };
+      })
+      .sort(function (left, right) {
+        var delta = conditionalRank(left.item.key) - conditionalRank(right.item.key);
+        return delta !== 0 ? delta : left.index - right.index;
+      })
+      .map(function (entry) {
+        return entry.item;
+      });
+    var services = base.items.filter(function (item) {
+      return item.group === GROUP_SERVICES;
+    });
+    var items = commonItems(target).concat(conditional, services);
     items.push(backItem());
     return {
       items: items,
       focusKey: null,
       target: target,
-      title: name || "互動",
+      title: targetName(target) || "互動",
     };
   }
 

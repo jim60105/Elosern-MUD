@@ -66,6 +66,7 @@ from web.webclient.presentation.affordances import (
     MAX_MOVE_EXITS,
     MAX_NODE_ID_CHARS,
     _DIALOGUE_UNAVAILABLE_REASON,
+    _NOT_CONVERSABLE_REASON,
     _bounded_display_name,
     _entity_kind,
     _exit_ref,
@@ -795,6 +796,22 @@ def _interact_targets(
             )
         elif is_dialogue_host(obj):
             code, message = _DIALOGUE_UNAVAILABLE_REASON
+            affordances.append(
+                {
+                    "kind": "action",
+                    "action_id": "explore.talk_open",
+                    "label": "交談",
+                    "enabled": False,
+                    "disabled_reason": {"code": code, "message": message},
+                }
+            )
+        elif isinstance(obj, NPC):
+            # The card's fixed common slot 1 (slice U): a visible NPC with no
+            # supported conversation keeps 交談, disabled, carrying the stable
+            # not-conversable reason, so no conditional or service row can take
+            # the slot. It grants no talk authority -- ``explore.talk_open``
+            # still rejects with ``not_dialogue_host``.
+            code, message = _NOT_CONVERSABLE_REASON
             affordances.append(
                 {
                     "kind": "action",

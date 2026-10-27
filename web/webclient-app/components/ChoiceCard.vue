@@ -74,6 +74,11 @@ const props = defineProps({
   // [{key, label, hint, badge, kind, enabled, reason, back, icon, testId,
   //   reasonTestId, keywordId}]
   rows: { type: Array, default: () => [] },
+  // The interaction mapping these rows were rendered from (slice U): a
+  // consumer that owns a stable entry mapping publishes its token here, and
+  // the DOM copy is what an activation reads back, so an activation can never
+  // name a mapping the player did not see.
+  mappingToken: { type: String, default: null },
   // Muted lines above the rows; never selectable, never a digit.
   notes: { type: Array, default: () => [] },
   // Rows re-key (and re-stagger) when this changes.
@@ -128,8 +133,32 @@ const digitCount = computed(() =>
   props.digitRows === null ? props.rows.filter((row) => !row.back).length : props.digitRows,
 );
 
+// The rows' contiguous groups (slice U): a run of rows sharing a `group`
+// identity draws one real labelled group (`role="group"` with a heading it
+// references) inside the composite. A card whose rows carry no group renders
+// one unlabelled wrapper, so every other consumer's semantics are unchanged.
+// The heading is not a row: it is never focusable, never a menuitem, takes no
+// digit and never moves the roving index.
+const groupedRows = computed(() => {
+  const groups = [];
+  props.rows.forEach((row, index) => {
+    const id = row.group || "";
+    const last = groups[groups.length - 1];
+    if (last && last.id === id) {
+      last.rows.push({ row, index });
+      return;
+    }
+    groups.push({ id, label: row.groupLabel || null, rows: [{ row, index }] });
+  });
+  return groups;
+});
+
 function rowId(index) {
   return `${idPrefix}-row-${index}`;
+}
+
+function groupHeadingId(group) {
+  return `${idPrefix}-group-${group.id}`;
 }
 
 function reasonId(index) {
@@ -301,7 +330,9 @@ watch(
 function setActive(index) {
   activeIndex.value = index;
   void nextTick(() => {
-    const el = Array.from(scrollRef.value?.children || []).find((child) => child.id === rowId(index));
+    // The row is resolved by its own id, not by its position among the
+    // scroller's children: grouped rows are grandchildren of the scroller.
+    const el = document.getElementById(rowId(index));
     el?.scrollIntoView?.({ block: "nearest" });
   });
 }
@@ -402,13 +433,22 @@ function focus() {
   listRef.value?.focus({ preventScroll: true });
 }
 
+// Focus one row by its stable key (slice U): a service flow returns focus to
+// the entry that opened it while that entry survives, else to the card's
+// first valid row.
+function focusRow(key) {
+  const index = props.rows.findIndex((row) => row.key === key);
+  setActive(index >= 0 ? index : firstEnabled(props.rows));
+  focus();
+}
+
 onMounted(() => {
   if (props.autofocus) {
     focus();
   }
 });
 
-defineExpose({ focus, setActive });
+defineExpose({ focus, setActive, focusRow });
 </script>
 
 <template>
@@ -428,6 +468,7 @@ defineExpose({ focus, setActive });
     tabindex="0"
     :data-testid="testId"
     :data-view="viewKey || null"
+    :data-mapping-token="mappingToken || null"
     :aria-activedescendant="rows.length ? rowId(activeIndex) : null"
     @keydown="onKeydown"
     @focusin="cardFocused = true"
@@ -451,7 +492,23 @@ defineExpose({ focus, setActive });
       @animationend="onRowsScroll"
     >
     <div
-      v-for="(row, index) in rows"
+      v-for="group in groupedRows"
+      :key="`${viewKey}-group-${group.id}`"
+      :class="cls('__group')"
+      :role="group.id ? 'group' : null"
+      :aria-labelledby="group.label ? groupHeadingId(group) : null"
+      :data-group="group.id || null"
+    >
+    <div
+      v-if="group.label"
+      :id="groupHeadingId(group)"
+      :class="cls('__group-heading')"
+      role="heading"
+      aria-level="3"
+      data-testid="choice-card-group-heading"
+    >{{ group.label }}</div>
+    <div
+      v-for="({ row, index }) in group.rows"
       :id="rowId(index)"
       :key="`${viewKey}-${row.key}`"
       :class="[
@@ -475,7 +532,12 @@ defineExpose({ focus, setActive });
       @click="onRowClick(index)"
       @mouseenter="hoverKey = row.key"
     >
-      <span :class="cls('__badge')" aria-hidden="true" :data-badge="row.badge">
+      <span
+        v-if="row.badge || row.icon"
+        :class="cls('__badge')"
+        aria-hidden="true"
+        :data-badge="row.badge"
+      >
         <!-- The keyboard glyph draws tiny in the loaded text faces, so a
              keyboard badge is drawn as a small keyboard. -->
         <svg
@@ -559,6 +621,7 @@ defineExpose({ focus, setActive });
         <rect x="5.5" y="10.5" width="13" height="9.5" rx="1.6" />
         <path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5M12 14.2v2.4" />
       </svg>
+    </div>
     </div>
     </div>
     <!-- The accessible copies of the rows' hints: descriptions, outside every
@@ -684,6 +747,28 @@ defineExpose({ focus, setActive });
 
 .choice-card__caption + .choice-card__rows {
   padding-top: calc(8px * var(--ui-scale));
+}
+
+/* A labelled row group (slice U): the heading is a caption step above its
+   rows, never a row itself -- it takes no badge, no digit, no focus and no
+   hover fill, and the group is its accessible name. */
+.choice-card__group {
+  display: flex;
+  flex-direction: column;
+  gap: inherit;
+}
+
+.choice-card__group + .choice-card__group {
+  margin-top: clamp(2px, 0.37vh, 4px * var(--ui-scale));
+}
+
+.choice-card__group-heading {
+  flex: none;
+  padding: calc(6px * var(--ui-scale)) calc(12px * var(--ui-scale)) 0;
+  font: var(--text-xs) / 1.3 var(--f-sans);
+  letter-spacing: 0.24em;
+  color: var(--paper-400);
+  text-transform: none;
 }
 
 /* Keyboard focus on the one tab stop: the card keeps its drop shadow (the
