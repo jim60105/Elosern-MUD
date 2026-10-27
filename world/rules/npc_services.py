@@ -397,28 +397,18 @@ def _dialogue_entries(actor: Any, npc: Any) -> list[ServiceEntry]:
     gate = _service_gate_reason(actor, npc, component, schedule_kind="talk")
     if gate is None and not authorized_dialogue_open(actor, npc):
         gate = _reason(REASON_POSSESSED)
-    if gate is not None:
-        return [
-            _entry(
-                f"dialogue.{service.key}",
-                service.label,
-                ServiceRoute(ROUTE_DIALOGUE, npc_id, topic_id=service.topic_id),
-                gate,
-            )
-            for service in source.dialogue.services
-        ]
     rows = {
         row.topic_id: row for row in project_topics(availability_context(actor, npc))
     }
     entries: list[ServiceEntry] = []
-    for service in source.dialogue.services:
+    for service in sorted(source.dialogue.services, key=lambda service: service.key):
         row = rows.get(service.topic_id)
         if row is None:
             # Hidden by canonical disclosure/permission: the entry is omitted
             # entirely, exactly like the topic it advertises.
             continue
-        reason = None
-        if row.availability == TOPIC_LOCKED:
+        reason = gate
+        if reason is None and row.availability == TOPIC_LOCKED:
             reason = ServiceReason(
                 REASON_TOPIC_LOCKED, row.requirement_hint or TOPIC_LOCKED_MESSAGE
             )

@@ -330,6 +330,11 @@ class DialogueAssociationProjectionTests(_ProjectionBase):
         )
         self.assertEqual(services.state, STATE_NONE)
 
+    def test_schedule_refusal_never_discloses_a_hidden_association(self):
+        self.host.db.schedule_state = "busy"
+        services = self._project_with(source=_dialogue_source([self.service]), rows=[])
+        self.assertEqual(services.state, STATE_NONE)
+
     def test_a_locked_association_stays_focusable_but_disabled(self):
         services = self._project_with(
             source=_dialogue_source([self.service]),
@@ -387,7 +392,17 @@ class ProjectionFailureTests(_ProjectionBase):
             )
 
         before = snapshot()
-        self._project(host)
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        with CaptureQueriesContext(connection) as queries:
+            self._project(host)
+        writes = [
+            query["sql"] for query in queries
+            if query["sql"].lstrip().split(" ", 1)[0].upper()
+            in {"INSERT", "UPDATE", "DELETE", "REPLACE"}
+        ]
+        self.assertEqual(writes, [])
         after = snapshot()
         self.assertEqual(before, after)
 
@@ -395,20 +410,20 @@ class ProjectionFailureTests(_ProjectionBase):
 class ServiceCapacityTests(EvenniaTest):
     def test_native_entry_count_matches_the_mapping(self):
         self.assertEqual(native_entry_count(()), 0)
-        self.assertEqual(native_entry_count({"merchant"}), 1)
-        self.assertEqual(native_entry_count({"guild_staff"}), 3)
+        self.assertEqual(native_entry_count({Merchant.name}), 1)
+        self.assertEqual(native_entry_count({GuildStaff.name}), 3)
         self.assertEqual(
-            native_entry_count({"merchant", "guild_staff", "church_host"}), 5
+            native_entry_count({Merchant.name, GuildStaff.name, ChurchHost.name}), 5
         )
 
     def test_capacity_rejects_overflow_instead_of_truncating(self):
-        validate_service_capacity({"guild_staff"}, 13)  # 3 + 13 == 16
+        validate_service_capacity({GuildStaff.name}, 13)  # 3 + 13 == 16
         with self.assertRaises(ValueError):
-            validate_service_capacity({"guild_staff"}, 14)
+            validate_service_capacity({GuildStaff.name}, 14)
         with self.assertRaises(TypeError):
-            validate_service_capacity({"guild_staff"}, True)
+            validate_service_capacity({GuildStaff.name}, True)
         with self.assertRaises(ValueError):
-            validate_service_capacity({"guild_staff"}, -1)
+            validate_service_capacity({GuildStaff.name}, -1)
 
     def test_route_shape_rejects_a_foreign_or_malformed_value(self):
         with self.assertRaises(ValueError):

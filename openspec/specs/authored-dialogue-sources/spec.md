@@ -17,7 +17,7 @@ Static dialogue SHALL be discovered from the flat `world/lore/dialogue/content/<
 - **THEN** loading rejects that file with an identity-named error
 
 ### Requirement: Unsafe or invalid content rejects the whole candidate snapshot
-Loading SHALL reject duplicate mapping keys, unsafe YAML constructs, unknown profiles, duplicate bindings, schema/reference errors and exceeded bounds before publishing any candidate entries. Successful publication SHALL expose one deeply immutable snapshot. Generated/private package dialogue SHALL remain outside this static snapshot.
+Loading SHALL reject duplicate mapping keys, unsafe YAML constructs, unknown profiles, duplicate bindings, schema/reference errors and exceeded bounds before publishing any candidate entries. Successful publication SHALL expose one deeply immutable snapshot. Generated/private package dialogue SHALL remain outside this static snapshot. Optional exact `services` rows SHALL reject duplicate, unsupported, dangling or cross-phase associations atomically; host assembly SHALL reject native plus associated entry overflow before persistence.
 
 #### Scenario: One invalid neighbor prevents partial publication
 - **WHEN** several valid files and one invalid file are loaded together

@@ -102,7 +102,7 @@ GENERATED_CAPABILITY_TYPES = frozenset({"quest_issuer", "scripted_dialogue"})
 #: trusted scoped ``service_id``. A generated scripted dialogue's
 #: ``dialogue_key`` and a commission issuer's ``issuer_key`` are the two
 #: authored identities; the scoped identity itself is always trusted.
-GENERATED_CAPABILITY_KWARGS: dict[str, frozenset[str]] = {
+_GENERATED_CAPABILITY_KWARGS: dict[str, frozenset[str]] = {
     "quest_issuer": frozenset({"issuer_key"}),
     "scripted_dialogue": frozenset({"dialogue_key"}),
 }
@@ -343,7 +343,7 @@ def _compile_role_capabilities(
             )
         kwargs = _require_mapping(entry.get("kwargs"), f"{where}.kwargs")
         unknown_kwargs = (
-            set(kwargs) - GENERATED_CAPABILITY_KWARGS[type_key] - {"service_id"}
+            set(kwargs) - _GENERATED_CAPABILITY_KWARGS[type_key] - {"service_id"}
         )
         if unknown_kwargs:
             _reject_package(

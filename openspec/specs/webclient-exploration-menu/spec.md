@@ -5,11 +5,11 @@ The read-only version-3 `exploration` panel and version-7 `character` panel, the
 ## Requirements
 
 ### Requirement: The exploration panel is an exact read-only version-4 presentation panel
-The production presentation registry SHALL register panel name `exploration` at schema version 4 with `available` true and `kind` `exploration`, and its available payload SHALL contain exactly `schema_version`, `available`, `kind`, `move`, `look`, `interact`, `character`, `quests`, and `inventory`.
+The production presentation registry SHALL register panel name `exploration` at schema version 5 with `available` true and `kind` `exploration`, and its available payload SHALL contain exactly `schema_version`, `available`, `kind`, `move`, `look`, `interact`, `character`, `quests`, and `inventory`.
 
 #### Scenario: Exploration snapshot carries the exploration root
 - **WHEN** a puppeted WebClient in exploration mode receives a full snapshot
-- **THEN** `exploration` reports schema version 4 and `kind == "exploration"`, the current Exits in `move`, the present room/entities/objects in `look`, and the present interact targets with their legal affordances, while a before/after comparison of canonical game state is unchanged
+- **THEN** `exploration` reports schema version 5 and `kind == "exploration"`, the current Exits in `move`, the present room/entities/objects in `look`, and the present interact targets with their legal affordances, while a before/after comparison of canonical game state is unchanged
 
 #### Scenario: A bound companion's possess affordance never degrades the panel
 - **WHEN** the room contains a bound companion of the actor and the full `exploration` panel is
@@ -57,8 +57,9 @@ The production presentation registry SHALL register panel name `exploration` at 
 
 #### Scenario: Interact targets carry exactly their four fields and a bounded affordance list
 - **WHEN** the presenter builds `interact`
-- **THEN** it is a bounded list of at most 32 present target descriptors, each carrying exactly `identity`, `display_name`, nullable `portrait_ref`, and a bounded `affordances` list of at most 8 descriptors
-- **AND** a target descriptor carries no keyword list and no other field, because a conversation's topics reach the browser only through the `dialogue` panel's `choices` once the conversation is open
+- **THEN** it is a bounded list of at most 32 present target descriptors, each carrying exactly `identity`, `display_name`, nullable `portrait_ref`, `services` and a bounded `affordances` list of at most 8 descriptors
+- **AND** `services` carries state `none|ready|unreadable` and at most 16 entries with exact `key`, `label`, `enabled`, `disabled_reason` and selected-provider `route`, independently of general affordances
+- **AND** topic bodies reach the browser only through the `dialogue` panel after opening
 
 #### Scenario: An action affordance carries exactly its five fields
 - **WHEN** the presenter serializes an action affordance
@@ -75,8 +76,8 @@ The production presentation registry SHALL register panel name `exploration` at 
 
 #### Scenario: A navigation affordance carries exactly its five fields and opens only a drawer
 - **WHEN** the presenter serializes a navigation affordance
-- **THEN** it contains exactly `kind` (`"navigate"`), `surface` (one of `"guild"` or `"shop"`), `label`, `enabled`, and nullable `disabled_reason`
-- **AND** navigation affordances are dock-navigation descriptors only; they are NOT registered action adapters, never enter a `ui_action` payload, and only tell the browser to open the corresponding service drawer
+- **THEN** it contains exactly `kind` (`"navigate"`), `surface` (`"npc_persona"`), `label`, `enabled`, and nullable `disabled_reason`
+- **AND** navigation affordances open the author editor; selected-provider services use their separate route union and never grant execution authority
 
 #### Scenario: Availability entries carry only the available boolean
 - **WHEN** the presenter builds `character`, `quests`, and `inventory`
@@ -91,8 +92,8 @@ The production presentation registry SHALL register panel name `exploration` at 
 - **THEN** it is built only from canonical room, entity, component, object, and service data, emits no live object or filesystem reference, does not mutate location, traits, knowledge, dialogue, quests, inventory, or world time, and uses the registered common unavailable form outside exploration mode
 
 #### Scenario: Available schema versions cut over together
-- **WHEN** either validator receives an available exploration panel with schema version 4, and then otherwise identical panels with version 3 or another unsupported version
-- **THEN** only version 4 is accepted, including its non-null reference fields, and no dual-version conversion is performed
+- **WHEN** either validator receives an available exploration panel with schema version 5, and then otherwise identical panels with version 4 or another unsupported version
+- **THEN** only version 5 is accepted, including its non-null reference fields, and no dual-version conversion is performed
 
 ### Requirement: explore.talk_open opens a conversation with the host's greeting
 The production action registry SHALL register `explore.talk_open`, whose payload SHALL accept exactly `npc_id` (a positive integer). The adapter SHALL obtain the actor from the authenticated session and SHALL reject, before writing anything: an unlawful possessed actor, an unresolvable `npc_id`, a schedule-blocked host, and a non-conversable host. On success it SHALL record the session through the deterministic dialogue-session seam and publish a full snapshot at one newer revision.
@@ -233,7 +234,7 @@ Existing exploration affordances SHALL remain server-authored. Party invite SHAL
 
 #### Scenario: A navigate service affordance needs an unambiguous usable host
 - **WHEN** the presenter decides whether to offer a `navigate`-kind service affordance (`surface` `"guild"` or `"shop"`)
-- **THEN** it is offered only when the current room has exactly one unambiguous `GuildStaff` or `Merchant` host for a service the actor can use, and it opens the corresponding service drawer rather than inventing a mutation
+- **THEN** no coarse guild/shop navigation is emitted; each selected NPC's independent services retain exact provider identity, even with multiple same-class hosts
 
 #### Scenario: No affordance references a remote, absent, or ambiguous target
 - **WHEN** the presenter builds any interact affordance

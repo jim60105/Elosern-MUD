@@ -552,6 +552,7 @@ class AuthoredDialoguePossessionTests(EvenniaTest):
         result = _buy_adapter(
             self.companion,
             {
+                "npc_id": merchant_host.pk,
                 "item_key": potion,
                 "quantity": 1,
                 "recipient_id": self.companion.pk,

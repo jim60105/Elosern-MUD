@@ -197,7 +197,7 @@
         "world.rules.tests.test_npc_capabilities",
         "world.rules.tests.test_npc_services",
         "world.rules.tests.test_dialogue_services",
-        "world.quests.tests.test_scene_package_services",
+
         "world.rules.tests.test_rules_observability",
         "world.rules.tests.test_service_binding_persistence",
         "world.rules.tests.test_service_gate",

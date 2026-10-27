@@ -118,6 +118,23 @@ class GeneratedServicePackageTests(RegistryIsolationMixin, EvenniaTest):
         with self.assertRaises(ScenePackageError):
             validate_scene_package(payload)
 
+    def test_dangling_and_cross_phase_topics_reject_before_publication(self):
+        for topic_id in ("missing", "daughter_offer", "g:foreign-phase"):
+            with self.subTest(topic_id=topic_id):
+                with self.assertRaises(ScenePackageError):
+                    validate_scene_package(self._payload(service_topic=topic_id))
+
+    def test_every_phase_validates_its_own_service_effect(self):
+        from copy import deepcopy
+
+        payload = self._payload()
+        later = deepcopy(payload["dialogue"][0]["phases"][0])
+        later["phase_id"] = "later"
+        later["topic_effects"] = []
+        payload["dialogue"][0]["phases"].append(later)
+        with self.assertRaises(ScenePackageError):
+            validate_scene_package(payload)
+
     def test_services_without_the_dialogue_capability_reject(self):
         payload = self._payload()
         payload["roles"][0]["capabilities"] = issuer_capabilities("story_mother")
@@ -211,6 +228,35 @@ class GeneratedServiceActivationTests(RegistryIsolationMixin, EvenniaTest):
         )
         (service,) = source.dialogue.services
         self.assertEqual(service.topic_id, offer.topic_id)
+
+    def test_opening_and_explicit_activation_have_separate_effect_authority(self):
+        from web.webclient.actions.exploration_actions import _talk_open_adapter
+        from world.rules.dialogue import live_dialogue_session, select_authored_topic
+
+        mother = self._mother()
+        entry = project_npc_services(self.player, self.player, mother).entries[0]
+        result = _talk_open_adapter(self.player, {"npc_id": mother.pk})
+        self.assertEqual(result["outcome"], "success")
+        session = live_dialogue_session(self.player)
+        self.assertEqual(session.completion_receipts, ())
+        self.assertEqual(session.selection_receipts, ())
+        self.assertEqual(read_records(self.player), [])
+        select_authored_topic(
+            self.player, mother, entry.route.topic_id,
+            selection_id="explicit-offer", expected_context_id=session.context_id,
+        )
+        self.assertTrue(read_records(self.player))
+
+    def test_departed_service_host_is_never_replaced_by_a_bystander(self):
+        from web.webclient.actions.exploration_actions import _talk_open_adapter
+        from typeclasses.npcs import NPC
+
+        mother = self._mother()
+        create_object(NPC, key="bystander", location=self.room)
+        mother.location = None
+        result = _talk_open_adapter(self.player, {"npc_id": mother.pk})
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(read_records(self.player), [])
 
 
 if __name__ == "__main__":

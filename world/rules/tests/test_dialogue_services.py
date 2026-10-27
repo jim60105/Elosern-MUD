@@ -14,6 +14,7 @@ import unittest
 from pathlib import Path
 
 from evennia.utils.test_resources import EvenniaTest
+from typeclasses.components import GuildStaff
 
 from world.lore.dialogue import loader
 from world.lore.dialogue.codec import (
@@ -183,7 +184,7 @@ class DialogueServicePolicyTests(unittest.TestCase):
         self.assertEqual(
             native_supported_topic_ids("t_narrative", dialogue), set()
         )
-        self.assertEqual(required_capability_types(GUILD_STAFF_DIALOGUE_KEY), {"guild_staff"})
+        self.assertEqual(required_capability_types(GUILD_STAFF_DIALOGUE_KEY), {GuildStaff.name})
         self.assertEqual(required_capability_types("t_narrative"), set())
 
     def test_a_dangling_reference_rejects_the_source(self):
@@ -253,7 +254,7 @@ class StaticLoaderAtomicityTests(EvenniaTest):
                 loader.load_dialogue_snapshot(
                     directory,
                     profiles=frozenset({"t_one"}),
-                    bindings={"guild_staff": "t_one"},
+                    bindings={GUILD_STAFF_DIALOGUE_KEY: "t_one"},
                     references=_references(),
                 )
 
@@ -264,10 +265,10 @@ class StaticLoaderAtomicityTests(EvenniaTest):
             snapshot = loader.load_dialogue_snapshot(
                 directory,
                 profiles=frozenset({"t_one"}),
-                bindings={"guild_staff": "t_one"},
+                bindings={GUILD_STAFF_DIALOGUE_KEY: "t_one"},
                 references=_references(),
             )
-        (row,) = snapshot["guild_staff"].services
+        (row,) = snapshot[GUILD_STAFF_DIALOGUE_KEY].services
         self.assertEqual(row.key, "guild_report_dialogue")
 
 
