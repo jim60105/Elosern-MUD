@@ -45,7 +45,7 @@ def continent_data() -> dict:
             key: {
                 "display_name_zh": f"region-{key}",
                 "nation_key": None,
-                "terrain_flavor_zh": [f"flavor-{key}"],
+                "terrain_flavor_zh": [f"flavor-{key}", f"second-flavor-{key}"],
                 "nominal_nation_keys": [],
                 "scene_archetype": None,
             }

@@ -294,6 +294,38 @@ def test_structural_defects_are_load_rejections(mutator, code):
     assert code in _codes(captured.value)
 
 
+@pytest.mark.parametrize(
+    "mutator, code",
+    [
+        (
+            lambda continent: continent["regions"]["eastern_plains"].__setitem__(
+                "terrain_flavor_zh", ["only one variant"]
+            ),
+            "invalid_collection_size",
+        ),
+        (
+            lambda continent: continent["regions"]["eastern_plains"].__setitem__(
+                "terrain_flavor_zh", ["a real variant", "   "]
+            ),
+            "invalid_field_value",
+        ),
+        (
+            lambda continent: continent["regions"]["eastern_plains"].__setitem__(
+                "display_name_zh",
+                continent["regions"]["southeast_coast"]["display_name_zh"],
+            ),
+            "duplicate_value",
+        ),
+    ],
+)
+def test_region_declarations_reject_incomplete_or_duplicate_authoring(mutator, code):
+    continent = fixtures.continent_data()
+    mutator(continent)
+    with pytest.raises(AuthoringError) as captured:
+        load_authoring_world(fixtures.custom_sources(continent=continent))
+    assert code in _codes(captured.value)
+
+
 def test_duplicate_outgoing_direction_is_structural():
     data = fixtures.settlement_data()
     data["nodes"]["market"] = {
