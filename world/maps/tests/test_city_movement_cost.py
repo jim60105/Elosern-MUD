@@ -19,6 +19,9 @@ from world.maps.static_references import settlement_node_xyz
 from world.rules.clock import CLOCK_YAML, get_world_clock
 
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+from world.tests.geography_fixture import publish_shipped_geography
+
+publish_shipped_geography()
 
 SOUTH_GATE_XYZ = settlement_node_xyz(
     WILDERNESS_ENTRY_REGISTRY["capital_altoria"].gate_for("n").destination
@@ -50,10 +53,11 @@ class SampleCityCostedExitTests(EvenniaTest):
     def test_fresh_spawn_every_intra_city_exit_is_costed_xyz_exit(self):
         sync_grid()
         exits = self._intra_city_exits()
-        # 52 capital directed links + 18 village (ciaran-village-crafts grew
-        # the village tree from five links to nine; every link spawns the
-        # costed exit in both directions).
-        self.assertEqual(len(exits), 70)
+        # Every authored directed road spawns the costed exit.
+        self.assertEqual(
+            len(exits),
+            sum(len(graph.edges) for graph in SETTLEMENT_GRAPHS.values()),
+        )
         for exit_obj in exits:
             self.assertIsInstance(exit_obj, CostedXYZExit)
 

@@ -6,9 +6,7 @@ from tools.spec_traceability import covers_requirement
 import unittest
 from dataclasses import fields, replace
 from types import MappingProxyType
-from unittest.mock import patch
 
-from world.lore import anchors as anchors_module
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY, AnchorPlacement
 from world.maps.static_references import anchor_entrance_xyz
 from world.lore.anchors import (
@@ -130,22 +128,25 @@ class AnchorPlacementRegistryTests(unittest.TestCase):
     )
     def test_world_position_transform_adds_the_cell_center_not_the_cell_index(self):
         from world.maps import geography as geography_module
+        from world.maps import map_data as map_data_module
 
         synthetic = {
             "t_frame_anchor": GeographicAnchor("t_frame_anchor", (2, 3), "synthetic")
         }
         frames = {"t_frame_anchor": LocalFrameAnchor("t_frame_anchor", (100, 200))}
         previous = geography_module.current()
+        previous_settlements = map_data_module.current()
         geography_module.publish(
             replace(previous, anchor_geography=MappingProxyType(synthetic))
         )
+        map_data_module.publish(
+            replace(previous_settlements, local_frame_anchors=MappingProxyType(frames))
+        )
         try:
-            with patch.dict(
-                anchors_module.LOCAL_FRAME_ANCHOR_REGISTRY, frames, clear=True
-            ):
-                self.assertEqual(
-                    world_position_m("t_frame_anchor", (150, 260)),
-                    (2500 + 50, 3500 + 60),
-                )
+            self.assertEqual(
+                world_position_m("t_frame_anchor", (150, 260)),
+                (2500 + 50, 3500 + 60),
+            )
         finally:
             geography_module.publish(previous)
+            map_data_module.publish(previous_settlements)
