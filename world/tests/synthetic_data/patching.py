@@ -8,9 +8,15 @@ import importlib
 import unittest.mock
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import ContextDecorator, ExitStack
+from dataclasses import replace
 from types import MappingProxyType
 
-from world.tests.synthetic_data.targets import REGISTRY_TARGETS, _CONTENT, _TARGET_DEPENDENCIES
+from world.tests.synthetic_data.targets import (
+    GEOGRAPHY_TARGETS,
+    REGISTRY_TARGETS,
+    _CONTENT,
+    _TARGET_DEPENDENCIES,
+)
 from world.tests.synthetic_data.discovery import (
     discover_consumer_bindings,
     discover_import_time_derivations,
@@ -40,7 +46,7 @@ class synthetic_registries(ContextDecorator):
     ) -> None:
         names = list(dict.fromkeys(logicals))
         for logical in names:
-            if logical not in REGISTRY_TARGETS:
+            if logical not in REGISTRY_TARGETS and logical not in GEOGRAPHY_TARGETS:
                 raise KeyError(f"unknown synthetic registry target {logical!r}")
         # Dependency closure: rows whose construction resolves foreign keys
         # through other catalogs require those targets in the same scope.
@@ -83,7 +89,10 @@ class synthetic_registries(ContextDecorator):
         try:
             _resolve_import_time_derivations(self._logicals)
             for logical in _dependency_order(self._logicals):
+                if logical in GEOGRAPHY_TARGETS:
+                    continue
                 _apply_target(stack, logical, self._extra)
+            _apply_geography(stack, self._logicals, self._extra)
         except Exception:
             # A failed __enter__ never reaches __exit__; unwind the partial
             # stack here so the scope leaves no patches behind.
@@ -198,6 +207,38 @@ def _apply_target(
     stack.callback(_late_binder_sweep, logical, replacement, shipped)
     if revalidate:
         _revalidate_skill_lineage()
+
+
+def _apply_geography(
+    stack: ExitStack,
+    logicals: tuple[str, ...],
+    extra: Mapping[str, Mapping[str, object]],
+) -> None:
+    """Substitute the map-owned composed views for this scope.
+
+    The geography domains are one immutable published snapshot, so they cannot
+    be patched as separate module attributes. The scope publishes a snapshot
+    whose selected composed views are the synthetic catalogs and restores the
+    previously published snapshot on exit; the shared terrain snapshot and the
+    cross-domain joins are unchanged, which is exactly the catalog
+    substitution a behavior test asks for.
+    """
+
+    selected = [logical for logical in logicals if logical in GEOGRAPHY_TARGETS]
+    if not selected:
+        return
+    from world.maps import geography as geography_module
+
+    if not geography_module.is_published():
+        geography_module.publish(geography_module.load_geography())
+    previous = geography_module.current()
+    overrides = {}
+    for logical in selected:
+        content = dict(_CONTENT[logical]())
+        content.update(extra.get(logical, {}))
+        overrides[GEOGRAPHY_TARGETS[logical]] = MappingProxyType(content)
+    geography_module.publish(replace(previous, **overrides))
+    stack.callback(geography_module.publish, previous)
 
 
 def _revalidate_skill_lineage() -> None:

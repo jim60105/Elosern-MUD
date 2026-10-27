@@ -1,29 +1,52 @@
 # Continental geography and coordinate units
 
-`world/lore/` owns the frozen physical geography of the known continent. These
-declarations are authoring contracts only: they spawn no rooms and are
-independent of persistent room lifecycle. `world/maps/wilderness_provider.py`
-hands them to the pure rules in `packages/map-core/elosern_map_core/terrain.py`
-through one explicit ``TERRAIN`` snapshot: the runtime provider is the same
-2700 by 2700 one-kilometre frame, and the variable cell span the travel-cost
-core reads is `WILDERNESS_KM_PER_CELL = 1`.
+The authored physical geography of the known continent lives in two map
+sources: `content/maps/continent.yaml` (frame, mainland boundary, terrain
+regions and prose, classifier parameters, waterways and fords, forest edge,
+ridge/passes and the reserved harbour sites) and `content/maps/locations.yaml`
+(every static geographic location's kind, name, description, cell and
+geographic constraint, including the unbuilt capitals, villages and dungeons).
+These declarations are authoring contracts only: they spawn no rooms, floors or
+instances and are independent of persistent room lifecycle.
+
+`world/maps/geography.py` is the one game-side adapter. It reads both
+canonical documents from an explicit root through `elosern_map_core`,
+composes the read-only views (terrain rules, region views, harbour sites,
+location identity and cell) and validates every cross-domain join before it
+publishes one immutable `GeographySnapshot`. Publication is atomic: a failed
+candidate leaves the previously published snapshot untouched. The game
+composition root loads and publishes at startup
+(`geography_source_publication`, the first startup step); tests and tools
+call `load_and_publish()` explicitly. Nothing loads or validates at import.
+
+Political affiliation, population and dungeon floor counts are *not* map
+fields: they stay in `world/lore/anchors.py::ANCHOR_LORE` and are joined by the
+same stable location identity. Settlement graphs, bindings, districts and
+interiors remain their own Python authorities until their own cutover.
+
+The pure classification, waterway rasterization and derivation rules live in
+`packages/map-core/elosern_map_core/terrain.py` and run over the snapshot's
+explicit `TerrainDefinition`: the runtime provider is the same 2700 by 2700
+one-kilometre frame, and `wilderness_provider.WILDERNESS_KM_PER_CELL`
+projection reads the authored `cell_size_km = 1`.
 
 ## Runtime terrain and validity
 
 One shared cell-validity rule (`is_valid_wilderness_cell`, a
 `world/maps/wilderness_provider.py` wrapper binding the live footprint
-registry and the authored `TERRAIN` snapshot into the core rule) decides
+registry and the published terrain snapshot into the core rule) decides
 validity: inside the frame, inside the mainland polygon
 evaluated at the cell centre, off the cliff-walled central summit ridge, off
 the authored inland waterways, and outside every live anchor footprint. Sea,
 ridge and water are impassable on foot; the authored pass windows
-(`RIDGE_PASSES`, the principal one near `(1410, 980)`) and the declared
-`WATERWAY_FORDS` are ordinary walkable ground. Every query is bounded local
-arithmetic, with no frame scan or room materialization.
+(`terrain.ridge.passes`, the principal one near `(1410, 980)`) and the declared
+waterway fords are ordinary walkable ground. Every query is bounded local
+arithmetic, with no frame scan or room materialization; derived tables belong
+to the snapshot, so a reload never reuses another world's results.
 
-`region_for_coordinates` classifies the whole frame into the declared registry
-regions with the authored bending mountain corridor, the meandering northern
-deep forest edge (`NORTH_FOREST_EDGE`, averaging about Y 1920 and covering
+`region_for_coordinates` classifies the whole frame into the declared region
+views with the authored bending mountain corridor, the meandering northern
+deep forest edge (`terrain.forest_edge`, averaging about Y 1920 and covering
 about one fifth of the land) and the border river; `terrain_description`
 stays the pinned `(x * 92821 + y * 68917) % len(variants)` form. Altoria's
 rasterized footprint is a 40 km² irregular mask and Ciaran is a hidden point
@@ -32,13 +55,14 @@ ordinary wilderness steps.
 
 ## Border river, forest edge and nominal claims
 
-界河 (`WATERWAY_ROUTES["border_river"]`) rises at the mountain corridor's
+界河 (`terrain.waterways["border_river"]` in the continent document) rises at
+the mountain corridor's
 first cell `(1320, 1410)` and meanders west inside Y 1290..1410 to the west
 coast at `(124, 1290)`. Its segments are all shallower than 45 degrees, so the
 existing rasterizer lays exactly one water cell per column and
 `border_river_row(x)` returns that cell. Corner cutting is forbidden for
 diagonal steps, so the one-cell line is a complete barrier; its three fords
-(`WATERWAY_FORDS["border_river"]`: upstream `(1150, 1363)`, principal
+(the same waterway's `fords`: upstream `(1150, 1363)`, principal
 `(830, 1370)` on the line between the Altoria and Valhalla capitals,
 downstream `(450, 1345)`) are the only crossings west of the source. East of
 the source the mountain corridor and the ridge passes still connect the two
@@ -208,14 +232,16 @@ tile run.
 
 ## Declarations
 
-| Module | Declaration | Contract |
+| Owner | Declaration | Contract |
 | --- | --- | --- |
-| `world/lore/wilderness_regions.py` | `MAINLAND_BOUNDARY_KM` | Ordered mainland boundary vertices in absolute `(east, north)` kilometres; implicitly closed. Shoelace area is exactly 5,000,000 km². |
-| `world/lore/wilderness_regions.py` | `CONTINENT_FRAME_CELLS`, `CONTINENT_CELL_SIZE_KM` | Wilderness cells are logical one-kilometre areas; the frame is 2700 × 2700 cells (`0 <= X, Y < 2700`). The cell-centre arithmetic and its `500` metre offset live in `elosern_map_core.geometry`. |
-| `world/lore/wilderness_regions.py` | `HARBOR_SITE_REGISTRY` | Reserved land-side harbor cells with their intended roles. A functional site is not a named anchor, city, quest or population. |
-| `world/lore/wilderness_regions.py` | `is_wilderness_cell`, `mainland_area_km2`, `is_on_mainland` | Thin bindings of the declarations above into `elosern_map_core.geometry`; boundary points count as land. |
-| `world/lore/anchors.py` | `ANCHOR_GEOGRAPHY_REGISTRY` | The canonical wilderness cell and geographic constraint of every declared lore anchor. Separate from both lore identity (`ANCHOR_REGISTRY`) and built grid rooms (`ANCHOR_PLACEMENT_REGISTRY`). |
-| `world/lore/anchors.py` | `LOCAL_FRAME_ANCHOR_REGISTRY`, `world_position_m` | Settlement-local metre anchor bindings; the transform itself is `elosern_map_core.geometry.local_to_world_m`. |
+| `content/maps/continent.yaml` | `frame_cells`, `cell_size_km`, `mainland_boundary_km` | Ordered mainland boundary vertices in absolute `(east, north)` kilometres; implicitly closed. Shoelace area is exactly 5,000,000 km². Wilderness cells are logical one-kilometre areas; the frame is 2700 × 2700 cells (`0 <= X, Y < 2700`). The cell-centre arithmetic and its `500` metre offset live in `elosern_map_core.geometry`. |
+| `content/maps/continent.yaml` | `regions` | The seven terrain regions with their display names, nominal claims, at least two nonblank prose variants and their map-owned `scene_archetype`, validated against the game scene catalog at publication. |
+| `content/maps/continent.yaml` | `terrain` | Every classifier input: forest edge, ridge parameters and passes, coastal boundary, waterways with their fords and the border-river key. |
+| `content/maps/continent.yaml` | `harbor_sites` | Reserved land-side harbor cells with their intended roles. A functional site is not a named anchor, city, quest or population. |
+| `content/maps/locations.yaml` | `locations` | Every static geographic location's kind, name, description, cell and geographic constraint, including locations with no built settlement or interior. |
+| `world/maps/geography.py` | `load_geography`, `publish`, `current` | Explicit document load, cross-domain validation and atomic publication of the immutable `GeographySnapshot`; every consumer reads `current()`. |
+| `world/lore/wilderness_regions.py` | `regions`, `harbor_sites`, `frame_cells`, `mainland_boundary_km`, `is_wilderness_cell`, `mainland_area_km2`, `is_on_mainland` | Thin read-only accessors over the published snapshot, bound into `elosern_map_core.geometry`; boundary points count as land. |
+| `world/lore/anchors.py` | `anchors`, `anchor_geography`, `ANCHOR_LORE` | The composed location views (map-facing fields plus the non-map nation/population/floor lore joined by identity). `LOCAL_FRAME_ANCHOR_REGISTRY` and `world_position_m` stay settlement-local frame declarations; the transform itself is `elosern_map_core.geometry.local_to_world_m`. |
 | `world/lore/nations.py` | `CONTINENT_AREA_KM2`, `CONTINENT_POPULATION`, `ELVEN_POPULATION`, `NEUTRAL_LANDS_AREA_KM2`, `NEUTRAL_LANDS_POPULATION`, `CAPITAL_POPULATION_SHARE` | Rounded continental totals. The neutral lands have no separate regional population total. |
 | `world/lore/nations.py` | `Nation.territory_km2`, `CapitalSupport`, `CAPITAL_SUPPORT_REGISTRY` | National area targets and the authored regional food/storage/water support (Valhalla additionally declares pastoral production and trade). |
 
@@ -242,15 +268,17 @@ Nothing in the declarations creates per-cell population or resource state.
 
 ## Ownership boundary
 
-`world/lore/` owns read-only declarations. The runtime map, travel-cost and
-presentation owners consume them; persistent room relocation remains the
-responsibility of `world/maps` synchronization. Declaring an anchor cell
-reveals nothing; knowledge and visibility rules remain authoritative, and
-`ANCHOR_GEOGRAPHY_REGISTRY` is not a lore-codex category.
+The map sources own every map-facing declaration; `world/lore/` owns the
+non-map lore joined to them and the read-only view types. The runtime map,
+travel-cost and presentation owners consume the published snapshot;
+persistent room relocation remains the responsibility of `world/maps`
+synchronization. Declaring a location cell reveals nothing; knowledge and
+visibility rules remain authoritative, and `anchor_geography()` is not a
+lore-codex category.
 
 `ANCHOR_PLACEMENT_REGISTRY` describes exactly
-the anchors with a built grid map; all geographic cells live in
-`ANCHOR_GEOGRAPHY_REGISTRY` instead. A placement holds the qualified
+the locations with a built grid map; all geographic cells live in
+`anchor_geography()` instead. A placement holds the qualified
 settlement-node identity of the anchor room; its current grid address is
 derived through `world/maps/static_references.py`.
 
@@ -263,7 +291,7 @@ records resolve, from their current stage's objective:
 
 | Family | Source | `world_cell` | Local identity (`map_key`, `node_id`) |
 | --- | --- | --- | --- |
-| ANCHOR locator | `ANCHOR_GEOGRAPHY_REGISTRY` | the anchor's cell | the built entrance node from `ANCHOR_PLACEMENT_REGISTRY`, when it exists in the settlement graph |
+| ANCHOR locator | `anchor_geography()` | the anchor's cell | the built entrance node from `ANCHOR_PLACEMENT_REGISTRY`, when it exists in the settlement graph |
 | GRID locator | the placement whose `zcoord` is the locator's map | the settlement's anchor cell | the locator's own `grid:<map>:<x>:<y>` node, when it exists in the settlement graph |
 | BOUND_INSTANCE locator | the accepted record's `stage_room_id` | the bound room's origin-room cell, when one resolves | the canonical `room:<dbref>` identity, when the bound room is a live `InstanceRoom` |
 | Species hunt | the objective's `region_key` | the legal cell of that region nearest the player | `wild:elosern:<x>:<y>` |
@@ -275,7 +303,7 @@ actual node. When the settlement exists but the named node does not, the world
 cell is kept and the local identity is absent.
 
 The nearest hunt cell is the cell of the target region, inside the region's
-`REGION_SEARCH_BOXES` window, that passes `is_valid_wilderness_cell` and has the
+`region_search_boxes()` window, that passes `is_valid_wilderness_cell` and has the
 smallest squared Euclidean cell distance to the player; ties go to the smaller
 `x`, then the smaller `y`. The search visits 16-cell tiles in order of their
 lower-bound distance and remembers which tiles hold no cell of the region
@@ -299,12 +327,18 @@ bearing and distance.
 
 ## Verification
 
+The source conversion and adapter mechanisms run as plain unit tests; the
+game consumer contracts run under the Evennia test runner (`<env>` holds
+`MUD_TEST_SETTINGS=1`):
+
 ```sh
-uv run --locked python -m unittest \
-  world.lore.tests.test_nations \
-  world.lore.tests.test_anchors \
+uv run --locked --env-file=<env> evennia test --settings test_settings.py --keepdb \
+  world.maps.tests.test_geography_source \
   world.lore.tests.test_wilderness_regions \
+  world.lore.tests.test_anchors \
+  world.lore.tests.test_nations \
   world.lore.tests.test_anchor_placement
+uv run --locked python -m unittest tests.test_map_geographic_sources
 uv run --locked python -m tools.spec_traceability check
 uv run --locked python -m tools.test_data_lint check
 ```

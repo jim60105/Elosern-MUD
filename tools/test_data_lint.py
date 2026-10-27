@@ -275,6 +275,30 @@ def _rulebook_keys(root: Path) -> set[str]:
     return keys
 
 
+def _harvest_geography(root: Path, out: set[str]) -> None:
+    """Harvest the YAML-authored geography's composed public views.
+
+    ``content/maps/continent.yaml`` and ``locations.yaml`` are the map-facing
+    authority, so their keys and display fields must stay in the token
+    universe exactly like a Python catalog's. The views are read through the
+    game adapter so the harvest follows the same composition consumers use.
+    """
+
+    from world.maps import geography as geography_module
+
+    if not geography_module.is_published():
+        geography_module.publish(geography_module.load_geography(root))
+    snapshot = geography_module.current()
+    for view in (
+        snapshot.regions,
+        snapshot.harbor_sites,
+        snapshot.anchors,
+        snapshot.anchor_geography,
+    ):
+        out.update(key for key in view if isinstance(key, str) and key)
+        _harvest_display(view, set(), out)
+
+
 #: Wire schema version for the cold-derivation subprocess payload.
 UNIVERSE_WIRE_VERSION = 1
 UNIVERSE_WIRE_FIELDS = (
@@ -425,6 +449,7 @@ def _derive_universe(root: Path) -> Universe:
                 if attr.isupper() and SYMBOL_RE.search(attr):
                     symbols.add(attr)
                 _harvest_display(value, set(), tokens)
+    _harvest_geography(root, tokens)
     tokens.update(_rulebook_keys(root))
 
     deny_path = root / DENY_PATH
