@@ -70,11 +70,14 @@ class ServiceBindingReport:
     :func:`service_available` refuses on. ``anchor_on_person`` records the
     anchored ``person`` binding the capability importer rejects (the runtime
     gate stays permissive: it never checked this and admissibility must not
-    change here). Both are read-only facts for configuration inspection;
-    nothing in this module repairs or rejects authored data.
+    change here). ``anchor_raw`` is the stored value exactly as written;
+    ``anchor_room`` is populated only when a ``place`` binding's anchor was
+    actually resolved. Read-only facts for configuration inspection; nothing
+    in this module repairs or rejects authored data.
     """
 
     binding: str | None
+    anchor_raw: Any
     anchor_room_id: int | None
     anchor_room: Any | None
     gate_malformed: bool
@@ -87,23 +90,27 @@ def read_service_binding(component: Any) -> ServiceBindingReport:
     Reads only persisted component fields (``service_binding`` /
     ``anchor_room_id``) and answers the same questions the runtime gate asks,
     without its debounced warn event: an inspection read must not emit the
-    gameplay malformed-binding reminder.
+    gameplay malformed-binding reminder. A non-``place`` binding reports its
+    stored anchor without resolving it — that reference is never used, so
+    claiming it cannot resolve would be false.
     """
     binding = getattr(component, "service_binding", None)
     raw_anchor = getattr(component, "anchor_room_id", None)
+    if binding == "person":
+        # An anchor on a person binding is authored data the importer rejects;
+        # the runtime gate never checked it, so it stays an inspection fact.
+        return ServiceBindingReport(
+            binding, raw_anchor, None, None, False, raw_anchor is not None
+        )
+    if binding != "place":
+        return ServiceBindingReport(binding, raw_anchor, None, None, True, False)
     anchor_id = (
         None
         if isinstance(raw_anchor, bool) or not isinstance(raw_anchor, int)
         else raw_anchor
     )
-    if binding == "person":
-        # An anchor on a person binding is authored data the importer rejects;
-        # the runtime gate never checked it, so it stays an inspection fact.
-        return ServiceBindingReport(binding, anchor_id, None, False, raw_anchor is not None)
-    if binding != "place":
-        return ServiceBindingReport(binding, anchor_id, None, True, False)
     if anchor_id is None:
-        return ServiceBindingReport(binding, anchor_id, None, True, False)
+        return ServiceBindingReport(binding, raw_anchor, None, None, True, False)
     # The anchor lives whenever a ROOM row with that id exists (Evennia deletes
     # the location reference with the room, so no dangling-location state can
     # masquerade as at-anchor). The query converts each row to its stored
@@ -117,8 +124,10 @@ def read_service_binding(component: Any) -> ServiceBindingReport:
 
     anchor_row = next(iter(ObjectDB.objects.filter(pk=anchor_id)), None)
     if anchor_row is None or not isinstance(anchor_row, Room):
-        return ServiceBindingReport(binding, anchor_id, None, True, False)
-    return ServiceBindingReport(binding, anchor_id, anchor_row, False, False)
+        return ServiceBindingReport(binding, raw_anchor, anchor_id, None, True, False)
+    return ServiceBindingReport(
+        binding, raw_anchor, anchor_id, anchor_row, False, False
+    )
 
 
 def _warn_malformed(host: Any, component: Any) -> None:
@@ -168,12 +177,20 @@ def service_available(actor: Any, host: Any, component: Any) -> ServiceVerdict:
     """
     if actor.location is None or host.location != actor.location:
         return _REMOTE
+    # The binding short circuits run before the anchor field is ever read: a
+    # person binding and an unknown binding must answer exactly as before, even
+    # when the stored anchor value is unreadable (design 2026-09-05-service-
+    # anchoring §3).
+    binding = getattr(component, "service_binding", None)
+    if binding == "person":
+        return _ALLOWED
+    if binding != "place":
+        _warn_malformed(host, component)
+        return _MALFORMED
     report = read_service_binding(component)
     if report.gate_malformed:
         _warn_malformed(host, component)
         return _MALFORMED
-    if report.binding == "person":
-        return _ALLOWED
     anchor_pk = getattr(host.location, "pk", None)
     if anchor_pk != report.anchor_room_id:
         return _OFF_ANCHOR

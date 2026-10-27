@@ -30,6 +30,7 @@ from world.rules.dialogue_availability import (
     TOPIC_OPEN,
     TopicProjection,
 )
+from world.rules import npc_services as npc_services_rules
 from world.rules.npc_services import (
     CONTEXT_REQUIRED,
     CONTEXT_REQUIRED_MESSAGE,
@@ -42,6 +43,7 @@ from world.rules.npc_services import (
     project_npc_services,
     validate_service_capacity,
 )
+from world.rules.service_gate import service_available
 
 
 def _scene(scene_id):
@@ -583,3 +585,36 @@ class ManagementInventoryTests(_ProjectionBase):
             in {"INSERT", "UPDATE", "DELETE", "REPLACE"}
         ]
         self.assertEqual(writes, [])
+
+    def test_a_malformed_declared_dialogue_key_is_unreadable_not_empty(self):
+        host = self._host("t_壞生成鍵")
+        self._add(
+            host, ScriptedDialogue.create(host, dialogue_key="scene_role:broken")
+        )
+        # No resolver patch: the stored key is declared but cannot produce an
+        # identity, which must stay visible as an unknown inventory.
+        services = inspect_npc_services(host)
+        self.assertEqual(services.state, STATE_UNREADABLE)
+        self.assertEqual(services.entries, ())
+
+
+class ProjectionEvaluationTests(_ProjectionBase):
+    """The player projection keeps its original read count and sharing."""
+
+    def test_one_possession_read_and_one_gate_per_component_group(self):
+        host = self._host("t_評估順序")
+        self._staff(host)
+        self._reception(host)
+        self._church(host)
+        with patch(
+            "world.rules.npc_services._possessed_by_control",
+            wraps=npc_services_rules._possessed_by_control,
+        ) as possessed, patch(
+            "world.rules.npc_services.service_available",
+            wraps=service_available,
+        ) as gate:
+            services = self._project(host)
+        self.assertEqual(services.state, STATE_READY)
+        self.assertEqual(possessed.call_count, 1)
+        # Staff (one shared verdict for its three rows), reception, church.
+        self.assertEqual(gate.call_count, 3)

@@ -361,7 +361,10 @@ class ServiceBindingReportTests(EvenniaTestCase):
     def test_an_anchored_person_binding_is_a_configuration_fact_only(self):
         report = read_service_binding(_component("person", self.anchor.pk))
         self.assertEqual(report.binding, "person")
-        self.assertEqual(report.anchor_room_id, self.anchor.pk)
+        self.assertEqual(report.anchor_raw, self.anchor.pk)
+        # A person binding never uses (or resolves) the anchor.
+        self.assertIsNone(report.anchor_room_id)
+        self.assertIsNone(report.anchor_room)
         self.assertFalse(report.gate_malformed)
         self.assertTrue(report.anchor_on_person)
 
@@ -391,3 +394,45 @@ class ServiceBindingReportTests(EvenniaTestCase):
             with self.subTest(binding=binding):
                 report = read_service_binding(_component(binding))
                 self.assertTrue(report.gate_malformed)
+
+    def test_an_invalid_anchor_value_keeps_its_raw_form(self):
+        report = read_service_binding(_component("place", "42"))
+        self.assertEqual(report.anchor_raw, "42")
+        self.assertIsNone(report.anchor_room_id)
+        self.assertTrue(report.gate_malformed)
+
+
+class _ExplodingAnchor(_Fake):
+    """A component whose anchor field cannot be read at all."""
+
+    @property
+    def anchor_room_id(self):
+        raise RuntimeError("anchor unreadable")
+
+
+class GateShortCircuitTests(EvenniaTestCase):
+    """The runtime gate answers without touching fields its rules never use."""
+
+    def setUp(self):
+        super().setUp()
+        self.anchor = create_object(Room, key="short anchor")
+        self.square = create_object(Room, key="short square")
+        self.host = create_object(NPC, key="short host", location=self.square)
+
+    def test_a_person_binding_never_reads_the_anchor(self):
+        component = _ExplodingAnchor(service_binding="person")
+        self.assertTrue(
+            service_available(_actor(self.square), self.host, component).allowed
+        )
+
+    def test_an_unknown_binding_still_fails_closed_and_warns(self):
+        component = _ExplodingAnchor(service_binding="world")
+        with patch("world.rules.service_gate.log_warn") as warned:
+            verdict = service_available(_actor(self.square), self.host, component)
+        self.assertEqual(verdict.reason, REASON_MALFORMED_BINDING)
+        self.assertTrue(warned.called)
+
+    def test_a_remote_host_answers_before_any_binding_read(self):
+        component = _ExplodingAnchor(service_binding="place")
+        verdict = service_available(_actor(self.anchor), self.host, component)
+        self.assertEqual(verdict.reason, REASON_REMOTE)

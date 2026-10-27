@@ -305,7 +305,12 @@ def _control_reason(actor: Any) -> ServiceReason | None:
 
 def _native_rows(
     npc: Any,
-) -> list[tuple[list[tuple[str, str, ServiceRoute]], Callable[[Any], ServiceReason | None]]]:
+) -> list[
+    tuple[
+        list[tuple[str, str, ServiceRoute]],
+        Callable[[Any, ServiceReason | None], ServiceReason | None],
+    ]
+]:
     """The host's native capabilities, in the fixed mapping order.
 
     Each group is the entries one component projects plus the one availability
@@ -316,7 +321,10 @@ def _native_rows(
     """
     npc_id = int(getattr(npc, "pk", 0) or 0)
     groups: list[
-        tuple[list[tuple[str, str, ServiceRoute]], Callable[[Any], ServiceReason | None]]
+        tuple[
+            list[tuple[str, str, ServiceRoute]],
+            Callable[[Any, ServiceReason | None], ServiceReason | None],
+        ]
     ] = []
 
     merchant = _component(npc, Merchant)
@@ -326,7 +334,7 @@ def _native_rows(
         groups.append(
             (
                 [("shop", "商店", ServiceRoute(ROUTE_SERVICES, npc_id, section="shop"))],
-                lambda actor: _service_gate_reason(
+                lambda actor, _control: _service_gate_reason(
                     actor, npc, merchant, schedule_kind="service_shop"
                 ),
             )
@@ -340,7 +348,7 @@ def _native_rows(
                     (key, label, ServiceRoute(ROUTE_SERVICES, npc_id, section=section))
                     for key, label, section in _GUILD_STAFF_ROWS
                 ],
-                lambda actor: _control_reason(actor)
+                lambda actor, control: control
                 or _service_gate_reason(
                     actor, npc, staff, schedule_kind="service_guild"
                 ),
@@ -361,7 +369,7 @@ def _native_rows(
                         ServiceRoute(ROUTE_SERVICES, npc_id, section="rank"),
                     )
                 ],
-                lambda actor: _control_reason(actor)
+                lambda actor, control: control
                 or _service_gate_reason(
                     actor, npc, reception, schedule_kind="service_guild"
                 ),
@@ -379,7 +387,7 @@ def _native_rows(
                         ServiceRoute(ROUTE_COMMAND, npc_id, command=CHURCH_JOIN_COMMAND),
                     )
                 ],
-                lambda actor: _control_reason(actor)
+                lambda actor, control: control
                 or _church_reason(actor, npc, church),
             )
         )
@@ -388,9 +396,12 @@ def _native_rows(
 
 def _native_entries(actor: Any, npc: Any) -> list[ServiceEntry]:
     """Project every native capability entry, in the fixed mapping order."""
+    # One possession read for the whole projection, at its original position:
+    # every controlled capability inherits the same verdict.
+    control_reason = _control_reason(actor)
     entries: list[ServiceEntry] = []
     for rows, reason_for in _native_rows(npc):
-        reason = reason_for(actor)
+        reason = reason_for(actor, control_reason)
         entries.extend(_entry(key, label, route, reason) for key, label, route in rows)
     return entries
 
@@ -420,15 +431,19 @@ def read_dialogue_source(npc: Any) -> tuple[Any | None, bool]:
     unknown static key, an unresolved generated phase). Management inspection
     must tell those apart: an unresolvable declared source leaves the service
     inventory unknown rather than silently empty.
+
+    Declaration is read from the stored dialogue key itself, not from whether
+    a source identity could be constructed: a malformed generated key (for
+    example ``scene_role:broken``) is still a declared source, and its
+    resolution failure must stay visible.
     """
-    from world.rules.dialogue_context import host_dialogue_binding
+    from world.rules.dialogue import dialogue_key_for
     from world.rules.dialogue_sources import dialogue_source_for_host
 
     source = dialogue_source_for_host(npc)
     if source is not None:
         return source, True
-    _host_key, identity = host_dialogue_binding(npc)
-    return None, identity is not None
+    return None, dialogue_key_for(npc) is not None
 
 
 def _dialogue_service_rows(
