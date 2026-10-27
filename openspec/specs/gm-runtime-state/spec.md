@@ -87,7 +87,7 @@ Stored truth and `disguised_stats` SHALL be shown side by side; disguise SHALL b
 
 #### Scenario: NPC summary fields
 - **WHEN** an NPC curated summary is rendered
-- **THEN** it includes applicable character fields with plain NPC name and no independent NPC title or duplicate profession summary, shop/guild service components, seven-section persona and version, today's schedule/current slot, dialogue key, memory and dialogue tabs
+- **THEN** it includes applicable character fields with plain NPC name and no independent NPC title or duplicate profession summary, contextual service labels/reasons separated from technical capability binding/anchor diagnostics, seven-section persona and version, today's schedule/current slot, dialogue key, memory and dialogue tabs
 
 #### Scenario: Monster summary fields
 - **WHEN** a monster curated summary is rendered
@@ -246,3 +246,22 @@ Reader acceptance SHALL include one fixed-fixture EvenniaTest module per reader,
 #### Scenario: Shard registration and traceability
 - **WHEN** a new Python test module is added
 - **THEN** it is registered in .github/evennia-shards.json, and requirement coverage follows canonical repository traceability annotations
+
+### Requirement: NPC service inspection separates context from configuration
+GM NPC inspection SHALL show supported service labels separately from capability configuration, including binding and anchor diagnostics. Without a legitimate player context availability SHALL state context required and confer no player authority. GM rendering SHALL remain independent of game frontend components.
+
+#### Scenario: No player context
+- **WHEN** a GM inspects a multi-capability NPC without an actor preview
+- **THEN** service names and explicit context-required reasons are shown without actionable player operations; technical fields remain inspectable
+
+#### Scenario: No fabricated preview
+- **WHEN** the current detail(npc) API has no actor/viewer input
+- **THEN** it retains context_required and no impersonation or player preview route is added
+
+#### Scenario: Malformed configuration
+- **WHEN** one capability has unreadable binding/anchor
+- **THEN** the technical error is reported independently and never presented as a successful empty service list
+
+#### Scenario: Independent applications
+- **WHEN** game and management render NPC services
+- **THEN** each uses its own existing primitives and no Vue import crosses the frontend boundary

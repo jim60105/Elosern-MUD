@@ -193,6 +193,9 @@ class NpcReaderTests(EvenniaTest):
         self.assertIn("版本 1", persona["note"])
         self.assertIn("世代", persona["note"])
 
+    @covers_requirement(
+        "gm-runtime-state::npc-service-inspection-separates-context-from-configuration"
+    )
     def test_services_are_the_projection_entries_with_context_required_availability(self):
         detail = npcs.detail(self.npc)
         services = section_of(detail, "services")
@@ -214,6 +217,9 @@ class NpcReaderTests(EvenniaTest):
         self.assertNotIn("t_follow_up", str(services))
         self.assertNotIn(HIDDEN_TOPIC.topic_id, str(services))
 
+    @covers_requirement(
+        "gm-runtime-state::npc-service-inspection-separates-context-from-configuration"
+    )
     def test_a_present_player_never_changes_the_management_summary(self):
         self.char1.location = self.room1
         services = section_of(npcs.detail(self.npc), "services")
@@ -221,6 +227,9 @@ class NpcReaderTests(EvenniaTest):
             column_values(services, "availability"), ["context_required"] * 4
         )
 
+    @covers_requirement(
+        "gm-runtime-state::npc-service-inspection-separates-context-from-configuration"
+    )
     def test_capability_diagnostics_keep_configuration_out_of_the_summary(self):
         detail = npcs.detail(self.npc)
         diagnostics = section_of(detail, "capability_diagnostics")
@@ -240,6 +249,9 @@ class NpcReaderTests(EvenniaTest):
         # The service summary stays free of the component-field inventory.
         self.assertNotIn("service_id=t_reader_service", str(section_of(detail, "services")))
 
+    @covers_requirement(
+        "gm-runtime-state::npc-service-inspection-separates-context-from-configuration"
+    )
     def test_an_unresolvable_anchor_is_reported_without_losing_the_entry(self):
         self.staff.anchor_room_id = self.room1.pk + 99999
         detail = npcs.detail(self.npc)
@@ -249,6 +261,9 @@ class NpcReaderTests(EvenniaTest):
         staff = _group(section_of(detail, "capability_diagnostics"), GuildStaff.name)
         self.assertIn("錨點無法解析", row_value(staff, "狀態"))
 
+    @covers_requirement(
+        "gm-runtime-state::npc-service-inspection-separates-context-from-configuration"
+    )
     def test_an_unresolvable_declared_dialogue_source_is_a_section_error(self):
         with patch(
             "world.rules.dialogue_sources.dialogue_source_for_host",
@@ -299,6 +314,9 @@ class NpcReaderTests(EvenniaTest):
         self.assertNotIn("無法解析", anchor)
         self.assertIn("person 綁定不應帶錨點", row_value(group_, "狀態"))
 
+    @covers_requirement(
+        "gm-runtime-state::npc-service-inspection-separates-context-from-configuration"
+    )
     def test_a_malformed_declared_dialogue_key_is_unreadable_not_empty(self):
         host = create.create_object(NPC, key="t_reader_broken_key", location=self.room1)
         host.components.add(
