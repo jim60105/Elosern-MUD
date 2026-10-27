@@ -63,12 +63,11 @@ tick, and displayed values in `guild_registration`, set `guild_rank` to `F`, and
   a failed registration restores it
 
 ### Requirement: Registration access is local, idempotent, and strict about persisted data
-Registration SHALL reject non-player entities, absent or remote staff, and ambiguous multiple
-local GuildStaff hosts. Local-host acceptance SHALL flow through
-`world/rules/service_gate.py::service_available` for the resolved staff component.
-Re-registering a valid member SHALL return the original record without replacing its branch, tick,
-or snapshot. A partial or malformed existing record SHALL raise `GuildDataError` without repair or
-rank mutation.
+Registration SHALL reject non-player entities and absent, invisible, remote or ineligible selected staff.
+Explicit provider selection SHALL remain valid among co-located GuildStaff hosts; implicit discovery SHALL
+reject ambiguity. Local-host acceptance SHALL flow through
+`world/rules/service_gate.py::service_available`. Re-registering a valid member SHALL return the original
+record unchanged; a partial or malformed record SHALL raise `GuildDataError` without repair or rank mutation.
 
 #### Scenario: Remote staff cannot register a player
 - **WHEN** a player invokes registration while the selected GuildStaff host is in another room

@@ -12,6 +12,7 @@ from unittest.mock import patch
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildExamReception, GuildStaff, Merchant
 from typeclasses.npcs import NPC
@@ -105,6 +106,9 @@ class ServicesOpenTests(EvenniaTest):
             read_world_clock().tick if read_world_clock() else None,
         )
 
+    @covers_requirement(
+        "webclient-service-menus::opening-selected-provider-services-is-read-only-and-correlated"
+    )
     def test_a_successful_read_returns_the_exact_private_wrapper(self):
         before = self._state()
         result = _services_open_adapter(self.player, {"npc_id": int(self.staff.pk)})
@@ -132,6 +136,9 @@ class ServicesOpenTests(EvenniaTest):
         self.assertIsNone(keeper["data"]["services"]["guild"])
         self.assertIsNone(keeper["data"]["services"]["rank"])
 
+    @covers_requirement(
+        "webclient-service-menus::opening-selected-provider-services-is-read-only-and-correlated"
+    )
     def test_two_merchants_read_one_exact_shop_each(self):
         twin = create_object(NPC, key="second keeper", location=self.hall)
         twin_component = Merchant.create(
@@ -151,6 +158,9 @@ class ServicesOpenTests(EvenniaTest):
             self.assertEqual(shop["stock"][0]["stock"], expected_stock)
         self.assertEqual(self._state(), before)
 
+    @covers_requirement(
+        "webclient-service-menus::opening-selected-provider-services-is-read-only-and-correlated"
+    )
     def test_two_counters_read_one_exact_reception_each(self):
         twin = create_object(NPC, key="second counter", location=self.hall)
         twin_component = GuildExamReception.create(
@@ -167,6 +177,9 @@ class ServicesOpenTests(EvenniaTest):
             self.assertIsNone(services["guild"])
             self.assertIsNone(services["shop"])
 
+    @covers_requirement(
+        "webclient-service-menus::opening-selected-provider-services-is-read-only-and-correlated"
+    )
     def test_an_unusable_selection_is_refused_without_data_or_writes(self):
         hidden = create_object(NPC, key="hidden clerk", location=self.hall)
         hidden_component = GuildStaff.create(
