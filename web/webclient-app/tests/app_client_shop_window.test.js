@@ -244,4 +244,48 @@ describe("the shop window in AppClient (webclient-shop-window)", () => {
     expect(store.view.hudDrawer).toBe(null);
     expect(wrapper.find('[data-testid="shop-window"]').exists()).toBe(false);
   });
+
+  it("reads the provider whose card opened the drawer, not the summary's other NPC", async () => {
+    await mountWith({ services: SHOP_SERVICES_SAMPLE, party: SHOP_PARTY_SAMPLE });
+    await get("hud-drawer-close").trigger("click");
+    await wrapper.vm.$nextTick();
+    // The room summary names one merchant; the presence card names another.
+    const summaryProvider = store.view.panels.services.shop.provider_id;
+    expect(summaryProvider).not.toBe(7);
+    store.activatePresence("target-7");
+    await wrapper.vm.$nextTick();
+    expect(store.view.presenceCard).toMatchObject({ kind: "verbs", identity: 7 });
+    const before = sent("services.open").length;
+    store.openHudDrawer("shop");
+    await wrapper.vm.$nextTick();
+    expect(sent("services.open").slice(before).map((envelope) => envelope.payload)).toEqual([
+      { npc_id: 7 },
+    ]);
+  });
+
+  it("states a refused provider read instead of the room summary's other provider", async () => {
+    await mountWith({ services: SHOP_SERVICES_SAMPLE, party: SHOP_PARTY_SAMPLE });
+    expect(wrapper.find('[data-testid="shop-rows__row--steel_shortsword"]').exists()).toBe(true);
+    // A purchase commits, so the open drawer reads its provider again…
+    const revision = store.view.revision + 1;
+    store.receive(1, "ui_update", [fx.update({ revision, panels: {} })]);
+    await wrapper.vm.$nextTick();
+    const refresh = sent("services.open").at(-1);
+    // …and the provider has left: the drawer states that refusal and never
+    // falls back to the room summary the committed panels still carry.
+    store.receive(1, "ui_action_result", [
+      fx.actionResult({
+        request_id: refresh.request_id,
+        outcome: "rejected",
+        code: "no_such_target",
+        message: "這裡沒有這個對象。",
+        presentation_revision: revision,
+      }),
+    ]);
+    await wrapper.vm.$nextTick();
+    const unavailable = get("shop-window__unavailable");
+    expect(unavailable.attributes("data-reason-code")).toBe("no_such_target");
+    expect(unavailable.text()).toBe("這裡沒有這個對象。");
+    expect(wrapper.find('[data-testid="shop-rows__row--steel_shortsword"]').exists()).toBe(false);
+  });
 });

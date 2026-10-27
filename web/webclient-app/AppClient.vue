@@ -46,6 +46,7 @@ import PartyWindow from "./components/PartyWindow.vue";
 import { usePartyWindow } from "./composables/use-party-window.js";
 import { useMapDrawer } from "./composables/use-map-drawer.js";
 import { useServicesOpen } from "./composables/use-services-open.js";
+import Protocol from "../static/webclient/js/elosern/protocol.js";
 import { useWindowHotkeys } from "./composables/use-window-hotkeys.js";
 import ObjectiveTracker from "./components/ObjectiveTracker.vue";
 import DesktopNavigation from "./components/DesktopNavigation.vue";
@@ -127,18 +128,36 @@ const {
 } = useMapDrawer(store, { onMapMove });
 // The two provider drawers (npc-targeted-service-flows): each opened drawer
 // reads its selected provider once through `services.open` and renders that
-// correlated snapshot. The room-wide summary stands in only until the read is
-// adopted — and once adopted it is the whole panel, so a section the selected
-// provider does not carry stays null instead of borrowing another NPC's
-// surface. A refused read drops the snapshot and the drawer falls back to the
-// room summary rather than to the provider the client guessed.
-const { openServices, closeServices, snapshots: servicesSnapshots } =
+// correlated snapshot. A drawer that is not targeted (no NPC to name) keeps
+// the room summary; a targeted one shows only its own read — while the first
+// read is in flight and after a refusal it states an unavailable surface
+// instead, so a flow opened for one provider can never be completed against
+// another.
+const { openServices, closeServices, slots: servicesSlots } =
   useServicesOpen(store, { dispatchIntent });
-const shopServices = computed(() => servicesSnapshots.value.shop ?? panel("services"));
-const counterServices = computed(() => servicesSnapshots.value.counter ?? panel("services"));
-// The provider the room summary cannot name (two merchants, or a reception
-// without guild staff) is the NPC whose verb card opened the drawer. It is a
-// selection hint for the read only; the server revalidates the exact target.
+function servicesFor(slot) {
+  const state = servicesSlots.value[slot];
+  if (!state) return panel("services");
+  if (state.snapshot) return state.snapshot;
+  const reason = state.refusal ?? {
+    code: "services_pending",
+    message: "正在讀取服務資訊。",
+  };
+  return {
+    schema_version: Protocol.SERVICES_SCHEMA_VERSION,
+    available: false,
+    kind: "services",
+    reason: {
+      code: reason.code || "services_unavailable",
+      message: reason.message || "服務資訊暫時無法讀取。",
+    },
+  };
+}
+const shopServices = computed(() => servicesFor("shop"));
+const counterServices = computed(() => servicesFor("counter"));
+// The NPC whose verb card opened the drawer is the selected provider; the
+// room summary's own discovery stands in only when no card named one. The
+// identity is a selection hint for the read; the server revalidates it.
 function presenceProviderId() {
   const identity = store.view.presenceCard?.identity;
   return Number.isSafeInteger(identity) && identity > 0 ? identity : null;
@@ -150,7 +169,7 @@ watch(
       const provider = panel("services")?.shop?.provider_id;
       openServices(
         "shop",
-        Number.isSafeInteger(provider) ? provider : presenceProviderId(),
+        presenceProviderId() ?? (Number.isSafeInteger(provider) ? provider : null),
       );
       closeServices("counter");
       return;
@@ -163,7 +182,7 @@ watch(
         : rankProvider;
       openServices(
         "counter",
-        Number.isSafeInteger(summaryProvider) ? summaryProvider : presenceProviderId(),
+        presenceProviderId() ?? (Number.isSafeInteger(summaryProvider) ? summaryProvider : null),
       );
       closeServices("shop");
       return;
