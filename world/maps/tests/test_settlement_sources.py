@@ -141,9 +141,9 @@ class ThirdSettlementTests(unittest.TestCase):
         self.assertEqual(sorted(snapshot.anchor_placements), ["village_eolas"])
         self.assertEqual(sorted(snapshot.local_frame_anchors), ["village_eolas"])
         self.assertEqual(sorted(snapshot.city_gates), ["t_third"])
-        # Entry rows are keyed by the settlement that declares them; the entry's
-        # own anchor_key is the location it binds.
-        self.assertEqual(sorted(snapshot.wilderness_entries), ["t_third"])
+        # Entry rows are keyed by the anchor identity the gate exits persist,
+        # which is the document's location_ref (never its own id).
+        self.assertEqual(sorted(snapshot.wilderness_entries), ["village_eolas"])
         self.assertEqual(
             snapshot.anchor_placements["village_eolas"].node.map_id, "t_third"
         )
@@ -153,9 +153,14 @@ class ThirdSettlementTests(unittest.TestCase):
         self.assertEqual(
             snapshot.local_frame_anchors["village_eolas"].local_anchor_m, (20, 30)
         )
-        entry = snapshot.wilderness_entries["t_third"]
+        entry = snapshot.wilderness_entries["village_eolas"]
         self.assertEqual(entry.anchor_key, "village_eolas")
         self.assertEqual(entry.gate_for("n").destination.map_id, "t_third")
+        # The exact lookup a gate exit performs (``db.anchor_key`` holds the
+        # entry's own anchor identity) resolves the entry.
+        self.assertIs(snapshot.wilderness_entries.get(entry.anchor_key), entry)
+        self.assertNotIn("t_third", snapshot.wilderness_entries)
+        self.assertIn(entry.anchor_key, snapshot.anchor_placements)
 
     def test_the_discovered_document_is_the_only_local_map_of_its_location(self):
         with tempfile.TemporaryDirectory() as directory:

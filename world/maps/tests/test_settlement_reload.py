@@ -65,7 +65,17 @@ roads:
     destination: plaza
     direction: w
 wilderness_entry:
+  shape:
+    - "#"
+  origin:
+    cell_x: 1410
+    cell_y: 2150
+  gates:
+    - return_direction: n
+      destination_node: plaza
 city_gate:
+  node: plaza
+  exit_key: 廣場
 """.lstrip()
 
 #: The same map with the ``gate`` node moved 300 m further east.
@@ -185,6 +195,43 @@ class SettlementReloadTests(EvenniaTestCase):
             distance_traversal_cost(after, "settlement", [_Probe()]).seconds,
             distance_traversal_cost(before, "settlement", [_Probe()]).seconds,
         )
+
+    def test_a_settlement_whose_id_differs_from_its_location_provisions_a_gate(self):
+        """A discovered document may be its own map while binding another location."""
+
+        from unittest.mock import patch
+
+        from typeclasses.exits import WildernessGateExit
+        from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+        from world.maps.bootstrap import sync_wilderness
+
+        self._sync(_DOCUMENT)
+        snapshot = map_data.current()
+        self.assertNotEqual("t_reload", "village_eolas")
+        entry = WILDERNESS_ENTRY_REGISTRY["village_eolas"]
+        self.assertEqual(entry.gate_for("n").destination.map_id, "t_reload")
+
+        # The synthetic world is the whole published world here, so the
+        # shipped-reference preflight (which guards the shipped declarations)
+        # is out of scope for this provisioning check.
+        with patch(
+            "world.maps.bootstrap.validate_static_references", return_value=None
+        ):
+            sync_wilderness()
+
+        gate_room = GridRoom.objects.filter_xyz(xyz=(100, 100, "t_reload")).first()
+        gates = [
+            exit_obj
+            for exit_obj in gate_room.exits
+            if isinstance(exit_obj, WildernessGateExit)
+        ]
+        self.assertEqual(len(gates), 1)
+        # The traversal hook and the local-map presenter both resolve the entry
+        # from ``db.anchor_key``; that identity must be the registry key.
+        self.assertEqual(gates[0].db.anchor_key, entry.anchor_key)
+        self.assertIs(WILDERNESS_ENTRY_REGISTRY.get(gates[0].db.anchor_key), entry)
+        self.assertEqual(gates[0].db.gate_direction, "n")
+        self.assertIsNotNone(entry.approach_cell(entry.gate_for("n")))
 
 
 class _Probe:

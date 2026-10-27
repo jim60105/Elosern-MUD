@@ -301,7 +301,10 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
     def test_find_gateway_matches_the_registry_rules(self):
         hit = find_gateway(SOUTH_APPROACH, "n")
         self.assertIsNotNone(hit)
-        self.assertIs(hit[0], CAPITAL)
+        # A full startup re-publishes the shipped world, so the resolved entry
+        # is compared against the *current* registry row, not an import-time
+        # capture.
+        self.assertIs(hit[0], live_anchor_entry())
         self.assertEqual(
             settlement_node_xy(hit[1].destination),
             settlement_node_xy(CAPITAL.gate_for("n").destination),

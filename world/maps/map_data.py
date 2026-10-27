@@ -90,11 +90,12 @@ class SettlementSnapshot:
 
     The typed documents are retained because consumers (and the editor's
     external context) need authored identity and provenance; the composed
-    mappings are the game-facing views. ``graphs``, ``city_gates`` and
-    ``wilderness_entries`` are keyed by the authored settlement (map) identity;
-    ``anchor_placements`` and ``local_frame_anchors`` are keyed by the
-    ``location_ref`` that binds them, because that is the identity a geographic
-    location navigates by.
+    mappings are the game-facing views. ``graphs`` and ``city_gates`` are keyed
+    by the authored settlement (map) identity; ``anchor_placements``,
+    ``local_frame_anchors`` and ``wilderness_entries`` are keyed by the
+    ``location_ref`` that binds them, because that is the anchor identity a
+    geographic location navigates by and the identity a gate exit persists in
+    ``db.anchor_key``.
     """
 
     settlements: Mapping[str, SettlementDocument]
@@ -358,7 +359,10 @@ def build_settlements(
         if city_gate is not None:
             city_gates[settlement_id] = city_gate
         if entry is not None:
-            entries[settlement_id] = entry
+            # Keyed by the anchor identity the gate exits persist
+            # (``db.anchor_key``), so traversal and the local-map presenter
+            # resolve the entry without an alias table.
+            entries[entry.anchor_key] = entry
         scene_archetypes.update(scenes)
 
     if not problems:
