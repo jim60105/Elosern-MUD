@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "ctranslate2>=4.8.2",
+    "elosern-map-core",
     "evennia==6.1.0",
     "jsonschema==4.25.1",
     "piexif>=1.1.3",
@@ -18,6 +19,12 @@ dependencies = [
 [tool.uv]
 package = false
 required-version = ">=0.12.0"
+
+[tool.uv.sources]
+# The pure map calculations live in their own locked package; this project
+# consumes them as an editable local dependency so a source edit is live in the
+# game environment. The container image syncs with --no-editable.
+elosern-map-core = { path = "packages/map-core", editable = true }
 
 [dependency-groups]
 dev = [

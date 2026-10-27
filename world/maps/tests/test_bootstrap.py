@@ -130,7 +130,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
 
         from dataclasses import replace
 
-        from world.maps.sparse_graph import SparseSettlementGraph
+        from elosern_map_core.sparse import SparseSettlementGraph
 
         capital = SETTLEMENT_GRAPHS["capital_altoria"]
         nodes = [
@@ -880,7 +880,7 @@ SYNTHETIC_MAP_KEY = "t_sparse_settlement"
 
 
 def _synthetic_node(node_id, coordinate, key):
-    from world.maps.sparse_graph import SparseNode
+    from elosern_map_core.sparse import SparseNode
 
     return SparseNode(
         node_id=node_id,
@@ -891,7 +891,7 @@ def _synthetic_node(node_id, coordinate, key):
 
 
 def _synthetic_graph(start_coordinate, north_coordinate):
-    from world.maps.sparse_graph import SparseRoad, SparseSettlementGraph
+    from elosern_map_core.sparse import SparseRoad, SparseSettlementGraph
 
     return SparseSettlementGraph(
         SYNTHETIC_MAP_KEY,
@@ -981,7 +981,7 @@ class SparseSettlementSyncTests(EvenniaTest):
             MAP_Y_TAG_CATEGORY,
             MAP_Z_TAG_CATEGORY,
         )
-        from world.maps.sparse_graph import SparseGraphError
+        from elosern_map_core.sparse import SparseGraphError
         from world.maps.bootstrap import NODE_IDENTITY_TAG_CATEGORY, sync_settlement_graph
 
         for index in (1, 2):
@@ -1020,7 +1020,7 @@ class SparseSettlementSyncTests(EvenniaTest):
             MAP_Z_TAG_CATEGORY,
         )
         from world.maps.bootstrap import sync_settlement_graph
-        from world.maps.sparse_graph import SparseGraphError
+        from elosern_map_core.sparse import SparseGraphError
 
         sync_settlement_graph(_synthetic_graph((1, 1), (1, 2)))
         moved_identity = self._room((1, 1, SYNTHETIC_MAP_KEY))

@@ -14,6 +14,8 @@ import math
 import unittest
 from collections import deque
 
+from elosern_map_core.terrain import rasterize_routes, ridge_center_x, ridge_span
+
 from world.lore.wilderness_regions import (
     MAINLAND_BOUNDARY_KM,
     WILDERNESS_REGION_REGISTRY,
@@ -23,11 +25,9 @@ from world.maps.wilderness_provider import (
     RIDGE_PASSES,
     WATERWAY_FORDS,
     WATERWAY_ROUTES,
+    TERRAIN,
     WILDERNESS_MAX_X,
     WILDERNESS_MAX_Y,
-    _rasterize_routes,
-    _ridge_center_x,
-    _ridge_span,
     border_river_row,
     forest_edge_row,
     is_closed_ridge_cell,
@@ -48,7 +48,7 @@ class AuthoredTerrainContractTests(unittest.TestCase):
         # rectangular band nor a continuous summit wall (the pass windows below
         # are open ground).
         for y in (150, 700, 1200, 1800):
-            centre = _ridge_center_x(y)
+            centre = ridge_center_x(TERRAIN, y)
             self.assertEqual(region_for_coordinates(centre, y), "central_mountains")
             self.assertNotEqual(
                 region_for_coordinates(centre - 300, y), "central_mountains"
@@ -56,7 +56,7 @@ class AuthoredTerrainContractTests(unittest.TestCase):
             self.assertNotEqual(
                 region_for_coordinates(centre + 300, y), "central_mountains"
             )
-        self.assertNotEqual(_ridge_center_x(100), _ridge_center_x(1200))
+        self.assertNotEqual(ridge_center_x(TERRAIN, 100), ridge_center_x(TERRAIN, 1200))
 
     @covers_requirement("wilderness-terrain::region-for-coordinates-is-a-pure-deterministic-function-covering-the-whole-bounded-map")
     def test_settlement_derived_anchor_cells_resolve_to_altoria_territory(self):
@@ -117,14 +117,14 @@ class AuthoredTerrainContractTests(unittest.TestCase):
         mountain = terrain_speed_m_per_hour(WILDERNESS_TERRAIN["central_mountains"])
         self.assertLess(mountain, terrain_speed_m_per_hour("road"))
         # Away from an authored pass the summit ridge is a closed cliff wall.
-        self.assertTrue(is_closed_ridge_cell((_ridge_center_x(1200), 1200)))
+        self.assertTrue(is_closed_ridge_cell((ridge_center_x(TERRAIN, 1200), 1200)))
 
     @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
     def test_rivers_are_authored_water_with_declared_fords(self):
         # Every ford lies on its own river, and every river starts and ends on
         # the coastal region it drains into (capital river -> southwest coast;
         # imperial rivers -> southeast coast).
-        raster = _rasterize_routes(WATERWAY_ROUTES)
+        raster = rasterize_routes(WATERWAY_ROUTES)
         for name, fords in WATERWAY_FORDS.items():
             for ford in fords:
                 # The ford is on its authored river before the exemption is
@@ -218,7 +218,7 @@ class _RunComponents:
         from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 
         candidates: dict[int, set[int]] = {}
-        for x, y in _rasterize_routes(WATERWAY_ROUTES):
+        for x, y in rasterize_routes(WATERWAY_ROUTES):
             candidates.setdefault(y, set()).add(x)
         for entry in WILDERNESS_ENTRY_REGISTRY.values():
             for x, y in entry.footprint_cells:
@@ -228,7 +228,7 @@ class _RunComponents:
         self.parent: list[int] = []
         previous: list[int] = []
         for y in range(WILDERNESS_MAX_Y + 1):
-            low, high = _ridge_span(y)
+            low, high = ridge_span(TERRAIN, y)
             row_candidates = set(candidates.get(y, ())) | set(range(low, high + 1))
             row_candidates |= {x for x, row in extra_blocked if row == y}
             current: list[int] = []
@@ -327,7 +327,7 @@ class BorderRiverContractTests(unittest.TestCase):
         # Source in the central range's western foothills near (1300, 1410).
         self.assertEqual(source, (1320, 1410))
         self.assertEqual(region_for_coordinates(*source), "central_mountains")
-        self.assertEqual(source[0], _ridge_center_x(source[1]) - 100)
+        self.assertEqual(source[0], ridge_center_x(TERRAIN, source[1]) - 100)
         # The mouth is the last land cell; its western neighbour is sea.
         self.assertLessEqual(abs(mouth[0] - 170), 50)
         self.assertEqual(mouth[1], 1290)
@@ -341,7 +341,7 @@ class BorderRiverContractTests(unittest.TestCase):
             self.assertLessEqual(abs(border_river_row(bend[0]) - bend[1]), 10, bend)
         # One water cell per column, exactly the classifier's river row, every
         # row inside Y 1290..1410.
-        raster = _rasterize_routes({"border_river": route})
+        raster = rasterize_routes({"border_river": route})
         columns = {}
         for x, y in raster:
             columns.setdefault(x, set()).add(y)
@@ -350,7 +350,7 @@ class BorderRiverContractTests(unittest.TestCase):
             self.assertEqual(rows, {border_river_row(x)}, x)
             self.assertTrue(1290 <= border_river_row(x) <= 1410, x)
         # No other waterway, ridge cell or anchor footprint is touched.
-        others = _rasterize_routes(
+        others = rasterize_routes(
             {name: points for name, points in WATERWAY_ROUTES.items() if name != "border_river"}
         )
         self.assertFalse(raster & others)
@@ -362,7 +362,7 @@ class BorderRiverContractTests(unittest.TestCase):
 
         fords = WATERWAY_FORDS["border_river"]
         self.assertEqual(len(fords), 3)
-        raster = _rasterize_routes({"border_river": WATERWAY_ROUTES["border_river"]})
+        raster = rasterize_routes({"border_river": WATERWAY_ROUTES["border_river"]})
         for ford in fords:
             self.assertIn(ford, raster)
             self.assertTrue(is_valid_wilderness_cell(ford), ford)
@@ -448,7 +448,7 @@ class BorderRiverContractTests(unittest.TestCase):
             self.assertEqual(nominal_nation_for_coordinates(x, row + 1), "valhalla")
         # Between the source and the ridge the source row continues as the
         # claim line; east of the ridge everything is Grandia.
-        centre = _ridge_center_x(1410)
+        centre = ridge_center_x(TERRAIN, 1410)
         self.assertEqual(nominal_nation_for_coordinates(centre, 1410), "altoria")
         self.assertEqual(nominal_nation_for_coordinates(centre, 1411), "valhalla")
         self.assertEqual(nominal_nation_for_coordinates(centre + 1, 1411), "grandia")
@@ -538,8 +538,8 @@ class ForestEdgeAndClaimContractTests(unittest.TestCase):
         self.assertEqual(nominal_nation_for_coordinates(*altoria), "altoria")
         ciaran = ANCHOR_GEOGRAPHY_REGISTRY["village_ciaran"].cell
         fionnen = ANCHOR_GEOGRAPHY_REGISTRY["village_fionnen"].cell
-        self.assertLess(ciaran[0], _ridge_center_x(ciaran[1]))
-        self.assertGreater(fionnen[0], _ridge_center_x(fionnen[1]))
+        self.assertLess(ciaran[0], ridge_center_x(TERRAIN, ciaran[1]))
+        self.assertGreater(fionnen[0], ridge_center_x(TERRAIN, fionnen[1]))
         self.assertEqual(nominal_nation_for_coordinates(*ciaran), "altoria")
         self.assertEqual(nominal_nation_for_coordinates(*fionnen), "grandia")
         eolas = ANCHOR_GEOGRAPHY_REGISTRY["village_eolas"].cell
@@ -552,9 +552,9 @@ class ForestEdgeAndClaimContractTests(unittest.TestCase):
 
         self.assertEqual(RIDGE_PASSES, ((410, 425), (970, 990), (1770, 1785)))
         # The ridge still closes inside the forest up to Y 2199 and stops there.
-        self.assertTrue(is_closed_ridge_cell((_ridge_center_x(2199), 2199)))
-        self.assertFalse(is_closed_ridge_cell((_ridge_center_x(2200), 2200)))
-        self.assertEqual(region_for_coordinates(_ridge_center_x(2100), 2100), "north_deep_forest")
+        self.assertTrue(is_closed_ridge_cell((ridge_center_x(TERRAIN, 2199), 2199)))
+        self.assertFalse(is_closed_ridge_cell((ridge_center_x(TERRAIN, 2200), 2200)))
+        self.assertEqual(region_for_coordinates(ridge_center_x(TERRAIN, 2100), 2100), "north_deep_forest")
         self.assertEqual(WILDERNESS_TERRAIN["north_deep_forest"], "woodland")
         # Forest cells off the ridge stay walkable (no new movement block).
         self.assertTrue(is_valid_wilderness_cell((900, 2350)))
@@ -626,7 +626,7 @@ class ForestEdgeAndClaimContractTests(unittest.TestCase):
         river = borders[("altoria", "valhalla")]
         self.assertEqual(river[: len(WATERWAY_ROUTES["border_river"])],
                          tuple(reversed(WATERWAY_ROUTES["border_river"])))
-        self.assertEqual(river[-1], (_ridge_center_x(1410), 1410))
+        self.assertEqual(river[-1], (ridge_center_x(TERRAIN, 1410), 1410))
         south = borders[("altoria", "grandia")]
         north = borders[("grandia", "valhalla")]
         self.assertTrue(is_land_cell(south[0]))
@@ -640,13 +640,13 @@ class ForestEdgeAndClaimContractTests(unittest.TestCase):
                 self.assertNotEqual(region_for_coordinates(*point), "north_deep_forest", point)
         end_x, end_y = north[-1]
         self.assertEqual(
-            region_for_coordinates(_ridge_center_x(end_y + 1), end_y + 1), "north_deep_forest"
+            region_for_coordinates(ridge_center_x(TERRAIN, end_y + 1), end_y + 1), "north_deep_forest"
         )
         # Every ridge-line point is the ridge centre of its row, and the cells
         # beside each line resolve to the line's two nations.
         for keys in (("altoria", "grandia"), ("grandia", "valhalla")):
             for x, y in borders[keys]:
-                self.assertEqual(x, _ridge_center_x(y))
+                self.assertEqual(x, ridge_center_x(TERRAIN, y))
                 if (x, y) == river[-1]:
                     continue  # the three-way junction with the river line
                 self.assertEqual(

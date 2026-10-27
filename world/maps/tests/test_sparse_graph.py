@@ -6,7 +6,7 @@ import unittest
 
 from tools.spec_traceability import covers_requirement
 
-from world.maps.sparse_graph import (
+from elosern_map_core.sparse import (
     SparseGraphError,
     SparseNode,
     SparseRoad,

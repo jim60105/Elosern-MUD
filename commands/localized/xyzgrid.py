@@ -20,7 +20,7 @@ from evennia.utils import ansi, list_to_string
 from evennia.utils.utils import delay
 
 from world.maps.map_data import SETTLEMENT_GRAPHS, settlement_graph
-from world.maps.sparse_graph import graph_from_xymap
+from world.maps.xymap_graph import graph_from_xymap
 
 PathData = namedtuple("PathData", ("target", "graph", "directions", "legs", "task"))
 

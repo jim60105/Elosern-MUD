@@ -59,7 +59,7 @@ class SampleCityCostedExitTests(EvenniaTest):
 
     def test_retype_path_updates_db_row_but_not_loaded_objects(self):
         # First sync WITHOUT the wildcard override: bare XYZExit instances.
-        from world.maps.sparse_graph import SparseSettlementGraph
+        from elosern_map_core.sparse import SparseSettlementGraph
 
         capital = SETTLEMENT_GRAPHS["capital_altoria"]
         bare_graph = SparseSettlementGraph(

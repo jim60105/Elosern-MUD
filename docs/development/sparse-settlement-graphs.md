@@ -8,9 +8,14 @@ authored coordinates are now integer metres and there is no ASCII map.
 
 ## Ownership
 
+The pure graph types, validation and routing live in the independent
+`packages/map-core` package (`elosern_map_core.sparse`); the game consumes it
+through the locked local dependency declared in the root `pyproject.toml`.
+
 | Concern | Owner |
 | --- | --- |
-| Sparse nodes, explicit roads, validation, route planning | `world/maps/sparse_graph.py` |
+| Sparse nodes, explicit roads, validation, route planning | `packages/map-core/elosern_map_core/sparse.py` |
+| Contrib `XYMap` adaptation for synthetic/builder maps | `world/maps/xymap_graph.py` |
 | Settlement identity tables (`NODE_IDS`, `ROADS`) and rooms' prototypes | `world/maps/altoria_capital.py`, `world/maps/village_ciaran.py` |
 | Shared assembly (`SETTLEMENT_GRAPHS`, `KNOWN_GRID_MAP_KEYS`) | `world/maps/map_data.py` |
 | Persistent room/exit convergence | `world/maps/bootstrap.py::sync_grid` |
@@ -96,7 +101,7 @@ span. `plan()` names each step's compass direction and spawned exit key;
 
 `commands/localized/xyzgrid.CmdGoto` uses the declared graph. Maps without a
 sparse declaration (synthetic test grids, builder maps) are adapted for the
-lifetime of the loaded `XYMap` by `graph_from_xymap()`, so the ASCII contrib
+lifetime of the loaded `XYMap` by `world.maps.xymap_graph.graph_from_xymap()`, so the ASCII contrib
 remains a compatibility surface for synthetic maps but never the routing
 authority for a declared settlement. `SparseSettlementGraph.display_projection()`
 gives the local-map adapter the same read-only node/link view without an ASCII

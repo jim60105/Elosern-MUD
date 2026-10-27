@@ -18,7 +18,7 @@ from types import MappingProxyType
 from world.maps.altoria_capital import NODE_IDS as _CAPITAL_NODE_IDS
 from world.maps.altoria_capital import ROADS as _CAPITAL_ROADS
 from world.maps.altoria_capital import XYMAP_DATA as _CAPITAL_XYMAP_DATA
-from world.maps.sparse_graph import build_sparse_graph
+from elosern_map_core.sparse import build_sparse_graph
 from world.maps.village_ciaran import NODE_IDS as _VILLAGE_NODE_IDS
 from world.maps.village_ciaran import ROADS as _VILLAGE_ROADS
 from world.maps.village_ciaran import XYMAP_DATA as _VILLAGE_XYMAP_DATA

@@ -40,7 +40,11 @@ from world.lore.wilderness_entry import OPPOSITE_DIRECTION, WILDERNESS_ENTRY_REG
 from world.lore.settlements.places import PLACE_REGISTRY
 from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
 from world.maps.map_data import SETTLEMENT_GRAPHS
-from world.maps.sparse_graph import SparseGraphError, SparseSettlementGraph, exit_spawn_names
+from elosern_map_core.sparse import (
+    SparseGraphError,
+    SparseSettlementGraph,
+    exit_spawn_names,
+)
 from world.maps.city_gates import CITY_GATE_REGISTRY
 from world.maps.instance import register_instance_reclamation
 from world.maps.limbo import (

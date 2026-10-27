@@ -4,16 +4,20 @@ Also owns the frozen continental coordinate-frame and mainland declarations of
 the known continent. These are authoring contracts only: they create no rooms,
 do not activate the runtime wilderness scale, and describe one continent (no
 planet size or further continent is inferred).
+
+The polygon and frame arithmetic these declarations feed lives in
+``elosern_map_core.geometry``; the helpers below only bind this module's
+authored values into it.
 """
 
 from dataclasses import dataclass
+
+from elosern_map_core import geometry as core_geometry
 
 #: The enclosing wilderness frame spans this many one-kilometre cells per axis.
 CONTINENT_FRAME_CELLS = 2700
 #: Logical size of one wilderness cell, kilometres per axis.
 CONTINENT_CELL_SIZE_KM = 1
-#: A cell's representative center is offset this many metres into the cell.
-CELL_CENTER_OFFSET_M = 500
 
 #: Ordered mainland boundary vertices as absolute ``(east, north)`` kilometres.
 #: The boundary is implicitly closed from the last vertex back to the first;
@@ -32,48 +36,16 @@ MAINLAND_BOUNDARY_KM: tuple[tuple[int, int], ...] = (
 )
 
 
-def cell_center_m(cell: tuple[int, int]) -> tuple[int, int]:
-    """Absolute ``(east, north)`` metres of a wilderness cell's center.
-
-    The mapping is ``E = 1000 * X + 500`` and ``N = 1000 * Y + 500``; a cell is
-    an area and this point is only its representative center.
-    """
-    x, y = cell
-    return (1000 * x + CELL_CENTER_OFFSET_M, 1000 * y + CELL_CENTER_OFFSET_M)
-
-
 def is_wilderness_cell(cell: tuple[int, int]) -> bool:
     """Whether ``(x, y)`` is inside the 2700 by 2700 enclosing frame."""
-    x, y = cell
-    return 0 <= x < CONTINENT_FRAME_CELLS and 0 <= y < CONTINENT_FRAME_CELLS
+
+    return core_geometry.is_within_frame(CONTINENT_FRAME_CELLS, cell)
 
 
 def mainland_area_km2() -> float:
     """Shoelace area of the closed mainland boundary, square kilometres."""
-    vertices = MAINLAND_BOUNDARY_KM
-    doubled = sum(
-        vertices[index][0] * vertices[(index + 1) % len(vertices)][1]
-        - vertices[(index + 1) % len(vertices)][0] * vertices[index][1]
-        for index in range(len(vertices))
-    )
-    return abs(doubled) / 2
 
-
-def _on_mainland_boundary(east_km: float, north_km: float) -> bool:
-    vertices = MAINLAND_BOUNDARY_KM
-    for index, (start_east, start_north) in enumerate(vertices):
-        end_east, end_north = vertices[(index + 1) % len(vertices)]
-        cross = (end_east - start_east) * (north_km - start_north) - (
-            end_north - start_north
-        ) * (east_km - start_east)
-        if cross != 0:
-            continue
-        if (
-            min(start_east, end_east) <= east_km <= max(start_east, end_east)
-            and min(start_north, end_north) <= north_km <= max(start_north, end_north)
-        ):
-            return True
-    return False
+    return core_geometry.polygon_area_km2(MAINLAND_BOUNDARY_KM)
 
 
 def is_on_mainland(east_km: float, north_km: float) -> bool:
@@ -81,20 +53,8 @@ def is_on_mainland(east_km: float, north_km: float) -> bool:
 
     Boundary points count as land; sea and the ocean margin do not.
     """
-    if _on_mainland_boundary(east_km, north_km):
-        return True
-    vertices = MAINLAND_BOUNDARY_KM
-    inside = False
-    for index, (start_east, start_north) in enumerate(vertices):
-        end_east, end_north = vertices[(index + 1) % len(vertices)]
-        if (start_north > north_km) == (end_north > north_km):
-            continue
-        crossing_east = (end_east - start_east) * (north_km - start_north) / (
-            end_north - start_north
-        ) + start_east
-        if east_km < crossing_east:
-            inside = not inside
-    return inside
+
+    return core_geometry.is_on_mainland(MAINLAND_BOUNDARY_KM, east_km, north_km)
 
 
 @dataclass(frozen=True)

@@ -11,7 +11,7 @@ authoritative map.
 | Concern | Unit / owner |
 | --- | --- |
 | Settlement node coordinate | integer metres in the settlement's local frame (`x` east, `y` north), declared in `world/maps/altoria_capital.py` / `world/maps/village_ciaran.py` |
-| Road length | Euclidean distance between the authored endpoints, owned by `world/maps/sparse_graph.py` |
+| Road length | Euclidean distance between the authored endpoints, owned by `packages/map-core/elosern_map_core/sparse.py` |
 | Road compass exit | authored per directed road (`ROADS` third field); an oblique metre delta never renames an exit |
 | Room/exit lifecycle | `world/maps/bootstrap.py::sync_grid` / `sync_settlement_graph` |
 | Map knowledge | `world/rules/map_knowledge.py` (sole writer) |

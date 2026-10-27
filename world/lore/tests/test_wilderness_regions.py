@@ -6,10 +6,11 @@ from tools.spec_traceability import covers_requirement
 import unittest
 from dataclasses import fields
 
+from elosern_map_core.geometry import CELL_CENTER_OFFSET_M, cell_center_m
+
 from world.lore.anchors import ANCHOR_GEOGRAPHY_REGISTRY, ANCHOR_REGISTRY
 from world.lore.nations import NATION_REGISTRY
 from world.lore.wilderness_regions import (
-    CELL_CENTER_OFFSET_M,
     CONTINENT_CELL_SIZE_KM,
     CONTINENT_FRAME_CELLS,
     HARBOR_SITE_REGISTRY,
@@ -17,7 +18,6 @@ from world.lore.wilderness_regions import (
     WILDERNESS_REGION_REGISTRY,
     HarborSite,
     WildernessRegion,
-    cell_center_m,
     is_on_mainland,
     is_wilderness_cell,
     mainland_area_km2,

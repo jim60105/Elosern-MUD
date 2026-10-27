@@ -9,7 +9,7 @@ calculation authority:
 
 - the terrain speed table and the wilderness region→terrain table live in
   ``rulebook/movement.yaml`` (authored integer meters per hour, never seconds);
-- settlement edge lengths come from ``world.maps.sparse_graph``'s physical node
+- settlement edge lengths come from ``elosern_map_core.sparse``'s physical node
   positions, wilderness distances from the provider's declared cell span, and
   gate approaches from the settlement anchor transform plus authored approach
   cells (``world.maps.wilderness_destination``);
