@@ -26,6 +26,7 @@ def _registered_gateways() -> list[tuple[tuple[int, int], tuple[tuple[int, int],
     unavailable on authored data (design D1).
     """
     from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+    from world.maps.static_references import settlement_node_xy
 
     result: list[tuple[tuple[int, int], tuple[tuple[int, int], str], str]] = []
     for entry in WILDERNESS_ENTRY_REGISTRY.values():
@@ -33,7 +34,10 @@ def _registered_gateways() -> list[tuple[tuple[int, int], tuple[tuple[int, int],
             approach = entry.approach_cell(gate)
             if approach is None:
                 continue
-            result.append((approach, (gate.grid_xy, gate.z_map_key), entry.anchor_key))
+            gate_xy = settlement_node_xy(
+                gate.destination, source=f"wilderness gate {entry.anchor_key}"
+            )
+            result.append((approach, (gate_xy, gate.z_map_key), entry.anchor_key))
     return result
 
 

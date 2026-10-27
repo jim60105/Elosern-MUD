@@ -103,6 +103,7 @@ class LoreSyncTests(EvenniaTestCase):
             WildernessEntryPoint,
             WildernessGate,
         )
+        from elosern_map_core.references import settlement_node_ref
 
         # A v2-typed extra entry proves the mirror preserves the NESTED dataclass
         # payload (gates -> tuple of primitive dicts, shape -> tuple of str) and
@@ -111,7 +112,7 @@ class LoreSyncTests(EvenniaTestCase):
             "capital_altoria",
             ("#",),
             (860, 1080),
-            (WildernessGate("n", (3050, 150), "capital_altoria"),),
+            (WildernessGate("n", settlement_node_ref("capital_altoria", "south_gate")),),
         )
         with (
             patch.dict(
@@ -130,7 +131,17 @@ class LoreSyncTests(EvenniaTestCase):
         self.assertEqual(first[0].db.fields, _db_safe(_plain(probe)))
         self.assertEqual(
             first[0].db.fields["gates"],
-            ({"return_direction": "n", "grid_xy": (3050, 150), "z_map_key": "capital_altoria"},),
+            (
+                {
+                    "return_direction": "n",
+                    "destination": {
+                        "domain": "settlement_node",
+                        "map_id": "capital_altoria",
+                        "object_id": "south_gate",
+                        "cell": None,
+                    },
+                },
+            ),
         )
         self.assertEqual(first[0].db.fields["shape"], ("#",))
 

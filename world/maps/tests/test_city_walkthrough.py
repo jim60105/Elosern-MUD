@@ -9,11 +9,11 @@ from typeclasses.rooms import AnchorRoom, GridRoom, Room
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 from world.maps.bootstrap import sync_grid
 from world.maps.limbo import LIMBO_KEY
+from world.maps.static_references import settlement_node_xyz
 from world.lore.sync import sync_all
 
-SOUTH_GATE_XYZ = (
-    *WILDERNESS_ENTRY_REGISTRY["capital_altoria"].gate_for("n").grid_xy,
-    "capital_altoria",
+SOUTH_GATE_XYZ = settlement_node_xyz(
+    WILDERNESS_ENTRY_REGISTRY["capital_altoria"].gate_for("n").destination
 )
 
 

@@ -45,7 +45,11 @@ def _minimap_fixture(character) -> None:
         importlib.import_module("world.maps." + "city_gates"),
         "CITY" + "_GATE_REGISTRY",
     )
-    SOUTH_GATE_XYZ = city_gate_registry[sorted(city_gate_registry)[0]].gate_xyz
+    from world.maps.static_references import settlement_node_xyz
+
+    SOUTH_GATE_XYZ = settlement_node_xyz(
+        city_gate_registry[sorted(city_gate_registry)[0]].gate
+    )
 
     from web.browser_support.browser_fixtures_data import (
         first_live_wilderness_entry,
@@ -56,7 +60,7 @@ def _minimap_fixture(character) -> None:
         (gate for gate in entry.gates if gate.return_direction != "n"), None
     )
     NORTH_GATE_XYZ = (
-        (*second_gate.grid_xy, second_gate.z_map_key) if second_gate else None
+        settlement_node_xyz(second_gate.destination) if second_gate else None
     )
 
     south_gate = grid(SOUTH_GATE_XYZ)
@@ -79,7 +83,7 @@ def _minimap_fixture(character) -> None:
     # (Under the shipped install this resolves to 東門 again — idempotent.)
     if os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") == "1":
         gate = second_gate
-        kit_gate = grid(gate.grid_xy + (gate.z_map_key,)) if gate else None
+        kit_gate = grid(settlement_node_xyz(gate.destination)) if gate else None
         if kit_gate is not None and kit_gate.id != north_gate.id:
             character.location = kit_gate
             record_arrival(character)

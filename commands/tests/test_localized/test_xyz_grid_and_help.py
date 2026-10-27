@@ -86,7 +86,11 @@ class LocalizedXyzGridCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         sync_grid()
         from typeclasses.rooms import GridRoom
 
-        self.south_gate = GridRoom.objects.filter_xyz(xyz=_gate_row().gate_xyz).first()
+        from world.maps.static_references import settlement_node_xyz
+
+        self.south_gate = GridRoom.objects.filter_xyz(
+            xyz=settlement_node_xyz(_gate_row().gate)
+        ).first()
         self.char1.location = self.south_gate
 
     def test_map_command_off_grid_zh_tw(self):

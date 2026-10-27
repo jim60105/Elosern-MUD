@@ -260,9 +260,9 @@ def validate_wilderness_entries(
         row_length = len(entry.shape[0])
         if row_length == 0:
             fail(anchor_key, "empty mask row")
-        for index, line in enumerate(entry.shape):
+        for row_index, line in enumerate(entry.shape):
             if len(line) != row_length:
-                fail(anchor_key, f"ragged mask: row {index} length {len(line)} != {row_length}")
+                fail(anchor_key, f"ragged mask: row {row_index} length {len(line)} != {row_length}")
             for char in line:
                 if char not in "#.":
                     fail(anchor_key, f"illegal mask character {char!r}")

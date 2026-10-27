@@ -25,10 +25,13 @@ def lit_district_keys_from_visits(
     registry: Mapping[str, MapDistrict] | None = None,
 ) -> frozenset[str]:
     """The keys of the districts whose exact landmark node was visited."""
+    from world.lore.map_districts import landmark_node_ids
+
     districts = MAP_DISTRICT_REGISTRY if registry is None else registry
     visited = {visit.node_id for visit in visits}
+    landmarks = landmark_node_ids(districts)
     return frozenset(
-        key for key, district in districts.items() if district.landmark_node in visited
+        key for key, node_id in landmarks.items() if node_id in visited
     )
 
 

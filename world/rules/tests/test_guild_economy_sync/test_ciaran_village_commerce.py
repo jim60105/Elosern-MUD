@@ -140,11 +140,10 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
             with self.subTest(place=place.key):
                 interior = self._village_interior(place)
                 self.assertEqual(interior.db.desc, place.room_desc_zh)
+                from world.maps.static_references import place_exterior_xyz
+
                 exterior = GridRoom.objects.filter_xyz(
-                    xyz=(
-                        *place.exterior_xy,
-                        _settlements()[place.settlement_key].zcoord,
-                    )
+                    xyz=place_exterior_xyz(place)
                 ).first()
                 self.assertIsNotNone(exterior)
                 self.assertIn(
@@ -479,9 +478,9 @@ class CiaranVillageCommonsTests(ServiceContentIsolation, EvenniaTestCase):
         return search_object_by_tag(place.key)[0]
 
     def _exterior(self, place):
-        return GridRoom.objects.filter_xyz(
-            xyz=(*place.exterior_xy, _settlements()[place.settlement_key].zcoord)
-        ).first()
+        from world.maps.static_references import place_exterior_xyz
+
+        return GridRoom.objects.filter_xyz(xyz=place_exterior_xyz(place)).first()
 
     @covers_requirement(
         "ciaran-village-commons::the-village-has-a-communal-shelter-a-sword-instructor-and-an-elder"
@@ -528,10 +527,10 @@ class CiaranVillageCommonsTests(ServiceContentIsolation, EvenniaTestCase):
         # each interior.
         blade_smith = next(
             q for q in _village_trading_places()
-            if any(p.exterior_xy == q.exterior_xy for p in attendants)
+            if any(p.exterior == q.exterior for p in attendants)
         )
         instructor = next(
-            p for p in attendants if p.exterior_xy == blade_smith.exterior_xy
+            p for p in attendants if p.exterior == blade_smith.exterior
         )
         clearing = self._exterior(blade_smith)
         dwelling_doors = {

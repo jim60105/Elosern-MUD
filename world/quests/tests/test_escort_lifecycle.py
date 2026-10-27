@@ -6,6 +6,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
 from tools.spec_traceability import covers_requirement
+from world.maps.static_references import settlement_node_xyz
 from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
 from world.quests import scene_store
@@ -908,7 +909,7 @@ def _smoke_gate():
     )
     entry = next(item for item in registry.values() if item.gate_for("w") is not None)
     gate = entry.gate_for("w")
-    return (*gate.grid_xy, gate.z_map_key), entry.approach_cell(gate)
+    return settlement_node_xyz(gate.destination), entry.approach_cell(gate)
 
 
 @_SMOKE_SCOPE

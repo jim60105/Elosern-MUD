@@ -37,8 +37,11 @@ def fixture_home_node_id() -> str:
         importlib.import_module(".".join(("world", "maps", "city_gates"))),
         "CITY" + "_GATE_REGISTRY",
     )
-    gate_x, gate_y, _ = registry[sorted(registry)[0]].gate_xyz
-    return f"grid:{z_map}:{gate_x}:{gate_y}"
+    from world.maps.static_references import settlement_node_xyz
+    from world.rules.map_knowledge import encode_grid
+
+    x, y, map_id = settlement_node_xyz(registry[sorted(registry)[0]].gate)
+    return encode_grid(map_id, x, y)
 
 
 def fixture_home_xyz_arg() -> str:

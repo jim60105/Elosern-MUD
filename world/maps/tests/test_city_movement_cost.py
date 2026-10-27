@@ -15,13 +15,13 @@ from world.lore.sync import sync_all
 from world.maps.map_data import SETTLEMENT_GRAPHS
 from world.maps.bootstrap import sync_grid
 from world.maps.limbo import LIMBO_KEY
+from world.maps.static_references import settlement_node_xyz
 from world.rules.clock import CLOCK_YAML, get_world_clock
 
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 
-SOUTH_GATE_XYZ = (
-    *WILDERNESS_ENTRY_REGISTRY["capital_altoria"].gate_for("n").grid_xy,
-    "capital_altoria",
+SOUTH_GATE_XYZ = settlement_node_xyz(
+    WILDERNESS_ENTRY_REGISTRY["capital_altoria"].gate_for("n").destination
 )
 
 MOVE = CLOCK_YAML["command_defaults"]["move"]
@@ -127,9 +127,8 @@ class SampleCityCostedExitTests(EvenniaTest):
         # intra-village link, and each step charges the same physical-edge
         # calculation as a capital street step.
         sync_grid()
-        village_entrance = (
-            *WILDERNESS_ENTRY_REGISTRY["village_ciaran"].gate_for("n").grid_xy,
-            "village_ciaran",
+        village_entrance = settlement_node_xyz(
+            WILDERNESS_ENTRY_REGISTRY["village_ciaran"].gate_for("n").destination
         )
         entrance = GridRoom.objects.filter_xyz(xyz=village_entrance).first()
         self.char1.location = entrance

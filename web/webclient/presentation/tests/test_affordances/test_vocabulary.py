@@ -127,7 +127,9 @@ class AffordanceVocabularyTests(VocabularyTestCase):
             importlib.import_module("world.maps." + "city_gates"),
             "CITY" + "_GATE_REGISTRY",
         )
-        gate_xyz = registry[sorted(registry)[0]].gate_xyz
+        from world.maps.static_references import settlement_node_xyz
+
+        gate_xyz = settlement_node_xyz(registry[sorted(registry)[0]].gate)
 
         sync_grid()
         grid = GridRoom.objects.filter_xyz(xyz=gate_xyz).first()

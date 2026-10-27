@@ -10,6 +10,7 @@ from world.rules.map_knowledge import record_arrival
 
 from ._support import (
     EAST_APPROACH,
+    _EAST_GATE,
     EAST_GATE_XYZ,
     SOUTH_APPROACH,
     SOUTH_GATE_XYZ,
@@ -148,7 +149,7 @@ class LocalMapGridGatewayTests(EvenniaTest):
             anchor_key=_T_MAP_KEY,
             shape=("#",),
             origin_xy=(90, 90),
-            gates=(WildernessGate("n", (2, 4), "other_capital"),),
+            gates=(WildernessGate("n", _EAST_GATE.destination),),
         )
         self.char1.location = self.south_gate
         record_arrival(self.char1)
@@ -156,7 +157,7 @@ class LocalMapGridGatewayTests(EvenniaTest):
             "schema_version": 1,
             "visited": {
                 _t_grid_id(*SOUTH_GATE_XYZ[:2]): {"first_seen_tick": 1, "last_seen_tick": 1},
-                "grid:other_capital:2:4": {"first_seen_tick": 2, "last_seen_tick": 2},
+                _t_grid_id(*EAST_GATE_XYZ[:2]): {"first_seen_tick": 2, "last_seen_tick": 2},
             },
         }
         self.char1.attributes.add("map_knowledge", record)

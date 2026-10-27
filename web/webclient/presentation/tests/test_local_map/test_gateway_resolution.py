@@ -8,7 +8,9 @@ from ._support import (
     SOUTH_APPROACH,
     SOUTH_GATE_XYZ,
     _T_MAP_KEY,
+    _NORTH_FACE,
     _T_PLAZA_XYZ,
+    _city_gate_row_for,
     _t_anchor_display,
     _t_region_display_for,
 )
@@ -37,11 +39,12 @@ class LocalMapGatewayResolutionTests(unittest.TestCase):
         from web.webclient.presentation.local_map import _registered_gateways
         from world.lore.wilderness_entry import WildernessEntryPoint, WildernessGate
 
+        gate_row = _city_gate_row_for(_NORTH_FACE)
         cave = WildernessEntryPoint(
             anchor_key="t_dungeon_point",
             shape=("#",),
             origin_xy=(10, 10),
-            gates=(WildernessGate("n", (0, 0), _T_MAP_KEY),),
+            gates=(WildernessGate("n", gate_row.gate),),
         )
         with patch(
             "world.lore.wilderness_entry.WILDERNESS_ENTRY_REGISTRY",
@@ -50,7 +53,7 @@ class LocalMapGatewayResolutionTests(unittest.TestCase):
             gateways = _registered_gateways()
         self.assertEqual(
             gateways,
-            [((10, 10), ((0, 0), _T_MAP_KEY), "t_dungeon_point")],
+            [((10, 10), (SOUTH_GATE_XYZ[:2], SOUTH_GATE_XYZ[2]), "t_dungeon_point")],
         )
 
     def test_wilderness_gateway_at_matches_only_registered_approach_cells(self):

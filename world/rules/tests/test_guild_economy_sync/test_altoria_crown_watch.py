@@ -113,9 +113,9 @@ def _interior(place):
 
 
 def _exterior(place):
-    return GridRoom.objects.filter_xyz(
-        xyz=(*place.exterior_xy, _settlement_z(place))
-    ).first()
+    from world.maps.static_references import place_exterior_xyz
+
+    return GridRoom.objects.filter_xyz(xyz=place_exterior_xyz(place)).first()
 
 
 def _settlement_z(place):

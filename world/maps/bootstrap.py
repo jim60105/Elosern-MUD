@@ -921,7 +921,18 @@ def sync_grid() -> SyncReport:
             limbo = limbo[0]
 
             for row in CITY_GATE_REGISTRY.values():
-                gate_xyz = settlement_node_xyz(row.gate, source="city gate")
+                try:
+                    gate_xyz = settlement_node_xyz(row.gate, source="city gate")
+                except Exception as error:
+                    log_warn(
+                        "bootstrap_grid_gate_missing",
+                        exc=error,
+                        context={
+                            "map_id": row.gate.map_id,
+                            "action": "skip_gate_row",
+                        },
+                    )
+                    continue
                 gate = GridRoom.objects.filter_xyz(xyz=gate_xyz).first()
                 if gate is None:
                     log_warn(
@@ -1072,7 +1083,21 @@ def sync_wilderness() -> None:
 
 def _provision_gate_exit(anchor_key: str, gate) -> None:
     """Ensure the one gate exit for ``(anchor_key, gate)`` on its destination room."""
-    gate_xyz = settlement_node_xyz(gate.destination, source=f"wilderness gate {anchor_key}")
+    try:
+        gate_xyz = settlement_node_xyz(
+            gate.destination, source=f"wilderness gate {anchor_key}"
+        )
+    except Exception as error:  # observability: ignore R2: a patched-in invalid gate row is skipped, exactly like a missing destination room
+        log_warn(
+            "bootstrap_gate_destination_room_missing",
+            exc=error,
+            context={
+                "gate_direction": gate.return_direction,
+                "anchor_key": anchor_key,
+                "action": "skip_gate_exit",
+            },
+        )
+        return
     gate_room = GridRoom.objects.filter_xyz(gate_xyz).first()
     if gate_room is None:
         log_warn(

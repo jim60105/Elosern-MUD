@@ -9,6 +9,7 @@ from typeclasses.exits import WildernessGateExit
 from typeclasses.rooms import GridRoom, Room, TerrainRoom
 from world.lore.sync import sync_all
 from world.maps.bootstrap import sync_grid, sync_wilderness
+from world.maps.static_references import settlement_node_xyz
 from world.maps.wilderness_provider import (
     WILDERNESS_NAME,
     region_for_coordinates,
@@ -49,12 +50,9 @@ def live_gateway_entry():
 
 _ENTRY = live_gateway_entry()
 _EAST_GATE = _ENTRY.gate_for("w")
-EAST_GATE_XYZ = (*_EAST_GATE.grid_xy, _EAST_GATE.z_map_key)
+EAST_GATE_XYZ = settlement_node_xyz(_EAST_GATE.destination)
 EAST_APPROACH = _ENTRY.approach_cell(_EAST_GATE)
-SOUTH_GATE_XYZ = (
-    *_ENTRY.gate_for("n").grid_xy,
-    _ENTRY.gate_for("n").z_map_key,
-)
+SOUTH_GATE_XYZ = settlement_node_xyz(_ENTRY.gate_for("n").destination)
 
 #: Physical durations at the one-kilometre wilderness cell span, from the
 #: authored meter positions (world-map-scale §8):

@@ -135,7 +135,7 @@ REGISTRY_INDEX: tuple[RegistrySpec, ...] = (
     _spec("magic_tiers", "魔法階級", "世界", _attr("world.lore.magic", "MAGIC_TIER_REGISTRY"), f"{_LORE}/magic.py", "display_name_zh"),
     _spec("nations", "國家", "世界", _attr("world.lore.nations", "NATION_REGISTRY"), f"{_LORE}/nations.py", "display_name_zh", "capital_anchor_key"),
     _spec("anchors", "錨點", "世界", _attr("world.lore.anchors", "ANCHOR_REGISTRY"), f"{_LORE}/anchors.py", "display_name_zh", "kind"),
-    _spec("anchor_placements", "錨點配置", "世界", _attr("world.lore.anchor_placement", "ANCHOR_PLACEMENT_REGISTRY"), f"{_LORE}/anchor_placement.py", "zcoord", "entrance_xy"),
+    _spec("anchor_placements", "錨點配置", "世界", _attr("world.lore.anchor_placement", "ANCHOR_PLACEMENT_REGISTRY"), f"{_LORE}/anchor_placement.py", "zcoord", "node.object_id"),
     _spec("wilderness_regions", "野外區域", "世界", _attr("world.lore.wilderness_regions", "WILDERNESS_REGION_REGISTRY"), f"{_LORE}/wilderness_regions.py", "display_name_zh", "nation_key"),
     _spec("wilderness_entries", "野外入口", "世界", _attr("world.lore.wilderness_entry", "WILDERNESS_ENTRY_REGISTRY"), f"{_LORE}/wilderness_entry.py", "origin_xy"),
     _spec("map_districts", "地圖區域", "世界", _attr("world.lore.map_districts", "MAP_DISTRICT_REGISTRY"), f"{_LORE}/map_districts.py", "district_name_zh", "kind"),

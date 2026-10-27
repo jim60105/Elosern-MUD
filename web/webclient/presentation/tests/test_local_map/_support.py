@@ -35,11 +35,13 @@ def _live_gateway_entry():
 def _city_gate_row_for(gate):
     """The city-gate row standing at ``gate``'s grid room (uniqueness
     asserted, so a settlement reorder cannot silently misbind the row)."""
+    from world.maps.static_references import settlement_node_xyz
+
     registry = _live("world.maps." + "city_gates", "CITY" + "_GATE_REGISTRY")
     matches = [
         row
         for row in registry.values()
-        if row.gate_xyz == (*gate.grid_xy, gate.z_map_key)
+        if settlement_node_xyz(row.gate) == settlement_node_xyz(gate.destination)
     ]
     if len(matches) != 1:
         raise AssertionError("exactly one city gate row stands at a gateway face")
@@ -49,8 +51,12 @@ def _city_gate_row_for(gate):
 _ENTRY = _live_gateway_entry()
 _NORTH_FACE = _ENTRY.gate_for("n")
 _EAST_GATE = _ENTRY.gate_for("w")
-SOUTH_GATE_XYZ = _city_gate_row_for(_NORTH_FACE).gate_xyz
-EAST_GATE_XYZ = (*_EAST_GATE.grid_xy, _EAST_GATE.z_map_key)
+SOUTH_GATE_XYZ = _live("world.maps." + "static_references", "settlement_node_xyz")(
+    _city_gate_row_for(_NORTH_FACE).gate
+)
+EAST_GATE_XYZ = _live("world.maps." + "static_references", "settlement_node_xyz")(
+    _EAST_GATE.destination
+)
 EAST_APPROACH = _ENTRY.approach_cell(_EAST_GATE)
 SOUTH_APPROACH = _ENTRY.approach_cell(_NORTH_FACE)
 
@@ -62,10 +68,11 @@ _T_MAP_KEY = SOUTH_GATE_XYZ[2]
 # The anchor's entrance node IS the central plaza: probe it from the anchor
 # placement registry instead of authoring its coordinate.
 _T_PLAZA_XYZ = (
-    * _live("world.lore" + ".anchor_placement", "ANCHOR_PLACEMENT" + "_REGISTRY")[
-        _city_gate_row_for(_NORTH_FACE).map_id
-    ].entrance_xy,
-    _T_MAP_KEY,
+    *_live("world.maps" + ".static_references", "anchor_entrance_xyz")(
+        _live("world.lore" + ".anchor_placement", "ANCHOR_PLACEMENT" + "_REGISTRY")[
+            _city_gate_row_for(_NORTH_FACE).gate.map_id
+        ]
+    ),
 )
 
 

@@ -52,6 +52,7 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "starting_companion_validation",
     "state_reaction_rules",
     "npc_persona_roster_validation",
+    "static_map_reference_validation",
     "sync_all",
     "sync_limbo",
     "sync_grid",
@@ -495,6 +496,14 @@ def at_server_start():
     _startup_step(
         "npc_persona_roster_validation",
         _validate_npc_roster_step,
+    )
+    # Fail-loud static map-reference gate: every authored static target
+    # (gates, anchor placements, wilderness gates, place exteriors, district
+    # landmarks, grid art) resolves against one current binding snapshot before
+    # lore or grid synchronization can persist partial state.
+    _startup_step(
+        "static_map_reference_validation",
+        lambda: _late("world.maps.static_references", "validate_static_references"),
     )
     _startup_step("sync_all", sync_all)
     _startup_step("sync_limbo", sync_limbo)

@@ -70,8 +70,9 @@ class GridRoomArtMetadataTests(EvenniaTest):
         sync_grid()
 
     def _room(self, key):
-        map_key, x, y = key
-        return GridRoom.objects.filter_xyz((x, y, map_key)).first()
+        from world.maps.static_references import settlement_node_xyz
+
+        return GridRoom.objects.filter_xyz(settlement_node_xyz(key)).first()
 
     @covers_requirement(
         "room-art-metadata::room-official-references-are-explicit-authored-keys"
@@ -85,7 +86,12 @@ class GridRoomArtMetadataTests(EvenniaTest):
                 self.assertTrue(is_registered_scene_key(room.scene_archetype))
                 # An authored grid node declares no room-art key.
                 self.assertIsNone(room.room_art_key)
-                self.assertEqual(room.scene_identity, grid_scene_identity(*key))
+                from world.maps.static_references import settlement_node_xy
+
+                self.assertEqual(
+                    room.scene_identity,
+                    grid_scene_identity(key.map_id, *settlement_node_xy(key)),
+                )
 
     def test_repeated_startup_converges_drifted_grid_metadata(self):
         key = next(iter(GRID_NODE_SCENE_ARCHETYPES))
@@ -100,7 +106,12 @@ class GridRoomArtMetadataTests(EvenniaTest):
         room = self._room(key)
         self.assertEqual(room.scene_archetype, GRID_NODE_SCENE_ARCHETYPES[key])
         self.assertIsNone(room.room_art_key)
-        self.assertEqual(room.scene_identity, grid_scene_identity(*key))
+        from world.maps.static_references import settlement_node_xy
+
+        self.assertEqual(
+            room.scene_identity,
+            grid_scene_identity(key.map_id, *settlement_node_xy(key)),
+        )
 
 
 class PermanentInteriorArtMetadataTests(EvenniaTest):
@@ -340,8 +351,9 @@ class RoomMetadataSmokeTests(EvenniaTest):
         sync_service_interiors()
 
         node = next(iter(GRID_NODE_SCENE_ARCHETYPES))
-        map_key, x, y = node
-        grid_room = GridRoom.objects.filter_xyz((x, y, map_key)).first()
+        from world.maps.static_references import settlement_node_xyz
+
+        grid_room = GridRoom.objects.filter_xyz(settlement_node_xyz(node)).first()
         self.assertTrue(is_registered_scene_key(grid_room.scene_archetype))
 
         interior = search_object_by_tag(next(iter(_live_places())))[0]

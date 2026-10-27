@@ -278,11 +278,6 @@ def validate_place_registry(
     """
     from elosern_map_core.references import ReferenceError, settlement_position
 
-    if index is None:
-        from world.maps.static_references import settlement_reference_index
-
-        index = settlement_reference_index()
-
     for place_key, place in places.items():
         if type(place.letter_service) is not bool:
             raise ValueError(f"place {place_key!r} letter_service must be a boolean")
@@ -344,10 +339,11 @@ def validate_place_registry(
                 f"place {place.key!r} exterior names map {place.exterior.map_id!r}, "
                 f"not its settlement's coordinate space {expected_map!r}"
             )
-        try:
-            settlement_position(index, place.exterior, source=f"place {place.key!r}")
-        except ReferenceError as error:
-            raise ValueError(str(error)) from error
+        if index is not None:
+            try:
+                settlement_position(index, place.exterior, source=f"place {place.key!r}")
+            except ReferenceError as error:
+                raise ValueError(str(error)) from error
         if type(place.church) is not bool:
             raise ValueError(f"place {place.key!r} church must be a boolean")
         if check_capabilities:
@@ -482,4 +478,10 @@ PLACE_REGISTRY: dict[str, PlaceDefinition] = {
     )
 }
 
-validate_place_registry(PLACE_REGISTRY, check_capabilities=False)
+from world.maps.static_references import settlement_reference_index  # noqa: E402
+
+validate_place_registry(
+    PLACE_REGISTRY,
+    check_capabilities=False,
+    index=settlement_reference_index(),
+)

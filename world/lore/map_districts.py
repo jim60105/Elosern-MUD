@@ -218,12 +218,12 @@ def landmark_node_ids(
     """
 
     from elosern_map_core.references import ReferenceError
-    from world.maps.static_references import reference_index, resolve_static
+    from world.maps.static_references import map_reference_index, resolve_static
     from world.maps.wilderness_provider import WILDERNESS_NAME
     from world.rules.map_knowledge import encode_grid, encode_wild
 
     registry = MAP_DISTRICT_REGISTRY if districts is None else districts
-    current = index if index is not None else reference_index()
+    current = index if index is not None else map_reference_index()
     result: dict[str, str] = {}
     for key, district in registry.items():
         try:
@@ -399,8 +399,8 @@ def validate_map_districts(
             voronoi.append((key, position))
 
     minimum_m = MIN_VORONOI_SPACING_KM * 1000
-    for index, (key, position) in enumerate(voronoi):
-        for other_key, other in voronoi[index + 1 :]:
+    for position_index, (key, position) in enumerate(voronoi):
+        for other_key, other in voronoi[position_index + 1 :]:
             distance = math.hypot(position[0] - other[0], position[1] - other[1])
             if distance < minimum_m:
                 fail(

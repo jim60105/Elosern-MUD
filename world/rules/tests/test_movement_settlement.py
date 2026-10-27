@@ -24,6 +24,7 @@ from typeclasses.exits import Exit, WildernessGateExit
 from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom, InstanceRoom, Room, TerrainRoom
 from world.maps.bootstrap import sync_grid, sync_wilderness
+from world.maps.static_references import settlement_node_xyz
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.clock import CLOCK_YAML, WorldClock, get_world_clock
 from world.rules.map_knowledge import KnowledgeError, parse_knowledge
@@ -57,7 +58,7 @@ def _gate_anchor_entry():
 
 _CAPITAL = _gate_anchor_entry()
 _EAST_GATE = _CAPITAL.gate_for("w")
-EAST_GATE_XYZ = (*_EAST_GATE.grid_xy, _EAST_GATE.z_map_key)
+EAST_GATE_XYZ = settlement_node_xyz(_EAST_GATE.destination)
 ENTRY_XY = _CAPITAL.approach_cell(_EAST_GATE)
 MOVE = CLOCK_YAML["command_defaults"]["move"]
 

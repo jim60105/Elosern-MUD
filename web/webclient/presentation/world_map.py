@@ -71,9 +71,9 @@ def quest_markers(actor, lit):
 
 def assemble_world_map(*, visit_ids, current, markers):
     """Assemble with fresh containers; cached static bodies remain private."""
-    from world.lore.map_districts import MAP_DISTRICT_REGISTRY
+    from world.lore.map_districts import landmark_node_ids
 
-    lit={key for key,district in MAP_DISTRICT_REGISTRY.items() if district.landmark_node in visit_ids}
+    lit={key for key,node_id in landmark_node_ids().items() if node_id in visit_ids}
     permitted=[]
     visited=[]
     for owner,row,hidden,node_ids in geometry.place_geometry():
@@ -97,7 +97,7 @@ def assemble_world_map(*, visit_ids, current, markers):
 
 
 def world_map_presenter(context):
-    from world.lore.map_districts import MAP_DISTRICT_REGISTRY
+    from world.lore.map_districts import landmark_node_ids
 
     actor=context.actor
     current=geometry.current_point(actor)
@@ -108,5 +108,5 @@ def world_map_presenter(context):
     except KnowledgeError as error:  # observability: ignore R2: unreadable knowledge is explicitly unavailable, never reset
         raise PanelUnavailableError from error
     ids={visit.node_id for visit in visits}
-    lit={key for key,district in MAP_DISTRICT_REGISTRY.items() if district.landmark_node in ids}
+    lit={key for key,node_id in landmark_node_ids().items() if node_id in ids}
     return assemble_world_map(visit_ids=ids,current=current,markers=quest_markers(actor,lit))

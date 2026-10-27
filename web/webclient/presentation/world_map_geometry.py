@@ -163,7 +163,7 @@ def terrain_layers():
 
 
 @cache
-def district_lines():
+def _district_lines(_signature):
     from world.maps.wilderness_provider import WATERWAY_ROUTES, national_borders
     from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
     from world.lore.anchors import ANCHOR_REGISTRY, AnchorKind, world_position_m
@@ -195,8 +195,16 @@ def district_lines():
     return result
 
 
+def district_lines():
+    """District line geometry at the current static-reference bindings."""
+
+    from world.maps.static_references import binding_signature
+
+    return _district_lines(binding_signature())
+
+
 @cache
-def district_geometry():
+def _district_geometry(_signature):
     from world.lore.map_districts import MAP_DISTRICT_REGISTRY
     from world.maps.district_partition import district_outlines
 
@@ -211,7 +219,9 @@ def district_geometry():
             if converted[0] != converted[-1]:
                 converted.append(converted[0][:])
             outline.append(converted)
-        x,y = world_node_point(district.landmark_node)
+        from world.lore.map_districts import landmark_node_id
+
+        x,y = world_node_point(landmark_node_id(district))
         result[key] = dict(name=district.district_name_zh, outline=outline,
                            landmark=dict(name=district.landmark_name_zh,x=x,y=y),
                            nations=nations.get(key,[]), terrain=terrain.get(key,[]),
@@ -219,14 +229,23 @@ def district_geometry():
     return result
 
 
+def district_geometry():
+    """District geometry at the current static-reference bindings."""
+
+    from world.maps.static_references import binding_signature
+
+    return _district_geometry(binding_signature())
+
+
 @cache
-def place_geometry():
+def _place_geometry(_signature):
     """Internal (owner, wire row, visit-only, canonical visit IDs) records."""
     from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
     from world.lore.anchors import ANCHOR_GEOGRAPHY_REGISTRY, ANCHOR_REGISTRY, AnchorKind
     from world.lore.wilderness_regions import HARBOR_SITE_REGISTRY
     from world.maps.district_partition import district_at
     from world.maps.map_data import settlement_graph
+    from world.maps.static_references import settlement_node_xyz
     from world.rules.map_knowledge import encode_grid, encode_wild
     from world.maps.wilderness_provider import WILDERNESS_NAME
 
@@ -239,7 +258,8 @@ def place_geometry():
         ids={encode_wild(WILDERNESS_NAME,x,y)}
         placement=ANCHOR_PLACEMENT_REGISTRY.get(key)
         if placement is not None:
-            ids.add(encode_grid(placement.zcoord,*placement.entrance_xy))
+            node_xyz = settlement_node_xyz(placement.node, source=f"anchor placement {key}")
+            ids.add(encode_grid(node_xyz[2], node_xyz[0], node_xyz[1]))
             graph = settlement_graph(placement.zcoord)
             if graph is not None:
                 ids.update(encode_grid(placement.zcoord, node.x, node.y) for node in graph.nodes.values())
@@ -249,3 +269,11 @@ def place_geometry():
         result.append((district_at((x,y)),dict(id=key,name=site.display_name,kind="harbour",x=x+.5,y=y+.5),False,
                        frozenset((encode_wild(WILDERNESS_NAME,x,y),))))
     return tuple(result)
+
+
+def place_geometry():
+    """Place visit geometry at the current static-reference bindings."""
+
+    from world.maps.static_references import binding_signature
+
+    return _place_geometry(binding_signature())

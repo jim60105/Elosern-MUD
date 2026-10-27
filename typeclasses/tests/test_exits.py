@@ -16,6 +16,7 @@ from typeclasses.exits import (
 )
 from typeclasses.rooms import GridRoom, Room
 from world.maps.bootstrap import sync_grid, sync_wilderness
+from world.maps.static_references import settlement_node_xyz
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.clock import get_world_clock
 
@@ -52,14 +53,8 @@ def live_gateway_entry():
 
 
 _CAPITAL = live_gateway_entry()
-EAST_GATE_XYZ = (
-    *_CAPITAL.gate_for("w").grid_xy,
-    _CAPITAL.gate_for("w").z_map_key,
-)
-SOUTH_GATE_XYZ = (
-    *_CAPITAL.gate_for("n").grid_xy,
-    _CAPITAL.gate_for("n").z_map_key,
-)
+EAST_GATE_XYZ = settlement_node_xyz(_CAPITAL.gate_for("w").destination)
+SOUTH_GATE_XYZ = settlement_node_xyz(_CAPITAL.gate_for("n").destination)
 EAST_APPROACH = _CAPITAL.approach_cell(_CAPITAL.gate_for("w"))
 SOUTH_APPROACH = _CAPITAL.approach_cell(_CAPITAL.gate_for("n"))
 

@@ -134,9 +134,9 @@ def _interior(place):
 
 
 def _exterior(place):
-    return GridRoom.objects.filter_xyz(
-        xyz=(*place.exterior_xy, _settlement_z(place))
-    ).first()
+    from world.maps.static_references import place_exterior_xyz
+
+    return GridRoom.objects.filter_xyz(xyz=place_exterior_xyz(place)).first()
 
 
 def _settlement_z(place):
@@ -351,13 +351,13 @@ class AltoriaLearningExchangeTests(ServiceContentIsolation, EvenniaTestCase):
         # a doorway collision would fail here as a lost room and in the
         # registry loader as a rejected record.
         for anchor in (_stalls(), _merchant_hall()):
-            with self.subTest(exterior=anchor.exterior_xy):
+            with self.subTest(exterior=anchor.exterior):
                 z = _settlement_z(anchor)
                 co_residents = [
                     place
                     for place in _places_tuple()
                     if place.settlement_key == anchor.settlement_key
-                    and place.exterior_xy == anchor.exterior_xy
+                    and place.exterior == anchor.exterior
                 ]
                 exterior = _exterior(anchor)
                 door_keys = [

@@ -9,15 +9,16 @@ import copy
 import unittest
 
 from tools.spec_traceability import covers_requirement
-from world.lore.map_districts import MapDistrict
+from elosern_map_core.references import wilderness_cell_ref
+from world.lore.map_districts import MapDistrict, landmark_node_ids
 from world.rules.map_district_lighting import lit_district_keys, lit_district_keys_from_visits
 from world.rules.map_knowledge import KNOWLEDGE_ATTR, KnowledgeError, NodeVisit
 
 _DISTRICTS = {
     # One region district spanning two claims, lit only at its single heart.
-    "mire": MapDistrict("mire", "霧沼區", "霧沼心", "wild:elosern:500:2400", "region", "mire_region"),
-    "dune": MapDistrict("dune", "沙丘區", "沙丘石", "wild:elosern:300:600", "voronoi"),
-    "vale": MapDistrict("vale", "溪谷區", "溪谷橋", "wild:elosern:700:900", "voronoi"),
+    "mire": MapDistrict("mire", "霧沼區", "霧沼心", wilderness_cell_ref((500, 2400)), "region", "mire_region"),
+    "dune": MapDistrict("dune", "沙丘區", "沙丘石", wilderness_cell_ref((300, 600)), "voronoi"),
+    "vale": MapDistrict("vale", "溪谷區", "溪谷橋", wilderness_cell_ref((700, 900)), "voronoi"),
 }
 
 
@@ -78,7 +79,7 @@ class DistrictLightingTests(unittest.TestCase):
         # The region district lights as one identity, whichever claim it spans.
         self.assertEqual(lit_district_keys(heart, _DISTRICTS), frozenset({"mire"}))
 
-        everything = _Character([d.landmark_node for d in _DISTRICTS.values()])
+        everything = _Character(landmark_node_ids(_DISTRICTS).values())
         self.assertEqual(lit_district_keys(everything, _DISTRICTS), frozenset(_DISTRICTS))
 
     @covers_requirement("map-districts::district-lighting-is-derived-from-visited-landmark-identity")

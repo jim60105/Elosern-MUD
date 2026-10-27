@@ -36,7 +36,9 @@ def _south_gate_xyz():
     keys = sorted(registry)
     if not keys:
         raise AssertionError("no city gate row exists")
-    return registry[keys[0]].gate_xyz
+    from world.maps.static_references import settlement_node_xyz
+
+    return settlement_node_xyz(registry[keys[0]].gate)
 
 
 class NodeIdEncoderTests(EvenniaTestCase):

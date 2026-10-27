@@ -57,7 +57,7 @@ _GEOGRAPHY = {
     "ruin": SimpleNamespace(anchor_key="ruin", cell=(700, 50)),
 }
 _PLACEMENTS = {
-    "town": SimpleNamespace(anchor_key="town", zcoord="town_map", entrance_xy=(10, 20)),
+    "town": SimpleNamespace(anchor_key="town", zcoord="town_map", node=object()),
 }
 _TOWN_NODES = {(10, 20), (35, 60)}
 _SITES = {
@@ -101,6 +101,12 @@ def _patch_geography(test):
         patcher = mock.patch.object(resolver, name, value)
         patcher.start()
         test.addCleanup(patcher.stop)
+    node_xy = mock.patch(
+        "world.maps.static_references.settlement_node_xy",
+        side_effect=lambda reference, **kwargs: (10, 20),
+    )
+    node_xy.start()
+    test.addCleanup(node_xy.stop)
 
 
 # --- Synthetic quests ----------------------------------------------------------

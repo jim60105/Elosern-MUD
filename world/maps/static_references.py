@@ -82,6 +82,25 @@ def reference_index() -> ReferenceIndex:
     )
 
 
+def map_reference_index() -> ReferenceIndex:
+    """The settlement/location bindings a district landmark can project."""
+
+    from world.lore.anchors import ANCHOR_GEOGRAPHY_REGISTRY
+    from world.maps.map_data import SETTLEMENT_GRAPHS
+
+    return ReferenceIndex.build(
+        settlement_nodes=(
+            (map_id, node_id, node.coordinate)
+            for map_id, graph in SETTLEMENT_GRAPHS.items()
+            for node_id, node in graph.nodes.items()
+        ),
+        locations=(
+            (key, tuple(geography.cell))
+            for key, geography in ANCHOR_GEOGRAPHY_REGISTRY.items()
+        ),
+    )
+
+
 def resolve_static(
     reference: QualifiedRef,
     *,
@@ -233,7 +252,7 @@ def validate_static_references(*, index: ReferenceIndex | None = None) -> None:
     from world.maps.city_gates import CITY_GATE_REGISTRY
     from world.maps.room_art import GRID_NODE_SCENE_ARCHETYPES
 
-    current = index if index is not None else reference_index()
+    current = index if index is not None else map_reference_index()
     problems: list[str] = []
 
     def check(source: str, reference: QualifiedRef) -> None:
@@ -267,6 +286,7 @@ __all__ = [
     "anchor_entrance_xyz",
     "binding_signature",
     "place_exterior_xyz",
+    "map_reference_index",
     "reference_index",
     "resolve_static",
     "settlement_node_xy",

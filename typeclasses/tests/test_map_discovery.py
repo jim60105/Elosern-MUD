@@ -8,6 +8,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
 from tools.spec_traceability import covers_requirement
+from elosern_map_core.references import settlement_node_ref, wilderness_cell_ref
 from typeclasses.exits import Exit, WildernessGateExit
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
@@ -21,10 +22,24 @@ class LandmarkArrivalTests(EvenniaTest):
         load_synthetic_grid()
         self.source,self.landmark,self.end=synthetic_rooms()
         self.char1.location=self.source
-        self.district=NS(key="t_district",landmark_node=_derive_node_id(self.landmark),district_name_zh="測試丘陵")
+        self.district=NS(
+            key="t_district",
+            landmark=wilderness_cell_ref((0, 0)),
+            landmark_node=_derive_node_id(self.landmark),
+            district_name_zh="測試丘陵",
+        )
         self.registry=patch("world.lore.map_districts.MAP_DISTRICT_REGISTRY",{"t_district":self.district})
         self.registry.start()
         self.addCleanup(self.registry.stop)
+        # The t_ grid map is not an authored settlement, so this fixture's
+        # landmark id is supplied directly instead of resolved from the
+        # production binding index.
+        self.landmark_ids=patch(
+            "world.lore.map_districts.landmark_node_ids",
+            side_effect=lambda *args, **kwargs: {"t_district": self.district.landmark_node},
+        )
+        self.landmark_ids.start()
+        self.addCleanup(self.landmark_ids.stop)
         self.exit=next(exit for exit in self.source.exits if exit.destination == self.landmark)
         # Discovery owns no clock semantics; keep these tests on the arrival
         # writer/transaction seam rather than every clock event consumer.
@@ -202,7 +217,7 @@ class LandmarkArrivalTests(EvenniaTest):
         import world.maps.wilderness_population
         sync_wilderness()
         entry=WildernessEntryPoint(anchor_key="t_gate",shape=("#",),origin_xy=(500,500),
-                                  gates=(WildernessGate("w",(0,0),"t_probe_grid"),))
+                                  gates=(WildernessGate("w",settlement_node_ref("t_probe_grid","gate")),))
         cell=entry.approach_cell(entry.gates[0])
         gate=create_object(WildernessGateExit,key="t_out",location=self.source,destination=self.source)
         gate.db.anchor_key="t_gate"

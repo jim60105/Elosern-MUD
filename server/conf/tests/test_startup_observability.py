@@ -30,6 +30,7 @@ from tools.spec_traceability import covers_requirement
 _BODY_TARGETS = (
     "world.rules.clock.get_world_clock",
     "world.rules.npc_roster_validation.validate_npc_roster",
+    "world.maps.static_references.validate_static_references",
     "world.lore.sync.sync_all",
     "world.maps.bootstrap.sync_limbo",
     "world.maps.bootstrap.sync_grid",
@@ -140,6 +141,7 @@ class StartupStepEventTests(_StubbedStartup):
                 "starting_companion_validation",
                 "state_reaction_rules",
                 "npc_persona_roster_validation",
+                "static_map_reference_validation",
             ],
         )
 
