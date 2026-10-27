@@ -30,7 +30,6 @@ from .browser_helpers import (
     sent_action_count,
     store_state,
     submit_until_admitted,
-    wait_for_presentation_adopted,
     wait_for_store_state,
 )
 from .harness import ManagedServer, ManagedServerTearDownMixin
@@ -1375,8 +1374,13 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # fallback.
         race_variant_line = synth_conditioned_variant_host_line("lineage")
         race_fallback_line = synth_conditioned_fallback_host_line("lineage")
-        open_dialogue_choices(page)
-        _press(page, "1")  # the race-qualified topic -> explore.talk_scripted
+        def _pick_race_topic() -> None:
+            # Re-open the list before every activation: a stale answer applied
+            # nothing, so the list returns with the same first topic focused.
+            open_dialogue_choices(page)
+            _press(page, "1")  # the race-qualified topic -> explore.talk_scripted
+
+        submit_until_admitted(page, _pick_race_topic, action_id="explore.talk_scripted")
         self._wait_panel(
             page,
             "dialogue",
@@ -1404,11 +1408,16 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # scene, and the fallback never appears.
         exposure_variant_line = synth_conditioned_variant_host_line("attire")
         exposure_fallback_line = synth_conditioned_fallback_host_line("attire")
-        open_dialogue_choices(page)
-        # The race scene's reading acknowledgement must be adopted before the
-        # next pick, or the pick names a revision the coordinator moved past.
-        wait_for_presentation_adopted(page)
-        _press(page, "2")  # the effective-exposure topic
+        def _pick_exposure_topic() -> None:
+            open_dialogue_choices(page)
+            _press(page, "2")  # the effective-exposure topic
+
+        # The race scene's reading acknowledgement and the action-options push
+        # both land around this pick, so the activation repeats while the
+        # admission gate answers stale.
+        submit_until_admitted(
+            page, _pick_exposure_topic, action_id="explore.talk_scripted"
+        )
         self._wait_panel(
             page,
             "dialogue",
