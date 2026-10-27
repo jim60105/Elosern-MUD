@@ -39,32 +39,69 @@ export const NPC_DETAIL = {
     },
     {
       key: "services",
-      title: "服務與職業",
+      title: "服務",
       type: "table",
       columns: [
-        { key: "component", label: "服務元件" },
-        { key: "slot", label: "插槽", mono: true },
-        { key: "fields", label: "欄位", mono: true },
+        { key: "service", label: "服務鍵", mono: true },
+        { key: "label", label: "服務" },
+        { key: "availability", label: "可用性", mono: true },
+        { key: "reason", label: "原因" },
+        { key: "route", label: "開啟路徑", mono: true },
       ],
       rows: [
         {
-          key: "GuildStaff",
+          key: "guild.register",
           cells: {
-            component: { value: "公會櫃檯" },
-            slot: { value: "t_guild_slot", mono: true },
-            fields: { value: "service_id=t_service", mono: true },
+            service: { value: "guild.register", mono: true },
+            label: { value: "t_register_service" },
+            availability: { value: "context_required", mono: true },
+            reason: { value: "t_context_reason" },
+            route: { value: "guild register @#12", mono: true },
           },
         },
         {
-          key: "ScriptedDialogue",
+          key: "dialogue.t_report",
           cells: {
-            component: { value: "腳本對話" },
-            slot: { value: "t_dialogue_slot", mono: true },
-            fields: { value: "dialogue_key=t_dialogue", mono: true },
+            service: { value: "dialogue.t_report", mono: true },
+            label: { value: "t_report_service" },
+            availability: { value: "context_required", mono: true },
+            reason: { value: "t_context_reason" },
+            route: { value: "talk 合成守衛", mono: true },
           },
         },
       ],
-      empty_note: "此 NPC 目前沒有服務元件。",
+      note: "t_services_note",
+    },
+    {
+      key: "capability_diagnostics",
+      title: "能力設定診斷",
+      type: "groups",
+      note: "t_diagnostics_note",
+      groups: [
+        {
+          key: "guild_staff",
+          title: "guild_staff",
+          rows: [
+            { key: "綁定", label: "綁定", value: "place", mono: true },
+            {
+              key: "錨點",
+              label: "錨點",
+              value: "#3",
+              mono: true,
+              link: { kind: "rooms", id: "3", label: "合成廣場" },
+            },
+            { key: "設定", label: "設定", value: "service_id=t_service", mono: true },
+            { key: "狀態", label: "狀態", value: "正常", tone: "ok" },
+          ],
+        },
+        {
+          key: "dialogue_services",
+          title: "對話服務關聯",
+          rows: [
+            { key: "t_report", label: "t_report", value: "t_topic · t_label", mono: true },
+          ],
+        },
+      ],
     },
     {
       key: "persona",

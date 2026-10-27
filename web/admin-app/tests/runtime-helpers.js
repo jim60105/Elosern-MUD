@@ -83,22 +83,22 @@ export const NPC_DETAIL = {
     },
     {
       key: "services",
-      title: "服務與職業",
+      title: "服務",
       type: "table",
       columns: [
-        { key: "component", label: "服務元件" },
-        { key: "slot", label: "插槽", mono: true },
+        { key: "service", label: "服務鍵", mono: true },
+        { key: "availability", label: "可用性", mono: true },
       ],
       rows: [
         {
-          key: "GuildStaff",
+          key: "guild.register",
           cells: {
-            component: { value: "公會櫃檯" },
-            slot: { value: "GuildStaff", mono: true },
+            service: { value: "guild.register", mono: true },
+            availability: { value: "context_required", mono: true },
           },
         },
       ],
-      empty_note: "此 NPC 目前沒有服務元件。",
+      empty_note: "此 NPC 目前沒有可公開顯示的服務項目。",
     },
     {
       key: "links",

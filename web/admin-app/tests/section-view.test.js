@@ -35,39 +35,42 @@ describe("GmSectionView", () => {
   it("renders a table through the shared ledger table, cell links included", () => {
     const wrapper = section({
       key: "services",
-      title: "服務與職業",
+      title: "服務",
       type: "table",
       columns: [
-        { key: "component", label: "服務元件" },
-        { key: "slot", label: "插槽", mono: true },
+        { key: "service", label: "服務鍵", mono: true },
+        { key: "label", label: "服務" },
       ],
       rows: [
         {
-          key: "GuildStaff",
+          key: "guild.register",
           cells: {
-            component: { value: "公會櫃檯" },
-            slot: { value: "GuildStaff", mono: true },
+            service: { value: "guild.register", mono: true },
+            label: { value: "登記成為冒險者" },
           },
         },
         {
           key: "npc",
-          cells: { component: { value: "#12", link: { kind: "npcs", id: "12", label: "守衛" } }, slot: { value: "—" } },
+          cells: {
+            service: { value: "#12", link: { kind: "npcs", id: "12", label: "守衛" } },
+            label: { value: "—" },
+          },
         },
       ],
-      empty_note: "此 NPC 目前沒有服務元件。",
+      empty_note: "此 NPC 目前沒有可公開顯示的服務項目。",
     });
     expect(wrapper.findComponent(GmTable).exists()).toBe(true);
-    expect(wrapper.findAll("th").map((n) => n.text())).toEqual(["服務元件", "插槽"]);
+    expect(wrapper.findAll("th").map((n) => n.text())).toEqual(["服務鍵", "服務"]);
     expect(wrapper.get("a").attributes("href")).toBe("/gm/runtime/npcs/12");
     const empty = section({
       key: "services",
-      title: "服務與職業",
+      title: "服務",
       type: "table",
-      columns: [{ key: "slot", label: "插槽" }],
+      columns: [{ key: "service", label: "服務鍵" }],
       rows: [],
-      empty_note: "此 NPC 目前沒有服務元件。",
+      empty_note: "此 NPC 目前沒有可公開顯示的服務項目。",
     });
-    expect(empty.findComponent(GmTable).text()).toContain("此 NPC 目前沒有服務元件。");
+    expect(empty.findComponent(GmTable).text()).toContain("此 NPC 目前沒有可公開顯示的服務項目。");
   });
 
   it("renders groups with their notes and rows", () => {
