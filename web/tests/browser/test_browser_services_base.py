@@ -156,22 +156,32 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 },
             )
             return store_state(page)["panels"]["party_inventory"]
-        # guild/shop: the host's medallion on the presence rail -> the
-        # host's verb card -> the navigate-kind service row
-        # (exploration-presence-rail). Both hops are addressed by their stable
-        # keys with the keyboard (the rail's and the card's arrow walks) because
-        # the card's row order is server-authored (交談 leads, then the
-        # target's own affordances). The medallion's identity is read from the
-        # committed panel, never guessed.
-        target_key = page.evaluate(
+        # guild/shop: the host's medallion on the presence rail -> the host's
+        # verb card -> that host's own contextual service row
+        # (exploration-presence-rail + npc-contextual-service-projection). Both
+        # hops are addressed by their stable keys with the keyboard (the rail's
+        # and the card's arrow walks) because the card's row order is
+        # server-authored. The provider identity and the row key are read from
+        # the committed panel's target-bound services field, never guessed: the
+        # version-5 cutover removed the coarse guild/shop navigation rows.
+        lookup = page.evaluate(
             """(surface) => {
                 const s = window.__elosernBridge && window.__elosernBridge.store;
                 const panels = (s && s.view && s.view.panels) || {};
                 const panel = panels.exploration || null;
                 for (const target of (panel && panel.interact) || []) {
-                    for (const affordance of target.affordances || []) {
-                        if (affordance.surface === surface) {
-                            return 'target-' + target.identity;
+                    const entries = (target.services && target.services.entries) || [];
+                    for (const entry of entries) {
+                        const route = entry.route || {};
+                        if (route.kind !== 'services' || !entry.enabled) {
+                            continue;
+                        }
+                        const matches = surface === 'shop'
+                            ? route.section === 'shop'
+                            : route.section !== 'shop';
+                        if (matches) {
+                            return { target: 'target-' + target.identity,
+                                     key: 'service-' + entry.key };
                         }
                     }
                 }
@@ -179,13 +189,12 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             }""",
             surface_key,
         )
-        self.assertTrue(
-            target_key,
-            f"no committed interact target carries the {surface_key} service entry",
+        self.assertIsNotNone(
+            lookup,
+            f"no committed interact target carries an enabled {surface_key} service entry",
         )
-        activate_presence_entry(page, target_key)  # open the verb card (no dispatch)
-        item_key = "service-" + surface_key
-        activate_card_row(page, item_key)  # open the frameless service drawer
+        activate_presence_entry(page, lookup["target"])  # open the verb card
+        activate_card_row(page, lookup["key"])  # open the frameless service drawer
         if surface_key == "shop":
             wait_for_store_state(
                 page,
