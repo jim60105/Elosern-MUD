@@ -21,6 +21,7 @@
 | `pnpm run showcase-coverage` | 對照 `web/webclient-app/component-manifest.json` 與 GM 的 `web/admin-app/component-manifest.json` 檢查元件覆蓋率 | `frontend` 工作 + 最上層契約測試 |
 | `pnpm run build:gm` | GM 控制台的獨立 Vite 建置（`vite.gm.config.js`）→ `web/static/gm/dist/`（穩定的 `index.js` + `index.css`；**不納入版本控制**，只清除 GM 自己的輸出目錄） | `frontend` 工作、瀏覽器工作區、容器 |
 | `pnpm run test:gm-boundary` | GM 相依邊界的無相依套件 Node 測試（`scripts/tests/gm-import-boundary.test.mjs`） | `frontend` 工作 + `web.gm.tests` 證據橋接 |
+| `pnpm run test:map-view` | `@elosern/map-view` 中立圖資原語的無相依套件 Node 測試（`packages/map-view/tests/*.test.js`） | `frontend` 工作 + `tests/test_map_view_boundary.py` |
 | `pnpm run dev` | 本機工作用的 Vite 開發伺服器（HMR） | —（僅供本機） |
 | `node --test web/static/webclient/js/tests/*.test.js` | 針對保留的獨立於 DOM 邏輯執行無相依套件的 Node 閘門（約 1 秒） | preflight + 最上層契約測試 |
 
@@ -32,11 +33,15 @@
 package.json / pnpm-lock.yaml / vite.config.js / vitest.config.js   (根目錄)
 .storybook/                                     vue3-vite 設定 (根目錄)
 scripts/component-coverage.mjs                  Storybook 覆蓋率閘門
+packages/map-view/                              中立圖資原語套件 @elosern/map-view（投影、平移縮放、幾何、字形、主題 hook；
+                                                無 store／OOB／玩家知識／host 樣式表）
 web/webclient-app/
   package.json                                  (應用程式樹的 "type": "module")
   main.js                                       SPA 入口點 (掛載至 #main-sub)
   App.vue                                       根元件 (A2 建置存根；B1 AppShell)
   lib/*.js                                      封裝 js/elosern/* 的 ESM 包裝器 (CJS 互通)
+  lib/map_{stops,chrome,glyphs,theme}.js        遊戲自己的地圖政策：縮放停點、詳情面板寬度、
+                                                字形縮放與節點→字形輸入對應、主題角色對應
   styles/tokens.css                             設計系統 tokens (D6)
   styles/fonts.css                              自我代管的 @font-face (D6)
   styles/fonts-mono.css                         Jim Mono TC 等寬字體的 @font-face（由匯入工具輸出，勿手動編輯）
