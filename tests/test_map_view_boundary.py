@@ -62,6 +62,7 @@ DUPLICATE_DEFINITIONS = (
 )
 PACKAGE_IMPORT = re.compile(r'''(?:\bfrom\s*|\bimport\s*\()\s*["']@elosern/map-view["']''')
 DEEP_IMPORT = re.compile(r'''["']@elosern/map-view/''')
+SPECIFIER = re.compile(r'''\bfrom\s*["']([^"']+)["']|\bimport\s*\(\s*["']([^"']+)["']''')
 HOST_TOKENS = re.compile(r"--gold-|--paper-|--seal-|--map-label-|--motion-|--ui-scale|--text-|--f-")
 HOST_GLOBALS = re.compile(
     r"\b(document|window|globalThis|localStorage|sessionStorage|fetch|WebSocket|XMLHttpRequest|"
@@ -85,6 +86,11 @@ def read(path: Path) -> str:
 def strip_comments(source: str) -> str:
     source = re.sub(r"/\*[\s\S]*?\*/", "", source)
     return re.sub(r"^[ \t]*//.*$", "", source, flags=re.MULTILINE)
+
+
+def specifiers(source: str) -> list[str]:
+    """Every static specifier, including a declaration that spans lines."""
+    return [next(group for group in match.groups() if group) for match in SPECIFIER.finditer(strip_comments(source))]
 
 
 class PrimitiveRunnerMixin(unittest.TestCase):
@@ -197,7 +203,12 @@ class RepositoryBoundaryTests(unittest.TestCase):
             code = strip_comments(read(path))
             self.assertIsNone(HOST_GLOBALS.search(code), f"{path.name} reaches a host global")
             self.assertIsNone(HOST_TOKENS.search(code), f"{path.name} names a host design token")
-            self.assertNotRegex(code, r'from\s+"\.\./', f"{path.name} imports outside the package")
+            for specifier in specifiers(read(path)):
+                self.assertRegex(
+                    specifier,
+                    r"^\./[a-z_]+\.js$",
+                    f"{path.name} imports {specifier!r} instead of a sibling module",
+                )
             # Only the package's own `--map-view` namespace may appear.
             for token in re.findall(r"--[a-z0-9-]+", code):
                 self.assertTrue(token.startswith("--map-view"), f"{path.name} publishes {token}")
@@ -219,6 +230,11 @@ class RepositoryBoundaryTests(unittest.TestCase):
         lock = read(REPO_ROOT / "pnpm-lock.yaml")
         self.assertIn("@elosern/map-view", lock)
         self.assertIn("workspace:*", lock)
+        # The container build installs and builds inside an empty /build tree,
+        # so the workspace package must enter that stage's build context.
+        containerfile = read(REPO_ROOT / "Containerfile")
+        vue_dist = containerfile.split("AS vue-dist", 1)[1].split("\nFROM ", 1)[0]
+        self.assertRegex(vue_dist, r"COPY[^\n]*packages/[^\n]*/build/packages/")
 
     def test_frontend_gate_runs_the_primitive_suite(self):
         workflow = yaml.safe_load(read(REPO_ROOT / ".github/workflows/quality-gate.yml"))

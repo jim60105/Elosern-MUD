@@ -25,21 +25,39 @@ function codeOf(name) {
     .replace(/^\s*\/\/.*$/gm, "");
 }
 
+// Every static module specifier, including a declaration that spans lines and
+// either quote style. Exported for the synthetic negative case below.
+export function specifiersOf(source) {
+  const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  return [
+    ...code.matchAll(/\bfrom\s*["']([^"']+)["']/g),
+    ...code.matchAll(/\bimport\s*\(\s*["']([^"']+)["']/g),
+    ...code.matchAll(/^\s*import\s+["']([^"']+)["']/gm),
+  ].map((match) => match[1]);
+}
+
 test("imports only relative sibling modules", () => {
   assert.ok(SOURCES.length > 0);
   for (const name of SOURCES) {
     const source = sourceOf(name);
-    const specifiers = [
-      ...source.matchAll(/^import\s.*?from\s+"([^"]+)";$/gm),
-      ...source.matchAll(/^export\s.*?from\s+"([^"]+)";$/gm),
-    ].map((match) => match[1]);
-    for (const specifier of specifiers) {
+    for (const specifier of specifiersOf(source)) {
       assert.match(specifier, /^\.\/[a-z_]+\.js$/, `${name} imports ${specifier}`);
     }
     // No dynamic import, no require: the module graph stays static.
     assert.doesNotMatch(source, /\bimport\s*\(/, `${name} uses a dynamic import`);
     assert.doesNotMatch(source, /\brequire\s*\(/, `${name} uses require`);
   }
+});
+
+test("collects a multiline import and a re-export instead of trusting one line", () => {
+  // The public entry re-exports across lines; a host dependency written the
+  // same way must still be caught.
+  const multilineImport = `import {\n  createStore,\n  connect,\n} from "host-store";\n`;
+  const multilineExport = `export {\n  dispatch,\n} from './game/oob.js';\n`;
+  assert.deepEqual(specifiersOf(multilineImport), ["host-store"]);
+  assert.deepEqual(specifiersOf(multilineExport), ["./game/oob.js"]);
+  assert.deepEqual(specifiersOf(`import "./host.css";\n`), ["./host.css"]);
+  assert.deepEqual(specifiersOf(`import {\n  project,\n} from "./projection.js";\n`), ["./projection.js"]);
 });
 
 test("never touches the DOM, a timer, a network or host state", () => {
