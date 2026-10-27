@@ -612,11 +612,10 @@ _NOTHING_REPORTABLE_LINE = "「目前沒有可以交回的任務。」"
 def reportable_quest_summary(actor: Any, npc: Any) -> str | None:
     """Return the Traditional Chinese reportable-quest listing for dialogue.
 
-    Enforces the same local-host rule as every guild service command: the
-    unique ``GuildStaff`` host in the actor's room is resolved through
-    ``resolve_local_service_host`` and the talked-to ``npc`` must be that
-    host; an absent or ambiguous host yields the standard rejection line for
-    every caller, registered or not. For the unique host the listing
+    Revalidates the exact talked-to ``GuildStaff`` through the selected-provider
+    resolver; another local staff member never replaces or obscures it.
+    An absent or unusable host yields the standard rejection line for
+    every caller, registered or not. For the selected host the listing
     intersects parsed records (state ``COMPLETED``), a registered offer for
     the record's definition at the staff's branch, and the actor's reward
     claims, ordered deterministically by ``(accepted_tick, quest_id)``.
@@ -626,18 +625,16 @@ def reportable_quest_summary(actor: Any, npc: Any) -> str | None:
     """
     from world.quests.runtime import QuestState, definition_for, read_records
     from world.rules.guild_offers import GuildOfferNotFound, get_guild_offer
+    from world.rules.service_targets import ServiceTargetError, require_service_target
 
     if not isinstance(actor, PlayerCharacter):
         return None
     try:
-        staff = resolve_local_service_host(actor, GuildStaff)
-    except GuildServiceError:
-        return _NO_LOCAL_STAFF_LINE
-    if staff is not npc:
+        staff, guild_staff = require_service_target(actor, getattr(npc, "pk", None), GuildStaff)
+    except ServiceTargetError:
         return _NO_LOCAL_STAFF_LINE
     if parse_guild_registration(actor) is None:
         return None
-    guild_staff = staff.components.get(GuildStaff.get_component_slot())
     branch_key = guild_staff.branch_key
     if not isinstance(branch_key, str) or not branch_key:
         return _NO_LOCAL_STAFF_LINE

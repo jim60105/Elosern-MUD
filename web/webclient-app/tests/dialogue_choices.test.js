@@ -84,7 +84,7 @@ describe("DialogueChoices", () => {
     expect(w.emitted("focus-applied")).toEqual([[PICKS[1].topicId]]);
     await w.setProps({ focusTopic: "undisclosed-topic" });
     expect(w.emitted("pick")).toBeUndefined();
-    expect(w.emitted("focus-applied")).toHaveLength(1);
+    expect(w.emitted("focus-applied")).toEqual([[PICKS[1].topicId], ["undisclosed-topic"]]);
     await key(w, "Enter");
     expect(w.emitted("pick")).toEqual([[PICKS[1]]]);
   });

@@ -189,11 +189,11 @@ function applyFocusTopic() {
     return;
   }
   const index = props.picks.findIndex((pick) => pick.topicId === topicId);
+  emit("focus-applied", topicId);
   if (index < 0) {
     return;
   }
   cardRef.value?.setActive(index);
-  emit("focus-applied", topicId);
 }
 
 onMounted(() => {

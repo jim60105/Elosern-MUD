@@ -38,6 +38,13 @@ only prefills `church join #<npc_id>` in the existing command input.
 The player submits it separately. Coarse guild/shop navigation is removed;
 ordinary editor navigation stays independent.
 
+Explicit activation of the native guild report association delivers the current
+`reportable_quest_summary` as a `service` delivery for that exact staff member.
+It lists reportable quests without settling them, grants no talk affinity and
+issues no formal reading receipt. Another co-present staff member does not hide
+the selected host. Reusing a generated service actor rejects conflicting dialogue
+identity, binding or anchor configuration before provisioning can rewrite it.
+
 Dialogue delivery enforces finite canonical UTF-8 JSON publication budgets across
 both backend selection and frontend transport:
 

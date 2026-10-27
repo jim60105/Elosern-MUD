@@ -142,6 +142,37 @@ describe("the dialogue choice list over the stage", () => {
     expect(list().findAll('[data-testid="dialogue-pick"]').map((row) => row.attributes("data-keyword-id"))).toEqual(["news", "town"]);
   });
 
+  it("retires an absent service topic after opening and never focuses a later conversation", async () => {
+    const host = {
+      ...fx.explorationPanel().interact[0],
+      services: { state: "ready", entries: [{
+        key: "dialogue.offer", label: "委託", enabled: true, disabled_reason: null,
+        route: { kind: "dialogue", npc_id: 7, topic_id: "not-disclosed" },
+      }] },
+    };
+    const response = store.receive(generation, "ui_update", [fx.update({
+      revision, panels: { exploration: fx.explorationPanel({ interact: [host] }) },
+    })], {});
+    expect(response.accepted).toBe(true);
+    revision += 1;
+    store.activatePresence("target-7");
+    store.activatePresenceVerb("service-dialogue.offer");
+    const request = sender.sent.actions.at(-1);
+    expect(request.action_id).toBe("explore.talk_open");
+    commit("dialogue", dialoguePanel());
+    store.receive(generation, "ui_action_result", [fx.actionResult({
+      request_id: request.request_id, presentation_revision: revision - 1,
+    })], {});
+    await settle();
+    expect(store.view.dialogueFocusTopic).toBeNull();
+    expect(sender.sent.actions).toHaveLength(1);
+    commit("exploration");
+    await settle();
+    await openDialogue(dialoguePanel({ keywords: ["news", "not-disclosed"] }));
+    expect(store.view.dialogueFocusTopic).toBeNull();
+    expect(sender.sent.actions).toHaveLength(1);
+  });
+
   it("renders nothing while the dialogue panel is unavailable", async () => {
     await openDialogue(unavailableDialoguePanel());
     expect(store.view.mode).toBe("dialogue");

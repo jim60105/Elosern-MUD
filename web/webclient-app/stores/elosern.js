@@ -337,6 +337,11 @@ export const useElosernStore = defineStore("elosern", () => {
     openHudDrawer: ctx.openHudDrawer,
     closeHudDrawer: ctx.closeHudDrawer,
     openNpcPersonaEditor: ctx.openNpcPersonaEditor,
+    clearDialogueFocus: (topicId) => {
+      const changed = ctx.clearDialogueFocus(topicId);
+      if (changed) ctx.publishView();
+      return changed;
+    },
     // H5 (task 5.3): the full-screen overlay controller — the single open
     // entry (`openOverlay` over `map` / `settings` / `help` / `codex` / `gallery`,
     // unknown names

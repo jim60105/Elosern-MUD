@@ -89,6 +89,9 @@ const dialogueFocusTopicId = computed(() => {
   }
   return pending.topicId;
 });
+function retireDialogueFocus(topicId) {
+  store.clearDialogueFocus(topicId);
+}
 // The behavior groups composed in use-app-client.js: every binding below is
 // a group's verbatim state/handler, destructured so the template is unchanged.
 const {
@@ -131,6 +134,22 @@ const {
   onSleepQuestionYes, onSleepQuestionNo, onSleepQuestionClose,
   onCompassTab, onRailTab, onPlaceTab, onPillTab,
 } = useAppClient(store, shellRef, sceneBackdropRef);
+watch(
+  () => [store.view.dialogueFocusTopic, dialogueVM.value],
+  ([pending, dialogue]) => {
+    if (pending && dialogue?.host.identity === pending.npcId &&
+        !dialogue.picks.some((pick) => pick.topicId === pending.topicId)) {
+      retireDialogueFocus(pending.topicId);
+    }
+  },
+);
+watch(
+  () => [store.view.mode, dialogueVM.value?.host?.identity],
+  ([mode, host], previous) => {
+    if (previous?.[0] === "dialogue" &&
+        (mode !== "dialogue" || host !== previous[1])) retireDialogueFocus();
+  },
+);
 // The map drawer (redesign-map-drawer): the area/world tab, the per-tab
 // session memory and the on-demand `map.view` requests; its 前往 goes
 // through the same `explore.move` seam as the minimap.
@@ -1259,7 +1278,7 @@ const rootStyle = computed(() => {
             :locked="store.view.dispatch.inFlight !== null"
             :before-activate="beforeChoiceActivate"
             :focus-topic="dialogueFocusTopicId"
-            @focus-applied="store.clearDialogueFocus($event)"
+            @focus-applied="retireDialogueFocus($event)"
             @pick="onDialoguePick"
             @freeform="onDialogueFreeform"
             @move="onDialogueMove"

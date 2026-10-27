@@ -395,7 +395,12 @@ def _require_bound_role_config(actor: Any, plan: Any) -> None:
         if components is None
         else components.get(ScriptedDialogue.get_component_slot())
     )
-    if live is None or live.service_id != declared.kwargs.get("service_id"):
+    if (
+        live is None
+        or live.service_id != declared.kwargs.get("service_id")
+        or live.service_binding != declared.binding.kind
+        or live.anchor_room_id is not None
+    ):
         raise EncounterUnavailable("role_config_conflict")
 
 

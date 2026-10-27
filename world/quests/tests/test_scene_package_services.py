@@ -184,9 +184,11 @@ class GeneratedServiceActivationTests(RegistryIsolationMixin, EvenniaTest):
         self.room.db.anchor_key = _anchor_key()
         self.player.move_to(self.room, quiet=True)
         definition_key = compile_blueprint_core(_package()["quest"]).definition.key
-        self.published = publish_scene_package(
-            _service_payload(definition_key), owner="tester"
-        )
+        payload = _service_payload(definition_key)
+        payload["encounters"].append({
+            **payload["encounters"][1], "scene_id": "return_market",
+        })
+        self.published = publish_scene_package(payload, owner="tester")
         activate_scene_encounter(
             self.player, self.published.package_id, "market", room=self.room, tick=5
         )
@@ -257,6 +259,25 @@ class GeneratedServiceActivationTests(RegistryIsolationMixin, EvenniaTest):
         result = _talk_open_adapter(self.player, {"npc_id": mother.pk})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(read_records(self.player), [])
+
+    def test_reactivation_rejects_conflicting_dialogue_binding_without_rewriting(self):
+        from typeclasses.components import ScriptedDialogue
+
+        mother = self._mother()
+        component = mother.components.get(ScriptedDialogue.get_component_slot())
+        for binding, anchor in (("place", self.room.pk), ("person", self.room.pk), (None, None)):
+            with self.subTest(binding=binding, anchor=anchor):
+                component.service_binding = binding
+                component.anchor_room_id = anchor
+                result = activate_scene_encounter(
+                    self.player, self.published.package_id, "return_market",
+                    room=self.room, tick=6,
+                )
+                self.assertFalse(result.activated)
+                self.assertEqual(result.reason, "role_config_conflict")
+                self.assertEqual(component.service_binding, binding)
+                self.assertEqual(component.anchor_room_id, anchor)
+                self.assertEqual(read_records(self.player), [])
 
 
 if __name__ == "__main__":
