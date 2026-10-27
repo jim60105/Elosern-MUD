@@ -46,11 +46,14 @@ SHALL operate on the caller's own persisted quest log and SHALL NOT require a lo
 - **THEN** the host answers with the no-understanding line, no turn-in is attempted, and no reward
   state changes
 
-#### Scenario: 回報 with ambiguous guild staff is rejected
+#### Scenario: 回報 lists from the named host and turns in through the one local host
 - **WHEN** a player talks to a guild staff NPC with `回報` while more than one `GuildStaff` host
   occupies the room
-- **THEN** both the listing and any turn-in attempt answer with the standard ambiguous-host
-  rejection line and no quest, wallet, inventory, merit, or claim state changes
+- **THEN** the listing answers from the exactly named, visible, co-present host — explicit
+  provider selection is never ambiguous and no other local staff member substitutes for it — while
+  a `回報 <quest_id>` turn-in keeps the sole-local-host rule and answers with the standard
+  ambiguous-host rejection line
+- **AND** neither path changes any quest, wallet, inventory, merit, or claim state when it refuses
 
 #### Scenario: 回報 with nothing reportable answers so
 - **WHEN** a player talks to the local guild staff with `回報` and no quest record is `COMPLETED` with a registered offer at the staff's branch and an absent quest id in the caller's reward claims
