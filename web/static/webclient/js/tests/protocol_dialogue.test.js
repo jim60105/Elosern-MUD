@@ -374,7 +374,8 @@ function makeLargeValidSiblingPanels() {
     stock.push(validServicesStockRow({ item_key: "item_" + i, display_name: "行商專用高級商品名稱道具" + i }));
   }
   const services = validServicesPanel({
-    shop: { open: true, member_id: 101, stock: stock, sellable: [] },
+    // Every section names its own provider; the validator never defaults it.
+    shop: { provider_id: 62, open: true, member_id: 101, stock: stock, sellable: [] },
     pagination: { stock_total: stock.length, sellable_total: 0, quest_total: 0, board_total: 0 },
   });
   const bagRows = [];
