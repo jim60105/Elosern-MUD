@@ -14,6 +14,7 @@ from tools.spec_traceability import covers_requirement
 # catalogs below can be scoped (same reason as the sibling command suites).
 import world.rules.equipment_effects  # noqa: F401
 
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.db import connection
@@ -33,6 +34,7 @@ from commands.guild import (
 )
 from commands.localized.general import CmdLook
 from commands.npc_services import CmdServices
+from commands.talk import CmdsTalk
 from typeclasses.components import (
     ChurchHost,
     GuildExamReception,
@@ -63,7 +65,6 @@ from world.rules.npc_services import (
     STATE_READY,
     UNREADABLE_MESSAGE,
     project_npc_services,
-    service_report_lines,
 )
 from world.rules.npc_schedules import SCHEDULE_BLOCKED_REASON
 from world.rules.service_gate import MESSAGE_OFF_ANCHOR
@@ -233,26 +234,33 @@ class ServiceDiscoveryCommandTests(_ServiceTextBase):
         self.assertEqual(services.state, STATE_READY)
         output = self.call(CmdServices(), self.host.key)
         self.assertTrue(output.startswith(self.host.key))
+        # The rendered rows are the fixed mapping order, reconstructed here
+        # independently of the renderer so a formatting or route defect shows.
+        self.assertEqual(
+            [line.split("　")[0].strip() for line in output.splitlines()[1:]],
+            [
+                "shop",
+                "guild.register",
+                "guild.board",
+                "guild.report",
+                "guild.exam",
+                "church.enroll",
+            ],
+        )
+        guidance = {
+            "shop": f"shop stock @#{self.host.pk}",
+            "guild.register": f"guild register @#{self.host.pk}",
+            "guild.board": f"guild list @#{self.host.pk}",
+            "guild.report": f"guild turnin <quest_id> @#{self.host.pk}",
+            "guild.exam": f"guild exam @#{self.host.pk}",
+            "church.enroll": f"church join #{self.host.pk}",
+        }
         for entry in services.entries:
-            self.assertIn(entry.key, output)
-            self.assertIn(entry.label, output)
+            self.assertIn(f"  {entry.key}　{entry.label}　→ {guidance[entry.key]}", output)
         # Only the selected provider's rows exist: the bystander merchant in
         # the same room contributes nothing.
         self.assertEqual(output.count("  shop　"), 1)
         self.assertNotIn(self.bystander.key, output)
-        self.assertEqual(
-            output.splitlines(), service_report_lines(self.host, services)
-        )
-        # Route guidance names the existing text flow with the exact provider.
-        for expected in (
-            f"shop stock @#{self.host.pk}",
-            f"guild register @#{self.host.pk}",
-            f"guild list @#{self.host.pk}",
-            f"guild turnin <quest_id> @#{self.host.pk}",
-            f"guild exam @#{self.host.pk}",
-            f"church join #{self.host.pk}",
-        ):
-            self.assertIn(expected, output)
 
     def test_alias_none_state_usage_and_read_only_discovery(self):
         plain = self._npcs("t_plain_host")
@@ -261,6 +269,11 @@ class ServiceDiscoveryCommandTests(_ServiceTextBase):
         self.assertEqual(output.strip(), "t_plain_host 目前沒有提供服務。")
         self.assertEqual(writes, [])
         self.assertEqual(before, _snapshot(self.char1, plain))
+        # A populated ready projection is read-only as well.
+        ready_before = _snapshot(self.char1, self.host)
+        _, ready_writes = _writes(lambda: self.call(CmdServices(), self.host.key))
+        self.assertEqual(ready_writes, [])
+        self.assertEqual(ready_before, _snapshot(self.char1, self.host))
         self.call(CmdServices(), "", "用法：services <npc>")
 
     def test_unreadable_is_distinct_from_none(self):
@@ -388,8 +401,31 @@ class ServiceDiscoveryCommandTests(_ServiceTextBase):
         ):
             output = self.call(CmdServices(), dialogue_host.key)
             self.assertIsNone(live_dialogue_session(self.char1))
-        self.assertIn(f"talk {dialogue_host.key}（話題 t_synth.offer）", output)
+        # The copyable handoff is one executable command; the topic rides its
+        # own annotation line and discovery selects nothing.
+        handoffs = [
+            line.split("→ ", 1)[1].strip()
+            for line in output.splitlines()
+            if "→ talk " in line
+        ]
+        self.assertEqual(len(handoffs), 1)
+        handoff = handoffs[0]
+        self.assertEqual(handoff, f"talk {dialogue_host.key}")
+        self.assertIn("相關話題：t_synth.offer（於對話中選擇）", output)
         self.assertIn("dialogue.t_parity_association", output)
+
+        # Execute the printed command through the real talk path: it must
+        # reach this exact provider, not fail on the printed annotation.
+        reached = []
+
+        def greeting(npc):
+            reached.append(npc)
+            return SimpleNamespace(text=f"招呼:{npc.key}", is_override=False)
+
+        with patch("commands.talk.resolve_greeting", side_effect=greeting):
+            answer = self.call(CmdsTalk(), handoff.removeprefix("talk "))
+        self.assertIs(reached[-1], dialogue_host)
+        self.assertIn(f"{dialogue_host.key}說：招呼:{dialogue_host.key}", answer)
 
 
 class TargetedShopCommandTests(_ServiceTextBase):
@@ -711,7 +747,13 @@ class TargetedExamCommandTests(_GuildTargetBase):
             self.call(CmdGuildExam(), f"E @#{self.reception_b.pk}"),
         )
         own_branch = self.call(CmdGuildExam(), f"E @#{self.reception_a.pk}")
-        self.assertNotIn(rejection_message(ExamReason.WRONG_BRANCH), own_branch)
+        # The selected counter's own branch is accepted, so the request moves
+        # past branch validation to the exact qualification refusal: the
+        # synthetic branch has no qualified host for the rank.
+        self.assertEqual(
+            own_branch.strip(),
+            rejection_message(ExamReason.UNQUALIFIED_EXAMINER),
+        )
         self.assertIsNone(self.char1.db.active_combat)
 
     @covers_requirement(

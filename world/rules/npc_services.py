@@ -518,9 +518,10 @@ def _route_guidance(entry: ServiceEntry, name: str, npc_id: int) -> str:
     """Name the existing text flow one entry opens; it grants no authority."""
     route = entry.route
     if route.kind == ROUTE_DIALOGUE:
-        # Talking opens the exact host; the associated topic is still chosen
-        # in the conversation and is never selected by discovery.
-        return f"talk {name}（話題 {route.topic_id}）"
+        # Talking opens the exact host; the associated topic is chosen in the
+        # conversation and is never selected by discovery, so the guidance
+        # stays one executable command with no identity or topic suffix.
+        return f"talk {name}"
     if route.kind == ROUTE_COMMAND:
         return f"{route.command} #{npc_id}"
     return _SECTION_GUIDANCE[route.section].format(npc_id=npc_id)
@@ -549,6 +550,13 @@ def service_report_lines(npc: Any, services: NpcServices) -> list[str]:
                 f"  {entry.key}　{entry.label}　→ "
                 f"{_route_guidance(entry, name, npc_id)}"
             )
+            if entry.route.kind == ROUTE_DIALOGUE:
+                # The topic is named on its own annotation line: the copyable
+                # command above stays one executable ``talk <npc>`` and never
+                # selects the topic.
+                lines.append(
+                    f"    相關話題：{entry.route.topic_id}（於對話中選擇）"
+                )
         else:
             lines.append(
                 f"  {entry.key}　{entry.label}（{entry.disabled_reason.message}）"
