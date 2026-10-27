@@ -310,6 +310,16 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
                         "services": {"state": "none", "entries": []},
                         "affordances": [
                             {
+                                "kind": "action",
+                                "action_id": "explore.talk_open",
+                                "label": "交談",
+                                "enabled": False,
+                                "disabled_reason": {
+                                    "code": "not_conversable",
+                                    "message": "對方無法交談。",
+                                },
+                            },
+                            {
                                 "kind": "navigate",
                                 "surface": "npc_persona",
                                 "label": "編輯人物設定",

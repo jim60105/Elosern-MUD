@@ -106,6 +106,14 @@ _DIALOGUE_UNAVAILABLE_REASON = (
     "dialogue_unavailable",
     "對方目前沒有可以交談的話題。",
 )
+# The fixed common slot's reason for a visible NPC with no supported
+# conversation at all (slice U): the card keeps 交談 at position 1, disabled,
+# instead of letting another row take the slot. It grants no talk authority —
+# the action rejects with ``not_dialogue_host`` exactly as before.
+_NOT_CONVERSABLE_REASON = (
+    "not_conversable",
+    "對方無法交談。",
+)
 
 # The fixed legal wait daypart of the idle baseline (member of DAYPARTS).
 BASELINE_WAIT_DAYPART = "noon"
