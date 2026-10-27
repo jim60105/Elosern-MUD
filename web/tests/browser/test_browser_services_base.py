@@ -121,6 +121,11 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         the party window on its 背包 tab (webclient-party-bag-retire): no
         keyboard frame is pushed and the router's stack is unchanged.
 
+        ``rank`` names the independent examination-reception surface
+        (npc-targeted-service-flows): it belongs to the reception host's own
+        ``rank`` entry, never to the clerk's registration/board/report rows, so
+        the drawer opened that way reads the reception provider alone.
+
         The host's verb card (exploration-presence-rail) carries its single
         交談 `explore.talk_open` row followed by its navigate-kind service
         entry (exploration_menu.js verbMenuFor), so both hops are reached by
@@ -183,7 +188,9 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                         // providers carry no guild section at all.
                         const matches = surface === 'shop'
                             ? route.section === 'shop'
-                            : ['registration', 'board', 'report'].indexOf(route.section) !== -1;
+                            : surface === 'rank'
+                                ? route.section === 'rank'
+                                : ['registration', 'board', 'report'].indexOf(route.section) !== -1;
                         if (matches) {
                             return { target: 'target-' + target.identity,
                                      key: 'service-' + entry.key };
@@ -212,7 +219,7 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                     "description": "shop window rendered (webclient-shop-window)",
                 },
             )
-        elif surface_key == "guild":
+        elif surface_key in ("guild", "rank"):
             wait_for_store_state(
                 page,
                 lambda s: s.get("hudDrawer") == "quest",
@@ -341,6 +348,10 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
     def _open_guild_menu(self, page):
         return self._open_surface(page, "guild")
+
+    def _open_reception_counter(self, page):
+        """Open the guild drawer through the examination reception's own entry."""
+        return self._open_surface(page, "rank")
 
     def _open_shop_menu(self, page):
         return self._open_surface(page, "shop")

@@ -8,6 +8,8 @@ Every body is byte-identical to its pre-split home in
 
 from __future__ import annotations
 
+import json
+
 from tools.spec_traceability import covers_requirement
 
 from web.browser_support.browser_fixtures_data import (
@@ -102,7 +104,6 @@ class GuildBoardJourneys(ServicesBrowserTest):
     @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
     @covers_requirement("webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region")
     @covers_requirement("webclient-quest-drawer::the-guild-board-is-organized-by-difficulty-grade-tabs")
-    @covers_requirement("webclient-quest-drawer::the-counter-tab-shows-the-rank-card-above-the-board")
     @covers_requirement("webclient-quest-drawer::selecting-a-board-offer-shows-its-detail-and-the-accept-action")
     def test_board_list_to_accept(self):
         page = self.logged_in_page()
@@ -113,9 +114,12 @@ class GuildBoardJourneys(ServicesBrowserTest):
         self._open_guild_menu(page)
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
+        # npc-targeted-service-flows: the drawer renders only the selected
+        # clerk's own read, so the counter is usable once that read lands.
+        page.wait_for_selector('[data-testid="quest-drawer__grade-rail"]', timeout=15000)
         self._select_quest_tab(page, "counter")
         # The default grade is the holder's own grade with its one offer,
-        # which the detail shows; the rank card sits above the list.
+        # which the detail shows.
         offer_key = guild_offer_quest_key()
         offer_rank = panel["guild"]["board"][0]["rank"]
         self.assertEqual(
@@ -124,7 +128,13 @@ class GuildBoardJourneys(ServicesBrowserTest):
             ).get_attribute("aria-selected"),
             "true",
         )
-        self.assertTrue(page.locator('[data-testid="quest-drawer__list"] [data-testid="guild-rank-card"]').is_visible())
+        # A GuildStaff provider owns registration and the board only: the
+        # independent rank surface belongs to the separate examination
+        # reception, so this counter carries no rank card at all — and never
+        # the reception-only body either.
+        counter = page.locator('[data-testid="quest-drawer__counter"]')
+        self.assertEqual(counter.locator('[data-testid="guild-rank-card"]').count(), 0)
+        self.assertEqual(counter.locator('[data-testid="quest-drawer__reception-rank"]').count(), 0)
         self.assertEqual(
             page.locator('[data-testid="quest-drawer__detail"]').get_attribute("data-quest-id"), offer_key
         )
@@ -152,35 +162,167 @@ class GuildBoardJourneys(ServicesBrowserTest):
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
 
     @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
+    @covers_requirement("webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region")
+    @covers_requirement("webclient-quest-drawer::the-counter-tab-shows-the-rank-card-above-the-board")
+    def test_reception_counter_shows_the_independent_rank_card(self):
+        """The rank surface is the reception host's own read.
+
+        The hall's reception counter owns the independent top-level `rank`
+        section; opening its own service entry targets exactly that provider,
+        so the counter renders the rank card alone (no grade rail, board row,
+        or registration) and the examination request names the reception.
+        """
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        panel = self._wait_services_available(page)
+        rank = panel["rank"]
+        reception_id = rank["provider_id"]
+        self.assertNotEqual(reception_id, panel["guild"]["provider_id"])
+        self.assertTrue(rank["next_rank"])
+
+        self._open_reception_counter(page)
+        counter = page.locator('[data-testid="quest-drawer__counter"]')
+        rank_card = counter.locator('[data-testid="quest-drawer__reception-rank"]')
+        rank_card.wait_for(state="visible", timeout=15000)
+        # The card is the shipped rank card: rank level, merit meter and the
+        # examination request, unchanged in content.
+        self.assertIn(
+            f'等級 {rank["rank"]}',
+            rank_card.locator('[data-testid="guild-counter__rank-level"]').inner_text(),
+        )
+        self.assertTrue(rank_card.locator('[data-testid="guild-counter__merit-meter"]').is_visible())
+        # The reception provider carries no board and no staff section.
+        self.assertEqual(counter.locator('[data-testid="quest-drawer__grade-rail"]').count(), 0)
+        self.assertEqual(counter.locator('[data-testid^="quest-drawer__row--"]').count(), 0)
+        self.assertEqual(counter.locator('[data-testid="quest-drawer__registration"]').count(), 0)
+
+        # The examination request dispatches the selected reception provider.
+        self.assertTrue(rank["exam_request"]["enabled"])
+        self._tab_until_focused(page, '[data-testid="guild-counter__exam"]', max_presses=60)
+        _press(page, "Enter")
+        wait_for_store_state(
+            page,
+            lambda s: sent_action_count(page, "guild.exam_request") == 1,
+        )
+        sent = page.evaluate("window.__elosernSent || []")
+        payloads = [
+            args[0]["payload"] for cmd, args, _kw in sent
+            if cmd == "ui_action" and args[0]["action_id"] == "guild.exam_request"
+        ]
+        self.assertEqual(
+            payloads,
+            [{"target_rank": rank["next_rank"], "npc_id": reception_id}],
+        )
+        self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
+
+    @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
     @covers_requirement("webclient-quest-drawer::the-guild-board-is-organized-by-difficulty-grade-tabs")
     @covers_requirement("webclient-quest-drawer::selecting-a-board-offer-shows-its-detail-and-the-accept-action")
     def test_board_frame_refreshes_on_committed_update(self):
-        """The guild counter's board re-renders on a committed update."""
+        """The guild counter follows its own provider's read on a commit."""
         page = self.logged_in_page()
         install_outbound_recorder(page)
         panel = self._wait_services_available(page)
         self.assertEqual(panel["pagination"]["board_total"], 1)
 
         self._open_guild_menu(page)
+        offer_key = guild_offer_quest_key()
+        page.wait_for_selector(f'[data-testid="quest-drawer__grade-rail"]', timeout=15000)
         self._select_quest_tab(page, "counter")
         old_name = panel["guild"]["board"][0]["display_name"]
-        board_row = page.locator(f'[data-testid="quest-drawer__row--{guild_offer_quest_key()}"]')
+        board_row = page.locator(f'[data-testid="quest-drawer__row--{offer_key}"]')
         self.assertTrue(board_row.is_visible())
         self.assertIn(old_name, board_row.inner_text())
         before = page.evaluate("() => window.__elosernBridge.router.depth()")
         sent_before = len([m for m in outbound_messages(page) if m[0] == "ui_action"])
+        wait_for_store_state(page, lambda s: not (s.get("dispatch") or {}).get("inFlight"))
 
+        # A committed presentation revision makes the open slot repeat its own
+        # correlated read. This journey stands where the server would answer
+        # that read: it records the one `services.open` the commit triggers and
+        # answers it with the clerk's own board, so the injected revision never
+        # has to exist on the live server.
+        page.evaluate(
+            """() => {
+              window.__elosernServiceReads = [];
+              const recorded = Evennia.msg.bind(Evennia);
+              Evennia.msg = function (cmdname, args, kwargs, callback) {
+                const envelope = args && args[0];
+                if (cmdname === 'ui_action' && envelope && envelope.action_id === 'services.open') {
+                  window.__elosernServiceReads.push(envelope);
+                  return undefined;
+                }
+                return recorded(cmdname, args, kwargs, callback);
+              };
+            }"""
+        )
+
+        # The committed update the server would publish: the room-wide summary
+        # names a decoy title the drawer must never render, because it renders
+        # its own slot's read and not the summary.
         updated = self._services_panel(page)
-        new_name = "新增任務委託"
-        updated["guild"]["board"][0]["display_name"] = new_name
+        decoy_name = "舊看板委託"
+        updated["guild"]["board"][0]["display_name"] = decoy_name
         inject_update(page, {"services": updated})
-        page.wait_for_timeout(200)
+        page.wait_for_function(
+            "() => (window.__elosernServiceReads || []).length === 1", timeout=15000
+        )
+
+        # The read is the exact provider the drawer selected, and there is no
+        # second one: no other `ui_action` left the client for the commit.
+        read = page.evaluate("() => window.__elosernServiceReads[0]")
+        self.assertEqual(read["action_id"], "services.open")
+        provider_id = panel["guild"]["provider_id"]
+        self.assertEqual(read["payload"], {"npc_id": provider_id})
+        self.assertEqual(
+            len([m for m in outbound_messages(page) if m[0] == "ui_action"]), sent_before
+        )
+
+        # The clerk's own correlated answer: its guild section and no rank or
+        # shop section, exactly the shape `services.open` returns.
+        new_name = "新增任務委託"
+        answer = json.loads(json.dumps(self._services_panel(page)))
+        answer["rank"] = None
+        answer["shop"] = None
+        answer["guild"]["board"][0]["display_name"] = new_name
+        accepted = page.evaluate(
+            """(args) => {
+              const store = window.__elosernBridge.store;
+              const view = store.view;
+              return store.receive(view.generation, 'ui_action_result', [{
+                protocol_version: 1,
+                presentation_epoch: view.epoch,
+                request_id: args.requestId,
+                outcome: 'success',
+                code: 'services_open',
+                message: '服務資訊',
+                presentation_revision: view.revision,
+                data: { npc_id: args.providerId, services: args.services },
+              }], {});
+            }""",
+            {
+                "requestId": read["request_id"],
+                "providerId": provider_id,
+                "services": answer,
+            },
+        )
+        self.assertTrue(accepted.get("accepted"), accepted)
+        page.wait_for_function(
+            "([selector, title]) => {"
+            " const el = document.querySelector(selector);"
+            " return !!el && el.innerText.indexOf(title) !== -1; }",
+            arg=[f'[data-testid="quest-drawer__row--{offer_key}"]', new_name],
+            timeout=15000,
+        )
         self.assertIn(new_name, board_row.inner_text())
         self.assertNotIn(old_name, board_row.inner_text())
+        self.assertNotIn(decoy_name, board_row.inner_text())
         self.assertEqual(page.evaluate("() => window.__elosernBridge.router.depth()"), before)
         self.assertEqual(
             len([m for m in outbound_messages(page) if m[0] == "ui_action"]), sent_before
         )
+        self.assertEqual(page.evaluate("() => window.__elosernServiceReads.length"), 1)
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
 
@@ -198,6 +340,8 @@ class GuildBoardJourneys(ServicesBrowserTest):
         locked = ladder[ladder.index(rank) + 1]
 
         self._open_guild_menu(page)
+        # The counter exists only once the selected clerk's own read lands.
+        page.wait_for_selector('[data-testid="quest-drawer__grade-rail"]', timeout=15000)
         self._select_quest_tab(page, "counter")
         tab = page.locator(f'[data-testid="quest-drawer__grade-rail"] [data-tab-key="{locked}"]')
         self.assertIn("is-locked", tab.get_attribute("class"))
@@ -210,8 +354,11 @@ class GuildBoardJourneys(ServicesBrowserTest):
         self.assertEqual(page.locator('[data-testid^="quest-drawer__row--"]').count(), 0)
         self.assertEqual(page.locator('[data-testid="quest-drawer__detail"]').count(), 0)
         self.assertEqual(page.locator('[data-testid="quest-drawer__accept"]').count(), 0)
-        # The rank card stays above the list on every grade.
-        self.assertTrue(page.locator('[data-testid="quest-drawer__list"] [data-testid="guild-rank-card"]').is_visible())
+        # The clerk's own read carries the board only, so no rank card renders
+        # beside it on any grade: the independent rank surface belongs to the
+        # examination reception's provider, not this one.
+        self.assertEqual(page.locator('[data-testid="guild-rank-card"]').count(), 0)
+        self.assertTrue(tab.is_visible())
 
 
 class GuildQuestJourneys(ServicesBrowserTest):
@@ -231,6 +378,9 @@ class GuildQuestJourneys(ServicesBrowserTest):
         self._open_guild_menu(page)
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
+        # The drawer opens on the guild entry's own section; this journey walks
+        # the quest book, so select its tab explicitly.
+        self._select_quest_tab(page, "book")
         # The book lands on the in-progress state with the held quest
         # selected; its detail mirrors the counter's abandon descriptor.
         self._tab_until_focused(page, '[data-testid="quest-drawer__abandon"]', max_presses=40)
@@ -271,6 +421,9 @@ class GuildQuestJourneys(ServicesBrowserTest):
         self.assertEqual(panel["pagination"]["quest_total"], 1)
 
         self._open_guild_menu(page)
+        # The drawer opens on the guild entry's own section; this journey walks
+        # the quest book, whose rows come from the committed quest_log panel.
+        self._select_quest_tab(page, "book")
         self.assertEqual(page.locator('[data-testid^="quest-drawer__row--"]').count(), 1)
         self.assertEqual(store_state(page)["hudDrawer"], "quest")
         depth_before = page.evaluate("() => window.__elosernBridge.router.depth()")
@@ -352,6 +505,9 @@ class GuildTurninJourneys(ServicesBrowserTest):
         self._open_guild_menu(page)
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
+        # The drawer opens on the guild entry's own section; the book carries
+        # the completed quest's counters, so select its tab explicitly.
+        self._select_quest_tab(page, "book")
         # The completed quest's detail carries the counter's enabled turn-in,
         # and the completed count is emphasized while it waits.
         completed_count = page.locator(
@@ -369,7 +525,15 @@ class GuildTurninJourneys(ServicesBrowserTest):
             for cmd, args, _kw in sent
             if cmd == "ui_action" and args[0]["action_id"] == "guild.quest_turnin"
         )
-        self.assertEqual(payload, {"quest_id": f"{guild_offer_quest_key()}:1"})
+        # The turn-in is a provider mutation: it names the clerk whose own
+        # read carried the enabled descriptor.
+        self.assertEqual(
+            payload,
+            {
+                "quest_id": f"{guild_offer_quest_key()}:1",
+                "npc_id": panel["guild"]["provider_id"],
+            },
+        )
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
 
@@ -385,19 +549,18 @@ class GuildExamAppointmentJourney(ServicesBrowserTest):
 
     SERVICES_MODE = "guild_exam_appointment"
 
-    def _ensure_guild_counter(self, page):
-        # The quest drawer stays open across the read-only schedule reply and
-        # the wait; reopen it through the host only when it is not on screen,
-        # then select its counter tab.
-        if not page.locator('[data-testid="guild-counter__exam"]').is_visible():
-            if not page.locator('[data-testid="quest-drawer"]').is_visible():
-                self._open_guild_menu(page)
-            self._select_quest_tab(page, "counter")
+    def _ensure_reception_counter(self, page):
+        # The examination request is the independent rank surface's own
+        # action (npc-targeted-service-flows): the drawer renders it only when
+        # its slot read the examination reception's provider, so reopen the
+        # drawer through that host's entry whenever the request is not there.
+        if page.locator('[data-testid="guild-counter__exam"]').count() == 0:
+            self._open_reception_counter(page)
         page.locator('[data-testid="guild-counter__exam"]').wait_for(state="visible")
 
     def _request_exam(self, page, expected_code):
         before = sent_action_count(page, "guild.exam_request")
-        self._ensure_guild_counter(page)
+        self._ensure_reception_counter(page)
         self._tab_until_focused(page, '[data-testid="guild-counter__exam"]')
         _press(page, "Enter")
         wait_for_store_state(
@@ -411,7 +574,8 @@ class GuildExamAppointmentJourney(ServicesBrowserTest):
         page = self.logged_in_page(viewport)
         install_outbound_recorder(page)
         panel = self._wait_services_available(page)
-        rank = panel["guild"]["rank"]
+        rank = panel["rank"]
+        reception_id = rank["provider_id"]
         next_rank = rank["next_rank"]
         self.assertTrue(next_rank)
         # Below threshold the request stays available: merit qualification
@@ -430,7 +594,9 @@ class GuildExamAppointmentJourney(ServicesBrowserTest):
             args[0]["payload"] for cmd, args, _kw in sent
             if cmd == "ui_action" and args[0]["action_id"] == "guild.exam_request"
         ]
-        self.assertEqual(payloads, [{"target_rank": next_rank}])
+        # The request names the reception provider whose rank surface it was
+        # activated from (the rank payload's own provider_id).
+        self.assertEqual(payloads, [{"target_rank": next_rank, "npc_id": reception_id}])
 
         # 2. Time passes; the weekly schedule walks the host into the hall
         # through its real Exit. The same request now reaches the merit gate.
@@ -455,13 +621,17 @@ class GuildExamAppointmentJourney(ServicesBrowserTest):
         self.assertNotEqual(self._dock_mode(page), "combat")
 
         # 3. The completed board quest's merit reaches the threshold; the
-        # present qualified host now starts the simulated examination.
-        self._ensure_guild_counter(page)
+        # present qualified host now starts the simulated examination. The
+        # turn-in belongs to the clerk's own board read, so that step reopens
+        # the drawer through the clerk before the request returns to the
+        # reception counter.
+        self._open_guild_menu(page)
+        page.wait_for_selector('[data-testid="quest-drawer__grade-rail"]', timeout=15000)
         self._select_quest_tab(page, "book")
         self._select_quest_state(page, "completed")
         self._tab_until_focused(page, '[data-testid="quest-drawer__turnin"]')
         _press(page, "Enter")
-        self._wait_panel(page, lambda p: p["guild"]["rank"]["merit_qualified"] is True)
+        self._wait_panel(page, lambda p: p["rank"]["merit_qualified"] is True)
         self._request_exam(page, "exam_started")
         self._wait_combat_mode(page)
         self.assertEqual(sent_action_count(page, "guild.exam_request"), 3)
