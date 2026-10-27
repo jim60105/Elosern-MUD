@@ -145,7 +145,8 @@ class DreamArtworkBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
         self.assertEqual(descriptor["retention_sources"], [])
         # The REQUIRED bundled dream is what the stage presents, with no error
         # styling at all.
-        self.assertTrue(self.displayed(page).startswith(BUNDLED_PREFIX), self.displayed(page))
+        shown = self.displayed(page)
+        self.assertTrue(shown.startswith(BUNDLED_PREFIX), shown)
         self.assertEqual(page.locator(ART_FAILURE).count(), 0)
         # The physical room's own art state did not move while the dream
         # resolved; the dream queued no job for it.

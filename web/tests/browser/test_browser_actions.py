@@ -210,11 +210,16 @@ class ActionLockingTest(BrowserAcceptanceTest):
                 ];
             }"""
         )
-        self.assertFalse(first, "the episode's one repair is already spent")
+        # Whichever source spends the episode's one repair — the renderer's
+        # automatic request or this probe — the other request is refused and
+        # exactly one `ui_sync` goes out.
         self.assertFalse(second, "a second resync in one episode must be blocked")
+        self.assertFalse(
+            first and second, "two repairs must never leave one episode"
+        )
         syncs = [cmd for cmd, _a, _k in page.evaluate("window.__elosernSent")
                  if cmd == "ui_sync"]
-        self.assertGreaterEqual(len(syncs), 1)
+        self.assertEqual(len(syncs), 1, "exactly one repair per episode")
 
         # Ordinary text still works when structured rendering fails.
         narrative_before = narrative_log_length(page)
