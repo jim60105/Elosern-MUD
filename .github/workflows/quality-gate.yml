@@ -294,6 +294,9 @@ jobs:
       - name: Run Vue component tests with Vitest
         run: pnpm test
 
+      - name: Run map-view primitive tests
+        run: pnpm run test:map-view
+
       - name: Build Storybook component showcase
         run: pnpm run build-storybook
 

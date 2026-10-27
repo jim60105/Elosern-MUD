@@ -1,7 +1,12 @@
-// Pure geometry and reading model for AreaMapView (OpenSpec change
+// Area map host policy and reading model for AreaMapView (OpenSpec change
 // render-area-map-view; approved design
 // docs/superpowers/specs/2026-10-22-world-map-drawer-design.md §6.2-§6.5).
 // Dependency-light ES module: no Vue, no DOM (text measurement is injected).
+//
+// The neutral geometry (projection, fit, cells, bounds, stops, dot lattice,
+// label collision, units) belongs to `@elosern/map-view`. What stays here is
+// this game's map: which layers exist, the server's fog and current node, the
+// quest markers, the travel descriptors and the Traditional Chinese reading.
 //
 // Input is a validated `area_map` v1 body (protocol/panels/map_panels.js
 // validateAreaMapPanel). Nothing here invents a node, an edge, a coordinate
@@ -10,8 +15,9 @@
 // Units per layer
 //   grid        map units are the payload's integer metres (UNITS.m)
 //   wilderness  map units are cells: payload cell-centre kilometres divided
-//               by `cell_km`, so a cell spans [n, n+1) like map_viewport's
-//               cellRect/wildernessStops; captions convert with
+//               by `cell_km`, so a cell spans [n, n+1) as the shared
+//               cellRect and this game's wildernessStops expect; captions
+//               convert with
 //               cellUnit(cell_km * 1000)
 //   instance /  coordinate-free rooms keep the minimap's radial placement
 //   interior    (local_map.js layoutRadial); radial units carry no distance,
@@ -23,23 +29,19 @@
 
 import LocalMap from "./local_map.js";
 import {
-  DEFAULT_MARGIN_PX,
-  MIN_NEARBY_SPAN_M,
   UNITS,
+  boundsCentredOn,
+  boundsOfPoints,
   cellUnit,
   centreOn,
+  createStop,
+  dotField,
   fitBounds,
   formatDistance,
-  nearestStop,
-  project,
-  scaleBar,
-  scaleOf,
-  settlementStops,
+  orderedStops,
   spanLimits,
-  wildernessStops,
-} from "./map_viewport.js";
-
-export { formatDistance, scaleBar, spanLimits, nearestStop };
+} from "@elosern/map-view";
+import { MIN_NEARBY_SPAN_M, settlementStops, wildernessStops } from "./map_stops.js";
 
 /** Minimum on-screen gap between scale-true dots (CSS px at ui-scale 1). */
 export const DOT_MIN_GAP_PX = 30;
@@ -91,11 +93,6 @@ export function placeNodes(area) {
   });
 }
 
-/** The wilderness cell (col, row) a cell-unit position falls in. */
-export function cellOf(placed) {
-  return { col: Math.floor(placed.x), row: Math.floor(placed.y) };
-}
-
 /** Ids of the nodes one edge away from the current node. */
 export function adjacentIds(area) {
   const out = new Set();
@@ -119,20 +116,6 @@ export function travelAction(area, node, adjacent = adjacentIds(area)) {
   return action;
 }
 
-function boundsOf(points) {
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  for (const { x, y } of points) {
-    minX = Math.min(minX, x);
-    minY = Math.min(minY, y);
-    maxX = Math.max(maxX, x);
-    maxY = Math.max(maxY, y);
-  }
-  return { minX, minY, maxX, maxY };
-}
-
 function currentPlaced(area, placed) {
   return placed.find((entry) => entry.node.id === area.current_node);
 }
@@ -141,25 +124,12 @@ function currentPlaced(area, placed) {
 function nearbyBounds(area, placed) {
   const here = currentPlaced(area, placed);
   const adjacent = adjacentIds(area);
-  let rx = 0;
-  let ry = 0;
-  for (const entry of placed) {
-    if (!adjacent.has(entry.node.id)) continue;
-    rx = Math.max(rx, Math.abs(entry.x - here.x));
-    ry = Math.max(ry, Math.abs(entry.y - here.y));
-  }
-  return { minX: here.x - rx, minY: here.y - ry, maxX: here.x + rx, maxY: here.y + ry };
+  return boundsCentredOn(here, placed.filter((entry) => adjacent.has(entry.node.id)));
 }
 
 // Bounds centred on `here` that reach every placed node.
 function centredBounds(here, placed) {
-  let rx = 0;
-  let ry = 0;
-  for (const entry of placed) {
-    rx = Math.max(rx, Math.abs(entry.x - here.x));
-    ry = Math.max(ry, Math.abs(entry.y - here.y));
-  }
-  return { minX: here.x - rx, minY: here.y - ry, maxX: here.x + rx, maxY: here.y + ry };
+  return boundsCentredOn(here, placed);
 }
 
 // ── zoom stops and the opening view ─────────────────────────────────────
@@ -167,7 +137,7 @@ function centredBounds(here, placed) {
 /** The layer's named zoom stops for this frame, widest first. */
 export function areaStops(area, placed, frame) {
   if (area.layer === "grid") {
-    return settlementStops(boundsOf(placed), nearbyBounds(area, placed), frame, { marginPx: OPENING_MARGIN_PX });
+    return settlementStops(boundsOfPoints(placed), nearbyBounds(area, placed), frame, { marginPx: OPENING_MARGIN_PX });
   }
   if (area.layer === "wilderness") {
     return wildernessStops(frame);
@@ -180,11 +150,8 @@ export function areaStops(area, placed, frame) {
     whole,
     fitBounds(nearbyBounds(area, placed), frame, { marginPx: OPENING_MARGIN_PX, minSpan: RADIAL_MIN_SPAN }).span,
   );
-  const stops = [Object.freeze({ key: "whole", label: "全圖", span: whole })];
-  // A near stop not clearly narrower than the whole view collapses into it,
-  // as map_viewport's own stop lists do.
-  if (whole / near >= 1.01) stops.push(Object.freeze({ key: "nearby", label: "近處", span: near }));
-  return Object.freeze(stops);
+  // A near stop not clearly narrower than the whole view collapses into it.
+  return orderedStops([createStop("whole", "全圖", whole), createStop("nearby", "近處", near)]);
 }
 
 /**
@@ -213,7 +180,7 @@ export function openingView(area, placed, frame, stops = areaStops(area, placed,
 /** The whole known area at one uniform scale. */
 export function wholeView(area, placed, frame, rect = null) {
   const stops = areaStops(area, placed, frame);
-  const bounds = area.layer === "wilderness" ? boundsOf(placed.map((p) => ({ x: p.x, y: p.y }))) : boundsOf(placed);
+  const bounds = boundsOfPoints(placed);
   const pad = area.layer === "wilderness" ? 0.5 : 0;
   const fitted = fitBounds(
     { minX: bounds.minX - pad, minY: bounds.minY - pad, maxX: bounds.maxX + pad, maxY: bounds.maxY + pad },
@@ -225,39 +192,16 @@ export function wholeView(area, placed, frame, rect = null) {
 
 // ── the scale-true dot field and caption ────────────────────────────────
 
-function niceAtLeast(value) {
-  const power = 10 ** Math.floor(Math.log10(value));
-  for (const step of [1, 2, 5, 10]) {
-    if (step * power >= value * (1 - 1e-9)) return step * power;
-  }
-  return 10 * power;
-}
-
 /**
- * The dot lattice for a metric view: dots sit on every integer world
- * multiple of a round 1/2/5 x 10^n metre step, chosen as the smallest step
- * whose on-screen gap is at least `minGapPx` (and, for wilderness cells, at
- * least one cell, so the dots mark cell corners instead of halving a cell). `spacingPx` is that step at the
- * view's uniform scale, `offsetX/offsetY` the lattice phase in [0, spacing),
- * and the caption states the step with the scale bar's own formatter.
+ * The shared dot lattice for this area with the legend caption that states
+ * its step in the scale bar's own units. Null for a coordinate-free layer,
+ * which states no distance.
  */
-export function dotField(view, frame, unit, minGapPx = DOT_MIN_GAP_PX, minStepMetres = 0) {
-  if (!unit) return null;
-  const k = scaleOf(view, frame);
-  const metresPerPx = unit.metres / k;
-  const stepMetres = niceAtLeast(Math.max(minGapPx * metresPerPx, minStepMetres));
-  const stepUnits = stepMetres / unit.metres;
-  const spacingPx = stepUnits * k;
-  const origin = project(view, frame, { x: 0, y: 0 });
-  const phase = (value) => ((value % spacingPx) + spacingPx) % spacingPx;
-  return Object.freeze({
-    stepMetres,
-    stepUnits,
-    spacingPx,
-    offsetX: phase(origin.x),
-    offsetY: phase(origin.y),
-    caption: `格距 ${formatDistance(stepMetres)}`,
-  });
+export function areaDotField(area, view, frame, minGapPx = DOT_MIN_GAP_PX) {
+  const unit = areaUnit(area);
+  const field = dotField(view, frame, unit, minGapPx, area.layer === "wilderness" ? unit.metres : 0);
+  if (!field) return null;
+  return Object.freeze({ ...field, caption: `格距 ${formatDistance(field.stepMetres)}` });
 }
 
 // ── reading model ───────────────────────────────────────────────────────
@@ -362,7 +306,12 @@ export function labelCandidates(area, placed, selectedId = null) {
     if (markerIds.has(node.id)) return 4;
     return node.visibility === "visited" ? 5 : 6;
   };
-  let entries = placed.map((entry) => ({ ...entry, priority: priority(entry.node), lines: labelLines(entry.node) }));
+  let entries = placed.map((entry) => ({
+    ...entry,
+    id: entry.node.id,
+    priority: priority(entry.node),
+    lines: labelLines(entry.node),
+  }));
   if (area.layer === "wilderness") {
     const here = currentPlaced(area, placed);
     const hereLabel = here.node.label;
@@ -382,149 +331,3 @@ export function labelCandidates(area, placed, selectedId = null) {
   }
   return entries.sort((a, b) => a.priority - b.priority);
 }
-
-/** Rough width of a label at fontPx (CJK one em, Latin about 0.58 em). */
-export function estimateTextWidth(text, fontPx) {
-  let em = 0;
-  for (const ch of text) {
-    const code = ch.codePointAt(0);
-    em += code > 0x2e80 ? 1 : ch === " " ? 0.3 : 0.58;
-  }
-  return em * fontPx;
-}
-
-function overlaps(a, b) {
-  return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
-}
-
-// Liang-Barsky: does the segment cross the box?
-function segmentHitsBox(seg, box) {
-  const dx = seg.x2 - seg.x1;
-  const dy = seg.y2 - seg.y1;
-  let t0 = 0;
-  let t1 = 1;
-  const clip = (p, q) => {
-    if (p === 0) return q >= 0;
-    const r = q / p;
-    if (p < 0) {
-      if (r > t1) return false;
-      if (r > t0) t0 = r;
-    } else {
-      if (r < t0) return false;
-      if (r < t1) t1 = r;
-    }
-    return true;
-  };
-  return (
-    clip(-dx, seg.x1 - box.left) &&
-    clip(dx, box.right - seg.x1) &&
-    clip(-dy, seg.y1 - box.top) &&
-    clip(dy, box.bottom - seg.y1) &&
-    t0 <= t1
-  );
-}
-
-/**
- * Greedy navigation-priority label placement in frame pixels. Each label
- * tries above its marker, then below, right, left and the four diagonals,
- * preferring a spot
- * clear of every drawn road (`segments`) before one that crosses a road;
- * a label that fits
- * nowhere clear of higher-priority labels and every marker is hidden, never
- * truncated or shrunk. The selected and current labels are always placed
- * (they may only be clamped inside the frame). Returns
- * `[{ id, lines, anchor, x, y, box }]` in placement order.
- */
-export function placeLabels(candidates, project2d, frame, {
-  fontPx = LABEL_FONT_PX,
-  measure = estimateTextWidth,
-  markerRadius = 12,
-  obstacles = [],
-  segments = [],
-} = {}) {
-  const lineHeight = Math.round(fontPx * 1.3);
-  // A rendered line's glyph box spans about 1.19 em above the baseline and
-  // 0.31 em below it (CJK faces), so boxes match what the browser paints.
-  const ascent = Math.round(fontPx * 1.19);
-  const glyphHeight = Math.round(fontPx * 1.5);
-  const gap = Math.round(fontPx * 0.45);
-  // Breathing room kept between two drawn labels.
-  const spacing = Math.round(fontPx * 0.2);
-  const padded = (box) => ({
-    left: box.left - spacing,
-    right: box.right + spacing,
-    top: box.top - spacing,
-    bottom: box.bottom + spacing,
-  });
-  const markers = obstacles.map((p) => ({
-    left: p.x - markerRadius,
-    right: p.x + markerRadius,
-    top: p.y - markerRadius,
-    bottom: p.y + markerRadius,
-    id: p.id,
-  }));
-  const placedBoxes = [];
-  const out = [];
-  for (const entry of candidates) {
-    const p = project2d(entry);
-    const width = Math.max(...entry.lines.map((line) => measure(line, fontPx))) + 4;
-    const height = (entry.lines.length - 1) * lineHeight + glyphHeight;
-    const options = [
-      { anchor: "middle", left: p.x - width / 2, top: p.y - markerRadius - gap - height },
-      { anchor: "middle", left: p.x - width / 2, top: p.y + markerRadius + gap },
-      { anchor: "start", left: p.x + markerRadius + gap, top: p.y - height / 2 },
-      { anchor: "end", left: p.x - markerRadius - gap - width, top: p.y - height / 2 },
-      { anchor: "start", left: p.x + markerRadius * 0.7, top: p.y - markerRadius * 0.7 - gap - height },
-      { anchor: "end", left: p.x - markerRadius * 0.7 - width, top: p.y - markerRadius * 0.7 - gap - height },
-      { anchor: "start", left: p.x + markerRadius * 0.7, top: p.y + markerRadius * 0.7 + gap },
-      { anchor: "end", left: p.x - markerRadius * 0.7 - width, top: p.y + markerRadius * 0.7 + gap },
-    ];
-    const must = entry.priority <= 1;
-    let chosen = null;
-    // Passes: clear of roads, then across roads, then (for the selected and
-    // current names only) across other markers, never across another label.
-    const passes = must ? [[true, true], [false, true], [false, false]] : [[true, true], [false, true]];
-    for (const [avoidRoads, avoidMarkers] of passes) {
-      for (const option of options) {
-        const box = { left: option.left, top: option.top, right: option.left + width, bottom: option.top + height };
-        const inside = box.left >= 0 && box.top >= 0 && box.right <= frame.width && box.bottom <= frame.height;
-        if (!inside) continue;
-        const blocked =
-          placedBoxes.some((other) => overlaps(padded(box), other)) ||
-          (avoidMarkers && markers.some((marker) => marker.id !== entry.node.id && overlaps(box, marker))) ||
-          (avoidRoads && segments.some((seg) => segmentHitsBox(seg, box)));
-        if (!blocked) {
-          chosen = { ...option, box };
-          break;
-        }
-      }
-      if (chosen) break;
-    }
-    if (!chosen && must) {
-      // Last resort: clamp each spot inside the frame and take the first that
-      // clears every placed label; only when none does, the spot above.
-      const clamped = options.map((option) => {
-        const left = Math.min(Math.max(0, option.left), Math.max(0, frame.width - width));
-        const top = Math.min(Math.max(0, option.top), Math.max(0, frame.height - height));
-        return { anchor: "middle", left, top, box: { left, top, right: left + width, bottom: top + height } };
-      });
-      chosen = clamped.find((option) => !placedBoxes.some((other) => overlaps(padded(option.box), other))) ?? clamped[0];
-    }
-    if (!chosen) continue;
-    placedBoxes.push(chosen.box);
-    const x = chosen.anchor === "middle" ? chosen.left + width / 2 : chosen.anchor === "start" ? chosen.left : chosen.left + width;
-    out.push({
-      id: entry.node.id,
-      lines: entry.lines,
-      anchor: chosen.anchor,
-      x,
-      y: chosen.top + ascent,
-      lineHeight,
-      box: chosen.box,
-      priority: entry.priority,
-    });
-  }
-  return out;
-}
-
-export { DEFAULT_MARGIN_PX };

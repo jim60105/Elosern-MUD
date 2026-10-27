@@ -13,12 +13,14 @@
     "build:gm": "vite build --config vite.gm.config.js",
     "favicon": "npx --yes realfavicon@0.9.3 generate web/brand/elosern-mark.svg web/brand/realfavicon-settings.json web/brand/favicon-markups.json web/static/favicon",
     "test": "vitest run",
+    "test:map-view": "node --test packages/map-view/tests/*.test.js",
     "test:gm-boundary": "node --test scripts/tests/gm-import-boundary.test.mjs",
     "build-storybook": "STORYBOOK_TELEMETRY_DISABLED=1 storybook build -o .storybook-out",
     "serve-storybook": "STORYBOOK_TELEMETRY_DISABLED=1 storybook dev -p 6006",
     "showcase-coverage": "node scripts/component-coverage.mjs"
   },
   "devDependencies": {
+    "@elosern/map-view": "workspace:*",
     "@storybook/vue3": "^10.4.6",
     "@storybook/vue3-vite": "^10.4.6",
     "@vitejs/plugin-vue": "^6.0.0",

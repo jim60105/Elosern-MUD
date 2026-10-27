@@ -3,11 +3,16 @@
 // minimap island and the map drawer's legend all draw it, so 目前位置, a
 // visited or seen place, a neighbour one road away and a gate read the same
 // wherever they appear. One <g> root (place it inside a translated <g> or a
-// legend <svg>); geometry comes from lib/map_marker_geometry.js.
+// legend <svg>); geometry comes from @elosern/map-view.
 //
 // `size` is the surface's uniform scale: it lands on the root group as
 // `scale(size)` around base-unit shapes, so radii, stroke widths and dash
 // patterns all scale together. No shape opts out with a vector effect.
+//
+// Ink comes from the host's theme: each rule reads the package's
+// `--map-view-<role>` hook with this game's own token as the fallback, so a
+// host that binds GAME_MAP_THEME_VARS paints with its own tokens and a host
+// that does not (the legend sample, the island) paints the same defaults.
 //
 // The current glyph wins over a gate, and the travel halo sits under either.
 // `markerClass` lands on the state's primary shape (the here ring, the gate or
@@ -21,7 +26,7 @@ import {
   NODE_DOT_R,
   HALO_R,
   gatePath,
-} from "../lib/map_marker_geometry.js";
+} from "@elosern/map-view";
 
 defineOptions({ inheritAttrs: false });
 
@@ -68,7 +73,7 @@ defineProps({
 <style scoped>
 .map-glyph__halo {
   fill: rgba(228, 200, 142, 0.08);
-  stroke: var(--gold-500);
+  stroke: var(--map-view-halo, var(--gold-500));
   stroke-width: 1.2;
   stroke-dasharray: 3 3;
 }
@@ -86,17 +91,17 @@ defineProps({
 @media (prefers-reduced-motion: reduce) {
   .map-glyph__here-glow { animation: none; }
 }
-.map-glyph__here-ring { fill: none; stroke: var(--paper-50); stroke-width: 2; }
-.map-glyph__here-dot { fill: var(--seal-deep); stroke: #fff2e6; stroke-width: 1.5; }
-.map-glyph__dot { fill: var(--paper-200); stroke: #15130f; stroke-width: 2; }
+.map-glyph__here-ring { fill: none; stroke: var(--map-view-paper, var(--paper-50)); stroke-width: 2; }
+.map-glyph__here-dot { fill: var(--map-view-current, var(--seal-deep)); stroke: #fff2e6; stroke-width: 1.5; }
+.map-glyph__dot { fill: var(--map-view-node, var(--paper-200)); stroke: #15130f; stroke-width: 2; }
 .map-glyph__dot.is-seen {
   fill: #2b2924;
   stroke: #948b7b;
   stroke-width: 1.6;
   stroke-dasharray: 2.2 2;
 }
-.map-glyph__gate { fill: #3a342a; stroke: var(--gold-400); stroke-width: 2; stroke-linejoin: round; }
-.map-glyph__gate.is-seen { fill: #26231d; stroke: var(--gold-500); }
+.map-glyph__gate { fill: #3a342a; stroke: var(--map-view-accent, var(--gold-400)); stroke-width: 2; stroke-linejoin: round; }
+.map-glyph__gate.is-seen { fill: #26231d; stroke: var(--map-view-accent-muted, var(--gold-500)); }
 .map-glyph__gate.is-selected,
-.map-glyph__dot.is-selected { stroke: var(--gold-300); stroke-width: 2.6; }
+.map-glyph__dot.is-selected { stroke: var(--map-view-selection, var(--gold-300)); stroke-width: 2.6; }
 </style>

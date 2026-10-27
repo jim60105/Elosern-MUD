@@ -15,17 +15,16 @@
 // rebuilds a path. Labels, markers and hatching live in screen space.
 
 import { compassWord } from "./area_map_view.js";
+import { WORLD_COUNTRY_SPAN_KM, WORLD_DISTRICT_SPAN_KM, WORLD_NEARBY_SPAN_KM, worldStops } from "./map_stops.js";
 import {
   DEFAULT_MARGIN_PX,
-  WORLD_COUNTRY_SPAN_KM,
-  WORLD_DISTRICT_SPAN_KM,
-  WORLD_NEARBY_SPAN_KM,
   centreOn,
+  estimateTextWidth,
   fitBounds,
   formatDistance,
+  rectsOverlap,
   spanLimits,
-  worldStops,
-} from "./map_viewport.js";
+} from "@elosern/map-view";
 
 /** The world view's controlled-view signature (one continent, kilometres). */
 export const WORLD_SIGNATURE = "world|elosern|km";
@@ -75,7 +74,9 @@ export function lodFor(span) {
 
 // ── bounds, stops and views ─────────────────────────────────────────────
 
-function boundsOfPoints(points) {
+// Payload geometry arrives as [x, y] tuples, so this bounds reducer reads
+// them directly instead of the shared point-object helper.
+function tupleBounds(points) {
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
@@ -91,7 +92,7 @@ function boundsOfPoints(points) {
 
 /** The common coastline's bounds: the continent the 大陸 stop fits. */
 export function continentBounds(world) {
-  return boundsOfPoints(world.common.coastline);
+  return tupleBounds(world.common.coastline);
 }
 
 export function worldStopsFor(world, frame) {
@@ -327,7 +328,7 @@ function computeAnchor(rings) {
 
 /** Outline bounds in world units. */
 export function outlineBounds(rings) {
-  return boundsOfPoints(rings.flat());
+  return tupleBounds(rings.flat());
 }
 
 /**
@@ -568,16 +569,6 @@ export function featurePoint(world, key) {
 
 // ── labels ──────────────────────────────────────────────────────────────
 
-/** Rough width of a label at fontPx (CJK one em, Latin about 0.58 em). */
-export function estimateTextWidth(text, fontPx, letterSpacingEm = 0) {
-  let em = 0;
-  for (const ch of text) {
-    const code = ch.codePointAt(0);
-    em += (code > 0x2e80 ? 1 : ch === " " ? 0.3 : 0.58) + letterSpacingEm;
-  }
-  return em * fontPx;
-}
-
 /**
  * Label candidates for a view. Priorities (lower wins a collision; ties
  * break on the stable key): the selected feature 0, commissions 1 (tracked
@@ -623,10 +614,6 @@ export function labelCandidates(world, lod, selectedKey = null) {
     out.push({ key, kind: "unlit", lines: ["未探明"], x: anchor.x, y: anchor.y, priority: pri(key, 6) });
   }
   return out.sort((a, b) => a.priority - b.priority || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
-}
-
-function overlaps(a, b) {
-  return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 }
 
 /**
@@ -684,8 +671,8 @@ export function placeWorldLabels(candidates, project, frame, {
       const box = { left: option.left, top: option.top, right: option.left + width, bottom: option.top + height };
       if (box.left < 0 || box.top < 0 || box.right > frame.width || box.bottom > frame.height) continue;
       const padded = { left: box.left - pad, right: box.right + pad, top: box.top - pad, bottom: box.bottom + pad };
-      if (placedBoxes.some((other) => overlaps(padded, other))) continue;
-      if (obstacles.some((ob) => ob.key !== candidate.key && overlaps(box, ob))) continue;
+      if (placedBoxes.some((other) => rectsOverlap(padded, other))) continue;
+      if (obstacles.some((ob) => ob.key !== candidate.key && rectsOverlap(box, ob))) continue;
       chosen = { ...option, box };
       break;
     }
@@ -706,5 +693,3 @@ export function placeWorldLabels(candidates, project, frame, {
   }
   return out;
 }
-
-export { DEFAULT_MARGIN_PX };

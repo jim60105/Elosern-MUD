@@ -1,20 +1,20 @@
 // Off-screen commission pointers for the map drawer (OpenSpec change
 // redesign-map-drawer; approved design
 // docs/superpowers/specs/2026-10-22-world-map-drawer-design.md §6.2/§6.5).
-// Dependency-free apart from the shared viewport clamp: no Vue, no DOM.
+// Dependency-free apart from the shared view clamp: no Vue, no DOM.
 //
 // A target is `{ id, title, sub, x, y, distance }` in frame pixels (its
 // projected position, usually far outside the frame) with its map distance
 // from the player. Targets inside the usable rectangle draw no pointer. The
 // rest are ordered nearest first; at most three are shown on the
-// rectangle's edge where the ray from its centre leaves it (map_viewport.js
+// rectangle's edge where the ray from its centre leaves it (@elosern/map-view
 // clampToRect, so the pointers avoid the open detail drawer whenever the host
 // passes a drawer-aware rectangle), and any further ones collapse into one
 // `＋n` chip. In distance order each pointer keeps the nearest free spot on
 // its edge. Conservative chip bounds prevent collisions across corners too;
 // a full edge folds excess targets into the list and reserves its ＋n chip.
 
-import { clampToRect } from "./map_viewport.js";
+import { clampToRect } from "@elosern/map-view";
 
 /** At most this many pointers are drawn; the rest collapse into `＋n`. */
 export const MAX_EDGE_POINTERS = 3;

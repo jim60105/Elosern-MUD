@@ -40,7 +40,7 @@ import {
   MARKER_CURRENT_RING_R,
   STUB_FOOTPRINT,
 } from "../composables/use-map-lattice-geometry.js";
-import { MARKER_LANDMARK_R, HALO_R } from "../lib/map_marker_geometry.js";
+import { HALO_R, MARKER_LANDMARK_R } from "@elosern/map-view";
 import MapNodeGlyph from "./MapNodeGlyph.vue";
 import { useMapLatticeRender } from "../composables/use-map-lattice-render.js";
 import { CANVAS_SIZE } from "../lib/minimap_projection.js";

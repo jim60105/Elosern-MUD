@@ -20,7 +20,8 @@ import {
   rememberLevel,
   selectScale,
 } from "../lib/minimap_projection.js";
-import { HALO_R, GATE_FOOTPRINT, ISLAND_GLYPH_SCALE, NODE_DOT_R, HERE_GLOW_R, paintedMarkerFootprint } from "../lib/map_marker_geometry.js";
+import { GATE_FOOTPRINT, HALO_R, HERE_GLOW_R, NODE_DOT_R } from "@elosern/map-view";
+import { ISLAND_GLYPH_SCALE, paintedMarkerFootprint } from "../lib/map_glyphs.js";
 
 // The island draws every node glyph at one uniform scale; its footprints and
 // spreading clearance are the base values times this scale.
@@ -133,9 +134,11 @@ describe("constants", () => {
   it("the module imports nothing from Vue and touches no DOM global", () => {
     const source = readFileSync(resolve(process.cwd(), "web/webclient-app/lib/minimap_projection.js"), "utf8");
     const imports = [...source.matchAll(/^import .* from "([^"]+)";$/gm)].map((match) => match[1]);
-    expect(imports).toEqual(["./local_map.js", "./map_marker_geometry.js"]);
-    const geometry = readFileSync(resolve(process.cwd(), "web/webclient-app/lib/map_marker_geometry.js"), "utf-8");
+    expect(imports).toEqual(["./local_map.js", "@elosern/map-view", "./map_glyphs.js"]);
+    const geometry = readFileSync(resolve(process.cwd(), "packages/map-view/src/glyph.js"), "utf-8");
     expect(geometry).not.toMatch(/\b(document|window|globalThis|requestAnimationFrame|vue)\b/);
+    const hostGlyphs = readFileSync(resolve(process.cwd(), "web/webclient-app/lib/map_glyphs.js"), "utf-8");
+    expect(hostGlyphs).not.toMatch(/\b(document|window|globalThis|requestAnimationFrame|vue)\b/);
     expect(source).not.toMatch(/\b(document|window|globalThis|requestAnimationFrame)\b/);
   });
 });

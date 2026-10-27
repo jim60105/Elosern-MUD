@@ -1,15 +1,14 @@
-// Pure map viewport (OpenSpec change establish-map-viewport). Every expected
-// value below is computed by hand from the synthetic inputs, not by calling
-// the module under test. The three top-level describe blocks map one-to-one
-// to the webclient-map-viewport requirements; the Python wrapper
-// tests/test_map_client_contracts.py checks each block ran and passed.
+// The game's map view policy, wired through the shared primitives (OpenSpec
+// change establish-map-viewport; extracted to @elosern/map-view by
+// map-view-shared-foundations). Every expected value below is computed by
+// hand from the synthetic inputs, not by calling the module under test. The
+// three top-level describe blocks map one-to-one to the webclient-map-viewport
+// requirements; the Python wrapper tests/test_map_client_contracts.py checks
+// each block ran and passed.
 
 import { describe, expect, it } from "vitest";
 import {
-  DETAIL_DRAWER_WIDTH,
-  MIN_NEARBY_SPAN_M,
   UNITS,
-  WORLD_COUNTRY_SPAN_KM,
   cellCentre,
   cellRect,
   cellUnit,
@@ -28,17 +27,21 @@ import {
   project,
   scaleBar,
   scaleOf,
-  settlementStops,
   spanLimits,
   toMetres,
   unproject,
-  usableRect,
   wheelFactor,
-  wildernessStops,
-  worldStops,
   zoomAt,
   zoomBy,
-} from "../../lib/map_viewport.js";
+} from "@elosern/map-view";
+import { DETAIL_DRAWER_WIDTH, usableRect } from "../../lib/map_chrome.js";
+import {
+  MIN_NEARBY_SPAN_M,
+  WORLD_COUNTRY_SPAN_KM,
+  settlementStops,
+  wildernessStops,
+  worldStops,
+} from "../../lib/map_stops.js";
 
 const EPS = 1e-9;
 // A non-square frame: 1000 x 600 px.

@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
 import MapEdgePointers from "../../components/MapEdgePointers.vue";
 import { MAX_EDGE_POINTERS, POINTER_PITCH_PX, farPointAlongBearing, layoutEdgePointers } from "../../lib/map_edge_pointers.js";
-import { usableRect } from "../../lib/map_viewport.js";
+import { usableRect } from "../../lib/map_chrome.js";
 
 let wrappers = [];
 afterEach(() => {

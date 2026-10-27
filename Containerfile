@@ -77,6 +77,9 @@ WORKDIR /build
 RUN npm install --global pnpm@12.5.1
 
 COPY --chown=root:0 package.json pnpm-lock.yaml pnpm-workspace.yaml vite.config.js vite.gm.config.js ./
+# The local workspace package (map-view-shared-foundations): its manifest must
+# be present for the frozen workspace install, and its source for the build.
+COPY --chown=root:0 packages/ /build/packages/
 RUN --mount=type=cache,id=pnpm-$TARGETARCH$TARGETVARIANT,sharing=locked,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile
 

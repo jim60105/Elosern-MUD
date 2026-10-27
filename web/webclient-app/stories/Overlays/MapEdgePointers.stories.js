@@ -1,7 +1,7 @@
 import { h } from "vue";
 import MapEdgePointers from "../../components/MapEdgePointers.vue";
 import { layoutEdgePointers } from "../../lib/map_edge_pointers.js";
-import { usableRect } from "../../lib/map_viewport.js";
+import { usableRect } from "../../lib/map_chrome.js";
 
 // MapEdgePointers (redesign-map-drawer): the drawer's HTML layer of
 // off-screen commission pointers over a plain stage the size of the drawer

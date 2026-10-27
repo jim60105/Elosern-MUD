@@ -6,9 +6,12 @@
 // helpers under test.
 
 import { afterEach, describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { mount } from "@vue/test-utils";
 import AreaMapView from "../../components/AreaMapView.vue";
-import { placeLabels } from "../../lib/area_map_view.js";
+import { placeLabels } from "@elosern/map-view";
+import { GAME_MAP_THEME, GAME_MAP_THEME_VARS } from "../../lib/map_theme.js";
 import MapPanels from "../../../static/webclient/js/elosern/protocol/panels/map_panels.js";
 import {
   ABSENT_DUNGEON_ROOMS,
@@ -231,7 +234,9 @@ describe("area rendering uses truthful geometry and server fog", () => {
   });
 
   it("the selected and current names never overlap, even in a cramped frame", () => {
-    const entry = (id, x, priority) => ({ node: { id }, x, y: 30, priority, lines: [`${id}名稱`] });
+    // The shared placement reads a candidate's own id, which the area host
+    // attaches to every label candidate.
+    const entry = (id, x, priority) => ({ id, x, y: 30, priority, lines: [`${id}名稱`] });
     // A 60 x 60 frame where no regular spot fits either 52 px name, so both
     // must-place names reach the clamped last resort.
     const out = placeLabels(
@@ -279,6 +284,23 @@ describe("area rendering uses truthful geometry and server fog", () => {
     const stops = w.vm.stops.map((s) => s.span);
     expect(out).toBeCloseTo(Math.max(...stops) * 1.25, 6);
     expect(inner).toBeCloseTo(Math.min(...stops) * 0.5, 6);
+  });
+
+  it("publishes the host theme roles the shared glyphs read", () => {
+    const w = mountMap(townArea());
+    const root = w.get('[data-testid="area-map"]').element;
+    // The surface exposes the package's theme namespace with the game's own
+    // tokens, so a shared glyph's `var(--map-view-<role>)` hook resolves here.
+    for (const [property, value] of Object.entries(GAME_MAP_THEME_VARS)) {
+      expect(root.style.getPropertyValue(property)).toBe(value);
+    }
+    expect(Object.keys(GAME_MAP_THEME_VARS).length).toBe(Object.keys(GAME_MAP_THEME).length);
+    // The shared node glyph reads those hooks (with its own fallbacks), so no
+    // second ink source is needed for a second map host.
+    const glyph = readFileSync(resolve(__dirname, "../../components/MapNodeGlyph.vue"), "utf-8");
+    for (const role of ["halo", "paper", "current", "node", "accent", "accent-muted", "selection"]) {
+      expect(glyph).toContain(`var(--map-view-${role}`);
+    }
   });
 });
 

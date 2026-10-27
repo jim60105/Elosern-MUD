@@ -16,7 +16,7 @@ coordinates or supplies travel geometry.
 | Wilderness node coordinates | integer one-kilometre cell indices (`0 <= x, y < 2700`) | `world/maps/wilderness_provider.py` |
 | `local_map` payload `x`/`y` | those same integers, unchanged | `web/webclient/presentation/local_map/` |
 | Minimap projection | presentation-only positions derived from the payload | `web/webclient-app/lib/minimap_projection.js` |
-| Area/world viewport | uniform scale in the panel's declared physical units | `web/webclient-app/lib/map_viewport.js` |
+| Area/world projection and geometry | uniform scale in the panel's declared physical units | `packages/map-view` (`@elosern/map-view`), with the game's stop/chrome/glyph policy in `web/webclient-app/lib/map_{stops,chrome,glyphs,theme}.js` |
 
 `z` stays the logical grid/layer key; it is never physical elevation. Interiors
 without coordinates stay coordinate-free connected scenes: their payload keeps
@@ -56,9 +56,15 @@ coordinates are never rewritten by the projection.
 
 The full map is the map drawer (redesign-map-drawer): its area tab draws the
 on-demand `area_map` at one uniform metre scale and its world tab the
-`world_map` in kilometres, both through `lib/map_viewport.js`. The old
-full-map overlay and its lattice (`cellSize`, col/row cell units, the
-overlay pitch fit and fitted view) were removed with it.
+`world_map` in kilometres, both through the shared primitives now owned by
+`packages/map-view` (`map-view-shared-foundations`). That package is host
+neutral: it takes explicit view/frame/point values, a host glyph descriptor
+and a host theme of painted roles, and imports no game store, OOB transport,
+player knowledge or host stylesheet. This game keeps its own scope stops,
+detail-panel width, glyph scales, fog, current node, quest markers and travel
+descriptors, and binds its theme so the shared glyphs paint with the game's
+tokens. The old full-map overlay and its lattice (`cellSize`, col/row cell
+units, the overlay pitch fit and fitted view) were removed earlier.
 
 `remembered` nodes stay off the canvas: on coordinate-bearing layers they are
 named edge-direction markers derived from the **raw** payload delta, and they
