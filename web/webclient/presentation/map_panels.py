@@ -100,7 +100,7 @@ WORLD_MAX_DISTRICT_NATIONS = 8
 WORLD_MAX_QUEST_MARKERS = 64
 WORLD_APPROXIMATE_GRID_KM = 50
 TRAIL_RESOLUTIONS = (1, 5)
-#: Continental frame edge in 1 km cells (mirror of CONTINENT_FRAME_CELLS).
+#: Continental frame edge in 1 km cells (the published continent's frame size).
 TRAIL_FRAME_CELLS = 2_700
 TRAIL_MAX_RUNS = 20_000
 TRAIL_DOWNSAMPLED_MAX_RUNS = 145_800

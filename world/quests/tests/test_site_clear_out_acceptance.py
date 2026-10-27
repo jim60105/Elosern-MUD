@@ -98,6 +98,12 @@ NEST = "t_clear_out_nest"
 CAMP = "t_clear_out_camp"
 BOSS = "t_clear_out_boss"
 
+from world.tests.geography_fixture import publish_shipped_geography
+
+
+def setUpModule():
+    publish_shipped_geography()
+
 
 class SiteClearOutAcceptanceTests(
     BattlefieldIsolation, QuestRegistryIsolation, EvenniaTest

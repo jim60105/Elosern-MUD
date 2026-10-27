@@ -121,12 +121,10 @@ def _synth_sync_capture() -> dict[str, Mapping[str, object]]:
         "monster_variants": content["monster_variants"](),
         "ambient_placements": content["ambient_placements"](),
         "monster_sites": content["monster_sites"](),
-        "anchors": content["anchors"](),
         "anchor_placements": content["anchor_placements"](),
         "settlements": content["settlements"](),
         "places": content["places"](),
         "name_packs": content["name_packs"](),
-        "wilderness_regions": content["regions"](),
         "wilderness_entries": content["wilderness_entries"](),
         "prices": content["prices"](),
     }
@@ -152,9 +150,7 @@ REGISTRY_TARGETS: dict[str, tuple[str, str]] = {
         "AMBIENT_PLACEMENT" + "_REGISTRY",
     ),
     "monster_sites": ("world.lore.monster_placement", "MONSTER_SITE" + "_REGISTRY"),
-    "anchors": ("world.lore.anchors", "ANCHOR" + "_REGISTRY"),
     "anchor_placements": ("world.lore.anchor_placement", "ANCHOR_PLACEMENT" + "_REGISTRY"),
-    "regions": ("world.lore.wilderness_regions", "WILDERNESS_REGION" + "_REGISTRY"),
     "wilderness_entries": ("world.lore.wilderness_entry", "WILDERNESS_ENTRY" + "_REGISTRY"),
     "city_gates": ("world.maps.city_gates", "CITY_GATE" + "_REGISTRY"),
     "archetypes": ("world.lore.scene_archetypes", "SCENE_ARCHETYPE" + "_REGISTRY"),
@@ -178,6 +174,15 @@ REGISTRY_TARGETS: dict[str, tuple[str, str]] = {
     "quest_issuances": ("world.rules.quest_issuance", "QUEST_ISSUANCE" + "_REGISTRY"),
     # The import-time capture the lore DB mirror iterates.
     "lore_sync": ("world.lore.sync", "_ALL" + "_REGISTRIES"),
+}
+
+# Logical geography domains the kit substitutes by publishing a derived
+# snapshot view instead of patching a module attribute: the map-owned domains
+# are composed values on the published geography, so a catalog swap replaces
+# that view for the scope and restores the previous snapshot afterwards.
+GEOGRAPHY_TARGETS: dict[str, str] = {
+    "anchors": "anchors",
+    "regions": "regions",
 }
 
 _CONTENT: dict[str, Callable[[], Mapping[str, object]]] = _content_by_logical()

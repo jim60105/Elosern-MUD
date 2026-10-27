@@ -414,9 +414,7 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
             "world.lore.wilderness_entry", "WILDERNESS_ENTRY" + "_REGISTRY"
         ).values()
         point = next(entry for entry in entries if entry.is_point_shape)
-        village_label = _live(
-            "world.lore.anchors", "ANCHOR" + "_REGISTRY"
-        )[point.anchor_key].display_name_zh
+        village_label = _t_anchor_display(point.anchor_key)
         authored = point.gates[0].return_direction
 
         self._at_wild(point.anchor_cell)

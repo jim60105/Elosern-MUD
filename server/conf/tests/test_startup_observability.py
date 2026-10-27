@@ -135,6 +135,7 @@ class StartupStepEventTests(_StubbedStartup):
         self.assertEqual(
             self._steps(info),
             [
+                "geography_source_publication",
                 "static_map_reference_validation",
                 "world_clock_init",
                 "equipment_rulebook_validation",
@@ -165,6 +166,7 @@ class StartupStepEventTests(_StubbedStartup):
         self.assertEqual(
             self._steps(info),
             [
+                "geography_source_publication",
                 "static_map_reference_validation",
                 "world_clock_init",
                 "equipment_rulebook_validation",
@@ -183,6 +185,7 @@ class StartupStepEventTests(_StubbedStartup):
             "world.rules.guild_exam_restrictions",
             "guild_exam_restriction_validation",
             preceding=(
+                "geography_source_publication",
                 "static_map_reference_validation",
                 "world_clock_init",
                 "equipment_rulebook_validation",
@@ -196,6 +199,7 @@ class StartupStepEventTests(_StubbedStartup):
             "world.rules.starting_companions",
             "starting_companion_validation",
             preceding=(
+                "geography_source_publication",
                 "static_map_reference_validation",
                 "world_clock_init",
                 "equipment_rulebook_validation",

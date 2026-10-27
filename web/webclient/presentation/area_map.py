@@ -147,12 +147,12 @@ def _check_payload_size(layer: str, map_id: str, payload: dict[str, Any]) -> Non
 
 
 def _settlement_title(z: str, location: Any) -> str:
-    from world.lore.anchors import ANCHOR_REGISTRY
+    from world.lore import anchors
     from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 
     for entry in WILDERNESS_ENTRY_REGISTRY.values():
         if any(gate.z_map_key == z for gate in entry.gates):
-            anchor = ANCHOR_REGISTRY.get(entry.anchor_key)
+            anchor = anchors.anchors().get(entry.anchor_key)
             if anchor is not None:
                 return f"{anchor.display_name_zh}街道圖"
     return f"{location.key}街道圖"

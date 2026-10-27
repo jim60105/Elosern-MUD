@@ -6,7 +6,6 @@ mainland polygon and the project-owned `TerrainRoom` and `WildernessReturnExit` 
 
 ## Requirements
 
-
 ### Requirement: ElosernWildernessMapProvider bounds the map to the declared one-kilometer frame
 `world/maps/wilderness_provider.py` SHALL define `WILDERNESS_KM_PER_CELL = 1`,
 `WILDERNESS_MAX_X = 2699`, `WILDERNESS_MAX_Y = 2699`, and `ElosernWildernessMapProvider`,
@@ -59,35 +58,36 @@ mainland, ridge, water, footprints).
 - **THEN** it SHALL NOT special-case any anchor key
 
 ### Requirement: get_location_name and at_prepare_room delegate to the deterministic terrain model
-`ElosernWildernessMapProvider.get_location_name(coordinates)` SHALL return
-`WILDERNESS_REGION_REGISTRY[region_for_coordinates(*coordinates)].display_name_zh`.
+`ElosernWildernessMapProvider.get_location_name(coordinates)` SHALL return the published region
+view's `display_name_zh` for `region_for_coordinates(*coordinates)`.
 `at_prepare_room(coordinates, caller, room)` SHALL unconditionally set these room fields on every
 call, and SHALL clear `room.room_art_key` on every activation:
 
 ```
 room.ndb.active_desc = terrain_description(*coordinates)
-room.scene_archetype = REGION_SCENE_ARCHETYPES[region_for_coordinates(*coordinates)]
+room.scene_archetype = the published region view's scene_archetype for the coordinate
 room.scene_identity  = wilderness name and current coordinates
 ```
 
-It SHALL also initialize the coordinate's deterministic monster population per the scenarios below.
+The scene archetype SHALL come from the continent source, validated at publication, never a Python
+region table; the hook SHALL also initialize monster population.
 
 #### Scenario: get_location_name matches the region registry
 - **WHEN** `get_location_name((x, y))` is called
-- **THEN** it returns the same string as `WILDERNESS_REGION_REGISTRY[region_for_coordinates(x, y)].
-  display_name_zh`
+- **THEN** it returns the published region view's `display_name_zh` for
+  `region_for_coordinates(x, y)`
 
 #### Scenario: at_prepare_room sets both the description and the scene_archetype seam
 - **WHEN** `at_prepare_room((x, y), caller, room)` is called on a `TerrainRoom`
-- **THEN** `room.ndb.active_desc == terrain_description(x, y)` and `room.scene_archetype ==
-  REGION_SCENE_ARCHETYPES[region_for_coordinates(x, y)]`
+- **THEN** `room.ndb.active_desc == terrain_description(x, y)` and `room.scene_archetype` equals the
+  published region view's `scene_archetype` for `region_for_coordinates(x, y)`
 
 #### Scenario: scene_archetype is re-set, not left stale, when a pooled room is reused at a new coordinate
 - **WHEN** a `TerrainRoom` object previously activated at coordinates `(x1, y1)` (with
   `region_for_coordinates(x1, y1) != region_for_coordinates(x2, y2)`) is later reused by the
   wilderness system and activated at different coordinates `(x2, y2)`
-- **THEN** after the second activation, `room.scene_archetype == REGION_SCENE_ARCHETYPES[region_for_coordinates(x2, y2)]`,
-  not the value computed for `(x1, y1)`
+- **THEN** after the second activation, `room.scene_archetype` equals the published region view's
+  scene archetype for `(x2, y2)`, not the value computed for `(x1, y1)`
 
 #### Scenario: at_prepare_room opens exactly the gate exit at an approach cell
 - **WHEN** `at_prepare_room((860, 1077), caller, room)` is called on a `TerrainRoom` carrying the
@@ -123,8 +123,8 @@ It SHALL also initialize the coordinate's deterministic monster population per t
 #### Scenario: at_prepare_room is a population no-op without a wilderness script
 - **WHEN** `at_prepare_room(coordinates, caller, room)` is called on a `TerrainRoom` with no
   attached wilderness script (as in the provider's unit tests)
-- **THEN** the description, scene archetype, scene identity, cleared room-art key, and (at approach cells) gate locks are set, no
-  exception is raised, and no monster is created
+- **THEN** the description, scene archetype, scene identity, cleared room-art key, and (at approach
+  cells) gate locks are set, no exception is raised, and no monster is created
 
 #### Scenario: Population assurance calls the capability resolver
 - **WHEN** `at_prepare_room` initializes the coordinate's deterministic monster population
@@ -132,29 +132,22 @@ It SHALL also initialize the coordinate's deterministic monster population per t
 - **THEN** it does so by calling
   `world.maps.wilderness_population.ensure_population(room.wilderness, coordinates)` when
   `room.wilderness` resolves to the wilderness script, and SHALL be a population no-op (setting
-  the scene metadata and any applicable gate locks) when no wilderness script is attached, so a pooled or
-  unit-test `TerrainRoom` is never required to have one
+  the scene metadata and any applicable gate locks) when no wilderness script is attached, so a
+  pooled or unit-test `TerrainRoom` is never required to have one
 
 #### Scenario: Gate exit locks use the stock lock-string form
 - **WHEN** `coordinates` equal some registered gate's `approach_cell`
 - **THEN** `at_prepare_room` SHALL set that gate's `return_direction` long-form exit (the contrib's
-  normalized exit key) on the room to `traverse:true();view:true()` locks, the same lock-string
-  form the stock `set_active_coordinates` pass uses for valid neighbors, so the gate exit is
-  visible and offered from the approach cell even though the footprint cell beyond it is
-  provider-invalid
-- **AND** the gateway step itself is performed by `WildernessReturnExit`'s registry branch, not by
-  ordinary coordinate movement
+  lock-string form) and no other lock state
 
 #### Scenario: Non-approach coordinates leave locks alone
-- **WHEN** `coordinates` name a coordinate that is not an approach cell
-- **THEN** `at_prepare_room` SHALL NOT touch any exit's locks
+- **WHEN** `at_prepare_room` runs at a coordinate that is no registered gate's approach cell
+- **THEN** no exit lock is modified by the provider hook
 
 #### Scenario: Point anchors open the authored direction to match the resolver
-- **WHEN** `coordinates` equal a point-shape entry's `anchor_cell`
-- **THEN** `at_prepare_room` SHALL open only the single gate's authored `return_direction` exit to
-  `traverse:true();view:true()`; the resolver advertises that one authored direction at a point
-  anchor, and every other direction stays ordinary terrain validity, so offered exits remain
-  identical to resolver truth
+- **WHEN** a point-shape entry is registered and its anchor cell is prepared
+- **THEN** exactly the authored gate direction is opened, matching the resolver's gateway
+  advertisement at that cell
 
 ### Requirement: ElosernWildernessMapProvider uses TerrainRoom and WildernessReturnExit
 `ElosernWildernessMapProvider.room_typeclass` SHALL be `typeclasses.rooms.TerrainRoom` and

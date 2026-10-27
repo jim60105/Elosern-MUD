@@ -73,8 +73,16 @@ def _live_region_keys() -> tuple[str, ...]:
     """The live terrain region keys, in registry order (no literal here)."""
     import importlib
 
-    module = importlib.import_module(".".join(("world", "lore", "wilderness_regions")))
-    return tuple(getattr(module, "WILDERNESS_REGION" + "_REGISTRY"))
+    from world.lore.wilderness_regions import regions
+
+    return tuple(regions())
+
+
+from world.tests.geography_fixture import publish_shipped_geography
+
+
+def setUpModule():
+    publish_shipped_geography()
 
 
 class HuntAcceptanceTests(BattlefieldIsolation, QuestRegistryIsolation, EvenniaTest):

@@ -1,18 +1,13 @@
 """Behavior tests for acceptance-time hunt target provisioning (task 3.1).
-
 The ambient placement rows, sites, and species/variant identities are file-local
 synthetic fixtures injected through the synthetic test-data kit's ``extra=``
 seam, and every region key is read from the live terrain model at runtime, so no
 shipped placement, species, variant, or region token is named as test content.
 """
-
 from tools.spec_traceability import covers_requirement
-
 from unittest.mock import patch
-
 from django.db import transaction
 from evennia.utils.test_resources import EvenniaTest
-
 from typeclasses.monsters import Monster
 from world.lore.monster_placement import AmbientPlacementRule, MonsterSite
 from world.maps.monster_provisioning import (
@@ -37,12 +32,12 @@ from world.maps.wilderness_population import (
     ensure_population,
 )
 from world.maps.wilderness_provider import (
-    REGION_SEARCH_BOXES,
     WILDERNESS_NAME,
     ElosernWildernessMapProvider,
     is_valid_wilderness_cell,
     region_for_coordinates,
 )
+from world.maps import wilderness_provider
 from world.rules.action import register_event_effect_planner
 from world.quests.binding import bind_stage_runtime
 from world.quests.definitions import QuestStage
@@ -61,22 +56,24 @@ from world.tests.synthetic_data import (
     SYNTH_MONSTER_VARIANTS,
     synthetic_registries,
 )
+from world.tests.geography_fixture import publish_shipped_geography
+
+
+def setUpModule():
+    publish_shipped_geography()
+
 
 _VARIANTS = tuple(SYNTH_MONSTER_VARIANTS)
 ORDINARY, STRONGER = _VARIANTS[0], _VARIANTS[1]
 SPECIES = SYNTH_MONSTER_SPECIES[next(iter(SYNTH_MONSTER_SPECIES))].key
 assert SYNTH_MONSTER_VARIANTS[ORDINARY].species_key == SPECIES
-
 #: A walkable south-western wild cell, far from the contract-pinned hunting band.
 PROBE = (500, 700)
-
 _SITE_KEY = "t_hunt_provisioning_site"
 _SITE_RECOVERY_TICKS = 3600
-
-
 def _first_cell_outside(regions: frozenset[str]) -> tuple[int, int]:
     """A walkable cell whose region is none of ``regions``."""
-    for region, (x_min, x_max, y_min, y_max) in REGION_SEARCH_BOXES.items():
+    for region, (x_min, x_max, y_min, y_max) in wilderness_provider.region_search_boxes().items():
         if region in regions:
             continue
         for x in range(x_min, x_max + 1):
@@ -91,16 +88,12 @@ def _first_cell_outside(regions: frozenset[str]) -> tuple[int, int]:
                     continue
                 return cell
     raise AssertionError("no walkable cell outside the requested regions")
-
-
 class ProvisioningWorldFixture(BattlefieldIsolation):
     """One live wilderness with the authored placements these tests need.
-
     A plain mixin (never collected on its own): the tests below pair it with
     ``EvenniaTest``, so ``super().setUp()`` runs the battlefield isolation and
     the standard Evennia fixtures.
     """
-
     def setUp(self):
         super().setUp()
         from evennia.contrib.grid.wilderness.wilderness import (
@@ -108,7 +101,6 @@ class ProvisioningWorldFixture(BattlefieldIsolation):
             create_wilderness,
             enter_wilderness,
         )
-
         self.region = region_for_coordinates(*PROBE)
         # The region's authored ambient population: one maintained individual
         # per covered coordinate, up to a hard ceiling of three.
@@ -159,9 +151,7 @@ class ProvisioningWorldFixture(BattlefieldIsolation):
         self.wilderness = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
         enter_wilderness(self.char1, coordinates=PROBE, name=WILDERNESS_NAME)
         self.room = self.char1.location
-
     # -- shared fixture helpers --------------------------------------------
-
     def _occupancy(self) -> dict[int, tuple]:
         """The bookkept individuals' durable surfaces, keyed by dbref."""
         return {
@@ -174,7 +164,6 @@ class ProvisioningWorldFixture(BattlefieldIsolation):
             for obj in list(self.wilderness.db.itemcoordinates or {})
             if isinstance(obj, Monster)
         }
-
     def _living_ordinary(self, region_key: str) -> list[Monster]:
         """Living ordinary-eligible individuals the region's bookkeeping holds."""
         return [
@@ -189,7 +178,6 @@ class ProvisioningWorldFixture(BattlefieldIsolation):
             and obj.species_key == SPECIES
             and obj.variant_key == ORDINARY
         ]
-
     def _spawn_ordinary(
         self,
         cell: tuple[int, int],
@@ -201,11 +189,8 @@ class ProvisioningWorldFixture(BattlefieldIsolation):
         individual.db.population_key = marker
         self.wilderness.db.itemcoordinates[individual] = cell
         return individual
-
-
 class HuntProvisioningTests(ProvisioningWorldFixture, EvenniaTest):
     """The ambient/site owners' ensure API under capacity, ownership, and state."""
-
     def test_a_region_that_already_holds_enough_creates_nothing(self):
         if not self._living_ordinary(self.region):
             self._spawn_ordinary(PROBE, marker=_population_key(*PROBE))
@@ -219,7 +204,6 @@ class HuntProvisioningTests(ProvisioningWorldFixture, EvenniaTest):
         self.assertEqual(result.created, ())
         self.assertEqual(result.available, available)
         self.assertEqual(self._occupancy(), before)
-
     def test_availability_counts_every_owner_not_only_the_ambient_footprint(self):
         # A site-owned (or otherwise foreign-owned) living ordinary individual is
         # a reachable target: it satisfies the guarantee without the ambient
@@ -236,7 +220,6 @@ class HuntProvisioningTests(ProvisioningWorldFixture, EvenniaTest):
         self.assertGreaterEqual(result.available, 1)
         self.assertEqual(self._occupancy(), before)
         self.assertEqual(foreign.db.site_key, _SITE_KEY)
-
     def test_a_shortfall_is_provisioned_through_the_ambient_owner(self):
         before = self._occupancy()
         available = len(self._living_ordinary(self.region))
@@ -259,7 +242,6 @@ class HuntProvisioningTests(ProvisioningWorldFixture, EvenniaTest):
             self.assertEqual(individual.variant_key, ORDINARY)
             self.assertGreater(_stored_hp(individual), 0)
             self.assertNotIn(pk, before)
-
     def test_provisioned_individuals_survive_the_ambient_pass(self):
         result = ensure_hunt_targets(
             self.region,
@@ -282,7 +264,6 @@ class HuntProvisioningTests(ProvisioningWorldFixture, EvenniaTest):
             )
             self.assertGreater(_stored_hp(individual), 0)
             self.assertIn(self.wilderness.db.itemcoordinates[individual], cells)
-
     def test_the_authored_capacity_ceiling_is_honored_per_coordinate(self):
         candidates = _candidate_cells(self.region, self.rule)
         saturated = next(iter(candidates))
@@ -316,7 +297,6 @@ class HuntProvisioningTests(ProvisioningWorldFixture, EvenniaTest):
             sorted(obj.pk for obj in after_saturated),
             sorted(obj.pk for obj in before_saturated),
         )
-
     def test_a_region_without_an_authored_rule_is_refused_without_state_change(self):
         before = self._occupancy()
         result = ensure_hunt_targets(
@@ -327,7 +307,6 @@ class HuntProvisioningTests(ProvisioningWorldFixture, EvenniaTest):
         self.assertEqual(result.created, ())
         self.assertEqual(self._living_ordinary(self.bare_region), [])
         self.assertEqual(self._occupancy(), before)
-
     def test_a_rule_without_the_hunts_ordinary_variant_is_refused(self):
         before = self._occupancy()
         result = ensure_hunt_targets(
@@ -337,7 +316,6 @@ class HuntProvisioningTests(ProvisioningWorldFixture, EvenniaTest):
         self.assertEqual(result.reason, PROVISION_NO_ELIGIBLE_VARIANT)
         self.assertEqual(result.created, ())
         self.assertEqual(self._occupancy(), before)
-
     def test_an_exhausted_authored_capacity_is_refused(self):
         # A region whose whole authored footprint already sits at its ceiling
         # cannot be topped up: the manager names the reason and creates nothing.
@@ -362,7 +340,6 @@ class HuntProvisioningTests(ProvisioningWorldFixture, EvenniaTest):
         self.assertEqual(result.created, ())
         self.assertEqual(result.available, self.rule.capacity)
         self.assertEqual(self._occupancy(), before)
-
     def test_a_cleared_site_is_never_recovered_by_provisioning(self):
         # The region's only authored source is one recoverable site. Once that
         # site is cleared and its authored in-game condition is not due, the hunt
@@ -401,7 +378,6 @@ class HuntProvisioningTests(ProvisioningWorldFixture, EvenniaTest):
             ],
             [],
         )
-
     def test_the_provisioning_snapshot_restores_bookkeeping_and_rooms(self):
         snapshot = snapshot_provisioning_surfaces()
         self.assertIsNotNone(snapshot)
@@ -426,11 +402,8 @@ class HuntProvisioningTests(ProvisioningWorldFixture, EvenniaTest):
             self.assertFalse(Monster.objects.filter(pk=pk).exists())
             # The rolled-back instance is evicted, not served from the cache.
             self.assertIsNone(Monster.objects.filter(pk=pk).first())
-
-
 class NoWorldProvisioningTests(EvenniaTest):
     """Provisioning before the wilderness exists refuses and snapshots nothing."""
-
     def test_an_absent_world_refuses_and_snapshots_nothing(self):
         region = region_for_coordinates(*PROBE)
         self.assertIsNone(snapshot_provisioning_surfaces())
@@ -438,19 +411,15 @@ class NoWorldProvisioningTests(EvenniaTest):
         self.assertFalse(result.satisfied)
         self.assertEqual(result.reason, PROVISION_WORLD_UNAVAILABLE)
         self.assertEqual(result.created, ())
-
-
 class OwnerTargetSubstitutionTests(
     ProvisioningWorldFixture, QuestRegistryIsolation, EvenniaTest
 ):
     """Bound stages count only their own bindings (task 2.1 / lifecycle delta).
-
     A bound stage's progress counts exactly the record's
     ``objective_target_ids``: a same-species individual elsewhere, an ambient
     respawn, and a recovered site's fresh newcomer never satisfy an old binding,
     while a newly issued quest binds those fresh identities as its own.
     """
-
     def setUp(self):
         super().setUp()
         register_event_effect_planner("quest", quest_event_effect_planner)
@@ -466,16 +435,12 @@ class OwnerTargetSubstitutionTests(
                 stages=(QuestStage(0, defeat(bound=True, quantity=1)),),
             )
         ).key
-
     def tearDown(self):
         from world.rules.action import _EVENT_EFFECT_PLANNERS
-
         _EVENT_EFFECT_PLANNERS.pop("quest", None)
         super().tearDown()
-
     def _defeat_entry(self, actor, individual):
         from world.rules.event_log import EventEntry
-
         return EventEntry(
             kind="target_defeated",
             actor=str(actor.key),
@@ -488,12 +453,9 @@ class OwnerTargetSubstitutionTests(
             },
             text_template="{actor} 擊敗了 {target}。",
         )
-
     def _plan(self, entries):
         from types import SimpleNamespace
-
         from world.rules.event_log import EventLog
-
         log = EventLog(
             actor=str(self.char1.key),
             skill_key="combat_upkeep",
@@ -507,11 +469,9 @@ class OwnerTargetSubstitutionTests(
             actor=self.char1, context=SimpleNamespace(battlefield=None)
         )
         return quest_event_effect_planner(request, log)
-
     def _commit(self, effects) -> None:
         for effect in effects:
             effect.apply()
-
     @staticmethod
     def _quest_log_writes(effects) -> list[str]:
         return [
@@ -519,17 +479,14 @@ class OwnerTargetSubstitutionTests(
             for effect in effects
             if effect.description.startswith("quest_log|")
         ]
-
     def _progress(self, quest_id: str) -> tuple[str, int]:
         from world.quests.runtime import read_records
-
         record = next(
             candidate
             for candidate in read_records(self.char1)
             if candidate.quest_id == quest_id
         )
         return record.state.value, record.stage_progress
-
     @covers_requirement(
         "quest-lifecycle::bound-stage-bindings-survive-every-substitution-attempt"
     )
@@ -568,7 +525,6 @@ class OwnerTargetSubstitutionTests(
         bind_stage_runtime(self.char1, fresh.quest_id, objective_targets=(newcomer,))
         self._commit(self._plan([self._defeat_entry(self.char1, newcomer)]))
         self.assertEqual(self._progress(fresh.quest_id), ("completed", 1))
-
     @covers_requirement(
         "quest-lifecycle::bound-stage-bindings-survive-every-substitution-attempt"
     )
@@ -596,7 +552,6 @@ class OwnerTargetSubstitutionTests(
         self.assertEqual(self._progress(record.quest_id), ("in_progress", 0))
         self._commit(self._plan([self._defeat_entry(self.char1, bound[0])]))
         self.assertEqual(self._progress(record.quest_id), ("completed", 1))
-
     @covers_requirement(
         "quest-lifecycle::bound-stage-bindings-survive-every-substitution-attempt"
     )
@@ -623,9 +578,6 @@ class OwnerTargetSubstitutionTests(
             [],
         )
         self.assertEqual(self._progress(record.quest_id), ("in_progress", 0))
-
-
 if __name__ == "__main__":
     import unittest
-
     unittest.main()

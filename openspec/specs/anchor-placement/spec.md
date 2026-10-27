@@ -23,27 +23,28 @@ dataclass (change 2) SHALL NOT be modified to add any placement, coordinate, or 
   onto it
 
 ### Requirement: Every placement's anchor_key resolves against ANCHOR_REGISTRY
-Every entry in `ANCHOR_PLACEMENT_REGISTRY` SHALL have an `anchor_key` that exists as a key in
-`world/lore/anchors.py::ANCHOR_REGISTRY`.
+Every entry in `ANCHOR_PLACEMENT_REGISTRY` SHALL have an `anchor_key` that exists as a key in the
+published geography's composed location views (the map-owned replacement for the former module
+registry).
 
 #### Scenario: capital_altoria's placement resolves
 - **WHEN** `ANCHOR_PLACEMENT_REGISTRY["capital_altoria"]` is inspected
-- **THEN** its `anchor_key` (`"capital_altoria"`) exists as a key in `ANCHOR_REGISTRY`
+- **THEN** its `anchor_key` (`"capital_altoria"`) exists as a key in the published location views
 
 #### Scenario: No placement references a nonexistent anchor
 - **WHEN** every entry in `ANCHOR_PLACEMENT_REGISTRY` is inspected
-- **THEN** each entry's `anchor_key` exists in `ANCHOR_REGISTRY`
+- **THEN** each entry's `anchor_key` exists in the published location views
 
 ### Requirement: ANCHOR_PLACEMENT_REGISTRY is intentionally partial
-`ANCHOR_PLACEMENT_REGISTRY` SHALL NOT be required to contain an entry for every key in
-`ANCHOR_REGISTRY`. It SHALL contain an entry for exactly those anchors that have a grid map built
-for them, and SHALL grow one entry per settlement as maps are added.
+`ANCHOR_PLACEMENT_REGISTRY` SHALL NOT be required to contain an entry for every published location.
+It SHALL contain an entry for exactly those locations that have a grid map built for them, and
+SHALL grow one entry per settlement as maps are added.
 
 #### Scenario: The registry follows the built settlement maps
 - **WHEN** `ANCHOR_PLACEMENT_REGISTRY` is inspected
 - **THEN** it contains one entry per settlement with a built grid map, including
-  `"capital_altoria"` and `"village_ciaran"`, and no test asserts that any other
-  `ANCHOR_REGISTRY` key must also appear
+  `"capital_altoria"` and `"village_ciaran"`, and no test asserts that any other published location
+  key must also appear
 
 #### Scenario: capital_altoria's placement matches the sample city's spawned AnchorRoom
 - **WHEN** `sync_grid()` (the `grid-room-sync` capability) has run and the spawned `AnchorRoom` for

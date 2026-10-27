@@ -26,8 +26,13 @@ from tools import map_district_partition as generator
 from tools.spec_traceability import covers_requirement
 from world.lore.map_districts import MAP_DISTRICT_REGISTRY
 from world.maps import district_partition
+from world.tests.geography_fixture import publish_shipped_geography
 
 _REGENERATE = "uv run --locked python -m tools.map_district_partition"
+
+
+def setUpModule():
+    publish_shipped_geography()
 
 
 class ShippedDistrictPartitionTests(unittest.TestCase):
@@ -152,10 +157,17 @@ class ShippedDistrictPartitionTests(unittest.TestCase):
     def test_runtime_lookup_never_loads_the_generator(self):
         root = Path(district_partition.__file__).resolve().parents[2]
         probe = (
+            "import json\n"
             "import sys\n"
             "from world.maps import district_partition as d\n"
-            "assert d.district_at((1250, 2420)) == 'north_deep_forest'\n"
-            "assert d.district_at((20, 20)) is None\n"
+            # The artifact lookup itself is independent of the live geography
+            # adapter; the land rule is an injectable boundary.
+            "partition = d.decode_partition(\n"
+            "    json.loads(d.DATA_PATH.read_text(encoding='utf-8')),\n"
+            "    is_land=lambda cell: True,\n"
+            ")\n"
+            "assert partition.district_at((1250, 2420)) == 'north_deep_forest'\n"
+            "assert partition.district_at((20, 20)) is None\n"
             "print(sorted(m for m in sys.modules if m.startswith(('tools', 'numpy', 'scipy'))))\n"
         )
         env = {**os.environ, "PYTHONPATH": str(root)}
@@ -165,3 +177,9 @@ class ShippedDistrictPartitionTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), "[]")
+
+    def test_the_live_lookup_follows_the_published_mainland(self):
+        self.assertEqual(
+            district_partition.district_at((1250, 2420)), "north_deep_forest"
+        )
+        self.assertIsNone(district_partition.district_at((20, 20)))

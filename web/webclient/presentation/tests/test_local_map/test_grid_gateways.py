@@ -353,9 +353,7 @@ class LocalMapGatewayPairTests(EvenniaTest):
         node = next(node for node in payload["nodes"] if node["id"] == self.ENTRY_ID)
         self.assertEqual(
             node["label"],
-            _live("world.lore.wilderness_regions", "WILDERNESS" + "_REGION_REGISTRY")[
-                region_for_coordinates(*EAST_APPROACH)
-            ].display_name_zh,
+            _t_region_display_for(*EAST_APPROACH),
         )
         # The gate's key normalizes to east; the slot stands whole lattice
         # cells east of the gate room and never refines the drawing's cell

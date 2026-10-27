@@ -16,18 +16,16 @@ no-ops; unknown categories and unresolvable keys reject with named errors),
 never a raw dataclass dump.
 """
 
-from collections.abc import Mapping, Set as ABCSet
+from collections.abc import Callable, Mapping, Set as ABCSet
 from dataclasses import dataclass
 from typing import Any
 
-from world.lore.anchors import ANCHOR_REGISTRY
 from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.guild import GUILD_RANK_REGISTRY
 from world.lore.magic import MAGIC_TIER_REGISTRY
 from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.lore.nations import NATION_REGISTRY
 from world.lore.races import RACE_REGISTRY
-from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
 from world.observability import log_warn
 
 # The persisted codex attribute name. All stored entries are namespaced
@@ -64,29 +62,50 @@ class CodexCategory:
     """One codex category: its exactly-one registry and card field names.
 
     Attributes:
-        registry: The immutable ``world/lore/`` registry this category
-            resolves to (exactly one per category).
+        loader: The callable returning the registry this category resolves to
+            (exactly one per category). Map-owned categories read the published
+            geography at call time, so a reload is always observed.
         card_fields: The player-facing card fields declared for this
             category, in rendering order.
     """
 
-    registry: Mapping[str, Any]
+    loader: Callable[[], Mapping[str, Any]]
     card_fields: tuple[str, ...]
+
+    @property
+    def registry(self) -> Mapping[str, Any]:
+        """The current registry for this category."""
+
+        return self.loader()
+
+
+def _constant(registry: Mapping[str, Any]) -> Callable[[], Mapping[str, Any]]:
+    return lambda: registry
+
+
+def _published(attribute: str) -> Callable[[], Mapping[str, Any]]:
+    def load() -> Mapping[str, Any]:
+        from world.maps.geography import current
+
+        return getattr(current(), attribute)
+
+    return load
 
 
 CODE_CATEGORIES: dict[str, CodexCategory] = {
-    "race": CodexCategory(RACE_REGISTRY, ("display_name_zh", "description")),
-    "nation": CodexCategory(NATION_REGISTRY, ("display_name_zh", "capital_name_zh")),
+    "race": CodexCategory(_constant(RACE_REGISTRY), ("display_name_zh", "description")),
+    "nation": CodexCategory(_constant(NATION_REGISTRY), ("display_name_zh", "capital_name_zh")),
     "region": CodexCategory(
-        WILDERNESS_REGION_REGISTRY, ("display_name_zh", "terrain_flavor_zh")
+        _published("regions"), ("display_name_zh", "terrain_flavor_zh")
     ),
     "monster": CodexCategory(
-        MONSTER_TIER_REGISTRY, ("display_name_zh", "description", "example_monsters_zh")
+        _constant(MONSTER_TIER_REGISTRY),
+        ("display_name_zh", "description", "example_monsters_zh"),
     ),
-    "element": CodexCategory(ELEMENT_REGISTRY, ("display_name_zh", "description")),
-    "magic": CodexCategory(MAGIC_TIER_REGISTRY, ("display_name_zh", "description")),
-    "anchor": CodexCategory(ANCHOR_REGISTRY, ("display_name_zh", "description")),
-    "guild": CodexCategory(GUILD_RANK_REGISTRY, ("display_name_zh", "description")),
+    "element": CodexCategory(_constant(ELEMENT_REGISTRY), ("display_name_zh", "description")),
+    "magic": CodexCategory(_constant(MAGIC_TIER_REGISTRY), ("display_name_zh", "description")),
+    "anchor": CodexCategory(_published("anchors"), ("display_name_zh", "description")),
+    "guild": CodexCategory(_constant(GUILD_RANK_REGISTRY), ("display_name_zh", "description")),
 }
 
 

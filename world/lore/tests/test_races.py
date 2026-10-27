@@ -7,7 +7,7 @@ import re
 import unittest
 from pathlib import Path
 
-from world.lore.anchors import ANCHOR_REGISTRY, AnchorKind
+from world.lore.anchors import AnchorKind, anchors
 from world.lore.guild import GUILD_RANK_REGISTRY
 from world.lore.races import (
     RACE_REGISTRY,
@@ -17,6 +17,11 @@ from world.lore.races import (
 )
 from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 from world.lore.starting_kits import SUBRACE_STARTING_KIT_REGISTRY
+from world.tests.geography_fixture import publish_shipped_geography
+
+
+def setUpModule():
+    publish_shipped_geography()
 
 
 BEASTFOLK_SUBRACES = {
@@ -183,7 +188,7 @@ class RaceRegistryTests(unittest.TestCase):
             self.assertIn(subrace.race_key, RACE_REGISTRY)
         for key in ELF_BRANCHES:
             subrace = SUBRACE_REGISTRY[key]
-            anchor = ANCHOR_REGISTRY[subrace.home_anchor_key]
+            anchor = anchors()[subrace.home_anchor_key]
             self.assertEqual(anchor.kind, AnchorKind.ELVEN_VILLAGE)
 
     def test_beastfolk_modifier_values(self):

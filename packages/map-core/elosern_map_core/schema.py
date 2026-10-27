@@ -233,7 +233,12 @@ _REGION = _mapping(
     {
         "display_name_zh": _str(min_length=1),
         "nation_key": _nullable(_str()),
-        "terrain_flavor_zh": _list(_str(), min_items=1),
+        # A region is player-facing terrain prose, so a declaration without at
+        # least two nonblank variants is incomplete authoring, not a coerceable
+        # value: the flavour selector needs a real choice.
+        "terrain_flavor_zh": _list(
+            _str(min_length=1, pattern=r"\s*\S"), min_items=2
+        ),
         "nominal_nation_keys": _list(_str(), required=False),
         "scene_archetype": _nullable(_str()),
     },
@@ -370,7 +375,10 @@ _DOCUMENT_KINDS: dict[str, dict[str, Any]] = {
                 min_items=3,
             ),
             "regions": _mapping(
-                {}, key_pattern=IDENTIFIER_PATTERN, items=_REGION
+                {},
+                key_pattern=IDENTIFIER_PATTERN,
+                unique_values=["display_name_zh"],
+                items=_REGION,
             ),
             "harbor_sites": _mapping(
                 {}, key_pattern=IDENTIFIER_PATTERN, items=_HARBOR_SITE
@@ -1041,6 +1049,12 @@ def _validate_value(
         )
         unique = spec.get("unique_values")
         if unique and value:
+            # Settlement nodes identify one object by its coordinate pair; any
+            # other unique field set (e.g. a region display name) reports the
+            # same collision as a duplicate value, not a duplicate coordinate.
+            coordinate_identity = tuple(unique) == ("x_m", "y_m")
+            code = "duplicate_coordinate" if coordinate_identity else "duplicate_value"
+            noun = "coordinate" if coordinate_identity else "value"
             seen_values: dict[tuple, str] = {}
             for key, item in value.items():
                 if not isinstance(item, Mapping):
@@ -1053,8 +1067,8 @@ def _validate_value(
                 if identity in seen_values:
                     _problem(
                         diagnostics,
-                        "duplicate_coordinate",
-                        f"{path}.{key} repeats coordinate {identity!r} of "
+                        code,
+                        f"{path}.{key} repeats {noun} {identity!r} of "
                         f"{path}.{seen_values[identity]}",
                         relative_path=relative_path,
                         field_path=f"{path}.{key}",

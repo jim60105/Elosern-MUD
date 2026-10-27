@@ -335,24 +335,27 @@ High and calamity tiers have no approved existing species in this roster. Their 
 - **THEN** the superseded fixed-ratio rule is not enforced; independent endurance and resolver encounter evidence govern authoring
 
 ### Requirement: Anchor registry covers capitals, elven villages, and known dungeons
-`world/lore/anchors.py` SHALL define an `AnchorKind` string enum (`CAPITAL`, `ELVEN_VILLAGE`,
-`DUNGEON`) and a frozen `Anchor` dataclass, and a module-level `ANCHOR_REGISTRY: dict[str, Anchor]`
-with exactly nine entries: three capitals, three elven villages, and three known dungeons.
+The game SHALL compose immutable location views from map-owned identity/kind/name/prose and separate non-map lore keyed by the same identity, without a fixed roster count.
+
+#### Scenario: Location kind and lore
+- **WHEN** synthetic capital, village and dungeon locations join nation/population/floor metadata
+- **THEN** map-facing fields come from YAML, non-map values remain their authored lore values and unknown joins are diagnosed
+
+#### Scenario: No invented local content
+- **WHEN** a new geographic location has no settlement or interior document
+- **THEN** it remains readable without generating rooms, dungeon floors, instances or population
 
 #### Scenario: Registry has exactly nine anchors of the right kinds
-- **WHEN** `ANCHOR_REGISTRY` is inspected
-- **THEN** it contains exactly 3 entries with `kind == AnchorKind.CAPITAL`, 3 with
-  `kind == AnchorKind.ELVEN_VILLAGE`, and 3 with `kind == AnchorKind.DUNGEON`
+- **WHEN** a synthetic source contains locations of each supported kind
+- **THEN** the composed registry includes those identities with their declared kinds and no duplicates; the inherited scenario title does not impose a fixed production roster size
 
 #### Scenario: Dungeon floor counts match world_info.md
-- **WHEN** the three dungeon anchors are inspected
-- **THEN** 永夜迷宮 has `floors == 80`, 龍之巢穴 has `floors == 50`, and 魔導遺跡 has
-  `floors == 60`
+- **WHEN** a dungeon's map-facing location fields change while its separate floor lore remains unchanged
+- **THEN** the composed view retains the existing authored floor value without deriving it from geometry or copying a floor approval table into map tests
 
 #### Scenario: Elven villages are not assigned to a nation
-- **WHEN** the three elven-village anchors are inspected
-- **THEN** each has `nation_key is None`, reflecting `world_info.md`'s description of the central
-  mountain range as neutral ground no nation can govern
+- **WHEN** a location joins non-map lore with a nullable political affiliation
+- **THEN** an absent nation stays absent regardless of the location's geometric nominal claim
 
 ### Requirement: Currency is an integer count of 銅 with no floats in the money path
 `world/lore/economy.py` SHALL define `COPPER_PER_SILVER = 100` and `COPPER_PER_GOLD = 10000` as integer constants, a `to_copper(gold: int = 0, silver: int = 0, copper: int = 0) -> int` helper that returns an `int`, and a frozen `PriceEntry` dataclass with integer `min_copper` and `max_copper: int | None` fields.

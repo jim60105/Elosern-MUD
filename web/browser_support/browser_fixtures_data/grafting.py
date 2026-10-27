@@ -167,25 +167,33 @@ def graft_synth_wilderness_terrain() -> None:
     regions have no shipped row of their own.
     """
     from dataclasses import replace
+    from types import MappingProxyType
 
-    import world.lore.wilderness_regions as _regions
+    import world.lore.scene_archetypes as _scenes
     import world.lore.monsters as _monsters
     from world.rules import travel_cost
     from world.tests.synthetic_data import SYNTH_REGIONS
-    from world.maps.wilderness_provider import (
-        WILDERNESS_MAX_X,
-        WILDERNESS_MAX_Y,
-        region_for_coordinates,
-    )
+    from world.maps import geography as _geography
+    from world.maps import wilderness_provider
+    from world.maps.wilderness_provider import region_for_coordinates
+
+    if not _geography.is_published():
+        _geography.publish(_geography.load_geography())
+    snapshot = _geography.current()
 
     partition_keys = {
         region_for_coordinates(x, y)
-        for x in range(0, WILDERNESS_MAX_X + 1, 60)
-        for y in range(0, WILDERNESS_MAX_Y + 1, 60)
+        for x in range(0, wilderness_provider.WILDERNESS_MAX_X + 1, 60)
+        for y in range(0, wilderness_provider.WILDERNESS_MAX_Y + 1, 60)
     }
     template = next(iter(SYNTH_REGIONS.values()))
+    scene = next(iter(_scenes.SCENE_ARCHETYPE_REGISTRY))
+    regions = dict(snapshot.regions)
     for key in sorted(partition_keys):
-        _regions.WILDERNESS_REGION_REGISTRY.setdefault(key, replace(template, key=key))
+        regions.setdefault(
+            key, replace(template, key=key, scene_archetype=scene)
+        )
+    _geography.publish(replace(snapshot, regions=MappingProxyType(regions)))
 
     # Every live region needs a terrain row: the grafted partition keys keep
     # their shipped rows, and the kit's regions borrow the rulebook's own

@@ -77,6 +77,11 @@ from world.tests.synthetic_data import (
 
 from .test_item_use import _support as item_support
 
+from world.tests.geography_fixture import publish_shipped_geography
+
+
+publish_shipped_geography()
+
 MOVE = CLOCK_YAML["command_defaults"]["move"]
 #: Integrated physical durations for a full-reserve party: the east-gate
 #: approach is 13,500 s at 1.25 m/s plus (27,001 m - 16,875 m) at the 1.125 m/s

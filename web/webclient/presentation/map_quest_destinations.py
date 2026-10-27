@@ -28,15 +28,15 @@ from enum import StrEnum
 from typing import Any, Callable
 
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
-from world.lore.anchors import ANCHOR_GEOGRAPHY_REGISTRY
+from world.lore.anchors import anchor_geography
 from world.lore.monster_placement import MONSTER_SITE_REGISTRY
 from world.maps import wilderness_provider
 from world.maps.map_data import settlement_graph
 from world.maps.wilderness_provider import (
-    REGION_SEARCH_BOXES,
     WILDERNESS_NAME,
     is_valid_wilderness_cell,
     region_for_coordinates,
+    region_search_boxes,
 )
 from world.observability import log_warn
 from world.quests.definitions import DestinationKind, ObjectiveKind
@@ -90,7 +90,7 @@ _BLOCK_OCCUPIED = 2
 #: tile holds any cell of a region never changes. Any other classifier (a
 #: synthetic test fixture or a patched provider) is never memoized, and
 #: legality (which reads the live footprint registry) is never cached.
-_OCCUPANCY: dict[tuple[str, tuple[int, int, int, int], int], bytearray] = {}
+_OCCUPANCY: dict[tuple[str, str, tuple[int, int, int, int], int], bytearray] = {}
 
 
 def clear_search_memo() -> None:
@@ -134,7 +134,17 @@ def nearest_region_cell(
     columns = (x_max - x_min) // block + 1
     rows = (y_max - y_min) // block + 1
     if classify is wilderness_provider.region_for_coordinates:
-        memo_key = (region_key, (x_min, x_max, y_min, y_max), block)
+        # The published geography identity is part of the key: two worlds (or a
+        # reload) may hold the same region key and window but classify
+        # differently, and a remembered tile must never cross that boundary.
+        from world.maps.geography import current
+
+        memo_key = (
+            current().identity,
+            region_key,
+            (x_min, x_max, y_min, y_max),
+            block,
+        )
         occupancy = _OCCUPANCY.get(memo_key)
         if occupancy is None:
             occupancy = bytearray(columns * rows)
@@ -181,7 +191,7 @@ def _settlement_anchor_cell(map_key: str) -> tuple[int, int] | None:
     """The wilderness anchor cell of the settlement built on ``map_key``."""
     for placement in ANCHOR_PLACEMENT_REGISTRY.values():
         if placement.zcoord == map_key:
-            geography = ANCHOR_GEOGRAPHY_REGISTRY.get(placement.anchor_key)
+            geography = anchor_geography().get(placement.anchor_key)
             return None if geography is None else tuple(geography.cell)
     return None
 
@@ -215,7 +225,7 @@ def enclosing_anchor_cell(room: Any) -> tuple[int, int] | None:
     anchors = {place.settlement_key for key, place in PLACE_REGISTRY.items() if key in tags}
     if len(anchors) != 1:
         return None
-    geography = ANCHOR_GEOGRAPHY_REGISTRY.get(next(iter(anchors)))
+    geography = anchor_geography().get(next(iter(anchors)))
     return None if geography is None else tuple(geography.cell)
 
 
@@ -283,7 +293,7 @@ def _resolve_locator(record, definition, locator) -> QuestDestination | None:
     if locator is None:
         return None
     if locator.kind is DestinationKind.ANCHOR:
-        geography = ANCHOR_GEOGRAPHY_REGISTRY.get(locator.anchor_key)
+        geography = anchor_geography().get(locator.anchor_key)
         if geography is None:
             return None
         placement = ANCHOR_PLACEMENT_REGISTRY.get(locator.anchor_key)
@@ -366,7 +376,7 @@ def resolve_record_destination(
             return None
         return _wild_destination(record, DestinationFamily.MONSTER_SITE, site.coordinates)
     if objective.region_key is not None:
-        bounds = REGION_SEARCH_BOXES.get(objective.region_key)
+        bounds = region_search_boxes().get(objective.region_key)
         if origin_cell is None or bounds is None:
             return None
         cell = nearest_region_cell(

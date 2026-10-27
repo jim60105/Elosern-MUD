@@ -62,11 +62,7 @@ import yaml
 
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
 from world.maps import map_data
-from world.maps.wilderness_provider import (
-    WILDERNESS_KM_PER_CELL,
-    WILDERNESS_NAME,
-    region_for_coordinates,
-)
+from world.maps.wilderness_provider import WILDERNESS_NAME, region_for_coordinates
 from world.observability import log_warn
 from world.rules.fatigue import (
     POSTURE_ATTRIBUTE,
@@ -181,18 +177,24 @@ def _validate_rulebook() -> None:
             raise TravelRulebookError(
                 f"movement.yaml: wilderness region {region!r} names unknown terrain {terrain!r}"
             )
-    # The live region model is the key source: a new region without a declared
-    # terrain would otherwise silently fall back to a default speed.
-    from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
 
-    missing = sorted(set(WILDERNESS_REGION_REGISTRY) - set(WILDERNESS_TERRAIN))
+
+_validate_rulebook()
+
+
+def validate_wilderness_region_coverage(region_keys) -> None:
+    """Reject a published region set this rulebook cannot price.
+
+    The map-owned region vocabulary is loaded from the continent source, so the
+    coverage join runs when that geography is published
+    (``world.maps.geography``), not at this module's import.
+    """
+
+    missing = sorted(set(region_keys) - set(WILDERNESS_TERRAIN))
     if missing:
         raise TravelRulebookError(
             f"movement.yaml: wilderness regions without a terrain row: {missing}"
         )
-
-
-_validate_rulebook()
 
 
 @dataclass(frozen=True, slots=True)
@@ -559,7 +561,9 @@ def settlement_edge_cost(
 def wilderness_cell_size_m() -> int:
     """The provider's declared wilderness cell span in meters (single authority)."""
 
-    return int(WILDERNESS_KM_PER_CELL) * 1000
+    from world.maps import wilderness_provider
+
+    return int(wilderness_provider.WILDERNESS_KM_PER_CELL) * 1000
 
 
 def wilderness_distance_m(

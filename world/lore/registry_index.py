@@ -65,6 +65,17 @@ def _attr(module: str, attribute: str) -> Callable[[], Mapping[str, Any]]:
     return load
 
 
+def _geography(attribute: str) -> Callable[[], Mapping[str, Any]]:
+    """One composed geography view of the currently published snapshot."""
+
+    def load() -> Mapping[str, Any]:
+        from world.maps.geography import current
+
+        return getattr(current(), attribute)
+
+    return load
+
+
 def _quest_definitions() -> Mapping[str, Any]:
     # The authored quest catalog. The process ``QUEST_DEFINITION_REGISTRY`` is
     # filled at startup and also holds runtime-generated quests (runtime state,
@@ -134,9 +145,9 @@ REGISTRY_INDEX: tuple[RegistrySpec, ...] = (
     _spec("elements", "元素", "世界", _attr("world.lore.elements", "ELEMENT_REGISTRY"), f"{_LORE}/elements.py", "display_name_zh"),
     _spec("magic_tiers", "魔法階級", "世界", _attr("world.lore.magic", "MAGIC_TIER_REGISTRY"), f"{_LORE}/magic.py", "display_name_zh"),
     _spec("nations", "國家", "世界", _attr("world.lore.nations", "NATION_REGISTRY"), f"{_LORE}/nations.py", "display_name_zh", "capital_anchor_key"),
-    _spec("anchors", "錨點", "世界", _attr("world.lore.anchors", "ANCHOR_REGISTRY"), f"{_LORE}/anchors.py", "display_name_zh", "kind"),
+    _spec("anchors", "錨點", "世界", _geography("anchors"), "content/maps/locations.yaml", "display_name_zh", "kind"),
     _spec("anchor_placements", "錨點配置", "世界", _attr("world.lore.anchor_placement", "ANCHOR_PLACEMENT_REGISTRY"), f"{_LORE}/anchor_placement.py", "zcoord", "node.object_id"),
-    _spec("wilderness_regions", "野外區域", "世界", _attr("world.lore.wilderness_regions", "WILDERNESS_REGION_REGISTRY"), f"{_LORE}/wilderness_regions.py", "display_name_zh", "nation_key"),
+    _spec("wilderness_regions", "野外區域", "世界", _geography("regions"), "content/maps/continent.yaml", "display_name_zh", "nation_key"),
     _spec("wilderness_entries", "野外入口", "世界", _attr("world.lore.wilderness_entry", "WILDERNESS_ENTRY_REGISTRY"), f"{_LORE}/wilderness_entry.py", "origin_xy"),
     _spec("map_districts", "地圖區域", "世界", _attr("world.lore.map_districts", "MAP_DISTRICT_REGISTRY"), f"{_LORE}/map_districts.py", "district_name_zh", "kind"),
     _spec("scene_archetypes", "場景原型", "世界", _attr("world.lore.scene_archetypes", "SCENE_ARCHETYPE_REGISTRY"), f"{_LORE}/scene_archetypes.py", "display_name_zh"),

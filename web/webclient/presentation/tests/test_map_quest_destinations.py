@@ -90,10 +90,10 @@ _BOXES = {"fen": (30, 59, 0, 19)}
 
 def _patch_geography(test):
     for name, value in (
-        ("ANCHOR_GEOGRAPHY_REGISTRY", _GEOGRAPHY),
+        ("anchor_geography", lambda: _GEOGRAPHY),
         ("ANCHOR_PLACEMENT_REGISTRY", _PLACEMENTS),
         ("MONSTER_SITE_REGISTRY", _SITES),
-        ("REGION_SEARCH_BOXES", _BOXES),
+        ("region_search_boxes", lambda: _BOXES),
         ("settlement_graph", _settlement_graph),
         ("region_for_coordinates", _classify),
         ("is_valid_wilderness_cell", _is_legal),

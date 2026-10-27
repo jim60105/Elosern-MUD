@@ -54,19 +54,15 @@ def _wilderness_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilde
     map was rescinded) fails closed.
     """
     from typeclasses.rooms import AnchorRoom, GridRoom, TerrainRoom
-    from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
+    from world.lore.wilderness_regions import regions
     from world.maps.wilderness_destination import (
         normalize_wilderness_direction,
         DIRECTION_DELTAS,
         wilderness_neighbor,
         resolve_wilderness_destination,
     )
-    from world.maps.wilderness_provider import (
-        WILDERNESS_MAX_X,
-        WILDERNESS_MAX_Y,
-        WILDERNESS_NAME,
-        region_for_coordinates,
-    )
+    from world.maps import wilderness_provider
+    from world.maps.wilderness_provider import WILDERNESS_NAME, region_for_coordinates
 
     location = actor.location
     if not isinstance(location, TerrainRoom):
@@ -75,14 +71,17 @@ def _wilderness_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilde
     if coordinates is None:
         raise PanelUnavailableError
     x, y = coordinates
-    if not (0 <= x <= WILDERNESS_MAX_X and 0 <= y <= WILDERNESS_MAX_Y):
+    if not (
+        0 <= x <= wilderness_provider.WILDERNESS_MAX_X
+        and 0 <= y <= wilderness_provider.WILDERNESS_MAX_Y
+    ):
         raise PanelUnavailableError
     visited = _visited_map(visits)
     current_id = encode_wild(WILDERNESS_NAME, x, y)
 
     builder.add_node(
         current_id,
-        WILDERNESS_REGION_REGISTRY[region_for_coordinates(x, y)].display_name_zh,
+        regions()[region_for_coordinates(x, y)].display_name_zh,
         x,
         y,
         visibility="current",
@@ -197,7 +196,7 @@ def _wilderness_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilde
             _, _, neighbor_anchor_key = neighbor_gateway
             label = _gateway_far_side_label("wilderness", (nx, ny), neighbor_anchor_key)
         else:
-            label = WILDERNESS_REGION_REGISTRY[region_for_coordinates(nx, ny)].display_name_zh
+            label = regions()[region_for_coordinates(nx, ny)].display_name_zh
         builder.add_node(
             node_id,
             label,

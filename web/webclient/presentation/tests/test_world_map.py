@@ -11,6 +11,10 @@ from web.webclient.presentation.world_map_geometry import raster_rings
 from elosern_map_core.references import wilderness_cell_ref
 from world.rules.map_knowledge import encode_wild
 from world.maps.wilderness_provider import WILDERNESS_NAME
+from world.tests.geography_fixture import publish_shipped_geography
+
+
+publish_shipped_geography()
 
 
 RING=[[0,0],[10,0],[10,10],[0,10],[0,0]]
@@ -107,13 +111,13 @@ class WorldMapPrivacyTests(TestCase):
         self.assertEqual(rings,[[[0,0],[10,0],[10,10],[0,10],[0,0]]])
         hole=raster_rings([(x,y) for y in range(0,15,5) for x in range(0,15,5) if (x,y)!=(5,5)])
         self.assertEqual(len(hole),2)
-        with patch("world.lore.wilderness_regions.CONTINENT_FRAME_CELLS",10), \
+        with patch("world.lore.wilderness_regions.frame_cells",return_value=10), \
              patch("world.maps.district_partition.district_at",return_value="t_district"), \
              patch("world.maps.wilderness_provider.region_for_coordinates",
                    side_effect=lambda x,y:"t_west" if x < 5 else "t_east"), \
              patch("world.maps.wilderness_provider.nominal_nation_for_coordinates",
                    side_effect=lambda x,y:"t_nation_w" if x < 5 else "t_nation_e"):
-            terrain,nations=panel.geometry.terrain_layers.__wrapped__()
+            terrain,nations=panel.geometry._terrain_layers("test-signature")
         regions={row["region"]:row["polygons"] for row in terrain["t_district"]}
         self.assertEqual(regions["t_west"],[[[0,0],[5,0],[5,10],[0,10],[0,0]]])
         self.assertEqual(regions["t_east"],[[[5,0],[10,0],[10,10],[5,10],[5,0]]])
@@ -126,8 +130,8 @@ class WorldMapPrivacyTests(TestCase):
         actor=NS(location=room)
         with patch("world.lore.settlements.places.PLACE_REGISTRY",{
                 "t_interior":NS(settlement_key="t_anchor")}), \
-             patch("web.webclient.presentation.map_quest_destinations.ANCHOR_GEOGRAPHY_REGISTRY",{
-                "t_anchor":NS(cell=(123,456))}):
+             patch("web.webclient.presentation.map_quest_destinations.anchor_geography",
+                   lambda: {"t_anchor":NS(cell=(123,456))}):
             self.assertEqual(panel.geometry.current_point(actor),(123.5,456.5))
             instance=Mock(spec=InstanceRoom)
             instance.attributes.get.return_value=room
@@ -167,17 +171,34 @@ class WorldMapPrivacyTests(TestCase):
                 self.assertNotIn(SECRET, json.dumps(body))
 
     def test_anchor_classification_keeps_villages_and_dungeons_visit_only(self):
+        from dataclasses import replace
+        from types import MappingProxyType
+
         from world.lore.anchors import AnchorKind
+        from world.maps import geography
+
         anchors={
             "t_village":NS(kind=AnchorKind.ELVEN_VILLAGE,display_name_zh=VILLAGE),
             "t_dungeon":NS(kind=AnchorKind.DUNGEON,display_name_zh=DUNGEON),
             "t_capital":NS(kind=AnchorKind.CAPITAL,display_name_zh=PUBLIC),
         }
-        with patch("world.lore.anchors.ANCHOR_REGISTRY",anchors), \
-             patch("world.lore.anchors.ANCHOR_GEOGRAPHY_REGISTRY",{
-                key:NS(cell=(100+i,200)) for i,key in enumerate(anchors)}), \
-             patch("world.lore.anchor_placement.ANCHOR_PLACEMENT_REGISTRY",{}), \
-             patch("world.lore.wilderness_regions.HARBOR_SITE_REGISTRY",{}), \
+        geography_views={
+            key:NS(anchor_key=key,cell=(100+i,200)) for i,key in enumerate(anchors)
+        }
+        from world.tests.geography_fixture import publish_shipped_geography
+
+        publish_shipped_geography()
+        previous = geography.current()
+        geography.publish(
+            replace(
+                previous,
+                anchors=MappingProxyType(anchors),
+                anchor_geography=MappingProxyType(geography_views),
+                harbor_sites=MappingProxyType({}),
+            )
+        )
+        self.addCleanup(geography.publish, previous)
+        with patch("world.lore.anchor_placement.ANCHOR_PLACEMENT_REGISTRY",{}), \
              patch("world.maps.district_partition.district_at",return_value=SECRET):
             records=panel.geometry._place_geometry("uncached-probe")
         policy={row["name"]:hidden for _,row,hidden,_ in records}

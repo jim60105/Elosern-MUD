@@ -114,18 +114,24 @@ def cell_of_position(position_m: tuple[int, int]) -> tuple[int, int]:
 
 
 class _ProductionTerrain:
-    """The live terrain model, settlement graphs and gateway registry."""
+    """One geography snapshot's terrain, settlement graphs and gateway registry.
 
-    def __init__(self) -> None:
-        from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
-        from world.maps import wilderness_provider as provider
+    Every geography-dependent operation is bound to the snapshot this adapter
+    was built from (including the reachability index), so a retained adapter
+    never mixes an older world's components with a newly published classifier.
+    """
+
+    def __init__(self, snapshot=None) -> None:
+        from world.maps.geography import current
+        from world.maps.wilderness_provider import WILDERNESS_NAME
         from world.maps.wilderness_reachability import walkable_components
 
-        self._provider = provider
-        self.wilderness_name = provider.WILDERNESS_NAME
-        self.max_cell = (provider.WILDERNESS_MAX_X, provider.WILDERNESS_MAX_Y)
-        self.region_keys = frozenset(WILDERNESS_REGION_REGISTRY)
-        self._components = walkable_components()
+        self._geography = snapshot if snapshot is not None else current()
+        self._terrain = self._geography.terrain
+        self.wilderness_name = WILDERNESS_NAME
+        self.max_cell = (self._geography.max_x, self._geography.max_y)
+        self.region_keys = frozenset(self._geography.regions)
+        self._components = walkable_components(self._geography)
         self._entries = tuple(self._gateway_entries())
         # Players leave settlements through gateway approaches, so a cell is
         # reachable when it shares a component with any of them. The shipped
@@ -137,15 +143,19 @@ class _ProductionTerrain:
             if (component := self._components.component(approach)) is not None
         )
 
-    @staticmethod
-    def _gateway_entries():
-        """``(z_map_key, gate grid_xy, approach cell)`` of every registered gate."""
+    def _gateway_entries(self):
+        """``(z_map_key, gate grid_xy, approach cell)`` of every registered gate.
+
+        Approaches are derived against this adapter's own frame bounds, so a
+        retained adapter never borrows another world's rectangle.
+        """
         from world.lore import wilderness_entry
         from world.maps.static_references import settlement_node_xy
 
+        bounds = (self._geography.max_x, self._geography.max_y)
         for entry in wilderness_entry.WILDERNESS_ENTRY_REGISTRY.values():
             for gate in entry.gates:
-                approach = entry.approach_cell(gate)
+                approach = entry.approach_cell(gate, bounds=bounds)
                 if approach is not None:
                     yield (
                         gate.z_map_key,
@@ -154,21 +164,30 @@ class _ProductionTerrain:
                     )
 
     def is_land(self, cell):
-        return self._provider.is_land_cell(cell)
+        from elosern_map_core import terrain as core_terrain
+
+        return core_terrain.is_land_cell(self._terrain, cell)
 
     def is_walkable(self, cell):
-        return self._provider.is_valid_wilderness_cell(cell)
+        from elosern_map_core import terrain as core_terrain
+
+        return core_terrain.is_valid_wilderness_cell(
+            self._terrain, self._components.footprints, cell
+        )
 
     def is_reachable(self, cell):
         component = self._components.component(cell)
         return component is not None and component in self._reachable_components
 
     def region_of(self, cell):
-        return self._provider.region_for_coordinates(*cell)
+        from elosern_map_core import terrain as core_terrain
+
+        return core_terrain.region_for_coordinates(self._terrain, *cell)
 
     def grid_site(self, map_key, xy):
+        from elosern_map_core.geometry import local_to_world_m
         from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
-        from world.lore.anchors import LOCAL_FRAME_ANCHOR_REGISTRY, world_position_m
+        from world.lore.anchors import LOCAL_FRAME_ANCHOR_REGISTRY
         from world.maps.map_data import settlement_graph
 
         graph = settlement_graph(map_key)
@@ -186,7 +205,11 @@ class _ProductionTerrain:
         )
         if anchor_key is None:
             return None
-        position = world_position_m(anchor_key, node.physical_coordinate)
+        position = local_to_world_m(
+            self._geography.anchor_geography[anchor_key].cell,
+            LOCAL_FRAME_ANCHOR_REGISTRY[anchor_key].local_anchor_m,
+            node.physical_coordinate,
+        )
         reachable = False
         for gate_map, gate_xy, approach in self._entries:
             gate_node = graph.node_at(gate_xy) if gate_map == map_key else None

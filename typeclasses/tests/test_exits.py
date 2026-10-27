@@ -19,6 +19,11 @@ from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.maps.static_references import settlement_node_xyz
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.clock import get_world_clock
+from world.tests.geography_fixture import publish_shipped_geography
+
+
+publish_shipped_geography()
+
 
 
 #: Live-catalog resolvers read the entry registry through an attribute string

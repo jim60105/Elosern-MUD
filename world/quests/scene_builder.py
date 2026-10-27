@@ -29,7 +29,7 @@ from evennia.objects.models import ObjectDB
 from typeclasses.entities import LivingEntity
 from typeclasses.rooms import AnchorRoom, GridRoom, InstanceRoom
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
-from world.lore.anchors import ANCHOR_REGISTRY
+from world.lore import anchors
 from world.lore.npc_tiers import NPC_TIER_REGISTRY
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.maps.instance import register_owned_entity, spawn_instance_room
@@ -273,7 +273,7 @@ def build_flavor_context(
         return None
     region = ""
     if requirement.anchor_near is not None:
-        anchor = ANCHOR_REGISTRY.get(requirement.anchor_near)
+        anchor = anchors.anchors().get(requirement.anchor_near)
         if anchor is not None:
             region = anchor.display_name_zh
     return {

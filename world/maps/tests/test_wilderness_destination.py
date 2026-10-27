@@ -31,17 +31,19 @@ from world.maps.wilderness_destination import (
     resolve_wilderness_destination,
     wilderness_neighbor,
 )
-from world.maps.wilderness_provider import (
-    WILDERNESS_MAX_X,
-    WILDERNESS_MAX_Y,
-    WILDERNESS_NAME,
-)
+from world.maps import wilderness_provider
+from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.map_knowledge import (
     encode_grid,
     encode_wild,
     parse_knowledge,
 )
 from world.tests.synthetic_data import SYNTH_WILDERNESS_ENTRIES, synthetic_registries
+from world.tests.geography_fixture import publish_shipped_geography
+
+
+# The resolver's module-level approach cells need the published frame bounds.
+publish_shipped_geography()
 
 #: Live-catalog resolvers read the entry registry through an attribute string
 #: assembled at call time, so this file never names a shipped catalog symbol
@@ -74,6 +76,7 @@ SOUTH_APPROACH = CAPITAL.approach_cell(CAPITAL.gate_for("n"))
 EAST_APPROACH = CAPITAL.approach_cell(CAPITAL.gate_for("w"))
 
 from world.maps.static_references import settlement_node_xy, settlement_node_xyz
+
 
 #: Grid-node spellings and xyz for both gates, derived from the entry's own
 #: identities against the current graph (the registry rows are the sole
@@ -157,13 +160,13 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
                 direction,
             )
         self.assertIsNone(
-            resolve_wilderness_destination(self._terrain(WILDERNESS_MAX_X, WILDERNESS_MAX_Y), "n")
+            resolve_wilderness_destination(self._terrain(wilderness_provider.WILDERNESS_MAX_X, wilderness_provider.WILDERNESS_MAX_Y), "n")
         )
         self.assertIsNone(
-            resolve_wilderness_destination(self._terrain(WILDERNESS_MAX_X, WILDERNESS_MAX_Y), "ne")
+            resolve_wilderness_destination(self._terrain(wilderness_provider.WILDERNESS_MAX_X, wilderness_provider.WILDERNESS_MAX_Y), "ne")
         )
         self.assertIsNone(
-            resolve_wilderness_destination(self._terrain(WILDERNESS_MAX_X, WILDERNESS_MAX_Y), "e")
+            resolve_wilderness_destination(self._terrain(wilderness_provider.WILDERNESS_MAX_X, wilderness_provider.WILDERNESS_MAX_Y), "e")
         )
 
     @covers_requirement("canonical-wilderness-destination::wilderness-destination-resolution-is-canonical-shared-and-registry-driven")
@@ -353,7 +356,7 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
         for direction in ("n", "ne", "e", "se", "s", "sw", "w", "nw"):
             self.assertIsNone(wilderness_neighbor(*SEA, direction), direction)
             self.assertIsNone(
-                wilderness_neighbor(WILDERNESS_MAX_X, WILDERNESS_MAX_Y, direction),
+                wilderness_neighbor(wilderness_provider.WILDERNESS_MAX_X, wilderness_provider.WILDERNESS_MAX_Y, direction),
                 direction,
             )
         # Footprint exclusion: the cell just west of the capital's mask cannot

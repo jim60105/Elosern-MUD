@@ -14,18 +14,26 @@ def point(x, y):
     return [int(x) if float(x).is_integer() else x, int(y) if float(y).is_integer() else y]
 
 
-@cache
 def common_layer():
-    from world.lore.anchors import ANCHOR_GEOGRAPHY_REGISTRY
+    """The coastline, national borders and capital markers."""
+
+    from world.maps.static_references import binding_signature
+
+    return _common_layer(binding_signature())
+
+
+@cache
+def _common_layer(_signature):
+    from world.lore.anchors import anchor_geography
     from world.lore.nations import NATION_REGISTRY
-    from world.lore.wilderness_regions import MAINLAND_BOUNDARY_KM
+    from world.lore.wilderness_regions import mainland_boundary_km
     from world.maps.wilderness_provider import national_borders
 
-    coast = [point(x, y) for x, y in MAINLAND_BOUNDARY_KM]
+    coast = [point(x, y) for x, y in mainland_boundary_km()]
     coast.append(coast[0][:])
     nations = []
     for key, nation in sorted(NATION_REGISTRY.items()):
-        x, y = ANCHOR_GEOGRAPHY_REGISTRY[nation.capital_anchor_key].cell
+        x, y = anchor_geography()[nation.capital_anchor_key].cell
         nations.append(dict(id=key, name=nation.display_name_zh, x=x + .5, y=y + .5))
     return dict(coastline=coast, borders=[[point(x, y) for x, y in border.points]
                                        for border in national_borders()], nations=nations)
@@ -141,16 +149,25 @@ def raster_rings(cells, step=5):
     return rings
 
 
-@cache
 def terrain_layers():
-    from world.lore.wilderness_regions import CONTINENT_FRAME_CELLS
+    """Terrain washes and nominal nations per district."""
+
+    from world.maps.static_references import binding_signature
+
+    return _terrain_layers(binding_signature())
+
+
+@cache
+def _terrain_layers(_signature):
+    from world.lore.wilderness_regions import frame_cells
     from world.maps.district_partition import district_at
     from world.maps.wilderness_provider import region_for_coordinates, nominal_nation_for_coordinates
 
+    size = frame_cells()
     groups = {}
     nations = {}
-    for y in range(0, CONTINENT_FRAME_CELLS, 5):
-        for x in range(0, CONTINENT_FRAME_CELLS, 5):
+    for y in range(0, size, 5):
+        for x in range(0, size, 5):
             key = district_at((x+2, y+2))
             if key is not None:
                 region = region_for_coordinates(x+2, y+2)
@@ -164,16 +181,17 @@ def terrain_layers():
 
 @cache
 def _district_lines(_signature):
-    from world.maps.wilderness_provider import WATERWAY_ROUTES, national_borders
+    from world.maps.geography import current
+    from world.maps.wilderness_provider import national_borders
     from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
-    from world.lore.anchors import ANCHOR_REGISTRY, AnchorKind, world_position_m
+    from world.lore.anchors import AnchorKind, anchors, world_position_m
     from world.maps.map_data import settlement_graph
 
     result = {}
     def add(kind, vertices):
         for key,lines in clip_lines(vertices).items():
             result.setdefault(key,dict(rivers=[],ridge=[],roads=[]))[kind].extend(lines)
-    for route in WATERWAY_ROUTES.values():
+    for route in current().terrain.waterway_routes.values():
         add("rivers", route)
     for border in national_borders():
         if border.nation_keys != ("altoria", "valhalla"):
@@ -181,7 +199,7 @@ def _district_lines(_signature):
     # There is no authored overland road network. Include the canonical roads
     # of public settlements; a hidden village's approach geometry is private.
     for key,placement in ANCHOR_PLACEMENT_REGISTRY.items():
-        if ANCHOR_REGISTRY[key].kind is not AnchorKind.CAPITAL:
+        if anchors()[key].kind is not AnchorKind.CAPITAL:
             continue
         graph = settlement_graph(placement.zcoord)
         if graph is None:
@@ -241,8 +259,8 @@ def district_geometry():
 def _place_geometry(_signature):
     """Internal (owner, wire row, visit-only, canonical visit IDs) records."""
     from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
-    from world.lore.anchors import ANCHOR_GEOGRAPHY_REGISTRY, ANCHOR_REGISTRY, AnchorKind
-    from world.lore.wilderness_regions import HARBOR_SITE_REGISTRY
+    from world.lore.anchors import AnchorKind, anchor_geography, anchors
+    from world.lore.wilderness_regions import harbor_sites
     from world.maps.district_partition import district_at
     from world.maps.map_data import settlement_graph
     from world.maps.static_references import settlement_node_xyz
@@ -250,8 +268,8 @@ def _place_geometry(_signature):
     from world.maps.wilderness_provider import WILDERNESS_NAME
 
     result=[]
-    for key,geo in sorted(ANCHOR_GEOGRAPHY_REGISTRY.items()):
-        anchor=ANCHOR_REGISTRY[key]
+    for key,geo in sorted(anchor_geography().items()):
+        anchor=anchors()[key]
         x,y=geo.cell
         hidden=anchor.kind in (AnchorKind.ELVEN_VILLAGE,AnchorKind.DUNGEON)
         kind="hidden" if hidden else "capital"
@@ -264,7 +282,7 @@ def _place_geometry(_signature):
             if graph is not None:
                 ids.update(encode_grid(placement.zcoord, node.x, node.y) for node in graph.nodes.values())
         result.append((district_at((x,y)),dict(id=key,name=anchor.display_name_zh,kind=kind,x=x+.5,y=y+.5),hidden,frozenset(ids)))
-    for key,site in sorted(HARBOR_SITE_REGISTRY.items()):
+    for key,site in sorted(harbor_sites().items()):
         x,y=site.cell
         result.append((district_at((x,y)),dict(id=key,name=site.display_name,kind="harbour",x=x+.5,y=y+.5),False,
                        frozenset((encode_wild(WILDERNESS_NAME,x,y),))))

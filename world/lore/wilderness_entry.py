@@ -7,7 +7,7 @@ Module-level registries are the source of truth (AGENTS.md); the DB mirror in
 from the authored mask — consumers never re-derive it.
 """
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
 from elosern_map_core.documents import QualifiedRef
@@ -146,8 +146,17 @@ class WildernessEntryPoint:
                 return gate
         return None
 
-    def approach_cell(self, gate: WildernessGate) -> tuple[int, int] | None:
+    def approach_cell(
+        self,
+        gate: WildernessGate,
+        *,
+        bounds: tuple[int, int] | None = None,
+    ) -> tuple[int, int] | None:
         """The exterior cell a wilderness traveler stands on to take ``gate``.
+
+        ``bounds`` defaults to the published provider frame; a candidate
+        validator passes its own explicit ``(max_x, max_y)`` so it never has
+        to publish a world to check one.
 
         Point-shape entries: the anchor cell itself (identity pinned by the
         wilderness-gateway registry requirement). Footprint entries: walk from
@@ -171,10 +180,10 @@ class WildernessEntryPoint:
         # The walk is bounded by the provider rectangle: a footprint touching
         # a rect edge would otherwise ray forever through outside-rect cells
         # (validation rejects such gates explicitly).
-        while cell in footprint and _in_provider_rect(cell):
+        while cell in footprint and _in_provider_rect(cell, bounds):
             crossed = True
             cell = (cell[0] + dx, cell[1] + dy)
-        if not crossed or not _in_provider_rect(cell):
+        if not crossed or not _in_provider_rect(cell, bounds):
             return None
         return cell
 
@@ -204,19 +213,25 @@ def _iter_map_extents() -> dict[str, set[tuple[int, int]]]:
     }
 
 
-def _in_provider_rect(cell: tuple[int, int]) -> bool:
-    max_x, max_y = _provider_bounds()
+def _in_provider_rect(
+    cell: tuple[int, int], bounds: tuple[int, int] | None = None
+) -> bool:
+    max_x, max_y = _provider_bounds() if bounds is None else bounds
     x, y = cell
     return 0 <= x <= max_x and 0 <= y <= max_y
 
 
-def _is_walkable_terrain(cell: tuple[int, int]) -> bool:
+def _is_walkable_terrain(
+    cell: tuple[int, int], walkable: Callable[[tuple[int, int]], bool] | None = None
+) -> bool:
     """Whether ``cell`` is land-side passable ground (the provider's rule).
 
     Deferred import for the same lore/world.maps boundary reason as
     :func:`_iter_map_extents`: the provider is the single owner of the terrain
     model, and validation must never keep a second copy of it.
     """
+    if walkable is not None:
+        return walkable(cell)
     from world.maps.wilderness_provider import is_walkable_cell
 
     return is_walkable_cell(cell)
@@ -226,6 +241,8 @@ def validate_wilderness_entries(
     registry: Mapping[str, WildernessEntryPoint] | None = None,
     *,
     index=None,
+    bounds: tuple[int, int] | None = None,
+    walkable: Callable[[tuple[int, int]], bool] | None = None,
 ) -> None:
     """Pure, DB-free validation of the whole authored registry (design D5).
 
@@ -244,6 +261,12 @@ def validate_wilderness_entries(
 
     if index is None:
         index = settlement_reference_index()
+
+    def in_frame(cell: tuple[int, int]) -> bool:
+        return _in_provider_rect(cell, bounds)
+
+    def is_walkable(cell: tuple[int, int]) -> bool:
+        return _is_walkable_terrain(cell, walkable)
 
     def fail(anchor_key: str, rule: str) -> None:
         raise ValueError(f"WILDERNESS_ENTRY_REGISTRY[{anchor_key!r}]: {rule}")
@@ -273,14 +296,14 @@ def validate_wilderness_entries(
         origin_x, origin_y = entry.origin_xy
         for row, line in enumerate(entry.shape):
             for col, cell in enumerate(line):
-                if cell == "#" and not _in_provider_rect(
+                if cell == "#" and not in_frame(
                     (origin_x + col, origin_y + row)
                 ):
                     fail(
                         anchor_key,
                         f"footprint cell ({origin_x + col}, {origin_y + row}) outside provider rectangle",
                     )
-                if cell == "#" and not _is_walkable_terrain(
+                if cell == "#" and not is_walkable(
                     (origin_x + col, origin_y + row)
                 ):
                     fail(
@@ -292,7 +315,7 @@ def validate_wilderness_entries(
         anchor = entry.anchor_cell
         if anchor is None:  # pragma: no cover - ruled out by no-'#' check
             fail(anchor_key, "anchor_cell is undefined")
-        if not _is_walkable_terrain(anchor):
+        if not is_walkable(anchor):
             fail(anchor_key, f"anchor_cell {anchor} is not walkable terrain")
 
         if not entry.is_point_shape:
@@ -355,7 +378,7 @@ def validate_wilderness_entries(
 
     # -- global cross-entry rules.
     def provider_valid_outside_footprints(cell: tuple[int, int]) -> bool:
-        if not _in_provider_rect(cell) or not _is_walkable_terrain(cell):
+        if not in_frame(cell) or not is_walkable(cell):
             return False
         return not any(cell in other for other in all_footprints.values())
 
@@ -376,7 +399,7 @@ def validate_wilderness_entries(
                     if other_anchor is not None and other_anchor in footprint:
                         fail(anchor_key, f"footprint contains point anchor cell of {other_key!r}")
         for gate in entry.gates:
-            approach = entry.approach_cell(gate)
+            approach = entry.approach_cell(gate, bounds=bounds)
             if approach is None:
                 fail(
                     anchor_key,
@@ -413,7 +436,7 @@ def validate_wilderness_entries(
                 if other_key == anchor_key:
                     continue
                 for other_gate in other_entry.gates:
-                    if other_entry.approach_cell(other_gate) == entry.anchor_cell:
+                    if other_entry.approach_cell(other_gate, bounds=bounds) == entry.anchor_cell:
                         fail(
                             anchor_key,
                             f"point anchor cell is {other_key!r} gate {other_gate.return_direction!r} approach cell",

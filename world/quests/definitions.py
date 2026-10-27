@@ -19,7 +19,7 @@ from world.lore.monster_species import (
 )
 from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.lore.registry_refs import ref, ref_many
-from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
+from world.lore import wilderness_regions
 from world.maps.map_data import KNOWN_GRID_MAP_KEYS
 
 
@@ -234,7 +234,7 @@ def _validate_hunt_selector(
     region_key = objective.region_key
     if not isinstance(region_key, str) or not region_key:
         _reject(definition, "species hunt requires a non-empty region_key")
-    if region_key not in WILDERNESS_REGION_REGISTRY:
+    if region_key not in wilderness_regions.regions():
         _reject(
             definition,
             f"species hunt names unknown wilderness region {region_key!r}",

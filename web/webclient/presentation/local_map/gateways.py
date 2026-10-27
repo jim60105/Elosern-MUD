@@ -10,10 +10,10 @@ both layer adapters resolve gateway identity through one registry face
 
 def _wild_region_label(x: int, y: int) -> str:
     """The region display name for one wilderness cell."""
-    from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
+    from world.lore.wilderness_regions import regions
     from world.maps.wilderness_provider import region_for_coordinates
 
-    return WILDERNESS_REGION_REGISTRY[region_for_coordinates(x, y)].display_name_zh
+    return regions()[region_for_coordinates(x, y)].display_name_zh
 
 
 def _registered_gateways() -> list[tuple[tuple[int, int], tuple[tuple[int, int], str], str]]:
@@ -69,7 +69,7 @@ def _gateway_far_side_label(layer: str, approach_cell: tuple[int, int], anchor_k
     way, never the terrain the gateway node itself stands on.
     """
     if layer == "wilderness":
-        from world.lore.anchors import ANCHOR_REGISTRY
+        from world.lore.anchors import anchors
 
-        return ANCHOR_REGISTRY[anchor_key].display_name_zh
+        return anchors()[anchor_key].display_name_zh
     return _wild_region_label(*approach_cell)

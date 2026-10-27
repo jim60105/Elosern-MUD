@@ -52,6 +52,11 @@ from world.maps.static_references import (
 )
 from world.rules.map_district_lighting import lit_district_keys
 from world.rules.map_knowledge import KNOWLEDGE_ATTR, encode_grid, parse_knowledge
+from world.tests.geography_fixture import publish_shipped_geography
+
+
+def setUpModule():
+    publish_shipped_geography()
 
 MAP = "t_ref_map"
 

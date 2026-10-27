@@ -31,7 +31,8 @@ from world.lore.monster_species import (
     validate_monster_species_registry,
 )
 from world.lore.monsters import MONSTER_TIER_REGISTRY
-from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
+from world.lore.wilderness_regions import regions
+from world.tests.geography_fixture import publish_shipped_geography
 from world.rules.monster_behaviour import BEHAVIOUR_PROFILES, MONSTER_BEHAVIOUR_YAML
 from world.rules.monster_individual import construct_species_individual
 from world.rules.traits import (
@@ -46,6 +47,10 @@ from world.tests.synthetic_data import (
     make_monster_variant,
     synthetic_registries,
 )
+
+
+def setUpModule():
+    publish_shipped_geography()
 
 
 def _tier_band_bases(tier_key: str) -> dict[str, int]:
@@ -170,7 +175,7 @@ class ShippedRegistryIdentityTests(unittest.TestCase):
             with self.subTest(species=key):
                 self.assertTrue(species.habitat_tags)
                 for tag in species.habitat_tags:
-                    self.assertIn(tag, WILDERNESS_REGION_REGISTRY)
+                    self.assertIn(tag, regions())
 
 
 class ShippedNarrativeTests(unittest.TestCase):
@@ -518,3 +523,4 @@ class AbilitySeamNegativeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

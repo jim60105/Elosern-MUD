@@ -11,13 +11,29 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
 from world.lore.races import RACE_REGISTRY
-from world.lore.sync import _ALL_REGISTRIES, _db_safe, _plain, sync_all, sync_one
+from world.lore.sync import (
+    _ALL_REGISTRIES,
+    _db_safe,
+    _plain,
+    geography_registries,
+    sync_all,
+    sync_one,
+)
+from world.tests.geography_fixture import publish_shipped_geography
+
+
+def setUpModule():
+    publish_shipped_geography()
+
+
+def _mirrored_registries():
+    return {**_ALL_REGISTRIES, **geography_registries()}
 
 
 class LoreSyncTests(EvenniaTestCase):
     def _lore_records(self):
         records = []
-        for category, registry in _ALL_REGISTRIES.items():
+        for category, registry in _mirrored_registries().items():
             for key, entry in registry.items():
                 matches = search_script(f"lore:{category}:{key}")
                 self.assertEqual(len(matches), 1, f"duplicate or missing {category}:{key}")
@@ -27,7 +43,7 @@ class LoreSyncTests(EvenniaTestCase):
 
     @covers_requirement("title-system::the-fixed-title-lore-registry-validates-and-syncs-idempotently")
     def test_sync_all_is_idempotent_and_complete(self):
-        expected = sum(len(registry) for registry in _ALL_REGISTRIES.values())
+        expected = sum(len(registry) for registry in _mirrored_registries().values())
 
         sync_all()
         first = self._lore_records()
@@ -72,10 +88,10 @@ class LoreSyncTests(EvenniaTestCase):
     @covers_requirement("lore-startup-sync::a-code-side-change-to-a-registry-is-reflected-on-the-next-sync")
     def test_wilderness_registry_records_are_mirrored_and_idempotent(self):
         from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
-        from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
+        from world.lore.wilderness_regions import regions
 
         sync_all()
-        for key in WILDERNESS_REGION_REGISTRY:
+        for key in regions():
             matches = search_script(f"lore:wilderness_regions:{key}")
             self.assertEqual(len(matches), 1)
             self.assertEqual(matches[0].db.category, "wilderness_regions")
@@ -84,9 +100,7 @@ class LoreSyncTests(EvenniaTestCase):
         self.assertEqual(entry_records[0].db.category, "wilderness_entries")
 
         sync_all()
-        total_wilderness = (
-            len(WILDERNESS_REGION_REGISTRY) + len(WILDERNESS_ENTRY_REGISTRY)
-        )
+        total_wilderness = len(regions()) + len(WILDERNESS_ENTRY_REGISTRY)
         self.assertEqual(
             ScriptDB.objects.filter(db_key__startswith="lore:wilderness_").count(),
             total_wilderness,

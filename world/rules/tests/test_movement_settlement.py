@@ -29,6 +29,10 @@ from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.clock import CLOCK_YAML, WorldClock, get_world_clock
 from world.rules.map_knowledge import KnowledgeError, parse_knowledge
 from world.rules.party import join_party
+from world.tests.geography_fixture import publish_shipped_geography
+
+
+publish_shipped_geography()
 
 
 def _gate_anchor_entry():
@@ -442,7 +446,6 @@ class MovementSettlementWildernessTests(EvenniaTest):
             write_fatigue_state,
         )
         from world.rules.party import join_party
-
         self.char1.race = "human"
         self.char1.apply_race_baseline()
         sleeper = create_object(NPC, key="沉睡同伴", location=self.char1.location)

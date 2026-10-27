@@ -1,6 +1,6 @@
 """Typed static world data from design document section 5.1."""
 
-from .anchors import ANCHOR_REGISTRY, Anchor, AnchorKind
+from .anchors import ANCHOR_LORE, Anchor, AnchorKind, AnchorLore
 from .economy import (
     COPPER_PER_GOLD,
     COPPER_PER_SILVER,
@@ -66,7 +66,7 @@ from .titles import (
 
 __all__ = [
     "AMBIENT_PLACEMENT_REGISTRY",
-    "ANCHOR_REGISTRY",
+    "ANCHOR_LORE",
     "AROUSAL_LEVELS",
     "CLIMAX_PHASE_LEVELS",
     "COPPER_PER_GOLD",
@@ -92,6 +92,7 @@ __all__ = [
     "AmbientPlacementRule",
     "Anchor",
     "AnchorKind",
+    "AnchorLore",
     "Element",
     "FixedTitleDef",
     "GuildRank",

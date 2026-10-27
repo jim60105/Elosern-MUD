@@ -117,7 +117,7 @@ class Nation:
         """
         from world.lore import anchors
 
-        anchor = anchors.ANCHOR_REGISTRY.get(self.capital_anchor_key)
+        anchor = anchors.anchors().get(self.capital_anchor_key)
         return anchor.display_name_zh if anchor is not None else self.capital_anchor_key
 
 

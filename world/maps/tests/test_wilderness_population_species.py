@@ -14,8 +14,8 @@ from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.monsters import Monster
 from world.lore.monster_placement import AmbientPlacementRule, variant_species_key
+import world.maps.wilderness_population as wilderness_population_module
 from world.maps.wilderness_population import (
-    CAPITAL_ENTRY_XY,
     _coordinate_hash,
     _population_key,
     _stored_hp,
@@ -24,20 +24,24 @@ from world.maps.wilderness_population import (
     species_rule_for_coordinates,
 )
 from world.maps.wilderness_provider import (
-    REGION_SEARCH_BOXES,
     WILDERNESS_NAME,
     ElosernWildernessMapProvider,
     is_valid_wilderness_cell,
     region_for_coordinates,
 )
+from world.maps import wilderness_provider
 from world.rules.combat_session import engage
 from world.rules.monster_individual import construct_species_individual
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
+from world.tests.geography_fixture import publish_shipped_geography
 from world.tests.synthetic_data import (
     SYNTH_MONSTER_TIERS,
     SYNTH_MONSTER_VARIANTS,
     synthetic_registries,
 )
+
+publish_shipped_geography()
+CAPITAL_ENTRY_XY = wilderness_population_module.capital_entry_xy()
 
 _VARIANTS = tuple(SYNTH_MONSTER_VARIANTS)
 ORDINARY, STRONGER = _VARIANTS[0], _VARIANTS[1]
@@ -61,7 +65,7 @@ def _first_cell(region: str, *, inside_band: bool) -> tuple[int, int]:
     Enumerated over the region's authored search window, so the fixture lookup
     stays a bounded local search rather than a frame sweep.
     """
-    x_min, x_max, y_min, y_max = REGION_SEARCH_BOXES[region]
+    x_min, x_max, y_min, y_max = wilderness_provider.region_search_boxes()[region]
     for x in range(x_min, x_max + 1):
         for y in range(y_min, y_max + 1):
             cell = (x, y)
@@ -74,7 +78,7 @@ def _first_cell(region: str, *, inside_band: bool) -> tuple[int, int]:
 
 def _cell_outside_every_rule(rules) -> tuple[int, int]:
     """A walkable cell whose region carries no authored rule."""
-    for region, (x_min, x_max, y_min, y_max) in REGION_SEARCH_BOXES.items():
+    for region, (x_min, x_max, y_min, y_max) in wilderness_provider.region_search_boxes().items():
         if region in rules:
             continue
         for x in range(x_min, x_max + 1):

@@ -1,16 +1,28 @@
 {
   "contract": [
     {
-      "path": "world/rules/tests/test_authored_dialogue_runtime.py",
-      "reason": "authored dialogue runtime selection and transactional session delivery"
+      "path": "tests/test_command_docs.py",
+      "reason": "player command docs parity contract"
     },
     {
-      "path": "world/rules/tests/test_dialogue_sources.py",
-      "reason": "shipped dialogue source inventory and profile service distinction"
+      "path": "tests/test_preset_authoring_docs_contract.py",
+      "reason": "authoring docs contract"
+    },
+    {
+      "path": "web/webclient/presentation/tests/test_lore_codex_registry_contract.py",
+      "reason": "every registered lore entry is representable by the codex panel"
     },
     {
       "path": "web/webclient/presentation/tests/test_world_map_measurement.py",
       "reason": "the shipped continental geography fits the measured world-map bound."
+    },
+    {
+      "path": "world/ai/tests/test_director_template_cards.py",
+      "reason": "offline quest template occupant card contract"
+    },
+    {
+      "path": "world/ai/tests/test_dream_frame_contract.py",
+      "reason": "approved dream frame divine-identity refusal contract"
     },
     {
       "path": "world/art/tests/test_bundled_interior_art.py",
@@ -33,48 +45,12 @@
       "reason": "bundled scene distribution and decode contract"
     },
     {
-      "path": "web/webclient/presentation/tests/test_lore_codex_registry_contract.py",
-      "reason": "every registered lore entry is representable by the codex panel"
+      "path": "world/imports/tests/test_social_identity_imports.py",
+      "reason": "import schema, validation, loader, and profile social identity producers."
     },
     {
       "path": "world/imports/tests/test_yohanna_demo.py",
       "reason": "authored Yohanna import card and real protection setup contract"
-    },
-    {
-      "path": "tests/test_command_docs.py",
-      "reason": "player command docs parity contract"
-    },
-    {
-      "path": "world/rules/tests/test_crocodile_resource_skill.py",
-      "reason": "crocodile representative-composition production smoke over the generic transfer/policy contracts"
-    },
-    {
-      "path": "world/rules/tests/test_sway_whistle_sparrow_resource_skill.py",
-      "reason": "sparrow representative-composition production smoke over the generic rider/lifetime contracts"
-    },
-    {
-      "path": "world/rules/tests/test_tide_lamp_crab_resource_skill.py",
-      "reason": "crab representative-composition production smoke over the generic self-guard/lifetime contracts"
-    },
-    {
-      "path": "world/rules/tests/test_monster_composition_coverage.py",
-      "reason": "authored-kit composition grouping and representative wiring contract"
-    },
-    {
-      "path": "world/lore/tests/test_dialogue_assembly.py",
-      "reason": "Altoria dialogue terrace split preserves tables and terrace alignment"
-    },
-    {
-      "path": "tests/test_preset_authoring_docs_contract.py",
-      "reason": "authoring docs contract"
-    },
-    {
-      "path": "world/ai/tests/test_director_template_cards.py",
-      "reason": "offline quest template occupant card contract"
-    },
-    {
-      "path": "world/ai/tests/test_dream_frame_contract.py",
-      "reason": "approved dream frame divine-identity refusal contract"
     },
     {
       "path": "world/lore/tests/test_anchor_placement.py",
@@ -89,8 +65,16 @@
       "reason": "assortment registry content contract"
     },
     {
+      "path": "world/lore/tests/test_bestiary_documentation.py",
+      "reason": "keyed bestiary documentation relationship contract"
+    },
+    {
       "path": "world/lore/tests/test_church.py",
       "reason": "frozen church catalogues, the derived church-place venue set, and the church lore/status realignment contract"
+    },
+    {
+      "path": "world/lore/tests/test_dialogue_assembly.py",
+      "reason": "Altoria dialogue terrace split preserves tables and terrace alignment"
     },
     {
       "path": "world/lore/tests/test_economy.py",
@@ -113,16 +97,16 @@
       "reason": "magic tier data contract"
     },
     {
-      "path": "world/lore/tests/test_monsters.py",
-      "reason": "monster tier data contract"
-    },
-    {
-      "path": "world/lore/tests/test_bestiary_documentation.py",
-      "reason": "keyed bestiary documentation relationship contract"
+      "path": "world/lore/tests/test_map_district_content.py",
+      "reason": "shipped map-district landmarks against the authored continent"
     },
     {
       "path": "world/lore/tests/test_monster_species_content.py",
       "reason": "registry-derived monster identity, profile/kit coverage and public narrative contract"
+    },
+    {
+      "path": "world/lore/tests/test_monsters.py",
+      "reason": "monster tier data contract"
     },
     {
       "path": "world/lore/tests/test_names.py",
@@ -155,6 +139,10 @@
     {
       "path": "world/lore/tests/test_races.py",
       "reason": "race/subrace data contract"
+    },
+    {
+      "path": "world/lore/tests/test_registry_index_contract.py",
+      "reason": "authored registry index coverage and shipped reference integrity contract"
     },
     {
       "path": "world/lore/tests/test_room_prose_language.py",
@@ -221,6 +209,14 @@
       "reason": "capital map walkability contract"
     },
     {
+      "path": "world/maps/tests/test_geography_source.py",
+      "reason": "geography publication, composition and snapshot-isolation mechanism contract"
+    },
+    {
+      "path": "world/maps/tests/test_map_district_partition.py",
+      "reason": "the committed district partition recomputes exactly from shipped geography"
+    },
+    {
       "path": "world/maps/tests/test_village_ciaran.py",
       "reason": "village ciaran map data contract"
     },
@@ -257,6 +253,10 @@
       "reason": "affinity config validation contract"
     },
     {
+      "path": "world/rules/tests/test_authored_dialogue_runtime.py",
+      "reason": "authored dialogue runtime selection and transactional session delivery"
+    },
+    {
       "path": "world/rules/tests/test_buffs.py",
       "reason": "buff rulebook content contract"
     },
@@ -269,12 +269,28 @@
       "reason": "church enrollment office and vestment handover contract"
     },
     {
+      "path": "world/rules/tests/test_church_hosts.py",
+      "reason": "the clergy host, ChurchHost service attachment, and spawn-data arousal"
+    },
+    {
       "path": "world/rules/tests/test_church_rulebook.py",
       "reason": "church rulebook cast-rail contract names its shipped rite rows"
     },
     {
       "path": "world/rules/tests/test_clock.py",
       "reason": "clock rulebook contract"
+    },
+    {
+      "path": "world/rules/tests/test_crocodile_resource_skill.py",
+      "reason": "crocodile representative-composition production smoke over the generic transfer/policy contracts"
+    },
+    {
+      "path": "world/rules/tests/test_dialogue_references.py",
+      "reason": "static permitted-reference catalog mirrors canonical registries"
+    },
+    {
+      "path": "world/rules/tests/test_dialogue_sources.py",
+      "reason": "shipped dialogue source inventory and profile service distinction"
     },
     {
       "path": "world/rules/tests/test_equipment_effect_rulebook.py",
@@ -313,10 +329,6 @@
       "reason": "place-derived service host roster and current place-declaration contract"
     },
     {
-      "path": "world/rules/tests/test_church_hosts.py",
-      "reason": "the clergy host, ChurchHost service attachment, and spawn-data arousal"
-    },
-    {
       "path": "world/rules/tests/test_human_combat_calibration.py",
       "reason": "human combat calibration evidence exercises shipped gear, skill, and monster rows through the real resolver"
     },
@@ -327,6 +339,10 @@
     {
       "path": "world/rules/tests/test_monster_behaviour_profile.py",
       "reason": "monster behaviour rulebook contract"
+    },
+    {
+      "path": "world/rules/tests/test_monster_composition_coverage.py",
+      "reason": "authored-kit composition grouping and representative wiring contract"
     },
     {
       "path": "world/rules/tests/test_npc_roster_validation.py",
@@ -347,6 +363,18 @@
     {
       "path": "world/rules/tests/test_shipped_item_use_regression.py",
       "reason": "shipped usable-item regression contract"
+    },
+    {
+      "path": "world/rules/tests/test_social_identity.py",
+      "reason": "social identity canonical tag model and reader/writer APIs."
+    },
+    {
+      "path": "world/rules/tests/test_sway_whistle_sparrow_resource_skill.py",
+      "reason": "sparrow representative-composition production smoke over the generic rider/lifetime contracts"
+    },
+    {
+      "path": "world/rules/tests/test_tide_lamp_crab_resource_skill.py",
+      "reason": "crab representative-composition production smoke over the generic self-guard/lifetime contracts"
     },
     {
       "path": "world/skills/sexual_acts/tests/test_acceptance.py",
@@ -427,30 +455,6 @@
     {
       "path": "world/skills/tests/test_spell_catalogs.py",
       "reason": "spell catalog content contract"
-    },
-    {
-      "path": "world/lore/tests/test_registry_index_contract.py",
-      "reason": "authored registry index coverage and shipped reference integrity contract"
-    },
-    {
-      "path": "world/lore/tests/test_map_district_content.py",
-      "reason": "shipped map-district landmarks against the authored continent"
-    },
-    {
-      "path": "world/maps/tests/test_map_district_partition.py",
-      "reason": "the committed district partition recomputes exactly from shipped geography"
-    },
-    {
-      "path": "world/rules/tests/test_social_identity.py",
-      "reason": "social identity canonical tag model and reader/writer APIs."
-    },
-    {
-      "path": "world/imports/tests/test_social_identity_imports.py",
-      "reason": "import schema, validation, loader, and profile social identity producers."
-    },
-    {
-      "path": "world/rules/tests/test_dialogue_references.py",
-      "reason": "static permitted-reference catalog mirrors canonical registries"
     }
   ],
   "debt": [

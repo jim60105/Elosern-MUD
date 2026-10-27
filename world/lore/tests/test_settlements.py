@@ -8,7 +8,7 @@ import unittest
 from dataclasses import replace
 from unittest import mock
 
-from world.lore.anchors import ANCHOR_REGISTRY
+from world.lore.anchors import anchors
 from world.lore.settlements.places import (
     PLACE_REGISTRY,
     place_capabilities,
@@ -24,6 +24,11 @@ from world.lore.settlements.settlements import (
 )
 from world.lore.settlements.shops import SHOP_REGISTRY
 from world.rules.npc_capabilities import capability, place_bound
+from world.tests.geography_fixture import publish_shipped_geography
+
+
+def setUpModule():
+    publish_shipped_geography()
 
 
 def _place_fields(place) -> tuple:
@@ -64,7 +69,7 @@ class SettlementRegistryTests(unittest.TestCase):
         for key, settlement in SETTLEMENT_REGISTRY.items():
             with self.subTest(settlement=key):
                 self.assertEqual(key, settlement.key)
-                self.assertIn(settlement.key, ANCHOR_REGISTRY)
+                self.assertIn(settlement.key, anchors())
 
     def test_shipped_settlement_registry_passes_validation(self):
         validate_settlement_registry(SETTLEMENT_REGISTRY)

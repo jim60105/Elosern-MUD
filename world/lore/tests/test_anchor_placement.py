@@ -4,21 +4,27 @@ Self-consistency checks for anchor grid placements (map-anchor-grid)."""
 from tools.spec_traceability import covers_requirement
 
 import unittest
-from dataclasses import fields
+from dataclasses import fields, replace
+from types import MappingProxyType
 from unittest.mock import patch
 
 from world.lore import anchors as anchors_module
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY, AnchorPlacement
 from world.maps.static_references import anchor_entrance_xyz
 from world.lore.anchors import (
-    ANCHOR_GEOGRAPHY_REGISTRY,
-    ANCHOR_REGISTRY,
     LOCAL_FRAME_ANCHOR_REGISTRY,
     Anchor,
     GeographicAnchor,
     LocalFrameAnchor,
+    anchor_geography,
+    anchors,
     world_position_m,
 )
+from world.tests.geography_fixture import publish_shipped_geography
+
+
+def setUpModule():
+    publish_shipped_geography()
 
 
 class AnchorPlacementRegistryTests(unittest.TestCase):
@@ -42,7 +48,7 @@ class AnchorPlacementRegistryTests(unittest.TestCase):
     @covers_requirement("anchor-placement::every-placement-s-anchor-key-resolves-against-anchor-registry")
     def test_every_entrys_anchor_key_exists_in_anchor_registry(self):
         for placement in ANCHOR_PLACEMENT_REGISTRY.values():
-            self.assertIn(placement.anchor_key, ANCHOR_REGISTRY)
+            self.assertIn(placement.anchor_key, anchors())
 
     @covers_requirement("anchor-placement::anchorplacement-is-a-frozen-dataclass-separate-from-anchor")
     def test_anchor_dataclass_keeps_its_pre_change_field_set(self):
@@ -63,12 +69,12 @@ class AnchorPlacementRegistryTests(unittest.TestCase):
         "continental-geography::the-known-continent-has-frozen-geographic-declarations"
     )
     def test_geographic_declarations_do_not_extend_grid_placement(self):
-        self.assertEqual(len(ANCHOR_GEOGRAPHY_REGISTRY), 9)
+        self.assertTrue(anchor_geography())
         self.assertEqual(
             list(ANCHOR_PLACEMENT_REGISTRY),
             ["capital_altoria", "village_ciaran"],
         )
-        self.assertLessEqual(set(ANCHOR_PLACEMENT_REGISTRY), set(ANCHOR_GEOGRAPHY_REGISTRY))
+        self.assertLessEqual(set(ANCHOR_PLACEMENT_REGISTRY), set(anchor_geography()))
         self.assertEqual(
             {field.name for field in fields(AnchorPlacement)},
             {"anchor_key", "node"},
@@ -79,9 +85,10 @@ class AnchorPlacementRegistryTests(unittest.TestCase):
         )
         from world.rules.lore_knowledge import CODE_CATEGORIES
 
+        self.assertIs(CODE_CATEGORIES["anchor"].registry, anchors())
         self.assertFalse(
             any(
-                spec.registry is ANCHOR_GEOGRAPHY_REGISTRY
+                spec.registry is anchor_geography()
                 for spec in CODE_CATEGORIES.values()
             )
         )
@@ -122,14 +129,23 @@ class AnchorPlacementRegistryTests(unittest.TestCase):
         "map-geometry-model::geometry-is-explicit-and-snapshot-scoped"
     )
     def test_world_position_transform_adds_the_cell_center_not_the_cell_index(self):
-        geography = {"t_frame_anchor": GeographicAnchor("t_frame_anchor", (2, 3), "synthetic")}
+        from world.maps import geography as geography_module
+
+        synthetic = {
+            "t_frame_anchor": GeographicAnchor("t_frame_anchor", (2, 3), "synthetic")
+        }
         frames = {"t_frame_anchor": LocalFrameAnchor("t_frame_anchor", (100, 200))}
-        with patch.dict(
-            anchors_module.ANCHOR_GEOGRAPHY_REGISTRY, geography, clear=True
-        ), patch.dict(
-            anchors_module.LOCAL_FRAME_ANCHOR_REGISTRY, frames, clear=True
-        ):
-            self.assertEqual(
-                world_position_m("t_frame_anchor", (150, 260)),
-                (2500 + 50, 3500 + 60),
-            )
+        previous = geography_module.current()
+        geography_module.publish(
+            replace(previous, anchor_geography=MappingProxyType(synthetic))
+        )
+        try:
+            with patch.dict(
+                anchors_module.LOCAL_FRAME_ANCHOR_REGISTRY, frames, clear=True
+            ):
+                self.assertEqual(
+                    world_position_m("t_frame_anchor", (150, 260)),
+                    (2500 + 50, 3500 + 60),
+                )
+        finally:
+            geography_module.publish(previous)
