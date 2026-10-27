@@ -178,7 +178,12 @@ def anchor_locator() -> RoomLocator:
 
 def grid_locator(x: int | None = None, y: int | None = None) -> RoomLocator:
     row = live_anchor_placement_row()
-    gx, gy = row.entrance_xy if x is None and y is None else (x, y)
+    if x is None and y is None:
+        from world.maps.static_references import settlement_node_xy
+
+        gx, gy = settlement_node_xy(row.node)
+    else:
+        gx, gy = x, y
     return RoomLocator(DestinationKind.GRID, xyz=(gx, gy, row.zcoord))
 
 

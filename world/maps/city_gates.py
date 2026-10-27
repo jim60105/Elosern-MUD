@@ -9,6 +9,11 @@ one row plus that city's map data; no bootstrap code change (design doc §4,
 D7). Race-based selection of which gate a new character takes is explicitly
 out of scope (design doc §2, YAGNI).
 
+The gate is a qualified settlement-node identity, never a coordinate: the
+current gate room address is derived from the settlement graph at the consumer
+boundary (``world/maps/static_references.py``). Moving the authored node moves
+the gate with it.
+
 The registry slot expresses "the authored way in from 虛境", and a row SHALL
 NOT be assumed to describe a walled settlement: elven villages have no walls
 and no gates, so ``village_ciaran``'s row is a concealed path (隱密小徑)
@@ -23,13 +28,15 @@ values instead of duplicating gate keys, aliases, or coordinates.
 from dataclasses import dataclass
 from types import MappingProxyType
 
+from elosern_map_core.documents import QualifiedRef
+from elosern_map_core.references import settlement_node_ref
+
 
 @dataclass(frozen=True, slots=True)
 class CityGateDef:
-    """One authored city gate: where it lands and how the exit is named."""
+    """One authored city gate: which node it lands on and how the exit is named."""
 
-    map_id: str
-    gate_xyz: tuple[int, int, str]
+    gate: QualifiedRef
     exit_key: str
     exit_aliases: tuple[str, ...]
 
@@ -37,14 +44,12 @@ class CityGateDef:
 CITY_GATE_REGISTRY: MappingProxyType = MappingProxyType(
     {
         "capital_altoria": CityGateDef(
-            map_id="capital_altoria",
-            gate_xyz=(3050, 150, "capital_altoria"),
+            gate=settlement_node_ref("capital_altoria", "south_gate"),
             exit_key="南門",
             exit_aliases=("王都", "城門"),
         ),
         "village_ciaran": CityGateDef(
-            map_id="village_ciaran",
-            gate_xyz=(35, 270, "village_ciaran"),
+            gate=settlement_node_ref("village_ciaran", "hidden_path"),
             exit_key="隱密小徑",
             exit_aliases=("祕徑", "幽徑"),
         ),

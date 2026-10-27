@@ -31,11 +31,13 @@ from world.lore.map_districts import (
     MapDistrict,
     MapDistrictError,
     cell_of_position,
+    landmark_node_id,
     production_terrain,
     validate_map_districts,
 )
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 from elosern_map_core.geometry import cell_center_m
+from elosern_map_core.references import settlement_node_ref, wilderness_cell_ref
 from elosern_map_core.terrain import ridge_center_x
 
 from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
@@ -70,33 +72,45 @@ class ShippedDistrictContractTests(unittest.TestCase):
         river_cell = (900, 1042)  # capital river water, not a ford
         footprint_cell = next(iter(WILDERNESS_ENTRY_REGISTRY["capital_altoria"].footprint_cells))
         faulty = {
-            "sea_probe": MapDistrict("sea_probe", "海測區", "海測碑", "wild:elosern:20:20", "voronoi"),
+            "sea_probe": MapDistrict(
+                "sea_probe", "海測區", "海測碑", wilderness_cell_ref((20, 20)), "voronoi"
+            ),
             "river_probe": MapDistrict(
-                "river_probe", "河測區", "河測碑", encode_wild("elosern", *river_cell), "voronoi"
+                "river_probe", "河測區", "河測碑", wilderness_cell_ref(river_cell), "voronoi"
             ),
             "wall_probe": MapDistrict(
-                "wall_probe", "城測區", "城測碑", encode_wild("elosern", *footprint_cell), "voronoi"
+                "wall_probe", "城測區", "城測碑", wilderness_cell_ref(footprint_cell), "voronoi"
             ),
             "ghost_probe": MapDistrict(
-                "ghost_probe", "幽測區", "幽測碑", "grid:capital_altoria:1:1", "voronoi"
+                "ghost_probe",
+                "幽測區",
+                "幽測碑",
+                settlement_node_ref("capital_altoria", "ghost_probe"),
+                "voronoi",
             ),
         }
         with self.assertRaises(MapDistrictError) as caught:
             validate_map_districts(faulty, self.terrain)
         problems = "\n".join(caught.exception.problems)
-        self.assertIn("sea_probe: landmark 'wild:elosern:20:20' lies in the sea", problems)
+        self.assertIn("sea_probe: landmark (20, 20) lies in the sea", problems)
         self.assertIn("river_probe: landmark", problems)
         self.assertIn("lies on blocked terrain", problems.split("river_probe:")[1])
         self.assertIn("wall_probe: landmark", problems)
         self.assertIn("lies on blocked terrain", problems.split("wall_probe:")[1])
-        self.assertIn("ghost_probe: landmark 'grid:capital_altoria:1:1' is not an existing grid node", problems)
+        self.assertIn("ghost_probe: district ghost_probe: settlement_node:capital_altoria:ghost_probe", problems)
+        self.assertIn("no authored node", problems)
 
     @covers_requirement("map-districts::every-map-district-has-one-canonical-reachable-landmark")
     def test_deep_forest_is_one_region_district_lit_at_its_heart(self):
         regions = [d for d in MAP_DISTRICT_REGISTRY.values() if d.kind == "region"]
         self.assertEqual([d.region_key for d in regions], ["north_deep_forest"])
         forest = regions[0]
-        self.assertEqual(forest.landmark_node, encode_wild("elosern", 1250, 2420))
+        self.assertEqual(forest.landmark.domain, "wilderness_cell")
+        self.assertEqual(forest.landmark.cell, (1250, 2420))
+        self.assertEqual(
+            landmark_node_id(forest),
+            encode_wild("elosern", 1250, 2420),
+        )
         # One district covers both nominal claims: no per-nation duplicate.
         self.assertEqual(
             WILDERNESS_REGION_REGISTRY["north_deep_forest"].nominal_nation_keys,
@@ -115,7 +129,9 @@ class ShippedDistrictContractTests(unittest.TestCase):
     def test_landmarks_are_spelt_as_the_knowledge_writer_records_them(self):
         for district in MAP_DISTRICT_REGISTRY.values():
             with self.subTest(district=district.key):
-                parts = decode_node(district.landmark_node)
+                node_id = landmark_node_id(district)
+                self.assertIsNotNone(node_id)
+                parts = decode_node(node_id)
                 if parts["prefix"] == "wild":
                     rebuilt = encode_wild(parts["name"], parts["x"], parts["y"])
                 else:
@@ -123,7 +139,7 @@ class ShippedDistrictContractTests(unittest.TestCase):
                     graph = settlement_graph(parts["z_map_key"])
                     self.assertIsNotNone(graph.node_at((parts["x"], parts["y"])))
                     rebuilt = encode_grid(parts["z_map_key"], parts["x"], parts["y"])
-                self.assertEqual(rebuilt, district.landmark_node)
+                self.assertEqual(rebuilt, node_id)
 
     @covers_requirement("map-districts::every-map-district-has-one-canonical-reachable-landmark")
     def test_seeds_cover_every_nation_outside_the_forest_in_one_metre_frame(self):
@@ -131,7 +147,8 @@ class ShippedDistrictContractTests(unittest.TestCase):
         for district in MAP_DISTRICT_REGISTRY.values():
             if district.kind != "voronoi":
                 continue
-            parts = decode_node(district.landmark_node)
+            node_id = landmark_node_id(district)
+            parts = decode_node(node_id)
             if parts["prefix"] == "wild":
                 cell = (parts["x"], parts["y"])
             else:
@@ -177,7 +194,8 @@ class ShippedDistrictContractTests(unittest.TestCase):
             for gate in entry.gates
         }
         for district in MAP_DISTRICT_REGISTRY.values():
-            parts = decode_node(district.landmark_node)
+            node_id = landmark_node_id(district)
+            parts = decode_node(node_id)
             if parts["prefix"] == "wild":
                 with self.subTest(district=district.key):
                     self.assertIn(components.component((parts["x"], parts["y"])), gateway)
@@ -191,7 +209,7 @@ class ShippedDistrictContractTests(unittest.TestCase):
         )
 
     def _continental_position(self, district):
-        parts = decode_node(district.landmark_node)
+        parts = decode_node(landmark_node_id(district))
         if parts["prefix"] == "wild":
             return cell_center_m((parts["x"], parts["y"]))
         return self.terrain.grid_site(parts["z_map_key"], (parts["x"], parts["y"])).position_m
@@ -204,7 +222,7 @@ class ShippedDistrictContractTests(unittest.TestCase):
         self.assertTrue(110 <= len(districts) <= 130, len(districts))
         # One landmark per district, and no node, district name or landmark
         # name shared between two districts.
-        for field in ("key", "landmark_node", "district_name_zh", "landmark_name_zh"):
+        for field in ("key", "landmark", "district_name_zh", "landmark_name_zh"):
             values = [getattr(district, field) for district in districts]
             self.assertEqual(len(set(values)), len(values), field)
         for district in districts:
@@ -256,7 +274,7 @@ class ShippedDistrictContractTests(unittest.TestCase):
             for gate in entry.gates
         }
         for district in MAP_DISTRICT_REGISTRY.values():
-            parts = decode_node(district.landmark_node)
+            parts = decode_node(landmark_node_id(district))
             with self.subTest(district=district.key):
                 if parts["prefix"] == "grid":
                     site = self.terrain.grid_site(parts["z_map_key"], (parts["x"], parts["y"]))
@@ -284,7 +302,7 @@ class ShippedDistrictContractTests(unittest.TestCase):
     def test_registry_entries_are_frozen(self):
         district = next(iter(MAP_DISTRICT_REGISTRY.values()))
         with self.assertRaises(dataclasses.FrozenInstanceError):
-            district.landmark_node = "wild:elosern:0:0"
+            district.landmark = district.landmark
 
 
 class WalkableComponentContractTests(unittest.TestCase):

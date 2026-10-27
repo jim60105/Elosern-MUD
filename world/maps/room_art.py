@@ -30,6 +30,9 @@ from __future__ import annotations
 from collections.abc import Mapping
 from types import MappingProxyType
 
+from elosern_map_core.documents import QualifiedRef
+from elosern_map_core.references import settlement_node_ref
+
 from world.art.scene_definitions import is_registered_room_art_key
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.lore.settlements.places import PLACE_REGISTRY
@@ -93,50 +96,50 @@ _REGION_SCENE_ARCHETYPES: dict[str, str] = {
 
 REGION_SCENE_ARCHETYPES: Mapping[str, str] = MappingProxyType(_REGION_SCENE_ARCHETYPES)
 
-# Authored grid node -> registered scene archetype, keyed (map key, x, y) in
-# the settlement's integer-metre local frame. Every walkable node of every
-# declared settlement graph is listed so the art panel resolves a real
-# registered archetype on a fresh boot.
-_GRID_NODE_SCENE_ARCHETYPES: dict[tuple[str, int, int], str] = {
+# Authored grid node identity -> registered scene archetype. Every walkable
+# node of every declared settlement graph is listed so the art panel resolves
+# a real registered archetype on a fresh boot; the node's current coordinate is
+# derived at the consumer boundary, never stored here.
+_GRID_NODE_SCENE_ARCHETYPES: dict[QualifiedRef, str] = {
     # 聖潔王都 (capital_altoria): the river town's streets, plazas, gates and
     # quays are all the town street.
-    ("capital_altoria", 3050, 150): "city_street",
-    ("capital_altoria", 1250, 760): "city_street",
-    ("capital_altoria", 2150, 920): "city_street",
-    ("capital_altoria", 3140, 1050): "city_street",
-    ("capital_altoria", 3970, 1120): "city_street",
-    ("capital_altoria", 4830, 970): "city_street",
-    ("capital_altoria", 2350, 1900): "city_street",
-    ("capital_altoria", 3350, 1980): "city_street",
-    ("capital_altoria", 1300, 2600): "city_street",
-    ("capital_altoria", 2420, 2700): "city_street",
-    ("capital_altoria", 3500, 2850): "city_street",
-    ("capital_altoria", 4380, 3000): "city_street",
-    ("capital_altoria", 5380, 2850): "city_street",
-    ("capital_altoria", 6500, 3010): "city_street",
-    ("capital_altoria", 2300, 3820): "city_street",
-    ("capital_altoria", 3480, 3700): "city_street",
-    ("capital_altoria", 4560, 3920): "city_street",
-    ("capital_altoria", 3500, 4850): "city_street",
-    ("capital_altoria", 4690, 5010): "city_street",
-    ("capital_altoria", 5650, 5200): "city_street",
-    ("capital_altoria", 4500, 6350): "city_street",
+    settlement_node_ref("capital_altoria", "south_gate"): "city_street",
+    settlement_node_ref("capital_altoria", "quay"): "city_street",
+    settlement_node_ref("capital_altoria", "riverbank_road"): "city_street",
+    settlement_node_ref("capital_altoria", "south_avenue"): "city_street",
+    settlement_node_ref("capital_altoria", "inn_lane"): "city_street",
+    settlement_node_ref("capital_altoria", "bath_forecourt"): "city_street",
+    settlement_node_ref("capital_altoria", "old_wall_ruins"): "city_street",
+    settlement_node_ref("capital_altoria", "north_avenue"): "city_street",
+    settlement_node_ref("capital_altoria", "craft_alley"): "city_street",
+    settlement_node_ref("capital_altoria", "market_street"): "city_street",
+    settlement_node_ref("capital_altoria", "central_plaza"): "city_street",
+    settlement_node_ref("capital_altoria", "guild_forecourt"): "city_street",
+    settlement_node_ref("capital_altoria", "east_market"): "city_street",
+    settlement_node_ref("capital_altoria", "east_gate"): "city_street",
+    settlement_node_ref("capital_altoria", "training_ground"): "city_street",
+    settlement_node_ref("capital_altoria", "holy_steps"): "city_street",
+    settlement_node_ref("capital_altoria", "great_temple"): "city_street",
+    settlement_node_ref("capital_altoria", "noble_quarter"): "city_street",
+    settlement_node_ref("capital_altoria", "upper_gate"): "city_street",
+    settlement_node_ref("capital_altoria", "academy"): "city_street",
+    settlement_node_ref("capital_altoria", "palace_forecourt"): "city_street",
     # 暗影谷村 (village_ciaran): the forest village's paths and groves are the
     # forest path, the cleared plaza and drill ground the town street, and the
     # stream approaches the wilderness path.
-    ("village_ciaran", 35, 270): "forest_path",
-    ("village_ciaran", 220, 305): "city_street",
-    ("village_ciaran", 405, 335): "city_street",
-    ("village_ciaran", 245, 135): "wilderness_path",
-    ("village_ciaran", 200, 465): "forest_path",
-    ("village_ciaran", 390, 495): "forest_path",
-    ("village_ciaran", 165, 650): "forest_path",
-    ("village_ciaran", 440, 665): "forest_path",
-    ("village_ciaran", 590, 300): "forest_path",
-    ("village_ciaran", 430, 85): "wilderness_path",
+    settlement_node_ref("village_ciaran", "hidden_path"): "forest_path",
+    settlement_node_ref("village_ciaran", "village_plaza"): "city_street",
+    settlement_node_ref("village_ciaran", "training_clearing"): "city_street",
+    settlement_node_ref("village_ciaran", "stream_path"): "wilderness_path",
+    settlement_node_ref("village_ciaran", "old_tree_north"): "forest_path",
+    settlement_node_ref("village_ciaran", "weaving_slope"): "forest_path",
+    settlement_node_ref("village_ciaran", "elder_tree"): "forest_path",
+    settlement_node_ref("village_ciaran", "silver_leaf_slope"): "forest_path",
+    settlement_node_ref("village_ciaran", "herb_garden"): "forest_path",
+    settlement_node_ref("village_ciaran", "stream_bend"): "wilderness_path",
 }
 
-GRID_NODE_SCENE_ARCHETYPES: Mapping[tuple[str, int, int], str] = MappingProxyType(
+GRID_NODE_SCENE_ARCHETYPES: Mapping[QualifiedRef, str] = MappingProxyType(
     _GRID_NODE_SCENE_ARCHETYPES
 )
 
@@ -178,6 +181,8 @@ def validate_room_art_registries() -> None:
                 f"region {region!r} maps to unregistered scene archetype {scene!r}"
             )
     for node, scene in GRID_NODE_SCENE_ARCHETYPES.items():
+        if not isinstance(node, QualifiedRef) or node.domain != "settlement_node":
+            raise ValueError(f"grid art key {node!r} is not a settlement_node reference")
         if scene not in SCENE_ARCHETYPE_REGISTRY:
             raise ValueError(
                 f"grid node {node!r} maps to unregistered scene archetype {scene!r}"

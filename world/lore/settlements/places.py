@@ -1,11 +1,12 @@
 """Place identity registry (settlement-shops design §3.2).
 
 A place is the single authored record of one service location: its interior
-room's identity and description, the exterior grid coordinate the interior
-attaches to (the z coordinate derives from the settlement), the doorway
-naming, its host's identity, the host's explicit capability declarations, and
-the assortments the place sells. Nothing a place declares is declared anywhere
-else.
+room's identity and description, the qualified settlement-node identity of the
+exterior room the interior attaches to, the doorway naming, its host's
+identity, the host's explicit capability declarations, and the assortments the
+place sells. Nothing a place declares is declared anywhere else. The exterior
+address is derived from the current settlement graph at the consumer boundary
+(``world/maps/static_references.py``); the row stores no coordinate.
 
 ``host_race`` / ``host_subrace`` / ``host_sex`` are creation-time authored
 identity: ``sync_service_content`` writes them once when it creates the host
@@ -23,6 +24,9 @@ may declare zero capabilities: the person exists without offering a service.
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Mapping
+
+from elosern_map_core.documents import QualifiedRef
+from elosern_map_core.references import settlement_node_ref
 
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.lore.registry_refs import ref, ref_many
@@ -82,7 +86,7 @@ class PlaceDefinition:
     kind: PlaceKind
     room_name_zh: str
     room_desc_zh: str
-    exterior_xy: tuple[int, int]  # z derives from the settlement
+    exterior: QualifiedRef  # settlement_node; map scope equals settlement_key
     doorway_key_zh: str
     doorway_aliases: tuple[str, ...]
     # The host is one optional group: every scalar below is None exactly when
@@ -234,13 +238,17 @@ def _validate_host_group(place: PlaceDefinition) -> None:
 
 
 def validate_place_registry(
-    places: Mapping[str, PlaceDefinition], *, check_capabilities: bool = True
+    places: Mapping[str, PlaceDefinition],
+    *,
+    check_capabilities: bool = True,
+    index=None,
 ) -> None:
     """Fail closed on a malformed place record, naming the place and rule.
 
     Record validity (design §3.2): the settlement must exist, the host race
     and sex must be registry members, a subrace must exist and belong to the
-    authored race, the exterior must be an (x, y) integer pair, every
+    authored race, the exterior must be a qualified settlement node in the
+    place's own settlement, every
     capability declaration is shape/vocabulary/reference-validated by the one
     capability core, and a place declares assortments iff it declares a
     merchant (shop) capability.
@@ -268,6 +276,8 @@ def validate_place_registry(
     keys on one exterior produce a single exit where two were authored,
     silently losing a location rather than failing.
     """
+    from elosern_map_core.references import ReferenceError, settlement_position
+
     for place_key, place in places.items():
         if type(place.letter_service) is not bool:
             raise ValueError(f"place {place_key!r} letter_service must be a boolean")
@@ -318,15 +328,22 @@ def validate_place_registry(
                     f"place {place.key!r} host_subrace {place.host_subrace!r} belongs to "
                     f"race {subrace.race_key!r}, not {place.host_race!r}"
                 )
-        if (
-            not isinstance(place.exterior_xy, tuple)
-            or len(place.exterior_xy) != 2
-            or any(type(axis) is not int for axis in place.exterior_xy)
-        ):
+        if not isinstance(place.exterior, QualifiedRef) or place.exterior.domain != "settlement_node":
             raise ValueError(
-                f"place {place.key!r} exterior_xy must be an (x, y) integer pair, "
-                f"got {place.exterior_xy!r}"
+                f"place {place.key!r} exterior must be a settlement_node reference, "
+                f"got {place.exterior!r}"
             )
+        expected_map = SETTLEMENT_REGISTRY[place.settlement_key].zcoord
+        if place.exterior.map_id != expected_map:
+            raise ValueError(
+                f"place {place.key!r} exterior names map {place.exterior.map_id!r}, "
+                f"not its settlement's coordinate space {expected_map!r}"
+            )
+        if index is not None:
+            try:
+                settlement_position(index, place.exterior, source=f"place {place.key!r}")
+            except ReferenceError as error:
+                raise ValueError(str(error)) from error
         if type(place.church) is not bool:
             raise ValueError(f"place {place.key!r} church must be a boolean")
         if check_capabilities:
@@ -395,22 +412,22 @@ def validate_place_registry(
             )
 
     # Cross-record pass: one doorway name per exterior. Keyed by
-    # (settlement_key, exterior_xy, doorway_key_zh) because the interior's z
-    # derives from the settlement — the same coordinate in two settlements is
-    # two streets, not one. exterior_xy is already validated as an (x, y)
-    # integer pair by the record loop above.
-    first_holder: dict[tuple[str, tuple[int, int], str], str] = {}
+    # (settlement_key, exterior identity, doorway_key_zh) because the interior's
+    # z derives from the settlement — the same node id in two settlements is
+    # two streets, not one. The exterior reference is already validated by the
+    # record loop above.
+    first_holder: dict[tuple[str, QualifiedRef, str], str] = {}
     for place in places.values():
         doorway = (
             place.settlement_key,
-            tuple(place.exterior_xy),
+            place.exterior,
             place.doorway_key_zh,
         )
         if doorway in first_holder:
             raise ValueError(
                 f"places {first_holder[doorway]!r} and {place.key!r} both declare "
                 f"doorway {place.doorway_key_zh!r} on the exterior at "
-                f"{tuple(place.exterior_xy)} of {place.settlement_key!r}; "
+                f"{place.exterior.object_id} of {place.settlement_key!r}; "
                 "two places on one exterior must name their doorways differently"
             )
         first_holder[doorway] = place.key
@@ -442,7 +459,7 @@ PLACE_REGISTRY: dict[str, PlaceDefinition] = {
             kind=PlaceKind.COURIER_STATION,
             room_name_zh="銀羽驛站・王都分站",
             room_desc_zh="銀羽驛行的櫃檯備有信紙與封蠟，牆上列著各地分站。旅人可在此寄信，或領取寄給自己的信件。",
-            exterior_xy=(2420, 2700),
+            exterior=settlement_node_ref("capital_altoria", "market_street"),
             doorway_key_zh="銀羽驛站",
             doorway_aliases=("courier",),
             letter_service=True,
@@ -453,7 +470,7 @@ PLACE_REGISTRY: dict[str, PlaceDefinition] = {
             kind=PlaceKind.COURIER_STATION,
             room_name_zh="銀羽驛站・精靈村分站",
             room_desc_zh="樹蔭下的銀羽驛行收存各地來信，木架上擱著公用信紙與封蠟。旅人可在此寄信，或領取寄給自己的信件。",
-            exterior_xy=(200, 465),
+            exterior=settlement_node_ref("village_ciaran", "old_tree_north"),
             doorway_key_zh="銀羽驛站",
             doorway_aliases=("courier",),
             letter_service=True,
@@ -461,4 +478,10 @@ PLACE_REGISTRY: dict[str, PlaceDefinition] = {
     )
 }
 
-validate_place_registry(PLACE_REGISTRY, check_capabilities=False)
+from world.maps.static_references import settlement_reference_index  # noqa: E402
+
+validate_place_registry(
+    PLACE_REGISTRY,
+    check_capabilities=False,
+    index=settlement_reference_index(),
+)

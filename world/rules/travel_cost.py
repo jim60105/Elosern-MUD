@@ -631,12 +631,23 @@ def _find_gate(
     grid_xy = (int(xyz[0]), int(xyz[1]))
     # Read the live registry (tests rebind the module attribute).
     from world.lore import wilderness_entry as wilderness_entry_module
+    from elosern_map_core.references import ReferenceError
+    from world.maps.static_references import settlement_node_xyz
 
     for entry in wilderness_entry_module.WILDERNESS_ENTRY_REGISTRY.values():
         if ANCHOR_PLACEMENT_REGISTRY.get(entry.anchor_key) is None:
             continue
         for gate in entry.gates:
-            if (gate.grid_xy, gate.z_map_key) != (grid_xy, map_id):
+            if gate.destination.map_id != map_id:
+                continue
+            try:
+                position = settlement_node_xyz(
+                    gate.destination,
+                    source=f"wilderness gate {entry.anchor_key}",
+                )
+            except ReferenceError:  # observability: ignore R2: a patched-in gate on an absent map is simply not this connector
+                continue
+            if position != (grid_xy[0], grid_xy[1], map_id):
                 continue
             if entry.approach_cell(gate) == tuple(wilderness_xy):
                 return entry, gate

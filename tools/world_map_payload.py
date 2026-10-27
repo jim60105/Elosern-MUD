@@ -38,8 +38,8 @@ def _markers():
 
 def _all_visits():
     from web.webclient.presentation.world_map_geometry import place_geometry
-    from world.lore.map_districts import MAP_DISTRICT_REGISTRY
-    visits={district.landmark_node for district in MAP_DISTRICT_REGISTRY.values()}
+    from world.lore.map_districts import landmark_node_ids
+    visits=set(landmark_node_ids().values())
     for _,_,_,ids in place_geometry():
         visits.update(ids)
     return visits
@@ -52,10 +52,11 @@ def _assemble(visits,markers):
 
 def representative_payload():
     from web.webclient.presentation.world_map_geometry import world_node_point
-    from world.lore.map_districts import MAP_DISTRICT_REGISTRY
+    from world.lore.map_districts import MAP_DISTRICT_REGISTRY, landmark_node_ids
+    landmarks=landmark_node_ids()
     districts=sorted(MAP_DISTRICT_REGISTRY.values(),key=lambda row:sum(
-        (a-b)**2 for a,b in zip(world_node_point(row.landmark_node),(860.5,1080.5))))
-    return _assemble({row.landmark_node for row in districts[:REPRESENTATIVE_LIT_DISTRICTS]},[])
+        (a-b)**2 for a,b in zip(world_node_point(landmarks[row.key]),(860.5,1080.5))))
+    return _assemble({landmarks[row.key] for row in districts[:REPRESENTATIVE_LIT_DISTRICTS]},[])
 
 
 def one_km_payload():

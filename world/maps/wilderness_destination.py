@@ -196,7 +196,11 @@ def gate_approach_distance_m(
     graph = settlement_graph(placement.zcoord)
     if graph is None:
         return None
-    node = graph.node_at(gate.grid_xy)
+    from world.maps.static_references import settlement_node_xy
+
+    node = graph.node_at(
+        settlement_node_xy(gate.destination, source=f"wilderness gate {entry.anchor_key}")
+    )
     approach = entry.approach_cell(gate)
     if node is None or approach is None:
         return None
@@ -255,14 +259,15 @@ def find_gateway(
 def grid_room_for_gate(gate: WildernessGate) -> Any:
     """The ``GridRoom`` a gate leads to, or ``None`` when it does not exist.
 
-    Resolved from the registry's own ``grid_xy``/``z_map_key`` -- not from any
-    exit object's stored anchor (the legacy ``_grid_room_for_anchor`` room-
-    hanging assumption is deleted, not generalized).
+    Resolved from the gate's authored settlement-node identity against the
+    current graph -- not from any exit object's stored anchor (the legacy
+    ``_grid_room_for_anchor`` room-hanging assumption is deleted, not
+    generalized).
     """
     from typeclasses.rooms import GridRoom
+    from world.maps.static_references import settlement_node_xyz
 
-    x, y = gate.grid_xy
-    return GridRoom.objects.filter_xyz((x, y, gate.z_map_key)).first()
+    return GridRoom.objects.filter_xyz(settlement_node_xyz(gate.destination)).first()
 
 
 def resolve_wilderness_destination(
@@ -308,7 +313,9 @@ def resolve_wilderness_destination(
             # Misconfiguration (destination room missing): the return exit
             # refuses the step, so the edge is unroutable.
             return None
-        gx, gy = gate.grid_xy
+        from world.maps.static_references import settlement_node_xy
+
+        gx, gy = settlement_node_xy(gate.destination)
         return encode_grid(gate.z_map_key, gx, gy)
 
     neighbor = wilderness_neighbor(x, y, normalized)

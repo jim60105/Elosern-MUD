@@ -826,9 +826,16 @@ def _production_districts(size: int) -> tuple[DistrictSeed, ...]:
     from world.rules.map_knowledge import decode_node
 
     entries = wilderness_entry.WILDERNESS_ENTRY_REGISTRY
+    from world.maps.static_references import settlement_node_xy
+
     seeds = []
     for district in map_districts.MAP_DISTRICT_REGISTRY.values():
-        parts = decode_node(district.landmark_node)
+        landmark_node = map_districts.landmark_node_id(district)
+        if landmark_node is None:
+            raise PartitionError(
+                [f"{district.key}: landmark {district.landmark!r} does not resolve to a node"]
+            )
+        parts = decode_node(landmark_node)
         if parts["prefix"] == "wild":
             seeds.append(
                 DistrictSeed(
@@ -848,7 +855,7 @@ def _production_districts(size: int) -> tuple[DistrictSeed, ...]:
             None,
         )
         if node is None or anchor_key is None:
-            raise PartitionError([f"{district.key}: grid landmark {district.landmark_node} does not resolve"])
+            raise PartitionError([f"{district.key}: grid landmark {landmark_node} does not resolve"])
         cell = map_districts.cell_of_position(world_position_m(anchor_key, node.physical_coordinate))
         approaches = []
         footprint: frozenset[Cell] = frozenset()
@@ -856,7 +863,16 @@ def _production_districts(size: int) -> tuple[DistrictSeed, ...]:
             if cell in entry.footprint_cells:
                 footprint = entry.footprint_cells
             for gate in entry.gates:
-                gate_node = graph.node_at(gate.grid_xy) if gate.z_map_key == map_key else None
+                gate_node = (
+                    graph.node_at(
+                        settlement_node_xy(
+                            gate.destination,
+                            source=f"wilderness gate {entry.anchor_key}",
+                        )
+                    )
+                    if gate.z_map_key == map_key
+                    else None
+                )
                 approach = entry.approach_cell(gate)
                 if gate_node is None or approach is None:
                     continue

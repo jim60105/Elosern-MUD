@@ -24,6 +24,7 @@ from world.maps.bootstrap import (
     sync_grid,
     sync_service_interiors,
 )
+from world.maps.static_references import place_exterior_xyz
 
 # The catalogs are read through the owning module (the shared probes helpers'
 # binding-safe accessor: the attribute is assembled at call time, never bound
@@ -62,8 +63,7 @@ class ServiceInteriorTests(EvenniaTestCase):
         return rooms[0] if rooms else None
 
     def _exterior(self, place):
-        zcoord = _settlements()[place.settlement_key].zcoord
-        return GridRoom.objects.filter_xyz(xyz=(*place.exterior_xy, zcoord)).first()
+        return GridRoom.objects.filter_xyz(xyz=place_exterior_xyz(place)).first()
 
     def test_fresh_sync_creates_one_permanent_interior_per_place(self):
         sync_service_interiors()
@@ -214,7 +214,7 @@ class ServiceInteriorTests(EvenniaTestCase):
         sync_service_interiors()
         groups: dict[tuple, list] = {}
         for place in _places().values():
-            groups.setdefault((place.settlement_key, place.exterior_xy), []).append(place)
+            groups.setdefault((place.settlement_key, place.exterior), []).append(place)
         shared = [row for row in groups.values() if len(row) >= 2]
         self.assertTrue(shared, "no exterior carries two places for the scenario")
         for places_on_one in shared:
@@ -244,34 +244,33 @@ class ServiceInteriorTests(EvenniaTestCase):
         "place-driven-service-sync::interiors-are-created-by-iterating-the-place-registry"
     )
     def test_one_unresolvable_exterior_warns_and_skips_only_that_place(self):
-        # The extra place's exterior coordinate resolves to no grid room
-        # (no settlement map has a node there); every other live place must
-        # still synchronize, exactly the warn-and-skip contract.
+        # One live place whose exterior identity resolves but whose grid room
+        # is absent must warn and skip alone; every other live place still
+        # synchronizes, exactly the warn-and-skip contract.
         places = _places()
-        bad_place = replace(
-            next(iter(places.values())),
-            key="t_missing_exterior",
-            room_name_zh="測試無外景點",
-            room_desc_zh="No exterior backs this place.",
-            exterior_xy=(9, 9),
+        bad_place = next(
+            place
+            for place in places.values()
+            if sum(other.exterior == place.exterior for other in places.values()) == 1
         )
+        exterior_xyz = place_exterior_xyz(bad_place)
+        GridRoom.objects.filter_xyz(exterior_xyz).first().delete()
         with patch("world.maps.bootstrap.log_warn") as warned:
-            with patch.dict(places, {"t_missing_exterior": bad_place}, clear=False):
-                sync_service_interiors()
+            sync_service_interiors()
         events = [
             call for call in warned.call_args_list
             if call.args and call.args[0] == "bootstrap_service_exterior_missing"
         ]
         self.assertEqual(len(events), 1)
-        self.assertEqual(events[0].kwargs["context"]["place"], "t_missing_exterior")
+        self.assertEqual(events[0].kwargs["context"]["place"], bad_place.key)
         self.assertEqual(
             events[0].kwargs["context"]["exterior_xyz"],
-            (9, 9, _settlements()[bad_place.settlement_key].zcoord),
+            exterior_xyz,
         )
         self.assertEqual(events[0].kwargs["context"]["action"], "skip_place")
         self.assertIsNone(self._interior(bad_place))
         for place in places.values():
-            if place.key == "t_missing_exterior":
+            if place.key == bad_place.key:
                 continue
             self.assertIsNotNone(self._interior(place), place.key)
 

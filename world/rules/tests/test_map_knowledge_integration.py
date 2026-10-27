@@ -19,6 +19,7 @@ from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom, InstanceRoom, Room, TerrainRoom
 from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.maps import wilderness_provider
+from world.maps.static_references import settlement_node_xyz
 from world.rules.clock import get_world_clock
 from world.rules.map_knowledge import (
     KnowledgeError,
@@ -77,11 +78,11 @@ class MapKnowledgeSeamTests(EvenniaTest):
         # Resolve the map vocabulary only after the grid bootstraps.
         self.map = live_map_key()
         self.gate_row = live_city_gate_registry()[self.map]
-        # The city-gate row's own gate_xyz is the south gate room's
+        # The city-gate row's own identity is the south gate room's
         # coordinate — read from the live registry, not a shipped constant.
-        self.south_gate_xyz = self.gate_row.gate_xyz
+        self.south_gate_xyz = settlement_node_xyz(self.gate_row.gate)
         entry, west_row = _entry_with_west_gate_on(self.map)
-        self.east_gate_xyz = (*west_row.grid_xy, west_row.z_map_key)
+        self.east_gate_xyz = settlement_node_xyz(west_row.destination)
         self.entry_xy = entry.approach_cell(west_row)
         self.wild = getattr(wilderness_provider, "WILDERNESS_NAME")
         self.east_gate = GridRoom.objects.filter_xyz(xyz=self.east_gate_xyz).first()

@@ -49,8 +49,10 @@ class WildernessExplorationPresenterTests(EvenniaTestCase):
         gate = next(
             entry.gate_for("w") for entry in entries if entry.gate_for("w") is not None
         )
+        from world.maps.static_references import settlement_node_xyz
+
         cls._east_gate = GridRoom.objects.filter_xyz(
-            xyz=(*gate.grid_xy, gate.z_map_key)
+            xyz=settlement_node_xyz(gate.destination)
         ).first()
 
     def setUp(self):

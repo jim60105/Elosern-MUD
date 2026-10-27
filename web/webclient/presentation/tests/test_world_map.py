@@ -8,6 +8,7 @@ from unittest.mock import Mock, patch
 from tools.spec_traceability import covers_requirement
 from web.webclient.presentation import world_map as panel
 from web.webclient.presentation.world_map_geometry import raster_rings
+from elosern_map_core.references import wilderness_cell_ref
 from world.rules.map_knowledge import encode_wild
 from world.maps.wilderness_provider import WILDERNESS_NAME
 
@@ -23,7 +24,7 @@ PUBLIC="VISIBLE_PORT_329"
 def fixtures():
     stack=ExitStack()
     stack.enter_context(patch("world.lore.map_districts.MAP_DISTRICT_REGISTRY",{
-        SECRET:NS(landmark_node=LANDMARK)}))
+        SECRET:NS(landmark=wilderness_cell_ref((12, 13)))}))
     stack.enter_context(patch.object(panel.geometry,"common_layer",return_value=dict(coastline=RING,borders=[],nations=[])))
     stack.enter_context(patch.object(panel.geometry,"district_geometry",return_value={SECRET:dict(
         name=SECRET,outline=[RING],landmark=dict(name="SECRET_LANDMARK_632",x=12.5,y=13.5),
@@ -178,7 +179,7 @@ class WorldMapPrivacyTests(TestCase):
              patch("world.lore.anchor_placement.ANCHOR_PLACEMENT_REGISTRY",{}), \
              patch("world.lore.wilderness_regions.HARBOR_SITE_REGISTRY",{}), \
              patch("world.maps.district_partition.district_at",return_value=SECRET):
-            records=panel.geometry.place_geometry.__wrapped__()
+            records=panel.geometry._place_geometry("uncached-probe")
         policy={row["name"]:hidden for _,row,hidden,_ in records}
         self.assertTrue(policy[VILLAGE])
         self.assertTrue(policy[DUNGEON])

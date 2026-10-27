@@ -92,6 +92,30 @@ changed. It then applies all plans in one transaction:
 `sync_settlement_graph(graph)` exposes the same convergence for one synthetic
 or test graph and returns a `SyncReport(created, updated, deleted)`.
 
+## Static references
+
+Static map targets outside the settlement graph — city gates (虛境 bridges),
+ghost-anchor placements, wilderness entry gates, service place exteriors,
+district landmarks and grid scene-art associations — declare a qualified
+identity (`QualifiedRef`: tagged domain, map scope, object id, or an explicitly
+typed wilderness cell). They never store coordinates.
+
+`world/maps/static_references.py` is the one game-side boundary that resolves
+those identities against the current bindings (`settlement_node_xyz`,
+`place_exterior_xyz`, `anchor_entrance_xyz`, `map_reference_index`,
+`binding_signature`). Moving an authored node therefore moves every dependent
+family without editing a target. The map-knowledge wire grammar (`grid:` /
+`wild:`) is unchanged and is derived at the consumer boundary; no
+coordinate-to-id alias table or fallback exists.
+
+`validate_static_references()` resolves the complete declaration closure from
+one binding snapshot. The startup catalog runs it as
+`static_map_reference_validation` before `sync_all`, and the direct sync
+entrypoints run it before their first write, so an absent, wrong-domain or
+duplicate target is rejected with the declaration and target named, leaving
+prior persistent state and knowledge untouched. A valid target with no
+materialized room keeps the existing warn-and-skip convergence behavior.
+
 ## Route adapter
 
 `SparseSettlementGraph.route()` runs Dijkstra over the declared adjacency only;

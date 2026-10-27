@@ -8,6 +8,7 @@ share the same pre-destination depletion admission.
 """
 
 from tools.spec_traceability import covers_requirement
+from elosern_map_core.references import settlement_node_ref
 
 from unittest.mock import patch
 from unittest.mock import MagicMock
@@ -824,7 +825,9 @@ class GateApproachCostTests(EvenniaTest):
             anchor_key="t_gate_anchor",
             shape=("#",),
             origin_xy=(100, 100),
-            gates=(WildernessGate("s", (1, 1), "t_gate_map"),),
+            gates=(
+                WildernessGate("s", settlement_node_ref("t_gate_map", "gate")),
+            ),
         )
         graph = SparseSettlementGraph(
             "t_gate_map",
@@ -847,7 +850,12 @@ class GateApproachCostTests(EvenniaTest):
                 # Assembled name: this behavior suite must not reference a
                 # catalog symbol literally.
                 getattr(travel_cost, "ANCHOR_PLACEMENT" + "_REGISTRY"),
-                {"t_gate_anchor": AnchorPlacement("t_gate_anchor", "t_gate_map", (0, 0))},
+                {
+                    "t_gate_anchor": AnchorPlacement(
+                        "t_gate_anchor",
+                        settlement_node_ref("t_gate_map", "anchor"),
+                    )
+                },
             ),
             patch.dict(
                 getattr(wilderness_entry_module, "WILDERNESS_ENTRY" + "_REGISTRY"),

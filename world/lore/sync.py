@@ -146,9 +146,16 @@ def sync_all() -> None:
     :func:`sync_monster_placement` for the same reason.
     """
 
+    # Every authored static map target resolves against one current binding
+    # snapshot before the first mirrored Script is created or updated
+    # (all-or-nothing import convention). This also covers a direct
+    # ``sync_all()`` call outside the startup catalog.
+    from world.maps.static_references import validate_static_references
+
+    validate_static_references()
     # wilderness-anchor-footprint: malformed authored wilderness data fails at
     # startup, before any lore:wilderness_entries:* Script is created or
-    # updated (all-or-nothing import convention).
+    # updated.
     validate_wilderness_entries()
 
     for category, registry in _ALL_REGISTRIES.items():

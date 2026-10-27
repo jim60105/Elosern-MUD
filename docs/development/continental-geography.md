@@ -72,12 +72,15 @@ geography and is not runtime data.
 `world/lore/map_districts.py` declares `MAP_DISTRICT_REGISTRY`, the frozen
 districts of the world map (world-map drawer design §4.1). Each `MapDistrict`
 has exactly one landmark and six fields: `key`, `district_name_zh`,
-`landmark_name_zh`, `landmark_node`, `kind` (`voronoi` or `region`) and
+`landmark_name_zh`, `landmark`, `kind` (`voronoi` or `region`) and
 `region_key` (set only for a `region` district).
 
-- `landmark_node` is the canonical map-knowledge node ID the player's arrival
-  records: `wild:elosern:<x>:<y>`, or `grid:<map>:<x>:<y>` for an existing
-  settlement node. A grid landmark is placed on the continent through the
+- `landmark` is a qualified authored identity: an existing settlement node
+  identity, an authored location, or an explicitly typed wilderness cell. The
+  canonical map-knowledge node ID the player's arrival records
+  (`wild:elosern:<x>:<y>` or `grid:<map>:<x>:<y>`) is derived from the
+  current binding by `world.lore.map_districts.landmark_node_ids`, never stored
+  in the row. A settlement landmark is placed on the continent through the
   settlement's local frame (`world_position_m`); Altoria's central plaza lands
   on the centre of cell `(860, 1080)`.
 - `region` districts take every cell of one terrain region. The northern deep
@@ -247,7 +250,9 @@ reveals nothing; knowledge and visibility rules remain authoritative, and
 
 `ANCHOR_PLACEMENT_REGISTRY` describes exactly
 the anchors with a built grid map; all geographic cells live in
-`ANCHOR_GEOGRAPHY_REGISTRY` instead.
+`ANCHOR_GEOGRAPHY_REGISTRY` instead. A placement holds the qualified
+settlement-node identity of the anchor room; its current grid address is
+derived through `world/maps/static_references.py`.
 
 ## Quest destinations on the map
 

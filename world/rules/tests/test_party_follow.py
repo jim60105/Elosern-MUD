@@ -22,6 +22,7 @@ from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom, Room
 from world.lore.sync import sync_all
 from world.maps.bootstrap import sync_grid, sync_wilderness
+from world.maps.static_references import settlement_node_xyz
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.clock import CLOCK_YAML, get_world_clock
 from world.rules.party import (
@@ -54,7 +55,7 @@ def _east_gate_probe():
         entry for entry in entries if entry.gate_for("w") is not None
     )
     gate = entry.gate_for("w")
-    return (*gate.grid_xy, gate.z_map_key), entry.approach_cell(gate)
+    return settlement_node_xyz(gate.destination), entry.approach_cell(gate)
 
 
 EAST_GATE_XYZ, ENTRY_XY = _east_gate_probe()  # the east-gate approach cell

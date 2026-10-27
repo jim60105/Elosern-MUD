@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from world.lore import anchors as anchors_module
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY, AnchorPlacement
+from world.maps.static_references import anchor_entrance_xyz
 from world.lore.anchors import (
     ANCHOR_GEOGRAPHY_REGISTRY,
     ANCHOR_REGISTRY,
@@ -30,11 +31,13 @@ class AnchorPlacementRegistryTests(unittest.TestCase):
         capital = ANCHOR_PLACEMENT_REGISTRY["capital_altoria"]
         self.assertEqual(capital.anchor_key, "capital_altoria")
         self.assertEqual(capital.zcoord, "capital_altoria")
-        self.assertEqual(capital.entrance_xy, (3500, 2850))
+        self.assertEqual(anchor_entrance_xyz(capital), (3500, 2850, "capital_altoria"))
+        self.assertEqual(capital.node.object_id, "central_plaza")
         village = ANCHOR_PLACEMENT_REGISTRY["village_ciaran"]
         self.assertEqual(village.anchor_key, "village_ciaran")
         self.assertEqual(village.zcoord, "village_ciaran")
-        self.assertEqual(village.entrance_xy, (220, 305))
+        self.assertEqual(anchor_entrance_xyz(village), (220, 305, "village_ciaran"))
+        self.assertEqual(village.node.object_id, "village_plaza")
 
     @covers_requirement("anchor-placement::every-placement-s-anchor-key-resolves-against-anchor-registry")
     def test_every_entrys_anchor_key_exists_in_anchor_registry(self):
@@ -68,7 +71,7 @@ class AnchorPlacementRegistryTests(unittest.TestCase):
         self.assertLessEqual(set(ANCHOR_PLACEMENT_REGISTRY), set(ANCHOR_GEOGRAPHY_REGISTRY))
         self.assertEqual(
             {field.name for field in fields(AnchorPlacement)},
-            {"anchor_key", "zcoord", "entrance_xy"},
+            {"anchor_key", "node"},
         )
         self.assertEqual(
             {field.name for field in fields(GeographicAnchor)},

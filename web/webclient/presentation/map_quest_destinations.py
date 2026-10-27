@@ -289,7 +289,14 @@ def _resolve_locator(record, definition, locator) -> QuestDestination | None:
         placement = ANCHOR_PLACEMENT_REGISTRY.get(locator.anchor_key)
         node_id = None
         if placement is not None:
-            node_id = _grid_node(placement.zcoord, *placement.entrance_xy)
+            from world.maps.static_references import settlement_node_xy
+
+            node_id = _grid_node(
+                placement.zcoord,
+                *settlement_node_xy(
+                    placement.node, source=f"anchor placement {placement.anchor_key}"
+                ),
+            )
         return QuestDestination(
             record.quest_id,
             record.definition_key,

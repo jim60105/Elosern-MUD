@@ -24,6 +24,7 @@ from typeclasses.rooms import GridRoom, Room, TerrainRoom
 from typeclasses.exits import WildernessGateExit
 from world.lore.sync import sync_all
 from world.maps.bootstrap import sync_grid, sync_wilderness
+from world.maps.static_references import settlement_node_xyz
 from world.maps.wilderness_population import (
     CAPITAL_ENTRY_XY,
     ensure_population,
@@ -97,7 +98,7 @@ def live_gateway_entry():
 
 
 _EAST_GATE = live_gateway_entry().gate_for("w")
-EAST_GATE_XYZ = (*_EAST_GATE.grid_xy, _EAST_GATE.z_map_key)
+EAST_GATE_XYZ = settlement_node_xyz(_EAST_GATE.destination)
 EAST_APPROACH = live_gateway_entry().approach_cell(_EAST_GATE)
 
 ENTRY_XY = CAPITAL_ENTRY_XY  # the east-gate approach cell, EAST_APPROACH

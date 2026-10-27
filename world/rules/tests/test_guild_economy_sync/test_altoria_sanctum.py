@@ -71,9 +71,9 @@ def _interior(place):
 
 
 def _exterior(place):
-    return GridRoom.objects.filter_xyz(
-        xyz=(*place.exterior_xy, _settlements()[place.settlement_key].zcoord)
-    ).first()
+    from world.maps.static_references import place_exterior_xyz
+
+    return GridRoom.objects.filter_xyz(xyz=place_exterior_xyz(place)).first()
 
 
 def _host(place):
@@ -178,7 +178,7 @@ class AltoriaSanctumTests(ServiceContentIsolation, EvenniaTestCase):
             sync_service_content()
         temple, sanctum = _temple_place(), _sanctum_place()
         self.assertEqual(
-            temple.exterior_xy, sanctum.exterior_xy,
+            temple.exterior, sanctum.exterior,
             "the two counters no longer share the temple steps",
         )
         self.assertNotEqual(temple.doorway_key_zh, sanctum.doorway_key_zh)

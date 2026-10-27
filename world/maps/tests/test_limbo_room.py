@@ -17,6 +17,7 @@ from typeclasses.exits import Exit
 from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom, LimboRoom, Room
 from world.maps.bootstrap import sync_grid, sync_limbo
+from world.maps.static_references import settlement_node_xyz
 from world.maps.limbo import (
     LIMBO_ALIAS,
     LIMBO_DESC,
@@ -43,7 +44,7 @@ def _gate_row():
     return registry[keys[0]]
 
 
-SOUTH_GATE_XYZ = _gate_row().gate_xyz
+SOUTH_GATE_XYZ = settlement_node_xyz(_gate_row().gate)
 
 
 class LimboRoomTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):

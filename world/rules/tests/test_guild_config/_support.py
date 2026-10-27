@@ -17,6 +17,7 @@ from unittest import mock
 
 import yaml
 
+from elosern_map_core.references import settlement_node_ref
 from world.lore.economy import PRICE_TABLE, PriceEntry
 from world.lore.guild import GUILD_BRANCH_REGISTRY
 from world.lore.guild import GUILD_RANK_REGISTRY
@@ -173,7 +174,7 @@ def _price_shop_env(
         kind=PlaceKind.GENERAL_STORE,
         room_name_zh="合成價格雜貨店",
         room_desc_zh="A synthetic price-scaling store.",
-        exterior_xy=(0, 0),
+        exterior=settlement_node_ref(settlement_key, "t_price_probe"),
         doorway_key_zh="合成價格入口",
         doorway_aliases=("probe store",),
         host_name="合成價格店主",

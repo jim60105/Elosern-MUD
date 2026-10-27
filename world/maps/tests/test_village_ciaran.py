@@ -11,6 +11,7 @@ from tools.spec_traceability import covers_requirement
 from evennia.utils.test_resources import EvenniaTestCase
 
 from world.maps.map_data import SETTLEMENT_GRAPHS
+from world.maps.static_references import settlement_node_xyz
 from world.maps.village_ciaran import PROTOTYPES, XYMAP_DATA
 
 # The approved outdoor positions, keyed by their stable authored identity.
@@ -222,7 +223,10 @@ class VillageCiaranMapTests(EvenniaTestCase):
         from world.maps.city_gates import CITY_GATE_REGISTRY
 
         row = CITY_GATE_REGISTRY["village_ciaran"]
-        self.assertEqual(row.gate_xyz, (*METER_COORDS["hidden_path"], "village_ciaran"))
+        self.assertEqual(
+            settlement_node_xyz(row.gate),
+            (*METER_COORDS["hidden_path"], "village_ciaran"),
+        )
 
     def test_no_wall_gate_guard_or_marketplace_in_village_text(self):
         for coordinate, prototype in PROTOTYPES.items():

@@ -81,9 +81,9 @@ def _interior(place):
 
 
 def _exterior(place):
-    return GridRoom.objects.filter_xyz(
-        xyz=(*place.exterior_xy, _settlements()[place.settlement_key].zcoord)
-    ).first()
+    from world.maps.static_references import place_exterior_xyz
+
+    return GridRoom.objects.filter_xyz(xyz=place_exterior_xyz(place)).first()
 
 
 def _host(place):
@@ -203,7 +203,7 @@ class AltoriaHospitalityTests(ServiceContentIsolation, EvenniaTestCase):
         tavern = _place_by_kind("tavern")
         inn = _place_by_kind("lodging")
         self.assertEqual(
-            tavern.exterior_xy, inn.exterior_xy,
+            tavern.exterior, inn.exterior,
             "the inn and the tavern no longer share the inn lane",
         )
         self.assertNotEqual(tavern.doorway_key_zh, inn.doorway_key_zh)

@@ -36,36 +36,44 @@ SYNTH_PREFIX = "t_"
 _SYNTH_MAP_KEY = sorted(KNOWN_GRID_MAP_KEYS)[0]
 
 
-def _shipped_first_gate_xy() -> tuple[int, int]:
-    """The shipped city-gate row's own (x, y), borrowed at kit assembly.
+def _shipped_first_gate_ref():
+    """The shipped city-gate row's own node identity, borrowed at kit assembly.
 
-    The kit's one city-gate row must land on a cell that survives
-    ``sync_grid()`` under the shipped map extent — the fixtures' registry
-    probes then resolve a real room for it. The shipped grid is still live
-    when the kit module imports (install patches registries afterwards), so
-    the borrowed cell follows the shipped gate wherever the map data is
-    re-planned, and the kit never names the shipped coordinate literally.
-    The row is selected by the SAME sorted-first key contract the fixtures'
-    registry probes use, so kit cell and probed home can never diverge.
+    The kit's city-gate, placement and wilderness-gate rows must land on a
+    node ``sync_grid()`` really materializes — the fixtures' registry probes
+    then resolve a real room. The shipped grid is still live when the kit
+    module imports (install patches registries afterwards), so the borrowed
+    identity follows the shipped gate wherever the map data is re-planned,
+    and the kit never names shipped coordinates literally. The row is selected
+    by the SAME sorted-first key contract the fixtures' registry probes use, so
+    kit identity and probed home can never diverge.
     """
     module = importlib.import_module(
         ".".join(("world", "maps", "city_gates"))
     )
     registry = getattr(module, "CITY" + "_GATE_REGISTRY")
-    _x, _y, _map_id = registry[sorted(registry)[0]].gate_xyz
-    return (_x, _y)
+    return registry[sorted(registry)[0]].gate
 
 
-_SYNTH_GATE_XY = _shipped_first_gate_xy()
+_SYNTH_GATE_REF = _shipped_first_gate_ref()
 
 
-def _shipped_second_wilderness_gate_xy() -> tuple[int, int]:
-    """The shipped capital entry's other gate cell, borrowed at kit assembly.
+def _ref_xy(reference) -> tuple[int, int]:
+    """The current address of one borrowed identity, before any patch."""
+    module = importlib.import_module(".".join(("world", "maps", "static_references")))
+    return getattr(module, "settlement_node_xy")(reference)
 
-    A synthetic wilderness gate must land on a cell ``sync_grid()`` really
+
+_SYNTH_GATE_XY = _ref_xy(_SYNTH_GATE_REF)
+
+
+def _shipped_second_wilderness_gate_ref():
+    """The shipped capital entry's other gate identity, borrowed at kit assembly.
+
+    A synthetic wilderness gate must land on a node ``sync_grid()`` really
     materializes, or the fixtures' ``filter_xyz`` probe resolves no room and
     the gateway silently disappears from the seeded map knowledge. The kit's
-    first gate already borrows the shipped city-gate cell; its second gate
+    first gate already borrows the shipped city-gate node; its second gate
     borrows the same entry's remaining gate, resolved from the live registry
     (still shipped when this module imports).
     """
@@ -75,12 +83,13 @@ def _shipped_second_wilderness_gate_xy() -> tuple[int, int]:
     registry = getattr(module, "WILDERNESS" + "_ENTRY_REGISTRY")
     entry = registry[sorted(registry)[0]]
     for gate in entry.gates:
-        if tuple(gate.grid_xy) != _SYNTH_GATE_XY:
-            return tuple(gate.grid_xy)
-    return _SYNTH_GATE_XY
+        if _ref_xy(gate.destination) != _SYNTH_GATE_XY:
+            return gate.destination
+    return _SYNTH_GATE_REF
 
 
-_SYNTH_SECOND_GATE_XY = _shipped_second_wilderness_gate_xy()
+_SYNTH_SECOND_GATE_REF = _shipped_second_wilderness_gate_ref()
+_SYNTH_SECOND_GATE_XY = _ref_xy(_SYNTH_SECOND_GATE_REF)
 
 
 def _shipped_first_element_key() -> str:

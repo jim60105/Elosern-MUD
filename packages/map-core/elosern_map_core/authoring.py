@@ -43,6 +43,11 @@ from .documents import (
 )
 from .sources import SourceDocument, fingerprint_text, is_world_source
 from .sparse import SparseGraphError, SparseNode, SparseRoad, SparseSettlementGraph
+from .references import (
+    ReferenceError,
+    ReferenceIndex,
+    resolve_reference,
+)
 from .terrain import (
     REGION_KEYS,
     TerrainDefinition,
@@ -112,6 +117,17 @@ class AuthoringWorld:
     documents: tuple[AuthoringDocument, ...]
     fingerprints: Mapping[str, str]
     diagnostics: tuple[Diagnostic, ...]
+
+    @property
+    def reference_index(self) -> ReferenceIndex:
+        """The current bindings every authored static target resolves against."""
+
+        return ReferenceIndex.from_documents(
+            settlements=self.settlements,
+            interiors=self.interiors,
+            locations=self.locations,
+            frame_cells=self.continent.terrain.frame_cells,
+        )
 
     @property
     def fingerprint(self) -> str:
@@ -442,8 +458,13 @@ def _structural_diagnostics(
                         )
                     )
 
+    reference_index = ReferenceIndex.from_documents(
+        settlements=settlements,
+        interiors=interiors,
+        locations=locations,
+        frame_cells=continent.terrain.frame_cells,
+    )
     for district_id, district in districts.districts.items():
-        landmark = district.landmark
         if district.kind == "region" and district.region_key not in continent.regions:
             diagnostics.append(
                 _diagnostic(
@@ -455,70 +476,23 @@ def _structural_diagnostics(
                     object_id=district_id,
                 )
             )
-        if landmark.domain == "settlement_node":
-            settlement = settlements.get(landmark.map_id or "")
-            if settlement is None:
-                diagnostics.append(
-                    _diagnostic(
-                        "unknown_reference",
-                        STRUCTURE,
-                        f"landmark map {landmark.map_id!r} is not an authored settlement",
-                        document=districts,
-                        field_path=f"districts.{district_id}.landmark.map_id",
-                        object_id=district_id,
-                    )
+        try:
+            resolve_reference(
+                reference_index,
+                district.landmark,
+                source=f"district {district_id}",
+            )
+        except ReferenceError as error:
+            diagnostics.append(
+                _diagnostic(
+                    error.code,
+                    STRUCTURE,
+                    str(error),
+                    document=districts,
+                    field_path=f"districts.{district_id}.landmark",
+                    object_id=district_id,
                 )
-            elif landmark.object_id not in settlement.nodes:
-                diagnostics.append(
-                    _diagnostic(
-                        "unknown_reference",
-                        STRUCTURE,
-                        f"landmark node {landmark.object_id!r} is not in {landmark.map_id!r}",
-                        document=districts,
-                        field_path=f"districts.{district_id}.landmark.object_id",
-                        object_id=district_id,
-                    )
-                )
-        elif landmark.domain == "interior_room":
-            interior = interiors.get(landmark.map_id or "")
-            if interior is None or landmark.object_id not in interior.rooms:
-                diagnostics.append(
-                    _diagnostic(
-                        "unknown_reference",
-                        STRUCTURE,
-                        f"landmark room {landmark.object_id!r} is not authored in "
-                        f"{landmark.map_id!r}",
-                        document=districts,
-                        field_path=f"districts.{district_id}.landmark",
-                        object_id=district_id,
-                    )
-                )
-        elif landmark.domain == "location":
-            if landmark.object_id not in locations.locations:
-                diagnostics.append(
-                    _diagnostic(
-                        "unknown_reference",
-                        STRUCTURE,
-                        f"landmark location {landmark.object_id!r} is not authored",
-                        document=districts,
-                        field_path=f"districts.{district_id}.landmark.object_id",
-                        object_id=district_id,
-                    )
-                )
-        elif landmark.domain == "wilderness_cell":
-            cell = landmark.cell
-            frame = continent.terrain.frame_cells
-            if cell is None or not (0 <= cell[0] < frame and 0 <= cell[1] < frame):
-                diagnostics.append(
-                    _diagnostic(
-                        "unknown_reference",
-                        STRUCTURE,
-                        f"landmark cell {cell!r} is outside the {frame}-cell frame",
-                        document=districts,
-                        field_path=f"districts.{district_id}.landmark.cell",
-                        object_id=district_id,
-                    )
-                )
+            )
 
     for interior_id, interior in interiors.items():
         room_ids = set(interior.rooms)

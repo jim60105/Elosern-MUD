@@ -21,12 +21,19 @@ from world.maps.city_gates import CITY_GATE_REGISTRY, CityGateDef
 from world.maps.bootstrap import sync_grid, sync_limbo, sync_wilderness
 from world.maps.limbo import LIMBO_ALIAS, LIMBO_DESC, LIMBO_KEY, LIMBO_LEGACY_KEY
 from world.maps.map_data import SETTLEMENT_GRAPHS
+from world.maps.static_references import (
+    StaticReferenceError,
+    anchor_entrance_xyz,
+    place_exterior_xyz,
+    settlement_node_xyz,
+)
+from elosern_map_core.references import settlement_node_ref
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
 _CAPITAL_ENTRY = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
-SOUTH_GATE_XYZ = (*_CAPITAL_ENTRY.gate_for("n").grid_xy, "capital_altoria")
-EAST_GATE_XYZ = (*_CAPITAL_ENTRY.gate_for("w").grid_xy, "capital_altoria")
+SOUTH_GATE_XYZ = settlement_node_xyz(_CAPITAL_ENTRY.gate_for("n").destination)
+EAST_GATE_XYZ = settlement_node_xyz(_CAPITAL_ENTRY.gate_for("w").destination)
 
 
 class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
@@ -164,20 +171,19 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         sync_grid()
 
         # Every placement row matches its settlement's spawned AnchorRoom:
-        # zcoord and entrance_xy equal the room's coordinates, and no two
+        # zcoord and the resolved entrance equal the room's coordinates, and no two
         # entries share a zcoord.
         self.assertEqual(
             len({placement.zcoord for placement in ANCHOR_PLACEMENT_REGISTRY.values()}),
             len(ANCHOR_PLACEMENT_REGISTRY),
         )
         for placement in ANCHOR_PLACEMENT_REGISTRY.values():
-            room = GridRoom.objects.filter_xyz(
-                xyz=(placement.entrance_xy[0], placement.entrance_xy[1], placement.zcoord)
-            ).first()
+            entrance = anchor_entrance_xyz(placement)
+            room = GridRoom.objects.filter_xyz(xyz=entrance).first()
             self.assertIsInstance(room, AnchorRoom)
             self.assertEqual(room.anchor_key, placement.anchor_key)
             self.assertEqual(room.xyz[2], placement.zcoord)
-            self.assertEqual((room.xyz[0], room.xyz[1]), placement.entrance_xy)
+            self.assertEqual(room.xyz, entrance)
 
     def test_bridging_exits_bind_limbo_and_south_gate_idempotently(self):
         limbo = create_object(Room, key=LIMBO_KEY, location=None)
@@ -269,15 +275,14 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
 
         self.assertEqual(list(CITY_GATE_REGISTRY), ["capital_altoria", "village_ciaran"])
         row = CITY_GATE_REGISTRY["capital_altoria"]
-        self.assertEqual(row.gate_xyz, SOUTH_GATE_XYZ)
+        self.assertEqual(settlement_node_xyz(row.gate), SOUTH_GATE_XYZ)
         self.assertEqual(row.exit_key, "南門")
         self.assertEqual(row.exit_aliases, ("王都", "城門"))
         village = CITY_GATE_REGISTRY["village_ciaran"]
         self.assertEqual(
-            village.gate_xyz,
-            (
-                *WILDERNESS_ENTRY_REGISTRY["village_ciaran"].gate_for("n").grid_xy,
-                "village_ciaran",
+            settlement_node_xyz(village.gate),
+            settlement_node_xyz(
+                WILDERNESS_ENTRY_REGISTRY["village_ciaran"].gate_for("n").destination
             ),
         )
         self.assertEqual(village.exit_key, "隱密小徑")
@@ -366,7 +371,10 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         limbo = create_object(Room, key=LIMBO_KEY, location=None)
         sync_grid()
 
-        expected = {row.exit_key: row.gate_xyz for row in CITY_GATE_REGISTRY.values()}
+        expected = {
+            row.exit_key: settlement_node_xyz(row.gate)
+            for row in CITY_GATE_REGISTRY.values()
+        }
         self.assertEqual(
             {exit_obj.key: exit_obj.destination.xyz for exit_obj in limbo.exits},
             expected,
@@ -388,7 +396,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         for row in CITY_GATE_REGISTRY.values():
             exit_obj = by_key[row.exit_key]
             # Exactly one forward exit per row, leading to that row's gate room.
-            self.assertEqual(exit_obj.destination.xyz, row.gate_xyz)
+            self.assertEqual(exit_obj.destination.xyz, settlement_node_xyz(row.gate))
 
     @covers_requirement(
         "village-ciaran-map::the-village-has-exactly-one-concealed-entrance"
@@ -432,11 +440,10 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
             )
 
     @covers_requirement("limbo-one-way-gates::a-registry-row-whose-gate-room-is-missing-warns-and-is-skipped-without-blocking-other-rows")
-    def test_missing_gate_room_row_warns_and_skips_without_blocking(self):
+    def test_absent_authored_gate_target_rejects_before_bridging(self):
         limbo = create_object(Room, key=LIMBO_KEY, location=None)
         broken_row = CityGateDef(
-            map_id="nowhere_city",
-            gate_xyz=(9, 9, "nowhere"),
+            gate=settlement_node_ref("nowhere_city", "missing"),
             exit_key="空門",
             exit_aliases=("不存在",),
         )
@@ -444,7 +451,36 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         rebound["nowhere_city"] = broken_row
 
         with (
+            patch("world.maps.city_gates.CITY_GATE_REGISTRY", rebound),
             patch("world.maps.bootstrap.CITY_GATE_REGISTRY", rebound),
+        ):
+            with self.assertRaises(StaticReferenceError):
+                sync_grid()
+        self.assertEqual(list(limbo.exits), [])
+
+    @covers_requirement("limbo-one-way-gates::a-registry-row-whose-gate-room-is-missing-warns-and-is-skipped-without-blocking-other-rows")
+    def test_missing_gate_room_row_warns_and_skips_without_blocking(self):
+        # A valid authored identity whose materialized room is absent keeps
+        # the convergence warn-and-skip contract; only resolution failures
+        # are rejected by the preflight.
+        limbo = create_object(Room, key=LIMBO_KEY, location=None)
+        broken_row = CityGateDef(
+            gate=settlement_node_ref("capital_altoria", "east_gate"),
+            exit_key="空門",
+            exit_aliases=("不存在",),
+        )
+        rebound = dict(CITY_GATE_REGISTRY)
+        rebound["missing_room"] = broken_row
+        real_resolve = settlement_node_xyz
+
+        def resolve(reference, **kwargs):
+            if reference == broken_row.gate:
+                return (999, 999, "capital_altoria")
+            return real_resolve(reference, **kwargs)
+
+        with (
+            patch("world.maps.bootstrap.CITY_GATE_REGISTRY", rebound),
+            patch("world.maps.bootstrap.settlement_node_xyz", side_effect=resolve),
             patch("world.maps.bootstrap.log_warn") as warn,
         ):
             sync_grid()
@@ -455,20 +491,19 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
             if call.args and call.args[0] == "bootstrap_grid_gate_missing"
         ]
         self.assertEqual(len(missing), 1)
-        self.assertEqual(missing[0].kwargs["context"]["map_id"], "nowhere_city")
+        self.assertEqual(missing[0].kwargs["context"]["map_id"], "capital_altoria")
         self.assertEqual(missing[0].kwargs["context"]["action"], "skip_gate_row")
         # The healthy rows still converged; the broken row created nothing.
         self.assertEqual(
             sorted(exit_obj.key for exit_obj in limbo.exits),
-            sorted(row.exit_key for row in CITY_GATE_REGISTRY.values()),
+            sorted(row.exit_key for key, row in CITY_GATE_REGISTRY.items()),
         )
 
     @covers_requirement("limbo-one-way-gates::adding-a-city-means-adding-a-registry-row-with-no-bootstrap-code-change")
     def test_second_registry_row_converges_a_second_forward_gate(self):
         limbo = create_object(Room, key=LIMBO_KEY, location=None)
         second_row = CityGateDef(
-            map_id="capital_altoria",
-            gate_xyz=EAST_GATE_XYZ,
+            gate=settlement_node_ref("capital_altoria", "east_gate"),
             exit_key="北門",
             exit_aliases=("王都北",),
         )
@@ -579,9 +614,8 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         # The village's single gate provisions exactly one exit on the
         # entrance node 隱密小徑, facing the wilderness with the authored
         # return direction "n".
-        village_entrance = (
-            *WILDERNESS_ENTRY_REGISTRY["village_ciaran"].gate_for("n").grid_xy,
-            "village_ciaran",
+        village_entrance = settlement_node_xyz(
+            WILDERNESS_ENTRY_REGISTRY["village_ciaran"].gate_for("n").destination
         )
         village_gate_exits = [
             e for e in GridRoom.objects.filter_xyz(xyz=village_entrance).first().exits
@@ -733,8 +767,9 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
 
         entrance_room = GridRoom.objects.filter_xyz(
             xyz=(
-                *WILDERNESS_ENTRY_REGISTRY["village_ciaran"].gate_for("n").grid_xy,
-                "village_ciaran",
+                *settlement_node_xyz(
+                    WILDERNESS_ENTRY_REGISTRY["village_ciaran"].gate_for("n").destination
+                ),
             )
         ).first()
         gate_exit = [
@@ -1363,7 +1398,6 @@ class MetricCutoverTests(EvenniaTest):
         from evennia.utils.search import search_object_by_tag
         from typeclasses.characters import PlayerCharacter
         from world.lore.settlements.places import PLACE_REGISTRY
-        from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
         from world.maps.room_art import grid_scene_identity
         from world.rules.map_knowledge import KNOWLEDGE_ATTR
 
@@ -1416,10 +1450,7 @@ class MetricCutoverTests(EvenniaTest):
         # Every service place's exterior resolves to its converged room and
         # every interior keeps its bidirectional doorway.
         for place in PLACE_REGISTRY.values():
-            zcoord = SETTLEMENT_REGISTRY[place.settlement_key].zcoord
-            exterior = GridRoom.objects.filter_xyz(
-                xyz=(*place.exterior_xy, zcoord)
-            ).first()
+            exterior = GridRoom.objects.filter_xyz(xyz=place_exterior_xyz(place)).first()
             with self.subTest(place=place.key):
                 self.assertIsNotNone(exterior)
                 interior = search_object_by_tag(place.key)

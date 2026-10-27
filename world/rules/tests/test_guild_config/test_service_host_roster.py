@@ -527,21 +527,21 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
     #: comparison and every sync test stayed green. The hosts' authored names
     #: and titles are deliberately not pinned: they follow the current place
     #: declaration, which the correspondence test above checks both ways.
-    #: Shape: place key -> (kind, exterior_xy, doorway name, host race,
+    #: Shape: place key -> (kind, exterior node id, doorway name, host race,
     #: host sex, assortment keys, declared dialogue tables).
     HOSPITALITY_PLACE_ROWS = {
         "altoria_tavern": (
-            "tavern", (3970, 1120), "醉月酒館",
+            "tavern", "inn_lane", "醉月酒館",
             "human", "female", (),
             ("altoria_tavern",),
         ),
         "altoria_lodging": (
-            "lodging", (3970, 1120), "爐火旅店",
+            "lodging", "inn_lane", "爐火旅店",
             "human", "female", (),
             ("altoria_lodging",),
         ),
         "altoria_bathhouse": (
-            "bathhouse", (4830, 970), "公共浴場",
+            "bathhouse", "bath_forecourt", "公共浴場",
             "human", "female", (),
             ("altoria_bathhouse",),
         ),
@@ -561,7 +561,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
                 self.assertEqual(
                     (
                         place.kind.value,
-                        place.exterior_xy,
+                        place.exterior.object_id,
                         place.doorway_key_zh,
                         place.host_race,
                         place.host_sex,
@@ -577,21 +577,21 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
     #: what keeps an attendant from quietly appearing behind the throne.
     CROWN_WATCH_PLACE_ROWS = {
         "altoria_palace": (
-            "palace", (4500, 6350), "王宮",
+            "palace", "palace_forecourt", "王宮",
             None, None, (), (),
         ),
         "altoria_noble_watch": (
-            "watch_post", (3500, 4850), "貴族區衛所",
+            "watch_post", "noble_quarter", "貴族區衛所",
             "human", "male", (),
             ("altoria_noble_watch",),
         ),
         "altoria_drill_yard": (
-            "training_ground", (2300, 3820), "校場",
+            "training_ground", "training_ground", "校場",
             "human", "male", (),
             ("altoria_drill_yard",),
         ),
         "altoria_guardhouse": (
-            "watch_post", (3050, 150), "衛兵駐所",
+            "watch_post", "south_gate", "衛兵駐所",
             "human", "male", (),
             ("altoria_guardhouse",),
         ),
@@ -610,7 +610,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
                 self.assertEqual(
                     (
                         place.kind.value,
-                        place.exterior_xy,
+                        place.exterior.object_id,
                         place.doorway_key_zh,
                         place.host_race,
                         place.host_sex,
@@ -645,17 +645,17 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
     #: CROWN_WATCH_PLACE_ROWS pattern).
     LEARNING_EXCHANGE_PLACE_ROWS = {
         "altoria_academy": (
-            "academy", (5650, 5200), "王立魔法學院",
+            "academy", "academy", "王立魔法學院",
             "human", "male", (),
             ("altoria_academy",),
         ),
         "altoria_merchant_hall": (
-            "merchant_hall", (5380, 2850), "商會公所",
+            "merchant_hall", "east_market", "商會公所",
             "human", "male", (),
             ("altoria_merchant_hall",),
         ),
         "altoria_market_stalls": (
-            "market", (2420, 2700), "市集棚",
+            "market", "market_street", "市集棚",
             None, None, (), (),
         ),
     }
@@ -674,7 +674,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
                 self.assertEqual(
                     (
                         place.kind.value,
-                        place.exterior_xy,
+                        place.exterior.object_id,
                         place.doorway_key_zh,
                         place.host_race,
                         place.host_sex,

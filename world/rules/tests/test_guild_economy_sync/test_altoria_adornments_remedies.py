@@ -51,8 +51,9 @@ def _interior(place):
 
 
 def _exterior(place):
-    zcoord = _settlements()[place.settlement_key].zcoord
-    return GridRoom.objects.filter_xyz(xyz=(*place.exterior_xy, zcoord)).first()
+    from world.maps.static_references import place_exterior_xyz
+
+    return GridRoom.objects.filter_xyz(xyz=place_exterior_xyz(place)).first()
 
 
 def _midday_tick(config):

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from types import MappingProxyType
+from elosern_map_core.references import settlement_node_ref
 from world.lore.anchors import Anchor, AnchorKind
 from world.lore.dialogue.conditions import All, Carries, Exposure, RaceIs
 from world.lore.dialogue.shape import AuthoredDialogue, AuthoredTopic, SceneVariant
@@ -38,8 +39,10 @@ from world.lore.settlements.capability_declarations import capability, place_bou
 
 from world.tests.synthetic_data.vocab import (
     _SYNTH_GATE_XY,
+    _SYNTH_GATE_REF,
     _SYNTH_MAP_KEY,
     _SYNTH_SECOND_GATE_XY,
+    _SYNTH_SECOND_GATE_REF,
 )
 
 SYNTH_GUILD_RANKS: dict[str, GuildRank] = {
@@ -140,9 +143,9 @@ SYNTH_ANCHORS: dict[str, Anchor] = {
 }
 
 SYNTH_ANCHOR_PLACEMENTS: dict[str, AnchorPlacement] = {
-    # Gate destinations resolve against the one known shipped map extent.
-    "t_hollow_tarn": AnchorPlacement("t_hollow_tarn", _SYNTH_MAP_KEY, (3, 3)),
-    "t_split_cairn": AnchorPlacement("t_split_cairn", _SYNTH_MAP_KEY, (4, 3)),
+    # Gate destinations borrow shipped node identities so they resolve.
+    "t_hollow_tarn": AnchorPlacement("t_hollow_tarn", _SYNTH_GATE_REF),
+    "t_split_cairn": AnchorPlacement("t_split_cairn", _SYNTH_SECOND_GATE_REF),
 }
 
 SYNTH_NATIONS: dict[str, Nation] = {
@@ -186,14 +189,14 @@ SYNTH_WILDERNESS_ENTRIES: dict[str, WildernessEntryPoint] = {
         origin_xy=(500, 500),
         # Gate cells are borrowed shipped grid cells: a synthetic gate must
         # name a cell the shipped map materializes, never a stale literal.
-        gates=(WildernessGate("w", _SYNTH_SECOND_GATE_XY, _SYNTH_MAP_KEY),),
+        gates=(WildernessGate("w", _SYNTH_SECOND_GATE_REF),),
     ),
     # Point-shape entry: exactly one '#' cell and exactly one gate.
     "t_split_cairn": WildernessEntryPoint(
         anchor_key="t_split_cairn",
         shape=(".#.",),
         origin_xy=(520, 520),
-        gates=(WildernessGate("n", _SYNTH_GATE_XY, _SYNTH_MAP_KEY),),
+        gates=(WildernessGate("n", _SYNTH_GATE_REF),),
     ),
 }
 
@@ -230,7 +233,7 @@ SYNTH_PLACES: dict[str, PlaceDefinition] = {
         kind=PlaceKind.GUILD_HALL,
         room_name_zh="合成苔徑公會廳",
         room_desc_zh="A synthetic guild hall for the mossgate stand-in world.",
-        exterior_xy=(0, 0),
+        exterior=settlement_node_ref("t_mossgate", "t_guild_hall"),
         doorway_key_zh="合成公會廳入口",
         doorway_aliases=("synthetic hall",),
         host_name="合成苔徑會長",
@@ -258,7 +261,7 @@ SYNTH_PLACES: dict[str, PlaceDefinition] = {
         kind=PlaceKind.GENERAL_STORE,
         room_name_zh="合成苔徑雜貨店",
         room_desc_zh="A synthetic general store for the mossgate stand-in world.",
-        exterior_xy=(1, 1),
+        exterior=settlement_node_ref("t_mossgate", "t_store"),
         doorway_key_zh="合成雜貨店入口",
         doorway_aliases=("synthetic store",),
         host_name="合成苔徑店主",
@@ -286,7 +289,7 @@ SYNTH_PLACES: dict[str, PlaceDefinition] = {
         kind=PlaceKind.HOME,
         room_name_zh="合成苔徑村中廣場",
         room_desc_zh="A synthetic gathering clearing: a place that exists with no host.",
-        exterior_xy=(2, 2),
+        exterior=settlement_node_ref("t_mossgate", "t_plaza"),
         doorway_key_zh="合成廣場入口",
         doorway_aliases=("synthetic plaza",),
     ),
@@ -303,12 +306,11 @@ SYNTH_SHOPS: dict[str, ShopDefinition] = {
 SYNTH_CITY_GATES: MappingProxyType = MappingProxyType(
     {
         _SYNTH_MAP_KEY: CityGateDef(
-            map_id=_SYNTH_MAP_KEY,
-            # The borrowed shipped gate cell (vocab resolver): the kit row
-            # must land on a cell the shipped map data actually contains,
+            # The borrowed shipped gate identity (vocab resolver): the kit
+            # row must land on a node the shipped map data actually contains,
             # or the registry-probing fixtures resolve no room and silently
             # no-op.
-            gate_xyz=(_SYNTH_GATE_XY[0], _SYNTH_GATE_XY[1], _SYNTH_MAP_KEY),
+            gate=_SYNTH_GATE_REF,
             exit_key="霧門",
             exit_aliases=("合成門", "苔徑門"),
         ),

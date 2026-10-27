@@ -46,6 +46,7 @@ def _late(module: str, name: str):
 # quest runtime must run after the lore/map syncs. Guard tests assert against
 # this catalog (behaviorally, via stubs) instead of source text.
 STARTUP_STEP_ORDER: tuple[str, ...] = (
+    "static_map_reference_validation",
     "world_clock_init",
     "equipment_rulebook_validation",
     "guild_exam_restriction_validation",
@@ -447,6 +448,15 @@ def at_server_start():
     # Per-layer tolerated registration-conflict classes, resolved lazily at
     # first failure exactly like the pre-refactor helper-local imports.
 
+    # Fail-loud static map-reference gate: every authored static target
+    # (gates, anchor placements, wilderness gates, place exteriors, district
+    # landmarks, grid art) resolves against one current binding snapshot before
+    # the first persistent startup action (the world clock is a persistent
+    # Script) or any lore/grid synchronization writes.
+    _startup_step(
+        "static_map_reference_validation",
+        lambda: _late("world.maps.static_references", "validate_static_references"),
+    )
     # Deterministic startup owns the world-clock singleton; presentation reads
     # only through read_world_clock() and must never create it.
     _startup_step("world_clock_init", get_world_clock)

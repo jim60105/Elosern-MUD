@@ -62,7 +62,9 @@ def gate_positions() -> list[tuple[str, int, int, str]]:
     registry = _gate_registry()
     positions = []
     for name in sorted(registry):
-        x, y, z_map = registry[name].gate_xyz
+        from world.maps.static_references import settlement_node_xyz
+
+        x, y, z_map = settlement_node_xyz(registry[name].gate)
         positions.append((name, int(x), int(y), str(z_map)))
     return positions
 

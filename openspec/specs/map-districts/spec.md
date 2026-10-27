@@ -6,15 +6,19 @@ Provide immutable exploration districts with one reachable landmark each and lig
 ## Requirements
 
 ### Requirement: Every map district has one canonical reachable landmark
-Each frozen district SHALL expose a stable key, district_name_zh, landmark_name_zh, landmark_node, kind of voronoi or region, and region_key only for region districts. Landmark identities SHALL be canonical wild:elosern:<x>:<y> or existing grid:<map>:<x>:<y> nodes, with reachable walkable positions and declared minimum Voronoi spacing.
+Each district SHALL resolve one qualified landmark to a reachable walkable position, with unique identities, declared minimum Voronoi spacing and region membership only for region districts.
 
 #### Scenario: Invalid landmarks fail authoring validation
-- **WHEN** a registry references sea, blocked terrain, an absent grid node, duplicate identity, or Voronoi landmarks below the declared minimum spacing
-- **THEN** validation rejects the registry and identifies the invalid declarations
+- **WHEN** sea, blocked terrain, absent settlement nodes, duplicate landmarks or insufficient spacing are declared
+- **THEN** runtime validation rejects and names each invalid declaration; authoring retains saveable reachability diagnostics
+
+#### Scenario: Stable landmark movement
+- **WHEN** a settlement landmark moves with its stable node identity
+- **THEN** the runtime canonical landmark follows its new binding while district lighting still reads existing visited-node knowledge
 
 #### Scenario: Deep forest has one discovery landmark
-- **WHEN** the northern deep forest district is read
-- **THEN** it is one region district covering both nominal nations, with one landmark near its north-coast centre around (1250,2420), roughly 500 km from the forest edge
+- **WHEN** a region district spans nominal national claims
+- **THEN** its one qualified landmark resolves independently of national borders and discovery still requires that landmark's canonical visited identity
 
 ### Requirement: District lighting is derived from visited landmark identity
 A district SHALL be lit if and only if its exact landmark node is in the player map-knowledge visited record. Reading lighting SHALL introduce no persistent state and SHALL leave the existing knowledge writer unchanged.

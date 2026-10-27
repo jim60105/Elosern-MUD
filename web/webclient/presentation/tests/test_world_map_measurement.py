@@ -77,11 +77,11 @@ class WorldMapMeasurementTests(unittest.TestCase):
         self.assertEqual(len(lit), world_map_payload.REPRESENTATIVE_LIT_DISTRICTS)
 
     def test_actual_presenter_geometry_fits_transport(self):
-        from world.lore.map_districts import MAP_DISTRICT_REGISTRY
+        from world.lore.map_districts import landmark_node_ids
         from web.webclient.presentation.world_map import assemble_world_map
 
         body = assemble_world_map(
-            visit_ids={row.landmark_node for row in MAP_DISTRICT_REGISTRY.values()},
+            visit_ids=set(landmark_node_ids().values()),
             current=(1999.5, 1099.5),
             markers=[],
         )

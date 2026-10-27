@@ -39,27 +39,28 @@ from world.lore.settlements.capability_declarations import (
     capability,
     place_bound,
 )
+from elosern_map_core.references import settlement_node_ref
 
 ROWS: tuple[PlaceDefinition, ...] = (
     PlaceDefinition(
         key="altoria_hok_home", settlement_key="capital_altoria",
         kind=PlaceKind.HOME, room_name_zh="霍克的家",
         room_desc_zh="門邊掛著旅行披風，木桌旁放著港口航路圖。小灶留有燉魚香氣，窗下擺著一張結實的床。",
-        exterior_xy=(4380, 3000), doorway_key_zh="霍克的家",
+        exterior=settlement_node_ref("capital_altoria", "guild_forecourt"), doorway_key_zh="霍克的家",
         doorway_aliases=("hok home",),
     ),
     PlaceDefinition(
         key="altoria_cassandra_home", settlement_key="capital_altoria",
         kind=PlaceKind.HOME, room_name_zh="卡珊卓的家",
         room_desc_zh="窗邊書桌放著旅行筆記，牆旁備有擦拭甲冑的布與油。臥房鋪著乾淨床單，茶壺收在木櫃裡。",
-        exterior_xy=(4380, 3000), doorway_key_zh="卡珊卓的家",
+        exterior=settlement_node_ref("capital_altoria", "guild_forecourt"), doorway_key_zh="卡珊卓的家",
         doorway_aliases=("cassandra home",),
     ),
     PlaceDefinition(
         key="altoria_augustine_home", settlement_key="capital_altoria",
         kind=PlaceKind.HOME, room_name_zh="奧古斯丁的家",
         room_desc_zh="窗外排列盆栽，爐邊有水壺與兩張椅子。寢室陳設樸素，舊地圖摺好收在旅行箱裡。",
-        exterior_xy=(4380, 3000), doorway_key_zh="奧古斯丁的家",
+        exterior=settlement_node_ref("capital_altoria", "guild_forecourt"), doorway_key_zh="奧古斯丁的家",
         doorway_aliases=("augustine home",),
     ),
     PlaceDefinition(
@@ -71,7 +72,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
             "阿爾托利亞的冒險者公會大廳，屋裡最顯眼的是一面大任務板，"
             "以及一座環形訓練場。"
         ),
-        exterior_xy=(4380, 3000),  # 公會前
+        exterior=settlement_node_ref("capital_altoria", "guild_forecourt"),  # 公會前
         doorway_key_zh="冒險者公會大廳",
         doorway_aliases=("guild hall", "hall"),
         host_name="葛里安‧衛登",
@@ -109,7 +110,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
             "阿爾托利亞的雜貨店，貨架總留著幾格空位，像在任何一支商隊趕來之前"
             "先替它們留好位置。"
         ),
-        exterior_xy=(2420, 2700),  # 市場街
+        exterior=settlement_node_ref("capital_altoria", "market_street"),  # 市場街
         doorway_key_zh="雜貨店",
         doorway_aliases=("general store", "store", "shop"),
         host_name="瑪爾特‧金秤",
@@ -144,7 +145,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
             "聖潔王都的鍛造鋪，砧聲在屋簷下響著，替這座王都的兵器生意一聲聲"
             "定了價。"
         ),
-        exterior_xy=(1300, 2600),  # 工匠巷
+        exterior=settlement_node_ref("capital_altoria", "craft_alley"),  # 工匠巷
         doorway_key_zh="鍛造鋪",
         doorway_aliases=("forge", "smithy"),
         host_name="維爾登‧黑潭",
@@ -175,7 +176,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         room_desc_zh=(
             "聖潔王都的裁縫坊，一卷卷布匹擱在案邊，等著北大道那些貴族的訂單。"
         ),
-        exterior_xy=(1300, 2600),  # 工匠巷
+        exterior=settlement_node_ref("capital_altoria", "craft_alley"),  # 工匠巷
         doorway_key_zh="裁縫坊",
         doorway_aliases=("tailor", "tailor shop"),
         host_name="妮絲塔‧狐溪",
@@ -210,7 +211,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         room_desc_zh=(
             "聖潔王都的首飾坊，展示櫃裡打著光，為市場街的飾品交易而亮。"
         ),
-        exterior_xy=(2420, 2700),  # 市場街
+        exterior=settlement_node_ref("capital_altoria", "market_street"),  # 市場街
         doorway_key_zh="首飾坊",
         doorway_aliases=("jeweller", "jewelry shop"),
         host_name="艾蓮娜‧鴉丘",
@@ -241,7 +242,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         room_desc_zh=(
             "聖潔王都的鍊金坊，一排排瓶罐塞好、貼好標籤，望著東市那條貨運道路。"
         ),
-        exterior_xy=(5380, 2850),  # 東市
+        exterior=settlement_node_ref("capital_altoria", "east_market"),  # 東市
         doorway_key_zh="鍊金坊",
         doorway_aliases=("alchemist", "alchemy shop"),
         host_name="希碧拉‧灰沼",
@@ -282,7 +283,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
             "圖旁邊；長凳上坐等的是各號的代辦，櫃檯那頭書記把一筆筆生意用白紙黑字敲定。東市的買賣就在這間屋子裡調度，誰走哪條路、誰替誰載玻璃與"
             "穀物、季末誰該付公會多少。牆上沒有公告板，門邊也沒有名單，這座公所日後要派什麼活，眼下都得隔著書桌、面對面跟人談。"
         ),
-        exterior_xy=(5380, 2850),  # 東市
+        exterior=settlement_node_ref("capital_altoria", "east_market"),  # 東市
         doorway_key_zh="商會公所",
         doorway_aliases=("merchant hall", "guild of merchants", "trading hall"),
         host_name="尤斯汀‧柯德溫",
@@ -318,7 +319,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
             "每個攤位都掃過了、也都不屬於誰，賣果子的天亮推車進來、黃昏推車出去，賣唱的佔西門那片寬地，這塊地本身不養任何固定的店主。一條街的生意"
             "靠的是只站今天一天的人，而棚子蓋來就是為了等那樣的人，什麼都不問，什麼都不留。"
         ),
-        exterior_xy=(2420, 2700),  # 市場街
+        exterior=settlement_node_ref("capital_altoria", "market_street"),  # 市場街
         doorway_key_zh="市集棚",
         doorway_aliases=("market stalls", "stalls", "covered market"),
     ),

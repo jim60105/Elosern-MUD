@@ -4,6 +4,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Mapping
+
+from elosern_map_core.references import settlement_node_ref
+
 from world.lore.anchors import Anchor, AnchorKind
 from world.lore.economy import PriceEntry
 from world.lore.elements import Element
@@ -70,7 +73,11 @@ from world.skills.registry import (
 )
 from world.skills.sexual_acts._builder import SexualActDef
 
-from world.tests.synthetic_data.vocab import SYNTH_PREFIX, _SYNTH_GATE_XY, _SYNTH_MAP_KEY
+from world.tests.synthetic_data.vocab import (
+    SYNTH_PREFIX,
+    _SYNTH_GATE_REF,
+    _SYNTH_MAP_KEY,
+)
 from world.tests.synthetic_data.data_items import SYNTH_ITEMS, SYNTH_PRICES
 from world.tests.synthetic_data.data_skills import SYNTH_ACT, SYNTH_ACT_SKILL, SYNTH_SKILLS
 from world.tests.synthetic_data.data_characters import (
@@ -184,9 +191,11 @@ def make_city_gate(key: str = "t_made_gate", **overrides: object) -> CityGateDef
     """One synthetic city-gate row (the registry key IS the map id)."""
     if not key.startswith(SYNTH_PREFIX):
         raise ValueError(f"synthetic keys must start with {SYNTH_PREFIX!r}, got {key!r}")
-    overrides.setdefault("map_id", key)
-    # Same borrowed shipped cell as the kit row (one valid-cell invariant).
-    overrides.setdefault("gate_xyz", (_SYNTH_GATE_XY[0], _SYNTH_GATE_XY[1], key))
+    # Same borrowed shipped node identity as the kit row (one resolvable-node
+    # invariant); callers override with their own resolvable identity.
+    overrides.setdefault(
+        "gate", settlement_node_ref(key, _SYNTH_GATE_REF.object_id)
+    )
     base = SYNTH_CITY_GATES[_SYNTH_MAP_KEY]
     merged = {field.name: getattr(base, field.name) for field in _dataclass_fields(base)}
     merged.update(overrides)
@@ -301,11 +310,10 @@ def make_wilderness_entry(
 
 def make_wilderness_gate(
     return_direction: str = "s",
-    grid_xy: tuple[int, int] = (3, 3),
-    z_map_key: str | None = None,
+    destination=None,
 ) -> WildernessGate:
-    """One synthetic wilderness gate against the known map extent."""
-    return WildernessGate(return_direction, grid_xy, z_map_key or _SYNTH_MAP_KEY)
+    """One synthetic wilderness gate against a resolvable settlement node."""
+    return WildernessGate(return_direction, destination or _SYNTH_GATE_REF)
 
 
 def make_quest_reward(

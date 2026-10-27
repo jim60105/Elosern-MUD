@@ -387,10 +387,9 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
 
         interior = search_object_by_tag("t_trading_post")[0]
         self.assertIsNotNone(interior)
-        zcoord = _settlements()[_place_by_kind("guild_hall").settlement_key].zcoord
-        exterior = GridRoom.objects.filter_xyz(
-            xyz=(*new_place.exterior_xy, zcoord)
-        ).first()
+        from world.maps.static_references import place_exterior_xyz
+
+        exterior = GridRoom.objects.filter_xyz(xyz=place_exterior_xyz(new_place)).first()
         self.assertIsNotNone(exterior)
         self.assertIn(interior, {exit_obj.destination for exit_obj in exterior.exits})
         self.assertIn(
@@ -469,9 +468,10 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             self.assertIsInstance(interior, Room)
             self.assertEqual(interior.key, hostless.room_name_zh)
             self.assertEqual(interior.db.desc, hostless.room_desc_zh)
-            zcoord = _settlements()[hostless.settlement_key].zcoord
+            from world.maps.static_references import place_exterior_xyz
+
             exterior = GridRoom.objects.filter_xyz(
-                xyz=(*hostless.exterior_xy, zcoord)
+                xyz=place_exterior_xyz(hostless)
             ).first()
             self.assertIsNotNone(exterior)
             self.assertIn(

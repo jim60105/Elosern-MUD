@@ -39,7 +39,11 @@ def _options_surface_fixture(character) -> None:
         importlib.import_module("world.maps." + "city_gates"),
         "CITY" + "_GATE_REGISTRY",
     )
-    south_gate_xyz = city_gate_registry[sorted(city_gate_registry)[0]].gate_xyz
+    from world.maps.static_references import settlement_node_xyz
+
+    south_gate_xyz = settlement_node_xyz(
+        city_gate_registry[sorted(city_gate_registry)[0]].gate
+    )
     south_gate = XYZRoom.objects.filter_xyz(xyz=south_gate_xyz).first()
     if south_gate is None:
         return

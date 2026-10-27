@@ -28,6 +28,7 @@ from world.quests.definitions import (
     QuestType,
 )
 from world.quests.room_observation import QuestObservableRoomMixin
+from world.maps.static_references import settlement_node_xyz
 from world.quests.runtime import QuestState, accept_quest, read_records, to_storage
 from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.rules.guild_offers import QuestReward
@@ -54,7 +55,7 @@ def _east_gate_xyz():
     ).values()
     entry = next(entry for entry in entries if entry.gate_for("w") is not None)
     gate = entry.gate_for("w")
-    return (*gate.grid_xy, gate.z_map_key)
+    return settlement_node_xyz(gate.destination)
 from world.rules.party import join_party
 
 from ._fixtures import (

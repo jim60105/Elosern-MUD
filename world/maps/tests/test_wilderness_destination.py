@@ -73,18 +73,21 @@ SEA = (0, 0)
 SOUTH_APPROACH = CAPITAL.approach_cell(CAPITAL.gate_for("n"))
 EAST_APPROACH = CAPITAL.approach_cell(CAPITAL.gate_for("w"))
 
-#: Grid-node spellings for both gates, derived from the entry's own rows.
+from world.maps.static_references import settlement_node_xy, settlement_node_xyz
+
+#: Grid-node spellings and xyz for both gates, derived from the entry's own
+#: identities against the current graph (the registry rows are the sole
+#: authored source; coordinates are never stored).
 SOUTH_GATE_NODE = encode_grid(
-    CAPITAL.gate_for("n").z_map_key, *CAPITAL.gate_for("n").grid_xy
+    CAPITAL.gate_for("n").z_map_key,
+    *settlement_node_xy(CAPITAL.gate_for("n").destination),
 )
 EAST_GATE_NODE = encode_grid(
-    CAPITAL.gate_for("w").z_map_key, *CAPITAL.gate_for("w").grid_xy
+    CAPITAL.gate_for("w").z_map_key,
+    *settlement_node_xy(CAPITAL.gate_for("w").destination),
 )
-
-#: Grid xyz for each gate room, derived the same way ``bootstrap`` no longer
-#: re-exports (limbo-one-way-gates D1): the registry rows are the sole source.
-SOUTH_GATE_XYZ = (*CAPITAL.gate_for("n").grid_xy, CAPITAL.gate_for("n").z_map_key)
-EAST_GATE_XYZ = (*CAPITAL.gate_for("w").grid_xy, CAPITAL.gate_for("w").z_map_key)
+SOUTH_GATE_XYZ = settlement_node_xyz(CAPITAL.gate_for("n").destination)
+EAST_GATE_XYZ = settlement_node_xyz(CAPITAL.gate_for("w").destination)
 
 
 class WildernessDestinationResolverTests(EvenniaTestCase):
@@ -295,10 +298,16 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
         hit = find_gateway(SOUTH_APPROACH, "n")
         self.assertIsNotNone(hit)
         self.assertIs(hit[0], CAPITAL)
-        self.assertEqual(hit[1].grid_xy, CAPITAL.gate_for("n").grid_xy)
+        self.assertEqual(
+            settlement_node_xy(hit[1].destination),
+            settlement_node_xy(CAPITAL.gate_for("n").destination),
+        )
         hit = find_gateway(EAST_APPROACH, "w")
         self.assertIsNotNone(hit)
-        self.assertEqual(hit[1].grid_xy, CAPITAL.gate_for("w").grid_xy)
+        self.assertEqual(
+            settlement_node_xy(hit[1].destination),
+            settlement_node_xy(CAPITAL.gate_for("w").destination),
+        )
         # Wrong direction at an approach cell is no gateway.
         self.assertIsNone(find_gateway(SOUTH_APPROACH, "s"))
         self.assertIsNone(find_gateway(EAST_APPROACH, "e"))
@@ -316,7 +325,7 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
         with synthetic_registries("wilderness_entries"):
             hit = find_gateway(point.anchor_cell, authored)
             self.assertIsNotNone(hit)
-            self.assertEqual(hit[1].grid_xy, point.gates[0].grid_xy)
+            self.assertEqual(hit[1].destination, point.gates[0].destination)
             for direction in ("n", "ne", "e", "se", "s", "sw", "w", "nw"):
                 if direction == authored:
                     continue

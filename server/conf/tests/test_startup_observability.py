@@ -30,6 +30,7 @@ from tools.spec_traceability import covers_requirement
 _BODY_TARGETS = (
     "world.rules.clock.get_world_clock",
     "world.rules.npc_roster_validation.validate_npc_roster",
+    "world.maps.static_references.validate_static_references",
     "world.lore.sync.sync_all",
     "world.maps.bootstrap.sync_limbo",
     "world.maps.bootstrap.sync_grid",
@@ -134,6 +135,7 @@ class StartupStepEventTests(_StubbedStartup):
         self.assertEqual(
             self._steps(info),
             [
+                "static_map_reference_validation",
                 "world_clock_init",
                 "equipment_rulebook_validation",
                 "guild_exam_restriction_validation",
@@ -163,6 +165,7 @@ class StartupStepEventTests(_StubbedStartup):
         self.assertEqual(
             self._steps(info),
             [
+                "static_map_reference_validation",
                 "world_clock_init",
                 "equipment_rulebook_validation",
                 "guild_exam_restriction_validation",
@@ -179,7 +182,11 @@ class StartupStepEventTests(_StubbedStartup):
         self._assert_import_gate(
             "world.rules.guild_exam_restrictions",
             "guild_exam_restriction_validation",
-            preceding=("world_clock_init", "equipment_rulebook_validation"),
+            preceding=(
+                "static_map_reference_validation",
+                "world_clock_init",
+                "equipment_rulebook_validation",
+            ),
         )
         # preset-companion-activation: the bounds sweep is a boot gate. The
         # name-aware side effect raises only for the companion module, so the
@@ -189,6 +196,7 @@ class StartupStepEventTests(_StubbedStartup):
             "world.rules.starting_companions",
             "starting_companion_validation",
             preceding=(
+                "static_map_reference_validation",
                 "world_clock_init",
                 "equipment_rulebook_validation",
                 "guild_exam_restriction_validation",
