@@ -205,6 +205,41 @@ uses `--text-*` tokens (never below `--text-xs`), and durations use
 `--motion-*` (pinned by `tests/components/window_primitives_styles.test.js`).
 The prototype's new glyphs live in `components/dock-icons.js`.
 
+## Interaction card and NPC services
+
+An interact target's medallion opens the interaction card
+(`composables/use-person-focus.js`, `ChoiceCard.vue`) with rows built once by
+`static/webclient/js/elosern/exploration_menu.js::verbMenuFor`: the fixed
+common group (交談 at slot 1, 查看 at slot 2, both kept — disabled, with the
+server's reason — when unavailable), the conditional group in its deterministic
+order (invite, leave, possess, possess release, deliver, 編輯人物設定 last), the
+contextual services in the server's own order, then the unnumbered return.
+
+- Rows are addressed by their stable key (`talk-open`, `look-target`,
+  `service-<entry key>` at `service-dialogue.guild_report_dialogue` granularity),
+  never by ring position. Only positions 1–9 draw a digit badge and answer a
+  digit; later rows have no badge and no second numbering scheme, and stay
+  reachable by arrows and scrolling. `ChoiceCard` resolves the active row by id
+  so grouped nesting cannot break that scroll.
+- `ChoiceCard` draws each contiguous group as a real `role="group"` named by its
+  own visible heading. Headings are not rows: no badge, no digit, no tab stop,
+  and they are never part of the row index. Disabled rows stay in the roving
+  focus with `aria-disabled` and an inline `aria-describedby` reason.
+- The store publishes the mapping the card was rendered from (actor, target,
+  room/node, ordered row keys, each row's route identity, enabled/reason) and
+  every activation names that mapping back — the DOM copy on the card for
+  pointer and keyboard, the acknowledged render for a digit that reaches the
+  store with focus elsewhere. A changed entry set, route or availability
+  consumes the activation without sending and requires a fresh selection; an
+  equal-content republication keeps the card, its rows and its focus.
+- A service row opens the selected provider's existing drawer/dialogue/command
+  flow through `stores/elosern/interaction.js::openServiceRoute`; the row is
+  recorded as the flow's origin. Closing that flow returns focus to that row
+  while it survives, else to the card's first valid row, else the rail/compass
+  fallback. A departed provider closes the card and its drawer in the commit
+  that removed it; a possession swap does not close the card and only makes a
+  pre-swap selection stale.
+
 ## Party window
 
 `PartyWindow` (webclient-party-window-member-tab; design §6/§6.1 of the party
