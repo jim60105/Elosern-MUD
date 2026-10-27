@@ -52,11 +52,11 @@ and the current node always counts as visited. Move actions appear only on
 the current node's traversable exits, which are resolved by the minimap
 helpers.
 
-For settlement graphs, `NODE_IDS` uses stable English slugs such as
+For settlement graphs, the discovered document's node keys use stable English slugs such as
 `south_gate` and `quay`, while the prototype's Chinese `key` supplies the
 display label（南門、碼頭埠）. Panel node IDs use the canonical coordinate-based
 `grid:<map>:<x>:<y>` grammar. These identities and labels serve separate roles;
-the settlement module owns the node and road set without a fixed panel-level count.
+the settlement document owns the node and road set without a fixed panel-level count.
 
 ## The `world_map` publisher and discovery narrative
 
