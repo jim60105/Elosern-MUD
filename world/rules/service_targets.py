@@ -29,6 +29,9 @@ from world.rules.service_gate import (
 #: The largest integer a browser can address without losing precision.
 MAX_SAFE_INTEGER = 9_007_199_254_740_991
 
+#: The terminal selected-provider suffix of a text provider command.
+TERMINAL_TARGET_PREFIX = "@#"
+
 
 class ServiceTargetReason(StrEnum):
     """Stable rejection reasons of one selected provider."""
@@ -84,6 +87,33 @@ def visible_room_entity(actor: Any, identity: Any) -> Any | None:
     for obj in location.filter_visible(candidates, actor):
         return obj
     return None
+
+
+def split_terminal_target(args: str) -> tuple[str, int | None, bool]:
+    """Split one terminal ``@#<dbid>`` suffix off a command argument line.
+
+    The suffix is only a target when it is the last whitespace-separated
+    token, so existing quantity, member ``=`` and rank parsing sees the
+    remainder untouched. ``supplied`` distinguishes an absent suffix
+    (``False``, implicit discovery) from an explicit attempt (``True``): a
+    malformed payload returns ``npc_id=None`` with ``supplied=True`` so the
+    caller rejects instead of falling back to an unrelated room provider.
+    A syntactically valid payload returns its integer; range admission stays
+    with :func:`require_service_target`, which rejects a non-positive or
+    non-addressable identity.
+    """
+    text = (args or "").strip()
+    if not text:
+        return "", None, False
+    parts = text.rsplit(None, 1)
+    token = parts[-1]
+    if not token.startswith(TERMINAL_TARGET_PREFIX):
+        return text, None, False
+    remainder = parts[0] if len(parts) == 2 else ""
+    payload = token[len(TERMINAL_TARGET_PREFIX) :]
+    if not payload.isascii() or not payload.isdigit():
+        return remainder, None, True
+    return remainder, int(payload), True
 
 
 def _service_component(npc: Any, component_class: type) -> Any | None:
@@ -211,11 +241,13 @@ def require_service_mutation(
 __all__ = [
     "MAX_SAFE_INTEGER",
     "SERVICE_COMPONENT_CLASSES",
+    "TERMINAL_TARGET_PREFIX",
     "ServiceTargetError",
     "ServiceTargetReason",
     "admitted_service_components",
     "require_service_mutation",
     "require_service_provider",
     "require_service_target",
+    "split_terminal_target",
     "visible_room_entity",
 ]

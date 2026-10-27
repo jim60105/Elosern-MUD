@@ -207,6 +207,23 @@ class CmdLook(_CmdLook):
         desc = caller.at_look(target)
         # 與上游相同：以 type=look 的 outputfunc 輸出，方便客戶端區分。
         self.msg(text=(desc, {"type": "look"}), options=None)
+        self._msg_services(target)
+
+    def _msg_services(self, target) -> None:
+        """附加選定對象的服務資訊（唯讀，與 services 指令同一份投影）。"""
+        from typeclasses.npcs import NPC
+        from world.rules.npc_services import project_npc_services, service_report_lines
+        from world.rules.service_targets import visible_room_entity
+
+        if not isinstance(target, NPC):
+            return
+        # ``search`` already resolves one visible object; re-admit it through
+        # the shared exploration visibility rule so the report can never
+        # describe an occupant this actor cannot see.
+        if visible_room_entity(self.caller, int(target.pk)) is not target:
+            return
+        services = project_npc_services(self.caller, self.caller, target)
+        self.caller.msg("\n".join(service_report_lines(target, services)))
 
 
 class CmdSay(_CmdSay):

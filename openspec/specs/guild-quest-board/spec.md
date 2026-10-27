@@ -152,10 +152,23 @@ The guild layer SHALL NOT construct, mutate, or reinterpret quest-record dicts i
 
 ### Requirement: Player-facing guild commands resolve one local service host
 The character cmdset SHALL provide commands for guild registration, offer listing, acceptance,
-quest-log listing, detail viewing, abandonment, and turn-in. Every guild service command SHALL
-search only the caller's room and SHALL reject absent or ambiguous matching hosts with
-Traditional Chinese output. Read-only personal quest-log commands (`guild log` and `guild show`)
-SHALL operate on the caller's own persisted quest log and SHALL NOT require a local `GuildStaff` host.
+quest-log listing, detail viewing, abandonment, and turn-in. Provider-dependent guild commands SHALL
+search only the caller's visible current room. Rejections SHALL use Traditional Chinese output.
+Read-only quest-log commands (`guild log` and `guild show`) SHALL NOT require a local `GuildStaff`
+host.
+
+#### Scenario: Explicit guild targets select exactly one eligible host
+- **WHEN** a provider-dependent guild command ends with an explicit terminal `@#dbid`
+- **THEN** only that eligible selected host is resolved, even among several providers, and no other
+  local staff member substitutes for it
+- **WHEN** no such suffix is supplied
+- **THEN** the established implicit ambiguous-host refusal remains
+
+#### Scenario: Abandonment keeps the selected-staff gate only for ordinary quests
+- **WHEN** a player abandons an ordinary guild quest
+- **THEN** the command keeps its selected-staff gate
+- **WHEN** a player abandons a private escort quest
+- **THEN** the command operates without a service host
 
 #### Scenario: Guild workflow is reachable from commands
 - **WHEN** a player enters the Altoria guild hall and invokes the documented guild commands
@@ -212,6 +225,10 @@ SHALL operate on the caller's own persisted quest log and SHALL NOT require a lo
 #### Scenario: Dialogue turn-in routes through the same turn_in_quest API
 - **WHEN** a player talks to the local guild staff with `回報 <quest_id>`
 - **THEN** exactly that quest turns in through the same deterministic `turn_in_quest` API used by `guild turnin`, with identical atomic settlement and rejection semantics, never accepting a remote host or bypassing `turn_in_quest`
+
+#### Scenario: Explicit provider survives same-class bystanders
+- **WHEN** a player supplies the terminal target suffix for a visible eligible provider while another same-class provider is present
+- **THEN** only the selected provider is used; if it departs before execution the command rejects without substituting the bystander
 
 ### Requirement: Board listing and quest log surface objective guidance
 `guild list` SHALL render each eligible offer with a one-line Traditional

@@ -3,6 +3,7 @@
 from typing import Any
 
 from commands.command import Command
+from commands.npc_services import resolve_selected_provider, split_selected_target
 
 from typeclasses.components import Merchant
 from world.rules.economy import (
@@ -57,7 +58,16 @@ class _ShopCommandBase(Command):
     locks = "cmd:all()"
     help_category = "Economy"
 
-    def resolve_merchant(self):
+    def resolve_merchant(self, npc_id: int | None = None):
+        """Return the merchant host; an explicit id admits exactly that one.
+
+        ``npc_id`` is ``None`` for today's implicit room discovery, whose
+        absence/ambiguity lines stay unchanged. An explicit identity resolves
+        through the shared selected-provider admission, so a second merchant
+        in the room can never stand in for the named one.
+        """
+        if npc_id is not None:
+            return resolve_selected_provider(self.caller, npc_id, Merchant)
         try:
             from world.rules.guild import resolve_local_service_host
 
@@ -67,7 +77,7 @@ class _ShopCommandBase(Command):
             return None
 
     def _parse_trade_args(
-        self, usage_verb: str
+        self, args: str, usage_verb: str
     ) -> tuple[str, int, Any] | None:
         """Parse ``<item_key> [數量] [= <成員>]``, messaging on failure.
 
@@ -81,7 +91,7 @@ class _ShopCommandBase(Command):
         ``None``. The member is ``None`` when the suffix is absent, meaning
         the caller.
         """
-        item_part, separator, member_token = self.args.partition("=")
+        item_part, separator, member_token = args.partition("=")
         parts = item_part.strip().split()
         if not parts:
             self.caller.msg(
@@ -126,7 +136,11 @@ class CmdShopStock(_ShopCommandBase):
     aliases = ("shop 庫存", "商店庫存")
 
     def func(self) -> None:
-        merchant_host = self.resolve_merchant()
+        parsed = split_selected_target(self.caller, self.args)
+        if parsed is None:
+            return
+        _args, npc_id = parsed
+        merchant_host = self.resolve_merchant(npc_id)
         if merchant_host is None:
             return
         merchant = merchant_host.components.get(Merchant.get_component_slot())
@@ -168,14 +182,18 @@ class CmdBuy(_ShopCommandBase):
     aliases = ("購買", "買", "shop buy")
 
     def func(self) -> None:
-        merchant_host = self.resolve_merchant()
+        parsed_target = split_selected_target(self.caller, self.args)
+        if parsed_target is None:
+            return
+        args, npc_id = parsed_target
+        merchant_host = self.resolve_merchant(npc_id)
         if merchant_host is None:
             return
         reason = interaction_reason(merchant_host, "service_shop")
         if reason is not None:
             self.caller.msg(reason)
             return
-        parsed = self._parse_trade_args("buy")
+        parsed = self._parse_trade_args(args, "buy")
         if parsed is None:
             return
         item_key, quantity, member = parsed
@@ -205,14 +223,18 @@ class CmdSell(_ShopCommandBase):
     aliases = ("販賣", "賣", "shop sell")
 
     def func(self) -> None:
-        merchant_host = self.resolve_merchant()
+        parsed_target = split_selected_target(self.caller, self.args)
+        if parsed_target is None:
+            return
+        args, npc_id = parsed_target
+        merchant_host = self.resolve_merchant(npc_id)
         if merchant_host is None:
             return
         reason = interaction_reason(merchant_host, "service_shop")
         if reason is not None:
             self.caller.msg(reason)
             return
-        parsed = self._parse_trade_args("sell")
+        parsed = self._parse_trade_args(args, "sell")
         if parsed is None:
             return
         item_key, quantity, member = parsed

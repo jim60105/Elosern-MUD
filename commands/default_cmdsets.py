@@ -67,6 +67,7 @@ from commands.guild import (
 from commands.invite import CmdInvite
 from commands.leave import CmdLeave
 from commands.lore import CmdLore
+from commands.npc_services import CmdServices
 from commands.possess import CmdHandoff, CmdPossess, CmdUnpossess
 from commands.party_views import CmdMemberSkills, CmdMemberStatus
 from commands.quest_delivery import CmdDeliver
@@ -246,6 +247,7 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdUnpossess)
         self.add(CmdHandoff)
         self.add(CmdLore)
+        self.add(CmdServices)
         self.add(CmdBackground)
         self.add(CmdPersonaPersonality)
         self.add(CmdPersonaLifeStory)

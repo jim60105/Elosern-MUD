@@ -22,7 +22,7 @@ from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 from typeclasses.components import ChurchHost
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
-from commands.church import CmdChurchJoin
+from commands.church import CmdChurchJoin, CmdChurchOffer
 from world.rules.church import SISTER_VESTMENTS_KEY
 from world.rules.clock import WorldClock
 from world.rules.npc_schedules import SCHEDULE_BLOCKED_REASON
@@ -111,6 +111,23 @@ class ChurchJoinCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIsNone(getattr(self.char1.db, "church", None))
 
     @covers_requirement("church-ordination::enrollment-is-a-deterministic-three-stage-transaction-behind-a-churchhost")
+    def test_a_stale_exact_id_is_refused_beside_second_clergy(self):
+        # The browser route pre-fills ``#<id>``; submitting it after that host
+        # left must reject, never enrolling through the remaining clergy.
+        self._host("t_second_celebrant", self.hall)
+        absent_pk = int(getattr(self.hall, "pk", 0)) + 10_000
+        before = list(self.char1.db.inventory or ())
+        self.call(CmdChurchJoin(), f"#{absent_pk}", "這裡沒有教會的神職人員")
+        self.assertIsNone(getattr(self.char1.db, "church", None))
+        self.assertEqual(list(self.char1.db.inventory or ()), before)
+
+    @covers_requirement("church-ordination::enrollment-is-a-deterministic-three-stage-transaction-behind-a-churchhost")
+    def test_hidden_clergy_is_never_named_or_substituted(self):
+        self.celebrant.locks.add("view:false()")
+        self.call(CmdChurchJoin(), "t_celebrant", "這裡沒有教會的神職人員")
+        self.assertIsNone(getattr(self.char1.db, "church", None))
+
+    @covers_requirement("church-ordination::enrollment-is-a-deterministic-three-stage-transaction-behind-a-churchhost")
     def test_off_duty_host_is_a_stable_rejection(self):
         self.celebrant.db.schedule_state = "busy"
         self.call(CmdChurchJoin(), "t_celebrant", SCHEDULE_BLOCKED_REASON)
@@ -136,6 +153,34 @@ class ChurchJoinCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.celebrant.location = square
         self.char1.location = square
         self.call(CmdChurchJoin(), "t_celebrant", MESSAGE_OFF_ANCHOR)
+        self.assertIsNone(getattr(self.char1.db, "church", None))
+
+    @covers_requirement("church-ordination::enrollment-is-a-deterministic-three-stage-transaction-behind-a-churchhost")
+    def test_offer_resolves_the_named_recipient_and_shows_the_menu(self):
+        # ``church offer`` keeps its own established name resolution; this
+        # regression exists because a shared-resolver refactor previously
+        # dropped the symbol it calls and made every offering raise.
+        self.call(CmdChurchJoin(), "t_celebrant", "你已加入光明教會")
+        recipient = create_object(NPC, key="t_offer_recipient", location=self.hall)
+        wallet = self.char1.db.wallet
+        merit = self.char1.db.church
+        output = self.call(
+            CmdChurchOffer(), recipient.key, f"你目前能為{recipient.key}提供的服務"
+        )
+        self.assertIn("用法：church offer <npc> [row_key]", output)
+        self.assertEqual(self.char1.db.wallet, wallet)
+        self.assertEqual(self.char1.db.church, merit)
+
+    @covers_requirement("church-ordination::enrollment-is-a-deterministic-three-stage-transaction-behind-a-churchhost")
+    def test_offer_rejects_an_unenrolled_caller_without_state_change(self):
+        recipient = create_object(NPC, key="t_offer_recipient", location=self.hall)
+        wallet = self.char1.db.wallet
+        self.call(
+            CmdChurchOffer(),
+            recipient.key,
+            "你尚未入教。請先與主祭交談",
+        )
+        self.assertEqual(self.char1.db.wallet, wallet)
         self.assertIsNone(getattr(self.char1.db, "church", None))
 
 

@@ -41,7 +41,7 @@ from world.rules.church import (
 from world.rules.npc_schedules import interaction_reason
 from world.rules.service_gate import MESSAGE_OFF_ANCHOR
 from world.skills.registry import SKILL_REGISTRY
-from commands.talk import _resolve_npc
+from commands.talk import _resolve_npc, resolve_visible_npc
 
 _NO_LOCAL_HOST_LINE = "這裡沒有教會的神職人員。"
 _AMBIGUOUS_HOST_LINE = "這裡有多名神職人員，請指明對象。"
@@ -96,26 +96,16 @@ def _resolve_join_host(caller, raw_target):
     revalidated here at submission through the shared visible-room resolver, so
     a second clergy member standing nearby never substitutes for the named one.
     """
-    from world.rules.service_targets import visible_room_entity
-
-    if raw_target.startswith("#"):
-        digits = raw_target[1:]
-        if not digits.isascii() or not digits.isdigit():
-            return None, _NO_LOCAL_HOST_LINE
-        host = visible_room_entity(caller, int(digits))
-        if host is None:
-            return None, _NO_LOCAL_HOST_LINE
-    else:
-        resolved = _resolve_npc(
-            caller,
-            raw_target,
-            missing=_NO_LOCAL_HOST_LINE,
-            ambiguous=_AMBIGUOUS_HOST_LINE,
-            not_npc=_NO_LOCAL_HOST_LINE,
-        )
-        if isinstance(resolved, str):
-            return None, resolved
-        host = resolved
+    resolved = resolve_visible_npc(
+        caller,
+        raw_target,
+        missing=_NO_LOCAL_HOST_LINE,
+        ambiguous=_AMBIGUOUS_HOST_LINE,
+        not_npc=_NO_LOCAL_HOST_LINE,
+    )
+    if isinstance(resolved, str):
+        return None, resolved
+    host = resolved
     components = getattr(host, "components", None)
     if components is None or not components.has(ChurchHost.name):
         return None, _NO_LOCAL_HOST_LINE

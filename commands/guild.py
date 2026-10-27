@@ -1,6 +1,7 @@
 """Player-facing guild registration, board, quest-log, and turn-in commands."""
 
 from commands.command import Command
+from commands.npc_services import resolve_selected_provider, split_selected_target
 
 from typeclasses.components import GuildStaff
 from world.quests.describe import describe_objective, describe_quest_detail
@@ -106,7 +107,16 @@ class _GuildCommandBase(Command):
     locks = "cmd:all()"
     help_category = "Guild"
 
-    def resolve_staff(self):
+    def resolve_staff(self, npc_id: int | None = None):
+        """Return the staff host; an explicit id admits exactly that one.
+
+        ``npc_id`` is ``None`` for today's implicit room discovery, whose
+        absence/ambiguity line stays unchanged. An explicit identity goes
+        through the shared selected-provider admission so a second co-located
+        clerk is never substituted.
+        """
+        if npc_id is not None:
+            return resolve_selected_provider(self.caller, npc_id, GuildStaff)
         try:
             from world.rules.guild import resolve_local_service_host
 
@@ -136,7 +146,11 @@ class CmdGuildRegister(_GuildCommandBase):
     aliases = ("guild 註冊", "註冊公會", "guild join")
 
     def func(self) -> None:
-        staff = self.resolve_staff()
+        parsed = split_selected_target(self.caller, self.args)
+        if parsed is None:
+            return
+        _args, npc_id = parsed
+        staff = self.resolve_staff(npc_id)
         if staff is None:
             return
         if self.gate_staff(staff):
@@ -162,7 +176,11 @@ class CmdGuildList(_GuildCommandBase):
     aliases = ("guild 任務", "任務列表")
 
     def func(self) -> None:
-        staff = self.resolve_staff()
+        parsed = split_selected_target(self.caller, self.args)
+        if parsed is None:
+            return
+        _args, npc_id = parsed
+        staff = self.resolve_staff(npc_id)
         if staff is None:
             return
         try:
@@ -191,12 +209,16 @@ class CmdGuildAccept(_GuildCommandBase):
     aliases = ("guild 接取", "接取任務")
 
     def func(self) -> None:
-        staff = self.resolve_staff()
+        parsed = split_selected_target(self.caller, self.args)
+        if parsed is None:
+            return
+        args, npc_id = parsed
+        staff = self.resolve_staff(npc_id)
         if staff is None:
             return
         if self.gate_staff(staff):
             return
-        definition_key = self.args.strip().partition(" ")[0]
+        definition_key = args.strip().partition(" ")[0]
         if not definition_key:
             self.caller.msg("用法：guild accept <definition_key>")
             return
@@ -288,12 +310,16 @@ class CmdGuildAbandon(_GuildCommandBase):
     aliases = ("guild 放棄", "放棄任務")
 
     def func(self) -> None:
-        staff = self.resolve_staff()
+        parsed = split_selected_target(self.caller, self.args)
+        if parsed is None:
+            return
+        args, npc_id = parsed
+        staff = self.resolve_staff(npc_id)
         if staff is None:
             return
         if self.gate_staff(staff):
             return
-        quest_id = self.args.strip().partition(" ")[0]
+        quest_id = args.strip().partition(" ")[0]
         if not quest_id:
             self.caller.msg("用法：guild abandon <quest_id>")
             return
@@ -312,12 +338,16 @@ class CmdGuildTurnIn(_GuildCommandBase):
     aliases = ("guild 回報", "回報任務", "guild turn-in")
 
     def func(self) -> None:
-        staff = self.resolve_staff()
+        parsed = split_selected_target(self.caller, self.args)
+        if parsed is None:
+            return
+        args, npc_id = parsed
+        staff = self.resolve_staff(npc_id)
         if staff is None:
             return
         if self.gate_staff(staff):
             return
-        quest_id = self.args.strip().partition(" ")[0]
+        quest_id = args.strip().partition(" ")[0]
         if not quest_id:
             self.caller.msg("用法：guild turnin <quest_id>")
             return

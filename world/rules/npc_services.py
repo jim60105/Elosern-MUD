@@ -503,6 +503,67 @@ def validate_service_capacity(type_keys: Any, associated_count: int) -> None:
         )
 
 
+#: The existing text command one ``services`` route section opens, with the
+#: exact selected provider written as its terminal target.
+_SECTION_GUIDANCE: dict[str, str] = {
+    "shop": "shop stock @#{npc_id}",
+    "registration": "guild register @#{npc_id}",
+    "board": "guild list @#{npc_id}",
+    "report": "guild turnin <quest_id> @#{npc_id}",
+    "rank": "guild exam @#{npc_id}",
+}
+
+
+def _route_guidance(entry: ServiceEntry, name: str, npc_id: int) -> str:
+    """Name the existing text flow one entry opens; it grants no authority."""
+    route = entry.route
+    if route.kind == ROUTE_DIALOGUE:
+        # Talking opens the exact host; the associated topic is chosen in the
+        # conversation and is never selected by discovery, so the guidance
+        # stays one executable command with no identity or topic suffix.
+        return f"talk {name}"
+    if route.kind == ROUTE_COMMAND:
+        return f"{route.command} #{npc_id}"
+    return _SECTION_GUIDANCE[route.section].format(npc_id=npc_id)
+
+
+def service_report_lines(npc: Any, services: NpcServices) -> list[str]:
+    """Render one derived projection as bounded player-facing text lines.
+
+    A pure read of the same descriptors the browser receives: the stable key,
+    the canonical label, the exact disabled reason, and the existing text
+    route. ``none`` (a host genuinely offers nothing) and ``unreadable`` (the
+    projection failed) stay distinct sentences, and every disabled entry keeps
+    its reason instead of disappearing. Nothing here writes, selects, or
+    creates authority.
+    """
+    name = str(getattr(npc, "key", "") or "") or "對象"
+    if services.state == STATE_UNREADABLE:
+        return [f"{name}：{UNREADABLE_MESSAGE}"]
+    if services.state != STATE_READY or not services.entries:
+        return [f"{name} 目前沒有提供服務。"]
+    npc_id = int(getattr(npc, "pk", 0) or 0)
+    lines = [f"{name} 的服務："]
+    for entry in services.entries:
+        if entry.enabled:
+            lines.append(
+                f"  {entry.key}　{entry.label}　→ "
+                f"{_route_guidance(entry, name, npc_id)}"
+            )
+            if entry.route.kind == ROUTE_DIALOGUE:
+                # The topic is named on its own annotation line: the copyable
+                # command above stays one executable ``talk <npc>`` and never
+                # selects the topic.
+                lines.append(
+                    f"    相關話題：{entry.route.topic_id}（於對話中選擇）"
+                )
+        else:
+            lines.append(
+                f"  {entry.key}　{entry.label}（{entry.disabled_reason.message}）"
+            )
+    return lines
+
+
 __all__ = [
     "CHURCH_JOIN_COMMAND",
     "MAX_SERVICE_ENTRIES",
@@ -523,5 +584,6 @@ __all__ = [
     "UNREADABLE_MESSAGE",
     "native_entry_count",
     "project_npc_services",
+    "service_report_lines",
     "validate_service_capacity",
 ]
