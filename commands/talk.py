@@ -16,6 +16,8 @@ refusal line and writes nothing.
 """
 
 import uuid
+from typing import Any
+
 from commands.command import Command
 
 from typeclasses.components import GuildStaff
@@ -119,6 +121,7 @@ def _resolve_npc(
     missing: str = _MISSING_TARGET,
     ambiguous: str = _AMBIGUOUS_TARGET,
     not_npc: str = _NOT_NPC,
+    candidates: Any = None,
 ) -> NPC | None | str:
     """Resolve a talk target to an NPC, or a reason string on failure.
 
@@ -126,15 +129,19 @@ def _resolve_npc(
     a resolution failure. The message overrides let sibling commands
     (``invite``/``leave``) reuse the exact resolution rules with their own
     target wording; the defaults keep ``talk``'s behavior unchanged.
+    ``candidates`` narrows the searched room objects (the visible-discovery
+    surfaces pass the room's visibility-filtered contents).
     """
     if not raw_target:
         return missing
-    location = caller.location
-    if location is None:
-        return not_npc
+    if candidates is None:
+        location = caller.location
+        if location is None:
+            return not_npc
+        candidates = location.contents
     matches = [
         obj
-        for obj in location.contents
+        for obj in candidates
         if isinstance(obj, NPC)
         and (
             raw_target.lower() in (obj.key.lower(), *(alias.lower() for alias in obj.aliases.all()))
@@ -145,6 +152,45 @@ def _resolve_npc(
     if len(matches) > 1:
         return ambiguous
     return matches[0]
+
+
+def resolve_visible_npc(
+    caller,
+    raw_target: str,
+    *,
+    missing: str,
+    ambiguous: str,
+    not_npc: str,
+) -> NPC | None | str:
+    """Resolve one visible room NPC by name/alias or exact ``#<id>``.
+
+    Names and aliases match only the room's visibility-filtered contents, so a
+    hidden occupant is neither named nor counted as an ambiguity. The exact
+    ``#<id>`` form reuses the shared exploration visibility rule; nothing here
+    authorizes a later operation, which each caller revalidates.
+    """
+    from world.rules.service_targets import visible_room_entity
+
+    target = (raw_target or "").strip()
+    if not target:
+        return missing
+    if target.startswith("#"):
+        digits = target[1:]
+        if not digits.isascii() or not digits.isdigit():
+            return not_npc
+        return visible_room_entity(caller, int(digits)) or not_npc
+    location = getattr(caller, "location", None)
+    if location is None:
+        return not_npc
+    visible = location.filter_visible(list(location.contents), caller)
+    return _resolve_npc(
+        caller,
+        target,
+        missing=missing,
+        ambiguous=ambiguous,
+        not_npc=not_npc,
+        candidates=visible,
+    )
 
 
 class CmdsTalk(Command):

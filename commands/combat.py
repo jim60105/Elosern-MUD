@@ -13,7 +13,9 @@ party-scoped exit. No command here inspects or writes persisted state itself.
 from typing import Any
 
 from commands.command import Command
+from commands.npc_services import resolve_selected_provider, split_selected_target
 
+from typeclasses.components import GuildExamReception
 from world.rules.action import RejectReason
 from world.rules.combat_result import settle_to_messages
 from world.rules.combat_session import (
@@ -950,12 +952,28 @@ class CmdGuildExam(Command):
     help_category = "Guild"
 
     def func(self) -> None:
-        target_rank = self.args.strip().partition(" ")[0] or next_exam_rank(self.caller)
+        parsed = split_selected_target(self.caller, self.args)
+        if parsed is None:
+            return
+        args, npc_id = parsed
+        reception = None
+        if npc_id is not None:
+            reception = resolve_selected_provider(
+                self.caller, npc_id, GuildExamReception
+            )
+            if reception is None:
+                return
+        target_rank = args.strip().partition(" ")[0] or next_exam_rank(self.caller)
         if target_rank is None:
             self.caller.msg(service_rejection_message("top_rank"))
             return
+        # An omitted suffix keeps today's call exactly: only an explicit
+        # selection pins the counter as the request's speaker.
+        kwargs = {"requested_by": "command"}
+        if reception is not None:
+            kwargs["speaker"] = reception
         try:
-            outcome = request_guild_exam(self.caller, target_rank, requested_by="command")
+            outcome = request_guild_exam(self.caller, target_rank, **kwargs)
         except GuildExamError as error:
             self.caller.msg(service_rejection_message(error))
             return
