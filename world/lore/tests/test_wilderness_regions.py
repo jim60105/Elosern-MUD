@@ -1,4 +1,4 @@
-"""Data-contract test: the authored continental geography views.
+"""Data-contract test: wilderness region data contract
 
 Self-consistency checks for the published wilderness terrain views
 (map-wilderness). Every assertion reads the composed views of one explicitly

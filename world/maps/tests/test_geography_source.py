@@ -1,4 +1,4 @@
-"""Mechanism tests: geography publication, composition and snapshot isolation.
+"""Data-contract test: geography publication, composition and snapshot-isolation mechanism contract
 
 These exercise the game adapter directly: explicitly loaded candidates, the
 immutable composed views, cross-domain join rejection, atomic publication, and

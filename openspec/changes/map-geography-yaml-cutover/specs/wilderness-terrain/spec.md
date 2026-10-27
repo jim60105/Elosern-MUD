@@ -35,17 +35,30 @@ pin the selection mechanism and its agreement with the loaded region, never a co
 - **THEN** both calls return the identical string, including across separate process invocations
   (same input, same output, with no persisted state required to reproduce it)
 
-#### Scenario: The description matches the coordinate's region and the fixed formula
-- **WHEN** `terrain_description(x, y)` is called for sampled coordinates after a reload
-- **THEN** the returned string is the published region view's own variant at index
-  `(x * 92821 + y * 68917) % len(variants)`, so both the region resolution and the selection
-  mechanism follow the loaded source rather than an old registry
+#### Scenario: The description matches the coordinate's region
+- **WHEN** `terrain_description(x, y)` is called
+- **THEN** the returned string is one of the published region view's own `terrain_flavor_zh`
+  variants at index `(x * 92821 + y * 68917) % len(variants)`, and that region is
+  `region_for_coordinates(x, y)`
+
+#### Scenario: A fixed coordinate produces a literal, spec-pinned string
+- **WHEN** `terrain_description(860, 1080)` is called (the `capital_altoria` anchor cell, which
+  `region_for_coordinates` resolves to `"western_hills_valleys"`)
+- **THEN** the fixed formula selects index `2` of that region's declared variants; the literal prose
+  is the continent source's own declaration, preserved by the conversion comparison rather than
+  copied into a second approval table
+
+#### Scenario: The constants and flavor text are contract, not discretion
+- **WHEN** the formula's constants (`92821`, `68917`) and the continent source's
+  `terrain_flavor_zh` text are weighed
+- **THEN** the formula constants remain this requirement's contract, and the prose remains the
+  authored source contract validated by schema, never an implementation or test-side copy
 
 #### Scenario: No LLM or network dependency exists in the call path
 - **WHEN** `world/maps/wilderness_provider.py` is inspected for imports and calls
 - **THEN** it references no module under `world/ai/`, no HTTP client, and no `random` module call
 
-### Requirement: The published terrain regions are mirrored into LoreRecord Scripts idempotently
+### Requirement: WILDERNESS_REGION_REGISTRY is mirrored into LoreRecord Scripts idempotently
 `world/lore/sync.py::sync_all()` SHALL mirror the published geography's composed region views under
 the category key `"wilderness_regions"`, so the mirror follows the loaded continent source exactly as
 it follows every other lore registry, including idempotency across repeated calls.

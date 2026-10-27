@@ -1,4 +1,4 @@
-"""Data-contract test: composed geographic location views.
+"""Data-contract test: anchor data contract
 
 Every map-facing field comes from ``content/maps/locations.yaml``; political
 affiliation, population and dungeon floor counts come from the separate Python
