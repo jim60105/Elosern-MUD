@@ -760,6 +760,7 @@ def _validate_generated_services(
     phase's complete native-plus-associated set must fit the entry bound.
     """
     from world.rules.npc_services import validate_service_capacity
+    from world.lore.dialogue.services import OFFER_COMMISSION_VERB
 
     if not services:
         return

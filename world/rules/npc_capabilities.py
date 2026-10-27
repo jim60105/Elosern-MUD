@@ -262,7 +262,16 @@ def _validate_references(type_key: str, kwargs: Mapping[str, Any], path: str, is
     if type_key == "scripted_dialogue":
         table = _loaded_dialogue_table()
         key = kwargs.get("dialogue_key")
-        if table is not None and isinstance(key, str) and key and key not in table:
+        if (
+            table is not None
+            and isinstance(key, str)
+            and key
+            and key not in table
+            # A generated role's scoped identity is validated by the package
+            # owner (which owns the published phases), not by the static
+            # registry.
+            and not _is_generated_dialogue_key(key)
+        ):
             issues.append(
                 f"{path}.kwargs authors dialogue_key {key!r} that the dialogue "
                 "registry does not carry"
@@ -286,6 +295,13 @@ def _validate_references(type_key: str, kwargs: Mapping[str, Any], path: str, is
                     f"{path}.kwargs authors issuer_key {authored!r} outside the "
                     f"issuer-key grammar: {error}"
                 )
+
+
+def _is_generated_dialogue_key(key: str) -> bool:
+    """Whether ``key`` is one trusted generated ``scene_role:<pkg>:<role>``."""
+    from world.rules.dialogue import generated_dialogue_parts
+
+    return generated_dialogue_parts(key) is not None
 
 
 def _loaded_dialogue_table() -> Any | None:
