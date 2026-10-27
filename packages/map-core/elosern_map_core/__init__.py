@@ -42,6 +42,17 @@ from .diagnostics import (
     RuntimeRejection,
     SourceLocation,
 )
+from .references import (
+    ReferenceError,
+    ReferenceIndex,
+    ResolvedReference,
+    interior_room_ref,
+    location_ref,
+    resolve_reference,
+    settlement_node_ref,
+    settlement_position,
+    wilderness_cell_ref,
+)
 from .schema import SCHEMA_VERSION, schema
 from .sources import (
     SourceDocument,
@@ -100,6 +111,9 @@ __all__ = [
     "PartitionFreshness",
     "REGION_KEYS",
     "RIDGE_BEND_PHASES",
+    "ReferenceError",
+    "ReferenceIndex",
+    "ResolvedReference",
     "RouteStep",
     "RuntimeMapSnapshot",
     "RuntimeRejection",
@@ -126,6 +140,7 @@ __all__ = [
     "exit_spawn_names",
     "fingerprint_text",
     "forest_edge_row",
+    "interior_room_ref",
     "is_closed_ridge_cell",
     "is_inland_water_cell",
     "is_land_cell",
@@ -136,6 +151,7 @@ __all__ = [
     "is_within_frame",
     "local_to_world_m",
     "load_authoring_world",
+    "location_ref",
     "make_source_document",
     "nominal_nation_for_coordinates",
     "polygon_area_km2",
@@ -147,7 +163,11 @@ __all__ = [
     "ridge_polyline",
     "ridge_span",
     "route_row_at",
+    "resolve_reference",
     "schema",
     "serialize_document",
+    "settlement_node_ref",
+    "settlement_position",
     "terrain_description",
+    "wilderness_cell_ref",
 ]
