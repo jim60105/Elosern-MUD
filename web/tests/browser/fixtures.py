@@ -97,22 +97,46 @@ class BrowserRuntime:
         shutil.rmtree(self.root_dir, ignore_errors=True)
 
 
+#: Every port this process has handed out. The kernel may re-issue a port as
+#: soon as its socket closes (``SO_REUSEADDR`` makes that likelier), so two
+#: runtimes in one process must never be allowed to draw it a second time.
+_ISSUED_PORTS: set[int] = set()
+
+
 def allocate_ports(count: int = PORT_COUNT) -> list[int]:
     """Bind ``count`` loopback sockets to port 0 and return their ports.
 
     All sockets are bound before any is released, so the returned ports are
-    distinct within one call. There is still a tiny release-then-bind race,
-    which is acceptable for ephemeral ports; distinctness per call is
-    guaranteed by the simultaneous bind.
+    distinct within one call, and a port this process already handed out is
+    never returned again, so successive runtimes in one process cannot
+    collide either. Across processes the harness startup lock serializes
+    allocation; the release-then-bind window for an unrelated process remains
+    the usual ephemeral-port race.
     """
     sockets = []
+    ports = []
     try:
-        for _ in range(count):
+        # A retry only happens when the kernel re-offers a port already in
+        # ``_ISSUED_PORTS``; the loop is bounded so a pathological exhaustion
+        # fails loudly instead of returning a duplicate.
+        for _ in range(count * 50):
+            if len(ports) == count:
+                break
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             sock.bind(("127.0.0.1", 0))
+            port = sock.getsockname()[1]
+            if port in _ISSUED_PORTS:
+                sock.close()
+                continue
+            _ISSUED_PORTS.add(port)
             sockets.append(sock)
-        return [sock.getsockname()[1] for sock in sockets]
+            ports.append(port)
+        if len(ports) != count:
+            raise RuntimeError(
+                f"could not allocate {count} fresh loopback ports"
+            )
+        return ports
     finally:
         for sock in sockets:
             sock.close()

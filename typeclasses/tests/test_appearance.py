@@ -794,8 +794,20 @@ class NPCTitleAppearanceTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIn("塞提斯", command)
         self.assertNotIn("南門守衛", command)
         # self.call strips ANSI (noansi default); normalize the seam string the
-        # same way so the three paths compare on identical rendered text.
-        self.assertEqual(ansi.parse_ansi(text, strip_ansi=True).strip(), command)
+        # same way so the three paths compare on identical rendered text. The
+        # 「看 <NPC>」 command additionally appends the selected NPC's service
+        # report (npc-service-text-parity), so the header it starts with is
+        # what must match the two appearance seams.
+        header = ansi.parse_ansi(text, strip_ansi=True).strip()
+        self.assertTrue(
+            command.startswith(header),
+            "the 看 <NPC> header must match the appearance seams",
+        )
+        self.assertNotEqual(
+            command,
+            header,
+            "看 <NPC> appends the NPC's service report after the header",
+        )
 
     def test_untitled_and_plain_targets_keep_their_headers(self):
         self.assertIn("布魯諾", self.char1.at_look(self.plain))
