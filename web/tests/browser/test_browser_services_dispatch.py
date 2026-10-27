@@ -72,11 +72,17 @@ class ServiceDispatchJourneys(ServicesBrowserTest):
         stale_revision = store_state(page)["revision"] - 1
         first_key = panel["shop"]["stock"][0]["item_key"]
         actor_id = int(store_state(page)["panels"]["status"]["actor"]["identity"])
+        provider_id = panel["shop"]["provider_id"]
 
         self._raw_ui_action(
             page,
             "shop.buy",
-            {"item_key": first_key, "quantity": 1, "recipient_id": actor_id},
+            {
+                "item_key": first_key,
+                "quantity": 1,
+                "recipient_id": actor_id,
+                "npc_id": provider_id,
+            },
             "stale-buy-1",
             stale_revision,
         )
@@ -103,6 +109,8 @@ class ServiceDispatchJourneys(ServicesBrowserTest):
             "item_key": first_key,
             "quantity": 1,
             "recipient_id": actor_id,
+            # services v8 names the exact merchant; the adapter revalidates it.
+            "npc_id": panel["shop"]["provider_id"],
         }
 
         # First delivery executes the buy exactly once.

@@ -263,11 +263,19 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         open_verb_card(page, host_identity)
         self.assertEqual(page.evaluate("window.__elosernBridge.router.depth()"), 1)
         # The host's verb card: the 交談 conversation entry, the author
-        # editor entry, 查看, and the trailing ✕ 返回 (the exploration
-        # fixture carries no guild navigate entry), centred over the stage.
+        # editor entry, the host's own authored dialogue service
+        # (npc-contextual-service-projection ships the guild report
+        # association on this host), 查看, and the trailing ✕ 返回, centred
+        # over the stage. The coarse guild/shop navigate rows are gone.
         self.assertEqual(
             card_row_keys(page),
-            ["talk-open", "service-npc_persona", "look-target", "back"],
+            [
+                "talk-open",
+                "service-npc_persona",
+                "service-dialogue.guild_report_dialogue",
+                "look-target",
+                "back",
+            ],
             "the verb card's rows",
         )
         _press(page, "Escape")  # closes the card
