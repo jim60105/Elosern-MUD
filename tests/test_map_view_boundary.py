@@ -10,10 +10,8 @@ game tree keeps no second implementation, only the package's public entry is
 imported, and the package carries no host dependency, stylesheet or design
 token.
 
-The delta requirement's canonical ID exists only after the archive sync, so no
-``covers_requirement`` annotation is attached here (a delta ID would be an
-unknown requirement); the tests below are the discoverable substantive
-evidence for it.
+The predicates below are annotated with the requirement's canonical ID, which
+exists once the delta has been synced into ``openspec/specs/``.
 """
 
 from __future__ import annotations
@@ -25,6 +23,8 @@ import subprocess
 import unittest
 
 import yaml
+
+from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = REPO_ROOT / "packages/map-view"
@@ -146,6 +146,7 @@ class PrimitiveRunnerMixin(unittest.TestCase):
 
 
 class PrimitiveEvidenceTests(PrimitiveRunnerMixin):
+    @covers_requirement("map-view-foundations::shared-map-geometry-is-host-neutral")
     def test_round_trip_anchor_and_scale_primitives_run(self):
         # The real runner executed the package's round-trip, zoom-anchor,
         # fit/scale and unequal-gap tests; an exit code alone is not evidence.
@@ -164,6 +165,7 @@ class PrimitiveEvidenceTests(PrimitiveRunnerMixin):
 
 
 class RepositoryBoundaryTests(unittest.TestCase):
+    @covers_requirement("map-view-foundations::shared-map-geometry-is-host-neutral")
     def test_game_tree_keeps_no_second_implementation(self):
         for relative in OBSOLETE_GAME_MODULES:
             self.assertFalse((GAME_DIR / relative).exists(), f"obsolete module still present: {relative}")
@@ -175,6 +177,7 @@ class RepositoryBoundaryTests(unittest.TestCase):
                     offenders.append(f"{path.relative_to(REPO_ROOT)}: {pattern.pattern}")
         self.assertEqual(offenders, [], "a game module still defines an extracted algorithm")
 
+    @covers_requirement("map-view-foundations::shared-map-geometry-is-host-neutral")
     def test_only_the_public_entry_is_imported(self):
         importers = []
         for path in js_files(GAME_DIR):
@@ -196,6 +199,7 @@ class RepositoryBoundaryTests(unittest.TestCase):
         ):
             self.assertIn(consumer, importers)
 
+    @covers_requirement("map-view-foundations::shared-map-geometry-is-host-neutral")
     def test_package_never_reaches_host_state_or_host_ink(self):
         sources = sorted(PACKAGE_SRC.glob("*.js"))
         self.assertGreaterEqual(len(sources), 8)
