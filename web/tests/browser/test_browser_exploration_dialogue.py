@@ -15,6 +15,7 @@ from web.browser_support.browser_fixtures_data import (
 )
 from .browser_base import BrowserAcceptanceTest, ui_scale
 from .browser_helpers import (
+    CARD_SELECTOR,
     activate_first_compass_exit,
     activate_overview_chip,
     fixture_home_node_id,
@@ -28,6 +29,7 @@ from .browser_helpers import (
     overview_target_with_affordance,
     sent_action_count,
     store_state,
+    submit_until_admitted,
     wait_for_presentation_adopted,
     wait_for_store_state,
 )
@@ -444,18 +446,12 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             page.locator('[data-testid="dialogue-exit"] .dialogue-choices__label').inner_text(),
             "結束對話",
         )
-        result_before_exit = (
-            store_state(page).get("lastActionResult") or {}
-        ).get("requestId")
-        page.click('[data-testid="dialogue-exit"]')
-        wait_for_store_state(
+        leave = submit_until_admitted(
             page,
-            lambda s: (
-                (s.get("lastActionResult") or {}).get("requestId")
-                not in (None, result_before_exit)
-            ),
+            lambda: page.click('[data-testid="dialogue-exit"]'),
+            action_id="explore.dialogue_leave",
         )
-        self.assertEqual(sent_action_count(page, "explore.dialogue_leave"), 1)
+        self.assertEqual(leave["outcome"], "success")
 
     @covers_requirement(
         "webclient-contextual-hud::the-command-region-collapses-in-dialogue-mode-and-the-message-window-spans-the-band"
@@ -604,13 +600,12 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
 
         # 結束對話 brings the dock back at the overview, focused, not remounted.
-        result_before_exit = (store_state(page).get("lastActionResult") or {}).get("requestId")
-        page.click('[data-testid="dialogue-exit"]')
-        wait_for_store_state(
+        submit_until_admitted(
             page,
-            lambda s: (s.get("lastActionResult") or {}).get("requestId") not in (None, result_before_exit)
-            and s.get("mode") == "exploration",
+            lambda: page.click('[data-testid="dialogue-exit"]'),
+            action_id="explore.dialogue_leave",
         )
+        wait_for_store_state(page, lambda s: s.get("mode") == "exploration")
         page.wait_for_timeout(150)
         after = page.evaluate(
             """(dock) => ({
@@ -740,22 +735,18 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
         # The exit row dispatches the deterministic leave seam exactly once
         # (the list returns once the reply is read). The scripted reply's own
-        # publication burst and reading acknowledgement must land first, so
-        # the leave names the newest revision.
+        # publication burst, the reading acknowledgement and the action-options
+        # generation's push all land around this point; the admission gate
+        # answers an activation only against the newest revision, so the
+        # journey repeats the same click, bounded, the way the client asks the
+        # player to operate again.
         open_dialogue_choices(page)
-        wait_for_presentation_adopted(page)
-        result_before_exit = (
-            store_state(page).get("lastActionResult") or {}
-        ).get("requestId")
-        page.click('[data-testid="dialogue-exit"]')
-        wait_for_store_state(
+        leave = submit_until_admitted(
             page,
-            lambda state: (
-                (state.get("lastActionResult") or {}).get("requestId")
-                not in (None, result_before_exit)
-            ),
+            lambda: page.click('[data-testid="dialogue-exit"]'),
+            action_id="explore.dialogue_leave",
         )
-        self.assertEqual(sent_action_count(page, "explore.dialogue_leave"), 1)
+        self.assertEqual(leave["outcome"], "success")
         self._wait_panel(
             page, "dialogue", lambda p: p.get("available") is not True
         )
@@ -1355,8 +1346,19 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self._wait_exploration_available(page)
 
         host = overview_target_with_affordance(page, "explore.talk_open")
-        activate_overview_chip(page, "target-%s" % host["identity"])
-        _press(page, "Enter")  # 交談 -> explore.talk_open
+
+        def _open_talk() -> None:
+            # The first activation selects the host's rail entry and opens its
+            # verb card; a stale answer applied nothing, so on a retry the card
+            # is already open and the same 交談 row keeps focus.
+            if page.locator(CARD_SELECTOR).count() == 0:
+                activate_overview_chip(page, "target-%s" % host["identity"])
+            _press(page, "Enter")  # 交談 -> explore.talk_open
+
+        opened = submit_until_admitted(
+            page, _open_talk, action_id="explore.talk_open"
+        )
+        self.assertEqual(opened["outcome"], "success")
         self._wait_panel(page, "dialogue", lambda p: p.get("available") is True)
         wait_for_store_state(
             page,
@@ -1890,6 +1892,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         """
         for viewport in ((1451, 790), (1920, 1080)):
             page = self.logged_in_page(viewport)
+            install_outbound_recorder(page)
             self._wait_exploration_available(page)
             host = overview_target_with_affordance(page, "explore.talk_open")
             page.wait_for_selector(
@@ -1943,7 +1946,13 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             standee = '[data-anchor="actor-right"] [data-testid="stage-actor"]'
             page.wait_for_selector(standee)
             page.evaluate("(sel) => { document.querySelector(sel).__presenceMark = true; }", standee)
-            _press(page, "Enter")  # 交談 -> explore.talk_open
+
+            # The journey already activated this host's rail entry above, so the
+            # verb card is open and 交談 keeps focus; a stale answer applied
+            # nothing and the same row answers the repeated Enter.
+            submit_until_admitted(
+                page, lambda: _press(page, "Enter"), action_id="explore.talk_open"
+            )
             self._wait_panel(page, "dialogue", lambda p: p.get("available") is True)
             wait_for_store_state(page, lambda s: s.get("mode") == "dialogue")
             page.wait_for_selector(standee)
@@ -1953,7 +1962,11 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             )
             # Leave the conversation so the next viewport starts in exploration.
             open_dialogue_choices(page)
-            page.click('[data-testid="dialogue-exit"]')
+            submit_until_admitted(
+                page,
+                lambda: page.click('[data-testid="dialogue-exit"]'),
+                action_id="explore.dialogue_leave",
+            )
             wait_for_store_state(page, lambda s: s.get("mode") == "exploration")
             page.close()
 
