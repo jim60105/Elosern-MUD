@@ -27,6 +27,7 @@ from elosern_map_core.references import (
     wilderness_cell_ref,
 )
 from elosern_map_core.sparse import SparseGraphError, build_sparse_graph
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.exits import Exit
 from typeclasses.rooms import GridRoom, Room
@@ -83,6 +84,7 @@ class ReferenceResolutionTests(unittest.TestCase):
             frame_cells=64,
         )
 
+    @covers_requirement("map-object-references::static-references-resolve-by-authored-identity")
     def test_absent_wrong_domain_and_duplicate_are_named(self):
         index = self._index()
 
@@ -131,6 +133,7 @@ class StaticFamilyMovementTests(EvenniaTest):
         place = mock.Mock(key="t_place", exterior=settlement_node_ref(MAP, "shop"))
         return district, place
 
+    @covers_requirement("map-object-references::static-references-resolve-by-authored-identity")
     def test_gates_places_districts_and_art_follow_the_moved_node(self):
         district, place = self._declarations()
 
@@ -270,6 +273,7 @@ class SyncPreservationTests(EvenniaTest):
 
 
 class PreflightPolicyTests(EvenniaTest):
+    @covers_requirement("map-object-references::static-references-resolve-by-authored-identity")
     def test_a_wrong_domain_target_is_rejected_before_any_write(self):
         from world.lore.settlements import places
         from world.maps import city_gates
@@ -404,6 +408,7 @@ class IntegratedMovedNodeTests(EvenniaTest):
                 stack.enter_context(mock.patch.object(target, attribute, value))
         return stack
 
+    @covers_requirement("map-object-references::static-references-resolve-by-authored-identity")
     def test_moved_node_follows_gate_art_service_and_lighting(self):
         place, district = self._place(), self._district()
         create_object(Room, key=LIMBO_KEY)
