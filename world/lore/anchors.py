@@ -7,10 +7,9 @@ authored in ``content/maps/locations.yaml`` and composed by
 counts that stay with their existing lore owner and are joined by the same
 stable identity.
 
-``LOCAL_FRAME_ANCHOR_REGISTRY`` binds authored settlement frames; it is a
-settlement-domain declaration (not map-facing geography) and stays here until
-the settlement cutover. It is neither the grid-placement registry nor a room
-spawner.
+``LOCAL_FRAME_ANCHOR_REGISTRY`` binds authored settlement frames. Its values are
+the published settlement documents' anchor bindings, keyed by ``location_ref``;
+it is neither the grid-placement registry nor a room spawner.
 """
 
 from __future__ import annotations
@@ -20,6 +19,8 @@ from enum import StrEnum
 from typing import Mapping
 
 from elosern_map_core.geometry import local_to_world_m
+
+from world.maps.published import PublishedView
 
 
 class AnchorKind(StrEnum):
@@ -95,10 +96,12 @@ ANCHOR_LORE: dict[str, AnchorLore] = {
 }
 
 
-LOCAL_FRAME_ANCHOR_REGISTRY: dict[str, LocalFrameAnchor] = {
-    "capital_altoria": LocalFrameAnchor("capital_altoria", (3500, 2850)),
-    "village_ciaran": LocalFrameAnchor("village_ciaran", (220, 305)),
-}
+#: One frame per discovered settlement document, keyed by its ``location_ref``.
+#: The authored metre point is the document's anchor binding; no reverse
+#: location list or second coordinate table exists.
+LOCAL_FRAME_ANCHOR_REGISTRY: Mapping[str, LocalFrameAnchor] = PublishedView(
+    "local_frame_anchors"
+)
 
 
 def _geography():

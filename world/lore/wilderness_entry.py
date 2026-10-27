@@ -2,9 +2,10 @@
 footprint, and which face-gates of that footprint lead back to its grid rooms
 (wilderness-anchor-footprint Model A).
 
-Module-level registries are the source of truth (AGENTS.md); the DB mirror in
-``world.lore.sync`` is a projection. All geometry helpers are pure and derived
-from the authored mask — consumers never re-derive it.
+Each settlement document's ``wilderness_entry`` row is the authored source; this
+module exposes the composed view of the published settlement world (the DB
+mirror in ``world.lore.sync`` is a projection of it). All geometry helpers are
+pure and derived from the authored mask — consumers never re-derive it.
 """
 
 from collections.abc import Callable, Mapping
@@ -12,6 +13,8 @@ from dataclasses import dataclass
 
 from elosern_map_core.documents import QualifiedRef
 from elosern_map_core.references import ReferenceError, settlement_node_ref, settlement_position
+
+from world.maps.published import PublishedView
 
 # Canonical wilderness directions, short form (matches the resolver's
 # DIRECTION_DELTAS keys and the wilderness-gateway spec vocabulary).
@@ -198,12 +201,11 @@ def _iter_map_extents() -> dict[str, set[tuple[int, int]]]:
     """Prototype-coordinate extents per grid map key.
 
     Deferred import: lore must not import ``world.maps`` at module scope, and
-    this is only consulted by the sync-time validation call (no import cycle —
-    the shared ``world.maps.map_data`` assembly imports nothing from lore).
-    The assembly is the single home of the sparse settlement graphs
-    (settlement-shops design §6.2 / §10; implement-sparse-settlement-graphs):
-    validation must see every map a gate names or a second settlement's gate
-    fails startup with ``unknown z_map_key``.
+    this is only consulted by a sync-time validation call. The published
+    settlement world is the single home of the sparse settlement graphs
+    (settlement-shops design §6.2 / §10); validation must see every map a gate
+    names or a second settlement's gate fails startup with
+    ``unknown z_map_key``. A candidate passes its own ``extents`` instead.
     """
     from world.maps.map_data import SETTLEMENT_GRAPHS
 
@@ -243,24 +245,34 @@ def validate_wilderness_entries(
     index=None,
     bounds: tuple[int, int] | None = None,
     walkable: Callable[[tuple[int, int]], bool] | None = None,
+    placements: Mapping[str, object] | None = None,
+    extents: Mapping[str, set[tuple[int, int]]] | None = None,
 ) -> None:
     """Pure, DB-free validation of the whole authored registry (design D5).
 
     Raises ``ValueError`` naming the offending entry and the rejected rule.
     Called by ``world.lore.sync.sync_all()`` before mirroring so malformed
-    authored data fails at startup. ``index`` is the current settlement-node
-    binding snapshot; production builds it from the live graphs, while a
-    synthetic candidate passes its own so validation never reads a partially
-    assembled registry.
+    authored data fails at startup. ``index``, ``placements`` and ``extents``
+    are the current settlement-node bindings, anchor placements and per-map
+    node extents; production reads them from the published world, while a
+    candidate passes its own so validation never reads a partially assembled
+    registry. ``walkable`` defaults to the published terrain rule; a candidate
+    that has no terrain yet passes ``True`` for every cell and leaves the
+    terrain rules to the geography candidate.
     """
     if registry is None:
         registry = WILDERNESS_ENTRY_REGISTRY
 
-    from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
-    from world.maps.static_references import settlement_reference_index
+    if placements is None:
+        from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
 
+        placements = ANCHOR_PLACEMENT_REGISTRY
     if index is None:
+        from world.maps.static_references import settlement_reference_index
+
         index = settlement_reference_index()
+    if extents is None:
+        extents = _iter_map_extents()
 
     def in_frame(cell: tuple[int, int]) -> bool:
         return _in_provider_rect(cell, bounds)
@@ -274,7 +286,7 @@ def validate_wilderness_entries(
     all_footprints: dict[str, frozenset[tuple[int, int]]] = {}
     for anchor_key, entry in registry.items():
         # -- anchor_key resolves against change 12's placement registry.
-        if entry.anchor_key not in ANCHOR_PLACEMENT_REGISTRY:
+        if entry.anchor_key not in placements:
             fail(anchor_key, f"anchor_key {entry.anchor_key!r} absent from ANCHOR_PLACEMENT_REGISTRY")
 
         # -- mask grammar: rectangle of '#'/'.' with at least one '#'.
@@ -356,10 +368,7 @@ def validate_wilderness_entries(
 
         # -- grid destination resolves to an authored node inside its map's
         #    extent.
-        extents = None  # lazily loaded once per validated registry
         for gate in entry.gates:
-            if extents is None:
-                extents = _iter_map_extents()
             try:
                 position = settlement_position(
                     index,
@@ -466,47 +475,9 @@ def validate_wilderness_entries(
         seen_gate_rooms.add(gate_room)
 
 
-WILDERNESS_ENTRY_REGISTRY: dict[str, WildernessEntryPoint] = {
-    "capital_altoria": WildernessEntryPoint(
-        anchor_key="capital_altoria",
-        # The city's rasterized physical envelope at the one-kilometre
-        # wilderness scale (world-map-scale design §8/§10.3): an irregular
-        # 40 km² built-up mask inside a seven-by-nine-kilometre box, replacing
-        # the old 5x5 ten-kilometre block. The mask rows are contract: the
-        # derived anchor cell is the plaza cell (860, 1080), and the south and
-        # east gate rays leave the mask at (860, 1077) and (864, 1080).
-        shape=(
-            "#.....#",
-            "##...##",
-            ".#####.",
-            "#######",
-            "#######",
-            "####..#",
-            "#..#.##",
-            "####...",
-            "..##...",
-        ),
-        origin_xy=(857, 1076),
-        gates=(
-            # 南門: a traveler at (860, 1077) heading north enters the city.
-            WildernessGate("n", settlement_node_ref("capital_altoria", "south_gate")),
-            # 東門: a traveler at (864, 1080) heading west enters the city.
-            WildernessGate("w", settlement_node_ref("capital_altoria", "east_gate")),
-        ),
-    ),
-    "village_ciaran": WildernessEntryPoint(
-        anchor_key="village_ciaran",
-        # The hidden village is a point entrance, not a nine-square-kilometre
-        # obstacle at the new scale (design §9/§10.3): the plaza cell itself,
-        # entered only from its authored direction. The hidden path's physical
-        # position (35, 270) transforms inside this same cell.
-        shape=("#",),
-        origin_xy=(1340, 1220),
-        gates=(
-            # 隱密小徑: a traveler at the anchor cell heading north follows the
-            # concealed path into the village. No other direction is a
-            # gateway.
-            WildernessGate("n", settlement_node_ref("village_ciaran", "hidden_path")),
-        ),
-    ),
-}
+#: The composed wilderness gateways of the published settlements, keyed by the
+#: anchor (``location_ref``) whose footprint and gates they declare. A
+#: settlement with no ``wilderness_entry`` row has no wilderness gateway.
+WILDERNESS_ENTRY_REGISTRY: Mapping[str, WildernessEntryPoint] = PublishedView(
+    "wilderness_entries"
+)
