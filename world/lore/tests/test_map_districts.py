@@ -36,6 +36,13 @@ from world.lore.map_districts import (
     landmark_node_ids,
     parse_districts_document,
 )
+from world.tests.geography_fixture import publish_shipped_geography
+
+
+def setUpModule():
+    # Encoding a canonical visit id validates its cell against the published
+    # frame; the mechanism fixtures stay synthetic.
+    publish_shipped_geography()
 
 _WALL_X = 200
 _FEN_Y = 300

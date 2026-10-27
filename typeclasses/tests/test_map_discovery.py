@@ -26,12 +26,15 @@ class LandmarkArrivalTests(EvenniaTest):
         self.source,self.landmark,self.end=synthetic_rooms()
         self.char1.location=self.source
         self.district=NS(
-            key="t_district",
+            district_id="t_district",
             landmark=wilderness_cell_ref((0, 0)),
             landmark_node=_derive_node_id(self.landmark),
             district_name_zh="測試丘陵",
         )
-        self.registry=patch("world.lore.map_districts.MAP_DISTRICT_REGISTRY",{"t_district":self.district})
+        self.registry=patch(
+            "world.lore.map_districts.current",
+            new=lambda: NS(districts={"t_district": self.district}),
+        )
         self.registry.start()
         self.addCleanup(self.registry.stop)
         # The t_ grid map is not an authored settlement, so this fixture's
@@ -174,7 +177,7 @@ class LandmarkArrivalTests(EvenniaTest):
         # Avoid SaverDict's persistence hook while recreating the failed-save
         # in-memory state. This assignment never writes the database.
         attribute.db_value=to_pickle(stored)
-        with fixtures(),patch("world.lore.map_districts.MAP_DISTRICT_REGISTRY",{SECRET:self.district}), \
+        with fixtures(),patch("world.lore.map_districts.current",new=lambda: NS(districts={SECRET:self.district})), \
              patch("web.webclient.presentation.world_map_geometry.current_point",return_value=(1,2)), \
              patch("web.webclient.presentation.world_map.quest_markers",return_value=[]):
             body=world_map_presenter(NS(actor=self.char1))

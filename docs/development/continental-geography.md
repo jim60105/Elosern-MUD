@@ -27,10 +27,15 @@ The geography candidate is validated against that candidate settlement world
 footprint and gateway checks read explicit inputs rather than a live registry.
 See `docs/development/sparse-settlement-graphs.md`.
 
+The authored districts are published by the third startup step,
+`district_source_publication`: `content/maps/districts.yaml` composed by
+`world/lore/map_districts.py` against the published terrain and bindings. See
+[Map districts](#map-districts).
+
 Political affiliation, population and dungeon floor counts are *not* map
 fields: they stay in `world/lore/anchors.py::ANCHOR_LORE` and are joined by the
-same stable location identity. Settlement graphs, bindings, districts and
-interiors remain their own Python authorities until their own cutover.
+same stable location identity. Interiors remain their own Python authority
+until their own cutover.
 
 The pure classification, waterway rasterization and derivation rules live in
 `packages/map-core/elosern_map_core/terrain.py` and run over the snapshot's
@@ -101,11 +106,13 @@ geography and is not runtime data.
 
 ## Map districts
 
-`world/lore/map_districts.py` declares `MAP_DISTRICT_REGISTRY`, the frozen
-districts of the world map (world-map drawer design §4.1). Each `MapDistrict`
-has exactly one landmark and six fields: `key`, `district_name_zh`,
-`landmark_name_zh`, `landmark`, `kind` (`voronoi` or `region`) and
-`region_key` (set only for a `region` district).
+`content/maps/districts.yaml` is the sole authority for the districts of the
+world map (world-map drawer design §4.1). Each district has exactly one
+landmark and the same fields the core district schema declares:
+`district_name_zh`, `landmark_name_zh`, `landmark`, `kind` (`voronoi` or
+`region`) and `region_key` (set only for a `region` district); the mapping key
+is the stable district identity. `world/lore/map_districts.py` loads, validates
+and publishes that document; it declares no authored rows of its own.
 
 - `landmark` is a qualified authored identity: an existing settlement node
   identity, an authored location, or an explicitly typed wilderness cell. The
@@ -113,33 +120,51 @@ has exactly one landmark and six fields: `key`, `district_name_zh`,
   (`wild:elosern:<x>:<y>` or `grid:<map>:<x>:<y>`) is derived from the
   current binding by `world.lore.map_districts.landmark_node_ids`, never stored
   in the row. A settlement landmark is placed on the continent through the
-  settlement's local frame (`world_position_m`); Altoria's central plaza lands
-  on the centre of cell `(860, 1080)`.
+  settlement's local frame (`world_position_m`), so moving the settlement node
+  moves the district's canonical node without editing the district document.
 - `region` districts take every cell of one terrain region. The northern deep
-  forest is the only one: its single landmark, 古樹之心 at `(1250, 2420)`, lies
-  about 500 km beyond the forest edge and covers both nominal claims.
+  forest is the only one: its single landmark lies about 500 km beyond the
+  forest edge and covers both nominal claims.
 - `voronoi` districts seed the walking-distance partition (see
   [District partition](#district-partition)). Two Voronoi landmarks are never closer than
   `MIN_VORONOI_SPACING_KM` (100 km, below the roughly 200 km district target).
 
+### Publication
+
+`world/lore/map_districts.py` is the one game-side adapter. It reads the
+canonical document through `elosern_map_core` and composes one immutable
+`DistrictSnapshot` (the typed document, its district declarations, source
+fingerprints and any saveable semantic diagnostics). Publication is atomic and
+is the third startup step, `district_source_publication`, after the settlement
+maps: `district_source_publication` rejects a candidate before the
+static-reference gate or any persistent synchronization, and a failed candidate
+leaves the previously published snapshot untouched. Tests and tools call
+`load_and_publish()` explicitly. Nothing loads or validates at import.
+
+Map-semantic findings (sea, blocked terrain, an unreachable or not-yet-bound
+landmark, landmark/region disagreement, insufficient declared spacing) are
+saveable work-in-progress diagnostics: `load_districts()` returns a candidate
+carrying them, and `publish()` rejects that candidate at runtime. Structural
+faults (unknown region membership, an unsupported landmark domain, an
+unresolvable reference, duplicate identities) reject the load itself. The
+district loader validates region membership against the published terrain and
+landmark references against the published settlement/location bindings; the
+geography candidate no longer performs that join.
+
 ### Authored roster
 
-The current registry holds 120 districts, comprising 119 Voronoi districts and
-one deep-forest region district. This is an authoring snapshot, not a required
-count; the manually edited registry owns membership. Placement targets roughly
-200 km district width and distributes seeds across each nominal nation's
-walkable land outside the forest.
+The district document owns membership; it is an authoring snapshot, not a
+specification-owned count. Placement targets roughly 200 km district width and
+distributes seeds across each nominal nation's walkable land outside the
+forest.
 
 - Placement. Seeds sit near the centroids of a relaxed layout computed per
   nation. The original seeds stay fixed at their authored cells. The
-  Grandia (`(1970, 1280)`) and Valhalla (`(780, 1910)`) capital anchor cells
-  are also fixed, so standing in either capital lights its district. Two
-  landmarks were moved onto features: the imperial east-branch ford
-  `(2300, 526)` and a bank of the capital river. Pass and border-river fords
-  are not landmarks: the border closes the partition there, so a seed on it
-  produces a sliver district along the ridge or river. The coordinates are
-  ordinary authored values; nothing is generated at runtime, and this
-  document does not repeat them.
+  Grandia and Valhalla capital anchor cells are also fixed, so standing in
+  either capital lights its district. Pass and border-river fords are not
+  landmarks: the border closes the partition there, so a seed on it produces a
+  sliver district along the ridge or river. The coordinates live only in the
+  authored document; nothing is generated at runtime.
 - Future grid maps. When the Grandia or Valhalla capital gains a settlement
   grid map, move its landmark to the matching `grid:` node (its footprint
   would block the current wilderness cell) and regenerate the partition.
@@ -158,20 +183,21 @@ walkable land outside the forest.
 
 ### Validation and lighting
 
-`validate_map_districts(registry=None, terrain=None)` is pure and
-database-free and reports every fault with its district key: identity and
-field shape, kind/region pairing, duplicate keys, nodes and names, canonical
-node grammar, sea, blocked terrain (ridge, river or anchor footprint), absent
-grid nodes, unreachable landmarks, region membership (a Voronoi seed may not
-sit in region-district land) and the spacing rule. A wilderness landmark is
+`diagnose_districts(districts, terrain=None, index=None)` is pure and
+database-free and reports every fault as a typed core diagnostic with the
+district identity and source field: identity and field shape, kind/region
+pairing, duplicate landmarks and names, canonical node grammar, sea, blocked
+terrain (ridge, river or anchor footprint), unbound grid projections,
+unreachable landmarks, region membership (a Voronoi seed may not sit in
+region-district land) and the spacing rule. A wilderness landmark is
 reachable when it lies in the same walkable component as a registered
 gateway approach (`world/maps/wilderness_reachability.py` indexes the exact
 components); a grid landmark is reachable when the settlement graph routes to
-it from a gate whose approach is reachable. Validation is not a startup step;
-the data-contract test `world.lore.tests.test_map_district_content` runs it
-against the shipped registry, and synthetic rule tests pass their own
-`terrain`. The registry is browsable in the GM portal index; it is not
-mirrored by `world/lore/sync.py`.
+it from a gate whose approach is reachable. The data-contract test
+`world.lore.tests.test_map_district_content` runs the shipped candidate, and
+synthetic rule tests pass their own `terrain`. The published districts are
+browsable in the GM portal index; they are not mirrored by
+`world/lore/sync.py`.
 
 Lighting is derived, never stored: `world/rules/map_district_lighting.py`
 lights a district if and only if its exact landmark node is in the visited
@@ -189,7 +215,7 @@ The runtime only reads that file through `world/maps/district_partition.py`
 (`district_at((x, y))`, `district_outlines()`); it never imports the generator
 or recomputes ownership.
 
-Regenerate after any change to the district registry, the terrain model
+Regenerate after any change to the district document, the terrain model
 (mainland, ridge, passes, waterways, fords, forest edge, nominal claims),
 anchor footprints, gateways or the settlement routes to a grid landmark:
 
@@ -201,10 +227,11 @@ uv run --locked python -m tools.map_district_partition --check  # exit 1 when st
 Commit the regenerated file with the change that caused it. The data-contract
 test `world.maps.tests.test_map_district_partition` regenerates it from the
 shipped inputs and fails on any byte difference, so stale data is never
-adopted at runtime. Run `validate_map_districts` (or
-`world.lore.tests.test_map_district_content`) first: the 100 km
-`MIN_VORONOI_SPACING_KM` spacing, reachability and region-membership rules
-belong to the registry validator, not the partitioner.
+adopted at runtime. The partition generator publishes the settlement,
+geography and district candidates before reading its seed input. Run
+`diagnose_districts` (or `world.lore.tests.test_map_district_content`) first:
+the 100 km `MIN_VORONOI_SPACING_KM` spacing, reachability and
+region-membership rules belong to the district validator, not the partitioner.
 
 Datum and units:
 

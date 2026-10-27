@@ -85,6 +85,15 @@ landmark:
   cell: null                   # required exactly for wilderness_cell
 ```
 
+This document is the sole district authority: `world/lore/map_districts.py`
+loads and validates it against the published terrain and settlement/location
+bindings, then publishes one immutable snapshot (startup step
+`district_source_publication`). Structure faults reject the load; sea, blocked
+or unreachable landmarks, region disagreement and insufficient declared
+spacing are saveable semantic diagnostics that reject runtime adoption only.
+Landmarks are never authored as coordinates, so moving a settlement node moves
+the district's canonical visited identity without editing this document.
+
 ### settlement
 
 `location_ref`, `binding{anchor_cell, local_anchor_m}`, optional

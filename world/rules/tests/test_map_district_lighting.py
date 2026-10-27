@@ -9,16 +9,29 @@ import copy
 import unittest
 
 from tools.spec_traceability import covers_requirement
+from elosern_map_core.documents import DistrictDeclaration
 from elosern_map_core.references import wilderness_cell_ref
-from world.lore.map_districts import MapDistrict, landmark_node_ids
+from world.lore.map_districts import landmark_node_ids
 from world.rules.map_district_lighting import lit_district_keys, lit_district_keys_from_visits
 from world.rules.map_knowledge import KNOWLEDGE_ATTR, KnowledgeError, NodeVisit
 
+
+def _district(key, name, landmark_name, cell, kind="voronoi", region_key=None):
+    return DistrictDeclaration(
+        district_id=key,
+        district_name_zh=name,
+        landmark_name_zh=landmark_name,
+        landmark=wilderness_cell_ref(cell),
+        kind=kind,
+        region_key=region_key,
+    )
+
+
 _DISTRICTS = {
     # One region district spanning two claims, lit only at its single heart.
-    "mire": MapDistrict("mire", "霧沼區", "霧沼心", wilderness_cell_ref((500, 2400)), "region", "mire_region"),
-    "dune": MapDistrict("dune", "沙丘區", "沙丘石", wilderness_cell_ref((300, 600)), "voronoi"),
-    "vale": MapDistrict("vale", "溪谷區", "溪谷橋", wilderness_cell_ref((700, 900)), "voronoi"),
+    "mire": _district("mire", "霧沼區", "霧沼心", (500, 2400), "region", "mire_region"),
+    "dune": _district("dune", "沙丘區", "沙丘石", (300, 600)),
+    "vale": _district("vale", "溪谷區", "溪谷橋", (700, 900)),
 }
 
 

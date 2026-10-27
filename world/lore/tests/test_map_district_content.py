@@ -12,6 +12,7 @@ Mechanism rules are covered with synthetic fixtures in ``test_map_districts``.
 
 import json
 import unittest
+from collections.abc import Mapping
 from unittest import mock
 
 import numpy as np
@@ -46,10 +47,18 @@ def setUpModule():
     publish_shipped_geography()
 
 
+def _plain(value):
+    if isinstance(value, Mapping):
+        return {key: _plain(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_plain(item) for item in value]
+    return value
+
+
 def _rows():
     """The authored rows as plain data, for a synthetic candidate document."""
 
-    return json.loads(json.dumps(map_districts.current().document.data["districts"]))
+    return _plain(map_districts.current().document.data["districts"])
 
 
 def _document(rows):

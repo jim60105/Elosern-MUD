@@ -675,7 +675,7 @@ class WildernessAreaTests(EvenniaTest):
         far = nodes[_t_wild_id(start[0] + half, start[1])]
         self.assertEqual((far["visibility"], far["visited"], far["action"]), ("seen", False, None))
         district_at = _live("world.maps.district_partition", "district_at")
-        districts = _live("world.lore.map_districts", "MAP_DISTRICT" + "_REGISTRY")
+        districts = _live("world.lore.map_districts", "current")().districts
         self.assertEqual(payload["district_name"], districts[district_at(start)].district_name_zh)
         self.assertEqual(payload["title"], _t_region_display_for(*start))
         self.assertEqual(payload["cell_km"], km)

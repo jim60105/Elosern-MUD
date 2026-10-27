@@ -32,7 +32,8 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.exits import Exit
 from typeclasses.rooms import GridRoom, Room
 
-from world.lore.map_districts import MapDistrict, landmark_node_id, landmark_node_ids
+from elosern_map_core.documents import DistrictDeclaration
+from world.lore.map_districts import landmark_node_id, landmark_node_ids
 from world.lore.settlements.places import PlaceDefinition, PlaceKind
 from world.maps import map_data
 from world.maps.bootstrap import (
@@ -132,8 +133,8 @@ class StaticFamilyMovementTests(EvenniaTest):
     """Every migrated family resolves the same identity at a new coordinate."""
 
     def _declarations(self):
-        district = MapDistrict(
-            "t_district", "測試區", "測試碑", settlement_node_ref(MAP, "anchor"), "voronoi"
+        district = DistrictDeclaration(
+            "t_district", "測試區", "測試碑", settlement_node_ref(MAP, "anchor"), "voronoi", None
         )
         place = mock.Mock(key="t_place", exterior=settlement_node_ref(MAP, "shop"))
         return district, place
@@ -179,7 +180,11 @@ class StaticFamilyMovementTests(EvenniaTest):
                 mock.patch.object(anchor_placement, "ANCHOR_PLACEMENT_REGISTRY", {}),
                 mock.patch.object(wilderness_entry, "WILDERNESS_ENTRY_REGISTRY", {}),
                 mock.patch.object(places, "PLACE_REGISTRY", {}),
-                mock.patch.object(map_districts, "MAP_DISTRICT_REGISTRY", {}),
+                mock.patch.object(
+                    map_districts,
+                    "current",
+                    return_value=mock.Mock(districts={}, identity="t_identity"),
+                ),
                 mock.patch.object(room_art, "GRID_NODE_SCENE_ARCHETYPES", {}),
             ):
                 with self.assertRaises(StaticReferenceError) as captured:
@@ -362,12 +367,13 @@ class IntegratedMovedNodeTests(EvenniaTest):
         )
 
     def _district(self):
-        return MapDistrict(
-            "t_ref_district",
-            "測試區",
-            "測試碑",
-            settlement_node_ref(MAP, "anchor"),
-            "voronoi",
+        return DistrictDeclaration(
+            district_id="t_ref_district",
+            district_name_zh="測試區",
+            landmark_name_zh="測試碑",
+            landmark=settlement_node_ref(MAP, "anchor"),
+            kind="voronoi",
+            region_key=None,
         )
 
     def _apply(self, graph, place, district):
@@ -398,7 +404,16 @@ class IntegratedMovedNodeTests(EvenniaTest):
                 {place.key: place},
             ),
             (bootstrap_module, "PLACE" + "_REGISTRY", {place.key: place}),
-            (districts_module, "MAP_DISTRICT_REGISTRY", {district.key: district}),
+            (
+                districts_module,
+                "current",
+                mock.Mock(
+                    return_value=mock.Mock(
+                        districts={district.district_id: district},
+                        identity="t_identity",
+                    )
+                ),
+            ),
             (room_art, "GRID_NODE_SCENE_ARCHETYPES", art),
             (bootstrap_module, "GRID_NODE_SCENE_ARCHETYPES", art),
         ):
@@ -447,8 +462,8 @@ class IntegratedMovedNodeTests(EvenniaTest):
                 any(exit_obj.destination.pk == shop.pk for exit_obj in interior.exits)
             )
             self.assertEqual(
-                lit_district_keys(traveller, {district.key: district}),
-                frozenset({district.key}),
+                lit_district_keys(traveller, {district.district_id: district}),
+                frozenset({district.district_id}),
             )
             first_signature = binding_signature()
 
@@ -481,6 +496,6 @@ class IntegratedMovedNodeTests(EvenniaTest):
                     [encode_grid(MAP, 40, 40)],
                 )
                 self.assertEqual(
-                    lit_district_keys(traveller, {district.key: district}),
-                    frozenset({district.key}),
+                    lit_district_keys(traveller, {district.district_id: district}),
+                    frozenset({district.district_id}),
                 )
