@@ -24,6 +24,7 @@ from world.rules.service_gate import (
     REASON_REMOTE,
     schedule_silenced,
     ServiceVerdict,
+    read_service_binding,
     service_available,
 )
 
@@ -335,3 +336,103 @@ class StaleBindingSilenceTests(EvenniaTestCase):
             self.clerk.db.party_member = self.owner.pk + 99999
             self.assertFalse(schedule_silenced(self.clerk))
             self.clerk.db.party_member = self.owner.pk
+
+
+class ServiceBindingReportTests(EvenniaTestCase):
+    """The read-only binding facts the configuration diagnostics present.
+
+    ``gate_malformed`` mirrors exactly what ``service_available`` refuses on;
+    ``anchor_on_person`` is the authored anchored-person binding the importer
+    rejects, which the runtime gate deliberately never checked.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.anchor = create_object(Room, key="report anchor")
+        self.square = create_object(Room, key="report square")
+
+    def test_a_person_binding_resolves_no_anchor(self):
+        report = read_service_binding(_component("person"))
+        self.assertEqual(report.binding, "person")
+        self.assertIsNone(report.anchor_room)
+        self.assertFalse(report.gate_malformed)
+        self.assertFalse(report.anchor_on_person)
+
+    def test_an_anchored_person_binding_is_a_configuration_fact_only(self):
+        report = read_service_binding(_component("person", self.anchor.pk))
+        self.assertEqual(report.binding, "person")
+        self.assertEqual(report.anchor_raw, self.anchor.pk)
+        # A person binding never uses (or resolves) the anchor.
+        self.assertIsNone(report.anchor_room_id)
+        self.assertIsNone(report.anchor_room)
+        self.assertFalse(report.gate_malformed)
+        self.assertTrue(report.anchor_on_person)
+
+    def test_a_resolvable_place_anchor_is_reported(self):
+        report = read_service_binding(_component("place", self.anchor.pk))
+        self.assertEqual(report.binding, "place")
+        self.assertEqual(report.anchor_room, self.anchor)
+        self.assertFalse(report.gate_malformed)
+
+    def test_a_missing_or_non_room_anchor_is_malformed(self):
+        for anchor in (None, True, "42", self.square.pk + 99999):
+            with self.subTest(anchor=anchor):
+                # ``square`` exists but the id above it does not; the non-int
+                # and bool values never resolve to a room row.
+                report = read_service_binding(_component("place", anchor))
+                self.assertTrue(report.gate_malformed)
+                self.assertIsNone(report.anchor_room)
+
+    def test_a_room_id_pointing_at_a_non_room_is_malformed(self):
+        host = create_object(NPC, key="report host", location=self.square)
+        report = read_service_binding(_component("place", host.pk))
+        self.assertTrue(report.gate_malformed)
+        self.assertIsNone(report.anchor_room)
+
+    def test_a_missing_or_unknown_binding_is_malformed(self):
+        for binding in (None, "world"):
+            with self.subTest(binding=binding):
+                report = read_service_binding(_component(binding))
+                self.assertTrue(report.gate_malformed)
+
+    def test_an_invalid_anchor_value_keeps_its_raw_form(self):
+        report = read_service_binding(_component("place", "42"))
+        self.assertEqual(report.anchor_raw, "42")
+        self.assertIsNone(report.anchor_room_id)
+        self.assertTrue(report.gate_malformed)
+
+
+class _ExplodingAnchor(_Fake):
+    """A component whose anchor field cannot be read at all."""
+
+    @property
+    def anchor_room_id(self):
+        raise RuntimeError("anchor unreadable")
+
+
+class GateShortCircuitTests(EvenniaTestCase):
+    """The runtime gate answers without touching fields its rules never use."""
+
+    def setUp(self):
+        super().setUp()
+        self.anchor = create_object(Room, key="short anchor")
+        self.square = create_object(Room, key="short square")
+        self.host = create_object(NPC, key="short host", location=self.square)
+
+    def test_a_person_binding_never_reads_the_anchor(self):
+        component = _ExplodingAnchor(service_binding="person")
+        self.assertTrue(
+            service_available(_actor(self.square), self.host, component).allowed
+        )
+
+    def test_an_unknown_binding_still_fails_closed_and_warns(self):
+        component = _ExplodingAnchor(service_binding="world")
+        with patch("world.rules.service_gate.log_warn") as warned:
+            verdict = service_available(_actor(self.square), self.host, component)
+        self.assertEqual(verdict.reason, REASON_MALFORMED_BINDING)
+        self.assertTrue(warned.called)
+
+    def test_a_remote_host_answers_before_any_binding_read(self):
+        component = _ExplodingAnchor(service_binding="place")
+        verdict = service_available(_actor(self.anchor), self.host, component)
+        self.assertEqual(verdict.reason, REASON_REMOTE)

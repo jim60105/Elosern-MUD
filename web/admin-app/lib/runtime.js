@@ -37,7 +37,7 @@ export const RUNTIME_KINDS = Object.freeze([
   Object.freeze({
     key: "npcs",
     label: "NPC",
-    blurb: "人物設定、服務元件、今日排程與敘事分頁",
+    blurb: "人物設定、服務、能力設定診斷、今日排程與敘事分頁",
     filters: Object.freeze([
       Object.freeze({ key: "location", label: "所在房間", type: "text", placeholder: "#12", mono: true }),
     ]),

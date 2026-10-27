@@ -13,12 +13,21 @@ from __future__ import annotations
 import types
 from unittest.mock import patch
 
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from evennia.utils import create
 from evennia.utils.test_resources import EvenniaTest
 from typeclasses.components import GuildStaff, ScriptedDialogue
 from typeclasses.npcs import NPC
+from world.lore.dialogue.shape import (
+    AuthoredDialogue,
+    AuthoredTopic,
+    DialogueService,
+)
+from world.lore.scenes import Scene, Speech
 from world.rules import npc_schedules
 from world.rules.npc_persona import initialize_npc_persona
+from world.rules.npc_services import CONTEXT_REQUIRED_MESSAGE, UNREADABLE_MESSAGE
 from world.rules.traits import restore_gauges_to_full
 from world.tests.synthetic_data import SYNTH_RACES
 
@@ -48,7 +57,71 @@ CARD = {
     "social_connection": "",
 }
 
-NPC_SECTIONS = ["npc_identity", "persona", "services", "schedule", "narrative_tabs"]
+
+def _scene(scene_id: str) -> Scene:
+    return Scene(
+        scene_id=scene_id,
+        revision="r1",
+        lines=(
+            Speech(speaker="actor", text="打擾了。"),
+            Speech(speaker="host", text="請說。"),
+        ),
+    )
+
+
+#: The synthetic dialogue source of the inspected host: one unconditional
+#: topic advertising a service and one predecessor-gated (therefore withheld
+#: without a player context) topic advertising another.
+OPEN_TOPIC = AuthoredTopic(
+    topic_id="t_reader_dialogue.topic_01",
+    keyword="近況",
+    label="詢問近況",
+    fallback=_scene("t_reader_dialogue.topic_01_scene"),
+)
+HIDDEN_TOPIC = AuthoredTopic(
+    topic_id="t_reader_dialogue.topic_02",
+    keyword="後續",
+    label="追問後續",
+    fallback=_scene("t_reader_dialogue.topic_02_scene"),
+    predecessors=(OPEN_TOPIC.topic_id,),
+    disclosure="pure_chain",
+)
+DIALOGUE = AuthoredDialogue(
+    greeting=None,
+    topics=(OPEN_TOPIC, HIDDEN_TOPIC),
+    services=(
+        DialogueService(key="t_report", topic_id=OPEN_TOPIC.topic_id, label="交談回報"),
+        DialogueService(
+            key="t_follow_up", topic_id=HIDDEN_TOPIC.topic_id, label="追問後續"
+        ),
+    ),
+)
+
+NPC_SECTIONS = [
+    "npc_identity",
+    "persona",
+    "services",
+    "capability_diagnostics",
+    "schedule",
+    "narrative_tabs",
+]
+
+
+def _attribute_rows(entity):
+    """Every stored Attribute of the host, values included."""
+    return sorted(
+        (str(attribute.key), str(attribute.category or ""), repr(attribute.value))
+        for attribute in entity.attributes.all()
+    )
+
+
+def _group(section, title):
+    for entry in section["groups"]:
+        if entry["title"] == title:
+            return entry
+    raise AssertionError(
+        f"group {title!r} missing from {[entry.get('title') for entry in section['groups']]}"
+    )
 
 
 class NpcReaderTests(EvenniaTest):
@@ -60,11 +133,21 @@ class NpcReaderTests(EvenniaTest):
         self.npc.apply_race_baseline()
         restore_gauges_to_full(self.npc)
         self.npc.attributes.add("npc_title", "合成頭銜")
+        # The authored table is an immutable mapping; replace the module
+        # attribute for the duration of the test (the same seam the dialogue
+        # suites use).
+        table = patch("world.rules.dialogue.DIALOGUE_TABLE", {"t_reader_dialogue": DIALOGUE})
+        table.start()
+        self.addCleanup(table.stop)
         self.dialogue = ScriptedDialogue.create(self.npc, dialogue_key="t_reader_dialogue")
+        self.dialogue.service_binding = "person"
         self.npc.components.add(self.dialogue)
-        self.npc.components.add(
-            GuildStaff.create(self.npc, service_id="t_reader_service", branch_key="t_reader_branch")
+        self.staff = GuildStaff.create(
+            self.npc, service_id="t_reader_service", branch_key="t_reader_branch"
         )
+        self.staff.service_binding = "place"
+        self.staff.anchor_room_id = self.room1.pk
+        self.npc.components.add(self.staff)
         initialize_npc_persona(self.npc, CARD, {"kind": "import", "record": "t-reader-npc"})
 
     @covers_requirement("gm-runtime-state::complete-curated-entity-summaries")
@@ -110,13 +193,142 @@ class NpcReaderTests(EvenniaTest):
         self.assertIn("版本 1", persona["note"])
         self.assertIn("世代", persona["note"])
 
-    def test_services_table_lists_each_existing_component(self):
+    @covers_requirement(
+        "gm-runtime-state::npc-service-inspection-separates-context-from-configuration"
+    )
+    def test_services_are_the_projection_entries_with_context_required_availability(self):
         detail = npcs.detail(self.npc)
         services = section_of(detail, "services")
-        slots = column_values(services, "slot")
-        self.assertIn(ScriptedDialogue.name, slots)
-        self.assertIn(GuildStaff.name, slots)
-        self.assertIn("t_reader_service", " ".join(column_values(services, "fields")))
+        self.assertEqual(
+            column_values(services, "service"),
+            ["guild.register", "guild.board", "guild.report", "dialogue.t_report"],
+        )
+        self.assertEqual(
+            column_values(services, "availability"), ["context_required"] * 4
+        )
+        self.assertEqual(
+            column_values(services, "reason"), [CONTEXT_REQUIRED_MESSAGE] * 4
+        )
+        routes = column_values(services, "route")
+        self.assertEqual(routes[0], f"guild register @#{self.npc.pk}")
+        self.assertEqual(routes[-1], f"talk {self.npc.key}")
+        # The withheld association and its topic identity never reach the
+        # player-facing summary.
+        self.assertNotIn("t_follow_up", str(services))
+        self.assertNotIn(HIDDEN_TOPIC.topic_id, str(services))
+
+    @covers_requirement(
+        "gm-runtime-state::npc-service-inspection-separates-context-from-configuration"
+    )
+    def test_a_present_player_never_changes_the_management_summary(self):
+        self.char1.location = self.room1
+        services = section_of(npcs.detail(self.npc), "services")
+        self.assertEqual(
+            column_values(services, "availability"), ["context_required"] * 4
+        )
+
+    @covers_requirement(
+        "gm-runtime-state::npc-service-inspection-separates-context-from-configuration"
+    )
+    def test_capability_diagnostics_keep_configuration_out_of_the_summary(self):
+        detail = npcs.detail(self.npc)
+        diagnostics = section_of(detail, "capability_diagnostics")
+        staff = _group(diagnostics, GuildStaff.name)
+        self.assertEqual(row_value(staff, "綁定"), "place")
+        self.assertEqual(row_value(staff, "錨點"), f"#{self.room1.pk}")
+        self.assertIn("service_id=t_reader_service", row_value(staff, "設定"))
+        self.assertEqual(row_value(staff, "狀態"), "正常")
+        dialogue = _group(diagnostics, ScriptedDialogue.name)
+        self.assertEqual(row_value(dialogue, "綁定"), "person")
+        associations = _group(diagnostics, "對話服務關聯")
+        self.assertEqual(
+            [entry["key"] for entry in associations["rows"]],
+            ["t_follow_up", "t_report"],
+        )
+        self.assertIn(HIDDEN_TOPIC.topic_id, str(associations))
+        # The service summary stays free of the component-field inventory.
+        self.assertNotIn("service_id=t_reader_service", str(section_of(detail, "services")))
+
+    @covers_requirement(
+        "gm-runtime-state::npc-service-inspection-separates-context-from-configuration"
+    )
+    def test_an_unresolvable_anchor_is_reported_without_losing_the_entry(self):
+        self.staff.anchor_room_id = self.room1.pk + 99999
+        detail = npcs.detail(self.npc)
+        services = section_of(detail, "services")
+        self.assertNotIn("error", services)
+        self.assertIn("guild.register", column_values(services, "service"))
+        staff = _group(section_of(detail, "capability_diagnostics"), GuildStaff.name)
+        self.assertIn("錨點無法解析", row_value(staff, "狀態"))
+
+    @covers_requirement(
+        "gm-runtime-state::npc-service-inspection-separates-context-from-configuration"
+    )
+    def test_an_unresolvable_declared_dialogue_source_is_a_section_error(self):
+        with patch(
+            "world.rules.dialogue_sources.dialogue_source_for_host",
+            return_value=None,
+        ):
+            detail = npcs.detail(self.npc)
+        services = section_of(detail, "services")
+        self.assertEqual(services["error"]["code"], "source_unavailable")
+        self.assertEqual(services["error"]["message"], UNREADABLE_MESSAGE)
+        associations = _group(
+            section_of(detail, "capability_diagnostics"), "對話服務關聯"
+        )
+        self.assertIn("無法解析", row_value(associations, "狀態"))
+
+    def test_a_plain_npc_has_no_service_entries_and_no_capability_groups(self):
+        plain = create.create_object(NPC, key="t_reader_plain", location=self.room1)
+        plain.race = SYNTH_RACE
+        plain.apply_race_baseline()
+        restore_gauges_to_full(plain)
+        detail = npcs.detail(plain)
+        self.assertEqual(section_of(detail, "services")["type"], "empty")
+        self.assertEqual(section_of(detail, "capability_diagnostics")["type"], "empty")
+        self.assertEqual(failed_sections(detail), {})
+
+    def test_narrative_only_dialogue_is_not_a_configuration_error(self):
+        narrative = AuthoredDialogue(greeting=None, topics=(), services=())
+        with patch(
+            "world.rules.dialogue.DIALOGUE_TABLE",
+            {"t_reader_dialogue": DIALOGUE, "t_reader_narrative": narrative},
+        ):
+            host = create.create_object(NPC, key="t_reader_narrative", location=self.room1)
+            host.race = SYNTH_RACE
+            host.apply_race_baseline()
+            restore_gauges_to_full(host)
+            dialogue = ScriptedDialogue.create(host, dialogue_key="t_reader_narrative")
+            host.components.add(dialogue)
+            diagnostics = section_of(npcs.detail(host), "capability_diagnostics")
+        group_ = _group(diagnostics, ScriptedDialogue.name)
+        self.assertEqual(row_value(group_, "狀態"), "正常")
+        self.assertIn("純敘事", str(group_))
+
+    def test_a_person_binding_reports_its_stored_anchor_without_a_false_failure(self):
+        self.dialogue.anchor_room_id = self.room1.pk
+        diagnostics = section_of(npcs.detail(self.npc), "capability_diagnostics")
+        group_ = _group(diagnostics, ScriptedDialogue.name)
+        anchor = row_value(group_, "錨點")
+        self.assertIn(f"#{self.room1.pk}", anchor)
+        self.assertNotIn("無法解析", anchor)
+        self.assertIn("person 綁定不應帶錨點", row_value(group_, "狀態"))
+
+    @covers_requirement(
+        "gm-runtime-state::npc-service-inspection-separates-context-from-configuration"
+    )
+    def test_a_malformed_declared_dialogue_key_is_unreadable_not_empty(self):
+        host = create.create_object(NPC, key="t_reader_broken_key", location=self.room1)
+        host.components.add(
+            ScriptedDialogue.create(host, dialogue_key="scene_role:broken")
+        )
+        detail = npcs.detail(host)
+        services = section_of(detail, "services")
+        self.assertEqual(services["error"]["code"], "source_unavailable")
+        associations = _group(
+            section_of(detail, "capability_diagnostics"), "對話服務關聯"
+        )
+        self.assertIn("無法解析", row_value(associations, "狀態"))
 
     def test_item_fields_keep_only_the_room_summary(self):
         item = npcs.item_of(self.npc)
@@ -163,10 +375,30 @@ class NpcReaderTests(EvenniaTest):
         self.assertEqual(labels["對話"]["id"], str(self.npc.pk))
 
     def test_reading_an_npc_creates_no_attributes(self):
-        before = stored_attribute_keys(self.npc)
+        before = _attribute_rows(self.npc)
         npcs.detail(self.npc)
         npcs.item_of(self.npc)
-        self.assertEqual(stored_attribute_keys(self.npc), before)
+        self.assertEqual(_attribute_rows(self.npc), before)
+        self.assertEqual(stored_attribute_keys(self.npc), {
+            (key, category) for key, category, _value in before
+        })
+
+    def test_a_malformed_host_read_writes_nothing(self):
+        self.staff.anchor_room_id = self.room1.pk + 99999
+        before = _attribute_rows(self.npc)
+        with CaptureQueriesContext(connection) as queries:
+            npcs.detail(self.npc)
+        writes = [
+            query["sql"]
+            for query in queries
+            if query["sql"].lstrip().split(" ", 1)[0].upper()
+            in {"INSERT", "UPDATE", "DELETE", "REPLACE"}
+        ]
+        self.assertEqual(writes, [])
+        self.assertEqual(_attribute_rows(self.npc), before)
+        # The gameplay malformed-binding debounce is the gate's own flag; a
+        # management read never arms it.
+        self.assertIsNone(getattr(self.npc.ndb, "service_gate_malformed_warned", None))
 
     def test_owner_identity_requires_and_resolves_a_dbref(self):
         with self.assertRaises(Exception) as missing:

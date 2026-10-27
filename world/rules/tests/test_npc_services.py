@@ -30,15 +30,20 @@ from world.rules.dialogue_availability import (
     TOPIC_OPEN,
     TopicProjection,
 )
+from world.rules import npc_services as npc_services_rules
 from world.rules.npc_services import (
+    CONTEXT_REQUIRED,
+    CONTEXT_REQUIRED_MESSAGE,
     STATE_NONE,
     STATE_READY,
     STATE_UNREADABLE,
     ServiceRoute,
+    inspect_npc_services,
     native_entry_count,
     project_npc_services,
     validate_service_capacity,
 )
+from world.rules.service_gate import service_available
 
 
 def _scene(scene_id):
@@ -468,3 +473,148 @@ class ServiceCapacityTests(EvenniaTest):
             ServiceRoute("command", 1, command="church pray")
         with self.assertRaises(ValueError):
             ServiceRoute("drawer", 1)
+
+
+class ManagementInventoryTests(_ProjectionBase):
+    """The actor-independent inventory a management read presents.
+
+    It reuses the projection's mapping and routes but asserts no player
+    verdict: every entry is ``context_required`` with the exact
+    missing-context reason, so no enabled operation can be fabricated.
+    """
+
+    def test_it_reuses_the_projection_mapping_without_a_verdict(self):
+        host = self._host("t_管理全服務")
+        self._merchant(host)
+        self._staff(host)
+        self._reception(host)
+        self._church(host)
+        inventory = inspect_npc_services(host)
+        projected = self._project(host)
+        self.assertEqual(inventory.state, STATE_READY)
+        self.assertEqual(
+            [entry.key for entry in inventory.entries],
+            [entry.key for entry in projected.entries],
+        )
+        self.assertEqual(
+            [entry.route.as_dict() for entry in inventory.entries],
+            [entry.route.as_dict() for entry in projected.entries],
+        )
+        for entry in inventory.entries:
+            self.assertFalse(entry.enabled)
+            self.assertEqual(entry.disabled_reason.code, CONTEXT_REQUIRED)
+            self.assertEqual(entry.disabled_reason.message, CONTEXT_REQUIRED_MESSAGE)
+
+    def test_it_never_consults_the_gate_or_a_present_player(self):
+        host = self._host("t_管理商")
+        self._merchant(host)
+        self.player.location = host.location
+        before = inspect_npc_services(host)
+        with patch(
+            "world.rules.npc_services.service_available",
+            side_effect=AssertionError("management must not evaluate the gate"),
+        ):
+            self.assertEqual(inspect_npc_services(host), before)
+
+    def test_a_host_without_capabilities_has_no_inventory(self):
+        host = self._host("t_空殼")
+        self.assertEqual(inspect_npc_services(host).state, STATE_NONE)
+
+    def test_a_declared_but_unresolvable_dialogue_source_is_unreadable(self):
+        host = self._host("t_壞來源")
+        self._add(host, ScriptedDialogue.create(host, dialogue_key="t_missing_dialogue"))
+        with patch(
+            "world.rules.dialogue_sources.dialogue_source_for_host",
+            return_value=None,
+        ):
+            services = inspect_npc_services(host)
+        self.assertEqual(services.state, STATE_UNREADABLE)
+        self.assertEqual(services.entries, ())
+
+    def test_an_unconditional_association_is_inventoried(self):
+        host = self._host("t_對話管理")
+        self._add(host, ScriptedDialogue.create(host, dialogue_key="t_key"))
+        service = DialogueService(
+            key="guild_report_dialogue",
+            topic_id="t_synth.offer",
+            label="交談回報委託",
+        )
+        with patch(
+            "world.rules.dialogue_sources.dialogue_source_for_host",
+            return_value=_dialogue_source([service]),
+        ), patch(
+            "world.rules.dialogue_availability.project_topics",
+            return_value=(_row("t_synth.offer"),),
+        ):
+            services = inspect_npc_services(host)
+        (entry,) = services.entries
+        self.assertEqual(entry.key, "dialogue.guild_report_dialogue")
+        self.assertEqual(entry.disabled_reason.code, CONTEXT_REQUIRED)
+
+    def test_a_withheld_association_never_enters_the_inventory(self):
+        host = self._host("t_隱藏對話")
+        self._add(host, ScriptedDialogue.create(host, dialogue_key="t_key"))
+        service = DialogueService(
+            key="guild_report_dialogue",
+            topic_id="t_synth.offer",
+            label="交談回報委託",
+        )
+        with patch(
+            "world.rules.dialogue_sources.dialogue_source_for_host",
+            return_value=_dialogue_source([service]),
+        ), patch(
+            "world.rules.dialogue_availability.project_topics",
+            return_value=(),
+        ):
+            services = inspect_npc_services(host)
+        self.assertEqual(services.state, STATE_NONE)
+
+    def test_the_inventory_writes_nothing(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        host = self._host("t_管理寫入")
+        self._merchant(host)
+        self._staff(host)
+        with CaptureQueriesContext(connection) as queries:
+            inspect_npc_services(host)
+        writes = [
+            query["sql"]
+            for query in queries
+            if query["sql"].lstrip().split(" ", 1)[0].upper()
+            in {"INSERT", "UPDATE", "DELETE", "REPLACE"}
+        ]
+        self.assertEqual(writes, [])
+
+    def test_a_malformed_declared_dialogue_key_is_unreadable_not_empty(self):
+        host = self._host("t_壞生成鍵")
+        self._add(
+            host, ScriptedDialogue.create(host, dialogue_key="scene_role:broken")
+        )
+        # No resolver patch: the stored key is declared but cannot produce an
+        # identity, which must stay visible as an unknown inventory.
+        services = inspect_npc_services(host)
+        self.assertEqual(services.state, STATE_UNREADABLE)
+        self.assertEqual(services.entries, ())
+
+
+class ProjectionEvaluationTests(_ProjectionBase):
+    """The player projection keeps its original read count and sharing."""
+
+    def test_one_possession_read_and_one_gate_per_component_group(self):
+        host = self._host("t_評估順序")
+        self._staff(host)
+        self._reception(host)
+        self._church(host)
+        with patch(
+            "world.rules.npc_services._possessed_by_control",
+            wraps=npc_services_rules._possessed_by_control,
+        ) as possessed, patch(
+            "world.rules.npc_services.service_available",
+            wraps=service_available,
+        ) as gate:
+            services = self._project(host)
+        self.assertEqual(services.state, STATE_READY)
+        self.assertEqual(possessed.call_count, 1)
+        # Staff (one shared verdict for its three rows), reception, church.
+        self.assertEqual(gate.call_count, 3)

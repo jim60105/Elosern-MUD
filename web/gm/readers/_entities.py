@@ -133,21 +133,28 @@ def component_rows(entity: Any) -> list[dict[str, Any]]:
     (evennia's components contrib), so the fields are grouped out of the same
     attribute inventory the raw tab already lists — no handler is constructed.
     """
-    names = component_names(entity)
-    if not names:
-        return []
-    rows: list[dict[str, Any]] = []
-    fields_by_slot: dict[str, dict[str, Any]] = {name: {} for name in names}
+    return [
+        {"name": name, "fields": component_fields(entity, name)}
+        for name in component_names(entity)
+    ]
+
+
+def component_fields(entity: Any, slot: str) -> dict[str, Any]:
+    """The stored ``<slot>::<field>`` Attributes of one component, as values.
+
+    Reading one slot at a time keeps a single unreadable field confined to that
+    component: a caller that inspects several components can contain each read
+    independently instead of losing the whole inventory (design §9).
+    """
+    fields: dict[str, Any] = {}
     for attribute in attributes_of(entity):
         key = str(getattr(attribute, "key", ""))
         if "::" not in key:
             continue
-        slot, _, field = key.partition("::")
-        if slot in fields_by_slot and field:
-            fields_by_slot[slot][field] = json_value(getattr(attribute, "value", None))
-    for name in names:
-        rows.append({"name": name, "fields": fields_by_slot[name]})
-    return rows
+        owner, _, field = key.partition("::")
+        if owner == slot and field:
+            fields[field] = json_value(getattr(attribute, "value", None))
+    return fields
 
 
 def stored_attribute_keys(entity: Any) -> set[tuple[str, str]]:
@@ -189,6 +196,7 @@ def identity_text(entity: Any) -> str:
 __all__ = [
     "attribute_rows",
     "attributes_of",
+    "component_fields",
     "component_names",
     "component_rows",
     "dbref_of",

@@ -1,11 +1,21 @@
 """NPC inspection reader: character fields plus the NPC-only surfaces.
 
 Everything a player character shows (through the shared
-:mod:`web.gm.readers.characters` projection) plus service components, the
-seven-section persona card with its version, today's schedule and the current
-slot, and the dialogue key. The 記憶 and 對話 tabs read through their own
-list/detail families (``memories``/``snapshots``/``dialogue``), which this
-reader only links to.
+:mod:`web.gm.readers.characters` projection) plus the player-facing service
+summary, capability configuration diagnostics, the seven-section persona card
+with its version, today's schedule and the current slot, and the dialogue key.
+The 記憶 and 對話 tabs read through their own list/detail families
+(``memories``/``snapshots``/``dialogue``), which this reader only links to.
+
+The service summary and the diagnostics are deliberately separate: the summary
+is the same derived inventory the game presents (from
+``world.rules.npc_services``), and because management selects no player body
+every entry answers ``context_required`` with the explicit missing-context
+reason — no enabled player operation and no impersonated verdict is ever
+fabricated. Binding, anchor, component-field and dialogue-association facts
+belong to the diagnostics section, so an operator can tell "this NPC offers X"
+apart from "this NPC's configuration is inconsistent". Both are read-only and
+neither imports the game frontend.
 """
 
 from __future__ import annotations
@@ -34,27 +44,6 @@ from web.gm.readers._sections import (
 )
 
 KIND = "npcs"
-
-#: Stable Traditional Chinese labels for the entity's service components.
-COMPONENT_LABELS: dict[str, str] = {}
-
-
-def _component_labels() -> dict[str, str]:
-    if COMPONENT_LABELS:
-        return COMPONENT_LABELS
-    from typeclasses import components as component_types
-
-    pairs = (
-        (component_types.GuildStaff, "公會櫃檯"),
-        (component_types.ChurchHost, "教會神職"),
-        (component_types.GuildExamReception, "考核櫃檯"),
-        (component_types.Merchant, "商人"),
-        (component_types.ScriptedDialogue, "腳本對話"),
-        (component_types.QuestIssuer, "委託發布者"),
-    )
-    for component_type, label in pairs:
-        COMPONENT_LABELS[str(component_type.name)] = label
-    return COMPONENT_LABELS
 
 
 def _day_seconds() -> int:
@@ -112,43 +101,222 @@ def persona_section(npc: Any) -> dict[str, Any]:
 
 
 def services_section(npc: Any) -> dict[str, Any]:
-    labels = _component_labels()
-    names = component_names(npc)
+    """The services this NPC offers, derived by the game's own projection.
+
+    Management selects no player body, so the shared projection's contextual
+    verdict is reported as ``context_required`` with its exact reason: the
+    stable key, the player label and the existing flow each entry opens are
+    shown, and no operation, authority or player-specific availability is
+    fabricated. Dialogue associations are configuration facts and stay out of
+    this summary; only the flow the entry opens is named.
+    """
+    from world.rules import npc_services
+
+    services = npc_services.inspect_npc_services(npc)
+    if services.state == npc_services.STATE_UNREADABLE:
+        # An unknown inventory is a section failure, never a successful empty
+        # service list.
+        raise SectionError("source_unavailable", npc_services.UNREADABLE_MESSAGE)
+    if services.state != npc_services.STATE_READY:
+        return empty("此 NPC 目前沒有可公開顯示的服務項目。")
+    name = label_of(npc)
+    npc_id = dbref_of(npc) or 0
     rows = []
-    for name in names:
-        fields = _component_fields(npc, name)
+    for entry in services.entries:
+        reason = entry.disabled_reason
         rows.append(
             table_row(
                 {
-                    "component": {"value": labels.get(name, name)},
-                    "slot": {"value": name, "mono": True},
-                    "fields": {
-                        "value": "、".join(f"{key}={value}" for key, value in sorted(fields.items()))
-                        or "—",
+                    "service": {"value": entry.key, "mono": True},
+                    "label": {"value": entry.label},
+                    "availability": {
+                        "value": reason.code if reason is not None else npc_services.CONTEXT_REQUIRED,
+                        "mono": True,
+                    },
+                    "reason": {
+                        "value": reason.message
+                        if reason is not None
+                        else npc_services.CONTEXT_REQUIRED_MESSAGE
+                    },
+                    "route": {
+                        "value": npc_services.route_guidance(entry, name, npc_id),
                         "mono": True,
                     },
                 },
-                key=name,
+                key=entry.key,
             )
         )
     return table(
         [
-            column("component", "服務元件"),
-            column("slot", "插槽", mono=True),
-            column("fields", "欄位", mono=True),
+            column("service", "服務鍵", mono=True),
+            column("label", "服務"),
+            column("availability", "可用性", mono=True),
+            column("reason", "原因"),
+            column("route", "開啟路徑", mono=True),
         ],
         rows,
-        empty_note="此 NPC 目前沒有服務元件。",
+        note=(
+            "未選擇玩家角色，所有服務一律標示需要玩家情境；"
+            "本區塊不提供玩家操作，也不代表任何玩家身分。"
+        ),
     )
 
 
-def _component_fields(npc: Any, slot: str) -> dict[str, Any]:
-    from web.gm.readers._entities import component_rows
+def capability_diagnostics_section(npc: Any) -> dict[str, Any]:
+    """The stored capability configuration of one NPC host.
 
-    for entry in component_rows(npc):
-        if entry["name"] == slot:
-            return dict(entry["fields"])
-    return {}
+    Separate from the service summary: every declared component keeps its
+    stored binding, its resolved anchor room and its authored fields, and one
+    unreadable component is contained to its own status instead of losing the
+    whole inventory. Authored dialogue associations — including hidden or
+    conditional topics — are authorized configuration data and are reported
+    here, never in the player-facing service summary.
+    """
+    try:
+        names = component_names(npc)
+    except Exception as error:
+        raise SectionError(
+            "source_unavailable", f"能力元件清冊無法讀取：{type(error).__name__}"
+        ) from error
+    items = []
+    for slot in names:
+        try:
+            items.append(_component_group(npc, slot))
+        except Exception as error:
+            items.append(
+                group(
+                    slot,
+                    [row("狀態", f"讀取失敗：{type(error).__name__}", mono=True, tone="crit")],
+                )
+            )
+    associations = _dialogue_association_group(npc)
+    if associations is not None:
+        items.append(associations)
+    if not items:
+        return empty("此 NPC 沒有宣告任何能力元件。")
+    return groups(
+        items,
+        note=(
+            "設定診斷只陳述已儲存的宣告、綁定、錨點與來源事實；"
+            "它不會修補資料，也不代表任何玩家可用性。"
+        ),
+    )
+
+
+def _component_group(npc: Any, slot: str) -> dict[str, Any]:
+    """One component's stored configuration, with its own failure boundary."""
+    from typeclasses.components import ScriptedDialogue
+    from world.rules import npc_services
+    from world.rules.service_gate import read_service_binding
+    from web.gm.readers._entities import component_fields
+
+    fields = component_fields(npc, slot)
+    components = getattr(npc, "components", None)
+    component = None
+    if components is not None and hasattr(components, "has") and components.has(slot):
+        component = components.get(slot)
+    rows = []
+    problems = []
+    if component is None or not hasattr(component, "service_binding"):
+        rows.append(row("綁定", "—（非服務元件）"))
+        rows.append(row("錨點", "—"))
+    else:
+        report = read_service_binding(component)
+        rows.append(row("綁定", report.binding or "未設定", mono=bool(report.binding)))
+        rows.append(_anchor_row(report))
+        narrative_only = False
+        if report.binding is None:
+            if slot != ScriptedDialogue.name:
+                problems.append("缺少綁定")
+            else:
+                source, declared = npc_services.read_dialogue_source(npc)
+                if source is None and declared:
+                    problems.append("對話來源無法解析")
+                elif source is not None and source.dialogue.services:
+                    problems.append("對話服務關聯缺少綁定")
+                else:
+                    narrative_only = True
+                    rows.append(row("服務", "純敘事對話（不使用服務綁定）"))
+        # An unset binding on narrative-only dialogue is the authored shape, not
+        # a malformed configuration.
+        if report.gate_malformed and not narrative_only:
+            problems.append(
+                "錨點無法解析" if report.binding == "place" else "綁定值無效"
+            )
+        if report.anchor_on_person:
+            problems.append("person 綁定不應帶錨點")
+    rows.append(
+        row(
+            "設定",
+            "、".join(f"{key}={value}" for key, value in sorted(fields.items())) or "—",
+            mono=True,
+        )
+    )
+    rows.append(
+        row("狀態", "；".join(problems), tone="crit")
+        if problems
+        else row("狀態", "正常", tone="ok")
+    )
+    return group(slot, rows)
+
+
+def _anchor_row(report: Any) -> dict[str, Any]:
+    """One component's stored anchor reference, without inventing a failure."""
+    raw = report.anchor_raw
+    if report.anchor_room is not None:
+        return row(
+            "錨點",
+            f"#{report.anchor_room_id}",
+            mono=True,
+            link_to=link("rooms", report.anchor_room_id, label_of(report.anchor_room)),
+        )
+    if raw is None:
+        return row("錨點", "—")
+    shown = f"#{raw}" if isinstance(raw, int) and not isinstance(raw, bool) else repr(raw)
+    if report.binding == "place":
+        return row("錨點", f"{shown}（無法解析為房間）", mono=True)
+    # A person/unknown binding never uses its anchor, so this reports the
+    # stored reference without claiming it failed to resolve.
+    return row("錨點", f"{shown}（目前綁定不使用錨點）", mono=True)
+
+
+def _dialogue_association_group(npc: Any) -> dict[str, Any] | None:
+    """The host's authored dialogue-service associations, source failures included."""
+    from world.rules import npc_services
+
+    key = "dialogue_services"
+    try:
+        source, declared = npc_services.read_dialogue_source(npc)
+    except Exception as error:
+        return group(
+            "對話服務關聯",
+            [row("狀態", f"來源讀取失敗：{type(error).__name__}", mono=True, tone="crit")],
+            key=key,
+        )
+    if source is None:
+        if not declared:
+            return None
+        return group(
+            "對話服務關聯",
+            [row("狀態", "已宣告的對話來源無法解析", tone="crit")],
+            key=key,
+        )
+    if not source.dialogue.services:
+        return group(
+            "對話服務關聯",
+            [row("狀態", "對話來源沒有宣告服務關聯")],
+            key=key,
+        )
+    rows = [
+        row(service.key, f"{service.topic_id} · {service.label}", mono=True)
+        for service in sorted(source.dialogue.services, key=lambda service: service.key)
+    ]
+    return group(
+        "對話服務關聯",
+        rows,
+        key=key,
+        note="隱藏或條件式話題只在此處列出，不會出現在服務摘要。",
+    )
 
 
 def schedule_section(npc: Any) -> dict[str, Any]:
@@ -216,7 +384,12 @@ def detail(npc: Any) -> dict[str, Any]:
             [
                 ("npc_identity", "NPC 身分", lambda: identity_section(npc)),
                 ("persona", "人物設定", lambda: persona_section(npc)),
-                ("services", "服務與職業", lambda: services_section(npc)),
+                ("services", "服務", lambda: services_section(npc)),
+                (
+                    "capability_diagnostics",
+                    "能力設定診斷",
+                    lambda: capability_diagnostics_section(npc),
+                ),
                 ("schedule", "今日排程", lambda: schedule_section(npc)),
             ]
         )
@@ -937,6 +1110,7 @@ __all__ = [
     "KIND",
     "MAX_RECALL_QUERY_CODE_POINTS",
     "MAX_SNAPSHOTS",
+    "capability_diagnostics_section",
     "detail",
     "dialogue_detail",
     "dialogue_list_items",

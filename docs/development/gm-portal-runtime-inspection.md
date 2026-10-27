@@ -43,6 +43,16 @@
 
 搜尋的比對順序固定為精確 `#dbref`、物件鍵、任務編號、來源識別。同一筆查詢不會把不同層級的結果混成單一分數排序。
 
+## NPC 服務與能力設定診斷
+
+NPC 明細把「這個 NPC 提供什麼」與「這個 NPC 的設定是否一致」分成兩個獨立區塊，兩者都只讀。
+
+「服務」區塊直接使用遊戲端同一份推導（`world/rules/npc_services.py::inspect_npc_services`，與玩家看到的 `project_npc_services` 共用能力對應、標籤與路徑）：每一個項目列出穩定服務鍵、玩家可見標籤、可用性、原因，以及該項目開啟的既有流程（`shop stock @#<id>`、`guild register @#<id>`、`talk <名稱>` 等）。GM 沒有選定玩家角色，因此所有項目的可用性一律是 `context_required`，原因固定為「未選擇玩家角色，無法判斷此服務是否可用。」。這個區塊不提供任何玩家操作、不冒充玩家身分，也不加入角色預覽或模擬入口。沒有可公開顯示的項目時顯示 `none` 的空狀態；服務清冊無法建立時（例如已宣告的對話來源解析失敗）區塊本身回報錯誤插槽，不會變成像「沒有服務」的空清單。
+
+「能力設定診斷」區塊列出每個已宣告元件的儲存事實：綁定（`person`／`place`）、錨點（`place` 綁定可解析時附房間連結，解析失敗時標示原因；其他綁定只陳述儲存值並說明目前綁定不使用錨點）、該元件的設定欄位，以及設定狀態。單一元件讀取失敗只影響自己的狀態列，其他元件照常顯示；元件清冊本身無法讀取時才讓整個區塊失敗。`person` 綁定帶錨點、缺少綁定、`place` 錨點無法解析、已宣告的對話來源無法解析等作者設定問題都在此處具名，但它們不會改變「服務」區塊列出的項目。對話來源的作者宣告關聯（包含隱藏或條件式話題）同樣只出現在這裡，不會出現在「服務」摘要中；純敘事對話沒有服務綁定，會標示為純敘事而非錯誤。屬性原始資料分頁不變。
+
+這些讀取不會建立或修補任何 Attribute，也不會觸發服務閘門的 malformed 警告去重旗標。
+
 ## Breakdown number display
 
 The character detail's 「屬性組成」 section lists each layer's authoritative amount for display only; it never recomputes an effective total. The model already stores `pct` layers in percentage points, so the display does not multiply them by 100.
