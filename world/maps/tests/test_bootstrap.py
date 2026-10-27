@@ -16,7 +16,6 @@ from typeclasses.rooms import AnchorRoom, GridRoom, Room
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 from world.quests.tests._fixtures import RegistryIsolationMixin
-from world.maps.altoria_capital import XYMAP_DATA
 from world.maps.city_gates import CITY_GATE_REGISTRY, CityGateDef
 from world.maps.bootstrap import sync_grid, sync_limbo, sync_wilderness
 from world.maps.limbo import LIMBO_ALIAS, LIMBO_DESC, LIMBO_KEY, LIMBO_LEGACY_KEY
@@ -38,6 +37,18 @@ publish_shipped_geography()
 _CAPITAL_ENTRY = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
 SOUTH_GATE_XYZ = settlement_node_xyz(_CAPITAL_ENTRY.gate_for("n").destination)
 EAST_GATE_XYZ = settlement_node_xyz(_CAPITAL_ENTRY.gate_for("w").destination)
+
+
+def _declared_road_count():
+    """The authored directed-road count of every published settlement."""
+
+    return sum(len(graph.edges) for graph in SETTLEMENT_GRAPHS.values())
+
+
+def _declared_node_count():
+    """The authored node count of every published settlement."""
+
+    return sum(len(graph.nodes) for graph in SETTLEMENT_GRAPHS.values())
 
 
 class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
@@ -88,12 +99,14 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
 
         # Two settlements: the capital's twenty-one rooms and the village's
         # ten (ciaran-village-crafts grew 暗影谷村 from six nodes to ten).
-        self.assertEqual(self._count_grid_rooms(), 31)
-        # 52 capital directed links + 18 village directed links.
-        self.assertEqual(self._count_city_exits(), 70)
+        self.assertEqual(self._count_grid_rooms(), _declared_node_count())
+        self.assertEqual(self._count_city_exits(), _declared_road_count())
         # One forward Limbo bridge per CITY_GATE_REGISTRY row.
         self.assertEqual(len(self._bridging_exits()), 2)
-        self.assertEqual(len(self._bridging_exits()) + self._count_city_exits(), 72)
+        self.assertEqual(
+            len(self._bridging_exits()) + self._count_city_exits(),
+            _declared_road_count() + len(CITY_GATE_REGISTRY),
+        )
 
     def test_sync_grid_is_idempotent_and_preserves_dbid(self):
         create_object(Room, key=LIMBO_KEY, location=None)
@@ -109,8 +122,8 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
             for room in GridRoom.objects.all_family()
         }
 
-        self.assertEqual(self._count_grid_rooms(), 31)
-        self.assertEqual(self._count_city_exits(), 70)
+        self.assertEqual(self._count_grid_rooms(), _declared_node_count())
+        self.assertEqual(self._count_city_exits(), _declared_road_count())
         self.assertEqual(len(self._bridging_exits()), 2)
         self.assertEqual(first_ids, second_ids)
 
@@ -119,7 +132,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
 
         self.assertEqual(XYZGrid.objects.all().count(), 0)
         sync_grid()
-        self.assertEqual(self._count_grid_rooms(), 31)
+        self.assertEqual(self._count_grid_rooms(), _declared_node_count())
 
     def test_in_place_update_changes_desc_without_new_room(self):
         create_object(Room, key=LIMBO_KEY, location=None)
@@ -129,15 +142,11 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         # zhtw-room-prose: the spawn pin asserts the mechanism (the room's desc
         # equals its authored prototype), not the sentence — the prototype's
         # prose is Traditional Chinese like every other shipped room text.
-        from world.maps.altoria_capital import PROTOTYPES
-        from world.maps.map_data import SETTLEMENT_GRAPHS
+        from world.maps.map_data import current
 
-        south_gate_coordinate = SETTLEMENT_GRAPHS["capital_altoria"].node(
-            "south_gate"
-        ).coordinate
-        self.assertEqual(
-            south_gate.db.desc, PROTOTYPES[south_gate_coordinate]["desc"]
-        )
+        declared = current().settlements["capital_altoria"].nodes["south_gate"]
+        self.assertEqual(south_gate.xyz, (*declared.coordinate, "capital_altoria"))
+        self.assertEqual(south_gate.db.desc, declared.desc)
 
         from dataclasses import replace
 
@@ -165,7 +174,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         with patch("world.maps.bootstrap.SETTLEMENT_GRAPHS", changed):
             sync_grid()
 
-        self.assertEqual(self._count_grid_rooms(), 31)
+        self.assertEqual(self._count_grid_rooms(), _declared_node_count())
         south_gate = GridRoom.objects.get(db_key="南門")
         self.assertEqual(south_gate.db.desc, "A rebuilt southern gate.")
 
@@ -250,8 +259,8 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
     def test_absent_limbo_degrades_without_raising(self):
         sync_grid()
 
-        self.assertEqual(self._count_grid_rooms(), 31)
-        self.assertEqual(self._count_city_exits(), 70)
+        self.assertEqual(self._count_grid_rooms(), _declared_node_count())
+        self.assertEqual(self._count_city_exits(), _declared_road_count())
         self.assertEqual(len(self._bridging_exits()), 0)
 
     @covers_requirement("limbo-one-way-gates::sync-grid-creates-exactly-one-forward-gate-exit-per-registry-row-and-converges-it-idempotently")
@@ -548,8 +557,8 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
     def test_at_server_start_without_limbo_syncs_lore_and_grid(self):
         at_server_start()
 
-        self.assertEqual(self._count_grid_rooms(), 31)
-        self.assertEqual(self._count_city_exits(), 70)
+        self.assertEqual(self._count_grid_rooms(), _declared_node_count())
+        self.assertEqual(self._count_city_exits(), _declared_road_count())
         self.assertEqual(len(self._bridging_exits()), 0)
         from evennia.utils.search import search_script
 
@@ -559,8 +568,8 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         create_object(Room, key=LIMBO_KEY, location=None)
         at_server_start()
 
-        self.assertEqual(self._count_grid_rooms(), 31)
-        self.assertEqual(self._count_city_exits(), 70)
+        self.assertEqual(self._count_grid_rooms(), _declared_node_count())
+        self.assertEqual(self._count_city_exits(), _declared_road_count())
         self.assertEqual(len(self._bridging_exits()), 2)
 
 
@@ -752,7 +761,7 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
     def test_at_server_start_provisions_wilderness_too(self):
         at_server_start()
 
-        self.assertEqual(self._count_grid_rooms(), 31)
+        self.assertEqual(self._count_grid_rooms(), _declared_node_count())
         from evennia.contrib.grid.wilderness.wilderness import WildernessScript
 
         scripts = WildernessScript.objects.filter(db_key=WILDERNESS_NAME)
@@ -1215,8 +1224,8 @@ class MetricCutoverTests(EvenniaTest):
 
         report = sync_grid()
 
-        self.assertEqual(self._count_grid_rooms(), 31)
-        self.assertEqual(self._count_city_exits(), 70)
+        self.assertEqual(self._count_grid_rooms(), _declared_node_count())
+        self.assertEqual(self._count_city_exits(), _declared_road_count())
         self.assertGreater(report.updated + report.created, 0)
         moved = self._object(plaza_id)
         self.assertEqual(
@@ -1387,8 +1396,8 @@ class MetricCutoverTests(EvenniaTest):
 
         self.assertNotIn("capital_altoria", grid.db.map_data)
         self.assertIn("synthetic_keep", grid.db.map_data)
-        self.assertEqual(self._count_grid_rooms(), 31)
-        self.assertEqual(self._count_city_exits(), 70)
+        self.assertEqual(self._count_grid_rooms(), _declared_node_count())
+        self.assertEqual(self._count_city_exits(), _declared_road_count())
 
     @covers_requirement(
         "grid-room-sync::sync-grid-runs-automatically-at-server-start-after-sync-all"
@@ -1424,7 +1433,7 @@ class MetricCutoverTests(EvenniaTest):
 
         at_server_start()
 
-        self.assertEqual(self._count_grid_rooms(), 31)
+        self.assertEqual(self._count_grid_rooms(), _declared_node_count())
         self.assertEqual(self._object(plaza_id).sparse_node_id, "central_plaza")
         self.assertEqual(
             observer.attributes.get(KNOWLEDGE_ATTR)["visited"],
