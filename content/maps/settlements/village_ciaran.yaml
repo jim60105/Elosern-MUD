@@ -1,0 +1,182 @@
+# Settlement local map authored source (schema version 1).
+# Converted once from the retired Python declaration; this document is
+# the sole authority for the graph, prototypes, binding, options,
+# entrances and map-owned scene associations. `location_ref` is the only
+# reverse link: a location's local map is discovered by this field, so a
+# new map for an existing location needs no Python registration.
+version: 1
+kind: settlement
+id: village_ciaran
+location_ref: village_ciaran
+binding:
+  anchor_cell:
+    cell_x: 1340
+    cell_y: 1220
+  local_anchor_m:
+    east_m: 220
+    north_m: 305
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  stream_bend:
+    x_m: 430
+    y_m: 85
+    prototype_parent: grid_room
+    key: 溪畔下游
+    desc: 溪流出了村子便寬了、緩了，水色轉深。下游有一片族人清洗染具的淺灘，石上還留著乾涸的藍色水痕；走到這裡的人多半只為坐一坐，聽水聲。
+    anchor_key:
+    typeclass:
+    scene_archetype: wilderness_path
+  stream_path:
+    x_m: 245
+    y_m: 135
+    prototype_parent: grid_room
+    key: 溪畔小徑
+    desc: 沿著潺潺溪流蜿蜒的土路，水邊幾塊平坦的石盤，正好讓人坐下歇腳。
+    anchor_key:
+    typeclass:
+    scene_archetype: wilderness_path
+  hidden_path:
+    x_m: 35
+    y_m: 270
+    prototype_parent: grid_room
+    key: 隱密小徑
+    desc: 藤蔓與落葉幾乎掩住了這條小徑；不認得這片林子的人，縱使走進去也看不出來。
+    anchor_key:
+    typeclass:
+    scene_archetype: forest_path
+  herb_garden:
+    x_m: 590
+    y_m: 300
+    prototype_parent: grid_room
+    key: 藥草園
+    desc: 練刀場東邊，樹冠開處漏下整片陽光。矮石壘成的畦邊圈著一株株藥草與香草，空氣裡是苦味與清甜交錯的氣息。
+    anchor_key:
+    typeclass:
+    scene_archetype: forest_path
+  village_plaza:
+    x_m: 220
+    y_m: 305
+    prototype_parent: anchor_room
+    key: 村中廣場
+    desc: 村裡的空地，老樹繞著一塊被腳步踩實的泥地。族人聚集在這裡交談，交換一天的見聞。
+    anchor_key: village_ciaran
+    typeclass:
+    scene_archetype: city_street
+  training_clearing:
+    x_m: 405
+    y_m: 335
+    prototype_parent: grid_room
+    key: 練刀場
+    desc: 無數腳步踩硬的空地，四周樹幹佈滿練習留下的刀痕——村中的少年刀舞者從清晨練到日暮，練的就是這裡。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  old_tree_north:
+    x_m: 200
+    y_m: 465
+    prototype_parent: grid_room
+    key: 村北古樹下
+    desc: 村北古樹之下，樹冠如屋簷般撐開；盤根間嵌著磨平的石座，孩子們聚在這裡聽長者說故事。
+    anchor_key:
+    typeclass:
+    scene_archetype: forest_path
+  weaving_slope:
+    x_m: 390
+    y_m: 495
+    prototype_parent: grid_room
+    key: 織房坡
+    desc: 通往林中住屋的緩坡，新染的布掛在繩上晾乾，風裡帶著植物染料的氣味。
+    anchor_key:
+    typeclass:
+    scene_archetype: forest_path
+  elder_tree:
+    x_m: 165
+    y_m: 650
+    prototype_parent: grid_room
+    key: 長老古樹下
+    desc: 再往北，林子更老。最老的那株巨樹寬得數人合抱，盤根之間有磨平的坐石；族裡老一輩的決定，多在這棵樹下說出口。平日這裡安靜，只餘風穿過樹冠的聲音。
+    anchor_key:
+    typeclass:
+    scene_archetype: forest_path
+  silver_leaf_slope:
+    x_m: 440
+    y_m: 665
+    prototype_parent: grid_room
+    key: 銀葉坡
+    desc: 織房坡再往上，坡頂長著一叢銀葉樹，葉背在午後的光裡泛著細碎銀光。樹下曬著幾件完成的花邊與綴飾，綴著貝殼和磨圓的晶砂。
+    anchor_key:
+    typeclass:
+    scene_archetype: forest_path
+roads:
+  - source: hidden_path
+    destination: village_plaza
+    direction: e
+  - source: village_plaza
+    destination: hidden_path
+    direction: w
+  - source: stream_path
+    destination: village_plaza
+    direction: n
+  - source: village_plaza
+    destination: stream_path
+    direction: s
+  - source: stream_path
+    destination: stream_bend
+    direction: e
+  - source: stream_bend
+    destination: stream_path
+    direction: w
+  - source: village_plaza
+    destination: old_tree_north
+    direction: n
+  - source: old_tree_north
+    destination: village_plaza
+    direction: s
+  - source: village_plaza
+    destination: training_clearing
+    direction: e
+  - source: training_clearing
+    destination: village_plaza
+    direction: w
+  - source: old_tree_north
+    destination: elder_tree
+    direction: n
+  - source: elder_tree
+    destination: old_tree_north
+    direction: s
+  - source: old_tree_north
+    destination: weaving_slope
+    direction: e
+  - source: weaving_slope
+    destination: old_tree_north
+    direction: w
+  - source: elder_tree
+    destination: silver_leaf_slope
+    direction: e
+  - source: silver_leaf_slope
+    destination: elder_tree
+    direction: w
+  - source: training_clearing
+    destination: herb_garden
+    direction: e
+  - source: herb_garden
+    destination: training_clearing
+    direction: w
+wilderness_entry:
+  shape:
+    - "#"
+  origin:
+    cell_x: 1340
+    cell_y: 1220
+  gates:
+    - return_direction: n
+      destination_node: hidden_path
+city_gate:
+  node: hidden_path
+  exit_key: 隱密小徑
+  exit_aliases: [祕徑, 幽徑]
