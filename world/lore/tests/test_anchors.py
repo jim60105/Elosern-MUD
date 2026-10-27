@@ -21,8 +21,9 @@ from world.lore.anchors import (
 
 
 def setUpModule():
-    if not geography.is_published():
-        geography.publish(geography.load_geography())
+    from world.tests.geography_fixture import publish_shipped_geography
+
+    publish_shipped_geography()
 
 
 class AnchorRegistryTests(unittest.TestCase):
@@ -100,9 +101,12 @@ class AnchorRegistryTests(unittest.TestCase):
         added = document_from_data(
             "content/maps/locations.yaml", data
         )
+        from world.maps import map_data
+
         snapshot = build_geography(
             current().continent,
             added,
+            map_data.current(),
             fingerprints=dict(current().fingerprints),
         )
         view = snapshot.anchors["t_unbuilt_location"]

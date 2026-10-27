@@ -25,7 +25,16 @@ from world.lore.anchors import AnchorKind, anchor_geography, anchors
 from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 from world.lore.wilderness_regions import harbor_sites, regions
-from world.maps import wilderness_provider
+from world.maps import map_data, wilderness_provider
+from world.tests.geography_fixture import publish_shipped_geography
+
+publish_shipped_geography()
+
+
+def _settlements():
+    """The candidate settlement world every geography candidate is joined against."""
+
+    return map_data.current()
 
 
 def _plain(value):
@@ -50,8 +59,7 @@ class ShippedGeographyPublicationTests(EvenniaTest):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        if not geography.is_published():
-            geography.publish(geography.load_geography())
+        publish_shipped_geography()
 
     def setUp(self):
         self._shipped = geography.current()
@@ -91,8 +99,12 @@ class ShippedGeographyPublicationTests(EvenniaTest):
         data["regions"]["eastern_plains"]["scene_archetype"] = "no_such_scene"
         broken = document_from_data(geography.CONTINENT_PATH, data)
         with self.assertRaises(geography.GeographyError) as captured:
-            geography.build_geography(broken, before.locations,
-                                      fingerprints=dict(before.fingerprints))
+            geography.build_geography(
+                broken,
+                before.locations,
+                _settlements(),
+                fingerprints=dict(before.fingerprints),
+            )
         self.assertIn("eastern_plains", str(captured.exception))
         self.assertIs(geography.current(), before)
         self.assertEqual(geography.current().identity, identities)
@@ -103,8 +115,12 @@ class ShippedGeographyPublicationTests(EvenniaTest):
         data["locations"].pop("dungeon_dragon_nest")
         locations = document_from_data(geography.LOCATIONS_PATH, data)
         with self.assertRaises(geography.GeographyError) as captured:
-            geography.build_geography(before.continent, locations,
-                                      fingerprints=dict(before.fingerprints))
+            geography.build_geography(
+                before.continent,
+                locations,
+                _settlements(),
+                fingerprints=dict(before.fingerprints),
+            )
         self.assertIn("dungeon_dragon_nest", str(captured.exception))
 
     def test_unsupported_cell_scale_is_rejected(self):
@@ -113,8 +129,12 @@ class ShippedGeographyPublicationTests(EvenniaTest):
         data["cell_size_km"] = 2
         candidate = document_from_data(geography.CONTINENT_PATH, data)
         with self.assertRaises(geography.GeographyError) as captured:
-            geography.build_geography(candidate, before.locations,
-                                      fingerprints=dict(before.fingerprints))
+            geography.build_geography(
+                candidate,
+                before.locations,
+                _settlements(),
+                fingerprints=dict(before.fingerprints),
+            )
         self.assertIn("cell_size_km", str(captured.exception))
 
     def test_gateway_approach_is_validated_before_publication(self):
@@ -131,7 +151,10 @@ class ShippedGeographyPublicationTests(EvenniaTest):
         candidate = document_from_data(geography.CONTINENT_PATH, data)
         with self.assertRaises(geography.GeographyError) as captured:
             geography.build_geography(
-                candidate, before.locations, fingerprints=dict(before.fingerprints)
+                candidate,
+                before.locations,
+                _settlements(),
+                fingerprints=dict(before.fingerprints),
             )
         self.assertIn("not provider-valid", str(captured.exception))
         self.assertIs(geography.current(), before)
@@ -141,8 +164,7 @@ class ShippedGeographyPublicationTests(EvenniaTest):
 class SnapshotIsolationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        if not geography.is_published():
-            geography.publish(geography.load_geography())
+        publish_shipped_geography()
 
     def setUp(self):
         self._shipped = geography.current()
@@ -158,7 +180,10 @@ class SnapshotIsolationTests(unittest.TestCase):
     def _world(self, coastal_y_max: int):
         continent = _continent_variant(coastal_y_max=coastal_y_max)
         return geography.build_geography(
-            continent, self._locations, fingerprints=self._fingerprints
+            continent,
+            self._locations,
+            _settlements(),
+            fingerprints=self._fingerprints,
         )
 
     def test_two_worlds_keep_independent_derived_tables(self):
@@ -249,7 +274,10 @@ class SnapshotIsolationTests(unittest.TestCase):
         }
         moved = document_from_data(geography.LOCATIONS_PATH, data)
         second = geography.build_geography(
-            first.continent, moved, fingerprints=dict(first.fingerprints)
+            first.continent,
+            moved,
+            _settlements(),
+            fingerprints=dict(first.fingerprints),
         )
         geography.publish(second)
         after = retained.grid_site("capital_altoria", (3500, 2850))
@@ -263,7 +291,10 @@ class SnapshotIsolationTests(unittest.TestCase):
         candidate = document_from_data(geography.CONTINENT_PATH, data)
         with self.assertRaises(geography.GeographyError) as captured:
             geography.build_geography(
-                candidate, self._locations, fingerprints=self._fingerprints
+                candidate,
+                self._locations,
+                _settlements(),
+                fingerprints=self._fingerprints,
             )
         self.assertIn("central_mountains", str(captured.exception))
 
