@@ -379,8 +379,10 @@ def provision_scoped_issuer(host: Any, *, content_key: str, plan: Any) -> str:
 
     ``plan`` is the complete immutable plan the publication boundary validated;
     it must declare exactly one person-bound ``quest_issuer`` whose
-    ``issuer_key`` is ``content_key``. A plan missing it, carrying anything
-    else, or declaring another identity is refused rather than repaired.
+    ``issuer_key`` is ``content_key`` and may additionally carry the role's
+    service-bound ``scripted_dialogue`` identity. A plan missing the issuer,
+    carrying any other capability, or declaring another identity is refused
+    rather than repaired.
     """
     from world.rules.npc_capabilities import CapabilityPlan, assemble_capabilities
 
@@ -390,10 +392,25 @@ def provision_scoped_issuer(host: Any, *, content_key: str, plan: Any) -> str:
             f"a generated issuer requires its validated capability plan, got "
             f"{type(plan).__name__}"
         )
-    if plan.type_keys() != frozenset({"quest_issuer"}):
+    type_keys = plan.type_keys()
+    if "quest_issuer" not in type_keys or type_keys - {
+        "quest_issuer",
+        "scripted_dialogue",
+    }:
         raise QuestIssuanceError(
             "a generated issuer plan must declare exactly one quest_issuer "
-            f"capability, got {sorted(plan.type_keys())}"
+            f"capability (optionally its service-bound dialogue), got {sorted(type_keys)}"
+        )
+    dialogue = plan.component("scripted_dialogue")
+    if dialogue is not None and (
+        dialogue.binding is None
+        or dialogue.binding.kind != "person"
+        or dialogue.kwargs.get("dialogue_key")
+        != plan.component("quest_issuer").kwargs.get("service_id")
+    ):
+        raise QuestIssuanceError(
+            "a generated issuer's service-bound dialogue must be the same "
+            "person-bound trusted scoped identity"
         )
     declared = plan.component("quest_issuer")
     if declared.binding is None or declared.binding.kind != "person":

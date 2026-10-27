@@ -12,12 +12,13 @@ prompts:
     角色與階段
     - roles[].role_id 是本包內的穩定識別碼；conversable 為 true 的角色才可有 dialogue。
     - 每個角色的 phases 至少一個，最多 16 個；恰好一個階段條件包含 {"default": true}，其餘階段的 conditions 只能使用既有的階段事實（例如 closure、reunion），不可混入話題條件。
-    - 階段欄位固定為 phase_id、conditions、greeting、topics、freeform_situation、freeform_goals、offline_response，可選 topic_effects。greeting 最多 500 字，freeform_situation 與 freeform_goals 各最多 400 字，offline_response 最多 500 字。
+    - 階段欄位固定為 phase_id、conditions、greeting、topics、freeform_situation、freeform_goals、offline_response，可選 topic_effects 與 services。greeting 最多 500 字，freeform_situation 與 freeform_goals 各最多 400 字，offline_response 最多 500 字。
 
     角色能力
-    - 只有 commissions 指名的角色才宣告 roles[].capabilities，而且恰好一項：{"type": "quest_issuer", "kwargs": {"issuer_key": "與 commissions 相同的 issuer_content_key"}, "binding": {"kind": "person"}}。
+    - commissions 指名的角色宣告恰好一項：{"type": "quest_issuer", "kwargs": {"issuer_key": "與 commissions 相同的 issuer_content_key"}, "binding": {"kind": "person"}}。
+    - 有階段宣告 services 的角色，另外宣告恰好一項：{"type": "scripted_dialogue", "kwargs": {}, "binding": {"kind": "person"}}。沒有 services 的角色不得宣告它。
     - 其他角色省略 capabilities 或給空陣列；不可宣告買賣、公會、招待或地點綁定的能力。
-    - kwargs 只填 issuer_key，service_id 由伺服器依場景包內容自動填入，不要自行填寫；binding 只能是 person。
+    - kwargs 只填 issuer_key，service_id 與 dialogue_key 由伺服器依場景包內容自動填入，不要自行填寫；binding 只能是 person。
     - commissions 指名的角色若缺少能力宣告、binding 不是 person、或 issuer_key 與該筆 commissions 的 issuer_content_key 不同，整個提案會被拒收，不會留下一半的委託授權。
 
     話題與場景
@@ -34,6 +35,12 @@ prompts:
     - topic_effects 是選填陣列，每列恰好是 {topic_id, verb, reference}。verb 只能是 offer_commission，reference 必須是這個角色同一階段所宣告委託的定義鍵。
     - 有 topic_effects 的話題必須宣告 requires 與 refusal。資格成立後仍可能被既有的持有、地點或委託授權拒絕，拒絕時只會播放 refusal，不會交付正式內容，也不會給好感。
     - 不要自行發明其他效果動詞、獎勵或好感變化。
+
+    服務
+    - services 是選填陣列，每列恰好是 {key, topic_id, label}，最多 16 列，同階段內 key 與 topic_id 都不得重複。
+    - key 符合 [a-z][a-z0-9_]{0,54}，label 最多 64 字，是玩家在互動選單看到的服務名稱。
+    - topic_id 只能是同一階段內已宣告、且列在 topic_effects 並以 offer_commission 為效果的話題。資訊性話題不得列為服務，也不要為了湊出服務而編造委託。
+    - 服務只是導引玩家開啟既有的話題；開啟服務不會接下委託，也不會給出任何效果。
 
     以下對話僅示範結構與語氣，請依實際角色重寫：
     {"topic_id": "greet_visitor", "keyword": "問路", "label": "詢問南門的方向", "fallback": {"scene_id": "greet_visitor_scene", "revision": "r1", "lines": [{"kind": "speech", "speaker": "actor", "text": "打擾了，請問往南門該走哪一邊？"}, {"kind": "speech", "speaker": "host", "text": "沿著麵包坊那條街走到底，看到舊鐘塔再往左轉。"}, {"kind": "narration", "text": "她把沾著麵粉的手在圍裙上擦了擦，朝門口抬了抬下巴。"}]}}

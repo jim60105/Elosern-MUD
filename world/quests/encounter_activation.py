@@ -334,6 +334,7 @@ def ensure_package_role(
         actor, reason = _resolve_actor(binding.npc_id)
         if actor is None:
             raise EncounterUnavailable(reason)
+        _require_bound_role_config(actor, plan)
     else:
         role_dialogue = definition.role_dialogue(role_id)
         actor = spawn_role_actor(
@@ -366,6 +367,36 @@ def ensure_package_role(
     _grant_role_knowledge(actor, definition, role_id, row.package_id, tick=tick)
     key = _provision_role(definition, role_id, row, actor, tick=tick, plan=plan)
     return actor, key
+
+
+def _require_bound_role_config(actor: Any, plan: Any) -> None:
+    """Refuse a bound actor whose identity contradicts the validated plan.
+
+    A reused actor keeps its exact configuration: it is never rewritten. When
+    the role declares a service-bound dialogue identity, the live actor must
+    already carry exactly that trusted scoped identity, otherwise the
+    encounter activation rejects instead of projecting a service the actor
+    cannot execute (the commission's own provisioning applies the same rule).
+    """
+    if plan is None:
+        return
+    declared = plan.component("scripted_dialogue")
+    if declared is None:
+        return
+    from typeclasses.components import ScriptedDialogue
+    from world.rules.dialogue import dialogue_key_for
+
+    expected_key = declared.kwargs.get("dialogue_key")
+    if dialogue_key_for(actor) != expected_key:
+        raise EncounterUnavailable("role_config_conflict")
+    components = getattr(actor, "components", None)
+    live = (
+        None
+        if components is None
+        else components.get(ScriptedDialogue.get_component_slot())
+    )
+    if live is None or live.service_id != declared.kwargs.get("service_id"):
+        raise EncounterUnavailable("role_config_conflict")
 
 
 def _replay(
