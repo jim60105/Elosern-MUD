@@ -47,6 +47,7 @@ def _late(module: str, name: str):
 # this catalog (behaviorally, via stubs) instead of source text.
 STARTUP_STEP_ORDER: tuple[str, ...] = (
     "geography_source_publication",
+    "settlement_source_publication",
     "static_map_reference_validation",
     "world_clock_init",
     "equipment_rulebook_validation",
@@ -456,6 +457,16 @@ def at_server_start():
     _startup_step(
         "geography_source_publication",
         lambda: _late("world.maps.geography", "load_and_publish"),
+    )
+    # The discovered settlement local maps are published next: the geography
+    # candidate validated its wilderness gateways against them, and every
+    # later consumer (graphs, anchor placements, city gates, wilderness
+    # entries, grid node art, the lore mirror and the static-reference gate)
+    # reads this one immutable snapshot. A failed candidate aborts boot before
+    # anything is published or persisted.
+    _startup_step(
+        "settlement_source_publication",
+        lambda: _late("world.maps.map_data", "load_and_publish"),
     )
     # Fail-loud static map-reference gate: every authored static target
     # (gates, anchor placements, wilderness gates, place exteriors, district

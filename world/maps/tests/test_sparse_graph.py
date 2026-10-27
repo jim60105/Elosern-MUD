@@ -243,8 +243,10 @@ class PhysicalGeometryTests(unittest.TestCase):
 
     @covers_requirement("grid-room-sync::sparse-authored-graphs-synchronize-without-identity-loss")
     def test_shipped_settlement_graphs_carry_distinct_meter_positions(self):
+        from world.tests.geography_fixture import publish_shipped_settlements
         from world.maps.map_data import SETTLEMENT_GRAPHS
 
+        publish_shipped_settlements()
         self.assertTrue(SETTLEMENT_GRAPHS)
         for map_id, graph in SETTLEMENT_GRAPHS.items():
             with self.subTest(map_id=map_id):

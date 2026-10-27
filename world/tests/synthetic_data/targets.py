@@ -150,9 +150,6 @@ REGISTRY_TARGETS: dict[str, tuple[str, str]] = {
         "AMBIENT_PLACEMENT" + "_REGISTRY",
     ),
     "monster_sites": ("world.lore.monster_placement", "MONSTER_SITE" + "_REGISTRY"),
-    "anchor_placements": ("world.lore.anchor_placement", "ANCHOR_PLACEMENT" + "_REGISTRY"),
-    "wilderness_entries": ("world.lore.wilderness_entry", "WILDERNESS_ENTRY" + "_REGISTRY"),
-    "city_gates": ("world.maps.city_gates", "CITY_GATE" + "_REGISTRY"),
     "archetypes": ("world.lore.scene_archetypes", "SCENE_ARCHETYPE" + "_REGISTRY"),
     "settlements": ("world.lore.settlements.settlements", "SETTLEMENT" + "_REGISTRY"),
     "places": ("world.lore.settlements.places", "PLACE" + "_REGISTRY"),
@@ -183,6 +180,17 @@ REGISTRY_TARGETS: dict[str, tuple[str, str]] = {
 GEOGRAPHY_TARGETS: dict[str, str] = {
     "anchors": "anchors",
     "regions": "regions",
+}
+
+# Logical settlement domains the kit substitutes by publishing a derived
+# settlement snapshot view instead of patching a module attribute: the
+# settlement-owned registries are composed values on the published world, so a
+# catalog swap replaces that view for the scope and restores the previous
+# snapshot afterwards. Every consumer that holds the view follows it.
+SETTLEMENT_TARGETS: dict[str, str] = {
+    "anchor_placements": "anchor_placements",
+    "wilderness_entries": "wilderness_entries",
+    "city_gates": "city_gates",
 }
 
 _CONTENT: dict[str, Callable[[], Mapping[str, object]]] = _content_by_logical()

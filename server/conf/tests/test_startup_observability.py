@@ -136,6 +136,7 @@ class StartupStepEventTests(_StubbedStartup):
             self._steps(info),
             [
                 "geography_source_publication",
+                "settlement_source_publication",
                 "static_map_reference_validation",
                 "world_clock_init",
                 "equipment_rulebook_validation",
@@ -167,6 +168,7 @@ class StartupStepEventTests(_StubbedStartup):
             self._steps(info),
             [
                 "geography_source_publication",
+                "settlement_source_publication",
                 "static_map_reference_validation",
                 "world_clock_init",
                 "equipment_rulebook_validation",
@@ -186,6 +188,7 @@ class StartupStepEventTests(_StubbedStartup):
             "guild_exam_restriction_validation",
             preceding=(
                 "geography_source_publication",
+                "settlement_source_publication",
                 "static_map_reference_validation",
                 "world_clock_init",
                 "equipment_rulebook_validation",
@@ -200,6 +203,7 @@ class StartupStepEventTests(_StubbedStartup):
             "starting_companion_validation",
             preceding=(
                 "geography_source_publication",
+                "settlement_source_publication",
                 "static_map_reference_validation",
                 "world_clock_init",
                 "equipment_rulebook_validation",

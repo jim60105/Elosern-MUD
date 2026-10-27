@@ -14,6 +14,7 @@ from types import MappingProxyType
 from world.tests.synthetic_data.targets import (
     GEOGRAPHY_TARGETS,
     REGISTRY_TARGETS,
+    SETTLEMENT_TARGETS,
     _CONTENT,
     _TARGET_DEPENDENCIES,
 )
@@ -46,7 +47,11 @@ class synthetic_registries(ContextDecorator):
     ) -> None:
         names = list(dict.fromkeys(logicals))
         for logical in names:
-            if logical not in REGISTRY_TARGETS and logical not in GEOGRAPHY_TARGETS:
+            if (
+                logical not in REGISTRY_TARGETS
+                and logical not in GEOGRAPHY_TARGETS
+                and logical not in SETTLEMENT_TARGETS
+            ):
                 raise KeyError(f"unknown synthetic registry target {logical!r}")
         # Dependency closure: rows whose construction resolves foreign keys
         # through other catalogs require those targets in the same scope.
@@ -70,7 +75,7 @@ class synthetic_registries(ContextDecorator):
         self._logicals = tuple(names)
         self._extra = dict(extra or {})
         for logical in self._extra:
-            if logical not in REGISTRY_TARGETS:
+            if logical not in REGISTRY_TARGETS and logical not in SETTLEMENT_TARGETS:
                 raise KeyError(f"unknown synthetic registry target {logical!r}")
 
     # -- scope lifecycle -----------------------------------------------------
@@ -91,15 +96,18 @@ class synthetic_registries(ContextDecorator):
             # catalogs, so a synthetic scope must establish the real baseline
             # before any catalog is swapped.
             from world.maps import geography as geography_module
+            from world.maps import map_data as map_data_module
 
+            map_data_module.ensure_published()
             if not geography_module.is_published():
                 geography_module.publish(geography_module.load_geography())
             _resolve_import_time_derivations(self._logicals)
             for logical in _dependency_order(self._logicals):
-                if logical in GEOGRAPHY_TARGETS:
+                if logical in GEOGRAPHY_TARGETS or logical in SETTLEMENT_TARGETS:
                     continue
                 _apply_target(stack, logical, self._extra)
             _apply_geography(stack, self._logicals, self._extra)
+            _apply_settlements(stack, self._logicals, self._extra)
         except Exception:
             # A failed __enter__ never reaches __exit__; unwind the partial
             # stack here so the scope leaves no patches behind.
@@ -244,6 +252,36 @@ def _apply_geography(
         overrides[GEOGRAPHY_TARGETS[logical]] = MappingProxyType(content)
     geography_module.publish(replace(previous, **overrides))
     stack.callback(geography_module.publish, previous)
+
+
+def _apply_settlements(
+    stack: ExitStack,
+    logicals: tuple[str, ...],
+    extra: Mapping[str, Mapping[str, object]],
+) -> None:
+    """Substitute the settlement-owned composed views for this scope.
+
+    The settlement domain is one immutable published snapshot, so its
+    registries cannot be patched as separate module attributes. The scope
+    publishes a snapshot whose selected composed views are the synthetic
+    catalogs and restores the previously published snapshot on exit; every
+    consumer that holds a registry view, and the lore mirror's import-time
+    capture, follow the substituted values.
+    """
+
+    selected = [logical for logical in logicals if logical in SETTLEMENT_TARGETS]
+    if not selected:
+        return
+    from world.maps import map_data as map_data_module
+
+    previous = map_data_module.current()
+    overrides = {}
+    for logical in selected:
+        content = dict(_CONTENT[logical]())
+        content.update(extra.get(logical, {}))
+        overrides[SETTLEMENT_TARGETS[logical]] = MappingProxyType(content)
+    map_data_module.publish(replace(previous, **overrides))
+    stack.callback(map_data_module.publish, previous)
 
 
 def _revalidate_skill_lineage() -> None:
