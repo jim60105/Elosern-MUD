@@ -663,6 +663,9 @@ class CommandDocsContractTests(unittest.TestCase):
     @covers_requirement("game-command-docs::the-command-reference-documents-the-lineage-command")
     @covers_requirement("game-command-docs::accurate-command-details")
     @covers_requirement("game-command-docs::party-combat-command-references-document-actor-scope-drafts-and-exit-confirmations")
+    @covers_requirement(
+        "game-command-docs::text-service-discovery-and-explicit-provider-targeting-match-contextual-services"
+    )
     def test_key_and_aliases_match_command_classes(self):
         for key, command in self.mounted.items():
             entry = self.entries[key]
@@ -682,6 +685,9 @@ class CommandDocsContractTests(unittest.TestCase):
     )
     @covers_requirement(
         "shop-economy::text-shop-commands-name-the-recipient-or-seller"
+    )
+    @covers_requirement(
+        "game-command-docs::text-service-discovery-and-explicit-provider-targeting-match-contextual-services"
     )
     def test_syntax_and_context_match_manifest(self):
         for key, expected in EXPECTED_COMMANDS.items():

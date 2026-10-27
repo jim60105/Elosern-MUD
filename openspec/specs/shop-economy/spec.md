@@ -150,10 +150,15 @@ unchanged and continue valid hosts.
 ### Requirement: Player-facing shop commands use only a local unambiguous merchant
 The character cmdset SHALL expose stock listing, buy, and sell commands with Traditional Chinese
 output. The stock listing SHALL identify the shop by its authored place name rather than a
-generic word.
-Commands SHALL resolve one Merchant host in the caller's current room and SHALL not permit
-remote dbref interaction. Host acceptance SHALL flow through
-`world/rules/service_gate.py::service_available`, and every refusal writes no transaction.
+generic word. Host acceptance SHALL flow through `world/rules/service_gate.py::service_available`,
+and every refusal writes no transaction.
+
+#### Scenario: Explicit and implicit merchant selection
+- **WHEN** a player appends an explicit terminal `@#dbid` to `shop stock`, `buy`, or `sell`
+- **THEN** exactly that visible eligible Merchant in the caller's current room is selected, without
+  substitution, and a remote target remains forbidden
+- **WHEN** no such suffix is supplied
+- **THEN** the established unambiguous implicit discovery applies
 
 #### Scenario: Altoria merchant is usable through commands
 - **WHEN** the player enters the general store during opening hours
@@ -185,6 +190,10 @@ remote dbref interaction. Host acceptance SHALL flow through
 #### Scenario: Place-named listings distinguish same-settlement shops
 - **WHEN** two shops operate in one settlement
 - **THEN** they are distinguishable by their listing alone
+
+#### Scenario: Explicit provider survives same-class bystanders
+- **WHEN** a player supplies the terminal target suffix for a visible eligible provider while another same-class provider is present
+- **THEN** only the selected provider is used; if it departs before execution the command rejects without substituting the bystander
 
 ### Requirement: Shop economy stays consistent with the canonical inventory
 Buy and sell SHALL keep operating on `db.inventory` as the canonical record, and their preflight checks

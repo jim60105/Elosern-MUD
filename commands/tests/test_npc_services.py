@@ -229,6 +229,9 @@ class ServiceDiscoveryCommandTests(_ServiceTextBase):
         self.bystander = self._npcs("t_service_bystander")
         self._merchant(self.bystander, shop_key="t_parity_other_shop")
 
+    @covers_requirement(
+        "game-command-docs::text-service-discovery-and-explicit-provider-targeting-match-contextual-services"
+    )
     def test_services_reports_the_selected_provider_projection(self):
         services = project_npc_services(self.char1, self.char1, self.host)
         self.assertEqual(services.state, STATE_READY)
@@ -262,6 +265,9 @@ class ServiceDiscoveryCommandTests(_ServiceTextBase):
         self.assertEqual(output.count("  shop　"), 1)
         self.assertNotIn(self.bystander.key, output)
 
+    @covers_requirement(
+        "game-command-docs::text-service-discovery-and-explicit-provider-targeting-match-contextual-services"
+    )
     def test_alias_none_state_usage_and_read_only_discovery(self):
         plain = self._npcs("t_plain_host")
         before = _snapshot(self.char1, plain)
@@ -276,6 +282,9 @@ class ServiceDiscoveryCommandTests(_ServiceTextBase):
         self.assertEqual(ready_before, _snapshot(self.char1, self.host))
         self.call(CmdServices(), "", "用法：services <npc>")
 
+    @covers_requirement(
+        "game-command-docs::text-service-discovery-and-explicit-provider-targeting-match-contextual-services"
+    )
     def test_unreadable_is_distinct_from_none(self):
         plain = self._npcs("t_plain_host")
         with patch(
@@ -297,6 +306,9 @@ class ServiceDiscoveryCommandTests(_ServiceTextBase):
         self.assertNotIn("shop stock @#", output)
         self.assertNotIn("church join #", output)
 
+    @covers_requirement(
+        "game-command-docs::text-service-discovery-and-explicit-provider-targeting-match-contextual-services"
+    )
     def test_services_look_and_web_payload_share_one_projection(self):
         from web.webclient.presentation.exploration import _services_payload
 
@@ -508,6 +520,9 @@ class TargetedShopCommandTests(_ServiceTextBase):
     @covers_requirement(
         "shop-economy::player-facing-shop-commands-use-only-a-local-unambiguous-merchant"
     )
+    @covers_requirement(
+        "game-command-docs::text-service-discovery-and-explicit-provider-targeting-match-contextual-services"
+    )
     def test_a_departed_target_is_never_replaced_by_the_bystander(self):
         departed_pk = self.keeper_a.pk
         self.keeper_a.location = create_object(Room, key="t_shop_elsewhere")
@@ -562,6 +577,9 @@ class TargetedShopCommandTests(_ServiceTextBase):
     @covers_requirement(
         "shop-economy::player-facing-shop-commands-use-only-a-local-unambiguous-merchant"
     )
+    @covers_requirement(
+        "game-command-docs::text-service-discovery-and-explicit-provider-targeting-match-contextual-services"
+    )
     def test_malformed_suffix_and_omitted_target_never_fall_back(self):
         self.assertIn(_NOT_FOUND, self.call(CmdShopStock(), "@#abc"))
         self.assertNotIn(SHOP_A_NAME, self.call(CmdShopStock(), "@#abc"))
@@ -613,6 +631,9 @@ class TargetedGuildCommandTests(_GuildTargetBase):
     @covers_requirement(
         "guild-quest-board::player-facing-guild-commands-resolve-one-local-service-host"
     )
+    @covers_requirement(
+        "game-command-docs::text-service-discovery-and-explicit-provider-targeting-match-contextual-services"
+    )
     def test_explicit_staff_survives_a_same_class_bystander(self):
         self.staff_a.db.schedule_state = "busy"
         before = _snapshot(self.char1, self.staff_a, self.staff_b)
@@ -628,6 +649,9 @@ class TargetedGuildCommandTests(_GuildTargetBase):
 
     @covers_requirement(
         "guild-quest-board::player-facing-guild-commands-resolve-one-local-service-host"
+    )
+    @covers_requirement(
+        "game-command-docs::text-service-discovery-and-explicit-provider-targeting-match-contextual-services"
     )
     def test_omitted_target_keeps_the_ambiguous_host_refusal(self):
         self.call(CmdGuildRegister(), "", "這裡沒有公會服務人員")
