@@ -42,13 +42,19 @@ from world.lore.dialogue.shape import (
     MAX_KEYWORD_CODE_POINTS,
     MAX_LABEL_CODE_POINTS,
     MAX_PREDECESSORS_PER_TOPIC,
+    MAX_SERVICE_ASSOCIATIONS,
+    MAX_SERVICE_KEY_CHARS,
+    MAX_SERVICE_LABEL_CODE_POINTS,
+    MAX_SERVICE_TOPIC_ID_CHARS,
     MAX_TOPICS_PER_DIALOGUE,
     MAX_VARIANTS_PER_TOPIC,
     AuthoredDialogue,
     AuthoredTopic,
+    DialogueService,
     SceneVariant,
     VARIANT_ID_PATTERN,
 )
+from world.lore.dialogue.services import DialogueServiceError, parse_service_rows
 from world.lore.scenes import (
     MAX_LINE_CODE_POINTS,
     MAX_REVISION_ASCII_CHARS,
@@ -354,8 +360,50 @@ def dialogue_phase_schema(*, identity_kind: Literal["static", "generated_local"]
                 "items": dialogue_topic_schema(identity_kind=identity_kind),
                 "maxItems": MAX_TOPICS_PER_DIALOGUE,
             },
+            "services": dialogue_service_rows_schema(identity_kind=identity_kind),
         },
         "required": ["greeting", "topics"],
+    }
+
+
+def dialogue_service_rows_schema(
+    *, identity_kind: Literal["static", "generated_local"]
+) -> dict[str, Any]:
+    """The explicit service association rows one source may declare.
+
+    The row names a stable association key, the complete topic identity of the
+    same source/phase, and its player label. ``topic_id`` uses the source's own
+    identity grammar: a full static topic id, or the local generated topic id
+    the package composes into its full identity.
+    """
+    if identity_kind not in ("static", "generated_local"):
+        raise ValueError(f"Unknown identity_kind: {identity_kind!r}")
+    return {
+        "type": "array",
+        "maxItems": MAX_SERVICE_ASSOCIATIONS,
+        "items": {
+            "type": "object",
+            "required": ["key", "topic_id", "label"],
+            "additionalProperties": False,
+            "properties": {
+                "key": {
+                    "type": "string",
+                    "pattern": r"^[a-z][a-z0-9_]{0,54}$",
+                    "maxLength": MAX_SERVICE_KEY_CHARS,
+                },
+                "topic_id": {
+                    "type": "string",
+                    "pattern": _identity_pattern(identity_kind),
+                    "minLength": 1,
+                    "maxLength": MAX_SERVICE_TOPIC_ID_CHARS,
+                },
+                "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": MAX_SERVICE_LABEL_CODE_POINTS,
+                },
+            },
+        },
     }
 
 
@@ -545,7 +593,7 @@ def parse_dialogue(
         raise TypeError(f"Dialogue payload must be a dict, got {type(payload)!r}")
 
     if isinstance(identity, StaticDialogueIdentity):
-        allowed_root = {"schema_version", "greeting", "topics"}
+        allowed_root = {"schema_version", "greeting", "topics", "services"}
         extra = set(payload.keys()) - allowed_root
         if extra:
             raise ValueError(f"Static dialogue payload contains unexpected fields: {sorted(extra)}")
@@ -554,7 +602,7 @@ def parse_dialogue(
                 f"Static dialogue requires schema_version 1, got {payload.get('schema_version')!r}"
             )
     elif isinstance(identity, GeneratedDialogueIdentity):
-        allowed_root = {"greeting", "topics"}
+        allowed_root = {"greeting", "topics", "services"}
         extra = set(payload.keys()) - allowed_root
         if extra:
             raise ValueError(f"Generated dialogue payload contains unexpected fields: {sorted(extra)}")
@@ -679,13 +727,44 @@ def parse_dialogue(
             )
         )
 
-    definition = AuthoredDialogue(greeting=greeting, topics=tuple(parsed_topics))
+    services = _parse_source_services(payload.get("services"), identity=identity)
+    definition = AuthoredDialogue(
+        greeting=greeting, topics=tuple(parsed_topics), services=services
+    )
     return validate_dialogue(
         definition,
         identity=identity,
         references=references,
         package_roles=package_roles,
         package_quests=package_quests,
+    )
+
+
+def _parse_source_services(
+    payload: Any, *, identity: DialogueIdentity
+) -> tuple[DialogueService, ...]:
+    """Parse one source's association rows into this source's full identities.
+
+    A generated phase declares its rows with local topic ids exactly like its
+    topics, so the same codec composes the full collision-free identity here.
+    The mechanical parser owns the shape; this function only applies the
+    source's identity grammar.
+    """
+    try:
+        rows = parse_service_rows(payload)
+    except DialogueServiceError as error:
+        raise ValueError(str(error)) from error
+    if not isinstance(identity, GeneratedDialogueIdentity):
+        return rows
+    return tuple(
+        DialogueService(
+            key=row.key,
+            topic_id=make_generated_topic_id(
+                identity.package_id, identity.role_id, identity.phase_id, row.topic_id
+            ),
+            label=row.label,
+        )
+        for row in rows
     )
 
 

@@ -15,6 +15,7 @@ import {
 } from "../fixtures.js";
 import {
   AFFORDANCES,
+  serviceFixture,
   explorationPanelFixture,
   compassArgs,
 } from "../fixtures/scene_overview.js";
@@ -42,7 +43,7 @@ const OVERVIEW_PANEL = explorationPanelFixture({
     { ref: "e", label: "東", destination: "town:gate:1:0" },
   ],
   targets: [
-    { identity: 11, name: "葛里安‧衛登", affordances: [AFFORDANCES.talk, AFFORDANCES.trade] },
+    { identity: 11, name: "葛里安‧衛登", affordances: [AFFORDANCES.talk], services: serviceFixture(11, "shop", "交易") },
   ],
   objects: [{ identity: 31, name: "任務板" }],
 });

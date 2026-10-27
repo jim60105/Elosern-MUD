@@ -49,12 +49,32 @@ const props = defineProps({
   // decision "Tab candidate set" — already-committed panel data only, zero
   // protocol change). Unavailable/absent panel → empty list.
   completionCandidates: { type: Array, default: () => [] },
+  // The one pre-fill request (`{ seq, text }`, npc-contextual-service-
+  // projection): a service route's command row focuses the existing input with
+  // its exact text. It never submits; the player still sends it deliberately.
+  prefill: { type: Object, default: null },
 });
 
 const emit = defineEmits(["submit", "sent", "focus-parent", "focus-lost"]);
 
 const field = ref(null);
 const draft = ref("");
+
+// A pre-fill request replaces the draft and puts the caret at its end. It
+// neither sends nor claims the field's own focus (the shell's focus seam runs
+// separately), so a refused send keeps exactly this text.
+watch(
+  () => (props.prefill ? props.prefill.seq : null),
+  (seq) => {
+    if (!seq || !props.prefill) {
+      return;
+    }
+    draft.value = props.prefill.text;
+    resetCompletion();
+    resetHistoryWalk();
+    nextTick(placeCaretEnd);
+  },
+);
 
 // Tab-completion cycle state (webclient-align-02): null = not cycling;
 // otherwise the current candidate list and a cursor where -1 is the

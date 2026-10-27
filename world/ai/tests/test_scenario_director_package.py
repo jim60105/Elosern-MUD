@@ -91,6 +91,41 @@ class ExtendedBlueprintContractTests(TestCase):
             self.assertNotIn(key, SCENARIO_DIRECTOR_OUTPUT_SCHEMA["properties"])
 
 
+class ProposedCapabilitySchemaTests(TestCase):
+    """The proposed role capabilities and phase service rows stay in step."""
+
+    def test_the_proposed_capability_vocabulary_matches_the_boundary(self):
+        from world.ai.scenario_director import packages
+        from world.quests.scene_package import GENERATED_CAPABILITY_TYPES
+
+        self.assertEqual(
+            frozenset(packages.GENERATED_CAPABILITY_TYPES),
+            frozenset(GENERATED_CAPABILITY_TYPES),
+        )
+        role_schema = PACKAGE_PAYLOAD_SCHEMA["properties"]["roles"]["items"]
+        declared = role_schema["properties"]["capabilities"]["items"]["properties"][
+            "type"
+        ]["enum"]
+        self.assertEqual(set(declared), set(GENERATED_CAPABILITY_TYPES))
+        # Two distinct capability types may coexist on one role; a duplicate
+        # type is the deterministic boundary's rejection.
+        self.assertEqual(
+            role_schema["properties"]["capabilities"]["maxItems"],
+            len(GENERATED_CAPABILITY_TYPES),
+        )
+        phase_schema = role_schema["properties"]
+        # The phase fragment carries the optional service rows.
+        dialogue_schema = PACKAGE_PAYLOAD_SCHEMA["properties"]["dialogue"]["items"]
+        phase_properties = dialogue_schema["properties"]["phases"]["items"][
+            "properties"
+        ]
+        self.assertIn("services", phase_properties)
+        self.assertEqual(
+            phase_properties["services"]["items"]["required"],
+            ["key", "topic_id", "label"],
+        )
+
+
 class BeatSceneRouteTests(TestCase):
     """The route's descriptor contract and its no-content gates."""
 

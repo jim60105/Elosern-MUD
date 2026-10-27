@@ -36,6 +36,10 @@ EFFECT_VERBS: tuple[str, ...] = ("offer_commission",)
 #: writer package; a repository-wide drift test pins it equal to
 #: ``world.quests.definitions.EscortCompletion``.
 ESCORT_COMPLETIONS: tuple[str, ...] = ("destination", "rendezvous")
+#: The closed generated capability vocabulary. Duplicated here for the same
+#: reason as ``ESCORT_COMPLETIONS``; a repository-wide drift test pins it equal
+#: to ``world.quests.scene_package.GENERATED_CAPABILITY_TYPES``.
+GENERATED_CAPABILITY_TYPES: tuple[str, ...] = ("quest_issuer", "scripted_dialogue")
 
 MAX_ID_LENGTH = 64
 MAX_PROSE = 500
@@ -90,24 +94,24 @@ _ROLE = {
                 "value": {"type": "integer", "minimum": 1},
             },
         },
-        #: One role's explicit capability declarations. Only a role named by
-        #: ``commissions`` declares one, and only the issuing authority is
-        #: supported: exactly one person-bound ``quest_issuer`` whose
-        #: ``issuer_key`` equals that commission's ``issuer_content_key``. The
-        #: scoped service identity is supplied by the deterministic boundary,
-        #: never invented here.
+        #: One role's explicit capability declarations: at most one per type,
+        #: person-bound. A role named by ``commissions`` declares the scoped
+        #: ``quest_issuer`` whose ``issuer_key`` equals that commission's
+        #: ``issuer_content_key``; a role whose phase advertises a dialogue
+        #: service declares the service-bound ``scripted_dialogue``. The scoped
+        #: service identity (and its dialogue key) is supplied by the
+        #: deterministic boundary, never invented here.
         "capabilities": {
             "type": "array",
-            "maxItems": 1,
+            "maxItems": len(GENERATED_CAPABILITY_TYPES),
             "items": {
                 "type": "object",
                 "required": ["type", "kwargs", "binding"],
                 "additionalProperties": False,
                 "properties": {
-                    "type": {"enum": ["quest_issuer"]},
+                    "type": {"enum": list(GENERATED_CAPABILITY_TYPES)},
                     "kwargs": {
                         "type": "object",
-                        "required": ["issuer_key"],
                         "additionalProperties": False,
                         "properties": {
                             "issuer_key": {
@@ -115,6 +119,11 @@ _ROLE = {
                                 "minLength": 1,
                                 "maxLength": 60,
                                 "pattern": "^[^0-9][^:]*$",
+                            },
+                            "dialogue_key": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": MAX_ID_LENGTH,
                             },
                             "service_id": {
                                 "type": "string",

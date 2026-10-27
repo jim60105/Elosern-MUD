@@ -224,3 +224,7 @@ Static/generated dialogue SHALL use immutable stable topic identities and comple
 - **WHEN** players need to discover guild commands
 - **THEN** command discoverability belongs to help, documentation and the interface, not to the
   dialogue table's prose
+
+#### Scenario: Explicit supported service associations
+- **WHEN** immutable source dialogue declares services metadata
+- **THEN** each association names an existing same-source supported deterministic entry and validation rejects unknown, duplicate, dangling or cross-phase references; ordinary topics remain ordinary dialogue

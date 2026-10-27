@@ -25,7 +25,7 @@ function exitRow(exit, index) {
 }
 
 // A synthesized available `exploration` panel at the current schema version
-// (v4). `targets` are interact descriptors (`{identity, name, affordances}`),
+// (v5). `targets` are interact descriptors (`{identity, name, affordances, services}`),
 // `entities` extra present characters with no interact descriptor, `objects`
 // look-only things, and `portraits` maps an identity to the wire-valid
 // decimal `portrait_ref` the presenter would supply (null everywhere else).
@@ -40,7 +40,7 @@ export function explorationPanelFixture({
 } = {}) {
   const refFor = (identity) => (Object.hasOwn(portraits, identity) ? portraits[identity] : null);
   return {
-    schema_version: 4,
+    schema_version: 5,
     available: true,
     kind: "exploration",
     move: exits.map(exitRow),
@@ -66,6 +66,7 @@ export function explorationPanelFixture({
       identity: target.identity,
       display_name: target.name,
       portrait_ref: refFor(target.identity),
+      services: target.services || { state: "none", entries: [] },
       affordances: target.affordances || [],
     })),
   };
@@ -152,9 +153,14 @@ export function compassArgs(panel, localMap, { arrivalKey = 1, busy = false, mot
 // Synthesized affordance rows.
 export const AFFORDANCES = {
   talk: { kind: "action", action_id: "explore.talk_open", label: "交談", enabled: true, disabled_reason: null },
-  trade: { kind: "navigate", surface: "shop", label: "交易", enabled: true, disabled_reason: null },
-  guild: { kind: "navigate", surface: "guild", label: "公會服務", enabled: true, disabled_reason: null },
   engage: { kind: "action", action_id: "explore.engage", label: "戰鬥", enabled: true, disabled_reason: null },
 };
+
+export function serviceFixture(npcId, section, label) {
+  return { state: "ready", entries: [{
+    key: section, label, enabled: true, disabled_reason: null,
+    route: { kind: "services", npc_id: npcId, section },
+  }] };
+}
 
 export { DIRECTION_LABELS };

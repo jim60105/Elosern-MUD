@@ -17,7 +17,7 @@ var MAX_SAFE_INTEGER = C.MAX_SAFE_INTEGER;
 var MAX_CANONICAL_JSON_BYTES = C.MAX_CANONICAL_JSON_BYTES;
 
 // ---------------------------------------------------------------------------
-// exploration panel v4 validators (mirror of
+// exploration panel v5 validators (mirror of
 // web.webclient.presentation.exploration, design D10). Shared bounds are
 // guarded by a dual-direction parity test.
 // ---------------------------------------------------------------------------
@@ -37,6 +37,17 @@ var EXPLORATION_MAX_REASON_MESSAGE = 128;
 // The opaque decimal portrait-catalog reference bound (schema version 4):
 // exactly the combat participant and dialogue host seam.
 var EXPLORATION_MAX_PORTRAIT_REF = 32;
+// The target-bound contextual services field (schema version 5): its own
+// bounds, outside the eight general-affordance list.
+var EXPLORATION_MAX_SERVICE_ENTRIES = 16;
+var EXPLORATION_MAX_SERVICE_KEY = 64;
+var EXPLORATION_MAX_SERVICE_LABEL = 64;
+var EXPLORATION_MAX_SERVICE_REASON_CODE = 64;
+var EXPLORATION_MAX_SERVICE_REASON_MESSAGE = 240;
+var EXPLORATION_MAX_TOPIC_ID = 2048;
+var EXPLORATION_SERVICE_STATES = ["none", "ready", "unreadable"];
+var EXPLORATION_SERVICE_SECTIONS = ["shop", "registration", "board", "report", "rank"];
+var EXPLORATION_SERVICE_ROUTE_KINDS = ["services", "dialogue", "command"];
 var EXPLORATION_ACTION_KINDS = ["action", "navigate"];
 // The target-scoped subset of the server's twelve-code allowlist: the panel
 // folds a host's talk into one explore.talk_open 交談 row, so the retired
@@ -50,7 +61,7 @@ var EXPLORATION_ACTION_IDS = [
   "explore.possess_release",
   "explore.deliver",
 ];
-var EXPLORATION_SURFACES = ["guild", "shop", "npc_persona"];
+var EXPLORATION_SURFACES = ["npc_persona"];
 var EXPLORATION_ENTITY_KINDS = ["character", "npc", "monster"];
 
 
@@ -248,11 +259,142 @@ function validateExplorationLook(value) {
   return value;
 }
 
+function requireServiceIdentifier(value, field, maximum) {
+  if (
+    typeof value !== "string" ||
+    !/^[a-z0-9._]{1,64}$/.test(value) ||
+    value.length > maximum
+  ) {
+    throw new Error(field + " must be a 1.." + maximum + " lowercase dotted or underscored identifier");
+  }
+  return value;
+}
+
+function validateExplorationServiceReason(value, enabled) {
+  if (value === null || value === undefined) {
+    if (!enabled) {
+      throw new Error("a disabled service entry requires a disabled_reason");
+    }
+    return null;
+  }
+  if (enabled) {
+    throw new Error("an enabled service entry must not carry a disabled_reason");
+  }
+  requireExactFields(value, "service disabled_reason", ["code", "message"], []);
+  requireServiceIdentifier(value.code, "service disabled_reason code", EXPLORATION_MAX_SERVICE_REASON_CODE);
+  var message = requireString(value.message, "message", EXPLORATION_MAX_SERVICE_REASON_MESSAGE);
+  if (!message.trim()) {
+    throw new Error("service disabled_reason message must be non-empty");
+  }
+  return { code: value.code, message: message };
+}
+
+function validateExplorationServiceRoute(value, identity) {
+  if (!isPlainObject(value)) {
+    throw new Error("service route must be a JSON object");
+  }
+  requireExactFields(
+    value,
+    "service route",
+    ["kind", "npc_id"],
+    ["section", "topic_id", "command"]
+  );
+  if (EXPLORATION_SERVICE_ROUTE_KINDS.indexOf(value.kind) === -1) {
+    throw new Error("service route kind is not a stable value");
+  }
+  if (value.npc_id !== identity) {
+    throw new Error("a service route must name the exact selected target");
+  }
+  if (value.kind === "services") {
+    if (EXPLORATION_SERVICE_SECTIONS.indexOf(value.section) === -1) {
+      throw new Error("service route section is not a stable value");
+    }
+    if (value.topic_id !== undefined || value.command !== undefined) {
+      throw new Error("a services route carries only its section");
+    }
+    return { kind: value.kind, npc_id: value.npc_id, section: value.section };
+  }
+  if (value.kind === "dialogue") {
+    if (
+      typeof value.topic_id !== "string" ||
+      value.topic_id.length < 1 ||
+      value.topic_id.length > EXPLORATION_MAX_TOPIC_ID
+    ) {
+      throw new Error("a dialogue route requires a bounded topic_id");
+    }
+    if (value.section !== undefined || value.command !== undefined) {
+      throw new Error("a dialogue route carries only its topic_id");
+    }
+    return { kind: value.kind, npc_id: value.npc_id, topic_id: value.topic_id };
+  }
+  if (value.command !== "church join") {
+    throw new Error("a command route names the one supported command");
+  }
+  if (value.section !== undefined || value.topic_id !== undefined) {
+    throw new Error("a command route carries only its command");
+  }
+  return { kind: value.kind, npc_id: value.npc_id, command: value.command };
+}
+
+function validateExplorationServiceEntry(value, identity) {
+  requireExactFields(
+    value,
+    "service entry",
+    ["key", "label", "enabled", "disabled_reason", "route"],
+    []
+  );
+  var key = requireServiceIdentifier(value.key, "service key", EXPLORATION_MAX_SERVICE_KEY);
+  var label = requireString(value.label, "label", EXPLORATION_MAX_SERVICE_LABEL);
+  if (!label.trim()) {
+    throw new Error("service label must be non-empty");
+  }
+  var enabled = requireBool(value.enabled, "enabled");
+  return {
+    key: key,
+    label: label,
+    enabled: enabled,
+    disabled_reason: validateExplorationServiceReason(value.disabled_reason, enabled),
+    route: validateExplorationServiceRoute(value.route, identity),
+  };
+}
+
+function validateExplorationServices(value, identity) {
+  requireExactFields(value, "services", ["state", "entries"], []);
+  if (EXPLORATION_SERVICE_STATES.indexOf(value.state) === -1) {
+    throw new Error("services state is not a stable value");
+  }
+  if (
+    !Array.isArray(value.entries) ||
+    value.entries.length > EXPLORATION_MAX_SERVICE_ENTRIES
+  ) {
+    throw new Error(
+      "services entries must be a list of at most " + EXPLORATION_MAX_SERVICE_ENTRIES + " entries"
+    );
+  }
+  var entries = value.entries.map(function (entry) {
+    return validateExplorationServiceEntry(entry, identity);
+  });
+  if (value.state === "ready" && entries.length === 0) {
+    throw new Error("a ready services state requires an entry");
+  }
+  if (value.state !== "ready" && entries.length > 0) {
+    throw new Error("an empty or unreadable services state carries no entry");
+  }
+  var seen = {};
+  entries.forEach(function (entry) {
+    if (seen[entry.key]) {
+      throw new Error("service entry keys must be unique");
+    }
+    seen[entry.key] = true;
+  });
+  return { state: value.state, entries: entries };
+}
+
 function validateExplorationInteractTarget(value) {
   requireExactFields(
     value,
     "interact target",
-    ["identity", "display_name", "portrait_ref", "affordances"],
+    ["identity", "display_name", "portrait_ref", "services", "affordances"],
     []
   );
   requireIdentity(value.identity, "target.identity");
@@ -261,6 +403,7 @@ function validateExplorationInteractTarget(value) {
     throw new Error("target display_name must be non-empty");
   }
   validateExplorationPortraitRef(value.portrait_ref);
+  validateExplorationServices(value.services, value.identity);
   if (
     !Array.isArray(value.affordances) ||
     value.affordances.length > EXPLORATION_MAX_AFFORDANCES
@@ -302,7 +445,7 @@ function validateExplorationMoveRow(value) {
   return value;
 }
 
-// Exact available exploration panel v4 schema (design D10).
+// Exact available exploration panel v5 schema (design D10).
 function validateExplorationPanel(payload) {
   requireExactFields(
     payload,
@@ -321,7 +464,7 @@ function validateExplorationPanel(payload) {
     []
   );
   requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-  if (payload.schema_version !== 4) {
+  if (payload.schema_version !== 5) {
     throw new Error("unsupported exploration schema_version");
   }
   if (payload.available !== true || payload.kind !== "exploration") {
@@ -352,7 +495,7 @@ function validateExplorationPanel(payload) {
   validateExplorationAvailability(payload.inventory, "inventory");
 
   var result = {
-    schema_version: 4,
+    schema_version: 5,
     available: true,
     kind: "exploration",
     move: payload.move,

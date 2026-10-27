@@ -35,6 +35,13 @@ export function applyInteraction(ctx) {
     if (!ctx.dockOnExplorationForm(rs)) {
       return false;
     }
+    // A contextual service row (npc-contextual-service-projection): its exact
+    // server route names the selected provider, so it is handled before the
+    // generic drawer row. The player's later explicit action in the opened
+    // flow is the only submission.
+    if (item.serviceRoute) {
+      return ctx.openServiceRoute(item.serviceRoute);
+    }
     // A client-local drawer-open row (the frameless 背包 / 商店 rows, the
     // `openCharacter` precedent): open the drawer without pushing a frame,
     // switching the sub-dock, or recording a service surface.
@@ -81,6 +88,54 @@ export function applyInteraction(ctx) {
     // the CommandEcho catalog resolves exactly one display line.
     if (item.actionId) {
       ctx.dispatchAction(item.actionId, item.payload || {}, item.commandDisplay || null);
+      return true;
+    }
+    return false;
+  };
+
+  // Open one contextual service route. Services open the selected provider's
+  // existing drawer and read THAT provider (never the room summary and never a
+  // bystander); dialogue opens the exact host and focuses its still-disclosed
+  // topic without selecting it; a command route only expands and pre-fills the
+  // existing command input. Nothing here dispatches gameplay except the
+  // conversation opening, which is itself a read.
+  ctx.openServiceRoute = function openServiceRoute(route) {
+    const rs = ctx.reducer.getCommittedState();
+    if (!ctx.dockOnExplorationForm(rs)) {
+      return false;
+    }
+    if (!route || typeof route !== "object") {
+      return false;
+    }
+    const npcId = route.npc_id;
+    if (typeof npcId !== "number" || !Number.isInteger(npcId) || npcId <= 0) {
+      return false;
+    }
+    if (route.kind === "services") {
+      const slot = route.section === "shop" ? "shop" : "counter";
+      ctx.requestServiceRead(slot, npcId, route.section || null);
+      ctx.openHudDrawer(slot === "shop" ? "shop" : "quest");
+      return true;
+    }
+    if (route.kind === "dialogue") {
+      if (typeof route.topic_id !== "string" || !route.topic_id) {
+        return false;
+      }
+      const requestId = ctx.dispatchAction("explore.talk_open", { npc_id: npcId });
+      if (requestId === null) {
+        return false;
+      }
+      ctx.recordDialogueFocus(npcId, route.topic_id, requestId);
+      ctx.publishView();
+      return true;
+    }
+    if (route.kind === "command") {
+      if (!ctx.prefillCommand(`${route.command} #${npcId}`)) {
+        return false;
+      }
+      // The shell's one focus seam: the command line expands and takes focus.
+      ctx.drawerRequest += 1;
+      ctx.publishView();
       return true;
     }
     return false;

@@ -54,11 +54,37 @@ def _object(**overrides):
     return value
 
 
-def _target(**overrides):
+def _service_entry(**overrides):
     value = {
-        "identity": 5,
+        "key": "shop",
+        "label": "商店",
+        "enabled": True,
+        "disabled_reason": None,
+        "route": {"kind": "services", "npc_id": 5, "section": "shop"},
+    }
+    value.update(overrides)
+    return value
+
+
+def _services(**overrides):
+    value = {"state": "ready", "entries": [_service_entry()]}
+    value.update(overrides)
+    return value
+
+
+def _target(**overrides):
+    identity = overrides.get("identity", 5)
+    value = {
+        "identity": identity,
         "display_name": "南門守衛",
         "portrait_ref": None,
+        "services": _services(
+            entries=[
+                _service_entry(
+                    route={"kind": "services", "npc_id": identity, "section": "shop"}
+                )
+            ]
+        ),
         "affordances": [_affordance()],
     }
     value.update(overrides)

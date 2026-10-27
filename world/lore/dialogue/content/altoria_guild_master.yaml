@@ -1,5 +1,9 @@
 schema_version: 1
 greeting: 櫃檯後頭，分會會長葛里安‧衛登正對著一本攤開的厚皮名冊核對單據。聽見腳步聲，他把羽毛筆往旁邊一擱，抬眼看來：「歡迎來到冒險者公會阿爾托利亞分會。是頭一回來王都辦理登記，還是要交接手頭上的委託？還沒登記入冊的話，先在名冊寫下名字，從 F 級踏實起步；要是剛辦完差事，拿著委託單過來，報上編號讓我查對。」
+services:
+- key: guild_report_dialogue
+  topic_id: guild_staff.topic_04
+  label: 交談回報委託
 topics:
 - topic_id: guild_staff.topic_01
   keyword: 註冊

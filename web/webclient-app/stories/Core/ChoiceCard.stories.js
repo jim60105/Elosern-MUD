@@ -2,6 +2,7 @@ import { h } from "vue";
 import ChoiceCard from "../../components/ChoiceCard.vue";
 import {
   AFFORDANCES,
+  serviceFixture,
   explorationPanelFixture,
   overflowCardArgs,
   suggestionsCardArgs,
@@ -55,10 +56,9 @@ const GUILD_HALL = explorationPanelFixture({
       name: "葛里安‧衛登",
       affordances: [
         AFFORDANCES.talk,
-        AFFORDANCES.guild,
-        AFFORDANCES.trade,
         { ...AFFORDANCES.engage, enabled: false, disabled_reason: { code: "safe_zone", message: "公會大廳裡不能動手。" } },
       ],
+      services: serviceFixture(11, "board", "公會服務"),
     },
   ],
   entities: [21, 22, 23, 24].map((identity, i) => ({ identity, name: ["旅人艾拉", "吟遊詩人", "鐵匠學徒", "信差"][i] })),

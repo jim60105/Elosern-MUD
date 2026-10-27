@@ -6,6 +6,45 @@ governing dialogue delivery over the Elosern Out-of-Band (OOB) protocol.
 
 ## Publication Budgets
 
+### Contextual service authoring and opening
+
+Static and generated dialogue may declare optional `services`, an array of exact
+`{key, topic_id, label}` rows. Keys match `[a-z][a-z0-9_]{0,54}`; labels contain
+1..64 Unicode code points. Keys and topic references are unique. References must
+resolve within the same source and generated phase. Informational topics cannot
+be advertised as services. Static support is the deterministic guild report
+topic; generated support requires an authorized `offer_commission` topic effect.
+Invalid associations reject the entire source candidate before publication.
+
+A generated service role declares person-bound `scripted_dialogue` with both
+`dialogue_key` and `service_id` equal to `scene_role:<package_id>:<role_id>`,
+alongside its declared `quest_issuer`. Compilation supplies these trusted
+identities before shared capability assembly. Narrative-only roles remain
+unbound. Native plus associated entries must fit the 16-entry host limit in
+every phase; overflow rejects before publication or assembly.
+
+Exploration schema 5 adds independent per-target `services: {state, entries}`.
+The state is `none`, `ready` or `unreadable`. Entries carry exact
+`{key, label, enabled, disabled_reason, route}` and always name the selected
+positive NPC identity. The bounded route union is
+`{kind: "services", npc_id, section: "shop|registration|board|report|rank"}`,
+`{kind: "dialogue", npc_id, topic_id}` or
+`{kind: "command", npc_id, command: "church join"}`.
+Services open the correlated `services.open` provider read; dialogue opens that
+host and locally focuses the still-disclosed topic without selecting it.
+Opening creates no quest effect or reading receipt. Explicit later activation
+revalidates current source, phase, binding and control authority. Enrollment
+only prefills `church join #<npc_id>` in the existing command input.
+The player submits it separately. Coarse guild/shop navigation is removed;
+ordinary editor navigation stays independent.
+
+Explicit activation of the native guild report association delivers the current
+`reportable_quest_summary` as a `service` delivery for that exact staff member.
+It lists reportable quests without settling them, grants no talk affinity and
+issues no formal reading receipt. Another co-present staff member does not hide
+the selected host. Reusing a generated service actor rejects conflicting dialogue
+identity, binding or anchor configuration before provisioning can rewrite it.
+
 Dialogue delivery enforces finite canonical UTF-8 JSON publication budgets across
 both backend selection and frontend transport:
 

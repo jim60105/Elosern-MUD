@@ -111,7 +111,7 @@ class ExplorationNpcPersonaAffordanceTest(EvenniaTest):
             mock_warn.assert_not_called()
 
     @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-4-presentation-panel")
-    def test_version_3_validator_accepts_surface_and_rejects_extra_fields(self):
+    def test_validator_accepts_the_editor_surface_and_rejects_extra_fields(self):
         self.assertIn("npc_persona", SURFACES)
         valid_row = {
             "kind": "navigate",
@@ -126,7 +126,7 @@ class ExplorationNpcPersonaAffordanceTest(EvenniaTest):
 
         payload = exploration_presenter(self._context())
         validated = validate_exploration(payload)
-        self.assertEqual(validated["schema_version"], 4)
+        self.assertEqual(validated["schema_version"], 5)
 
         # Extra field on navigate affordance rejects
         bad_payload = dict(payload)
@@ -145,8 +145,8 @@ class ExplorationNpcPersonaAffordanceTest(EvenniaTest):
             affordances = []
             for j in range(MAX_AFFORDANCES - 1):
                 affordances.append({
-                    "kind": "navigate",
-                    "surface": "shop" if j % 2 == 0 else "guild",
+                    "kind": "action",
+                    "action_id": "explore.talk_open",
                     "label": "超長導航標籤測試文字" * 2,
                     "enabled": True,
                     "disabled_reason": None,
@@ -162,11 +162,12 @@ class ExplorationNpcPersonaAffordanceTest(EvenniaTest):
                 "identity": i + 1,
                 "display_name": "極限長度名稱測試用角色" * 2,
                 "portrait_ref": None,
+                "services": {"state": "none", "entries": []},
                 "affordances": affordances,
             })
 
         max_payload = {
-            "schema_version": 4,
+            "schema_version": 5,
             "available": True,
             "kind": "exploration",
             "move": [],
@@ -254,7 +255,7 @@ class ExplorationVisibilityTargetPublicationTest(EvenniaTest):
         self.assertEqual(interact_ids, [visible_npc.id])
 
     @covers_requirement("webclient-exploration-menu::interaction-publication-and-shared-local-target-resolution-use-visible-candidates")
-    def test_hidden_duplicate_merchant_does_not_disable_visible_host_navigation(self):
+    def test_hidden_duplicate_merchant_never_affects_the_visible_hosts_services(self):
         from typeclasses.components import Merchant
         from world.tests.synthetic_data import SYNTH_GUILD_BRANCH_KEY
 
@@ -277,7 +278,6 @@ class ExplorationVisibilityTargetPublicationTest(EvenniaTest):
         hidden_component.anchor_room_id = self.room.pk
         hidden_merchant.components.add(hidden_component)
 
-        # _resolve_single_host finds the visible merchant uniquely
         host = _resolve_single_host(self.player, Merchant)
         self.assertEqual(host, visible_merchant)
 
@@ -287,9 +287,17 @@ class ExplorationVisibilityTargetPublicationTest(EvenniaTest):
         target = validated["interact"][0]
         self.assertEqual(target["identity"], visible_merchant.id)
 
-        nav_affordances = [a for a in target["affordances"] if a["kind"] == "navigate" and a.get("surface") == "shop"]
-        self.assertEqual(len(nav_affordances), 1)
-        self.assertTrue(nav_affordances[0]["enabled"])
+        # The visible provider's own shop entry is present and enabled; the
+        # hidden duplicate is not an interact target at all, so it can neither
+        # hide nor disable that entry.
+        services = target["services"]
+        self.assertEqual(services["state"], "ready")
+        shop = next(entry for entry in services["entries"] if entry["key"] == "shop")
+        self.assertTrue(shop["enabled"])
+        self.assertEqual(
+            shop["route"],
+            {"kind": "services", "npc_id": int(visible_merchant.pk), "section": "shop"},
+        )
 
     @covers_requirement("webclient-exploration-menu::interaction-publication-and-shared-local-target-resolution-use-visible-candidates")
     def test_overridden_room_policy_excludes_target(self):

@@ -3,9 +3,9 @@
 
 The command surface is deliberately thin: the deterministic enrollment rite,
 the office branch, and the vestment handover all live in
-``world/rules/church.py::enroll`` (design §5.1). This module owns host
-resolution (the ``resolve_local_service_host`` pattern), the schedule gate
-(``interaction_reason(host, "service_church")``), the stable rejection prose,
+``world/rules/church.py::enroll`` (design §5.1). This module owns exact target
+resolution (a local name/alias or the browser route's ``#<id>``), the schedule
+gate (``interaction_reason(host, "service_church")``), the stable rejection prose,
 and the authored presentation around the deterministic grant — no dialogue
 model, no LLM intent participates. ``church pray`` and ``church offer`` are
 equally thin: ``world/rules/church.py::pray_step`` and
@@ -38,13 +38,14 @@ from world.rules.church import (
     redeem_step,
     redemption_catalogue,
 )
-from world.rules.guild import GuildServiceError, resolve_local_service_host
 from world.rules.npc_schedules import interaction_reason
 from world.rules.service_gate import MESSAGE_OFF_ANCHOR
 from world.skills.registry import SKILL_REGISTRY
 from commands.talk import _resolve_npc
 
 _NO_LOCAL_HOST_LINE = "這裡沒有教會的神職人員。"
+_AMBIGUOUS_HOST_LINE = "這裡有多名神職人員，請指明對象。"
+_JOIN_USAGE = "用法：church join <npc>"
 
 _REJECTION_LINES = {
     EnrollmentReason.NOT_A_PLAYER: "只有冒險者能加入教會。",
@@ -87,8 +88,42 @@ _REDEEM_USAGE = "用法：church redeem [list|<key>]"
 _MERIT_USAGE = "用法：church merit"
 
 
+def _resolve_join_host(caller, raw_target):
+    """Resolve the one clergy host the player named, or a refusal line.
+
+    ``<npc>`` is the local name/alias of a present clergy member, or the exact
+    ``#<id>`` form the browser enrollment route pre-fills. The exact identity is
+    revalidated here at submission through the shared visible-room resolver, so
+    a second clergy member standing nearby never substitutes for the named one.
+    """
+    from world.rules.service_targets import visible_room_entity
+
+    if raw_target.startswith("#"):
+        digits = raw_target[1:]
+        if not digits.isascii() or not digits.isdigit():
+            return None, _NO_LOCAL_HOST_LINE
+        host = visible_room_entity(caller, int(digits))
+        if host is None:
+            return None, _NO_LOCAL_HOST_LINE
+    else:
+        resolved = _resolve_npc(
+            caller,
+            raw_target,
+            missing=_NO_LOCAL_HOST_LINE,
+            ambiguous=_AMBIGUOUS_HOST_LINE,
+            not_npc=_NO_LOCAL_HOST_LINE,
+        )
+        if isinstance(resolved, str):
+            return None, resolved
+        host = resolved
+    components = getattr(host, "components", None)
+    if components is None or not components.has(ChurchHost.name):
+        return None, _NO_LOCAL_HOST_LINE
+    return host, None
+
+
 class CmdChurchJoin(Command):
-    """向主祭正式入教，成為光明教會的一員。"""
+    """向指定的主祭正式入教，成為光明教會的一員。"""
 
     key = "church join"
     aliases = ("入教", "洗禮")
@@ -96,10 +131,13 @@ class CmdChurchJoin(Command):
     help_category = "church"
 
     def func(self) -> None:
-        try:
-            host = resolve_local_service_host(self.caller, ChurchHost)
-        except GuildServiceError:
-            self.caller.msg(_NO_LOCAL_HOST_LINE)
+        raw_target = self.args.strip()
+        if not raw_target:
+            self.caller.msg(_JOIN_USAGE)
+            return
+        host, refusal = _resolve_join_host(self.caller, raw_target)
+        if refusal is not None:
+            self.caller.msg(refusal)
             return
         reason = interaction_reason(host, "service_church")
         if reason is not None:

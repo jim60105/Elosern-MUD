@@ -35,8 +35,10 @@ const CLERK = {
   portrait_ref: null,
   affordances: [
     { kind: "action", action_id: "explore.talk_open", label: "交談", enabled: true, disabled_reason: null },
-    { kind: "navigate", surface: "guild", label: "公會服務", enabled: true, disabled_reason: null },
   ],
+  services: { state: "ready", entries: [
+    { key: "guild", label: "公會服務", enabled: true, disabled_reason: null, route: { kind: "services", npc_id: 7, section: "board" } },
+  ] },
 };
 
 // One committed catalog value in the exact accepted shape: the canonical
@@ -1150,7 +1152,7 @@ describe("AppClient companion focus (reuse-lineup-person-focus)", () => {
     // store's own lifecycle keeps the card (the settled rule).
     await commit({
       exploration: {
-        schema_version: 4,
+        schema_version: 5,
         available: false,
         reason: { code: "scene_lost", message: "場景暫時無法顯示" },
       },

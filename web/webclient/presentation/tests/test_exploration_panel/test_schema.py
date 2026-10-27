@@ -20,7 +20,16 @@ from web.webclient.presentation.protocol import (
     json_byte_size,
 )
 
-from ._support import _affordance, _entity, _move_row, _object, _target, _valid_panel
+from ._support import (
+    _affordance,
+    _entity,
+    _move_row,
+    _object,
+    _service_entry,
+    _services,
+    _target,
+    _valid_panel,
+)
 
 
 
@@ -45,14 +54,14 @@ class ExplorationSchemaTests(unittest.TestCase):
     def test_rejects_wrong_kind_and_version(self):
         with self.assertRaises(ExplorationPanelError):
             validate_exploration(_valid_panel(kind="services"))
-        # The exact-gate cutover: the v2 and v3 panels are protocol errors in
-        # v4, as is any other version (no dual-version adapter).
+        # The exact-gate cutover: the v2, v3 and v4 panels are protocol errors
+        # in v5, as is any other version (no dual-version adapter).
         with self.assertRaises(ExplorationPanelError):
             validate_exploration(_valid_panel(schema_version=2))
         with self.assertRaises(ExplorationPanelError):
             validate_exploration(_valid_panel(schema_version=3))
         with self.assertRaises(ExplorationPanelError):
-            validate_exploration(_valid_panel(schema_version=5))
+            validate_exploration(_valid_panel(schema_version=4))
 
     def test_rejects_duplicate_interact_identities(self):
         payload = _valid_panel(
@@ -555,6 +564,195 @@ class ExplorationSchemaTests(unittest.TestCase):
         )
         with self.assertRaises(ExplorationPanelError):
             validate_exploration(payload)
+
+    # ── Schema 5: the target-bound contextual services field ────────────────
+
+    def test_services_states_are_exact(self):
+        none = _target(identity=5, services={"state": "none", "entries": []})
+        self.assertEqual(
+            validate_exploration(_valid_panel(interact=[none]))["interact"][0]["services"],
+            {"state": "none", "entries": []},
+        )
+        unreadable = _target(
+            identity=5, services={"state": "unreadable", "entries": []}
+        )
+        self.assertEqual(
+            validate_exploration(_valid_panel(interact=[unreadable]))["interact"][0][
+                "services"
+            ]["state"],
+            "unreadable",
+        )
+        # A ready state requires at least one entry; an empty or unreadable
+        # state carries none.
+        for services in (
+            {"state": "ready", "entries": []},
+            {"state": "none", "entries": [_service_entry()]},
+            {"state": "unreadable", "entries": [_service_entry()]},
+            {"state": "empty", "entries": []},
+            {"state": "ready"},
+        ):
+            with self.subTest(services=services):
+                with self.assertRaises(ProtocolValidationError):
+                    validate_exploration(
+                        _valid_panel(interact=[_target(services=services)])
+                    )
+
+    def test_service_entries_are_exact_and_bounded(self):
+        with self.assertRaises(ProtocolValidationError):
+            validate_exploration(
+                _valid_panel(
+                    interact=[_target(services=_services(entries=[_service_entry(key="Shop")]))]
+                )
+            )
+        with self.assertRaises(ProtocolValidationError):
+            validate_exploration(
+                _valid_panel(
+                    interact=[
+                        _target(
+                            services=_services(
+                                entries=[_service_entry(), _service_entry()]
+                            )
+                        )
+                    ]
+                )
+            )
+        with self.assertRaises(ProtocolValidationError):
+            validate_exploration(
+                _valid_panel(
+                    interact=[
+                        _target(
+                            services=_services(
+                                entries=[
+                                    _service_entry(key="k" * 65),
+                                ]
+                            )
+                        )
+                    ]
+                )
+            )
+        with self.assertRaises(ProtocolValidationError):
+            validate_exploration(
+                _valid_panel(
+                    interact=[
+                        _target(
+                            services=_services(
+                                entries=[
+                                    _service_entry(
+                                        disabled_reason=None, enabled=False
+                                    )
+                                ]
+                            )
+                        )
+                    ]
+                )
+            )
+        with self.assertRaises(ProtocolValidationError):
+            validate_exploration(
+                _valid_panel(
+                    interact=[
+                        _target(
+                            services=_services(
+                                entries=[
+                                    _service_entry(
+                                        disabled_reason={
+                                            "code": "off_anchor",
+                                            "message": "他的服務不在這裡營業。",
+                                        },
+                                        enabled=True,
+                                    )
+                                ]
+                            )
+                        )
+                    ]
+                )
+            )
+        # The exact entry shape: no extra field, all five present.
+        entry = _service_entry()
+        entry["label_extra"] = "x"
+        with self.assertRaises(ProtocolValidationError):
+            validate_exploration(
+                _valid_panel(interact=[_target(services=_services(entries=[entry]))])
+            )
+
+    def test_service_routes_are_exact_discriminated_objects(self):
+        identity = 5
+        valid = [
+            {"kind": "services", "npc_id": identity, "section": "shop"},
+            {"kind": "services", "npc_id": identity, "section": "registration"},
+            {"kind": "services", "npc_id": identity, "section": "board"},
+            {"kind": "services", "npc_id": identity, "section": "report"},
+            {"kind": "services", "npc_id": identity, "section": "rank"},
+            {"kind": "dialogue", "npc_id": identity, "topic_id": "guild_staff.topic_04"},
+            {"kind": "command", "npc_id": identity, "command": "church join"},
+        ]
+        for route in valid:
+            with self.subTest(route=route):
+                normalized = validate_exploration(
+                    _valid_panel(
+                        interact=[
+                            _target(
+                                services=_services(
+                                    entries=[_service_entry(route=route)]
+                                )
+                            )
+                        ]
+                    )
+                )
+                self.assertEqual(
+                    normalized["interact"][0]["services"]["entries"][0]["route"], route
+                )
+        invalid = [
+            # A foreign provider is never the selected target.
+            {"kind": "services", "npc_id": identity + 1, "section": "shop"},
+            {"kind": "services", "npc_id": identity, "section": "counter"},
+            {"kind": "services", "npc_id": identity},
+            {"kind": "services", "npc_id": identity, "section": "shop", "topic_id": "x"},
+            {"kind": "dialogue", "npc_id": identity},
+            {"kind": "dialogue", "npc_id": identity, "topic_id": "t" * 2049},
+            {"kind": "dialogue", "npc_id": identity, "topic_id": "x", "section": "shop"},
+            {"kind": "command", "npc_id": identity, "command": "church pray"},
+            {"kind": "command", "npc_id": identity, "command": "church join", "topic_id": "x"},
+            {"kind": "drawer", "npc_id": identity},
+        ]
+        for route in invalid:
+            with self.subTest(route=route):
+                with self.assertRaises(ProtocolValidationError):
+                    validate_exploration(
+                        _valid_panel(
+                            interact=[
+                                _target(
+                                    services=_services(
+                                        entries=[_service_entry(route=route)]
+                                    )
+                                )
+                            ]
+                        )
+                    )
+
+    def test_dense_services_fail_the_envelope_without_truncation(self):
+        topic = "t" * 2048
+        interact = []
+        for target_index in range(MAX_INTERACT_TARGETS):
+            identity = target_index + 1
+            entries = [
+                _service_entry(
+                    key=f"dialogue.k{entry_index:02d}",
+                    route={
+                        "kind": "dialogue",
+                        "npc_id": identity,
+                        "topic_id": topic,
+                    },
+                )
+                for entry_index in range(16)
+            ]
+            interact.append(
+                _target(
+                    identity=identity,
+                    services={"state": "ready", "entries": entries},
+                )
+            )
+        with self.assertRaises(ExplorationPanelError):
+            validate_exploration(_valid_panel(interact=interact))
 
 
 if __name__ == "__main__":

@@ -91,14 +91,21 @@ MAX_OFFLINE_RESPONSE = 500
 MAX_PHASE_GREETING = 500
 
 #: The capability types a generated package role may declare. A generated role
-#: exists to hold scene narrative and, when it issues a commission, exactly one
-#: scoped issuing authority; trade, guild, reception and place-anchored
-#: services have no authored place in a generated scene.
-GENERATED_CAPABILITY_TYPES = frozenset({"quest_issuer"})
+#: exists to hold scene narrative: when it issues a commission it declares the
+#: scoped issuing authority, and when one of its phases advertises an explicit
+#: dialogue service it declares the service-bound dialogue identity. Trade,
+#: guild, reception and place-anchored services have no authored place in a
+#: generated scene.
+GENERATED_CAPABILITY_TYPES = frozenset({"quest_issuer", "scripted_dialogue"})
 
-#: The optional authored kwargs a generated capability may carry beside its
-#: trusted scoped ``service_id``.
-GENERATED_CAPABILITY_KWARGS = frozenset({"issuer_key"})
+#: The optional authored kwargs each generated capability may carry beside its
+#: trusted scoped ``service_id``. A generated scripted dialogue's
+#: ``dialogue_key`` and a commission issuer's ``issuer_key`` are the two
+#: authored identities; the scoped identity itself is always trusted.
+_GENERATED_CAPABILITY_KWARGS: dict[str, frozenset[str]] = {
+    "quest_issuer": frozenset({"issuer_key"}),
+    "scripted_dialogue": frozenset({"dialogue_key"}),
+}
 
 
 def _reject_package(message: str) -> None:
@@ -178,6 +185,10 @@ class DialoguePhase:
     freeform_situation: str
     freeform_goals: str
     offline_response: str
+    #: The phase's explicit service associations (default none). Each row names
+    #: a topic of THIS phase whose existing deterministic entry it advertises;
+    #: it grants no effect, reading completion, or extra authority.
+    services: tuple[Any, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -290,14 +301,16 @@ def _compile_role_capabilities(
 ) -> tuple[Any, ...]:
     """Compile one role's explicit capability declarations, or reject them.
 
-    A generated role declares at most one capability of the supported
-    vocabulary, person-bound, and its scoped ``service_id`` is the TRUSTED
-    identity ``scene_role:<package_id>:<role_id>`` — the model cannot know the
-    content digest, so an absent value is supplied here and a differing
-    authored one is a rejection. ``issuer_key`` stays an authored value: the
-    commission cross-check requires it to equal the declared content key. The
-    compiled declarations still go through the shared capability core, so the
-    per-type vocabulary and required kwargs have exactly one owner.
+    A generated role declares at most one capability of each supported type,
+    person-bound, and its scoped ``service_id`` is the TRUSTED identity
+    ``scene_role:<package_id>:<role_id>`` — the model cannot know the content
+    digest, so an absent value is supplied here and a differing authored one is
+    a rejection. A service-bound generated dialogue's ``dialogue_key`` is the
+    same trusted scoped identity for the same reason. ``issuer_key`` stays an
+    authored value: the commission cross-check requires it to equal the
+    declared content key. The compiled declarations still go through the shared
+    capability core, so the per-type vocabulary and required kwargs have
+    exactly one owner.
     """
     from world.rules.npc_capabilities import (
         CapabilityValidationError,
@@ -329,7 +342,9 @@ def _compile_role_capabilities(
                 f"generated roles may declare {sorted(GENERATED_CAPABILITY_TYPES)}"
             )
         kwargs = _require_mapping(entry.get("kwargs"), f"{where}.kwargs")
-        unknown_kwargs = set(kwargs) - GENERATED_CAPABILITY_KWARGS - {"service_id"}
+        unknown_kwargs = (
+            set(kwargs) - _GENERATED_CAPABILITY_KWARGS[type_key] - {"service_id"}
+        )
         if unknown_kwargs:
             _reject_package(
                 f"{where}.kwargs declares {sorted(unknown_kwargs)}, which a "
@@ -341,6 +356,20 @@ def _compile_role_capabilities(
                 f"{where}.kwargs service_id {authored_service_id!r} is not the "
                 f"trusted scoped identity {trusted_service_id!r}"
             )
+        authored_values = {
+            key: value for key, value in kwargs.items() if key != "service_id"
+        }
+        if type_key == "scripted_dialogue":
+            authored_dialogue_key = authored_values.get("dialogue_key")
+            if (
+                authored_dialogue_key is not None
+                and authored_dialogue_key != trusted_service_id
+            ):
+                _reject_package(
+                    f"{where}.kwargs dialogue_key {authored_dialogue_key!r} is not "
+                    f"the trusted scoped identity {trusted_service_id!r}"
+                )
+            authored_values["dialogue_key"] = trusted_service_id
         binding = _require_mapping(entry.get("binding"), f"{where}.binding")
         if binding != {"kind": "person"}:
             _reject_package(
@@ -352,7 +381,7 @@ def _compile_role_capabilities(
                 type_key,
                 binding=person_bound(),
                 service_id=trusted_service_id,
-                **{key: value for key, value in kwargs.items() if key != "service_id"},
+                **authored_values,
             )
         )
     try:
@@ -715,16 +744,66 @@ def _validate_topic_effects(
     return tuple(effects)
 
 
+def _validate_generated_services(
+    services: Any,
+    *,
+    where: str,
+    topic_effects: tuple[TopicEffect, ...],
+    role: RoleDefinition,
+) -> None:
+    """Reject a phase whose service associations cannot be executed here.
+
+    A generated source may advertise only a topic this same phase bound an
+    ``offer_commission`` effect to — an informational topic is never a service.
+    The role must carry the service-bound dialogue capability, an
+    effect-bearing association also needs its scoped issuing authority, and the
+    phase's complete native-plus-associated set must fit the entry bound.
+    """
+    from world.rules.npc_services import validate_service_capacity
+    from world.lore.dialogue.services import OFFER_COMMISSION_VERB
+
+    if not services:
+        return
+    capability_types = frozenset(item.type for item in role.capabilities)
+    if "scripted_dialogue" not in capability_types:
+        _reject_package(
+            f"{where} declares service associations but role {role.role_id!r} "
+            "carries no service-bound scripted_dialogue capability"
+        )
+    supported = frozenset(
+        effect.topic_id
+        for effect in topic_effects
+        if effect.verb == OFFER_COMMISSION_VERB
+    )
+    for service in services:
+        if service.topic_id not in supported:
+            _reject_package(
+                f"{where} service {service.key!r} names topic "
+                f"{service.topic_id!r}, which this phase does not bind an "
+                f"{OFFER_COMMISSION_VERB!r} effect to"
+            )
+    if supported and "quest_issuer" not in capability_types:
+        _reject_package(
+            f"{where} advertises an effect-bearing service but role "
+            f"{role.role_id!r} carries no scoped quest_issuer capability"
+        )
+    try:
+        validate_service_capacity(capability_types, len(services))
+    except (TypeError, ValueError) as error:
+        _reject_package(f"{where} {error}")
+
+
 def _parse_generated_phase(
     *,
     where: str,
     identity: GeneratedDialogueIdentity,
     greeting: Any,
     topics_payload: Any,
+    services_payload: Any,
     role_ids: frozenset[str],
     definition_keys: set[str],
-) -> tuple[AuthoredTopic, ...]:
-    """Parse one phase through the one common generated-local codec."""
+) -> tuple[tuple[AuthoredTopic, ...], tuple[Any, ...]]:
+    """Parse one phase (topics and explicit service rows) through the one codec."""
     if not isinstance(topics_payload, list):
         _reject_package(f"{where} topics must be an array")
     if len(topics_payload) > MAX_PHASE_TOPICS:
@@ -734,7 +813,11 @@ def _parse_generated_phase(
 
     try:
         dialogue = parse_dialogue(
-            {"greeting": greeting, "topics": topics_payload},
+            {
+                "greeting": greeting,
+                "topics": topics_payload,
+                "services": services_payload,
+            },
             identity=identity,
             references=static_dialogue_references(),
             package_roles=role_ids,
@@ -745,7 +828,7 @@ def _parse_generated_phase(
     keywords = [topic.keyword for topic in dialogue.topics]
     if len(set(keywords)) != len(keywords):
         _reject_package(f"{where} repeats a topic keyword")
-    return dialogue.topics
+    return dialogue.topics, dialogue.services
 
 
 def _reject_duplicate_local_topic_ids(where: str, topics_payload: list[Any]) -> None:
@@ -824,12 +907,16 @@ def _validate_dialogue(
                 "conditions",
                 "greeting",
                 "topics",
+                "services",
                 "freeform_situation",
                 "freeform_goals",
                 "offline_response",
                 "topic_effects",
             }
-            required_phase_fields = allowed_phase_fields - {"topic_effects"}
+            required_phase_fields = allowed_phase_fields - {
+                "services",
+                "topic_effects",
+            }
             if (
                 not set(phase_entry).issubset(allowed_phase_fields)
                 or not required_phase_fields.issubset(phase_entry)
@@ -892,11 +979,12 @@ def _validate_dialogue(
             )
             identity = GeneratedDialogueIdentity(package_id, role_id, phase_id)
             where = f"role {role_id!r} phase {phase_id!r}"
-            topics = _parse_generated_phase(
+            topics, services = _parse_generated_phase(
                 where=where,
                 identity=identity,
                 greeting=phase_entry["greeting"],
                 topics_payload=phase_entry.get("topics"),
+                services_payload=phase_entry.get("services"),
                 role_ids=role_ids,
                 definition_keys=definition_keys,
             )
@@ -908,6 +996,12 @@ def _validate_dialogue(
                 definition_keys=definition_keys,
                 commission_role_ids=commission_role_ids,
             )
+            _validate_generated_services(
+                services,
+                where=where,
+                topic_effects=topic_effects,
+                role=roles[role_id],
+            )
             phases.append(
                 DialoguePhase(
                     phase_id=phase_id,
@@ -918,6 +1012,7 @@ def _validate_dialogue(
                     freeform_situation=phase_entry.get("freeform_situation") or "",
                     freeform_goals=phase_entry.get("freeform_goals") or "",
                     offline_response=phase_entry["offline_response"],
+                    services=tuple(services),
                 )
             )
         if defaults != 1:
@@ -1375,13 +1470,6 @@ def _validate_package_impl(payload: Any) -> ScenePackageDefinition:
     commission_role_ids = frozenset(
         commission.role_id for commission in commissions
     )
-    for role in roles:
-        if role.capabilities and role.role_id not in commission_role_ids:
-            _reject_package(
-                f"role {role.role_id!r} declares capabilities but issues no "
-                "commission; a generated capability belongs to a commission role"
-            )
-
     definition_keys = {definition_key}
     encounters = _validate_encounters(payload.get("encounters"), role_ids)
     dialogue = _validate_dialogue(
@@ -1392,6 +1480,9 @@ def _validate_package_impl(payload: Any) -> ScenePackageDefinition:
         commission_role_ids=frozenset(
             commission.role_id for commission in commissions
         ),
+    )
+    _validate_role_capability_ownership(
+        roles, dialogue, commission_role_ids=commission_role_ids
     )
     return ScenePackageDefinition(
         package_id=package_id,
@@ -1407,6 +1498,43 @@ def _validate_package_impl(payload: Any) -> ScenePackageDefinition:
         guild_branch=guild_branch,
         quest=quest_core,
     )
+
+
+def _validate_role_capability_ownership(
+    roles: tuple[RoleDefinition, ...],
+    dialogue: tuple[RoleDialogue, ...],
+    *,
+    commission_role_ids: frozenset[str],
+) -> None:
+    """Reject a role whose capabilities it cannot justify.
+
+    A scoped issuing authority belongs to a commission role. A service-bound
+    dialogue identity belongs to a role whose dialogue declares service
+    associations — and a role that declares associations must carry it. A
+    narrative-only role therefore stays unbound.
+    """
+    services_by_role = {
+        entry.role_id: any(phase.services for phase in entry.phases)
+        for entry in dialogue
+    }
+    for role in roles:
+        types = frozenset(item.type for item in role.capabilities)
+        if "quest_issuer" in types and role.role_id not in commission_role_ids:
+            _reject_package(
+                f"role {role.role_id!r} declares a quest_issuer capability but "
+                "issues no commission"
+            )
+        declares_services = services_by_role.get(role.role_id, False)
+        if declares_services and "scripted_dialogue" not in types:
+            _reject_package(
+                f"role {role.role_id!r} declares dialogue service associations "
+                "but carries no service-bound scripted_dialogue capability"
+            )
+        if "scripted_dialogue" in types and not declares_services:
+            _reject_package(
+                f"role {role.role_id!r} carries a service-bound scripted_dialogue "
+                "capability but declares no dialogue service association"
+            )
 
 
 def scene_package_id(canonical: dict[str, Any]) -> str:

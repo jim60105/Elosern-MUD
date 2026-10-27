@@ -1,7 +1,7 @@
 import { h } from "vue";
 import PresenceRail from "../../components/PresenceRail.vue";
 import { ART_PANEL_SAMPLE } from "../fixtures.js";
-import { AFFORDANCES, explorationPanelFixture, presenceArgs } from "../fixtures/scene_overview.js";
+import { AFFORDANCES, serviceFixture, explorationPanelFixture, presenceArgs } from "../fixtures/scene_overview.js";
 
 // The story's face-crop entry. Storybook serves `web/static` only (the built-in
 // fallbacks under `/art/defaults/`), so the SHARED sample's portrait-store URL
@@ -73,8 +73,8 @@ export default {
 
 const HALL = explorationPanelFixture({
   targets: [
-    { identity: 101, name: "碼頭船長", affordances: [AFFORDANCES.talk, AFFORDANCES.trade] },
-    { identity: 12, name: "葛里安‧衛登", affordances: [AFFORDANCES.talk, AFFORDANCES.guild] },
+    { identity: 101, name: "碼頭船長", affordances: [AFFORDANCES.talk], services: serviceFixture(101, "shop", "交易") },
+    { identity: 12, name: "葛里安‧衛登", affordances: [AFFORDANCES.talk], services: serviceFixture(12, "board", "公會服務") },
   ],
   entities: [{ identity: 21, name: "旅人艾拉" }],
   objects: [{ identity: 31, name: "任務板" }],

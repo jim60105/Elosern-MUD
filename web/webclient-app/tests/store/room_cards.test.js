@@ -105,7 +105,7 @@ describe("the room card slice (exploration-room-actions)", () => {
     // directly (no builder rows); the view publishes no wait-row list.
     open();
     expect(store.view.waitRows).toBeUndefined();
-    commit({ exploration: { schema_version: 4, available: false, reason: { code: "scene_lost", message: "暫時不可用。" } } });
+    commit({ exploration: { schema_version: 5, available: false, reason: { code: "scene_lost", message: "暫時不可用。" } } });
     expect(store.openRoomCard("wait")).toBe(false);
     expect(store.view.roomCard).toBeNull();
     commit({ exploration: fx.explorationPanel() });
@@ -143,7 +143,7 @@ describe("the room card slice (exploration-room-actions)", () => {
     expect(store.view.roomCard).toBeNull();
 
     store.openRoomCard("wait");
-    commit({ exploration: { schema_version: 4, available: false, reason: { code: "scene_lost", message: "暫時不可用。" } } });
+    commit({ exploration: { schema_version: 5, available: false, reason: { code: "scene_lost", message: "暫時不可用。" } } });
     expect(store.view.roomCard).toBeNull();
   });
 

@@ -118,7 +118,7 @@
 
 | 指令 | 說明 |
 | --- | --- |
-| [`church join`](/game/command-reference?id=church-join) | 在主祭面前入教（入教／洗禮）。 |
+| [`church join`](/game/command-reference?id=church-join) | 向指定的主祭入教（入教／洗禮）；語法 `church join <npc>`，寫出名字或 `#<編號>`。 |
 | [`church pray`](/game/command-reference?id=church-pray) | 在教會聖所祈禱，花費時間累積恩寵（祈禱）。 |
 | [`church offer`](/game/command-reference?id=church-offer) | 向 NPC 獻上性愛服務，依對方意願獲得恩寵與銅錢。 |
 | [`church redeem`](/game/command-reference?id=church-redeem) | 以恩寵兌換教會敘階（敘階）。 |

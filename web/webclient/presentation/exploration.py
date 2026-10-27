@@ -1,4 +1,4 @@
-"""Exact schema-version-4 ``exploration`` panel and presenter (webclient-exploration-menu).
+"""Exact schema-version-5 ``exploration`` panel and presenter (webclient-exploration-menu).
 
 The presenter serializes a read-only exploration surface from canonical room,
 entity, component, and service data. It is registered beside ``status``,
@@ -14,8 +14,9 @@ present targets, each with exactly the affordances that target legally
 supports), and the ``character``/``quests``/``inventory`` availability entries.
 Affordances use a distinguished shape: an **action** affordance carries a real
 ``action_id`` (``explore.talk_open`` / ``explore.engage``) while a
-**navigation** affordance carries a ``surface`` (``"guild"`` / ``"shop"``) and
-only opens an existing ``services`` submenu.
+**navigation** affordance carries a ``surface`` — the ordinary author editor
+(``npc_persona``) is the only navigation surface a target carries. A target's
+supported services are the separate bounded ``services`` field.
 
 Version 3 folds each conversable host's talk into exactly one 交談 affordance
 naming ``explore.talk_open``, listed before the target's other affordances and
@@ -36,6 +37,15 @@ entry that is absent or cap-dropped, and a ``null`` means the current bounded
 view does not admit the subject at all. The ``art`` panel's own membership, cap
 and face crops are unchanged. Producer and client bundle cut over together
 with no compatibility adapter or data migration.
+
+Version 5 replaces the coarse guild/shop navigation rows with one exact
+target-bound ``services`` field: ``{state, entries}`` where ``state`` is
+``none``, ``ready`` or ``unreadable`` and each entry carries its stable key,
+label, availability with a reason, and the exact route it opens. The field is
+outside the eight general-affordance bound, so service rows can never displace
+the ordinary editor/party controls, and an unreadable projection is a distinct
+state rather than an empty list. The projection itself is
+``world.rules.npc_services.project_npc_services``.
 
 The payload shape and the exact shared bounds (design D10) are mirrored by the
 client validator in ``web/static/webclient/js/elosern/protocol.js`` and guarded
@@ -62,7 +72,6 @@ from web.webclient.presentation.affordances import (
     _is_exit,
     _look_entries,
     _move_entries,
-    _resolve_single_host,
     _target_affordance_entries,
     _traversable,
 )
@@ -91,9 +100,25 @@ from world.rules.map_knowledge import (
     KnowledgeError,
     decode_node,
 )
+from world.rules.npc_services import (
+    MAX_SERVICE_ENTRIES,
+    MAX_SERVICE_KEY_CHARS,
+    MAX_SERVICE_LABEL_CODE_POINTS,
+    MAX_SERVICE_REASON_CODE_CHARS,
+    MAX_SERVICE_REASON_MESSAGE_CODE_POINTS,
+    ROUTE_COMMAND,
+    ROUTE_DIALOGUE,
+    ROUTE_KINDS,
+    ROUTE_SERVICES,
+    SERVICE_SECTIONS,
+    SERVICE_STATES,
+    STATE_READY,
+    STATE_UNREADABLE,
+    project_npc_services,
+)
 from world.rules.service_view import build_services_view
 
-EXPLORATION_SCHEMA_VERSION = 4
+EXPLORATION_SCHEMA_VERSION = 5
 
 # Exact shared bounds (design D10) -- must stay equal in the JS validator.
 MAX_LOOK_ENTITIES = 32
@@ -114,8 +139,9 @@ ACTION_IDS = tuple(
     for code in ACTION_CODE_ALLOWLIST
     if code not in ("explore.talk_scripted", "explore.talk_freeform")
 )
-SURFACES = ("guild", "shop", "npc_persona")
+SURFACES = ("npc_persona",)
 ENTITY_KINDS = ("character", "npc", "monster")
+MAX_TOPIC_ID_CHARS = 2048
 
 
 class ExplorationPanelError(ProtocolValidationError):
@@ -311,7 +337,7 @@ def _validate_interact_target(value: Any) -> dict[str, Any]:
     _require_exact_fields(
         value,
         "interact target",
-        {"identity", "display_name", "portrait_ref", "affordances"},
+        {"identity", "display_name", "portrait_ref", "services", "affordances"},
         {},
     )
     identity = _require_identity(value, "identity")
@@ -319,6 +345,7 @@ def _validate_interact_target(value: Any) -> dict[str, Any]:
     if not display_name.strip():
         raise ProtocolValidationError("target display_name must be non-empty")
     portrait_ref = _validate_portrait_ref(value["portrait_ref"])
+    services = _validate_services(value["services"], identity)
     affordances = value["affordances"]
     if not isinstance(affordances, list) or len(affordances) > MAX_AFFORDANCES:
         raise ProtocolValidationError(
@@ -329,8 +356,124 @@ def _validate_interact_target(value: Any) -> dict[str, Any]:
         "identity": identity,
         "display_name": display_name,
         "portrait_ref": portrait_ref,
+        "services": services,
         "affordances": affordances,
     }
+
+
+def _validate_service_reason(value: Any, enabled: bool) -> dict[str, Any] | None:
+    if value is None:
+        if not enabled:
+            raise ProtocolValidationError(
+                "a disabled service entry requires a disabled_reason"
+            )
+        return None
+    if enabled:
+        raise ProtocolValidationError(
+            "an enabled service entry must not carry a disabled_reason"
+        )
+    _require_exact_fields(value, "service disabled_reason", {"code", "message"}, {})
+    code = _validate_identifier(value["code"], "service disabled_reason code")
+    if len(code) > MAX_SERVICE_REASON_CODE_CHARS:
+        raise ProtocolValidationError("service disabled_reason code exceeds its bound")
+    message = _require_str(
+        value, "message", maximum=MAX_SERVICE_REASON_MESSAGE_CODE_POINTS
+    )
+    if not message.strip():
+        raise ProtocolValidationError(
+            "service disabled_reason message must be non-empty"
+        )
+    return {"code": code, "message": message}
+
+
+def _validate_service_route(value: Any, identity: int) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ProtocolValidationError("service route must be a JSON object")
+    _require_exact_fields(
+        value,
+        "service route",
+        {"kind", "npc_id"},
+        {"section": "conditional", "topic_id": "conditional", "command": "conditional"},
+    )
+    kind = value["kind"]
+    if kind not in ROUTE_KINDS:
+        raise ProtocolValidationError("service route kind is not a stable value")
+    npc_id = value["npc_id"]
+    if isinstance(npc_id, bool) or not isinstance(npc_id, int) or npc_id != identity:
+        raise ProtocolValidationError(
+            "a service route must name the exact selected target"
+        )
+    if kind == ROUTE_SERVICES:
+        section = value.get("section")
+        if section not in SERVICE_SECTIONS:
+            raise ProtocolValidationError("service route section is not a stable value")
+        if "topic_id" in value or "command" in value:
+            raise ProtocolValidationError("a services route carries only its section")
+        return {"kind": kind, "npc_id": npc_id, "section": section}
+    if kind == ROUTE_DIALOGUE:
+        topic_id = value.get("topic_id")
+        if not isinstance(topic_id, str) or not (
+            1 <= len(topic_id) <= MAX_TOPIC_ID_CHARS
+        ):
+            raise ProtocolValidationError(
+                "a dialogue route requires a bounded topic_id"
+            )
+        if "section" in value or "command" in value:
+            raise ProtocolValidationError("a dialogue route carries only its topic_id")
+        return {"kind": kind, "npc_id": npc_id, "topic_id": topic_id}
+    command = value.get("command")
+    if command != "church join":
+        raise ProtocolValidationError("a command route names the one supported command")
+    if "section" in value or "topic_id" in value:
+        raise ProtocolValidationError("a command route carries only its command")
+    return {"kind": kind, "npc_id": npc_id, "command": command}
+
+
+def _validate_service_entry(value: Any, identity: int) -> dict[str, Any]:
+    _require_exact_fields(
+        value,
+        "service entry",
+        {"key", "label", "enabled", "disabled_reason", "route"},
+        {},
+    )
+    key = _validate_identifier(value["key"], "service key")
+    if len(key) > MAX_SERVICE_KEY_CHARS:
+        raise ProtocolValidationError("service key exceeds its bound")
+    label = _require_str(value, "label", maximum=MAX_SERVICE_LABEL_CODE_POINTS)
+    if not label.strip():
+        raise ProtocolValidationError("service label must be non-empty")
+    enabled = _require_bool(value, "enabled")
+    return {
+        "key": key,
+        "label": label,
+        "enabled": enabled,
+        "disabled_reason": _validate_service_reason(value["disabled_reason"], enabled),
+        "route": _validate_service_route(value["route"], identity),
+    }
+
+
+def _validate_services(value: Any, identity: int) -> dict[str, Any]:
+    """Validate one target's exact bounded contextual service information."""
+    _require_exact_fields(value, "services", {"state", "entries"}, {})
+    state = value["state"]
+    if state not in SERVICE_STATES:
+        raise ProtocolValidationError("services state is not a stable value")
+    entries = value["entries"]
+    if not isinstance(entries, list) or len(entries) > MAX_SERVICE_ENTRIES:
+        raise ProtocolValidationError(
+            f"services entries must be a list of at most {MAX_SERVICE_ENTRIES} entries"
+        )
+    entries = [_validate_service_entry(entry, identity) for entry in entries]
+    if state == STATE_READY and not entries:
+        raise ProtocolValidationError("a ready services state requires an entry")
+    if state != STATE_READY and entries:
+        raise ProtocolValidationError(
+            "an empty or unreadable services state carries no entry"
+        )
+    keys = [entry["key"] for entry in entries]
+    if len(set(keys)) != len(keys):
+        raise ProtocolValidationError("service entry keys must be unique")
+    return {"state": state, "entries": entries}
 
 
 def _validate_availability(value: Any, name: str) -> dict[str, Any]:
@@ -589,13 +732,15 @@ def _interact_targets(
     """Serialize bounded present NPC/monster targets from the shared vocabulary.
 
     The per-target affordance rules (party bound/full rules, companion rule,
-    dead-monster engage, exact-local-host navigation) live in the canonical
-    vocabulary; this serializer maps the shared candidates into the exact
-    version-4 descriptor shapes. The single 交談 row is derived from the same
+    dead-monster engage) live in the canonical vocabulary; this serializer maps
+    the shared candidates into the exact version-5 descriptor shapes. The
+    single 交談 row is derived from the same
     ``opens_dialogue`` predicate the ``explore.talk_open`` adapter commits
-    through, so the rendered affordance and the action agree.
+    through, so the rendered affordance and the action agree. Each target's
+    ``services`` field is the derived projection of its own capabilities and
+    explicit dialogue associations; a projection failure degrades to the
+    distinct unreadable state, never to a fabricated or stale row.
     """
-    from typeclasses.components import GuildStaff, Merchant
     from typeclasses.monsters import Monster
     from typeclasses.npcs import NPC
     from world.rules.dialogue import authorized_dialogue_open
@@ -611,10 +756,6 @@ def _interact_targets(
         return []
     resolve = portrait_ref_for or (lambda _entity: None)
     possessed = is_possessed_actor(actor)
-    # Possession omits guild navigation entirely: no opener, no disabled
-    # substitute, and no guild host resolution.
-    guild_host = None if possessed else _resolve_single_host(actor, GuildStaff)
-    shop_host = _resolve_single_host(actor, Merchant)
     candidates = [
         obj
         for obj in location.contents
@@ -628,9 +769,7 @@ def _interact_targets(
     present.sort(key=lambda obj: (int(obj.pk),))
     targets: list[dict[str, Any]] = []
     for obj in present[:MAX_INTERACT_TARGETS]:
-        entries = _target_affordance_entries(
-            obj, actor, guild_host=guild_host, shop_host=shop_host
-        )
+        entries = _target_affordance_entries(obj, actor)
         affordances: list[dict[str, Any]] = []
         if opens_dialogue(obj):
             # One 交談 per conversable host, listed before the vocabulary rows.
@@ -666,17 +805,7 @@ def _interact_targets(
                 }
             )
         for entry in entries:
-            if entry.navigation:
-                affordances.append(
-                    {
-                        "kind": "navigate",
-                        "surface": entry.surface,
-                        "label": entry.label,
-                        "enabled": entry.enabled,
-                        "disabled_reason": _reason_dict(entry),
-                    }
-                )
-            elif entry.action_id in (
+            if entry.action_id in (
                 "explore.deliver",
                 "explore.party_invite",
                 "explore.party_leave",
@@ -729,10 +858,17 @@ def _interact_targets(
                 "identity": int(obj.pk),
                 "display_name": _bounded_display_name(obj),
                 "portrait_ref": resolve(obj),
+                "services": _services_payload(actor, obj),
                 "affordances": affordances[:MAX_AFFORDANCES],
             }
         )
     return targets
+
+
+def _services_payload(actor: Any, obj: Any) -> dict[str, Any]:
+    """Serialize one target's derived services, fail-closed on any failure."""
+    services = project_npc_services(actor, actor, obj)
+    return services.as_dict()
 
 
 def _services_available(actor: Any) -> bool:

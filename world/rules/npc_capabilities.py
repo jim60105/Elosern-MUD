@@ -262,7 +262,16 @@ def _validate_references(type_key: str, kwargs: Mapping[str, Any], path: str, is
     if type_key == "scripted_dialogue":
         table = _loaded_dialogue_table()
         key = kwargs.get("dialogue_key")
-        if table is not None and isinstance(key, str) and key and key not in table:
+        if (
+            table is not None
+            and isinstance(key, str)
+            and key
+            and key not in table
+            # A generated role's scoped identity is validated by the package
+            # owner (which owns the published phases), not by the static
+            # registry.
+            and not _is_generated_dialogue_key(key)
+        ):
             issues.append(
                 f"{path}.kwargs authors dialogue_key {key!r} that the dialogue "
                 "registry does not carry"
@@ -286,6 +295,13 @@ def _validate_references(type_key: str, kwargs: Mapping[str, Any], path: str, is
                     f"{path}.kwargs authors issuer_key {authored!r} outside the "
                     f"issuer-key grammar: {error}"
                 )
+
+
+def _is_generated_dialogue_key(key: str) -> bool:
+    """Whether ``key`` is one trusted generated ``scene_role:<pkg>:<role>``."""
+    from world.rules.dialogue import generated_dialogue_parts
+
+    return generated_dialogue_parts(key) is not None
 
 
 def _loaded_dialogue_table() -> Any | None:
@@ -517,8 +533,47 @@ def _revalidate_plan(plan: CapabilityPlan) -> None:
                 f"{path} component {component.type!r} is place-bound but its anchor "
                 f"room {binding.anchor_room!r} was never resolved"
             )
+    _validate_service_combination(plan, issues)
     if issues:
         raise CapabilityValidationError(issues)
+
+
+def _validate_service_combination(plan: CapabilityPlan, issues: list[str]) -> None:
+    """Reject an oversized or unexecutable complete capability/dialogue set.
+
+    A static dialogue source advertises its explicit service associations on
+    every host that carries it, so the complete plan — not the source alone —
+    must fit the entry bound and must carry the capability that executes each
+    native association. A generated source is validated by its package owner
+    (the phase's own association list is not in the static snapshot).
+    """
+    from world.lore.dialogue import DIALOGUE_SNAPSHOT
+    from world.lore.dialogue.services import required_capability_types
+    from world.rules.npc_services import validate_service_capacity
+
+    dialogue_component = plan.component("scripted_dialogue")
+    dialogue_key = (
+        None
+        if dialogue_component is None
+        else dialogue_component.kwargs.get("dialogue_key")
+    )
+    source = (
+        DIALOGUE_SNAPSHOT.get(dialogue_key)
+        if isinstance(dialogue_key, str) and dialogue_key
+        else None
+    )
+    associated = len(source.services) if source is not None else 0
+    if associated:
+        missing = sorted(required_capability_types(dialogue_key) - plan.type_keys())
+        if missing:
+            issues.append(
+                f"scripted_dialogue {dialogue_key!r} advertises service entries that "
+                f"require capabilities {missing}"
+            )
+    try:
+        validate_service_capacity(plan.type_keys(), associated)
+    except (TypeError, ValueError) as error:
+        issues.append(str(error))
 
 
 __all__ = [

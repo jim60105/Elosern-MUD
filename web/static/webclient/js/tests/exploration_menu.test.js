@@ -4,8 +4,9 @@
  * Runs with Node 24's built-in test runner; no npm packages. Covers the
  * scene-overview footer, the exit and presence-rail builders, the wait
  * submenu, the top navigation bar's entries, a target's verb card rows,
- * disabled-row non-submission, and the navigate-kind service affordance being
- * dock-navigation only (never submitted as an action).
+ * disabled-row non-submission, and the target-bound service rows (schema 5)
+ * being navigation only (they name their exact route and never submit an
+ * action).
  */
 
 "use strict";
@@ -17,10 +18,37 @@ const ExplorationMenu = require("../elosern/exploration_menu.js");
 const Protocol = require("../elosern/protocol.js");
 const { SYNTH_ITEM } = require("./support/synthetic-data.js");
 
-function validPanel(overrides) {
+function serviceEntry(overrides) {
   return Object.assign(
     {
-      schema_version: 4,
+      key: "shop",
+      label: "商店",
+      enabled: true,
+      disabled_reason: null,
+      route: { kind: "services", npc_id: 5, section: "shop" },
+    },
+    overrides || {}
+  );
+}
+
+function servicesNone() {
+  return { state: "none", entries: [] };
+}
+
+// Every interact target in this suite carries the exact services field the
+// schema-5 validator requires; a test that overrides a target keeps that
+// shape unless it supplies its own.
+function withServices(target) {
+  if (!target || target.services) {
+    return target;
+  }
+  return Object.assign({}, target, { services: servicesNone() });
+}
+
+function validPanel(overrides) {
+  const panel = Object.assign(
+    {
+      schema_version: 5,
       available: true,
       kind: "exploration",
       move: [
@@ -42,18 +70,22 @@ function validPanel(overrides) {
           identity: 5,
           display_name: "南門守衛",
           portrait_ref: null,
+          services: {
+            state: "ready",
+            entries: [
+              serviceEntry(),
+              serviceEntry({
+                key: "guild.register",
+                label: "登記成為冒險者",
+                route: { kind: "services", npc_id: 5, section: "registration" },
+              }),
+            ],
+          },
           affordances: [
             {
               kind: "action",
               action_id: "explore.talk_open",
               label: "交談",
-              enabled: true,
-              disabled_reason: null,
-            },
-            {
-              kind: "navigate",
-              surface: "guild",
-              label: "公會服務",
               enabled: true,
               disabled_reason: null,
             },
@@ -66,6 +98,10 @@ function validPanel(overrides) {
     },
     overrides || {}
   );
+  if (Array.isArray(panel.interact)) {
+    panel.interact = panel.interact.map(withServices);
+  }
+  return panel;
 }
 
 test("the navigation builder carries 角色狀態 plus available quests and inventory", () => {
@@ -187,7 +223,7 @@ test("rail target entries name their server-authored affordances", () => {
   assert.equal(person.identity, 5);
   assert.equal(person.enabled, true);
   assert.equal(person.actionId, null, "a target entry opens the verb card and submits nothing");
-  assert.equal(person.summary, "交談／公會服務");
+  assert.equal(person.summary, "交談／商店／登記成為冒險者");
   assert.equal(person.openTarget, undefined, "the openTarget item kind is retired");
 });
 
@@ -208,99 +244,158 @@ test("a target with no affordances still opens its card, and its affordance fram
   assert.equal(empty.actionId, null);
 });
 
-test("the navigate-kind service affordance is dock-navigation only, never an action", () => {
+test("service rows carry their exact server route and are never actions", () => {
   const model = ExplorationMenu.buildMenus(validPanel(), {});
   const target = ExplorationMenu.targetById(model, 5);
   const targetMenu = ExplorationMenu.targetMenuFor(model, target);
-  const service = targetMenu.items.find((item) => item.key === "service-guild");
-  assert.ok(service);
-  assert.equal(service.enabled, true);
-  assert.equal(service.actionId, null);
-  assert.equal(service.payload, null);
-  assert.equal(service.openDrawer, "quest");
-   assert.equal(service.openServiceSubmenu, undefined);
+  const shop = targetMenu.items.find((item) => item.key === "service-shop");
+  assert.ok(shop);
+  assert.equal(shop.enabled, true);
+  assert.equal(shop.actionId, null);
+  assert.equal(shop.payload, null);
+  assert.equal(shop.openDrawer, undefined);
+  assert.equal(shop.openServiceSubmenu, undefined);
+  assert.deepEqual(shop.serviceRoute, {
+    kind: "services",
+    npc_id: 5,
+    section: "shop",
+  });
+  const guild = targetMenu.items.find(
+    (item) => item.key === "service-guild.register"
+  );
+  assert.ok(guild);
+  assert.equal(guild.openDrawer, undefined);
+  assert.equal(guild.serviceSection, "registration");
+  assert.deepEqual(guild.serviceRoute, {
+    kind: "services",
+    npc_id: 5,
+    section: "registration",
+  });
 });
 
-test("shop navigate affordance carries openDrawer: 'shop' and no openServiceSubmenu", () => {
-   const panel = validPanel({
-     interact: [
-       {
-         identity: 7,
-         display_name: "雜貨店老闆",
-         portrait_ref: null,
-         affordances: [
-           {
-             kind: "navigate",
-             surface: "shop",
-             label: "商店",
-             enabled: true,
-             disabled_reason: null,
-           },
-           {
-             kind: "navigate",
-             surface: "shop",
-             label: "打烊的商店",
-             enabled: false,
-             disabled_reason: "店家已打烊",
-           },
-         ],
-       },
-     ],
-});
-   const model = ExplorationMenu.buildMenus(panel, {});
-   const target = ExplorationMenu.targetById(model, 7);
+test("a disabled service row keeps its server reason and submits nothing", () => {
+  const panel = validPanel({
+    interact: [
+      {
+        identity: 7,
+        display_name: "雜貨店老闆",
+        portrait_ref: null,
+        services: {
+          state: "ready",
+          entries: [
+            serviceEntry({
+              key: "shop",
+              route: { kind: "services", npc_id: 7, section: "shop" },
+            }),
+            serviceEntry({
+              key: "guild.exam",
+              label: "參加升階考核",
+              enabled: false,
+              disabled_reason: { code: "schedule_blocked", message: "櫃台休息中。" },
+              route: { kind: "services", npc_id: 7, section: "rank" },
+            }),
+          ],
+        },
+        affordances: [],
+      },
+    ],
+  });
+  assert.doesNotThrow(() => Protocol.validateExplorationPanel(panel));
+  const model = ExplorationMenu.buildMenus(panel, {});
+  const target = ExplorationMenu.targetById(model, 7);
   const targetMenu = ExplorationMenu.targetMenuFor(model, target);
-
-   const shopOpen = targetMenu.items[0];
-   assert.equal(shopOpen.key, "service-shop");
-   assert.equal(shopOpen.label, "商店");
-   assert.equal(shopOpen.enabled, true);
-   assert.equal(shopOpen.actionId, null);
-   assert.equal(shopOpen.payload, null);
-   assert.equal(shopOpen.openDrawer, "shop");
-   assert.equal(shopOpen.openServiceSubmenu, undefined);
-   assert.equal(shopOpen.description, null);
-   assert.equal(shopOpen.disabledReason, null);
-
-   const shopClosed = targetMenu.items[1];
-   assert.equal(shopClosed.enabled, false);
-   assert.equal(shopClosed.openDrawer, "shop");
-   assert.equal(shopClosed.openServiceSubmenu, undefined);
-   assert.equal(shopClosed.disabledReason, "店家已打烊");
+  const disabled = targetMenu.items.find(
+    (item) => item.key === "service-guild.exam"
+  );
+  assert.ok(disabled);
+  assert.equal(disabled.enabled, false);
+  assert.equal(disabled.actionId, null);
+  assert.equal(disabled.payload, null);
+  assert.deepEqual(disabled.disabledReason, {
+    code: "schedule_blocked",
+    message: "櫃台休息中。",
+  });
+  assert.equal(disabled.description, "櫃台休息中。");
 });
 
-test("guild navigate affordance carries openDrawer: 'quest', no openServiceSubmenu, and disabled reason preserved", () => {
+test("dialogue and command service rows carry their handoff and no drawer", () => {
   const panel = validPanel({
     interact: [
       {
         identity: 9,
         display_name: "公會執事",
         portrait_ref: null,
-        affordances: [
-          {
-            kind: "navigate",
-            surface: "guild",
-            label: "公會服務",
-            enabled: false,
-            disabled_reason: "公會整修中",
-          },
-        ],
+        services: {
+          state: "ready",
+          entries: [
+            serviceEntry({
+              key: "dialogue.guild_report_dialogue",
+              label: "交談回報委託",
+              route: {
+                kind: "dialogue",
+                npc_id: 9,
+                topic_id: "guild_staff.topic_04",
+              },
+            }),
+            serviceEntry({
+              key: "church.enroll",
+              label: "入教",
+              route: { kind: "command", npc_id: 9, command: "church join" },
+            }),
+          ],
+        },
+        affordances: [],
       },
     ],
-});
+  });
+  assert.doesNotThrow(() => Protocol.validateExplorationPanel(panel));
   const model = ExplorationMenu.buildMenus(panel, {});
   const target = ExplorationMenu.targetById(model, 9);
-  const targetMenu = ExplorationMenu.targetMenuFor(model, target);
-  const row = targetMenu.items[0];
-  assert.equal(row.key, "service-guild");
-  assert.equal(row.label, "公會服務");
-  assert.equal(row.enabled, false);
-  assert.equal(row.actionId, null);
-  assert.equal(row.payload, null);
-  assert.equal(row.openDrawer, "quest");
-  assert.equal(row.openServiceSubmenu, undefined);
-  assert.equal(row.description, null);
-  assert.equal(row.disabledReason, "公會整修中");
+  const rows = ExplorationMenu.targetMenuFor(model, target).items;
+  const dialogue = rows.find(
+    (item) => item.key === "service-dialogue.guild_report_dialogue"
+  );
+  assert.deepEqual(dialogue.dialogueRoute, {
+    npcId: 9,
+    topicId: "guild_staff.topic_04",
+  });
+  assert.equal(dialogue.openDrawer, undefined);
+  const command = rows.find((item) => item.key === "service-church.enroll");
+  assert.equal(command.commandPrefill, "church join #9");
+  assert.equal(command.openDrawer, undefined);
+});
+
+test("an unreadable service projection keeps one disabled sentence row", () => {
+  const panel = validPanel({
+    interact: [
+      {
+        identity: 11,
+        display_name: "沉默的祭司",
+        portrait_ref: null,
+        services: { state: "unreadable", entries: [] },
+        affordances: [],
+      },
+    ],
+  });
+  assert.doesNotThrow(() => Protocol.validateExplorationPanel(panel));
+  const model = ExplorationMenu.buildMenus(panel, {});
+  const target = ExplorationMenu.targetById(model, 11);
+  const rows = ExplorationMenu.targetMenuFor(model, target).items;
+  const unreadable = rows.find((item) => item.key === "services-unreadable");
+  assert.ok(unreadable);
+  assert.equal(unreadable.enabled, false);
+  assert.equal(unreadable.label, "服務資訊暫時無法讀取。");
+  assert.equal(unreadable.actionId, null);
+});
+
+test("a target with no services adds no service row", () => {
+  const model = ExplorationMenu.buildMenus(validPanel(), {});
+  const target = ExplorationMenu.targetById(model, 8);
+  const rows = ExplorationMenu.targetMenuFor(model, target).items;
+  assert.deepEqual(
+    rows.filter((item) => String(item.key).startsWith("service-")),
+    []
+  );
 });
 
 test("no exploration menu item carries openServiceSubmenu", () => {
@@ -744,9 +839,9 @@ test("verbMenuFor keeps payload order and appends 查看 then back", () => {
   const menu = ExplorationMenu.verbMenuFor(model, panel.interact[0]);
   assert.deepEqual(
     menu.items.map((item) => item.key),
-    ["talk-open", "service-guild", "look-target", "back"]
+    ["talk-open", "service-shop", "service-guild.register", "look-target", "back"]
   );
-  const look = menu.items[2];
+  const look = menu.items[3];
   assert.equal(look.label, "查看");
   assert.equal(look.actionId, "explore.look");
   assert.deepEqual(look.payload, { target_id: 5 });

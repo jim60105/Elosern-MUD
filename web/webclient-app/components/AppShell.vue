@@ -157,6 +157,10 @@ const props = defineProps({
   // the committed exploration panel's exit labels and interact-target display
   // names, forwarded untouched to the command line.
   completionCandidates: { type: Array, default: () => [] },
+  // The contextual service command route's pre-fill (`{ seq, text }`), forwarded
+  // untouched: the field takes the text, and the store's drawer request focuses
+  // it. Nothing is submitted.
+  commandPrefill: { type: Object, default: null },
   // MC5 (multichar-05-topbar-switcher-ui): committed account roster read model
   rosterAvailable: { type: Boolean, default: false },
   rosterCharacters: { type: Array, default: () => [] },
@@ -600,6 +604,7 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMe
           :accepting="props.commandAccepts"
           :text-to-html="props.textToHtml"
           :completion-candidates="props.completionCandidates"
+          :prefill="props.commandPrefill"
           @submit="onSubmit"
           @sent="releaseCommandField(true)"
           @focus-parent="releaseCommandField(true)"

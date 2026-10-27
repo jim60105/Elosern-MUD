@@ -36,6 +36,17 @@ describe("CommandLine (H5, webclient-hud-05-overlays-and-command-line)", () => {
     expect(w.findAll("[aria-expanded]").length).toBe(0);
   });
 
+  it("prefills an exact provider without sending until explicit submission", async () => {
+    const w = mountLine();
+    await w.setProps({ prefill: { seq: 1, text: "church join #73" } });
+    const input = w.get("textarea#inputfield");
+    expect(input.element.value).toBe("church join #73");
+    expect(w.emitted("submit")).toBeUndefined();
+    pressKey(input.element, "Enter");
+    await w.vm.$nextTick();
+    expect(w.emitted("submit")).toEqual([["church join #73"]]);
+  });
+
   it("sends exactly one command on Enter, emits sent, and clears the field", async () => {
     const w = mountLine();
     const input = w.get("textarea#inputfield");

@@ -208,12 +208,70 @@ class ReportableQuestSummaryTests(DialogueTurnInRegistryIsolation, EvenniaTestCa
         self.assertIsNone(reportable_quest_summary(talker, self.staff))
 
     @covers_requirement("guild-quest-board::player-facing-guild-commands-resolve-one-local-service-host")
-    def test_ambiguous_staff_yields_the_rejection_line(self):
+    def test_another_staff_member_does_not_obscure_the_selected_report_host(self):
         second = create_object(NPC, key="second clerk", location=self.hall)
         _attach_staff(second, service_id="second")
         self.assertEqual(
-            reportable_quest_summary(self.player, self.staff), _NO_STAFF_LINE
+            reportable_quest_summary(self.player, self.staff), _NOTHING_LINE
         )
+
+    def test_native_service_opening_and_selection_list_without_settlement_or_receipt(self):
+        from typeclasses.components import ScriptedDialogue
+        from world.lore.dialogue.services import GUILD_STAFF_DIALOGUE_KEY, GUILD_STAFF_TURNIN_KEYWORD
+        from world.lore.dialogue.shape import AuthoredDialogue, AuthoredTopic, DialogueService
+        from world.lore.scenes import Scene, Speech
+        from world.rules.dialogue import live_dialogue_session, select_authored_topic
+        from web.webclient.actions.exploration_actions import _talk_open_adapter
+
+        definition = register(quest("report_service", stages=(QuestStage(0, defeat()),)))
+        register_guild_offer(_offer(definition.key))
+        quest_id = self._complete(definition.key)
+        topic_id = f"{GUILD_STAFF_DIALOGUE_KEY}.topic_04"
+        source = AuthoredDialogue(
+            greeting="歡迎。",
+            topics=(AuthoredTopic(
+                topic_id=topic_id, keyword=GUILD_STAFF_TURNIN_KEYWORD,
+                label="回報", fallback=Scene("t_report", "r1", (
+                    Speech(speaker="actor", text="有什麼工作？"),
+                    Speech(speaker="host", text="先登記。"),
+                )),
+            ),),
+            services=(DialogueService("report", topic_id, "回報"),),
+        )
+        scripted = ScriptedDialogue.create(
+            self.staff, dialogue_key=GUILD_STAFF_DIALOGUE_KEY,
+        )
+        scripted.service_binding = "person"
+        self.staff.components.add(scripted)
+        second = create_object(NPC, key="second", location=self.hall)
+        _attach_staff(second, service_id="second")
+        before = read_records(self.player)
+        with patch("world.rules.dialogue.DIALOGUE_TABLE", {GUILD_STAFF_DIALOGUE_KEY: source}):
+            result = _talk_open_adapter(self.player, {"npc_id": self.staff.pk})
+            self.assertEqual(result["outcome"], "success")
+            session = live_dialogue_session(self.player)
+            self.assertEqual(session.completion_receipts, ())
+            self.assertEqual(read_records(self.player), before)
+            delivery = select_authored_topic(
+                self.player, self.staff, topic_id, selection_id="report-service",
+                expected_context_id=session.context_id,
+            )
+            from world.rules.dialogue_context import DialogueContextError
+
+            scripted.service_binding = "place"
+            scripted.anchor_room_id = create_object(Room, key="other anchor").pk
+            prior = self.player.db.dialogue_session
+            with self.assertRaises(DialogueContextError):
+                select_authored_topic(
+                    self.player, self.staff, topic_id, selection_id="rebound-report",
+                    expected_context_id=session.context_id,
+                )
+            self.assertEqual(self.player.db.dialogue_session, prior)
+        self.assertEqual(delivery.kind, "service")
+        self.assertIn(quest_id, "\n".join(line.text for line in delivery.lines))
+        self.assertEqual(read_records(self.player), before)
+        self.assertEqual(parse_reward_claims(self.player), [])
+        self.assertEqual(live_dialogue_session(self.player).completion_receipts, ())
 
     @covers_requirement("guild-quest-board::player-facing-guild-commands-resolve-one-local-service-host")
     def test_talked_to_npc_must_be_the_resolved_host(self):
@@ -223,16 +281,14 @@ class ReportableQuestSummaryTests(DialogueTurnInRegistryIsolation, EvenniaTestCa
         )
 
     @covers_requirement("guild-quest-board::player-facing-guild-commands-resolve-one-local-service-host")
-    def test_unregistered_player_still_hits_the_ambiguous_host_rule(self):
+    def test_unregistered_player_uses_the_selected_hosts_registration_guidance(self):
         second = create_object(NPC, key="second clerk", location=self.hall)
         _attach_staff(second, service_id="second")
         other = create_object(PlayerCharacter, key="unregistered")
         other.race = "human"
         other.apply_race_baseline()
         other.location = self.hall
-        self.assertEqual(
-            reportable_quest_summary(other, self.staff), _NO_STAFF_LINE
-        )
+        self.assertIsNone(reportable_quest_summary(other, self.staff))
 
 
 class DialogueTurnInTests(DialogueTurnInRegistryIsolation, EvenniaTestCase):

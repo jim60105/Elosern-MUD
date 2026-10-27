@@ -264,6 +264,53 @@
   // Target affordance menus.
   // -------------------------------------------------------------------------
 
+  // The distinct unreadable copy (design §8.2): service information that could
+  // not be projected is NOT an empty list, so it keeps one disabled row whose
+  // text says so instead of silently disappearing.
+  var SERVICES_UNREADABLE = "服務資訊暫時無法讀取。";
+
+  // One contextual service entry as a flat card row (npc-contextual-service-
+  // projection; U later groups these rows). The row carries the server-authored
+  // route verbatim; the store consumes it and the renderer never parses a
+  // label. The route retains the provider through every consumer.
+  function serviceItem(entry) {
+    var route = entry && entry.route ? entry.route : null;
+    var reason = (entry && entry.disabled_reason) || null;
+    var item = {
+      key: "service-" + (entry && entry.key ? entry.key : "unknown"),
+      label: (entry && entry.label) || "",
+      enabled: !!(entry && entry.enabled),
+      actionId: null,
+      payload: null,
+      description: entry && entry.enabled ? null : (reason && reason.message) || null,
+      disabledReason: reason,
+      serviceRoute: route,
+    };
+    if (route && route.kind === "services") {
+      item.serviceSection = route.section;
+    } else if (route && route.kind === "dialogue") {
+      item.dialogueRoute = { npcId: route.npc_id, topicId: route.topic_id };
+    } else if (route && route.kind === "command") {
+      // Pre-fill only: the text command's explicit target is the selected
+      // provider's exact identity; the store never submits it.
+      item.commandPrefill = route.command + " #" + route.npc_id;
+    }
+    return item;
+  }
+
+  function serviceItems(target) {
+    var services = target && target.services;
+    if (!services || services.state === "none") {
+      return [];
+    }
+    if (services.state === "unreadable") {
+      return [
+        disabledItem("services-unreadable", SERVICES_UNREADABLE, SERVICES_UNREADABLE),
+      ];
+    }
+    return (services.entries || []).map(serviceItem);
+  }
+
   function targetMenuFor(model, target) {
     var affordances = (target && target.affordances) || [];
     var items = [];
@@ -367,16 +414,13 @@
           }
         }
       } else if (affordance.kind === "navigate") {
-        // A navigate-kind service affordance is dock-navigation only; it is
-        // never submitted as an action and never carries an action_id.
-        // Both guild and shop surfaces open client-local frameless drawers
-        // (openDrawer: "quest" | "shop", the 背包 precedent), leaving the
-        // router's frame stack untouched.
+        // Only the ordinary author editor remains a navigation affordance
+        // (npc-persona-editor-window D1): a client-local window bound BY VALUE
+        // to this target's identity. It never pushes a router frame; a
+        // disabled entry opens nothing and carries the server-authored reason
+        // as its explanation. Supported services are the target's separate
+        // `services` field below, never a coarse surface opener.
         if (affordance.surface === "npc_persona") {
-          // The author editor (npc-persona-editor-window D1): a client-local
-          // window bound BY VALUE to this target's identity. It never pushes a
-          // router frame; a disabled entry opens nothing and carries the
-          // server-authored reason as its explanation.
           items.push({
             key: "service-npc_persona",
             label: affordance.label || "編輯人物設定",
@@ -389,23 +433,10 @@
               : (affordance.disabled_reason && affordance.disabled_reason.message) || null,
             disabledReason: affordance.disabled_reason || null,
           });
-          return;
         }
-        var drawerMap = { guild: "quest", shop: "shop" };
-        var drawerName = drawerMap[affordance.surface] || affordance.surface;
-        var labelFallback = affordance.surface === "guild" ? "公會服務" : "商店";
-        items.push({
-          key: "service-" + affordance.surface,
-          label: affordance.label || labelFallback,
-          enabled: !!affordance.enabled,
-          actionId: null,
-          payload: null,
-          openDrawer: drawerName,
-          description: null,
-          disabledReason: affordance.disabled_reason || null,
-        });
       }
     });
+    items = items.concat(serviceItems(target));
      if (items.length === 0) {
        items.push(disabledItem("target-empty", "此對象沒有可用的互動。", null));
      }

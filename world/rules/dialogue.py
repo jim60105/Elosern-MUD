@@ -48,11 +48,16 @@ from world.lore.scenes import Narration, Scene, Speech, scene_canonical_bytes
 from typeclasses.components import ScriptedDialogue
 
 from world.lore.dialogue import DIALOGUE_ROWS
+from world.lore.dialogue.services import (
+    GUILD_STAFF_DIALOGUE_KEY,
+    GUILD_STAFF_TURNIN_KEYWORD,
+)
 from world.lore.dialogue.shape import DialogueDefinition, KeywordResponse
 from world.observability import log_error, log_info
 
-GUILD_STAFF_DIALOGUE_KEY = "guild_staff"
-GUILD_STAFF_TURNIN_KEYWORD = "回報"
+#: The guild counter's dialogue key and deterministic report keyword are owned
+#: by the dialogue-service association contract (``world.lore.dialogue.
+#: services``) and re-exported here for every historical import path.
 
 # A generated story role's dialogue identity names its package and role, e.g.
 # ``scene_role:pkg_ab12:mother``. The shared resolver reads the role's current
@@ -1349,6 +1354,16 @@ def _select_authored_topic(
     row = projected.get(matched_topic.topic_id)
     if row is None:
         raise TopicNotFoundError("unknown_topic", "對方不明白這個話題。")
+    associated_service = any(
+        service.topic_id == matched_topic.topic_id for service in source.dialogue.services
+    )
+    if associated_service:
+        from world.rules.dialogue_context import DialogueContextError
+        from world.rules.service_gate import service_available
+
+        component = host.components.get(ScriptedDialogue.get_component_slot())
+        if not service_available(actor, host, component).allowed:
+            raise DialogueContextError("service_unavailable")
     if row.availability == TOPIC_LOCKED:
         # A visibly locked topic stays selectable and plays its authored
         # refusal; it grants no effect and never exposes the formal body.
@@ -1357,6 +1372,33 @@ def _select_authored_topic(
     else:
         kind = "formal"
         scene = select_scene_variant(matched_topic, context)
+    # Explicit native associations deliver the existing deterministic read,
+    # rather than awarding a formal reading receipt for explanatory prose.
+    from world.lore.dialogue.services import native_supported_topic_ids
+
+    dialogue_key = getattr(context.source_identity, "dialogue_key", "")
+    if (
+        kind == "formal"
+        and matched_topic.topic_id in native_supported_topic_ids(dialogue_key, source.dialogue)
+        and associated_service
+    ):
+        from typeclasses.components import GuildStaff
+        from world.rules.dialogue_context import DialogueContextError
+        from world.rules.guild import reportable_quest_summary
+        from world.rules.service_targets import ServiceTargetError, require_service_target
+
+        try:
+            require_service_target(actor, int(host.pk), GuildStaff)
+        except ServiceTargetError as error:
+            raise DialogueContextError("service_unavailable") from error
+        summary = reportable_quest_summary(actor, host)
+        kind = "service"
+        if summary is not None:
+            scene = Scene(
+                scene_id=scene.scene_id,
+                revision=scene.revision,
+                lines=tuple(Speech(speaker="host", text=line) for line in summary.splitlines()),
+            )
     # A declared effect is settled only for a formal, qualified selection. Its
     # authorization is rechecked inside the settlement transaction, so the
     # delivered kind can still fall back to the author's safe refusal.

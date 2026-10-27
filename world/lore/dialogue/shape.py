@@ -27,9 +27,16 @@ MAX_STATIC_TOPIC_ID_CHARS = 96
 MAX_VARIANTS_PER_TOPIC = 8
 MAX_PREDECESSORS_PER_TOPIC = 16
 MAX_TOPICS_PER_DIALOGUE = 16
+MAX_SERVICE_ASSOCIATIONS = 16
+#: An association key keeps its ``dialogue.`` route prefix inside the 64
+#: character service-entry key bound.
+MAX_SERVICE_KEY_CHARS = 55
+MAX_SERVICE_LABEL_CODE_POINTS = 64
+MAX_SERVICE_TOPIC_ID_CHARS = 2048
 
 VARIANT_ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,31}\Z")
 STATIC_SUFFIX_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,31}\Z")
+SERVICE_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,54}\Z")
 
 
 @dataclass(frozen=True)
@@ -155,11 +162,55 @@ class AuthoredTopic:
 
 
 @dataclass(frozen=True)
+class DialogueService:
+    """One explicit source association from a dialogue to a service entry.
+
+    The row is authored data, never inferred: it names a stable semantic key,
+    the complete topic identity of the same source/phase whose existing
+    deterministic entry it advertises, and the player-facing label. It grants
+    no effect, reading completion, or additional authority at projection or
+    open time.
+    """
+
+    key: str
+    topic_id: str
+    label: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.key, str) or not SERVICE_KEY_PATTERN.match(self.key):
+            raise ValueError(
+                "DialogueService key must match "
+                f"[a-z][a-z0-9_]{{0,{MAX_SERVICE_KEY_CHARS - 1}}}"
+            )
+        if (
+            not isinstance(self.topic_id, str)
+            or not self.topic_id
+            or len(self.topic_id) > MAX_SERVICE_TOPIC_ID_CHARS
+        ):
+            raise ValueError(
+                "DialogueService topic_id must be a non-empty string of at most "
+                f"{MAX_SERVICE_TOPIC_ID_CHARS} characters"
+            )
+        if (
+            not isinstance(self.label, str)
+            or not (1 <= len(self.label) <= MAX_SERVICE_LABEL_CODE_POINTS)
+        ):
+            raise ValueError(
+                "DialogueService label must be a string of 1.."
+                f"{MAX_SERVICE_LABEL_CODE_POINTS} code points"
+            )
+
+
+@dataclass(frozen=True)
 class AuthoredDialogue:
-    """An immutable dialogue definition: an optional greeting plus authored topics."""
+    """An immutable dialogue definition: a greeting, topics, and source services."""
 
     greeting: str | None
     topics: tuple[AuthoredTopic, ...]
+    #: The explicit service associations this source advertises (default none):
+    #: ordinary narrative dialogue carries no service and stays exactly as it
+    #: was.
+    services: tuple[DialogueService, ...] = ()
 
     def __post_init__(self) -> None:
         if self.greeting is not None and not isinstance(self.greeting, str):
@@ -177,6 +228,35 @@ class AuthoredDialogue:
             if t.topic_id in topic_ids:
                 raise ValueError(f"Duplicate topic_id {t.topic_id!r} in AuthoredDialogue")
             topic_ids.add(t.topic_id)
+        if not isinstance(self.services, tuple):
+            raise TypeError("AuthoredDialogue services must be a tuple of DialogueService")
+        if len(self.services) > MAX_SERVICE_ASSOCIATIONS:
+            raise ValueError(
+                "AuthoredDialogue cannot exceed "
+                f"{MAX_SERVICE_ASSOCIATIONS} service associations, got {len(self.services)}"
+            )
+        service_keys: set[str] = set()
+        service_topics: set[str] = set()
+        for service in self.services:
+            if not isinstance(service, DialogueService):
+                raise TypeError(
+                    f"Service item must be DialogueService, got {type(service)!r}"
+                )
+            if service.key in service_keys:
+                raise ValueError(
+                    f"Duplicate service key {service.key!r} in AuthoredDialogue"
+                )
+            if service.topic_id in service_topics:
+                raise ValueError(
+                    f"Duplicate service topic {service.topic_id!r} in AuthoredDialogue"
+                )
+            if service.topic_id not in topic_ids:
+                raise ValueError(
+                    f"Service {service.key!r} names topic {service.topic_id!r} "
+                    "outside this dialogue source"
+                )
+            service_keys.add(service.key)
+            service_topics.add(service.topic_id)
 
     @property
     def responses(self) -> tuple[KeywordResponse, ...]:

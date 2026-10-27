@@ -23,6 +23,11 @@ from yaml.scanner import ScannerError
 
 from world.lore.dialogue.codec import StaticDialogueIdentity, parse_dialogue
 from world.lore.dialogue.conditions import DialogueReferences
+from world.lore.dialogue.services import (
+    DialogueServiceError,
+    native_supported_topic_ids,
+    validate_service_associations,
+)
 from world.lore.dialogue.shape import AuthoredDialogue
 
 MAX_DIALOGUE_FILE_BYTES = 262144  # 256 KiB
@@ -301,6 +306,21 @@ def load_dialogue_snapshot(
         try:
             identity = StaticDialogueIdentity(profile_key=stem, dialogue_key=diag_key)
             authored = parse_dialogue(payload, identity=identity, references=references)
+            # The source's service associations must name one of its own native
+            # supported deterministic entries; an unsupported association
+            # rejects the whole candidate before publication.
+            validate_service_associations(
+                authored,
+                dialogue_key=diag_key,
+                supported_topic_ids=native_supported_topic_ids(diag_key, authored),
+            )
+        except DialogueServiceError as exc:
+            raise DialogueSourceError(
+                f"Dialogue service association failed for {path.name!r} ({diag_key}): {exc}",
+                path=path,
+                profile_key=stem,
+                dialogue_key=diag_key,
+            ) from exc
         except (ValueError, TypeError) as exc:
             raise DialogueSourceError(
                 f"Dialogue validation failed for {path.name!r} ({diag_key}): {exc}",
