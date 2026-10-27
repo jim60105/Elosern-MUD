@@ -87,6 +87,13 @@ class synthetic_registries(ContextDecorator):
         stack = ExitStack()
         self._open = True
         try:
+            # The map-owned geography is validated against the shipped
+            # catalogs, so a synthetic scope must establish the real baseline
+            # before any catalog is swapped.
+            from world.maps import geography as geography_module
+
+            if not geography_module.is_published():
+                geography_module.publish(geography_module.load_geography())
             _resolve_import_time_derivations(self._logicals)
             for logical in _dependency_order(self._logicals):
                 if logical in GEOGRAPHY_TARGETS:
@@ -229,8 +236,6 @@ def _apply_geography(
         return
     from world.maps import geography as geography_module
 
-    if not geography_module.is_published():
-        geography_module.publish(geography_module.load_geography())
     previous = geography_module.current()
     overrides = {}
     for logical in selected:

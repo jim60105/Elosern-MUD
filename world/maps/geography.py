@@ -297,14 +297,15 @@ def _validate_game_joins(
     regions = set(snapshot.regions)
     anchors = snapshot.anchors
     for key, nation in sorted(NATION_REGISTRY.items()):
-        anchor = anchors.get(nation.capital_anchor_key)
+        capital_key = getattr(nation, "capital_anchor_key", None)
+        anchor = anchors.get(capital_key)
         if anchor is None:
             problems.append(
-                f"nation {key!r} capital anchor {nation.capital_anchor_key!r} joins no location"
+                f"nation {key!r} capital anchor {capital_key!r} joins no location"
             )
         elif anchor.kind is not AnchorKind.CAPITAL:
             problems.append(
-                f"nation {key!r} capital anchor {nation.capital_anchor_key!r} is not a capital"
+                f"nation {key!r} capital anchor {capital_key!r} is not a capital"
             )
     for key in sorted(SETTLEMENT_REGISTRY):
         if key not in anchors:
@@ -313,29 +314,30 @@ def _validate_game_joins(
         if key not in anchors:
             problems.append(f"anchor placement {key!r} joins no geographic location")
     for key, entry in sorted(WILDERNESS_ENTRY_REGISTRY.items()):
-        if entry.anchor_key not in anchors:
+        if getattr(entry, "anchor_key", None) not in anchors:
             problems.append(
                 f"wilderness entry {key!r} joins no geographic location "
                 f"({entry.anchor_key!r})"
             )
     for key, district in sorted(MAP_DISTRICT_REGISTRY.items()):
-        if district.region_key is not None and district.region_key not in regions:
+        region_key = getattr(district, "region_key", None)
+        if region_key is not None and region_key not in regions:
             problems.append(
-                f"district {key!r} names unknown terrain region {district.region_key!r}"
+                f"district {key!r} names unknown terrain region {region_key!r}"
             )
     for key, species in sorted(MONSTER_SPECIES_REGISTRY.items()):
-        for tag in species.habitat_tags:
+        for tag in getattr(species, "habitat_tags", ()):
             if tag not in regions:
                 problems.append(
                     f"monster species {key!r} habitat tag {tag!r} is not a terrain region"
                 )
     for key, rule in sorted(AMBIENT_PLACEMENT_REGISTRY.items()):
-        if rule.region_key not in regions:
+        if getattr(rule, "region_key", None) not in regions:
             problems.append(
                 f"ambient placement {key!r} names unknown terrain region {rule.region_key!r}"
             )
     for key, site in sorted(MONSTER_SITE_REGISTRY.items()):
-        if site.region_key not in regions:
+        if getattr(site, "region_key", None) not in regions:
             problems.append(
                 f"monster site {key!r} names unknown terrain region {site.region_key!r}"
             )

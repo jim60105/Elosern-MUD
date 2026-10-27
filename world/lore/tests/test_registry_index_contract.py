@@ -30,6 +30,11 @@ from world.lore.registry_index import (
     check_references,
     declaration_errors,
 )
+from world.tests.geography_fixture import publish_shipped_geography
+
+
+def setUpModule():
+    publish_shipped_geography()
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -136,13 +141,14 @@ class RegistryInventoryContractTest(unittest.TestCase):
 
     @covers_requirement("authored-registry-references::explicit-complete-lazy-registry-inventory")
     def test_every_startup_sync_registry_and_named_category_is_indexed(self):
-        from world.lore.sync import _ALL_REGISTRIES
+        from world.lore.sync import _ALL_REGISTRIES, geography_registries
 
+        mirrored = {**_ALL_REGISTRIES, **geography_registries()}
         names = {spec.name for spec in REGISTRY_INDEX}
-        self.assertEqual(len(_ALL_REGISTRIES), 21)
-        self.assertLessEqual(set(_ALL_REGISTRIES), names)
+        self.assertEqual(len(mirrored), 21)
+        self.assertLessEqual(set(mirrored), names)
         self.assertLessEqual(ADDITIONAL_CATEGORIES, names)
-        for category, registry in _ALL_REGISTRIES.items():
+        for category, registry in mirrored.items():
             with self.subTest(registry=category):
                 self.assertEqual(dict(self.loaded[category]), dict(registry))
 
