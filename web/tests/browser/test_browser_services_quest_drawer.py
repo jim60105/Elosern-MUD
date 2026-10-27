@@ -210,8 +210,9 @@ class KeyboardServiceDrawerJourneys(ServicesBrowserTest):
             page.evaluate("() => window.__elosernBridge.router.trail()"), trail_before
         )
 
-        # The emitted payload is unchanged: the exact server-authored
-        # guild.register action with an empty payload.
+        # The emitted payload names the exact provider (services v8,
+        # npc-targeted-service-flows): guild.register carries the selected
+        # clerk's identity and nothing else.
         sent = page.evaluate("window.__elosernSent || []")
         registers = [
             args[0]
@@ -219,7 +220,9 @@ class KeyboardServiceDrawerJourneys(ServicesBrowserTest):
             if cmd == "ui_action" and args[0]["action_id"] == "guild.register"
         ]
         self.assertEqual(len(registers), 1)
-        self.assertEqual(registers[0]["payload"], {})
+        self.assertEqual(
+            registers[0]["payload"], {"npc_id": panel["guild"]["provider_id"]}
+        )
 
 
 class ServicesUnavailableJourney(ServicesBrowserTest):

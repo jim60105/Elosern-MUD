@@ -176,9 +176,14 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                         if (route.kind !== 'services' || !entry.enabled) {
                             continue;
                         }
+                        // The shop surface opens the merchant's shop section;
+                        // the guild surface opens a guild counter section
+                        // (registration/board/report) — never the independent
+                        // rank request or a dialogue association, whose
+                        // providers carry no guild section at all.
                         const matches = surface === 'shop'
                             ? route.section === 'shop'
-                            : route.section !== 'shop';
+                            : ['registration', 'board', 'report'].indexOf(route.section) !== -1;
                         if (matches) {
                             return { target: 'target-' + target.identity,
                                      key: 'service-' + entry.key };

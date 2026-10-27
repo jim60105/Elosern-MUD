@@ -138,7 +138,16 @@ class GuildBoardJourneys(ServicesBrowserTest):
             for cmd, args, _kw in sent
             if cmd == "ui_action" and args[0]["action_id"] == "guild.quest_accept"
         )
-        self.assertEqual(payload, {"definition_key": guild_offer_quest_key()})
+        # guild.quest_accept names its exact provider (services v8,
+        # npc-targeted-service-flows): the board was read from the clerk whose
+        # identity the commit revalidates.
+        self.assertEqual(
+            payload,
+            {
+                "definition_key": guild_offer_quest_key(),
+                "npc_id": panel["guild"]["provider_id"],
+            },
+        )
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
 
