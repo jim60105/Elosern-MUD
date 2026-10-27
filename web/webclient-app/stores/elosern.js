@@ -247,6 +247,7 @@ export const useElosernStore = defineStore("elosern", () => {
     // return-to-origin (slice U).
     acknowledgePresenceMapping: ctx.acknowledgePresenceMapping,
     claimPresenceServiceOrigin: ctx.claimPresenceServiceOrigin,
+    presenceServiceOriginValid: ctx.presenceServiceOriginValid,
     // The place card's room actions and the client-local room cards
     // (exploration-room-actions).
     activateRoomLook: ctx.activateRoomLook,

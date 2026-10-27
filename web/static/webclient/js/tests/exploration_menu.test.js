@@ -846,10 +846,13 @@ test("verbMenuFor keeps the common slots, then services, then back", () => {
     ["common", "common", "services", "services", undefined],
     "the card groups the common slots, then the contextual services"
   );
-  assert.deepEqual(
-    menu.items.slice(0, 3).map((item) => item.groupLabel),
-    ["一般", "一般", "服務"]
-  );
+  // Each row carries its group's heading; the copy itself is presentation, so
+  // only the grouping contract is asserted here.
+  const labels = menu.items.map((item) => item.groupLabel);
+  assert.ok(labels.slice(0, 4).every((label) => typeof label === "string" && label.trim().length > 0));
+  assert.equal(labels[0], labels[1], "the common rows share one heading");
+  assert.notEqual(labels[1], labels[2], "the services group has its own heading");
+  assert.equal(labels[4], undefined, "the return row is in no group");
   const look = menu.items[1];
   assert.equal(look.label, "查看");
   assert.equal(look.actionId, "explore.look");

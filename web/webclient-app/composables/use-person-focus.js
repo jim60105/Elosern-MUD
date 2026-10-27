@@ -175,7 +175,7 @@ export function usePersonFocus(store, { panel, compassRef, onRailHover, showRead
     if (card.value.kind === "verbs") {
       store.activatePresenceVerb(key, renderedMappingToken());
     } else {
-      store.activatePresence(key);
+      store.activatePresence(key, renderedMappingToken());
     }
   }
 
@@ -214,7 +214,9 @@ export function usePersonFocus(store, { panel, compassRef, onRailHover, showRead
     if (!insideCard && !lost) {
       return false;
     }
-    cardRef.value?.focusRow(origin);
+    // A flow opened by a different acting body returns to the card's first
+    // valid row instead of that entry.
+    cardRef.value?.focusRow(store.presenceServiceOriginValid?.() === false ? null : origin);
     store.claimPresenceServiceOrigin();
     return true;
   }

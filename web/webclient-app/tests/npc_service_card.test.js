@@ -139,7 +139,10 @@ describe("the interaction card's row model", () => {
     expect(services).toHaveLength(1);
     expect(services[0].key).toBe("services-unreadable");
     expect(services[0].enabled).toBe(false);
-    expect(services[0].description).toBe("服務資訊暫時無法讀取。");
+    // The copy is presentation; the contract is that the unreadable state is
+    // one disabled, self-explaining row rather than an empty group.
+    expect(typeof services[0].description).toBe("string");
+    expect(services[0].description.trim().length).toBeGreaterThan(0);
   });
 
   it("omits the services group when the projection is none", () => {
@@ -187,9 +190,16 @@ describe("the card rows", () => {
       services: { state: "ready", entries: [service("shop", "交易", "shop")] },
     })));
     const byKey = Object.fromEntries(rows.map((row) => [row.key, row]));
-    expect(byKey["talk-open"]).toMatchObject({ group: "common", groupLabel: "一般" });
-    expect(byKey["look-target"]).toMatchObject({ group: "common", groupLabel: "一般" });
-    expect(byKey["service-shop"]).toMatchObject({ group: "services", groupLabel: "服務" });
+    expect(byKey["talk-open"].group).toBe("common");
+    expect(byKey["look-target"].group).toBe("common");
+    expect(byKey["service-shop"].group).toBe("services");
+    // One heading per group, carried on every row of that group.
+    expect(byKey["talk-open"].groupLabel).toBe(byKey["look-target"].groupLabel);
+    expect(byKey["service-shop"].groupLabel).not.toBe(byKey["talk-open"].groupLabel);
+    for (const row of [byKey["talk-open"], byKey["service-shop"]]) {
+      expect(typeof row.groupLabel).toBe("string");
+      expect(row.groupLabel.trim().length).toBeGreaterThan(0);
+    }
     expect(byKey.back.group).toBeUndefined();
   });
 

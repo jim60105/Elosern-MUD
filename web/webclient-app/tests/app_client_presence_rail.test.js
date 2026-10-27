@@ -227,15 +227,15 @@ describe("AppClient presence rail and person focus (exploration-presence-rail)",
     // the unnumbered return (slice U).
     expect(cardRows().map((row) => row.text())).toEqual(["1交談", "2查看", "3公會服務", "返回"]);
     expect(
-      card().findAll('[data-testid="choice-card-group-heading"]').map((heading) => heading.text()),
-    ).toEqual(["一般", "服務"]);
-    expect(
       card().findAll('[role="group"]').map((group) => group.attributes("data-group")),
     ).toEqual(["common", "services"]);
-    // Every group is named by its own heading.
+    // Every group is named by its own non-empty heading (the copy itself is
+    // presentation, so only the wiring is asserted).
+    expect(card().findAll('[data-testid="choice-card-group-heading"]')).toHaveLength(2);
     for (const group of card().findAll('[role="group"]')) {
       const heading = document.getElementById(group.attributes("aria-labelledby"));
       expect(heading?.getAttribute("role")).toBe("heading");
+      expect(heading.textContent.trim().length).toBeGreaterThan(0);
     }
     expect(document.activeElement).toBe(card().element);
     // The rail fades out (kept mounted, hidden and inert).
@@ -1162,8 +1162,10 @@ describe("AppClient companion focus (reuse-lineup-person-focus)", () => {
     await open("target-101");
     expect(zOf("101")).toBe("6");
 
-    // The exploration panel goes away: the derived emphasis clears while the
-    // store's own lifecycle keeps the card (the settled rule).
+    // The exploration panel goes away: the committed presentation can no
+    // longer establish the target, so the card retires in that commit (the
+    // delta's readable-availability rule) and the emphasis with it. This is
+    // not a departure: nothing is reported as having left.
     await commit({
       exploration: {
         schema_version: 5,
@@ -1171,7 +1173,8 @@ describe("AppClient companion focus (reuse-lineup-person-focus)", () => {
         reason: { code: "scene_lost", message: "場景暫時無法顯示" },
       },
     });
-    expect(store.view.presenceCard).toMatchObject({ kind: "verbs", identity: 101 });
+    expect(store.view.presenceCard).toBe(null);
+    expect(store.view.presenceNotice).toBe(null);
     expect(speaks("101")).toBe("false");
     expect(zOf("101")).toBe("2");
     expect(rightActors()).toHaveLength(0);

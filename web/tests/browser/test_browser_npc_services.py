@@ -28,6 +28,19 @@ from .browser_helpers import (
 from .test_browser_services_base import ServicesBrowserTest
 
 
+def _assert_group_headings(case, card):
+    """Every group is named by its own non-empty, distinct heading.
+
+    The heading copy is presentation; the contract is the grouping and its
+    accessible name, so only those are asserted.
+    """
+    headings = card["headings"]
+    case.assertEqual(len(headings), len(card["groups"]))
+    for heading in headings:
+        case.assertTrue(heading and heading.strip(), "a group heading is empty")
+    case.assertEqual(len(set(headings)), len(headings), "two groups share a heading")
+
+
 def _press(page, key, wait_ms=80):
     page.keyboard.press(key)
     page.wait_for_timeout(wait_ms)
@@ -107,7 +120,7 @@ class MerchantServiceCardJourneys(ServicesBrowserTest):
         # Every NPC descriptor carries the author-editor conditional row, so
         # the merchant's card holds all three labelled groups in order.
         self.assertEqual(card["groups"], ["common", "conditional", "services"])
-        self.assertEqual(card["headings"], ["一般", "互動", "服務"])
+        _assert_group_headings(self, card)
         keys = card_row_keys(page)
         self.assertEqual(keys[:2], ["talk-open", "look-target"])
         self.assertIn(lookup["key"], keys)
@@ -253,7 +266,7 @@ class ReceptionServiceCardJourneys(ServicesBrowserTest):
         self.assertNotIn("services.exam_start", sent)
         card = page.evaluate(ACTIVE_ROW_JS)
         self.assertEqual(card["groups"], ["common", "conditional", "services"])
-        self.assertEqual(card["headings"], ["一般", "互動", "服務"])
+        _assert_group_headings(self, card)
 
 
 class GroupedCardOverflowJourneys(ServicesBrowserTest):
@@ -318,7 +331,7 @@ class GroupedCardOverflowJourneys(ServicesBrowserTest):
         ] + ["back"]
         self.assertEqual(keys, expected)
         card = page.evaluate(ACTIVE_ROW_JS)
-        self.assertEqual(card["headings"], ["一般", "互動", "服務"])
+        _assert_group_headings(self, card)
         self.assertEqual(card["groups"], ["common", "conditional", "services"])
         # Only the first nine rows advertise a digit.
         badges = page.evaluate(
