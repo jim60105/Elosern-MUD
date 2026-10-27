@@ -111,6 +111,23 @@ class ChurchJoinCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIsNone(getattr(self.char1.db, "church", None))
 
     @covers_requirement("church-ordination::enrollment-is-a-deterministic-three-stage-transaction-behind-a-churchhost")
+    def test_a_stale_exact_id_is_refused_beside_second_clergy(self):
+        # The browser route pre-fills ``#<id>``; submitting it after that host
+        # left must reject, never enrolling through the remaining clergy.
+        self._host("t_second_celebrant", self.hall)
+        absent_pk = int(getattr(self.hall, "pk", 0)) + 10_000
+        before = list(self.char1.db.inventory or ())
+        self.call(CmdChurchJoin(), f"#{absent_pk}", "這裡沒有教會的神職人員")
+        self.assertIsNone(getattr(self.char1.db, "church", None))
+        self.assertEqual(list(self.char1.db.inventory or ()), before)
+
+    @covers_requirement("church-ordination::enrollment-is-a-deterministic-three-stage-transaction-behind-a-churchhost")
+    def test_hidden_clergy_is_never_named_or_substituted(self):
+        self.celebrant.locks.add("view:false()")
+        self.call(CmdChurchJoin(), "t_celebrant", "這裡沒有教會的神職人員")
+        self.assertIsNone(getattr(self.char1.db, "church", None))
+
+    @covers_requirement("church-ordination::enrollment-is-a-deterministic-three-stage-transaction-behind-a-churchhost")
     def test_off_duty_host_is_a_stable_rejection(self):
         self.celebrant.db.schedule_state = "busy"
         self.call(CmdChurchJoin(), "t_celebrant", SCHEDULE_BLOCKED_REASON)
