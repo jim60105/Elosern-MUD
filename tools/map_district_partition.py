@@ -829,17 +829,17 @@ def _production_districts(size: int) -> tuple[DistrictSeed, ...]:
     from world.maps.static_references import settlement_node_xy
 
     seeds = []
-    for district in map_districts.MAP_DISTRICT_REGISTRY.values():
+    for district in map_districts.current().districts.values():
         landmark_node = map_districts.landmark_node_id(district)
         if landmark_node is None:
             raise PartitionError(
-                [f"{district.key}: landmark {district.landmark!r} does not resolve to a node"]
+                [f"{district.district_id}: landmark {district.landmark!r} does not resolve to a node"]
             )
         parts = decode_node(landmark_node)
         if parts["prefix"] == "wild":
             seeds.append(
                 DistrictSeed(
-                    district.key, district.kind, (parts["x"], parts["y"]), district.region_key
+                    district.district_id, district.kind, (parts["x"], parts["y"]), district.region_key
                 )
             )
             continue
@@ -855,7 +855,7 @@ def _production_districts(size: int) -> tuple[DistrictSeed, ...]:
             None,
         )
         if node is None or anchor_key is None:
-            raise PartitionError([f"{district.key}: grid landmark {landmark_node} does not resolve"])
+            raise PartitionError([f"{district.district_id}: grid landmark {landmark_node} does not resolve"])
         cell = map_districts.cell_of_position(world_position_m(anchor_key, node.physical_coordinate))
         approaches = []
         footprint: frozenset[Cell] = frozenset()
@@ -880,7 +880,7 @@ def _production_districts(size: int) -> tuple[DistrictSeed, ...]:
                     approaches.append(approach)
         seeds.append(
             DistrictSeed(
-                district.key,
+                district.district_id,
                 district.kind,
                 cell,
                 district.region_key,
@@ -952,9 +952,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, default=DATA_PATH)
     args = parser.parse_args(argv)
     _bootstrap()
+    from world.lore import map_districts
+    from world.maps import map_data
     from world.maps.geography import load_and_publish
 
+    map_data.load_and_publish()
     load_and_publish()
+    map_districts.load_and_publish()
     text = generate(production_input())
     current = args.output.read_text(encoding="utf-8") if args.output.exists() else None
     if args.check:

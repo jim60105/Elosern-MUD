@@ -1,28 +1,40 @@
-"""Map-district registry validation over a synthetic terrain (map-districts).
+"""Map-district document loading and validation over synthetic fixtures.
 
-The terrain, settlement and districts here are file-local fixtures: a 400 by
-400 frame whose western strip is sea, with a blocked wall column, a northern
-``fen`` region, an unreachable eastern island and one synthetic settlement.
-Shipped geography is covered by ``test_map_district_content``.
+The documents, terrain, settlement bindings and regions here are file-local
+synthetic fixtures: a 400 by 400 frame whose western strip is sea, a blocked
+wall column, a northern ``fen`` region, an unreachable eastern island and one
+synthetic settlement. Structural faults reject the candidate; terrain and
+spacing findings stay loadable as saveable work in progress and reject runtime
+adoption. Shipped content is covered by ``test_map_district_content``.
 """
 
-import dataclasses
+import hashlib
+import json
 import unittest
+from unittest import mock
 
-from tools.spec_traceability import covers_requirement
-from world.lore.map_districts import (
-    MIN_VORONOI_SPACING_KM,
-    GridSite,
-    MapDistrict,
-    MapDistrictError,
-    cell_of_position,
-    validate_map_districts,
-)
+from elosern_map_core.authoring import AuthoringError
+from elosern_map_core.diagnostics import SEMANTIC, STRUCTURE
+from elosern_map_core.documents import DistrictDeclaration
 from elosern_map_core.references import (
     ReferenceIndex,
     interior_room_ref,
     settlement_node_ref,
     wilderness_cell_ref,
+)
+from tools.spec_traceability import covers_requirement
+from world.lore import map_districts
+from world.lore.map_districts import (
+    DISTRICTS_PATH,
+    MIN_VORONOI_SPACING_KM,
+    DistrictError,
+    DistrictNotLoaded,
+    GridSite,
+    build_districts,
+    cell_of_position,
+    diagnose_districts,
+    landmark_node_ids,
+    parse_districts_document,
 )
 
 _WALL_X = 200
@@ -58,169 +70,426 @@ class _Terrain:
         return self.grid_sites.get((map_key, tuple(xy)))
 
 
-def _voronoi(key, x, y, name=None):
-    return MapDistrict(
-        key, f"{name or key}區", f"{name or key}碑", wilderness_cell_ref((x, y)), "voronoi"
-    )
-
-
 #: The settlement-node bindings the synthetic districts resolve against.
 _INDEX = ReferenceIndex.build(
     settlement_nodes=[
         ("testtown", "town_node", (40, 60)),
         ("testtown", "cut_node", (41, 60)),
         ("testtown", "dock_node", (42, 60)),
-        ("testtown", "ghost_node", (9, 9)),
+        ("testtown", "moved_node", (40, 60)),
     ],
     interior_rooms=[("testtown", "inner")],
     frame_cells=400,
 )
 
 
-def _registry(*districts):
-    return {district.key: district for district in districts}
+def _cell(x, y):
+    return {"domain": "wilderness_cell", "map_id": None, "object_id": None,
+            "cell": {"cell_x": x, "cell_y": y}}
 
 
-def _valid():
-    return _registry(
-        MapDistrict("fen_heart", "沼心區", "沼心碑", wilderness_cell_ref((250, 350)), "region", "fen"),
-        _voronoi("west_seed", 50, 50),
-        _voronoi("east_seed", 300, 50),
-        MapDistrict("town_seed", "城區", "城碑", settlement_node_ref("testtown", "town_node"), "voronoi"),
+def _node(map_id, object_id):
+    return {"domain": "settlement_node", "map_id": map_id, "object_id": object_id,
+            "cell": None}
+
+
+def _room(map_id, object_id):
+    return {"domain": "interior_room", "map_id": map_id, "object_id": object_id,
+            "cell": None}
+
+
+def _row(name, landmark_name, landmark, kind="voronoi", region_key=None):
+    return {
+        "district_name_zh": name,
+        "landmark_name_zh": landmark_name,
+        "landmark": landmark,
+        "kind": kind,
+        "region_key": region_key,
+    }
+
+
+def _document(rows):
+    """Parse one synthetic district document through the real codec."""
+
+    data = {
+        "version": 1,
+        "kind": "districts",
+        "id": "districts",
+        "districts": rows,
+    }
+    return parse_districts_document(json.dumps(data, ensure_ascii=False))
+
+
+def _valid_rows():
+    return {
+        "fen_heart": _row(
+            "合成沼心區", "合成沼心碑", _cell(250, 350), "region", "fen"
+        ),
+        "west_seed": _row("合成西區", "合成西碑", _cell(50, 50)),
+        "east_seed": _row("合成東區", "合成東碑", _cell(300, 50)),
+        "town_seed": _row("合成城區", "合成城碑", _node("testtown", "town_node")),
+    }
+
+
+def _build(rows, *, terrain=None, index=_INDEX):
+    return build_districts(
+        _document(rows),
+        terrain=terrain or _Terrain(),
+        index=index,
     )
 
 
-class MapDistrictValidationTests(unittest.TestCase):
-    def assertRejected(self, registry, *fragments):
-        with self.assertRaises(MapDistrictError) as caught:
-            validate_map_districts(registry, _Terrain(), index=_INDEX)
-        joined = "\n".join(caught.exception.problems)
-        for fragment in fragments:
-            self.assertIn(fragment, joined)
-        return caught.exception.problems
+def _diagnose(rows, *, terrain=None, index=_INDEX):
+    return diagnose_districts(
+        _document(rows).districts,
+        terrain=terrain or _Terrain(),
+        index=index,
+    )
 
-    @covers_requirement("map-districts::every-map-district-has-one-canonical-reachable-landmark")
-    def test_a_valid_registry_with_every_kind_and_layer_passes(self):
-        self.assertIsNone(validate_map_districts(_valid(), _Terrain(), index=_INDEX))
-        fields = [field.name for field in dataclasses.fields(MapDistrict)]
+
+def _by_object(diagnostics):
+    found = {}
+    for item in diagnostics:
+        found.setdefault(item.object_id, []).append(item)
+    return found
+
+
+class DistrictDocumentTests(unittest.TestCase):
+    @covers_requirement(
+        "map-districts::every-map-district-has-one-canonical-reachable-landmark"
+    )
+    def test_a_valid_document_loads_without_diagnostics(self):
+        rows = _valid_rows()
+        self.assertEqual(_diagnose(rows), ())
+        snapshot = _build(rows)
+        self.assertEqual(tuple(snapshot.districts), tuple(rows))
+        self.assertEqual(snapshot.diagnostics, ())
+        # The parsed document is the single source: the snapshot carries its
+        # relative path and content fingerprint, so a name-only edit changes
+        # the published identity without touching any landmark reference.
+        self.assertEqual(snapshot.document.relative_path, DISTRICTS_PATH)
         self.assertEqual(
-            fields,
-            ["key", "district_name_zh", "landmark_name_zh", "landmark", "kind", "region_key"],
+            dict(snapshot.fingerprints),
+            {DISTRICTS_PATH: snapshot.document.fingerprint},
         )
-        with self.assertRaises(dataclasses.FrozenInstanceError):
-            _valid()["west_seed"].kind = "region"
+        expected = hashlib.sha256(
+            (DISTRICTS_PATH + "\0" + snapshot.document.fingerprint + "\0").encode(
+                "utf-8"
+            )
+        ).hexdigest()
+        self.assertEqual(snapshot.identity, expected)
 
-    @covers_requirement("map-districts::every-map-district-has-one-canonical-reachable-landmark")
-    def test_sea_blocked_absent_and_unreachable_landmarks_are_named(self):
-        registry = _valid() | _registry(
-            _voronoi("sea_seed", 5, 150),
-            _voronoi("wall_seed", _WALL_X, 150),
-            _voronoi("island_seed", 390, 150),
-            MapDistrict("ghost_seed", "幽區", "幽碑", settlement_node_ref("testtown", "ghost_node"), "voronoi"),
-            MapDistrict("cut_seed", "斷區", "斷碑", settlement_node_ref("testtown", "cut_node"), "voronoi"),
-            MapDistrict("dock_seed", "港區", "港碑", settlement_node_ref("testtown", "dock_node"), "voronoi"),
+    @covers_requirement(
+        "map-districts::every-map-district-has-one-canonical-reachable-landmark"
+    )
+    def test_publish_adopts_a_clean_candidate_and_rejects_a_diagnosed_one(self):
+        with mock.patch.object(map_districts, "_PUBLISHED", None):
+            with self.assertRaises(DistrictNotLoaded):
+                map_districts.current()
+            clean = _build(_valid_rows())
+            self.assertIs(map_districts.publish(clean), clean)
+            self.assertIs(map_districts.current(), clean)
+            self.assertTrue(map_districts.is_published())
+
+            # A terrain semantic fault loads (saveable work in progress) but
+            # never replaces the published baseline.
+            broken_rows = _valid_rows() | {
+                "sea_seed": _row("合成海區", "合成海碑", _cell(5, 150))
+            }
+            candidate = _build(broken_rows)
+            self.assertEqual(
+                [item.code for item in candidate.diagnostics], ["landmark_in_sea"]
+            )
+            with self.assertRaises(DistrictError) as caught:
+                map_districts.publish(candidate)
+            self.assertEqual(
+                [item.code for item in caught.exception.diagnostics],
+                ["landmark_in_sea"],
+            )
+            self.assertIs(map_districts.current(), clean)
+
+    @covers_requirement(
+        "map-districts::every-map-district-has-one-canonical-reachable-landmark"
+    )
+    def test_name_edit_keeps_identity_and_reaches_consumers(self):
+        rows = _valid_rows()
+        original = _build(rows)
+        edited_rows = dict(rows)
+        edited_rows["west_seed"] = _row("合成西區改名", "合成西碑改名", _cell(50, 50))
+        edited = _build(edited_rows)
+        self.assertEqual(tuple(original.districts), tuple(edited.districts))
+        self.assertEqual(
+            original.districts["west_seed"].landmark,
+            edited.districts["west_seed"].landmark,
         )
-        problems = self.assertRejected(
-            registry,
-            "sea_seed: landmark (5, 150) lies in the sea",
-            f"wall_seed: landmark ({_WALL_X}, 150) lies on blocked terrain",
-            "island_seed: landmark (390, 150) is unreachable",
-            "ghost_seed: landmark testtown:ghost_node is not an existing grid node",
-            "cut_seed: landmark testtown:cut_node is unreachable",
-            "dock_seed: landmark testtown:dock_node lies in the sea",
+        self.assertEqual(
+            landmark_node_ids(original.districts, index=_INDEX),
+            landmark_node_ids(edited.districts, index=_INDEX),
         )
-        # Exactly the six faulty declarations are reported; the valid ones are not.
-        self.assertEqual(len(problems), 6)
-        for valid_key in _valid():
-            self.assertFalse(any(p.startswith(f"{valid_key}:") for p in problems))
+        self.assertNotEqual(original.identity, edited.identity)
+        with mock.patch.object(map_districts, "_PUBLISHED", None):
+            map_districts.publish(edited)
+            district = map_districts.current().districts["west_seed"]
+            self.assertEqual(district.district_name_zh, "合成西區改名")
+            self.assertEqual(district.landmark_name_zh, "合成西碑改名")
 
-    @covers_requirement("map-districts::every-map-district-has-one-canonical-reachable-landmark")
-    def test_non_canonical_landmark_identities_are_rejected(self):
-        for reference in (
-            wilderness_cell_ref((400, 50)),  # beyond the frame
-            interior_room_ref("testtown", "inner"),  # no continental position
-            settlement_node_ref("testtown", "missing"),  # absent target
-            settlement_node_ref("othertown", "town_node"),  # absent map scope
-        ):
-            with self.subTest(reference=reference):
-                registry = {
-                    "odd_seed": MapDistrict("odd_seed", "異區", "異碑", reference, "voronoi")
-                }
-                self.assertRejected(registry, "odd_seed:")
 
-    @covers_requirement("map-districts::every-map-district-has-one-canonical-reachable-landmark")
-    def test_duplicate_identities_are_rejected(self):
-        twin_node = _voronoi("twin_node", 50, 50, name="雙")
-        twin_names = MapDistrict("twin_names", "west_seed區", "west_seed碑", wilderness_cell_ref((150, 150)), "voronoi")
-        second_fen = MapDistrict("fen_rim", "沼緣區", "沼緣碑", wilderness_cell_ref((100, 390)), "region", "fen")
-        misfiled = {"stray_key": _voronoi("other_key", 50, 250)}
-        self.assertRejected(
-            _valid() | _registry(twin_node, twin_names, second_fen) | misfiled,
-            "twin_node: duplicate landmark",
-            "twin_names: duplicate district_name_zh 'west_seed區' (also 'west_seed')",
-            "twin_names: duplicate landmark_name_zh 'west_seed碑' (also 'west_seed')",
-            "fen_rim: duplicate region_key 'fen' (also 'fen_heart')",
-            "stray_key: registered under a different key than 'other_key'",
+class DistrictStructureTests(unittest.TestCase):
+    @covers_requirement(
+        "map-districts::every-map-district-has-one-canonical-reachable-landmark"
+    )
+    def test_unknown_reference_interior_room_and_region_are_structural(self):
+        rows = _valid_rows() | {
+            "ghost_seed": _row("合成幽區", "合成幽碑", _node("testtown", "ghost_node")),
+            "room_seed": _row("合成室區", "合成室碑", _room("testtown", "inner")),
+            "bad_region": _row("合成異區", "合成異碑", _cell(250, 150), "region", "moor"),
+        }
+        diagnostics = _diagnose(rows)
+        self.assertEqual({item.category for item in diagnostics}, {STRUCTURE})
+        found = _by_object(diagnostics)
+        self.assertEqual(found["ghost_seed"][0].code, "unknown_reference")
+        self.assertIn("no authored node", found["ghost_seed"][0].message)
+        self.assertEqual(found["room_seed"][0].code, "unsupported_landmark_domain")
+        self.assertEqual(found["bad_region"][0].code, "unknown_region")
+        with self.assertRaises(DistrictError) as caught:
+            _build(rows)
+        self.assertEqual(
+            {item.object_id for item in caught.exception.diagnostics},
+            {"ghost_seed", "room_seed", "bad_region"},
         )
 
-    @covers_requirement("map-districts::every-map-district-has-one-canonical-reachable-landmark")
-    def test_kind_and_region_constraints(self):
-        self.assertRejected(
-            _registry(
-                MapDistrict("odd_kind", "甲區", "甲碑", wilderness_cell_ref((50, 50)), "square"),
-                MapDistrict("no_region", "乙區", "乙碑", wilderness_cell_ref((250, 50)), "region"),
-                MapDistrict("bad_region", "丙區", "丙碑", wilderness_cell_ref((250, 150)), "region", "moor"),
-                MapDistrict("loose_region", "丁區", "丁碑", wilderness_cell_ref((50, 150)), "voronoi", "plain"),
-                MapDistrict("fen_heart", "沼心區", "沼心碑", wilderness_cell_ref((150, 150)), "region", "fen"),
-                _voronoi("fen_seed", 50, 350),
-            ),
-            "odd_kind: kind 'square'",
-            "no_region: region_key None is not a terrain region",
-            "bad_region: region_key 'moor' is not a terrain region",
-            "loose_region: a voronoi district declares no region_key",
-            # A region landmark must lie in its own region...
-            "fen_heart: landmark lies in region 'plain', not 'fen'",
-            # ...and a Voronoi seed may not sit inside region-district land.
-            "fen_seed: landmark lies inside region district territory 'fen'",
+    @covers_requirement(
+        "map-districts::every-map-district-has-one-canonical-reachable-landmark"
+    )
+    def test_duplicate_identities_and_misfiled_rows_are_structural(self):
+        rows = _valid_rows() | {
+            "twin_node": _row("合成雙區", "合成雙碑", _cell(50, 50)),
+            "twin_names": _row("合成西區", "合成西碑", _cell(150, 150)),
+            "fen_rim": _row("合成沼緣區", "合成沼緣碑", _cell(100, 390), "region", "fen"),
+        }
+        found = _by_object(_diagnose(rows))
+        self.assertIn("duplicate_landmark", [item.code for item in found["twin_node"]])
+        self.assertIn(
+            "duplicate_district_name_zh", [item.code for item in found["twin_names"]]
+        )
+        self.assertIn(
+            "duplicate_landmark_name_zh", [item.code for item in found["twin_names"]]
+        )
+        self.assertIn("duplicate_region_key", [item.code for item in found["fen_rim"]])
+
+    @covers_requirement(
+        "map-districts::every-map-district-has-one-canonical-reachable-landmark"
+    )
+    def test_unreachable_frame_and_misfiled_bindings_are_reported(self):
+        rows = _valid_rows() | {
+            "sea_seed": _row("合成海區", "合成海碑", _cell(5, 150)),
+            "wall_seed": _row("合成牆區", "合成牆碑", _cell(_WALL_X, 150)),
+            "island_seed": _row("合成島區", "合成島碑", _cell(390, 150)),
+            "cut_seed": _row("合成斷區", "合成斷碑", _node("testtown", "cut_node")),
+            "dock_seed": _row("合成港區", "合成港碑", _node("testtown", "dock_node")),
+            "beyond_seed": _row("合成外區", "合成外碑", _cell(400, 50)),
+        }
+        found = _by_object(_diagnose(rows))
+        self.assertEqual(found["sea_seed"][0].code, "landmark_in_sea")
+        self.assertEqual(found["wall_seed"][0].code, "landmark_blocked")
+        self.assertEqual(found["island_seed"][0].code, "unreachable_landmark")
+        self.assertEqual(found["cut_seed"][0].code, "unreachable_landmark")
+        self.assertEqual(found["dock_seed"][0].code, "landmark_in_sea")
+        self.assertEqual(found["beyond_seed"][0].code, "invalid_reference")
+        self.assertEqual(found["beyond_seed"][0].category, STRUCTURE)
+        for key in ("sea_seed", "wall_seed", "island_seed", "cut_seed", "dock_seed"):
+            self.assertEqual(found[key][0].category, SEMANTIC, key)
+
+    @covers_requirement(
+        "map-districts::every-map-district-has-one-canonical-reachable-landmark"
+    )
+    def test_a_resolved_grid_landmark_without_a_binding_is_unbound(self):
+        # The authored node exists in the binding index but this world has no
+        # continental projection for it yet: saveable work, not a bad identity.
+        terrain = _Terrain()
+        rows = _valid_rows() | {
+            "pending_seed": _row("合成待區", "合成待碑", _node("othertown", "plaza"))
+        }
+        index = ReferenceIndex.build(
+            settlement_nodes=[("othertown", "plaza", (10, 10))], frame_cells=400
+        )
+        found = _by_object(_diagnose(rows, terrain=terrain, index=index))
+        self.assertEqual(found["pending_seed"][0].code, "unbound_landmark")
+        self.assertEqual(found["pending_seed"][0].category, SEMANTIC)
+
+    def test_programmatic_declarations_still_face_the_identity_rules(self):
+        # Schema rules guarantee kind/region pairing for parsed documents; a
+        # programmatic candidate is still checked, never trusted.
+        declaration = DistrictDeclaration(
+            district_id="loose_region",
+            district_name_zh="合成鬆區",
+            landmark_name_zh="合成鬆碑",
+            landmark=wilderness_cell_ref((50, 150)),
+            kind="voronoi",
+            region_key="plain",
+        )
+        diagnostics = diagnose_districts(
+            {"loose_region": declaration}, terrain=_Terrain(), index=_INDEX
+        )
+        self.assertEqual(
+            [item.code for item in diagnostics], ["invalid_region_membership"]
         )
 
-    @covers_requirement("map-districts::every-map-district-has-one-canonical-reachable-landmark")
+
+class DistrictSpacingAndMembershipTests(unittest.TestCase):
+    @covers_requirement(
+        "map-districts::every-map-district-has-one-canonical-reachable-landmark"
+    )
     def test_voronoi_spacing_is_the_single_declared_minimum(self):
         self.assertEqual(MIN_VORONOI_SPACING_KM, 100)
         # Cell centres 100 cells apart are exactly 100 km apart: allowed.
-        self.assertIsNone(
-            validate_map_districts(
-                _registry(_voronoi("near_a", 50, 50), _voronoi("near_b", 150, 50)),
-                _Terrain(),
-                index=_INDEX,
-            )
+        self.assertEqual(
+            _diagnose(
+                {
+                    "near_a": _row("合成甲區", "合成甲碑", _cell(50, 50)),
+                    "near_b": _row("合成乙區", "合成乙碑", _cell(150, 50)),
+                }
+            ),
+            (),
         )
         # 99 cells apart is below the minimum, and the pair is named.
-        self.assertRejected(
-            _registry(_voronoi("near_a", 50, 50), _voronoi("near_b", 149, 50)),
-            "near_a: landmark is 99.0 km from 'near_b', below the 100 km minimum spacing",
+        diagnostics = _diagnose(
+            {
+                "near_a": _row("合成甲區", "合成甲碑", _cell(50, 50)),
+                "near_b": _row("合成乙區", "合成乙碑", _cell(149, 50)),
+            }
         )
+        self.assertEqual([item.code for item in diagnostics], ["invalid_spacing"])
+        self.assertEqual(
+            diagnostics[0].message,
+            "landmark is 99.0 km from 'near_b', below the 100 km minimum spacing",
+        )
+        self.assertEqual(diagnostics[0].category, SEMANTIC)
         # A grid landmark is measured at its continental position: the town
         # node at (150.2 km, 150.7 km) is 0.36 km from the centre of cell (150, 150).
-        self.assertRejected(
-            _registry(
-                MapDistrict("town_seed", "城區", "城碑", settlement_node_ref("testtown", "town_node"), "voronoi"),
-                _voronoi("by_town", 150, 150),
-            ),
-            "town_seed: landmark is 0.4 km from 'by_town'",
+        diagnostics = _diagnose(
+            {
+                "town_seed": _row("合成城區", "合成城碑", _node("testtown", "town_node")),
+                "by_town": _row("合成鄰區", "合成鄰碑", _cell(150, 150)),
+            }
+        )
+        self.assertEqual(
+            [item.message for item in diagnostics],
+            ["landmark is 0.4 km from 'by_town', below the 100 km minimum spacing"],
         )
         # Region districts are exempt: the forest heart may sit next to a seed.
-        self.assertIsNone(
-            validate_map_districts(
-                _registry(
-                    MapDistrict("fen_heart", "沼心區", "沼心碑", wilderness_cell_ref((150, 300)), "region", "fen"),
-                    _voronoi("by_fen", 150, 299),
-                ),
-                _Terrain(),
-                index=_INDEX,
+        self.assertEqual(
+            _diagnose(
+                {
+                    "fen_heart": _row(
+                        "合成沼心區", "合成沼心碑", _cell(150, 300), "region", "fen"
+                    ),
+                    "by_fen": _row("合成臨區", "合成臨碑", _cell(150, 299)),
+                }
+            ),
+            (),
+        )
+
+    @covers_requirement(
+        "map-districts::every-map-district-has-one-canonical-reachable-landmark"
+    )
+    def test_region_membership_governs_both_kinds(self):
+        found = _by_object(
+            _diagnose(
+                {
+                    "fen_heart": _row(
+                        "合成沼心區", "合成沼心碑", _cell(150, 150), "region", "fen"
+                    ),
+                    "fen_seed": _row("合成沼邊區", "合成沼邊碑", _cell(50, 350)),
+                }
             )
         )
+        self.assertEqual(found["fen_heart"][0].code, "region_mismatch")
+        self.assertIn("not 'fen'", found["fen_heart"][0].message)
+        self.assertEqual(found["fen_seed"][0].code, "region_territory_overlap")
+        self.assertEqual(found["fen_seed"][0].category, SEMANTIC)
+
+
+class DistrictSourceBoundaryTests(unittest.TestCase):
+    def test_duplicate_yaml_keys_are_rejected_by_the_codec(self):
+        data = {
+            "version": 1,
+            "kind": "districts",
+            "id": "districts",
+            "districts": {
+                "west_seed": _row("合成西區", "合成西碑", _cell(50, 50)),
+            },
+        }
+        text = json.dumps(data, ensure_ascii=False).replace(
+            '"west_seed":',
+            '"west_seed": {},\n    "west_seed":',
+            1,
+        )
+        with self.assertRaises(AuthoringError):
+            parse_districts_document(text)
+
+    def test_invalid_kind_and_region_shape_are_structural_at_parse(self):
+        for row in (
+            _row("odd_kind", "合成方碑", _cell(50, 50), "square"),
+            _row("no_region", "合成無碑", _cell(250, 50), "region"),
+        ):
+            with self.subTest(district=next(iter(row))):
+                with self.assertRaises(AuthoringError) as caught:
+                    _document({next(iter(row)): row})
+                self.assertTrue(caught.exception.diagnostics)
+
+    def test_a_missing_source_rejects_without_touching_the_baseline(self):
+        import tempfile
+        from pathlib import Path
+
+        with mock.patch.object(map_districts, "_PUBLISHED", None):
+            clean = _build(_valid_rows())
+            map_districts.publish(clean)
+            with tempfile.TemporaryDirectory() as root:
+                with self.assertRaises(DistrictError) as caught:
+                    map_districts.load_districts(Path(root))
+            self.assertEqual(
+                [item.code for item in caught.exception.diagnostics],
+                ["missing_document"],
+            )
+            self.assertIs(map_districts.current(), clean)
+
+
+class LandmarkIdentityTests(unittest.TestCase):
+    @covers_requirement(
+        "map-districts::every-map-district-has-one-canonical-reachable-landmark"
+    )
+    def test_a_settlement_landmark_follows_its_moved_node_by_stable_identity(self):
+        rows = {
+            "town_seed": _row("合成城區", "合成城碑", _node("testtown", "moved_node"))
+        }
+        document = _document(rows)
+        district = document.districts["town_seed"]
+        # No coordinate is authored for the landmark: only the qualified id.
+        self.assertEqual(district.landmark, settlement_node_ref("testtown", "moved_node"))
+        self.assertIsNone(district.landmark.cell)
+
+        before = landmark_node_ids(
+            document.districts,
+            index=ReferenceIndex.build(
+                settlement_nodes=[("testtown", "moved_node", (10, 10))],
+                frame_cells=400,
+            ),
+        )
+        after = landmark_node_ids(
+            document.districts,
+            index=ReferenceIndex.build(
+                settlement_nodes=[("testtown", "moved_node", (40, 40))],
+                frame_cells=400,
+            ),
+        )
+        self.assertEqual(before, {"town_seed": "grid:testtown:10:10"})
+        self.assertEqual(after, {"town_seed": "grid:testtown:40:40"})
 
     def test_cell_of_position_floors_metres_into_kilometre_cells(self):
         self.assertEqual(cell_of_position((150_999, 150_000)), (150, 150))
         self.assertEqual(cell_of_position((151_000, 149_999)), (151, 149))
+
+
+if __name__ == "__main__":
+    unittest.main()

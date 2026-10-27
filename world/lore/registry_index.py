@@ -76,6 +76,14 @@ def _geography(attribute: str) -> Callable[[], Mapping[str, Any]]:
     return load
 
 
+def _districts() -> Mapping[str, Any]:
+    """The map districts of the currently published district document."""
+
+    from world.lore.map_districts import current
+
+    return current().districts
+
+
 def _quest_definitions() -> Mapping[str, Any]:
     # The authored quest catalog. The process ``QUEST_DEFINITION_REGISTRY`` is
     # filled at startup and also holds runtime-generated quests (runtime state,
@@ -149,7 +157,7 @@ REGISTRY_INDEX: tuple[RegistrySpec, ...] = (
     _spec("anchor_placements", "錨點配置", "世界", _attr("world.lore.anchor_placement", "ANCHOR_PLACEMENT_REGISTRY"), "content/maps/settlements", "zcoord", "node.object_id"),
     _spec("wilderness_regions", "野外區域", "世界", _geography("regions"), "content/maps/continent.yaml", "display_name_zh", "nation_key"),
     _spec("wilderness_entries", "野外入口", "世界", _attr("world.lore.wilderness_entry", "WILDERNESS_ENTRY_REGISTRY"), "content/maps/settlements", "origin_xy"),
-    _spec("map_districts", "地圖區域", "世界", _attr("world.lore.map_districts", "MAP_DISTRICT_REGISTRY"), f"{_LORE}/map_districts.py", "district_name_zh", "kind"),
+    _spec("map_districts", "地圖區域", "世界", _districts, "content/maps/districts.yaml", "district_name_zh", "kind"),
     _spec("scene_archetypes", "場景原型", "世界", _attr("world.lore.scene_archetypes", "SCENE_ARCHETYPE_REGISTRY"), f"{_LORE}/scene_archetypes.py", "display_name_zh"),
     _spec("name_packs", "命名套組", "世界", _attr("world.lore.names", "NAME_PACK_REGISTRY"), f"{_LORE}/names.py", "race_key"),
     _spec("titles", "固定稱號", "世界", _attr("world.lore.titles", "FIXED_TITLE_REGISTRY"), f"{_LORE}/titles.py", "display_name_zh", "category"),

@@ -24,7 +24,7 @@ from scipy import ndimage
 
 from tools import map_district_partition as generator
 from tools.spec_traceability import covers_requirement
-from world.lore.map_districts import MAP_DISTRICT_REGISTRY
+from world.lore import map_districts
 from world.maps import district_partition
 from world.tests.geography_fixture import publish_shipped_geography
 
@@ -39,6 +39,7 @@ class ShippedDistrictPartitionTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        cls.districts = map_districts.current().districts
         cls.inp = generator.production_input()
         cls.partition = generator.compute_partition(cls.inp)
         cls.text = generator.serialize(generator.encode(cls.partition, cls.inp))
@@ -72,7 +73,7 @@ class ShippedDistrictPartitionTests(unittest.TestCase):
         owner, land = self.partition.owner, self.inp.land
         self.assertTrue(np.all(owner[land] > 0))
         self.assertTrue(np.all(owner[~land] == 0))
-        self.assertEqual(self.partition.keys, tuple(sorted(MAP_DISTRICT_REGISTRY)))
+        self.assertEqual(self.partition.keys, tuple(sorted(self.districts)))
         # The runtime decoder agrees with the raster on a lattice of the
         # frame plus every cell of every exception tile.
         frozen = district_partition.frozen_partition()
@@ -126,23 +127,30 @@ class ShippedDistrictPartitionTests(unittest.TestCase):
     )
     def test_every_landmark_lies_in_its_own_district(self):
         by_key = {seed.key: seed for seed in self.inp.districts}
-        self.assertEqual(set(by_key), set(MAP_DISTRICT_REGISTRY))
+        self.assertEqual(set(by_key), set(self.districts))
         for key, seed in by_key.items():
             with self.subTest(district=key):
                 self.assertEqual(district_partition.district_at(seed.landmark_cell), key)
-        # The capital plaza landmark is inside the capital's footprint; the
-        # whole footprint belongs to the plaza's district.
-        royal = by_key["royal_river_valley"]
-        self.assertIn(royal.landmark_cell, royal.footprint)
-        for cell in royal.footprint:
-            self.assertEqual(district_partition.district_at(cell), "royal_river_valley", cell)
+        # A grid landmark is inside its settlement's footprint; the whole
+        # footprint belongs to that landmark's district.
+        grid_keys = [
+            key
+            for key, district in self.districts.items()
+            if district.landmark.domain == "settlement_node"
+        ]
+        self.assertTrue(grid_keys)
+        for key in grid_keys:
+            footprinted = by_key[key]
+            self.assertIn(footprinted.landmark_cell, footprinted.footprint)
+            for cell in footprinted.footprint:
+                self.assertEqual(district_partition.district_at(cell), key, cell)
 
     @covers_requirement(
         "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
     )
     def test_outlines_cover_every_district_with_integer_metre_rings(self):
         document = json.loads(self.committed)
-        self.assertEqual(sorted(document["outlines"]), sorted(MAP_DISTRICT_REGISTRY))
+        self.assertEqual(sorted(document["outlines"]), sorted(self.districts))
         for key, rings in document["outlines"].items():
             with self.subTest(district=key):
                 self.assertTrue(rings)

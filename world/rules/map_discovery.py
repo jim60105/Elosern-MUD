@@ -57,7 +57,7 @@ def publish_traversal_narrative(actor, before):
     callback. Message delivery cannot compensate an already committed move.
     """
     from typeclasses.characters import PlayerCharacter
-    from world.lore.map_districts import MAP_DISTRICT_REGISTRY, landmark_node_ids
+    from world.lore.map_districts import current, landmark_node_ids
 
     if not isinstance(actor, PlayerCharacter) and not getattr(actor.db, "possessed_by", None):
         return
@@ -71,8 +71,8 @@ def publish_traversal_narrative(actor, before):
             log_warn("map_discovery_knowledge_unreadable", exc=error, context={"char": actor.pk})
     if before is not None and destination not in before and destination in after:
         landmarks = landmark_node_ids()
-        discovery=next((district for district in MAP_DISTRICT_REGISTRY.values()
-                        if landmarks.get(district.key) == destination),None)
+        discovery=next((district for district in current().districts.values()
+                        if landmarks.get(district.district_id) == destination),None)
     message=f"你移動到了{actor.location.key}。"
     if discovery is not None:
         message += f"\n已探明：{discovery.district_name_zh}"
@@ -80,7 +80,7 @@ def publish_traversal_narrative(actor, before):
         try:
             actor.msg(message)
             if discovery is not None:
-                log_info("map_district_discovered", context={"char": actor.pk, "district": discovery.key})
+                log_info("map_district_discovered", context={"char": actor.pk, "district": discovery.district_id})
         except Exception as error:
             log_warn("map_discovery_delivery_failed", exc=error, context={"char": actor.pk})
     transaction.on_commit(deliver)

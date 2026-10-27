@@ -6,6 +6,7 @@ tests are the universe derivation (no DB) and the deny-list regressions.
 
 from __future__ import annotations
 
+import ast
 import json
 import tempfile
 import unittest
@@ -142,6 +143,21 @@ class ScannerTests(unittest.TestCase):
             self.assertIn("zzz_synthetic_buff", keys)
         finally:
             tmp.cleanup()
+
+    def test_yaml_district_document_keys_are_harvested(self):
+        """The district YAML authority still feeds the shipped-token universe."""
+        from elosern_map_core.codec import parse_document
+
+        text = (REPO / "content" / "maps" / "districts.yaml").read_text(encoding="utf-8")
+        document = parse_document("content/maps/districts.yaml", text).document
+        key = next(iter(document.districts))
+        self.assertIn(key, UNIVERSE.tokens)
+        findings = lint._string_findings(
+            ast.parse(f'DISTRICT = "{key}"\n'),
+            UNIVERSE,
+            "world/lore/tests/test_probe.py",
+        )
+        self.assertEqual([finding.kind for finding in findings], ["token"])
 
     def test_deny_list_regressions(self):
         """Every deny entry: rule-bound admission is mechanically checkable, and
