@@ -1012,6 +1012,35 @@ def wait_for_presentation_settled(page: Page, timeout: int = 30000) -> None:
     raise AssertionError("presentation revision never settled")
 
 
+def wait_for_presentation_adopted(page: Page, timeout: int = 30000) -> None:
+    """Wait until the committed revision has adopted the last action result.
+
+    A submitted ``ui_action`` must name the server's newest revision exactly
+    (the dispatcher rejects anything else as ``stale``). The result's
+    ``presentation_revision`` is the revision its own publication commits, so
+    the next submit is only safe once that revision is adopted and nothing is
+    in flight. This is stronger than the quiet-gap settle: a slow runner can
+    pause a publication burst longer than two polls.
+    """
+
+    def _adopted(state: dict) -> bool:
+        dispatch = state.get("dispatch") or {}
+        if dispatch.get("inFlight") is not None or dispatch.get("uncertain"):
+            return False
+        if not state.get("connected"):
+            return False
+        if (state.get("recovery") or {}).get("status") not in (None, "idle"):
+            return False
+        target = (state.get("lastActionResult") or {}).get(
+            "presentationRevision"
+        )
+        if target is None:
+            return False
+        return int(state.get("revision") or 0) >= int(target)
+
+    wait_for_store_state(page, _adopted, timeout=timeout)
+
+
 def wait_for_page_shown(page: Page, timeout: int = 15000) -> None:
     """Wait until the message window's page on screen is fully shown.
 

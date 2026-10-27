@@ -25,7 +25,7 @@ from .browser_helpers import (
     presence_entry_keys,
     sent_action_count,
     store_state,
-    wait_for_presentation_settled,
+    wait_for_presentation_adopted,
     wait_for_store_state,
 )
 from .harness import ManagedServer, ManagedServerTearDownMixin
@@ -142,10 +142,10 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         release = page.locator('[data-testid="action-bar__btn--possess"]')
         release.wait_for(timeout=30000)
         self.assertEqual(release.inner_text().strip(), "解除附身")
-        # The possession commit's publication burst must land before the next
+        # The possession result's publication must be adopted before the next
         # submit: the dispatcher names the newest revision exactly and a
         # submit in that window is refused as stale.
-        wait_for_presentation_settled(page)
+        wait_for_presentation_adopted(page)
         release.click()
         self.assertEqual(sent_action_count(page, "explore.possess_release"), 1)
         # The release unpuppets the companion: the client enters its

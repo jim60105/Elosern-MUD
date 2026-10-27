@@ -28,7 +28,7 @@ from .browser_helpers import (
     overview_target_with_affordance,
     sent_action_count,
     store_state,
-    wait_for_presentation_settled,
+    wait_for_presentation_adopted,
     wait_for_store_state,
 )
 from .harness import ManagedServer, ManagedServerTearDownMixin
@@ -743,7 +743,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # publication burst and reading acknowledgement must land first, so
         # the leave names the newest revision.
         open_dialogue_choices(page)
-        wait_for_presentation_settled(page)
+        wait_for_presentation_adopted(page)
         result_before_exit = (
             store_state(page).get("lastActionResult") or {}
         ).get("requestId")
@@ -972,9 +972,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self._wait_exploration_available(page)
         host = overview_target_with_affordance(page, "explore.talk_open")
         activate_overview_chip(page, "target-%s" % host["identity"])
-        # The possession commit's publication burst must land before the open
+        # The possession result's publication must be adopted before the open
         # submit: the dispatcher names the newest revision exactly.
-        wait_for_presentation_settled(page)
+        wait_for_presentation_adopted(page)
         _press(page, "Enter")  # 交談 -> explore.talk_open
         self._wait_panel(page, "dialogue", lambda p: p.get("available") is True)
         wait_for_store_state(
