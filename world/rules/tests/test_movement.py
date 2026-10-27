@@ -33,6 +33,9 @@ from world.rules.travel_cost import (
 )
 from world.skills.registry import SkillCategory
 from world.tests.synthetic_data import make_skill, synthetic_registries
+from world.tests.geography_fixture import publish_shipped_geography
+
+publish_shipped_geography()
 
 # A synthetic mobility skill standing in for any non-flight mobility
 # skill: the waiver is keyed to the one flight skill, so ANY other owned row
@@ -811,8 +814,10 @@ class GateApproachCostTests(EvenniaTest):
     def test_a_500_metre_authored_approach_costs_400_seconds(self):
         import types
 
+        from dataclasses import replace
+        from types import MappingProxyType
+
         from world.lore.anchor_placement import AnchorPlacement
-        from world.lore import wilderness_entry as wilderness_entry_module
         from world.lore.wilderness_entry import WildernessEntryPoint, WildernessGate
         from world.maps import map_data
         from elosern_map_core.sparse import SparseNode, SparseSettlementGraph
@@ -845,31 +850,33 @@ class GateApproachCostTests(EvenniaTest):
         )
         room = types.SimpleNamespace(sparse_node_id="gate", xyz=(1, 1, "t_gate_map"))
         gate = entry.gates[0]
+        previous = map_data.current()
+        placements = dict(previous.anchor_placements)
+        placements["t_gate_anchor"] = AnchorPlacement(
+            "t_gate_anchor", settlement_node_ref("t_gate_map", "anchor")
+        )
+        entries = dict(previous.wilderness_entries)
+        entries["t_gate_anchor"] = entry
+        map_data.publish(
+            replace(
+                previous,
+                anchor_placements=MappingProxyType(placements),
+                wilderness_entries=MappingProxyType(entries),
+            )
+        )
         with (
-            patch.dict(
-                # Assembled name: this behavior suite must not reference a
-                # catalog symbol literally.
-                getattr(travel_cost, "ANCHOR_PLACEMENT" + "_REGISTRY"),
-                {
-                    "t_gate_anchor": AnchorPlacement(
-                        "t_gate_anchor",
-                        settlement_node_ref("t_gate_map", "anchor"),
-                    )
-                },
-            ),
-            patch.dict(
-                getattr(wilderness_entry_module, "WILDERNESS_ENTRY" + "_REGISTRY"),
-                {"t_gate_anchor": entry},
-            ),
             patch.object(map_data, "SETTLEMENT_GRAPHS", {"t_gate_map": graph}),
         ):
-            from world.maps.wilderness_destination import gate_approach_distance_m
+            try:
+                from world.maps.wilderness_destination import gate_approach_distance_m
 
-            self.assertEqual(
-                gate_approach_distance_m(entry, gate, cell_size_m=1000), 500
-            )
-            cost = gate_approach_cost(
-                room, (100, 100), [self.char1], cell_size_m=1000
-            )
+                self.assertEqual(
+                    gate_approach_distance_m(entry, gate, cell_size_m=1000), 500
+                )
+                cost = gate_approach_cost(
+                    room, (100, 100), [self.char1], cell_size_m=1000
+                )
+            finally:
+                map_data.publish(previous)
         self.assertEqual(cost.seconds, 400)
 
