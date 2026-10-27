@@ -76,7 +76,7 @@ class ServiceTargetResolutionTests(ServiceRegistryIsolation):
         player = actor(location=room)
         npc, component = require_service_target(player, second.pk, GuildStaff)
         self.assertIs(npc, second)
-        self.assertIs(component, second.components.get("guild_staff"))
+        self.assertIs(component, second.components.get(GuildStaff.name))
         npc, _ = require_service_target(player, first.pk, GuildStaff)
         self.assertIs(npc, first)
 
