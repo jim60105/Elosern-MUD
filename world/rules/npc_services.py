@@ -21,7 +21,7 @@ an empty list, whose ``none`` state means a host genuinely offers nothing.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 from typeclasses.components import (
     ChurchHost,
@@ -43,6 +43,12 @@ STATE_NONE = "none"
 STATE_READY = "ready"
 STATE_UNREADABLE = "unreadable"
 SERVICE_STATES = (STATE_NONE, STATE_READY, STATE_UNREADABLE)
+
+#: The management inventory's availability answer: no player body is selected,
+#: so the shared projection's actor-specific verdict cannot be asserted.
+CONTEXT_REQUIRED = "context_required"
+#: The exact reason every management entry carries in place of a player verdict.
+CONTEXT_REQUIRED_MESSAGE = "未選擇玩家角色，無法判斷此服務是否可用。"
 
 MAX_SERVICE_ENTRIES = 16
 MAX_SERVICE_KEY_CHARS = 64
@@ -292,71 +298,100 @@ def _possessed_by_control(actor: Any) -> bool:
     return is_possessed_actor(actor)
 
 
-def _native_entries(actor: Any, npc: Any) -> list[ServiceEntry]:
-    """Project every native capability entry, in the fixed mapping order."""
+def _control_reason(actor: Any) -> ServiceReason | None:
+    """The possession control refusal a capability group inherits, or ``None``."""
+    return _reason(REASON_POSSESSED) if _possessed_by_control(actor) else None
+
+
+def _native_rows(
+    npc: Any,
+) -> list[tuple[list[tuple[str, str, ServiceRoute]], Callable[[Any], ServiceReason | None]]]:
+    """The host's native capabilities, in the fixed mapping order.
+
+    Each group is the entries one component projects plus the one availability
+    evaluation they share: the guild staff's three rows read the same
+    component, gate and schedule. The caller decides whether to evaluate it
+    (the player projection) or treat every entry as context-required (the
+    management inventory).
+    """
     npc_id = int(getattr(npc, "pk", 0) or 0)
-    entries: list[ServiceEntry] = []
-    possessed = _possessed_by_control(actor)
-    control_reason = _reason(REASON_POSSESSED) if possessed else None
+    groups: list[
+        tuple[list[tuple[str, str, ServiceRoute]], Callable[[Any], ServiceReason | None]]
+    ] = []
 
     merchant = _component(npc, Merchant)
     if merchant is not None:
         # A closed shop stays inspectable: the shop's own ``open`` flag and its
         # product reasons belong to the flow this entry opens.
-        reason = _service_gate_reason(
-            actor, npc, merchant, schedule_kind="service_shop"
-        )
-        entries.append(
-            _entry(
-                "shop",
-                "商店",
-                ServiceRoute(ROUTE_SERVICES, npc_id, section="shop"),
-                reason,
+        groups.append(
+            (
+                [("shop", "商店", ServiceRoute(ROUTE_SERVICES, npc_id, section="shop"))],
+                lambda actor: _service_gate_reason(
+                    actor, npc, merchant, schedule_kind="service_shop"
+                ),
             )
         )
 
     staff = _component(npc, GuildStaff)
     if staff is not None:
-        reason = control_reason or _service_gate_reason(
-            actor, npc, staff, schedule_kind="service_guild"
-        )
-        for key, label, section in _GUILD_STAFF_ROWS:
-            entries.append(
-                _entry(
-                    key,
-                    label,
-                    ServiceRoute(ROUTE_SERVICES, npc_id, section=section),
-                    reason,
-                )
+        groups.append(
+            (
+                [
+                    (key, label, ServiceRoute(ROUTE_SERVICES, npc_id, section=section))
+                    for key, label, section in _GUILD_STAFF_ROWS
+                ],
+                lambda actor: _control_reason(actor)
+                or _service_gate_reason(
+                    actor, npc, staff, schedule_kind="service_guild"
+                ),
             )
+        )
 
     reception = _component(npc, GuildExamReception)
     if reception is not None:
         # Entry only: registration, branch and next-rank eligibility stay inside
         # the rank flow, and merit or an absent qualified adventurer never
         # disables the request (schedule-first result).
-        reason = control_reason or _service_gate_reason(
-            actor, npc, reception, schedule_kind="service_guild"
-        )
-        entries.append(
-            _entry(
-                "guild.exam",
-                "參加升階考核",
-                ServiceRoute(ROUTE_SERVICES, npc_id, section="rank"),
-                reason,
+        groups.append(
+            (
+                [
+                    (
+                        "guild.exam",
+                        "參加升階考核",
+                        ServiceRoute(ROUTE_SERVICES, npc_id, section="rank"),
+                    )
+                ],
+                lambda actor: _control_reason(actor)
+                or _service_gate_reason(
+                    actor, npc, reception, schedule_kind="service_guild"
+                ),
             )
         )
 
     church = _component(npc, ChurchHost)
     if church is not None:
-        entries.append(
-            _entry(
-                "church.enroll",
-                "入教",
-                ServiceRoute(ROUTE_COMMAND, npc_id, command=CHURCH_JOIN_COMMAND),
-                control_reason or _church_reason(actor, npc, church),
+        groups.append(
+            (
+                [
+                    (
+                        "church.enroll",
+                        "入教",
+                        ServiceRoute(ROUTE_COMMAND, npc_id, command=CHURCH_JOIN_COMMAND),
+                    )
+                ],
+                lambda actor: _control_reason(actor)
+                or _church_reason(actor, npc, church),
             )
         )
+    return groups
+
+
+def _native_entries(actor: Any, npc: Any) -> list[ServiceEntry]:
+    """Project every native capability entry, in the fixed mapping order."""
+    entries: list[ServiceEntry] = []
+    for rows, reason_for in _native_rows(npc):
+        reason = reason_for(actor)
+        entries.extend(_entry(key, label, route, reason) for key, label, route in rows)
     return entries
 
 
@@ -377,6 +412,40 @@ def _church_reason(actor: Any, npc: Any, component: Any) -> ServiceReason | None
     return None
 
 
+def read_dialogue_source(npc: Any) -> tuple[Any | None, bool]:
+    """The host's resolved dialogue source and whether one was declared.
+
+    ``dialogue_source_for_host`` returns ``None`` both when the host declares
+    no dialogue source at all and when a declared one cannot resolve (an
+    unknown static key, an unresolved generated phase). Management inspection
+    must tell those apart: an unresolvable declared source leaves the service
+    inventory unknown rather than silently empty.
+    """
+    from world.rules.dialogue_context import host_dialogue_binding
+    from world.rules.dialogue_sources import dialogue_source_for_host
+
+    source = dialogue_source_for_host(npc)
+    if source is not None:
+        return source, True
+    _host_key, identity = host_dialogue_binding(npc)
+    return None, identity is not None
+
+
+def _dialogue_service_rows(
+    source: Any, npc: Any
+) -> list[tuple[str, str, ServiceRoute]]:
+    """Every authored dialogue-service association, in stable key order."""
+    npc_id = int(getattr(npc, "pk", 0) or 0)
+    return [
+        (
+            f"dialogue.{service.key}",
+            service.label,
+            ServiceRoute(ROUTE_DIALOGUE, npc_id, topic_id=service.topic_id),
+        )
+        for service in sorted(source.dialogue.services, key=lambda service: service.key)
+    ]
+
+
 def _dialogue_entries(actor: Any, npc: Any) -> list[ServiceEntry]:
     """Project the host's explicit dialogue-service associations."""
     from world.rules.dialogue import authorized_dialogue_open
@@ -385,14 +454,12 @@ def _dialogue_entries(actor: Any, npc: Any) -> list[ServiceEntry]:
         availability_context,
         project_topics,
     )
-    from world.rules.dialogue_sources import dialogue_source_for_host
 
-    source = dialogue_source_for_host(npc)
-    if source is None or not source.dialogue.services:
-        return []
-    npc_id = int(getattr(npc, "pk", 0) or 0)
     component = _component(npc, ScriptedDialogue)
     if component is None:
+        return []
+    source, _declared = read_dialogue_source(npc)
+    if source is None or not source.dialogue.services:
         return []
     gate = _service_gate_reason(actor, npc, component, schedule_kind="talk")
     if gate is None and not authorized_dialogue_open(actor, npc):
@@ -401,8 +468,8 @@ def _dialogue_entries(actor: Any, npc: Any) -> list[ServiceEntry]:
         row.topic_id: row for row in project_topics(availability_context(actor, npc))
     }
     entries: list[ServiceEntry] = []
-    for service in sorted(source.dialogue.services, key=lambda service: service.key):
-        row = rows.get(service.topic_id)
+    for key, label, route in _dialogue_service_rows(source, npc):
+        row = rows.get(route.topic_id)
         if row is None:
             # Hidden by canonical disclosure/permission: the entry is omitted
             # entirely, exactly like the topic it advertises.
@@ -412,14 +479,7 @@ def _dialogue_entries(actor: Any, npc: Any) -> list[ServiceEntry]:
             reason = ServiceReason(
                 REASON_TOPIC_LOCKED, row.requirement_hint or TOPIC_LOCKED_MESSAGE
             )
-        entries.append(
-            _entry(
-                f"dialogue.{service.key}",
-                service.label,
-                ServiceRoute(ROUTE_DIALOGUE, npc_id, topic_id=service.topic_id),
-                reason,
-            )
-        )
+        entries.append(_entry(key, label, route, reason))
     return entries
 
 
@@ -470,6 +530,80 @@ def project_npc_services(actor: Any, viewer: Any, npc: Any) -> NpcServices:
     return NpcServices(STATE_READY, tuple(entries))
 
 
+def inspect_npc_services(npc: Any) -> NpcServices:
+    """The host's actor-independent service inventory, for management reads.
+
+    The same capability mapping, labels and routes as
+    :func:`project_npc_services`, but no player body is selected: every entry
+    answers ``context_required`` with the exact reason that player context is
+    absent, so no enabled player operation — and no fabricated player verdict —
+    is ever presented. A caller must not use this as a player projection.
+
+    Dialogue associations are filtered by the same actorless disclosure the
+    shared availability semantics apply: an unconditional topic is enumerated,
+    a guarded or predecessor-locked one is withheld, so a hidden association
+    never appears in this inventory. A declared dialogue source that cannot
+    resolve leaves the inventory unknown and is reported as ``unreadable``,
+    never as an empty list.
+    """
+    from world.rules.dialogue_availability import (
+        availability_context,
+        project_topics,
+    )
+
+    npc_id = int(getattr(npc, "pk", 0) or 0)
+    if npc_id <= 0:
+        return NpcServices(STATE_NONE)
+    try:
+        rows = [
+            row
+            for group, _reason_for in _native_rows(npc)
+            for row in group
+        ]
+        if _component(npc, ScriptedDialogue) is not None:
+            source, declared = read_dialogue_source(npc)
+            if source is None:
+                if declared:
+                    # An authored association list may exist; without the
+                    # resolved source the complete inventory cannot be stated.
+                    return NpcServices(STATE_UNREADABLE)
+            elif source.dialogue.services:
+                disclosed = {
+                    row.topic_id
+                    for row in project_topics(availability_context(None, npc))
+                }
+                rows.extend(
+                    row
+                    for row in _dialogue_service_rows(source, npc)
+                    if row[2].topic_id in disclosed
+                )
+    except Exception as error:
+        log_warn(
+            PROJECTION_FAILED_EVENT,
+            context={
+                "npc": npc_id,
+                "actor": 0,
+                "error": type(error).__name__,
+            },
+            exc=error,
+        )
+        return NpcServices(STATE_UNREADABLE)
+    if not rows:
+        return NpcServices(STATE_NONE)
+    if len(rows) > MAX_SERVICE_ENTRIES:
+        # A runtime overflow is an integrity failure, never a silent truncation.
+        log_warn(
+            PROJECTION_FAILED_EVENT,
+            context={"npc": npc_id, "actor": 0, "reason": "entry_overflow"},
+        )
+        return NpcServices(STATE_UNREADABLE)
+    reason = ServiceReason(CONTEXT_REQUIRED, CONTEXT_REQUIRED_MESSAGE)
+    return NpcServices(
+        STATE_READY,
+        tuple(_entry(key, label, route, reason) for key, label, route in rows),
+    )
+
+
 def native_entry_count(type_keys: Any) -> int:
     """The number of native capability entries one host's types project."""
     keys = frozenset(type_keys or ())
@@ -514,7 +648,7 @@ _SECTION_GUIDANCE: dict[str, str] = {
 }
 
 
-def _route_guidance(entry: ServiceEntry, name: str, npc_id: int) -> str:
+def route_guidance(entry: ServiceEntry, name: str, npc_id: int) -> str:
     """Name the existing text flow one entry opens; it grants no authority."""
     route = entry.route
     if route.kind == ROUTE_DIALOGUE:
@@ -548,7 +682,7 @@ def service_report_lines(npc: Any, services: NpcServices) -> list[str]:
         if entry.enabled:
             lines.append(
                 f"  {entry.key}　{entry.label}　→ "
-                f"{_route_guidance(entry, name, npc_id)}"
+                f"{route_guidance(entry, name, npc_id)}"
             )
             if entry.route.kind == ROUTE_DIALOGUE:
                 # The topic is named on its own annotation line: the copyable
@@ -566,6 +700,8 @@ def service_report_lines(npc: Any, services: NpcServices) -> list[str]:
 
 __all__ = [
     "CHURCH_JOIN_COMMAND",
+    "CONTEXT_REQUIRED",
+    "CONTEXT_REQUIRED_MESSAGE",
     "MAX_SERVICE_ENTRIES",
     "NpcServices",
     "PROJECTION_FAILED_EVENT",
@@ -582,8 +718,11 @@ __all__ = [
     "ServiceReason",
     "ServiceRoute",
     "UNREADABLE_MESSAGE",
+    "inspect_npc_services",
     "native_entry_count",
     "project_npc_services",
+    "read_dialogue_source",
+    "route_guidance",
     "service_report_lines",
     "validate_service_capacity",
 ]

@@ -62,6 +62,65 @@ _OFF_ANCHOR = ServiceVerdict(False, REASON_OFF_ANCHOR)
 _MALFORMED = ServiceVerdict(False, REASON_MALFORMED_BINDING)
 
 
+@dataclass(frozen=True)
+class ServiceBindingReport:
+    """One component's stored binding, anchor and configuration facts.
+
+    ``gate_malformed`` is the runtime admissibility answer that
+    :func:`service_available` refuses on. ``anchor_on_person`` records the
+    anchored ``person`` binding the capability importer rejects (the runtime
+    gate stays permissive: it never checked this and admissibility must not
+    change here). Both are read-only facts for configuration inspection;
+    nothing in this module repairs or rejects authored data.
+    """
+
+    binding: str | None
+    anchor_room_id: int | None
+    anchor_room: Any | None
+    gate_malformed: bool
+    anchor_on_person: bool
+
+
+def read_service_binding(component: Any) -> ServiceBindingReport:
+    """Read one component's binding and resolve its anchor room. Read-only.
+
+    Reads only persisted component fields (``service_binding`` /
+    ``anchor_room_id``) and answers the same questions the runtime gate asks,
+    without its debounced warn event: an inspection read must not emit the
+    gameplay malformed-binding reminder.
+    """
+    binding = getattr(component, "service_binding", None)
+    raw_anchor = getattr(component, "anchor_room_id", None)
+    anchor_id = (
+        None
+        if isinstance(raw_anchor, bool) or not isinstance(raw_anchor, int)
+        else raw_anchor
+    )
+    if binding == "person":
+        # An anchor on a person binding is authored data the importer rejects;
+        # the runtime gate never checked it, so it stays an inspection fact.
+        return ServiceBindingReport(binding, anchor_id, None, False, raw_anchor is not None)
+    if binding != "place":
+        return ServiceBindingReport(binding, anchor_id, None, True, False)
+    if anchor_id is None:
+        return ServiceBindingReport(binding, anchor_id, None, True, False)
+    # The anchor lives whenever a ROOM row with that id exists (Evennia deletes
+    # the location reference with the room, so no dangling-location state can
+    # masquerade as at-anchor). The query converts each row to its stored
+    # typeclass, so the isinstance gate rejects a stored id that points at a
+    # non-room object (import-time resolution pins rooms; this is the
+    # corruption defense in depth). A plain Room.objects filter would pin to
+    # one typeclass path and blind subclass rooms — same constraint
+    # world/maps/bootstrap.py documents.
+    from evennia.objects.models import ObjectDB
+    from typeclasses.rooms import Room
+
+    anchor_row = next(iter(ObjectDB.objects.filter(pk=anchor_id)), None)
+    if anchor_row is None or not isinstance(anchor_row, Room):
+        return ServiceBindingReport(binding, anchor_id, None, True, False)
+    return ServiceBindingReport(binding, anchor_id, anchor_row, False, False)
+
+
 def _warn_malformed(host: Any, component: Any) -> None:
     """Emit at most ONE malformed-binding warn per host per process (ndb flag).
 
@@ -109,33 +168,14 @@ def service_available(actor: Any, host: Any, component: Any) -> ServiceVerdict:
     """
     if actor.location is None or host.location != actor.location:
         return _REMOTE
-    binding = getattr(component, "service_binding", None)
-    if binding == "person":
+    report = read_service_binding(component)
+    if report.gate_malformed:
+        _warn_malformed(host, component)
+        return _MALFORMED
+    if report.binding == "person":
         return _ALLOWED
-    if binding != "place":
-        _warn_malformed(host, component)
-        return _MALFORMED
-    anchor_room_id = getattr(component, "anchor_room_id", None)
-    if isinstance(anchor_room_id, bool) or not isinstance(anchor_room_id, int):
-        _warn_malformed(host, component)
-        return _MALFORMED
-    # The anchor lives whenever a ROOM row with that id exists (Evennia
-    # deletes the location reference with the room, so no dangling-location
-    # state can masquerade as at-anchor). The query converts each row to its
-    # stored typeclass, so the isinstance gate rejects a stored id that
-    # points at a non-room object (import-time resolution pins rooms; this
-    # is the corruption defense in depth). A plain Room.objects filter would
-    # pin to one typeclass path and blind subclass rooms — same constraint
-    # world/maps/bootstrap.py documents.
-    from evennia.objects.models import ObjectDB
-    from typeclasses.rooms import Room
-
-    anchor_row = next(iter(ObjectDB.objects.filter(pk=anchor_room_id)), None)
-    if anchor_row is None or not isinstance(anchor_row, Room):
-        _warn_malformed(host, component)
-        return _MALFORMED
     anchor_pk = getattr(host.location, "pk", None)
-    if anchor_pk != anchor_room_id:
+    if anchor_pk != report.anchor_room_id:
         return _OFF_ANCHOR
     return _ALLOWED
 
