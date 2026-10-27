@@ -20,6 +20,36 @@ from .geometry import (
     local_to_world_m,
     polygon_area_km2,
 )
+from .authoring import (
+    AuthoritativeExternalResult,
+    AuthoringWorld,
+    PARTITION_ALGORITHM_VERSION,
+    PartitionFreshness,
+    RuntimeMapSnapshot,
+    compile_runtime,
+    diagnose_world,
+    load_authoring_world,
+)
+from .codec import (
+    ParsedDocument,
+    document_from_data,
+    parse_document,
+    serialize_document,
+)
+from .diagnostics import (
+    AuthoringError,
+    Diagnostic,
+    RuntimeRejection,
+    SourceLocation,
+)
+from .schema import SCHEMA_VERSION, schema
+from .sources import (
+    SourceDocument,
+    discover_source_documents,
+    discover_source_paths,
+    fingerprint_text,
+    make_source_document,
+)
 from .sparse import (
     RouteStep,
     SparseEdge,
@@ -58,12 +88,24 @@ from .terrain import (
 )
 
 __all__ = [
+    "AuthoringError",
+    "AuthoringWorld",
+    "AuthoritativeExternalResult",
     "CELL_CENTER_OFFSET_M",
+    "Diagnostic",
     "METRES_PER_WILDERNESS_CELL",
     "NationalBorder",
+    "PARTITION_ALGORITHM_VERSION",
+    "ParsedDocument",
+    "PartitionFreshness",
     "REGION_KEYS",
     "RIDGE_BEND_PHASES",
     "RouteStep",
+    "RuntimeMapSnapshot",
+    "RuntimeRejection",
+    "SCHEMA_VERSION",
+    "SourceDocument",
+    "SourceLocation",
     "SparseDisplayMap",
     "SparseDisplayNode",
     "SparseEdge",
@@ -75,8 +117,14 @@ __all__ = [
     "border_river_row",
     "build_sparse_graph",
     "cell_center_m",
+    "compile_runtime",
     "compass_direction",
+    "diagnose_world",
+    "discover_source_documents",
+    "discover_source_paths",
+    "document_from_data",
     "exit_spawn_names",
+    "fingerprint_text",
     "forest_edge_row",
     "is_closed_ridge_cell",
     "is_inland_water_cell",
@@ -87,8 +135,11 @@ __all__ = [
     "is_walkable_cell",
     "is_within_frame",
     "local_to_world_m",
+    "load_authoring_world",
+    "make_source_document",
     "nominal_nation_for_coordinates",
     "polygon_area_km2",
+    "parse_document",
     "rasterize_routes",
     "rasterize_segment",
     "region_for_coordinates",
@@ -96,5 +147,7 @@ __all__ = [
     "ridge_polyline",
     "ridge_span",
     "route_row_at",
+    "schema",
+    "serialize_document",
     "terrain_description",
 ]

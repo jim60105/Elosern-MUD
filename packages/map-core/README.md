@@ -1,10 +1,11 @@
 # elosern-map-core
 
-Pure, deterministic map calculations for Elosern: sparse settlement graphs and
-their shortest-path routing, the explicit-input cell/local/world metric
-transforms, and the wilderness terrain rules. The package has **no runtime
-dependencies** and imports no game code, Evennia, Django, HTTP client or UI
-state, so it can be imported, tested and reasoned about outside the MUD.
+Pure, deterministic map calculations for Elosern: the typed authoring documents
+and their restricted round-trip YAML codec, sparse settlement graphs and their
+shortest-path routing, the explicit-input cell/local/world metric transforms,
+and the wilderness terrain rules. The package imports no game code, Evennia,
+Django, HTTP client or UI state, so it can be imported, tested and reasoned
+about outside the MUD.
 
 ## Units
 
@@ -23,6 +24,52 @@ local anchor point is the settlement position that sits on the wilderness
 anchor cell's centre.
 
 ## API
+
+### `elosern_map_core` authoring surface
+
+- `schema()` — deep copy of the complete machine-readable version-1 domain
+  schema (document kinds, every nested field including room prototype fields,
+  typed value constraints, list identities and cross-field rules).
+- `SourceDocument(relative_path, text, fingerprint)`,
+  `make_source_document(...)`, `discover_source_paths(root)`,
+  `discover_source_documents(root)` — the sorted world source set
+  (`content/maps/{continent,locations,districts}.yaml`,
+  `content/maps/settlements/*.yaml`, `content/maps/interiors/*.yaml`). Layouts
+  and generated artifacts are never discovered as world inputs.
+- `parse_document(relative_path, text)` — restricted YAML 1.2 parse returning
+  typed values, one-based field provenance and the comment-preserving
+  round-trip tree.
+- `document_from_data(relative_path, data)` — validate a programmatic candidate
+  and build its typed document.
+- `serialize_document(document, retained_tree=None)` — merge the candidate into
+  a copy of the retained tree, emit readable YAML and re-parse its own output;
+  a failed or lossy candidate returns no text and never mutates the baseline.
+- `load_authoring_world(source_documents)` — one structurally complete
+  `AuthoringWorld` (or an `AuthoringError` carrying every source-located
+  diagnostic). Unfinished maps load and record semantic work-in-progress
+  diagnostics.
+- `diagnose_world(world, *, partition_freshness=None)` — the saveable semantic
+  diagnostics; supplied freshness can add `stale_partition`.
+- `compile_runtime(world, authoritative_external_result, partition_freshness)` —
+  the immutable `RuntimeMapSnapshot`, or a `RuntimeRejection`. It requires a
+  diagnostic-free world, an explicit authoritative external result bound to
+  this world's fingerprint and a current partition signature.
+
+The codec rejects duplicate keys (before mappings are constructed), explicit or
+custom tags, anchors, aliases, merge keys, timestamps, non-finite numbers,
+non-decimal integer literals, sets/binary, multiple documents, empty documents,
+non-string keys, unknown fields, unsupported versions/kinds and value-type
+coercions. Integer fields never accept booleans, fractions or numeric strings.
+
+Read-only inspection:
+
+```console
+uv run --locked python -m elosern_map_core schema
+uv run --locked python -m elosern_map_core inspect <workspace-root>
+```
+
+See `docs/development/map-authoring-documents.md` for the complete field and
+diagnostic reference.
 
 ### `elosern_map_core.geometry`
 

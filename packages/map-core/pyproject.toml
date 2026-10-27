@@ -1,10 +1,12 @@
 [project]
 name = "elosern-map-core"
 version = "0.1.0"
-description = "Pure deterministic map geometry, sparse routing and terrain rules for the Elosern map layers."
+description = "Pure authoring documents, restricted YAML codec, map geometry, sparse routing and terrain rules for the Elosern map layers."
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "ruamel-yaml>=0.19.1",
+]
 
 [build-system]
 requires = ["hatchling>=1.27.0"]
