@@ -41,7 +41,7 @@ from world.rules.church import (
 from world.rules.npc_schedules import interaction_reason
 from world.rules.service_gate import MESSAGE_OFF_ANCHOR
 from world.skills.registry import SKILL_REGISTRY
-from commands.talk import resolve_visible_npc
+from commands.talk import _resolve_npc, resolve_visible_npc
 
 _NO_LOCAL_HOST_LINE = "這裡沒有教會的神職人員。"
 _AMBIGUOUS_HOST_LINE = "這裡有多名神職人員，請指明對象。"
