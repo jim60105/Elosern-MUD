@@ -263,6 +263,23 @@ describe("the shop window in AppClient (webclient-shop-window)", () => {
     ]);
   });
 
+  it("states a pending surface while its first read waits for the single-action store", async () => {
+    await mountWith({ services: SHOP_SERVICES_SAMPLE, party: SHOP_PARTY_SAMPLE });
+    await get("hud-drawer-close").trigger("click");
+    await wrapper.vm.$nextTick();
+    // Another action holds the store, so the entry read cannot dispatch yet.
+    expect(store.dispatchAction("explore.wait", { daypart: "dusk" })).not.toBe(null);
+    await wrapper.vm.$nextTick();
+    const before = sent("services.open").length;
+    store.openHudDrawer("shop");
+    await wrapper.vm.$nextTick();
+    expect(sent("services.open")).toHaveLength(before);
+    const unavailable = get("shop-window__unavailable");
+    expect(unavailable.attributes("data-reason-code")).toBe("services_pending");
+    // The room summary's rows are never offered for a targeted drawer.
+    expect(wrapper.find('[data-testid="shop-rows__row--steel_shortsword"]').exists()).toBe(false);
+  });
+
   it("states a refused provider read instead of the room summary's other provider", async () => {
     await mountWith({ services: SHOP_SERVICES_SAMPLE, party: SHOP_PARTY_SAMPLE });
     expect(wrapper.find('[data-testid="shop-rows__row--steel_shortsword"]').exists()).toBe(true);

@@ -8,19 +8,25 @@
 // every shipped section naming that same provider; anything else is discarded
 // so a stale, foreign or substituted response never reopens UI.
 //
-// A slot that has been targeted keeps its identity until the drawer closes or
-// reselects: while its first read is in flight, and after a refusal, it has no
-// snapshot and the drawer shows an unavailable surface rather than the room
-// summary, so a flow opened for one NPC can never be completed against
-// another. A dispatch the store refuses (one action is already in flight) is
-// remembered and replayed once the store is free, so an opening that races a
-// mutation still reads its provider.
+// A slot records its selected provider the moment the drawer asks for it —
+// before the dispatch, while the read is in flight, and after a refusal. The
+// drawer therefore never renders the room summary for a targeted slot: until
+// a snapshot is adopted it states an unavailable surface, so a flow opened for
+// one NPC can never be completed against another.
+//
+// The store runs one action at a time. An opening it refuses (because another
+// action is in flight) is remembered as scheduling information and replayed
+// once the store settles; an explicit opening always supersedes the previous
+// selection and any queued intent, so a late replay can never override the
+// latest choice.
 //
 // Refresh ownership: while a slot holds a snapshot, a committed presentation
 // revision (a purchase, a registration, a quest write) repeats the read for
-// the same provider once nothing is in flight. `services.open` publishes no
-// panel of its own, so a read cannot trigger another read. The selection is
-// never persisted on the actor or the NPC.
+// the same provider once nothing is in flight; a snapshot older than the
+// committed revision is re-read too, because the result's own presentation
+// revision — not the arrival time — says what it shows. `services.open`
+// publishes no panel of its own, so a read cannot trigger another read. The
+// selection is never persisted on the actor or the NPC.
 import { computed, ref, watch } from "vue";
 import Protocol from "../../static/webclient/js/elosern/protocol.js";
 
@@ -67,11 +73,22 @@ export function useServicesOpen(store, { dispatchIntent }) {
     wanted.value = nextWanted;
   }
 
+  function forgetWanted(slot) {
+    if (!(slot in wanted.value)) return;
+    const next = { ...wanted.value };
+    delete next[slot];
+    wanted.value = next;
+  }
+
+  // Record the slot's selection and try to dispatch it. The selection is
+  // recorded whether or not the dispatch succeeds, so the drawer is targeted
+  // from this moment on. A same-provider read keeps its snapshot and refusal
+  // on screen; a different provider starts from nothing and stops owning the
+  // previous read.
   function dispatchRead(slot, providerId) {
     const previous = slots.value[slot];
-    const sameProvider = previous && previous.providerId === providerId;
+    const sameProvider = previous !== undefined && previous.providerId === providerId;
     const requestId = dispatchIntent(ACTION_ID, { npc_id: providerId });
-    if (!requestId) return null;
     slots.value = {
       ...slots.value,
       [slot]: {
@@ -79,24 +96,24 @@ export function useServicesOpen(store, { dispatchIntent }) {
         requestId,
         epoch: store.view.epoch,
         generation: store.view.generation,
-        // A refresh keeps the committed snapshot on screen; a re-target or a
-        // first read starts from nothing.
         revision: sameProvider ? previous.revision : null,
         snapshot: sameProvider ? previous.snapshot : null,
-        refusal: null,
+        refusal: requestId === null && sameProvider ? previous.refusal : null,
       },
     };
     return requestId;
   }
 
   // Open (or re-target) one slot. Re-opening the provider of a slot that holds
-  // a snapshot or a pending read is a no-op; a slate that only recorded a
-  // refusal reads again, because selecting the provider is what retries it.
+  // a snapshot or a pending read is a no-op for that provider; a slot that only
+  // recorded a refusal reads again, because selecting the provider is what
+  // retries it. Either way the call supersedes any queued intent.
   function openServices(slot, providerId) {
     if (!isProviderId(providerId)) {
       clearSlot(slot);
       return null;
     }
+    forgetWanted(slot);
     const current = slots.value[slot];
     if (
       current &&
@@ -106,8 +123,6 @@ export function useServicesOpen(store, { dispatchIntent }) {
       return null;
     }
     if (!dispatchRead(slot, providerId)) {
-      // The store holds one action at a time: remember the opening instead of
-      // losing it, and replay it when the store is free.
       wanted.value = { ...wanted.value, [slot]: providerId };
     }
     return null;
@@ -118,15 +133,21 @@ export function useServicesOpen(store, { dispatchIntent }) {
   }
 
   // Replay every remembered opening, then re-read every adopted slot whose
-  // committed revision moved on, once no request is in flight. A read that
-  // has not settled yet keeps its slot.
+  // snapshot trails the committed revision, once no request is in flight. A
+  // read that has not settled yet keeps its slot.
   function advance() {
     const queued = wanted.value;
     if (Object.keys(queued).length > 0) {
       wanted.value = {};
       for (const [slot, providerId] of Object.entries(queued)) {
         const current = slots.value[slot];
-        if (current && current.providerId === providerId) continue;
+        if (
+          current &&
+          current.providerId === providerId &&
+          (current.snapshot || current.requestId)
+        ) {
+          continue;
+        }
         if (!dispatchRead(slot, providerId)) {
           wanted.value = { ...wanted.value, [slot]: providerId };
         }
@@ -185,15 +206,23 @@ export function useServicesOpen(store, { dispatchIntent }) {
         };
         return;
       }
+      // The result's own presentation revision says what the rows show; a
+      // result that already trails the committed state is re-read below
+      // instead of being recorded as current.
+      const revision =
+        typeof result.presentationRevision === "number"
+          ? result.presentationRevision
+          : store.view.revision;
       slots.value = {
         ...slots.value,
         [slot]: {
           ...settled,
-          revision: store.view.revision,
+          revision,
           snapshot: result.data.services,
           refusal: null,
         },
       };
+      if (revision < store.view.revision) advance();
     },
   );
 

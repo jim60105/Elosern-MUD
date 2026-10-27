@@ -39,6 +39,7 @@ function deliver(view, requestId, data, overrides = {}) {
     requestId,
     epoch: view.epoch,
     outcome: "success",
+    presentationRevision: view.revision,
     data,
     ...overrides,
   };
@@ -212,7 +213,14 @@ describe("useServicesOpen", () => {
     view.dispatch.inFlight = { requestId: "session:0" };
     openServices("shop", SHOP_PROVIDER);
     expect(sent).toHaveLength(0);
-    expect(slots.value.shop).toBeUndefined();
+    // The drawer is targeted from the moment it asked: no snapshot yet, so it
+    // states a pending surface instead of the room summary's other provider.
+    expect(slots.value.shop).toMatchObject({
+      providerId: SHOP_PROVIDER,
+      requestId: null,
+      snapshot: null,
+      refusal: null,
+    });
 
     // The other action settles (result delivered, gate released): the
     // remembered opening reads its provider.
@@ -238,6 +246,63 @@ describe("useServicesOpen", () => {
     view.dispatch.inFlight = null;
     await nextTick();
     expect(sent).toHaveLength(0);
+  });
+
+  it("retries a refused provider selected again while the store was busy", async () => {
+    const { view, sent, openServices, slots } = setup();
+    openServices("shop", SHOP_PROVIDER);
+    deliver(view, "session:1", undefined, {
+      outcome: "rejected",
+      code: "no_such_target",
+      message: "這裡沒有這個對象。",
+    });
+    await nextTick();
+    expect(slots.value.shop.refusal).toMatchObject({ code: "no_such_target" });
+
+    // The keeper is selected again while another action holds the store.
+    view.dispatch.inFlight = { requestId: "session:2" };
+    openServices("shop", SHOP_PROVIDER);
+    expect(sent).toHaveLength(1);
+    deliver(view, "session:2", undefined, { outcome: "success" });
+    view.dispatch.inFlight = null;
+    await nextTick();
+    expect(sent).toHaveLength(2);
+    expect(sent[1].payload).toEqual({ npc_id: SHOP_PROVIDER });
+  });
+
+  it("supersedes a queued retarget when the current provider is reselected", async () => {
+    const { view, sent, openServices, slots } = setup();
+    openServices("shop", SHOP_PROVIDER);
+    deliver(view, "session:1", shopRead());
+    await nextTick();
+    expect(slots.value.shop.snapshot).toEqual(SERVICES_PANEL_SHOP_ROWS_SAMPLE);
+
+    // A retarget waits for the store, then the drawer goes back to the
+    // provider it already shows: the queued retarget must not win later.
+    view.dispatch.inFlight = { requestId: "session:2" };
+    openServices("shop", 77);
+    openServices("shop", SHOP_PROVIDER);
+    deliver(view, "session:2", undefined, { outcome: "success" });
+    view.dispatch.inFlight = null;
+    await nextTick();
+    // Only the reselected provider was read; the abandoned retarget never runs.
+    expect(sent.slice(1).map((entry) => entry.payload)).toEqual([{ npc_id: SHOP_PROVIDER }]);
+    expect(slots.value.shop.providerId).toBe(SHOP_PROVIDER);
+    deliver(view, sent[1].requestId, shopRead());
+    await nextTick();
+    expect(slots.value.shop.snapshot).toEqual(SERVICES_PANEL_SHOP_ROWS_SAMPLE);
+  });
+
+  it("re-reads a snapshot whose result trails the committed revision", async () => {
+    const { view, sent, openServices, slots } = setup();
+    openServices("shop", SHOP_PROVIDER);
+    // The result was prepared for an older revision than the one now
+    // committed, so it is adopted and immediately refreshed.
+    deliver(view, "session:1", shopRead(), { presentationRevision: view.revision - 1 });
+    await nextTick();
+    expect(slots.value.shop.snapshot).toEqual(SERVICES_PANEL_SHOP_ROWS_SAMPLE);
+    expect(sent).toHaveLength(2);
+    expect(sent[1].payload).toEqual({ npc_id: SHOP_PROVIDER });
   });
 
   it("clears a slot when it is opened without a usable provider", async () => {
