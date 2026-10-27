@@ -79,23 +79,11 @@ def instance_scene_identity(identity: object) -> str:
 
 # --------------------------------------------------------------------------- authored tables
 
-# Wilderness region key -> registered scene archetype (design §6.4): forest
-# regions render the forest path, the central mountains the mountain path, the
-# coastal strips the coastal path, and plains/hills the wilderness path. Region
-# keys are ``world.lore.wilderness_regions``' keys; they describe terrain, not
-# scene art, which is exactly why this explicit mapping exists.
-_REGION_SCENE_ARCHETYPES: dict[str, str] = {
-    "north_deep_forest": "forest_path",
-    "northwest_highland_forest": "forest_path",
-    "central_mountains": "mountain_path",
-    "southeast_coast": "coastal_path",
-    "southwest_coast": "coastal_path",
-    "eastern_plains": "wilderness_path",
-    "western_hills_valleys": "wilderness_path",
-}
-
-REGION_SCENE_ARCHETYPES: Mapping[str, str] = MappingProxyType(_REGION_SCENE_ARCHETYPES)
-
+# Wilderness region scene associations are map-owned fields of the continent
+# source (``scene_archetype`` per region), published by
+# ``world.maps.geography`` after validating them against the scene catalog.
+# They are deliberately not duplicated here.
+#
 # Authored grid node identity -> registered scene archetype. Every walkable
 # node of every declared settlement graph is listed so the art panel resolves
 # a real registered archetype on a fresh boot; the node's current coordinate is
@@ -175,11 +163,6 @@ def validate_room_art_registries() -> None:
     every authored place must be declared here. A defect names the offending
     key so a bad edit cannot silently degrade a room to no scene art.
     """
-    for region, scene in REGION_SCENE_ARCHETYPES.items():
-        if scene not in SCENE_ARCHETYPE_REGISTRY:
-            raise ValueError(
-                f"region {region!r} maps to unregistered scene archetype {scene!r}"
-            )
     for node, scene in GRID_NODE_SCENE_ARCHETYPES.items():
         if not isinstance(node, QualifiedRef) or node.domain != "settlement_node":
             raise ValueError(f"grid art key {node!r} is not a settlement_node reference")
@@ -210,7 +193,6 @@ __all__ = [
     "GRID_NODE_SCENE_ARCHETYPES",
     "MAX_SCENE_IDENTITY_CODE_POINTS",
     "PLACE_SCENE_ARCHETYPES",
-    "REGION_SCENE_ARCHETYPES",
     "grid_scene_identity",
     "instance_scene_identity",
     "place_scene_identity",

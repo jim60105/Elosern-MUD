@@ -27,11 +27,8 @@ from copy import deepcopy
 from typing import Any
 
 from world.observability import log_info, log_warn
-from world.maps.wilderness_provider import (
-    WILDERNESS_MAX_X,
-    WILDERNESS_MAX_Y,
-    WILDERNESS_NAME,
-)
+from world.maps import wilderness_provider
+from world.maps.wilderness_provider import WILDERNESS_NAME
 
 # The persisted record schema version. All stored records carry this literal.
 SCHEMA_VERSION = 1
@@ -157,7 +154,7 @@ def encode_wild(name: str, x: int, y: int) -> str:
         )
     if not _is_non_negative_int(x) or not _is_non_negative_int(y):
         raise NodeIDError("wilderness coordinates must be non-negative integers")
-    if x > WILDERNESS_MAX_X or y > WILDERNESS_MAX_Y:
+    if x > wilderness_provider.WILDERNESS_MAX_X or y > wilderness_provider.WILDERNESS_MAX_Y:
         raise NodeIDError("wilderness coordinates exceed the provider bounds")
     node_id = f"{_WILD_PREFIX}:{name}:{x}:{y}"
     if len(node_id) > MAX_NODE_ID_CHARS:
@@ -218,7 +215,7 @@ def decode_node(node_id: Any) -> dict[str, Any]:
         x, y = int(x_raw), int(y_raw)
         if not _is_non_negative_int(x) or not _is_non_negative_int(y):
             raise NodeIDError("wilderness coordinates must be non-negative integers")
-        if x > WILDERNESS_MAX_X or y > WILDERNESS_MAX_Y:
+        if x > wilderness_provider.WILDERNESS_MAX_X or y > wilderness_provider.WILDERNESS_MAX_Y:
             raise NodeIDError("wilderness coordinates exceed the provider bounds")
         return {"prefix": _WILD_PREFIX, "name": name, "x": x, "y": y}
     if prefix == _ROOM_PREFIX:

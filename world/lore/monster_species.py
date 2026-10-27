@@ -54,7 +54,6 @@ from types import MappingProxyType
 from .guild import GUILD_RANK_REGISTRY
 from .monsters import MONSTER_TIER_REGISTRY, MonsterTier
 from .registry_refs import ref
-from .wilderness_regions import WILDERNESS_REGION_REGISTRY
 
 
 class MonsterSpeciesRegistryError(ValueError):
@@ -164,10 +163,16 @@ class MonsterVariant:
     behaviour_profile_key: str | None = None
 
 
-def _faces(habitat_face, tier_face, grade_face) -> tuple[frozenset, frozenset, frozenset]:
-    """Resolve the validated vocabularies, defaulting to the static lore faces."""
+def _faces(habitat_face, tier_face, grade_face):
+    """Resolve the validated vocabularies, defaulting to the static lore faces.
+
+    The habitat vocabulary is a map-owned declaration (the continent's terrain
+    regions), so it has no import-time lore face: the published geography
+    validates every habitat tag against the regions it declares. An explicit
+    ``habitat_face`` still checks membership for behavior tests.
+    """
     return (
-        frozenset(habitat_face) if habitat_face is not None else frozenset(WILDERNESS_REGION_REGISTRY),
+        frozenset(habitat_face) if habitat_face is not None else None,
         frozenset(tier_face) if tier_face is not None else frozenset(MONSTER_TIER_REGISTRY),
         frozenset(grade_face) if grade_face is not None else frozenset(GUILD_RANK_REGISTRY),
     )
@@ -413,7 +418,7 @@ def validate_monster_species_registry(
                 raise MonsterSpeciesRegistryError(
                     f"species {mapping_key!r} has an empty habitat tag"
                 )
-            if tag not in habitat_keys:
+            if habitat_keys is not None and tag not in habitat_keys:
                 raise MonsterSpeciesRegistryError(
                     f"species {mapping_key!r} habitat tag {tag!r} is not a "
                     "known habitat"

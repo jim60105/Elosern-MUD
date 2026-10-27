@@ -1,0 +1,272 @@
+# Continental geography authored source (schema version 1).
+# Converted once from the former Python declarations; this document is the
+# sole map-facing authority for the frame, mainland, terrain and regions.
+version: 1
+kind: continent
+id: continent
+frame_cells: 2700
+cell_size_km: 1
+mainland_boundary_km:
+  - east_km: 450
+    north_km: 100
+  - east_km: 1850
+    north_km: 100
+  - east_km: 2400
+    north_km: 450
+  - east_km: 2600
+    north_km: 1350
+  - east_km: 1930
+    north_km: 2250
+  - east_km: 1800
+    north_km: 2600
+  - east_km: 750
+    north_km: 2550
+  - east_km: 200
+    north_km: 2050
+  - east_km: 100
+    north_km: 1050
+  - east_km: 300
+    north_km: 350
+regions:
+  central_mountains:
+    display_name_zh: 中央山脈
+    nation_key:
+    terrain_flavor_zh:
+      - 陡峭的山壁直插雲霄，寒風中隱約傳來難以辨明來源的歌聲。
+      - 林木稀疏的山徑蜿蜒而上，碎石在腳下滑動，四周異常寂靜。
+      - 雲霧終年繚繞山腰，據說深處藏著人族從未涉足之地。
+    nominal_nation_keys:
+      - altoria
+      - grandia
+      - valhalla
+    scene_archetype: mountain_path
+  eastern_plains:
+    display_name_zh: 東部大平原
+    nation_key: grandia
+    terrain_flavor_zh:
+      - 一望無際的麥田隨風起伏，遠方農莊的炊煙筆直升起。
+      - 平整的官道兩側是修剪整齊的果園，牛車緩緩碾過塵土。
+      - 肥沃的黑土地上阡陌縱橫，灌溉渠道映著天光。
+    nominal_nation_keys:
+      - grandia
+    scene_archetype: wilderness_path
+  north_deep_forest:
+    display_name_zh: 北部深林
+    nation_key:
+    terrain_flavor_zh:
+      - 巨木遮蔽天日，林間彌漫著潮濕腐葉的氣息，寂靜得令人不安。
+      - 糾結的藤蔓封鎖了視野，遠處似乎有什麼龐然大物正在移動。
+      - 無人踏足的密林深處，偶爾傳來不知名生物的低吼。
+    nominal_nation_keys:
+      - grandia
+      - valhalla
+    scene_archetype: forest_path
+  northwest_highland_forest:
+    display_name_zh: 西北高地森林
+    nation_key: valhalla
+    terrain_flavor_zh:
+      - 高聳的針葉林間，獸群的足跡清晰可辨，空氣中帶著松脂的氣味。
+      - 起伏的高地覆蓋著濃密的森林，獵人的營火痕跡散落其間。
+      - 礦脈裸露的岩壁旁，成群的野獸在林間空地遊蕩。
+    nominal_nation_keys:
+      - valhalla
+    scene_archetype: forest_path
+  southeast_coast:
+    display_name_zh: 東南海岸
+    nation_key: grandia
+    terrain_flavor_zh:
+      - 鹹濕的海風夾雜著魚市的喧鬧，遠方帆影點點。
+      - 石砌的碼頭邊堆滿待運的貨箱，海鳥在桅杆間盤旋。
+      - 潮水拍打著防波堤，港區小巷瀰漫著海產與香料的氣味。
+    nominal_nation_keys:
+      - grandia
+    scene_archetype: coastal_path
+  southwest_coast:
+    display_name_zh: 西南海岸
+    nation_key: altoria
+    terrain_flavor_zh:
+      - 精工打磨的木船停靠在小巧的港灣，工匠的敲打聲不絕於耳。
+      - 海崖下的漁村炊煙裊裊，曬鹽場在陽光下泛著白光。
+      - 商船的旗幟在海風中獵獵作響，岸邊堆滿待售的精工器物。
+    nominal_nation_keys:
+      - altoria
+    scene_archetype: coastal_path
+  western_hills_valleys:
+    display_name_zh: 西部丘陵與谷地
+    nation_key: altoria
+    terrain_flavor_zh:
+      - 起伏的丘陵間點綴著石砌梯田，遠處傳來礦坑鑿擊的回聲。
+      - 谷地間河流蜿蜒，兩岸散落著手工業者的作坊與磨坊。
+      - 低緩的丘陵覆滿灌木與野花，羊群在坡地上安靜地啃食。
+    nominal_nation_keys:
+      - altoria
+    scene_archetype: wilderness_path
+harbor_sites:
+  imperial_southeast_main_port:
+    display_name: Imperial southeastern main port
+    cell:
+      cell_x: 2070
+      cell_y: 241
+    role: Agricultural and magical-goods exports
+  imperial_southeast_secondary_port:
+    display_name: Imperial southeastern secondary port
+    cell:
+      cell_x: 2400
+      cell_y: 454
+    role: Eastern coastal collection
+  imperial_southern_secondary_port:
+    display_name: Imperial southern secondary port
+    cell:
+      cell_x: 1700
+      cell_y: 101
+    role: Southern coastal transfer
+  kingdom_southern_secondary_port:
+    display_name: Kingdom southern secondary port
+    cell:
+      cell_x: 600
+      cell_y: 101
+    role: Southern coastal supply
+  kingdom_southwest_main_port:
+    display_name: Kingdom southwestern main port
+    cell:
+      cell_x: 301
+      cell_y: 350
+    role: River/sea transfer and foreign trade
+  kingdom_western_secondary_port:
+    display_name: Kingdom western secondary port
+    cell:
+      cell_x: 201
+      cell_y: 700
+    role: Western mining and craft exports
+terrain:
+  forest_edge:
+    - cell_x: 0
+      cell_y: 1950
+    - cell_x: 190
+      cell_y: 1950
+    - cell_x: 330
+      cell_y: 1900
+    - cell_x: 480
+      cell_y: 1955
+    - cell_x: 640
+      cell_y: 1925
+    - cell_x: 780
+      cell_y: 1920
+    - cell_x: 900
+      cell_y: 1890
+    - cell_x: 1040
+      cell_y: 1945
+    - cell_x: 1200
+      cell_y: 1900
+    - cell_x: 1330
+      cell_y: 1935
+    - cell_x: 1470
+      cell_y: 1890
+    - cell_x: 1600
+      cell_y: 1945
+    - cell_x: 1760
+      cell_y: 1905
+    - cell_x: 1900
+      cell_y: 1950
+    - cell_x: 2050
+      cell_y: 1915
+    - cell_x: 2180
+      cell_y: 1925
+    - cell_x: 2699
+      cell_y: 1925
+  ridge:
+    base_x: 1410
+    period: 60
+    step: 10
+    min_x: 1300
+    max_x: 1520
+    north_limit_y: 2200
+    mountain_corridor_half_width: 100
+    passes:
+      - y_min: 410
+        y_max: 425
+      - y_min: 970
+        y_max: 990
+      - y_min: 1770
+        y_max: 1785
+  coastal_y_max: 500
+  waterways:
+    border_river:
+      route:
+        - cell_x: 1320
+          cell_y: 1410
+        - cell_x: 1210
+          cell_y: 1380
+        - cell_x: 1100
+          cell_y: 1350
+        - cell_x: 990
+          cell_y: 1395
+        - cell_x: 900
+          cell_y: 1380
+        - cell_x: 830
+          cell_y: 1370
+        - cell_x: 740
+          cell_y: 1330
+        - cell_x: 650
+          cell_y: 1310
+        - cell_x: 530
+          cell_y: 1355
+        - cell_x: 400
+          cell_y: 1340
+        - cell_x: 290
+          cell_y: 1300
+        - cell_x: 170
+          cell_y: 1290
+        - cell_x: 124
+          cell_y: 1290
+      fords:
+        - cell_x: 1150
+          cell_y: 1363
+        - cell_x: 830
+          cell_y: 1370
+        - cell_x: 450
+          cell_y: 1345
+    capital_river:
+      route:
+        - cell_x: 1150
+          cell_y: 1060
+        - cell_x: 860
+          cell_y: 1040
+        - cell_x: 600
+          cell_y: 800
+        - cell_x: 310
+          cell_y: 360
+      fords:
+        - cell_x: 860
+          cell_y: 1040
+        - cell_x: 600
+          cell_y: 800
+        - cell_x: 400
+          cell_y: 497
+    imperial_east_branch:
+      route:
+        - cell_x: 2070
+          cell_y: 700
+        - cell_x: 2200
+          cell_y: 600
+        - cell_x: 2390
+          cell_y: 460
+      fords:
+        - cell_x: 2300
+          cell_y: 526
+    imperial_river:
+      route:
+        - cell_x: 1950
+          cell_y: 1260
+        - cell_x: 1990
+          cell_y: 1100
+        - cell_x: 2070
+          cell_y: 700
+        - cell_x: 2060
+          cell_y: 250
+      fords:
+        - cell_x: 1990
+          cell_y: 1100
+        - cell_x: 2067
+          cell_y: 600
+  border_river_key: border_river

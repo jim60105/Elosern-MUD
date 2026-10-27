@@ -46,6 +46,7 @@ def _late(module: str, name: str):
 # quest runtime must run after the lore/map syncs. Guard tests assert against
 # this catalog (behaviorally, via stubs) instead of source text.
 STARTUP_STEP_ORDER: tuple[str, ...] = (
+    "geography_source_publication",
     "static_map_reference_validation",
     "world_clock_init",
     "equipment_rulebook_validation",
@@ -448,6 +449,14 @@ def at_server_start():
     # Per-layer tolerated registration-conflict classes, resolved lazily at
     # first failure exactly like the pre-refactor helper-local imports.
 
+    # The authored continental geography is loaded, validated and published
+    # first: every later map consumer (terrain, presenter, lore mirror,
+    # static-reference preflight) reads this one immutable snapshot, and a
+    # failed candidate aborts boot before anything is published or persisted.
+    _startup_step(
+        "geography_source_publication",
+        lambda: _late("world.maps.geography", "load_and_publish"),
+    )
     # Fail-loud static map-reference gate: every authored static target
     # (gates, anchor placements, wilderness gates, place exteriors, district
     # landmarks, grid art) resolves against one current binding snapshot before

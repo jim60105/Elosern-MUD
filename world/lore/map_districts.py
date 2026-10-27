@@ -114,18 +114,24 @@ def cell_of_position(position_m: tuple[int, int]) -> tuple[int, int]:
 
 
 class _ProductionTerrain:
-    """The live terrain model, settlement graphs and gateway registry."""
+    """One geography snapshot's terrain, settlement graphs and gateway registry.
 
-    def __init__(self) -> None:
-        from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
-        from world.maps import wilderness_provider as provider
+    Every geography-dependent operation is bound to the snapshot this adapter
+    was built from (including the reachability index), so a retained adapter
+    never mixes an older world's components with a newly published classifier.
+    """
+
+    def __init__(self, snapshot=None) -> None:
+        from world.maps.geography import current
+        from world.maps.wilderness_provider import WILDERNESS_NAME
         from world.maps.wilderness_reachability import walkable_components
 
-        self._provider = provider
-        self.wilderness_name = provider.WILDERNESS_NAME
-        self.max_cell = (provider.WILDERNESS_MAX_X, provider.WILDERNESS_MAX_Y)
-        self.region_keys = frozenset(WILDERNESS_REGION_REGISTRY)
-        self._components = walkable_components()
+        self._geography = snapshot if snapshot is not None else current()
+        self._terrain = self._geography.terrain
+        self.wilderness_name = WILDERNESS_NAME
+        self.max_cell = (self._geography.max_x, self._geography.max_y)
+        self.region_keys = frozenset(self._geography.regions)
+        self._components = walkable_components(self._geography)
         self._entries = tuple(self._gateway_entries())
         # Players leave settlements through gateway approaches, so a cell is
         # reachable when it shares a component with any of them. The shipped
@@ -154,17 +160,25 @@ class _ProductionTerrain:
                     )
 
     def is_land(self, cell):
-        return self._provider.is_land_cell(cell)
+        from elosern_map_core import terrain as core_terrain
+
+        return core_terrain.is_land_cell(self._terrain, cell)
 
     def is_walkable(self, cell):
-        return self._provider.is_valid_wilderness_cell(cell)
+        from elosern_map_core import terrain as core_terrain
+
+        return core_terrain.is_valid_wilderness_cell(
+            self._terrain, self._components.footprints, cell
+        )
 
     def is_reachable(self, cell):
         component = self._components.component(cell)
         return component is not None and component in self._reachable_components
 
     def region_of(self, cell):
-        return self._provider.region_for_coordinates(*cell)
+        from elosern_map_core import terrain as core_terrain
+
+        return core_terrain.region_for_coordinates(self._terrain, *cell)
 
     def grid_site(self, map_key, xy):
         from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY

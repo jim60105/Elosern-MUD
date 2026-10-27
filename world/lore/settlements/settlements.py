@@ -12,9 +12,6 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Mapping
 
-from world.lore.anchors import ANCHOR_REGISTRY
-
-
 class SettlementArchetype(StrEnum):
     CAPITAL = "capital"
     TOWN = "town"
@@ -38,18 +35,15 @@ def validate_settlement_registry(
 ) -> None:
     """Fail closed on a malformed settlement record, naming the row.
 
-    A settlement key MUST resolve in the geographic anchor registry: places
-    resolve their exterior coordinate space through the settlement, and the
-    anchor registry is the single naming authority for geography.
+    A settlement key MUST resolve in the composed geographic locations. That
+    join is checked when the geography candidate is published
+    (``world.maps.geography``), because the locations are loaded map sources
+    rather than import-time lore tables.
     """
     for key, settlement in registry.items():
         if key != settlement.key:
             raise ValueError(
                 f"settlement {key!r} key mismatch (declared {settlement.key!r})"
-            )
-        if settlement.key not in ANCHOR_REGISTRY:
-            raise ValueError(
-                f"settlement {settlement.key!r} has no matching ANCHOR_REGISTRY key"
             )
         if not isinstance(settlement.zcoord, str) or not settlement.zcoord.strip():
             raise ValueError(

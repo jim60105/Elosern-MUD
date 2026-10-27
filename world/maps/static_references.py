@@ -60,7 +60,7 @@ def settlement_reference_index() -> ReferenceIndex:
 def reference_index() -> ReferenceIndex:
     """The complete index for every authored static target family."""
 
-    from world.lore.anchors import ANCHOR_GEOGRAPHY_REGISTRY
+    from world.lore.anchors import anchor_geography
     from world.lore.settlements.places import PLACE_REGISTRY
 
     from world.maps.map_data import SETTLEMENT_GRAPHS
@@ -77,7 +77,7 @@ def reference_index() -> ReferenceIndex:
         interior_rooms=((place.key, place.key) for place in PLACE_REGISTRY.values()),
         locations=(
             (key, tuple(geography.cell))
-            for key, geography in ANCHOR_GEOGRAPHY_REGISTRY.items()
+            for key, geography in anchor_geography().items()
         ),
     )
 
@@ -85,7 +85,7 @@ def reference_index() -> ReferenceIndex:
 def map_reference_index() -> ReferenceIndex:
     """The settlement/location bindings a district landmark can project."""
 
-    from world.lore.anchors import ANCHOR_GEOGRAPHY_REGISTRY
+    from world.lore.anchors import anchor_geography
     from world.maps.map_data import SETTLEMENT_GRAPHS
 
     return ReferenceIndex.build(
@@ -96,7 +96,7 @@ def map_reference_index() -> ReferenceIndex:
         ),
         locations=(
             (key, tuple(geography.cell))
-            for key, geography in ANCHOR_GEOGRAPHY_REGISTRY.items()
+            for key, geography in anchor_geography().items()
         ),
     )
 
@@ -174,7 +174,8 @@ def binding_signature() -> str:
     """
 
     from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
-    from world.lore.anchors import ANCHOR_GEOGRAPHY_REGISTRY, LOCAL_FRAME_ANCHOR_REGISTRY
+    from world.lore.anchors import LOCAL_FRAME_ANCHOR_REGISTRY, anchor_geography
+    from world.maps.geography import current
     from world.lore.map_districts import MAP_DISTRICT_REGISTRY
     from world.lore.settlements.places import PLACE_REGISTRY
     from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
@@ -209,9 +210,13 @@ def binding_signature() -> str:
     parts.append(
         tuple(
             (key, tuple(geography.cell))
-            for key, geography in sorted(ANCHOR_GEOGRAPHY_REGISTRY.items())
+            for key, geography in sorted(anchor_geography().items())
         )
     )
+    # The authored continent and location sources themselves: a reload that
+    # changes terrain, prose or a scene association must invalidate every
+    # presenter cache keyed by this digest.
+    parts.append(current().identity)
     parts.append(
         tuple(
             (key, frame.local_anchor_m)

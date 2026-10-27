@@ -13,7 +13,7 @@ raises ``QuestDescribeError`` so drift fails loudly in tests.
 
 from typing import TYPE_CHECKING, Any
 
-from world.lore.anchors import ANCHOR_REGISTRY
+from world.lore import anchors, wilderness_regions
 from world.lore.guild import GUILD_RANK_REGISTRY
 from world.lore.items import ITEM_REGISTRY
 from world.lore.monster_species import (
@@ -21,7 +21,6 @@ from world.lore.monster_species import (
     MONSTER_VARIANT_REGISTRY,
 )
 from world.lore.monsters import MONSTER_TIER_REGISTRY
-from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
 from world.quests.definitions import (
     DestinationKind,
     ObjectiveKind,
@@ -69,7 +68,7 @@ def describe_destination(locator: RoomLocator | None) -> str:
     if locator is None:
         raise QuestDescribeError("objective has no destination")
     if locator.kind is DestinationKind.ANCHOR:
-        anchor = ANCHOR_REGISTRY.get(locator.anchor_key)
+        anchor = anchors.anchors().get(locator.anchor_key)
         if anchor is None:
             raise QuestDescribeError(f"unknown anchor {locator.anchor_key!r}")
         return anchor.display_name_zh
@@ -130,7 +129,7 @@ def _countable_variant_names(objective: QuestObjective) -> tuple[str, ...]:
 
 def _describe_species_hunt(objective: QuestObjective) -> tuple[str, str | None]:
     """Render one regional species-hunt objective from the shared registries."""
-    region = WILDERNESS_REGION_REGISTRY.get(objective.region_key)
+    region = wilderness_regions.regions().get(objective.region_key)
     if region is None:
         raise QuestDescribeError(
             f"unknown wilderness region {objective.region_key!r}"

@@ -1,0 +1,88 @@
+# Static geographic locations authored source (schema version 1).
+# Map-facing identity, kind, name, prose and cell only; political affiliation,
+# population and floor lore stay with their Python owners.
+version: 1
+kind: locations
+id: locations
+locations:
+  capital_altoria:
+    kind: capital
+    display_name_zh: 聖潔王都
+    description: Capital of the Altoria Kingdom.
+    cell:
+      cell_x: 860
+      cell_y: 1080
+    geographic_constraint: Western river valley and hills; riverfront below northern terraces
+    scene_archetype:
+  capital_grandia:
+    kind: capital
+    display_name_zh: 輝煌帝都
+    description: Capital of the Grandia Empire.
+    cell:
+      cell_x: 1970
+      cell_y: 1280
+    geographic_constraint: Eastern agricultural plain and major river supply
+    scene_archetype:
+  capital_valhalla:
+    kind: capital
+    display_name_zh: 咆哮王城
+    description: Capital of the Valhalla Beast Kingdom.
+    cell:
+      cell_x: 780
+      cell_y: 1910
+    geographic_constraint: Northwestern highland forest and tribal routes
+    scene_archetype:
+  dungeon_arcane_ruins:
+    kind: dungeon
+    display_name_zh: 魔導遺跡
+    description: A known dungeon in the western Altoria Kingdom.
+    cell:
+      cell_x: 480
+      cell_y: 1160
+    geographic_constraint: Western Altoria hills and ancient/mineral sites
+    scene_archetype:
+  dungeon_dragon_nest:
+    kind: dungeon
+    display_name_zh: 龍之巢穴
+    description: A known dungeon in the eastern Grandia Empire.
+    cell:
+      cell_x: 2340
+      cell_y: 1220
+    geographic_constraint: Remote eastern Grandia
+    scene_archetype:
+  dungeon_eternal_night:
+    kind: dungeon
+    display_name_zh: 永夜迷宮
+    description: A northern deep-forest dungeon under Valhalla's nominal but unenforced claim.
+    cell:
+      cell_x: 900
+      cell_y: 2350
+    geographic_constraint: Northern deep forest under nominal Valhalla jurisdiction
+    scene_archetype:
+  village_ciaran:
+    kind: elven_village
+    display_name_zh: 暗影谷村
+    description: Ciaran village underground on the western side of the neutral central range.
+    cell:
+      cell_x: 1340
+      cell_y: 1220
+    geographic_constraint: Underground settlement on the western flank of the central mountains
+    scene_archetype:
+  village_eolas:
+    kind: elven_village
+    display_name_zh: 幽月谷村
+    description: Hidden Eolas village in a northern valley of the neutral central range.
+    cell:
+      cell_x: 1410
+      cell_y: 2150
+    geographic_constraint: Hidden northern mountain valley near deep forest
+    scene_archetype:
+  village_fionnen:
+    kind: elven_village
+    display_name_zh: 翠綠森林村
+    description: Fionnen village on the eastern side of the neutral central range.
+    cell:
+      cell_x: 1490
+      cell_y: 1510
+    geographic_constraint: Forest on the eastern mountain flank
+    scene_archetype:

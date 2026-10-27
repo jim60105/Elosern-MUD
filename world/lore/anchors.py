@@ -1,13 +1,23 @@
-"""Geographic anchor registry from design section 5.1 and lore-world-data.
+"""Geographic location identity and the non-map lore joined to it.
 
-``ANCHOR_REGISTRY`` is lore identity. ``ANCHOR_GEOGRAPHY_REGISTRY`` declares
-the canonical wilderness cell of every anchor and ``LOCAL_FRAME_ANCHOR_REGISTRY``
-binds the authored settlement frames; neither is the grid-placement registry
-and neither spawns rooms.
+Map-facing identity (kind, name, description, cell, geographic constraint) is
+authored in ``content/maps/locations.yaml`` and composed by
+:mod:`world.maps.geography`. This module owns the view types plus
+:data:`ANCHOR_LORE`: the political affiliation, population and dungeon floor
+counts that stay with their existing lore owner and are joined by the same
+stable identity.
+
+``LOCAL_FRAME_ANCHOR_REGISTRY`` binds authored settlement frames; it is a
+settlement-domain declaration (not map-facing geography) and stays here until
+the settlement cutover. It is neither the grid-placement registry nor a room
+spawner.
 """
+
+from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Mapping
 
 from elosern_map_core.geometry import local_to_world_m
 
@@ -19,7 +29,22 @@ class AnchorKind(StrEnum):
 
 
 @dataclass(frozen=True)
+class AnchorLore:
+    """The non-map lore one location identity carries.
+
+    These values are joined to the authored geographic location by identity;
+    none of them is derived from geometry, and an absent nation stays absent.
+    """
+
+    nation_key: str | None
+    population: int | None
+    floors: int | None
+
+
+@dataclass(frozen=True)
 class Anchor:
+    """One composed geographic location (map-facing fields + joined lore)."""
+
     key: str
     kind: AnchorKind
     display_name_zh: str
@@ -29,49 +54,9 @@ class Anchor:
     description: str
 
 
-ANCHOR_REGISTRY: dict[str, Anchor] = {
-    "capital_grandia": Anchor(
-        "capital_grandia", AnchorKind.CAPITAL, "輝煌帝都", "grandia", 800_000, None,
-        "Capital of the Grandia Empire.",
-    ),
-    "capital_altoria": Anchor(
-        "capital_altoria", AnchorKind.CAPITAL, "聖潔王都", "altoria", 600_000, None,
-        "Capital of the Altoria Kingdom.",
-    ),
-    "capital_valhalla": Anchor(
-        "capital_valhalla", AnchorKind.CAPITAL, "咆哮王城", "valhalla", 400_000, None,
-        "Capital of the Valhalla Beast Kingdom.",
-    ),
-    "village_fionnen": Anchor(
-        "village_fionnen", AnchorKind.ELVEN_VILLAGE, "翠綠森林村", None, 120, None,
-        "Fionnen village on the eastern side of the neutral central range.",
-    ),
-    "village_ciaran": Anchor(
-        "village_ciaran", AnchorKind.ELVEN_VILLAGE, "暗影谷村", None, 100, None,
-        "Ciaran village underground on the western side of the neutral central range.",
-    ),
-    "village_eolas": Anchor(
-        "village_eolas", AnchorKind.ELVEN_VILLAGE, "幽月谷村", None, 80, None,
-        "Hidden Eolas village in a northern valley of the neutral central range.",
-    ),
-    "dungeon_eternal_night": Anchor(
-        "dungeon_eternal_night", AnchorKind.DUNGEON, "永夜迷宮", "valhalla", None, 80,
-        "A northern deep-forest dungeon under Valhalla's nominal but unenforced claim.",
-    ),
-    "dungeon_dragon_nest": Anchor(
-        "dungeon_dragon_nest", AnchorKind.DUNGEON, "龍之巢穴", "grandia", None, 50,
-        "A known dungeon in the eastern Grandia Empire.",
-    ),
-    "dungeon_arcane_ruins": Anchor(
-        "dungeon_arcane_ruins", AnchorKind.DUNGEON, "魔導遺跡", "altoria", None, 60,
-        "A known dungeon in the western Altoria Kingdom.",
-    ),
-}
-
-
 @dataclass(frozen=True)
 class GeographicAnchor:
-    """The canonical wilderness cell of one lore anchor.
+    """The canonical wilderness cell of one geographic location.
 
     Declaring a cell creates no room and reveals nothing to players; map
     knowledge and visibility rules remain authoritative.
@@ -80,46 +65,6 @@ class GeographicAnchor:
     anchor_key: str
     cell: tuple[int, int]
     geographic_constraint: str
-
-
-ANCHOR_GEOGRAPHY_REGISTRY: dict[str, GeographicAnchor] = {
-    "capital_altoria": GeographicAnchor(
-        "capital_altoria", (860, 1080),
-        "Western river valley and hills; riverfront below northern terraces",
-    ),
-    "capital_grandia": GeographicAnchor(
-        "capital_grandia", (1970, 1280),
-        "Eastern agricultural plain and major river supply",
-    ),
-    "capital_valhalla": GeographicAnchor(
-        "capital_valhalla", (780, 1910),
-        "Northwestern highland forest and tribal routes",
-    ),
-    "village_ciaran": GeographicAnchor(
-        "village_ciaran", (1340, 1220),
-        "Underground settlement on the western flank of the central mountains",
-    ),
-    "village_fionnen": GeographicAnchor(
-        "village_fionnen", (1490, 1510),
-        "Forest on the eastern mountain flank",
-    ),
-    "village_eolas": GeographicAnchor(
-        "village_eolas", (1410, 2150),
-        "Hidden northern mountain valley near deep forest",
-    ),
-    "dungeon_eternal_night": GeographicAnchor(
-        "dungeon_eternal_night", (900, 2350),
-        "Northern deep forest under nominal Valhalla jurisdiction",
-    ),
-    "dungeon_dragon_nest": GeographicAnchor(
-        "dungeon_dragon_nest", (2340, 1220),
-        "Remote eastern Grandia",
-    ),
-    "dungeon_arcane_ruins": GeographicAnchor(
-        "dungeon_arcane_ruins", (480, 1160),
-        "Western Altoria hills and ancient/mineral sites",
-    ),
-}
 
 
 @dataclass(frozen=True)
@@ -134,10 +79,44 @@ class LocalFrameAnchor:
     local_anchor_m: tuple[int, int]
 
 
+#: Non-map lore keyed by the authored location identity. Political affiliation,
+#: rounded population and dungeon floor counts are lore facts, never values
+#: inferred from the geographic cell.
+ANCHOR_LORE: dict[str, AnchorLore] = {
+    "capital_grandia": AnchorLore("grandia", 800_000, None),
+    "capital_altoria": AnchorLore("altoria", 600_000, None),
+    "capital_valhalla": AnchorLore("valhalla", 400_000, None),
+    "village_fionnen": AnchorLore(None, 120, None),
+    "village_ciaran": AnchorLore(None, 100, None),
+    "village_eolas": AnchorLore(None, 80, None),
+    "dungeon_eternal_night": AnchorLore("valhalla", None, 80),
+    "dungeon_dragon_nest": AnchorLore("grandia", None, 50),
+    "dungeon_arcane_ruins": AnchorLore("altoria", None, 60),
+}
+
+
 LOCAL_FRAME_ANCHOR_REGISTRY: dict[str, LocalFrameAnchor] = {
     "capital_altoria": LocalFrameAnchor("capital_altoria", (3500, 2850)),
     "village_ciaran": LocalFrameAnchor("village_ciaran", (220, 305)),
 }
+
+
+def _geography():
+    from world.maps.geography import current
+
+    return current()
+
+
+def anchors() -> Mapping[str, Anchor]:
+    """The published composed geographic-location views."""
+
+    return _geography().anchors
+
+
+def anchor_geography() -> Mapping[str, GeographicAnchor]:
+    """The published location cells and geographic constraints."""
+
+    return _geography().anchor_geography
 
 
 def world_position_m(
@@ -145,10 +124,25 @@ def world_position_m(
 ) -> tuple[int, int]:
     """Absolute ``(east, north)`` metres of a settlement-local metre position.
 
-    ``world = wilderness_anchor_cell_center + local - local_anchor``. The
-    settlement's ``z`` remains a logical layer and is never elevation; this
-    transform returns horizontal metres only.
+    ``world_m = wilderness_anchor_cell_center + local_m - local_anchor_m``.
+    The settlement's ``z`` remains a logical layer and is never elevation;
+    this transform returns horizontal metres only.
     """
-    geography = ANCHOR_GEOGRAPHY_REGISTRY[anchor_key]
+
+    geography = anchor_geography()[anchor_key]
     frame = LOCAL_FRAME_ANCHOR_REGISTRY[anchor_key]
     return local_to_world_m(geography.cell, frame.local_anchor_m, local_position_m)
+
+
+__all__ = [
+    "ANCHOR_LORE",
+    "Anchor",
+    "AnchorKind",
+    "AnchorLore",
+    "GeographicAnchor",
+    "LOCAL_FRAME_ANCHOR_REGISTRY",
+    "LocalFrameAnchor",
+    "anchor_geography",
+    "anchors",
+    "world_position_m",
+]

@@ -32,7 +32,7 @@ def _reach_matches(room: Any, destination: RoomLocator, stage_room_id: int | Non
 
 
 def resolve_room_anchor(room: Any) -> str | None:
-    """Resolve a room to a registered ANCHOR_REGISTRY key, or None.
+    """Resolve a room to a published geographic-location key, or None.
 
     Reuses the REACH anchor resolution attribute (anchor_key).
     """
@@ -42,9 +42,9 @@ def resolve_room_anchor(room: Any) -> str | None:
     if anchor_key is None and hasattr(room, "db"):
         anchor_key = getattr(room.db, "anchor_key", None)
     if isinstance(anchor_key, str) and anchor_key:
-        from world.lore.anchors import ANCHOR_REGISTRY
+        from world.lore import anchors
 
-        if anchor_key in ANCHOR_REGISTRY:
+        if anchor_key in anchors.anchors():
             return anchor_key
     return None
 
@@ -52,14 +52,15 @@ def resolve_room_anchor(room: Any) -> str | None:
 def resolve_room_region(
     room: Any, coordinates: tuple[int, int] | None = None
 ) -> str | None:
-    """Resolve a room or coordinates to a registered WILDERNESS_REGION_REGISTRY key, or None."""
-    from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
+    """Resolve a room or coordinates to a published terrain-region key, or None."""
+    from world.lore import wilderness_regions
 
+    regions = wilderness_regions.regions()
     if room is not None:
         region_key = getattr(room, "region_key", None)
         if region_key is None and hasattr(room, "db"):
             region_key = getattr(room.db, "region_key", None)
-        if isinstance(region_key, str) and region_key in WILDERNESS_REGION_REGISTRY:
+        if isinstance(region_key, str) and region_key in regions:
             return region_key
 
     coords = coordinates
@@ -70,15 +71,14 @@ def resolve_room_region(
         try:
             x, y = coords
             if isinstance(x, int) and isinstance(y, int) and not isinstance(x, bool) and not isinstance(y, bool):
-                from world.maps.wilderness_provider import (
-                    WILDERNESS_MAX_X,
-                    WILDERNESS_MAX_Y,
-                    region_for_coordinates,
-                )
+                from world.maps import wilderness_provider
 
-                if 0 <= x <= WILDERNESS_MAX_X and 0 <= y <= WILDERNESS_MAX_Y:
-                    reg_key = region_for_coordinates(x, y)
-                    if reg_key in WILDERNESS_REGION_REGISTRY:
+                if (
+                    0 <= x <= wilderness_provider.WILDERNESS_MAX_X
+                    and 0 <= y <= wilderness_provider.WILDERNESS_MAX_Y
+                ):
+                    reg_key = wilderness_provider.region_for_coordinates(x, y)
+                    if reg_key in regions:
                         return reg_key
         except Exception:  # observability: ignore R2: invalid coordinates or non-wilderness room is treated as non-resolving
             pass

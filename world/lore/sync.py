@@ -10,7 +10,6 @@ from evennia.utils.search import search_script
 
 from world.observability import log_info
 
-from .anchors import ANCHOR_REGISTRY
 from .anchor_placement import ANCHOR_PLACEMENT_REGISTRY
 from .economy import PRICE_TABLE
 from .elements import ELEMENT_REGISTRY
@@ -28,7 +27,6 @@ from .races import RACE_REGISTRY, STATIC_TIER_REGISTRY, SUBRACE_REGISTRY
 from .settlements import PLACE_REGISTRY, SETTLEMENT_REGISTRY
 from .titles import FIXED_TITLE_REGISTRY
 from .wilderness_entry import WILDERNESS_ENTRY_REGISTRY, validate_wilderness_entries
-from .wilderness_regions import WILDERNESS_REGION_REGISTRY
 
 
 class LoreRecord(DefaultScript):
@@ -75,15 +73,29 @@ _ALL_REGISTRIES: dict[str, Mapping[str, Any]] = {
     "monster_tiers": MONSTER_TIER_REGISTRY,
     **MONSTER_SPECIES_REGISTRIES,
     **MONSTER_PLACEMENT_REGISTRIES,
-    "anchors": ANCHOR_REGISTRY,
     "anchor_placements": ANCHOR_PLACEMENT_REGISTRY,
     "name_packs": NAME_PACK_REGISTRY,
-    "wilderness_regions": WILDERNESS_REGION_REGISTRY,
     "wilderness_entries": WILDERNESS_ENTRY_REGISTRY,
     "settlements": SETTLEMENT_REGISTRY,
     "places": PLACE_REGISTRY,
     "prices": PRICE_TABLE,
 }
+
+
+def geography_registries() -> dict[str, Mapping[str, Any]]:
+    """The composed map-owned registries the published geography supplies.
+
+    They are read at call time from the current snapshot, so the mirror always
+    follows the loaded world and never a stale import-time capture.
+    """
+
+    from world.maps.geography import current
+
+    geography = current()
+    return {
+        "anchors": geography.anchors,
+        "wilderness_regions": geography.regions,
+    }
 
 
 def _db_safe(value: Any) -> Any:
@@ -161,6 +173,9 @@ def sync_all() -> None:
     for category, registry in _ALL_REGISTRIES.items():
         if category in _NAMED_STEP_CATEGORIES:
             continue
+        for key, entry in registry.items():
+            sync_one(category, key, entry)
+    for category, registry in geography_registries().items():
         for key, entry in registry.items():
             sync_one(category, key, entry)
     sync_monster_species()

@@ -54,10 +54,10 @@ from world.maps.wilderness_population import (
     species_rule_for_coordinates,
 )
 from world.maps.wilderness_provider import (
-    REGION_SEARCH_BOXES,
     WILDERNESS_NAME,
     is_valid_wilderness_cell,
     region_for_coordinates,
+    region_search_boxes,
 )
 from world.observability import log_info, log_warn
 
@@ -241,7 +241,7 @@ def _candidate_cells(
     Callers consume only as far as their shortfall needs; the exhausted case
     is the one path that walks the whole window.
     """
-    x_min, x_max, y_min, y_max = REGION_SEARCH_BOXES[region_key]
+    x_min, x_max, y_min, y_max = region_search_boxes()[region_key]
     for x in range(x_min, x_max + 1):
         for y in range(y_min, y_max + 1):
             if region_for_coordinates(x, y) != region_key:

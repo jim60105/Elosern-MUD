@@ -895,13 +895,13 @@ def production_input() -> PartitionInput:
     """Rasterize the live terrain model and district registry."""
     from world.lore import wilderness_entry
     from world.lore.nations import NATION_REGISTRY
-    from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
+    from world.lore.wilderness_regions import regions
     from world.maps import wilderness_provider as provider
-    from world.maps.wilderness_reachability import _mainland_row_intervals
+    from world.maps.wilderness_reachability import mainland_row_intervals
 
     size = provider.WILDERNESS_MAX_X + 1
     nation_names = tuple(sorted(NATION_REGISTRY))
-    region_names = tuple(sorted(WILDERNESS_REGION_REGISTRY))
+    region_names = tuple(sorted(regions()))
     nation_code = {name: index + 1 for index, name in enumerate(nation_names)}
     region_code = {name: index + 1 for index, name in enumerate(region_names)}
     land = np.zeros((size, size), dtype=bool)
@@ -912,7 +912,7 @@ def production_input() -> PartitionInput:
     nation_of = provider.nominal_nation_for_coordinates
     region_of = provider.region_for_coordinates
     for y in range(size):
-        for west, east in _mainland_row_intervals(y):
+        for west, east in mainland_row_intervals(provider.terrain_definition(), y):
             xs = range(west, east + 1)
             land[y, west : east + 1] = True
             walkable[y, west : east + 1] = [passable((x, y)) for x in xs]
@@ -952,6 +952,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, default=DATA_PATH)
     args = parser.parse_args(argv)
     _bootstrap()
+    from world.maps.geography import load_and_publish
+
+    load_and_publish()
     text = generate(production_input())
     current = args.output.read_text(encoding="utf-8") if args.output.exists() else None
     if args.check:

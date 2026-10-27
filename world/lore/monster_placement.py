@@ -26,7 +26,6 @@ from types import MappingProxyType
 
 from .monster_species import MONSTER_SPECIES_REGISTRY, MONSTER_VARIANT_REGISTRY
 from .registry_refs import ref, ref_many
-from .wilderness_regions import WILDERNESS_REGION_REGISTRY
 # Read the variant registry as a MODULE attribute at call time (never a
 # from-import binding captured once): the synthetic test-data kit patches the
 # owner module's attribute, so a scoped behavior test observes its stand-in
@@ -216,11 +215,11 @@ def validate_monster_placement_registry(
     exercise this function with invented keys. Validation only reads its inputs
     and raises before anything is published.
     """
-    regions = (
-        frozenset(WILDERNESS_REGION_REGISTRY)
-        if region_face is None
-        else frozenset(region_face)
-    )
+    # The terrain-region vocabulary is map-owned (a continent declaration), so
+    # it has no import-time lore face: publication of the geography candidate
+    # validates every placement region key against the regions it declares.
+    # An explicit face still checks membership for behavior tests.
+    regions = None if region_face is None else frozenset(region_face)
     variants = MONSTER_VARIANT_REGISTRY if variant_face is None else variant_face
     species = MONSTER_SPECIES_REGISTRY if species_face is None else species_face
     kinds = frozenset(MONSTER_SITE_KINDS) if kind_face is None else frozenset(kind_face)
@@ -232,7 +231,8 @@ def validate_monster_placement_registry(
                 f"{what} has region key {rule.region_key!r}; a rule is keyed by "
                 "the region it covers"
             )
-        _check_region(rule.region_key, regions, what)
+        if regions is not None:
+            _check_region(rule.region_key, regions, what)
         _check_variant_keys(rule.variant_keys, rule.region_key, variants, species, what)
         _require_int(rule.quantity, f"{what} quantity", 1)
         _require_int(rule.capacity, f"{what} capacity", rule.quantity)
@@ -251,7 +251,8 @@ def validate_monster_placement_registry(
             raise MonsterPlacementRegistryError(
                 f"{what} declares unknown kind {site.kind!r}"
             )
-        _check_region(site.region_key, regions, what)
+        if regions is not None:
+            _check_region(site.region_key, regions, what)
         _check_coordinates(site.coordinates, what)
         _check_variant_keys(site.variant_keys, site.region_key, variants, species, what)
         _require_int(site.capacity, f"{what} capacity", 1)
