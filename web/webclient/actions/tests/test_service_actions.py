@@ -1422,6 +1422,25 @@ class TargetedSubmissionTests(ServiceActionBase):
     @covers_requirement(
         "webclient-service-menus::service-actions-reject-stale-duplicate-and-tampered-input-without-mutation"
     )
+    def test_an_ordinary_abandon_names_one_of_two_present_clerks(self):
+        self._register()
+        record = accept_guild_offer(self.player, self.staff, _T_BOARD_QUEST)
+        second = create_object(NPC, key="second clerk", location=self.hall)
+        second_component = GuildStaff.create(
+            second, service_id="staff_two", branch_key=BRANCH
+        )
+        second_component.service_binding = "place"
+        second_component.anchor_room_id = self.hall.pk
+        second.components.add(second_component)
+        result = _quest_abandon_adapter(
+            self.player, {"quest_id": record.quest_id, "npc_id": int(self.staff.pk)}
+        )
+        self.assertEqual(result["outcome"], "success")
+        self.assertIs(read_records(self.player)[0].state, QuestState.FAILED)
+
+    @covers_requirement(
+        "webclient-service-menus::service-actions-reject-stale-duplicate-and-tampered-input-without-mutation"
+    )
     def test_a_departed_clerk_is_refused_even_with_another_clerk_present(self):
         self._register()
         record = accept_guild_offer(self.player, self.staff, _T_BOARD_QUEST)
