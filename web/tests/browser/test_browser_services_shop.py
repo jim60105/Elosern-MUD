@@ -105,7 +105,12 @@ class ShopJourneys(ServicesBrowserTest):
         self.assertEqual(sent_action_count(page, "shop.buy"), 1)
         self.assertEqual(
             _sent_payload(page, "shop.buy"),
-            {"item_key": first_key, "quantity": 2, "recipient_id": actor_id},
+            {
+                "item_key": first_key,
+                "quantity": 2,
+                "recipient_id": actor_id,
+                "npc_id": panel["shop"]["provider_id"],
+            },
         )
         self.assertEqual(self._services_panel(page)["player"]["wallet"], expected_wallet)
         # The header purse is the shop window's only balance.
@@ -166,7 +171,12 @@ class ShopJourneys(ServicesBrowserTest):
         self.assertEqual(sent_action_count(page, "shop.sell"), 1)
         self.assertEqual(
             _sent_payload(page, "shop.sell"),
-            {"item_key": potion, "quantity": 1, "seller_id": actor_id},
+            {
+                "item_key": potion,
+                "quantity": 1,
+                "seller_id": actor_id,
+                "npc_id": panel["shop"]["provider_id"],
+            },
         )
         # The republished shop rows report the seller's remaining copies: the
         # potion left the sellable list and the staple count is untouched.
@@ -210,7 +220,9 @@ class ShopJourneys(ServicesBrowserTest):
         wait_for_store_state(page, lambda s: s.get("hudDrawer") is None)
         self.assertEqual(sent_action_count(page), sent_before, "the frameless 背包 entry dispatches no action")
 
-        # No submitted service payload carries a host/branch/actor field.
+        # Every submitted service payload names its exact provider (`npc_id`,
+        # services v8) and never a host/branch/session/actor field: the
+        # provider id is precisely what a service payload carries now.
         for cmdname, args, _kwargs in outbound_messages(page):
             if cmdname != "ui_action" or not args:
                 continue
@@ -218,6 +230,7 @@ class ShopJourneys(ServicesBrowserTest):
             if not action_id.startswith(("guild.", "shop.")):
                 continue
             submitted = args[0].get("payload", {})
+            self.assertIsInstance(submitted.get("npc_id"), int, action_id)
             for forbidden in ("host", "branch", "session", "actor", "dbref", "identity"):
                 self.assertNotIn(
                     forbidden,
@@ -256,13 +269,25 @@ class ShopCompanionJourneys(ServicesBrowserTest):
             ),
         )
         exploration = store_state(page)["panels"]["exploration"]
+        services = self._services_panel(page)
+        # The merchant is the exact provider the drawer names; its contextual
+        # services field (exploration v5) is where the shop entry lives now.
+        provider_id = (services.get("shop") or {}).get("provider_id")
+        merchant = next(
+            (
+                target
+                for target in exploration.get("interact") or []
+                if target.get("identity") == provider_id
+            ),
+            None,
+        )
+        self.assertIsNotNone(merchant, "the merchant must be a committed interact target")
         service_entries = [
-            affordance
-            for target in exploration.get("interact") or []
-            for affordance in target.get("affordances") or []
-            if affordance.get("surface") in {"guild", "shop"}
+            entry
+            for entry in (merchant.get("services") or {}).get("entries") or []
+            if entry.get("key") == "shop"
         ]
-        return self._services_panel(page), service_entries
+        return services, service_entries
 
     @covers_requirement(
         "webclient-shop-window::the-shop-window-shares-member-selection-and-normal-trades-during-possession",
@@ -291,10 +316,18 @@ class ShopCompanionJourneys(ServicesBrowserTest):
         )
         self.assertIsNone(possessed_services["guild"])
         self.assertEqual(
-            [entry["surface"] for entry in service_entries], ["shop"]
+            [entry["key"] for entry in service_entries], ["shop"]
         )
         self.assertTrue(service_entries[0]["enabled"])
         self.assertIsNone(service_entries[0]["disabled_reason"])
+        self.assertEqual(
+            service_entries[0]["route"],
+            {
+                "kind": "services",
+                "npc_id": possessed_services["shop"]["provider_id"],
+                "section": "shop",
+            },
+        )
 
         self._open_surface(page, "shop")
         # The viewed-member selection survives possession; the journey never
@@ -341,7 +374,12 @@ class ShopCompanionJourneys(ServicesBrowserTest):
         self.assertEqual(sent_action_count(page, "shop.buy"), 1)
         self.assertEqual(
             _sent_payload(page, "shop.buy"),
-            {"item_key": potion, "quantity": 2, "recipient_id": companion_id},
+            {
+                "item_key": potion,
+                "quantity": 2,
+                "recipient_id": companion_id,
+                "npc_id": self._services_panel(page)["shop"]["provider_id"],
+            },
         )
         # The companion (still the viewed member) holds two more, and the
         # republished bag and purse agree without a full snapshot.
@@ -387,7 +425,12 @@ class ShopCompanionJourneys(ServicesBrowserTest):
         self.assertEqual(sent_action_count(page, "shop.sell"), 1)
         self.assertEqual(
             _sent_payload(page, "shop.sell"),
-            {"item_key": potion, "quantity": 1, "seller_id": companion_id},
+            {
+                "item_key": potion,
+                "quantity": 1,
+                "seller_id": companion_id,
+                "npc_id": self._services_panel(page)["shop"]["provider_id"],
+            },
         )
         wait_for_store_state(
             page,
@@ -427,7 +470,7 @@ class ShopCompanionJourneys(ServicesBrowserTest):
         panel, service_entries = self._enter_companion_possession(page, companion_id)
         self.assertIsNone(panel["guild"])
         self.assertEqual(
-            [entry["surface"] for entry in service_entries], ["shop"]
+            [entry["key"] for entry in service_entries], ["shop"]
         )
         self.assertTrue(service_entries[0]["enabled"])
         self._open_surface(page, "shop")

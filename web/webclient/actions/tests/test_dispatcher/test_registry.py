@@ -64,6 +64,7 @@ class RegistryTests(unittest.TestCase):
                     "guild.exam_request",
                     "shop.buy",
                     "shop.sell",
+                    "services.open",
                     "inventory.use",
                     "inventory.toggle_equip",
                     "creation.preset",

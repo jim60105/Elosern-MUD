@@ -243,11 +243,18 @@ class PossessionPresentationTests(EvenniaTest):
     @covers_requirement(
         "exploration-affordances::the-shared-read-only-affordance-vocabulary-supports-possessed-shop-access"
     )
-    def test_possessed_actor_keeps_shop_navigation_and_omits_guild(self):
-        """Shop navigation stays enabled; guild navigation is absent everywhere."""
+    def test_possessed_actor_keeps_the_shop_service_and_loses_guild_services(self):
+        """The possessed body keeps the merchant counters; guild stays refused.
+
+        The version-5 cutover replaced the coarse guild/shop navigation rows
+        with the exploration panel's separate target-bound ``services`` field
+        (npc-contextual-service-projection), so the possession rule is asserted
+        where it now lives: the derived projection every target carries.
+        """
         from typeclasses.components import GuildStaff, Merchant, ScriptedDialogue
         from typeclasses.npcs import NPC
         from world.rules.dialogue import GUILD_STAFF_DIALOGUE_KEY
+        from world.rules.npc_services import project_npc_services
 
         staff = create_object(NPC, key="公會職員", location=self.room1)
         staff_component = GuildStaff.create(
@@ -260,9 +267,16 @@ class PossessionPresentationTests(EvenniaTest):
         staff_component.service_binding = "place"
         staff_component.anchor_room_id = self.room1.pk
         staff.components.add(staff_component)
-        staff.components.add(
-            ScriptedDialogue.create(staff, dialogue_key=GUILD_STAFF_DIALOGUE_KEY)
+        # The authored guild table declares the ``guild_report_dialogue``
+        # service association, so its dialogue component carries the stored
+        # place binding the shared capability assembly writes for shipped
+        # hosts; without it the projected entry reads malformed_binding.
+        dialogue_component = ScriptedDialogue.create(
+            staff, dialogue_key=GUILD_STAFF_DIALOGUE_KEY
         )
+        dialogue_component.service_binding = "place"
+        dialogue_component.anchor_room_id = self.room1.pk
+        staff.components.add(dialogue_component)
         shop = create_object(NPC, key="行商", location=self.room1)
         shop_component = Merchant.create(
             shop, service_id="shop", shop_key="t_possession_shop"
@@ -275,9 +289,10 @@ class PossessionPresentationTests(EvenniaTest):
 
         vocabulary = exploration_affordances(self.npc)
         navigation = [entry for entry in vocabulary if entry.navigation]
-        self.assertEqual([entry.surface for entry in navigation], ["shop"])
-        self.assertTrue(navigation[0].enabled)
-        self.assertIsNone(navigation[0].disabled_reason)
+        # No coarse service navigation row survives the cutover: the vocabulary
+        # emits no navigation entry at all, and the only navigation surface a
+        # target carries is the ordinary author editor.
+        self.assertEqual([entry.surface for entry in navigation], [])
 
         talk = [
             entry
@@ -295,20 +310,46 @@ class PossessionPresentationTests(EvenniaTest):
         self.assertEqual(engage[0].disabled_reason[0], REASON_POSSESSED_ENGAGE)
         self.assertIsNotNone(monster.pk)
 
+        # The merchant counters stay open to the possessed body...
+        shop_services = project_npc_services(self.npc, self.npc, shop)
+        self.assertEqual(shop_services.state, "ready")
+        self.assertEqual([entry.key for entry in shop_services.entries], ["shop"])
+        self.assertTrue(shop_services.entries[0].enabled)
+        self.assertIsNone(shop_services.entries[0].disabled_reason)
+        self.assertEqual(shop_services.entries[0].route.as_dict(), {
+            "kind": "services",
+            "npc_id": int(shop.pk),
+            "section": "shop",
+        })
+
+        # ...and every guild service refuses for the same reason the trade
+        # mutations refuse: a possessed body never reaches guild paperwork.
+        staff_services = project_npc_services(self.npc, self.npc, staff)
+        self.assertEqual(staff_services.state, "ready")
+        by_key = {entry.key: entry for entry in staff_services.entries}
+        for key in ("guild.register", "guild.board", "guild.report"):
+            self.assertIn(key, by_key)
+            self.assertFalse(by_key[key].enabled, f"a possessed body must not reach {key}")
+            self.assertEqual(by_key[key].disabled_reason.code, "possessed_service")
+        # The explicit dialogue association stays open: a lawful possessed actor
+        # may open the host's authored scene, and opening grants no service.
+        self.assertTrue(by_key["dialogue.guild_report_dialogue"].enabled)
+
         context = PresentationContext(actor=self.npc, protocol_version=1)
         exploration = self.registry.render("exploration", context)
-        exploration_navigation = [
-            affordance
-            for target in exploration["interact"]
+        targets = {
+            target["identity"]: target for target in exploration["interact"]
+        }
+        self.assertEqual(targets[shop.pk]["services"], shop_services.as_dict())
+        self.assertEqual(targets[staff.pk]["services"], staff_services.as_dict())
+        navigation_surfaces = {
+            affordance.get("surface")
+            for target in targets.values()
             for affordance in target["affordances"]
             if affordance.get("kind") == "navigate"
-            and affordance.get("surface") in {"guild", "shop"}
-        ]
-        self.assertEqual(
-            [affordance["surface"] for affordance in exploration_navigation],
-            ["shop"],
-        )
-        self.assertTrue(exploration_navigation[0]["enabled"])
+        }
+        self.assertNotIn("guild", navigation_surfaces)
+        self.assertNotIn("shop", navigation_surfaces)
 
         form = self.registry.render("context_actions", context)
         self.assertEqual(form["kind"], "exploration")
@@ -317,16 +358,7 @@ class PossessionPresentationTests(EvenniaTest):
             for affordance in form["affordances"]
             if affordance.get("navigation") is True
         ]
-        self.assertEqual(
-            [affordance["surface"] for affordance in form_navigation], ["shop"]
-        )
-        self.assertTrue(form_navigation[0]["enabled"])
-        self.assertFalse(
-            any(
-                affordance.get("surface") == "guild"
-                for affordance in form["affordances"]
-            )
-        )
+        self.assertEqual(form_navigation, [])
 
     @covers_requirement(
         "exploration-affordances::affordance-params-are-validator-normalized"
@@ -555,6 +587,7 @@ class PossessionPresentationTests(EvenniaTest):
                 "item_key": potion,
                 "quantity": 2,
                 "recipient_id": self.npc.pk,
+                "npc_id": merchant_host.pk,
             },
         )
         self.assertEqual(buy_result["outcome"], "success")
@@ -572,6 +605,7 @@ class PossessionPresentationTests(EvenniaTest):
                 "item_key": potion,
                 "quantity": 1,
                 "seller_id": self.npc.pk,
+                "npc_id": merchant_host.pk,
             },
         )
         self.assertEqual(sell_result["outcome"], "success")
