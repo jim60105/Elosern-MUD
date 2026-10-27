@@ -312,6 +312,13 @@ export function applyView(ctx) {
       hudDrawer: ctx.hudDrawer.value,
       // The NPC author editor's latest open request (`{ npcId, seq }`).
       npcPersonaRequest: ctx.npcPersonaRequest,
+      // The contextual service route the shell consumes: the exact provider
+      // read (`{ seq, slot, npcId, section }`), the pending dialogue-topic
+      // focus (`{ npcId, topicId, ... }`) and the command pre-fill
+      // (`{ seq, text }`). All client-local; none carries authority.
+      serviceReadRequest: ctx.serviceReadRequest,
+      dialogueFocusTopic: ctx.dialogueFocusTopic,
+      commandPrefill: ctx.commandPrefill,
       // H5 (task 5.2): the single open-overlay name (null | map | settings
       // | help | codex | gallery), plus the opener element captured at open time —
       // the anchor

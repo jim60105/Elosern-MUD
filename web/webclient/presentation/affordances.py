@@ -2,10 +2,16 @@
 
 This module owns the shared, read-only affordance rules for a puppeted player
 in exploration mode: the frozen discriminated :class:`AffordanceView` contract
-(action vs navigation), the ten emitted action codes plus the guild/shop
-surfaces, validator-normalized params, the freeform binding-only exception, the
-idle baseline, the suggestion-eligibility layer, and the deterministic
-``default_cards()`` degradation derivation.
+(action vs navigation), the ten emitted action codes, validator-normalized
+params, the freeform binding-only exception, the idle baseline, the
+suggestion-eligibility layer, and the deterministic ``default_cards()``
+degradation derivation.
+
+The vocabulary emits action codes only: a target's supported services reach the
+player through the exploration panel's separate target-bound ``services`` field
+(npc-contextual-service-projection), so no guild/shop navigation row is inferred
+here. The class keeps its navigation shape for the ``context_actions``
+contract, which still validates a supplied navigation candidate.
 
 The version-1 ``exploration`` panel presenter and the ``context_actions``
 exploration presenter both consume this vocabulary; the v1 panel serializer
@@ -36,13 +42,6 @@ from world.rules.dialogue import (
 from world.rules.npc_schedules import interaction_reason
 from world.rules.party import has_general_membership, is_companion, party_size
 from world.rules.time_skip import unsafe_rejection
-from world.rules.service_gate import (
-    MESSAGE_OFF_ANCHOR,
-    REASON_REMOTE,
-    service_available,
-)
-from world.observability import log_warn
-
 # The thirteen action codes the allowlist admits. ``explore.interact`` is
 # deliberately absent: the exploration panel's interact group is a label over
 # per-target affordances, never a dispatcher action. ``explore.talk_open`` is
@@ -536,12 +535,6 @@ def _engage_entry(monster: Any, *, actor: Any = None) -> AffordanceView:
     )
 
 
-#: Shared registry code for the gate's fixed refusal (service_messages maps
-#: it onto MESSAGE_OFF_ANCHOR); navigation disabled_reason codes are free
-#: identifiers, never action ids.
-_SERVICE_DISABLED_REASON = ("service_unavailable", MESSAGE_OFF_ANCHOR)
-
-
 def _possess_entry(npc: Any, actor: Any) -> AffordanceView:
     from web.webclient.actions.exploration_actions import validate_possess_payload
     from world.rules.possession import POSSESSION_REJECTION_MESSAGES, possession_verdict
@@ -561,72 +554,9 @@ def _possess_entry(npc: Any, actor: Any) -> AffordanceView:
     )
 
 
-def _service_entry(surface: str, actor: Any, host: Any) -> AffordanceView:
-    """The navigate-kind service entry for one surface, gated honestly.
-
-    The emission key is unchanged (exact local host); this consults the one
-    read-only resolver for the entry's ENABLED state (design
-    2026-09-05-service-anchoring D5): ``allowed`` (including the person /
-    unset-binding default) is the unchanged enabled entry; ``off_anchor`` or
-    ``malformed_binding`` emits the same entry shape disabled, carrying the
-    gate's fixed registry message — a traveling clerk stands beside the
-    player but sells nothing here, and the entry says so instead of
-    promising a dead dock surface. ``remote`` is unreachable at this site
-    (hosts resolve from ``actor.location.contents``); if host resolution
-    ever breaks the invariant, the panel degrades to the same disabled
-    entry with a warn diagnostic instead of crashing. A host missing the
-    component slot entirely (unreachable via the resolve path) keeps the
-    enabled entry — presentation never fail-closes a whole panel on data
-    the resolver was never asked about.
-    """
-    from typeclasses.components import GuildStaff, Merchant
-
-    component_class = GuildStaff if surface == "guild" else Merchant
-    component = host.components.get(component_class.get_component_slot())
-    if component is None:
-        enabled = True
-    else:
-        verdict = service_available(actor, host, component)
-        if verdict.reason == REASON_REMOTE:
-            # Per-snapshot renders make an unbounded invariant warn spam the
-            # log while the broken condition persists; debounce per host +
-            # surface on ndb, the gate's malformed-binding warn idiom.
-            ndb = host.ndb
-            warned = set(getattr(ndb, "affordance_remote_warned", None) or ())
-            if surface not in warned:
-                ndb.affordance_remote_warned = warned | {surface}
-                log_warn(
-                    "affordance_service_host_remote",
-                    context={
-                        "char": getattr(host, "key", None),
-                        "surface": surface,
-                        "actor": getattr(actor, "key", None),
-                    },
-                )
-        enabled = verdict.allowed
-    if enabled:
-        return AffordanceView(
-            surface=surface,
-            label="公會服務" if surface == "guild" else "商店",
-            navigation=True,
-            enabled=True,
-            disabled_reason=None,
-        )
-    return AffordanceView(
-        surface=surface,
-        label="公會服務" if surface == "guild" else "商店",
-        navigation=True,
-        enabled=False,
-        disabled_reason=_SERVICE_DISABLED_REASON,
-    )
-
-
 def _target_affordance_entries(
     obj: Any,
     actor: Any,
-    *,
-    guild_host: Any | None,
-    shop_host: Any | None,
 ) -> list[AffordanceView]:
     """The untruncated affordance entries of one present NPC/monster target.
 
@@ -634,7 +564,8 @@ def _target_affordance_entries(
     first (a truncated delivery is an invisible quest verb, so it assembles
     before the keyword pool per the possession-affordance truncation
     precedent), then the scripted keyword entries (authored order), freeform,
-    party leave/invite, engage, and the exact-local-host navigation entries.
+    party leave/invite, and engage. Service rows are derived separately by the
+    exploration panel's target-bound ``services`` field, never as affordances.
     """
     from typeclasses.monsters import Monster
     from typeclasses.npcs import LLMNPC, NPC
@@ -655,10 +586,6 @@ def _target_affordance_entries(
         entries.append(_party_invite_entry(obj, actor))
     if isinstance(obj, Monster):
         entries.append(_engage_entry(obj, actor=actor))
-    if guild_host is not None and obj is guild_host:
-        entries.append(_service_entry("guild", actor, obj))
-    if shop_host is not None and obj is shop_host:
-        entries.append(_service_entry("shop", actor, obj))
     return entries
 
 
@@ -790,18 +717,12 @@ def _look_entries(actor: Any) -> list[AffordanceView]:
 
 def _target_entries(actor: Any) -> list[AffordanceView]:
     """The bounded per-target affordance entries of every present NPC/monster."""
-    from typeclasses.components import GuildStaff, Merchant
     from typeclasses.monsters import Monster
     from typeclasses.npcs import NPC
-    from world.rules.possession import is_possessed_actor
 
     location = getattr(actor, "location", None)
     if location is None:
         return []
-    # Possession omits guild navigation entirely: neither the guild opener nor
-    # a disabled substitute is emitted, and no guild host is resolved.
-    guild_host = None if is_possessed_actor(actor) else _resolve_single_host(actor, GuildStaff)
-    shop_host = _resolve_single_host(actor, Merchant)
     candidates = [
         obj
         for obj in location.contents
@@ -812,11 +733,7 @@ def _target_entries(actor: Any) -> list[AffordanceView]:
     present.sort(key=lambda obj: (int(obj.pk),))
     entries: list[AffordanceView] = []
     for obj in present[:MAX_INTERACT_TARGETS]:
-        entries.extend(
-            _target_affordance_entries(
-                obj, actor, guild_host=guild_host, shop_host=shop_host
-            )[:MAX_AFFORDANCES]
-        )
+        entries.extend(_target_affordance_entries(obj, actor)[:MAX_AFFORDANCES])
     return entries
 
 

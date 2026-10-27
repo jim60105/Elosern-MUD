@@ -128,6 +128,76 @@ export function applyHud(ctx) {
     return true;
   };
 
+  // ── Contextual service routes (npc-contextual-service-projection) ───────
+  // A service row names the exact selected provider, so the client records
+  // ONE opening request the shell consumes: the drawer opens AND that exact
+  // provider is read, including when the same drawer is already open (a
+  // same-drawer re-selection otherwise never re-runs the drawer watcher).
+  // null | { seq, slot, npcId, section }
+  ctx.serviceReadRequest = null;
+  ctx.serviceReadSeq = 0;
+  ctx.requestServiceRead = function requestServiceRead(slot, npcId, section) {
+    if (slot !== "shop" && slot !== "counter") {
+      return false;
+    }
+    if (typeof npcId !== "number" || !Number.isInteger(npcId) || npcId <= 0) {
+      return false;
+    }
+    ctx.serviceReadSeq += 1;
+    ctx.serviceReadRequest = { seq: ctx.serviceReadSeq, slot, npcId, section: section || null };
+    ctx.publishView();
+    return true;
+  };
+
+  // A dialogue service route, in two steps: the row opens the exact host and
+  // records which still-disclosed topic the client should FOCUS once the
+  // committed choices arrive. Nothing is selected and no effect runs.
+  ctx.dialogueFocusTopic = null; // null | { npcId, topicId, requestId, seq }
+  ctx.dialogueFocusSeq = 0;
+  ctx.recordDialogueFocus = function recordDialogueFocus(npcId, topicId, requestId) {
+    if (ctx.dialogueFocusTopic) {
+      ctx.dialogueFocusTopic = null;
+    }
+    if (
+      typeof npcId !== "number" ||
+      !Number.isInteger(npcId) ||
+      npcId <= 0 ||
+      typeof topicId !== "string" ||
+      !topicId
+    ) {
+      return false;
+    }
+    ctx.dialogueFocusSeq += 1;
+    ctx.dialogueFocusTopic = {
+      npcId,
+      topicId,
+      requestId: typeof requestId === "string" ? requestId : null,
+      seq: ctx.dialogueFocusSeq,
+    };
+    return true;
+  };
+  ctx.clearDialogueFocus = function clearDialogueFocus(topicId) {
+    const pending = ctx.dialogueFocusTopic;
+    if (!pending || (topicId !== undefined && pending.topicId !== topicId)) {
+      return false;
+    }
+    ctx.dialogueFocusTopic = null;
+    return true;
+  };
+
+  // The command route's pre-fill (church enrollment): the shell expands and
+  // focuses the existing input with this exact text. Nothing is submitted.
+  ctx.commandPrefill = null; // null | { seq, text }
+  ctx.commandPrefillSeq = 0;
+  ctx.prefillCommand = function prefillCommand(text) {
+    if (typeof text !== "string" || !text.trim()) {
+      return false;
+    }
+    ctx.commandPrefillSeq += 1;
+    ctx.commandPrefill = { seq: ctx.commandPrefillSeq, text };
+    return true;
+  };
+
   const HUD_OVERLAY_NAMES = new Set(["map", "settings", "help", "codex", "gallery"]);
   const hudOverlay = ref(null);
   const hudOverlayOpener = ref(null);
