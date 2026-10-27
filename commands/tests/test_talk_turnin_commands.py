@@ -116,9 +116,15 @@ class TalkTurnInCommandTests(TalkTurnInCommandIsolation, EvenniaCommandTestMixin
         staff_component.service_binding = "place"
         staff_component.anchor_room_id = self.hall.pk
         self.staff.components.add(staff_component)
-        self.staff.components.add(
-            ScriptedDialogue.create(self.staff, dialogue_key=GUILD_STAFF_DIALOGUE_KEY)
+        # The authored table's 回報 topic declares a dialogue service
+        # association, so the associated-service gate re-reads this component's
+        # own place binding (shipped hosts get it from the capability assembly).
+        dialogue_component = ScriptedDialogue.create(
+            self.staff, dialogue_key=GUILD_STAFF_DIALOGUE_KEY
         )
+        dialogue_component.service_binding = "place"
+        dialogue_component.anchor_room_id = self.hall.pk
+        self.staff.components.add(dialogue_component)
         register_adventurer(self.char1, self.staff)
 
     def _complete_quest(self) -> str:
@@ -216,17 +222,28 @@ class TalkTurnInCommandTests(TalkTurnInCommandIsolation, EvenniaCommandTestMixin
         self.assertNotIn("可以交回", output)
 
     @covers_requirement("guild-quest-board::player-facing-guild-commands-resolve-one-local-service-host")
-    def test_turnin_with_ambiguous_staff_is_rejected(self):
+    def test_a_second_staff_member_never_shadows_the_selected_report_host(self):
+        """The typed ``回報`` listing answers from the host the player named.
+
+        ``talk <npc> 回報`` is explicit provider selection (npc-targeted-service-
+        flows): a second local ``GuildStaff`` host no longer makes the listing
+        ambiguous, and the selected host's own branch decides what is listed.
+        """
+        from commands.guild import CmdGuildAccept
+
+        self.call(CmdGuildAccept(), _QUEST_KEY, "你接取了任務")
+        quest_id = self._complete_quest()
         second = create_object(NPC, key="second clerk", location=self.hall)
         second_staff = GuildStaff.create(second, service_id="second", branch_key=BRANCH)
         second_staff.service_binding = "place"
         second_staff.anchor_room_id = self.hall.pk
         second.components.add(second_staff)
-        second.components.add(
-            ScriptedDialogue.create(second, dialogue_key=GUILD_STAFF_DIALOGUE_KEY)
-        )
         output = self.call(CmdsTalk(), f"公會職員 {GUILD_STAFF_TURNIN_KEYWORD}")
-        self.assertIn("這裡沒有公會服務人員", output)
+        self.assertIn(quest_id, output)
+        self.assertIn("可以交回", output)
+        # Listing never settles: the reward is unchanged and still unclaimed.
+        self.assertEqual(self.char1.db.wallet, 0)
+        self.assertEqual(read_records(self.char1)[0].state.value, "completed")
 
     @covers_requirement("guild-quest-board::player-facing-guild-commands-resolve-one-local-service-host")
     def test_turnin_with_quest_id_and_ambiguous_staff_uses_the_standard_line(self):

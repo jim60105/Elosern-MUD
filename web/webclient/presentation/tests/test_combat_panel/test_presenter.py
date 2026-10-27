@@ -599,10 +599,12 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         # the shared caps: generative hosts capped at MAX_INTERACT_TARGETS
         # minus the two surface hosts, each emitting min(MAX_AFFORDANCES,
         # authored responses + freeform + invite) entries; the guild and shop
-        # hosts (min(MAX_AFFORDANCES, keyword pool) + one navigation entry
-        # each); one entry per exit; one per look object; plus the safe-room
-        # baseline. Every expectation is DERIVED from the production caps and
-        # the fixture's own declared inputs (tier S: no vocabulary-size pin).
+        # hosts (min(MAX_AFFORDANCES, keyword pool) each — the schema-5 cutover
+        # moved their services out of the affordance vocabulary into the
+        # exploration panel's target-bound services field); one entry per exit;
+        # one per look object; plus the safe-room baseline. Every expectation
+        # is DERIVED from the production caps and the fixture's own declared
+        # inputs (tier S: no vocabulary-size pin).
         # The scripted keyword pool renders from the live dialogue table:
         # build the room on the kit-authored dialogue row and branch.
         from web.webclient.presentation.affordances import (
@@ -621,7 +623,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         t_responses = min(len(_T_DIALOGUE_ROW.responses), MAX_SCRIPTED_KEYWORDS)
         t_generative_hosts = MAX_INTERACT_TARGETS - 2
         t_host_entries = min(MAX_AFFORDANCES, t_responses + 2)
-        t_surface_entries = min(MAX_AFFORDANCES, t_responses) + 1
+        t_surface_entries = min(MAX_AFFORDANCES, t_responses)
         t_exit_entries = 12
         t_look_entries = MAX_LOOK_OBJECTS
         t_baseline_entries = 2
@@ -672,10 +674,11 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         vocabulary = exploration_affordances(self.player)
         self.assertEqual(len(vocabulary), expected_vocabulary)
         self.assertLessEqual(len(vocabulary), MAX_CONTEXT_AFFORDANCES)
-        # Every target slot and every navigation surface is present; only the
-        # monster-bound engage code, the companion-bound leave/possess codes,
-        # the delivery code, and the panel-only conversation opener (which the
-        # vocabulary never emits) are absent from this room.
+        # Every target slot is present and the vocabulary emits no navigation
+        # entry at all (the retired guild/shop rows): only the monster-bound
+        # engage code, the companion-bound leave/possess codes, the delivery
+        # code, and the panel-only conversation opener (which the vocabulary
+        # never emits) are absent from this room.
         from web.webclient.presentation.affordances import ACTION_CODE_ALLOWLIST
 
         ids = {
@@ -697,7 +700,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             },
         )
         surfaces = {entry.surface for entry in vocabulary if entry.navigation}
-        self.assertEqual(surfaces, {"guild", "shop"})
+        self.assertEqual(surfaces, set())
         payload = self.registry.render(
             "context_actions",
             PresentationContext(actor=self.player, protocol_version=1),

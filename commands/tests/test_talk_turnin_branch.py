@@ -54,12 +54,20 @@ class TalkTurnInBranchTests(EvenniaCommandTestMixin, EvenniaTest):
         self.char1.race = "human"
         self.char1.apply_race_baseline()
         self.staff = create_object(NPC, key="公會職員", location=self.hall)
-        self.staff.components.add(
-            GuildStaff.create(self.staff, service_id="staff")
+        # Both authored capabilities declare their place binding, exactly as the
+        # shared capability assembly writes it for shipped hosts: the guild
+        # service gate (and the P-era associated-service gate on the dialogue
+        # component) fails closed on an unbound component.
+        staff_component = GuildStaff.create(self.staff, service_id="staff")
+        staff_component.service_binding = "place"
+        staff_component.anchor_room_id = self.hall.pk
+        self.staff.components.add(staff_component)
+        dialogue_component = ScriptedDialogue.create(
+            self.staff, dialogue_key=GUILD_STAFF_DIALOGUE_KEY
         )
-        self.staff.components.add(
-            ScriptedDialogue.create(self.staff, dialogue_key=GUILD_STAFF_DIALOGUE_KEY)
-        )
+        dialogue_component.service_binding = "place"
+        dialogue_component.anchor_room_id = self.hall.pk
+        self.staff.components.add(dialogue_component)
 
     def tearDown(self):
         clear_dialogue_session(self.char1)

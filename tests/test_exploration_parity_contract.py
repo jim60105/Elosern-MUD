@@ -21,6 +21,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 _PY_EXPLORATION = REPO_ROOT / "web/webclient/presentation/exploration.py"
 _PY_AFFORDANCES = REPO_ROOT / "web/webclient/presentation/affordances.py"
 _PY_CHARACTER = REPO_ROOT / "web/webclient/presentation/character.py"
+_PY_NPC_SERVICES = REPO_ROOT / "world/rules/npc_services.py"
 _JS_PROTOCOL = REPO_ROOT / "web/static/webclient/js/elosern/protocol.js"
 
 # Bounds the exploration panel still owns (look entities are panel-only; the
@@ -68,10 +69,32 @@ _EXPLORATION_FRAGMENTS = (
     '"explore.party_invite"',
     '"explore.party_leave"',
     '"explore.engage"',
-    '"guild"',
-    '"shop"',
     '"action"',
     '"navigate"',
+    '"npc_persona"',
+    '"services"',
+    '"entries"',
+    '"route"',
+)
+
+# The version-5 contextual service vocabulary lives in the projection owner
+# (``world/rules/npc_services.py``) since the P cutover removed the coarse
+# guild/shop navigation rows from the exploration panel; the client mirror's
+# exploration validator repeats the same states, route kinds, sections and the
+# one text command a route may pre-fill.
+_SERVICE_FRAGMENTS = (
+    '"none"',
+    '"ready"',
+    '"unreadable"',
+    '"services"',
+    '"dialogue"',
+    '"command"',
+    '"shop"',
+    '"registration"',
+    '"board"',
+    '"report"',
+    '"rank"',
+    '"church join"',
 )
 
 
@@ -132,6 +155,13 @@ class ExplorationValidatorParityContract(unittest.TestCase):
         js_source = protocol_client_source()
         for fragment in _EXPLORATION_FRAGMENTS:
             self.assertIn(fragment, py_source, f"Python exploration missing {fragment!r}")
+            self.assertIn(fragment, js_source, f"JS protocol missing {fragment!r}")
+
+    def test_python_and_js_share_the_contextual_service_vocabulary(self):
+        py_source = _PY_NPC_SERVICES.read_text(encoding="utf-8")
+        js_source = protocol_client_source()
+        for fragment in _SERVICE_FRAGMENTS:
+            self.assertIn(fragment, py_source, f"Python services missing {fragment!r}")
             self.assertIn(fragment, js_source, f"JS protocol missing {fragment!r}")
 
     def test_character_category_group_bound_matches_the_skillcategory_enum(self):

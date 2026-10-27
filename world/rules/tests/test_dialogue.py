@@ -178,9 +178,19 @@ class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
         player.location = room
         host = self._scripted_host()
         host.location = room
-        host.components.add(
-            GuildStaff.create(host, service_id="staff", branch_key=SYNTH_BRANCH)
+        # Both capabilities carry the stored place binding the shared capability
+        # assembly writes for a shipped host: the guild gate and the P-era
+        # associated-service gate on the dialogue component fail closed without
+        # one, which would answer the rejection line instead of the guidance.
+        staff_component = GuildStaff.create(
+            host, service_id="staff", branch_key=SYNTH_BRANCH
         )
+        staff_component.service_binding = "place"
+        staff_component.anchor_room_id = room.pk
+        host.components.add(staff_component)
+        dialogue_component = resolve_dialogue_component(host)
+        dialogue_component.service_binding = "place"
+        dialogue_component.anchor_room_id = room.pk
         response = dialogue_response(host, player, GUILD_STAFF_TURNIN_KEYWORD)
         self.assertEqual(response, _staff_answer(GUILD_STAFF_TURNIN_KEYWORD))
         self.assertNotIn("可以交回", response)
