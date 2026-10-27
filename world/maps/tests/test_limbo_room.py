@@ -26,6 +26,7 @@ from world.maps.limbo import (
 )
 from world.quests.tests._fixtures import RegistryIsolationMixin
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
+from world.tests.geography_fixture import publish_shipped_geography
 
 
 #: The city-gate row the starting-room bridge is built from, read through the
@@ -43,6 +44,8 @@ def _gate_row():
         raise AssertionError("no city gate row exists for the limbo bridge")
     return registry[keys[0]]
 
+
+publish_shipped_geography()
 
 SOUTH_GATE_XYZ = settlement_node_xyz(_gate_row().gate)
 
