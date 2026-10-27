@@ -508,40 +508,40 @@ defineExpose({ focus, setActive, focusRow });
       data-testid="choice-card-group-heading"
     >{{ group.label }}</div>
     <div
-      v-for="entry in group.rows"
-      :id="rowId(entry.index)"
-      :key="`${viewKey}-${entry.row.key}`"
+      v-for="({ row, index }) in group.rows"
+      :id="rowId(index)"
+      :key="`${viewKey}-${row.key}`"
       :class="[
         cls('__row'),
-        cls(`__row--${entry.row.kind || 'row'}`),
-        entry.index === activeIndex ? cls('__row--active') : [],
-        entry.index === trailingIndex ? cls('__row--trailing') : [],
-        entry.row.lock ? cls('__row--locked') : [],
-        entry.row.unread && !entry.row.lock ? cls('__row--unread') : [],
+        cls(`__row--${row.kind || 'row'}`),
+        index === activeIndex ? cls('__row--active') : [],
+        index === trailingIndex ? cls('__row--trailing') : [],
+        row.lock ? cls('__row--locked') : [],
+        row.unread && !row.lock ? cls('__row--unread') : [],
       ]"
       role="menuitem"
-      :data-testid="entry.row.testId || 'choice-card-row'"
-      :data-row-key="entry.row.key"
-      :data-keyword-id="entry.row.keywordId"
-      :data-active="entry.index === activeIndex ? 'true' : 'false'"
-      :data-locked="entry.row.lock ? 'true' : null"
-      :data-unread="entry.row.unread && !entry.row.lock ? 'true' : null"
-      :style="{ '--row-index': entry.index }"
-      :aria-disabled="entry.row.enabled === false ? 'true' : null"
-      :aria-describedby="describedBy(entry.row, entry.index)"
-      @click="onRowClick(entry.index)"
-      @mouseenter="hoverKey = entry.row.key"
+      :data-testid="row.testId || 'choice-card-row'"
+      :data-row-key="row.key"
+      :data-keyword-id="row.keywordId"
+      :data-active="index === activeIndex ? 'true' : 'false'"
+      :data-locked="row.lock ? 'true' : null"
+      :data-unread="row.unread && !row.lock ? 'true' : null"
+      :style="{ '--row-index': index }"
+      :aria-disabled="row.enabled === false ? 'true' : null"
+      :aria-describedby="describedBy(row, index)"
+      @click="onRowClick(index)"
+      @mouseenter="hoverKey = row.key"
     >
       <span
-        v-if="entry.row.badge || entry.row.icon"
+        v-if="row.badge || row.icon"
         :class="cls('__badge')"
         aria-hidden="true"
-        :data-badge="entry.row.badge"
+        :data-badge="row.badge"
       >
         <!-- The keyboard glyph draws tiny in the loaded text faces, so a
              keyboard badge is drawn as a small keyboard. -->
         <svg
-          v-if="entry.row.icon === 'keyboard'"
+          v-if="row.icon === 'keyboard'"
           :class="cls('__badge-icon')"
           viewBox="0 0 24 24"
           fill="none"
@@ -555,8 +555,8 @@ defineExpose({ focus, setActive, focusRow });
         <!-- A close badge's ✕ is drawn too: two fine strokes, where the text
              glyph read as a heavy Latin X. -->
         <svg
-          v-else-if="entry.row.icon === 'close'"
-          :class="[cls('__badge-icon'), cls('__badge-icon--close'), entry.row.kind === 'leave' ? cls('__badge-icon--leave') : []]"
+          v-else-if="row.icon === 'close'"
+          :class="[cls('__badge-icon'), cls('__badge-icon--close'), row.kind === 'leave' ? cls('__badge-icon--leave') : []]"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -568,7 +568,7 @@ defineExpose({ focus, setActive, focusRow });
         <!-- A trash-can badge (the suggestions card's 清除建議): drawn in the
              dock icon vocabulary so it never reads as the ✕ of 返回. -->
         <svg
-          v-else-if="entry.row.icon === 'trash'"
+          v-else-if="row.icon === 'trash'"
           :class="[cls('__badge-icon'), cls('__badge-icon--trash')]"
           viewBox="0 0 24 24"
           fill="none"
@@ -580,34 +580,34 @@ defineExpose({ focus, setActive, focusRow });
         >
           <path d="M4.5 7h15M9.5 7V4.8h5V7M6.5 7l1 12.2h9L17.5 7M10.2 10.5v5.5M13.8 10.5v5.5" />
         </svg>
-        <template v-else>{{ entry.row.badge }}</template>
+        <template v-else>{{ row.badge }}</template>
       </span>
       <span :class="cls('__text')">
-        <span :class="cls('__label')">{{ entry.row.label }}</span>
+        <span :class="cls('__label')">{{ row.label }}</span>
         <span
-          v-if="entry.row.hint"
+          v-if="row.hint"
           :class="cls('__hint')"
           data-testid="choice-card-hint"
-        >{{ entry.row.hint }}</span>
+        >{{ row.hint }}</span>
         <span
-          v-if="entry.row.reason"
-          :id="reasonId(entry.index)"
+          v-if="row.reason"
+          :id="reasonId(index)"
           :class="cls('__reason')"
-          :data-testid="entry.row.reasonTestId || 'choice-card-reason'"
-        >{{ entry.row.reason }}</span>
+          :data-testid="row.reasonTestId || 'choice-card-reason'"
+        >{{ row.reason }}</span>
         <!-- A locked topic says so in text, not only by its padlock. -->
-        <span v-if="entry.row.lock" :class="cls('__sr')">（尚未解鎖）</span>
+        <span v-if="row.lock" :class="cls('__sr')">（尚未解鎖）</span>
         <!-- An unread topic says so in text, not only by its pip. -->
-        <span v-else-if="entry.row.unread" :class="cls('__sr')">（未讀）</span>
+        <span v-else-if="row.unread" :class="cls('__sr')">（未讀）</span>
       </span>
       <span
-        v-if="entry.row.unread && !entry.row.lock"
+        v-if="row.unread && !row.lock"
         :class="cls('__unread')"
         data-testid="choice-card-unread"
         aria-hidden="true"
       ></span>
       <svg
-        v-if="entry.row.lock"
+        v-if="row.lock"
         :class="cls('__lock')"
         data-testid="choice-card-lock"
         aria-hidden="true"
@@ -767,7 +767,7 @@ defineExpose({ focus, setActive, focusRow });
   padding: calc(6px * var(--ui-scale)) calc(12px * var(--ui-scale)) 0;
   font: var(--text-xs) / 1.3 var(--f-sans);
   letter-spacing: 0.24em;
-  color: var(--ink-400);
+  color: var(--paper-400);
   text-transform: none;
 }
 
