@@ -24,11 +24,23 @@ import tomllib
 import unittest
 from pathlib import Path
 
+from tools.spec_traceability import covers_requirement
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = REPO_ROOT / "packages" / "map-core"
 sys.path.insert(0, str(PACKAGE_ROOT / "tests"))
 
 import authoring_fixtures as fixtures  # noqa: E402
+from elosern_map_core import (  # noqa: E402
+    AuthoringError,
+    RuntimeRejection,
+    compile_runtime,
+    diagnose_world,
+    document_from_data,
+    load_authoring_world,
+    parse_document,
+    serialize_document,
+)
 
 ISOLATED_AUTHORING = textwrap.dedent(
     """
@@ -253,6 +265,163 @@ class InspectionEntryPointTests(unittest.TestCase):
             {entry["relative_path"] for entry in observed["documents"]},
         )
         self.assertEqual(_tree_digest(workspace), before)
+
+
+class AuthoringRequirementTests(unittest.TestCase):
+    """Requirement-level evidence through the package's public authoring API."""
+
+    @covers_requirement(
+        "map-authoring-documents::"
+        "map-documents-are-discovered-and-schema-checked-as-a-complete-candidate"
+    )
+    def test_discovery_is_deterministic_and_unsupported_candidates_are_rejected(self):
+        sources = fixtures.source_documents()
+        forward = load_authoring_world(sources)
+        backward = load_authoring_world(tuple(reversed(sources)))
+        self.assertEqual(
+            [document.relative_path for document in forward.documents],
+            sorted(document.relative_path for document in sources),
+        )
+        self.assertEqual(forward.fingerprint, backward.fingerprint)
+
+        identity = fixtures.settlement_data()
+        identity["id"] = "other_map"
+        with self.assertRaises(AuthoringError) as captured:
+            load_authoring_world(fixtures.custom_sources(settlement=identity))
+        self.assertIn(
+            "identity_mismatch",
+            {item.code for item in captured.exception.diagnostics},
+        )
+
+        unknown = fixtures.settlement_data()
+        unknown["nodes"]["plaza"]["mystery"] = 1
+        with self.assertRaises(AuthoringError) as captured:
+            load_authoring_world(fixtures.custom_sources(settlement=unknown))
+        diagnostics = captured.exception.diagnostics
+        self.assertIn("unknown_field", {item.code for item in diagnostics})
+        unknown_field = next(
+            item for item in diagnostics if item.code == "unknown_field"
+        )
+        self.assertEqual(unknown_field.relative_path, fixtures.SETTLEMENT_PATH)
+        self.assertEqual(unknown_field.field_path, "nodes.plaza.mystery")
+        self.assertIsNotNone(unknown_field.line)
+
+        coerced = fixtures.settlement_data()
+        coerced["nodes"]["plaza"]["x_m"] = True
+        with self.assertRaises(AuthoringError) as captured:
+            load_authoring_world(fixtures.custom_sources(settlement=coerced))
+        self.assertIn(
+            "invalid_field_value",
+            {item.code for item in captured.exception.diagnostics},
+        )
+
+    @covers_requirement(
+        "map-authoring-documents::"
+        "restricted-yaml-preserves-supported-authored-information"
+    )
+    def test_unsafe_yaml_is_rejected_and_supported_values_round_trip(self):
+        for text, code in (
+            ("version: 1\nversion: 2\n", "duplicate_key"),
+            ("a: &shared 1\nb: *shared\n", "anchor_or_alias"),
+            ("child:\n  <<: {x: 1}\n", "merge_key"),
+            ("a: 2024-01-01\n", "timestamp_value"),
+            ("a: .inf\n", "non_finite_number"),
+        ):
+            with self.assertRaises(AuthoringError, msg=code) as captured:
+                parse_document(fixtures.SETTLEMENT_PATH, text)
+            self.assertIn(
+                code,
+                {item.code for item in captured.exception.diagnostics},
+            )
+
+        text = fixtures.yaml_text(fixtures.settlement_data()).replace(
+            "nodes:",
+            "nodes:  # retained source comment",
+        )
+        parsed = parse_document(fixtures.SETTLEMENT_PATH, text)
+        data = fixtures.plain_data(parsed.document.data)
+        data["nodes"]["plaza"]["desc"] = "Edited prose.\nSecond line."
+        candidate = document_from_data(fixtures.SETTLEMENT_PATH, data)
+        emitted = serialize_document(candidate, parsed.round_trip)
+
+        self.assertIn("# retained source comment", emitted)
+        self.assertIn("Edited prose.", emitted)
+        reparsed = parse_document(fixtures.SETTLEMENT_PATH, emitted)
+        self.assertEqual(reparsed.document.data, candidate.data)
+        self.assertEqual(
+            reparsed.document.data["nodes"]["plaza"]["desc"],
+            "Edited prose.\nSecond line.",
+        )
+        self.assertEqual(
+            reparsed.document.data["wilderness_entry"]["shape"],
+            ("#",),
+        )
+        self.assertEqual(
+            reparsed.document.data["roads"][0]["bends"],
+            ({"x_m": 50, "y_m": 10},),
+        )
+
+    @covers_requirement(
+        "map-authoring-documents::"
+        "authoring-diagnostics-and-runtime-acceptance-have-distinct-gates"
+    )
+    def test_unfinished_world_is_saveable_while_runtime_requires_full_evidence(self):
+        unfinished = fixtures.loaded_world(roads=[])
+        self.assertIn(
+            "unreachable_landmark",
+            {item.code for item in diagnose_world(unfinished)},
+        )
+        self.assertIn(
+            "plaza",
+            serialize_document(unfinished.settlements["demo_map"]),
+        )
+        with self.assertRaises(RuntimeRejection):
+            compile_runtime(
+                unfinished,
+                fixtures.valid_external(unfinished),
+                fixtures.current_freshness(unfinished),
+            )
+
+        complete = fixtures.loaded_world()
+        snapshot = compile_runtime(
+            complete,
+            fixtures.valid_external(complete),
+            fixtures.current_freshness(complete),
+        )
+        self.assertEqual(sorted(snapshot.settlements), ["demo_map"])
+
+        with self.assertRaises(RuntimeRejection) as captured:
+            compile_runtime(complete, None, fixtures.current_freshness(complete))
+        self.assertIn(
+            "external_reference_unavailable",
+            {item.code for item in captured.exception.diagnostics},
+        )
+
+        duplicate = fixtures.settlement_data()
+        duplicate["nodes"]["market"] = {
+            "x_m": 200,
+            "y_m": 0,
+            "prototype_parent": "grid_room",
+            "key": "Market",
+            "desc": "A market.",
+            "anchor_key": None,
+            "typeclass": None,
+            "scene_archetype": None,
+        }
+        duplicate["roads"].append(
+            {
+                "source": "gate",
+                "destination": "market",
+                "direction": "e",
+                "bends": [],
+            }
+        )
+        with self.assertRaises(AuthoringError) as captured:
+            load_authoring_world(fixtures.custom_sources(settlement=duplicate))
+        self.assertIn(
+            "duplicate_outgoing_direction",
+            {item.code for item in captured.exception.diagnostics},
+        )
 
 
 if __name__ == "__main__":
