@@ -120,8 +120,8 @@ const {
   compassRef, compassTargets, compassArrivalKey, compassBusy, compassActive,
   readoutContent, aimedNode, onCompassMove, onCompassAim, onCompassBlocked, onRailHover,
   railRef, railMounted, railShown, presenceCardOpen, personFocus, focusTarget, focusPortrait,
-  cardRows, cardKey, cardCaption, cardLabel, speaker,
-  onRailActivate, onCardPick, onCardBack,
+  cardRef, cardRows, cardKey, cardCaption, cardLabel, cardMappingToken, speaker,
+  onRailActivate, onCardPick, onCardBack, returnToServiceOrigin,
   roomCardRef, roomCard, roomCardOpen, roomCardShown, roomCardRows, roomCardNotes, roomCardTrailing,
   roomCardCaption, roomCardLabel, tilesShown, waitFormOpen, sleepOpen, lastTile, returning,
   waitTileTime, sleepTileFatigue, placeActions, pillShown, pillCount, pillLabel,
@@ -134,6 +134,13 @@ const {
   onSleepQuestionYes, onSleepQuestionNo, onSleepQuestionClose,
   onCompassTab, onRailTab, onPlaceTab, onPillTab,
 } = useAppClient(store, shellRef, sceneBackdropRef);
+// The command line's release (the shell's one focus seam): the free-form
+// borrow ends, and a service row's command hand-off hands focus back to the
+// entry that opened it while that entry survives (slice U).
+async function onShellFocusLost() {
+  store.clearFreeformTarget();
+  await returnToServiceOrigin();
+}
 watch(
   () => [store.view.dialogueFocusTopic, dialogueVM.value],
   ([pending, dialogue]) => {
@@ -870,7 +877,7 @@ const rootStyle = computed(() => {
         :possession-banner="possessionBanner"
         :place-actions="placeActions"
         @submit-command="onSubmitCommand"
-        @focus-lost="store.clearFreeformTarget()"
+        @focus-lost="onShellFocusLost"
         @open-full-log="openFullLog"
         @reading-change="onReadingChange"
         @scene-advance="onSceneAdvance"
@@ -1211,10 +1218,12 @@ const rootStyle = computed(() => {
                card shell, trapping focus until it closes. -->
           <ChoiceCard
             v-else-if="presenceCardOpen"
+            ref="cardRef"
             :key="cardKey"
             test-id="presence-card"
             :data-card-kind="store.view.presenceCard?.kind"
             :rows="cardRows"
+            :mapping-token="cardMappingToken"
             :trailing-index="cardRows.length - 1"
             :caption="cardCaption"
             :aria-label="cardLabel"

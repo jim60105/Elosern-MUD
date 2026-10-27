@@ -74,6 +74,11 @@ const props = defineProps({
   // [{key, label, hint, badge, kind, enabled, reason, back, icon, testId,
   //   reasonTestId, keywordId}]
   rows: { type: Array, default: () => [] },
+  // The interaction mapping these rows were rendered from (slice U): a
+  // consumer that owns a stable entry mapping publishes its token here, and
+  // the DOM copy is what an activation reads back, so an activation can never
+  // name a mapping the player did not see.
+  mappingToken: { type: String, default: null },
   // Muted lines above the rows; never selectable, never a digit.
   notes: { type: Array, default: () => [] },
   // Rows re-key (and re-stagger) when this changes.
@@ -128,8 +133,32 @@ const digitCount = computed(() =>
   props.digitRows === null ? props.rows.filter((row) => !row.back).length : props.digitRows,
 );
 
+// The rows' contiguous groups (slice U): a run of rows sharing a `group`
+// identity draws one real labelled group (`role="group"` with a heading it
+// references) inside the composite. A card whose rows carry no group renders
+// one unlabelled wrapper, so every other consumer's semantics are unchanged.
+// The heading is not a row: it is never focusable, never a menuitem, takes no
+// digit and never moves the roving index.
+const groupedRows = computed(() => {
+  const groups = [];
+  props.rows.forEach((row, index) => {
+    const id = row.group || "";
+    const last = groups[groups.length - 1];
+    if (last && last.id === id) {
+      last.rows.push({ row, index });
+      return;
+    }
+    groups.push({ id, label: row.groupLabel || null, rows: [{ row, index }] });
+  });
+  return groups;
+});
+
 function rowId(index) {
   return `${idPrefix}-row-${index}`;
+}
+
+function groupHeadingId(group) {
+  return `${idPrefix}-group-${group.id}`;
 }
 
 function reasonId(index) {
@@ -301,7 +330,9 @@ watch(
 function setActive(index) {
   activeIndex.value = index;
   void nextTick(() => {
-    const el = Array.from(scrollRef.value?.children || []).find((child) => child.id === rowId(index));
+    // The row is resolved by its own id, not by its position among the
+    // scroller's children: grouped rows are grandchildren of the scroller.
+    const el = document.getElementById(rowId(index));
     el?.scrollIntoView?.({ block: "nearest" });
   });
 }
@@ -402,13 +433,22 @@ function focus() {
   listRef.value?.focus({ preventScroll: true });
 }
 
+// Focus one row by its stable key (slice U): a service flow returns focus to
+// the entry that opened it while that entry survives, else to the card's
+// first valid row.
+function focusRow(key) {
+  const index = props.rows.findIndex((row) => row.key === key);
+  setActive(index >= 0 ? index : firstEnabled(props.rows));
+  focus();
+}
+
 onMounted(() => {
   if (props.autofocus) {
     focus();
   }
 });
 
-defineExpose({ focus, setActive });
+defineExpose({ focus, setActive, focusRow });
 </script>
 
 <template>
@@ -428,6 +468,7 @@ defineExpose({ focus, setActive });
     tabindex="0"
     :data-testid="testId"
     :data-view="viewKey || null"
+    :data-mapping-token="mappingToken || null"
     :aria-activedescendant="rows.length ? rowId(activeIndex) : null"
     @keydown="onKeydown"
     @focusin="cardFocused = true"
@@ -451,35 +492,56 @@ defineExpose({ focus, setActive });
       @animationend="onRowsScroll"
     >
     <div
-      v-for="(row, index) in rows"
-      :id="rowId(index)"
-      :key="`${viewKey}-${row.key}`"
+      v-for="group in groupedRows"
+      :key="`${viewKey}-group-${group.id}`"
+      :class="cls('__group')"
+      :role="group.id ? 'group' : null"
+      :aria-labelledby="group.label ? groupHeadingId(group) : null"
+      :data-group="group.id || null"
+    >
+    <div
+      v-if="group.label"
+      :id="groupHeadingId(group)"
+      :class="cls('__group-heading')"
+      role="heading"
+      aria-level="3"
+      data-testid="choice-card-group-heading"
+    >{{ group.label }}</div>
+    <div
+      v-for="entry in group.rows"
+      :id="rowId(entry.index)"
+      :key="`${viewKey}-${entry.row.key}`"
       :class="[
         cls('__row'),
-        cls(`__row--${row.kind || 'row'}`),
-        index === activeIndex ? cls('__row--active') : [],
-        index === trailingIndex ? cls('__row--trailing') : [],
-        row.lock ? cls('__row--locked') : [],
-        row.unread && !row.lock ? cls('__row--unread') : [],
+        cls(`__row--${entry.row.kind || 'row'}`),
+        entry.index === activeIndex ? cls('__row--active') : [],
+        entry.index === trailingIndex ? cls('__row--trailing') : [],
+        entry.row.lock ? cls('__row--locked') : [],
+        entry.row.unread && !entry.row.lock ? cls('__row--unread') : [],
       ]"
       role="menuitem"
-      :data-testid="row.testId || 'choice-card-row'"
-      :data-row-key="row.key"
-      :data-keyword-id="row.keywordId"
-      :data-active="index === activeIndex ? 'true' : 'false'"
-      :data-locked="row.lock ? 'true' : null"
-      :data-unread="row.unread && !row.lock ? 'true' : null"
-      :style="{ '--row-index': index }"
-      :aria-disabled="row.enabled === false ? 'true' : null"
-      :aria-describedby="describedBy(row, index)"
-      @click="onRowClick(index)"
-      @mouseenter="hoverKey = row.key"
+      :data-testid="entry.row.testId || 'choice-card-row'"
+      :data-row-key="entry.row.key"
+      :data-keyword-id="entry.row.keywordId"
+      :data-active="entry.index === activeIndex ? 'true' : 'false'"
+      :data-locked="entry.row.lock ? 'true' : null"
+      :data-unread="entry.row.unread && !entry.row.lock ? 'true' : null"
+      :style="{ '--row-index': entry.index }"
+      :aria-disabled="entry.row.enabled === false ? 'true' : null"
+      :aria-describedby="describedBy(entry.row, entry.index)"
+      @click="onRowClick(entry.index)"
+      @mouseenter="hoverKey = entry.row.key"
     >
-      <span :class="cls('__badge')" aria-hidden="true" :data-badge="row.badge">
+      <span
+        v-if="entry.row.badge || entry.row.icon"
+        :class="cls('__badge')"
+        aria-hidden="true"
+        :data-badge="entry.row.badge"
+      >
         <!-- The keyboard glyph draws tiny in the loaded text faces, so a
              keyboard badge is drawn as a small keyboard. -->
         <svg
-          v-if="row.icon === 'keyboard'"
+          v-if="entry.row.icon === 'keyboard'"
           :class="cls('__badge-icon')"
           viewBox="0 0 24 24"
           fill="none"
@@ -493,8 +555,8 @@ defineExpose({ focus, setActive });
         <!-- A close badge's ✕ is drawn too: two fine strokes, where the text
              glyph read as a heavy Latin X. -->
         <svg
-          v-else-if="row.icon === 'close'"
-          :class="[cls('__badge-icon'), cls('__badge-icon--close'), row.kind === 'leave' ? cls('__badge-icon--leave') : []]"
+          v-else-if="entry.row.icon === 'close'"
+          :class="[cls('__badge-icon'), cls('__badge-icon--close'), entry.row.kind === 'leave' ? cls('__badge-icon--leave') : []]"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -506,7 +568,7 @@ defineExpose({ focus, setActive });
         <!-- A trash-can badge (the suggestions card's 清除建議): drawn in the
              dock icon vocabulary so it never reads as the ✕ of 返回. -->
         <svg
-          v-else-if="row.icon === 'trash'"
+          v-else-if="entry.row.icon === 'trash'"
           :class="[cls('__badge-icon'), cls('__badge-icon--trash')]"
           viewBox="0 0 24 24"
           fill="none"
@@ -518,34 +580,34 @@ defineExpose({ focus, setActive });
         >
           <path d="M4.5 7h15M9.5 7V4.8h5V7M6.5 7l1 12.2h9L17.5 7M10.2 10.5v5.5M13.8 10.5v5.5" />
         </svg>
-        <template v-else>{{ row.badge }}</template>
+        <template v-else>{{ entry.row.badge }}</template>
       </span>
       <span :class="cls('__text')">
-        <span :class="cls('__label')">{{ row.label }}</span>
+        <span :class="cls('__label')">{{ entry.row.label }}</span>
         <span
-          v-if="row.hint"
+          v-if="entry.row.hint"
           :class="cls('__hint')"
           data-testid="choice-card-hint"
-        >{{ row.hint }}</span>
+        >{{ entry.row.hint }}</span>
         <span
-          v-if="row.reason"
-          :id="reasonId(index)"
+          v-if="entry.row.reason"
+          :id="reasonId(entry.index)"
           :class="cls('__reason')"
-          :data-testid="row.reasonTestId || 'choice-card-reason'"
-        >{{ row.reason }}</span>
+          :data-testid="entry.row.reasonTestId || 'choice-card-reason'"
+        >{{ entry.row.reason }}</span>
         <!-- A locked topic says so in text, not only by its padlock. -->
-        <span v-if="row.lock" :class="cls('__sr')">（尚未解鎖）</span>
+        <span v-if="entry.row.lock" :class="cls('__sr')">（尚未解鎖）</span>
         <!-- An unread topic says so in text, not only by its pip. -->
-        <span v-else-if="row.unread" :class="cls('__sr')">（未讀）</span>
+        <span v-else-if="entry.row.unread" :class="cls('__sr')">（未讀）</span>
       </span>
       <span
-        v-if="row.unread && !row.lock"
+        v-if="entry.row.unread && !entry.row.lock"
         :class="cls('__unread')"
         data-testid="choice-card-unread"
         aria-hidden="true"
       ></span>
       <svg
-        v-if="row.lock"
+        v-if="entry.row.lock"
         :class="cls('__lock')"
         data-testid="choice-card-lock"
         aria-hidden="true"
@@ -559,6 +621,7 @@ defineExpose({ focus, setActive });
         <rect x="5.5" y="10.5" width="13" height="9.5" rx="1.6" />
         <path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5M12 14.2v2.4" />
       </svg>
+    </div>
     </div>
     </div>
     <!-- The accessible copies of the rows' hints: descriptions, outside every
@@ -684,6 +747,28 @@ defineExpose({ focus, setActive });
 
 .choice-card__caption + .choice-card__rows {
   padding-top: calc(8px * var(--ui-scale));
+}
+
+/* A labelled row group (slice U): the heading is a caption step above its
+   rows, never a row itself -- it takes no badge, no digit, no focus and no
+   hover fill, and the group is its accessible name. */
+.choice-card__group {
+  display: flex;
+  flex-direction: column;
+  gap: inherit;
+}
+
+.choice-card__group + .choice-card__group {
+  margin-top: clamp(2px, 0.37vh, 4px * var(--ui-scale));
+}
+
+.choice-card__group-heading {
+  flex: none;
+  padding: calc(6px * var(--ui-scale)) calc(12px * var(--ui-scale)) 0;
+  font: var(--text-xs) / 1.3 var(--f-sans);
+  letter-spacing: 0.24em;
+  color: var(--ink-400);
+  text-transform: none;
 }
 
 /* Keyboard focus on the one tab stop: the card keeps its drop shadow (the

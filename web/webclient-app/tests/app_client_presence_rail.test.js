@@ -223,7 +223,20 @@ describe("AppClient presence rail and person focus (exploration-presence-rail)",
 
     expect(sender.sent.actions).toHaveLength(0);
     expect(store.router.depth()).toBe(1);
-    expect(cardRows().map((row) => row.text())).toEqual(["1交談", "2公會服務", "3查看", "返回"]);
+    // The fixed common slots come first, then the contextual services, then
+    // the unnumbered return (slice U).
+    expect(cardRows().map((row) => row.text())).toEqual(["1交談", "2查看", "3公會服務", "返回"]);
+    expect(
+      card().findAll('[data-testid="choice-card-group-heading"]').map((heading) => heading.text()),
+    ).toEqual(["一般", "服務"]);
+    expect(
+      card().findAll('[role="group"]').map((group) => group.attributes("data-group")),
+    ).toEqual(["common", "services"]);
+    // Every group is named by its own heading.
+    for (const group of card().findAll('[role="group"]')) {
+      const heading = document.getElementById(group.attributes("aria-labelledby"));
+      expect(heading?.getAttribute("role")).toBe("heading");
+    }
     expect(document.activeElement).toBe(card().element);
     // The rail fades out (kept mounted, hidden and inert).
     expect(rail().attributes("style")).toContain("display: none");
@@ -435,7 +448,8 @@ describe("AppClient presence rail and person focus (exploration-presence-rail)",
     await mountWith();
     store.activatePresence("target-7");
     await settle();
-    key(card().element, "3");
+    // Slot 2 is the fixed 查看 row.
+    key(card().element, "2");
     await settle();
     expect(sender.sent.actions).toHaveLength(1);
     expect(sender.sent.actions[0]).toMatchObject({ action_id: "explore.look", payload: { target_id: 7 } });
