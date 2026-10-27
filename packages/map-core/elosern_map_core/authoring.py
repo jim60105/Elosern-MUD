@@ -953,7 +953,7 @@ def compile_runtime(
     graphs: dict[str, SparseSettlementGraph] = {}
     for settlement_id, settlement in world.settlements.items():
         try:
-            graphs[settlement_id] = _settlement_graph(settlement_id, settlement)
+            graphs[settlement_id] = build_settlement_graph(settlement_id, settlement)
         except SparseGraphError as error:
             diagnostics.append(
                 _diagnostic(
@@ -982,10 +982,19 @@ def compile_runtime(
     )
 
 
-def _settlement_graph(
+def build_settlement_graph(
     settlement_id: str,
     settlement: SettlementDocument,
 ) -> SparseSettlementGraph:
+    """Assemble one settlement document's validated sparse graph.
+
+    This is the single conversion from authored node/road declarations to the
+    spawn, identity and route graph every consumer reads: node prototypes carry
+    the authored room fields, roads keep the authored compass octant (never a
+    direction inferred from the metre deltas) and the road identity is the
+    ``source>destination`` pair the game adapter persists on each exit.
+    """
+
     nodes = []
     for node in settlement.nodes.values():
         prototype: dict[str, Any] = {
@@ -1002,7 +1011,7 @@ def _settlement_graph(
         )
     roads = [
         SparseRoad(
-            f"{road.source}->{road.destination}",
+            f"{road.source}>{road.destination}",
             road.source,
             road.destination,
             bend_points=tuple((bend.x_m, bend.y_m) for bend in road.bends),
@@ -1025,6 +1034,7 @@ __all__ = [
     "PARTITION_ALGORITHM_VERSION",
     "PartitionFreshness",
     "RuntimeMapSnapshot",
+    "build_settlement_graph",
     "compile_runtime",
     "diagnose_world",
     "load_authoring_world",
