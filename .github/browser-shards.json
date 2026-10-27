@@ -288,7 +288,11 @@
         "web.tests.browser.test_browser_exploration_actions.ExplorationBrowserTest.test_no_take_or_drop_control_is_rendered",
         "web.tests.browser.test_browser_exploration_actions.ExplorationBrowserTest.test_non_success_action_results_speak_once_in_the_narrative",
         "web.tests.browser.test_browser_exploration_nav.ExplorationBrowserTest.test_pointer_back_cell_returns_to_the_root_without_an_action",
-        "web.tests.browser.test_browser_exploration_state.ExplorationBrowserTest.test_reconnect_rebuilds_exploration_without_replay"
+        "web.tests.browser.test_browser_exploration_state.ExplorationBrowserTest.test_reconnect_rebuilds_exploration_without_replay",
+        "web.tests.browser.test_browser_npc_services.MerchantServiceCardJourneys.test_merchant_purchase_returns_focus_to_its_service_row",
+        "web.tests.browser.test_browser_npc_services.MerchantServiceCardJourneys.test_a_departed_provider_retires_the_card_and_its_drawer",
+        "web.tests.browser.test_browser_npc_services.ReceptionServiceCardJourneys.test_reception_row_opens_the_rank_flow_without_starting_an_exam",
+        "web.tests.browser.test_browser_npc_services.GroupedCardOverflowJourneys.test_the_card_groups_eleven_services_and_digits_stop_at_nine"
       ],
       "files_b": [
         "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_alternative_text_is_present_outside_the_bitmap",
