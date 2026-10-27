@@ -24,6 +24,8 @@ import tomllib
 import unittest
 from pathlib import Path
 
+from tools.spec_traceability import covers_requirement
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = REPO_ROOT / "packages" / "map-core"
 
@@ -138,6 +140,9 @@ class InstalledDistributionTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertEqual(completed.stdout.split(), ["0.1.0", "elosern_map_core"])
 
+    @covers_requirement(
+        "map-geometry-model::directed-sparse-routes-retain-authored-geometry"
+    )
     def test_game_adapters_read_their_declarations_through_the_core(self):
         from elosern_map_core.sparse import SparseSettlementGraph
         from world.maps.map_data import SETTLEMENT_GRAPHS
@@ -177,6 +182,10 @@ class InstalledDistributionTests(unittest.TestCase):
 
 
 class ImportBoundaryTests(unittest.TestCase):
+    @covers_requirement(
+        "map-geometry-model::geometry-is-explicit-and-snapshot-scoped",
+        "map-geometry-model::directed-sparse-routes-retain-authored-geometry",
+    )
     def test_core_calculations_run_with_evennia_django_and_world_absent(self):
         completed = _run_isolated(str(PACKAGE_ROOT))
         self.assertEqual(completed.returncode, 0, completed.stderr)

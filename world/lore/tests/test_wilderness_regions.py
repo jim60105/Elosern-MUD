@@ -100,6 +100,9 @@ class WildernessRegionRegistryTests(unittest.TestCase):
     @covers_requirement(
         "continental-geography::coordinate-frames-have-explicit-physical-units"
     )
+    @covers_requirement(
+        "map-geometry-model::geometry-is-explicit-and-snapshot-scoped"
+    )
     def test_frame_covers_2700_logical_kilometre_cells_with_metre_centers(self):
         self.assertEqual(CONTINENT_FRAME_CELLS, 2700)
         self.assertEqual(CONTINENT_CELL_SIZE_KM, 1)

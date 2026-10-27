@@ -36,6 +36,9 @@ def _road(source, destination, **kwargs):
 
 class SparseGraphValidationTests(unittest.TestCase):
     @covers_requirement("grid-room-sync::sparse-authored-graphs-synchronize-without-identity-loss")
+    @covers_requirement(
+        "map-geometry-model::directed-sparse-routes-retain-authored-geometry"
+    )
     def test_two_identities_binding_the_same_coordinate_are_refused(self):
         # The refusal happens at construction, before any caller can persist a
         # room, tag, reference or cached coordinate.
@@ -46,6 +49,9 @@ class SparseGraphValidationTests(unittest.TestCase):
                 [],
             )
 
+    @covers_requirement(
+        "map-geometry-model::directed-sparse-routes-retain-authored-geometry"
+    )
     def test_duplicate_identity_is_refused(self):
         with self.assertRaises(SparseGraphError):
             SparseSettlementGraph(
@@ -54,6 +60,9 @@ class SparseGraphValidationTests(unittest.TestCase):
                 [],
             )
 
+    @covers_requirement(
+        "map-geometry-model::directed-sparse-routes-retain-authored-geometry"
+    )
     def test_unknown_road_endpoint_is_refused(self):
         with self.assertRaises(SparseGraphError):
             SparseSettlementGraph(
@@ -62,6 +71,9 @@ class SparseGraphValidationTests(unittest.TestCase):
                 [_road("a", "missing")],
             )
 
+    @covers_requirement(
+        "map-geometry-model::directed-sparse-routes-retain-authored-geometry"
+    )
     def test_self_loop_duplicate_pair_and_duplicate_direction_are_refused(self):
         nodes = [_node("a", 0, 0), _node("b", 1, 0)]
         with self.subTest("self-loop"):
@@ -130,6 +142,9 @@ class SparseRouteTests(unittest.TestCase):
         )
 
     @covers_requirement("grid-room-sync::sparse-authored-graphs-synchronize-without-identity-loss")
+    @covers_requirement(
+        "map-geometry-model::directed-sparse-routes-retain-authored-geometry"
+    )
     def test_route_uses_the_three_explicit_roads_with_their_physical_lengths(self):
         graph = self._huge_graph()
         route = graph.route("west", "far")
@@ -147,6 +162,9 @@ class SparseRouteTests(unittest.TestCase):
         self.assertAlmostEqual(sum(edge.length for edge in route), expected)
         self.assertEqual(len({round(edge.length, 6) for edge in graph.edges}), 3)
 
+    @covers_requirement(
+        "map-geometry-model::directed-sparse-routes-retain-authored-geometry"
+    )
     def test_route_allocates_by_graph_size_not_coordinate_span(self):
         # A meter lattice over these coordinates would be untenable; the
         # search must stay bounded by the four nodes and three roads.
@@ -204,6 +222,9 @@ class PhysicalGeometryTests(unittest.TestCase):
                 physical_positions={(0, 0): (0, 0), (1, 0): (10, 0), (1, 1): (1, 1)},
             )
 
+    @covers_requirement(
+        "map-geometry-model::directed-sparse-routes-retain-authored-geometry"
+    )
     def test_lengths_use_physical_positions_while_direction_uses_logical_ones(self):
         graph = build_sparse_graph(
             map_id="t_map",
