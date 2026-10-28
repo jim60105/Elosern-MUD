@@ -43,7 +43,12 @@
         "web.tests.browser.test_browser_combat_scales.CombatMenuBrowserTest.test_panel_advertises_scales_only_for_the_mastered_element",
         "web.tests.browser.test_browser_combat_scales.CombatMenuBrowserTest.test_panel_groups_skills_by_category_in_enum_order",
         "web.tests.browser.test_browser_creation_reconnect.ReconnectCreationJourney.test_reconnect_restores_saved_stage_and_never_auto_resubmits",
-        "web.tests.browser.test_browser_unified_scenes.UnifiedScenesBrowserTest.test_provisional_and_terminal_failures_are_reached_once"
+        "web.tests.browser.test_browser_unified_scenes.UnifiedScenesBrowserTest.test_provisional_and_terminal_failures_are_reached_once",
+        "web.tests.browser.test_map_editor_persistence.MapEditorPersistenceBrowserTest.test_a_drag_is_one_saved_operation_that_undoes_to_absence_and_redoes",
+        "web.tests.browser.test_map_editor_persistence.MapEditorPersistenceBrowserTest.test_escape_cancels_a_drag_and_shift_arrow_nudges_one_step_per_press",
+        "web.tests.browser.test_map_editor_persistence.MapEditorPersistenceBrowserTest.test_an_incomplete_field_draft_is_never_written_and_escape_restores_it",
+        "web.tests.browser.test_map_editor_persistence.MapEditorPersistenceBrowserTest.test_a_refreshed_page_does_not_inherit_undo_history",
+        "web.tests.browser.test_map_editor_persistence.MapEditorPersistenceBrowserTest.test_a_failed_save_is_reported_with_the_baseline_intact_and_no_retry"
       ]
     },
     {
