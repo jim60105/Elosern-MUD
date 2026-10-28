@@ -222,3 +222,16 @@ test("entrance diagnostics locate the relationship; the E tool is registered on 
   assert.equal(entranceRequest("town", "yard", "settlement").defaults.node, "settlement_node:town:yard");
   assert.equal(entranceRequest("hall", "front").defaults.room, "interior_room:hall:front");
 });
+
+test("a moved endpoint keeps the relationship by ID; an absent one is flagged and never navigated", () => {
+  const data = world();
+  data.settlements[0].nodes[1].local_m = [900, 100];
+  const exterior = relationshipView(data, "exterior:hall");
+  assert.equal(exterior.endpoints[0].ref, "settlement_node:town:yard");
+  assert.match(exterior.endpoints[0].position, /900/);
+  // A snapshot that no longer holds the node (a stale or external change).
+  data.settlements[0].nodes = data.settlements[0].nodes.filter((row) => row.id !== "yard");
+  const stale = relationshipView(data, "exterior:hall");
+  assert.equal(stale.endpoints[0].present, false);
+  assert.equal(otherEnd(stale, { domain: "interior", mapId: "hall" }).ref, "interior_room:hall:front");
+});
