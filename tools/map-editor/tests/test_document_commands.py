@@ -403,7 +403,10 @@ def test_a_removal_that_breaks_internal_references_fails_the_gate(workspace):
     before = Presence(sha(path), path.read_text(encoding="utf-8"))
     with pytest.raises(CommandError) as raised:
         editor.service.apply_effect(Effect(REMOVE, f"content/maps/settlements/{fixture.SETTLEMENT_ID}.yaml"), before, command="internal", segment="s")
-    assert raised.value.code == "validation_failed"
+    # The district landmark still names a node of that settlement: the
+    # fresh-baseline internal guard explains it before the authoring gate.
+    assert raised.value.code == "deletion_refused"
+    assert raised.value.details["internal_references"][0]["kind"] == "landmark"
     assert sha(path) == before.fingerprint
     assert json.dumps(raised.value.details)
     assert os.path.exists(path)
