@@ -1,5 +1,7 @@
 {
-  "version": 1,
+  "version": 2,
+  "algorithm_version": 1,
+  "source_signature": "7904f2767a89d22e9708df5f24328afbd2c8b83304a36313dd3d6e01a03140e8",
   "fingerprint": "1e95bf66448d6a5006aea5c851f79483d60db00c84e6501c001d79ae42b3973e",
   "frame_cells": 2700,
   "tile_cells": 5,

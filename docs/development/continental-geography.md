@@ -208,12 +208,22 @@ the world-map panel change.
 
 ## District partition
 
-`tools/map_district_partition.py` computes which district owns every land
-cell offline (world-map drawer design §4.2) and writes the frozen,
-version-controlled result to `world/maps/data/district_partition.json`.
-The runtime only reads that file through `world/maps/district_partition.py`
-(`district_at((x, y))`, `district_outlines()`); it never imports the generator
-or recomputes ownership.
+The partition algorithm and its snapshot-to-input assembly live in the pure map
+core: `elosern_map_core.partition` (generation) and
+`elosern_map_core.partition_codec` (lightweight decode, metadata and
+freshness). `tools/map_district_partition.py` is only the game adapter that
+binds the published world into an explicit `PartitionInputSnapshot` (terrain,
+declared nation/region identifiers, anchor footprints, resolved district
+seeds, source signature) and writes the frozen, version-controlled result to
+`world/maps/data/district_partition.json` (world-map drawer design §4.2). The
+runtime only reads that file through `world/maps/district_partition.py`
+(`district_at((x, y))`, `district_outlines()`, `freshness()`); it never imports
+the generator or recomputes ownership.
+
+The generator needs the core package's optional `generation` extra (NumPy and
+SciPy). The runtime never does: decoding, metadata and freshness run on the
+standard library alone, so a process without the extra still reports
+`freshness()` instead of silently recomputing or adopting stale data.
 
 Regenerate after any change to the district document, the terrain model
 (mainland, ridge, passes, waterways, fords, forest edge, nominal claims),
@@ -222,6 +232,11 @@ anchor footprints, gateways or the settlement routes to a grid landmark:
 ```sh
 uv run --locked python -m tools.map_district_partition          # rewrite the file
 uv run --locked python -m tools.map_district_partition --check  # exit 1 when stale
+
+# The independent package project keeps its own lock:
+cd packages/map-core
+uv sync --extra generation
+uv run --locked --extra generation python -m pytest tests
 ```
 
 Commit the regenerated file with the change that caused it. The data-contract
@@ -232,6 +247,18 @@ geography and district candidates before reading its seed input. Run
 `diagnose_districts` (or `world.lore.tests.test_map_district_content`) first:
 the 100 km `MIN_VORONOI_SPACING_KM` spacing, reachability and
 region-membership rules belong to the district validator, not the partitioner.
+
+The artifact carries its `version` (document format), `algorithm_version`
+(`PARTITION_ALGORITHM_VERSION`) and `source_signature`, a conservative digest
+of the authored sources the partition depends on (`continent`, `locations`,
+`districts` and every `settlements/*.yaml`; interiors and editor layouts are
+excluded because they cannot change ownership). The generator signs the source
+fingerprints of the *published* documents it read, never a separate, later
+read of the files, so its ownership and signature always describe one source
+set. `world.maps.district_partition.freshness()` compares that metadata with
+the sources currently on disk and reports `current=False` when a source, a
+source's membership, or the algorithm version changed. Adding or editing an
+interior never invalidates it.
 
 Datum and units:
 
@@ -387,11 +414,13 @@ uv run --locked --env-file=<env> evennia test --settings test_settings.py --keep
   world.rules.tests.test_map_district_lighting
 ```
 
-The district partition's synthetic mechanics run as a plain unit test and its
+The district partition's synthetic mechanics run in the independent package,
+its runtime/generator independence probes as a plain unit test, and its
 production recomputation under the Evennia runner:
 
 ```sh
-uv run --locked python -m unittest tests.test_map_district_partition
+cd packages/map-core && uv run --locked --extra generation python -m pytest tests/test_partition.py
+uv run --locked python -m unittest tests.test_map_partition_independence
 uv run --locked --env-file=<env> evennia test --settings test_settings.py --keepdb \
   world.maps.tests.test_map_district_partition
 ```

@@ -8,6 +8,14 @@ dependencies = [
     "ruamel-yaml>=0.19.1",
 ]
 
+[project.optional-dependencies]
+# Offline district-partition generation only. Runtime decoding, metadata and
+# freshness checks stay on the standard library and never import this extra.
+generation = [
+    "numpy>=2.3",
+    "scipy>=1.16",
+]
+
 [build-system]
 requires = ["hatchling>=1.27.0"]
 build-backend = "hatchling.build"

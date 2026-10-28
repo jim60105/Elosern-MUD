@@ -18,6 +18,7 @@ from unittest import mock
 import numpy as np
 
 from elosern_map_core.geometry import cell_center_m
+from elosern_map_core.partition import PartitionInput, compute_partition
 from elosern_map_core.references import ReferenceIndex
 from tools import map_district_partition as generator
 from tools.spec_traceability import covers_requirement
@@ -363,7 +364,7 @@ class SyntheticConsumerEvidenceTests(unittest.TestCase):
         with mock.patch.object(map_districts, "_PUBLISHED", snapshot):
             # The production input adapter reads the published district world:
             # no test-side seed construction and no registration.
-            seeds = generator._production_districts(size)
+            seeds = generator.district_seeds()
         self.assertEqual(
             {seed.key for seed in seeds}, set(snapshot.districts)
         )
@@ -374,7 +375,7 @@ class SyntheticConsumerEvidenceTests(unittest.TestCase):
         nation[:, 101:] = 2
         walkable[:, 100] = False
         region = np.full((size, size), 1, dtype=np.uint8)
-        inp = generator.PartitionInput(
+        inp = PartitionInput(
             size,
             land,
             walkable,
@@ -383,8 +384,9 @@ class SyntheticConsumerEvidenceTests(unittest.TestCase):
             region,
             ("plain",),
             seeds,
+            source_signature="synthetic",
         )
-        partition = generator.compute_partition(inp)
+        partition = compute_partition(inp)
         self.assertEqual(partition.keys, tuple(sorted(snapshot.districts)))
         self.assertTrue(np.all(partition.owner[land] > 0))
         self.assertEqual(partition.owner_at((10, 10)), "west_seed")

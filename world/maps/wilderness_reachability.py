@@ -17,10 +17,8 @@ reuses another world's components.
 
 from __future__ import annotations
 
-import math
-
 from elosern_map_core import terrain as core_terrain
-from elosern_map_core.terrain import TerrainDefinition
+from elosern_map_core.terrain import TerrainDefinition, mainland_row_intervals
 
 from world.lore import wilderness_entry as _wilderness_entry_module
 
@@ -106,51 +104,6 @@ class WalkableComponents:
         return None
 
 
-def mainland_row_intervals(terrain: TerrainDefinition, y: int) -> list[tuple[int, int]]:
-    """Inclusive X intervals of land cells in row ``y``.
-
-    The even-odd crossings of the row's centre line give the candidate ends;
-    each end is then corrected against :func:`is_land_cell` (the single land
-    rule), so a floating-point edge case can only move an end onto the rule's
-    own answer, never disagree with it.
-    """
-    north = y + 0.5
-    vertices = terrain.mainland_boundary_km
-    crossings: list[float] = []
-    for index, (start_east, start_north) in enumerate(vertices):
-        end_east, end_north = vertices[(index + 1) % len(vertices)]
-        if (start_north > north) == (end_north > north):
-            continue
-        crossings.append(
-            (end_east - start_east) * (north - start_north) / (end_north - start_north)
-            + start_east
-        )
-    crossings.sort()
-    intervals: list[tuple[int, int]] = []
-    for west, east in zip(crossings[::2], crossings[1::2]):
-        low = max(math.ceil(west - 0.5), 0)
-        high = min(math.floor(east - 0.5), terrain.max_x)
-        while low <= high and not core_terrain.is_land_cell(terrain, (low, y)):
-            low += 1
-        while low > 0 and core_terrain.is_land_cell(terrain, (low - 1, y)):
-            low -= 1
-        while high >= low and not core_terrain.is_land_cell(terrain, (high, y)):
-            high -= 1
-        while high < terrain.max_x and core_terrain.is_land_cell(terrain, (high + 1, y)):
-            high += 1
-        if low <= high:
-            intervals.append((low, high))
-    # A corrected end can grow into its neighbour interval; merge so every
-    # land cell of the row belongs to exactly one interval.
-    merged: list[tuple[int, int]] = []
-    for low, high in intervals:
-        if merged and low <= merged[-1][1] + 1:
-            merged[-1] = (merged[-1][0], max(merged[-1][1], high))
-        else:
-            merged.append((low, high))
-    return merged
-
-
 def walkable_components(snapshot=None) -> WalkableComponents:
     """The component index for one geography snapshot and the live entry registry."""
 
@@ -173,6 +126,5 @@ def walkable_components(snapshot=None) -> WalkableComponents:
 
 __all__ = [
     "WalkableComponents",
-    "mainland_row_intervals",
     "walkable_components",
 ]

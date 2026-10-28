@@ -3,9 +3,10 @@
 Pure, deterministic map calculations for Elosern: the typed authoring documents
 and their restricted round-trip YAML codec, sparse settlement graphs and their
 shortest-path routing, the explicit-input cell/local/world metric transforms,
-and the wilderness terrain rules. The package imports no game code, Evennia,
-Django, HTTP client or UI state, so it can be imported, tested and reasoned
-about outside the MUD.
+the wilderness terrain rules, and the district partition's lightweight artifact
+codec with the offline generator behind an optional `generation` extra. The
+package imports no game code, Evennia, Django, HTTP client or UI state, so it
+can be imported, tested and reasoned about outside the MUD.
 
 ## Units
 
@@ -119,6 +120,46 @@ The forest edge must be X-increasing and the border river X-decreasing; both are
 validated at construction because their per-column row tables are single-valued.
 `region_flavors` must cover every region key in `REGION_KEYS`.
 
+### `elosern_map_core.partition_codec`
+
+The runtime half of the frozen district partition (standard library only, no
+generation dependency):
+
+- `decode_partition(document, is_land=...)` — the decoded ownership, tile runs,
+  exception tiles and outline rings; the land rule is the caller's boundary.
+- `read_partition_metadata(document)` — `PartitionMetadata` (format version,
+  `PARTITION_ALGORITHM_VERSION`, `source_signature`, raster `fingerprint`)
+  without expanding any raster.
+- `partition_source_signature(documents)` — the conservative digest over the
+  authored sources ownership depends on (`continent`, `locations`, `districts`,
+  `settlement`); interiors and layouts are excluded.
+  `partition_source_signature_from_fingerprints({path: fingerprint})` signs a
+  published snapshot's retained source set with the same rule.
+- `partition_freshness(metadata, source_signature, algorithm_version=...)` —
+  the `PartitionFreshness` result; a missing current signature is never current.
+- `FORMAT_VERSION`, `MIXED`, `PARTITION_ALGORITHM_VERSION`,
+  `PARTITION_SOURCE_KINDS`, `DistrictPartition`, `PartitionDocumentError`.
+
+### `elosern_map_core.partition` (the `generation` extra)
+
+The offline generator, imported only by the game's thin generator adapter. It
+needs NumPy and SciPy:
+
+```console
+uv sync --extra generation
+uv run --locked --extra generation python -m pytest tests
+```
+
+- `PartitionInputSnapshot` — the explicit immutable inputs: a
+  `TerrainDefinition`, the declared nation and region identifiers, anchor
+  footprint cells, resolved `DistrictSeed`s and the source signature.
+- `partition_input(snapshot)` — rasterize the snapshot into a `PartitionInput`.
+- `generate_partition(input)` — partition, encode and serialize the complete
+  artifact text (`version`, `algorithm_version`, `source_signature`,
+  `fingerprint`, tile runs, exception tiles and outlines).
+- `compute_partition`, `compute_outlines`, `encode`, `serialize`, `fingerprint`
+  — the individual stages, for focused assertions.
+
 ## Cache ownership
 
 Derived tables belong to the definition instance that produced them:
@@ -134,6 +175,9 @@ Graph objects cache only their own derived adjacency and coordinate index.
 ```console
 uv run --locked python -m pytest          # inside this directory
 ```
+
+The partition generator tests need the extra (CI uses this form):
+`uv run --locked --extra generation python -m pytest tests`.
 
 The game project consumes this package through its own `uv.lock`; the package
 keeps independent metadata and lock.

@@ -6,9 +6,10 @@ regenerates it from the live terrain and compares the complete artifact byte
 for byte, then checks the shipped ownership: every land cell owned once, sea
 unowned, the deep forest exactly its region, every Voronoi district inside
 one nation and connected to its own sources by legal steps, every landmark
-in its own district, and a runtime lookup that never loads the generator.
-Partition mechanics are covered by synthetic fixtures in
-``tests.test_map_district_partition``.
+in its own district, the artifact's algorithm version and source dependency
+signature against the shipped sources, and a runtime lookup that never loads
+the generator. Partition mechanics are covered by the core package tests in
+``packages/map-core/tests/test_partition.py``.
 """
 
 import json
@@ -18,10 +19,25 @@ import sys
 import unittest
 from dataclasses import replace
 from pathlib import Path
+from unittest import mock
 
 import numpy as np
 from scipy import ndimage
 
+from elosern_map_core.partition import (
+    compute_partition,
+    encode,
+    generate_partition,
+    partition_input,
+    serialize,
+)
+from elosern_map_core.partition_codec import (
+    FORMAT_VERSION,
+    PARTITION_ALGORITHM_VERSION,
+    partition_freshness,
+    partition_source_signature_from_fingerprints,
+    read_partition_metadata,
+)
 from tools import map_district_partition as generator
 from tools.spec_traceability import covers_requirement
 from world.lore import map_districts
@@ -40,9 +56,9 @@ class ShippedDistrictPartitionTests(unittest.TestCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.districts = map_districts.current().districts
-        cls.inp = generator.production_input()
-        cls.partition = generator.compute_partition(cls.inp)
-        cls.text = generator.serialize(generator.encode(cls.partition, cls.inp))
+        cls.inp = partition_input(generator.map_input_snapshot())
+        cls.partition = compute_partition(cls.inp)
+        cls.text = serialize(encode(cls.partition, cls.inp))
         cls.committed = generator.DATA_PATH.read_text(encoding="utf-8")
 
     @covers_requirement(
@@ -62,9 +78,50 @@ class ShippedDistrictPartitionTests(unittest.TestCase):
     def test_a_registry_change_without_regeneration_is_a_mismatch(self):
         dropped = next(d for d in self.inp.districts if d.key == "eastern_pasture")
         changed = replace(self.inp, districts=tuple(d for d in self.inp.districts if d is not dropped))
-        regenerated = generator.generate(changed)
+        regenerated = generate_partition(changed)
         self.assertNotEqual(regenerated, self.committed)
         self.assertNotIn('"eastern_pasture"', regenerated)
+
+    @covers_requirement(
+        "map-district-partition::frozen-partition-and-outlines-reproduce-deterministically-offline"
+    )
+    def test_the_artifact_is_current_for_the_shipped_sources(self):
+        freshness = district_partition.freshness()
+        self.assertEqual(freshness.algorithm_version, PARTITION_ALGORITHM_VERSION)
+        self.assertEqual(freshness.input_signature, self.inp.source_signature)
+        self.assertTrue(freshness.current)
+
+    @covers_requirement(
+        "map-district-partition::frozen-partition-and-outlines-reproduce-deterministically-offline"
+    )
+    def test_the_signature_binds_the_published_documents_not_a_later_file_read(self):
+        # The generator signs the source fingerprints of the published world.
+        # A file edit after publication must therefore produce a different
+        # signature than the current sources, never certify it as current.
+        published = generator.published_source_fingerprints()
+        self.assertIn("content/maps/districts.yaml", published)
+        edited = dict(published)
+        edited["content/maps/districts.yaml"] = "0" * 64
+        with mock.patch.object(
+            generator, "published_source_fingerprints", return_value=edited
+        ):
+            signature = generator.map_input_snapshot().source_signature
+        self.assertEqual(
+            self.inp.source_signature,
+            partition_source_signature_from_fingerprints(published),
+        )
+        self.assertNotEqual(signature, district_partition.current_source_signature())
+        metadata = read_partition_metadata(
+            {
+                "version": FORMAT_VERSION,
+                "algorithm_version": PARTITION_ALGORITHM_VERSION,
+                "source_signature": signature,
+                "fingerprint": "0" * 64,
+            }
+        )
+        self.assertFalse(
+            partition_freshness(metadata, district_partition.current_source_signature()).current
+        )
 
     @covers_requirement(
         "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
@@ -176,7 +233,11 @@ class ShippedDistrictPartitionTests(unittest.TestCase):
             ")\n"
             "assert partition.district_at((1250, 2420)) == 'north_deep_forest'\n"
             "assert partition.district_at((20, 20)) is None\n"
+            "assert partition.district_keys == tuple(json.loads(d.DATA_PATH.read_text(encoding='utf-8'))['districts'])\n"
+            "metadata = d.artifact_metadata()\n"
+            "assert metadata.source_signature\n"
             "print(sorted(m for m in sys.modules if m.startswith(('tools', 'numpy', 'scipy'))))\n"
+            "print(sorted(m for m in sys.modules if m == 'elosern_map_core.partition'))\n"
         )
         env = {**os.environ, "PYTHONPATH": str(root)}
         env.pop("DJANGO_SETTINGS_MODULE", None)
@@ -184,7 +245,7 @@ class ShippedDistrictPartitionTests(unittest.TestCase):
             [sys.executable, "-c", probe], cwd=root, env=env, capture_output=True, text=True, timeout=120
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.strip(), "[]")
+        self.assertEqual(result.stdout.splitlines(), ["[]", "[]"])
 
     def test_the_live_lookup_follows_the_published_mainland(self):
         self.assertEqual(
