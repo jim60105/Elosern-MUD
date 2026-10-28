@@ -60,6 +60,9 @@ jobs:
         working-directory: packages/map-core
         run: uv run --locked --extra generation python -m pytest tests
 
+      - name: Validate map reference context freshness
+        run: uv run --locked python -m tools.map_reference_context --check
+
       - name: Run Node DOM-independent test suite
         run: node --test web/static/webclient/js/tests/*.test.js
 

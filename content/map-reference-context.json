@@ -1,0 +1,1283 @@
+{
+  "discovery_rules": [
+    "world/lore/**/*.py",
+    "world/quests/**/*.py",
+    "world/rules/**/*.py",
+    "world/rules/**/*.yaml",
+    "tools/map_reference_context.py",
+    "packages/map-core/elosern_map_core/reference_context.py"
+  ],
+  "exporter_version": 1,
+  "external_identifiers": {
+    "assortments": [
+      "capital_adornments",
+      "capital_remedies",
+      "common_arms",
+      "common_outfits",
+      "elven_adornments",
+      "elven_attire",
+      "elven_crafted_arms",
+      "elven_fare",
+      "elven_remedies",
+      "elven_sundries",
+      "general_sundries",
+      "sanctum_wares",
+      "staple_meals"
+    ],
+    "elements": [
+      "dark",
+      "earth",
+      "fire",
+      "ice",
+      "light",
+      "lightning",
+      "water",
+      "wind"
+    ],
+    "magic_tiers": [
+      "advanced",
+      "apprentice",
+      "intermediate",
+      "superior",
+      "ultimate"
+    ],
+    "monster_species": [
+      "fog_mane_lynx",
+      "ridge_burrow_hare",
+      "rock_echo_goat",
+      "sway_whistle_sparrow",
+      "tide_devouring_crocodile",
+      "tide_lamp_crab"
+    ],
+    "monster_tiers": [
+      "calamity",
+      "high",
+      "low",
+      "mid"
+    ],
+    "nations": [
+      "altoria",
+      "grandia",
+      "valhalla"
+    ],
+    "quest_definitions": [
+      "cliff_echo_camp_clear_out",
+      "eastern_plains_ridge_burrow_hare",
+      "eastern_plains_sway_whistle_sparrow",
+      "introductory_hunt",
+      "northwest_highland_forest_fog_mane_lynx",
+      "ridge_burrow_nest_clear_out",
+      "southwest_coast_tide_lamp_crab",
+      "tide_mouth_boss_site_clear_out",
+      "western_hills_valleys_ridge_burrow_hare",
+      "western_hills_valleys_rock_echo_goat"
+    ],
+    "races": [
+      "beastfolk",
+      "elf",
+      "human"
+    ],
+    "scene_archetypes": [
+      "cave_interior",
+      "city_street",
+      "coastal_path",
+      "dungeon_interior",
+      "forest_path",
+      "mountain_path",
+      "ruin_interior",
+      "shrine_interior",
+      "tavern_interior",
+      "wilderness_path"
+    ],
+    "service_hosts": [
+      "altoria_academy_dean",
+      "altoria_alchemist",
+      "altoria_bathhouse_keeper",
+      "altoria_blacksmith",
+      "altoria_drill_instructor",
+      "altoria_eatery_owner",
+      "altoria_guard_captain",
+      "altoria_guild_master",
+      "altoria_high_priestess",
+      "altoria_innkeeper",
+      "altoria_jeweller",
+      "altoria_merchant",
+      "altoria_merchant_master",
+      "altoria_noble_watch_captain",
+      "altoria_sanctum_deacon",
+      "altoria_tailor",
+      "altoria_tavern_keeper",
+      "ciaran_elenis",
+      "ciaran_gwenaera",
+      "ciaran_hailiel",
+      "ciaran_lareneth",
+      "ciaran_nireth",
+      "ciaran_teliel",
+      "ciaran_valwyn",
+      "ciaran_vethiel"
+    ],
+    "settlements": [
+      "capital_altoria",
+      "village_ciaran"
+    ],
+    "shops": [
+      "altoria_alchemist",
+      "altoria_eatery",
+      "altoria_forge",
+      "altoria_general_store",
+      "altoria_jeweller",
+      "altoria_sanctum_shop",
+      "altoria_tailor",
+      "ciaran_gwenaera_home",
+      "ciaran_hailiel_home",
+      "ciaran_lareneth_home",
+      "ciaran_nireth_home",
+      "ciaran_valwyn_home",
+      "ciaran_vethiel_home"
+    ],
+    "subraces": [
+      "bearkin",
+      "bovinekin",
+      "catkin",
+      "ciaran",
+      "eolas",
+      "fionnen",
+      "foxkin",
+      "human_coastal",
+      "human_highland",
+      "human_noble",
+      "human_plains",
+      "human_royal",
+      "rabbitkin",
+      "tigerkin",
+      "wolfkin"
+    ],
+    "titles": [
+      "c_believer",
+      "c_bishop",
+      "c_cardinal",
+      "c_priest",
+      "c_sister",
+      "g_a_rank",
+      "g_b_rank",
+      "g_c_rank",
+      "g_d_rank",
+      "g_e_rank",
+      "g_f_rank",
+      "g_s_rank"
+    ],
+    "wilderness_regions": [
+      "central_mountains",
+      "eastern_plains",
+      "north_deep_forest",
+      "northwest_highland_forest",
+      "southeast_coast",
+      "southwest_coast",
+      "western_hills_valleys"
+    ]
+  },
+  "fingerprint": "dae126433c19ed07088b90b6219405b103da4cdd564073115bfbf8e9379008f0",
+  "incoming_references": {
+    "interior_room:altoria_academy:altoria_academy": [
+      {
+        "source": "place:altoria_academy",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_altoria_upper.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_academy",
+          "object_id": "altoria_academy"
+        }
+      },
+      {
+        "source": "service_host:altoria_academy_dean",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_academy",
+          "object_id": "altoria_academy"
+        }
+      }
+    ],
+    "interior_room:altoria_alchemist:altoria_alchemist": [
+      {
+        "source": "place:altoria_alchemist",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_altoria_middle.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_alchemist",
+          "object_id": "altoria_alchemist"
+        }
+      },
+      {
+        "source": "service_host:altoria_alchemist",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_alchemist",
+          "object_id": "altoria_alchemist"
+        }
+      }
+    ],
+    "interior_room:altoria_augustine_home:altoria_augustine_home": [
+      {
+        "source": "place:altoria_augustine_home",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_altoria_middle.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_augustine_home",
+          "object_id": "altoria_augustine_home"
+        }
+      }
+    ],
+    "interior_room:altoria_bathhouse:altoria_bathhouse": [
+      {
+        "source": "place:altoria_bathhouse",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_altoria_lower.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_bathhouse",
+          "object_id": "altoria_bathhouse"
+        }
+      },
+      {
+        "source": "service_host:altoria_bathhouse_keeper",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_bathhouse",
+          "object_id": "altoria_bathhouse"
+        }
+      }
+    ],
+    "interior_room:altoria_cassandra_home:altoria_cassandra_home": [
+      {
+        "source": "place:altoria_cassandra_home",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_altoria_middle.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_cassandra_home",
+          "object_id": "altoria_cassandra_home"
+        }
+      }
+    ],
+    "interior_room:altoria_drill_yard:altoria_drill_yard": [
+      {
+        "source": "place:altoria_drill_yard",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_altoria_upper.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_drill_yard",
+          "object_id": "altoria_drill_yard"
+        }
+      },
+      {
+        "source": "service_host:altoria_drill_instructor",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_drill_yard",
+          "object_id": "altoria_drill_yard"
+        }
+      }
+    ],
+    "interior_room:altoria_eatery:altoria_eatery": [
+      {
+        "source": "place:altoria_eatery",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_altoria_lower.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_eatery",
+          "object_id": "altoria_eatery"
+        }
+      },
+      {
+        "source": "service_host:altoria_eatery_owner",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_eatery",
+          "object_id": "altoria_eatery"
+        }
+      }
+    ],
+    "interior_room:altoria_forge:altoria_forge": [
+      {
+        "source": "place:altoria_forge",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_altoria_middle.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_forge",
+          "object_id": "altoria_forge"
+        }
+      },
+      {
+        "source": "service_host:altoria_blacksmith",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_forge",
+          "object_id": "altoria_forge"
+        }
+      }
+    ],
+    "interior_room:altoria_general_store:altoria_general_store": [
+      {
+        "source": "place:altoria_general_store",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_altoria_middle.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_general_store",
+          "object_id": "altoria_general_store"
+        }
+      },
+      {
+        "source": "service_host:altoria_merchant",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_general_store",
+          "object_id": "altoria_general_store"
+        }
+      }
+    ],
+    "interior_room:altoria_guardhouse:altoria_guardhouse": [
+      {
+        "source": "place:altoria_guardhouse",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_altoria_lower.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_guardhouse",
+          "object_id": "altoria_guardhouse"
+        }
+      },
+      {
+        "source": "service_host:altoria_guard_captain",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_guardhouse",
+          "object_id": "altoria_guardhouse"
+        }
+      }
+    ],
+    "interior_room:altoria_guild_hall:altoria_guild_hall": [
+      {
+        "source": "place:altoria_guild_hall",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_altoria_middle.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_guild_hall",
+          "object_id": "altoria_guild_hall"
+        }
+      },
+      {
+        "source": "service_host:altoria_guild_master",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_guild_hall",
+          "object_id": "altoria_guild_hall"
+        }
+      }
+    ],
+    "interior_room:altoria_hok_home:altoria_hok_home": [
+      {
+        "source": "place:altoria_hok_home",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_altoria_middle.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_hok_home",
+          "object_id": "altoria_hok_home"
+        }
+      }
+    ],
+    "interior_room:altoria_jeweller:altoria_jeweller": [
+      {
+        "source": "place:altoria_jeweller",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_altoria_middle.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_jeweller",
+          "object_id": "altoria_jeweller"
+        }
+      },
+      {
+        "source": "service_host:altoria_jeweller",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_jeweller",
+          "object_id": "altoria_jeweller"
+        }
+      }
+    ],
+    "interior_room:altoria_lodging:altoria_lodging": [
+      {
+        "source": "place:altoria_lodging",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_altoria_lower.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_lodging",
+          "object_id": "altoria_lodging"
+        }
+      },
+      {
+        "source": "service_host:altoria_innkeeper",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_lodging",
+          "object_id": "altoria_lodging"
+        }
+      }
+    ],
+    "interior_room:altoria_market_stalls:altoria_market_stalls": [
+      {
+        "source": "place:altoria_market_stalls",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_altoria_middle.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_market_stalls",
+          "object_id": "altoria_market_stalls"
+        }
+      }
+    ],
+    "interior_room:altoria_merchant_hall:altoria_merchant_hall": [
+      {
+        "source": "place:altoria_merchant_hall",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_altoria_middle.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_merchant_hall",
+          "object_id": "altoria_merchant_hall"
+        }
+      },
+      {
+        "source": "service_host:altoria_merchant_master",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_merchant_hall",
+          "object_id": "altoria_merchant_hall"
+        }
+      }
+    ],
+    "interior_room:altoria_noble_watch:altoria_noble_watch": [
+      {
+        "source": "place:altoria_noble_watch",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_altoria_upper.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_noble_watch",
+          "object_id": "altoria_noble_watch"
+        }
+      },
+      {
+        "source": "service_host:altoria_noble_watch_captain",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_noble_watch",
+          "object_id": "altoria_noble_watch"
+        }
+      }
+    ],
+    "interior_room:altoria_palace:altoria_palace": [
+      {
+        "source": "place:altoria_palace",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_altoria_upper.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_palace",
+          "object_id": "altoria_palace"
+        }
+      }
+    ],
+    "interior_room:altoria_sanctum:altoria_sanctum": [
+      {
+        "source": "place:altoria_sanctum",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_altoria_upper.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_sanctum",
+          "object_id": "altoria_sanctum"
+        }
+      },
+      {
+        "source": "service_host:altoria_sanctum_deacon",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_sanctum",
+          "object_id": "altoria_sanctum"
+        }
+      }
+    ],
+    "interior_room:altoria_silverfeather:altoria_silverfeather": [
+      {
+        "source": "place:altoria_silverfeather",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_silverfeather",
+          "object_id": "altoria_silverfeather"
+        }
+      }
+    ],
+    "interior_room:altoria_tailor:altoria_tailor": [
+      {
+        "source": "place:altoria_tailor",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_altoria_middle.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_tailor",
+          "object_id": "altoria_tailor"
+        }
+      },
+      {
+        "source": "service_host:altoria_tailor",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_tailor",
+          "object_id": "altoria_tailor"
+        }
+      }
+    ],
+    "interior_room:altoria_tavern:altoria_tavern": [
+      {
+        "source": "place:altoria_tavern",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_altoria_lower.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_tavern",
+          "object_id": "altoria_tavern"
+        }
+      },
+      {
+        "source": "service_host:altoria_tavern_keeper",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_tavern",
+          "object_id": "altoria_tavern"
+        }
+      }
+    ],
+    "interior_room:altoria_temple:altoria_temple": [
+      {
+        "source": "place:altoria_temple",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_altoria_upper.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_temple",
+          "object_id": "altoria_temple"
+        }
+      },
+      {
+        "source": "service_host:altoria_high_priestess",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "altoria_temple",
+          "object_id": "altoria_temple"
+        }
+      }
+    ],
+    "interior_room:ciaran_elenis_home:ciaran_elenis_home": [
+      {
+        "source": "place:ciaran_elenis_home",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_ciaran.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "ciaran_elenis_home",
+          "object_id": "ciaran_elenis_home"
+        }
+      },
+      {
+        "source": "service_host:ciaran_elenis",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "ciaran_elenis_home",
+          "object_id": "ciaran_elenis_home"
+        }
+      }
+    ],
+    "interior_room:ciaran_gwenaera_home:ciaran_gwenaera_home": [
+      {
+        "source": "place:ciaran_gwenaera_home",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_ciaran.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "ciaran_gwenaera_home",
+          "object_id": "ciaran_gwenaera_home"
+        }
+      },
+      {
+        "source": "service_host:ciaran_gwenaera",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "ciaran_gwenaera_home",
+          "object_id": "ciaran_gwenaera_home"
+        }
+      }
+    ],
+    "interior_room:ciaran_hailiel_home:ciaran_hailiel_home": [
+      {
+        "source": "place:ciaran_hailiel_home",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_ciaran.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "ciaran_hailiel_home",
+          "object_id": "ciaran_hailiel_home"
+        }
+      },
+      {
+        "source": "service_host:ciaran_hailiel",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "ciaran_hailiel_home",
+          "object_id": "ciaran_hailiel_home"
+        }
+      }
+    ],
+    "interior_room:ciaran_lareneth_home:ciaran_lareneth_home": [
+      {
+        "source": "place:ciaran_lareneth_home",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_ciaran.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "ciaran_lareneth_home",
+          "object_id": "ciaran_lareneth_home"
+        }
+      },
+      {
+        "source": "service_host:ciaran_lareneth",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "ciaran_lareneth_home",
+          "object_id": "ciaran_lareneth_home"
+        }
+      }
+    ],
+    "interior_room:ciaran_nireth_home:ciaran_nireth_home": [
+      {
+        "source": "place:ciaran_nireth_home",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_ciaran.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "ciaran_nireth_home",
+          "object_id": "ciaran_nireth_home"
+        }
+      },
+      {
+        "source": "service_host:ciaran_nireth",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "ciaran_nireth_home",
+          "object_id": "ciaran_nireth_home"
+        }
+      }
+    ],
+    "interior_room:ciaran_shelter:ciaran_shelter": [
+      {
+        "source": "place:ciaran_shelter",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_ciaran.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "ciaran_shelter",
+          "object_id": "ciaran_shelter"
+        }
+      }
+    ],
+    "interior_room:ciaran_silverfeather:ciaran_silverfeather": [
+      {
+        "source": "place:ciaran_silverfeather",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "ciaran_silverfeather",
+          "object_id": "ciaran_silverfeather"
+        }
+      }
+    ],
+    "interior_room:ciaran_teliel_home:ciaran_teliel_home": [
+      {
+        "source": "place:ciaran_teliel_home",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_ciaran.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "ciaran_teliel_home",
+          "object_id": "ciaran_teliel_home"
+        }
+      },
+      {
+        "source": "service_host:ciaran_teliel",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "ciaran_teliel_home",
+          "object_id": "ciaran_teliel_home"
+        }
+      }
+    ],
+    "interior_room:ciaran_valwyn_home:ciaran_valwyn_home": [
+      {
+        "source": "place:ciaran_valwyn_home",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_ciaran.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "ciaran_valwyn_home",
+          "object_id": "ciaran_valwyn_home"
+        }
+      },
+      {
+        "source": "service_host:ciaran_valwyn",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "ciaran_valwyn_home",
+          "object_id": "ciaran_valwyn_home"
+        }
+      }
+    ],
+    "interior_room:ciaran_vethiel_home:ciaran_vethiel_home": [
+      {
+        "source": "place:ciaran_vethiel_home",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_ciaran.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "ciaran_vethiel_home",
+          "object_id": "ciaran_vethiel_home"
+        }
+      },
+      {
+        "source": "service_host:ciaran_vethiel",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "ciaran_vethiel_home",
+          "object_id": "ciaran_vethiel_home"
+        }
+      }
+    ]
+  },
+  "schema_version": 1,
+  "source_manifest": {
+    "packages/map-core/elosern_map_core/__init__.py": "1b0f205d08705dec03877a22523e84ffd6f215a79d56cf27935708507fab6d95",
+    "packages/map-core/elosern_map_core/authoring.py": "92dc8c19bbc45d6d5a990b3ee319b711cb35921c05ffd46c0e84a1a1f10eb652",
+    "packages/map-core/elosern_map_core/codec.py": "432eb131d27b408d0a1e967f2818be1f464729981b0067d10b871dabe8e8ad93",
+    "packages/map-core/elosern_map_core/diagnostics.py": "b97cd0cb1eb552084c43053d57b96a89e3ce84a2215295756dba8f879dab2303",
+    "packages/map-core/elosern_map_core/documents.py": "01a31b0bbc85a9c1be54836ffd8de9c93b6daee540ef14cbd19b064fb3cf218d",
+    "packages/map-core/elosern_map_core/geometry.py": "c2ba914858f815eebc63d2e812062fdd64a7e1aa16aa80d95c0df5c8aa7be249",
+    "packages/map-core/elosern_map_core/partition_codec.py": "9c174e9d350dfc504520258a64cac883f187e6434893ce7c72671a2338b023f4",
+    "packages/map-core/elosern_map_core/reference_context.py": "6bcaf4198e889206701b0f0dba04702a59ebd51fe1c07ea90d13a08b2be7ea58",
+    "packages/map-core/elosern_map_core/references.py": "64d5a263d1c9148979cf9af2806a2a5644ce81ba1757f0e41ad108c496dff513",
+    "packages/map-core/elosern_map_core/schema.py": "b5e7eda9bd325be47defdb7460221e732b0d57a39386d41f8e65e55cdd1104a5",
+    "packages/map-core/elosern_map_core/sources.py": "b0e4642835cac8ce8ffdf22e00092fef5af91a1c693fbbf083b21ab8e9469fff",
+    "packages/map-core/elosern_map_core/sparse.py": "b5db602ba61654edfc6e9e4e0d8536568fea6aa21854e2fcc3a6583192ced59a",
+    "packages/map-core/elosern_map_core/terrain.py": "9b531386df4df69318130c1c869df15e10e2b2a9b27e07b59d398a11a0a5125a",
+    "tools/map_reference_context.py": "90b087c5b9fef9018c765a928b81a2c9cacbf962b4dffe2d637fd5a0e0bfca95",
+    "world/lore/__init__.py": "2ca4eda0bdc91f2b0b85bd3d4fab00c08cd2f8c2dffc66d0d430c7e6657e73db",
+    "world/lore/action_evidence.py": "289a02f07d315ce03a24eb38bebf9cf46e7c7913b2c5b3f4adc68f85f9438b33",
+    "world/lore/anchor_placement.py": "54bee28f0b1ed82d419431355140af86577371783077684bb3cea119bba37057",
+    "world/lore/anchors.py": "26cc64a31ac1cdafc10e777000f25edaf016c04e230c097f9c54cdbc3362d037",
+    "world/lore/bestiary_documentation.py": "004694a0d21709fdf088b50f9bff46251bbc9f49a23d7b50208f459dd779703b",
+    "world/lore/church/__init__.py": "49eca094998f4e49bae0354201121d22e895b386b737144af356e0acdf454694",
+    "world/lore/church/places.py": "65d5e913b93cb203373da101c8c500a1fedc3e9abb2a299bf367b8279091f8f3",
+    "world/lore/combat_traits.py": "ea811ef92ecba84a6b4368a6fc4c1537042a854841326d0843a1d2e8908d8066",
+    "world/lore/dialogue/__init__.py": "66f4bce6b4c3816ad2ff5650c84a1a139b3567d399026ea49e517974af828417",
+    "world/lore/dialogue/codec.py": "56b00229d8d6ead1ce2b883453263d18c5871dd897232c081d8ca9f0e3fc4295",
+    "world/lore/dialogue/conditions.py": "bf7b6ba67ef11664dadb425ea92456dc4cae41dff39aac6b77ee9affa31e9072",
+    "world/lore/dialogue/loader.py": "a5e1ce9a9f157759cca758729b3dca007d6a7b23ce893a70cf4267d6eebe9582",
+    "world/lore/dialogue/services.py": "679c744e9e38de5f900d6a6410b19da431877a9f95bb046244802e1f56ed47ef",
+    "world/lore/dialogue/shape.py": "b52fe97fec7b070e1ce1960aa4bbfbd74c8107d642bcb3b44f6e394246ef892e",
+    "world/lore/economy.py": "db3dd1c079077be216c2a8b1b1f8c22709577cf4adfff5aa3c5c3af249305862",
+    "world/lore/elements.py": "36052b938baf1b432bcce823bd8957191c50b0183d84b7febf54b10295b37403",
+    "world/lore/guild.py": "d2148ef7554aee171203ceaee18e6506202788a0e9ce715ed7885b20e9544f34",
+    "world/lore/guild_adventurers.py": "424b60250ec79a70ffacc2b492f27c3a1d7ba385c4f7806f20ea40c9153ad5d7",
+    "world/lore/items/__init__.py": "ae10633e209acfdaa76f74055e1af70c32e5f12c173691f2015155b0c96410f8",
+    "world/lore/items/assembly.py": "aacb06e8b10def8b001e1c0deffd9deccfbe675eb7d983d56a80ef5c775b04e2",
+    "world/lore/items/data_armor_accessories_materials.py": "a6c7418f8d25ea1db8633a3db2b8f53127ec67184710df67c3a24bb1ef608c90",
+    "world/lore/items/data_core_items.py": "2867da3ace7e9a4181622e043e2055cc818edfb68217db27d98ca1441dc7b70e",
+    "world/lore/items/data_guild_accessories.py": "b7413f65c4ad8659d919a929cc6e5ecc97316940f05a588e2bb8965697c82101",
+    "world/lore/items/data_inspect_only_codex.py": "b8fbed1622fa840b2573722e6f048ae16c7721d2887e309f32a1d2cfcd1410cb",
+    "world/lore/items/data_intimacy_items.py": "e9d5363bab120577130942aec267087b3505ee88a05054376631acbdedf67d9a",
+    "world/lore/items/data_military_equipment.py": "32fe972de87bb1b815de620f73af15398fc040b941f980982ffdb4b98908407d",
+    "world/lore/items/data_named_equipment.py": "bf1940df92f74508e7ca734b48af519eea956e141947c22c08fd3244d9ef8710",
+    "world/lore/items/data_regional_equipment.py": "bb577e204091f562ff9704ba304bb67851398e64ab5ae53ce22ea09b5fea65d1",
+    "world/lore/items/vocab.py": "0c13bb1dc25c8df3f641884e7be47045ccb0e3e3301da7133058e0ac7340860e",
+    "world/lore/magic.py": "f1ae1ffe5f9c9ffba58ac9ea78f80618c80d1ef2d763c7e3b545e7bf8af27dc8",
+    "world/lore/map_districts.py": "5a3e96fa284cf4ecaa3bb1590f4080405a13c98164b402c4a275336a88c71039",
+    "world/lore/monster_placement.py": "84870464666809a43c5aa3378cb79fc627a3a08fb3d1e23a522c51558e1d3008",
+    "world/lore/monster_species.py": "d06cc09d1ea86dfc8ab403bd5fb2fbcb6e2f55457c6ddfd0f1f029936586f2b1",
+    "world/lore/monster_visuals.py": "973f5ecbc54b805716f2b9706f27f51807ea5f58f99821618d5d2c37876ce4e6",
+    "world/lore/monsters.py": "550abd3a3571da752b02bb75cf941dc2ab0fb89269ed32be8680cab5c9fc92bf",
+    "world/lore/names.py": "8a75cd6dca2f93ad173a31564fbb3fe752d4b8428a051110868a9de6f2ec834d",
+    "world/lore/nations.py": "43f7f423802ecd56ade274588a789dd3673dae7811c8e87ea34af45208506802",
+    "world/lore/npc_card.py": "dfcfdd19ccbe3e92f7a3a7a8a561e423ba8710b14b7172cefb5f1c4fb9713dbd",
+    "world/lore/npc_editorial_review.py": "9344e2b199fb4c2d83e2d18742aaa124b6eeb9a5585fa5afcc60fc0e8ecc3fdb",
+    "world/lore/npc_profiles/__init__.py": "1998093eb069d59fc3250de264cfe431a2f842f5c20d47997c75eb9e936eb064",
+    "world/lore/npc_profiles/altoria_guild.py": "4e1aeaa10c8a87788b94842fff83727511febc727e933c021c2fa1b7975cdf04",
+    "world/lore/npc_profiles/altoria_lower.py": "485d327f3885fc8b48a1ca31ad4e45085471a727a6234e255dde33aa470708f3",
+    "world/lore/npc_profiles/altoria_trade.py": "13e835f3954920902b8a60afdb25b03c263b73bc0855ee6aa8c48ef4072b8f36",
+    "world/lore/npc_profiles/altoria_upper.py": "99fbbfbc2a340b493df93755386ee6c09fa8f98448484c5894154ae3377f290f",
+    "world/lore/npc_profiles/ciaran_homes_a.py": "c82e5c6a858a8df432a33fe3763283b608be82589adc75a5ae84c4326a42fb1a",
+    "world/lore/npc_profiles/ciaran_homes_b.py": "b0de829a2d3b36bf3a3d59b3c3610189746117b8d9129dcf4afa0ced9085a461",
+    "world/lore/npc_profiles/inventory.py": "7385c27092e638bb7d05343619b98dda5f2f3b1b25af96a561967db6a1b87a07",
+    "world/lore/npc_profiles/shape.py": "988fc9dea7ad2f706bef99f8d6df265e423802af79a76880b6099cd2ba2be4fa",
+    "world/lore/npc_tiers.py": "ef6a82a681f9212ab71295771986769e6f7285538367f72297bad6dddb66fd48",
+    "world/lore/player_presets/__init__.py": "7640ad1e9fcdee37be50038eb956441baf7ed9f347b4ffc0f748b695c887fee0",
+    "world/lore/player_presets/assembly.py": "f285d3efdca8bb76276f5a5c6696f0a3a43c775516affaa8443ab89239cc30a4",
+    "world/lore/player_presets/data_pack_cards.py": "d294866917e5d88adb83b0f604ea5c62c22cc59a44815a5f4aa1b2b7c49895bb",
+    "world/lore/player_presets/data_story_cards.py": "0952410d5fae7e7dc43d3e82cdb2abdfd1fdc1ac994589177a2575ed2c42802b",
+    "world/lore/player_presets/validation.py": "084c3ff9755e870076bf84f4a0b617968fe5967285519e988eccd120edb3bca9",
+    "world/lore/player_presets/vocab.py": "ce785ac741406c576af66408c286b2c93c16d6367b41d4b041d3f5f5b0633661",
+    "world/lore/races.py": "d1d3672182c64eae1dfb17f1fe16962c9db5f51fb5a0b7404e70d88b20887ae4",
+    "world/lore/registry_index.py": "f9f969a2340e7c9ca26d457250c138de9c67813f3dadaca21f6d56eff3a4845d",
+    "world/lore/registry_refs.py": "26bf919f94ae5cd7a451570d734c5d13bd2080137f55a111a26c4554d29646b8",
+    "world/lore/scene_archetypes.py": "737c650a1a5223defef655520242cc162301181b63f1f783e451def3f19b4388",
+    "world/lore/scenes.py": "ba525c31108b5abcd3c487df9578d6e38e5dc2504b6cf4cf5711313e2dd97898",
+    "world/lore/settlements/__init__.py": "13b916e302018d28878942694d5e9ba6457b7eb8818ac8272504cbb002fd8f7c",
+    "world/lore/settlements/_prose_lang.py": "7cf3638af425039e2568341c9f4159385225b07c5b6fb688bb73eda0aeb66692",
+    "world/lore/settlements/assortments.py": "4eb6bc1d2393e93dfe92370c3c3b24a032986b9a46cf29733d6bb73cc3026ece",
+    "world/lore/settlements/capability_declarations.py": "190fc2ce62a335fe7906968e0e10f86ce9fedadf5873476b3b1742fd552c5861",
+    "world/lore/settlements/places.py": "141cd668fd0ccf61f8ffdbd1d13c2df46abee6059260b310c83b7739d4e3cbab",
+    "world/lore/settlements/places_altoria_lower.py": "e1502c9c0d8346c2c69b52d75a877f30d5e6d66a9f1f13a228f97595c6cb03b2",
+    "world/lore/settlements/places_altoria_middle.py": "51cefb1e5f27a72c3e63fd7b4d9f71ea55494583d0dea057e455446c8b069662",
+    "world/lore/settlements/places_altoria_upper.py": "278fb7af1e89be3df25543547fbd3fad3f59ffd36830304af1a9b67627a540eb",
+    "world/lore/settlements/places_ciaran.py": "9e3d4a12c7d485e6f0bc5d3f6b481f3fa0e7e06a74db4d9f92749b59406c27ae",
+    "world/lore/settlements/settlements.py": "85435f4ef4613c4faba5405f748fb2833b64059d696d5a199e77613434b98da9",
+    "world/lore/settlements/shops.py": "940f04d7c6db2dbcef7e3a14cd2716cde8b753dcd0e73aafffb9b8433854ab1d",
+    "world/lore/sex.py": "41636022009a201f954611dbea378438a0469ca166eff54034a87489c5c2cda4",
+    "world/lore/sexual_vocab.py": "a67052bc4741ea037f4209977c618486b5870c439a0d84c1e8575f06146d922b",
+    "world/lore/social_identities.py": "d51416b9f27807211f96754514e25c83fb7291f7b68eb88011bc9f5a4050d034",
+    "world/lore/starting_kits.py": "7a030a0bc4cdf985868f6cdb5dd6bf7362afdbba3e4194f2316431fc84571fa8",
+    "world/lore/sync.py": "fdd7edc21614757513ad20feaff343410859d34d0e399c1929314d7b22a023ce",
+    "world/lore/titles.py": "5878ad1e457a6a644a0ad9b93035c55d6f7a7649e266049b2bfd66d4dc860793",
+    "world/lore/wilderness_entry.py": "432624fa3e90c993486efdca3035771fef5dee532c6adc492795da08d1bfa78c",
+    "world/lore/wilderness_regions.py": "0030b1e84e3708466201a877aaf124a6b869d2ed04fe56c3ee66f2035ef0577e",
+    "world/quests/__init__.py": "1ee2230f6b2f2893c1c1c71a339ccd2aabad28c2425c80d5989ac963d13a7f0d",
+    "world/quests/acquire.py": "d7eb47755b3f8df62964fde5e2bb2302381dad7a82b3ff37eee804900382dfc8",
+    "world/quests/apps.py": "c8fd1d104d7bf2e270d1cd2504445dc667c2ba49d4da38f99d8e894c9bdeaeb5",
+    "world/quests/binding.py": "4d50b7f94eb1ad272bf691ec1b9508c8475b2ca1d1139d5f6ab9be1847879c16",
+    "world/quests/bootstrap.py": "d64a567757362d79a1162a9d9c4fbff9adcfefa3329f612093ea91a82d45e49b",
+    "world/quests/catalog.py": "e1d97746b56aee56c25a9aad429e24baa8bef1706c7cb89b4edc8498184b388a",
+    "world/quests/characterization.py": "0125ecad710e2d61683c4cad0137e5c61fb02de6fe2887cc134a7e6ea6eabcaf",
+    "world/quests/compile/__init__.py": "e52ae929e45be519dbc5ad638c4a1db4e56e017201fe613a1dddb4e0623da4d7",
+    "world/quests/compile/canonical.py": "b70508b66845c24019760d3ab77e7d598ae081744c1bc4442fb7cd1a75bac51d",
+    "world/quests/compile/compiler.py": "23f30b2b94265730dc361f97556d4423f85eab71bfb7ffb338a1bcd176f1e8c0",
+    "world/quests/compile/contracts.py": "43ceba7ebb0621c21142e380f3001af924304abd234f62016a1b728ca5b0d8ba",
+    "world/quests/compile/fields.py": "af3b16a58a6db73462d033965552a1d2435c60c400540fc9c79de4c28c4f129b",
+    "world/quests/compile/payload.py": "3a0bfa2d8935f1089e23d8d8d83eb2db2338edb62da9a7d85cc87dd3a20cf653",
+    "world/quests/compile/registration.py": "95c96af5211bcf15cde0c699b9717ed050379872534b2ae1e7a35e898391c3ba",
+    "world/quests/deadlines.py": "05965c10ca387b4764d9a595488ba1898c04f1f06c52a532fede0a88630bc1db",
+    "world/quests/definitions.py": "05fa8d592003843d6133042bb96c0b6b8e36a11e8cb20ea94f8a93a3daafacd5",
+    "world/quests/deliver.py": "84e3222b8fb9bec0ca55118b6448f24b16e329a1baf3d305fb858294f7d2a700",
+    "world/quests/describe.py": "0ec5fbacc828160d2e0500eca87fe1da719e60ae70780125982cac188946c4e5",
+    "world/quests/encounter_activation.py": "df245c2b7a5e16650646cc500650ab383d755c476e6d6db76e0dd5e6fe6322ac",
+    "world/quests/encounter_dispatch.py": "481558483b0db8d553af7a4274caa3f7a653e4550736124e856fbb66525a5b2d",
+    "world/quests/encounters.py": "5ccc4ad64b0dd2db7892cfad4ad848dd11ca82b343f15726367cffee2a1a2467",
+    "world/quests/escort.py": "422b6154d4d026b30ab72ce8de914486f7d5609dadec95cd471bc29951f78b4c",
+    "world/quests/escort_events.py": "95acdd434a5b5b537d80b40e41006fc804d0e4ff2499044e5f75665580b02905",
+    "world/quests/escort_lifecycle.py": "5a2a012593ee84763bf64016e713fb07d108a01d6ae776123314c8215b35140a",
+    "world/quests/generated_quest_store.py": "7b37e9d8a7dbb38be4169a3f0a9cd8ab5703fa548466a0c432435f4e98807b01",
+    "world/quests/gm.py": "3f565b5e65db9965d1850fe2f6317b6bdf34fb5b7cd5194bd32d764a1d7963f6",
+    "world/quests/materializer.py": "e3f4b74f6b2ab10dd7f3bf01ef3d7ffcbf537a5a7d1478415677829417693950",
+    "world/quests/migrations/0001_scene_packages.py": "03369ecc87982871e06417521167c2f6d25b542a9eba5a4a24f1a8996d12902d",
+    "world/quests/migrations/0002_encounter_room.py": "8a85c42b01d98d8b8ee140cef39ca938cc04712767caf88ab066ca2d44661ac4",
+    "world/quests/migrations/0003_escort_outcomes.py": "5a207863f63fbb607482a5bd4d13c75d0b159cac5520fa8757fde6e8adbbc32b",
+    "world/quests/migrations/0004_package_owner_index.py": "79f862af33174bb4d8b7a5d0f405896d496a491f4aede04bf9a281aed7691376",
+    "world/quests/migrations/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "world/quests/models.py": "beb4f3547e99d2903abe4062c0ebcc02e34bcb31e3f076d5bd27ce3c34577cf2",
+    "world/quests/outcome_store.py": "550af8d48bef66bcd401fb93cc03a7250d849e1623d8c6bafca57fb615d288d9",
+    "world/quests/phases.py": "f1843d5294f22d36ac94402a8b733c75af93527750b8545372b56a309d72e1fe",
+    "world/quests/planner.py": "33a936fa2f497a8d0b6dc7c4ed59a38549505a5a14dc961ff304f5b6bf2871c7",
+    "world/quests/retention.py": "0dc112629dea61ae4bb3ad034e7d3dd7920950cb77b86ddf6615e2cf06568003",
+    "world/quests/room_observation.py": "e3e16618f1801807215a7b61315858746332b34df06f35db2bcac3518fa0ef8c",
+    "world/quests/runtime.py": "0143094a149f5f461c0bf63814e68a95ebe969831b11a52d725ecf63717edb85",
+    "world/quests/scene_api.py": "f5079982282beea88a87b81a7aaea2d3bf7c0b5d27c301d9dda43e8dd248461f",
+    "world/quests/scene_builder.py": "2a8089ec03f15d62cb3d154ad0ff788fc8b93b7ac93a257c9b7e4221f8ce31d6",
+    "world/quests/scene_package.py": "3e2bb587b3ee3a71705527acc0aad6fb918b10c47a6a23d5e6c471fb8dcf0206",
+    "world/quests/scene_store.py": "dab5fec4e2b9c4dba7dd933477714483d7f8bc3e3ec6f8fefa236ce0539bc16b",
+    "world/quests/settlement.py": "8569df6ef361b27970630e14b745accd825f93f4bd074e0c730323a89f6b884e",
+    "world/quests/story_dialogue.py": "15675217f3e01e72a2aa344bd95b2fb6aaf7900eb2e8d088d15453a940ccff08",
+    "world/quests/transitions.py": "f5b58802101699f609c284a406570b83285210edf121e9b95239ff8c2515ed1b",
+    "world/rules/__init__.py": "4d21c0e91b689862480a858bfc5fe46c4790fc063998cd746bbdffeb9f22e509",
+    "world/rules/account_roster.py": "0c87b016e08e5e629328bb280d1a8d66176aff74814fc28250ae6bc32280d1fe",
+    "world/rules/action/__init__.py": "cca5cc77cc1daff125a32d135c6637720043d88bf7f8d020ff89334d7ec342e1",
+    "world/rules/action/contracts.py": "24b3ee8b7f01be097e1a21c2d0d949e312fdb664f2e2f41d1755e5ce21b58709",
+    "world/rules/action/costs.py": "2889d9b4b96dd8e26995edfb135d2df59a2cb5669b000646adfee017aed42c36",
+    "world/rules/action/effects/__init__.py": "6f5950507e162e6e275622b35805921a3ceddae2dedca8e5cd8b63ca03631464",
+    "world/rules/action/effects/buffs.py": "7c50a7d0b4da0a6fedd40d7015992a8397b243a3de437aeb57b67ed1d9ad5486",
+    "world/rules/action/effects/church.py": "486b56be0f277b62bacbfc976849684458fac5cb63aff0effc34b164f9e30cc1",
+    "world/rules/action/effects/conferral.py": "e354b766bb1d897e35fda2380bad1b11bf9296c768e858409f3eb095980ae1b2",
+    "world/rules/action/effects/divine.py": "7d553372ab6e47ea17e54636112a5d74d9cc7c4ab32ffa2215e93a8547056bbf",
+    "world/rules/action/effects/gauge_transfer.py": "d787fa0ffec0068261ef1330d5d24a89aff32b2304f68147396938ef28b011b6",
+    "world/rules/action/effects/sexual.py": "4c7415458058507fe7e29a31ec49b50a0c02d411bd928990919b4b245cb1fdad",
+    "world/rules/action/event_log.py": "d0f743700e87a39f92d244d74f3d8a36b5290924c45b58dd4942a9c8aa8364af",
+    "world/rules/action/gates.py": "8aa6a8fde61eef4915fc3b335a19c1e06d5c3d705991b1d1c021a5c462d3c42f",
+    "world/rules/action/resolver.py": "037e3dfbafa66456dcc204bed4b5a6a06ad2c81793f67bcce062b1cfd361546f",
+    "world/rules/action/routing.py": "ce168b2c5cbc9737c069d3299ba2dc15e6a95d6179347311a0c46d804807004e",
+    "world/rules/action/transaction.py": "3ff3bb309c2a21eb45fa0253bb4d8453053686e7a9550ad3b039db8f97f2765d",
+    "world/rules/action_evidence.py": "789752b0dee7ca79bbc6df470f77c3508321d9e688e910cf08a558e99734c50d",
+    "world/rules/action_gates.py": "d3a98937c932f2b875e1cfeea3a0a3cfb40f4c431256b100784075aa482ab9f0",
+    "world/rules/action_preview.py": "5ade88f9e2f278cb11bda514a12ced65af2578cd89b2b79fbf13be6569bc7084",
+    "world/rules/affinity.py": "11a3fd553a4538843a0ff0e47a0454520510508076b2dde85c0f76ce04df2e72",
+    "world/rules/affinity_config.py": "f7413ef26ca42e835e8cb42c2ace3e18422c709a9970e444ae56d9c5c63960b0",
+    "world/rules/art_view.py": "1de5f27e271307c0ef002914d35ccb7d8ccc704969975f025d48b304185fc8e8",
+    "world/rules/buffs/__init__.py": "e018eed38e9c0dcbcdc4f2bb8e8b8bb2b08ea6d7267c804de24a0e85b3d7d3b3",
+    "world/rules/buffs/buff_class.py": "62adde2a03282f9d93cfad92653d11d6c80fa7f92dc17e48e17c0df63965631d",
+    "world/rules/buffs/definitions.py": "c68723194a6b0b674cdffc8f16b1fe23201f3912b922a3d5a74e8ee4e9d2b90b",
+    "world/rules/buffs/rates.py": "17853641f7f86de4675a3eb2d98fd4afeea7c7daebc3f47224ba89c3f8b6a908",
+    "world/rules/buffs/surface.py": "1fb64db4802043a8b7124a56d535c4fb54b312e9f8509be7eafb1238958bb85e",
+    "world/rules/caravan_arrivals.py": "e811db84b8fd6992130ba77db149839f6159ff02097fff122c4ac96861248f39",
+    "world/rules/cast_settlement.py": "27eefe133cc874ea3ffc887fcd443d172ddc875567b72dd321807330a3bfd095",
+    "world/rules/character_creation.py": "0c36b9f8d2885756f77e9c77e79f2d62a476511c615fd56b995a57513e5b7ca2",
+    "world/rules/church.py": "d0d197ca2b70aa2623edeecf065f4d702789bfcfde32dc59d1e8b028397e7b52",
+    "world/rules/church_rulebook.py": "7373da0ee3b9311dc8dbb1c768ff54437ad180a86307ef7fc2c6d3480f679f7e",
+    "world/rules/city_gates.py": "769431ba2710458d3f6f560ef8eb5b9f0c0d704ebf29230246b59b9fec67232b",
+    "world/rules/clock.py": "57b710ee6c02de1c8e889d35081a9b3ced06506ad3fb3540fdb0692b0c43f3ff",
+    "world/rules/combat/__init__.py": "e6f030fbd5174ae8e7e32a0cd9e69ba46858d09cebbe1b523c72dcc5e24fa813",
+    "world/rules/combat/battlefield.py": "5a47e4d18c6b65570d44f7738e3e06a349df736cc682dbe734c76438114450c4",
+    "world/rules/combat/damage.py": "cd682fc18558639e403a5ddd3e77a005a77b50caa93bce5e344f48779fdd2d17",
+    "world/rules/combat/decision_scope.py": "7d029bd2b04f201a0bee06e641ebdcd427337a351a920d565555db30bc1e8eaa",
+    "world/rules/combat/healing.py": "9b3f5ba15759b2fd7c04524dfb8390db2eca0a6e90c2c26bca0c0635b087cfee",
+    "world/rules/combat/rounds.py": "4232cd0acb7592a199a4db9cc84b2adbf21b26eca56b7bfc095d082ec6c6cc59",
+    "world/rules/combat/scalars.py": "42e20bfdbe8b0e79f03956f28a03f2029b2f087a148c7ceaa55ba71df478490a",
+    "world/rules/combat_beats.py": "b37a500f5590e4c4ee22f7bba81577d0b2be8c01c829ccfaf4aa272cd9171475",
+    "world/rules/combat_initiation.py": "c7c1aaebaf9f44e410be887de2824a16e4cb493d4f80fbd4b3794adb4312736f",
+    "world/rules/combat_modifiers.py": "e92118029122d78857a12311167090bfb5e6303f95318ae1c197581c71598b22",
+    "world/rules/combat_result.py": "959975c30966790d43f32d7e4f44634b699421b086ab111078829132e0ff84e8",
+    "world/rules/combat_session/__init__.py": "743b969b7194ed4b455ab38e460ffde6c595dcab1034394142c3497eb5cfcff5",
+    "world/rules/combat_session/ai_tuning.py": "e7e389ed8913b89b29eff7ce2dd73d527b4e2dfff1c06ae7d4e5b8328f4c7b65",
+    "world/rules/combat_session/battlefield.py": "2b196c163c59627798ed451b45d3ee87c820a3138bc0cb93555c7a863e6e1246",
+    "world/rules/combat_session/errors.py": "5b7bdca13f2e68fc6608b97ae9a2d650cc3213f1cad267419ac75e409b2fad0e",
+    "world/rules/combat_session/exit.py": "2201050d4c919fba3d94d077f26bd3c964f42e312654dc376450c06883f0b611",
+    "world/rules/combat_session/lifecycle.py": "6de75858bf5e305995d50f3b20587ae7f9c1a5034005b4d096d7edf437899675",
+    "world/rules/combat_session/observations.py": "bef535ecbe9f76ad28fed714f23cd8c2097f610a7a2658fc18bb951d7b43e005",
+    "world/rules/combat_session/policies.py": "18cff904cd3635e2e07febc6f4ae3f95413ae516864a89df8f83957cfca5626d",
+    "world/rules/combat_session/records.py": "b4b0d461d30cc49d9edfec7e5349853c09f2656158c9cd6fbe154d386a7a97d9",
+    "world/rules/combat_session/rounds.py": "cfa9520dbba002d2bb5974a942530d51800f0c20772fa57ec903260389c8f34a",
+    "world/rules/combat_session/scans.py": "c4d2a1a61e3fae8fb3c6d683982478f07b71bc03045b144d32311a9353db88b6",
+    "world/rules/combat_session/settlement.py": "f0162e76c952959b453eb1a34ab5c843173be0aae1bf9310fb54746c99bad588",
+    "world/rules/combat_session/snapshot.py": "5d99242c7ba174629a862e625f3c88f909a06c36261a875b9ce78422a05ff416",
+    "world/rules/combat_session/targeting.py": "14762c5d774e027c4453a291b4d05dbb316df4db410cc70a51330f1d67c2e0cb",
+    "world/rules/combat_session/writer.py": "37459aaf3af537ffba58a786e4238e7b5d09785edab989fef8fd209f20b4bf18",
+    "world/rules/combat_view.py": "c291c6f6adeaacfd56d5664cad7fffbfec43b1bd2c0c925e774bb78c245cdfc3",
+    "world/rules/correspondence.py": "4c7601c0ac797ce0e16becc186da411d3746443dcf15911b3931842037c673f6",
+    "world/rules/creation_messages.py": "9d898583aac629cf98f4752a3b1fcf79b62871b6f958d443526443e853f49f1c",
+    "world/rules/creation_wizard.py": "1f117ffd88fbfd30ad6c06f318d3eb8563fde746ffb869d24772fd0c92dc39db",
+    "world/rules/cross_lineage_unlock.py": "2d5be43005b3e54430e40fb48286367f88dc8a01b9b40d4fcd054c42f5d11d99",
+    "world/rules/defeat_aftermath/__init__.py": "d21525ea09e3c34d72953eb6d9272371d94b5b76ebe37b39f7f3a0ffc09d3551",
+    "world/rules/defeat_aftermath/aftermath.py": "9c7633ce8353e5053e97dfa80054db8507b815b89fc390a298f08687e682d924",
+    "world/rules/defeat_aftermath/contracts.py": "2735bbd4ae4ec4cfa90dd6f0f39043a72ff8ceb673b9b911f5440484c640e117",
+    "world/rules/defeat_aftermath/digest.py": "c8064c34f11a61b8a8635e5582eae5ea0e5f7b51e822666f50d69acd24193ccb",
+    "world/rules/defeat_aftermath/rulebook.py": "947cd14e9c7896c75880d2e4c5239b1ae90ca02b8881367dd406fa7e3aad1f75",
+    "world/rules/defeat_aftermath/validation_core.py": "08c6042163b6755a1eacf00d35f23029cc810735d9b1eb984ba86dbdf61716f1",
+    "world/rules/defeat_aftermath/validation_digest.py": "40c95da8c58c2fd5f89fb20be78e47636b032ea1ead195d994701f061af8861c",
+    "world/rules/defeat_aftermath/validation_violation.py": "f622b457d1bea7c69663c2722802cc59a4a3cf5c5b03d0760a8e4a2ce6750889",
+    "world/rules/defeat_aftermath/violation.py": "d447c14d1ca966a56a2e8b45adf109dac42fb1389a931c7c88be7a54f6dea653",
+    "world/rules/dialogue.py": "e4bde885388686bc35a6df7e3b3dcf8f224ab185421f18e47a030bbbccc0842f",
+    "world/rules/dialogue_availability.py": "5c64e95c15255d321976a55b59a8171ce01b4992b5d6089f826fee190a90445f",
+    "world/rules/dialogue_conditions.py": "260e955af780e30ba5b6c638f5d9be9e021718d4697dc4ce285d7ef69d7b954f",
+    "world/rules/dialogue_context.py": "99e9d76496d40fd7e32a2169a0fdd75306b22b9b1f49ed56e6374f0ab0a01aec",
+    "world/rules/dialogue_references.py": "e964aa91a4c67da036c37ce9633cf264f7b80005b477c7ebf4b33ac9194d0b91",
+    "world/rules/dialogue_sources.py": "5135da96143353b472b0449787ad3bc4d7a30d5db7c5e00f223e4469af9ad945",
+    "world/rules/dice.py": "860db148874e389f584ba116d5e8934c69c5c7946dd7539e069716caed35be5a",
+    "world/rules/disengage.py": "91b750b06213014935f01adde4704d2fe4155fdfa4a2f6a1c223bbe6dd418483",
+    "world/rules/displayed_stats.py": "b4194b8dfbaa52db5191b4ddd523b028620cf07c47b3540261f4896bf5ded765",
+    "world/rules/economy.py": "b0ea993cc8b404f5e8458b07c26e08ddeea858caefc20495061529e78ef76845",
+    "world/rules/equipment.py": "366f7c6baeae222b56fcaebc36361a77485fc26313642d567b1b880d70487caf",
+    "world/rules/equipment_effects.py": "863600d22c00b736d6493b87032dd5837d6f80ea65d1b4104f09cd49894ac1e4",
+    "world/rules/event_log.py": "1d9b6077c2e6f6c182f08e49119f0a73d9be82558bfd8774fee8ef465edf1a45",
+    "world/rules/exam_schedule_holds.py": "d52a96c326f2289617147fbb3167b5442ad43922f4a893f7ef63f825b829f814",
+    "world/rules/fatigue.py": "24f59cfecd5a252c5dc2772ad593b724dca043a6d28263b8c5082009dff9abf9",
+    "world/rules/field_cast.py": "451653d3e6b2d83703f65fbf7c7296cd3b187c4d28992be79039f2ed588a01c1",
+    "world/rules/gm.py": "db6d2b153a048a4271fa7030a39c78702bc9c4a4cc8e131f3cf21aa03ef2ac7e",
+    "world/rules/guild.py": "8346664c98b6271e5b2fb79a0d44efb5659aea06ebdf8799a85e73f401652f32",
+    "world/rules/guild_config/__init__.py": "b7e8db471b5e5f64f8fa72915b11bc90606b28479366d8bb7c64707c39cda7c0",
+    "world/rules/guild_config/_catalog.py": "bef13d468937e3e900a00f03ccd93e35fd29a2b980171aa3e49dd505ba777019",
+    "world/rules/guild_config/_commerce.py": "54f27bbbf249c5276170265628cc227ddb2e089b8ac8c2e24d05cb77bd5a91dc",
+    "world/rules/guild_config/_hosts.py": "ce6443c9b24506bac976479b133c111b114002fcf2630649d1f012c91886e67d",
+    "world/rules/guild_config/_loaders.py": "56f0070fec2e915149e7a2ba9d49a366c76fe60854df191aa4865b80594a1438",
+    "world/rules/guild_config/_quests.py": "22c1f6ed870a245338d5234e72b0154454b9bb5370679f1baf9c96d31a9181b6",
+    "world/rules/guild_config/_shops.py": "6801cc0500a768ff467823de927c1c8dcdd49a71f30524c9f5493ef44c7f666a",
+    "world/rules/guild_config/_types.py": "99c9e91949e2e0f0b3c052ddc0ef1645e6b6f53e57882e025fb9ce0757214828",
+    "world/rules/guild_economy.py": "e916036c1ff8e66423b33d6ffcb4a5fba71f7218d89ab44834cb3c993a67921e",
+    "world/rules/guild_exam_request.py": "66daa72bb0503343893166bfd55404806891f5b7a0c324d5fa0f8f093f01c239",
+    "world/rules/guild_exam_restrictions.py": "39f636f1d41a9d6145665aedaee673469d4ef864e6aa1f8164ba071e6c549e90",
+    "world/rules/guild_exams.py": "416859debdba7a91df6b66df48adedd4536a2ce8b46b89f0536de9f37153c2b1",
+    "world/rules/guild_offers.py": "b382f9892afcb564ebb2dd485ebebbb771082c36eeeed5fea9af0c894ce8d5a5",
+    "world/rules/human_guild_hosts.py": "20b1695cfa4fbb1a1f862c4cd4eb8a7c45e981b5468dde62b91c644b2eab27b8",
+    "world/rules/item_effects.py": "86dcfa1a1ae00e7d76c528b893ed668e484874525a8a1133008d27f45df69c07",
+    "world/rules/items/__init__.py": "184b90e6f20a67389238f8731471ac03d1aac89be2d9caab646eee0fbbef531c",
+    "world/rules/items/contracts.py": "ec691a1aed98d58a60a46745fa7c55924a8af0381245da599b7a95138df08b88",
+    "world/rules/items/journal.py": "9411848cf28a1bfffd63970b9f997c61a6b320053f4407f32b7df24a8eb192f1",
+    "world/rules/items/planning.py": "c779fdeccbac8146d965bcba74dabc48c12d56423724000ff807e7123a519348",
+    "world/rules/items/reads.py": "7dc93f3d671b2966f16f0c10a508ad221b03f71cea5d400f9ccf2c7d908d95a1",
+    "world/rules/items/settlement.py": "cdedc385a958dee57e6fe696d0366d8edd2ce5c8266202d2cf6c319cac2398a3",
+    "world/rules/lineage_query.py": "f0cd5051d652b8abb52c42ce4ba9080c493e2a2c4cadb1d470ff7dec740cb9e2",
+    "world/rules/lore_knowledge.py": "04ee8bf163fc3b9ad5d0a428576650637204e37c8893b0e8fd5116a589ad0a02",
+    "world/rules/map_discovery.py": "a97c3216776f3db32397c9a72050203922c7b6a6e51c006104208d1f245f10b3",
+    "world/rules/map_district_lighting.py": "45e346cefbff57dc213b7b0110b1d8bf34ec284bff85e8cbc06fbae616648a36",
+    "world/rules/map_knowledge.py": "299fdb87bb403962a3ccef6fda800b1c3d29f075a09c08f86071ea46a77ad04a",
+    "world/rules/mental_time.py": "e89e5712fa09366112ffdde03e64a9a0c6f0715c83cb24a4e9a3daa5867c095b",
+    "world/rules/monster_ai/__init__.py": "29ffeb28deec7bfe06260a969811cd55cbb162dfc695399eb8ac601b13a0c748",
+    "world/rules/monster_ai/candidates.py": "9d927d58e84924d338529e07532bbac30a2c1a40921f5237879c12f2e5ace662",
+    "world/rules/monster_ai/coordination.py": "f4b485487c54a7880a83360dc193872cf7d11485b3019b8c86952b0a936f2f3d",
+    "world/rules/monster_ai/estimation.py": "f5be405b713f71c20b37853dba2712457571378ca211659567f8231bf3c991f1",
+    "world/rules/monster_ai/legality.py": "ae60d6f8d0c4250519bbf0229d7810124ac813187b985acd2657e5b0c9198758",
+    "world/rules/monster_ai/manual_campaign.py": "4a110d5d5abf66b6ab794b87270eacb2ca28b9cdbdf35aaa2597c78ea9687693",
+    "world/rules/monster_ai/manual_reports.py": "a30c7c822ac36f1f8df36b97375d4de39d16aace0155970be7d7c7fffc3bafc5",
+    "world/rules/monster_ai/models.py": "de48fa079e3031c63390373f1305b22b3bfc7f54bea57d74a39ba147b49f141d",
+    "world/rules/monster_ai/selection.py": "55496d79645694bda3c6e46f526cbf13b7d83e3025f59409b39000c93267a52c",
+    "world/rules/monster_ai/snapshot.py": "2566f9b0cf373b7653b19da511ef273043669785797e55742a0684cab8cc0a01",
+    "world/rules/monster_ai/trace.py": "159ef938a74fea37ed86dffe79496abf6477efc60fe5d085743bdad9f9a4c649",
+    "world/rules/monster_ai/utility.py": "0ae217655d0e4e1c2e8a7b1ade154f73cdb24d72072efa901c856b8dd065fbe4",
+    "world/rules/monster_behaviour.py": "bad5390fc03d977bc79d2d162a12f873eb8248a0db2f555d0dfac4893130730a",
+    "world/rules/monster_individual.py": "aebffc963389222d028d121c9ee9d9bd7b13f88e3ffcc6a42f7939e0eeed0591",
+    "world/rules/movement.py": "eb354e5159dffc76ff0694846616454fe617b262ccc2fb14e3b6881bacf02c2e",
+    "world/rules/movement_settlement.py": "43e22fa2e32e3b3e9a2087013d2bcc8917ec17af11fed86e447b37dbbfb2aaa3",
+    "world/rules/mp_flow.py": "cf7f26056b7845b1df943068fe21fc5cfb2b5ab5d837c20a660418d6804179a4",
+    "world/rules/namegen.py": "f22a06725ebb3ce1553cf5b568f13ffcedcef3e63b97089dc9c72c9f05b26c71",
+    "world/rules/npc_capabilities.py": "46b02af1f99742ee7ed081dbc720f676d9b5f23ee41671f38aa9e5bcfc7022e8",
+    "world/rules/npc_identity.py": "6de367d1960090137d420daeeb54e8361877e71d57aa71f597ef3502482bf6fa",
+    "world/rules/npc_intents.py": "504e305b39c8680b245d6f6c8adbd8f9002e1b5820451edaf8ad654bd341c2c6",
+    "world/rules/npc_persona.py": "518649e21c3419bb3b4137d18a533afba35971d4b07edcdc0ca37c262467b1de",
+    "world/rules/npc_roster_validation.py": "c0a5af57ee35d357a04f0bb7d50b03a4bdfac2bbb11385115bb526ea7f3b54e5",
+    "world/rules/npc_schedules.py": "36d3befd7c99b72dcba1ac5f116fe82964c4072efa604553b9ddec26b8b8d0fb",
+    "world/rules/npc_services.py": "3b4ca781a5a96c5e17894c4857eb7094d75b4cbb5cef8648f60233ce3dc3fb51",
+    "world/rules/overwhelm.py": "41a609dc40f7b1a2d3ded1a36fdd4d70de7d0f60703b1fef4ef466d364e693cf",
+    "world/rules/party.py": "3df9a497df74a169cf1ae0839fe2129c78120171e8c5374fd1fcbbf29a859d0d",
+    "world/rules/party_inventory.py": "c55823db8d7b5840e37909830d38e17693236a57fefa3cbc1c993a118d1cd2b5",
+    "world/rules/party_scope.py": "b1ccf568114f41d1fe19475922d24f528bda52480b05c995c77bb046f4a7bd09",
+    "world/rules/persona.py": "ada51cdbf5dcdfe636ad8c9b98bd51ee520a2e18312116268aba366ade91ef16",
+    "world/rules/persona_edit.py": "5428ff71124b5f08c9619a11bd84e14300eed2aba5bb080b47353c7fb2156611",
+    "world/rules/phase_hooks.py": "7625f75ccc45b769f893b315fa5fb0b41323dd32761f146d808cb76ab00dc54a",
+    "world/rules/player_control.py": "e4488afe9b22179a52f615098b82feebb261dc8018f8aa177eac093983785116",
+    "world/rules/player_messages.py": "5b79df5bd4fbf1e56b809b76429c3c2d7bfd065c7cebab724193328659f22212",
+    "world/rules/pleasure.py": "09d5fdf11f720c6d0be2349542684b532d61f4a2a52cce84b81d6ab2204c02ab",
+    "world/rules/possession.py": "bcf4f398e8195424bc0c950f49270bf0e70f0b71dd83df3a2a899432cbe7db8c",
+    "world/rules/presentation_events.py": "b784ea1e940767300a6abe4ec723e81802664ace5176244b2af88b4dc9d9ae89",
+    "world/rules/progression/__init__.py": "19d55ffc66db25ec195b1b77b19478a6dc3e007d07f0fa7a99b7fd4391f6877a",
+    "world/rules/progression/_constants.py": "2996c37a60e0f5a120ad7338062513bc7c995e67e9a7cc7169709396c7b058e3",
+    "world/rules/progression/_gates.py": "2d9b87b2a1b0bcfcb10dd404d65751b52d4771cfe18ee0cf04760f7daa2d31a8",
+    "world/rules/progression/_lineage.py": "e77668e8ea4738ae9115d13480925185cc6711319ff7905693f294256bd205ec",
+    "world/rules/progression/_practice.py": "0a5ff865181fd01eb391fd9ca0e3a3e24f064dfeab3891ade96d9c463da4267d",
+    "world/rules/progression/_scales.py": "e3fe413762fc31c10ed69e3cfdb2f85ec4ead48047d510e84163a9e0c617edae",
+    "world/rules/progression/_scaling.py": "4f487e807f7e294a0185cb79ca599d6b51455c028711df7607644e159555a28b",
+    "world/rules/protection_demo.py": "fd92b8d359cb02500ad091e7509dbf2d4b0dd7028fe0bb220e7f1c0d668eeb44",
+    "world/rules/quantum.py": "7b66627e72d94a78da1d05f6d8ca65d189b72baf7062f07190b810914d826e59",
+    "world/rules/quest_delivery.py": "4061a01e49fb95dacb75fb10e803798e7aef2267a191235fd8a30f108d9b61fa",
+    "world/rules/quest_issuance.py": "8698b1c8f52cc8332fda539183ed54df2c67afa5f7a9ecfb156c69b0f9e7613f",
+    "world/rules/rulebook/__init__.py": "9c6e9b3de3817bc32f9de33f76096e8e22c71184628871c295d643aa664ca1c1",
+    "world/rules/rulebook/affinity.yaml": "2df4db4fefd5672c966d1cdb082a520a03f35fba14d8d20d866031432a8e2795",
+    "world/rules/rulebook/buffs.yaml": "06af76a81965106527af94ed80a117d513934a7a69c04714de15d9c4810524c1",
+    "world/rules/rulebook/church.yaml": "a9831c5842acfd0d4d81f8342ecfec7f84d7df541ca5c23e7fb8e2d6a055b53e",
+    "world/rules/rulebook/clock.yaml": "dc70d02e6394786f7e401f0bcef90d9703f746e9feda7a705fe821fa06011d64",
+    "world/rules/rulebook/combat.yaml": "bb081b5a1b40b26487eb7c2e4da13cede4122db78771846472972e9645ef2528",
+    "world/rules/rulebook/combat_modifiers.yaml": "d666401ce4351e7102e2e5aa0cb6bc1f70813ffd7e48abb7d26a088c9f6f6b0d",
+    "world/rules/rulebook/commerce/altoria.yaml": "9e35ac5f6387314550f1087bbd181b559e31f46934c14480331bb708751b7065",
+    "world/rules/rulebook/commerce/ciaran.yaml": "8d6045b117f1190e682b957e4e495745a53d8248f5666e68ee86656882ac262c",
+    "world/rules/rulebook/commerce/scales.yaml": "4b9f08d435abf5357f823dd2e134bc7c0717fc4789cbe681d821bd2cea3fae98",
+    "world/rules/rulebook/cross_lineage_unlock.yaml": "ba8592ff747c2497e4bc5ae6f0caafc592c843043fa25ca9cdd19e319eee6ba3",
+    "world/rules/rulebook/defeat_aftermath.yaml": "10d969d9ca9320effade9978df535bcc7867be5445331ff156e5631592ee853a",
+    "world/rules/rulebook/equipment_effects.yaml": "802dd0d04ace492c96398f9e956a1e809fcb426f0a2edb59b8734c366c45303c",
+    "world/rules/rulebook/fatigue.yaml": "c8005c3f936fcfe36b6dea4329aece18e61e662e479fb623c13888f50d8640e5",
+    "world/rules/rulebook/guild_economy.yaml": "8cd93986ac6aed5024b63803dbe381570d596742b87048c289c0f1a7a35c673a",
+    "world/rules/rulebook/guild_exam_restrictions.yaml": "60a7df45d0db574d08b0974b75f75512a5e44c74024918a8e27114414a255c8a",
+    "world/rules/rulebook/instance.yaml": "aa73bc6238b00771288efd3f6dabc179cf827e547df7f0327c83062cb0b486e4",
+    "world/rules/rulebook/item_effects.yaml": "0bf7b086d8c6f0d48b37b74811f04c19c4aeeda725a6d3f9ba94649694137c31",
+    "world/rules/rulebook/monster_behaviour.yaml": "d447326ac0094b34eac140458149b59fd3eea1125c14ceace3c096034e9fe204",
+    "world/rules/rulebook/movement.yaml": "072a1054db3806316e0ce384d326e5c60e14611a039dd1c22cedde5fb26eab37",
+    "world/rules/rulebook/npc_schedules.yaml": "4807e4f54107f3e4a8941ee1ce1988088a74ff914d46037e32c8254e5d347b50",
+    "world/rules/rulebook/overwhelm.yaml": "1720d632316b91c292a5809a43a479050251d792b7d2b56f3f04dd6b68128e3d",
+    "world/rules/rulebook/progression.yaml": "26be24816e024e894c2be7d85da4e8fd4000eb8db5f812ba4d44fc6f68832f83",
+    "world/rules/rulebook/schema.py": "ac58a8e06e0a32e2c7c422dc61beb5468b015bc8dbd38281c36ffa496318e911",
+    "world/rules/rulebook/sexual.yaml": "aa50e358ca85cdb52f22016ba824b6c4a1ed61a8e73c182a4f35913560e9c93a",
+    "world/rules/rulebook/sexual_act_effects.yaml": "d244cb388edf3b2dc76b498fe87e211655d68b0caf93651ed898d86440a983b8",
+    "world/rules/rulebook/sexual_pleasure.yaml": "80dde75dfcb4d77b0dca20491f29de3fe34bfcaccb40072640311932153d0eb4",
+    "world/rules/rulebook/sexual_resist.yaml": "a7146fe53b3e7e13e37691cdd5f2a47f0bc92ceb933beeff07d75b0a4da6237c",
+    "world/rules/rulebook/state_reactions.yaml": "49c0953d2fc03d60dcf065530c9b01d0127661018a4727379208a62f351667b1",
+    "world/rules/rulebook/status_display.yaml": "e138c61d9972dc91dee1ef06ab5508ce5d7f9fc46f34295480eb8a3a71434c8a",
+    "world/rules/service_gate.py": "8c9584aa8ddbcff0d6a83c7cc461a2674035f4a464c5d3ef7ff1ffe66f56fdfb",
+    "world/rules/service_messages.py": "0f79e5790c715c027ffe4bf0069698e5a5f82ee81a309507f8f1ea6fbfbb3192",
+    "world/rules/service_targets.py": "5039f734ec0d0013ed257deec05d50ca2d7a3cdee791d794998450cccbd49708",
+    "world/rules/service_view.py": "fede9fba38bac40f97515220c409705efa4d6d927dfe76875b414806988de9e4",
+    "world/rules/service_windows.py": "601a4c61e1c1ce437ebffacdca2cbc9510591bb5a02b08b49530129304c9290f",
+    "world/rules/settlement_alignment.py": "c99b81cf25e7f3b262323477baef81f32280c45c875ce0d260f8dc46720bb27e",
+    "world/rules/sexual_act_effects.py": "756336043287d2b2e753fc71a88c5850ac761ac3f7cee0725f327990b13c1cca",
+    "world/rules/sexual_resist.py": "da2c771336a0afe9705c154be9dc56a793daa9cdb6c201f25e18506c1faf3b74",
+    "world/rules/sexual_state/__init__.py": "9a54d318a0830e3ac25f33173470907c312a68e89a9ecbf1c1ba5e231742b363",
+    "world/rules/sexual_state/handler.py": "b353534785cef6c59a29f4d0d9a2de9d85140ec082087bfb0c606782a6e91142",
+    "world/rules/sexual_state/lifecycle.py": "275813fe15c06ba6caa79c636cb58daa43bdd71bdf64842f8306a4b7e70f04e3",
+    "world/rules/sexual_state/pleasure.py": "f557ded9b1f573de3c4a9b81e8e8a9f5db02b72773c4860aa390b858288a22cc",
+    "world/rules/sexual_state/traits.py": "eb0b8495f68f47fb8b51654821200f22bfe7f008f1241ebc84e284833bf14f91",
+    "world/rules/sexual_transitions.py": "69cf32779cfd749d35a7c6ffa62f1067698f3f30df04821b2efcccb98de67c87",
+    "world/rules/shop_hours.py": "676d1dd1353d6758068c0b1c9d40e2f3db986cd97d1507a025982d124e04b366",
+    "world/rules/skill_effects.py": "6fdffeed7109222c2d762b7784cb513631db43d5e1d8d8b7383a29d8e18a0856",
+    "world/rules/skill_ownership.py": "a028bd224eb349c98ee829986dcdc9bdc518470ccf86ef719aba4ef8f0087205",
+    "world/rules/skip_safety.py": "72088a1fd2bb12f9bf777805740ada42da4c5689c30e7cbfa94bd752fd4ff255",
+    "world/rules/sleep_control.py": "1388c5b1329d509b57f1276d5d49a2dda4767cacaaf9a9be84cf3fc0b269aa52",
+    "world/rules/sleep_receipt.py": "838722c751a008c17ab6d509ef5a15e9b3c9f27214aef5b54f7770178d821e85",
+    "world/rules/social_identity.py": "51a80969f1d78aa1ce06ed5c4b6d5cdec9e55608ad4b25234645fa46b076f9bf",
+    "world/rules/spell_conditions.py": "f5b07aa36a9e870eb76d53642d22ab5e0d3accf97855fce90cf27ad852b09323",
+    "world/rules/starting_companions.py": "f7cf4e342cfc5bcb0fcbedeb1129a29872bd6ae95b247ed6198f8b77fb4b1029",
+    "world/rules/state_derived_roll.py": "a2750faa8d5e9eeeddcd20a7c711e4d76be0b13a7f8dae6413f84f0c3ecfce99",
+    "world/rules/state_reactions.py": "7a9b6c952722bfa13db3e219bcba63578cec8ccd9c4dd635211eaa5693e3c0de",
+    "world/rules/status_display.py": "615ef85f36c071cc2e44b776f621820dbdfd780460ef40e536559c2b956ab2ea",
+    "world/rules/status_query/__init__.py": "2ced83665d18ee4788a248549138c9a15cdbabdfef00d16efc8c0f1a4e48e678",
+    "world/rules/status_query/assembly.py": "addb46139de0811cc2a390f37824890a758b7781ec0abe5041fdbcb0342612f8",
+    "world/rules/status_query/breakdown.py": "514a9e6dfd273c442a18cad32e76d0025a1896525b9a5037e4896279534eddd2",
+    "world/rules/status_query/character.py": "cbf8a06c06b98105bcacde85bcdf280bb0cf07fb10d295d91519315e2aa36707",
+    "world/rules/status_query/conditions.py": "fbd38c4ed1a07442e6c4a7530c28153f0d21ba91d8346f7f2ec73d3078ac84d3",
+    "world/rules/status_query/context.py": "51417f8da2aab4d23963edc1c7f5a0dee3b91352f6efbd926bb1b3f96238e14e",
+    "world/rules/status_query/fatigue.py": "7b6969faecb8b0cb549187a16135e57c408d68262ac5956f2fadebd13bc0216e",
+    "world/rules/status_query/models.py": "aa0f3fd37cb62eac2722953071bda9e28dfd8e10e25155921ac2c44feabdeaff",
+    "world/rules/status_query/provenance.py": "a3288f8c9c47b45fbb9a93e0f9a37bad0cbecc5f0cdaf68717c2270503dfa4e3",
+    "world/rules/status_query/readers.py": "dd8a659d5226379f648cd23dca384d6ad108ef0270e4e3ea9b5483f3554ebbcc",
+    "world/rules/status_query/sexual.py": "829f841791b3cc0515171fd423306e8a1fcbddb2900f4771d53f0f3c47bc684f",
+    "world/rules/status_query/status.py": "2aeb90c5fd389bf2f600de8ec8ac4e101c67e1a7d1fcd5e15a9cf8c9f68a30cc",
+    "world/rules/status_text.py": "293518f7c908dd79946ed08e8af1c65a4871c4deaae3fd656553bccc2c19417b",
+    "world/rules/stored_sexual_reads.py": "6ce57e7c3a8d1166476efaf8ea21cd4c0408d9c05270beef08e737be54378fd5",
+    "world/rules/story_effects.py": "571c1dd4c381be9925b75ba15ad3b3e862e5b9f754d5a3fc558f5590cfe480c5",
+    "world/rules/surfaces.py": "2f680085abfebc53919d1146da29308ef39b2a0eb334fcd7a8f241e112ff5cf9",
+    "world/rules/target_facts.py": "18c850571b194d6fbaddf6d2ce329a2b6763e920e3050da97d3db1d3df04855b",
+    "world/rules/targeting.py": "2eec94487a48b86133833dcbb9ac86477b381caa7fa8b095dd67b71640bc1a97",
+    "world/rules/time_skip.py": "6c98b765b50cbcda606047643c0672187372675aea46e0c34f7f7b9c0780e3bd",
+    "world/rules/title_view.py": "16fea08f0dcd76d16f1e76db98feefd6c53ca329cff2a29ca7cbdd28167b518e",
+    "world/rules/titles/__init__.py": "762b43d83b88d7ec146ee013dafc60ee9c79bd0fa3ed737f8e4063c6dde41543",
+    "world/rules/titles/awards.py": "afd05d152bffdda198e80a42d5226d54db93af6dd818dd6d797c9775178b9f2e",
+    "world/rules/titles/ballot.py": "633765d3c47e36e0e04ee77786d35ab3b06cf5179a3842790bb6def2eab28131",
+    "world/rules/titles/planner.py": "59f9288fd032f5daa32c3085746bda18a6b74c47dd546772350adb0748c231d4",
+    "world/rules/titles/removal.py": "ceed0f1a4c117c1aac1c9a68c4e38d052fa645e20104f09ce2ae3338325e2c9e",
+    "world/rules/titles/state.py": "7efdc1e5a9a745f0ba980106f133f031856f21f7bfacb83beaef54f7a3097247",
+    "world/rules/traits.py": "fb483c81ecbdfaf57f973fb984867c119bf2615451415980ef82e4de61ae7237",
+    "world/rules/travel_cost.py": "8bfd5fb2e7298542deaebcfb369481338abc919fd4239bfeba2418cceaf4813f",
+    "world/rules/unlock_notices.py": "c3402f1db1a73348f5667761e9fe7722c11a692b2a1371593528b70ac9e452f1",
+    "world/rules/upkeep.py": "2e400d2dfa0434bc0e49a5a509dba51a82ebaa2e972b6d842639dd12fbf3128d",
+    "world/rules/wallet.py": "db5b03079ce2f905a411c1fe553a5ecedaa9eedb9dc4ef9cd961c8facb6e9c9a"
+  }
+}

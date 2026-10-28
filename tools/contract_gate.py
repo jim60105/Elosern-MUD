@@ -73,6 +73,7 @@ def _run(*args: str) -> Callable[[], bool]:
 
 
 GATES: dict[str, Callable[[], bool]] = {
+    "reference-context": _run("-m", "tools.map_reference_context", "--check"),
     "traceability": _run("-m", "tools.spec_traceability", "check"),
     "observability": _run("-m", "tools.observability_lint", "check"),
     "test-data": _run("-m", "tools.test_data_lint", "check"),
