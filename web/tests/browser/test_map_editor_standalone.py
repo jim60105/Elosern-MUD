@@ -144,7 +144,7 @@ class MapEditorStandaloneBrowserTest(_StandaloneEditorBrowser):
     def test_local_build_assets_load_with_node_unavailable_and_network_denied(self):
         self.assertIsNone(shutil.which("node", path=self.editor._empty_path))
         page = self.open()
-        page.wait_for_function("document.fonts.status === 'loaded'", timeout=15000)
+        page.wait_for_function("() => document.fonts.status === 'loaded'", timeout=15000)
         fonts = page.evaluate(
             "[...performance.getEntriesByType('resource')].filter(e => e.name.endsWith('.woff2')).map(e => e.name)"
         )

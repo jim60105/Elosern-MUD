@@ -6,6 +6,11 @@
 // (scene point) -- the host turns that into one saved command. The card stays
 // at its draft place until the host settles that command; no new drag
 // starts while `busy`.
+// Keyboard: Tab walks the marks in object-list order, an arrow key moves
+// focus to the nearest mark in that direction, Enter selects and asks the
+// host to focus the inspector. Ctrl/⌘-click toggles, Shift-click extends.
+// Floating chrome: tool pill (top left), zoom pill (top right), north arrow,
+// scale bar and coordinate frame (bottom left).
 // Authored labels render through text interpolation only.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
@@ -20,24 +25,32 @@ import {
   themeVars,
   wheelFactor,
   zoomBy,
+  scaleBar,
+  scaleOf,
   DRAG_THRESHOLD_PX,
 } from "@elosern/map-view";
+import { nearestInDirection } from "../lib/keyboard.js";
 
 const props = defineProps({
   scene: { type: Object, default: null },
-  selected: { type: String, default: null },
+  selected: { type: Array, default: () => [] },
+  tools: { type: Array, default: () => [] },
+  tool: { type: String, default: "select" },
+  frameLabel: { type: String, default: "" },
   stale: { type: Boolean, default: false },
   label: { type: String, default: "" },
   movable: { type: Boolean, default: false },
   busy: { type: Boolean, default: false },
 });
-const emit = defineEmits(["select", "move"]);
+const emit = defineEmits(["select", "enter", "move", "tool"]);
+const chosen = computed(() => new Set(props.selected));
 // { id, point } while a mark is dragged or its move awaits the service.
 const draft = ref(null);
 
 const host = ref(null);
 const frame = ref(null);
 const view = ref(null);
+const fitted = ref(null);
 let observer = null;
 
 const theme = themeVars(
@@ -64,8 +77,10 @@ function fit() {
   const minSpan = props.scene.kind === "interior" ? 4 : 200;
   try {
     view.value = fitBounds(props.scene.bounds, frame.value, { minSpan, marginPx: 72 });
+    fitted.value = view.value;
   } catch {
     view.value = null;
+    fitted.value = null;
   }
 }
 
@@ -139,6 +154,8 @@ function onDragKey(event) {
 }
 function onPointerDown(event) {
   if (event.button !== 0) return;
+  // Floating chrome keeps its own clicks; only the map surface pans.
+  if (event.target.closest(".map-pill")) return;
   const markElement = event.target.closest(".map-mark");
   if (markElement) {
     if (!props.movable || markElement.dataset.kind !== "room" || props.busy || !view.value) return;
@@ -201,15 +218,64 @@ function onWheel(event) {
   });
 }
 
-function select(mark) {
+function select(mark, event = {}) {
   if (suppressClick) {
     suppressClick = false;
     return;
   }
-  emit("select", mark.id);
+  emit("select", { ref: mark.id, toggle: Boolean(event.ctrlKey || event.metaKey), range: Boolean(event.shiftKey) });
 }
 
-defineExpose({ fit });
+function focusMark(id) {
+  const element = [...(host.value?.querySelectorAll(".map-mark") ?? [])].find((el) => el.dataset.qualifiedRef === id);
+  element?.focus();
+}
+
+function onMarkKey(mark, event) {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    select(mark, event);
+    if (event.key === "Enter") emit("enter", mark.id);
+    return;
+  }
+  if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return;
+  const next = nearestInDirection(props.scene?.marks ?? [], mark.id, event.key);
+  if (event.key.startsWith("Arrow")) event.preventDefault();
+  if (next) focusMark(next);
+}
+
+function zoom(factor) {
+  if (!view.value || !frame.value) return;
+  view.value = zoomBy(view.value, frame.value, factor, { x: frame.value.width / 2, y: frame.value.height / 2 });
+}
+
+const zoomLevel = computed(() => {
+  if (!view.value || !fitted.value || !frame.value) return "—";
+  return `${Math.round((scaleOf(view.value, frame.value) / scaleOf(fitted.value, frame.value)) * 100)}%`;
+});
+
+const bar = computed(() => {
+  if (!view.value || !frame.value || !props.scene?.unit) return null;
+  try {
+    return scaleBar(view.value, frame.value, props.scene.unit, 96);
+  } catch {
+    return null;
+  }
+});
+
+function brackets(at) {
+  const r = 18;
+  const l = 6;
+  const { x, y } = at;
+  return [
+    `M${x - r} ${y - r + l} v${-l} h${l}`,
+    `M${x + r} ${y - r + l} v${-l} h${-l}`,
+    `M${x - r} ${y + r - l} v${l} h${l}`,
+    `M${x + r} ${y + r - l} v${l} h${-l}`,
+  ].join(" ");
+}
+
+defineExpose({ fit, focusMark });
 </script>
 
 <template>
@@ -249,7 +315,7 @@ defineExpose({ fit });
         v-for="mark in marks"
         :key="mark.id"
         class="map-mark"
-        :class="[`map-mark--${mark.role}`, { 'map-mark--selected': mark.id === selected, 'map-mark--draft': mark.draft }]"
+        :class="[`map-mark--${mark.role}`, { 'map-mark--selected': chosen.has(mark.id), 'map-mark--draft': mark.draft }]"
         :data-draft="mark.draft ? 'true' : null"
         :transform="`translate(${mark.at.x.toFixed(1)} ${mark.at.y.toFixed(1)})`"
         :data-kind="mark.kind"
@@ -257,10 +323,9 @@ defineExpose({ fit });
         role="button"
         tabindex="0"
         :aria-label="mark.label"
-        :aria-pressed="mark.id === selected"
-        @click="select(mark)"
-        @keydown.enter.prevent="select(mark)"
-        @keydown.space.prevent="select(mark)"
+        :aria-pressed="chosen.has(mark.id)"
+        @click="select(mark, $event)"
+        @keydown="onMarkKey(mark, $event)"
       >
         <template v-if="mark.kind === 'room'">
           <rect x="-100" y="-26" width="200" height="52" rx="6" class="map-mark__card" />
@@ -268,14 +333,47 @@ defineExpose({ fit });
           <text y="17" class="map-mark__card-id">{{ mark.detail }}</text>
         </template>
         <template v-else>
-          <circle v-if="mark.id === selected" r="14" class="map-mark__ring" />
+          <template v-if="chosen.has(mark.id)">
+            <circle r="14" class="map-mark__ring" />
+            <path :d="brackets({ x: 0, y: 0 })" class="map-mark__brackets" />
+          </template>
           <path v-if="mark.gateway" :d="gatePath()" class="map-mark__gate" />
           <circle v-else :r="NODE_DOT_R" class="map-mark__dot" />
           <text y="-14" class="map-mark__label">{{ mark.label }}</text>
         </template>
       </g>
     </svg>
+    <div class="map-pill map-pill--tools" role="toolbar" aria-label="工具">
+      <button
+        v-for="item in tools"
+        :key="item.key"
+        type="button"
+        class="map-pill__button"
+        :class="{ 'map-pill__button--on': tool === item.key }"
+        :aria-pressed="tool === item.key"
+        :aria-keyshortcuts="item.hotkey ? item.hotkey.toUpperCase() : null"
+        :data-tool="item.key"
+        @click="emit('tool', item.key)"
+      >
+        <span aria-hidden="true">{{ item.glyph }}</span> {{ item.label }}
+        <kbd v-if="item.hotkey" class="editor__key">{{ item.hotkey.toUpperCase() }}</kbd>
+      </button>
+    </div>
+    <div class="map-pill map-pill--zoom" role="group" aria-label="視圖">
+      <button type="button" class="map-pill__button" aria-label="縮小" data-zoom="out" @click="zoom(1.25)">−</button>
+      <span class="map-pill__level mono">{{ zoomLevel }}</span>
+      <button type="button" class="map-pill__button" aria-label="放大" data-zoom="in" @click="zoom(0.8)">+</button>
+      <button type="button" class="map-pill__button" data-zoom="fit" @click="fit">⌖ 適配</button>
+    </div>
+    <p class="map-canvas__frame">
+      <span v-if="scene?.unit" class="map-canvas__north" aria-hidden="true">▲北</span>
+      <template v-if="bar">
+        <i class="map-canvas__bar" :style="{ width: `${bar.px.toFixed(0)}px` }" aria-hidden="true" />
+        <span>{{ bar.text }}</span>
+      </template>
+      <span class="mono">{{ frameLabel }}</span>
+    </p>
     <p v-if="scene?.kind === 'interior'" class="map-canvas__note">版面僅供編輯器使用 · 不代表距離或座標</p>
-    <span v-if="stale" class="map-canvas__badge">過期預覽</span>
+    <span v-if="stale" class="map-canvas__badge">▲ 過期預覽</span>
   </div>
 </template>

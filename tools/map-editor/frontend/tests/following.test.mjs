@@ -33,9 +33,9 @@ test("another service session is always held for an explicit reread", () => {
 });
 
 test("a selection survives by identity and a removed one is reported", () => {
-  assert.deepEqual(preserveSelection("x", () => true), { selected: "x", removed: null });
-  assert.deepEqual(preserveSelection("x", () => false), { selected: null, removed: "x" });
-  assert.deepEqual(preserveSelection(null, () => false), { selected: null, removed: null });
+  assert.deepEqual(preserveSelection(["x", "y"], (ref) => ref === "x"), { kept: ["x"], removed: ["y"] });
+  assert.deepEqual(preserveSelection(["x"], () => true), { kept: ["x"], removed: [] });
+  assert.deepEqual(preserveSelection([], () => false), { kept: [], removed: [] });
 });
 
 test("banner priority: connection, persistent failure, held draft, rejection, preview", () => {
