@@ -326,6 +326,53 @@ class ServiceInteriorTests(EvenniaTestCase):
                 ["測試巷門乙", "測試巷門甲"],
             )
 
+    def test_a_declared_interior_link_supplies_both_doors_and_retires_cleanly(self):
+        # One authored relationship supplies both endpoint and return meanings,
+        # and withdrawing it removes exactly its own two doors.
+        house = interior_document(
+            "t_link_house",
+            {"t_link_house_room": interior_room("測試連通宅", "A synthetic house.")},
+        )
+        neighbour = interior_document(
+            "t_link_neighbour",
+            {"t_link_neighbour_room": interior_room("測試鄰居", "A synthetic neighbour.")},
+            interior_links=(
+                {
+                    "source_room": "t_link_neighbour_room",
+                    "target_interior": "t_link_house",
+                    "target_room": "t_link_house_room",
+                    "label": "敲門",
+                    "return_label": "回鄰居",
+                },
+            ),
+        )
+        with published_interiors(house, neighbour):
+            sync_interiors()
+            house_room = self._interior("t_link_house_room")
+            neighbour_room = self._interior("t_link_neighbour_room")
+            self.assertEqual(
+                [(e.key, e.destination.pk) for e in neighbour_room.exits],
+                [("敲門", house_room.pk)],
+            )
+            self.assertEqual(
+                [(e.key, e.destination.pk) for e in house_room.exits],
+                [("回鄰居", neighbour_room.pk)],
+            )
+            with published_interiors(
+                house,
+                interior_document(
+                    "t_link_neighbour",
+                    {
+                        "t_link_neighbour_room": interior_room(
+                            "測試鄰居", "A synthetic neighbour."
+                        )
+                    },
+                ),
+            ):
+                sync_interiors()
+            self.assertEqual(self._interior("t_link_neighbour_room").exits, [])
+            self.assertEqual(self._interior("t_link_house_room").exits, [])
+
     def test_retargeting_an_exterior_retires_the_old_doorway(self):
         # Moving an interior to another exterior is one authored edit: the old
         # doorway and its return exit disappear, and the unrelated doors on

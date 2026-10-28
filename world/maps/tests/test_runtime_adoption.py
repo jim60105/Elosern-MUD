@@ -181,6 +181,9 @@ class MapWorldAdoptionTests(EvenniaTestCase):
         room_count = Room.objects.all_family().count()
         host_state = _npcs_state()
 
+        # Re-adopting the unchanged sources and synchronizing again must not
+        # recreate anything either.
+        runtime.adopt()
         bootstrap.sync_interiors()
         bootstrap.sync_interiors()
 
