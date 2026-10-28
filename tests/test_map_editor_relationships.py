@@ -27,6 +27,8 @@ from pathlib import Path
 
 from ruamel.yaml import YAML
 
+from tools.spec_traceability import covers_requirement
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EDITOR_TESTS = REPO_ROOT / "tools" / "map-editor" / "tests"
 
@@ -109,6 +111,7 @@ class RelationshipProcessTests(unittest.TestCase):
     def data(self, document):
         return YAML(typ="safe", pure=True).load((self.workspace / document).read_text(encoding="utf-8"))
 
+    @covers_requirement("map-editor-relationships::cross-layer-relationships-edit-one-owner-and-expose-both-meanings")
     def test_an_entrance_edit_writes_one_owner_recording_both_meanings(self):
         _annex(self.workspace)
         editor = self.start()
@@ -131,6 +134,7 @@ class RelationshipProcessTests(unittest.TestCase):
         state = editor.workspace_state()
         self.assertEqual([row for row in state["diagnostics"] if row["category"] == "structure"], [])
 
+    @covers_requirement("map-editor-relationships::cross-layer-relationships-edit-one-owner-and-expose-both-meanings")
     def test_the_start_entry_stays_one_way_and_invalid_targets_name_their_field(self):
         editor = self.start()
         before = synthetic.tree_digest(self.workspace)
@@ -158,6 +162,7 @@ class RelationshipProcessTests(unittest.TestCase):
         self.assertEqual(self.changed(before), set())
         self.assertEqual(self.data(SETTLEMENT)["city_gate"], synthetic.settlement_data()["city_gate"])
 
+    @covers_requirement("map-editor-relationships::deletion-requires-established-absence-of-incoming-static-references")
     def test_a_referenced_room_locates_its_link_which_is_removed_before_the_room(self):
         _annex(self.workspace)
         synthetic.write_reference_context(self.workspace)
@@ -184,6 +189,7 @@ class RelationshipProcessTests(unittest.TestCase):
         self.assertEqual(self.data(INTERIOR), hall)
         self.assertEqual(self.changed(before), {INTERIOR, ANNEX})
 
+    @covers_requirement("map-editor-relationships::deletion-requires-established-absence-of-incoming-static-references")
     def test_a_missing_index_refuses_deletion_while_entrance_edits_save(self):
         editor = self.start()
         self.assertFalse(editor.workspace_state()["external_context_status"]["current"])
@@ -199,6 +205,7 @@ class RelationshipProcessTests(unittest.TestCase):
         self.assertIn("unavailable", body["error"].values())
         self.assertEqual(self.changed(before), set())
 
+    @covers_requirement("map-editor-relationships::deletion-requires-established-absence-of-incoming-static-references")
     def test_an_external_change_after_inspection_refuses_a_delete_and_an_undo(self):
         synthetic.write_reference_context(self.workspace)
         editor = self.start()
