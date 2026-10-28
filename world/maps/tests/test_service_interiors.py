@@ -1,30 +1,37 @@
-"""Integration tests for registry-driven permanent service interiors (task 3.2, sample-city spec).
+"""Integration tests for the authored permanent interiors (sample-city spec).
 
-Interiors are created by iterating ``PLACE_REGISTRY`` grouped by settlement
-(place-driven-service-sync task 1.x): each place yields one tagged room in its
-settlement's coordinate space, two doorway exits to its exterior, and an
-authored description re-applied in place on every sync, so every registry row —
-the capital's five places included — is exercised. A place whose exterior
-cannot be resolved warns naming the row and is skipped alone.
+Interiors are synchronized from the interior documents, independently of the
+service registry: each authored room exists once (tagged by its stable room
+id), carries its authored prose and scene facts, and owns its connections and
+its exterior doorway pair. A service place only *joins* such a room, so a
+standalone interior needs no service record at all. A room whose authored
+exterior has no materialized street warns (naming the room, its interior and
+the joined place) and is skipped alone.
 """
 
 from tools.spec_traceability import covers_requirement
 
 import importlib
-from dataclasses import replace
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
 from evennia.utils.search import search_object_by_tag
 from evennia.utils.test_resources import EvenniaTestCase
 
+from elosern_map_core.references import interior_room_ref
+from elosern_map_core.references import settlement_node_ref
 from typeclasses.exits import Exit
 from typeclasses.rooms import GridRoom, Room
-from world.maps.bootstrap import (
-    sync_grid,
-    sync_interiors,
+from world.maps import interiors
+from world.maps.bootstrap import sync_grid, sync_interiors
+from world.maps.static_references import settlement_node_xyz
+from world.tests.geography_fixture import publish_shipped_map_world
+from world.tests.interior_fixture import (
+    interior_document,
+    interior_exterior,
+    interior_room,
+    published_interiors,
 )
-from world.maps.static_references import place_exterior_xyz
 
 # The catalogs are read through the owning module (the shared probes helpers'
 # binding-safe accessor: the attribute is assembled at call time, never bound
@@ -34,72 +41,79 @@ from world.maps.static_references import place_exterior_xyz
 
 def _live_registry(dotted: str, attribute: str):
     """The CURRENT owner-module attribute for one catalog (binding-safe)."""
+
     return getattr(importlib.import_module(dotted), attribute)
 
 
 def _places():
     """The CURRENT place-registry mapping."""
+
     return _live_registry("world.lore.settlements.places", "PLACE" + "_REGISTRY")
 
 
-def _settlements():
-    """The CURRENT settlement-registry mapping."""
-    return _live_registry(
-        "world.lore.settlements.settlements", "SETTLEMENT" + "_REGISTRY"
-    )
+def _authored_rooms():
+    """The CURRENT published interior rooms, keyed by identity."""
+
+    return interiors.current().rooms
 
 
 class ServiceInteriorTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
+        publish_shipped_map_world()
         create_object(Room, key="虛境", location=None)
         sync_grid()
 
     def _count_grid_rooms(self):
         return GridRoom.objects.all_family().count()
 
-    def _interior(self, place):
-        rooms = search_object_by_tag(place.key)
+    def _interior(self, room_id):
+        rooms = search_object_by_tag(room_id)
         return rooms[0] if rooms else None
 
-    def _exterior(self, place):
-        return GridRoom.objects.filter_xyz(xyz=place_exterior_xyz(place)).first()
+    def _frontage(self, room_id):
+        exterior = interiors.current().exteriors[room_id]
+        return GridRoom.objects.filter_xyz(
+            xyz=settlement_node_xyz(
+                _settlement_ref(exterior.settlement, exterior.node)
+            )
+        ).first()
 
-    def test_fresh_sync_creates_one_permanent_interior_per_place(self):
+    def test_fresh_sync_creates_one_room_per_authored_interior(self):
         sync_interiors()
-        for place in _places().values():
-            room = self._interior(place)
-            self.assertIsNotNone(room, place.key)
+        for room_id, authored in _authored_rooms().items():
+            room = self._interior(room_id)
+            self.assertIsNotNone(room, room_id)
             self.assertIsInstance(room, Room)
-            self.assertEqual(room.key, place.room_name_zh)
+            self.assertEqual(room.key, authored.name_zh)
             self.assertIsNone(room.db.expire_tick)
-            self.assertEqual(room.location, None)
-            self.assertEqual(room.db.desc, place.room_desc_zh)
+            self.assertIsNone(room.location)
+            self.assertEqual(room.db.desc, authored.desc_zh)
 
     def test_interiors_converge_onto_the_authored_scene_metadata(self):
-        # unified-room-art-metadata: a permanent interior is a plain Room that
-        # now carries readable scene metadata. Every authored place declares a
-        # registered scene archetype; its place key IS its registered room-art
-        # key; and its identity is the authored place identity. A second sync
+        # A permanent interior is a plain Room carrying readable scene facts:
+        # the archetype and artwork key the room's own document declares, and a
+        # logical identity derived from its authored room id. A second sync
         # re-applies the same facts in place without duplicating a room.
         from world.art.scene_definitions import (
             is_registered_room_art_key,
             is_registered_scene_key,
         )
-        from world.maps.room_art import PLACE_SCENE_ARCHETYPES, place_scene_identity
+        from world.maps.room_art import place_scene_identity
 
         sync_interiors()
-        for place in _places().values():
-            room = self._interior(place)
-            self.assertEqual(room.scene_archetype, PLACE_SCENE_ARCHETYPES[place.key])
-            self.assertTrue(is_registered_scene_key(room.scene_archetype), place.key)
-            self.assertEqual(room.room_art_key, place.key)
-            self.assertTrue(is_registered_room_art_key(room.room_art_key), place.key)
-            self.assertEqual(room.scene_identity, place_scene_identity(place.key))
+        for room_id, authored in _authored_rooms().items():
+            room = self._interior(room_id)
+            self.assertEqual(room.scene_archetype, authored.scene_archetype)
+            self.assertTrue(is_registered_scene_key(room.scene_archetype), room_id)
+            self.assertEqual(room.room_art_key, authored.art_key)
+            if authored.art_key is not None:
+                self.assertTrue(is_registered_room_art_key(room.room_art_key))
+            self.assertEqual(room.scene_identity, place_scene_identity(room_id))
 
         room_count = Room.objects.all_family().count()
-        for place in _places().values():
-            room = self._interior(place)
+        for room_id in _authored_rooms():
+            room = self._interior(room_id)
             room.scene_archetype = None
             room.room_art_key = None
             room.scene_identity = "drifted"
@@ -108,17 +122,18 @@ class ServiceInteriorTests(EvenniaTestCase):
         sync_interiors()
 
         self.assertEqual(Room.objects.all_family().count(), room_count)
-        for place in _places().values():
-            room = self._interior(place)
-            self.assertEqual(room.scene_archetype, PLACE_SCENE_ARCHETYPES[place.key])
-            self.assertEqual(room.room_art_key, place.key)
-            self.assertEqual(room.scene_identity, place_scene_identity(place.key))
+        for room_id, authored in _authored_rooms().items():
+            room = self._interior(room_id)
+            self.assertEqual(room.scene_archetype, authored.scene_archetype)
+            self.assertEqual(room.room_art_key, authored.art_key)
+            self.assertEqual(room.scene_identity, place_scene_identity(room_id))
 
     def test_interiors_have_bidirectional_doorways_to_documented_exteriors(self):
         sync_interiors()
-        for place in _places().values():
-            interior = self._interior(place)
-            exterior = self._exterior(place)
+        for room_id in interiors.current().exteriors:
+            interior = self._interior(room_id)
+            exterior = self._frontage(room_id)
+            self.assertIsNotNone(exterior, room_id)
             self.assertIn(
                 interior, {exit_obj.destination for exit_obj in exterior.exits}
             )
@@ -126,191 +141,277 @@ class ServiceInteriorTests(EvenniaTestCase):
                 exterior, {exit_obj.destination for exit_obj in interior.exits}
             )
 
-    @covers_requirement("sample-city-altoria::the-sample-city-s-declared-exterior-topology-remains-unchanged-while-permanent-service-interiors-are-attached")
+    @covers_requirement(
+        "sample-city-altoria::the-sample-city-s-declared-exterior-topology-remains-unchanged-while-permanent-service-interiors-are-attached"
+    )
     def test_grid_topology_is_unchanged(self):
+        grid_before = self._count_grid_rooms()
         sync_interiors()
-        # Two settlements are spawned (21 capital + 6 village nodes); the
-        # interiors are still not xyzgrid nodes.
-        self.assertEqual(self._count_grid_rooms(), 31)
+        self.assertEqual(self._count_grid_rooms(), grid_before)
 
     def test_interiors_are_not_xyzgrid_nodes(self):
         sync_interiors()
         grid_keys = {room.key for room in GridRoom.objects.all_family()}
-        for place in _places().values():
-            self.assertNotIn(place.room_name_zh, grid_keys)
+        for room_id, authored in _authored_rooms().items():
+            self.assertNotIn(authored.name_zh, grid_keys, room_id)
 
-    @covers_requirement("sample-city-altoria::altoria-service-content-synchronizes-idempotently-without-resetting-live-state")
     @covers_requirement(
-        "place-driven-service-sync::interiors-are-created-by-iterating-the-place-registry"
+        "sample-city-altoria::altoria-service-content-synchronizes-idempotently-without-resetting-live-state"
     )
     def test_repeated_sync_reuses_tags_reapplies_desc_and_duplicates_no_doorway(self):
         sync_interiors()
-        first = {
-            place.key: (room.pk, sorted(e.key for e in room.exits))
-            for place in _places().values()
-            for room in search_object_by_tag(place.key)
-        }
+
+        def snapshot():
+            return {
+                room_id: (room.pk, sorted(e.key for e in room.exits))
+                for room_id in _authored_rooms()
+                for room in search_object_by_tag(room_id)
+            }
+
+        first = snapshot()
         room_count = Room.objects.all_family().count()
         exit_count = Exit.objects.all().count()
-        # Drift the authored description the way a legacy database has it:
-        # the next sync must re-apply the authored text in place.
-        for place in _places().values():
-            room = search_object_by_tag(place.key)[0]
+        for room_id in _authored_rooms():
+            room = search_object_by_tag(room_id)[0]
             room.db.desc = "drifted description"
             room.save()
 
         sync_interiors()
 
-        second = {
-            place.key: (room.pk, sorted(e.key for e in room.exits))
-            for place in _places().values()
-            for room in search_object_by_tag(place.key)
-        }
-        self.assertEqual(first, second)
+        self.assertEqual(snapshot(), first)
         self.assertEqual(Room.objects.all_family().count(), room_count)
         self.assertEqual(Exit.objects.all().count(), exit_count)
-        for place in _places().values():
-            room = search_object_by_tag(place.key)[0]
-            self.assertEqual(room.db.desc, place.room_desc_zh)
+        for room_id, authored in _authored_rooms().items():
+            self.assertEqual(
+                search_object_by_tag(room_id)[0].db.desc, authored.desc_zh
+            )
 
-    def test_doorway_keys_and_aliases_are_the_places_authored_pair(self):
+    def test_doorway_keys_and_aliases_are_the_authored_pair(self):
         sync_interiors()
-        for place in _places().values():
-            interior = self._interior(place)
-            exterior = self._exterior(place)
+        for room_id, exterior in interiors.current().exteriors.items():
+            interior = self._interior(room_id)
+            street = self._frontage(room_id)
             forward = [
                 exit_obj
-                for exit_obj in exterior.exits
+                for exit_obj in street.exits
                 if exit_obj.destination == interior
             ]
             self.assertEqual(len(forward), 1)
-            self.assertEqual(forward[0].key, place.doorway_key_zh)
-            self.assertEqual(set(forward[0].aliases.all()), set(place.doorway_aliases))
+            self.assertEqual(forward[0].key, exterior.doorway_key)
+            self.assertEqual(
+                set(forward[0].aliases.all()), set(exterior.doorway_aliases)
+            )
             back = [
                 exit_obj
                 for exit_obj in interior.exits
-                if exit_obj.destination == exterior
+                if exit_obj.destination == street
             ]
             self.assertEqual(len(back), 1)
             self.assertEqual(back[0].key, "外")
 
     def test_interior_reachable_from_and_back_to_exterior(self):
         sync_interiors()
-        for place in _places().values():
-            interior = self._interior(place)
-            exterior = self._exterior(place)
-            self.assertTrue(
-                interior.access(exterior, "traverse", default=True),
-                place.key,
-            )
-            self.assertIn(exterior, {e.destination for e in interior.exits})
+        for room_id in interiors.current().exteriors:
+            interior = self._interior(room_id)
+            street = self._frontage(room_id)
+            self.assertTrue(interior.access(street, "traverse", default=True), room_id)
+            self.assertIn(street, {e.destination for e in interior.exits})
 
-    @covers_requirement("sample-city-altoria::the-sample-city-s-declared-exterior-topology-remains-unchanged-while-permanent-service-interiors-are-attached")
+    @covers_requirement(
+        "sample-city-altoria::the-sample-city-s-declared-exterior-topology-remains-unchanged-while-permanent-service-interiors-are-attached"
+    )
     def test_one_exterior_carrying_two_places_yields_two_doorways(self):
-        # The craft-alley scenario (altoria-capital-replan): one exterior with
-        # two interiors is one street with two doors. Discovered dynamically
-        # from the live registry — this suite follows the rows, never names a
-        # shipped place.
+        # The shared-alley scenario: one exterior with two interiors is one
+        # street with two doors. Discovered dynamically from the published
+        # interiors — this suite follows the authored rows, never names one.
         sync_interiors()
-        groups: dict[tuple, list] = {}
-        for place in _places().values():
-            groups.setdefault((place.settlement_key, place.exterior), []).append(place)
-        shared = [row for row in groups.values() if len(row) >= 2]
-        self.assertTrue(shared, "no exterior carries two places for the scenario")
-        for places_on_one in shared:
-            exterior = self._exterior(places_on_one[0])
-            interiors = [self._interior(place) for place in places_on_one]
-            self.assertTrue(all(room is not None for room in interiors))
-            # One doorway exit per place on the exterior, keys distinct.
+        grouped: dict[tuple, list[str]] = {}
+        for room_id, exterior in interiors.current().exteriors.items():
+            grouped.setdefault((exterior.settlement, exterior.node), []).append(room_id)
+        shared = [row for row in grouped.values() if len(row) >= 2]
+        self.assertTrue(shared, "no exterior carries two interiors for the scenario")
+        for room_ids in shared:
+            street = self._frontage(room_ids[0])
+            rooms = [self._interior(room_id) for room_id in room_ids]
             forward = [
-                exit_obj for exit_obj in exterior.exits
-                if exit_obj.destination in interiors
+                exit_obj
+                for exit_obj in street.exits
+                if exit_obj.destination in rooms
             ]
-            self.assertEqual(len(forward), len(places_on_one))
+            self.assertEqual(len(forward), len(room_ids))
             self.assertEqual(
                 sorted(exit_obj.key for exit_obj in forward),
-                sorted(place.doorway_key_zh for place in places_on_one),
+                sorted(
+                    interiors.current().exteriors[room_id].doorway_key
+                    for room_id in room_ids
+                ),
             )
-            # Each interior leads back through exactly one 外 exit.
-            for room, place in zip(interiors, places_on_one):
+            for room in rooms:
                 back = [
-                    exit_obj for exit_obj in room.exits
-                    if exit_obj.destination == exterior and exit_obj.key == "外"
+                    exit_obj
+                    for exit_obj in room.exits
+                    if exit_obj.destination == street and exit_obj.key == "外"
                 ]
-                self.assertEqual(len(back), 1, place.key)
+                self.assertEqual(len(back), 1)
 
-    @covers_requirement("guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster")
     @covers_requirement(
         "place-driven-service-sync::interiors-are-created-by-iterating-the-place-registry"
     )
-    def test_one_unresolvable_exterior_warns_and_skips_only_that_place(self):
-        # One live place whose exterior identity resolves but whose grid room
-        # is absent must warn and skip alone; every other live place still
-        # synchronizes, exactly the warn-and-skip contract.
-        places = _places()
-        bad_place = next(
-            place
-            for place in places.values()
-            if sum(other.exterior == place.exterior for other in places.values()) == 1
+    def test_one_unresolvable_exterior_warns_and_skips_only_that_room(self):
+        # One authored room whose exterior resolves but whose grid room is
+        # absent must warn and skip alone; every other room still synchronizes.
+        shared = {}
+        for room_id, exterior in interiors.current().exteriors.items():
+            shared.setdefault((exterior.settlement, exterior.node), []).append(room_id)
+        room_id = next(
+            room_ids[0] for room_ids in shared.values() if len(room_ids) == 1
         )
-        exterior_xyz = place_exterior_xyz(bad_place)
-        GridRoom.objects.filter_xyz(exterior_xyz).first().delete()
+        shared_exterior = interiors.current().exteriors[room_id]
+        xyz = settlement_node_xyz(
+            _settlement_ref(shared_exterior.settlement, shared_exterior.node)
+        )
+        GridRoom.objects.filter_xyz(xyz).first().delete()
         with patch("world.maps.bootstrap.log_warn") as warned:
             sync_interiors()
         events = [
-            call for call in warned.call_args_list
-            if call.args and call.args[0] == "bootstrap_service_exterior_missing"
+            call
+            for call in warned.call_args_list
+            if call.args and call.args[0] == "bootstrap_interior_exterior_missing"
         ]
         self.assertEqual(len(events), 1)
-        self.assertEqual(events[0].kwargs["context"]["place"], bad_place.key)
-        self.assertEqual(
-            events[0].kwargs["context"]["exterior_xyz"],
-            exterior_xyz,
-        )
-        self.assertEqual(events[0].kwargs["context"]["action"], "skip_place")
-        self.assertIsNone(self._interior(bad_place))
-        for place in places.values():
-            if place.key == bad_place.key:
+        self.assertEqual(events[0].kwargs["context"]["room"], room_id)
+        self.assertEqual(events[0].kwargs["context"]["exterior_xyz"], xyz)
+        self.assertIsNone(self._interior(room_id))
+        for other_id in interiors.current().rooms:
+            if other_id == room_id:
                 continue
-            self.assertIsNotNone(self._interior(place), place.key)
+            self.assertIsNotNone(self._interior(other_id), other_id)
 
     @covers_requirement(
         "place-driven-service-sync::interiors-are-created-by-iterating-the-place-registry"
     )
-    def test_two_synthetic_places_on_one_exterior_get_their_own_doorways(self):
-        # altoria-place-slices task 3.2's positive side over synthetic rows:
-        # a newly authored pair sharing one exterior under different doorway
-        # names (the shape every capital content change will write) yields one
-        # doorway exit per place on the street, not one shared exit.
-        places = _places()
-        # Ride one live row's own settlement and exterior — the suite follows
-        # the registry and never names a shipped settlement.
-        base = next(iter(places.values()))
-        pair = [
-            replace(
-                base,
-                key=f"t_alley_{suffix}",
-                room_name_zh=f"測試巷道室{suffix}",
-                room_desc_zh="Synthetic shared-exterior interior.",
-                doorway_key_zh=f"測試巷門{suffix}",
-                doorway_aliases=(f"t alley {suffix}",),
-            )
-            for suffix in ("a", "b")
-        ]
-        with patch.dict(places, {place.key: place for place in pair}, clear=False):
-            sync_interiors()
-            exterior = self._exterior(pair[0])
-            interiors = [self._interior(place) for place in pair]
-        self.assertTrue(all(room is not None for room in interiors))
-        forward = [
-            exit_obj for exit_obj in exterior.exits
-            if exit_obj.destination in interiors
-        ]
-        self.assertEqual(len(forward), 2)
-        self.assertEqual(
-            sorted(exit_obj.key for exit_obj in forward),
-            sorted(place.doorway_key_zh for place in pair),
+    def test_two_synthetic_rooms_on_one_exterior_get_their_own_doorways(self):
+        # A newly authored pair sharing one exterior under different doorway
+        # names (the shape every content change writes) yields one doorway exit
+        # per room on the street, not one shared exit.
+        anchor_room = next(iter(interiors.current().exteriors))
+        anchor = interiors.current().exteriors[anchor_room]
+        document = interior_document(
+            "t_alley_a_doc",
+            {"t_alley_a": interior_room("測試巷道室甲", "Synthetic shared-exterior room A.")},
+            exterior=interior_exterior(
+                anchor.settlement, anchor.node, "t_alley_a", "測試巷門甲"
+            ),
         )
+        partner = interior_document(
+            "t_alley_b_doc",
+            {"t_alley_b": interior_room("測試巷道室乙", "Synthetic shared-exterior room B.")},
+            exterior=interior_exterior(
+                anchor.settlement, anchor.node, "t_alley_b", "測試巷門乙"
+            ),
+        )
+        with published_interiors(document, partner):
+            sync_interiors()
+            street = self._frontage("t_alley_a")
+            rooms = [self._interior("t_alley_a"), self._interior("t_alley_b")]
+            self.assertTrue(all(room is not None for room in rooms))
+            forward = [
+                exit_obj
+                for exit_obj in street.exits
+                if exit_obj.destination in rooms
+            ]
+            self.assertEqual(len(forward), 2)
+            self.assertEqual(
+                sorted(exit_obj.key for exit_obj in forward),
+                ["測試巷門乙", "測試巷門甲"],
+            )
+
+    def test_retargeting_an_exterior_retires_the_old_doorway(self):
+        # Moving an interior to another exterior is one authored edit: the old
+        # doorway and its return exit disappear, and the unrelated doors on
+        # both streets survive.
+        first_room = next(iter(interiors.current().exteriors))
+        first = interiors.current().exteriors[first_room]
+        other_node = self._another_node(first)
+        declaration = interiors.current().rooms[first_room]
+        moved = interior_document(
+            first_room,
+            {
+                first_room: interior_room(
+                    declaration.name_zh,
+                    declaration.desc_zh,
+                    scene_archetype=declaration.scene_archetype,
+                    art_key=declaration.art_key,
+                )
+            },
+            exterior=interior_exterior(
+                first.settlement, other_node, first_room, first.doorway_key
+            ),
+        )
+        with published_interiors(moved):
+            sync_interiors()
+            interior = self._interior(first_room)
+            old_street = GridRoom.objects.filter_xyz(
+                xyz=settlement_node_xyz(
+                    _settlement_ref(first.settlement, first.node)
+                )
+            ).first()
+            self.assertIsNotNone(old_street)
+            self.assertNotIn(
+                interior,
+                {exit_obj.destination for exit_obj in old_street.exits},
+                "the retired doorway is still on the old street",
+            )
+            self.assertNotIn(
+                old_street,
+                {exit_obj.destination for exit_obj in interior.exits},
+            )
+            new_street = GridRoom.objects.filter_xyz(
+                xyz=settlement_node_xyz(
+                    _settlement_ref(first.settlement, other_node)
+                )
+            ).first()
+            self.assertIn(
+                interior, {exit_obj.destination for exit_obj in new_street.exits}
+            )
+
+    def _another_node(self, exterior) -> str:
+        """Another authored settlement node of the same settlement."""
+
+        graph = _live_registry("world.maps.map_data", "SETTLEMENT" + "_GRAPHS")[
+            exterior.settlement
+        ]
+        occupied = {exterior.node}
+        return next(
+            node_id for node_id in graph.nodes if node_id not in occupied
+        )
+
+    def test_a_standalone_room_needs_no_service_record(self):
+        document = interior_document(
+            "t_standalone_room_doc",
+            {"t_standalone_room": interior_room("測試獨立空屋", "A standalone room.")},
+        )
+        places = _places()
+        with published_interiors(document):
+            self.assertNotIn("t_standalone_room", places)
+            sync_interiors()
+            room = self._interior("t_standalone_room")
+            self.assertIsNotNone(room)
+            self.assertEqual(room.db.desc, "A standalone room.")
+            self.assertEqual(room.exits, [])
+
+    def test_a_service_place_only_joins_an_authored_room(self):
+        # The service record declares no geometry: its room is the interior's,
+        # and the place key is the join identity.
+        for key, place in _places().items():
+            with self.subTest(place=key):
+                self.assertEqual(place.room, interior_room_ref(key, key))
+                self.assertIn(key, interiors.current().rooms)
+                self.assertEqual(place.room_name_zh, interiors.current().room(key).name_zh)
+
+
+def _settlement_ref(settlement: str, node: str):
+    return settlement_node_ref(settlement, node)
 
 
 if __name__ == "__main__":

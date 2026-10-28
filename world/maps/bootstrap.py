@@ -212,116 +212,60 @@ def _prune_retired_interior_edges(planned: set[tuple[str, int, int]]) -> None:
         exit_obj.delete()
 
 
-def _link_exits(link, house):
-    """The two directed exits one authored interior link supplies.
+def _interior_plan(snapshot):
+    """Every authored interior edge this sync must converge, plus the skipped rooms.
 
-    ``(source_room, target_room, label)`` is the forward door and
-    ``(target_room, source_room, return_label)`` the return door; an absent
-    ``return_label`` authors a one-way link.
+    The plan is read-only and refers to rooms by their authored identity, so it
+    can be built before this batch creates anything. An authored exterior that
+    resolves to no materialized street is reported once and its dependent room
+    is skipped — the whole dependent interior, exactly today's warn-and-skip
+    contract — while every other interior still synchronizes. Connections that
+    touch a skipped room are skipped with it.
     """
 
-    from evennia.utils.search import search_object_by_tag
-
-    def _room(room_id):
-        rooms = [obj for obj in search_object_by_tag(room_id) if isinstance(obj, Room)]
-        if len(rooms) != 1:
-            raise InteriorSyncError(
-                f"interior link room {room_id!r} resolves to {len(rooms)} rooms"
-            )
-        return rooms[0]
-
-    target = link.target_interior
-    owner = f"link:{house}:{link.source_room}>{target}:{link.target_room}:{link.label}"
-    edges = [
-        (
-            _room(link.source_room),
-            _room(link.target_room),
-            link.label,
-            (),
-            owner,
-        )
-    ]
-    if link.return_label is not None:
-        edges.append(
-            (
-                _room(link.target_room),
-                _room(link.source_room),
-                link.return_label,
-                (),
-                f"{owner}:return",
-            )
-        )
-    return edges
-
-
-class InteriorSyncError(RuntimeError):
-    """One interior could not be realized against the materialized map."""
-
-
-def _evict_batch_cache() -> None:
-    """Drop the identity map after a rolled-back interior batch.
-
-    The database rollback restores the rows, but this batch created rooms and
-    exits and rewrote their attributes in the same process, and the idmapper
-    would keep serving those live objects. The global flush is the engine's own
-    recovery idiom; this path only runs when the batch refused to commit.
-    """
-
-    from evennia.utils.idmapper.models import flush_cache
-
-    flush_cache()
-
-
-def _interior_edges(snapshot) -> tuple[list, set[tuple[str, int, int]]]:
-    """Every authored interior edge this sync must converge, and its plan.
-
-    Exteriors resolve against the materialized grid rooms. A room whose
-    authored exterior has no materialized room is reported and skipped with its
-    own doorway pair only — the rest of the world still synchronizes, exactly
-    the existing warn-and-skip contract for a temporarily absent realization.
-    """
-
-    from evennia.utils.search import search_object_by_tag
-
-    edges: list[tuple[object, object, str, tuple[str, ...], str]] = []
-    planned: set[tuple[str, int, int]] = set()
-
-    def _room(room_id):
-        rooms = [obj for obj in search_object_by_tag(room_id) if isinstance(obj, Room)]
-        if len(rooms) != 1:
-            raise InteriorSyncError(
-                f"interior room {room_id!r} resolves to {len(rooms)} rooms"
-            )
-        return rooms[0]
-
+    room_edges: list[tuple[str, str, str, tuple[str, ...], str]] = []
     for interior_id, document in snapshot.documents.items():
         for connection in document.connections:
-            edges.append(
+            room_edges.append(
                 (
-                    _room(connection.source),
-                    _room(connection.destination),
+                    connection.source,
+                    connection.destination,
                     connection.label,
                     (),
                     f"connection:{interior_id}:{connection.source}>"
                     f"{connection.destination}:{connection.label}",
                 )
             )
-
     for link in snapshot.interior_links:
         house = snapshot.rooms[link.source_room].interior_id
-        edges.extend(_link_exits(link, house))
+        owner = (
+            f"link:{house}:{link.source_room}>"
+            f"{link.target_interior}:{link.target_room}:{link.label}"
+        )
+        room_edges.append(
+            (link.source_room, link.target_room, link.label, (), owner)
+        )
+        if link.return_label is not None:
+            room_edges.append(
+                (
+                    link.target_room,
+                    link.source_room,
+                    link.return_label,
+                    (),
+                    f"{owner}:return",
+                )
+            )
 
-    joined = {
-        place.room.object_id: place.key
-        for place in PLACE_REGISTRY.values()
-    }
+    exterior_edges: list[tuple[object, str, str, tuple[str, ...], str, str]] = []
+    skipped: set[str] = set()
+    joined = {place.room.object_id: place.key for place in PLACE_REGISTRY.values()}
     for room_id, exterior in snapshot.exteriors.items():
         reference = settlement_node_ref(exterior.settlement, exterior.node)
         try:
             exterior_xyz = settlement_node_xyz(
                 reference, source=f"interior room {room_id} exterior"
             )
-        except Exception as error:  # observability: ignore R2: the authored target was already validated at adoption; a materially absent binding is the warn-and-skip case this loop owns
+        except Exception as error:  # observability: ignore R2: the authored target was validated at adoption; a materially absent binding is the warn-and-skip case this loop owns
             log_warn(
                 "bootstrap_interior_exterior_missing",
                 exc=error,
@@ -332,6 +276,7 @@ def _interior_edges(snapshot) -> tuple[list, set[tuple[str, int, int]]]:
                     "action": "skip_interior",
                 },
             )
+            skipped.add(room_id)
             continue
         exterior_room = _find_exterior(exterior_xyz)
         if exterior_room is None:
@@ -345,30 +290,60 @@ def _interior_edges(snapshot) -> tuple[list, set[tuple[str, int, int]]]:
                     "action": "skip_interior",
                 },
             )
+            skipped.add(room_id)
             continue
-        interior_room = _room(room_id)
-        edges.append(
+        interior_id = snapshot.rooms[room_id].interior_id
+        exterior_edges.append(
             (
                 exterior_room,
-                interior_room,
+                room_id,
                 exterior.doorway_key,
                 tuple(exterior.doorway_aliases),
-                f"doorway:{snapshot.rooms[room_id].interior_id}",
-            )
-        )
-        edges.append(
-            (
-                interior_room,
-                exterior_room,
-                "外",
-                ("out", "leave"),
-                f"doorway_return:{snapshot.rooms[room_id].interior_id}",
+                f"doorway:{interior_id}",
+                f"doorway_return:{interior_id}",
             )
         )
 
-    for location, destination, key, aliases, owner in edges:
+    room_edges = [
+        edge
+        for edge in room_edges
+        if edge[0] not in skipped and edge[1] not in skipped
+    ]
+    return room_edges, exterior_edges, skipped
+
+
+def _apply_interior_edges(room_edges, exterior_edges) -> None:
+    """Converge every planned interior edge, then retire the unplanned ones.
+
+    Both endpoints exist by now: the room loop created every non-skipped room
+    in this same transaction. Each authored relationship owns exactly one exit
+    per direction, so a repeat run renames in place and a retired or retargeted
+    relationship leaves nothing behind.
+    """
+
+    from evennia.utils.search import search_object_by_tag
+
+    def _room(room_id):
+        rooms = [obj for obj in search_object_by_tag(room_id) if isinstance(obj, Room)]
+        if len(rooms) != 1:
+            raise InteriorSyncError(
+                f"interior room {room_id!r} resolves to {len(rooms)} rooms"
+            )
+        return rooms[0]
+
+    planned: set[tuple[str, int, int]] = set()
+    for source_id, destination_id, key, aliases, owner in room_edges:
+        location = _room(source_id)
+        destination = _room(destination_id)
+        _ensure_owned_exit(location, destination, key, aliases, owner)
         planned.add((owner, location.pk, destination.pk))
-    return edges, planned
+    for street, room_id, key, aliases, owner, return_owner in exterior_edges:
+        room = _room(room_id)
+        _ensure_owned_exit(street, room, key, aliases, owner)
+        planned.add((owner, street.pk, room.pk))
+        _ensure_owned_exit(room, street, "外", ("out", "leave"), return_owner)
+        planned.add((return_owner, room.pk, street.pk))
+    _prune_retired_interior_edges(planned)
 
 
 def sync_interiors() -> None:
@@ -398,9 +373,15 @@ def sync_interiors() -> None:
     validate_static_references()
     snapshot = current_interiors()
 
+    # The plan is read-only: a room whose authored exterior has no materialized
+    # street is skipped (warned once) before this batch creates anything.
+    room_edges, exterior_edges, skipped = _interior_plan(snapshot)
+
     try:
         with transaction.atomic():
             for room_id in snapshot.rooms:
+                if room_id in skipped:
+                    continue
                 room = _ensure_interior(snapshot.room(room_id))
                 _apply_room_art(
                     room,
@@ -408,10 +389,7 @@ def sync_interiors() -> None:
                     room_art_key=snapshot.rooms[room_id].art_key,
                     scene_identity=place_scene_identity(room_id),
                 )
-            edges, planned = _interior_edges(snapshot)
-            for location, destination, key, aliases, owner in edges:
-                _ensure_owned_exit(location, destination, key, aliases, owner)
-            _prune_retired_interior_edges(planned)
+            _apply_interior_edges(room_edges, exterior_edges)
     except Exception:
         _evict_batch_cache()
         raise
