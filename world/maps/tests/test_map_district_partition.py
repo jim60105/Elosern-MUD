@@ -19,6 +19,7 @@ import sys
 import unittest
 from dataclasses import replace
 from pathlib import Path
+from unittest import mock
 
 import numpy as np
 from scipy import ndimage
@@ -30,7 +31,13 @@ from elosern_map_core.partition import (
     partition_input,
     serialize,
 )
-from elosern_map_core.partition_codec import PARTITION_ALGORITHM_VERSION
+from elosern_map_core.partition_codec import (
+    FORMAT_VERSION,
+    PARTITION_ALGORITHM_VERSION,
+    partition_freshness,
+    partition_source_signature_from_fingerprints,
+    read_partition_metadata,
+)
 from tools import map_district_partition as generator
 from tools.spec_traceability import covers_requirement
 from world.lore import map_districts
@@ -83,6 +90,38 @@ class ShippedDistrictPartitionTests(unittest.TestCase):
         self.assertEqual(freshness.algorithm_version, PARTITION_ALGORITHM_VERSION)
         self.assertEqual(freshness.input_signature, self.inp.source_signature)
         self.assertTrue(freshness.current)
+
+    @covers_requirement(
+        "map-district-partition::frozen-partition-and-outlines-reproduce-deterministically-offline"
+    )
+    def test_the_signature_binds_the_published_documents_not_a_later_file_read(self):
+        # The generator signs the source fingerprints of the published world.
+        # A file edit after publication must therefore produce a different
+        # signature than the current sources, never certify it as current.
+        published = generator.published_source_fingerprints()
+        self.assertIn("content/maps/districts.yaml", published)
+        edited = dict(published)
+        edited["content/maps/districts.yaml"] = "0" * 64
+        with mock.patch.object(
+            generator, "published_source_fingerprints", return_value=edited
+        ):
+            signature = generator.map_input_snapshot().source_signature
+        self.assertEqual(
+            self.inp.source_signature,
+            partition_source_signature_from_fingerprints(published),
+        )
+        self.assertNotEqual(signature, district_partition.current_source_signature())
+        metadata = read_partition_metadata(
+            {
+                "version": FORMAT_VERSION,
+                "algorithm_version": PARTITION_ALGORITHM_VERSION,
+                "source_signature": signature,
+                "fingerprint": "0" * 64,
+            }
+        )
+        self.assertFalse(
+            partition_freshness(metadata, district_partition.current_source_signature()).current
+        )
 
     @covers_requirement(
         "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"

@@ -40,8 +40,9 @@ from elosern_map_core.partition import (
     generate_partition,
     partition_input,
 )
-from elosern_map_core.partition_codec import partition_source_signature
-from elosern_map_core.sources import discover_source_documents
+from elosern_map_core.partition_codec import (
+    partition_source_signature_from_fingerprints,
+)
 
 #: The repository root the shipped sources are read from.
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -134,26 +135,43 @@ def _footprint_cells() -> frozenset[tuple[int, int]]:
     return frozenset(cells)
 
 
-def map_input_snapshot(root: str | Path | None = None) -> PartitionInputSnapshot:
+def published_source_fingerprints() -> dict[str, str]:
+    """The source fingerprints the published world was built from.
+
+    The generator signs the *published* documents, never a fresh read of the
+    files, so the artifact's signature and its ownership describe the same
+    source set even if a file changes after publication.
+    """
+    from world.lore import map_districts
+    from world.maps import geography, map_data
+
+    fingerprints: dict[str, str] = {}
+    for snapshot in (map_data.current(), geography.current(), map_districts.current()):
+        fingerprints.update(snapshot.fingerprints)
+    return fingerprints
+
+
+def map_input_snapshot() -> PartitionInputSnapshot:
     """The explicit immutable map inputs of the currently published world."""
     from world.lore.nations import NATION_REGISTRY
     from world.lore.wilderness_regions import regions
     from world.maps.wilderness_provider import terrain_definition
 
-    base = Path(root) if root is not None else REPOSITORY_ROOT
     return PartitionInputSnapshot(
         terrain=terrain_definition(),
         nation_names=tuple(sorted(NATION_REGISTRY)),
         region_names=tuple(sorted(regions())),
         footprints=_footprint_cells(),
         districts=district_seeds(),
-        source_signature=partition_source_signature(discover_source_documents(base)),
+        source_signature=partition_source_signature_from_fingerprints(
+            published_source_fingerprints()
+        ),
     )
 
 
-def artifact_text(root: str | Path | None = None) -> str:
+def artifact_text() -> str:
     """The complete committed artifact text for the current sources."""
-    return generate_partition(partition_input(map_input_snapshot(root)))
+    return generate_partition(partition_input(map_input_snapshot()))
 
 
 def _bootstrap() -> None:

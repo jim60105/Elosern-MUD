@@ -133,6 +133,8 @@ generation dependency):
 - `partition_source_signature(documents)` — the conservative digest over the
   authored sources ownership depends on (`continent`, `locations`, `districts`,
   `settlement`); interiors and layouts are excluded.
+  `partition_source_signature_from_fingerprints({path: fingerprint})` signs a
+  published snapshot's retained source set with the same rule.
 - `partition_freshness(metadata, source_signature, algorithm_version=...)` —
   the `PartitionFreshness` result; a missing current signature is never current.
 - `FORMAT_VERSION`, `MIXED`, `PARTITION_ALGORITHM_VERSION`,

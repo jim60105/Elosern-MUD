@@ -252,11 +252,13 @@ The artifact carries its `version` (document format), `algorithm_version`
 (`PARTITION_ALGORITHM_VERSION`) and `source_signature`, a conservative digest
 of the authored sources the partition depends on (`continent`, `locations`,
 `districts` and every `settlements/*.yaml`; interiors and editor layouts are
-excluded because they cannot change ownership).
-`world.maps.district_partition.freshness()` compares that metadata with the
-current sources and reports `current=False` when a source, a source's
-membership, or the algorithm version changed. Adding or editing an interior
-never invalidates it.
+excluded because they cannot change ownership). The generator signs the source
+fingerprints of the *published* documents it read, never a separate, later
+read of the files, so its ownership and signature always describe one source
+set. `world.maps.district_partition.freshness()` compares that metadata with
+the sources currently on disk and reports `current=False` when a source, a
+source's membership, or the algorithm version changed. Adding or editing an
+interior never invalidates it.
 
 Datum and units:
 

@@ -41,6 +41,7 @@ from .partition_codec import (
     decode_partition,
     partition_freshness,
     partition_source_signature,
+    partition_source_signature_from_fingerprints,
     read_partition_metadata,
 )
 from .codec import (
@@ -181,6 +182,7 @@ __all__ = [
     "parse_document",
     "partition_freshness",
     "partition_source_signature",
+    "partition_source_signature_from_fingerprints",
     "rasterize_routes",
     "rasterize_segment",
     "region_for_coordinates",

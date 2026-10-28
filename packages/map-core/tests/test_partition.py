@@ -616,19 +616,23 @@ class DecoderValidationTests(unittest.TestCase):
     def test_malformed_documents_are_rejected(self):
         inp = FrozenEncodingTests()._input()
         document = encode(compute_partition(inp), inp)
-        mutations = {
-            "mixed marker": lambda d: d["exceptions"][0].__setitem__(2, MIXED),
-            "listed twice": lambda d: d["exceptions"].append(list(d["exceptions"][0])),
-            "malformed ring": lambda d: d["outlines"]["west"][0].append(5),
-            "unsupported partition version": lambda d: d.__setitem__("version", 99),
-        }
-        for rule, mutate in mutations.items():
-            with self.subTest(rule=rule):
+        mutations = [
+            (lambda d: d["exceptions"][0].__setitem__(2, MIXED), "mixed marker"),
+            (lambda d: d["exceptions"].append(list(d["exceptions"][0])), "listed twice"),
+            (lambda d: d["outlines"]["west"][0].append(5), "malformed ring"),
+            (lambda d: d.__setitem__("version", 99), "unsupported partition version"),
+            (lambda d: d.__setitem__("frame_cells", 0), "not a multiple of tile_cells"),
+            (lambda d: d.__setitem__("frame_cells", True), "not a multiple of tile_cells"),
+            (lambda d: d["exceptions"].__setitem__(0, "ab"), "no integer tile position"),
+            (lambda d: d["outlines"].__setitem__("west", "ring"), "not a list of rings"),
+        ]
+        for mutate, message in mutations:
+            with self.subTest(message=message):
                 broken = json.loads(json.dumps(document))
                 mutate(broken)
                 with self.assertRaises(PartitionDocumentError) as caught:
                     decode_partition(broken, is_land=lambda cell: True)
-                self.assertIn(rule, str(caught.exception))
+                self.assertIn(message, str(caught.exception))
 
 
 def _terrain(frame=20):

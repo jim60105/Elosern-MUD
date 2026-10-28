@@ -180,14 +180,27 @@ def partition_source_signature(
     :func:`elosern_map_core.sources.expected_document`, so the generator and
     every runtime caller classify a path identically.
     """
+    return partition_source_signature_from_fingerprints(
+        {document.relative_path: document.fingerprint for document in documents}
+    )
+
+
+def partition_source_signature_from_fingerprints(
+    fingerprints: Mapping[str, str],
+) -> str:
+    """The same signature over a ``{relative_path: fingerprint}`` source set.
+
+    A published world retains the fingerprints of the documents it was built
+    from; signing those binds a generated artifact to the exact sources behind
+    its ownership instead of a later, possibly changed, read of the files.
+    """
     digest = hashlib.sha256()
     rows: list[tuple[str, str]] = []
-    for document in documents:
-        relative_path = document.relative_path
+    for relative_path, fingerprint in fingerprints.items():
         expected = expected_document(relative_path)
         if expected is None or expected[0] not in PARTITION_SOURCE_KINDS:
             continue
-        rows.append((relative_path.replace("\\", "/"), document.fingerprint))
+        rows.append((relative_path.replace("\\", "/"), fingerprint))
     for relative_path, fingerprint in sorted(rows):
         digest.update(relative_path.encode("utf-8"))
         digest.update(b"\0")
@@ -219,16 +232,30 @@ def decode_partition(
 ) -> DistrictPartition:
     """Decode and shape-check a partition document.
 
-    ``is_land`` is the caller's land rule (the game binds the published
-    mainland polygon); it is the only geography this reader needs.
+    ``is_land`` is required: a coarse tile stores one code for its land, and
+    only the caller's mainland rule can tell a sea cell of such a tile apart
+    from land. The game adapter binds the published mainland polygon and
+    therefore offers ``decode_partition(document)``; the core seam here is
+    ``decode_partition(document, is_land)``.
     """
     document = _document(source)
     metadata = read_partition_metadata(document)
     frame, tile = document.get("frame_cells"), document.get("tile_cells")
-    if not isinstance(frame, int) or not isinstance(tile, int) or tile < 1 or frame % tile:
+    if (
+        isinstance(frame, bool)
+        or isinstance(tile, bool)
+        or not isinstance(frame, int)
+        or not isinstance(tile, int)
+        or frame < 1
+        or tile < 1
+        or frame % tile
+    ):
         raise PartitionDocumentError("frame_cells is not a multiple of tile_cells")
     count = frame // tile
-    keys = tuple(document.get("districts") or ())
+    districts = document.get("districts")
+    if not isinstance(districts, list) or any(not isinstance(key, str) for key in districts):
+        raise PartitionDocumentError("districts is not a list of keys")
+    keys = tuple(districts)
     if list(keys) != sorted(set(keys)):
         raise PartitionDocumentError("district keys are not unique and sorted")
     rows = document.get("coarse")
@@ -238,8 +265,13 @@ def decode_partition(
         )
     coarse = tuple(_expand(row, count, f"coarse row {ty}") for ty, row in enumerate(rows))
     exceptions: dict[tuple[int, int], tuple[int, ...]] = {}
-    for entry in document.get("exceptions") or ():
-        if len(entry) < 2 or not all(isinstance(value, int) for value in entry[:2]):
+    entries = document.get("exceptions")
+    if not isinstance(entries, list):
+        raise PartitionDocumentError("exceptions is not a list")
+    for entry in entries:
+        if not isinstance(entry, list) or len(entry) < 2:
+            raise PartitionDocumentError("an exception entry has no integer tile position")
+        if any(isinstance(value, bool) or not isinstance(value, int) for value in entry[:2]):
             raise PartitionDocumentError("an exception entry has no integer tile position")
         tx, ty = entry[0], entry[1]
         if not (0 <= tx < count and 0 <= ty < count) or coarse[ty][tx] != MIXED:
@@ -262,8 +294,14 @@ def decode_partition(
     if not isinstance(outlines, Mapping) or set(outlines) != set(keys):
         raise PartitionDocumentError("outlines do not cover exactly the districts")
     for key, rings in outlines.items():
+        if not isinstance(rings, list):
+            raise PartitionDocumentError(f"outline of {key!r} is not a list of rings")
         for ring in rings:
-            if len(ring) % 2 or not all(isinstance(value, int) for value in ring):
+            if not isinstance(ring, list):
+                raise PartitionDocumentError(f"outline of {key!r} holds a malformed ring")
+            if len(ring) % 2 or not all(
+                isinstance(value, int) and not isinstance(value, bool) for value in ring
+            ):
                 raise PartitionDocumentError(f"outline of {key!r} holds a malformed ring")
     return DistrictPartition(
         fingerprint=metadata.fingerprint,
@@ -291,5 +329,6 @@ __all__ = [
     "decode_partition",
     "partition_freshness",
     "partition_source_signature",
+    "partition_source_signature_from_fingerprints",
     "read_partition_metadata",
 ]
