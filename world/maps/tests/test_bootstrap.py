@@ -549,9 +549,11 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
     def test_at_server_start_calls_sync_grid_after_sync_all(self):
         from server.conf.at_server_startstop import STARTUP_STEP_ORDER
 
+        # The map world (starting room, grid, interiors) converges in the one
+        # map-sync step; the lore mirror runs only after it committed.
         self.assertLess(
+            STARTUP_STEP_ORDER.index("sync_map_world"),
             STARTUP_STEP_ORDER.index("sync_all"),
-            STARTUP_STEP_ORDER.index("sync_grid"),
         )
 
     def test_at_server_start_without_limbo_syncs_lore_and_grid(self):
@@ -754,7 +756,7 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         from server.conf.at_server_startstop import STARTUP_STEP_ORDER
 
         self.assertLess(
-            STARTUP_STEP_ORDER.index("sync_grid"),
+            STARTUP_STEP_ORDER.index("sync_map_world"),
             STARTUP_STEP_ORDER.index("sync_wilderness"),
         )
 
