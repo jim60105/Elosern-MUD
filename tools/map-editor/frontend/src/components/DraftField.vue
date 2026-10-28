@@ -32,7 +32,10 @@ watch(
 );
 // An unmounted field (another selection, or drafts discarded by 載入新版)
 // holds no draft.
-onBeforeUnmount(() => emit("drafts", 0));
+onBeforeUnmount(() => {
+  draft.value = null;
+  emit("drafts", 0);
+});
 // A new saved value for the same field (own save or adopted change) keeps an
 // open draft; a closed field shows the new value.
 
