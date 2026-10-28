@@ -203,7 +203,8 @@
         "web.tests.browser.test_harness.ManagedServerFastTests",
         "web.tests.browser.test_harness.StartupLockTests",
         "web.tests.browser.test_harness.StartupSerializationTests",
-        "web.tests.browser.test_browser_console_saves.ConsoleSaveConfigurationTests"
+        "web.tests.browser.test_browser_console_saves.ConsoleSaveConfigurationTests",
+        "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_the_room_tool_creates_a_standalone_room_without_a_layout_write"
       ]
     },
     {
@@ -224,7 +225,8 @@
         "web.tests.browser.test_browser_creation_concept.ConceptCreationJourneys.test_concept_field_journey_to_activation_at_the_reference_viewport",
         "web.tests.browser.test_browser_inventory_grid.InventoryGridJourneys.test_bag_tab_lists_the_committed_rows_with_keyboard_reach",
         "web.tests.browser.test_browser_console_saves.ConsoleSaveIsolationBrowserTest.test_first_protected_teleport_saves_the_before_state_privately",
-        "web.tests.browser.test_browser_synth_lineage.SynthLineageBrowserTest.test_synthetic_member_lineage_matches_text_and_panel"
+        "web.tests.browser.test_browser_synth_lineage.SynthLineageBrowserTest.test_synthetic_member_lineage_matches_text_and_panel",
+        "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_the_connection_tool_creates_a_two_way_pair_in_one_command_and_undo_removes_it"
       ]
     },
     {
@@ -287,7 +289,8 @@
         "web.tests.browser.test_browser_services_shop.ShopJourneys.test_buy_quantity_validation_exact_copper",
         "web.tests.browser.test_browser_services_shop.ShopJourneys.test_sell_and_repeated_inventory_without_use_control",
         "web.tests.browser.test_browser_services_shop.ShopCompanionJourneys.test_buy_potions_for_a_companion",
-        "web.tests.browser.test_browser_services_shop.ShopCompanionJourneys.test_possessed_shop_opens_at_the_large_acceptance_viewport"
+        "web.tests.browser.test_browser_services_shop.ShopCompanionJourneys.test_possessed_shop_opens_at_the_large_acceptance_viewport",
+        "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_auto_arrange_writes_only_the_layout_and_names_it"
       ]
     },
     {
@@ -334,7 +337,8 @@
         "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_scene_caption_and_status_usable_at_the_reference_viewport",
         "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_scene_caption_sits_on_the_stage_floor_between_the_portraits",
         "web.tests.browser.test_browser_layout.LayoutMigrationTest",
-        "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_a_new_local_map_from_a_location_is_empty_and_unfinished"
+        "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_a_new_local_map_from_a_location_is_empty_and_unfinished",
+        "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_a_referenced_room_refuses_deletion_and_a_connection_is_deleted_directly"
       ]
     },
     {
@@ -372,7 +376,8 @@
         "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_pointer_disabled_row_explains_without_submitting",
         "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_pointer_exploration_root_and_submenu_submission",
         "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_rapid_double_activation_pushes_one_frame",
-        "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_a_referenced_node_refuses_deletion_and_an_unreferenced_one_is_deleted"
+        "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_a_referenced_node_refuses_deletion_and_an_unreferenced_one_is_deleted",
+        "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_room_fields_by_keyboard_keep_the_id_and_a_connection_is_relabelled"
       ],
       "files_b": [
         "web.tests.browser.test_browser_art.ArtPendingSceneTest.test_pending_generating_notice_clears_dock_and_command_line",

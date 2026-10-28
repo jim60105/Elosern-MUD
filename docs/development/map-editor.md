@@ -9,8 +9,8 @@ Django, opens a database, or needs the game running.
 
 The editor browses the complete authoring world: every domain, diagnostics,
 source ownership, external-index and partition freshness, and static maps
-drawn with `@elosern/map-view`. The first document commands rearrange interior
-room layouts, with service-owned autosave, overwrite guards and undo/redo of
+drawn with `@elosern/map-view`. The document commands edit interior room
+layouts, with service-owned autosave, overwrite guards and undo/redo of
 the manual segment (§3). The service follows the workspace files
 continuously (§3.4) and the page recovers from stale previews, disconnects
 and restarts without a handoff (§3.5). The workbench shell (§3.6) provides
@@ -54,12 +54,14 @@ uv run --locked python -m unittest tests.test_map_editor_file_following
 uv run --locked python -m unittest tests.test_map_editor_watching
 uv run --locked python -m unittest tests.test_map_editor_geography
 uv run --locked python -m unittest tests.test_map_editor_settlements
+uv run --locked python -m unittest tests.test_map_editor_interiors
 uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_standalone
 uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_persistence
 uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_file_following
 uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_accessibility
 uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_geography
 uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_settlements
+uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_interiors
 ```
 
 The accessibility module runs its keyboard workflow in Chromium and Firefox
@@ -77,7 +79,7 @@ an empty `PATH`, so neither the game's packages nor Node can be reached.
 | `GET /api/workspace` | One complete replacement of the authoritative state: `session_generation`, `snapshot_revision`, `write_pause`, `preview_state` (`current`/`stale`/`unavailable`), `snapshot_read_at`, `checked_at`, `schema` (the core schema), `documents` (path, kind, id, fingerprint, values), `world` (the core-derived projection), `diagnostics`, `candidate_diagnostics` (the failing read while stale or unavailable), `external_context_status`, `partition_status`, `history`, `pending_intent`, `uncertain_outcome`, `external_change` (`sequence`, `at` and the changed `documents` of the last adopted external change; §3.4) and `following` (`active`, reconciled `batches`, the last watcher `error`). `write_pause` is only the explicit pause of an uncertain publication; the stale or unavailable preview is the separate `preview_state`. |
 | `GET /api/events` | Server-sent events: `status` on connect and `invalidate` after a published change, each carrying only `session_generation`, `snapshot_revision` and `preview_state`. A client refetches `/api/workspace` on every invalidation and on a reconnect status that names another session or revision. Nothing is patched or merged. |
 | `POST /api/reload` | Authenticated explicit reread of the current disk files. A loadable read publishes and is the only way to resolve an uncertain publication. A structural failure keeps the last preview and marks it `stale`. An identical read publishes nothing. It never writes a file. |
-| `POST /api/commands/<name>` | One named single-document command (the layout commands of §3.1, the geography commands of §3.8) or `undo`/`redo` of the current segment (see §3). |
+| `POST /api/commands/<name>` | One named single-document command (the layout commands of §3.1, the geography commands of §3.8, the settlement commands of §3.9, the interior commands of §3.10) or `undo`/`redo` of the current segment (see §3). |
 | `GET /api/session` | Same-origin launch-token bootstrap (see §4). |
 
 `external_incoming_references` maps the `qualified_ref` of every projected
@@ -398,13 +400,12 @@ the inspector drawer.
 ### 3.7 Mandatory domain dependencies
 
 The shell's domain commands arrive with their changes. Delivered:
-`map-editor-continent-tools` (§3.8) and `map-editor-settlement-tools`
-(§3.9). The batch's remaining changes must deliver, through their own domain
-modules:
+`map-editor-continent-tools` (§3.8), `map-editor-settlement-tools` (§3.9)
+and `map-editor-interior-tools` (§3.10). The batch's remaining changes must
+deliver, through their own domain modules:
 
 | Change | Delivers on this shell |
 | --- | --- |
-| `map-editor-interior-tools` | Room N, connection R, 自動排列, room fields, room delete |
 | `map-editor-entrance-tools` | Entrance E (on the settlement screen as well), 前往另一端, 更換端點… with the qualified-object selector (`[data-object-selector]`) |
 | `map-editor-partition-jobs` | Partition district drawables, 分區 chip and inspector regenerate/cancel, and rejection of every command route (geography included) while a generation runs |
 
@@ -557,6 +558,88 @@ delta and Shift+arrow (10 m per press). A selection spanning documents is
 inspect/copy only. The location inspector's 建立本地圖 creates a local map
 and opens it. Rejection of commands while a partition generation runs is
 added by `map-editor-partition-jobs`.
+
+### 3.10 Interior tools
+
+Service handlers live in `elosern_map_editor/interiors.py`. Each source
+command writes exactly one document, `content/maps/interiors/<interior_id>.yaml`,
+and carries `interior_id`; a `document_id` naming another document is
+`cross_document`. Interiors are coordinate-free: no command, projection
+field or browser control gives a room a position in metres, a distance or a
+route length.
+
+| Command | Arguments |
+| --- | --- |
+| `create_interior` | `interior_id` (new), `room_id` (new) and `fields` with every room field (`name_zh`, `desc_zh`, `scene_archetype`, `art_key`); expected presence `absent` |
+| `delete_interior` | `interior_id` only: removes the document |
+| `create_room` | `room_id` (new), `fields` with every room field |
+| `duplicate_room` | `room_id`, `new_room_id` |
+| `set_room_fields` | `room_id`, `fields` (any room field; the ID is never renamed) |
+| `delete_room` | `room_id` |
+| `create_connection` | `source`, `destination`, `label`, `return_label` (a name adds the reverse connection in the same operation, or `null`) |
+| `set_connection` | `source`, `destination`, `label` of an existing connection and `value` `{source, destination, label}` |
+| `delete_connection` | `source`, `destination`, `label` |
+| `arrange_interior_layout` | `positions` `[{room_id, x, y}, ...]` (at most 1,000, integers within ±100,000): writes only `content/map-editor-layouts/<interior_id>.yaml`, merging into its other positions |
+
+- **Standalone interiors.** A new interior has its first room, no
+  connections, no interior links and no exterior. No service, NPC, economy
+  or layout record is written or required. Creating a room never writes a
+  layout: it is drawn at the deterministic list position
+  (`[index % 3, ⌊index / 3⌋]`) until a later, distinct layout command places
+  it.
+- **Identity.** Room and interior IDs are read-only once created. The game
+  gives a permanent room one identity across every interior, which the core
+  authoring gate does not check, so `check_room_identities` (`commands.py`)
+  mirrors that rule on the fresh disk baseline for every interior effect,
+  undo and redo included. It refuses (`duplicate_room_identity`) only a
+  duplicate the candidate introduces, so a duplicate already on disk does not
+  block unrelated edits. `duplicate_room` copies the ordinary values (name,
+  description, scene, art key) and no relationship: no connection, exterior,
+  interior link or landmark, and no incoming reference is retargeted.
+- **Service rooms.** Existing service-place keys stay the room IDs that
+  service and host records join. The inspector lists the joining `places` and
+  `service_hosts` records from the reference index read-only; editing a
+  joined room's prose keeps its ID and creates no second interior. Host and
+  goods authoring is not part of the editor.
+- **Connections** are directed and named; the name is the exit's name.
+  Endpoints must be rooms of the document and differ (`self_loop`), and the
+  ordered triple is unique (`duplicate_connection`); a two-way creation
+  checks both triples before writing either. Names are non-blank with no
+  surrounding whitespace. Two exits of one room with the same name are not
+  refused (the core has no such rule); the inspector marks them.
+- **Deletion never cascades.** `delete_room` is refused (409
+  `deletion_refused`, guard `internal`) while a connection in either
+  direction, the exterior, an interior link of the document, another
+  interior's link or a district landmark names the room. Then the
+  execution-time external reference check applies (§8): a room joined by a
+  service place or host is refused, and nothing is removed while the index is
+  not current. `delete_interior` passes the same guards for every room it
+  declares. Undoing a room or interior creation removes objects, so it also
+  needs a current index. Layout positions of a deleted room or interior are
+  left in place for the explicit `remove_interior_layout` cleanup; a later
+  room or interior with the same ID shows them again.
+
+The projection adds each room's `scene_status`, as for settlement nodes
+(§3.9).
+
+On the page the tools are 選取 V, 房間 N (opens the room creation form at
+once, or the new-interior form when no interior is open), 連接 R (choose the
+source room, then the destination, on the canvas or in the object list; the
+form requires the name and, with 建立雙向, the return name) and 自動排列 (one
+`arrange_interior_layout` command: columns by connection distance from the
+entrance room, rows in authored order, unreached rooms after them; it
+overwrites the arranged positions and is undoable). 外部入口 E arrives with
+`map-editor-entrance-tools`. Rooms are cards and connections curved arrows,
+each with one direction chevron; a two-way pair reads `去 ⇄ 回` once.
+Selecting a connection selects its editor-local reference
+`connection:<interior>:<source>><destination>/<percent-encoded name>`, which
+no other document can name. Every edit has a non-drag path: the room
+inspector's name, description, scene (from the current index) and art key
+fields, the directed connection rows with ⟶ 新連接 and ⧉ 複製為新房間, the
+connection inspector's endpoint selectors and name field with 建立反向連接,
+the editor-only 版面 X/Y fields, Shift+arrow, and the open interior's ＋ 新房間,
+自動排列, ＋ 新室內 and 刪除室內文件. After a layout save the diagnostics strip
+names the layout document.
 
 ## 4. Security Model and Limitations
 
