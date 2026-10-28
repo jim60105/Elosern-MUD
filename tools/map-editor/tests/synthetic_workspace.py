@@ -250,6 +250,28 @@ def write_partitionable_workspace(root: str | Path) -> Path:
     return root
 
 
+#: A frame large enough that the real generation takes seconds (about nine
+#: on a developer machine), so a test can browse, mutate and cancel while it
+#: runs without any hook.
+SLOW_FRAME_CELLS = 3000
+
+
+def write_slow_partition_workspace(root: str | Path, frame_cells: int = SLOW_FRAME_CELLS) -> Path:
+    """The partitionable workspace on a large square continent."""
+
+    root = write_partitionable_workspace(root)
+    data = continent_data()
+    data["frame_cells"] = frame_cells
+    data["mainland_boundary_km"] = [
+        {"east_km": 0, "north_km": 0},
+        {"east_km": frame_cells, "north_km": 0},
+        {"east_km": frame_cells, "north_km": frame_cells},
+        {"east_km": 0, "north_km": frame_cells},
+    ]
+    (root / "content/maps/continent.yaml").write_text(yaml_text(data), encoding="utf-8")
+    return root
+
+
 def write_workspace(root: str | Path) -> Path:
     """Write the synthetic world sources under ``root`` and return it."""
 

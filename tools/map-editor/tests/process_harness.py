@@ -242,6 +242,21 @@ def command(editor: "EditorProcess", name: str, *, document_id: str, expected: s
     )
 
 
+def partition(editor: "EditorProcess", action: str) -> tuple[int, dict]:
+    """``generate`` or ``cancel`` the partition job with a current body."""
+
+    session = editor.session()
+    body = {"session_generation": session["session_generation"]}
+    if action == "generate":
+        body["snapshot_revision"] = editor.workspace_state()["snapshot_revision"]
+    return editor.request(
+        "POST",
+        f"/api/partition/{action}",
+        headers={"Origin": editor.origin, "X-Map-Editor-Token": session["token"], "Content-Type": "application/json"},
+        body=json.dumps(body),
+    )
+
+
 def load_by_path(name: str, path: Path):
     """Import a stand-alone helper module (e.g. the synthetic workspace) by path."""
 
