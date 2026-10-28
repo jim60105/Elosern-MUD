@@ -10,8 +10,8 @@ source files or the service's state:
   those files and the output becomes current and game-ready;
 - a saved relevant edit makes the old output stale (older-input revision,
   readiness withheld) without any automatic regeneration;
-- while a slow job runs, requests stay responsive, a second job and every
-  world-data command are refused, and a cancel keeps the last artifact;
+- while an observed worker is stopped, requests stay responsive, a second job
+  and every world-data command are refused, and a cancel keeps the last artifact;
 - an external replacement of a partition source during the job prevents its
   publication as current and keeps the last artifact.
 """
@@ -19,10 +19,14 @@ source files or the service's state:
 from __future__ import annotations
 
 import hashlib
+import os
 import shutil
+import signal
+import subprocess
 import tempfile
 import time
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
 
 from tools.spec_traceability import covers_requirement
@@ -51,6 +55,70 @@ ARTIFACT = "world/maps/data/district_partition.json"
 DISTRICTS = "content/maps/districts.yaml"
 LOCATIONS = "content/maps/locations.yaml"
 TERMINAL = {"succeeded", "cancelled", "failed"}
+
+
+def _partition_worker(editor) -> tuple[int, str] | None:
+    """Find this service's worker through the OS, on Linux and macOS."""
+    assert editor.process is not None
+    listing = subprocess.run(
+        ["ps", "-axo", "pid=,ppid=,stat=,command="],
+        capture_output=True, text=True, check=True, timeout=5,
+    )
+    for line in listing.stdout.splitlines():
+        columns = line.split(None, 3)
+        if len(columns) != 4:
+            continue
+        pid, parent, state, command = columns
+        if int(parent) == editor.process.pid and "-m elosern_map_editor.partition_worker" in command:
+            return int(pid), state
+    return None
+
+
+@contextmanager
+def held_partition_job(editor, timeout: float = 30):
+    """Hold the real worker at an OS-observed stop, leaving the service live.
+
+    Acquiring the worker still requires observing it before it exits. Once
+    stopped, browsing, cancellation and file following need no generation-time
+    margin. No service hook or synthetic worker replaces real generation.
+    """
+    deadline = time.monotonic() + timeout
+    worker = None
+    try:
+        while time.monotonic() < deadline:
+            worker = _partition_worker(editor)
+            if worker is not None:
+                os.kill(worker[0], signal.SIGSTOP)
+                break
+            job = editor.workspace_state()["partition_job"]
+            if job["state"] in TERMINAL:
+                raise AssertionError(f"the partition job ended before its worker was observed: {job}")
+            time.sleep(0.01)
+        else:
+            raise AssertionError("the partition worker did not appear")
+
+        while time.monotonic() < deadline:
+            observed = _partition_worker(editor)
+            if observed is None or observed[0] != worker[0]:
+                raise AssertionError("the partition worker exited before its stop was observed")
+            if "T" in observed[1]:
+                job = editor.workspace_state()["partition_job"]
+                if job["state"] != "generating" or not job["job_id"]:
+                    raise AssertionError(f"the stopped worker has no generating job: {job}")
+                yield job
+                return
+            time.sleep(0.01)
+        raise AssertionError("the partition worker did not stop")
+    finally:
+        # Entry assertions can fail after SIGSTOP too. Re-identify the child
+        # before resuming; a successful cancel/invalidation normally killed it.
+        if worker is not None:
+            observed = _partition_worker(editor)
+            if observed is not None and observed[0] == worker[0]:
+                try:
+                    os.kill(worker[0], signal.SIGCONT)
+                except ProcessLookupError:
+                    pass  # The service reaped the worker after the OS read.
 
 
 def _sha(path: Path) -> str:
@@ -104,14 +172,6 @@ class PartitionJobProcessTests(unittest.TestCase):
             time.sleep(0.05)
         self.fail("the partition job did not finish")
 
-    def wait_generating(self, editor) -> None:
-        deadline = time.monotonic() + 30
-        while time.monotonic() < deadline:
-            if editor.workspace_state()["partition_job"]["state"] == "generating":
-                return
-            time.sleep(0.02)
-        self.fail("the partition job never started generating")
-
     def location_edit(self, editor, value: str):
         state = editor.workspace_state()
         expected = next(row["fingerprint"] for row in state["documents"] if row["relative_path"] == LOCATIONS)
@@ -153,20 +213,23 @@ class PartitionJobProcessTests(unittest.TestCase):
         editor = self.start(workspace)
         sources = synthetic.tree_digest(workspace)
         self.assertEqual(harness.partition(editor, "generate")[0], 200)
-        self.wait_generating(editor)
-        for _ in range(5):
-            started = time.monotonic()
-            state = editor.workspace_state()
-            self.assertLess(time.monotonic() - started, 2.0)
-            self.assertEqual(state["partition_job"]["state"], "generating")
-        status, body = harness.partition(editor, "generate")
-        self.assertEqual((status, body["error"]["code"]), (409, "job_running"))
-        status, body = self.location_edit(editor, "改名城")
-        self.assertEqual(status, 423, body)
-        self.assertEqual(body["error"]["reason"], "partition_generating")
-        status, body = harness.partition(editor, "cancel")
-        self.assertEqual(status, 200, body)
-        self.assertEqual(self.settle(editor)["state"], "cancelled")
+        with held_partition_job(editor) as generating:
+            for _ in range(5):
+                started = time.monotonic()
+                state = editor.workspace_state()
+                self.assertLess(time.monotonic() - started, 2.0)
+                self.assertEqual(state["partition_job"]["state"], "generating")
+                self.assertEqual(state["partition_job"]["job_id"], generating["job_id"])
+            status, body = harness.partition(editor, "generate")
+            self.assertEqual((status, body["error"]["code"]), (409, "job_running"))
+            status, body = self.location_edit(editor, "改名城")
+            self.assertEqual(status, 423, body)
+            self.assertEqual(body["error"]["reason"], "partition_generating")
+            status, body = harness.partition(editor, "cancel")
+            self.assertEqual(status, 200, body)
+            job = self.settle(editor)
+            self.assertEqual(job["state"], "cancelled")
+            self.assertEqual(job["job_id"], generating["job_id"])
         self.assertEqual((workspace / ARTIFACT).read_bytes(), prior)
         self.assertEqual(synthetic.tree_digest(workspace), sources)
         # The world is writable again once the job ended.
@@ -178,13 +241,14 @@ class PartitionJobProcessTests(unittest.TestCase):
         prior = _sentinel(workspace)
         editor = self.start(workspace)
         self.assertEqual(harness.partition(editor, "generate")[0], 200)
-        self.wait_generating(editor)
-        data = synthetic.partitionable_districts_data()
-        data["districts"]["synthetic_district"]["district_name_zh"] = "外部改名"
-        (workspace / DISTRICTS).write_text(synthetic.yaml_text(data), encoding="utf-8")
-        job = self.settle(editor)
-        self.assertEqual(job["state"], "failed", job)
-        self.assertEqual(job["reason"], "inputs_changed")
+        with held_partition_job(editor) as generating:
+            data = synthetic.partitionable_districts_data()
+            data["districts"]["synthetic_district"]["district_name_zh"] = "外部改名"
+            (workspace / DISTRICTS).write_text(synthetic.yaml_text(data), encoding="utf-8")
+            job = self.settle(editor)
+            self.assertEqual(job["state"], "failed", job)
+            self.assertEqual(job["reason"], "inputs_changed")
+            self.assertEqual(job["job_id"], generating["job_id"])
         self.assertEqual((workspace / ARTIFACT).read_bytes(), prior)
         self.assertNotEqual(editor.workspace_state()["partition_status"]["status"], "current")
 

@@ -10,8 +10,8 @@ the service's state; shipped copy is never asserted.
   control-point drag saves one command and regenerates nothing;
 - a successful job draws the derived district outlines; a later relevant
   edit keeps them, marked as older input, until the next explicit job;
-- while a slow job runs the page stays usable, a world edit is refused by the
-  service and shown, and the chip's cancel keeps the last artifact;
+- while an OS-observed worker is stopped the page stays usable, a world edit is
+  refused by the service and shown, and the chip's cancel keeps the last artifact;
 - an external source change during a job ends it as failed, never current.
 """
 
@@ -25,6 +25,8 @@ from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 from ruamel.yaml import YAML
+
+from tests.test_map_editor_generation import held_partition_job
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 EDITOR_TESTS = REPO_ROOT / "tools" / "map-editor" / "tests"
@@ -176,39 +178,43 @@ class MapEditorGenerationBrowserTest(unittest.TestCase):
         self.start(workspace)
         page = self.open()
         page.click(CHIP)
-        self.wait_for(lambda: self.chip() == "generating", "the job did not start")
-        # Browsing stays useful: another domain opens and the continent returns.
-        page.click('[data-domain-tab="settlement"]')
-        self.wait_for(
-            lambda: page.locator('[data-domain-tab="settlement"]').get_attribute("aria-pressed") == "true",
-            "browsing stalled while generating",
-        )
-        page.click('[data-domain-tab="continent"]')
-        continent = (workspace / CONTINENT).read_bytes()
-        self.drag_river_point(-60)
-        self.wait_for(lambda: page.locator('[data-banner="partition-generating"]').count() == 1,
-                      "the refused world edit was not shown")
-        self.assertEqual((workspace / CONTINENT).read_bytes(), continent)
-        self.assertEqual(self.chip(), "generating")
-        page.click(CHIP)
-        self.wait_for(lambda: self.chip() == "cancelled", "the chip did not cancel")
+        with held_partition_job(self.editor) as generating:
+            self.wait_for(lambda: self.chip() == "generating", "the job did not start")
+            # Browsing stays useful: another domain opens and the continent returns.
+            page.click('[data-domain-tab="settlement"]')
+            self.wait_for(
+                lambda: page.locator('[data-domain-tab="settlement"]').get_attribute("aria-pressed") == "true",
+                "browsing stalled while generating",
+            )
+            page.click('[data-domain-tab="continent"]')
+            continent = (workspace / CONTINENT).read_bytes()
+            self.drag_river_point(-60)
+            self.wait_for(lambda: page.locator('[data-banner="partition-generating"]').count() == 1,
+                          "the refused world edit was not shown")
+            self.assertEqual((workspace / CONTINENT).read_bytes(), continent)
+            self.assertEqual(self.chip(), "generating")
+            page.click(CHIP)
+            self.wait_for(lambda: self.chip() == "cancelled", "the chip did not cancel")
+            job = self.editor.workspace_state()["partition_job"]
+            self.assertEqual((job["state"], job["job_id"]), ("cancelled", generating["job_id"]))
         self.assertEqual(self.names(), ["generate", "move_control_point", "cancel"])
         self.assertEqual((workspace / PARTITION).read_bytes(), prior)
-        self.assertEqual(self.editor.workspace_state()["partition_job"]["state"], "cancelled")
 
     def test_an_external_source_change_during_a_job_never_shows_it_current(self):
         workspace = synthetic.write_slow_partition_workspace(self.root / "workspace")
         self.start(workspace)
         page = self.open()
         page.click(CHIP)
-        self.wait_for(lambda: self.chip() == "generating", "the job did not start")
-        data = synthetic.partitionable_districts_data()
-        data["districts"]["synthetic_district"]["district_name_zh"] = "外部改名"
-        (workspace / DISTRICTS).write_text(synthetic.yaml_text(data), encoding="utf-8")
-        self.wait_for(lambda: self.chip() == "failed", "the invalidated job was not reported as failed")
+        with held_partition_job(self.editor) as generating:
+            self.wait_for(lambda: self.chip() == "generating", "the job did not start")
+            data = synthetic.partitionable_districts_data()
+            data["districts"]["synthetic_district"]["district_name_zh"] = "外部改名"
+            (workspace / DISTRICTS).write_text(synthetic.yaml_text(data), encoding="utf-8")
+            self.wait_for(lambda: self.chip() == "failed", "the invalidated job was not reported as failed")
+            job = self.editor.workspace_state()["partition_job"]
+            self.assertEqual((job["state"], job["reason"]), ("failed", "inputs_changed"))
+            self.assertEqual(job["job_id"], generating["job_id"])
         self.assertFalse((workspace / PARTITION).exists())
-        job = self.editor.workspace_state()["partition_job"]
-        self.assertEqual((job["state"], job["reason"]), ("failed", "inputs_changed"))
         self.assertEqual(page.locator("[data-older-partition]").count(), 0)
 
 
