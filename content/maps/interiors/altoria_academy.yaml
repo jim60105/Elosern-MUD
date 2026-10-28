@@ -1,0 +1,24 @@
+# Permanent interior authored source (schema version 1).
+# Converted once from the retired Python place room fields; this document is
+# the sole authority for the room's identity, name, prose, scene/art metadata
+# and its one exterior entrance relationship. The room id is the stable place
+# key a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: altoria_academy
+rooms:
+  altoria_academy:
+    name_zh: 聖潔王都王立魔法學院
+    desc_zh: 聖潔王都的學院把講課收在同一個屋簷下，一間長廳，階梯式的長椅面對著示範場，無論幾點都燈光明亮到能讀書，廳旁是一間書庫，王都藏的階級課本照學生攀登的順序上架。學生在門外的階梯上爭論，裡面的講師回答問題的方式正是一所學校該有的樣子，一路答到底。院長的書桌正對著示範場；這座城市懂得的每一條魔法階級階梯與八元素的知識，都出自像這樣某個地方，而王國的這一間，正是薇歐蕾特‧阿爾托利亞從前坐過的教室。
+    scene_archetype: tavern_interior
+    art_key: altoria_academy
+connections: []
+exterior:
+  settlement: capital_altoria
+  node: academy
+  room: altoria_academy
+  doorway_key: 王立魔法學院
+  doorway_aliases:
+  - academy
+  - royal academy
+  - magic academy

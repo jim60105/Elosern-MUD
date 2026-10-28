@@ -13,7 +13,7 @@ Three things live here, in this order:
 * **The authored declarations** — :data:`SCENE_ART_DEFINITIONS` and the closed
   terminal vocabulary. Their completeness against the lore registry and the
   real files is what :func:`scene_art_collection_problems` checks.
-* **The authored room-art keys** — :data:`ROOM_ART_KEYS`, the closed vocabulary
+* **The authored room-art keys** — :func:`room_art_keys`, the closed vocabulary
   of authored room content an operator ``room/<room-art-key>/`` directory may
   name. Keys identify authored room content (never a database row, never a
   translated name) and are projected from the authored place registry, so a
@@ -70,7 +70,6 @@ from world.art.no_follow import RejectedFile, open_dir_fd, open_file_bytes
 from world.art.official import admit_image_header
 from world.art.subjects import is_valid_subject_key
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
-from world.lore.settlements.places import PLACE_REGISTRY
 from world.observability import log_info, log_warn
 
 # The one boundary/diagnostic event id of the bundled collection: the load
@@ -186,15 +185,29 @@ SCENE_ART_KEYS: tuple[str, ...] = tuple(
     definition.key for definition in _SCENE_ART_DEFINITIONS
 )
 
-# The authored room-art-key vocabulary. A place key IS the permanent
-# interior's room tag (``world.lore.settlements.places``), so projecting the
-# authored place registry keeps one source of truth: a ``room/<key>/``
-# directory that no authored place declares cannot be characterized, and no
-# key is ever a runtime row id or a translated display name. A future room
-# family (authored grid rooms, declared instances) extends this projection in
-# the change that declares its metadata.
-ROOM_ART_KEYS: tuple[str, ...] = tuple(sorted(PLACE_REGISTRY))
-ROOM_ART_KEY_SET: frozenset[str] = frozenset(ROOM_ART_KEYS)
+
+def room_art_keys() -> tuple[str, ...]:
+    """The authored room-art-key vocabulary of the published interior world.
+
+    A permanent interior room declares its own ``art_key`` in its interior
+    document, so projecting the published interiors keeps one source of truth:
+    a ``room/<key>/`` directory that no authored room declares cannot be
+    characterized, and no key is ever a runtime row id or a translated display
+    name. A future room family (declared instances) extends this projection in
+    the change that declares its metadata.
+
+    Read per call: the vocabulary follows the currently published map world.
+    """
+
+    from world.maps.interiors import current
+
+    return tuple(sorted(current().room_art_keys.values()))
+
+
+def room_art_key_set() -> frozenset[str]:
+    """The authored room-art-key vocabulary as a membership set."""
+
+    return frozenset(room_art_keys())
 
 
 def is_registered_scene_key(key: object) -> bool:
@@ -204,7 +217,7 @@ def is_registered_scene_key(key: object) -> bool:
 
 def is_registered_room_art_key(key: object) -> bool:
     """True when ``key`` names one of the authored room-art keys."""
-    return isinstance(key, str) and key in ROOM_ART_KEY_SET
+    return isinstance(key, str) and key in room_art_key_set()
 
 
 def scene_definition_for(key: str) -> SceneArtDefinition | None:

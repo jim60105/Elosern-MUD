@@ -1,0 +1,24 @@
+# Permanent interior authored source (schema version 1).
+# Converted once from the retired Python place room fields; this document is
+# the sole authority for the room's identity, name, prose, scene/art metadata
+# and its one exterior entrance relationship. The room id is the stable place
+# key a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: altoria_merchant_hall
+rooms:
+  altoria_merchant_hall:
+    name_zh: 聖潔王都商會公所
+    desc_zh: 聖潔王都的商會公所是一間縱長的辦公室，俯著東市那條貨運道上的車馬，窗下一張稅率長桌，牆上釘著路線圖，這一季各支商隊的名字用粉筆記在地圖旁邊；長凳上坐等的是各號的代辦，櫃檯那頭書記把一筆筆生意用白紙黑字敲定。東市的買賣就在這間屋子裡調度，誰走哪條路、誰替誰載玻璃與穀物、季末誰該付公會多少。牆上沒有公告板，門邊也沒有名單，這座公所日後要派什麼活，眼下都得隔著書桌、面對面跟人談。
+    scene_archetype: tavern_interior
+    art_key: altoria_merchant_hall
+connections: []
+exterior:
+  settlement: capital_altoria
+  node: east_market
+  room: altoria_merchant_hall
+  doorway_key: 商會公所
+  doorway_aliases:
+  - merchant hall
+  - guild of merchants
+  - trading hall

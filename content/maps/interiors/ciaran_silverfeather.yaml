@@ -1,0 +1,22 @@
+# Permanent interior authored source (schema version 1).
+# Converted once from the retired Python place room fields; this document is
+# the sole authority for the room's identity, name, prose, scene/art metadata
+# and its one exterior entrance relationship. The room id is the stable place
+# key a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: ciaran_silverfeather
+rooms:
+  ciaran_silverfeather:
+    name_zh: 銀羽驛站・精靈村分站
+    desc_zh: 樹蔭下的銀羽驛行收存各地來信，木架上擱著公用信紙與封蠟。旅人可在此寄信，或領取寄給自己的信件。
+    scene_archetype: tavern_interior
+    art_key: ciaran_silverfeather
+connections: []
+exterior:
+  settlement: village_ciaran
+  node: old_tree_north
+  room: ciaran_silverfeather
+  doorway_key: 銀羽驛站
+  doorway_aliases:
+  - courier

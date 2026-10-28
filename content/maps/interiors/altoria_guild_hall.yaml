@@ -1,0 +1,23 @@
+# Permanent interior authored source (schema version 1).
+# Converted once from the retired Python place room fields; this document is
+# the sole authority for the room's identity, name, prose, scene/art metadata
+# and its one exterior entrance relationship. The room id is the stable place
+# key a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: altoria_guild_hall
+rooms:
+  altoria_guild_hall:
+    name_zh: 阿爾托利亞冒險者公會大廳
+    desc_zh: 阿爾托利亞的冒險者公會大廳，屋裡最顯眼的是一面大任務板，以及一座環形訓練場。
+    scene_archetype: tavern_interior
+    art_key: altoria_guild_hall
+connections: []
+exterior:
+  settlement: capital_altoria
+  node: guild_forecourt
+  room: altoria_guild_hall
+  doorway_key: 冒險者公會大廳
+  doorway_aliases:
+  - guild hall
+  - hall

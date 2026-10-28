@@ -1,0 +1,24 @@
+# Permanent interior authored source (schema version 1).
+# Converted once from the retired Python place room fields; this document is
+# the sole authority for the room's identity, name, prose, scene/art metadata
+# and its one exterior entrance relationship. The room id is the stable place
+# key a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: altoria_market_stalls
+rooms:
+  altoria_market_stalls:
+    name_zh: 聖潔王都市集棚
+    desc_zh: 聖潔王都的市集棚是蓋在別人攤位上頭的一片屋頂，長長一座棚子，支架撐著帆布與攔板，日光從縫隙漏下來，在空蕩的攤位排之間拖出淡淡的光條。每個攤位都掃過了、也都不屬於誰，賣果子的天亮推車進來、黃昏推車出去，賣唱的佔西門那片寬地，這塊地本身不養任何固定的店主。一條街的生意靠的是只站今天一天的人，而棚子蓋來就是為了等那樣的人，什麼都不問，什麼都不留。
+    scene_archetype: tavern_interior
+    art_key: altoria_market_stalls
+connections: []
+exterior:
+  settlement: capital_altoria
+  node: market_street
+  room: altoria_market_stalls
+  doorway_key: 市集棚
+  doorway_aliases:
+  - market stalls
+  - stalls
+  - covered market

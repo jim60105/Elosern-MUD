@@ -1,0 +1,23 @@
+# Permanent interior authored source (schema version 1).
+# Converted once from the retired Python place room fields; this document is
+# the sole authority for the room's identity, name, prose, scene/art metadata
+# and its one exterior entrance relationship. The room id is the stable place
+# key a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: ciaran_nireth_home
+rooms:
+  ciaran_nireth_home:
+    name_zh: 妮瑞斯的家
+    desc_zh: 成把的藥草與塞著木塞的小藥罐擠滿這間曬得到太陽的屋子，按摘下的時辰排，不按值多少錢排。窗邊一方臼，窗外望得見村子的藥草園，門口一帶的空氣苦裡帶甜。藥是留給需要的人的；被村子請託把藥換成錢賣，是同一座種藥的村子順便想到的事。
+    scene_archetype: tavern_interior
+    art_key: ciaran_nireth_home
+connections: []
+exterior:
+  settlement: village_ciaran
+  node: herb_garden
+  room: ciaran_nireth_home
+  doorway_key: 妮瑞斯的家
+  doorway_aliases:
+  - nireth
+  - nireth's home

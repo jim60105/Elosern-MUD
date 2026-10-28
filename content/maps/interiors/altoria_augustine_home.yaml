@@ -1,0 +1,22 @@
+# Permanent interior authored source (schema version 1).
+# Converted once from the retired Python place room fields; this document is
+# the sole authority for the room's identity, name, prose, scene/art metadata
+# and its one exterior entrance relationship. The room id is the stable place
+# key a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: altoria_augustine_home
+rooms:
+  altoria_augustine_home:
+    name_zh: 奧古斯丁的家
+    desc_zh: 窗外排列盆栽，爐邊有水壺與兩張椅子。寢室陳設樸素，舊地圖摺好收在旅行箱裡。
+    scene_archetype: tavern_interior
+    art_key: altoria_augustine_home
+connections: []
+exterior:
+  settlement: capital_altoria
+  node: guild_forecourt
+  room: altoria_augustine_home
+  doorway_key: 奧古斯丁的家
+  doorway_aliases:
+  - augustine home

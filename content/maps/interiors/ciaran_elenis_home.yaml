@@ -1,0 +1,23 @@
+# Permanent interior authored source (schema version 1).
+# Converted once from the retired Python place room fields; this document is
+# the sole authority for the room's identity, name, prose, scene/art metadata
+# and its one exterior entrance relationship. The room id is the stable place
+# key a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: ciaran_elenis_home
+rooms:
+  ciaran_elenis_home:
+    name_zh: 艾莉妮斯的家
+    desc_zh: 最老的樹下是最老的一間屋子，門框被同一族腳步磨了一百年，磨得發亮。屋裡簡樸而從容，低矮的坐處、一格擱著留種的莢果與摺好的布的擱板，沒有什麼東西分好了類等誰來買。長老的家當都是被記得的東西，村莊自己的歷史完完整整留著，沒有一樣拿出來等著賺陌生人的錢。
+    scene_archetype: tavern_interior
+    art_key: ciaran_elenis_home
+connections: []
+exterior:
+  settlement: village_ciaran
+  node: elder_tree
+  room: ciaran_elenis_home
+  doorway_key: 艾莉妮斯的家
+  doorway_aliases:
+  - elenis
+  - elenis's home

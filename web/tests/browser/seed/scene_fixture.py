@@ -48,7 +48,7 @@ def _scene_fixture(character) -> None:
         return
     from django.conf import settings
 
-    from world.art.scene_definitions import ROOM_ART_KEY_SET, is_registered_room_art_key
+    from world.art.scene_definitions import is_registered_room_art_key, room_art_keys
     from web.browser_support.unified_image_transitions import (
         SCENE_FIXTURE_IDENTITY_PREFIX,
         install_transition_cmdset,
@@ -61,7 +61,7 @@ def _scene_fixture(character) -> None:
     # The authored metadata the map owner writes: a registered room-art key for
     # the override, a bounded logical place identity, and the archetype the room
     # already carries.
-    keys = sorted(ROOM_ART_KEY_SET)
+    keys = sorted(room_art_keys())
     if not keys:
         raise AssertionError("no authored room-art key is registered")
     room_art_key = keys[0]

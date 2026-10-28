@@ -1,0 +1,23 @@
+# Permanent interior authored source (schema version 1).
+# Converted once from the retired Python place room fields; this document is
+# the sole authority for the room's identity, name, prose, scene/art metadata
+# and its one exterior entrance relationship. The room id is the stable place
+# key a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: ciaran_gwenaera_home
+rooms:
+  ciaran_gwenaera_home:
+    name_zh: 格威娜拉的家
+    desc_zh: 銀絲與做了一半的飾品攤在工作檯的布上，分的標準出自手藝人的眼光，不是商人的眼光。完成的作品掛在窗邊的繩上，旁邊晾著從下面坡上採來的花頭；爐火溫著一壺水，沒人指望會有客人要用。這是一個喜歡綴飾工作的人的家，會做買賣只是因為村子請她做。
+    scene_archetype: tavern_interior
+    art_key: ciaran_gwenaera_home
+connections: []
+exterior:
+  settlement: village_ciaran
+  node: silver_leaf_slope
+  room: ciaran_gwenaera_home
+  doorway_key: 格威娜拉的家
+  doorway_aliases:
+  - gwenaera
+  - gwenaera's home

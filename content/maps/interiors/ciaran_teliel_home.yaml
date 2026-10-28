@@ -1,0 +1,23 @@
+# Permanent interior authored source (schema version 1).
+# Converted once from the retired Python place room fields; this document is
+# the sole authority for the room's identity, name, prose, scene/art metadata
+# and its one exterior entrance relationship. The room id is the stable place
+# key a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: ciaran_teliel_home
+rooms:
+  ciaran_teliel_home:
+    name_zh: 泰莉爾的家
+    desc_zh: 練刀場邊的一戶人家，屋裡那片騰空的空間掃得乾淨，留給赤腳練刀的人。木刀在門邊排成一排，刀柄被許多手握得發白；對面擱著坐墊與水壺，為每一次練習之後的休息也留了位置。屋裡沒有一樣東西在賣，村子刀術導師的家教人的方式，和她的場子一直以來一樣，靠練習者自己的重複。
+    scene_archetype: tavern_interior
+    art_key: ciaran_teliel_home
+connections: []
+exterior:
+  settlement: village_ciaran
+  node: training_clearing
+  room: ciaran_teliel_home
+  doorway_key: 泰莉爾的家
+  doorway_aliases:
+  - teliel
+  - teliel's home

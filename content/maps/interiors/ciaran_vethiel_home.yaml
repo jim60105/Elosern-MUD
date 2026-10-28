@@ -1,0 +1,23 @@
+# Permanent interior authored source (schema version 1).
+# Converted once from the retired Python place room fields; this document is
+# the sole authority for the room's identity, name, prose, scene/art metadata
+# and its one exterior entrance relationship. The room id is the stable place
+# key a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: ciaran_vethiel_home
+rooms:
+  ciaran_vethiel_home:
+    name_zh: 維特希爾的家
+    desc_zh: 藥草倒掛在椽上晾乾，染好的線繞在織機邊的木釘上。木架上看得見許多手的磨損，可這間屋子首先是個住家，地上一個坐墊，火邊一壺水，織品之間攤著幾件衣服等人欣賞。
+    scene_archetype: tavern_interior
+    art_key: ciaran_vethiel_home
+connections: []
+exterior:
+  settlement: village_ciaran
+  node: weaving_slope
+  room: ciaran_vethiel_home
+  doorway_key: 維特希爾的家
+  doorway_aliases:
+  - vethiel
+  - vethiel's home

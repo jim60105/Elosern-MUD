@@ -1,0 +1,22 @@
+# Permanent interior authored source (schema version 1).
+# Converted once from the retired Python place room fields; this document is
+# the sole authority for the room's identity, name, prose, scene/art metadata
+# and its one exterior entrance relationship. The room id is the stable place
+# key a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: altoria_hok_home
+rooms:
+  altoria_hok_home:
+    name_zh: 霍克的家
+    desc_zh: 門邊掛著旅行披風，木桌旁放著港口航路圖。小灶留有燉魚香氣，窗下擺著一張結實的床。
+    scene_archetype: tavern_interior
+    art_key: altoria_hok_home
+connections: []
+exterior:
+  settlement: capital_altoria
+  node: guild_forecourt
+  room: altoria_hok_home
+  doorway_key: 霍克的家
+  doorway_aliases:
+  - hok home
