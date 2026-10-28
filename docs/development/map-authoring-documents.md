@@ -116,7 +116,10 @@ the district's canonical visited identity without editing this document.
 
 ### interior
 
-`rooms.<room_id>`: `name_zh`, `desc_zh`, `scene_archetype` (nullable);
+`rooms.<room_id>`: `name_zh`, `desc_zh`, `scene_archetype` (nullable),
+`art_key` (optional, nullable — the registered room-art key this room
+addresses; an absent key declares no room artwork and the room renders its
+archetype chain, and no key is ever inferred from the room id or a name);
 `connections[]` (`source`, `destination`, `label`); optional `interior_links[]`
 (`source_room`, `target_interior`, `target_room`, `label`, `return_label`);
 optional `exterior{settlement, node, room, doorway_key, doorway_aliases[]}`.

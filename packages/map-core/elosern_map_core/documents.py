@@ -210,6 +210,10 @@ class InteriorRoomDeclaration:
     name_zh: str
     desc_zh: str
     scene_archetype: str | None
+    # The optional authored room-art key this room addresses. ``None`` means
+    # the room declares no artwork of its own and renders the archetype chain;
+    # a key is never inferred from the room id, a name or a database row.
+    art_key: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -530,6 +534,7 @@ class InteriorDocument(AuthoringDocument):
                         name_zh=str(value["name_zh"]),
                         desc_zh=str(value["desc_zh"]),
                         scene_archetype=value.get("scene_archetype"),
+                        art_key=value.get("art_key"),
                     )
                     for key, value in data["rooms"].items()
                 }

@@ -26,6 +26,7 @@ CONTINENT_PATH = "content/maps/continent.yaml"
 LOCATIONS_PATH = "content/maps/locations.yaml"
 DISTRICTS_PATH = "content/maps/districts.yaml"
 SETTLEMENT_PATH = "content/maps/settlements/demo_map.yaml"
+INTERIOR_PATH = "content/maps/interiors/{}.yaml"
 
 
 def continent_data() -> dict:
@@ -261,8 +262,18 @@ def interior_data(interior_id: str = "demo_interior") -> dict:
         "kind": "interior",
         "id": interior_id,
         "rooms": {
-            "hall": {"name_zh": "大廳", "desc_zh": "A hall.", "scene_archetype": None},
-            "inner": {"name_zh": "內室", "desc_zh": "An inner room.", "scene_archetype": None},
+            "hall": {
+                "name_zh": "大廳",
+                "desc_zh": "A hall.",
+                "scene_archetype": None,
+                "art_key": None,
+            },
+            "inner": {
+                "name_zh": "內室",
+                "desc_zh": "An inner room.",
+                "scene_archetype": None,
+                "art_key": None,
+            },
         },
         "connections": [
             {"source": "hall", "destination": "inner", "label": "in"},

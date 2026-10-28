@@ -298,6 +298,41 @@ def test_serializer_reparses_its_own_output():
     assert reparsed.document.data == document.data
 
 
+def test_an_interior_room_carries_an_optional_artwork_key():
+    """A room's artwork key is authored, optional, and never inferred.
+
+    The declaration is the only source of a room's registered artwork lineage:
+    an absent or explicit ``null`` key means the room declares no artwork of
+    its own, so a reader can distinguish "not authored" from a key that merely
+    happens to match the room id.
+    """
+
+    data = fixtures.interior_data()
+    data["rooms"]["hall"]["art_key"] = "hall_art"
+    data["rooms"]["inner"]["art_key"] = None
+    path = fixtures.INTERIOR_PATH.format("demo_interior")
+
+    document = parse_document(path, fixtures.yaml_text(data)).document
+    assert document.rooms["hall"].art_key == "hall_art"
+    assert document.rooms["inner"].art_key is None
+
+    omitted = fixtures.interior_data()
+    reparsed = parse_document(
+        path, fixtures.yaml_text(omitted)
+    ).document
+    assert reparsed.rooms["hall"].art_key is None
+
+
+def test_an_interior_artwork_key_must_be_an_identifier():
+    data = fixtures.interior_data()
+    data["rooms"]["hall"]["art_key"] = "Sanctum Art"
+    with pytest.raises(AuthoringError) as captured:
+        parse_document(
+            fixtures.INTERIOR_PATH.format("demo_interior"), fixtures.yaml_text(data)
+        )
+    assert "invalid_field_value" in {item.code for item in captured.value.diagnostics}
+
+
 def test_schema_is_machine_readable_and_mutation_isolated():
     first = schema()
     assert first["version"] == 1

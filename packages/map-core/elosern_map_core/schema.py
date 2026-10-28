@@ -327,6 +327,7 @@ _INTERIOR_ROOM = _mapping(
         "name_zh": _str(min_length=1),
         "desc_zh": _str(),
         "scene_archetype": _nullable(_str()),
+        "art_key": _nullable(_str(pattern=IDENTIFIER_PATTERN, required=False)),
     },
 )
 
