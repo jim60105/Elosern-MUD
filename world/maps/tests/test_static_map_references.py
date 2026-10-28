@@ -279,6 +279,9 @@ class SyncPreservationTests(EvenniaTest):
             {encode_grid(MAP, 10, 10): {"first_seen_tick": 2, "last_seen_tick": 7}},
         )
 
+    @covers_requirement(
+        "map-runtime-adoption::runtime-adoption-publishes-one-complete-validated-world"
+    )
     def test_moved_node_keeps_identity_home_inbound_and_knowledge(self):
         sync_settlement_graph(_graph(10, 10))
         room = GridRoom.objects.filter_xyz(xyz=(10, 10, MAP)).first()

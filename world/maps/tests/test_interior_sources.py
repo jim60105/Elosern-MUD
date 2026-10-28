@@ -14,6 +14,7 @@ import unittest
 from elosern_map_core.codec import document_from_data
 from elosern_map_core.references import interior_room_ref
 
+from tools.spec_traceability import covers_requirement
 from world.maps.interiors import (
     InteriorError,
     build_interiors,
@@ -94,6 +95,9 @@ class InteriorSourceTests(unittest.TestCase):
         self.assertNotIn("t_standalone_room", snapshot.exteriors)
         self.assertEqual(snapshot.room("t_standalone_room").art_key, None)
 
+    @covers_requirement(
+        "map-runtime-adoption::permanent-interiors-are-map-owned-independently-of-services"
+    )
     def test_a_multi_room_document_binds_one_entrance_and_internal_connections(self):
         documents = {
             "t_house": _document(
@@ -224,6 +228,9 @@ class InteriorSourceTests(unittest.TestCase):
         )
         self.assertNotEqual(first.identity, second.identity)
 
+    @covers_requirement(
+        "map-runtime-adoption::permanent-interiors-are-map-owned-independently-of-services"
+    )
     def test_no_interior_reads_the_service_registry(self):
         """The interior domain is independent of service records."""
 

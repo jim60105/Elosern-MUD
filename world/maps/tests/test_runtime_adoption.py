@@ -24,6 +24,7 @@ from evennia.utils.test_resources import EvenniaTestCase
 from elosern_map_core.partition_codec import PARTITION_ALGORITHM_VERSION, PartitionFreshness
 from elosern_map_core.references import interior_room_ref
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.rooms import Room
 from world.maps import bootstrap, runtime
 from world.maps.static_references import binding_signature
@@ -84,6 +85,9 @@ class MapWorldAdoptionTests(EvenniaTestCase):
 
     # -- one complete bundle ---------------------------------------------------
 
+    @covers_requirement(
+        "map-runtime-adoption::runtime-adoption-publishes-one-complete-validated-world"
+    )
     def test_adoption_publishes_one_complete_validated_bundle(self):
         bundle = runtime.current()
 
@@ -117,6 +121,9 @@ class MapWorldAdoptionTests(EvenniaTestCase):
                 self.assertEqual(place.room.object_id, key)
                 self.assertIn(key, bundle.interiors.rooms)
 
+    @covers_requirement(
+        "map-runtime-adoption::permanent-interiors-are-map-owned-independently-of-services"
+    )
     def test_interior_synchronization_needs_no_service_record(self):
         with tempfile.TemporaryDirectory() as directory:
             root = _copy_map_sources(Path(directory))
@@ -197,6 +204,9 @@ class MapWorldAdoptionTests(EvenniaTestCase):
 
     # -- rejected candidates ---------------------------------------------------
 
+    @covers_requirement(
+        "map-runtime-adoption::runtime-adoption-publishes-one-complete-validated-world"
+    )
     def test_a_bad_service_target_publishes_nothing(self):
         places = _places()
 
@@ -270,6 +280,9 @@ class MapWorldAdoptionTests(EvenniaTestCase):
         self.assertIs(runtime.current(), baseline)
         self.assertEqual(binding_signature(), baseline_signature)
 
+    @covers_requirement(
+        "map-runtime-adoption::runtime-adoption-publishes-one-complete-validated-world"
+    )
     def test_a_stale_partition_rejects_the_candidate(self):
         baseline = runtime.current()
         signature = binding_signature()
@@ -284,6 +297,9 @@ class MapWorldAdoptionTests(EvenniaTestCase):
         self.assertIs(runtime.current(), baseline)
         self.assertEqual(binding_signature(), signature)
 
+    @covers_requirement(
+        "map-runtime-adoption::runtime-adoption-publishes-one-complete-validated-world"
+    )
     def test_a_failed_synchronization_restores_the_prior_bundle_and_world(self):
         baseline = runtime.current()
         baseline_signature = binding_signature()

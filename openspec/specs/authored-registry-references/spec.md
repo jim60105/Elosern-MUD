@@ -44,7 +44,7 @@ Single-key references SHALL support nullable None only when declared nullable; m
 - **THEN** those entries remain browsable without declared links and such references are not inferred
 
 ### Requirement: Cached bidirectional integrity model
-The reference model SHALL expose forward references by source field and referrers grouped by the declaration's inverse name, cached for the process lifetime because registries are immutable. Integrity checking SHALL report every dangling target as registry, key, field_path, target_registry, and missing_key.
+Reference indexes SHALL expose source fields, inverse referrers and complete dangling-target diagnostics, reusing immutable results only within the owning registry snapshot and rebuilding after map publication.
 
 #### Scenario: Bidirectional and cached results
 - **WHEN** references from nested and repeated synthetic entries are indexed twice
@@ -56,7 +56,7 @@ The reference model SHALL expose forward references by source field and referrer
 
 #### Scenario: Shipped reference acceptance
 - **WHEN** all first-batch shipped references are checked in CI
-- **THEN** the dangling list is empty and no new startup validation hook is required
+- **THEN** the dangling list is empty and non-map checks retain their CI-only contract; map adoption separately validates its authoritative closure
 
 #### Scenario: Declaration validity rules
 - **WHEN** reference declarations are registered
@@ -68,4 +68,4 @@ The reference model SHALL expose forward references by source field and referrer
 
 #### Scenario: Checks are CI contracts only
 - **WHEN** the integrity checks run
-- **THEN** they act as CI contracts and no new startup enforcement is added
+- **THEN** non-map checks remain CI contracts, while map adoption validates its map-facing closure before publication

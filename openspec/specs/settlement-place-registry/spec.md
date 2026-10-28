@@ -8,11 +8,11 @@ edit rather than a code edit across four files.
 ## Requirements
 
 ### Requirement: A place is the single authored record of one service location
-Each place SHALL own its geometry, naming, optional complete host identity and direct capability declarations, and assortments. Hostless places SHALL remain valid without host/capability/goods fields. A host SHALL allow zero capabilities without implying a profession.
+Each place SHALL own non-map kind, qualified room reference, optional complete host identity/direct capabilities and assortments, while room identity/prose/topology belong solely to interior documents. Hostless and zero-capability hosts SHALL remain valid under existing non-map validation rules.
 
 #### Scenario: One source record
-- **WHEN** a hosted location is authored
-- **THEN** geometry, identity, direct components and goods are declared there once
+- **WHEN** a hosted location is authored with a valid qualified interior-room reference
+- **THEN** the qualified room join, non-map identity, direct components and goods are declared in the service record once; geometry/naming/topology live in the interior document
 
 #### Scenario: Goods without a shop identity fail load
 - **WHEN** goods exist without a valid merchant/shop configuration
@@ -32,7 +32,7 @@ Each place SHALL own its geometry, naming, optional complete host identity and d
 
 #### Scenario: One record carries a whole location
 - **WHEN** a place loads
-- **THEN** its interior/exterior/doorway, title-free host identity, direct components and goods are authored there once
+- **THEN** its qualified room reference, host identity, direct components and goods are authored in the place; room/exterior/doorway data are authored once in the interior document
 
 #### Scenario: A place may declare no host at all
 - **WHEN** all host fields are absent
@@ -40,79 +40,78 @@ Each place SHALL own its geometry, naming, optional complete host identity and d
 
 #### Scenario: A host-less place may not sell
 - **WHEN** a hostless place declares assortments/additions/exclusions
-- **THEN** catalog validation names and rejects it
+- **THEN** catalog validation names and rejects the place
 
 #### Scenario: A dwelling that trades is still a dwelling
-- **WHEN** a dwelling host carries merchant capability
-- **THEN** place kind remains dwelling
+- **WHEN** a dwelling host has merchant capability
+- **THEN** place kind remains dwelling rather than being inferred from trade
 
 #### Scenario: Every shipped place's kind describes its location
-- **WHEN** shipped kinds are inspected
+- **WHEN** shipped place kinds are inspected
 - **THEN** each retains its actual world location type
 
 #### Scenario: Two places may share an exterior
-- **WHEN** shared exterior places have distinct doorway names
-- **THEN** both load with their separate doorways
+- **WHEN** interior relationships share an exterior with distinct doorway names
+- **THEN** each loads and receives its own doorway
 
 #### Scenario: Two places sharing a doorway name fail load
-- **WHEN** places share exterior and doorway name
+- **WHEN** interior relationships share an exterior and doorway name
 - **THEN** validation names both places and the collision
 
 #### Scenario: One record supplies every distinguishing field
 - **WHEN** place fields are enumerated
-- **THEN** stable key, settlement/kind, localized room, exterior/doorway, title-free host/profile, direct components and assortments come from that record
+- **THEN** stable key, settlement/kind, qualified room reference, host/profile, direct components and assortments come from the service record; localized room identity and exterior/doorway declarations come only from the interior document
 
 #### Scenario: No host roster row and no code-side interior constant
-- **WHEN** a place host/interior is authored
-- **THEN** separate roster declarations and interior code constants remain unnecessary
+- **WHEN** a host/interior is authored
+- **THEN** no separate host roster declaration or code-side interior constant is required; topology is declared in its map document
 
 #### Scenario: A shop identity and assortments are interdependent
 - **WHEN** goods lack merchant/shop identity or a trading declaration names no goods
-- **THEN** existing interdependence validation rejects the candidate
+- **THEN** the existing interdependence validation rejects the candidate
 
 #### Scenario: The host group is indivisible
-- **WHEN** a host is declared
-- **THEN** required name/profile/race/subrace/sex identity is complete or absent, titles are absent and zero capabilities is valid
+- **WHEN** a place declares a host
+- **THEN** its required name/profile/race/subrace/sex identity is complete or wholly absent; zero declared capabilities remains valid
 
 #### Scenario: Kind describes the location, never the host's capability
-- **WHEN** a home host trades
-- **THEN** kind still describes a home
+- **WHEN** kind is authored for a trading home
+- **THEN** it describes the home, independently of merchant capability
 
 #### Scenario: The kind vocabulary is closed and complete
-- **WHEN** kinds are validated
-- **THEN** unknown kinds reject without approximation or service inference
+- **WHEN** kinds are validated against existing lore vocabulary
+- **THEN** unknown kinds reject without approximate substitutions or capability inference
 
 #### Scenario: A shared exterior may carry distinct doorways
-- **WHEN** distinct places share an exterior
-- **THEN** distinct doorway names preserve both locations and collisions reject
+- **WHEN** two distinct interior relationships share an exterior
+- **THEN** unique doorway names preserve both locations; a shared doorway name rejects
 
 ### Requirement: A settlement declares its archetype and coordinate space
-The system SHALL support settlement records carrying a stable key matching
-the geographic anchor registry, an archetype drawn from a closed vocabulary
-of the six settlement archetypes the world defines, and the map coordinate
-space its places sit in. A place SHALL name a settlement that exists.
+A non-map settlement record SHALL retain its authored archetype and resolve its map association through the map snapshot; service places SHALL target qualified rooms without duplicating coordinate space or exterior geometry.
+
+#### Scenario: Two settlement spaces
+- **WHEN** two settlements have equal local coordinates but distinct qualified room references
+- **THEN** each service resolves its own room with no place-authored coordinate fallback
+
+#### Scenario: Unknown settlement
+- **WHEN** a non-map service settlement or qualified room is absent
+- **THEN** static validation rejects before persistence while archetype and geographic kind remain distinct
 
 #### Scenario: A place in an unknown settlement fails load
-- **WHEN** a place names a settlement key absent from the settlement
-  registry
-- **THEN** catalog validation raises naming the place and the missing
-  settlement
+- **WHEN** a place names an unknown service settlement
+- **THEN** validation rejects with that place and missing settlement before persistent writes
 
 #### Scenario: Two settlements' places resolve in their own coordinate spaces
-- **WHEN** two settlements each declare a place at the same exterior
-  coordinate
-- **THEN** each interior attaches to its own settlement's exterior room, and
-  neither attaches to the other's
+- **WHEN** service places target distinct qualified rooms whose maps have equal numeric coordinates
+- **THEN** each resolves only its own room/map and neither attaches to the other
 
 #### Scenario: Exterior coordinates resolve inside the settlement's space
-- **WHEN** a place's exterior coordinate is resolved
-- **THEN** it is resolved within that settlement's coordinate space rather than being declared with
-  one
+- **WHEN** a joined interior relationship resolves a settlement exterior
+- **THEN** its qualified target determines the owning map and current coordinates without a duplicate coordinate field in the place
 
 #### Scenario: Archetypes are not anchor kinds
-- **WHEN** the archetype vocabulary is compared with the geographic anchor kind vocabulary
-- **THEN** they are distinct: anchor kinds classify geography and include non-settlements; archetypes
-  classify how a settlement is built
+- **WHEN** non-map settlement archetypes and geographic location kinds are validated
+- **THEN** each uses its own closed vocabulary and a non-settlement location needs no invented settlement archetype
 
 ### Requirement: Shop identities and the service-host roster are derived from places
 Shop identities and roster rows SHALL derive from explicit place component declarations. Required configuration SHALL be complete, unknown/dead kwargs rejected, and canonical host provenance unique. Per-component person/place bindings SHALL be independent of place kind or component ordering.
