@@ -239,6 +239,28 @@ class _AccessibilityBrowser(unittest.TestCase):
         self.disk_unchanged()
         page.context.close()
 
+        # 2560x1440: the same regions, search and canvas entry by keyboard.
+        page = self.open(LARGE)
+        self.assertEqual(page.locator(".editor").get_attribute("data-layout"), "columns")
+        regions = []
+        for _ in range(5):
+            page.keyboard.press("F6")
+            regions.append(self.active_region(page))
+        self.assertEqual(regions, ["header", "nav", "canvas", "inspector", "diagnostics"])
+        page.keyboard.press("F6")
+        page.keyboard.press("/")
+        self.assertIsNotNone(self.active(page, "data-search"))
+        # Inside the search field single keys are text, not domain switches.
+        page.keyboard.type("3")
+        self.assertEqual(self.domain(page), "continent")
+        page.keyboard.press("F6")
+        self.assertEqual(self.active_region(page), "canvas")
+        page.keyboard.press("Tab")
+        page.keyboard.press("Enter")
+        self.wait_for(lambda: self.inspected(page) is not None, "Enter did not select a mark")
+        self.assertIsNotNone(self.active(page, "data-inspector-title"))
+        page.context.close()
+
         # 200 % zoom: the columns are drawers; Escape closes one and returns
         # focus to its header toggle.
         page = self.open(ZOOM_200)
