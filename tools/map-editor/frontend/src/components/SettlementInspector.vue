@@ -278,6 +278,12 @@ const formError = computed(() => {
   if (form.prototype_parent === "anchor_room" && !form.anchor_key) return "錨點房間需要選擇地點。";
   return null;
 });
+// A new ID that already exists links to the existing node (design §5.3).
+const duplicateRef = computed(() => {
+  if (!props.creation || props.creation.type === "road") return null;
+  const taken = (formSettlement.value?.nodes ?? []).some((row) => row.id === form.id);
+  return taken ? `settlement_node:${formSettlement.value.id}:${form.id}` : null;
+});
 function submitCreation() {
   submitted.value = true;
   const creation = props.creation;
@@ -390,7 +396,10 @@ const TITLES = { node: "新節點", road: "新道路", duplicate: "複製為新�
           </label>
         </template>
       </template>
-      <p v-if="submitted && formError" class="draft-field__hint" data-field-error="creation">{{ formError }}</p>
+      <p v-if="submitted && formError" class="draft-field__hint" data-field-error="creation">
+        {{ formError }}
+        <button v-if="duplicateRef" type="button" class="link" :data-follow="duplicateRef" @click="emit('select', duplicateRef)">前往現有節點</button>
+      </p>
       <div class="inspector__actions">
         <button type="submit" class="button" data-creation-submit>＋ 建立</button>
         <button type="button" class="button" data-creation-cancel @click="emit('cancel')">取消 Esc</button>
