@@ -49,12 +49,16 @@ const editable = computed(() => new Set(editableRoles(view.value)));
 const ROLE_LABELS = { wilderness: "野外端", start: "起始端", node: "據點端點", room: "室內端點", source: "起點", target: "終點" };
 const directionOptions = COMPASS.map((item) => ({ value: item.value, label: `${item.label} · ${item.value}` }));
 
-function edit(patch) {
+// `focusRole`: the endpoint whose 更換端點… keeps focus. An edit that changes
+// the reference re-keys this inspector, so focus is restored on the new one.
+function edit(patch, focusRole = null) {
   const current = view.value;
   if (!current) return;
   const { descriptor, ref: next } = editCommand(current, patch);
   props.submit(descriptor).then((result) => {
-    if (result?.changed && next && next !== props.selected) props.choose(next);
+    if (!(result?.changed && next && next !== props.selected)) return;
+    props.choose(next);
+    if (focusRole) nextTick(() => document.querySelector(`[data-change-endpoint="${focusRole}"]`)?.focus());
   });
 }
 
@@ -71,7 +75,7 @@ function closeSelector() {
 }
 function chooseEndpoint(role, value) {
   closeSelector();
-  edit({ [role]: value });
+  edit({ [role]: value }, role);
 }
 </script>
 

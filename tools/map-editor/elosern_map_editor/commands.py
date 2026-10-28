@@ -536,7 +536,8 @@ def check_doorways(baseline, candidate) -> None:
     """Refuse a candidate that newly gives two interiors one doorway.
 
     The game refuses two interiors that open onto the same settlement node
-    under the same doorway name (aliases are not compared); the core gate does
+    under the same doorway name (the exact (settlement, node, doorway_key)
+    tuple, as the game compares it; aliases are not compared); the core gate does
     not check it, so the editor mirrors that rule for every world-source
     effect on the fresh disk baseline. A duplicate the baseline already holds
     does not block unrelated edits; only one this candidate introduces

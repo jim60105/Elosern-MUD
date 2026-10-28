@@ -194,7 +194,9 @@ class RelationshipProcessTests(unittest.TestCase):
         status, body = self.send(editor, "delete_location", "content/maps/locations.yaml",
                                  {"location_id": synthetic.BARE_LOCATION_ID})
         self.assertEqual(status, 409, body)
-        self.assertEqual(body["error"]["guard"], "unavailable")
+        self.assertEqual(body["error"]["code"], "deletion_refused")
+        # The refusal names the unavailable index as its guard.
+        self.assertIn("unavailable", body["error"].values())
         self.assertEqual(self.changed(before), set())
 
     def test_an_external_change_after_inspection_refuses_a_delete_and_an_undo(self):

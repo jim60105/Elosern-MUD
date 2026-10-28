@@ -46,9 +46,10 @@ const takenDirections = computed(() => new Set((settlement.value?.wilderness_ent
 const lines = (text) => String(text ?? "").split("\n").map((item) => item.trim()).filter(Boolean);
 
 const selecting = ref(null);
-const trigger = ref(null);
-const setTrigger = (element) => {
-  if (element) trigger.value = element;
+// One trigger per selector key, so focus returns to the live button.
+const triggers = {};
+const setTrigger = (key) => (element) => {
+  triggers[key] = element;
 };
 const RULES = { node: { kind: "node", mapId: null }, target: { kind: "room", mapId: null } };
 function chooseTarget(key, value) {
@@ -56,8 +57,9 @@ function chooseTarget(key, value) {
   closeSelector();
 }
 function closeSelector() {
+  const key = selecting.value;
   selecting.value = null;
-  nextTick(() => trigger.value?.focus());
+  nextTick(() => triggers[key]?.focus());
 }
 
 const error = computed(() => {
@@ -113,13 +115,22 @@ function submit() {
   );
 }
 
+// Enter in a text field or a select submits; a focused button, radio or
+// checkbox keeps its own activation (Enter on 選擇… opens the selector).
+const NON_TEXT = new Set(["button", "submit", "reset", "checkbox", "radio"]);
+function submitsOnEnter(target) {
+  const tag = String(target?.tagName ?? "").toLowerCase();
+  if (tag === "select") return true;
+  return tag === "input" && !NON_TEXT.has(String(target.type ?? "text").toLowerCase());
+}
+
 function onKey(event) {
   if (event.target.closest?.("[data-object-selector]")) return;
   if (event.key === "Escape") {
     event.preventDefault();
     event.stopPropagation();
     emit("cancel");
-  } else if (event.key === "Enter" && !event.isComposing && event.target.tagName !== "TEXTAREA") {
+  } else if (event.key === "Enter" && !event.isComposing && submitsOnEnter(event.target)) {
     event.preventDefault();
     submit();
   }
@@ -185,7 +196,7 @@ function onKey(event) {
         <p class="mono" :data-creation-value="key">{{ form[key] || "（尚未選擇）" }}</p>
         <button
           v-if="selecting !== key"
-          :ref="setTrigger"
+          :ref="setTrigger(key)"
           type="button"
           class="button"
           :data-creation-choose="key"

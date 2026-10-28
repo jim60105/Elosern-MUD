@@ -231,7 +231,11 @@ class MapEditorRelationshipBrowserTest(unittest.TestCase):
         page.click(f'[data-object="{BACK}"]')
         page.locator('[data-creation="entrance"]').wait_for()
         page.check('[data-creation-field="kind-link"]')
-        page.click('[data-creation-choose="target"]')
+        # Enter on the focused 選擇… button opens the selector; it never submits the form.
+        page.locator('[data-creation-choose="target"]').focus()
+        page.keyboard.press("Enter")
+        page.locator('[data-selector="creation-target"] [data-selector-query]').wait_for()
+        self.assertEqual(self.names(), [])
         page.locator('[data-selector="creation-target"] [data-selector-query]').fill("annex_lobby")
         page.click('[data-selector-choice="interior_room:synthetic_annex:annex_lobby"]')
         page.fill('[data-creation-field="label"]', "passage")

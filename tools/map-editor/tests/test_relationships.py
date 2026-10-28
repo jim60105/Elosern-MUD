@@ -332,3 +332,21 @@ def test_a_duplicate_doorway_already_on_disk_does_not_block_unrelated_edits(work
                          {"interior_id": HALL, "room_id": "back", "fields": {"name_zh": "改名"}})
     assert status == 200, body
     assert _changed(before, workspace) == {INTERIOR}
+
+
+def test_doorway_checks_run_through_undo_and_redo(workspace):
+    editor = Editor(workspace)
+    _annex(editor)
+    assert _send(editor, "set_exterior", INTERIOR, {"interior_id": HALL, "value": None})[0] == 200
+    value = {"room": "interior_room:synthetic_annex:annex_lobby", "node": YARD, "doorway_key": "Door",
+             "doorway_aliases": []}
+    # With the hall's doorway removed, the annex may take the same name.
+    assert _send(editor, "set_exterior", ANNEX, {"interior_id": "synthetic_annex", "value": value})[0] == 200
+    assert editor.undo()[0] == 200
+    assert editor.undo()[0] == 200
+    assert _data(workspace, INTERIOR)["exterior"]["doorway_key"] == "Door"
+    # Redoing the hall removal is fine; redoing the annex doorway only after it.
+    assert editor.redo()[0] == 200
+    assert editor.redo()[0] == 200
+    assert _data(workspace, ANNEX)["exterior"]["doorway_key"] == "Door"
+    assert _data(workspace, INTERIOR)["exterior"] is None
