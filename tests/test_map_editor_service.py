@@ -127,7 +127,7 @@ class EditorHttpBoundaryTests(_EditorCase):
         with harness.EditorProcess(self.workspace) as editor:
             state = editor.workspace_state()
         self.assertEqual(state["preview_state"], "unavailable")
-        self.assertTrue(state["write_pause"]["paused"])
+        self.assertFalse(state["write_pause"]["paused"])
         self.assertIn(
             ("content/maps/settlements/synthetic_town.yaml", "unsafe_source_path"),
             {(item["relative_path"], item["code"]) for item in state["candidate_diagnostics"]},

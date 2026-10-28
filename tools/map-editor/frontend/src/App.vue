@@ -3,17 +3,23 @@
 // the first document commands: interior room layout moves (drag release,
 // Shift+arrow, or confirmed inspector fields), each one guarded and autosaved
 // as one single-document operation, plus undo/redo of the current manual
-// segment. Further editing tools arrive in later slices.
+// segment. The page follows the workspace files continuously: every
+// loadable external change is adopted (held behind open drafts until 載入新版),
+// a restarted service is held until an explicit reconnect-and-read, and the
+// selection survives by qualified identity. Further editing tools arrive in
+// later slices.
 // Authored text is rendered with text interpolation only (never v-html).
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import MapCanvas from "./components/MapCanvas.vue";
 import LayoutPositionFields from "./components/LayoutPositionFields.vue";
-import { CONNECTING, createWorkspaceClient } from "./lib/workspace_client.js";
+import { CONNECTING, DISCONNECTED, createWorkspaceClient } from "./lib/workspace_client.js";
+import { ADOPT, HOLD_DRAFT, HOLD_RESTART, followDecision, preserveSelection } from "./lib/following.js";
+import { workspaceBanner } from "./lib/banner.js";
 import { createCommandClient } from "./lib/command_client.js";
 import { findInterior, fromScene, moveCommand, nudgeDelta, parseRoomRef, storedPosition } from "./lib/layout_edit.js";
-import { persistenceBanner, saveChip, saveState } from "./lib/persistence.js";
+import { saveChip, saveState } from "./lib/persistence.js";
 import { sceneFor } from "./lib/map_scene.js";
-import { diagnosticCounts, indexChip, partitionChip, priorityBanner, syncChip } from "./lib/status.js";
+import { diagnosticCounts, indexChip, partitionChip, syncChip } from "./lib/status.js";
 import { inspect, mapTitle, sourcePathFor, worldTree } from "./lib/world_index.js";
 
 const client = ref({ connection: CONNECTING, workspace: null, error: null });
@@ -23,8 +29,15 @@ const selected = ref(null);
 const diagnosticsOpen = ref(false);
 const persistence = ref({ inFlight: 0, failure: null, savedAt: null, lastDocument: null });
 const draftCount = ref(0);
+// The snapshot on screen (commands are built against it), the newest held
+// one, why it is held, and a form epoch that discards drafts when bumped.
+const displayed = ref(null);
+const pending = ref(null);
+const hold = ref(null);
+const formEpoch = ref(0);
+const removedSelection = ref(null);
 
-const workspace = computed(() => client.value.workspace);
+const workspace = computed(() => displayed.value);
 const world = computed(() => workspace.value?.world ?? null);
 
 let workspaceClient = null;
@@ -35,12 +48,13 @@ onMounted(() => {
     EventSourceImpl: window.EventSource,
     onChange: (next) => {
       client.value = next;
+      offer(next.workspace);
     },
   });
   // One manual segment per page load: a refresh never inherits undo/redo.
   commands = createCommandClient({
     fetchImpl: (...args) => window.fetch(...args),
-    getWorkspace: () => client.value.workspace,
+    getWorkspace: () => displayed.value,
     refetch: () => workspaceClient.refetch(),
     onChange: (next) => {
       persistence.value = next;
@@ -56,6 +70,56 @@ onBeforeUnmount(() => {
   window.removeEventListener("beforeunload", onBeforeUnload);
 });
 
+// -- file following ----------------------------------------------------------
+function adopt(next) {
+  displayed.value = next;
+  pending.value = null;
+  hold.value = null;
+  if (next) commands?.clearRejection(next);
+}
+
+function offer(incoming) {
+  if (!incoming || incoming === displayed.value || incoming === pending.value) return;
+  const decision = followDecision({ displayed: displayed.value, incoming, drafts: draftCount.value });
+  if (decision === ADOPT) {
+    adopt(incoming);
+  } else {
+    pending.value = incoming;
+    hold.value = decision;
+  }
+}
+
+// The last draft resolved and its command (if confirmed) has its answer:
+// nothing is lost by adopting the held change now. A confirmed draft is
+// therefore always built against the snapshot it was typed on.
+watch([draftCount, () => persistence.value.inFlight], ([count, inFlight]) => {
+  if (count === 0 && inFlight === 0 && hold.value === HOLD_DRAFT) adopt(pending.value);
+});
+
+// A lost connection abandons queued commands: nothing is replayed later.
+watch(
+  () => client.value.connection,
+  (connection) => {
+    if (connection === DISCONNECTED) commands?.abandon();
+  },
+);
+
+async function reconnect() {
+  commands?.abandon();
+  await workspaceClient.refetch();
+  const fresh = client.value.workspace;
+  if (fresh && fresh !== displayed.value && !client.value.error) {
+    formEpoch.value += 1;
+    adopt(fresh);
+  }
+}
+
+function loadNewVersion() {
+  if (!pending.value) return;
+  formEpoch.value += 1;
+  adopt(pending.value);
+}
+
 // Keep the open maps and the selection by stable identity across snapshots.
 watch(world, (next) => {
   if (!next) return;
@@ -63,8 +127,22 @@ watch(world, (next) => {
   const interiorIds = next.interiors.map((i) => i.id);
   if (!settlementIds.includes(mapIds.value.settlement)) mapIds.value.settlement = settlementIds[0] ?? null;
   if (!interiorIds.includes(mapIds.value.interior)) mapIds.value.interior = interiorIds[0] ?? null;
-  if (selected.value && !inspect(next, selected.value)) selected.value = null;
+  const kept = preserveSelection(selected.value, (ref) => Boolean(inspect(next, ref)));
+  if (kept.removed) {
+    selected.value = null;
+    removedSelection.value = kept.removed;
+  }
 });
+watch(selected, (ref) => {
+  if (ref) removedSelection.value = null;
+});
+const connectionState = computed(() => (hold.value === HOLD_RESTART ? "restarted" : client.value.connection));
+const canvasStale = computed(
+  () =>
+    workspace.value?.preview_state === "stale" ||
+    client.value.connection === DISCONNECTED ||
+    hold.value === HOLD_RESTART,
+);
 
 const DOMAINS = [
   { key: "continent", label: "大陸", chip: "1" },
@@ -86,11 +164,16 @@ const currentSaveState = computed(() =>
     drafts: draftCount.value,
   }),
 );
-const banner = computed(() => {
-  const connection = priorityBanner(workspace.value, client.value.connection);
-  if (connection?.key === "disconnected") return connection;
-  return persistenceBanner(workspace.value, persistence.value.failure) ?? connection;
-});
+const banner = computed(() =>
+  workspaceBanner({
+    workspace: workspace.value,
+    connection: client.value.connection,
+    hold: hold.value,
+    pending: pending.value,
+    drafts: draftCount.value,
+    failure: persistence.value.failure,
+  }),
+);
 const chips = computed(() => [
   { key: "save", name: "存檔", ...saveChip(currentSaveState.value, persistence.value.savedAt) },
   { key: "sync", name: "檔案同步", ...syncChip(workspace.value, client.value.connection) },
@@ -190,9 +273,13 @@ function onBeforeUnload(event) {
   }
 }
 
-function onBannerAction() {
-  commands?.reload();
+function onBannerAction(action) {
+  if (action === "reconnect") reconnect();
+  else if (action === "adopt") loadNewVersion();
+  else commands?.reload();
 }
+
+const BANNER_ACTIONS = { reload: "重新讀取", adopt: "載入新版", reconnect: "重新連線並讀取" };
 
 function location(item) {
   if (!item.relative_path) return "（工作區）";
@@ -201,7 +288,7 @@ function location(item) {
 </script>
 
 <template>
-  <div class="editor" :data-preview-state="workspace?.preview_state ?? 'loading'" :data-connection="client.connection">
+  <div class="editor" :data-preview-state="workspace?.preview_state ?? 'loading'" :data-connection="connectionState">
     <header class="editor__header" role="banner">
       <span class="editor__seal" aria-hidden="true">✎</span>
       <h1 class="editor__title">地圖編纂</h1>
@@ -231,8 +318,14 @@ function location(item) {
       <section v-if="banner" class="banner" :class="`banner--${banner.tone}`" :data-banner="banner.key">
         <strong class="banner__title">{{ banner.title }}</strong>
         <span class="banner__text">{{ banner.text }}</span>
-        <button v-if="banner.action === 'reload'" type="button" class="banner__action" data-banner-action="reload" @click="onBannerAction">
-          重新讀取
+        <button
+          v-if="banner.action"
+          type="button"
+          class="banner__action"
+          :data-banner-action="banner.action"
+          @click="onBannerAction(banner.action)"
+        >
+          {{ BANNER_ACTIONS[banner.action] }}
         </button>
       </section>
     </div>
@@ -298,7 +391,7 @@ function location(item) {
         v-if="scene"
         :scene="scene"
         :selected="selected"
-        :stale="workspace?.preview_state === 'stale'"
+        :stale="canvasStale"
         :label="title"
         :movable="layoutMovable"
         :busy="persistence.inFlight > 0"
@@ -329,6 +422,7 @@ function location(item) {
         <template v-if="selectedRoom">
           <h3 class="section-label">版面位置</h3>
           <LayoutPositionFields
+            :key="formEpoch"
             :room-ref="selected"
             :position="selectedRoom.position"
             @confirm="onFieldConfirm"
@@ -337,6 +431,9 @@ function location(item) {
           <p class="inspector__note">只寫入 {{ `content/map-editor-layouts/${selectedRoom.interiorId}.yaml` }}；不改變世界座標或距離。</p>
         </template>
       </template>
+      <p v-else-if="removedSelection" class="inspector__empty" data-selection-removed>
+        已選取的 <span class="mono">{{ removedSelection }}</span> 在新版檔案中已不存在，選取已清除。
+      </p>
       <p v-else class="inspector__empty">選取地圖上的物件以檢視其欄位、來源文件與識別碼。</p>
     </aside>
 

@@ -91,6 +91,11 @@ class Editor:
         )
         return response.status_code, response.json()
 
+    def follow(self) -> bool:
+        """One watcher reconciliation, as after coalesced notifications."""
+
+        return self.service.reconcile()
+
     def positions(self, interior_id: str = fixture.INTERIOR_ID) -> dict:
         for interior in self.state()["world"]["interiors"]:
             if interior["id"] == interior_id:

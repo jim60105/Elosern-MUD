@@ -11,8 +11,10 @@ The editor browses the complete authoring world: every domain, diagnostics,
 source ownership, external-index and partition freshness, and static maps
 drawn with `@elosern/map-view`. The first document commands rearrange interior
 room layouts, with service-owned autosave, overwrite guards and undo/redo of
-the manual segment (§3). Further domain commands, file following and the
-full workbench arrive in later slices.
+the manual segment (§3). The service follows the workspace files
+continuously (§3.4) and the page recovers from stale previews, disconnects
+and restarts without a handoff (§3.5). Further domain commands and the full
+workbench arrive in later slices.
 
 ## 1. Launch
 
@@ -46,8 +48,11 @@ pnpm --dir tools/map-editor/frontend test                        # pure frontend
 pnpm --dir tools/map-editor/frontend run test:boundary           # game-tree import allowlist
 uv run --locked python -m unittest tests.test_map_editor_service # real process, repo root
 uv run --locked python -m unittest tests.test_map_editor_persistence
+uv run --locked python -m unittest tests.test_map_editor_file_following
+uv run --locked python -m unittest tests.test_map_editor_watching
 uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_standalone
 uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_persistence
+uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_file_following
 ```
 
 The two repository-level checks start the service as a child process from
@@ -59,9 +64,9 @@ an empty `PATH`, so neither the game's packages nor Node can be reached.
 
 | Route | Purpose |
 | --- | --- |
-| `GET /api/workspace` | One complete replacement of the authoritative state: `session_generation`, `snapshot_revision`, `write_pause`, `preview_state` (`current`/`stale`/`unavailable`), `snapshot_read_at`, `checked_at`, `schema` (the core schema), `documents` (path, kind, id, fingerprint, values), `world` (the core-derived projection), `diagnostics`, `candidate_diagnostics` (the failing read while stale or unavailable), `external_context_status`, `partition_status`. |
+| `GET /api/workspace` | One complete replacement of the authoritative state: `session_generation`, `snapshot_revision`, `write_pause`, `preview_state` (`current`/`stale`/`unavailable`), `snapshot_read_at`, `checked_at`, `schema` (the core schema), `documents` (path, kind, id, fingerprint, values), `world` (the core-derived projection), `diagnostics`, `candidate_diagnostics` (the failing read while stale or unavailable), `external_context_status`, `partition_status`, `history`, `pending_intent`, `uncertain_outcome`, `external_change` (`sequence`, `at` and the changed `documents` of the last adopted external change; §3.4) and `following` (`active`, reconciled `batches`, the last watcher `error`). `write_pause` is only the explicit pause of an uncertain publication; the stale or unavailable preview is the separate `preview_state`. |
 | `GET /api/events` | Server-sent events: `status` on connect and `invalidate` after a published change, each carrying only `session_generation`, `snapshot_revision` and `preview_state`. A client refetches `/api/workspace` on every invalidation and on a reconnect status that names another session or revision. Nothing is patched or merged. |
-| `POST /api/reload` | Authenticated reread of the current disk files. A loadable read publishes. A structural failure keeps the last preview, marks it `stale` and sets `write_pause`. An identical read publishes nothing. It never writes a file. |
+| `POST /api/reload` | Authenticated explicit reread of the current disk files. A loadable read publishes and is the only way to resolve an uncertain publication. A structural failure keeps the last preview and marks it `stale`. An identical read publishes nothing. It never writes a file. |
 | `POST /api/commands/<name>` | One named single-document command (`move_interior_layout`, `remove_interior_layout`) or `undo`/`redo` of the current segment (see §3). |
 | `GET /api/session` | Same-origin launch-token bootstrap (see §4). |
 
@@ -98,8 +103,11 @@ rereads are strictly serial:
    exactly these keys and types (`invalid_body`, 400);
 2. `session_generation` and `snapshot_revision` equal the current values
    (`stale_session` / `stale_snapshot`, 409);
-3. no write pause: a stale or unavailable preview, or an uncertain
-   publication (`write_paused`, 423, with `reason`);
+3. no write pause, then a current preview. Both are `write_paused` (423)
+   with a `reason`: `uncertain_durability` for an uncertain publication, or
+   `stale_preview` / `unavailable_preview` while the last read did not load.
+   The two conditions are orthogonal: a stale preview recovers by itself,
+   the pause only through the explicit reread;
 4. the handler validates its typed arguments (`invalid_command`, 400) and
    derives the one document it owns. A `document_id` that differs, or an
    object of another document, is `cross_document` (400, with `owner`);
@@ -154,9 +162,8 @@ creates in memory. A command from another segment starts a new empty
 segment, so a refreshed page, or a second tab, never inherits undo/redo, and
 the second tab's first command ends the first tab's segment. The segment id
 is not a security boundary. History is cleared whenever the service adopts a
-source or layout change it did not write: it compares the fingerprint map of
-every source and layout path after its own write with the map it expected.
-Changes to the generated artifacts do not count. A service restart is a new
+source or layout change it did not write, and when a read fails to load
+(§3.4). Changes to the generated artifacts do not count. A service restart is a new
 session with no history. Commands are never replayed after a reconnect.
 
 Only one owning document is mutated per operation. The browser has no
@@ -199,6 +206,104 @@ another process. That process might write the target or another document the
 candidate world was validated with. The fingerprint guard detects accidental
 overwrites under continuous file following. It is not a compare-and-swap or
 merge guarantee: do not run two writers at once.
+
+### 3.4 Continuous file following
+
+There is no handoff, turn, ownership or return state, and no route for one.
+Manual and AI (OMP) editing alternate freely. The editor never starts OMP
+and never claims whether OMP is running or finished.
+
+**Watching.** `elosern_map_editor.watching` runs one watch coordinator
+(watchfiles) in the service lifespan. It watches:
+
+- `content/` recursively: world sources, layouts (also a layout directory
+  created later) and the reference context;
+- the partition artifact's directory, filtered to that file;
+- the external context source closure where available: the literal
+  directory prefix of each glob discovery rule recursively, and each literal
+  rule file through its parent directory, filtered to the file.
+
+A root that does not exist is watched through its nearest existing ancestor.
+After every reconciliation the plan is recomputed, and a changed plan
+restarts the watchers. Each (re)start reconciles once as soon as the watcher
+is established, which covers changes made while it was starting.
+Notifications are coalesced until the directories stay quiet for the settle
+interval (`settle_seconds`, 0.15 s; at most 1.6 s per batch). A debounce is
+not a multi-file transaction: an AI edit that spans files may be seen
+half-way and simply loads (or fails) as it is. A watcher failure is reported
+in `following.error` and retried with a backoff of 2 s up to 30 s.
+
+**Reconciliation.** Each batch is one complete fresh read under the service
+lock, compared with the *committed fingerprint ledger*: the source/layout
+presence map the service last committed to. That is its last adopted loaded
+read, or that map plus its own write's result (absence included). A write
+that published counts as committed even when the service's own reread after
+it failed or did not load. While a publication is uncertain, either its
+intended or its baseline presence is own output. No path or event is ever
+suppressed because it was recently saved.
+
+| Fresh read | Effect |
+| --- | --- |
+| Loads and equals the ledger | The service's own output, however delayed or coalesced the notification was: history kept, nothing published (unless an artifact status changed) |
+| Loads and differs | An external change, adopted automatically as the new snapshot: history cleared, and `external_change` records the differing documents |
+| Does not load | Read once more after the settle interval, in case a write was caught half-way. If it still fails, the last preview is kept and marked `stale` (or `unavailable` with no prior preview), and `candidate_diagnostics` gives file, field and line. The history is cleared, the ledger is not moved by the failed read, and commands are rejected (`stale_preview`). The next loadable change recovers automatically. Nothing is ever rewritten from memory. |
+
+Restoring the exact committed bytes after a failure is not an external
+change, but the failure already ended the segment. The same fingerprint
+limit applies the other way: an external writer that writes exactly the
+bytes the editor committed cannot be told apart from the editor's own write.
+If another document changes while a command is published, the segment ends
+and that guarded operation starts the next one. If the command's own
+document is overwritten before the service's reread, the operation is not
+recorded.
+
+**Remaining race.** If OMP and the editor write the same document within
+one settle interval, the editor's save is rejected with the external content
+intact: `stale_snapshot`, or `stale_document` at the disk recheck. The page
+then shows the reloaded content. Nothing is merged or retried. The operator
+is responsible for not editing the same documents in OMP and the editor at
+the same time.
+
+### 3.5 Recovery states on the page
+
+The page keeps one displayed snapshot, and every command is built against
+it. Each complete workspace the service returns is either adopted at once or
+held:
+
+- **External change with an open field draft.** It is held behind the
+  banner 檔案已被外部修改（有草稿）, which names the changed documents and the
+  drafts and history that will be discarded. 載入新版 discards the drafts and
+  adopts it. Once no draft is left and no command is in flight, the held
+  snapshot is adopted silently. A draft confirmed meanwhile is still sent
+  against the snapshot it was typed on, and it is rejected without changing
+  disk. Snapshots after that command (its own result included) stay held
+  until the drafts are resolved. Without drafts, adoption is silent apart
+  from the 檔案同步 chip.
+- **Selection.** Domain, open maps, canvas view and selection are preserved
+  by qualified identity. A selection removed by the external change is
+  cleared, and the inspector names it.
+- **Stale or unavailable preview.** The canvas is desaturated with the stale
+  badge, and the banner shows the first failing `path:line`. There is no
+  action, because recovery is automatic. With no prior snapshot, the canvas
+  shows no preview, never an empty world. Controls are not pre-disabled. A
+  rejected command is shown in the banner until a newer snapshot or the next
+  successful command.
+- **Disconnected.** The last snapshot stays on screen, inspectable and
+  marked stale. Every queued command is abandoned, so nothing is replayed. A
+  command already sent when the connection dropped is reported as failed;
+  whether it landed is shown by the next read, and the fingerprint guard
+  protects any later write. A reconnect to the same session refetches
+  automatically.
+- **Restarted service.** A new session (new generation and token) is held.
+  The old snapshot stays stale, and the old tab's writes are rejected
+  (`unauthorized` for the old token, `stale_session` for the old
+  generation). 重新連線並讀取 rereads and discards drafts, and only then are
+  writes allowed. Write permission, drafts and commands are never restored
+  from browser storage.
+
+Banner priority, highest first: disconnected or restarted, failed or
+uncertain save, external change with drafts, rejected command, stale or
+unavailable preview.
 
 ## 4. Security Model and Limitations
 

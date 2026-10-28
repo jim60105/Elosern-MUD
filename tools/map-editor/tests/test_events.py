@@ -127,7 +127,7 @@ def test_an_unchanged_reread_publishes_nothing(workspace):
         assert _request(port, "GET", "/api/workspace")[1]["checked_at"] > before
 
 
-def test_a_failed_reread_keeps_the_last_preview_as_stale_and_pauses_writes(workspace):
+def test_a_failed_reread_keeps_the_last_preview_as_stale(workspace):
     port = free_port()
     with LiveServer(make_config(workspace, port=port)):
         session = _session(port)
@@ -136,7 +136,8 @@ def test_a_failed_reread_keeps_the_last_preview_as_stale_and_pauses_writes(works
         assert _reload(port, session["token"], session["session_generation"])[0] == 200
         state = _request(port, "GET", "/api/workspace")[1]
         assert state["preview_state"] == "stale"
-        assert state["write_pause"] == {"paused": True, "reason": "stale_preview"}
+        # The stale preview is its own condition, orthogonal to the write pause.
+        assert state["write_pause"] == {"paused": False, "reason": None}
         assert state["world"] == before["world"]
         assert state["snapshot_read_at"] == before["snapshot_read_at"]
         assert any(d["relative_path"] == SETTLEMENT for d in state["candidate_diagnostics"])
@@ -145,7 +146,7 @@ def test_a_failed_reread_keeps_the_last_preview_as_stale_and_pauses_writes(works
         _move_yard(workspace, 300)
         _reload(port, session["token"], session["session_generation"])
         recovered = _request(port, "GET", "/api/workspace")[1]
-        assert (recovered["preview_state"], recovered["write_pause"]["paused"]) == ("current", False)
+        assert recovered["preview_state"] == "current"
 
 
 def test_an_old_session_token_is_rejected_after_a_restart(workspace):

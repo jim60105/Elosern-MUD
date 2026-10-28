@@ -50,6 +50,11 @@ class EditorConfig:
     limits: Limits = field(default_factory=Limits)
     #: Seconds between SSE keep-alive comments.
     heartbeat_seconds: float = 15.0
+    #: Follow the workspace files continuously (directory watching).
+    watch: bool = True
+    #: Settle interval: notifications are coalesced until the directories
+    #: stay quiet this long, and a failed watcher read is retried once after it.
+    settle_seconds: float = 0.15
 
     def __post_init__(self) -> None:
         if not isinstance(self.port, int) or isinstance(self.port, bool) or not (

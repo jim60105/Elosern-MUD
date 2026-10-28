@@ -33,6 +33,8 @@ def dist(tmp_path: Path) -> Path:
 
 
 def make_config(workspace: Path, dist: Path | None = None, port: int = PORT, **kwargs) -> EditorConfig:
+    # Mechanism tests drive rereads explicitly; watching tests opt in.
+    kwargs.setdefault("watch", False)
     return EditorConfig(
         workspace_root=workspace,
         port=port,
