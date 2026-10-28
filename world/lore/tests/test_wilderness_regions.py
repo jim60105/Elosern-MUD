@@ -28,10 +28,12 @@ from world.lore.wilderness_regions import (
     regions,
 )
 
+from world.tests.geography_fixture import publish_shipped_geography
+
 
 def setUpModule():
     if not geography.is_published():
-        geography.publish(geography.load_geography())
+        publish_shipped_geography()
 
 
 class WildernessRegionRegistryTests(unittest.TestCase):

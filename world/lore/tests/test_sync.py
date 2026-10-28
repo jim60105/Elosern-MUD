@@ -20,7 +20,10 @@ from world.lore.sync import (
     sync_all,
     sync_one,
 )
+
 from world.tests.geography_fixture import publish_shipped_geography
+
+from world.tests.geography_fixture import publish_settlements
 
 
 def setUpModule():
@@ -130,7 +133,7 @@ class LoreSyncTests(EvenniaTestCase):
         previous = map_data.current()
         entries = dict(previous.wilderness_entries)
         entries["capital_altoria"] = probe
-        map_data.publish(
+        publish_settlements(
             replace(previous, wilderness_entries=MappingProxyType(entries))
         )
         try:
@@ -139,7 +142,7 @@ class LoreSyncTests(EvenniaTestCase):
             sync_all()
             second = search_script("lore:wilderness_entries:capital_altoria")
         finally:
-            map_data.publish(previous)
+            publish_settlements(previous)
         self.assertEqual(len(first), 1)
         self.assertEqual(len(second), 1)
         self.assertEqual(first[0].id, second[0].id)
@@ -171,14 +174,14 @@ class LoreSyncTests(EvenniaTestCase):
         previous = map_data.current()
         entries = dict(previous.wilderness_entries)
         entries["capital_altoria"] = malformed
-        map_data.publish(
+        publish_settlements(
             replace(previous, wilderness_entries=MappingProxyType(entries))
         )
         try:
             with self.assertRaises(ValueError):
                 sync_all()
         finally:
-            map_data.publish(previous)
+            publish_settlements(previous)
         # Nothing was created: the validation error precedes every mirror write.
         self.assertEqual(
             ScriptDB.objects.filter(db_key__startswith="lore:wilderness_entries:").count(), 0

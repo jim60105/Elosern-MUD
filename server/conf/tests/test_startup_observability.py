@@ -30,7 +30,8 @@ from tools.spec_traceability import covers_requirement
 _BODY_TARGETS = (
     "world.rules.clock.get_world_clock",
     "world.rules.npc_roster_validation.validate_npc_roster",
-    "world.lore.map_districts.load_and_publish",
+    "world.maps.runtime.adopt",
+    "world.maps.runtime.synchronize",
     "world.maps.static_references.validate_static_references",
     "world.lore.sync.sync_all",
     "world.maps.bootstrap.sync_limbo",
@@ -136,10 +137,7 @@ class StartupStepEventTests(_StubbedStartup):
         self.assertEqual(
             self._steps(info),
             [
-                "geography_source_publication",
-                "settlement_source_publication",
-                "district_source_publication",
-                "static_map_reference_validation",
+                "map_world_adoption",
                 "world_clock_init",
                 "equipment_rulebook_validation",
                 "guild_exam_restriction_validation",
@@ -169,10 +167,7 @@ class StartupStepEventTests(_StubbedStartup):
         self.assertEqual(
             self._steps(info),
             [
-                "geography_source_publication",
-                "settlement_source_publication",
-                "district_source_publication",
-                "static_map_reference_validation",
+                "map_world_adoption",
                 "world_clock_init",
                 "equipment_rulebook_validation",
                 "guild_exam_restriction_validation",
@@ -181,32 +176,21 @@ class StartupStepEventTests(_StubbedStartup):
             ],
         )
 
-    def test_district_publication_failure_aborts_before_static_reference_gate(self):
-        # A district candidate carrying a structural or semantic diagnostic
-        # rejects publication, so boot must stop there: the static-reference
-        # gate and every persistent synchronization never run.
+    def test_adoption_failure_aborts_before_the_first_persistent_step(self):
+        # A rejected map candidate stops boot at the adoption step: no registry
+        # is installed and no persistent synchronization runs.
         info, warn, error = self._run(
-            {
-                "world.lore.map_districts.load_and_publish": {
-                    "side_effect": RuntimeError("invalid districts")
-                }
-            },
+            {"world.maps.runtime.adopt": {"side_effect": RuntimeError("bad map")}},
             assert_raises=RuntimeError,
         )
         error.assert_called_once()
         self.assertEqual(error.call_args.args[0], "startup_step_failed")
         self.assertEqual(
             error.call_args.kwargs["context"],
-            {"step": "district_source_publication"},
+            {"step": "map_world_adoption"},
         )
         warn.assert_not_called()
-        self.assertEqual(
-            self._steps(info),
-            [
-                "geography_source_publication",
-                "settlement_source_publication",
-            ],
-        )
+        self.assertEqual(self._steps(info), [])
 
     def test_fail_loud_import_gate_failures_abort_boot_at_their_step(self):
         # guild-exam-restriction-policy: the guild-exam restriction rulebook is
@@ -217,10 +201,7 @@ class StartupStepEventTests(_StubbedStartup):
             "world.rules.guild_exam_restrictions",
             "guild_exam_restriction_validation",
             preceding=(
-                "geography_source_publication",
-                "settlement_source_publication",
-                "district_source_publication",
-                "static_map_reference_validation",
+                "map_world_adoption",
                 "world_clock_init",
                 "equipment_rulebook_validation",
             ),
@@ -233,10 +214,7 @@ class StartupStepEventTests(_StubbedStartup):
             "world.rules.starting_companions",
             "starting_companion_validation",
             preceding=(
-                "geography_source_publication",
-                "settlement_source_publication",
-                "district_source_publication",
-                "static_map_reference_validation",
+                "map_world_adoption",
                 "world_clock_init",
                 "equipment_rulebook_validation",
                 "guild_exam_restriction_validation",

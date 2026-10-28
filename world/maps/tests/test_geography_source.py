@@ -26,7 +26,10 @@ from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 from world.lore.wilderness_regions import harbor_sites, regions
 from world.maps import map_data, wilderness_provider
-from world.tests.geography_fixture import publish_shipped_geography
+from world.tests.geography_fixture import (
+    publish_geography,
+    publish_shipped_geography,
+)
 
 publish_shipped_geography()
 
@@ -65,7 +68,7 @@ class ShippedGeographyPublicationTests(EvenniaTest):
         self._shipped = geography.current()
 
     def tearDown(self):
-        geography.publish(self._shipped)
+        publish_geography(self._shipped)
 
     def test_the_published_views_are_immutable(self):
         with self.assertRaises(TypeError):
@@ -88,7 +91,7 @@ class ShippedGeographyPublicationTests(EvenniaTest):
                          core_region_for(geography.current().terrain, *cell))
         self.assertNotIn(key, SETTLEMENT_REGISTRY)
         self.assertNotIn(key, WILDERNESS_ENTRY_REGISTRY)
-        geography.load_and_publish()
+        publish_shipped_geography()
         self.assertEqual(ObjectDB.objects.count(), rooms)
         self.assertIn(key, anchors())
 
@@ -172,7 +175,7 @@ class SnapshotIsolationTests(unittest.TestCase):
         self._fingerprints = dict(self._shipped.fingerprints)
 
     def tearDown(self):
-        geography.publish(self._shipped)
+        publish_geography(self._shipped)
         from web.webclient.presentation.map_quest_destinations import clear_search_memo
 
         clear_search_memo()
@@ -191,13 +194,13 @@ class SnapshotIsolationTests(unittest.TestCase):
         second = self._world(400)
         self.assertIsNot(first.terrain, second.terrain)
         self.assertNotEqual(first.identity, second.identity)
-        geography.publish(first)
+        publish_geography(first)
         first_box = wilderness_provider.region_search_boxes()["eastern_plains"]
-        geography.publish(second)
+        publish_geography(second)
         second_box = wilderness_provider.region_search_boxes()["eastern_plains"]
         self.assertNotEqual(first_box, second_box)
         self.assertEqual(second_box[2], 401)
-        geography.publish(first)
+        publish_geography(first)
         self.assertEqual(wilderness_provider.region_search_boxes()["eastern_plains"], first_box)
 
     def test_reachability_and_search_memos_are_snapshot_scoped(self):
@@ -206,7 +209,7 @@ class SnapshotIsolationTests(unittest.TestCase):
 
         first = self._world(500)
         second = self._world(400)
-        geography.publish(first)
+        publish_geography(first)
         first_components = walkable_components()
         first_cell = nearest_region_cell(
             (0, 0),
@@ -215,7 +218,7 @@ class SnapshotIsolationTests(unittest.TestCase):
             is_legal=lambda cell: wilderness_provider.is_valid_wilderness_cell(cell),
             bounds=wilderness_provider.region_search_boxes()["southeast_coast"],
         )
-        geography.publish(second)
+        publish_geography(second)
         second_components = walkable_components()
         self.assertIsNot(first_components, second_components)
         second_cell = nearest_region_cell(
@@ -279,7 +282,7 @@ class SnapshotIsolationTests(unittest.TestCase):
             _settlements(),
             fingerprints=dict(first.fingerprints),
         )
-        geography.publish(second)
+        publish_geography(second)
         after = retained.grid_site("capital_altoria", (3500, 2850))
         self.assertEqual(after.position_m, before.position_m)
         fresh = _ProductionTerrain(second).grid_site("capital_altoria", (3500, 2850))

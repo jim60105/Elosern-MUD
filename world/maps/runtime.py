@@ -62,7 +62,9 @@ __all__ = [
     "MapWorldNotLoaded",
     "adopt",
     "commit_adoption",
+    "clear_published_world",
     "compose",
+    "compose_settlements",
     "current",
     "ensure_published",
     "is_published",
@@ -207,6 +209,64 @@ def partition_freshness_for(world: AuthoringWorld) -> PartitionFreshness:
     )
 
 
+def compose_settlements(root: str | Path | None = None) -> SettlementSnapshot:
+    """Compose one settlement candidate from an explicit root, publishing nothing.
+
+    This reads only the documents a settlement candidate depends on (its own
+    documents, the locations and the continent frame), so a caller can check a
+    candidate source directory without supplying the whole world; runtime
+    adoption still composes every domain through :func:`compose`.
+    """
+
+    from elosern_map_core.codec import parse_document
+    from elosern_map_core.sources import discover_source_paths, read_source_document
+
+    base = Path(root) if root is not None else REPOSITORY_ROOT
+    paths = tuple(
+        path
+        for path in discover_source_paths(base)
+        if path.startswith("content/maps/settlements/")
+    )
+    if not paths:
+        raise MapWorldError([f"no settlement documents are discoverable under {base}"])
+    settlements = [read_source_document(base, path) for path in paths]
+    locations_source = read_source_document(base, "content/maps/locations.yaml")
+    continent_source = read_source_document(base, "content/maps/continent.yaml")
+    continent = parse_document(
+        continent_source.relative_path, continent_source.text
+    ).document
+    locations = parse_document(
+        locations_source.relative_path, locations_source.text
+    ).document
+    documents = {}
+    fingerprints = {}
+    for source in settlements:
+        parsed = parse_document(source.relative_path, source.text)
+        documents[parsed.identity] = parsed.document
+        fingerprints[source.relative_path] = source.fingerprint
+    fingerprints[locations_source.relative_path] = locations_source.fingerprint
+    return build_settlements(
+        documents,
+        locations,
+        frame_cells=continent.terrain.frame_cells,
+        fingerprints=fingerprints,
+    )
+
+
+def _uninstall() -> None:
+    """Forget the published world in every map reader (the not-loaded state)."""
+
+    from world.lore import map_districts
+    from world.maps import geography, interiors, map_data
+
+    geography._PUBLISHED = None
+    map_data._PUBLISHED = None
+    map_districts._PUBLISHED = None
+    interiors._PUBLISHED = None
+    global _BUNDLE
+    _BUNDLE = None
+
+
 def compose(root: str | Path | None = None) -> ComposedWorld:
     """Read, compose and game-check one complete candidate (nothing published).
 
@@ -230,17 +290,33 @@ def compose(root: str | Path | None = None) -> ComposedWorld:
     interiors: InteriorSnapshot | None = None
     districts = None
 
+    def _fingerprints(*prefixes: str) -> dict[str, str]:
+        """The candidate's own source fingerprints for one composed domain."""
+
+        return {
+            path: fingerprint
+            for path, fingerprint in world.fingerprints.items()
+            if path in prefixes or any(path.startswith(prefix) for prefix in prefixes)
+        }
+
+    settlement_sources = _fingerprints("content/maps/settlements/")
+    settlement_sources["content/maps/locations.yaml"] = world.fingerprints[
+        "content/maps/locations.yaml"
+    ]
+    interior_sources = _fingerprints("content/maps/interiors/")
+    district_sources = _fingerprints("content/maps/districts.yaml")
+
     try:
         settlements = build_settlements(
             world.settlements,
             world.locations,
             frame_cells=world.continent.terrain.frame_cells,
-            fingerprints=world.fingerprints,
+            fingerprints=settlement_sources,
         )
     except SettlementError as error:
         problems.extend(error.problems)
     try:
-        interiors = build_interiors(world.interiors, fingerprints=world.fingerprints)
+        interiors = build_interiors(world.interiors, fingerprints=interior_sources)
     except InteriorError as error:
         problems.extend(error.problems)
     if settlements is not None:
@@ -249,7 +325,10 @@ def compose(root: str | Path | None = None) -> ComposedWorld:
                 world.continent,
                 world.locations,
                 settlements,
-                fingerprints=world.fingerprints,
+                fingerprints=_fingerprints("content/maps/continent.yaml")
+                | {"content/maps/locations.yaml": world.fingerprints[
+                    "content/maps/locations.yaml"
+                ]},
             )
         except geography.GeographyError as error:
             problems.extend(error.problems)
@@ -261,7 +340,7 @@ def compose(root: str | Path | None = None) -> ComposedWorld:
                         geography_snapshot, settlements
                     ),
                     index=world.reference_index,
-                    fingerprints=world.fingerprints,
+                    fingerprints=district_sources,
                 )
             except map_districts.DistrictError as error:
                 problems.extend(item.message for item in error.diagnostics)
@@ -412,7 +491,7 @@ def adopt(root: str | Path | None = None) -> MapWorld:
         validate_static_references()
     except BaseException:
         if previous is None:
-            _BUNDLE = None
+            _uninstall()
         else:
             _install(previous)
         raise
@@ -464,7 +543,7 @@ def rollback_adoption() -> bool:
     _PENDING = None
     _PENDING_SETTLED = True
     if previous is None:
-        _BUNDLE = None
+        _uninstall()
         return True
     _install(previous)
     return True
@@ -502,3 +581,14 @@ def is_published() -> bool:
     """Whether a complete map bundle has been published in this process."""
 
     return _BUNDLE is not None
+
+
+def clear_published_world():
+    """Forget the published world and return the bundle it held."""
+
+    previous = _BUNDLE
+    global _PENDING, _PENDING_SETTLED
+    _PENDING = None
+    _PENDING_SETTLED = True
+    _uninstall()
+    return previous

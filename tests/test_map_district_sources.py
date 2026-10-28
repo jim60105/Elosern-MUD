@@ -23,6 +23,7 @@ from elosern_map_core.sources import discover_source_paths
 from tools.spec_traceability import covers_requirement
 from world.lore import map_districts
 from world.lore.map_districts import (
+from world.tests.geography_fixture import publish_districts
     DISTRICTS_PATH,
     DistrictError,
     DistrictNotLoaded,
@@ -215,9 +216,9 @@ class DistrictCandidateBoundaryTests(unittest.TestCase):
         )
         with mock.patch.object(map_districts, "_PUBLISHED", None):
             baseline = self._build({"plain_seed": _row("合成平", _cell(10, 10))})
-            map_districts.publish(baseline)
+            publish_districts(baseline)
             with self.assertRaises(DistrictError):
-                map_districts.publish(candidate)
+                publish_districts(candidate)
             self.assertIs(map_districts.current(), baseline)
 
     def test_duplicate_and_misfiled_documents_are_structural(self):

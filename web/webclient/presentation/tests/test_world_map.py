@@ -11,7 +11,7 @@ from web.webclient.presentation.world_map_geometry import raster_rings
 from elosern_map_core.references import wilderness_cell_ref
 from world.rules.map_knowledge import encode_wild
 from world.maps.wilderness_provider import WILDERNESS_NAME
-from world.tests.geography_fixture import publish_shipped_geography
+from world.tests.geography_fixture import (publish_geography, publish_shipped_geography)
 
 
 publish_shipped_geography()
@@ -185,11 +185,10 @@ class WorldMapPrivacyTests(TestCase):
         geography_views={
             key:NS(anchor_key=key,cell=(100+i,200)) for i,key in enumerate(anchors)
         }
-        from world.tests.geography_fixture import publish_shipped_geography
 
         publish_shipped_geography()
         previous = geography.current()
-        geography.publish(
+        publish_geography(
             replace(
                 previous,
                 anchors=MappingProxyType(anchors),

@@ -24,6 +24,7 @@ from elosern_map_core.references import (
 )
 from tools.spec_traceability import covers_requirement
 from world.lore import map_districts
+from world.maps import runtime
 from world.lore.map_districts import (
     DISTRICTS_PATH,
     MIN_VORONOI_SPACING_KM,
@@ -36,7 +37,10 @@ from world.lore.map_districts import (
     landmark_node_ids,
     parse_districts_document,
 )
-from world.tests.geography_fixture import publish_shipped_geography
+from world.tests.geography_fixture import (
+    publish_districts,
+    publish_shipped_geography,
+)
 
 
 def setUpModule():
@@ -194,7 +198,7 @@ class DistrictDocumentTests(unittest.TestCase):
             with self.assertRaises(DistrictNotLoaded):
                 map_districts.current()
             clean = _build(_valid_rows())
-            self.assertIs(map_districts.publish(clean), clean)
+            self.assertIs(publish_districts(clean), clean)
             self.assertIs(map_districts.current(), clean)
             self.assertTrue(map_districts.is_published())
 
@@ -451,10 +455,10 @@ class DistrictSourceBoundaryTests(unittest.TestCase):
 
         with mock.patch.object(map_districts, "_PUBLISHED", None):
             clean = _build(_valid_rows())
-            map_districts.publish(clean)
+            publish_districts(clean)
             with tempfile.TemporaryDirectory() as root:
                 with self.assertRaises(DistrictError) as caught:
-                    map_districts.load_and_publish(Path(root))
+                    runtime.adopt(Path(root))
             self.assertEqual(
                 [item.code for item in caught.exception.diagnostics],
                 ["missing_document"],

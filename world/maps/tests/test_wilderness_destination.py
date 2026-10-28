@@ -41,7 +41,10 @@ from world.rules.map_knowledge import (
     parse_knowledge,
 )
 from world.tests.synthetic_data import SYNTH_WILDERNESS_ENTRIES, synthetic_registries
-from world.tests.geography_fixture import publish_shipped_geography
+from world.tests.geography_fixture import (
+    publish_settlements,
+    publish_shipped_geography,
+)
 
 
 # The resolver's module-level approach cells need the published frame bounds.
@@ -78,6 +81,7 @@ SOUTH_APPROACH = CAPITAL.approach_cell(CAPITAL.gate_for("n"))
 EAST_APPROACH = CAPITAL.approach_cell(CAPITAL.gate_for("w"))
 
 from world.maps.static_references import settlement_node_xy, settlement_node_xyz
+from world.tests.geography_fixture import (publish_settlements, publish_shipped_geography)
 
 
 #: Grid-node spellings and xyz for both gates, derived from the entry's own
@@ -250,7 +254,7 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
         previous = map_data.current()
         entries = dict(previous.wilderness_entries)
         entries["t_l_shape"] = entry
-        map_data.publish(replace(previous, wilderness_entries=MappingProxyType(entries)))
+        publish_settlements(replace(previous, wilderness_entries=MappingProxyType(entries)))
         try:
             with patch.object(wilderness_provider, "_FOOTPRINT_CACHE", {}):
                 # West orthogonal (501,600) is a footprint cell.
@@ -267,7 +271,7 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
                     encode_wild(WILDERNESS_NAME, 502, 601),
                 )
         finally:
-            map_data.publish(previous)
+            publish_settlements(previous)
 
     @covers_requirement("canonical-wilderness-destination::wilderness-destination-resolution-is-canonical-shared-and-registry-driven")
     def test_south_away_from_any_gateway_is_an_ordinary_step(self):

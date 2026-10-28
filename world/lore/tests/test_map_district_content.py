@@ -84,7 +84,7 @@ class ShippedDistrictContractTests(unittest.TestCase):
         self.assertTrue(self.districts)
         # Reloading the same source reproduces the same identity and a
         # diagnostic-free candidate: no consumer registration, no Python row.
-        again = map_districts.load_districts()
+        again = runtime.compose().districts
         self.assertEqual(again.identity, self.snapshot.identity)
         self.assertEqual(again.diagnostics, ())
         self.assertEqual(tuple(again.districts), tuple(self.districts))

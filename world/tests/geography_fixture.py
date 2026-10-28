@@ -25,6 +25,69 @@ def publish_shipped_map_world():
     return runtime.current()
 
 
+def publish_geography(snapshot):
+    """Install one geography view into the published map bundle."""
+
+    from dataclasses import replace
+
+    from world.maps import runtime
+
+    runtime.ensure_published()
+    return runtime.publish(replace(runtime.current(), geography=snapshot))
+
+
+def publish_settlements(snapshot):
+    """Install one settlement view into the published map bundle."""
+
+    from dataclasses import replace
+
+    from world.maps import runtime
+
+    runtime.ensure_published()
+    return runtime.publish(replace(runtime.current(), settlements=snapshot))
+
+
+def publish_districts(snapshot):
+    """Install one district view into the published map bundle."""
+
+    from dataclasses import replace
+
+    from world.maps import runtime
+
+    runtime.ensure_published()
+    return runtime.publish(replace(runtime.current(), districts=snapshot))
+
+
+def publish_interiors(snapshot):
+    """Install one interior view into the published map bundle."""
+
+    from dataclasses import replace
+
+    from world.maps import runtime
+
+    runtime.ensure_published()
+    return runtime.publish(replace(runtime.current(), interiors=snapshot))
+
+
+def clear_published_map_world():
+    """Forget the published bundle for a scope that asserts the not-loaded state."""
+
+    from world.maps import runtime
+
+    return runtime.clear_published_world()
+
+
+def restore_published_map_world(bundle) -> None:
+    """Restore a previously saved bundle."""
+
+    from world.maps import runtime
+
+    if bundle is None:
+        runtime.clear_published_world()
+    else:
+        runtime.publish(bundle)
+
+
 def publish_shipped_settlements():
     """The published settlement world (adopting the whole map world if needed)."""
 
@@ -76,9 +139,15 @@ class GeographyPublicationMixin:
 
 __all__ = [
     "GeographyPublicationMixin",
+    "clear_published_map_world",
+    "publish_districts",
+    "publish_geography",
+    "publish_interiors",
+    "restore_published_map_world",
     "publish_shipped_districts",
     "publish_shipped_geography",
     "publish_shipped_interiors",
+    "publish_settlements",
     "publish_shipped_map_world",
     "publish_shipped_settlements",
 ]
