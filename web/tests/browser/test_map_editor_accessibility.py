@@ -208,6 +208,32 @@ class _AccessibilityBrowser(unittest.TestCase):
     def disk_unchanged(self) -> None:
         self.assertEqual(synthetic.tree_digest(self.workspace), self.baseline)
 
+    def inspector_fields_fit(self, page) -> None:
+        """Check border boxes against both their label and inspector content."""
+        fields = page.locator('[data-region="inspector"] :is(.draft-field__input, .layout-field__input)')
+        self.assertGreater(fields.count(), 0)
+        for field in fields.all():
+            geometry = field.evaluate("""el => {
+                const box = el.getBoundingClientRect();
+                const label = el.closest(".draft-field, .layout-field").getBoundingClientRect();
+                const inspector = el.closest('[data-region="inspector"]');
+                const outer = inspector.getBoundingClientRect();
+                const css = getComputedStyle(inspector);
+                return {
+                    left: box.left, right: box.right,
+                    labelLeft: label.left, labelRight: label.right,
+                    contentLeft: outer.left + parseFloat(css.borderLeftWidth) + parseFloat(css.paddingLeft),
+                    contentRight: outer.right - parseFloat(css.borderRightWidth) - parseFloat(css.paddingRight),
+                    fontSize: parseFloat(getComputedStyle(el).fontSize),
+                    scale: parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ui-scale")),
+                };
+            }""")
+            self.assertGreaterEqual(geometry["left"], geometry["labelLeft"] - 1, geometry)
+            self.assertLessEqual(geometry["right"], geometry["labelRight"] + 1, geometry)
+            self.assertGreaterEqual(geometry["labelLeft"], geometry["contentLeft"] - 1, geometry)
+            self.assertLessEqual(geometry["labelRight"], geometry["contentRight"] + 1, geometry)
+            self.assertGreaterEqual(geometry["fontSize"], 16 * geometry["scale"] - 0.1, geometry)
+
     # -- viewport reflow, shared by Chromium and Firefox ---------------------
     def viewport_reflow(self):
         self.start(dense_diagnostics, long_multiline_node)
@@ -251,8 +277,27 @@ class _AccessibilityBrowser(unittest.TestCase):
             box = heading.bounding_box()
             self.assertLessEqual(box["x"] + box["width"], width + 0.5)
             self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)
+            self.inspector_fields_fit(page)
+            if layout == "columns":
+                # Both domains share field styling, including creation inputs.
+                page.locator('[data-region="canvas"]').focus()
+                page.keyboard.press("n")
+                canvas = page.locator('[data-region="canvas"]').bounding_box()
+                page.mouse.click(canvas["x"] + canvas["width"] * 0.8, canvas["y"] + canvas["height"] * 0.8)
+                page.locator('[data-creation="node"]').wait_for()
+                self.inspector_fields_fit(page)
+                page.keyboard.press("Escape")
+                page.click('[data-domain-tab="interior"]')
+                page.click(f'[data-object="{FRONT}"]')
+                self.inspector_fields_fit(page)
+                page.locator('[data-region="canvas"]').focus()
+                page.keyboard.press("n")
+                page.locator('[data-creation="room"]').wait_for()
+                self.inspector_fields_fit(page)
+                page.keyboard.press("Escape")
             page.context.close()
         self.assertEqual(self.posts, [])
+        self.disk_unchanged()
 
     # -- the keyboard-only workflow, shared by Chromium and Firefox ----------
     def keyboard_workflow(self):

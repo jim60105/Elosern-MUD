@@ -570,12 +570,15 @@ select {
 
 .layout-field {
   display: grid;
+  min-width: 0;
   gap: calc(2px * var(--ui-scale));
   font-size: var(--text-xs);
   color: var(--paper-500);
 }
 
 .layout-field__input {
+  box-sizing: border-box;
+  min-width: 0;
   width: 100%;
   padding: calc(4px * var(--ui-scale)) calc(8px * var(--ui-scale));
   border: 1px solid var(--band-edge-dim);
@@ -1221,6 +1224,7 @@ select {
 
 .draft-field {
   display: grid;
+  min-width: 0;
   gap: calc(2px * var(--ui-scale));
   font-size: var(--text-xs);
   color: var(--paper-500);
@@ -1233,6 +1237,8 @@ select {
 }
 
 .draft-field__input {
+  box-sizing: border-box;
+  min-width: 0;
   width: 100%;
   padding: calc(4px * var(--ui-scale)) calc(8px * var(--ui-scale));
   border: 1px solid var(--band-edge-dim);
