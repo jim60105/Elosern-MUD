@@ -172,7 +172,11 @@ class _AccessibilityBrowser(unittest.TestCase):
         return locator.text_content() if locator.count() else None
 
     def domain(self, page):
-        return page.locator('[data-domain-tab][aria-pressed="true"]').get_attribute("data-domain-tab")
+        tabs = page.locator("[data-domain-tab]")
+        for index in range(tabs.count()):
+            if tabs.nth(index).get_attribute("aria-pressed") == "true":
+                return tabs.nth(index).get_attribute("data-domain-tab")
+        return None
 
     def tab_to(self, page, selector: str, limit: int = 60) -> None:
         for _ in range(limit):
