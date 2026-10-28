@@ -1,11 +1,17 @@
 <script setup>
-// The read-only world browser: every loaded domain, its source ownership,
-// diagnostics and the external-index/partition freshness, over the service's
-// complete authoritative snapshot. Editing tools arrive in later slices.
+// The world browser over the service's complete authoritative snapshot, with
+// the first document commands: interior room layout moves (drag release,
+// Shift+arrow, or confirmed inspector fields), each one guarded and autosaved
+// as one single-document operation, plus undo/redo of the current manual
+// segment. Further editing tools arrive in later slices.
 // Authored text is rendered with text interpolation only (never v-html).
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import MapCanvas from "./components/MapCanvas.vue";
+import LayoutPositionFields from "./components/LayoutPositionFields.vue";
 import { CONNECTING, createWorkspaceClient } from "./lib/workspace_client.js";
+import { createCommandClient } from "./lib/command_client.js";
+import { findInterior, fromScene, moveCommand, nudgeDelta, parseRoomRef, storedPosition } from "./lib/layout_edit.js";
+import { persistenceBanner, saveChip, saveState } from "./lib/persistence.js";
 import { sceneFor } from "./lib/map_scene.js";
 import { diagnosticCounts, indexChip, partitionChip, priorityBanner, syncChip } from "./lib/status.js";
 import { inspect, mapTitle, sourcePathFor, worldTree } from "./lib/world_index.js";
@@ -15,11 +21,14 @@ const domain = ref("continent");
 const mapIds = ref({ settlement: null, interior: null });
 const selected = ref(null);
 const diagnosticsOpen = ref(false);
+const persistence = ref({ inFlight: 0, failure: null, savedAt: null, lastDocument: null });
+const draftCount = ref(0);
 
 const workspace = computed(() => client.value.workspace);
 const world = computed(() => workspace.value?.world ?? null);
 
 let workspaceClient = null;
+let commands = null;
 onMounted(() => {
   workspaceClient = createWorkspaceClient({
     fetchImpl: (...args) => window.fetch(...args),
@@ -28,9 +37,24 @@ onMounted(() => {
       client.value = next;
     },
   });
+  // One manual segment per page load: a refresh never inherits undo/redo.
+  commands = createCommandClient({
+    fetchImpl: (...args) => window.fetch(...args),
+    getWorkspace: () => client.value.workspace,
+    refetch: () => workspaceClient.refetch(),
+    onChange: (next) => {
+      persistence.value = next;
+    },
+  });
   workspaceClient.start();
+  window.addEventListener("keydown", onKeydown);
+  window.addEventListener("beforeunload", onBeforeUnload);
 });
-onBeforeUnmount(() => workspaceClient?.stop());
+onBeforeUnmount(() => {
+  workspaceClient?.stop();
+  window.removeEventListener("keydown", onKeydown);
+  window.removeEventListener("beforeunload", onBeforeUnload);
+});
 
 // Keep the open maps and the selection by stable identity across snapshots.
 watch(world, (next) => {
@@ -54,8 +78,21 @@ const sourcePath = computed(() => sourcePathFor(world.value, domain.value, curre
 const tree = computed(() => worldTree(world.value));
 const objects = computed(() => scene.value?.marks ?? []);
 const record = computed(() => inspect(world.value, selected.value));
-const banner = computed(() => priorityBanner(workspace.value, client.value.connection));
+const currentSaveState = computed(() =>
+  saveState({
+    workspace: workspace.value,
+    inFlight: persistence.value.inFlight,
+    failure: persistence.value.failure,
+    drafts: draftCount.value,
+  }),
+);
+const banner = computed(() => {
+  const connection = priorityBanner(workspace.value, client.value.connection);
+  if (connection?.key === "disconnected") return connection;
+  return persistenceBanner(workspace.value, persistence.value.failure) ?? connection;
+});
 const chips = computed(() => [
+  { key: "save", name: "存檔", ...saveChip(currentSaveState.value, persistence.value.savedAt) },
   { key: "sync", name: "檔案同步", ...syncChip(workspace.value, client.value.connection) },
   { key: "index", name: "索引", ...indexChip(workspace.value) },
   { key: "partition", name: "分區", ...partitionChip(workspace.value) },
@@ -81,6 +118,82 @@ function openTreeEntry(entry) {
     openDomain(entry.domain, entry.mapId);
   }
 }
+// -- interior layout commands ----------------------------------------------
+const selectedRoom = computed(() => {
+  const room = parseRoomRef(selected.value);
+  if (!room || domain.value !== "interior") return null;
+  const interior = findInterior(world.value, room.interiorId);
+  const position = interior && storedPosition(interior, room.roomId);
+  return position ? { ...room, position } : null;
+});
+const layoutMovable = computed(() => domain.value === "interior" && Boolean(world.value));
+
+function submitMove(interiorId, roomId, positionOf) {
+  // Built when its turn comes, against the snapshot the previous command left.
+  return commands.submit((current) => {
+    const interior = findInterior(current.world, interiorId);
+    const from = interior && storedPosition(interior, roomId);
+    if (!from) return null;
+    const to = positionOf(from);
+    if (to[0] === from[0] && to[1] === from[1]) return null;
+    return moveCommand(current.world, interiorId, roomId, to);
+  });
+}
+
+function onCanvasMove({ id, point, settle }) {
+  const room = parseRoomRef(id);
+  if (!room) return settle();
+  selected.value = id;
+  submitMove(room.interiorId, room.roomId, () => fromScene(point)).finally(settle);
+}
+
+function onFieldConfirm(position) {
+  const room = selectedRoom.value;
+  if (room) submitMove(room.interiorId, room.roomId, () => position);
+}
+
+function inTextField(target) {
+  return Boolean(target?.closest?.("input, textarea, select, [contenteditable='true']"));
+}
+
+function onKeydown(event) {
+  if (event.isComposing || !commands) return;
+  const modifier = event.ctrlKey || event.metaKey;
+  if (modifier && event.key.toLowerCase() === "s") {
+    // Save flushes accepted operations; it never forces a field draft.
+    event.preventDefault();
+    commands.flush();
+    return;
+  }
+  if (inTextField(event.target)) return;
+  if (modifier && event.key.toLowerCase() === "z") {
+    event.preventDefault();
+    if (event.shiftKey) commands.redo();
+    else commands.undo();
+    return;
+  }
+  const delta = nudgeDelta(event.key);
+  if (event.shiftKey && !modifier && !event.altKey && delta && selectedRoom.value) {
+    event.preventDefault();
+    const { interiorId, roomId } = selectedRoom.value;
+    submitMove(interiorId, roomId, ([x, y]) => [x + delta[0], y + delta[1]]);
+    return;
+  }
+  if (event.key === "Escape" && selected.value) selected.value = null;
+}
+
+function onBeforeUnload(event) {
+  // Resolve drafts and pending saves before leaving; nothing is restored later.
+  if (draftCount.value > 0 || persistence.value.inFlight > 0) {
+    event.preventDefault();
+    event.returnValue = "";
+  }
+}
+
+function onBannerAction() {
+  commands?.reload();
+}
+
 function location(item) {
   if (!item.relative_path) return "（工作區）";
   return item.line ? `${item.relative_path}:${item.line}` : item.relative_path;
@@ -118,6 +231,9 @@ function location(item) {
       <section v-if="banner" class="banner" :class="`banner--${banner.tone}`" :data-banner="banner.key">
         <strong class="banner__title">{{ banner.title }}</strong>
         <span class="banner__text">{{ banner.text }}</span>
+        <button v-if="banner.action === 'reload'" type="button" class="banner__action" data-banner-action="reload" @click="onBannerAction">
+          重新讀取
+        </button>
       </section>
     </div>
 
@@ -184,7 +300,10 @@ function location(item) {
         :selected="selected"
         :stale="workspace?.preview_state === 'stale'"
         :label="title"
+        :movable="layoutMovable"
+        :busy="persistence.inFlight > 0"
         @select="selected = $event"
+        @move="onCanvasMove"
       />
       <div v-else-if="workspace && !world" class="no-preview" data-no-preview>
         <p class="no-preview__title">無可用預覽</p>
@@ -207,6 +326,16 @@ function location(item) {
             <dd :data-field="field.label">{{ field.value }}</dd>
           </template>
         </dl>
+        <template v-if="selectedRoom">
+          <h3 class="section-label">版面位置</h3>
+          <LayoutPositionFields
+            :room-ref="selected"
+            :position="selectedRoom.position"
+            @confirm="onFieldConfirm"
+            @drafts="draftCount = $event"
+          />
+          <p class="inspector__note">只寫入 {{ `content/map-editor-layouts/${selectedRoom.interiorId}.yaml` }}；不改變世界座標或距離。</p>
+        </template>
       </template>
       <p v-else class="inspector__empty">選取地圖上的物件以檢視其欄位、來源文件與識別碼。</p>
     </aside>
@@ -217,7 +346,8 @@ function location(item) {
         <span data-count="warnings">▲ {{ counts.warnings }}</span>
         <span>· {{ chips[1].text }}</span>
         <span>· {{ chips[2].text }}</span>
-        <span class="diagnostics__hint">唯讀瀏覽 · 編輯工具尚未提供</span>
+        <span v-if="persistence.lastDocument" class="diagnostics__saved mono" data-last-saved>{{ persistence.lastDocument }}</span>
+        <span class="diagnostics__hint">Ctrl/⌘+Z 復原 · Shift+Ctrl/⌘+Z 重做 · Shift+方向鍵 微調房間</span>
       </button>
       <ol v-if="diagnosticsOpen || workspace?.preview_state !== 'current'" class="diagnostics__list">
         <li v-for="(item, index) in allDiagnostics" :key="index" class="diagnostic" :class="`diagnostic--${item.category}`" :data-diagnostic="item.code">

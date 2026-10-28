@@ -513,3 +513,91 @@ select {
     animation: none !important;
   }
 }
+
+/* -- persistence (frontend design §5.1-§5.3) ------------------------------ */
+.chip--busy {
+  color: var(--gold-400);
+  border-color: var(--gold-600);
+}
+
+.chip--draft {
+  color: var(--gold-400);
+  border-color: var(--gold-600);
+  border-style: dashed;
+}
+
+.banner__action {
+  margin-left: auto;
+  padding: 0 calc(12px * var(--ui-scale));
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.banner__action:focus-visible,
+.layout-field__input:focus-visible {
+  outline: 2px solid var(--gold-300);
+  outline-offset: 2px;
+}
+
+.layout-fields {
+  display: grid;
+  gap: calc(8px * var(--ui-scale));
+}
+
+.layout-field {
+  display: grid;
+  gap: calc(2px * var(--ui-scale));
+  font-size: var(--text-xs);
+  color: var(--paper-500);
+}
+
+.layout-field__input {
+  width: 100%;
+  padding: calc(4px * var(--ui-scale)) calc(8px * var(--ui-scale));
+  border: 1px solid var(--band-edge-dim);
+  border-radius: 4px;
+  background: rgba(11, 13, 16, 0.6);
+  color: var(--paper-100);
+  font-size: var(--text-sm);
+}
+
+.layout-field__input--draft {
+  border-bottom: 1px dashed var(--gold-500);
+  background: rgba(199, 154, 74, 0.1);
+}
+
+.layout-field__input--error {
+  border-color: var(--seal-500);
+}
+
+.layout-field__hint {
+  min-height: 1lh;
+  color: var(--gold-400);
+}
+
+.layout-field__hint[data-field-error] {
+  color: var(--seal-400);
+}
+
+.inspector__note {
+  font-size: var(--text-xs);
+  color: var(--paper-500);
+  overflow-wrap: anywhere;
+}
+
+.diagnostics__saved {
+  font-size: var(--text-xs);
+  color: var(--paper-500);
+}
+
+.map-mark--draft .map-mark__card {
+  stroke-dasharray: 6 4;
+}
+
+.map-canvas--interior .map-mark--room {
+  cursor: grab;
+}
