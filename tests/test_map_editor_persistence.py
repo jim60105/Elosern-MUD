@@ -16,6 +16,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from tools.spec_traceability import covers_requirement
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EDITOR_TESTS = REPO_ROOT / "tools" / "map-editor" / "tests"
 
@@ -72,6 +74,10 @@ class _EditorCase(unittest.TestCase):
 
 
 class DocumentCommandProcessTests(_EditorCase):
+    @covers_requirement(
+        "map-editor-persistence::completed-commands-save-exactly-one-validated-document",
+        "map-editor-persistence::drafts-and-history-obey-completed-operation-boundaries",
+    )
     def test_one_move_saves_only_its_layout_and_undo_returns_to_absence(self):
         with harness.EditorProcess(self.workspace) as editor:
             status, body = _move(editor, "back", 2, 1)
@@ -100,6 +106,7 @@ class DocumentCommandProcessTests(_EditorCase):
             self.assertEqual(editor.workspace_state()["world"]["layouts"], [])
         self.assertEqual(self.world_now(), self.world)
 
+    @covers_requirement("map-editor-persistence::completed-commands-save-exactly-one-validated-document")
     def test_a_failed_write_keeps_the_first_saved_operation(self):
         if hasattr(os, "geteuid") and os.geteuid() == 0:
             self.skipTest("directory permissions do not bind the superuser")
