@@ -52,10 +52,12 @@ uv run --locked python -m unittest tests.test_map_editor_service # real process,
 uv run --locked python -m unittest tests.test_map_editor_persistence
 uv run --locked python -m unittest tests.test_map_editor_file_following
 uv run --locked python -m unittest tests.test_map_editor_watching
+uv run --locked python -m unittest tests.test_map_editor_geography
 uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_standalone
 uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_persistence
 uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_file_following
 uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_accessibility
+uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_geography
 ```
 
 The accessibility module runs its keyboard workflow in Chromium and Firefox
@@ -73,7 +75,7 @@ an empty `PATH`, so neither the game's packages nor Node can be reached.
 | `GET /api/workspace` | One complete replacement of the authoritative state: `session_generation`, `snapshot_revision`, `write_pause`, `preview_state` (`current`/`stale`/`unavailable`), `snapshot_read_at`, `checked_at`, `schema` (the core schema), `documents` (path, kind, id, fingerprint, values), `world` (the core-derived projection), `diagnostics`, `candidate_diagnostics` (the failing read while stale or unavailable), `external_context_status`, `partition_status`, `history`, `pending_intent`, `uncertain_outcome`, `external_change` (`sequence`, `at` and the changed `documents` of the last adopted external change; §3.4) and `following` (`active`, reconciled `batches`, the last watcher `error`). `write_pause` is only the explicit pause of an uncertain publication; the stale or unavailable preview is the separate `preview_state`. |
 | `GET /api/events` | Server-sent events: `status` on connect and `invalidate` after a published change, each carrying only `session_generation`, `snapshot_revision` and `preview_state`. A client refetches `/api/workspace` on every invalidation and on a reconnect status that names another session or revision. Nothing is patched or merged. |
 | `POST /api/reload` | Authenticated explicit reread of the current disk files. A loadable read publishes and is the only way to resolve an uncertain publication. A structural failure keeps the last preview and marks it `stale`. An identical read publishes nothing. It never writes a file. |
-| `POST /api/commands/<name>` | One named single-document command (`move_interior_layout`, `remove_interior_layout`) or `undo`/`redo` of the current segment (see §3). |
+| `POST /api/commands/<name>` | One named single-document command (the layout commands of §3.1, the geography commands of §3.8) or `undo`/`redo` of the current segment (see §3). |
 | `GET /api/session` | Same-origin launch-token bootstrap (see §4). |
 
 `external_incoming_references` maps the `qualified_ref` of every projected
@@ -144,9 +146,13 @@ internal create, replace or remove effect for its owning document:
 
 A success answers the new status, `changed`, `document_id` and the new
 `fingerprint` (or `absent`) after the service has reread and published the
-result. No shipped handler produces an object-removing world-document effect
-yet. The reference guard is exercised through the real executor with
-internally constructed effects, and the layout handlers remove no map object.
+result. `delete_location` (§3.8) and the undo of `create_location` are the
+object-removing world-document effects. Every removal first passes the
+map-internal reference guard on the fresh disk baseline (a settlement
+`location_ref`, a node `anchor_key` or a district landmark still naming the
+removed object refuses it as `deletion_refused` with `guard: internal` and
+the `internal_references`), then the authoring gate and the execution-time
+external-reference guard of §8. Nothing cascades.
 
 ### 3.2 Drafts, completed operations and history
 
@@ -180,7 +186,7 @@ source or layout change it did not write, and when a read fails to load
 session with no history. Commands are never replayed after a reconnect.
 
 Only one owning document is mutated per operation. A multi-selection (§3.6)
-is inspect/copy only in this slice; a selection that spans documents states
+is inspect/copy only; a selection that spans documents states
 so, and the service refuses it as `cross_document`.
 
 ### 3.3 Durability
@@ -387,20 +393,80 @@ the inspector drawer.
 
 ### 3.7 Mandatory domain dependencies
 
-This shell deliberately ships no domain command beyond interior layout moves.
-The batch's later changes must deliver, through their own domain modules:
+The shell's domain commands arrive with their changes. Delivered:
+`map-editor-continent-tools` (§3.8). The batch's remaining changes must
+deliver, through their own domain modules:
 
 | Change | Delivers on this shell |
 | --- | --- |
-| `map-editor-continent-tools` | Continent tools (control points A, waterway, ridge, location, footprint grid), drawables for the ridge and footprint layers, location delete |
 | `map-editor-settlement-tools` | Node N, road R (建立雙向), bends, node fields, multi-selection edits, node delete |
 | `map-editor-interior-tools` | Room N, connection R, 自動排列, room fields, room delete |
 | `map-editor-entrance-tools` | Entrance E, 前往另一端, 更換端點… with the qualified-object selector (`[data-object-selector]`) |
-| `map-editor-partition-jobs` | Partition drawables, and 分區 chip regenerate/cancel |
+| `map-editor-partition-jobs` | Partition district drawables, 分區 chip and inspector regenerate/cancel, and rejection of every command route (geography included) while a generation runs |
 
 Each registers its tools in `TOOLS` (`src/lib/workbench.js`), sends its own
 named single-document command, and lets the service's refusal (for example
 `deletion_refused`) replace the shell's explanatory delete block.
+
+### 3.8 Continent geography tools
+
+Service handlers live in `elosern_map_editor/geography.py` on the shared
+`DocumentCommand` base (`commands.py`): typed arguments, the owner check, a
+mutation of the thawed document data, comment-preserving serialization
+validated by the core schema, then the authoring gate and the writer. Field
+values are validated by the core schema; the service and the browser keep no
+second schema or classifier. Frames: mainland vertices are kilometre geometry
+(`km 地理`); forest-edge, waterway-route, ford, site, location, ridge and pass
+values are one-kilometre wilderness cell indices (`1 km 格`); the settlement
+local anchor is metres (`m 地方`).
+
+| Command | Document | Arguments |
+| --- | --- | --- |
+| `move_control_point`, `insert_control_point`, `remove_control_point` | continent | `feature` (`{kind: mainland}`, `{kind: forest_edge}`, or `{kind: waterway_route}` / `{kind: waterway_ford}` with `waterway_id`), `index`, `point` `[a, b]` (move/insert) |
+| `set_terrain_parameter` | continent | `field` (`ridge.base_x`, `ridge.period`, `ridge.step`, `ridge.min_x`, `ridge.max_x`, `ridge.north_limit_y`, `ridge.mountain_corridor_half_width`, `coastal_y_max`, `border_river_key`), `value` |
+| `add_ridge_pass`, `set_ridge_pass`, `remove_ridge_pass` | continent | `y_min`, `y_max`, `index` |
+| `add_waterway`, `remove_waterway` | continent | `waterway_id` (new), `route` cells; the border river is never removed |
+| `set_region_field` | continent | `region_id` (the core's fixed regions), `field` (`display_name_zh`, `nation_key`, `terrain_flavor_zh`, `nominal_nation_keys`, `scene_archetype`), `value` |
+| `add_site`, `set_site_field`, `remove_site` | continent | reserved (harbour) sites: `site_id`, `display_name`, `role`, `cell` |
+| `create_location`, `set_location_field`, `delete_location` | locations | a new `location_id` plus `kind`, `display_name_zh`, `description`, `geographic_constraint`, `scene_archetype`, `cell`; established IDs are never renamed |
+| `create_district`, `set_district_field` | districts | names, `membership` `{kind, region_key}` (set together) and a stable qualified `landmark` `{domain, map_id, object_id, cell}` |
+| `set_footprint_cell` | settlement | `settlement_id`, absolute `cell`, `filled`; a filled cell outside the mask grows it with `.` (at most 64x64) |
+| `set_binding` | settlement | `settlement_id`, `anchor_cell`, `local_anchor_m` |
+
+Creating a location never creates a local map, room or settlement document;
+a local map is a separate settlement command. Locations derive their local
+maps from settlement `location_ref` values, so 開啟本地圖 appears only when one
+exists and 無本地圖 otherwise.
+
+The projection adds the core's `terrain_preview` (`terrain_preview()` over
+`terrain_definition()` of the current inputs, sampled on at most 90x90 cells
+with region and surface codes, the closed ridge walls between passes, pass
+centres and the derived national borders), the ridge, coastal and
+border-river fields, full region fields, ford centres and each settlement's
+`footprint` (`shape`, `origin`, `cells`). Inconsistent terrain inputs save as
+diagnosed work in progress with `terrain_preview.status: unavailable`.
+
+Derived output is never written and never handled: a committed change to a
+partition source only makes `partition_status` stale (its `input_signature`
+no longer equals `expected_signature`); nothing regenerates per pointer
+movement or per command. A stale partition is not a stale preview, so
+commands stay admitted. Commands are rejected (423) while writes are paused
+or the preview is stale or unavailable; rejection while a partition
+generation runs is added by `map-editor-partition-jobs`.
+
+On the page the continent tools are 選取 V, 加控制點 A (insert at the nearest
+segment, or after the selected point), 水系 (two clicks, then a creation
+form), 山脊 (a pass creation form at the clicked row), 地點 (a location or
+reserved-site creation form at the clicked cell) and 佔地 (toggle cells of the
+selected footprint). Selecting a feature (by click or in the object list)
+shows its control-point diamonds; a drag is one command on release and Escape
+cancels it. The inspector gives every essential edit a non-drag path:
+frame-labelled numeric fields, 前方插入/後方插入/移除控制點, the footprint
+`#`/`.` grid (arrow keys and Space), the structured landmark selector, and a
+read-only 衍生結果 section with the terrain preview state and the partition's
+input signature against the current one. Geometry deletions send their
+command directly; a location delete first shows the inline refusal while a
+map or external reference remains.
 ## 4. Security Model and Limitations
 
 - **Loopback only.** The service binds a loopback address and answers only

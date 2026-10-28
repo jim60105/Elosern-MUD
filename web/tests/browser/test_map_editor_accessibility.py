@@ -169,6 +169,14 @@ class _AccessibilityBrowser(unittest.TestCase):
     def active_region(self, page):
         return page.evaluate("() => document.activeElement?.closest('[data-region]')?.dataset.region ?? null")
 
+    def listed_locations(self, page):
+        """Object-list rows that name a location (the list also holds features)."""
+
+        return page.evaluate(
+            "() => [...document.querySelectorAll('[data-object]')]"
+            ".filter((row) => row.dataset.object.startsWith('location:')).length"
+        )
+
     def inspected(self, page):
         locator = page.locator("[data-inspector-ref]")
         return locator.text_content() if locator.count() else None
@@ -260,7 +268,8 @@ class _AccessibilityBrowser(unittest.TestCase):
         page.keyboard.press("Tab")
         page.keyboard.press("Enter")
         self.wait_for(lambda: self.inspected(page) is not None, "Enter did not select a mark")
-        self.assertIsNotNone(self.active(page, "data-inspector-title"))
+        # Enter focuses the first inspector field (the heading when none).
+        self.assertEqual(self.active_region(page), "inspector")
         page.context.close()
 
         # 200 % zoom: the columns are drawers; Escape closes one and returns
@@ -323,9 +332,9 @@ class MapEditorAccessibilityBrowserTest(_AccessibilityBrowser):
         self.assertEqual(page.locator('[data-kind="location"]').count(), locations)
         page.click('[data-layer="locations"]')
         self.assertEqual(page.locator('[data-kind="location"]').count(), 0)
-        self.assertEqual(page.locator("[data-object]").count(), 0)
+        self.assertEqual(self.listed_locations(page), 0)
         page.click('[data-layer="locations"]')
-        self.assertEqual(page.locator("[data-object]").count(), locations)
+        self.assertEqual(self.listed_locations(page), locations)
         page.click('[data-layer="partition"]')
         self.assertFalse(page.locator('[data-layer="partition"]').is_checked())
         page.click('[data-domain-tab="interior"]')
