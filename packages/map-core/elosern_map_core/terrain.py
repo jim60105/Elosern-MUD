@@ -46,6 +46,10 @@ REGION_KEYS = frozenset(
     }
 )
 
+#: Every nation identifier :func:`nominal_nation_for_coordinates` can return,
+#: sorted. The classifier owns this vocabulary; a partition snapshot declares it.
+NATION_KEYS = ("altoria", "grandia", "valhalla")
+
 #: The ridge bend walks this many phases, so its centre moves by at most two
 #: steps either side of ``ridge_base_x``. The phase count is part of the
 #: algorithm, not a per-world setting: every derivation that needs the ridge's
@@ -722,6 +726,7 @@ def terrain_preview(definition: TerrainDefinition, *, max_side: int = 90) -> Ter
 
 
 __all__ = [
+    "NATION_KEYS",
     "NationalBorder",
     "PREVIEW_SURFACES",
     "TerrainPreview",

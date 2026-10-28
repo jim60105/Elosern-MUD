@@ -52,16 +52,25 @@ import json
 import math
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from typing import Any
 
 import numpy as np
 from scipy import ndimage
 
+from .authoring import (
+    AuthoringWorld,
+    build_settlement_graph,
+    gate_approach_cell,
+    terrain_definition,
+)
+from .geometry import local_to_world_m
 from .partition_codec import (
     FORMAT_VERSION,
     MIXED,
     PARTITION_ALGORITHM_VERSION,
 )
 from .terrain import (
+    NATION_KEYS,
     TerrainDefinition,
     is_passable_terrain,
     mainland_row_intervals,
@@ -244,6 +253,102 @@ def partition_input(snapshot: PartitionInputSnapshot) -> PartitionInput:
         region_names=snapshot.region_names,
         districts=snapshot.districts,
         source_signature=snapshot.source_signature,
+    )
+
+
+def world_snapshot(world: AuthoringWorld) -> PartitionInputSnapshot:
+    """Bind one loaded authoring world into an explicit partition snapshot.
+
+    This is the authoring-document form of the snapshot: every input comes
+    from the world's own documents and the core's rules, so an independent
+    process (the map editor's partition job) can partition a candidate world
+    without any game registry.
+
+    * terrain: :func:`elosern_map_core.authoring.terrain_definition`;
+    * nations: the classifier vocabulary :data:`NATION_KEYS`; regions: the
+      continent's declared region keys;
+    * footprints: every settlement's wilderness-entry footprint;
+    * a wilderness-cell landmark seeds its cell; a settlement-node landmark
+      seeds the cell holding the node's world position, with the footprint
+      that contains that cell and the approach cell of every gate of its
+      settlement whose destination node routes to the landmark;
+    * the source signature is :attr:`AuthoringWorld.partition_signature`.
+
+    A landmark that cannot seed (an interior room, an unknown map or node)
+    raises :class:`PartitionError` naming the district.
+    """
+
+    terrain = terrain_definition(world.continent)
+    entries = [
+        (settlement_id, settlement, settlement.wilderness_entry)
+        for settlement_id, settlement in sorted(world.settlements.items())
+        if settlement.wilderness_entry is not None
+    ]
+    footprints: set[Cell] = set()
+    for _, _, entry in entries:
+        footprints.update(entry.footprint_cells)
+    graphs: dict[str, Any] = {}
+    problems: list[str] = []
+    seeds: list[DistrictSeed] = []
+    for district_id, district in sorted(world.districts.districts.items()):
+        landmark = district.landmark
+        if landmark.domain == "wilderness_cell" and landmark.cell is not None:
+            seeds.append(
+                DistrictSeed(district_id, district.kind, tuple(landmark.cell), district.region_key)
+            )
+            continue
+        settlement = (
+            world.settlements.get(landmark.map_id)
+            if landmark.domain == "settlement_node" and landmark.map_id is not None
+            else None
+        )
+        node = settlement.nodes.get(landmark.object_id) if settlement is not None else None
+        if settlement is None or node is None:
+            problems.append(
+                f"{district_id}: landmark {landmark.domain} {landmark.map_id}:"
+                f"{landmark.object_id} cannot seed the partition"
+            )
+            continue
+        binding = settlement.binding
+        east, north = local_to_world_m(
+            binding.anchor_cell, binding.local_anchor_m, (node.x_m, node.y_m)
+        )
+        cell = (east // CELL_M, north // CELL_M)
+        footprint: frozenset[Cell] = frozenset()
+        for _, _, entry in entries:
+            if cell in entry.footprint_cells:
+                footprint = entry.footprint_cells
+        approaches: set[Cell] = set()
+        entry = settlement.wilderness_entry
+        if entry is not None:
+            graph = graphs.get(landmark.map_id)
+            if graph is None:
+                graph = graphs[landmark.map_id] = build_settlement_graph(landmark.map_id, settlement)
+            for gate in entry.gates:
+                approach = gate_approach_cell(entry, gate.return_direction)
+                if approach is None or gate.destination_node not in settlement.nodes:
+                    continue
+                if graph.route(gate.destination_node, node.node_id) is not None:
+                    approaches.add(approach)
+        seeds.append(
+            DistrictSeed(
+                district_id,
+                district.kind,
+                cell,
+                district.region_key,
+                tuple(sorted(approaches)),
+                footprint,
+            )
+        )
+    if problems:
+        raise PartitionError(problems)
+    return PartitionInputSnapshot(
+        terrain=terrain,
+        nation_names=NATION_KEYS,
+        region_names=tuple(sorted(world.continent.regions)),
+        footprints=frozenset(footprints),
+        districts=tuple(seeds),
+        source_signature=world.partition_signature,
     )
 
 
@@ -938,4 +1043,5 @@ __all__ = [
     "generate_partition",
     "partition_input",
     "serialize",
+    "world_snapshot",
 ]

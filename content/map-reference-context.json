@@ -176,7 +176,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "6aeb8415d050f95cf886ebd233c92e60740fd53b5b31b6f9a7603127a6f29c0a",
+  "fingerprint": "3dca24bc55cb3d6ce1900174c668dde3426a2d0dddd09110d9c363a8ebb18519",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -893,14 +893,14 @@
     "packages/map-core/elosern_map_core/documents.py": "1a1c6aa02c1cf0a1fd94ec2170c5fd737cb24c059af852657790b09cee8268c9",
     "packages/map-core/elosern_map_core/geometry.py": "c2ba914858f815eebc63d2e812062fdd64a7e1aa16aa80d95c0df5c8aa7be249",
     "packages/map-core/elosern_map_core/inspection.py": "8ef9b37558b13aa53dce314639696624d3b992e042a5dacba32559b3e2cacec2",
-    "packages/map-core/elosern_map_core/partition.py": "3a680736e3ff0f7cb07b35b92ebab2864a2c10ceb697dedab19ac55fbd0dcde3",
+    "packages/map-core/elosern_map_core/partition.py": "5d09f2b80f795949e5cbb4b7ce738475758a1c4a5dc26f5d26a733bb9046a893",
     "packages/map-core/elosern_map_core/partition_codec.py": "9c174e9d350dfc504520258a64cac883f187e6434893ce7c72671a2338b023f4",
     "packages/map-core/elosern_map_core/reference_context.py": "23b290c95e6a94f281bc8281c075a1074dab0e7aebb061237640de759607cd13",
     "packages/map-core/elosern_map_core/references.py": "64d5a263d1c9148979cf9af2806a2a5644ce81ba1757f0e41ad108c496dff513",
     "packages/map-core/elosern_map_core/schema.py": "b5e7eda9bd325be47defdb7460221e732b0d57a39386d41f8e65e55cdd1104a5",
     "packages/map-core/elosern_map_core/sources.py": "b0e4642835cac8ce8ffdf22e00092fef5af91a1c693fbbf083b21ab8e9469fff",
     "packages/map-core/elosern_map_core/sparse.py": "7ef86b108afd37af4cc79e604632aefd61195a4de7a32262b915cd0ebd7f2f3a",
-    "packages/map-core/elosern_map_core/terrain.py": "44931ecc196c9df4f98af29239f109749affbc3573a2a2846e18df5f74e2c094",
+    "packages/map-core/elosern_map_core/terrain.py": "d548b22a5337b85891b743b94a9bc6000c7122736edfe0ef98221a409b7dc20a",
     "tools/map_reference_context.py": "c379dde7cef91d8f8cb2bc48cd1074ca867124109cb937f8327ab5bc436c7cfc",
     "world/lore/__init__.py": "2ca4eda0bdc91f2b0b85bd3d4fab00c08cd2f8c2dffc66d0d430c7e6657e73db",
     "world/lore/action_evidence.py": "289a02f07d315ce03a24eb38bebf9cf46e7c7913b2c5b3f4adc68f85f9438b33",
