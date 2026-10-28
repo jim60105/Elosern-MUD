@@ -230,8 +230,17 @@ def write_workspace(root: str | Path) -> Path:
     return root
 
 
-def write_reference_context(root: str | Path, *, rules: tuple[str, ...] = ("external/**/*.txt",)) -> Path:
-    """Write one external source plus a current reference context for it."""
+def write_reference_context(
+    root: str | Path,
+    *,
+    rules: tuple[str, ...] = ("external/**/*.txt",),
+    incoming: dict[str, list[dict]] | None = None,
+) -> Path:
+    """Write one external source plus a current reference context for it.
+
+    ``incoming`` maps canonical target keys (``interior_room:hall:front``) to
+    incoming static reference records.
+    """
 
     root = Path(root)
     external = root / "external" / "declarations.txt"
@@ -249,7 +258,7 @@ def write_reference_context(root: str | Path, *, rules: tuple[str, ...] = ("exte
         "schema_version": 1,
         "exporter_version": 1,
         "external_identifiers": {},
-        "incoming_references": {},
+        "incoming_references": incoming or {},
         "source_manifest": manifest,
         "discovery_rules": list(rules),
         "fingerprint": digest.hexdigest(),

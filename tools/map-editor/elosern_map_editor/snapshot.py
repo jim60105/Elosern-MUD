@@ -19,6 +19,7 @@ from elosern_map_core import (
     AuthoringError,
     Diagnostic,
     ReferenceContextError,
+    ReferenceContextFreshness,
     PartitionDocumentError,
     SparseGraphError,
     build_settlement_graph,
@@ -35,6 +36,7 @@ from elosern_map_core import (
     read_partition_metadata,
 )
 from elosern_map_core.diagnostics import STRUCTURE, sorted_diagnostics
+from elosern_map_core.reference_context import ReferenceContextDocument
 
 from .config import Limits
 from .confinement import (
@@ -85,6 +87,14 @@ class WorkspaceRead:
     diagnostics: tuple[dict[str, Any], ...]
     external_context_status: dict[str, Any]
     partition_status: dict[str, Any]
+    #: ``(relative_path, presence)`` for every discovered world source and
+    #: layout document: the raw-byte content fingerprint, or ``unreadable:<code>``
+    #: for an entry that was refused. Generated artifacts are not included.
+    fingerprints: tuple[tuple[str, str], ...] = ()
+
+    @property
+    def fingerprint_map(self) -> dict[str, str]:
+        return dict(self.fingerprints)
 
     @property
     def digest(self) -> str:
@@ -92,7 +102,7 @@ class WorkspaceRead:
 
         payload = json.dumps(
             [self.loaded, self.documents, self.world, self.diagnostics,
-             self.external_context_status, self.partition_status],
+             self.external_context_status, self.partition_status, self.fingerprints],
             sort_keys=True,
             ensure_ascii=False,
             default=str,
@@ -101,9 +111,12 @@ class WorkspaceRead:
 
 
 # -- source reads ----------------------------------------------------------
-def _read_sources(workspace: ConfinedWorkspace, limits: Limits, rows):
+def read_sources(workspace: ConfinedWorkspace, limits: Limits, rows):
+    """``(sources, refusal diagnostics, presence fingerprints)`` for discovered rows."""
+
     sources = []
     diagnostics: list[Diagnostic] = []
+    fingerprints: dict[str, str] = {}
     if len(rows) > limits.max_documents:
         diagnostics.append(
             Diagnostic(
@@ -112,9 +125,10 @@ def _read_sources(workspace: ConfinedWorkspace, limits: Limits, rows):
                 message=f"{len(rows)} documents exceed the {limits.max_documents}-document limit",
             )
         )
-        return sources, diagnostics
+        return sources, diagnostics, fingerprints
     for relative_path, refusal in rows:
         if refusal is not None:
+            fingerprints[relative_path] = f"unreadable:{refusal}"
             diagnostics.append(
                 _refusal(relative_path, refusal, f"{relative_path} was refused ({refusal})")
             )
@@ -122,8 +136,10 @@ def _read_sources(workspace: ConfinedWorkspace, limits: Limits, rows):
         try:
             raw = workspace.read_document(relative_path, limits.max_document_bytes)
         except ConfinementError as error:
+            fingerprints[relative_path] = f"unreadable:{error.code}"
             diagnostics.append(_refusal(relative_path, error.code, str(error)))
             continue
+        fingerprints[relative_path] = hashlib.sha256(raw).hexdigest()
         try:
             text = raw.decode("utf-8")
         except UnicodeDecodeError as error:
@@ -137,14 +153,16 @@ def _read_sources(workspace: ConfinedWorkspace, limits: Limits, rows):
             )
             continue
         sources.append(make_source_document(relative_path, text))
-    return sources, diagnostics
+    return sources, diagnostics, fingerprints
 
 
-def _read_layouts(workspace: ConfinedWorkspace, limits: Limits):
+def _read_layout_sources(workspace: ConfinedWorkspace, limits: Limits):
+    return read_sources(workspace, limits, workspace.discover_layouts())
+
+
+def _parse_layouts(sources, refused):
     layouts: dict[str, dict[str, Any]] = {}
-    diagnostics: list[Diagnostic] = []
-    sources, refused = _read_sources(workspace, limits, workspace.discover_layouts())
-    diagnostics.extend(refused)
+    diagnostics: list[Diagnostic] = list(refused)
     for source in sources:
         try:
             parsed = parse_document(source.relative_path, source.text)
@@ -190,11 +208,26 @@ def _partition_status(workspace: ConfinedWorkspace, limits: Limits, world) -> tu
     )
 
 
-def _external_context_status(workspace: ConfinedWorkspace, limits: Limits) -> dict[str, Any]:
+@dataclass(frozen=True, slots=True)
+class ExternalContext:
+    """One execution-time read of the reference context and its freshness.
+
+    ``document``/``freshness`` are ``None`` when the context could not be read
+    or checked; such a context can never prove that a target is unreferenced.
+    """
+
+    status: dict[str, Any]
+    document: ReferenceContextDocument | None = None
+    freshness: ReferenceContextFreshness | None = None
+
+
+def read_external_context(workspace: ConfinedWorkspace, limits: Limits) -> ExternalContext:
+    """Fresh confined read of the reference context, re-hashing every source."""
+
     base = {"relative_path": REFERENCE_CONTEXT_ARTIFACT}
 
-    def unavailable(status: str, reason: str) -> dict[str, Any]:
-        return {**base, "status": status, "current": False, "reasons": [reason]}
+    def unavailable(status: str, reason: str) -> ExternalContext:
+        return ExternalContext({**base, "status": status, "current": False, "reasons": [reason]})
 
     try:
         raw = workspace.read_document(REFERENCE_CONTEXT_ARTIFACT, limits.max_artifact_bytes)
@@ -229,13 +262,17 @@ def _external_context_status(workspace: ConfinedWorkspace, limits: Limits) -> di
             return unavailable("unavailable", "external sources exceed the total byte limit")
         hashes[relative_path] = hashlib.sha256(data).hexdigest()
     freshness = check_reference_context_freshness(context, hashes, discovered_files=discovered)
-    return {
-        **base,
-        "status": freshness.status,
-        "current": freshness.current,
-        "reasons": list(freshness.reasons),
-        "fingerprint": context.fingerprint,
-    }
+    return ExternalContext(
+        {
+            **base,
+            "status": freshness.status,
+            "current": freshness.current,
+            "reasons": list(freshness.reasons),
+            "fingerprint": context.fingerprint,
+        },
+        context,
+        freshness,
+    )
 
 
 # -- projection ------------------------------------------------------------
@@ -406,8 +443,10 @@ def _project(world, layouts: Mapping[str, dict[str, Any]]) -> dict[str, Any]:
 def read_workspace(workspace: ConfinedWorkspace, limits: Limits) -> WorkspaceRead:
     """One fresh confined read of the complete workspace."""
 
-    sources, refused = _read_sources(workspace, limits, workspace.discover_world())
-    external = _external_context_status(workspace, limits)
+    sources, refused, fingerprints = read_sources(workspace, limits, workspace.discover_world())
+    layout_sources, layout_refused, layout_fingerprints = _read_layout_sources(workspace, limits)
+    presence = tuple(sorted({**fingerprints, **layout_fingerprints}.items()))
+    external = read_external_context(workspace, limits).status
     document_rows = tuple(
         {"relative_path": source.relative_path, "fingerprint": source.fingerprint}
         for source in sorted(sources, key=lambda item: item.relative_path)
@@ -421,6 +460,7 @@ def read_workspace(workspace: ConfinedWorkspace, limits: Limits) -> WorkspaceRea
             diagnostics=tuple(item.as_dict() for item in sorted_diagnostics(refused)),
             external_context_status=external,
             partition_status=partition,
+            fingerprints=presence,
         )
     try:
         world = load_authoring_world(sources)
@@ -433,8 +473,9 @@ def read_workspace(workspace: ConfinedWorkspace, limits: Limits) -> WorkspaceRea
             diagnostics=tuple(item.as_dict() for item in error.diagnostics),
             external_context_status=external,
             partition_status=partition,
+            fingerprints=presence,
         )
-    layouts, layout_diagnostics = _read_layouts(workspace, limits)
+    layouts, layout_diagnostics = _parse_layouts(layout_sources, layout_refused)
     partition, freshness = _partition_status(workspace, limits, world)
     diagnostics = sorted_diagnostics(
         (*diagnose_world(world, partition_freshness=freshness), *layout_diagnostics)
@@ -457,7 +498,15 @@ def read_workspace(workspace: ConfinedWorkspace, limits: Limits) -> WorkspaceRea
         diagnostics=tuple(item.as_dict() for item in diagnostics),
         external_context_status=external,
         partition_status=partition,
+        fingerprints=presence,
     )
 
 
-__all__ = ["WorkspaceRead", "read_workspace", "thaw"]
+__all__ = [
+    "ExternalContext",
+    "WorkspaceRead",
+    "read_external_context",
+    "read_sources",
+    "read_workspace",
+    "thaw",
+]
