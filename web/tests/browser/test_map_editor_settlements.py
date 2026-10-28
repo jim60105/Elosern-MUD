@@ -225,9 +225,9 @@ class MapEditorSettlementBrowserTest(unittest.TestCase):
         # The anchor key travelled with the prototype as the core requires.
         self.assertEqual(self.data()["nodes"]["yard"]["anchor_key"], synthetic.LOCATION_ID)
         scene = page.locator('[data-field-input="node-scene_archetype"]')
-        scene.fill("city_street")
+        scene.fill("synthetic_scene")
         scene.press("Enter")
-        self.wait_for(lambda: self.data()["nodes"]["yard"]["scene_archetype"] == "city_street", "scene not saved")
+        self.wait_for(lambda: self.data()["nodes"]["yard"]["scene_archetype"] == "synthetic_scene", "scene not saved")
         self.settle(page)
         # No index: the scene is reported unavailable, never valid.
         self.wait_for(lambda: page.locator('[data-scene-status="unavailable"]').count() == 1, "scene status missing")

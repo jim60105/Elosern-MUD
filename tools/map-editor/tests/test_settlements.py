@@ -193,7 +193,7 @@ def test_duplicating_creates_a_new_id_without_copying_relationships(workspace):
 
 def test_node_fields_follow_the_core_schema(workspace):
     editor = Editor(workspace)
-    fields = {"key": "Courtyard", "desc": "Line one.\nLine two.", "scene_archetype": "city_street", "typeclass": "tests.Room"}
+    fields = {"key": "Courtyard", "desc": "Line one.\nLine two.", "scene_archetype": "synthetic_scene", "typeclass": "tests.Room"}
     assert _send(editor, "set_node_fields", SETTLEMENT, {"settlement_id": TOWN, "node_id": "yard", "fields": fields})[0] == 200
     node = _data(workspace)["nodes"]["yard"]
     assert {key: node[key] for key in fields} == fields
@@ -497,7 +497,7 @@ def test_stale_previews_and_documents_reject_settlement_commands(workspace):
 def test_scene_references_report_valid_invalid_and_unavailable_separately(workspace):
     editor = Editor(workspace)
     assert _send(editor, "set_node_fields", SETTLEMENT, {"settlement_id": TOWN, "node_id": "yard",
-                                                         "fields": {"scene_archetype": "city_street"}})[0] == 200
+                                                         "fields": {"scene_archetype": "synthetic_scene"}})[0] == 200
 
     def statuses():
         state = editor.state()
@@ -511,10 +511,10 @@ def test_scene_references_report_valid_invalid_and_unavailable_separately(worksp
     import json
 
     document = json.loads(context.read_text(encoding="utf-8"))
-    document["external_identifiers"] = {"scene_archetypes": ["city_street"]}
+    document["external_identifiers"] = {"scene_archetypes": ["synthetic_scene"]}
     context.write_text(json.dumps(document), encoding="utf-8")
     editor.reload()
-    assert statuses() == ({"gate": "invalid", "yard": "valid"}, {"scene_archetypes": ["city_street"]})
+    assert statuses() == ({"gate": "invalid", "yard": "valid"}, {"scene_archetypes": ["synthetic_scene"]})
 
 
 # -- route preview ------------------------------------------------------------------------
