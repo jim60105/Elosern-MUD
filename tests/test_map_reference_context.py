@@ -34,6 +34,7 @@ from elosern_map_core.reference_context import (
     encode_reference_context,
 )
 from tools import map_reference_context as exporter
+from tools.spec_traceability import covers_requirement
 
 
 def _forbid_db(*args, **kwargs):
@@ -43,6 +44,7 @@ def _forbid_db(*args, **kwargs):
 class FatalDatabaseAccessTests(unittest.TestCase):
     """The exporter must never read or create a live database connection."""
 
+    @covers_requirement("map-external-reference-context::reference-export-records-authoritative-static-dependencies")
     def test_real_registry_construction_with_live_db_access_forbidden(self):
         # Patch connect, cursor, and _cursor on BaseDatabaseWrapper
         with (
@@ -86,7 +88,6 @@ assert failed, "database guard did not catch direct query"
 
 print("SUBPROCESS_SUCCESS")
 
-print("SUBPROCESS_SUCCESS")
 """
         result = subprocess.run(
             [sys.executable, "-c", script],
@@ -101,11 +102,13 @@ print("SUBPROCESS_SUCCESS")
 class DeterministicExportTests(unittest.TestCase):
     """Two exports from identical sources must be byte-for-byte identical."""
 
+    @covers_requirement("map-external-reference-context::reference-export-records-authoritative-static-dependencies")
     def test_reproducible_byte_identical_output(self):
         first = exporter.export_reference_context_text()
         second = exporter.export_reference_context_text()
         self.assertEqual(first, second)
 
+    @covers_requirement("map-external-reference-context::reference-export-records-authoritative-static-dependencies")
     def test_identifiers_and_incoming_references_structure(self):
         doc = exporter.build_reference_context_document()
         # Verify required identifier families exist and are sorted
@@ -129,6 +132,7 @@ class DeterministicExportTests(unittest.TestCase):
 class GeometryExclusionTests(unittest.TestCase):
     """Moving a settlement node coordinate alone does not invalidate the external reference context."""
 
+    @covers_requirement("map-external-reference-context::reference-export-records-authoritative-static-dependencies")
     def test_coordinate_change_alone_leaves_fingerprint_and_targets_identical(self):
         before_doc = exporter.build_reference_context_document()
 
@@ -181,6 +185,7 @@ class FreshnessAndMutationTests(unittest.TestCase):
         self.current_hashes = dict(self.doc.source_manifest)
         self.discovered = list(self.doc.source_manifest.keys())
 
+    @covers_requirement("map-external-reference-context::reference-context-freshness-covers-source-closure-and-membership")
     def test_current_when_sources_match(self):
         freshness = check_reference_context_freshness(
             self.doc,
@@ -190,6 +195,7 @@ class FreshnessAndMutationTests(unittest.TestCase):
         self.assertTrue(freshness.current)
         self.assertEqual(freshness.status, STATUS_CURRENT)
 
+    @covers_requirement("map-external-reference-context::reference-context-freshness-covers-source-closure-and-membership")
     def test_synthetic_external_file_addition_invalidates_membership(self):
         added_hashes = dict(self.current_hashes)
         added_hashes["world/lore/synthetic_added_file.py"] = "abcdef123456"
@@ -204,6 +210,7 @@ class FreshnessAndMutationTests(unittest.TestCase):
         self.assertEqual(freshness.status, STATUS_MEMBERSHIP_MISMATCH)
         self.assertTrue(any("synthetic_added_file.py" in r for r in freshness.reasons))
 
+    @covers_requirement("map-external-reference-context::reference-context-freshness-covers-source-closure-and-membership")
     def test_synthetic_external_file_removal_invalidates_membership(self):
         removed_hashes = dict(self.current_hashes)
         first_file = self.discovered[0]
@@ -218,6 +225,7 @@ class FreshnessAndMutationTests(unittest.TestCase):
         self.assertFalse(freshness.current)
         self.assertEqual(freshness.status, STATUS_MISSING)
 
+    @covers_requirement("map-external-reference-context::reference-context-freshness-covers-source-closure-and-membership")
     def test_tracked_file_content_modification_invalidates_freshness(self):
         changed_hashes = dict(self.current_hashes)
         first_file = self.discovered[0]
@@ -232,6 +240,7 @@ class FreshnessAndMutationTests(unittest.TestCase):
         self.assertEqual(freshness.status, STATUS_CHANGED)
         self.assertTrue(any(first_file in r for r in freshness.reasons))
 
+    @covers_requirement("map-external-reference-context::reference-context-freshness-covers-source-closure-and-membership")
     def test_version_bump_reports_incompatible(self):
         doc_incompatible = ReferenceContextDocument(
             schema_version=SCHEMA_VERSION,
@@ -265,6 +274,7 @@ class CliCheckEnforcementTests(unittest.TestCase):
             self.assertEqual(code, 1)
             self.assertFalse(missing_path.exists())
 
+    @covers_requirement("map-external-reference-context::reference-context-freshness-covers-source-closure-and-membership")
     def test_check_fails_without_modifying_stale_file(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             stale_path = Path(tmp_dir) / "stale-reference-context.json"
@@ -280,6 +290,7 @@ class CliCheckEnforcementTests(unittest.TestCase):
 class ConsumerIndependenceTests(unittest.TestCase):
     """Consumer-side freshness checking works without Evennia, Django, or game modules."""
 
+    @covers_requirement("map-external-reference-context::reference-context-freshness-covers-source-closure-and-membership")
     def test_freshness_checking_without_game_modules_imported(self):
         script = """
 import sys
@@ -316,6 +327,7 @@ print("INDEPENDENT_CHECK_OK")
         self.assertIn("INDEPENDENT_CHECK_OK", result.stdout, msg=f"stdout={result.stdout}\nstderr={result.stderr}")
         self.assertEqual(result.returncode, 0)
 
+    @covers_requirement("map-external-reference-context::reference-context-freshness-covers-source-closure-and-membership")
     def test_external_source_change_causes_destructive_command_and_undo_to_refuse(self):
         """WHEN an external dependency changes while index bytes & browser snapshot are unchanged
         THEN execution-time check reports unavailable and refuses deletion including undo,
@@ -400,6 +412,7 @@ class DeletionSafetyAndUndoRefusalTests(unittest.TestCase):
         self.doc = exporter.build_reference_context_document()
         self.current_hashes = dict(self.doc.source_manifest)
 
+    @covers_requirement("map-external-reference-context::reference-context-freshness-covers-source-closure-and-membership")
     def test_stale_external_context_blocks_deletion_and_undo_remove(self):
         # Scenario: an external dependency changes, but the index on disk / in browser was not refreshed
         changed_hashes = dict(self.current_hashes)
@@ -418,6 +431,7 @@ class DeletionSafetyAndUndoRefusalTests(unittest.TestCase):
         self.assertEqual(decision.status, DELETION_REFUSED_UNAVAILABLE)
         self.assertTrue(any("unavailable" in r for r in decision.reasons))
 
+    @covers_requirement("map-external-reference-context::reference-context-freshness-covers-source-closure-and-membership")
     def test_referenced_target_refuses_deletion_even_when_fresh(self):
         freshness = ReferenceContextFreshness(current=True, status=STATUS_CURRENT, reasons=())
         # Pick a target that has an incoming reference
