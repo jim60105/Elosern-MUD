@@ -20,6 +20,8 @@
 // Settlement: node marks and bend diamonds drag the same way; a directed
 // road is chosen by clicking its line, and the selected road shows its
 // direction chevrons at the start of each segment (pointing downstream).
+// Interior: the exterior entrance is a dashed, non-draggable card naming
+// the other map and node, joined to its room by a dashed link.
 // Authored labels render through text interpolation only.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
@@ -495,6 +497,11 @@ defineExpose({ fit, focusMark });
       >
         <template v-if="mark.kind === 'room'">
           <rect x="-100" y="-26" width="200" height="52" rx="6" class="map-mark__card" />
+          <text y="-3" class="map-mark__card-name">{{ mark.label }}</text>
+          <text y="17" class="map-mark__card-id">{{ mark.detail }}</text>
+        </template>
+        <template v-else-if="mark.kind === 'exterior'">
+          <rect x="-100" y="-26" width="200" height="52" rx="6" class="map-mark__card map-mark__card--exterior" />
           <text y="-3" class="map-mark__card-name">{{ mark.label }}</text>
           <text y="17" class="map-mark__card-id">{{ mark.detail }}</text>
         </template>

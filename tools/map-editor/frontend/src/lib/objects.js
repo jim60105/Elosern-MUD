@@ -22,6 +22,7 @@ import {
 } from "./continent.js";
 import { bendRef, compassLabel, roadLabel, roadRef } from "./settlement.js";
 import { connectionRef, reverseOf } from "./interior.js";
+import { ownerMap, relationshipRefs, relationshipView } from "./relationships.js";
 
 export const DOMAIN_LABELS = Object.freeze({ continent: "大陸", settlement: "據點", interior: "室內" });
 
@@ -129,7 +130,51 @@ export function objectCatalog(world) {
       });
     }
   }
+  relationshipEntries(world, catalog, locations, settlements);
   return catalog;
+}
+
+const tail = (ref) => String(ref ?? "").split(":").slice(1).join(":");
+
+function identityText(view) {
+  const [a, b] = view.endpoints;
+  if (view.kind === "gate") return `${view.ownerId} · ${view.values.direction} ⇄ ${tail(b.ref)}`;
+  if (view.kind === "city_gate") return `→ ${tail(b.ref)}`;
+  if (view.kind === "exterior") return `${tail(a.ref)} ⇄ ${tail(b.ref)}`;
+  return `${tail(a.ref)} ${view.twoWay ? "⇄" : "→"} ${tail(b.ref)}（${view.values.label}）`;
+}
+
+// Entrance relationships: editor-local references shown on their owner's
+// map, each naming its owning document, both endpoints with their labels and
+// its one-way/two-way meaning (one record, never a mirrored reverse).
+function relationshipEntries(world, catalog, locations, settlements) {
+  for (const ref of relationshipRefs(world)) {
+    const view = relationshipView(world, ref);
+    if (!view) continue;
+    const { domain, mapId } = ownerMap(ref);
+    let parent = mapId;
+    if (domain === "settlement") {
+      const settlement = settlements.get(mapId);
+      parent = `${locations.get(settlement?.location_ref)?.display_name_zh ?? settlement?.location_ref ?? ""} › ${mapId}`;
+    }
+    const ends = view.endpoints
+      .map((end) => `${end.domainLabel} ${end.ref ?? end.name}（${end.name}）${end.label}`)
+      .join("；");
+    catalog.set(ref, {
+      ref,
+      kind: "relationship",
+      relationship: view.kind,
+      domain,
+      mapId,
+      id: ref,
+      // IDs, not names: searching a node's or room's name finds the object.
+      label: `${view.kindLabel} ${identityText(view)}`,
+      parentLabel: parent,
+      relativePath: view.ownerPath,
+      layer: null,
+      frame: `${view.twoWay ? "雙向" : "單向"}，單一紀錄（擁有者 ${view.ownerPath}）；端點：${ends}`,
+    });
+  }
 }
 
 // Continental features, control points, ridge passes, sites, regions,

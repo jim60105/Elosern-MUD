@@ -12,6 +12,7 @@
 // Authored text renders through text interpolation only.
 import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
 import DraftField from "./DraftField.vue";
+import EntranceForm from "./EntranceForm.vue";
 import {
   IDENTIFIER,
   blankRoom,
@@ -32,6 +33,7 @@ import {
   setConnection,
 } from "../lib/interior.js";
 import { nextId } from "../lib/continent.js";
+import { entranceRequest } from "../lib/relationships.js";
 
 const props = defineProps({
   world: { type: Object, required: true },
@@ -45,6 +47,7 @@ const props = defineProps({
   // Selects a reference; a plain callback because the answer can arrive
   // after this instance unmounted (the old reference left the snapshot).
   choose: { type: Function, required: true },
+  catalog: { type: Map, default: () => new Map() },
 });
 const emit = defineEmits(["create", "cancel", "select", "drafts", "open", "delete", "arrange", "delete-interior"]);
 
@@ -219,7 +222,17 @@ const mapInterior = computed(() => (!props.selection.length ? findInterior(props
 <template>
   <div class="interior-inspector" data-interior-inspector>
     <!-- creation forms -->
-    <form v-if="creation" class="creation" :data-creation="creation.type" @submit.prevent="submitCreation" @keydown="onFormKey">
+    <EntranceForm
+      v-if="creation?.type === 'entrance'"
+      :world="world"
+      :catalog="catalog"
+      domain="interior"
+      :map-id="interiorId"
+      :creation="creation"
+      @create="(descriptor, ref) => emit('create', descriptor, ref)"
+      @cancel="emit('cancel')"
+    />
+    <form v-else-if="creation" class="creation" :data-creation="creation.type" @submit.prevent="submitCreation" @keydown="onFormKey">
       <h3 class="section-label">{{ TITLES[creation.type] }}</h3>
       <template v-if="creation.type === 'connection'">
         <label class="draft-field">
@@ -362,6 +375,7 @@ const mapInterior = computed(() => (!props.selection.length ? findInterior(props
       <div class="inspector__actions">
         <button type="button" class="button" data-action="new-connection" @click="openConnection(room.id)">⟶ 新連接</button>
         <button type="button" class="button" data-action="duplicate-room" @click="openDuplicate">⧉ 複製為新房間</button>
+        <button type="button" class="button" data-action="new-entrance" @click="emit('open', entranceRequest(interior.id, room.id))">⌂ 新外部入口</button>
       </div>
     </template>
 

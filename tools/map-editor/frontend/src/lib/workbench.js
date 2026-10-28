@@ -14,7 +14,7 @@ export function useDrawers({ width, scale = 1 }) {
 }
 
 // Tools per domain (frontend design §4, §6), each registered with its
-// commands; the entrance slice adds entrance E.
+// commands.
 export const TOOLS = Object.freeze({
   continent: [
     { key: "select", label: "選取", glyph: "⌖", hotkey: "v" },
@@ -28,12 +28,13 @@ export const TOOLS = Object.freeze({
     { key: "select", label: "選取", glyph: "⌖", hotkey: "v" },
     { key: "node", label: "節點", glyph: "●", hotkey: "n" },
     { key: "road", label: "道路", glyph: "⟶", hotkey: "r" },
+    { key: "entrance", label: "入口", glyph: "⌂", hotkey: "e" },
   ],
-  // 外部入口 E arrives with map-editor-entrance-tools.
   interior: [
     { key: "select", label: "選取", glyph: "⌖", hotkey: "v" },
     { key: "room", label: "房間", glyph: "▭", hotkey: "n" },
     { key: "connection", label: "連接", glyph: "⟶", hotkey: "r" },
+    { key: "entrance", label: "外部入口", glyph: "⌂", hotkey: "e" },
     { key: "arrange", label: "自動排列", glyph: "⊞" },
   ],
 });

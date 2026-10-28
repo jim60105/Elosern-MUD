@@ -16,6 +16,7 @@
 
 import { DISCONNECTED } from "./workspace_client.js";
 import { REFERENCE_CONTEXT_PATH } from "./paths.js";
+import { cityGateRef, exteriorRef } from "./relationship_refs.js";
 
 export const CLASSES = Object.freeze([
   { key: "structure", label: "結構錯誤", glyph: "✕", tone: "seal" },
@@ -47,6 +48,22 @@ function objectTarget(catalog, ref) {
   return entry ? { domain: entry.domain, mapId: entry.mapId, ref, layer: entry.layer } : null;
 }
 
+// Entrance fields whose diagnostic locates one relationship object (a
+// field naming a list of several, such as the gates or links, keeps its map).
+const RELATIONSHIP_FIELDS = Object.freeze([
+  { prefix: "city_gate", owner: "settlement", ref: (id) => cityGateRef(id) },
+  { prefix: "exterior", owner: "interior", ref: (id) => exteriorRef(id) },
+]);
+
+function relationshipTarget(catalog, settlementId, interiorId, field) {
+  for (const rule of RELATIONSHIP_FIELDS) {
+    const id = rule.owner === "settlement" ? settlementId : interiorId;
+    if (!id || !(field === rule.prefix || field.startsWith(`${rule.prefix}.`))) continue;
+    return objectTarget(catalog, rule.ref(id));
+  }
+  return null;
+}
+
 // Where a diagnostic of the displayed (loaded) snapshot points, or null.
 export function diagnosticTarget(world, catalog, item) {
   if (!world) return null;
@@ -71,6 +88,8 @@ export function diagnosticTarget(world, catalog, item) {
   }
   const settlement = world.settlements.find((row) => row.relative_path === path);
   if (settlement) {
+    const entrance = relationshipTarget(catalog, settlement.id, null, field);
+    if (entrance) return entrance;
     if (field.startsWith("wilderness_entry")) {
       const location = objectTarget(catalog, `location:${settlement.location_ref}`);
       return location ? { ...location, layer: "footprint" } : null;
@@ -80,7 +99,10 @@ export function diagnosticTarget(world, catalog, item) {
   const interior =
     world.interiors.find((row) => row.relative_path === path) ??
     world.interiors.find((row) => row.layout_relative_path === path);
-  if (interior) return { domain: "interior", mapId: interior.id, ref: null, layer: null };
+  if (interior) {
+    const entrance = interior.relative_path === path ? relationshipTarget(catalog, null, interior.id, field) : null;
+    return entrance ?? { domain: "interior", mapId: interior.id, ref: null, layer: null };
+  }
   const layout = (world.layouts ?? []).find((row) => row.relative_path === path);
   if (layout && world.interiors.some((row) => row.id === layout.id)) {
     return { domain: "interior", mapId: layout.id, ref: null, layer: null };

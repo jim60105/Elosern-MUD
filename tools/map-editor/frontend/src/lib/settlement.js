@@ -10,6 +10,7 @@
 // The service and the core schema decide validity.
 
 import { FRAME_LOCAL_M, nextId } from "./continent.js";
+import { cityGateRef, exteriorRef, gateRef } from "./relationship_refs.js";
 
 export { FRAME_LOCAL_M, nextId };
 // One Shift+arrow press moves the selected nodes by this many metres.
@@ -169,7 +170,8 @@ export function roadLabel(settlement, road) {
 // Map references that must be removed explicitly before the nodes can be
 // deleted (the service refuses them the same way; nothing cascades): roads
 // in either direction, wilderness gates, the city gate, interior exteriors
-// and district landmarks. Each row links to the declaring object.
+// and district landmarks. Each row links to the declaring object (an
+// entrance row to its relationship, where it is removed separately).
 export function nodeBlockers(world, refs) {
   const rows = [];
   const selection = oneDocumentNodes(refs);
@@ -184,16 +186,16 @@ export function nodeBlockers(world, refs) {
   }
   for (const gate of settlement.wilderness_entry?.gates ?? []) {
     if (ids.has(gate.destination_node)) {
-      rows.push({ kind: "野外入口", label: `${compassLabel(gate.return_direction)} → ${nodeName(settlement, gate.destination_node)}`, ref: null, source: path, external: false });
+      rows.push({ kind: "野外入口", label: `${compassLabel(gate.return_direction)} → ${nodeName(settlement, gate.destination_node)}`, ref: gateRef(settlement.id, gate.return_direction), source: path, external: false });
     }
   }
   if (settlement.city_gate && ids.has(settlement.city_gate.node)) {
-    rows.push({ kind: "城門", label: nodeName(settlement, settlement.city_gate.node), ref: null, source: path, external: false });
+    rows.push({ kind: "城門", label: nodeName(settlement, settlement.city_gate.node), ref: cityGateRef(settlement.id), source: path, external: false });
   }
   for (const interior of world.interiors ?? []) {
     const exterior = interior.exterior;
     if (exterior?.settlement === settlement.id && ids.has(exterior.node)) {
-      rows.push({ kind: "入口", label: `⌂ ${interior.id}`, ref: `interior_room:${interior.id}:${exterior.room}`, source: interior.relative_path, external: false });
+      rows.push({ kind: "入口", label: `⌂ ${interior.id}`, ref: exteriorRef(interior.id), source: interior.relative_path, external: false });
     }
   }
   for (const district of world.districts ?? []) {

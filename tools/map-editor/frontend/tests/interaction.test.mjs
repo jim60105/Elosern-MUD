@@ -99,6 +99,7 @@ const world = fixture();
 const catalog = objectCatalog(world);
 
 test("search tells equal names apart by parent map and source document", () => {
+  // Entrance relationships are labelled by IDs, so a name finds only rooms.
   const results = searchObjects(catalog, "前廳");
   assert.deepEqual(results.map((item) => item.ref), ["interior_room:hall:front", "interior_room:annex:front"]);
   assert.ok(results.every((item) => item.sameLabel === 2));
@@ -135,14 +136,14 @@ test("relationships come from authored fields and name their declaring document"
   const kinds = yard.incoming.map((row) => [row.ref, row.source, row.external]);
   assert.deepEqual(kinds, [
     ["settlement_node:town:gate", S, false],
-    ["interior_room:hall:front", I, false],
+    ["exterior:hall", I, false],
     [null, D, false],
     [null, "world/x.py", true],
   ]);
   const back = relationsOf(world, {}, "interior_room:hall:back");
-  assert.ok(back.incoming.some((row) => row.ref === "interior_room:annex:front" && row.source === J));
+  assert.ok(back.incoming.some((row) => row.ref.startsWith("interior_link:annex:front>hall:back/") && row.source === J));
   const front = relationsOf(world, {}, "interior_room:hall:front");
-  assert.ok(front.outgoing.some((row) => row.ref === "settlement_node:town:yard"));
+  assert.ok(front.outgoing.some((row) => row.ref === "exterior:hall"));
   const place = relationsOf(world, {}, "location:place");
   assert.ok(place.incoming.some((row) => row.ref === "settlement:town"));
   assert.equal(relationsOf(world, {}, "location:nowhere"), null);

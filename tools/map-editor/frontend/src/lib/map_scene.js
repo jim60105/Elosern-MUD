@@ -26,8 +26,10 @@ import {
   waterwayRef,
 } from "./continent.js";
 
-import { bendRef, parseSettlementRef, roadLabel, roadRef } from "./settlement.js";
+import { bendRef, compassLabel, parseSettlementRef, roadLabel, roadRef } from "./settlement.js";
 import { connectionLabels, connectionRef, reverseOf, roomName } from "./interior.js";
+import { exteriorCardPosition, exteriorRef, relationshipView } from "./relationships.js";
+import { cityGateRef, gateRef, linkRef } from "./relationship_refs.js";
 
 export { INTERIOR_COLUMNS } from "./layout_edit.js";
 
@@ -255,6 +257,15 @@ export function settlementScene(settlement, selection = []) {
   const items = [
     ...settlement.nodes.map((node) => ({ id: node.qualified_ref, label: node.key })),
     ...settlement.roads.map((road) => ({ id: roadRef(settlement.id, road.source, road.destination), label: `道路 ${roadLabel(settlement, road)}` })),
+    // The settlement-owned entrances (listed, not drawn: the gate node keeps
+    // its gate glyph and the wilderness end is a continental cell).
+    ...(settlement.wilderness_entry?.gates ?? []).map((gate) => ({
+      id: gateRef(settlement.id, gate.return_direction),
+      label: `野外入口 ${compassLabel(gate.return_direction)} → ${settlement.nodes.find((node) => node.id === gate.destination_node)?.key ?? gate.destination_node}`,
+    })),
+    ...(settlement.city_gate
+      ? [{ id: cityGateRef(settlement.id), label: `起始房間入口 → ${settlement.nodes.find((node) => node.id === settlement.city_gate.node)?.key ?? settlement.city_gate.node}` }]
+      : []),
   ];
   const drawn = [...marks, ...links.flatMap((link) => link.points)];
   const bounds = boundsOfPoints(drawn.length ? drawn : [{ x: 0, y: 0 }]);
@@ -272,7 +283,7 @@ export function interiorPositions(interior) {
 // Rooms are cards; each directed connection is a selectable curved arrow (a
 // two-way pair bends apart and reads `去 ⇄ 回` once). `items` is the object
 // list: rooms, then connections.
-export function interiorScene(interior, selection = []) {
+export function interiorScene(interior, selection = [], world = null) {
   const positions = interiorPositions(interior);
   const chosen = new Set(selection);
   const marks = interior.rooms.map((room) => ({
@@ -301,11 +312,44 @@ export function interiorScene(interior, selection = []) {
       points: [positions.get(connection.source), positions.get(connection.destination)],
     });
   });
+  // The exterior entrance: a dashed card naming the other map and node, one
+  // layout column left of its room, joined to it by a dashed link. It is the
+  // relationship itself (never dragged; presentation only).
+  const exterior = interior.exterior ? relationshipView(world, exteriorRef(interior.id)) : null;
+  const card = exterior ? exteriorCardPosition(positions.get(interior.exterior.room)) : null;
+  if (exterior && card) {
+    const ref = exteriorRef(interior.id);
+    marks.push({
+      id: ref,
+      kind: "exterior",
+      label: `⌂ ${interior.exterior.settlement}`,
+      detail: exterior.endpoints[0].name,
+      role: "exterior",
+      draggable: false,
+      ...card,
+    });
+    links.push({
+      id: `exterior-link:${interior.id}`,
+      ref,
+      kind: "exterior",
+      label: "",
+      twoWay: true,
+      curve: false,
+      arrow: false,
+      selected: chosen.has(ref),
+      points: [card, positions.get(interior.exterior.room)],
+    });
+  }
   const items = [
     ...interior.rooms.map((room) => ({ id: room.qualified_ref, label: room.name_zh })),
     ...interior.connections.map((connection) => ({
       id: connectionRef(interior.id, connection.source, connection.destination, connection.label),
       label: `連接 ${roomName(interior, connection.source)} → ${roomName(interior, connection.destination)}（${connection.label}）`,
+    })),
+    ...(exterior ? [{ id: exteriorRef(interior.id), label: `外部入口 ${exterior.title}` }] : []),
+    ...(interior.interior_links ?? []).map((link) => ({
+      id: linkRef(interior.id, link),
+      label: `室內連結 ${roomName(interior, link.source_room)} → ${link.target_interior} · ${link.target_room}（${link.label}）`,
     })),
   ];
   const bounds = boundsOfPoints(marks.length ? marks : [{ x: 0, y: 0 }]);
@@ -320,5 +364,5 @@ export function sceneFor(world, domain, mapId, selection = []) {
     return settlement ? settlementScene(settlement, selection) : null;
   }
   const interior = world.interiors.find((item) => item.id === mapId);
-  return interior ? interiorScene(interior, selection) : null;
+  return interior ? interiorScene(interior, selection, world) : null;
 }

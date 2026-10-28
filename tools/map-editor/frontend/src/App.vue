@@ -9,7 +9,8 @@
 // commands (interior documents, rooms, named connections and editor-only
 // layouts; continental geometry, locations, districts, footprints and
 // bindings; local maps, settlement nodes, prototypes, directed roads and
-// bends) with undo/redo of the manual segment. Copying the OMP context only
+// bends; entrance relationships: wilderness gates, the starting-room entry,
+// interior exteriors and links) with undo/redo of the manual segment. Copying the OMP context only
 // writes plain text to the clipboard; it starts nothing.
 // Authored text is rendered with text interpolation only (never v-html).
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
@@ -21,6 +22,8 @@ import DiagnosticsStrip from "./components/DiagnosticsStrip.vue";
 import ContinentInspector from "./components/ContinentInspector.vue";
 import SettlementInspector from "./components/SettlementInspector.vue";
 import InteriorInspector from "./components/InteriorInspector.vue";
+import RelationshipInspector from "./components/RelationshipInspector.vue";
+import { entranceRequest, isRelationshipRef, relationshipRemoval } from "./lib/relationships.js";
 import {
   KM,
   cellOfMetres,
@@ -100,9 +103,11 @@ const settlementDrafts = ref(0);
 const settlementLeadDrafts = ref(0);
 const interiorDrafts = ref(0);
 const interiorLeadDrafts = ref(0);
+const relationshipDrafts = ref(0);
 const draftCount = computed(
   () =>
     layoutDrafts.value +
+    relationshipDrafts.value +
     continentDrafts.value +
     leadDrafts.value +
     settlementDrafts.value +
@@ -455,6 +460,15 @@ function toggleLayer(key) {
 
 // -- selection ---------------------------------------------------------------
 function choose({ ref, toggle = false, range = false }) {
+  // 入口 E / 外部入口 E: the chosen node or room opens the entrance form.
+  if (tool.value === "entrance" && domain.value === "settlement" && parseSettlementRef(ref)?.kind === "node") {
+    openEntrance(entranceRequest(currentMapId.value, parseSettlementRef(ref).nodeId, "settlement"), ref);
+    return;
+  }
+  if (tool.value === "entrance" && domain.value === "interior" && parseInteriorRef(ref)?.kind === "room") {
+    openEntrance(entranceRequest(parseInteriorRef(ref).interiorId, parseInteriorRef(ref).roomId), ref);
+    return;
+  }
   if (domain.value === "settlement" && tool.value === "road" && parseSettlementRef(ref)?.kind === "node") {
     pickRoadEnd(parseSettlementRef(ref).nodeId);
     return;
@@ -482,6 +496,22 @@ async function onCanvasEnter() {
   inspectorRef.value?.focusFirstField();
 }
 
+// The picked node or room becomes the selection, so its inspector holds the
+// form; focus moves into the form.
+function openEntrance(request, ref) {
+  toolHint.value = null;
+  selection.value = [ref];
+  creation.value = request;
+  if (drawers.value) drawer.value = "inspector";
+  nextTick(() => root.value?.querySelector("[data-creation='entrance'] input, [data-creation='entrance'] select")?.focus());
+}
+
+// A plain callback for inspectors whose command answer can arrive after
+// they unmounted: select one reference, or nothing.
+function selectRef(ref) {
+  selection.value = ref ? [ref] : [];
+}
+
 // -- interior layout commands ----------------------------------------------
 const selectedRoom = computed(() => {
   const room = parseRoomRef(selected.value);
@@ -501,6 +531,7 @@ const showSettlementInspector = computed(
   () => domain.value === "settlement" && Boolean(world.value) && Boolean(findSettlement(world.value, currentMapId.value)),
 );
 const showInteriorInspector = computed(() => domain.value === "interior" && Boolean(world.value));
+const selectedRelationship = computed(() => (selected.value && isRelationshipRef(selected.value) && record.value ? selected.value : null));
 const pendingPoints = computed(() => (pendingStart.value ? [pendingStart.value.point] : []));
 const showContinentInspector = computed(
   () =>
@@ -519,6 +550,15 @@ watch([tool, domain, currentMapId], () => {
 // Interior tools (registered after the reset above, so they run after it):
 // 房間 N opens the creation form at once (a room has no position to click),
 // 連接 R waits for two rooms, 自動排列 runs once and returns to 選取.
+// 入口 E / 外部入口 E wait for a node or room (canvas or object list).
+watch(tool, (key) => {
+  if (key !== "entrance" || !world.value || domain.value === "continent") return;
+  toolHint.value =
+    domain.value === "settlement"
+      ? "入口：選取一個節點（畫布或物件清單）建立野外入口或起始房間入口；Esc 取消。"
+      : "外部入口：選取一個房間（畫布或物件清單）建立據點外部入口或室內連結；Esc 取消。";
+  if (drawers.value) drawer.value = "inspector";
+});
 watch(tool, (key) => {
   if (domain.value !== "interior" || !world.value) return;
   if (key === "room") openInteriorCreation();
@@ -1019,6 +1059,18 @@ function requestDelete() {
   if (!selection.value.length) return;
   if (selection.value.length === 1 && world.value) {
     const ref = selection.value[0];
+    if (isRelationshipRef(ref)) {
+      // An entrance relationship is owned by its one document and is not an
+      // object any other document names: it is removed directly, and nothing
+      // else (neither endpoint) is touched.
+      const removal = relationshipRemoval(world.value, ref);
+      if (removal) {
+        send(removal).then((result) => {
+          if (result?.changed) selection.value = [];
+        });
+      }
+      return;
+    }
     const settlementRemovalCommand = settlementRemoval(ref);
     if (settlementRemovalCommand) {
       // Roads and bends are owned by their settlement document only.
@@ -1308,7 +1360,8 @@ async function onChip(key) {
           :creation="creation"
           :hint="toolHint"
           :submit="send"
-          :choose="(ref) => (selection = [ref])"
+          :choose="selectRef"
+          :catalog="catalog"
           @create="onCreate"
           @cancel="cancelTool"
           @open="openCreation"
@@ -1328,6 +1381,7 @@ async function onChip(key) {
           :hint="toolHint"
           :submit="send"
           :choose="(ref) => (selection = [ref])"
+          :catalog="catalog"
           @create="onCreate"
           @cancel="cancelTool"
           @open="openCreation"
@@ -1338,6 +1392,20 @@ async function onChip(key) {
           @drafts="interiorLeadDrafts = $event"
         />
         </template>
+        <RelationshipInspector
+          v-if="selectedRelationship"
+          :key="`${formEpoch}:${selectedRelationship}`"
+          :world="world"
+          :catalog="catalog"
+          :selected="selectedRelationship"
+          :domain="domain"
+          :map-id="currentMapId"
+          :submit="send"
+          :choose="selectRef"
+          @follow="follow"
+          @delete="requestDelete"
+          @drafts="relationshipDrafts = $event"
+        />
         <template v-if="selectedRoom">
           <h3 class="section-label">版面位置 · 僅供編輯器</h3>
           <LayoutPositionFields
@@ -1360,6 +1428,7 @@ async function onChip(key) {
           :hint="toolHint"
           :submit="send"
           :choose="(ref) => (selection = [ref])"
+          :catalog="catalog"
           @create="onCreate"
           @cancel="cancelTool"
           @open="openCreation"
@@ -1395,7 +1464,8 @@ async function onChip(key) {
           :creation="creation"
           :hint="toolHint"
           :submit="send"
-          :choose="(ref) => (selection = [ref])"
+          :choose="selectRef"
+          :catalog="catalog"
           @create="onCreate"
           @cancel="cancelTool"
           @open="openCreation"
