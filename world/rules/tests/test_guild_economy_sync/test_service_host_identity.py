@@ -13,7 +13,7 @@ from typeclasses.components import Merchant
 from typeclasses.components import ScriptedDialogue
 from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom
-from world.maps.bootstrap import sync_service_interiors
+from world.maps.bootstrap import sync_interiors
 from world.rules import guild_config
 from world.rules import guild_economy
 from world.art.official_refs import (
@@ -382,7 +382,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             ),
         ):
             load_catalog_into_cache()
-            sync_service_interiors()
+            sync_interiors()
             sync_service_content()
 
         interior = search_object_by_tag("t_trading_post")[0]
@@ -461,7 +461,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             load_catalog_into_cache()
             # The roster derivation skipped the row: no anchor, no service id.
             self.assertNotIn("t_forecourt", {row.spawn_room for row in get_catalog().service_hosts})
-            sync_service_interiors()
+            sync_interiors()
             sync_service_content()
 
             interior = search_object_by_tag("t_forecourt")[0]
@@ -487,7 +487,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             room_count = Room.objects.all_family().count()
             npc_count = NPC.objects.all_family().count()
             interior_pks = [room.pk for room in search_object_by_tag("t_forecourt")]
-            sync_service_interiors()
+            sync_interiors()
             sync_service_content()
             self.assertEqual(Room.objects.all_family().count(), room_count)
             self.assertEqual(NPC.objects.all_family().count(), npc_count)

@@ -31,9 +31,9 @@ def fixture_home_node_id() -> str:
     import importlib
 
     from world.quests.definitions import KNOWN_GRID_MAP_KEYS
-    from world.maps import map_data
+    from world.maps import runtime
 
-    map_data.ensure_published()
+    runtime.ensure_published()
 
     z_map = sorted(KNOWN_GRID_MAP_KEYS)[0]
     registry = getattr(

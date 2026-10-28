@@ -52,7 +52,6 @@ __all__ = [
     "current",
     "exterior_for",
     "is_published",
-    "publish",
     "room",
     "room_name_zh",
 ]
@@ -243,11 +242,16 @@ def build_interiors(
 _PUBLISHED: InteriorSnapshot | None = None
 
 
-def publish(snapshot: InteriorSnapshot) -> InteriorSnapshot:
-    """Adopt one already-validated interior world and return it."""
+def _install(snapshot: InteriorSnapshot) -> InteriorSnapshot:
+    """Bind one validated snapshot as this process's interior world.
+
+    The map composition root (``world.maps.runtime``) owns publication: it
+    installs the four domain views of one bundle together, so no domain can be
+    replaced on its own and no partial world can be observed.
+    """
 
     if not isinstance(snapshot, InteriorSnapshot):
-        raise TypeError("publish() requires an InteriorSnapshot")
+        raise TypeError("_install() requires an InteriorSnapshot")
     global _PUBLISHED
     _PUBLISHED = snapshot
     return snapshot

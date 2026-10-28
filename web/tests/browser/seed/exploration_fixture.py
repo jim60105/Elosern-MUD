@@ -148,7 +148,7 @@ def _exploration_fixture(character) -> None:
     from typeclasses.npcs import LLMNPC, NPC
     from world.maps.bootstrap import (
         sync_grid,
-        sync_service_interiors,
+        sync_interiors,
     )
     from world.rules.map_knowledge import record_arrival
 
@@ -156,7 +156,7 @@ def _exploration_fixture(character) -> None:
         return
 
     sync_grid()
-    sync_service_interiors()
+    sync_interiors()
     # The capital's city-gate row coordinate, probed from the live registry
     # (mirrors test_limbo_room.py::_gate_row).
     import importlib

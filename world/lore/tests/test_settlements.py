@@ -365,7 +365,7 @@ class PlaceRegistryTests(unittest.TestCase):
         "settlement-place-registry::a-settlement-declares-its-archetype-and-coordinate-space"
     )
     def test_shipped_places_transcribe_the_bootstrap_interiors(self):
-        # The place row is the only source sync_service_interiors reads. The
+        # The place row is the only source sync_interiors reads. The
         # capital five's addresses are the altoria-capital-replan exteriors;
         # every other field these rows transcribe is untouched by the replan
         # (the neutrality gate: test_capital_places_keep_their_identities).

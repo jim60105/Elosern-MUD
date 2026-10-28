@@ -33,7 +33,7 @@ def _services_fixture_synth(character, mode: str) -> None:
 
     from world.maps.bootstrap import (
         sync_grid,
-        sync_service_interiors,
+        sync_interiors,
     )
 
     # The shared catalog was assigned process-globally by the harness install
@@ -44,7 +44,7 @@ def _services_fixture_synth(character, mode: str) -> None:
     catalog = guild_config.get_catalog()
 
     sync_grid()
-    sync_service_interiors()
+    sync_interiors()
 
     # The two service rooms come from the kit's OWN place rows (resolved by
     # kind from the live registry — never a shipped row name). The place-driven
@@ -56,19 +56,22 @@ def _services_fixture_synth(character, mode: str) -> None:
     from typeclasses.rooms import Room
 
     def _kit_interior(kind: str):
+        from world.maps import interiors
+
         place = live_place_by_kind(kind)
         if place is None:
             raise AssertionError(f"services fixture (synth): no live {kind} place")
         rooms = search_object_by_tag(place.key)
         if rooms:
             return rooms[0]
+        authored = interiors.current().room(place.room.object_id)
         room = create_object(
             Room,
-            key=place.room_name_zh,
-            tags=[place.key],
+            key=authored.name_zh,
+            tags=[authored.room_id],
             location=None,
         )
-        room.db.desc = place.room_desc_zh
+        room.db.desc = authored.desc_zh
         return room
 
     hall = _kit_interior("guild_hall")

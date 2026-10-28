@@ -38,7 +38,7 @@ from world.lore.settlements.places import PlaceDefinition, PlaceKind
 from world.maps import map_data
 from world.maps.bootstrap import (
     sync_grid,
-    sync_service_interiors,
+    sync_interiors,
     sync_settlement_graph,
 )
 from world.maps.city_gates import CityGateDef
@@ -443,7 +443,7 @@ class IntegratedMovedNodeTests(EvenniaTest):
 
         with self._apply(_graph(10, 10), place, district):
             sync_grid()
-            sync_service_interiors()
+            sync_interiors()
             anchor = GridRoom.objects.filter_xyz(xyz=(10, 10, MAP)).first()
             shop = GridRoom.objects.filter_xyz(xyz=(20, 10, MAP)).first()
             self.assertEqual(anchor.scene_archetype, "t_synthetic_scene")
@@ -470,7 +470,7 @@ class IntegratedMovedNodeTests(EvenniaTest):
             moved = _graph(40, 40)
             with self._apply(moved, place, district):
                 sync_grid()
-                sync_service_interiors()
+                sync_interiors()
                 # The declarations never changed; every consumer followed the
                 # same stable node to its new binding.
                 self.assertNotEqual(binding_signature(), first_signature)

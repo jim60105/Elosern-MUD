@@ -28,7 +28,7 @@ from world.lore.npc_card import (
     NPC_PERSONA_CONTENT_GENERATION,
     normalize_card,
 )
-from world.maps.bootstrap import sync_grid, sync_service_interiors
+from world.maps.bootstrap import sync_grid, sync_interiors
 from world.quests.catalog import register_catalog
 from world.quests.bootstrap import restore_generated_quests
 from world.quests.compile.contracts import QuestCompileError
@@ -49,7 +49,7 @@ class NpcPersonaFreshBootstrapTests(EvenniaTest):
         register_catalog()
         create_object(Room, key="虛境", location=None)
         sync_grid()
-        sync_service_interiors()
+        sync_interiors()
         sync_service_content()
 
     @covers_requirement(

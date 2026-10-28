@@ -115,13 +115,9 @@ def main(argv=None):
     parser.add_argument("--json",action="store_true")
     args=parser.parse_args(argv)
     _bootstrap()
-    from world.lore.map_districts import load_and_publish as publish_districts
-    from world.maps.map_data import load_and_publish as publish_settlements
-    from world.maps.geography import load_and_publish
+    from world.maps import runtime
 
-    publish_settlements()
-    load_and_publish()
-    publish_districts()
+    runtime.ensure_published()
     results=measure()
     if args.json:
         print(json.dumps(results,indent=2,sort_keys=True))

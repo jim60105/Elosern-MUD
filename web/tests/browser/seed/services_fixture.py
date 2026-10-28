@@ -30,7 +30,7 @@ def _services_fixture(character) -> None:
     )
     from world.maps.bootstrap import (
         sync_grid,
-        sync_service_interiors,
+        sync_interiors,
     )
     from world.quests.catalog import register_catalog
     from world.rules.clock import get_world_clock
@@ -50,7 +50,7 @@ def _services_fixture(character) -> None:
 
     register_catalog()
     sync_grid()
-    sync_service_interiors()
+    sync_interiors()
     catalog = load_catalog_into_cache()
     register_catalog_offers(catalog)
     sync_guild_economy()

@@ -182,7 +182,7 @@ class ShippedPersistentAdventurerSmokeTests(EvenniaTest):
 
     def test_three_hosts_normal_lineage_equipment_homes_and_weekly_arrivals(self):
         from world.lore.guild_adventurers import ADVENTURER_REGISTRY
-        from world.maps.bootstrap import sync_grid, sync_service_interiors, resolve_residence_route
+        from world.maps.bootstrap import sync_grid, sync_interiors, resolve_residence_route
         from world.rules.human_guild_hosts import sync_persistent_adventurers, qualified_host
         from world.rules.npc_schedules import settle_npc_schedules, get_world_clock
         from world.rules.progression import can_use_skill
@@ -192,7 +192,7 @@ class ShippedPersistentAdventurerSmokeTests(EvenniaTest):
 
         get_world_clock().tick = 0
         sync_grid()
-        sync_service_interiors()
+        sync_interiors()
         normal_hosts = sync_persistent_adventurers()
         rows = tuple(ADVENTURER_REGISTRY.values())
         self.assertEqual(len(normal_hosts), 3)
@@ -271,7 +271,7 @@ class ShippedPersistentExamLifecycleSmokeTests(EvenniaTest):
         from world.quests.catalog import register_catalog
         from world.rules.guild_economy import sync_guild_economy
         from world.rules.skip_safety import _BATTLEFIELDS
-        from world.maps.bootstrap import sync_grid, sync_service_interiors
+        from world.maps.bootstrap import sync_grid, sync_interiors
 
         super().setUp()
         self._battlefields = dict(_BATTLEFIELDS)
@@ -280,7 +280,7 @@ class ShippedPersistentExamLifecycleSmokeTests(EvenniaTest):
         sync_quest_runtime()
         create_object(Room, key="虛境", location=None)
         sync_grid()
-        sync_service_interiors()
+        sync_interiors()
         sync_guild_economy()
 
     def tearDown(self):

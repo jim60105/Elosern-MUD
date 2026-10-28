@@ -44,7 +44,7 @@ from world.rules.dialogue import dialogue_key_for, greeting_for, table_response
 from world.rules import guild_config, guild_economy
 from world.rules.guild_config import get_catalog
 from world.rules.guild_economy import sync_service_content
-from world.maps.bootstrap import sync_service_interiors
+from world.maps.bootstrap import sync_interiors
 from world.skills.handler import INNATE_SKILL_ORDER
 
 from ._support import (
@@ -325,7 +325,7 @@ class AltoriaHospitalityTests(ServiceContentIsolation, EvenniaTestCase):
             patcher.stop()
         self._patchers.clear()  # the base's addCleanup stops each once only
         with self.captureOnCommitCallbacks(execute=True):
-            sync_service_interiors()
+            sync_interiors()
             sync_service_content()
         for place in places:
             with self.subTest(arrival=place.kind):

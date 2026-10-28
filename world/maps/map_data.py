@@ -40,12 +40,7 @@ from elosern_map_core.authoring import build_settlement_graph
 from elosern_map_core.codec import parse_document
 from elosern_map_core.documents import LocationsDocument, SettlementDocument, QualifiedRef
 from elosern_map_core.references import ReferenceIndex, settlement_node_ref
-from elosern_map_core.sources import (
-    SourceDocument,
-    discover_source_paths,
-    fingerprint_text,
-    read_source_document,
-)
+from elosern_map_core.sources import SourceDocument, fingerprint_text
 from elosern_map_core.sparse import SparseGraphError, SparseSettlementGraph
 
 from world.lore.anchor_placement import AnchorPlacement
@@ -405,78 +400,37 @@ def build_settlements(
     )
 
 
-def load_settlements(root: str | Path | None = None) -> SettlementSnapshot:
-    """Read, validate and compose the shipped settlements from ``root``."""
-
-    base = Path(root) if root is not None else REPOSITORY_ROOT
-    paths = tuple(
-        path
-        for path in discover_source_paths(base)
-        if path.startswith(f"{SETTLEMENTS_DIRECTORY}/")
-    )
-    if not paths:
-        raise SettlementError(
-            [f"no {SETTLEMENTS_DIRECTORY}/*.yaml document is discoverable under {base}"]
-        )
-    sources = tuple(read_source_document(base, path) for path in paths)
-    locations_source = read_source_document(base, LOCATIONS_PATH)
-    continent_source = read_source_document(base, CONTINENT_PATH)
-    continent = parse_document(continent_source.relative_path, continent_source.text)
-    documents, locations, fingerprints = parse_settlement_documents(
-        sources, locations_source.text
-    )
-    return build_settlements(
-        documents,
-        locations,
-        frame_cells=continent.document.terrain.frame_cells,
-        fingerprints=fingerprints,
-    )
-
-
 _PUBLISHED: SettlementSnapshot | None = None
 
 
-def publish(snapshot: SettlementSnapshot) -> SettlementSnapshot:
-    """Replace the process settlement world atomically and return the snapshot."""
+def _install(snapshot: SettlementSnapshot) -> SettlementSnapshot:
+    """Bind one validated snapshot as this process's settlement world.
+
+    The map composition root (``world.maps.runtime``) owns publication: it
+    installs the four domain views of one bundle together, so no domain can be
+    replaced on its own and no partial world can be observed.
+    """
 
     global _PUBLISHED
     if not isinstance(snapshot, SettlementSnapshot):
-        raise TypeError("publish() requires a SettlementSnapshot")
+        raise TypeError("_install() requires a SettlementSnapshot")
     _PUBLISHED = snapshot
     return snapshot
-
-
-def load_and_publish(root: str | Path | None = None) -> SettlementSnapshot:
-    """Load the shipped settlements and publish them; a failure keeps the baseline."""
-
-    return publish(load_settlements(root))
-
-
-def ensure_published(root: str | Path | None = None) -> SettlementSnapshot:
-    """Publish the shipped settlements when a composition root has none yet.
-
-    Only bootstrap/synchronization entry points call this: they establish the
-    world before any consumer reads it. Read-only accessors never load
-    implicitly.
-    """
-
-    if _PUBLISHED is None:
-        return load_and_publish(root)
-    return _PUBLISHED
 
 
 def current() -> SettlementSnapshot:
     """The published settlement world.
 
     Raises :class:`SettlementNotLoaded` instead of loading implicitly: every
-    process entry point publishes explicitly before any read-only consumer runs.
+    process entry point adopts the complete map world before any read-only
+    consumer runs.
     """
 
     snapshot = _PUBLISHED
     if snapshot is None:
         raise SettlementNotLoaded(
-            "settlement maps are not loaded; call "
-            "world.maps.map_data.load_and_publish() before using map consumers"
+            "settlement maps are not loaded; adopt the map world with "
+            "world.maps.runtime before using map consumers"
         )
     return snapshot
 
@@ -511,11 +465,7 @@ __all__ = [
     "SettlementSnapshot",
     "build_settlements",
     "current",
-    "ensure_published",
     "is_published",
-    "load_and_publish",
-    "load_settlements",
     "parse_settlement_documents",
-    "publish",
     "settlement_graph",
 ]

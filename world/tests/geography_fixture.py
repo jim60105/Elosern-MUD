@@ -1,49 +1,64 @@
 """Explicit shipped map-world publication for game consumer tests.
 
-Production publishes the discovered settlement local maps, the continental
-geography and then the authored district document as its first three startup
-steps; a game consumer test publishes exactly the same snapshots in its module
-or class setup, so no test relies on an import-time load.
+Production adopts the complete authored map world as its first startup step
+(``map_world_adoption``); a game consumer test publishes exactly the same
+bundle in its module or class setup, so no test relies on an import-time load.
 
-The three are published together because they are one map world: the geography
-candidate validates its wilderness gateways against the settlement candidate,
-every settlement registry view reads the published settlement snapshot, and
-the district loader validates its regions and landmarks against both.
+The four domain views (settlements, continental geography, districts and
+permanent interiors) are one bundle because they are one map world: the
+geography candidate validates its wilderness gateways against the settlement
+candidate, districts validate against both, and every service place joins an
+interior room. Nothing here writes persistent state; a test that needs the
+materialized world runs the map synchronization itself.
 """
 
 from __future__ import annotations
 
 
+def publish_shipped_map_world():
+    """Adopt the repository's authored map world when nothing is published."""
+
+    from world.maps import runtime
+
+    if not runtime.is_published():
+        runtime.adopt()
+    return runtime.current()
+
+
 def publish_shipped_settlements():
-    """Publish the repository's authored settlement world when nothing is published."""
+    """The published settlement world (adopting the whole map world if needed)."""
 
     from world.maps import map_data
 
-    if not map_data.is_published():
-        map_data.publish(map_data.load_settlements())
+    publish_shipped_map_world()
     return map_data.current()
 
 
 def publish_shipped_geography():
-    """Publish the shipped settlement, geography and district snapshots when needed."""
+    """The published continental geography (adopting the whole world if needed)."""
 
-    publish_shipped_settlements()
     from world.maps import geography
 
-    if not geography.is_published():
-        geography.publish(geography.load_geography())
-    publish_shipped_districts()
+    publish_shipped_map_world()
     return geography.current()
 
 
 def publish_shipped_districts():
-    """Publish the repository's authored district document when nothing is published."""
+    """The published district world (adopting the whole map world if needed)."""
 
     from world.lore import map_districts
 
-    if not map_districts.is_published():
-        map_districts.publish(map_districts.load_districts())
+    publish_shipped_map_world()
     return map_districts.current()
+
+
+def publish_shipped_interiors():
+    """The published permanent interiors (adopting the whole world if needed)."""
+
+    from world.maps import interiors
+
+    publish_shipped_map_world()
+    return interiors.current()
 
 
 class GeographyPublicationMixin:
@@ -55,7 +70,7 @@ class GeographyPublicationMixin:
 
     @classmethod
     def setUpClass(cls):
-        publish_shipped_geography()
+        publish_shipped_map_world()
         super().setUpClass()
 
 
@@ -63,5 +78,7 @@ __all__ = [
     "GeographyPublicationMixin",
     "publish_shipped_districts",
     "publish_shipped_geography",
+    "publish_shipped_interiors",
+    "publish_shipped_map_world",
     "publish_shipped_settlements",
 ]

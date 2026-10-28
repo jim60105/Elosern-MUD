@@ -1140,13 +1140,11 @@ def sync_grid() -> SyncReport:
     room is missing warns and is skipped; other rows still converge.
     """
 
-    from world.lore.map_districts import ensure_published as ensure_districts_published
-    from world.maps.geography import ensure_published
-    from world.maps.map_data import ensure_published as ensure_settlements_published
+    from world.maps import runtime
 
-    ensure_settlements_published()
-    ensure_published()
-    ensure_districts_published()
+    # This is a world composition root: adopt the complete map world (or use
+    # the one startup already adopted) before any graph or reference read.
+    runtime.ensure_published()
     validate_static_references()
 
     graphs = tuple(SETTLEMENT_GRAPHS.values())
@@ -1320,13 +1318,11 @@ def sync_wilderness() -> None:
     refresh pass.
     """
 
-    from world.lore.map_districts import ensure_published as ensure_districts_published
-    from world.maps.geography import ensure_published
-    from world.maps.map_data import ensure_published as ensure_settlements_published
+    from world.maps import runtime
 
-    ensure_settlements_published()
-    ensure_published()
-    ensure_districts_published()
+    # This is a world composition root: adopt the complete map world (or use
+    # the one startup already adopted) before any graph or reference read.
+    runtime.ensure_published()
     validate_static_references()
 
     create_wilderness(name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider())

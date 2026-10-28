@@ -35,7 +35,7 @@ _BODY_TARGETS = (
     "world.lore.sync.sync_all",
     "world.maps.bootstrap.sync_limbo",
     "world.maps.bootstrap.sync_grid",
-    "world.maps.bootstrap.sync_service_interiors",
+    "world.maps.bootstrap.sync_interiors",
     "world.maps.bootstrap.sync_wilderness",
     "world.quests.bootstrap.sync_quest_runtime",
     "world.rules.guild_economy.restore_persisted_sessions",

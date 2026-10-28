@@ -61,7 +61,7 @@ from world.lore.settlements.places import place_dialogue_keys, place_shop_identi
 from world.rules.dialogue import dialogue_key_for, greeting_for, table_response
 from world.rules.guild_config import get_catalog
 from world.rules.guild_economy import sync_service_content
-from world.maps.bootstrap import sync_service_interiors
+from world.maps.bootstrap import sync_interiors
 
 from ._support import (
     ServiceContentIsolation,
@@ -271,7 +271,7 @@ class AltoriaLearningExchangeTests(ServiceContentIsolation, EvenniaTestCase):
         ):
             return  # the finally-block's restore already completed the job
         with self.captureOnCommitCallbacks(execute=True):
-            sync_service_interiors()
+            sync_interiors()
             sync_service_content()
 
     @covers_requirement(

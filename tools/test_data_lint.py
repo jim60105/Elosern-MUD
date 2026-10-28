@@ -285,9 +285,10 @@ def _harvest_geography(root: Path, out: set[str]) -> None:
     """
 
     from world.maps import geography as geography_module
+    from world.maps import runtime
 
     if not geography_module.is_published():
-        geography_module.publish(geography_module.load_geography(root))
+        runtime.publish(runtime.preview(runtime.compose(root)))
     snapshot = geography_module.current()
     for view in (
         snapshot.regions,
@@ -310,12 +311,10 @@ def _harvest_districts(root: Path, out: set[str]) -> None:
     """
 
     from world.lore import map_districts as districts_module
-    from world.maps import map_data as map_data_module
+    from world.maps import runtime
 
-    if not map_data_module.is_published():
-        map_data_module.publish(map_data_module.load_settlements(root))
     if not districts_module.is_published():
-        districts_module.publish(districts_module.load_districts(root))
+        runtime.publish(runtime.preview(runtime.compose(root)))
     districts = districts_module.current().districts
     out.update(key for key in districts if isinstance(key, str) and key)
     for district in districts.values():

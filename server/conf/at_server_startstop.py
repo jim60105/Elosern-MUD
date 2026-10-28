@@ -46,10 +46,7 @@ def _late(module: str, name: str):
 # quest runtime must run after the lore/map syncs. Guard tests assert against
 # this catalog (behaviorally, via stubs) instead of source text.
 STARTUP_STEP_ORDER: tuple[str, ...] = (
-    "geography_source_publication",
-    "settlement_source_publication",
-    "district_source_publication",
-    "static_map_reference_validation",
+    "map_world_adoption",
     "world_clock_init",
     "equipment_rulebook_validation",
     "guild_exam_restriction_validation",
@@ -59,7 +56,7 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "sync_all",
     "sync_limbo",
     "sync_grid",
-    "sync_service_interiors",
+    "sync_interiors",
     "sync_quest_runtime",
     "sync_guild_economy",
     "sync_npc_schedules",
@@ -423,12 +420,7 @@ def at_server_start():
     it behaviorally.
     """
     from world.lore.sync import sync_all
-    from world.maps.bootstrap import (
-        sync_grid,
-        sync_limbo,
-        sync_service_interiors,
-        sync_wilderness,
-    )
+    from world.maps.bootstrap import sync_grid, sync_limbo, sync_wilderness
     from world.quests.bootstrap import sync_quest_runtime
     from world.rules.clock import get_world_clock
     from world.rules.guild_economy import restore_persisted_sessions, sync_guild_economy
@@ -451,41 +443,16 @@ def at_server_start():
     # Per-layer tolerated registration-conflict classes, resolved lazily at
     # first failure exactly like the pre-refactor helper-local imports.
 
-    # The authored continental geography is loaded, validated and published
-    # first: every later map consumer (terrain, presenter, lore mirror,
-    # static-reference preflight) reads this one immutable snapshot, and a
-    # failed candidate aborts boot before anything is published or persisted.
+    # The complete authored map world is adopted as ONE candidate before
+    # anything is published or persisted: the discovered continent, locations,
+    # districts, settlements and permanent interiors are composed, checked
+    # against their own bindings (static references, service room joins, scene
+    # and art catalogs, quest destinations) and against the committed partition
+    # artifact's freshness, and only then installed as one immutable bundle.
+    # A rejected candidate aborts boot with the previous bundle untouched.
     _startup_step(
-        "geography_source_publication",
-        lambda: _late("world.maps.geography", "load_and_publish"),
-    )
-    # The discovered settlement local maps are published next: the geography
-    # candidate validated its wilderness gateways against them, and every
-    # later consumer (graphs, anchor placements, city gates, wilderness
-    # entries, grid node art, the lore mirror and the static-reference gate)
-    # reads this one immutable snapshot. A failed candidate aborts boot before
-    # anything is published or persisted.
-    _startup_step(
-        "settlement_source_publication",
-        lambda: _late("world.maps.map_data", "load_and_publish"),
-    )
-    # The authored district document is published next: its loader validates
-    # every district against the published terrain/sub-region keys, has the
-    # qualified landmarks resolved against the published bindings, and rejects
-    # a candidate carrying any diagnostic, so a failed candidate aborts boot
-    # before the static-reference gate or any persistent synchronization.
-    _startup_step(
-        "district_source_publication",
-        lambda: _late("world.lore.map_districts", "load_and_publish"),
-    )
-    # Fail-loud static map-reference gate: every authored static target
-    # (gates, anchor placements, wilderness gates, place exteriors, district
-    # landmarks, grid art) resolves against one current binding snapshot before
-    # the first persistent startup action (the world clock is a persistent
-    # Script) or any lore/grid synchronization writes.
-    _startup_step(
-        "static_map_reference_validation",
-        lambda: _late("world.maps.static_references", "validate_static_references"),
+        "map_world_adoption",
+        lambda: _late("world.maps.runtime", "adopt"),
     )
     # Deterministic startup owns the world-clock singleton; presentation reads
     # only through read_world_clock() and must never create it.
@@ -544,7 +511,14 @@ def at_server_start():
     # economy, and NPC-schedule syncs all move ahead of session
     # restoration so a recovery settlement runs the complete stage set
     # (fix-startup-clock-source-order D1).
-    _startup_step("sync_service_interiors", sync_service_interiors)
+    # Persistent map synchronization is paired with the adoption above: the
+    # adopted bundle stays pending until every authored interior converges, so
+    # a failed synchronization restores the pre-adoption bundle and leaves the
+    # persistent baseline as it was.
+    _startup_step(
+        "sync_interiors",
+        lambda: _late("world.maps.runtime", "synchronize"),
+    )
     _startup_step("sync_quest_runtime", sync_quest_runtime)
     _startup_step("sync_guild_economy", sync_guild_economy)
     _startup_step("sync_npc_schedules", sync_npc_schedules)

@@ -215,14 +215,29 @@ def _wild_node(cell: tuple[int, int]) -> str | None:
 
 
 def enclosing_anchor_cell(room: Any) -> tuple[int, int] | None:
-    """Read the unique registered enclosing anchor of a coordinate-free room."""
+    """Read the unique authored enclosing anchor of a coordinate-free room.
+
+    A permanent interior room reaches the continental frame through the
+    exterior entrance its interior document authors — the room itself carries
+    no coordinates and needs no service record to be located. An ambiguous or
+    unlocatable room answers ``None`` rather than an arbitrary enclosure.
+    """
     from typeclasses.rooms import Room
-    from world.lore.settlements.places import PLACE_REGISTRY
+    from world.maps import interiors
 
     if not isinstance(room, Room):
         return None
     tags = set(room.tags.all())
-    anchors = {place.settlement_key for key, place in PLACE_REGISTRY.items() if key in tags}
+    anchors: set[str] = set()
+    for tag in tags:
+        if not isinstance(tag, str):
+            continue
+        found = interiors.current().rooms.get(tag)
+        if found is None:
+            continue
+        exterior = interiors.current().exteriors.get(found.room_id)
+        if exterior is not None:
+            anchors.add(exterior.settlement)
     if len(anchors) != 1:
         return None
     geography = anchor_geography().get(next(iter(anchors)))

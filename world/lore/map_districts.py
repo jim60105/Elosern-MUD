@@ -66,8 +66,10 @@ DISTRICTS_PATH = "content/maps/districts.yaml"
 #: land is narrow without producing slivers.
 MIN_VORONOI_SPACING_KM = 100
 
-#: The landmark domains a continental district may project.
-LANDMARK_DOMAINS: tuple[str, ...] = ("settlement_node", "wilderness_cell", "location")
+#: The landmark domains a continental district may project. The one vocabulary
+#: lives with the static-reference boundary, because a landmark is exactly a
+#: qualified static target that must resolve there.
+from world.maps.static_references import LANDMARK_DOMAINS  # noqa: E402
 
 #: Landmark diagnostics that describe a real authored identity but no usable
 #: continental projection yet; they stay loadable as saveable work in progress.
@@ -166,17 +168,24 @@ class _ProductionTerrain:
     never mixes an older world's components with a newly published classifier.
     """
 
-    def __init__(self, snapshot=None) -> None:
+    def __init__(self, snapshot=None, settlements=None) -> None:
         from world.maps.geography import current
         from world.maps.wilderness_provider import WILDERNESS_NAME
         from world.maps.wilderness_reachability import walkable_components
 
         self._geography = snapshot if snapshot is not None else current()
+        if settlements is None:
+            from world.maps.map_data import current as current_settlements
+
+            settlements = current_settlements()
+        self._settlements = settlements
         self._terrain = self._geography.terrain
         self.wilderness_name = WILDERNESS_NAME
         self.max_cell = (self._geography.max_x, self._geography.max_y)
         self.region_keys = frozenset(self._geography.regions)
-        self._components = walkable_components(self._geography)
+        self._components = walkable_components(
+            self._geography, entries=self._settlements.wilderness_entries
+        )
         self._entries = tuple(self._gateway_entries())
         # Players leave settlements through gateway approaches, so a cell is
         # reachable when it shares a component with any of them. The shipped
@@ -193,17 +202,19 @@ class _ProductionTerrain:
         Approaches are derived against this adapter's own frame bounds, so a
         retained adapter never borrows another world's rectangle.
         """
-        from world.lore import wilderness_entry
-        from world.maps.static_references import settlement_node_xy
+        from elosern_map_core.references import settlement_position
 
         bounds = (self._geography.max_x, self._geography.max_y)
-        for entry in wilderness_entry.WILDERNESS_ENTRY_REGISTRY.values():
+        index = self._settlements.reference_index
+        for entry in self._settlements.wilderness_entries.values():
             for gate in entry.gates:
                 approach = entry.approach_cell(gate, bounds=bounds)
                 if approach is not None:
                     yield (
                         gate.z_map_key,
-                        settlement_node_xy(gate.destination, source="wilderness gate"),
+                        settlement_position(
+                            index, gate.destination, source="wilderness gate"
+                        ),
                         approach,
                     )
 
@@ -230,20 +241,17 @@ class _ProductionTerrain:
 
     def grid_site(self, map_key, xy):
         from elosern_map_core.geometry import local_to_world_m
-        from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
-        from world.lore.anchors import LOCAL_FRAME_ANCHOR_REGISTRY
-        from world.maps.map_data import settlement_graph
 
-        graph = settlement_graph(map_key)
+        graph = self._settlements.graphs.get(map_key)
         node = graph.node_at(xy) if graph is not None else None
         if node is None:
             return None
         anchor_key = next(
             (
                 placement.anchor_key
-                for placement in ANCHOR_PLACEMENT_REGISTRY.values()
+                for placement in self._settlements.anchor_placements.values()
                 if placement.zcoord == map_key
-                and placement.anchor_key in LOCAL_FRAME_ANCHOR_REGISTRY
+                and placement.anchor_key in self._settlements.local_frame_anchors
             ),
             None,
         )
@@ -251,7 +259,7 @@ class _ProductionTerrain:
             return None
         position = local_to_world_m(
             self._geography.anchor_geography[anchor_key].cell,
-            LOCAL_FRAME_ANCHOR_REGISTRY[anchor_key].local_anchor_m,
+            self._settlements.local_frame_anchors[anchor_key].local_anchor_m,
             node.physical_coordinate,
         )
         reachable = False
@@ -268,6 +276,17 @@ class _ProductionTerrain:
 def production_terrain() -> DistrictTerrain:
     """The live terrain the shipped document is validated against."""
     return _ProductionTerrain()
+
+
+def candidate_terrain(geography_snapshot, settlements) -> DistrictTerrain:
+    """One candidate world's terrain, for validating that candidate's districts.
+
+    The adapter is bound to the candidate geography *and* the candidate
+    settlements, so a district is never projected through the previously
+    published graphs or anchor placements.
+    """
+
+    return _ProductionTerrain(geography_snapshot, settlements)
 
 
 def landmark_node_ids(
@@ -644,80 +663,37 @@ def parse_districts_document(text: str) -> DistrictsDocument:
     return parse_document(DISTRICTS_PATH, text).document
 
 
-def load_districts(root: str | Path | None = None) -> DistrictSnapshot:
-    """Read, validate and compose the shipped districts from ``root``.
-
-    ``root`` selects the district source only; the terrain, region keys and
-    landmark bindings come from the currently published geography and
-    settlements, exactly like every other map consumer.
-    """
-
-    base = Path(root) if root is not None else REPOSITORY_ROOT
-    try:
-        source = read_source_document(base, DISTRICTS_PATH)
-    except FileNotFoundError as error:
-        raise DistrictError(
-            (
-                Diagnostic(
-                    code="missing_document",
-                    category=STRUCTURE,
-                    message=f"{DISTRICTS_PATH} is absent under {base}",
-                    relative_path=DISTRICTS_PATH,
-                    field_path="",
-                ),
-            )
-        ) from error
-    except AuthoringError as error:
-        raise DistrictError(error.diagnostics) from error
-    try:
-        parsed = parse_document(source.relative_path, source.text)
-    except AuthoringError as error:
-        raise DistrictError(error.diagnostics) from error
-    return build_districts(
-        parsed.document,
-        fingerprints={source.relative_path: source.fingerprint},
-    )
-
-
 _PUBLISHED: DistrictSnapshot | None = None
 
 
-def publish(snapshot: DistrictSnapshot) -> DistrictSnapshot:
-    """Adopt a candidate atomically; a candidate with diagnostics is rejected."""
+def _install(snapshot: DistrictSnapshot) -> DistrictSnapshot:
+    """Bind one validated snapshot as this process's district world.
 
-    if snapshot.diagnostics:
-        raise DistrictError(snapshot.diagnostics)
+    The map composition root (``world.maps.runtime``) owns publication: it
+    installs the four domain views of one bundle together, so no domain can be
+    replaced on its own and no partial world can be observed.
+    """
+
     global _PUBLISHED
+    if not isinstance(snapshot, DistrictSnapshot):
+        raise TypeError("_install() requires a DistrictSnapshot")
     _PUBLISHED = snapshot
     return snapshot
 
 
-def load_and_publish(root: str | Path | None = None) -> DistrictSnapshot:
-    """Load the shipped districts and publish them; a failure keeps the baseline."""
-
-    return publish(load_districts(root))
-
-
-def ensure_published(root: str | Path | None = None) -> DistrictSnapshot:
-    """Publish the shipped districts when a composition root has none yet.
-
-    Only bootstrap/synchronization entry points call this: they establish the
-    published world a consumer reads, so an empty domain never leaks out.
-    """
-
-    if _PUBLISHED is None:
-        return load_and_publish(root)
-    return _PUBLISHED
-
-
 def current() -> DistrictSnapshot:
-    """The published district world."""
+    """The published district world.
+
+    Raises :class:`DistrictNotLoaded` instead of loading implicitly: every
+    process entry point adopts the complete map world before any read-only
+    consumer runs.
+    """
 
     snapshot = _PUBLISHED
     if snapshot is None:
         raise DistrictNotLoaded(
-            "map districts are not loaded; call "
-            "world.lore.map_districts.load_and_publish() before using map consumers"
+            "map districts are not loaded; adopt the map world with "
+            "world.maps.runtime before using map consumers"
         )
     return snapshot
 
@@ -741,13 +717,10 @@ __all__ = [
     "cell_of_position",
     "current",
     "diagnose_districts",
-    "ensure_published",
     "is_published",
     "landmark_node_id",
     "landmark_node_ids",
-    "load_and_publish",
-    "load_districts",
     "parse_districts_document",
     "production_terrain",
-    "publish",
+    "candidate_terrain",
 ]

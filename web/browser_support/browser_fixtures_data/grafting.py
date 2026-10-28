@@ -174,11 +174,12 @@ def graft_synth_wilderness_terrain() -> None:
     from world.rules import travel_cost
     from world.tests.synthetic_data import SYNTH_REGIONS
     from world.maps import geography as _geography
+    from world.maps import runtime as _runtime
     from world.maps import wilderness_provider
     from world.maps.wilderness_provider import region_for_coordinates
 
-    if not _geography.is_published():
-        _geography.publish(_geography.load_geography())
+    if not _runtime.is_published():
+        _runtime.ensure_published()
     snapshot = _geography.current()
 
     partition_keys = {
@@ -193,7 +194,14 @@ def graft_synth_wilderness_terrain() -> None:
         regions.setdefault(
             key, replace(template, key=key, scene_archetype=scene)
         )
-    _geography.publish(replace(snapshot, regions=MappingProxyType(regions)))
+    # A graft is a deliberate whole-bundle replacement: the map world has one
+    # publication pointer, so the grafted geography is installed together with
+    # the settlements, districts and interiors it is joined with.
+    _runtime.publish(
+        replace(_runtime.current(), geography=replace(
+            snapshot, regions=MappingProxyType(regions)
+        ))
+    )
 
     # Every live region needs a terrain row: the grafted partition keys keep
     # their shipped rows, and the kit's regions borrow the rulebook's own

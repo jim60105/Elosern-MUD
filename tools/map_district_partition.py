@@ -193,13 +193,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, default=DATA_PATH)
     args = parser.parse_args(argv)
     _bootstrap()
-    from world.lore import map_districts
-    from world.maps import map_data
-    from world.maps.geography import load_and_publish
+    from world.maps import runtime
 
-    map_data.load_and_publish()
-    load_and_publish()
-    map_districts.load_and_publish()
+    # Generation reads one validated candidate world *without* requiring the
+    # artifact it is about to write, so a missing or stale artifact is exactly
+    # the case this command repairs.
+    runtime.preview(runtime.compose())
     text = artifact_text()
     current = args.output.read_text(encoding="utf-8") if args.output.exists() else None
     if args.check:

@@ -22,7 +22,7 @@ from typeclasses.exits import Exit
 from typeclasses.rooms import GridRoom, Room
 from world.maps.bootstrap import (
     sync_grid,
-    sync_service_interiors,
+    sync_interiors,
 )
 from world.maps.static_references import place_exterior_xyz
 
@@ -66,7 +66,7 @@ class ServiceInteriorTests(EvenniaTestCase):
         return GridRoom.objects.filter_xyz(xyz=place_exterior_xyz(place)).first()
 
     def test_fresh_sync_creates_one_permanent_interior_per_place(self):
-        sync_service_interiors()
+        sync_interiors()
         for place in _places().values():
             room = self._interior(place)
             self.assertIsNotNone(room, place.key)
@@ -88,7 +88,7 @@ class ServiceInteriorTests(EvenniaTestCase):
         )
         from world.maps.room_art import PLACE_SCENE_ARCHETYPES, place_scene_identity
 
-        sync_service_interiors()
+        sync_interiors()
         for place in _places().values():
             room = self._interior(place)
             self.assertEqual(room.scene_archetype, PLACE_SCENE_ARCHETYPES[place.key])
@@ -105,7 +105,7 @@ class ServiceInteriorTests(EvenniaTestCase):
             room.scene_identity = "drifted"
             room.save()
 
-        sync_service_interiors()
+        sync_interiors()
 
         self.assertEqual(Room.objects.all_family().count(), room_count)
         for place in _places().values():
@@ -115,7 +115,7 @@ class ServiceInteriorTests(EvenniaTestCase):
             self.assertEqual(room.scene_identity, place_scene_identity(place.key))
 
     def test_interiors_have_bidirectional_doorways_to_documented_exteriors(self):
-        sync_service_interiors()
+        sync_interiors()
         for place in _places().values():
             interior = self._interior(place)
             exterior = self._exterior(place)
@@ -128,13 +128,13 @@ class ServiceInteriorTests(EvenniaTestCase):
 
     @covers_requirement("sample-city-altoria::the-sample-city-s-declared-exterior-topology-remains-unchanged-while-permanent-service-interiors-are-attached")
     def test_grid_topology_is_unchanged(self):
-        sync_service_interiors()
+        sync_interiors()
         # Two settlements are spawned (21 capital + 6 village nodes); the
         # interiors are still not xyzgrid nodes.
         self.assertEqual(self._count_grid_rooms(), 31)
 
     def test_interiors_are_not_xyzgrid_nodes(self):
-        sync_service_interiors()
+        sync_interiors()
         grid_keys = {room.key for room in GridRoom.objects.all_family()}
         for place in _places().values():
             self.assertNotIn(place.room_name_zh, grid_keys)
@@ -144,7 +144,7 @@ class ServiceInteriorTests(EvenniaTestCase):
         "place-driven-service-sync::interiors-are-created-by-iterating-the-place-registry"
     )
     def test_repeated_sync_reuses_tags_reapplies_desc_and_duplicates_no_doorway(self):
-        sync_service_interiors()
+        sync_interiors()
         first = {
             place.key: (room.pk, sorted(e.key for e in room.exits))
             for place in _places().values()
@@ -159,7 +159,7 @@ class ServiceInteriorTests(EvenniaTestCase):
             room.db.desc = "drifted description"
             room.save()
 
-        sync_service_interiors()
+        sync_interiors()
 
         second = {
             place.key: (room.pk, sorted(e.key for e in room.exits))
@@ -174,7 +174,7 @@ class ServiceInteriorTests(EvenniaTestCase):
             self.assertEqual(room.db.desc, place.room_desc_zh)
 
     def test_doorway_keys_and_aliases_are_the_places_authored_pair(self):
-        sync_service_interiors()
+        sync_interiors()
         for place in _places().values():
             interior = self._interior(place)
             exterior = self._exterior(place)
@@ -195,7 +195,7 @@ class ServiceInteriorTests(EvenniaTestCase):
             self.assertEqual(back[0].key, "外")
 
     def test_interior_reachable_from_and_back_to_exterior(self):
-        sync_service_interiors()
+        sync_interiors()
         for place in _places().values():
             interior = self._interior(place)
             exterior = self._exterior(place)
@@ -211,7 +211,7 @@ class ServiceInteriorTests(EvenniaTestCase):
         # two interiors is one street with two doors. Discovered dynamically
         # from the live registry — this suite follows the rows, never names a
         # shipped place.
-        sync_service_interiors()
+        sync_interiors()
         groups: dict[tuple, list] = {}
         for place in _places().values():
             groups.setdefault((place.settlement_key, place.exterior), []).append(place)
@@ -256,7 +256,7 @@ class ServiceInteriorTests(EvenniaTestCase):
         exterior_xyz = place_exterior_xyz(bad_place)
         GridRoom.objects.filter_xyz(exterior_xyz).first().delete()
         with patch("world.maps.bootstrap.log_warn") as warned:
-            sync_service_interiors()
+            sync_interiors()
         events = [
             call for call in warned.call_args_list
             if call.args and call.args[0] == "bootstrap_service_exterior_missing"
@@ -298,7 +298,7 @@ class ServiceInteriorTests(EvenniaTestCase):
             for suffix in ("a", "b")
         ]
         with patch.dict(places, {place.key: place for place in pair}, clear=False):
-            sync_service_interiors()
+            sync_interiors()
             exterior = self._exterior(pair[0])
             interiors = [self._interior(place) for place in pair]
         self.assertTrue(all(room is not None for room in interiors))

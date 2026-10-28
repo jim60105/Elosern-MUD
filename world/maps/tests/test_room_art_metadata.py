@@ -25,7 +25,7 @@ from world.art.scene_definitions import (
     is_registered_room_art_key,
     is_registered_scene_key,
 )
-from world.maps.bootstrap import sync_grid, sync_service_interiors
+from world.maps.bootstrap import sync_grid, sync_interiors
 from world.maps.instance import spawn_instance_room
 from world.maps.room_art import (
     GRID_NODE_SCENE_ARCHETYPES,
@@ -130,7 +130,7 @@ class PermanentInteriorArtMetadataTests(EvenniaTest):
         "room-art-metadata::room-official-references-are-explicit-authored-keys"
     )
     def test_new_interior_carries_metadata_that_survives_reload(self):
-        sync_service_interiors()
+        sync_interiors()
         place = next(iter(_live_places().values()))
         interior = search_object_by_tag(place.key)[0]
 
@@ -147,14 +147,14 @@ class PermanentInteriorArtMetadataTests(EvenniaTest):
         self.assertEqual(reloaded.scene_identity, place_scene_identity(place.key))
 
     def test_repeated_startup_reapplies_interior_metadata_without_duplicates(self):
-        sync_service_interiors()
+        sync_interiors()
         count = Room.objects.all_family().count()
         place = next(iter(_live_places().values()))
         interior = search_object_by_tag(place.key)[0]
         interior.scene_archetype = None
         interior.save()
 
-        sync_service_interiors()
+        sync_interiors()
 
         self.assertEqual(Room.objects.all_family().count(), count)
         self.assertEqual(
@@ -354,7 +354,7 @@ class RoomMetadataSmokeTests(EvenniaTest):
         """
         _limbo()
         sync_grid()
-        sync_service_interiors()
+        sync_interiors()
 
         node = next(iter(GRID_NODE_SCENE_ARCHETYPES))
         from world.maps.static_references import settlement_node_xyz

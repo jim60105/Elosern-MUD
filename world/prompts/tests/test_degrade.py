@@ -324,7 +324,7 @@ class BoundedFailureDegradeTests(PromptFixture):
         with patch("world.lore.sync.sync_all"), patch(
             "world.maps.bootstrap.sync_grid"
         ), patch("world.maps.bootstrap.sync_wilderness"), patch(
-            "world.maps.bootstrap.sync_service_interiors"
+            "world.maps.bootstrap.sync_interiors"
         ), patch("world.quests.bootstrap.sync_quest_runtime"), patch(
             "world.rules.guild_economy.sync_guild_economy"
         ), patch(

@@ -29,7 +29,7 @@ from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom, Room
 from world.maps.bootstrap import (
     sync_grid,
-    sync_service_interiors,
+    sync_interiors,
 )
 from world.quests.catalog import register_catalog
 from world.quests.definitions import QUEST_DEFINITION_REGISTRY
@@ -252,7 +252,7 @@ class ServiceContentIsolation(QuestRegistryIsolation):
         register_catalog()
         create_object(Room, key="虛境", location=None)
         sync_grid()
-        sync_service_interiors()
+        sync_interiors()
         # Snapshot the REAL module cache (the name imported above is a value
         # copy; rebinding it restores nothing). A test that calls
         # load_catalog_into_cache() inside a temporary registry patch would
