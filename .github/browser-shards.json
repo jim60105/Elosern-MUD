@@ -123,7 +123,8 @@
         "web.tests.browser.test_browser_services_quest_drawer.ServicesUnavailableJourney.test_unavailable_services_drawer_renders_reason_only",
         "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_search_tells_equal_names_apart_and_alt_left_returns",
         "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_diagnostics_locate_targets_and_reveal_a_hidden_layer",
-        "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_dragging_a_referenced_node_is_one_command_that_keeps_its_relations"
+        "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_dragging_a_referenced_node_is_one_command_that_keeps_its_relations",
+        "web.tests.browser.test_map_editor_relationships.MapEditorRelationshipBrowserTest.test_an_unavailable_index_refuses_deletion_at_the_action_while_entrance_edits_save"
       ],
       "files_b": [
         "web.tests.browser.test_browser_creation_reconnect.ReconnectPresetCreationJourney.test_reconnect_restores_preset_stage_and_never_auto_activates",
@@ -226,7 +227,8 @@
         "web.tests.browser.test_browser_inventory_grid.InventoryGridJourneys.test_bag_tab_lists_the_committed_rows_with_keyboard_reach",
         "web.tests.browser.test_browser_console_saves.ConsoleSaveIsolationBrowserTest.test_first_protected_teleport_saves_the_before_state_privately",
         "web.tests.browser.test_browser_synth_lineage.SynthLineageBrowserTest.test_synthetic_member_lineage_matches_text_and_panel",
-        "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_the_connection_tool_creates_a_two_way_pair_in_one_command_and_undo_removes_it"
+        "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_the_connection_tool_creates_a_two_way_pair_in_one_command_and_undo_removes_it",
+        "web.tests.browser.test_map_editor_relationships.MapEditorRelationshipBrowserTest.test_the_settlement_entrance_tool_adds_a_gate_with_one_settlement_write"
       ]
     },
     {
@@ -314,7 +316,8 @@
         "web.tests.browser.test_browser_exit_compass.ExitCompassBrowserTest.test_holding_a_direction_walks_until_a_dead_end",
         "web.tests.browser.test_browser_exit_compass.ExitCompassBrowserTest.test_a_disabled_exit_reads_its_reason_from_the_readout",
         "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_keyboard_only_workflow_in_chromium",
-        "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityFirefoxTest.test_keyboard_only_workflow_in_firefox"
+        "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityFirefoxTest.test_keyboard_only_workflow_in_firefox",
+        "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_a_retargeted_road_and_a_new_bend_stay_selected"
       ]
     },
     {
@@ -338,7 +341,8 @@
         "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_scene_caption_sits_on_the_stage_floor_between_the_portraits",
         "web.tests.browser.test_browser_layout.LayoutMigrationTest",
         "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_a_new_local_map_from_a_location_is_empty_and_unfinished",
-        "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_a_referenced_room_refuses_deletion_and_a_connection_is_deleted_directly"
+        "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_a_referenced_room_refuses_deletion_and_a_connection_is_deleted_directly",
+        "web.tests.browser.test_map_editor_relationships.MapEditorRelationshipBrowserTest.test_changing_an_endpoint_with_the_selector_by_keyboard_writes_the_qualified_id"
       ]
     },
     {
@@ -462,7 +466,8 @@
         "web.tests.browser.test_browser_creation_viewport_pointer.ViewportCreationJourney.test_reference_viewport_keeps_creation_essentials_visible_and_literal",
         "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_reload_in_combat_plays_nothing",
         "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_mode_transitions_reduced",
-        "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_mode_transitions_off"
+        "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_mode_transitions_off",
+        "web.tests.browser.test_map_editor_relationships.MapEditorRelationshipBrowserTest.test_the_exterior_card_leads_to_the_other_end_and_alt_left_returns"
       ]
     },
     {
@@ -516,7 +521,8 @@
         "web.tests.browser.test_browser_creation_preset.PresetCreationJourneys.test_rejected_preset_save_stays_on_the_list_without_confirmation",
         "web.tests.browser.test_browser_layout.ContextualHudStandingJourneyTest",
         "web.tests.browser.test_browser_drawer_content.DrawerContentBrowserTest.test_status_opens_the_party_window_hero_and_no_drawer_stands_art",
-        "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_prototype_name_and_scene_fields_by_keyboard"
+        "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_prototype_name_and_scene_fields_by_keyboard",
+        "web.tests.browser.test_map_editor_relationships.MapEditorRelationshipBrowserTest.test_a_referenced_node_locates_its_exterior_which_is_removed_before_the_node"
       ],
       "files_b": [
         "web.tests.browser.test_browser_creation_reset_draft.ResetAndDraftJourneys.test_escape_from_reset_confirm_returns_to_form_without_mutation",
@@ -540,7 +546,8 @@
         "web.tests.browser.test_browser_proportional_ui_scale.ProportionalUiScaleBrowserTest",
         "web.tests.browser.test_browser_skillbook_casting.SkillBookFieldCastJourneyTest.test_keyboard_self_none_and_single_utility_casts",
         "web.tests.browser.test_browser_skillbook_casting.SkillBookFieldCastJourneyTest.test_area_opening_at_a_chosen_scale_starts_combat_then_book_hands_off",
-        "web.tests.browser.test_browser_skillbook_casting.CompanionFieldCastJourneyTest.test_companion_casts_a_field_heal_from_the_skill_tab"
+        "web.tests.browser.test_browser_skillbook_casting.CompanionFieldCastJourneyTest.test_companion_casts_a_field_heal_from_the_skill_tab",
+        "web.tests.browser.test_map_editor_relationships.MapEditorRelationshipBrowserTest.test_the_interior_entrance_tool_creates_a_two_way_link_as_one_record"
       ],
       "files_b": [
         "web.tests.browser.test_browser_combat_beats.CombatBeatsBrowserTest.test_reconnect_replays_no_round",
