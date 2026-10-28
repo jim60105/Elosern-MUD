@@ -228,20 +228,28 @@ def enclosing_anchor_cell(room: Any) -> tuple[int, int] | None:
     if not isinstance(room, Room):
         return None
     tags = set(room.tags.all())
-    anchors: set[str] = set()
+    published = interiors.current()
+    # A room reached through its interior's internal connections shares the
+    # document's one exterior entrance, so every room resolves the document's
+    # entrance. The exterior names a settlement *map*, which the authored
+    # anchor placement binds to a location and therefore to one continental
+    # cell.
+    cells = set()
     for tag in tags:
         if not isinstance(tag, str):
             continue
-        found = interiors.current().rooms.get(tag)
+        found = published.rooms.get(tag)
         if found is None:
             continue
-        exterior = interiors.current().exteriors.get(found.room_id)
-        if exterior is not None:
-            anchors.add(exterior.settlement)
-    if len(anchors) != 1:
+        exterior = published.documents[found.interior_id].exterior
+        if exterior is None:
+            continue
+        cell = _settlement_anchor_cell(exterior.settlement)
+        if cell is not None:
+            cells.add(cell)
+    if len(cells) != 1:
         return None
-    geography = anchor_geography().get(next(iter(anchors)))
-    return None if geography is None else tuple(geography.cell)
+    return next(iter(cells))
 
 
 def instance_origin(room: Any) -> Any:

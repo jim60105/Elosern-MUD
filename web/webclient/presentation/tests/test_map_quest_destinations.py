@@ -516,7 +516,7 @@ class AcceptedDestinationsConsumerTests(RegistryIsolationMixin, EvenniaTest):
                     "t_service",
                     {"t_service": interior_room("合成服務室", "A synthetic service room.")},
                     exterior=interior_exterior(
-                        "town", "town_node", "t_service", "合成服務門"
+                        "town_map", "town_node", "t_service", "合成服務門"
                     ),
                 )
             ]
@@ -556,14 +556,27 @@ class AcceptedDestinationsConsumerTests(RegistryIsolationMixin, EvenniaTest):
                 self.assertEqual(self._snapshot(), before)
             # A second authored enclosing anchor makes the room ambiguous: an
             # arbitrary one is never chosen.
-            for settlement in ("ruin", "missing"):
-                with self.subTest(second_settlement=settlement):
-                    with published_interiors(
-                        *_interiors(settlement), replace_existing=True
-                    ):
-                        self.assertIsNone(
-                            actor_world_cell(SimpleNamespace(location=interior))
-                        )
+            second_placement = SimpleNamespace(
+                anchor_key="ruin", zcoord="ruin_map", node=object()
+            )
+            # A second authored enclosure in a different place is ambiguous.
+            with published_interiors(
+                *_interiors("ruin_map"), replace_existing=True
+            ), mock.patch.object(
+                resolver,
+                "ANCHOR_PLACEMENT_REGISTRY",
+                {**_PLACEMENTS, "ruin": second_placement},
+            ):
+                self.assertIsNone(
+                    actor_world_cell(SimpleNamespace(location=interior))
+                )
+            # A second room naming an unplaced settlement adds no enclosure, so
+            # the one resolvable document still locates the room.
+            with published_interiors(*_interiors("missing"), replace_existing=True):
+                self.assertEqual(
+                    actor_world_cell(SimpleNamespace(location=interior)),
+                    (300, 400),
+                )
             # A room whose only tag names no authored interior is
             # unlocatable: no arbitrary enclosure is invented for it.
             unregistered = create_object(Room, key="Synthetic unregistered")
@@ -573,11 +586,40 @@ class AcceptedDestinationsConsumerTests(RegistryIsolationMixin, EvenniaTest):
                     actor_world_cell(SimpleNamespace(location=unregistered))
                 )
             # Restoring the authored room locates it again.
-            with published_interiors(*_interiors("town"), replace_existing=True):
+            with published_interiors(*_interiors("town_map"), replace_existing=True):
                 self.assertEqual(
                     actor_world_cell(SimpleNamespace(location=unregistered)),
                     (300, 400),
                 )
+
+    @covers_requirement("map-quest-destinations::accepted-commission-destinations-resolve-on-the-server")
+    def test_an_inner_room_locates_its_document_without_a_service_record(self):
+        from typeclasses.rooms import Room
+
+        from world.tests.interior_fixture import (
+            interior_document,
+            interior_exterior,
+            interior_room,
+            published_interiors,
+        )
+
+        _patch_geography(self)
+        inner_room = create_object(Room, key="Synthetic inner")
+        inner_room.tags.add("t_inner_room")
+        house = interior_document(
+            "t_two_room_house",
+            {
+                "t_entrance": interior_room("合成門廳", "A synthetic hall."),
+                "t_inner_room": interior_room("合成內室", "A synthetic inner room."),
+            },
+            exterior=interior_exterior("town_map", "town_node", "t_entrance", "合成門"),
+        )
+        with published_interiors(house, replace_existing=True):
+            # The inner room has no service record and no exterior of its own:
+            # it is located through the document that authors it.
+            self.assertEqual(
+                actor_world_cell(SimpleNamespace(location=inner_room)), (300, 400)
+            )
 
     def test_empty_or_missing_quest_log_resolves_to_nothing(self):
         self.char1.db.quest_log = None

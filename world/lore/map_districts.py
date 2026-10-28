@@ -20,11 +20,12 @@ Two kinds exist:
   the whole forest across both nominal claims, so it is deliberately hard to
   light.
 
-Nothing here loads at import time. The game composition root (and tests) call
-:func:`load_and_publish`, and every read-only consumer goes through
-:func:`current`. :func:`load_districts` returns a candidate snapshot even when
-the terrain rules report saveable work-in-progress diagnostics;
-:func:`publish` rejects a candidate carrying any diagnostic, so runtime
+Nothing here loads at import time. The map composition root
+(``world.maps.runtime``) composes this domain from the candidate source set and
+installs it as part of one adopted bundle, and every read-only consumer goes
+through :func:`current`. :func:`build_districts` returns a candidate snapshot
+even when the terrain rules report saveable work-in-progress diagnostics;
+adoption rejects a candidate carrying any diagnostic, so runtime
 adoption never precedes a rejection and a failed candidate leaves the
 previously published snapshot untouched.
 """

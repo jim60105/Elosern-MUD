@@ -666,7 +666,7 @@ def _validate_objective(
                 "ESCORT objective quantity must be exactly 1; arrival observation "
                 "cannot accumulate repeated visits",
             )
-        _validate_escort_completion(definition, objective)
+        _validate_escort_completion(definition, objective, bindings)
     elif objective.kind is ObjectiveKind.ACQUIRE:
         if (
             objective.monster_tier is not None

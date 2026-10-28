@@ -167,6 +167,63 @@ class DefinitionRegistrationTests(QuestRegistryIsolation, unittest.TestCase):
                 with self.assertRaises(QuestDefinitionError):
                     register(quest(key, stages=(QuestStage(0, objective),)))
 
+    def test_an_escort_destination_is_checked_against_the_supplied_bindings(self):
+        # A candidate world supplies its own anchor/grid bindings: an escort
+        # destination the candidate retires is rejected even while the
+        # published world still knows it, and a candidate-only destination is
+        # accepted without touching the published registries.
+        from world.quests.definitions import QuestLocationBindings, validate_definition
+
+        def bindings(anchor_keys=(), grid_map_keys=()):
+            return QuestLocationBindings(
+                anchor_keys=frozenset(anchor_keys),
+                grid_map_keys=frozenset(grid_map_keys),
+                region_keys=frozenset(),
+            )
+
+        anchor = anchor_locator()
+        anchor_quest = quest(
+            "t-escort-anchor-bindings",
+            stages=(QuestStage(0, escort(anchor)),),
+        )
+        with self.assertRaises(QuestDefinitionError):
+            validate_definition(anchor_quest, bindings=bindings())
+        validate_definition(
+            anchor_quest, bindings=bindings(anchor_keys=(anchor.anchor_key,))
+        )
+
+        grid = grid_locator()
+        grid_quest = quest(
+            "t-escort-grid-bindings",
+            stages=(QuestStage(0, escort(grid)),),
+        )
+        with self.assertRaises(QuestDefinitionError):
+            validate_definition(grid_quest, bindings=bindings())
+        validate_definition(
+            grid_quest, bindings=bindings(grid_map_keys=(grid.xyz[2],))
+        )
+
+        # A destination that exists only in the candidate world is accepted
+        # without touching the published registries.
+        candidate_anchor = RoomLocator(DestinationKind.ANCHOR, anchor_key="t_candidate_anchor")
+        candidate_anchor_quest = quest(
+            "t-escort-candidate-anchor",
+            stages=(QuestStage(0, escort(candidate_anchor)),),
+        )
+        validate_definition(
+            candidate_anchor_quest,
+            bindings=bindings(anchor_keys=("t_candidate_anchor",)),
+        )
+        candidate_grid = RoomLocator(DestinationKind.GRID, xyz=(1, 2, "t_candidate_map"))
+        candidate_grid_quest = quest(
+            "t-escort-candidate-grid",
+            stages=(QuestStage(0, escort(candidate_grid)),),
+        )
+        validate_definition(
+            candidate_grid_quest,
+            bindings=bindings(grid_map_keys=("t_candidate_map",)),
+        )
+
     @covers_requirement(
         "lore-item-catalog::retiring-an-item-key-leaves-no-dangling-reference"
     )

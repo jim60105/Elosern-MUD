@@ -716,6 +716,31 @@ class PlaceRegistryTests(unittest.TestCase):
         self.assertIn("t_offline_store", str(caught.exception))
 
 
+class SettlementMapAssociationTests(unittest.TestCase):
+    def test_the_map_association_comes_from_the_published_binding(self):
+        # The coordinate space is not authored on the non-map settlement row:
+        # changing the binding changes what the row exposes.
+        from dataclasses import replace as replace_placement
+
+        from elosern_map_core.references import settlement_node_ref
+        from world.lore import anchor_placement
+        from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
+
+        key = next(iter(SETTLEMENT_REGISTRY))
+        published = anchor_placement.ANCHOR_PLACEMENT_REGISTRY[key]
+        self.assertEqual(SETTLEMENT_REGISTRY[key].zcoord, published.zcoord)
+
+        moved = replace_placement(
+            published, node=settlement_node_ref("t_moved_map", "t_moved_node")
+        )
+        with mock.patch.object(
+            anchor_placement,
+            "ANCHOR_PLACEMENT_REGISTRY",
+            {key: moved},
+        ):
+            self.assertEqual(SETTLEMENT_REGISTRY[key].zcoord, "t_moved_map")
+
+
 class DerivedShopRegistryTests(unittest.TestCase):
     """Shop identities are a view over the places that author a shop_key."""
 

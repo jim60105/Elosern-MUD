@@ -129,6 +129,8 @@ class AnchorPlacementRegistryTests(unittest.TestCase):
     def test_world_position_transform_adds_the_cell_center_not_the_cell_index(self):
         from world.maps import geography as geography_module
         from world.maps import map_data as map_data_module
+        from world.maps import runtime
+        from world.tests.geography_fixture import publish_geography, publish_settlements
 
         synthetic = {
             "t_frame_anchor": GeographicAnchor("t_frame_anchor", (2, 3), "synthetic")
@@ -136,10 +138,10 @@ class AnchorPlacementRegistryTests(unittest.TestCase):
         frames = {"t_frame_anchor": LocalFrameAnchor("t_frame_anchor", (100, 200))}
         previous = geography_module.current()
         previous_settlements = map_data_module.current()
-        geography_module.publish(
+        publish_geography(
             replace(previous, anchor_geography=MappingProxyType(synthetic))
         )
-        map_data_module.publish(
+        publish_settlements(
             replace(previous_settlements, local_frame_anchors=MappingProxyType(frames))
         )
         try:
@@ -148,5 +150,5 @@ class AnchorPlacementRegistryTests(unittest.TestCase):
                 (2500 + 50, 3500 + 60),
             )
         finally:
-            geography_module.publish(previous)
-            map_data_module.publish(previous_settlements)
+            publish_settlements(previous_settlements)
+            publish_geography(previous)

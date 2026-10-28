@@ -75,6 +75,8 @@ class MapWorldAdoptionTests(EvenniaTestCase):
         self.baseline = runtime.adopt()
         bootstrap.sync_grid()
         bootstrap.sync_interiors()
+        # Startup settles the adoption once the persistent world converged.
+        runtime.commit_adoption()
 
     def tearDown(self):
         runtime.publish(self.baseline)
@@ -218,6 +220,55 @@ class MapWorldAdoptionTests(EvenniaTestCase):
         self.assertIs(runtime.current(), baseline)
         self.assertEqual(binding_signature(), baseline_signature)
         self.assertEqual(Room.objects.all_family().count(), rooms_before)
+
+    def test_a_second_adoption_keeps_the_last_synchronized_rollback_baseline(self):
+        baseline = runtime.current()
+        baseline_signature = binding_signature()
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = _copy_map_sources(Path(directory))
+            (root / "content/maps/interiors/t_adoption_study.yaml").write_text(
+                _extra_interior_document(), encoding="utf-8"
+            )
+            (root / "content/maps/interiors/t_adoption_study_two.yaml").write_text(
+                _extra_interior_document()
+                .replace("t_adoption_study", "t_adoption_study_two")
+                .replace("合成書房門", "合成第二書房門"),
+                encoding="utf-8",
+            )
+            with patch.object(
+                runtime,
+                "partition_freshness_for",
+                side_effect=lambda world: PartitionFreshness(
+                    algorithm_version=PARTITION_ALGORITHM_VERSION,
+                    input_signature=world.partition_signature,
+                    current=True,
+                ),
+            ):
+                runtime.adopt(root)
+                runtime.adopt()
+            self.assertIsNot(runtime.current(), baseline)
+
+            calls = {"count": 0}
+            real = bootstrap._ensure_owned_exit
+
+            def fail_after_writes(*args, **kwargs):
+                calls["count"] += 1
+                created = real(*args, **kwargs)
+                if calls["count"] > 2:
+                    raise RuntimeError("injected interior edge failure")
+                return created
+
+            with patch.object(
+                bootstrap, "_ensure_owned_exit", side_effect=fail_after_writes
+            ):
+                with self.assertRaises(RuntimeError):
+                    runtime.synchronize()
+
+        # The failed synchronization restores the last SYNCHRONIZED world, not
+        # the intermediate unsynchronized adoption.
+        self.assertIs(runtime.current(), baseline)
+        self.assertEqual(binding_signature(), baseline_signature)
 
     def test_a_stale_partition_rejects_the_candidate(self):
         baseline = runtime.current()

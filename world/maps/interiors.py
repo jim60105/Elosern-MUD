@@ -315,6 +315,16 @@ def room_name_zh(reference: QualifiedRef) -> str:
 
 
 def exterior_for(room_id: str) -> ExteriorDeclaration | None:
-    """The authored exterior entrance of one published room, if it has one."""
+    """The authored exterior entrance of one published room's interior.
 
-    return current().exteriors.get(room_id)
+    The entrance relationship belongs to the interior document, so every room
+    of that document — an inner room reached through its own connections
+    included — resolves the same entrance. A document that declares none has no
+    exterior at all.
+    """
+
+    published = current()
+    found = published.rooms.get(room_id)
+    if found is None:
+        return None
+    return published.documents[found.interior_id].exterior

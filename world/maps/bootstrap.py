@@ -85,7 +85,13 @@ def _ensure_interior(room_data):
     """Create or converge one permanent interior room and return it."""
     from evennia.utils.search import search_object_by_tag
 
-    rooms = search_object_by_tag(room_data.room_id)
+    rooms = [
+        obj for obj in search_object_by_tag(room_data.room_id) if isinstance(obj, Room)
+    ]
+    if len(rooms) > 1:
+        raise InteriorSyncError(
+            f"interior room {room_data.room_id!r} resolves to {len(rooms)} rooms"
+        )
     if rooms:
         room = rooms[0]
     else:
@@ -137,7 +143,7 @@ def _owned_exits() -> list:
     )
 
 
-def _ensure_owned_exit(location, destination, key, aliases, owner):
+def _ensure_owned_exit(location, destination, key, aliases, owner, *, touched=None):
     """Converge exactly one exit this synchronizer owns, and return it.
 
     An exit already owned under ``owner`` that still leads to this exact
@@ -158,7 +164,8 @@ def _ensure_owned_exit(location, destination, key, aliases, owner):
         unowned = [
             exit_obj
             for exit_obj in location.exits
-            if exit_obj.destination == destination
+            if exit_obj.destination is not None
+            and exit_obj.destination == destination
             and not exit_obj.tags.has(category=INTERIOR_EDGE_TAG_CATEGORY)
         ]
         if unowned:
@@ -174,6 +181,8 @@ def _ensure_owned_exit(location, destination, key, aliases, owner):
                 destination=destination,
             )
             created.tags.add(owner, category=INTERIOR_EDGE_TAG_CATEGORY)
+            if touched is not None:
+                touched.append(created)
             return created
     keep = sorted(owned, key=lambda exit_obj: exit_obj.id)[0]
     for duplicate in owned[1:]:
@@ -183,12 +192,26 @@ def _ensure_owned_exit(location, destination, key, aliases, owner):
     if set(keep.aliases.all()) != set(aliases):
         keep.aliases.clear()
         keep.aliases.add(list(aliases))
+    # A dead home (the room it defaulted to was deleted) would block the save;
+    # an exit with no home is valid, so clear the dead reference first.
+    home = keep.db_home
+    if home is not None and getattr(home, "pk", None) is None:
+        keep.home = None
     keep.save()
+    if touched is not None:
+        touched.append(keep)
     return keep
 
 
-def _prune_retired_interior_edges(planned: set[tuple[str, int, int]]) -> None:
-    """Delete owned exits that no authored relationship plans any more."""
+def _prune_retired_interior_edges(
+    planned: set[tuple[str, int, int]], *, preserved: frozenset[int] = frozenset()
+) -> None:
+    """Delete owned exits that no authored relationship plans any more.
+
+    ``preserved`` holds the rooms of a skipped (temporarily unrealizable)
+    interior: their existing exits are not retired, so a dependency that is
+    momentarily absent leaves a working location exactly as it was.
+    """
 
     for exit_obj in _owned_exits():
         owner = exit_obj.tags.get(category=INTERIOR_EDGE_TAG_CATEGORY)
@@ -196,6 +219,8 @@ def _prune_retired_interior_edges(planned: set[tuple[str, int, int]]) -> None:
         destination = exit_obj.destination
         if location is None or destination is None:
             exit_obj.delete()
+            continue
+        if location.pk in preserved or destination.pk in preserved:
             continue
         if (owner, location.pk, destination.pk) in planned:
             continue
@@ -304,6 +329,13 @@ def _interior_plan(snapshot):
             )
         )
 
+    # A missing materialized frontage skips the whole dependent interior
+    # document, not just its entrance room: the rooms reachable only through it
+    # belong to the same temporarily unrealizable location.
+    if skipped:
+        for document in snapshot.documents.values():
+            if skipped & set(document.rooms):
+                skipped.update(document.rooms)
     room_edges = [
         edge
         for edge in room_edges
@@ -312,21 +344,42 @@ def _interior_plan(snapshot):
     return room_edges, exterior_edges, skipped
 
 
-def _evict_batch_cache() -> None:
-    """Drop the identity map after a rolled-back interior batch.
+class InteriorSyncError(RuntimeError):
+    """One authored interior cannot be realized against the materialized map."""
+
+
+def _evict_batch_cache(touched=()) -> None:
+    """Drop the batch's live objects so the persisted baseline is read again.
 
     The database rollback restores the rows, but this batch created rooms and
-    exits and rewrote their attributes in the same process, and the idmapper
-    would keep serving those live objects. The global flush is the engine's own
-    recovery idiom; this path only runs when the batch refused to commit.
+    exits and rewrote their keys, aliases and attributes in the same process,
+    and the identity map would keep serving those live objects (Evennia keeps
+    objects that carry non-persistent attributes). The global flush is the
+    engine's own recovery idiom; the batch's own objects are forced out as
+    well, because a map room's non-persistent attributes are never authored
+    state and the persisted baseline must win over them.
     """
 
     from evennia.utils.idmapper.models import flush_cache
 
     flush_cache()
+    for obj in touched:
+        flusher = getattr(obj, "flush_from_cache", None)
+        if flusher is None:
+            continue
+        try:
+            flusher(force=True)
+        except Exception as error:  # observability: ignore R2: best-effort eviction of one object; the rest still flush
+            log_warn(
+                "bootstrap_interior_cache_eviction_failed",
+                exc=error,
+                context={"obj": getattr(obj, "db_key", "?"), "dbref": getattr(obj, "dbref", "?")},
+            )
 
 
-def _apply_interior_edges(room_edges, exterior_edges) -> None:
+def _apply_interior_edges(
+    room_edges, exterior_edges, *, skipped=frozenset(), touched=None
+) -> None:
     """Converge every planned interior edge, then retire the unplanned ones.
 
     Both endpoints exist by now: the room loop created every non-skipped room
@@ -345,19 +398,34 @@ def _apply_interior_edges(room_edges, exterior_edges) -> None:
             )
         return rooms[0]
 
+    # An exit whose endpoint no longer exists is dead weight from a deleted
+    # object, not an authored relationship: retire it before converging, so a
+    # vanished street can never be resurrected by a save on a dangling row.
+    for exit_obj in _owned_exits():
+        if exit_obj.location is None or exit_obj.destination is None:
+            exit_obj.delete()
+
     planned: set[tuple[str, int, int]] = set()
+    preserved = frozenset(
+        room.pk
+        for room_id in skipped
+        for room in search_object_by_tag(room_id)
+        if isinstance(room, Room)
+    )
     for source_id, destination_id, key, aliases, owner in room_edges:
         location = _room(source_id)
         destination = _room(destination_id)
-        _ensure_owned_exit(location, destination, key, aliases, owner)
+        _ensure_owned_exit(location, destination, key, aliases, owner, touched=touched)
         planned.add((owner, location.pk, destination.pk))
     for street, room_id, key, aliases, owner, return_owner in exterior_edges:
         room = _room(room_id)
-        _ensure_owned_exit(street, room, key, aliases, owner)
+        _ensure_owned_exit(street, room, key, aliases, owner, touched=touched)
         planned.add((owner, street.pk, room.pk))
-        _ensure_owned_exit(room, street, "外", ("out", "leave"), return_owner)
+        _ensure_owned_exit(
+            room, street, "外", ("out", "leave"), return_owner, touched=touched
+        )
         planned.add((return_owner, room.pk, street.pk))
-    _prune_retired_interior_edges(planned)
+    _prune_retired_interior_edges(planned, preserved=preserved)
 
 
 def sync_interiors() -> None:
@@ -391,21 +459,25 @@ def sync_interiors() -> None:
     # street is skipped (warned once) before this batch creates anything.
     room_edges, exterior_edges, skipped = _interior_plan(snapshot)
 
+    touched: list = []
     try:
         with transaction.atomic():
             for room_id in snapshot.rooms:
                 if room_id in skipped:
                     continue
                 room = _ensure_interior(snapshot.room(room_id))
+                touched.append(room)
                 _apply_room_art(
                     room,
                     scene_archetype=snapshot.rooms[room_id].scene_archetype,
                     room_art_key=snapshot.rooms[room_id].art_key,
                     scene_identity=place_scene_identity(room_id),
                 )
-            _apply_interior_edges(room_edges, exterior_edges)
+            _apply_interior_edges(
+                room_edges, exterior_edges, skipped=skipped, touched=touched
+            )
     except Exception:
-        _evict_batch_cache()
+        _evict_batch_cache(touched)
         raise
 
 

@@ -18,11 +18,11 @@ A location's local map is discovered from ``location_ref`` alone, so adding a
 map for an existing location is a source edit: no Python registration, roster
 or reverse location list exists.
 
-Publication is atomic: a failed candidate raises :class:`SettlementError` and
-leaves the previously published snapshot exactly as it was. Nothing loads at
-import time; the game composition root (and tests) call
-:func:`load_and_publish`, and every read-only consumer goes through a registry
-view or :func:`current`.
+Composition never publishes: a failed candidate raises :class:`SettlementError`
+and leaves the adopted world exactly as it was. Nothing loads at import time;
+the map composition root (``world.maps.runtime``) composes this domain and
+installs it inside one adopted bundle, and every read-only consumer goes
+through a registry view or :func:`current`.
 
 Consumers must read through :func:`settlement_graph` (or
 :data:`SETTLEMENT_GRAPHS`); never rebuild a graph from a single source file.

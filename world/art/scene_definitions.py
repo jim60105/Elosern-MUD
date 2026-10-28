@@ -201,7 +201,7 @@ def room_art_keys() -> tuple[str, ...]:
 
     from world.maps.interiors import current
 
-    return tuple(sorted(current().room_art_keys.values()))
+    return tuple(sorted(set(current().room_art_keys.values())))
 
 
 def room_art_key_set() -> frozenset[str]:

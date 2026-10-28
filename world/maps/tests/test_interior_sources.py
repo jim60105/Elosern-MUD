@@ -211,6 +211,19 @@ class InteriorSourceTests(unittest.TestCase):
             build_interiors(documents)
         self.assertIn("t_absent", str(caught.exception))
 
+    def test_two_synthetic_worlds_have_distinct_identities(self):
+        """A composed world's identity covers the documents it actually holds."""
+
+        from world.tests.interior_fixture import build_synthetic_interiors
+
+        first = build_synthetic_interiors(
+            _document("t_first_world", {"t_first_room": _room()})
+        )
+        second = build_synthetic_interiors(
+            _document("t_second_world", {"t_second_room": _room()})
+        )
+        self.assertNotEqual(first.identity, second.identity)
+
     def test_no_interior_reads_the_service_registry(self):
         """The interior domain is independent of service records."""
 

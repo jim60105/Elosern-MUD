@@ -18,9 +18,10 @@ region flavours) belongs to the immutable snapshot's ``TerrainDefinition`` and
 its ``cached_property`` values, so two independent worlds or a reload can never
 observe each other's derivations.
 
-Nothing here loads or validates at import time: the game composition root (and
-tests) call :func:`load_and_publish`, and every read-only consumer goes through
-:func:`current`.
+Nothing here loads or validates at import time: the map composition root
+(``world.maps.runtime``) builds this snapshot from the candidate source set and
+installs it inside one adopted bundle, and every read-only consumer goes
+through :func:`current`.
 """
 
 from __future__ import annotations

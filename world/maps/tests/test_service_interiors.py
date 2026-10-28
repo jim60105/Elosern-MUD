@@ -14,6 +14,7 @@ from tools.spec_traceability import covers_requirement
 import importlib
 from unittest.mock import patch
 
+from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
 from evennia.utils.search import search_object_by_tag
 from evennia.utils.test_resources import EvenniaTestCase
@@ -432,6 +433,106 @@ class ServiceInteriorTests(EvenniaTestCase):
         return next(
             node_id for node_id in graph.nodes if node_id not in occupied
         )
+
+    def test_a_transiently_unavailable_frontage_keeps_the_interior_topology(self):
+        # Retargeting a room onto a statically valid but not-yet-materialized
+        # street must not destroy the room or its internal topology: the
+        # dependent interior is skipped, and only the doorway to the vanished
+        # street (now a dangling exit) retires.
+        anchor_room = next(iter(interiors.current().exteriors))
+        anchor_exterior = interiors.current().exteriors[anchor_room]
+        settlement = anchor_exterior.settlement
+        other_node = self._another_node(anchor_exterior)
+        rooms = {
+            "t_hold_hall": interior_room("測試門廳", "A synthetic hall."),
+            "t_hold_inner": interior_room("測試內室", "A synthetic inner room."),
+        }
+        connections = (
+            {"source": "t_hold_hall", "destination": "t_hold_inner", "label": "往內"},
+        )
+        settled = interior_document(
+            "t_hold_house",
+            rooms,
+            connections=connections,
+            exterior=interior_exterior(
+                settlement, anchor_exterior.node, "t_hold_hall", "測試門廳門"
+            ),
+        )
+        retargeted = interior_document(
+            "t_hold_house",
+            rooms,
+            connections=connections,
+            exterior=interior_exterior(
+                settlement, other_node, "t_hold_hall", "測試門廳門"
+            ),
+        )
+        with published_interiors(settled):
+            sync_interiors()
+            hall = self._interior("t_hold_hall")
+            inner = self._interior("t_hold_inner")
+            self.assertTrue(any(exit_obj.key == "外" for exit_obj in hall.exits))
+            before = (
+                hall.pk,
+                hall.db.desc,
+                sorted((exit_obj.key, exit_obj.destination.pk) for exit_obj in hall.exits),
+                inner.pk,
+                inner.db.desc,
+            )
+
+            # The new frontage is authored but not materialized.
+            prettier = GridRoom.objects.filter_xyz(
+                xyz=settlement_node_xyz(_settlement_ref(settlement, other_node))
+            ).first()
+            prettier.delete()
+
+            with published_interiors(retargeted), patch("world.maps.bootstrap.log_warn"):
+                sync_interiors()
+
+            hall = self._interior("t_hold_hall")
+            inner = self._interior("t_hold_inner")
+            self.assertEqual(
+                (
+                    hall.pk,
+                    hall.db.desc,
+                    sorted(
+                        (exit_obj.key, exit_obj.destination.pk)
+                        for exit_obj in hall.exits
+                    ),
+                    inner.pk,
+                    inner.db.desc,
+                ),
+                before,
+                "a skipped dependent interior lost its room or its topology",
+            )
+            # No partial doorway was created on the absent street.
+            self.assertFalse(
+                [
+                    exit_obj
+                    for exit_obj in hall.exits
+                    if exit_obj.destination is None
+                ]
+            )
+            self.assertIsNone(
+                GridRoom.objects.filter_xyz(
+                    xyz=settlement_node_xyz(
+                        _settlement_ref(settlement, other_node)
+                    )
+                ).first()
+            )
+
+    def test_two_rooms_sharing_one_tag_raise_the_integrity_error(self):
+        from world.maps.bootstrap import InteriorSyncError
+
+        with published_interiors(
+            interior_document(
+                "t_ambiguous_room",
+                {"t_ambiguous_room": interior_room("測試曖昧室", "A synthetic room.")},
+            )
+        ):
+            sync_interiors()
+            create_object(Room, key="duplicate", tags=["t_ambiguous_room"], location=None)
+            with self.assertRaises(InteriorSyncError):
+                sync_interiors()
 
     def test_a_standalone_room_needs_no_service_record(self):
         document = interior_document(

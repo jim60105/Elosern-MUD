@@ -53,10 +53,8 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "starting_companion_validation",
     "state_reaction_rules",
     "npc_persona_roster_validation",
+    "sync_map_world",
     "sync_all",
-    "sync_limbo",
-    "sync_grid",
-    "sync_interiors",
     "sync_quest_runtime",
     "sync_guild_economy",
     "sync_npc_schedules",
@@ -420,7 +418,7 @@ def at_server_start():
     it behaviorally.
     """
     from world.lore.sync import sync_all
-    from world.maps.bootstrap import sync_grid, sync_limbo, sync_wilderness
+    from world.maps.bootstrap import sync_wilderness
     from world.quests.bootstrap import sync_quest_runtime
     from world.rules.clock import get_world_clock
     from world.rules.guild_economy import restore_persisted_sessions, sync_guild_economy
@@ -503,22 +501,22 @@ def at_server_start():
         "npc_persona_roster_validation",
         _validate_npc_roster_step,
     )
-    _startup_step("sync_all", sync_all)
-    _startup_step("sync_limbo", sync_limbo)
-    _startup_step("sync_grid", sync_grid)
-    # Every world-event clock source must be registered before any startup
-    # operation can advance time: the service interiors, quest runtime, guild
-    # economy, and NPC-schedule syncs all move ahead of session
-    # restoration so a recovery settlement runs the complete stage set
-    # (fix-startup-clock-source-order D1).
     # Persistent map synchronization is paired with the adoption above: the
-    # adopted bundle stays pending until every authored interior converges, so
-    # a failed synchronization restores the pre-adoption bundle and leaves the
-    # persistent baseline as it was.
+    # starting room, every settlement graph and every permanent interior
+    # converge inside ONE transaction, the adopted bundle stays pending until
+    # that transaction commits, and a failure rolls the persistent baseline
+    # back and restores the pre-adoption bundle. The lore mirror runs only
+    # afterwards, so no mirrored row can describe a world that was rolled back.
+    # Every world-event clock source must still be registered before any
+    # startup operation can advance time: the quest runtime, guild economy and
+    # NPC-schedule syncs all move ahead of session restoration so a recovery
+    # settlement runs the complete stage set (fix-startup-clock-source-order
+    # D1).
     _startup_step(
-        "sync_interiors",
+        "sync_map_world",
         lambda: _late("world.maps.runtime", "synchronize"),
     )
+    _startup_step("sync_all", sync_all)
     _startup_step("sync_quest_runtime", sync_quest_runtime)
     _startup_step("sync_guild_economy", sync_guild_economy)
     _startup_step("sync_npc_schedules", sync_npc_schedules)

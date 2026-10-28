@@ -92,7 +92,13 @@ def published_interiors(*documents, replace_existing: bool = False):
         documents_by_id = {}
     for document in documents:
         documents_by_id[document.identity] = document
-    snapshot = build_interiors(documents_by_id, fingerprints=current.fingerprints)
+    snapshot = build_interiors(
+        documents_by_id,
+        fingerprints={
+            document.relative_path: document.fingerprint
+            for document in documents_by_id.values()
+        },
+    )
     runtime.publish(replace(previous, interiors=snapshot))
     try:
         yield snapshot
@@ -124,10 +130,18 @@ def synthetic_exterior_interior(
 
 
 def build_synthetic_interiors(*documents):
-    """One composed interior world holding exactly ``documents`` (nothing published)."""
+    """One composed interior world holding exactly ``documents`` (nothing published).
+
+    The fingerprints are the synthetic documents' own, so two different
+    synthetic worlds never share a world identity (and therefore never share a
+    snapshot-scoped reference-index cache entry).
+    """
 
     return build_interiors(
-        MappingProxyType({document.identity: document for document in documents})
+        MappingProxyType({document.identity: document for document in documents}),
+        fingerprints={
+            document.relative_path: document.fingerprint for document in documents
+        },
     )
 
 

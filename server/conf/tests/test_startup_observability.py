@@ -34,9 +34,6 @@ _BODY_TARGETS = (
     "world.maps.runtime.synchronize",
     "world.maps.static_references.validate_static_references",
     "world.lore.sync.sync_all",
-    "world.maps.bootstrap.sync_limbo",
-    "world.maps.bootstrap.sync_grid",
-    "world.maps.bootstrap.sync_interiors",
     "world.maps.bootstrap.sync_wilderness",
     "world.quests.bootstrap.sync_quest_runtime",
     "world.rules.guild_economy.restore_persisted_sessions",
@@ -144,6 +141,7 @@ class StartupStepEventTests(_StubbedStartup):
                 "starting_companion_validation",
                 "state_reaction_rules",
                 "npc_persona_roster_validation",
+                "sync_map_world",
             ],
         )
 

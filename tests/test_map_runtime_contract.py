@@ -121,24 +121,32 @@ class MapSourceOwnershipContract(unittest.TestCase):
 
         steps = list(STARTUP_STEP_ORDER)
         self.assertIn("map_world_adoption", steps)
-        self.assertIn("sync_interiors", steps)
+        self.assertIn("sync_map_world", steps)
         for retired in (
             "geography_source_publication",
             "settlement_source_publication",
             "district_source_publication",
             "static_map_reference_validation",
             "sync_service_interiors",
+            "sync_limbo",
+            "sync_grid",
+            "sync_interiors",
         ):
             self.assertNotIn(retired, steps, f"{retired} is a retired startup step")
         self.assertLess(
             steps.index("map_world_adoption"),
-            steps.index("sync_grid"),
-            "the map world must be adopted before the grid materializes",
+            steps.index("sync_map_world"),
+            "the map world must be adopted before its persistent synchronization",
         )
         self.assertLess(
-            steps.index("sync_grid"),
-            steps.index("sync_interiors"),
-            "interior doorways need the materialized streets",
+            steps.index("sync_map_world"),
+            steps.index("sync_all"),
+            "the lore mirror must not describe a world that can still roll back",
+        )
+        self.assertLess(
+            steps.index("sync_map_world"),
+            steps.index("sync_quest_runtime"),
+            "quest runtime syncs after the map world is materialized",
         )
 
 

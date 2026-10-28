@@ -480,14 +480,19 @@ def adopt(root: str | Path | None = None) -> MapWorld:
     global _BUNDLE, _PENDING, _PENDING_SETTLED
 
     world = load_candidate(root)
+    # Two distinct values: the bundle this install replaces (undone verbatim if
+    # the installation is rejected) and the last *synchronized* world (the
+    # rollback baseline a later synchronization failure restores). A second
+    # adoption before synchronization must not replace that baseline.
     previous = _BUNDLE
+    baseline = _BUNDLE if _PENDING_SETTLED else _PENDING
     _install(world)
     try:
         # The game-side declaration registries (city gates, anchor placements,
         # wilderness gates, place joins, district landmarks, grid art) are read
         # through the bundle this process now holds: reject a world whose own
         # registries disagree before anything is persisted, and leave the
-        # previous bundle in place.
+        # previously published world exactly as it was.
         validate_static_references()
     except BaseException:
         if previous is None:
@@ -495,7 +500,7 @@ def adopt(root: str | Path | None = None) -> MapWorld:
         else:
             _install(previous)
         raise
-    _PENDING = previous
+    _PENDING = baseline
     _PENDING_SETTLED = False
     return world
 
@@ -503,18 +508,28 @@ def adopt(root: str | Path | None = None) -> MapWorld:
 def synchronize(root: str | Path | None = None) -> MapWorld:
     """Adopt (when needed) and converge the persistent map world.
 
-    The persistent interior synchronization runs inside its own transaction; a
-    failure rolls it back, restores the pre-adoption bundle and evicts the
-    process caches the failed batch touched, so registries, persistent state
-    and caches all stay at the prior baseline.
+    The starting room, every settlement graph and every permanent interior
+    converge inside ONE transaction: a candidate that moves a node and then
+    fails on an interior rolls its coordinate moves back too, so the persistent
+    baseline can never disagree with the bundle. A failure also evicts the
+    process caches the batch touched and restores the bundle the adoption
+    replaced; only a successful run commits the adoption.
     """
+
+    from django.db import transaction
 
     from world.maps import bootstrap
 
     world = ensure_published(root)
     try:
-        bootstrap.sync_interiors()
+        with transaction.atomic():
+            bootstrap.sync_limbo()
+            bootstrap.sync_grid()
+            bootstrap.sync_interiors()
     except BaseException:
+        # ``sync_interiors`` already evicted the objects its own batch touched;
+        # this second eviction covers a failure inside the grid or limbo step.
+        bootstrap._evict_batch_cache()
         rollback_adoption()
         raise
     commit_adoption()

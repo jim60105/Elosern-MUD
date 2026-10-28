@@ -300,6 +300,28 @@ def _harvest_geography(root: Path, out: set[str]) -> None:
         _harvest_display(view, set(), out)
 
 
+def _harvest_interiors(root: Path, out: set[str]) -> None:
+    """Harvest the YAML-authored permanent interiors' identities and prose.
+
+    ``content/maps/interiors/`` is the sole authority for a permanent room's
+    name, so those names and their stable room/artwork keys must stay in the
+    token universe exactly like a Python catalog's; moving content to YAML must
+    never weaken the gate silently.
+    """
+
+    from world.maps import interiors as interiors_module
+    from world.maps import runtime
+
+    if not interiors_module.is_published():
+        runtime.publish(runtime.preview(runtime.compose(root)))
+    for room in interiors_module.current().rooms.values():
+        out.add(room.room_id)
+        if room.art_key is not None:
+            out.add(room.art_key)
+        if room.name_zh:
+            out.add(room.name_zh)
+
+
 def _harvest_districts(root: Path, out: set[str]) -> None:
     """Harvest the YAML-authored district document's keys and display fields.
 
@@ -480,6 +502,7 @@ def _derive_universe(root: Path) -> Universe:
                 _harvest_display(value, set(), tokens)
     _harvest_geography(root, tokens)
     _harvest_districts(root, tokens)
+    _harvest_interiors(root, tokens)
     tokens.update(_rulebook_keys(root))
 
     deny_path = root / DENY_PATH

@@ -146,6 +146,9 @@ SYNTH_ANCHOR_PLACEMENTS: dict[str, AnchorPlacement] = {
     # Gate destinations borrow shipped node identities so they resolve.
     "t_hollow_tarn": AnchorPlacement("t_hollow_tarn", _SYNTH_GATE_REF),
     "t_split_cairn": AnchorPlacement("t_split_cairn", _SYNTH_SECOND_GATE_REF),
+    # The stand-in settlement's coordinate space is declared by its own
+    # placement, exactly like a shipped settlement's.
+    "t_mossgate": AnchorPlacement("t_mossgate", _SYNTH_GATE_REF),
 }
 
 SYNTH_NATIONS: dict[str, Nation] = {
@@ -222,7 +225,6 @@ SYNTH_SETTLEMENTS: dict[str, SettlementDefinition] = {
     "t_mossgate": SettlementDefinition(
         key="t_mossgate",
         archetype=SettlementArchetype.TOWN,
-        zcoord="t_mossgate",
     ),
 }
 
