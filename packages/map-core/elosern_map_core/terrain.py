@@ -615,8 +615,116 @@ def terrain_description(definition: TerrainDefinition, x: int, y: int) -> str:
     return variants[index]
 
 
+#: The preview's surface classes, in code order.
+PREVIEW_SURFACES = ("sea", "land", "water", "ridge")
+
+
+@dataclass(frozen=True)
+class TerrainPreview:
+    """A coarse, deterministic preview of the derived terrain of one definition.
+
+    ``samples`` is row-major from the southern row; sample ``(column, row)``
+    classifies the cell ``(column * step + step // 2, row * step + step // 2)``
+    (clamped to the frame) with the same rule functions the game uses. Each
+    value is ``region_index * len(PREVIEW_SURFACES) + surface_index`` where
+    ``region_index`` indexes :attr:`regions` and ``surface_index`` indexes
+    :data:`PREVIEW_SURFACES`. Every geometric value is in cell indices.
+    """
+
+    step: int
+    columns: int
+    rows: int
+    regions: tuple[str, ...]
+    samples: tuple[int, ...]
+    #: Closed ridge-wall polylines (cell coordinates) between the pass windows.
+    ridge_walls: tuple[tuple[Point, ...], ...]
+    #: ``(y_min, y_max, centre_cell)`` per authored pass window, in order.
+    passes: tuple[tuple[int, int, Point], ...]
+    #: Derived national borders; empty with ``borders_reason`` when the
+    #: inputs cannot derive them.
+    national_borders: tuple[NationalBorder, ...]
+    borders_reason: str | None
+
+
+def _sample_cell(index: int, step: int, maximum: int) -> int:
+    return min(index * step + step // 2, maximum)
+
+
+def _ridge_walls(definition: TerrainDefinition) -> tuple[tuple[Point, ...], ...]:
+    walls: list[tuple[Point, ...]] = []
+    start: int | None = None
+    limit = min(definition.ridge_north_limit, definition.frame_cells)
+
+    def closed_row(y: int) -> bool:
+        if any(low <= y <= high for low, high in definition.ridge_passes):
+            return False
+        return definition.ridge_min_x <= ridge_center_x(definition, y) <= definition.ridge_max_x
+
+    for y in range(0, limit + 1):
+        inside = y < limit and closed_row(y)
+        if inside and start is None:
+            start = y
+        elif not inside and start is not None:
+            walls.append(ridge_polyline(definition, start, y - 1))
+            start = None
+    return tuple(walls)
+
+
+def terrain_preview(definition: TerrainDefinition, *, max_side: int = 90) -> TerrainPreview:
+    """Sample the derived terrain on at most ``max_side`` x ``max_side`` cells.
+
+    Pure and bounded: it calls only this module's rules, so the preview of an
+    edited definition is exactly what the classifier derives from it.
+    """
+
+    if isinstance(max_side, bool) or not isinstance(max_side, int) or max_side < 1:
+        raise ValueError("max_side must be a positive integer")
+    frame = definition.frame_cells
+    step = max(1, math.ceil(frame / max_side))
+    count = math.ceil(frame / step)
+    regions = tuple(sorted(REGION_KEYS))
+    region_index = {key: index for index, key in enumerate(regions)}
+    surfaces = len(PREVIEW_SURFACES)
+    samples: list[int] = []
+    for row in range(count):
+        y = _sample_cell(row, step, definition.max_y)
+        for column in range(count):
+            x = _sample_cell(column, step, definition.max_x)
+            if not is_land_cell(definition, (x, y)):
+                surface = 0
+            elif is_closed_ridge_cell(definition, (x, y)):
+                surface = 3
+            elif is_inland_water_cell(definition, (x, y)):
+                surface = 2
+            else:
+                surface = 1
+            samples.append(region_index[region_for_coordinates(definition, x, y)] * surfaces + surface)
+    passes = tuple(
+        (low, high, (ridge_center_x(definition, (low + high) // 2), (low + high) // 2))
+        for low, high in definition.ridge_passes
+    )
+    try:
+        borders = definition.national_borders
+        reason = None
+    except ValueError as error:
+        borders, reason = (), str(error)
+    return TerrainPreview(
+        step=step,
+        columns=count,
+        rows=count,
+        regions=regions,
+        samples=tuple(samples),
+        ridge_walls=_ridge_walls(definition),
+        passes=passes,
+        national_borders=borders,
+        borders_reason=reason,
+    )
+
+
 __all__ = [
     "NationalBorder",
+    "PREVIEW_SURFACES",
+    "TerrainPreview",
     "REGION_KEYS",
     "RIDGE_BEND_PHASES",
     "TerrainDefinition",
@@ -637,4 +745,5 @@ __all__ = [
     "ridge_span",
     "route_row_at",
     "terrain_description",
+    "terrain_preview",
 ]

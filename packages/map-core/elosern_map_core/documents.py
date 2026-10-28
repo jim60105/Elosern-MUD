@@ -109,6 +109,18 @@ class WildernessEntryDeclaration:
         )
 
     @property
+    def mask_cells(self) -> frozenset[Cell]:
+        """Every ``#`` cell of the mask, also for a one-cell point shape."""
+
+        origin_x, origin_y = self.origin
+        return frozenset(
+            (origin_x + column, origin_y + row)
+            for row, line in enumerate(self.shape)
+            for column, character in enumerate(line)
+            if character == "#"
+        )
+
+    @property
     def anchor_cell(self) -> Cell | None:
         cells = [
             (column, row)

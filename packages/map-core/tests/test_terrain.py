@@ -337,3 +337,77 @@ class TestRasterizer:
             _world_a(mainland_boundary_km=((0, 0), (1, 1)))
         with pytest.raises(ValueError):
             _world_a(ridge_min_x=30, ridge_max_x=20)
+
+
+class TestTerrainPreview:
+    """The coarse preview is the classifier's own answer at its sample cells."""
+
+    def test_every_sample_agrees_with_the_rule_functions(self):
+        from elosern_map_core.terrain import (
+            PREVIEW_SURFACES,
+            is_closed_ridge_cell,
+            is_inland_water_cell,
+            is_land_cell,
+            terrain_preview,
+        )
+
+        definition = _world_a()
+        preview = terrain_preview(definition, max_side=8)
+        assert preview.step == 5 and preview.columns == preview.rows == 8
+        assert len(preview.samples) == 64
+        for row in range(preview.rows):
+            for column in range(preview.columns):
+                x, y = column * 5 + 2, row * 5 + 2
+                value = preview.samples[row * preview.columns + column]
+                region, surface = divmod(value, len(PREVIEW_SURFACES))
+                assert preview.regions[region] == region_for_coordinates(definition, x, y)
+                expected = (
+                    "sea"
+                    if not is_land_cell(definition, (x, y))
+                    else "ridge"
+                    if is_closed_ridge_cell(definition, (x, y))
+                    else "water"
+                    if is_inland_water_cell(definition, (x, y))
+                    else "land"
+                )
+                assert PREVIEW_SURFACES[surface] == expected
+
+    def test_an_edited_river_changes_the_preview(self):
+        from elosern_map_core.terrain import terrain_preview
+
+        before = terrain_preview(_world_a(), max_side=40)
+        moved = _world_a(waterway_routes={"border_river": ((20, 26), (0, 26))}, waterway_fords={})
+        after = terrain_preview(moved, max_side=40)
+        assert before.samples != after.samples
+        # Row 20 lost its water and row 26 gained it.
+        water = lambda preview, y: [preview.samples[y * 40 + x] % 4 == 2 for x in range(0, 20)]  # noqa: E731
+        assert any(water(before, 20)) and not any(water(after, 20))
+        assert any(water(after, 26))
+
+    def test_pass_windows_split_the_ridge_wall(self):
+        from elosern_map_core.terrain import terrain_preview
+
+        preview = terrain_preview(_world_a(), max_side=40)
+        assert [(low, high) for low, high, _ in preview.passes] == [(4, 5)]
+        _, _, centre = preview.passes[0]
+        assert centre == (ridge_center_x(_world_a(), 4), 4)
+        rows = [sorted({y for _, y in wall}) for wall in preview.ridge_walls]
+        assert rows[0][0] == 0 and rows[0][-1] == 3
+        assert rows[1][0] == 6 and rows[-1][-1] == 34
+
+    def test_borders_are_the_derived_ones_or_explained(self):
+        from elosern_map_core.terrain import terrain_preview
+
+        definition = _world_a()
+        preview = terrain_preview(definition, max_side=40)
+        assert preview.national_borders == definition.national_borders
+        assert preview.borders_reason is None
+        sea = _world_a(mainland_boundary_km=((100, 100), (101, 100), (101, 101)))
+        empty = terrain_preview(sea, max_side=40)
+        assert empty.national_borders == () and empty.borders_reason
+
+    def test_invalid_sampling_bound_is_rejected(self):
+        from elosern_map_core.terrain import terrain_preview
+
+        with pytest.raises(ValueError):
+            terrain_preview(_world_a(), max_side=0)

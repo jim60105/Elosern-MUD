@@ -28,6 +28,7 @@ from .authoring import (
     compile_runtime,
     diagnose_world,
     load_authoring_world,
+    terrain_definition,
 )
 from .partition_codec import (
     FORMAT_VERSION,
@@ -116,7 +117,9 @@ from .terrain import (
     REGION_KEYS,
     RIDGE_BEND_PHASES,
     NationalBorder,
+    PREVIEW_SURFACES,
     TerrainDefinition,
+    TerrainPreview,
     border_river_row,
     forest_edge_row,
     is_closed_ridge_cell,
@@ -135,6 +138,7 @@ from .terrain import (
     ridge_span,
     route_row_at,
     terrain_description,
+    terrain_preview,
 )
 
 __all__ = [
@@ -148,6 +152,8 @@ __all__ = [
     "METRES_PER_WILDERNESS_CELL",
     "MIXED",
     "NationalBorder",
+    "PREVIEW_SURFACES",
+    "TerrainPreview",
     "PARTITION_ALGORITHM_VERSION",
     "PARTITION_SOURCE_KINDS",
     "ParsedDocument",
@@ -242,6 +248,8 @@ __all__ = [
     "serialize_document",
     "settlement_node_ref",
     "settlement_position",
+    "terrain_definition",
     "terrain_description",
+    "terrain_preview",
     "wilderness_cell_ref",
 ]
