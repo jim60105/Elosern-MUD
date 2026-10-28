@@ -212,8 +212,8 @@ jobs:
           (cd w-a/tools/map-editor/frontend && pnpm install --frozen-lockfile && pnpm run build)
           (cd w-b/tools/map-editor/frontend && pnpm install --frozen-lockfile && pnpm run build)
 
-      - name: Install Chromium for browser acceptance
-        run: uv run --locked playwright install --with-deps chromium
+      - name: Install Chromium and Firefox for browser acceptance
+        run: uv run --locked playwright install --with-deps chromium firefox
         working-directory: w-a
 
       - name: Prepare Evennia runtime directories

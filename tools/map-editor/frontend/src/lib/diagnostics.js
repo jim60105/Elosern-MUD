@@ -22,7 +22,7 @@ export const CLASSES = Object.freeze([
   { key: "external", label: "外部索引與引用", glyph: "✕", tone: "seal" },
   { key: "service", label: "服務與存檔", glyph: "✕", tone: "seal" },
   { key: "semantic", label: "未完成", glyph: "▲", tone: "warn" },
-  { key: "partition", label: "分區過期", glyph: "▲", tone: "warn" },
+  { key: "partition", label: "分區產物", glyph: "▲", tone: "warn" },
 ]);
 
 export const GO = "go";

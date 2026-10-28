@@ -1012,3 +1012,9 @@ select {
 .editor--drawers .editor__chips {
   margin-left: 0;
 }
+
+.diagnostics__hint {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
