@@ -55,6 +55,9 @@ class EditorConfig:
     #: Settle interval: notifications are coalesced until the directories
     #: stay quiet this long, and a failed watcher read is retried once after it.
     settle_seconds: float = 0.15
+    #: Wall-clock bound of one partition job's generation process; a job
+    #: that exceeds it fails (``timeout``) and leaves the artifact unchanged.
+    partition_timeout_seconds: float = 900.0
 
     def __post_init__(self) -> None:
         if not isinstance(self.port, int) or isinstance(self.port, bool) or not (

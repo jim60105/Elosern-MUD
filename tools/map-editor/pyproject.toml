@@ -5,7 +5,8 @@ description = "Independent local map editor service for the Elosern authored map
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "elosern-map-core",
+    # The core generation extra (NumPy/SciPy) for explicit partition jobs.
+    "elosern-map-core[generation]",
     "starlette>=0.47",
     "uvicorn>=0.35",
     # Workspace notifications (continuous file following, map-editor-file-following).

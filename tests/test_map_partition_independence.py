@@ -132,6 +132,34 @@ _GENERATION_PROBE = textwrap.dedent(
 )
 
 
+_AUTHORING_PARITY_PROBE = textwrap.dedent(
+    """
+    import json
+    import sys
+    from pathlib import Path
+
+    BLOCKED = {"world", "evennia", "django", "twisted", "typeclasses", "tools"}
+
+    class Blocker:
+        def find_spec(self, name, path=None, target=None):
+            if name.split(".")[0] in BLOCKED:
+                raise AssertionError(f"authoring input imported forbidden namespace {name}")
+            return None
+
+    sys.meta_path.insert(0, Blocker())
+
+    from elosern_map_core import discover_source_documents, load_authoring_world
+    from elosern_map_core.partition import generate_partition, partition_input, world_snapshot
+
+    root = Path.cwd()
+    world = load_authoring_world(discover_source_documents(root))
+    text = generate_partition(partition_input(world_snapshot(world)))
+    committed = (root / "world" / "maps" / "data" / "district_partition.json").read_text(encoding="utf-8")
+    print(json.dumps(text == committed))
+    """
+)
+
+
 def _run_probe(source: str) -> subprocess.CompletedProcess:
     env = {**os.environ, "PYTHONPATH": str(REPO_ROOT)}
     env.pop("DJANGO_SETTINGS_MODULE", None)
@@ -173,6 +201,27 @@ class GenerationIsGameFreeTests(unittest.TestCase):
         result = _run_probe(_GENERATION_PROBE)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), "[]")
+
+
+class AuthoringInputParityTests(unittest.TestCase):
+    """The editor's input binding and the game adapter produce one artifact.
+
+    ``world_snapshot`` (the map editor's partition-job input, from the
+    authoring documents alone) and ``tools.map_district_partition`` (the
+    game's adapter, from the published registries) are two bindings of the
+    same seed rules. Over the current sources the authoring binding must
+    regenerate the committed artifact byte for byte, so an editor job on
+    unchanged sources is a no-op and the two can never drift silently. This
+    compares two producers over the same inputs; it records no shipped value.
+    """
+
+    @covers_requirement(
+        "map-district-partition::frozen-partition-and-outlines-reproduce-deterministically-offline"
+    )
+    def test_authoring_world_input_regenerates_the_committed_artifact(self):
+        result = _run_probe(_AUTHORING_PARITY_PROBE)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "true")
 
 
 class FreshnessSignatureTests(unittest.TestCase):

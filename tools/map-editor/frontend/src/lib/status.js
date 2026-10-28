@@ -33,12 +33,42 @@ export function indexChip(workspace) {
   return { tone: "ok", glyph: "✓", text: "索引 現行", state: "current" };
 }
 
+// The 分區 chip (frontend design §5.1) combines the artifact's freshness with
+// the explicit partition job. `action` is what activating it does: regenerate
+// when the output is not current, cancel while generating, nothing otherwise
+// (the chip then only expands the partition diagnostics).
 export function partitionChip(workspace) {
   const status = workspace?.partition_status;
-  if (!status) return { tone: "neutral", glyph: "⟳", text: "分區", state: "loading" };
-  if (status.status === "current") return { tone: "ok", glyph: "✓", text: "分區 現行", state: "current" };
-  if (status.status === "stale") return { tone: "warn", glyph: "▲", text: "分區過期", state: "stale" };
-  return { tone: "seal", glyph: "⦸", text: "分區不可用", state: "unavailable" };
+  const job = workspace?.partition_job;
+  if (!status) return { tone: "neutral", glyph: "⟳", text: "分區", state: "loading", action: null };
+  if (job?.state === "generating" || job?.state === "publishing") {
+    return { tone: "busy", glyph: "⟳", text: "分區產生中 · 取消", state: "generating", action: "cancel" };
+  }
+  if (status.game_ready) return { tone: "ok", glyph: "✓", text: "分區 現行", state: "current", action: null };
+  if (job?.state === "cancelled") {
+    return { tone: "neutral", glyph: "⦸", text: "分區已取消 · 保留舊版", state: "cancelled", action: "regenerate" };
+  }
+  if (job?.state === "failed") {
+    return { tone: "seal", glyph: "✕", text: "分區產生失敗 · 保留舊版", state: "failed", action: "regenerate" };
+  }
+  if (status.status === "stale") {
+    return { tone: "warn", glyph: "▲", text: "分區過期 · 重新產生", state: "stale", action: "regenerate" };
+  }
+  return { tone: "seal", glyph: "⦸", text: "分區不可用 · 重新產生", state: "unavailable", action: "regenerate" };
+}
+
+// The partition output's input revision: the artifact's input signature
+// against the current one, shortened for display, and whether the displayed
+// output belongs to older inputs.
+export function partitionRevision(workspace) {
+  const status = workspace?.partition_status;
+  if (!status || status.status === "unavailable") return null;
+  const short = (value) => (value ? String(value).slice(0, 8) : "—");
+  return {
+    output: short(status.input_signature),
+    current: short(status.expected_signature),
+    older: status.status === "stale",
+  };
 }
 
 export function firstFailure(workspace) {

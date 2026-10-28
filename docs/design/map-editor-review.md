@@ -14,7 +14,9 @@ settlement screen of design §4.2 (see "Settlement tools review");
 `map-editor-interior-tools` (P17), the interior screen of design §4.3 (see
 "Interior tools review"); `map-editor-entrance-tools` (P18), the cross-layer
 entrances of design §4.4 and the deletion refusal of §5.4 (see "Entrance
-tools review").
+tools review"); `map-editor-partition-jobs` (P19), the 分區 chip actions,
+the regenerate control and the derived district outlines of design §3, §4.1
+and §5.1 (see "Partition jobs review").
 **Viewports:** 1451x790 (reference), 2560x1440, and 200 % zoom of the
 reference emulated as a 725x395 CSS viewport at device scale 2 (it reproduces
 the layout width, not every media feature of a real browser zoom).
@@ -32,7 +34,7 @@ the layout width, not every media feature of a real browser zoom).
 | Element (design §) | Review notes | Disposition |
 | --- | --- | --- |
 | Header, domain pill tabs with key chips, breadcrumb (§2) | Seal glyph and serif gold title first; tabs as one pill group; the breadcrumb gains the 「← 返回」 button after cross-map navigation. | Matches |
-| Status chips (§5.1) | Four buttons in fixed order, glyph and text with colour. 分區 regenerate/cancel arrive with `map-editor-partition-jobs`; the chip currently expands the partition diagnostics. | Matches (partition action: Shell ready) |
+| Status chips (§5.1) | Four buttons in fixed order, glyph and text with colour. The 分區 chip (P19) regenerates when stale, unavailable, cancelled or failed, cancels while generating, and expands the partition diagnostics when current. | Matches |
 | Priority banner (§5.2) | One persistent slot, polite live region, one action; ordering unchanged from P13. | Matches |
 | Three columns and drawers (§2) | Columns at the two supported viewports; drawers with 導覽 / 檢查器 toggles when both side columns cannot fit. At 200 % an open drawer covers most of the canvas; flagged for the human reviewer. | Matches |
 | Canvas chrome (§2) | Tool pill top left, zoom pill top right, north arrow, scale bar and frame label bottom left, interior layout note bottom right, stale badge. Only 選取 V is registered until the domain tool changes land. | Matches (tools: Shell ready) |
@@ -59,7 +61,7 @@ the layout width, not every media feature of a real browser zoom).
 | ~~Return after AI leaves an inaccessible landmark~~ | — | Replaced: a loadable change with semantic diagnostics loads; the strip's 前往 locates the landmark object. |
 | Unexpected manual-mode file change | §1.1 | Matches (P13). |
 | Reconnect an old tab / restart service | §5.2 ① | Matches (P13). |
-| Source change during partition generation | §9 | Shell ready: 分區 chip and partition diagnostics; generation arrives with `map-editor-partition-jobs`. |
+| Source change during partition generation | §9 | Matches (P19): the external change ends the job; the chip reads ✕ 分區產生失敗 · 保留舊版, the artifact is unchanged and nothing is labelled current. |
 | Selected object moves or disappears | §1.1 | Matches: the selection (also a multi-selection) is kept by identity and removed members are named. |
 | Copy context for OMP | §1.1 | Matches: plain text with qualified IDs, relative paths, frames and units and currentness; no token, ownership claim or action. |
 | Keyboard-only edits | §6 | Matches for the shell, layout edits, continent edits and settlement edits (N, R, object-list road endpoints, schema-typed fields, Shift+arrow group nudges) and interior edits (N, R, object-list connection endpoints, room fields, 自動排列) and entrance edits (E or ⌂ 新入口 with the form, the keyboard selector, label fields). |
@@ -81,7 +83,7 @@ the elements a later change completes.
 | Locations without a local map (§4.1) | 無本地圖 in the tree and the inspector with no rooms; 開啟本地圖 for settlement-derived local maps. | Matches |
 | Districts and landmarks | Names, kind and region membership, plus a structured landmark selector (domain, map, object or cell). Saving a landmark that is not reachable shows ▲ in the diagnostics strip. | Matches |
 | Binding | Anchor cell `1 km 格` and local anchor `m 地方`, with the world-metre rule stated; interiors get no metres. | Matches |
-| Derived results (§4.1, §3) | The inspector section shows the terrain preview state and the partition's input signature against the current one. National borders draw dash-dot ink with no handles. 重新產生分區 and the partition district outlines arrive with `map-editor-partition-jobs`, which also adds rejection of commands during generation (its task 1.2). | Matches (regeneration: Ready, P19) |
+| Derived results (§4.1, §3) | The inspector section shows the terrain preview state, the partition's input signature against the current one and 重新產生分區 / 取消產生 (P19). National borders draw dash-dot ink with no handles; the district outlines are described under "Partition jobs review". | Matches |
 | Region prose and classifier fields | Name, nation keys, scene and one-variant-per-line descriptions; a variant containing a line break is shown as external-edit only. A reviewer should confirm that this is acceptable for authored prose. | Matches |
 
 ## Settlement tools review
@@ -141,3 +143,17 @@ only mechanisms.
 | Start entry | Labelled 起始房間入口 and stated as one-way, fixed. No return field is offered. | Matches |
 | Deletion refusal (§5.4) | A referenced node or room lists each entrance as its relationship, linked. The relationship's own removal states that it writes only its owner and deletes no endpoint. The last wilderness gate is refused by the service; the whole-entry removal is a separate action that names the footprint mask it discards. | Matches |
 
+## Partition jobs review
+
+Rows for the explicit partition jobs of design §1.1, §3, §4.1 and §5.1,
+delivered by `map-editor-partition-jobs` (P19). The person reviewing judges
+tone, wording and visual polish here; the tests establish only mechanisms.
+
+| Element (design §) | Review notes | Disposition |
+| --- | --- | --- |
+| 分區 chip (§5.1) | 分區 現行 · ▲ 分區過期 · 重新產生 · ⟳ 分區產生中 · 取消 · 分區已取消 · 保留舊版 · ✕ 分區產生失敗 · 保留舊版, plus ⦸ 分區不可用 · 重新產生 for a missing or malformed artifact (not in the prototype). The busy tone matches the save chip's ⟳. Judge whether the unavailable wording reads well next to the others. | Matches |
+| 重新產生分區 (§4.1) | The continent inspector's 衍生結果 section offers 重新產生分區, or 取消產生 while generating, under the input revision line (產物輸入 · 現行輸入, eight hex digits each, as in the prototype's r41/r43 idea). A failed job lists its problems in monospace below. | Matches |
+| District outlines (§3) | Derived rings in thin dotted paper ink on the 分區 layer with the national borders, never selectable and with no handles. Review their density against the dot field for the 120 shipped districts at 1451x790. | Matches |
+| Older-input output (§5.1, architecture §9) | Outlines of an artifact for older inputs fade to the warning tone. The canvas keeps the label ▲ 分區輸出屬於舊輸入 · 不可作為遊戲就緒 at the bottom right while they are shown, and the inspector repeats it. Judge the label's placement against the frame label at both viewports. | Matches |
+| Rejection during generation (§5.2) | A world-data edit during a job is refused by the service and shown in the banner slot as ▲「<command>」未存檔：分區產生中; layout edits still save. Browsing, inspection, search and cancellation stay available. | Matches |
+| Cancel after completion | A cancel that arrives after publication finds no running job; the chip and inspector show the completed state, with no rollback claim. | Matches |

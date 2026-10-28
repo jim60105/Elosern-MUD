@@ -271,7 +271,41 @@ const DOMAINS = [
 ];
 const FRAMES = { continent: "地理座標（公尺）· 1 km 格", settlement: "地方座標（公尺）", interior: "版面格（非距離）" };
 const currentMapId = computed(() => (domain.value === "continent" ? null : mapIds.value[domain.value]));
-const fullScene = computed(() => sceneFor(world.value, domain.value, currentMapId.value, selection.value));
+// The current partition artifact's district outlines, fetched once per
+// artifact (keyed on its fingerprint) and shown only while they match it.
+const partitionOutlines = ref(null);
+watch(
+  () => workspace.value?.partition_status?.artifact_fingerprint ?? null,
+  async (fingerprint) => {
+    if (!fingerprint || partitionOutlines.value?.artifact_fingerprint === fingerprint) return;
+    let outlines = null;
+    try {
+      const response = await window.fetch("/api/partition/outlines", { credentials: "same-origin", cache: "no-store" });
+      outlines = response.ok ? await response.json() : null;
+    } catch {
+      outlines = null;
+    }
+    // A late answer for an artifact that is no longer displayed is dropped;
+    // only outlines of the displayed artifact are kept (a newer artifact than
+    // the status names is fetched again with the next snapshot).
+    if (outlines?.artifact_fingerprint === (workspace.value?.partition_status?.artifact_fingerprint ?? null)) {
+      partitionOutlines.value = outlines;
+    }
+  },
+  { immediate: true },
+);
+const partitionView = computed(() => {
+  const status = workspace.value?.partition_status;
+  const outlines = partitionOutlines.value;
+  if (!status?.artifact_fingerprint || outlines?.artifact_fingerprint !== status.artifact_fingerprint) return null;
+  return { outlines: outlines.outlines, older: status.status !== "current" };
+});
+const olderPartitionShown = computed(
+  () => domain.value === "continent" && Boolean(partitionView.value?.older) && !hiddenLayers.value.includes("partition"),
+);
+const fullScene = computed(() =>
+  sceneFor(world.value, domain.value, currentMapId.value, selection.value, { partition: partitionView.value }),
+);
 const scene = computed(() => visibleScene(fullScene.value, hiddenLayers.value));
 const title = computed(() => crumbFor(domain.value, currentMapId.value));
 const sourcePath = computed(() => sourcePathFor(world.value, domain.value, currentMapId.value));
@@ -1148,7 +1182,17 @@ function onBannerAction(action) {
 
 const BANNER_ACTIONS = { reload: "重新讀取", adopt: "載入新版", reconnect: "重新連線並讀取" };
 
+// Explicit partition regeneration and cancellation (frontend design §5.1).
+function onPartition(action) {
+  if (action === "generate" || action === "cancel") commands?.partition(action);
+}
+
 async function onChip(key) {
+  if (key === "partition") {
+    const action = partitionChip(workspace.value).action;
+    if (action === "regenerate") return onPartition("generate");
+    if (action === "cancel") return onPartition("cancel");
+  }
   if (key === "save") {
     if (currentSaveState.value === FAILED || currentSaveState.value === UNCERTAIN) {
       root.value?.querySelector("[data-banner-action]")?.focus();
@@ -1289,6 +1333,7 @@ async function onChip(key) {
         :scene="scene"
         :selected="selection"
         :stale="canvasStale"
+        :older-partition="olderPartitionShown"
         :label="title"
         :movable="layoutMovable"
         :busy="persistence.inFlight > 0"
@@ -1349,6 +1394,7 @@ async function onChip(key) {
           @follow="follow"
           @drafts="leadDrafts = $event"
           @create-map="onCreateMap"
+          @partition="onPartition"
         />
         <SettlementInspector
           v-if="showSettlementInspector && !record"
@@ -1453,6 +1499,7 @@ async function onChip(key) {
           @follow="follow"
           @drafts="continentDrafts = $event"
           @create-map="onCreateMap"
+          @partition="onPartition"
         />
         <SettlementInspector
           v-if="showSettlementInspector && record"

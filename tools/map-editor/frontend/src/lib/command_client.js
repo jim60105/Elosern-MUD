@@ -166,6 +166,48 @@ export function createCommandClient({
     await refetch();
   }
 
+  // The explicit partition job (frontend design §5.1): only the 分區 chip and
+  // the inspector's 重新產生分區 call this; no pointer or command path does.
+  // A generate waits for the queued commands, so it names the snapshot they
+  // left; a cancel is sent at once. A cancel that finds no generating job
+  // (it already finished) is not a failure: the refetch shows the outcome.
+  async function partition(action) {
+    if (action === "generate") await tail;
+    const workspace = getWorkspace();
+    if (!workspace) return null;
+    const body =
+      action === "generate"
+        ? { session_generation: workspace.session_generation, snapshot_revision: workspace.snapshot_revision }
+        : { session_generation: workspace.session_generation };
+    let result;
+    try {
+      result = await post(`/api/partition/${action}`, body, workspace);
+    } catch (error) {
+      result = { ok: false, status: 0, payload: { error: { code: "network_error", message: String(error?.message ?? error) } } };
+    }
+    const error = result.payload?.error ?? {};
+    if (!result.ok && error.code !== "job_not_running") {
+      state.failure = {
+        command: action === "generate" ? "partition_generate" : "partition_cancel",
+        code: error.code ?? `http_${result.status}`,
+        message: error.message ?? `HTTP ${result.status}`,
+        documentId: null,
+        details: error,
+        observedRevision: Math.max(workspace.snapshot_revision, error.snapshot_revision ?? 0),
+        observedSession: workspace.session_generation,
+      };
+    } else if (state.failure && !PERSISTENT.has(state.failure.code)) {
+      state.failure = null;
+    }
+    emit();
+    try {
+      await refetch();
+    } catch {
+      // The workspace client records its own fetch error state.
+    }
+    return result.payload;
+  }
+
   // Drop every queued command that has not been sent (connection lost).
   function abandon() {
     generation += 1;
@@ -198,6 +240,7 @@ export function createCommandClient({
     undo: () => history("undo"),
     redo: () => history("redo"),
     flush,
+    partition,
     reload,
     abandon,
     clearRejection,

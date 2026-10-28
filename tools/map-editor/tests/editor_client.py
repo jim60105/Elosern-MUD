@@ -22,9 +22,11 @@ def sha(path: Path) -> str:
 
 
 class Editor:
-    def __init__(self, workspace: Path, *, fault=None, segment: str = "segment-a") -> None:
+    def __init__(
+        self, workspace: Path, *, fault=None, segment: str = "segment-a", partition_hook=None, **config
+    ) -> None:
         self.workspace = workspace
-        self.app = create_app(make_config(workspace), fault=fault)
+        self.app = create_app(make_config(workspace, **config), fault=fault, partition_hook=partition_hook)
         self.service = service_of(self.app)
         self.client = TestClient(self.app, base_url=f"http://127.0.0.1:{PORT}")
         body = self.client.get("/api/session").json()
@@ -89,6 +91,16 @@ class Editor:
         response = self.client.post(
             "/api/reload", headers=self.headers(), content=json.dumps({"session_generation": self.generation})
         )
+        return response.status_code, response.json()
+
+    def partition(self, action: str, body: dict | None = None) -> tuple[int, dict]:
+        """``generate`` or ``cancel`` the partition job."""
+
+        if body is None:
+            body = {"session_generation": self.generation}
+            if action == "generate":
+                body["snapshot_revision"] = self.state()["snapshot_revision"]
+        response = self.client.post(f"/api/partition/{action}", headers=self.headers(), content=json.dumps(body))
         return response.status_code, response.json()
 
     def follow(self) -> bool:

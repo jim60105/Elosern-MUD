@@ -44,7 +44,12 @@ function point([x, y]) {
 // walls and national borders; never selectable, never handled). Control-point
 // diamonds appear only for the selected feature or the feature of the
 // selected point. `items` is the object list: features, then marks.
-export function continentScene(world, selection = []) {
+//
+// `partition` is the current artifact's district outlines
+// ({ outlines: {district: [[x0, y0, x1, y1, ...], ...]}, older }), drawn as
+// derived, non-selectable rings on the 分區 layer. Outlines that belong to
+// older inputs carry `older` so the canvas labels them persistently.
+export function continentScene(world, selection = [], partition = null) {
   const continent = world.continent;
   const preview = continent.terrain_preview?.status === "current" ? continent.terrain_preview : null;
   const cell = cellMetres(world);
@@ -82,6 +87,7 @@ export function continentScene(world, selection = []) {
       selectable: true,
       selected: chosen.has(RIDGE),
     })),
+    ...districtOutlines(world, partition),
     ...(preview?.national_borders ?? []).map((border, index) => ({
       id: `border:${index}`,
       ref: null,
@@ -356,9 +362,31 @@ export function interiorScene(interior, selection = [], world = null) {
   return { kind: "interior", unit: null, bounds, shapes: [], marks, links, items };
 }
 
-export function sceneFor(world, domain, mapId, selection = []) {
+// The partition district outlines: one polygon per ring, in metres.
+function districtOutlines(world, partition) {
+  if (!partition?.outlines) return [];
+  const names = new Map((world.districts ?? []).map((district) => [district.id, district.district_name_zh]));
+  const older = Boolean(partition.older);
+  return Object.entries(partition.outlines).flatMap(([key, rings]) =>
+    rings.map((ring, index) => ({
+      id: `district:${key}:${index}`,
+      ref: null,
+      role: older ? "district district--older" : "district",
+      type: "polygon",
+      points: Array.from({ length: Math.floor(ring.length / 2) }, (_, at) => ({ x: ring[2 * at], y: ring[2 * at + 1] })),
+      label: `分區 ${names.get(key) ?? key}${older ? " · 舊輸入" : ""}`,
+      layer: "partition",
+      selectable: false,
+      derived: true,
+      district: key,
+      older,
+    })),
+  );
+}
+
+export function sceneFor(world, domain, mapId, selection = [], { partition = null } = {}) {
   if (!world) return null;
-  if (domain === "continent") return continentScene(world, selection);
+  if (domain === "continent") return continentScene(world, selection, partition);
   if (domain === "settlement") {
     const settlement = world.settlements.find((item) => item.id === mapId);
     return settlement ? settlementScene(settlement, selection) : null;

@@ -156,8 +156,8 @@ generation dependency):
 
 ### `elosern_map_core.partition` (the `generation` extra)
 
-The offline generator, imported only by the game's thin generator adapter. It
-needs NumPy and SciPy:
+The offline generator, imported only by the game's thin generator adapter
+and the map editor's partition-job worker. It needs NumPy and SciPy:
 
 ```console
 uv sync --extra generation
@@ -167,6 +167,11 @@ uv run --locked --extra generation python -m pytest tests
 - `PartitionInputSnapshot` — the explicit immutable inputs: a
   `TerrainDefinition`, the declared nation and region identifiers, anchor
   footprint cells, resolved `DistrictSeed`s and the source signature.
+- `world_snapshot(world)` — bind one loaded `AuthoringWorld` into that
+  snapshot from its documents alone (terrain, `NATION_KEYS`, the declared
+  regions, settlement footprints, district seeds with their routed gate
+  approaches and containing footprint, `world.partition_signature`); an
+  interior-room landmark cannot seed (`PartitionError`).
 - `partition_input(snapshot)` — rasterize the snapshot into a `PartitionInput`.
 - `generate_partition(input)` — partition, encode and serialize the complete
   artifact text (`version`, `algorithm_version`, `source_signature`,

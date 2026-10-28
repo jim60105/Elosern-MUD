@@ -43,7 +43,7 @@ import {
   terrainParameter,
   waterwayRef,
 } from "../lib/continent.js";
-import { partitionChip } from "../lib/status.js";
+import { partitionChip, partitionRevision } from "../lib/status.js";
 import { createSettlement } from "../lib/settlement.js";
 
 const props = defineProps({
@@ -53,7 +53,7 @@ const props = defineProps({
   creation: { type: Object, default: null },
   hint: { type: String, default: null },
 });
-const emit = defineEmits(["send", "create", "cancel", "select", "follow", "drafts", "create-map"]);
+const emit = defineEmits(["send", "create", "cancel", "select", "follow", "drafts", "create-map", "partition"]);
 
 // Draft counts of every open field, summed for the page's follow hold.
 const counts = reactive({});
@@ -339,8 +339,10 @@ function submitMapForm() {
 // -- derived results ---------------------------------------------------------------
 const preview = computed(() => continent.value.terrain_preview ?? null);
 const partition = computed(() => props.workspace?.partition_status ?? null);
-const partitionText = computed(() => partitionChip(props.workspace).text);
-const short = (value) => (value ? String(value).slice(0, 8) : "—");
+const partitionState = computed(() => partitionChip(props.workspace));
+const revision = computed(() => partitionRevision(props.workspace));
+const job = computed(() => props.workspace?.partition_job ?? null);
+const generating = computed(() => partitionState.value.state === "generating");
 </script>
 
 <template>
@@ -735,13 +737,25 @@ const short = (value) => (value ? String(value).slice(0, 8) : "—");
         <span v-if="preview?.status === 'current'" class="ok">✓ 依目前輸入由核心推導</span>
         <span v-else class="warn">▲ 無法推導（{{ preview?.reason ?? "—" }}）</span>
       </p>
-      <p data-derived="partition" :data-partition-state="partition?.status ?? 'loading'">
-        分區：{{ partitionText }}
-        <span v-if="partition && partition.status !== 'unavailable'" class="mono">
-          （產物輸入 {{ short(partition.input_signature) }} · 現行輸入 {{ short(partition.expected_signature) }}）
+      <p data-derived="partition" :data-partition-state="partitionState.state" :data-artifact-state="partition?.status ?? 'loading'">
+        分區：{{ partitionState.glyph }} {{ partitionState.text }}
+        <span v-if="revision" class="mono" data-partition-revision>
+          （產物輸入 {{ revision.output }} · 現行輸入 {{ revision.current }}）
         </span>
       </p>
-      <p class="inspector__muted">國界與分區由輸入推導，沒有可編輯的控制點；編輯不會自動重新產生分區。</p>
+      <p v-if="revision?.older" class="warn" data-partition-older>▲ 畫面上的分區輪廓屬於舊輸入，重新產生成功前不可作為遊戲就緒。</p>
+      <ul v-if="job?.state === 'failed' && job.problems?.length" class="inspector__muted" data-partition-problems>
+        <li v-for="(line, index) in job.problems" :key="index" class="mono">{{ line }}</li>
+      </ul>
+      <div class="inspector__actions">
+        <button v-if="generating" type="button" class="button" data-action="partition-cancel" @click="emit('partition', 'cancel')">
+          ✕ 取消產生
+        </button>
+        <button v-else type="button" class="button" data-action="partition-generate" @click="emit('partition', 'generate')">
+          ⟳ 重新產生分區
+        </button>
+      </div>
+      <p class="inspector__muted">國界與分區由輸入推導，沒有可編輯的控制點；編輯不會自動重新產生分區，只有這個按鈕或狀態列的分區按鈕會產生。</p>
     </template>
   </div>
 </template>

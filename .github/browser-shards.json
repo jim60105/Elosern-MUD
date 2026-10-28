@@ -205,7 +205,8 @@
         "web.tests.browser.test_harness.StartupLockTests",
         "web.tests.browser.test_harness.StartupSerializationTests",
         "web.tests.browser.test_browser_console_saves.ConsoleSaveConfigurationTests",
-        "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_the_room_tool_creates_a_standalone_room_without_a_layout_write"
+        "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_the_room_tool_creates_a_standalone_room_without_a_layout_write",
+        "web.tests.browser.test_map_editor_generation.MapEditorGenerationBrowserTest.test_only_the_explicit_controls_regenerate_and_old_outlines_are_labelled"
       ]
     },
     {
@@ -381,7 +382,8 @@
         "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_pointer_exploration_root_and_submenu_submission",
         "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_rapid_double_activation_pushes_one_frame",
         "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_a_referenced_node_refuses_deletion_and_an_unreferenced_one_is_deleted",
-        "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_room_fields_by_keyboard_keep_the_id_and_a_connection_is_relabelled"
+        "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_room_fields_by_keyboard_keep_the_id_and_a_connection_is_relabelled",
+        "web.tests.browser.test_map_editor_generation.MapEditorGenerationBrowserTest.test_browsing_then_cancelling_keeps_the_last_artifact_and_refuses_world_edits"
       ],
       "files_b": [
         "web.tests.browser.test_browser_art.ArtPendingSceneTest.test_pending_generating_notice_clears_dock_and_command_line",
@@ -569,7 +571,8 @@
         "web.tests.browser.test_browser_npc_persona_editor.NpcPersonaEditorBrowserTest.test_single_page_conflict_reload_and_discard",
         "web.tests.browser.test_browser_unified_scenes.UnifiedScenesBrowserTest.test_room_precedence_retention_movement_and_fullview",
         "web.tests.browser.test_browser_dream_artwork.DreamArtworkBrowserTest.test_offline_dream_and_official_failure_use_shared_scene",
-        "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_list_multi_selection_moves_as_one_command_and_cross_document_is_inspect_only"
+        "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_list_multi_selection_moves_as_one_command_and_cross_document_is_inspect_only",
+        "web.tests.browser.test_map_editor_generation.MapEditorGenerationBrowserTest.test_an_external_source_change_during_a_job_never_shows_it_current"
       ],
       "files_b": [
         "web.tests.browser.test_browser_npc_persona_editor_edges.NpcPersonaEditorEdgesBrowserTest.test_late_read_does_not_seed_different_npc",

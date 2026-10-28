@@ -781,3 +781,98 @@ class FreshnessTests(unittest.TestCase):
         self.assertFalse(current.current)
         self.assertEqual(current.algorithm_version, PARTITION_ALGORITHM_VERSION + 1)
         self.assertFalse(partition_freshness(self._metadata(signature), None).current)
+
+
+class WorldSnapshotTests(unittest.TestCase):
+    """``world_snapshot`` binds an authoring world without any game registry."""
+
+    def _world(self, *, roads=None, districts=None, interiors=None):
+        import authoring_fixtures as fixtures
+        from elosern_map_core.authoring import load_authoring_world
+
+        settlement = fixtures.settlement_data(roads=roads)
+        settlement["nodes"]["shed"] = dict(settlement["nodes"]["plaza"], x_m=900, y_m=900, key="Shed")
+        settlement["wilderness_entry"] = {
+            "shape": ["##", "##"],
+            "origin": {"cell_x": 4, "cell_y": 4},
+            "gates": [
+                {"return_direction": "n", "destination_node": "gate"},
+                {"return_direction": "w", "destination_node": "shed"},
+            ],
+        }
+        district_data = fixtures.districts_data()
+        district_data["districts"]["wild_district"] = {
+            "district_name_zh": "荒野區",
+            "landmark_name_zh": "荒野地標",
+            "landmark": {
+                "domain": "wilderness_cell",
+                "map_id": None,
+                "object_id": None,
+                "cell": {"cell_x": 30, "cell_y": 12},
+            },
+            "kind": "voronoi",
+            "region_key": None,
+        }
+        district_data["districts"].update(districts or {})
+        return load_authoring_world(
+            fixtures.custom_sources(
+                settlement=settlement, districts=district_data, interiors=interiors
+            )
+        )
+
+    def test_seeds_footprints_and_identifiers_come_from_the_documents(self):
+        from elosern_map_core.partition import world_snapshot
+        from elosern_map_core.terrain import NATION_KEYS
+
+        world = self._world()
+        snapshot = world_snapshot(world)
+        footprint = frozenset({(4, 4), (5, 4), (4, 5), (5, 5)})
+        seeds = {seed.key: seed for seed in snapshot.districts}
+        # plaza: cell (5, 5) centre 5500 m + local (100, 0) -> (5600, 5500) m,
+        # inside the footprint. The north gate's node routes to it (approach one
+        # cell south of the anchor cell (4, 4)); the west gate's isolated node
+        # does not, so its approach (6, 4) is excluded.
+        self.assertEqual(
+            seeds["demo_district"],
+            DistrictSeed("demo_district", "voronoi", (5, 5), None, ((4, 3),), footprint),
+        )
+        self.assertEqual(
+            seeds["wild_district"], DistrictSeed("wild_district", "voronoi", (30, 12), None)
+        )
+        self.assertEqual(snapshot.footprints, footprint)
+        self.assertEqual(snapshot.nation_names, NATION_KEYS)
+        self.assertEqual(snapshot.region_names, tuple(sorted(world.continent.regions)))
+        self.assertEqual(snapshot.source_signature, world.partition_signature)
+        self.assertEqual(snapshot.size, world.continent.terrain.frame_cells)
+
+    def test_a_gate_without_a_route_to_the_landmark_seeds_no_approach(self):
+        from elosern_map_core.partition import world_snapshot
+
+        seeds = {seed.key: seed for seed in world_snapshot(self._world(roads=[])).districts}
+        self.assertEqual(seeds["demo_district"].approaches, ())
+
+    def test_an_interior_room_landmark_cannot_seed(self):
+        from elosern_map_core.partition import world_snapshot
+
+        room = {
+            "district_name_zh": "室內區",
+            "landmark_name_zh": "室內地標",
+            "landmark": {
+                "domain": "interior_room",
+                "map_id": "demo_interior",
+                "object_id": "hall",
+                "cell": None,
+            },
+            "kind": "voronoi",
+            "region_key": None,
+        }
+        import authoring_fixtures as fixtures
+
+        world = self._world(
+            districts={"room_district": room},
+            interiors={"demo_interior": fixtures.interior_data()},
+        )
+        with self.assertRaises(PartitionError) as caught:
+            world_snapshot(world)
+        self.assertEqual(len(caught.exception.problems), 1)
+        self.assertIn("room_district", caught.exception.problems[0])

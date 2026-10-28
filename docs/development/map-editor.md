@@ -16,7 +16,7 @@ continuously (§3.4) and the page recovers from stale previews, disconnects
 and restarts without a handoff (§3.5). The workbench shell (§3.6) provides
 navigation, search, selection, inspection, diagnostics, the copy-only OMP
 context and the keyboard contract. Further domain commands arrive in later
-slices (§3.7).
+slices (§3.7). Partition regeneration is an explicit background job (§3.12).
 
 ## 1. Launch
 
@@ -76,10 +76,13 @@ an empty `PATH`, so neither the game's packages nor Node can be reached.
 
 | Route | Purpose |
 | --- | --- |
-| `GET /api/workspace` | One complete replacement of the authoritative state: `session_generation`, `snapshot_revision`, `write_pause`, `preview_state` (`current`/`stale`/`unavailable`), `snapshot_read_at`, `checked_at`, `schema` (the core schema), `documents` (path, kind, id, fingerprint, values), `world` (the core-derived projection), `diagnostics`, `candidate_diagnostics` (the failing read while stale or unavailable), `external_context_status`, `partition_status`, `history`, `pending_intent`, `uncertain_outcome`, `external_change` (`sequence`, `at` and the changed `documents` of the last adopted external change; §3.4) and `following` (`active`, reconciled `batches`, the last watcher `error`). `write_pause` is only the explicit pause of an uncertain publication; the stale or unavailable preview is the separate `preview_state`. |
+| `GET /api/workspace` | One complete replacement of the authoritative state: `session_generation`, `snapshot_revision`, `write_pause`, `preview_state` (`current`/`stale`/`unavailable`), `snapshot_read_at`, `checked_at`, `schema` (the core schema), `documents` (path, kind, id, fingerprint, values), `world` (the core-derived projection), `diagnostics`, `candidate_diagnostics` (the failing read while stale or unavailable), `external_context_status`, `partition_status` (artifact freshness, its `artifact_fingerprint`, input and expected signatures, and `game_ready`), `partition_job` (§3.12), `history`, `pending_intent`, `uncertain_outcome`, `external_change` (`sequence`, `at` and the changed `documents` of the last adopted external change; §3.4) and `following` (`active`, reconciled `batches`, the last watcher `error`). `write_pause` is only the explicit pause of an uncertain publication; the stale or unavailable preview is the separate `preview_state`. |
 | `GET /api/events` | Server-sent events: `status` on connect and `invalidate` after a published change, each carrying only `session_generation`, `snapshot_revision` and `preview_state`. A client refetches `/api/workspace` on every invalidation and on a reconnect status that names another session or revision. Nothing is patched or merged. |
 | `POST /api/reload` | Authenticated explicit reread of the current disk files. A loadable read publishes and is the only way to resolve an uncertain publication. A structural failure keeps the last preview and marks it `stale`. An identical read publishes nothing. It never writes a file. |
 | `POST /api/commands/<name>` | One named single-document command (the layout commands of §3.1, the geography commands of §3.8, the settlement commands of §3.9, the interior commands of §3.10, the entrance commands of §3.11) or `undo`/`redo` of the current segment (see §3). |
+| `POST /api/partition/generate` | Admits one explicit partition job (§3.12). Body: exactly `session_generation` and `snapshot_revision`. |
+| `POST /api/partition/cancel` | Cancels the generating partition job (§3.12). Body: exactly `session_generation`. |
+| `GET /api/partition/outlines` | The current partition artifact's `artifact_fingerprint`, `input_signature` and district `outlines` (rings of `[x0, y0, x1, y1, ...]` metres); 404 `partition_unavailable` for a missing or malformed artifact. Read-only. |
 | `GET /api/session` | Same-origin launch-token bootstrap (see §4). |
 
 `external_incoming_references` maps the `qualified_ref` of every projected
@@ -96,7 +99,8 @@ history moves. Commands must name the current `session_generation` and
 `snapshot_revision` (§3). Startup is a fresh disk read with a new session identity, and
 the editor is writable exactly when that read loads. There is no handoff,
 resume or return route, and no generic patch, file-write, path, shell, Python
-or account route.
+or account route. The partition routes take no path or file content: the job
+writes only the partition artifact (§3.12).
 
 ## 3. Document Commands, Autosave and History
 
@@ -458,8 +462,8 @@ partition source only makes `partition_status` stale (its `input_signature`
 no longer equals `expected_signature`); nothing regenerates per pointer
 movement or per command. A stale partition is not a stale preview, so
 commands stay admitted. Commands are rejected (423) while writes are paused
-or the preview is stale or unavailable; rejection while a partition
-generation runs is added by `map-editor-partition-jobs`.
+or the preview is stale or unavailable, and every world-data command is
+rejected while a partition job runs (§3.12).
 
 On the page the continent tools are 選取 V, 加控制點 A (insert at the nearest
 segment, or after the selected point), 水系 (two clicks, then a creation
@@ -470,8 +474,9 @@ shows its control-point diamonds; a drag is one command on release and Escape
 cancels it. The inspector gives every essential edit a non-drag path:
 frame-labelled numeric fields, 前方插入/後方插入/移除控制點, the footprint
 `#`/`.` grid (arrow keys and Space), the structured landmark selector, and a
-read-only 衍生結果 section with the terrain preview state and the partition's
-input signature against the current one. Geometry deletions send their
+衍生結果 section with the terrain preview state, the partition's input
+signature against the current one and the explicit 重新產生分區 / 取消產生
+control (§3.12). Geometry deletions send their
 command directly; a location delete first shows the inline refusal while a
 map or external reference remains.
 
@@ -749,6 +754,106 @@ start entry in the object list.
   node or room deletion links each entrance that must go first. Core
   diagnostics on `city_gate` and `exterior` fields locate the relationship.
 
+### 3.12 Partition jobs
+
+Partition generation is explicit and runs outside request handling
+(`elosern_map_editor/partition_job.py`, `partition_worker.py`). The editor
+project installs the core `generation` extra (NumPy/SciPy) in its own lock,
+without any game dependency. Nothing regenerates per pointer movement, drag,
+command or file change: only `POST /api/partition/generate`, reached from the
+分區 chip or the inspector's 重新產生分區, starts a job.
+
+**Admission** (inside the service lock): the current `session_generation` and
+`snapshot_revision` (`stale_session` / `stale_snapshot`, 409); no write pause
+and a current preview (`write_paused`, 423); no running job (`job_running`,
+409). A fresh confined read of the world sources must carry the published
+world's partition source signature (`stale_snapshot`, 409, until the reread),
+and the artifact's presence must be readable (`artifact_unreadable`, 409).
+That read is the captured input; its signature is the job's
+`input_signature`.
+
+**Execution.** A dedicated thread runs `python -I -m
+elosern_map_editor.partition_worker` as a child process on exactly the
+captured sources. The child loads them with the core authoring loader, binds
+them with `elosern_map_core.partition.world_snapshot` and generates the
+artifact text; it reads and writes no workspace file. The service's event
+loop and interpreter never run the raster work, so browsing, inspection,
+rereads, file following, status and cancellation stay responsive. A job that
+exceeds `partition_timeout_seconds` (900 s by default) fails with `timeout`.
+The editor's `world_snapshot` binding and the game's
+`tools.map_district_partition` registry binding are two bindings of one seed
+rule; `tests/test_map_partition_independence.py` proves the editor binding
+regenerates the committed artifact byte for byte.
+
+**Exclusion.** While a job is `generating` or `publishing`, every command
+whose document is a world source, including undo and redo of one, is
+rejected (`write_paused`, 423, `reason: partition_generating`) at admission
+and again at the single effect publication point. Editor layout commands
+stay admitted: a layout cannot change a generation input. There is no
+handoff state to block.
+
+**Invalidation and publication.** Any adopted loaded read (file following, an
+explicit reread or the service's own write) whose partition signature differs
+from the captured one ends the job at once (`failed`, `inputs_changed`) and
+ends its child process. When the child answers, publication runs inside the
+same lock as commands: the job must still be the generating one, then no
+write pause, a current preview, a fresh disk read whose partition signature
+(the signature over the partition-kind sources, the "full current source
+signature" of the design; interiors and layouts cannot change ownership)
+equals the captured one, and an unchanged artifact presence
+(`write_paused`, `stale_preview`, `inputs_changed`, `artifact_changed`).
+Only then does the writer replace `world/maps/data/district_partition.json`
+with the same guarded atomic replacement as a source document (temporary
+file, flush, rename, directory flush), reached through the one confined
+opener reserved for this artifact; no command or route can name it. The
+service rereads and publishes the new snapshot. The artifact is not a
+source, so it never enters the committed fingerprint ledger and its own
+change is no external change (history stays).
+
+**States** (`partition_job.state`): `idle`, `generating`, `publishing`,
+`succeeded`, `cancelled`, `failed` with a `reason` (`generation_failed`,
+`inputs_invalid`, `inputs_changed`, `write_paused`, `stale_preview`,
+`artifact_changed`, `publish_failed`, `publish_uncertain`, `reread_failed`,
+`timeout`, `worker_failed`, `output_too_large`, `internal_error`) and bounded
+`problems`. Any unexpected error in the job thread or the publication ends
+the job as `internal_error`, so no failure leaves world-data writes refused. A
+cancel, a failure or a timeout never touches the last artifact.
+`POST /api/partition/cancel` ends a generating job; while or after
+publication it answers `job_not_running` (409) with the job's own state, so
+a completed publication is reported as completed and nothing promises a
+rollback. A `publish_uncertain` outcome leaves whatever the reread finds on
+disk and withholds `game_ready` until a later job succeeds; it does not
+pause source writes, because the artifact's freshness is always read from
+disk.
+
+**Freshness on the page.** `partition_status.game_ready` is true only for an
+artifact that describes the current inputs (and not after an uncertain
+publication); the core's `stale_partition` diagnostic withholds game
+readiness otherwise. Source saved state is separate from output freshness: a
+saved relevant edit leaves the old artifact in place and marks it stale. The
+分區 chip reads 分區 現行, ▲ 分區過期 · 重新產生, ⟳ 分區產生中 · 取消,
+分區已取消 · 保留舊版 or ✕ 分區產生失敗 · 保留舊版; activating it regenerates when
+the output is not current and cancels while generating. The canvas draws the
+current artifact's district outlines (fetched once per
+`artifact_fingerprint`) as derived, non-selectable rings on the 分區 layer.
+Outlines of an artifact for older inputs stay inspectable but fade and carry
+a persistent canvas label and an inspector note; they are never shown as
+current. A command refused during generation appears in the banner slot
+with its own reason.
+
+**Limitations.** One job at a time per service; a service restart ends a
+running job (its child is killed) and the next session starts idle. The
+publication recheck and the replacement are not atomic against another
+process writing the same files, exactly like source writes; an external
+writer must not regenerate the artifact concurrently. A source change that
+lands after the publication recheck but before the reread leaves the job
+`succeeded` with an artifact for the captured inputs; the reread then
+reports it stale (`game_ready` false, the chip offers 重新產生), so it is
+never labelled current. The withheld readiness after `publish_uncertain` is
+session state: after a restart the artifact's freshness is again read from
+disk alone. The child has a wall-clock bound but no memory bound, and its
+answer is buffered before the size check; this is a developer-only tool.
+
 ## 4. Security Model and Limitations
 
 - **Loopback only.** The service binds a loopback address and answers only
@@ -772,7 +877,8 @@ start entry in the object list.
   processes, remote access, accounts and multiple users are out of scope.
 - **Confinement.** Document identities resolve only to the allowlisted
   sources (`content/maps/...`), layouts (`content/map-editor-layouts/...`) and
-  the two generated artifacts. Files are opened by walking from a descriptor of
+  the two generated artifacts; only the partition job publishes the
+  partition artifact (§3.12), and no command can name either artifact. Files are opened by walking from a descriptor of
   the real workspace root with `O_NOFOLLOW`, so traversal and every symbolic
   link below the root are refused at the actual open, including links that
   would stay inside the workspace. A linked workspace root is resolved once at
