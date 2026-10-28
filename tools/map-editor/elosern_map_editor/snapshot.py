@@ -342,10 +342,12 @@ def _project(world, layouts: Mapping[str, dict[str, Any]]) -> dict[str, Any]:
             "cell_size_km": terrain.cell_size_km,
             "mainland_boundary_km": [list(point) for point in terrain.mainland_boundary_km],
             "forest_edge": [_cell(cell) for cell in terrain.forest_edge],
+            "forest_edge_m": [list(cell_center_m(cell)) for cell in terrain.forest_edge],
             "waterways": [
                 {
                     "id": waterway_id,
                     "route": [_cell(cell) for cell in waterway.route],
+                    "route_m": [list(cell_center_m(cell)) for cell in waterway.route],
                     "fords": [_cell(cell) for cell in waterway.fords],
                 }
                 for waterway_id, waterway in sorted(terrain.waterways.items())
@@ -355,6 +357,7 @@ def _project(world, layouts: Mapping[str, dict[str, Any]]) -> dict[str, Any]:
                     "id": site.site_id,
                     "display_name": site.display_name,
                     "cell": _cell(site.cell),
+                    "centre_m": list(cell_center_m(site.cell)),
                     "role": site.role,
                 }
                 for site in continent.harbor_sites.values()
