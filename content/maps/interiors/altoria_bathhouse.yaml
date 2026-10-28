@@ -1,0 +1,23 @@
+# Permanent interior authored source (schema version 1).
+# Converted once from the retired Python place room fields; this document is
+# the sole authority for the room's identity, name, prose, scene/art metadata
+# and its one exterior entrance relationship. The room id is the stable place
+# key a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: altoria_bathhouse
+rooms:
+  altoria_bathhouse:
+    name_zh: 聖潔王都公共浴場
+    desc_zh: 聖潔王都的公共浴場，人還沒走到門口，蒸氣就先漫過浴場前的路緣。屋內的地面一分為二，男側與女側，各有各深的河水池，各有各大喊大潑水的老主顧，中間隔著一道高牆，管理員的聲音整天沿著牆走來走去。在這裡作主的是王都人族與獸人遮蓋私密的習俗，寬衣是個人的事，而這棟建築是唯一讓它當眾進行的地方，在陌生人之間、隔著一堵牆。一個精靈若和他們共浴，會覺得沒什麼值得隔牆；這場分歧是浴場另一處地標，而伊莎貝爾對它很有意見，問起便說給你聽。
+    scene_archetype: tavern_interior
+    art_key: altoria_bathhouse
+connections: []
+exterior:
+  settlement: capital_altoria
+  node: bath_forecourt
+  room: altoria_bathhouse
+  doorway_key: 公共浴場
+  doorway_aliases:
+  - bathhouse
+  - baths

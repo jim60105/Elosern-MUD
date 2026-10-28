@@ -21,7 +21,12 @@ from elosern_map_core.codec import parse_document
 from elosern_map_core.diagnostics import AuthoringError
 from elosern_map_core.sources import make_source_document
 from tools.spec_traceability import covers_requirement
-from world.maps import map_data
+from world.maps import map_data, runtime
+from world.tests.geography_fixture import (
+    clear_published_map_world,
+    publish_settlements,
+    restore_published_map_world,
+)
 from world.tests.geography_fixture import publish_shipped_settlements
 
 publish_shipped_settlements()
@@ -136,7 +141,7 @@ class ThirdSettlementTests(unittest.TestCase):
     def test_a_third_document_is_discovered_and_composed_without_registration(self):
         with tempfile.TemporaryDirectory() as directory:
             root = _write_root(directory, _THIRD)
-            snapshot = map_data.load_settlements(root)
+            snapshot = runtime.compose_settlements(root)
 
         self.assertEqual(sorted(snapshot.graphs), ["t_third"])
         self.assertEqual(sorted(snapshot.settlements), ["t_third"])
@@ -172,7 +177,7 @@ class ThirdSettlementTests(unittest.TestCase):
     def test_the_discovered_document_is_the_only_local_map_of_its_location(self):
         with tempfile.TemporaryDirectory() as directory:
             root = _write_root(directory, _THIRD)
-            snapshot = map_data.load_settlements(root)
+            snapshot = runtime.compose_settlements(root)
 
         self.assertEqual(set(snapshot.graphs), {"t_third"})
         # The shipped world is untouched: discovery and publication are
@@ -362,7 +367,7 @@ class SettlementPublicationIsolationTests(unittest.TestCase):
     def test_a_failed_candidate_leaves_the_previous_snapshot_published(self):
         before = map_data.current()
         with self.assertRaises(map_data.SettlementError):
-            map_data.publish(
+            publish_settlements(
                 _build(
                     [
                         _document(
@@ -382,18 +387,17 @@ class SettlementPublicationIsolationTests(unittest.TestCase):
             before.graphs["t_absent"] = None
         with self.assertRaises(TypeError):
             before.anchor_placements["t_absent"] = None
-        self.assertEqual(map_data.load_settlements().identity, before.identity)
+        self.assertEqual(runtime.compose_settlements().identity, before.identity)
         self.assertIs(map_data.current(), before)
 
     def test_reading_before_publication_raises(self):
         from world.maps.published import PublishedView
 
-        saved = map_data._PUBLISHED
+        saved = clear_published_map_world()
         try:
-            map_data._PUBLISHED = None
             with self.assertRaises(map_data.SettlementNotLoaded):
                 len(PublishedView("graphs"))
             with self.assertRaises(map_data.SettlementNotLoaded):
                 map_data.current()
         finally:
-            map_data._PUBLISHED = saved
+            restore_published_map_world(saved)

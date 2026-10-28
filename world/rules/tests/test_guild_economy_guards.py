@@ -81,7 +81,7 @@ class NoGenerativeImportTests(unittest.TestCase):
         from server.conf.at_server_startstop import STARTUP_STEP_ORDER
 
         for sync in (
-            "sync_service_interiors",
+            "sync_interiors",
             "sync_quest_runtime",
             "sync_guild_economy",
             "sync_npc_schedules",
@@ -113,7 +113,7 @@ class NoGenerativeImportTests(unittest.TestCase):
             "world.maps.bootstrap.sync_grid": "sync_grid",
             "world.rules.guild_economy.restore_persisted_sessions": "restore_persisted_sessions",
             "world.maps.bootstrap.sync_wilderness": "sync_wilderness",
-            "world.maps.bootstrap.sync_service_interiors": "sync_service_interiors",
+            "world.maps.bootstrap.sync_interiors": "sync_interiors",
             "world.quests.bootstrap.sync_quest_runtime": "sync_quest_runtime",
             "world.rules.guild_economy.sync_guild_economy": "sync_guild_economy",
             "world.rules.npc_schedules.sync_npc_schedules": "sync_npc_schedules",
@@ -146,7 +146,7 @@ class NoGenerativeImportTests(unittest.TestCase):
                 stack.enter_context(patcher)
             at_server_start()
         for sync in (
-            "sync_service_interiors",
+            "sync_interiors",
             "sync_quest_runtime",
             "sync_guild_economy",
             "sync_npc_schedules",

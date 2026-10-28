@@ -1,0 +1,23 @@
+# Permanent interior authored source (schema version 1).
+# Converted once from the retired Python place room fields; this document is
+# the sole authority for the room's identity, name, prose, scene/art metadata
+# and its one exterior entrance relationship. The room id is the stable place
+# key a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: altoria_drill_yard
+rooms:
+  altoria_drill_yard:
+    name_zh: 聖潔王都校場
+    desc_zh: 聖潔王都的校場是上城牆下一片耙平的泥地，練習樁一排排立著，圍繩的握處磨得發白，一條長凳，是那種一整個上午的招式練下來會讓人一身汗的長凳。王都的徵兵在白天於此操練，公會到傍晚才來用屬於它的時段，樁上的痕跡來自一百雙不同的手。場子裡沒有任何東西會自己磨快一刀或評定一階，它是這座城市來做「任何地面都肯承接的那種功課」的地方，只因為在這裡，每個人都看得見標準在哪裡。
+    scene_archetype: tavern_interior
+    art_key: altoria_drill_yard
+connections: []
+exterior:
+  settlement: capital_altoria
+  node: training_ground
+  room: altoria_drill_yard
+  doorway_key: 校場
+  doorway_aliases:
+  - drill yard
+  - training ground

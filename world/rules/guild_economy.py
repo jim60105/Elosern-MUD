@@ -30,7 +30,7 @@ from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
 from world.rules.npc_persona import initialize_npc_persona
 from typeclasses.npcs import NPC, ensure_npc_canonical_age
 from world.lore.settlements.places import PLACE_REGISTRY
-from world.maps.bootstrap import sync_service_interiors
+from world.maps.bootstrap import sync_interiors
 from world.rules.guild_config import get_catalog, load_catalog_into_cache
 from world.rules.npc_capabilities import (
     COMPONENT_TYPES,
@@ -484,9 +484,9 @@ def _resolve_service_plans(roster):
     if problems:
         log_warn(
             "guild_economy_service_interiors_missing",
-            context={"action": "sync_service_interiors_first"},
+            context={"action": "sync_interiors_first"},
         )
-        sync_service_interiors()
+        sync_interiors()
         rooms, problems = _resolve_spawn_rooms(roster)
     if problems:
         raise ServiceHostIntegrityError(

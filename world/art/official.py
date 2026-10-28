@@ -521,9 +521,9 @@ def _registered_room_art_keys() -> frozenset[str]:
     room no authored place declares is skipped like any other unregistered
     reference (never inferred from a room name or a database row).
     """
-    from world.art.scene_definitions import ROOM_ART_KEY_SET
+    from world.art.scene_definitions import room_art_key_set
 
-    return ROOM_ART_KEY_SET
+    return room_art_key_set()
 
 
 def _registered_kind_keys(kind: str) -> frozenset[str]:

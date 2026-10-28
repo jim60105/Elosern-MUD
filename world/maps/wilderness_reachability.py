@@ -104,14 +104,23 @@ class WalkableComponents:
         return None
 
 
-def walkable_components(snapshot=None) -> WalkableComponents:
-    """The component index for one geography snapshot and the live entry registry."""
+def walkable_components(snapshot=None, entries=None) -> WalkableComponents:
+    """The component index for one geography snapshot and one entry registry.
+
+    ``entries`` defaults to the published wilderness-entry registry; a candidate
+    world passes its own, so a candidate's walkability is never computed from
+    the previously published gateways.
+    """
 
     from world.maps.geography import current
 
     geography = snapshot if snapshot is not None else current()
     terrain = geography.terrain
-    registry = _wilderness_entry_module.WILDERNESS_ENTRY_REGISTRY
+    registry = (
+        entries
+        if entries is not None
+        else _wilderness_entry_module.WILDERNESS_ENTRY_REGISTRY
+    )
     key = (geography.identity, tuple(registry.items()))
     cached = _INDEX_CACHE.get(key)
     if cached is None:

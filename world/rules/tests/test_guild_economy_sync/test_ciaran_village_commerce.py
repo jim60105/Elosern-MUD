@@ -32,14 +32,18 @@ from world.lore.items.vocab import EquipmentModifierKey
 from ._support import (
     ServiceContentIsolation,
     _items,
-    _place_by_kind,
     _npc_profiles,
+    _place_by_kind,
     _places,
     _settlements,
     _village_places,
+    _village_subrace_key,
     _village_trading_place,
     _village_trading_places,
-    _village_subrace_key,
+    doorway_key,
+    exterior_key,
+    room_desc,
+    room_name,
 )
 
 
@@ -139,7 +143,7 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
         for place in places:
             with self.subTest(place=place.key):
                 interior = self._village_interior(place)
-                self.assertEqual(interior.db.desc, place.room_desc_zh)
+                self.assertEqual(interior.db.desc, room_desc(place))
                 from world.maps.static_references import place_exterior_xyz
 
                 exterior = GridRoom.objects.filter_xyz(
@@ -194,12 +198,12 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
         sync_service_content()
         for place in _village_places():
             with self.subTest(place=place.key):
-                self.assertNotIn("店", place.room_name_zh)
-                self.assertNotIn("舖", place.room_name_zh)
-                self.assertNotIn("櫃檯", place.room_desc_zh)
-                self.assertNotIn("招牌", place.room_desc_zh)
+                self.assertNotIn("店", room_name(place))
+                self.assertNotIn("舖", room_name(place))
+                self.assertNotIn("櫃檯", room_desc(place))
+                self.assertNotIn("招牌", room_desc(place))
                 for token in ("counter", "sign", "shopfront", "store", "shelf"):
-                    self.assertNotIn(token, place.room_desc_zh)
+                    self.assertNotIn(token, room_desc(place))
 
     @covers_requirement(
         "ciaran-village-commerce::one-good-is-sold-at-two-prices-in-two-settlements"
@@ -496,12 +500,12 @@ class CiaranVillageCommonsTests(ServiceContentIsolation, EvenniaTestCase):
                 interiors = search_object_by_tag(place.key)
                 self.assertEqual(len(interiors), 1)
                 interior = interiors[0]
-                self.assertEqual(interior.db.desc, place.room_desc_zh)
+                self.assertEqual(interior.db.desc, room_desc(place))
                 exterior = self._exterior(place)
                 doorway = next(
                     exit_obj
                     for exit_obj in exterior.exits
-                    if exit_obj.key == place.doorway_key_zh
+                    if exit_obj.key == doorway_key(place)
                 )
                 self.assertIs(doorway.destination, interior)
                 self.assertIn(
@@ -527,24 +531,24 @@ class CiaranVillageCommonsTests(ServiceContentIsolation, EvenniaTestCase):
         # each interior.
         blade_smith = next(
             q for q in _village_trading_places()
-            if any(p.exterior == q.exterior for p in attendants)
+            if any(exterior_key(p) == exterior_key(q) for p in attendants)
         )
         instructor = next(
-            p for p in attendants if p.exterior == blade_smith.exterior
+            p for p in attendants if exterior_key(p) == exterior_key(blade_smith)
         )
         clearing = self._exterior(blade_smith)
         dwelling_doors = {
             e.key: e for e in clearing.exits
-            if e.key in {blade_smith.doorway_key_zh, instructor.doorway_key_zh}
+            if e.key in {doorway_key(blade_smith), doorway_key(instructor)}
         }
         self.assertEqual(
             set(dwelling_doors),
-            {blade_smith.doorway_key_zh, instructor.doorway_key_zh},
+            {doorway_key(blade_smith), doorway_key(instructor)},
             "練刀場 does not carry one doorway per dwelling",
         )
-        self.assertIs(dwelling_doors[blade_smith.doorway_key_zh].destination,
+        self.assertIs(dwelling_doors[doorway_key(blade_smith)].destination,
                       self._interior(blade_smith))
-        self.assertIs(dwelling_doors[instructor.doorway_key_zh].destination,
+        self.assertIs(dwelling_doors[doorway_key(instructor)].destination,
                       self._interior(instructor))
         for place in (blade_smith, instructor):
             with self.subTest(reciprocal=place.key):
@@ -559,7 +563,7 @@ class CiaranVillageCommonsTests(ServiceContentIsolation, EvenniaTestCase):
                 self.assertEqual(len(search_object_by_tag(place.key)), 1)
                 exterior = self._exterior(place)
                 self.assertEqual(
-                    len([e for e in exterior.exits if e.key == place.doorway_key_zh]), 1
+                    len([e for e in exterior.exits if e.key == doorway_key(place)]), 1
                 )
                 residents = [
                     o for o in self._interior(place).contents if isinstance(o, NPC)
@@ -621,7 +625,7 @@ class CiaranVillageCommonsTests(ServiceContentIsolation, EvenniaTestCase):
                 exterior = self._exterior(place)
                 player.location = exterior
                 doorway = next(
-                    e for e in exterior.exits if e.key == place.doorway_key_zh
+                    e for e in exterior.exits if e.key == doorway_key(place)
                 )
                 # No lock, no prerequisite: the default traversal access
                 # check is all the doorway consults, and the stock exit

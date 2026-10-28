@@ -78,14 +78,10 @@ Among the declared rooms, exactly one, the central plaza, SHALL spawn as an `Anc
   instances that are not `AnchorRoom` instances
 
 ### Requirement: The sample city's declared exterior topology remains unchanged while permanent service interiors are attached
-Every notable building referenced by the xyzgrid SHALL remain represented by one exterior
-GridRoom in that map. Guild economy SHALL additionally create one ordinary permanent room outside the
-xyzgrid node count for each place the settlement's place registry declares, linked bidirectionally from
-that place's declared exterior. The number and identity of those interiors SHALL follow the registry
-rather than being fixed by this requirement.
+Map-owned permanent interiors SHALL attach by qualified relationships without becoming settlement grid nodes or changing exterior topology; service/goods behavior remains service-owned.
 
 #### Scenario: Grid topology is unchanged
-- **WHEN** the sparse map declaration is parsed after guild economy lands
+- **WHEN** the sparse map declaration is parsed after map-owned interiors lands
 - **THEN** it still contains the declared exterior nodes and roads, without service interiors becoming grid nodes
 
 #### Scenario: Declared interiors are reachable and permanent
@@ -99,7 +95,7 @@ rather than being fixed by this requirement.
   the grid rooms
 
 #### Scenario: Adding a trading place needs no map edit
-- **WHEN** a place is declared against an exterior that already exists in the grid
+- **WHEN** an interior relationship is declared against an exterior that already exists in the grid
 - **THEN** its interior and doorways appear after synchronization with no change to the sparse map declaration
 
 #### Scenario: Specialist shops do not narrow what the capital sells
@@ -107,7 +103,7 @@ rather than being fixed by this requirement.
 - **THEN** each shop exposes its current authored assortment union and allowed place-level additions/removals; no historical roster defines capital availability
 
 #### Scenario: One exterior carries two doors
-- **WHEN** two places declare the same exterior with different doorway names
+- **WHEN** two interior relationships declare the same exterior with different doorway names
 - **THEN** both interiors exist, that exterior holds one doorway exit per place, and each interior
   leads back to it
 
@@ -122,7 +118,7 @@ rather than being fixed by this requirement.
   unchanged
 
 #### Scenario: An exterior may carry several doors or none
-- **WHEN** place declarations against grid exteriors are inspected
+- **WHEN** interior relationship declarations against grid exteriors are inspected
 - **THEN** one exterior MAY carry more than one interior, distinguished by their authored doorway
   names (a craft alley with a forge and a tailor on it is one street with two doors), and some
   exteriors SHALL carry none at all, since a capital contains squares, steps, ruins and quaysides

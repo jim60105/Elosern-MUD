@@ -1,12 +1,14 @@
 """Place identity registry (settlement-shops design §3.2).
 
-A place is the single authored record of one service location: its interior
-room's identity and description, the qualified settlement-node identity of the
-exterior room the interior attaches to, the doorway naming, its host's
+A place is the single authored record of one service location's *service*
+facts: its non-map kind, the qualified interior room it joins, its host's
 identity, the host's explicit capability declarations, and the assortments the
-place sells. Nothing a place declares is declared anywhere else. The exterior
-address is derived from the current settlement graph at the consumer boundary
-(``world/maps/static_references.py``); the row stores no coordinate.
+place sells. The room itself — name, prose, scene facts, connections and its
+one exterior entrance relationship — belongs solely to the permanent interior
+document under ``content/maps/interiors/``; a place never repeats it. The
+room's identity is the place key, so every existing room tag and service join
+survives; the exterior address is derived from the current settlement graph at
+the consumer boundary (``world/maps/static_references.py``), never stored.
 
 ``host_race`` / ``host_subrace`` / ``host_sex`` are creation-time authored
 identity: ``sync_service_content`` writes them once when it creates the host
@@ -26,7 +28,7 @@ from enum import StrEnum
 from typing import Mapping
 
 from elosern_map_core.documents import QualifiedRef
-from elosern_map_core.references import settlement_node_ref
+from elosern_map_core.references import interior_room_ref
 
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.lore.registry_refs import ref, ref_many
@@ -84,11 +86,11 @@ class PlaceDefinition:
     key: str  # also the interior room tag
     settlement_key: str = field(metadata=ref("settlements", inverse="places"))
     kind: PlaceKind
-    room_name_zh: str
-    room_desc_zh: str
-    exterior: QualifiedRef  # settlement_node; map scope equals settlement_key
-    doorway_key_zh: str
-    doorway_aliases: tuple[str, ...]
+    # The qualified permanent interior room this place serves. Its object id IS
+    # this place key (the room's stable tag and the join's identity); its map
+    # scope names the interior document, which owns the room's name, prose,
+    # scene facts and exterior relationship.
+    room: QualifiedRef
     # The host is one optional group: every scalar below is None exactly when
     # the place authors no host at all (validate_place_registry enforces the
     # all-or-nothing set; host_subrace stays outside the count because None is
@@ -137,6 +139,18 @@ class PlaceDefinition:
     # derived church venue set reads. It is not a capability and not a host
     # datum; a church host's venue identity is its own ``church_host`` kwarg.
     church: bool = False
+
+    @property
+    def room_name_zh(self) -> str:
+        """The joined interior room's authored display name.
+
+        A read view of the one room authority (the interior document), never a
+        second copy: map-facing service labels resolve through the room join.
+        """
+
+        from world.maps.interiors import room_name_zh
+
+        return room_name_zh(self.room)
 
 
 def place_capabilities(place: PlaceDefinition, type_key: str) -> tuple[CapabilityDeclaration, ...]:
@@ -241,14 +255,13 @@ def validate_place_registry(
     places: Mapping[str, PlaceDefinition],
     *,
     check_capabilities: bool = True,
-    index=None,
 ) -> None:
     """Fail closed on a malformed place record, naming the place and rule.
 
     Record validity (design §3.2): the settlement must exist, the host race
     and sex must be registry members, a subrace must exist and belong to the
-    authored race, the exterior must be a qualified settlement node in the
-    place's own settlement, every
+    authored race, the room must be a qualified ``interior_room`` reference
+    whose object id is this place key (the room's stable join identity), every
     capability declaration is shape/vocabulary/reference-validated by the one
     capability core, and a place declares assortments iff it declares a
     merchant (shop) capability.
@@ -269,15 +282,11 @@ def validate_place_registry(
     rejected on a hostless place, and otherwise must resolve in the NPC
     profile registry.
 
-    The record loop is followed by one cross-record rule (altoria-place-slices,
-    born with the replan's shared exteriors): two places MAY share an exterior
-    — a craft alley with a forge and a tailor on it is one street with two
-    doors — but never a doorway name on it, because two identical doorway
-    keys on one exterior produce a single exit where two were authored,
-    silently losing a location rather than failing.
+    Two interiors sharing one exterior stay valid — a craft alley with a forge
+    and a tailor on it is one street with two doors — but the shared-doorway
+    rule now lives with the interior documents that author the doorway, so a
+    place record carries no geometry to collide on.
     """
-    from elosern_map_core.references import ReferenceError, settlement_position
-
     for place_key, place in places.items():
         if type(place.letter_service) is not bool:
             raise ValueError(f"place {place_key!r} letter_service must be a boolean")
@@ -328,22 +337,22 @@ def validate_place_registry(
                     f"place {place.key!r} host_subrace {place.host_subrace!r} belongs to "
                     f"race {subrace.race_key!r}, not {place.host_race!r}"
                 )
-        if not isinstance(place.exterior, QualifiedRef) or place.exterior.domain != "settlement_node":
+        if not isinstance(place.room, QualifiedRef) or place.room.domain != "interior_room":
             raise ValueError(
-                f"place {place.key!r} exterior must be a settlement_node reference, "
-                f"got {place.exterior!r}"
+                f"place {place.key!r} room must be an interior_room reference, "
+                f"got {place.room!r}"
             )
-        expected_map = SETTLEMENT_REGISTRY[place.settlement_key].zcoord
-        if place.exterior.map_id != expected_map:
+        if place.room.map_id is None:
             raise ValueError(
-                f"place {place.key!r} exterior names map {place.exterior.map_id!r}, "
-                f"not its settlement's coordinate space {expected_map!r}"
+                f"place {place.key!r} room names no interior document; a "
+                "permanent room join is scoped by its interior"
             )
-        if index is not None:
-            try:
-                settlement_position(index, place.exterior, source=f"place {place.key!r}")
-            except ReferenceError as error:
-                raise ValueError(str(error)) from error
+        if place.room.object_id != place.key:
+            raise ValueError(
+                f"place {place.key!r} joins interior room "
+                f"{place.room.object_id!r}; a place key IS the permanent room "
+                "identity, so the join must keep it"
+            )
         if type(place.church) is not bool:
             raise ValueError(f"place {place.key!r} church must be a boolean")
         if check_capabilities:
@@ -411,27 +420,6 @@ def validate_place_registry(
                 "without a shop identity (a merchant capability authoring shop_key)"
             )
 
-    # Cross-record pass: one doorway name per exterior. Keyed by
-    # (settlement_key, exterior identity, doorway_key_zh) because the interior's
-    # z derives from the settlement — the same node id in two settlements is
-    # two streets, not one. The exterior reference is already validated by the
-    # record loop above.
-    first_holder: dict[tuple[str, QualifiedRef, str], str] = {}
-    for place in places.values():
-        doorway = (
-            place.settlement_key,
-            place.exterior,
-            place.doorway_key_zh,
-        )
-        if doorway in first_holder:
-            raise ValueError(
-                f"places {first_holder[doorway]!r} and {place.key!r} both declare "
-                f"doorway {place.doorway_key_zh!r} on the exterior at "
-                f"{place.exterior.object_id} of {place.settlement_key!r}; "
-                "two places on one exterior must name their doorways differently"
-            )
-        first_holder[doorway] = place.key
-
 
 # The registry is assembled from the per-settlement slices in fixed order (the
 # world/lore/items assembly precedent). Slice order is load-bearing: the
@@ -457,31 +445,22 @@ PLACE_REGISTRY: dict[str, PlaceDefinition] = {
             key="altoria_silverfeather",
             settlement_key="capital_altoria",
             kind=PlaceKind.COURIER_STATION,
-            room_name_zh="銀羽驛站・王都分站",
-            room_desc_zh="銀羽驛行的櫃檯備有信紙與封蠟，牆上列著各地分站。旅人可在此寄信，或領取寄給自己的信件。",
-            exterior=settlement_node_ref("capital_altoria", "market_street"),
-            doorway_key_zh="銀羽驛站",
-            doorway_aliases=("courier",),
+            room=interior_room_ref("altoria_silverfeather", "altoria_silverfeather"),
             letter_service=True,
         ),
         PlaceDefinition(
             key="ciaran_silverfeather",
             settlement_key="village_ciaran",
             kind=PlaceKind.COURIER_STATION,
-            room_name_zh="銀羽驛站・精靈村分站",
-            room_desc_zh="樹蔭下的銀羽驛行收存各地來信，木架上擱著公用信紙與封蠟。旅人可在此寄信，或領取寄給自己的信件。",
-            exterior=settlement_node_ref("village_ciaran", "old_tree_north"),
-            doorway_key_zh="銀羽驛站",
-            doorway_aliases=("courier",),
+            room=interior_room_ref("ciaran_silverfeather", "ciaran_silverfeather"),
             letter_service=True,
         ),
     )
 }
 
-# The exterior bindings are resolved by the explicit static-reference gate
-# (``world.maps.static_references.validate_static_references``) once the
-# settlement world is published, not at import: the settlement domain is
-# discovered YAML with no import-time publication.
+# The room joins resolve against the published interior documents by the
+# explicit map-adoption gate (``world.maps.runtime``), not at import: the
+# interior domain is discovered YAML with no import-time publication.
 validate_place_registry(
     PLACE_REGISTRY,
     check_capabilities=False,

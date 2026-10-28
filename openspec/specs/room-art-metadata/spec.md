@@ -6,7 +6,7 @@ Define authored per-place official artwork metadata and stable logical scene ide
 ## Requirements
 
 ### Requirement: Room official references are explicit authored keys
-Supported authored rooms and explicitly declared instances SHALL carry optional registered room_art_key metadata synchronized by the map owner. Keys SHALL NOT be inferred from names, ObjectDB ids, threat tiers or nearby rooms. Dynamic rooms without declarations SHALL use their archetype chain without new generation.
+Static room scene/art references SHALL come from map documents and be checked against authoritative game catalogs before adoption; map owners synchronize them without inferring keys or generating undeclared art.
 
 #### Scenario: Permanent interior metadata converges
 - **WHEN** startup runs twice for an authored permanent interior

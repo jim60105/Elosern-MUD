@@ -1,0 +1,23 @@
+# Permanent interior authored source (schema version 1).
+# Converted once from the retired Python place room fields; this document is
+# the sole authority for the room's identity, name, prose, scene/art metadata
+# and its one exterior entrance relationship. The room id is the stable place
+# key a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: altoria_guardhouse
+rooms:
+  altoria_guardhouse:
+    name_zh: 聖潔王都衛兵駐所
+    desc_zh: 聖潔王都的衛兵駐所站在南門的陰影裡，一間溫暖的屋子對著拱門下冰冷的通道，一面牆上是長凳與兵器架，火盆把天花板燻得黝黑，一扇木窗板半開的窗俯瞰門洞，值更的人坐在爐邊就能盯著接下來的幾個小時。靴子按整點進出這裡，牆上的輿圖標出每一條出城的路。這是一個當值的場所，而一個駐所該掛在輿圖旁邊的東西，告示、公文、人頭的金價，這裡一概沒有；這座城市的工作從公會那扇門走進來，這扇門不發活。
+    scene_archetype: tavern_interior
+    art_key: altoria_guardhouse
+connections: []
+exterior:
+  settlement: capital_altoria
+  node: south_gate
+  room: altoria_guardhouse
+  doorway_key: 衛兵駐所
+  doorway_aliases:
+  - guardhouse
+  - guard house

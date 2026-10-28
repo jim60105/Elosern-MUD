@@ -1,0 +1,23 @@
+# Permanent interior authored source (schema version 1).
+# Converted once from the retired Python place room fields; this document is
+# the sole authority for the room's identity, name, prose, scene/art metadata
+# and its one exterior entrance relationship. The room id is the stable place
+# key a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: altoria_noble_watch
+rooms:
+  altoria_noble_watch:
+    name_zh: 聖潔王都貴族區衛所
+    desc_zh: 聖潔王都的貴族區衛所是一間縱長的屋子，堆著盾牌、疊著斗篷，兩頭各一座火盆，門邊一張登記桌，要是還有什麼人到訪需要登記，就會被寫在這張桌上。街區的巡邏按整點輪過這裡。牆上沒有任何一張是命令，屋裡也沒有任何一樣東西會阻擋人，當初蓋這駐所的人把地面從門到桌留空，像一戶沒有訪客的人家把客廳的門敞著。
+    scene_archetype: tavern_interior
+    art_key: altoria_noble_watch
+connections: []
+exterior:
+  settlement: capital_altoria
+  node: noble_quarter
+  room: altoria_noble_watch
+  doorway_key: 貴族區衛所
+  doorway_aliases:
+  - noble watch
+  - watch post

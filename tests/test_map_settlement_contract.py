@@ -13,6 +13,7 @@ import unittest
 from pathlib import Path
 
 from tools.spec_traceability import covers_requirement
+from world.maps import runtime
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SETTLEMENTS_DIRECTORY = REPO_ROOT / "content" / "maps" / "settlements"
@@ -85,7 +86,7 @@ class SettlementDocumentSetTests(unittest.TestCase):
     def test_every_discovered_document_composes_and_binds_one_location(self):
         from world.maps import map_data
 
-        snapshot = map_data.load_settlements()
+        snapshot = runtime.compose_settlements()
         discovered = sorted(path.stem for path in SETTLEMENTS_DIRECTORY.glob("*.yaml"))
         self.assertEqual(sorted(snapshot.settlements), discovered)
         self.assertEqual(sorted(snapshot.graphs), discovered)
@@ -105,8 +106,8 @@ class SettlementDocumentSetTests(unittest.TestCase):
     def test_the_shipped_document_set_publishes_a_stable_identity(self):
         from world.maps import map_data
 
-        once = map_data.load_settlements()
-        again = map_data.load_settlements()
+        once = runtime.compose_settlements()
+        again = runtime.compose_settlements()
         self.assertEqual(once.identity, again.identity)
         self.assertEqual(
             sorted(once.fingerprints),

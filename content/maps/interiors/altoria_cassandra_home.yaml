@@ -1,0 +1,22 @@
+# Permanent interior authored source (schema version 1).
+# Converted once from the retired Python place room fields; this document is
+# the sole authority for the room's identity, name, prose, scene/art metadata
+# and its one exterior entrance relationship. The room id is the stable place
+# key a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: altoria_cassandra_home
+rooms:
+  altoria_cassandra_home:
+    name_zh: 卡珊卓的家
+    desc_zh: 窗邊書桌放著旅行筆記，牆旁備有擦拭甲冑的布與油。臥房鋪著乾淨床單，茶壺收在木櫃裡。
+    scene_archetype: tavern_interior
+    art_key: altoria_cassandra_home
+connections: []
+exterior:
+  settlement: capital_altoria
+  node: guild_forecourt
+  room: altoria_cassandra_home
+  doorway_key: 卡珊卓的家
+  doorway_aliases:
+  - cassandra home

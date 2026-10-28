@@ -30,6 +30,7 @@ from world.lore.map_districts import (
     diagnose_districts,
     parse_districts_document,
 )
+from world.tests.geography_fixture import publish_districts
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOTS = ("commands", "server", "typeclasses", "web", "world", "tools", "tests")
@@ -215,9 +216,9 @@ class DistrictCandidateBoundaryTests(unittest.TestCase):
         )
         with mock.patch.object(map_districts, "_PUBLISHED", None):
             baseline = self._build({"plain_seed": _row("合成平", _cell(10, 10))})
-            map_districts.publish(baseline)
+            publish_districts(baseline)
             with self.assertRaises(DistrictError):
-                map_districts.publish(candidate)
+                publish_districts(candidate)
             self.assertIs(map_districts.current(), baseline)
 
     def test_duplicate_and_misfiled_documents_are_structural(self):

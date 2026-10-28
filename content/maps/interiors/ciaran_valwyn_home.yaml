@@ -1,0 +1,23 @@
+# Permanent interior authored source (schema version 1).
+# Converted once from the retired Python place room fields; this document is
+# the sole authority for the room's identity, name, prose, scene/art metadata
+# and its one exterior entrance relationship. The room id is the stable place
+# key a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: ciaran_valwyn_home
+rooms:
+  ciaran_valwyn_home:
+    name_zh: 瓦爾溫的家
+    desc_zh: 村北那株老樹下，樹根環抱間是這戶人家。沿著每一面牆，一輩子蒐羅來的零物擱在織籃與挖空的石裡，羽毛、種子、一綑綑紮起的絲，樣樣被細心留著，樣樣有一個故事。這是一個被留下來的事物裝滿的家，不是一間鋪子。
+    scene_archetype: tavern_interior
+    art_key: ciaran_valwyn_home
+connections: []
+exterior:
+  settlement: village_ciaran
+  node: old_tree_north
+  room: ciaran_valwyn_home
+  doorway_key: 瓦爾溫的家
+  doorway_aliases:
+  - valwyn
+  - valwyn's home

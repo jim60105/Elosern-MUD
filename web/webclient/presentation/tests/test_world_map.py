@@ -11,7 +11,13 @@ from web.webclient.presentation.world_map_geometry import raster_rings
 from elosern_map_core.references import wilderness_cell_ref
 from world.rules.map_knowledge import encode_wild
 from world.maps.wilderness_provider import WILDERNESS_NAME
-from world.tests.geography_fixture import publish_shipped_geography
+from world.tests.geography_fixture import (publish_geography, publish_shipped_geography)
+from world.tests.interior_fixture import (
+    interior_document,
+    interior_exterior,
+    interior_room,
+    published_interiors,
+)
 
 
 publish_shipped_geography()
@@ -128,8 +134,16 @@ class WorldMapPrivacyTests(TestCase):
         room=Mock(spec=Room)
         room.tags.all.return_value=["t_interior"]
         actor=NS(location=room)
-        with patch("world.lore.settlements.places.PLACE_REGISTRY",{
-                "t_interior":NS(settlement_key="t_anchor")}), \
+        with published_interiors(
+                interior_document(
+                    "t_interior",
+                    {"t_interior": interior_room("合成室內", "A synthetic room.")},
+                    exterior=interior_exterior(
+                        "t_anchor", "t_node", "t_interior", "合成門"
+                    ),
+                ),
+                replace_existing=True,
+             ), \
              patch("web.webclient.presentation.map_quest_destinations.anchor_geography",
                    lambda: {"t_anchor":NS(cell=(123,456))}):
             self.assertEqual(panel.geometry.current_point(actor),(123.5,456.5))
@@ -156,7 +170,16 @@ class WorldMapPrivacyTests(TestCase):
         instance.attributes.get.return_value = room
         log = [to_storage(_record(name)) for name in ("hunt", "grid", "site")]
         with fixtures(), \
-             patch("world.lore.settlements.places.PLACE_REGISTRY", {"t_service": NS(settlement_key="town")}), \
+             published_interiors(
+                interior_document(
+                    "t_service",
+                    {"t_service": interior_room("合成服務", "A synthetic service room.")},
+                    exterior=interior_exterior(
+                        "town", "town_node", "t_service", "合成門"
+                    ),
+                ),
+                replace_existing=True,
+             ), \
              patch.dict("world.quests.definitions.QUEST_DEFINITION_REGISTRY", _DEFINITIONS), \
              patch("world.maps.district_partition.district_at", return_value=SECRET):
             for location in (room, instance):
@@ -185,11 +208,10 @@ class WorldMapPrivacyTests(TestCase):
         geography_views={
             key:NS(anchor_key=key,cell=(100+i,200)) for i,key in enumerate(anchors)
         }
-        from world.tests.geography_fixture import publish_shipped_geography
 
         publish_shipped_geography()
         previous = geography.current()
-        geography.publish(
+        publish_geography(
             replace(
                 previous,
                 anchors=MappingProxyType(anchors),
@@ -197,7 +219,7 @@ class WorldMapPrivacyTests(TestCase):
                 harbor_sites=MappingProxyType({}),
             )
         )
-        self.addCleanup(geography.publish, previous)
+        self.addCleanup(publish_geography, previous)
         with patch("world.lore.anchor_placement.ANCHOR_PLACEMENT_REGISTRY",{}), \
              patch("world.maps.district_partition.district_at",return_value=SECRET):
             records=panel.geometry._place_geometry("uncached-probe")

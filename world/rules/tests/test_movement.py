@@ -33,7 +33,7 @@ from world.rules.travel_cost import (
 )
 from world.skills.registry import SkillCategory
 from world.tests.synthetic_data import make_skill, synthetic_registries
-from world.tests.geography_fixture import publish_shipped_geography
+from world.tests.geography_fixture import (publish_settlements, publish_shipped_geography)
 
 publish_shipped_geography()
 
@@ -857,7 +857,7 @@ class GateApproachCostTests(EvenniaTest):
         )
         entries = dict(previous.wilderness_entries)
         entries["t_gate_anchor"] = entry
-        map_data.publish(
+        publish_settlements(
             replace(
                 previous,
                 anchor_placements=MappingProxyType(placements),
@@ -877,6 +877,6 @@ class GateApproachCostTests(EvenniaTest):
                     room, (100, 100), [self.char1], cell_size_m=1000
                 )
             finally:
-                map_data.publish(previous)
+                publish_settlements(previous)
         self.assertEqual(cost.seconds, 400)
 

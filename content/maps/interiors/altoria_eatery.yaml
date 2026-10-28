@@ -1,0 +1,24 @@
+# Permanent interior authored source (schema version 1).
+# Converted once from the retired Python place room fields; this document is
+# the sole authority for the room's identity, name, prose, scene/art metadata
+# and its one exterior entrance relationship. The room id is the stable place
+# key a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: altoria_eatery
+rooms:
+  altoria_eatery:
+    name_zh: 聖潔王都餐館
+    desc_zh: 聖潔王都的餐館，廚房蒸氣從門口漫出去，罩在南大道的人流上頭。
+    scene_archetype: tavern_interior
+    art_key: altoria_eatery
+connections: []
+exterior:
+  settlement: capital_altoria
+  node: south_avenue
+  room: altoria_eatery
+  doorway_key: 餐館
+  doorway_aliases:
+  - eatery
+  - restaurant
+  - diner

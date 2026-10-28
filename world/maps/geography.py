@@ -18,9 +18,10 @@ region flavours) belongs to the immutable snapshot's ``TerrainDefinition`` and
 its ``cached_property`` values, so two independent worlds or a reload can never
 observe each other's derivations.
 
-Nothing here loads or validates at import time: the game composition root (and
-tests) call :func:`load_and_publish`, and every read-only consumer goes through
-:func:`current`.
+Nothing here loads or validates at import time: the map composition root
+(``world.maps.runtime``) builds this snapshot from the candidate source set and
+installs it inside one adopted bundle, and every read-only consumer goes
+through :func:`current`.
 """
 
 from __future__ import annotations
@@ -34,7 +35,7 @@ from typing import Any, Mapping
 
 from elosern_map_core.codec import parse_document
 from elosern_map_core.documents import ContinentDocument, LocationsDocument
-from elosern_map_core.sources import fingerprint_text, read_source_document
+from elosern_map_core.sources import fingerprint_text
 from elosern_map_core.terrain import REGION_KEYS, TerrainDefinition
 
 from world.lore.anchors import ANCHOR_LORE, Anchor, AnchorKind, GeographicAnchor
@@ -457,72 +458,37 @@ def parse_geography_documents(
     return continent.document, locations.document, fingerprints
 
 
-def load_geography(root: str | Path | None = None) -> GeographySnapshot:
-    """Read, validate and compose the shipped geography from ``root``."""
-
-    from world.maps.map_data import load_settlements
-
-    base = Path(root) if root is not None else REPOSITORY_ROOT
-    continent_source = read_source_document(base, CONTINENT_PATH)
-    locations_source = read_source_document(base, LOCATIONS_PATH)
-    continent = parse_document(continent_source.relative_path, continent_source.text)
-    locations = parse_document(locations_source.relative_path, locations_source.text)
-    return build_geography(
-        continent.document,
-        locations.document,
-        load_settlements(base),
-        fingerprints={
-            continent_source.relative_path: continent_source.fingerprint,
-            locations_source.relative_path: locations_source.fingerprint,
-        },
-    )
-
-
 _PUBLISHED: GeographySnapshot | None = None
 
 
-def publish(snapshot: GeographySnapshot) -> GeographySnapshot:
-    """Replace the process geography atomically and return the new snapshot."""
+def _install(snapshot: GeographySnapshot) -> GeographySnapshot:
+    """Bind one validated snapshot as this process's geography.
+
+    The map composition root (``world.maps.runtime``) owns publication: it
+    installs the four domain views of one bundle together, so no domain can be
+    replaced on its own and no partial world can be observed.
+    """
 
     global _PUBLISHED
     if not isinstance(snapshot, GeographySnapshot):
-        raise TypeError("publish() requires a GeographySnapshot")
+        raise TypeError("_install() requires a GeographySnapshot")
     _PUBLISHED = snapshot
     return snapshot
-
-
-def load_and_publish(root: str | Path | None = None) -> GeographySnapshot:
-    """Load the shipped geography and publish it; a failure keeps the baseline."""
-
-    return publish(load_geography(root))
-
-
-def ensure_published(root: str | Path | None = None) -> GeographySnapshot:
-    """Publish the shipped geography when a composition root has none yet.
-
-    Only bootstrap/synchronization entry points call this: they are the
-    explicit composition roots that establish the world before any consumer
-    reads it. Read-only accessors never load implicitly.
-    """
-
-    if _PUBLISHED is None:
-        return load_and_publish(root)
-    return _PUBLISHED
 
 
 def current() -> GeographySnapshot:
     """The published geography.
 
-    Raises :class:`GeographyNotLoaded` instead of loading implicitly: every
-    process entry point publishes explicitly before any read-only consumer
+    Raises :class:`GeographyNotLoaded` instead of loading implicitly: the map
+    composition root adopts one complete bundle before any read-only consumer
     runs, and a validator must never inspect the published world by accident.
     """
 
     snapshot = _PUBLISHED
     if snapshot is None:
         raise GeographyNotLoaded(
-            "continental geography is not loaded; call "
-            "world.maps.geography.load_and_publish() before using map consumers"
+            "continental geography is not loaded; adopt the map world with "
+            "world.maps.runtime before using map consumers"
         )
     return snapshot
 
@@ -543,10 +509,6 @@ __all__ = [
     "SUPPORTED_CELL_SIZE_KM",
     "build_geography",
     "current",
-    "ensure_published",
     "is_published",
-    "load_and_publish",
-    "load_geography",
     "parse_geography_documents",
-    "publish",
 ]

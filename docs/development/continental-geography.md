@@ -9,33 +9,39 @@ geographic constraint, including the unbuilt capitals, villages and dungeons).
 These declarations are authoring contracts only: they spawn no rooms, floors or
 instances and are independent of persistent room lifecycle.
 
-`world/maps/geography.py` is the one game-side adapter. It reads both
-canonical documents from an explicit root through `elosern_map_core`,
+`world/maps/geography.py` is the one game-side adapter for this domain. It
 composes the read-only views (terrain rules, region views, harbour sites,
-location identity and cell) and validates every cross-domain join before it
-publishes one immutable `GeographySnapshot`. Publication is atomic: a failed
-candidate leaves the previously published snapshot untouched. The game
-composition root loads and publishes at startup
-(`geography_source_publication`, the first startup step); tests and tools
-call `load_and_publish()` explicitly. Nothing loads or validates at import.
+location identity and cell) from one candidate document set and validates every
+cross-domain join before the world is published.
 
-The settlement local maps are published by the next startup step,
-`settlement_source_publication`: discovered YAML under
-`content/maps/settlements/<map_id>.yaml` composed by `world/maps/map_data.py`.
-The geography candidate is validated against that candidate settlement world
-(`build_geography(continent, locations, settlements)`), so its wilderness
-footprint and gateway checks read explicit inputs rather than a live registry.
-See `docs/development/sparse-settlement-graphs.md`.
+Publication is not per domain. `world/maps/runtime.py` is the single game
+composition root: at startup it discovers the complete authored source set
+(`continent.yaml`, `locations.yaml`, `districts.yaml`, `settlements/*.yaml`,
+`interiors/*.yaml`), composes the settlement, geography, district and interior
+views from that one candidate, runs the authoritative game-side checks (static
+reference closure, service room joins, registered scene catalog, quest
+destinations and district diagnostics) plus the required partition-artifact
+freshness, and only then installs one immutable bundle (startup step
+`map_world_adoption`). A rejected candidate raises and leaves the previously
+published bundle, the persistent world and the process caches untouched; tests
+and tools adopt explicitly. Nothing loads or validates at import.
 
-The authored districts are published by the third startup step,
-`district_source_publication`: `content/maps/districts.yaml` composed by
-`world/lore/map_districts.py` against the published terrain and bindings. See
+The settlement local maps are the same bundle's settlement view: discovered
+YAML under `content/maps/settlements/<map_id>.yaml` composed by
+`world/maps/map_data.py`. The geography candidate is validated against that
+candidate settlement world (`build_geography(continent, locations,
+settlements)`), so its wilderness footprint and gateway checks read explicit
+inputs rather than a live registry. See
+`docs/development/sparse-settlement-graphs.md`.
+
+The authored districts are composed from `content/maps/districts.yaml` by
+`world/lore/map_districts.py` against the candidate terrain and bindings. See
 [Map districts](#map-districts).
 
 Political affiliation, population and dungeon floor counts are *not* map
 fields: they stay in `world/lore/anchors.py::ANCHOR_LORE` and are joined by the
-same stable location identity. Interiors remain their own Python authority
-until their own cutover.
+same stable location identity. Permanent interiors are authored YAML: see
+`docs/development/map-authoring-documents.md`.
 
 The pure classification, waterway rasterization and derivation rules live in
 `packages/map-core/elosern_map_core/terrain.py` and run over the snapshot's
@@ -131,25 +137,23 @@ and publishes that document; it declares no authored rows of its own.
 
 ### Publication
 
-`world/lore/map_districts.py` is the one game-side adapter. It reads the
-canonical document through `elosern_map_core` and composes one immutable
-`DistrictSnapshot` (the typed document, its district declarations, source
-fingerprints and any saveable semantic diagnostics). Publication is atomic and
-is the third startup step, `district_source_publication`, after the settlement
-maps: `district_source_publication` rejects a candidate before the
-static-reference gate or any persistent synchronization, and a failed candidate
-leaves the previously published snapshot untouched. Tests and tools call
-`load_and_publish()` explicitly. Nothing loads or validates at import.
+`world/lore/map_districts.py` is the one game-side adapter. It composes one
+immutable `DistrictSnapshot` (the typed document, its district declarations,
+source fingerprints and any saveable semantic diagnostics) from the candidate
+document set. Adoption (`world/maps/runtime.py`) rejects a candidate carrying
+any district diagnostic before anything is installed or synchronized, and a
+failed candidate leaves the previously published bundle untouched. Nothing
+loads or validates at import.
 
 Map-semantic findings (sea, blocked terrain, an unreachable or not-yet-bound
 landmark, landmark/region disagreement, insufficient declared spacing) are
-saveable work-in-progress diagnostics: `load_districts()` returns a candidate
-carrying them, and `publish()` rejects that candidate at runtime. Structural
-faults (unknown region membership, an unsupported landmark domain, an
-unresolvable reference, duplicate identities) reject the load itself. The
-district loader validates region membership against the published terrain and
-landmark references against the published settlement/location bindings; the
-geography candidate no longer performs that join.
+saveable work-in-progress diagnostics: composing a candidate keeps them on the
+snapshot, and adoption rejects such a candidate. Structural faults (unknown
+region membership, an unsupported landmark domain, an unresolvable reference,
+duplicate identities) reject the load itself. The district adapter validates
+region membership against the candidate terrain and landmark references
+against the candidate settlement/location bindings; the geography candidate no
+longer performs that join.
 
 ### Authored roster
 
@@ -301,7 +305,8 @@ tile run.
 | `content/maps/continent.yaml` | `terrain` | Every classifier input: forest edge, ridge parameters and passes, coastal boundary, waterways with their fords and the border-river key. |
 | `content/maps/continent.yaml` | `harbor_sites` | Reserved land-side harbor cells with their intended roles. A functional site is not a named anchor, city, quest or population. |
 | `content/maps/locations.yaml` | `locations` | Every static geographic location's kind, name, description, cell and geographic constraint, including locations with no built settlement or interior. |
-| `world/maps/geography.py` | `load_geography`, `publish`, `current` | Explicit document load, cross-domain validation and atomic publication of the immutable `GeographySnapshot`; every consumer reads `current()`. |
+| `world/maps/runtime.py` | `compose`, `adopt`, `synchronize`, `current` | The one map composition root: complete-candidate validation, one immutable bundle, and the persistent synchronization that commits it. |
+| `world/maps/geography.py` | `build_geography`, `current` | Composition of the immutable `GeographySnapshot` from the candidate documents; every consumer reads the adopted `current()`. |
 | `world/lore/wilderness_regions.py` | `regions`, `harbor_sites`, `frame_cells`, `mainland_boundary_km`, `is_wilderness_cell`, `mainland_area_km2`, `is_on_mainland` | Thin read-only accessors over the published snapshot, bound into `elosern_map_core.geometry`; boundary points count as land. |
 | `world/lore/anchors.py` | `anchors`, `anchor_geography`, `ANCHOR_LORE`, `LOCAL_FRAME_ANCHOR_REGISTRY`, `world_position_m` | The composed location views (map-facing fields plus the non-map nation/population/floor lore joined by identity). The frame anchors are the published settlement documents' anchor bindings, keyed by `location_ref`; the transform itself is `elosern_map_core.geometry.local_to_world_m`. |
 | `world/lore/nations.py` | `CONTINENT_AREA_KM2`, `CONTINENT_POPULATION`, `ELVEN_POPULATION`, `NEUTRAL_LANDS_AREA_KM2`, `NEUTRAL_LANDS_POPULATION`, `CAPITAL_POPULATION_SHARE` | Rounded continental totals. The neutral lands have no separate regional population total. |

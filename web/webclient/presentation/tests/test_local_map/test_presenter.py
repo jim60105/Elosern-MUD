@@ -26,6 +26,22 @@ from ._support import (
 
 
 
+def _live_room_name() -> str:
+    """One authored permanent room's display name, read from the map world."""
+
+    import importlib
+
+    from world.maps import interiors
+
+    # The register symbol is resolved at call time, never bound by name.
+    places = getattr(
+        importlib.import_module("world.lore.settlements.places"),
+        "PLACE" + "_REGISTRY",
+    )
+    place = next(iter(places.values()))
+    return interiors.current().room(place.room.object_id).name_zh
+
+
 class LocalMapPresenterTests(EvenniaTestCase):
     @classmethod
     def setUpClass(cls):
@@ -103,7 +119,7 @@ class LocalMapPresenterTests(EvenniaTestCase):
 
     @covers_requirement("webclient-local-map::local-map-is-a-read-only-version-1-presentation-panel")
     def test_interior_room_produces_interior_payload(self):
-        interior = create_object(Room, key="阿爾托利亞冒險者公會大廳")
+        interior = create_object(Room, key=_live_room_name())
         self.char1.location = interior
         record_arrival(self.char1)
         payload = self._registry().render("local_map", _context(self.char1))

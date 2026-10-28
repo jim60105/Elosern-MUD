@@ -38,7 +38,6 @@ from world.art.scene_definitions import (
     BUNDLED_SCENE_MAX_FILE_BYTES,
     BUNDLED_SCENE_MEDIA_PREFIX,
     DREAM_SCENE_KEY,
-    ROOM_ART_KEYS,
     SCENE_ART_DEFINITIONS,
     SCENE_ART_KEYS,
     SceneArtDefinition,
@@ -141,13 +140,20 @@ class AuthoredRegistryTests(unittest.TestCase):
             with self.subTest(key=repr(key)):
                 self.assertFalse(is_registered_scene_key(key))
 
-    def test_the_room_art_vocabulary_is_the_authored_place_projection(self):
+    def test_the_room_art_vocabulary_is_the_authored_interior_projection(self):
         """Room-art keys are authored content, never ids or display names."""
-        from world.lore.settlements.places import PLACE_REGISTRY
+        from world.maps import interiors
 
-        self.assertEqual(ROOM_ART_KEYS, tuple(sorted(PLACE_REGISTRY)))
-        self.assertTrue(ROOM_ART_KEYS, "the authored room-art vocabulary is empty")
-        for key in ROOM_ART_KEYS:
+        from world.tests.geography_fixture import publish_shipped_map_world
+
+        publish_shipped_map_world()
+        keys = scene_definitions.room_art_keys()
+        self.assertEqual(
+            keys,
+            tuple(sorted(interiors.current().room_art_keys.values())),
+        )
+        self.assertTrue(keys, "the authored room-art vocabulary is empty")
+        for key in keys:
             with self.subTest(key=key):
                 self.assertTrue(is_registered_room_art_key(key))
         for key in ("", None, 7, _PLANTED_KEY, "t_synth:key"):

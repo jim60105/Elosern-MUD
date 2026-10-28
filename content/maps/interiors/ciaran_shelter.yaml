@@ -1,0 +1,23 @@
+# Permanent interior authored source (schema version 1).
+# Converted once from the retired Python place room fields; this document is
+# the sole authority for the room's identity, name, prose, scene/art metadata
+# and its one exterior entrance relationship. The room id is the stable place
+# key a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: ciaran_shelter
+rooms:
+  ciaran_shelter:
+    name_zh: 共食棚
+    desc_zh: 寬寬一片編枝的屋頂，罩著被所有人的腳踩平的地板。長桌擱在蔭裡；當日採集的東西開著簍放在桌上，燒水的位置早已鋪好，等下一個來的人。沒有人看管食物，也沒有人索取，森林給村子的就放在這一頂共用的屋簷下，每個村民都從同一張桌上吃。
+    scene_archetype: tavern_interior
+    art_key: ciaran_shelter
+connections: []
+exterior:
+  settlement: village_ciaran
+  node: village_plaza
+  room: ciaran_shelter
+  doorway_key: 共食棚
+  doorway_aliases:
+  - shelter
+  - communal shelter

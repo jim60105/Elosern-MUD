@@ -20,7 +20,7 @@ def _minimap_fixture(character) -> None:
     from evennia.utils.search import search_object_by_tag
     from world.maps.bootstrap import (
         sync_grid,
-        sync_service_interiors,
+        sync_interiors,
         sync_wilderness,
     )
     from world.maps.instance import spawn_instance_room
@@ -28,7 +28,7 @@ def _minimap_fixture(character) -> None:
 
     sync_grid()
     sync_wilderness()
-    sync_service_interiors()
+    sync_interiors()
 
     from evennia.contrib.grid.xyzgrid.xyzroom import XYZRoom
 

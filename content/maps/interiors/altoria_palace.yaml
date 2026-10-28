@@ -1,0 +1,23 @@
+# Permanent interior authored source (schema version 1).
+# Converted once from the retired Python place room fields; this document is
+# the sole authority for the room's identity, name, prose, scene/art metadata
+# and its one exterior entrance relationship. The room id is the stable place
+# key a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: altoria_palace
+rooms:
+  altoria_palace:
+    name_zh: 聖潔王都王宮
+    desc_zh: 聖潔王都的王座通道在自己屋簷下升起，磨亮的石材正是這座王都立足的崖壁顏色，立柱之間的寬度夠得過一支儀仗，最遠端是三級臺的矮臺，王椅在臺後俯瞰整座大殿的全長。它宏偉、潔淨，而且正在等待，門口沒有衛兵，地上沒有跪求的人，沒有任何聲音在大理石上迴盪。這間屋子遲早要裝進的東西、一座王宮該有的每個故事，都還沒有被寫出來，大殿也懶得假裝不是這樣。沿著它走完一趟的人會聽見的唯一聲音是自己的腳步，那才是這座城市頭上這頂王冠最忠實的描述。
+    scene_archetype: shrine_interior
+    art_key: altoria_palace
+connections: []
+exterior:
+  settlement: capital_altoria
+  node: palace_forecourt
+  room: altoria_palace
+  doorway_key: 王宮
+  doorway_aliases:
+  - palace
+  - royal palace

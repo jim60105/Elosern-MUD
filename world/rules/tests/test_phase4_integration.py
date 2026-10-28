@@ -21,7 +21,7 @@ from commands.guild import (
 from commands.economy import CmdBuy, CmdInventory
 from world.maps.bootstrap import (
     sync_grid,
-    sync_service_interiors,
+    sync_interiors,
 )
 from world.quests.catalog import register_catalog
 from world.quests.runtime import read_records
@@ -73,7 +73,7 @@ class Phase4Isolation(QuestRegistryIsolation):
         sync_quest_runtime()
         create_object(Room, key="虛境", location=None)
         sync_grid()
-        sync_service_interiors()
+        sync_interiors()
         self._previous_catalog = CATALOG
         self._previous_offers = list(GUILD_OFFER_REGISTRY.items())
 

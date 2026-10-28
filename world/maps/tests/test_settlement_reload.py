@@ -17,7 +17,7 @@ from typeclasses.rooms import GridRoom, Room
 from world.maps import map_data
 from world.maps.bootstrap import sync_settlement_graph
 from world.maps.limbo import LIMBO_KEY
-from world.tests.geography_fixture import publish_shipped_geography
+from world.tests.geography_fixture import (publish_settlements, publish_shipped_geography)
 
 publish_shipped_geography()
 
@@ -118,12 +118,12 @@ class SettlementReloadTests(EvenniaTestCase):
         create_object(Room, key=LIMBO_KEY, location=None)
 
     def tearDown(self):
-        map_data.publish(self.previous)
+        publish_settlements(self.previous)
         super().tearDown()
 
     def _sync(self, text):
         snapshot = _snapshot(text)
-        map_data.publish(snapshot)
+        publish_settlements(snapshot)
         report = sync_settlement_graph(snapshot.graphs["t_reload"])
         return report
 

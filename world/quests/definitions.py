@@ -222,6 +222,7 @@ def _declared_hunt_fields(objective: QuestObjective) -> tuple[str, ...]:
 def _validate_hunt_selector(
     definition: QuestDefinition,
     objective: QuestObjective,
+    bindings: "QuestLocationBindings | None" = None,
 ) -> None:
     """Validate the complete regional species-hunt selector.
 
@@ -234,7 +235,7 @@ def _validate_hunt_selector(
     region_key = objective.region_key
     if not isinstance(region_key, str) or not region_key:
         _reject(definition, "species hunt requires a non-empty region_key")
-    if region_key not in wilderness_regions.regions():
+    if region_key not in _bindings(bindings).region_keys:
         _reject(
             definition,
             f"species hunt names unknown wilderness region {region_key!r}",
@@ -352,10 +353,38 @@ def ordinary_countable_variant_keys(objective: QuestObjective) -> tuple[str, ...
     return tuple(ordinary)
 
 
+@dataclass(frozen=True, slots=True)
+class QuestLocationBindings:
+    """The static map identities a quest destination resolves against.
+
+    A map candidate is validated against its own bindings, so a quest target
+    that a new world retires is rejected before that world is published.
+    """
+
+    anchor_keys: frozenset[str]
+    grid_map_keys: frozenset[str]
+    region_keys: frozenset[str]
+
+
+def _bindings(
+    bindings: "QuestLocationBindings | None",
+) -> "QuestLocationBindings":
+    """The supplied bindings, else the currently published map world's."""
+
+    if bindings is not None:
+        return bindings
+    return QuestLocationBindings(
+        anchor_keys=frozenset(ANCHOR_PLACEMENT_REGISTRY),
+        grid_map_keys=frozenset(KNOWN_GRID_MAP_KEYS),
+        region_keys=frozenset(wilderness_regions.regions()),
+    )
+
+
 def _validate_destination(
     definition: QuestDefinition,
     destination: RoomLocator | None,
     kind: ObjectiveKind,
+    bindings: "QuestLocationBindings | None" = None,
 ) -> None:
     if destination is None:
         _reject(definition, f"{kind.value} objective requires a destination")
@@ -366,7 +395,8 @@ def _validate_destination(
             _reject(definition, "ANCHOR locator cannot carry XYZ coordinates")
         if not destination.anchor_key:
             _reject(definition, "ANCHOR locator requires an anchor_key")
-        if destination.anchor_key not in ANCHOR_PLACEMENT_REGISTRY:
+        known_anchors = _bindings(bindings).anchor_keys
+        if destination.anchor_key not in known_anchors:
             _reject(
                 definition,
                 f"anchor {destination.anchor_key!r} has no reachable AnchorRoom "
@@ -388,7 +418,7 @@ def _validate_destination(
             _reject(definition, "GRID locator x/y must be integers")
         if not isinstance(z, str) or not z:
             _reject(definition, "GRID locator z must be a non-empty map key")
-        if z not in KNOWN_GRID_MAP_KEYS:
+        if z not in _bindings(bindings).grid_map_keys:
             _reject(definition, f"grid map key {z!r} is not known to the xyzgrid")
     elif destination.kind is DestinationKind.BOUND_INSTANCE:
         if destination.anchor_key is not None or destination.xyz is not None:
@@ -481,6 +511,7 @@ def _validate_relation(
 def _validate_escort_completion(
     definition: QuestDefinition,
     objective: QuestObjective,
+    bindings: "QuestLocationBindings | None" = None,
 ) -> None:
     """Validate the closed escort completion discriminator (escort-rendezvous §6)."""
     _validate_role_refs(
@@ -507,7 +538,9 @@ def _validate_escort_completion(
                 definition,
                 "destination ESCORT objective cannot declare a typed relation",
             )
-        _validate_destination(definition, objective.destination, ObjectiveKind.ESCORT)
+        _validate_destination(
+            definition, objective.destination, ObjectiveKind.ESCORT, bindings
+        )
         return
     if objective.destination is not None:
         _reject(
@@ -528,6 +561,7 @@ def _validate_escort_completion(
 def _validate_objective(
     definition: QuestDefinition,
     objective: QuestObjective,
+    bindings: "QuestLocationBindings | None" = None,
 ) -> None:
     if not isinstance(objective, QuestObjective):
         _reject(definition, "stages must carry QuestObjective values")
@@ -558,7 +592,7 @@ def _validate_objective(
                     "monster_tier, requires_bound_targets, or a site key; a hunt "
                     "declares exactly one selector family",
                 )
-            _validate_hunt_selector(definition, objective)
+            _validate_hunt_selector(definition, objective, bindings)
         elif has_site:
             if not has_bound:
                 _reject(
@@ -607,7 +641,9 @@ def _validate_objective(
                 "REACH objective quantity must be exactly 1; arrival observation "
                 "cannot accumulate repeated visits",
             )
-        _validate_destination(definition, objective.destination, ObjectiveKind.REACH)
+        _validate_destination(
+            definition, objective.destination, ObjectiveKind.REACH, bindings
+        )
     elif objective.kind is ObjectiveKind.ESCORT:
         if (
             objective.monster_tier is not None
@@ -630,7 +666,7 @@ def _validate_objective(
                 "ESCORT objective quantity must be exactly 1; arrival observation "
                 "cannot accumulate repeated visits",
             )
-        _validate_escort_completion(definition, objective)
+        _validate_escort_completion(definition, objective, bindings)
     elif objective.kind is ObjectiveKind.ACQUIRE:
         if (
             objective.monster_tier is not None
@@ -683,6 +719,8 @@ def _validate_objective(
 def validate_escort_predicate(
     definition: QuestDefinition,
     objective: QuestObjective,
+    *,
+    bindings: "QuestLocationBindings | None" = None,
 ) -> None:
     """Validate one escort objective's closed completion contract (public seam).
 
@@ -691,11 +729,21 @@ def validate_escort_predicate(
     it validates through this one seam rather than a second copy of the grammar.
     Raises :class:`QuestDefinitionError` naming ``definition`` on any violation.
     """
-    _validate_objective(definition, objective)
+    _validate_objective(definition, objective, bindings)
 
 
-def validate_definition(definition: QuestDefinition) -> None:
-    """Raise ``QuestDefinitionError`` unless ``definition`` is fully valid."""
+def validate_definition(
+    definition: QuestDefinition,
+    *,
+    bindings: "QuestLocationBindings | None" = None,
+) -> None:
+    """Raise ``QuestDefinitionError`` unless ``definition`` is fully valid.
+
+    ``bindings`` supplies the anchor/grid-map identities a static destination
+    must resolve against. The default reads the currently published map world;
+    a map candidate supplies its own, so a quest cannot be approved against a
+    world that is being replaced.
+    """
     if not isinstance(definition, QuestDefinition):
         raise QuestDefinitionError(
             "quest definitions must be QuestDefinition values, not raw mappings"
@@ -740,7 +788,7 @@ def validate_definition(definition: QuestDefinition) -> None:
             f"stage indices must be contiguous starting at zero, got {indices}",
         )
     for stage in definition.stages:
-        _validate_objective(definition, stage.objective)
+        _validate_objective(definition, stage.objective, bindings)
 
 
 QUEST_DEFINITION_REGISTRY: dict[str, QuestDefinition] = {}

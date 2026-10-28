@@ -533,9 +533,12 @@ class AuthoredKeyAdmissionTests(_CatalogCase):
     )
     def test_a_declared_scene_key_and_a_declared_room_key_index(self):
         from world.art import scene_definitions
+        from world.tests.geography_fixture import publish_shipped_map_world
 
+        # The room-art vocabulary is the authored interior world's.
+        publish_shipped_map_world()
         scene_key = scene_definitions.SCENE_ART_KEYS[0]
-        room_key = scene_definitions.ROOM_ART_KEYS[0]
+        room_key = scene_definitions.room_art_keys()[0]
         self.image("scene", scene_key, "a.png")
         self.image("room", room_key, "a.png")
         self.image("scene", "t_synth_ghost", "a.png")

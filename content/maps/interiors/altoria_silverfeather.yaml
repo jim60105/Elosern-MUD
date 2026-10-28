@@ -1,0 +1,22 @@
+# Permanent interior authored source (schema version 1).
+# Converted once from the retired Python place room fields; this document is
+# the sole authority for the room's identity, name, prose, scene/art metadata
+# and its one exterior entrance relationship. The room id is the stable place
+# key a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: altoria_silverfeather
+rooms:
+  altoria_silverfeather:
+    name_zh: 銀羽驛站・王都分站
+    desc_zh: 銀羽驛行的櫃檯備有信紙與封蠟，牆上列著各地分站。旅人可在此寄信，或領取寄給自己的信件。
+    scene_archetype: tavern_interior
+    art_key: altoria_silverfeather
+connections: []
+exterior:
+  settlement: capital_altoria
+  node: market_street
+  room: altoria_silverfeather
+  doorway_key: 銀羽驛站
+  doorway_aliases:
+  - courier

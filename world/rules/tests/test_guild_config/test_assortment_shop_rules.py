@@ -15,6 +15,13 @@ from world.lore.items import ItemPresentation
 from world.lore.items import ItemRarity
 from world.lore.settlements.assortments import ASSORTMENT_REGISTRY
 from world.lore.settlements.assortments import AssortmentDefinition
+from elosern_map_core.references import interior_room_ref
+from world.maps import interiors
+from world.tests.interior_fixture import (
+    interior_document,
+    interior_room,
+    published_interiors,
+)
 from world.lore.settlements.places import PLACE_REGISTRY
 from world.lore.settlements.places import place_shop_identity
 from world.rules.npc_capabilities import capability, place_bound
@@ -385,7 +392,7 @@ class ShopRuleTests(unittest.TestCase):
         second_place = replace(
             PLACE_REGISTRY["altoria_general_store"],
             key="t_second_shop",
-            room_name_zh="合成二號店",
+            room=interior_room_ref("t_second_shop_room", "t_second_shop"),
             host_name="合成二號",
             components=(
                 capability(
@@ -401,6 +408,10 @@ class ShopRuleTests(unittest.TestCase):
             {**raw_commerce()["shops"][0]},
             {"shop_key": "t_second_shop", "open_hour": 9, "close_hour": 19, "restock_hour": 7},
         ]
+        second_interior = interior_document(
+            "t_second_shop_room",
+            {"t_second_shop": interior_room("合成二號店", "A synthetic second shop.")},
+        )
         with mock.patch.dict(ASSORTMENT_REGISTRY, {"t_shared_goods": shared}, clear=False), \
              mock.patch.dict(
                  SHOP_REGISTRY,
@@ -410,8 +421,12 @@ class ShopRuleTests(unittest.TestCase):
                  PLACE_REGISTRY,
                  {"t_second_shop": second_place},
                  clear=False,
-             ):
+             ), published_interiors(second_interior):
             configs = validate_shop_configs(rows, offers, _shipped_scales())
+            self.assertEqual(
+                configs["t_second_shop"].display_name_zh,
+                interiors.current().room("t_second_shop").name_zh,
+            )
             self.assertEqual(
                 {offer.item_key for offer in configs["t_second_shop"].offers},
                 {"meal"},

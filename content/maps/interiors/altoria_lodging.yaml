@@ -1,0 +1,23 @@
+# Permanent interior authored source (schema version 1).
+# Converted once from the retired Python place room fields; this document is
+# the sole authority for the room's identity, name, prose, scene/art metadata
+# and its one exterior entrance relationship. The room id is the stable place
+# key a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: altoria_lodging
+rooms:
+  altoria_lodging:
+    name_zh: 聖潔王都爐火旅店
+    desc_zh: 聖潔王都的爐火旅店把公共大廳圍在一道嵌牆的火塘邊，那面牆正是它與酒館共用的隔牆，巷子裡的兩扇門因此暖著同一間長屋。上了樓梯，客房的門一字排開，門後各自私密，一張床、一個臉盆、一道扣得住的門閂。這座城市在這裡把旅途睡回去，歇著、一覺到天亮，或是趁著安靜的幾個小時修煉。樓梯對每個使用它的人都不作任何要求。
+    scene_archetype: tavern_interior
+    art_key: altoria_lodging
+connections: []
+exterior:
+  settlement: capital_altoria
+  node: inn_lane
+  room: altoria_lodging
+  doorway_key: 爐火旅店
+  doorway_aliases:
+  - inn
+  - lodging

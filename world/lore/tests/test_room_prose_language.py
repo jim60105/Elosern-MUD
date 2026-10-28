@@ -15,9 +15,9 @@ import unittest
 from world.lore.settlements._prose_lang import english_prose_defects
 from world.lore.settlements.places import PLACE_REGISTRY
 from world.maps.limbo import LIMBO_DESC, LIMBO_KEY
-from world.tests.geography_fixture import publish_shipped_settlements
+from world.tests.geography_fixture import publish_shipped_map_world
 
-publish_shipped_settlements()
+publish_shipped_map_world()
 
 
 def _is_han(char: str) -> bool:
@@ -26,8 +26,19 @@ def _is_han(char: str) -> bool:
 
 def _shipped_authored_rooms():
     """(label, name, description) for every authored room description shipped."""
+    from world.maps import interiors
+
+    published = interiors.current()
     for place in PLACE_REGISTRY.values():
-        yield place.key, place.room_name_zh, place.room_desc_zh
+        room = published.room(place.room.object_id)
+        yield place.key, room.name_zh, room.desc_zh
+    for room in published.rooms.values():
+        if place_keys := {
+            place.room.object_id for place in PLACE_REGISTRY.values()
+        }:
+            if room.room_id in place_keys:
+                continue
+        yield room.room_id, room.name_zh, room.desc_zh
     from world.maps.map_data import current
 
     for settlement_id, document in current().settlements.items():
@@ -44,7 +55,19 @@ class AuthoredRoomProseLanguageTests(unittest.TestCase):
     def test_every_shipped_room_description_is_traditional_chinese(self):
         corpus = list(_shipped_authored_rooms())
         # Guard sanity: the corpus actually covers both description kinds.
-        self.assertEqual(len(corpus), len(PLACE_REGISTRY) + 32, "corpus regressed")
+        from world.maps import interiors
+        from world.maps.map_data import current
+
+        settlement_rooms = sum(
+            len(node.desc) > 0
+            for document in current().settlements.values()
+            for node in document.nodes.values()
+        )
+        self.assertEqual(
+            len(corpus),
+            len(interiors.current().rooms) + settlement_rooms + 1,
+            "corpus regressed",
+        )
         for label, _name, desc in corpus:
             with self.subTest(room=label):
                 self.assertEqual(english_prose_defects(label, desc), [])

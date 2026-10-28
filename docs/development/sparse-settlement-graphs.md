@@ -73,8 +73,7 @@ any publication raises `SettlementNotLoaded`. Nothing loads at import.
 `LOCAL_FRAME_ANCHOR_REGISTRY`, `CITY_GATE_REGISTRY`,
 `WILDERNESS_ENTRY_REGISTRY` and `GRID_NODE_SCENE_ARCHETYPES` are read-only views
 over the published snapshot, so a replacement reaches every consumer that
-already holds them. The composition roots (`settlement_source_publication` and
-`geography_source_publication` at startup, `sync_grid`, `sync_wilderness`,
+already holds them. The composition roots (`world.maps.runtime` at startup, `sync_grid`, `sync_wilderness`,
 `sync_all`) publish explicitly. The one-time conversion compared the emitted
 documents against the retired Python declarations; that comparison is evidence
 of preservation, not a permanent approval corpus.
@@ -125,7 +124,7 @@ or test graph and returns a `SyncReport(created, updated, deleted)`.
 ## Static references
 
 Static map targets outside the settlement graph — city gates (虛境 bridges),
-ghost-anchor placements, wilderness entry gates, service place exteriors,
+ghost-anchor placements, wilderness entry gates, place room joins and their authored exterior entrances,
 district landmarks and grid scene-art associations — declare a qualified
 identity (`QualifiedRef`: tagged domain, map scope, object id, or an explicitly
 typed wilderness cell). They never store coordinates.
@@ -140,7 +139,7 @@ coordinate-to-id alias table or fallback exists.
 
 `validate_static_references()` resolves the complete declaration closure from
 one binding snapshot. The startup catalog runs it as
-`static_map_reference_validation` before `sync_all`, and the direct sync
+the adoption gate before `sync_all` and `sync_grid`, and the direct sync
 entrypoints run it before their first write, so an absent, wrong-domain or
 duplicate target is rejected with the declaration and target named, leaving
 prior persistent state and knowledge untouched. A valid target with no

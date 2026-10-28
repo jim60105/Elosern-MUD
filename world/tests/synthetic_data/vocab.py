@@ -26,15 +26,15 @@ from world.quests.definitions import (
     QuestType,
     RoomLocator,
 )
-from world.maps import map_data as _map_data
+from world.maps import runtime as _runtime
 
 # The reserved key prefix every synthetic identifier carries.
 SYNTH_PREFIX = "t_"
 
 # The kit is a test composition root: it borrows shipped map identities while
-# the kit module imports, and those readers resolve against the published
-# settlement world (discovered YAML, never import-time module data).
-_map_data.ensure_published()
+# the kit module imports, and those readers resolve against the adopted map
+# world (discovered YAML, never import-time module data).
+_runtime.ensure_published()
 
 # One shipped map key resolved at runtime (the xyzgrid knows exactly one city
 # map today): gate/placement rows must name a map the validator's extent scan

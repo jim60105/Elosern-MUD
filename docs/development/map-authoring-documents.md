@@ -88,7 +88,7 @@ landmark:
 This document is the sole district authority: `world/lore/map_districts.py`
 loads and validates it against the published terrain and settlement/location
 bindings, then publishes one immutable snapshot (startup step
-`district_source_publication`). Structure faults reject the load; sea, blocked
+the map-world adoption step). Structure faults reject the load; sea, blocked
 or unreachable landmarks, region disagreement and insufficient declared
 spacing are saveable semantic diagnostics that reject runtime adoption only.
 Landmarks are never authored as coordinates, so moving a settlement node moves
@@ -116,7 +116,10 @@ the district's canonical visited identity without editing this document.
 
 ### interior
 
-`rooms.<room_id>`: `name_zh`, `desc_zh`, `scene_archetype` (nullable);
+`rooms.<room_id>`: `name_zh`, `desc_zh`, `scene_archetype` (nullable),
+`art_key` (optional, nullable — the registered room-art key this room
+addresses; an absent key declares no room artwork and the room renders its
+archetype chain, and no key is ever inferred from the room id or a name);
 `connections[]` (`source`, `destination`, `label`); optional `interior_links[]`
 (`source_room`, `target_interior`, `target_room`, `label`, `return_label`);
 optional `exterior{settlement, node, room, doorway_key, doorway_aliases[]}`.

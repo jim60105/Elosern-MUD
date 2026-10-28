@@ -1,0 +1,23 @@
+# Permanent interior authored source (schema version 1).
+# Converted once from the retired Python place room fields; this document is
+# the sole authority for the room's identity, name, prose, scene/art metadata
+# and its one exterior entrance relationship. The room id is the stable place
+# key a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: altoria_tailor
+rooms:
+  altoria_tailor:
+    name_zh: 聖潔王都裁縫坊
+    desc_zh: 聖潔王都的裁縫坊，一卷卷布匹擱在案邊，等著北大道那些貴族的訂單。
+    scene_archetype: tavern_interior
+    art_key: altoria_tailor
+connections: []
+exterior:
+  settlement: capital_altoria
+  node: craft_alley
+  room: altoria_tailor
+  doorway_key: 裁縫坊
+  doorway_aliases:
+  - tailor
+  - tailor shop

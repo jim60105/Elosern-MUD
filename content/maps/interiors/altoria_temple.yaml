@@ -1,0 +1,24 @@
+# Permanent interior authored source (schema version 1).
+# Converted once from the retired Python place room fields; this document is
+# the sole authority for the room's identity, name, prose, scene/art metadata
+# and its one exterior entrance relationship. The room id is the stable place
+# key a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: altoria_temple
+rooms:
+  altoria_temple:
+    name_zh: 聖潔王都光明神殿
+    desc_zh: 光明神殿的光比屋子先到，長窗沿中殿一路開到屋頂，晨光從窗格斜斜落下來，亮得幾乎可以用手捧住。長椅對著墊高的臺，主祭在那裡誦讀、祝禱、回答提問；空氣裡留著一點今日焚香的氣息。近處的牆邊，中殿沒有任何隔斷或簾幔，直接敞進聖所自己的大廳，那裡是教會行愛之工的地方，從長椅上就看得見那裡的商品櫃。祝禱、事工與買賣是同一份信仰的三座櫃檯，並排站在同一片光裡；這座城市裡沒有人會覺得提起它們其中任何一樣時該壓低聲音。
+    scene_archetype: shrine_interior
+    art_key: altoria_temple
+connections: []
+exterior:
+  settlement: capital_altoria
+  node: great_temple
+  room: altoria_temple
+  doorway_key: 光明神殿
+  doorway_aliases:
+  - temple
+  - cathedral
+  - church

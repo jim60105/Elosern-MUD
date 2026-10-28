@@ -1,0 +1,23 @@
+# Permanent interior authored source (schema version 1).
+# Converted once from the retired Python place room fields; this document is
+# the sole authority for the room's identity, name, prose, scene/art metadata
+# and its one exterior entrance relationship. The room id is the stable place
+# key a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: ciaran_hailiel_home
+rooms:
+  ciaran_hailiel_home:
+    name_zh: 海莉爾的家
+    desc_zh: 一道厚樑下是一間低矮溫暖的屋子。爐膛用餘燼蓋著過夜，窗邊的坐位望出去正是村中的練刀場，年幼的刀舞者從清晨到日暮都在那裡練刀。這屋家的器具沿牆收得整整齊齊；沒有任何一樣擺著等誰來買。
+    scene_archetype: tavern_interior
+    art_key: ciaran_hailiel_home
+connections: []
+exterior:
+  settlement: village_ciaran
+  node: training_clearing
+  room: ciaran_hailiel_home
+  doorway_key: 海莉爾的家
+  doorway_aliases:
+  - hailiel
+  - hailiel's home

@@ -55,13 +55,15 @@ from world.lore.settlements.places import place_dialogue_keys, place_shop_identi
 from world.rules.dialogue import dialogue_key_for, greeting_for, table_response
 from world.rules.guild_config import get_catalog
 from world.rules.guild_economy import sync_service_content
-from world.maps.bootstrap import sync_service_interiors
+from world.maps.bootstrap import sync_interiors
 
 from ._support import (
     ServiceContentIsolation,
     _live_registry,
     _places,
     _restore_places_snapshot,
+    doorway_key,
+    room_desc,
 )
 
 
@@ -130,7 +132,7 @@ def _doorway(place):
     doorways = [
         exit_obj
         for exit_obj in _exterior(place).exits
-        if exit_obj.key == place.doorway_key_zh
+        if exit_obj.key == doorway_key(place)
     ]
     assert len(doorways) == 1, place.key
     return doorways[0]
@@ -217,7 +219,7 @@ class AltoriaCrownWatchTests(ServiceContentIsolation, EvenniaTestCase):
                 interiors = search_object_by_tag(place.key)
                 self.assertEqual(len(interiors), 1, place.kind)
                 interior = interiors[0]
-                self.assertEqual(interior.db.desc, place.room_desc_zh)
+                self.assertEqual(interior.db.desc, room_desc(place))
                 exterior = _exterior(place)
                 self.assertIsNotNone(exterior, place.kind)
                 doorway = _doorway(place)
@@ -261,7 +263,7 @@ class AltoriaCrownWatchTests(ServiceContentIsolation, EvenniaTestCase):
                         [
                             e
                             for e in _exterior(place).exits
-                            if e.key == place.doorway_key_zh
+                            if e.key == doorway_key(place)
                         ]
                     ),
                     1,
@@ -389,7 +391,7 @@ class AltoriaCrownWatchTests(ServiceContentIsolation, EvenniaTestCase):
                 del _places()[place.key]
                 exterior = _exterior(place)
                 for doorway in list(exterior.exits):
-                    if doorway.key == place.doorway_key_zh:
+                    if doorway.key == doorway_key(place):
                         doorway.delete()
                 interior = _interior(place)
                 for back_exit in list(interior.exits):
@@ -429,7 +431,7 @@ class AltoriaCrownWatchTests(ServiceContentIsolation, EvenniaTestCase):
                 patcher.stop()
             self._patchers.clear()
             with self.captureOnCommitCallbacks(execute=True):
-                sync_service_interiors()
+                sync_interiors()
                 sync_service_content()
         # The rooms arrived.
         for place in places:

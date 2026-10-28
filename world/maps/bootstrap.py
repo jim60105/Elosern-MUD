@@ -44,6 +44,7 @@ from elosern_map_core.sparse import (
     SparseSettlementGraph,
     exit_spawn_names,
 )
+from elosern_map_core.references import settlement_node_ref
 from world.maps.city_gates import CITY_GATE_REGISTRY
 from world.maps.instance import register_instance_reclamation
 from world.maps.limbo import (
@@ -54,12 +55,10 @@ from world.maps.limbo import (
 )
 from world.maps.room_art import (
     GRID_NODE_SCENE_ARCHETYPES,
-    PLACE_SCENE_ARCHETYPES,
     grid_scene_identity,
     place_scene_identity,
 )
 from world.maps.static_references import (
-    place_exterior_xyz,
     settlement_node_xyz,
     validate_static_references,
 )
@@ -82,26 +81,30 @@ def _find_exterior(xyz):
     return GridRoom.objects.filter_xyz(xyz=xyz).first()
 
 
-def _ensure_doorway(location, destination, key, aliases):
-    """Create ``key``/``aliases`` exit from ``location`` to ``destination`` if missing."""
-    _ensure_exit(location, destination, key, aliases)
-
-
-def _ensure_interior(key, tag, desc):
-    """Create one tagged permanent interior room and return it."""
+def _ensure_interior(room_data):
+    """Create or converge one permanent interior room and return it."""
     from evennia.utils.search import search_object_by_tag
 
-    rooms = search_object_by_tag(tag)
+    rooms = [
+        obj for obj in search_object_by_tag(room_data.room_id) if isinstance(obj, Room)
+    ]
+    if len(rooms) > 1:
+        raise InteriorSyncError(
+            f"interior room {room_data.room_id!r} resolves to {len(rooms)} rooms"
+        )
     if rooms:
         room = rooms[0]
     else:
         room = create_object(
             Room,
-            key=key,
-            tags=[tag],
+            key=room_data.name_zh,
+            tags=[room_data.room_id],
             location=None,
         )
-    room.db.desc = desc
+    if room.key != room_data.name_zh:
+        room.key = room_data.name_zh
+        room.save()
+    room.db.desc = room_data.desc_zh
     return room
 
 
@@ -110,8 +113,9 @@ def _apply_room_art(room, *, scene_archetype, room_art_key, scene_identity):
 
     Re-assigned unconditionally on every sync so a boot converges a room whose
     stored metadata drifted (an older boot, a manual edit) onto the authored
-    declaration. The values come only from the authored tables in
-    ``world.maps.room_art``; nothing here infers a key from a name or id.
+    declaration. The values come only from the room's authored interior
+    document; nothing here infers a key from a name or an id, and an absent
+    authored artwork key clears a stale one.
     """
     for field_name, value in (
         ("scene_archetype", scene_archetype),
@@ -122,85 +126,383 @@ def _apply_room_art(room, *, scene_archetype, room_art_key, scene_identity):
             setattr(room, field_name, value)
 
 
-def _ensure_interior_doorways(interior, exterior, interior_key, interior_aliases):
-    """Create the four directed doorway exits between interior and exterior."""
-    _ensure_doorway(exterior, interior, interior_key, interior_aliases)
-    _ensure_doorway(interior, exterior, "外", ["out", "leave"])
+#: Tag category owning every exit the interior synchronizer authors. An owned
+#: exit carries its authored relationship identity as the tag, so a repeat sync
+#: reconciles only its own surface and a retired or retargeted relationship
+#: leaves nothing behind.
+INTERIOR_EDGE_TAG_CATEGORY = "interior_topology"
 
 
-def sync_service_interiors() -> None:
-    """Create every registered place's permanent interior idempotently.
+def _owned_exits() -> list:
+    """Every exit this synchronizer owns, in any room."""
 
-    The grid street topology is unchanged: these rooms are not xyzgrid nodes.
-    Places are grouped by settlement so each exterior resolves in its own
-    settlement's coordinate space (the z derives from the settlement record,
-    never a code-side constant). Each interior is tagged by its place key so
-    repeated startup reuses the same room rather than duplicating it, and
-    every authored description is updated in place on every sync. A place
-    whose exterior cannot be resolved is warned (naming the row) and skipped;
-    the remaining places still synchronize.
+    return list(
+        ObjectDB.objects.filter(
+            db_tags__db_category=INTERIOR_EDGE_TAG_CATEGORY
+        ).distinct()
+    )
+
+
+def _ensure_owned_exit(location, destination, key, aliases, owner, *, touched=None):
+    """Converge exactly one exit this synchronizer owns, and return it.
+
+    An exit already owned under ``owner`` that still leads to this exact
+    destination is renamed in place. Otherwise an unowned exit from ``location``
+    to ``destination`` is adopted — that is how a database bootstrapped before
+    the interior documents kept its committed doorways — and a missing one is
+    created. Retargeting is handled by the prune pass of the same sync, which
+    removes an owned exit that no longer answers an authored relationship.
     """
-    from collections import defaultdict
+
+    owned = [
+        exit_obj
+        for exit_obj in location.exits
+        if exit_obj.tags.has(owner, category=INTERIOR_EDGE_TAG_CATEGORY)
+        and exit_obj.destination == destination
+    ]
+    if not owned:
+        unowned = [
+            exit_obj
+            for exit_obj in location.exits
+            if exit_obj.destination is not None
+            and exit_obj.destination == destination
+            and not exit_obj.tags.has(category=INTERIOR_EDGE_TAG_CATEGORY)
+        ]
+        if unowned:
+            keep = sorted(unowned, key=lambda exit_obj: exit_obj.id)[0]
+            keep.tags.add(owner, category=INTERIOR_EDGE_TAG_CATEGORY)
+            owned = [keep]
+        else:
+            created = create_object(
+                Exit,
+                key=key,
+                aliases=aliases,
+                location=location,
+                destination=destination,
+            )
+            created.tags.add(owner, category=INTERIOR_EDGE_TAG_CATEGORY)
+            if touched is not None:
+                touched.append(created)
+            return created
+    keep = sorted(owned, key=lambda exit_obj: exit_obj.id)[0]
+    for duplicate in owned[1:]:
+        duplicate.delete()
+    if keep.key != key:
+        keep.key = key
+    if set(keep.aliases.all()) != set(aliases):
+        keep.aliases.clear()
+        keep.aliases.add(list(aliases))
+    # A dead home (the room it defaulted to was deleted) would block the save;
+    # an exit with no home is valid, so clear the dead reference first.
+    home = keep.db_home
+    if home is not None and getattr(home, "pk", None) is None:
+        keep.home = None
+    keep.save()
+    if touched is not None:
+        touched.append(keep)
+    return keep
+
+
+def _prune_retired_interior_edges(
+    planned: set[tuple[str, int, int]], *, preserved: frozenset[int] = frozenset()
+) -> None:
+    """Delete owned exits that no authored relationship plans any more.
+
+    ``preserved`` holds the rooms of a skipped (temporarily unrealizable)
+    interior: their existing exits are not retired, so a dependency that is
+    momentarily absent leaves a working location exactly as it was.
+    """
+
+    for exit_obj in _owned_exits():
+        owner = exit_obj.tags.get(category=INTERIOR_EDGE_TAG_CATEGORY)
+        location = exit_obj.location
+        destination = exit_obj.destination
+        if location is None or destination is None:
+            exit_obj.delete()
+            continue
+        if location.pk in preserved or destination.pk in preserved:
+            continue
+        if (owner, location.pk, destination.pk) in planned:
+            continue
+        log_info(
+            "bootstrap_interior_edge_pruned",
+            context={
+                "owner": owner,
+                "exit_key": exit_obj.key,
+                "source_room_key": location.key,
+                "destination_room_key": destination.key,
+                "action": "retire_unplanned_interior_exit",
+            },
+        )
+        exit_obj.delete()
+
+
+def _interior_plan(snapshot):
+    """Every authored interior edge this sync must converge, plus the skipped rooms.
+
+    The plan is read-only and refers to rooms by their authored identity, so it
+    can be built before this batch creates anything. An authored exterior that
+    resolves to no materialized street is reported once and its dependent room
+    is skipped — the whole dependent interior, exactly today's warn-and-skip
+    contract — while every other interior still synchronizes. Connections that
+    touch a skipped room are skipped with it.
+    """
+
+    room_edges: list[tuple[str, str, str, tuple[str, ...], str]] = []
+    for interior_id, document in snapshot.documents.items():
+        for connection in document.connections:
+            room_edges.append(
+                (
+                    connection.source,
+                    connection.destination,
+                    connection.label,
+                    (),
+                    f"connection:{interior_id}:{connection.source}>"
+                    f"{connection.destination}:{connection.label}",
+                )
+            )
+    for link in snapshot.interior_links:
+        house = snapshot.rooms[link.source_room].interior_id
+        owner = (
+            f"link:{house}:{link.source_room}>"
+            f"{link.target_interior}:{link.target_room}:{link.label}"
+        )
+        room_edges.append(
+            (link.source_room, link.target_room, link.label, (), owner)
+        )
+        if link.return_label is not None:
+            room_edges.append(
+                (
+                    link.target_room,
+                    link.source_room,
+                    link.return_label,
+                    (),
+                    f"{owner}:return",
+                )
+            )
+
+    exterior_edges: list[tuple[object, str, str, tuple[str, ...], str, str]] = []
+    skipped: set[str] = set()
+    joined = {place.room.object_id: place.key for place in PLACE_REGISTRY.values()}
+    for room_id, exterior in snapshot.exteriors.items():
+        reference = settlement_node_ref(exterior.settlement, exterior.node)
+        try:
+            exterior_xyz = settlement_node_xyz(
+                reference, source=f"interior room {room_id} exterior"
+            )
+        except Exception as error:  # observability: ignore R2: the authored target was validated at adoption; a materially absent binding is the warn-and-skip case this loop owns
+            log_warn(
+                "bootstrap_interior_exterior_missing",
+                exc=error,
+                context={
+                    "room": room_id,
+                    "interior": snapshot.rooms[room_id].interior_id,
+                    "place": joined.get(room_id),
+                    "action": "skip_interior",
+                },
+            )
+            skipped.add(room_id)
+            continue
+        exterior_room = _find_exterior(exterior_xyz)
+        if exterior_room is None:
+            log_warn(
+                "bootstrap_interior_exterior_missing",
+                context={
+                    "room": room_id,
+                    "interior": snapshot.rooms[room_id].interior_id,
+                    "place": joined.get(room_id),
+                    "exterior_xyz": exterior_xyz,
+                    "action": "skip_interior",
+                },
+            )
+            skipped.add(room_id)
+            continue
+        interior_id = snapshot.rooms[room_id].interior_id
+        exterior_edges.append(
+            (
+                exterior_room,
+                room_id,
+                exterior.doorway_key,
+                tuple(exterior.doorway_aliases),
+                f"doorway:{interior_id}",
+                f"doorway_return:{interior_id}",
+            )
+        )
+
+    # A missing materialized frontage skips the whole dependent interior
+    # document, not just its entrance room: the rooms reachable only through it
+    # belong to the same temporarily unrealizable location.
+    if skipped:
+        for document in snapshot.documents.values():
+            if skipped & set(document.rooms):
+                skipped.update(document.rooms)
+    room_edges = [
+        edge
+        for edge in room_edges
+        if edge[0] not in skipped and edge[1] not in skipped
+    ]
+    return room_edges, exterior_edges, skipped
+
+
+class InteriorSyncError(RuntimeError):
+    """One authored interior cannot be realized against the materialized map."""
+
+
+def _evict_batch_cache(touched=()) -> None:
+    """Drop the batch's live objects so the persisted baseline is read again.
+
+    The database rollback restores the rows, but this batch created rooms and
+    exits and rewrote their keys, aliases and attributes in the same process,
+    and the identity map would keep serving those live objects (Evennia keeps
+    objects that carry non-persistent attributes). The global flush is the
+    engine's own recovery idiom; the batch's own objects are forced out as
+    well, because a map room's non-persistent attributes are never authored
+    state and the persisted baseline must win over them.
+    """
+
+    from evennia.utils.idmapper.models import flush_cache
+
+    flush_cache()
+    for obj in touched:
+        flusher = getattr(obj, "flush_from_cache", None)
+        if flusher is None:
+            continue
+        try:
+            flusher(force=True)
+        except Exception as error:  # observability: ignore R2: best-effort eviction of one object; the rest still flush
+            log_warn(
+                "bootstrap_interior_cache_eviction_failed",
+                exc=error,
+                context={"obj": getattr(obj, "db_key", "?"), "dbref": getattr(obj, "dbref", "?")},
+            )
+
+
+def _apply_interior_edges(
+    room_edges, exterior_edges, *, skipped=frozenset(), touched=None
+) -> None:
+    """Converge every planned interior edge, then retire the unplanned ones.
+
+    Both endpoints exist by now: the room loop created every non-skipped room
+    in this same transaction. Each authored relationship owns exactly one exit
+    per direction, so a repeat run renames in place and a retired or retargeted
+    relationship leaves nothing behind.
+    """
+
+    from evennia.utils.search import search_object_by_tag
+
+    def _room(room_id):
+        rooms = [obj for obj in search_object_by_tag(room_id) if isinstance(obj, Room)]
+        if len(rooms) != 1:
+            raise InteriorSyncError(
+                f"interior room {room_id!r} resolves to {len(rooms)} rooms"
+            )
+        return rooms[0]
+
+    # An exit whose endpoint no longer exists is dead weight from a deleted
+    # object, not an authored relationship: retire it before converging, so a
+    # vanished street can never be resurrected by a save on a dangling row.
+    for exit_obj in _owned_exits():
+        if exit_obj.location is None or exit_obj.destination is None:
+            exit_obj.delete()
+
+    planned: set[tuple[str, int, int]] = set()
+    preserved = frozenset(
+        room.pk
+        for room_id in skipped
+        for room in search_object_by_tag(room_id)
+        if isinstance(room, Room)
+    )
+    for source_id, destination_id, key, aliases, owner in room_edges:
+        location = _room(source_id)
+        destination = _room(destination_id)
+        _ensure_owned_exit(location, destination, key, aliases, owner, touched=touched)
+        planned.add((owner, location.pk, destination.pk))
+    for street, room_id, key, aliases, owner, return_owner in exterior_edges:
+        room = _room(room_id)
+        _ensure_owned_exit(street, room, key, aliases, owner, touched=touched)
+        planned.add((owner, street.pk, room.pk))
+        _ensure_owned_exit(
+            room, street, "外", ("out", "leave"), return_owner, touched=touched
+        )
+        planned.add((return_owner, room.pk, street.pk))
+    _prune_retired_interior_edges(planned, preserved=preserved)
+
+
+def sync_interiors() -> None:
+    """Converge every authored permanent interior onto the persistent world.
+
+    The authored interior documents are the only source: a room exists once
+    (tagged by its stable room id), carries its authored name, prose and
+    scene/art facts, and every authored connection, interior link and exterior
+    doorway is one owned exit. A room needs no service record; a service place
+    only joins it. The grid street topology is unchanged — interiors are not
+    xyzgrid nodes.
+
+    The whole batch is one transaction, so a failure leaves no half-converged
+    interior behind; the walls and exits this sync created or changed are
+    evicted from the identity map afterwards so a rolled-back write can never
+    be served from a stale in-process cache. An authored target that resolves
+    to no materialized room is warned (naming the room, its interior and the
+    joined place when one exists) and skipped; every other interior still
+    synchronizes.
+    """
+
+    from evennia.utils.search import search_object_by_tag
+
+    from world.maps.interiors import current as current_interiors
+    from world.maps.static_references import validate_static_references
 
     validate_static_references()
+    snapshot = current_interiors()
 
-    by_settlement: dict[str, list] = defaultdict(list)
-    for place in PLACE_REGISTRY.values():
-        by_settlement[place.settlement_key].append(place)
+    # The plan is read-only: a room whose authored exterior has no materialized
+    # street is skipped (warned once) before this batch creates anything.
+    room_edges, exterior_edges, skipped = _interior_plan(snapshot)
 
-    for settlement_key, places in by_settlement.items():
-        for place in places:
-            exterior_xyz = place_exterior_xyz(place)
-            exterior = _find_exterior(exterior_xyz)
-            if exterior is None:
-                log_warn(
-                    "bootstrap_service_exterior_missing",
-                    context={
-                        "place": place.key,
-                        "exterior_xyz": exterior_xyz,
-                        "action": "skip_place",
-                    },
-                )
-                continue
-            interior = _ensure_interior(
-                place.room_name_zh,
-                place.key,
-                place.room_desc_zh,
-            )
-            scene_archetype = PLACE_SCENE_ARCHETYPES.get(place.key)
-            if scene_archetype is None:
-                # The import-time contract guarantees every authored place is
-                # declared; a runtime-patched registry (a test seam) that adds
-                # an undeclared row is reported rather than silently left
-                # without scene art.
-                log_warn(
-                    "bootstrap_interior_scene_missing",
-                    context={"place": place.key, "action": "skip_scene_metadata"},
-                )
-            else:
+    touched: list = []
+    try:
+        with transaction.atomic():
+            for room_id in snapshot.rooms:
+                if room_id in skipped:
+                    continue
+                room = _ensure_interior(snapshot.room(room_id))
+                touched.append(room)
                 _apply_room_art(
-                    interior,
-                    scene_archetype=scene_archetype,
-                    room_art_key=place.key,
-                    scene_identity=place_scene_identity(place.key),
+                    room,
+                    scene_archetype=snapshot.rooms[room_id].scene_archetype,
+                    room_art_key=snapshot.rooms[room_id].art_key,
+                    scene_identity=place_scene_identity(room_id),
                 )
-            _ensure_interior_doorways(
-                interior,
-                exterior,
-                place.doorway_key_zh,
-                list(place.doorway_aliases),
+            _apply_interior_edges(
+                room_edges, exterior_edges, skipped=skipped, touched=touched
             )
+    except Exception:
+        _evict_batch_cache(touched)
+        raise
 
 
 def resolve_residence_route(home_key: str, guild_key: str) -> dict:
-    """Resolve materialized place/grid identities, rejecting disconnected routes."""
+    """Resolve materialized place/grid identities, rejecting disconnected routes.
+
+    The two places must share one frontage: their joined interiors declare the
+    same exterior entrance, which is the authored relationship the route is
+    built on. The frontage room itself is the settlement node both interiors
+    open onto.
+    """
     from evennia.utils.search import search_object_by_tag
+
+    from world.maps import interiors
 
     home_place = PLACE_REGISTRY[home_key]
     guild_place = PLACE_REGISTRY[guild_key]
+    home_exterior = interiors.exterior_for(home_place.room.object_id)
+    guild_exterior = interiors.exterior_for(guild_place.room.object_id)
     if (
         home_place.settlement_key != guild_place.settlement_key
-        or home_place.exterior != guild_place.exterior
+        or home_exterior is None
+        or guild_exterior is None
+        or (home_exterior.settlement, home_exterior.node)
+        != (guild_exterior.settlement, guild_exterior.node)
     ):
         raise ValueError(f"residence {home_key!r} and guild {guild_key!r} need one frontage")
     rooms = {}
@@ -209,7 +511,14 @@ def resolve_residence_route(home_key: str, guild_key: str) -> dict:
         if len(matches) != 1:
             raise ValueError(f"place {key!r} resolves to {len(matches)} rooms")
         rooms[role] = matches[0]
-    frontage = list(GridRoom.objects.filter_xyz(xyz=place_exterior_xyz(home_place)))
+    frontage = list(
+        GridRoom.objects.filter_xyz(
+            xyz=settlement_node_xyz(
+                settlement_node_ref(home_exterior.settlement, home_exterior.node),
+                source=f"residence {home_key!r} frontage",
+            )
+        )
+    )
     if len(frontage) != 1:
         raise ValueError(f"residence {home_key!r} frontage resolves to {len(frontage)} rooms")
     rooms["frontage"] = frontage[0]
@@ -895,13 +1204,11 @@ def sync_grid() -> SyncReport:
     room is missing warns and is skipped; other rows still converge.
     """
 
-    from world.lore.map_districts import ensure_published as ensure_districts_published
-    from world.maps.geography import ensure_published
-    from world.maps.map_data import ensure_published as ensure_settlements_published
+    from world.maps import runtime
 
-    ensure_settlements_published()
-    ensure_published()
-    ensure_districts_published()
+    # This is a world composition root: adopt the complete map world (or use
+    # the one startup already adopted) before any graph or reference read.
+    runtime.ensure_published()
     validate_static_references()
 
     graphs = tuple(SETTLEMENT_GRAPHS.values())
@@ -1075,13 +1382,11 @@ def sync_wilderness() -> None:
     refresh pass.
     """
 
-    from world.lore.map_districts import ensure_published as ensure_districts_published
-    from world.maps.geography import ensure_published
-    from world.maps.map_data import ensure_published as ensure_settlements_published
+    from world.maps import runtime
 
-    ensure_settlements_published()
-    ensure_published()
-    ensure_districts_published()
+    # This is a world composition root: adopt the complete map world (or use
+    # the one startup already adopted) before any graph or reference read.
+    runtime.ensure_published()
     validate_static_references()
 
     create_wilderness(name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider())

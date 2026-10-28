@@ -84,6 +84,14 @@ def _districts() -> Mapping[str, Any]:
     return current().districts
 
 
+def _interiors() -> Mapping[str, Any]:
+    """The permanent interior rooms of the currently published map world."""
+
+    from world.maps.interiors import current
+
+    return current().rooms
+
+
 def _quest_definitions() -> Mapping[str, Any]:
     # The authored quest catalog. The process ``QUEST_DEFINITION_REGISTRY`` is
     # filled at startup and also holds runtime-generated quests (runtime state,
@@ -174,7 +182,26 @@ REGISTRY_INDEX: tuple[RegistrySpec, ...] = (
     _spec("starting_kits", "起始裝備", "物品與經濟", _attr("world.lore.starting_kits", "SUBRACE_STARTING_KIT_REGISTRY"), f"{_LORE}/starting_kits.py", "subrace_key"),
     # 聚落
     _spec("settlements", "聚落", "聚落", _attr("world.lore.settlements.settlements", "SETTLEMENT_REGISTRY"), f"{_LORE}/settlements/settlements.py", "archetype", "zcoord"),
-    _spec("places", "場所", "聚落", _attr("world.lore.settlements.places", "PLACE_REGISTRY"), f"{_LORE}/settlements", "room_name_zh", "settlement_key", "kind"),
+    _spec(
+        "places",
+        "場所",
+        "聚落",
+        _attr("world.lore.settlements.places", "PLACE_REGISTRY"),
+        f"{_LORE}/settlements",
+        "settlement_key",
+        "kind",
+        "room.object_id",
+    ),
+    _spec(
+        "interiors",
+        "永久室內",
+        "聚落",
+        _interiors,
+        "content/maps/interiors",
+        "interior_id",
+        "scene_archetype",
+        "art_key",
+    ),
     _spec("shops", "商店", "聚落", _attr("world.lore.settlements.shops", "SHOP_REGISTRY"), f"{_LORE}/settlements/shops.py", "host_name"),
     # 人物
     _spec("npc_profiles", "NPC 人物設定", "人物", _attr("world.lore.npc_profiles", "NPC_PROFILE_REGISTRY"), f"{_LORE}/npc_profiles", "card.identity.public", "apparent_age"),
@@ -373,19 +400,39 @@ def _build(specs: tuple[RegistrySpec, ...]) -> ReferenceIndex:
     )
 
 
+def _map_world_identity() -> str:
+    """The identity of the published map world, or ``""`` when none is loaded.
+
+    A map-owned registry (interiors, districts) changes when a new map world is
+    published, so the reference index must be rebuilt then. Keying the cache by
+    this identity keeps that rebuild honest without clearing results a rejected
+    adoption never touched.
+    """
+
+    from world.maps import runtime
+
+    return runtime.current().identity if runtime.is_published() else ""
+
+
 @functools.lru_cache(maxsize=8)
-def _cached(specs: tuple[RegistrySpec, ...]) -> ReferenceIndex:
+def _cached(
+    specs: tuple[RegistrySpec, ...], map_world_identity: str
+) -> ReferenceIndex:
     return _build(specs)
 
 
 def build_reference_index(specs: tuple[RegistrySpec, ...] | None = None) -> ReferenceIndex:
     """The forward/inverse reference maps, cached per index for the process.
 
-    Registries never change at runtime, so one walk per process suffices. The
-    cache is keyed by the index tuple itself, so a different index (a test's
-    synthetic one) never reuses another index's maps.
+    The Python lore registries never change at runtime; the map-owned views of
+    this index (interiors, districts) do, whenever a new map world is adopted.
+    The cache is therefore keyed by the index tuple *and* the published map
+    world's identity, so neither a different index (a test's synthetic one) nor
+    a republished map world reuses another world's maps.
     """
-    return _cached(REGISTRY_INDEX if specs is None else tuple(specs))
+    return _cached(
+        REGISTRY_INDEX if specs is None else tuple(specs), _map_world_identity()
+    )
 
 
 def _key_sets(specs: tuple[RegistrySpec, ...]) -> dict[str, frozenset[Any]]:

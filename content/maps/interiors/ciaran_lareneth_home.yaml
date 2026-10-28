@@ -1,0 +1,23 @@
+# Permanent interior authored source (schema version 1).
+# Converted once from the retired Python place room fields; this document is
+# the sole authority for the room's identity, name, prose, scene/art metadata
+# and its one exterior entrance relationship. The room id is the stable place
+# key a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: ciaran_lareneth_home
+rooms:
+  ciaran_lareneth_home:
+    name_zh: 拉瑞內斯的家
+    desc_zh: 溪畔小徑旁這戶人家，空氣裡懸著糖漬花的香氣。曬乾的花瓣織在籃裡擱著，挨著一方小爐石；窗邊一張矮凳上擺著今日待客的小點，為每個經過的人留著。
+    scene_archetype: tavern_interior
+    art_key: ciaran_lareneth_home
+connections: []
+exterior:
+  settlement: village_ciaran
+  node: stream_path
+  room: ciaran_lareneth_home
+  doorway_key: 拉瑞內斯的家
+  doorway_aliases:
+  - lareneth
+  - lareneth's home

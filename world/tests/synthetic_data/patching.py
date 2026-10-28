@@ -92,17 +92,12 @@ class synthetic_registries(ContextDecorator):
         stack = ExitStack()
         self._open = True
         try:
-            # The map-owned geography is validated against the shipped
-            # catalogs, so a synthetic scope must establish the real baseline
-            # before any catalog is swapped.
-            from world.maps import geography as geography_module
-            from world.maps import map_data as map_data_module
-            from world.lore import map_districts as districts_module
+            # The map world is validated against the shipped catalogs, so a
+            # synthetic scope must establish the real baseline before any
+            # catalog is swapped.
+            from world.maps import runtime as runtime_module
 
-            map_data_module.ensure_published()
-            if not geography_module.is_published():
-                geography_module.publish(geography_module.load_geography())
-            districts_module.ensure_published()
+            runtime_module.ensure_published()
             _resolve_import_time_derivations(self._logicals)
             for logical in _dependency_order(self._logicals):
                 if logical in GEOGRAPHY_TARGETS or logical in SETTLEMENT_TARGETS:
@@ -110,6 +105,7 @@ class synthetic_registries(ContextDecorator):
                 _apply_target(stack, logical, self._extra)
             _apply_geography(stack, self._logicals, self._extra)
             _apply_settlements(stack, self._logicals, self._extra)
+            _apply_interiors(stack, self._logicals)
         except Exception:
             # A failed __enter__ never reaches __exit__; unwind the partial
             # stack here so the scope leaves no patches behind.
@@ -244,16 +240,18 @@ def _apply_geography(
     selected = [logical for logical in logicals if logical in GEOGRAPHY_TARGETS]
     if not selected:
         return
-    from world.maps import geography as geography_module
+    from world.maps import runtime as runtime_module
 
-    previous = geography_module.current()
+    previous = runtime_module.current()
     overrides = {}
     for logical in selected:
         content = dict(_CONTENT[logical]())
         content.update(extra.get(logical, {}))
         overrides[GEOGRAPHY_TARGETS[logical]] = MappingProxyType(content)
-    geography_module.publish(replace(previous, **overrides))
-    stack.callback(geography_module.publish, previous)
+    runtime_module.publish(
+        replace(previous, geography=replace(previous.geography, **overrides))
+    )
+    stack.callback(runtime_module.publish, previous)
 
 
 def _apply_settlements(
@@ -274,16 +272,48 @@ def _apply_settlements(
     selected = [logical for logical in logicals if logical in SETTLEMENT_TARGETS]
     if not selected:
         return
-    from world.maps import map_data as map_data_module
+    from world.maps import runtime as runtime_module
 
-    previous = map_data_module.current()
+    previous = runtime_module.current()
     overrides = {}
     for logical in selected:
         content = dict(_CONTENT[logical]())
         content.update(extra.get(logical, {}))
         overrides[SETTLEMENT_TARGETS[logical]] = MappingProxyType(content)
-    map_data_module.publish(replace(previous, **overrides))
-    stack.callback(map_data_module.publish, previous)
+    runtime_module.publish(
+        replace(
+            previous,
+            settlements=replace(previous.settlements, **overrides),
+        )
+    )
+    stack.callback(runtime_module.publish, previous)
+
+
+def _apply_interiors(stack: ExitStack, logicals: tuple[str, ...]) -> None:
+    """Install the kit's own permanent interiors for a scope that swaps places.
+
+    A place row only joins an authored room, so a scope whose place catalog is
+    synthetic must publish the synthetic rooms too; the previously published
+    bundle is restored on exit.
+    """
+
+    if "places" not in logicals:
+        return
+    from world.maps import runtime as runtime_module
+    from world.maps.interiors import build_interiors
+    from world.tests.synthetic_data.interiors import interior_documents
+
+    previous = runtime_module.current()
+    documents = {
+        document.identity: document for document in interior_documents()
+    }
+    runtime_module.publish(
+        replace(
+            previous,
+            interiors=build_interiors(MappingProxyType(documents)),
+        )
+    )
+    stack.callback(runtime_module.publish, previous)
 
 
 def _revalidate_skill_lineage() -> None:

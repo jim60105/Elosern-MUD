@@ -1068,7 +1068,7 @@ class StartupClockSourceOrderTests(BattlefieldIsolation, RegistryIsolationMixin,
         from dataclasses import replace
         from unittest.mock import patch
 
-        from world.maps.bootstrap import sync_grid, sync_service_interiors
+        from world.maps.bootstrap import sync_grid, sync_interiors
         from world.quests.bootstrap import sync_quest_runtime
         from world.rules.clock import settle_combat_result
         from world.rules.combat_session import _persist, engage, read_session
@@ -1111,7 +1111,7 @@ class StartupClockSourceOrderTests(BattlefieldIsolation, RegistryIsolationMixin,
         # before session restoration (fix-startup-clock-source-order D1).
         with patch("world.rules.combat_session.settlement.settle_combat_result", side_effect=spy):
             sync_grid()
-            sync_service_interiors()
+            sync_interiors()
             sync_quest_runtime()
             sync_guild_economy()
             sync_npc_schedules()

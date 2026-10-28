@@ -158,20 +158,16 @@ def sync_all() -> None:
     :func:`sync_monster_placement` for the same reason.
     """
 
-    # This is a world composition root: establish the geography before any
-    # map-facing consumer or mirror reads it (startup publishes it first; a
-    # direct call must not observe an empty world).
-    from world.maps.geography import ensure_published
-    from world.lore.map_districts import ensure_published as ensure_districts_published
-    from world.maps.map_data import ensure_published as ensure_settlements_published
+    # This is a world composition root: adopt the complete map world (a
+    # validated bundle, or the shipped one when startup already adopted it)
+    # before any map-facing consumer or mirror reads it. Adoption also runs the
+    # static-reference closure, so a direct ``sync_all()`` call outside the
+    # startup catalog cannot mirror a world whose map targets do not resolve.
+    from world.maps import runtime
 
-    ensure_settlements_published()
-    ensure_published()
-    ensure_districts_published()
-    # Every authored static map target resolves against one current binding
-    # snapshot before the first mirrored Script is created or updated
-    # (all-or-nothing import convention). This also covers a direct
-    # ``sync_all()`` call outside the startup catalog.
+    runtime.ensure_published()
+    # Every authored static map target resolves against the adopted world
+    # before the first mirrored Script is created or updated.
     from world.maps.static_references import validate_static_references
 
     validate_static_references()

@@ -47,23 +47,14 @@ from world.lore.settlements.capability_declarations import (
     capability,
     place_bound,
 )
-from elosern_map_core.references import settlement_node_ref
+from elosern_map_core.references import interior_room_ref
 
 ROWS: tuple[PlaceDefinition, ...] = (
     PlaceDefinition(
         key="altoria_temple",
         settlement_key="capital_altoria",
         kind=PlaceKind.TEMPLE,
-        room_name_zh="聖潔王都光明神殿",
-        room_desc_zh=(
-            "光明神殿的光比屋子先到，長窗沿中殿一路開到屋頂，晨光從窗格斜斜落下來，亮得幾乎可以用手捧住。長椅對著墊高的臺，主祭在那裡誦讀、祝禱、"
-            "回答提問；空氣裡留著一點今日焚香的氣息。近處的牆邊，中殿沒有任何隔斷或簾幔，直接敞進聖所自己的大廳，那裡是教會行愛之工的地方，從長椅"
-            "上就看得見那裡的商品櫃。祝禱、事工與買賣是同一份信仰的三座櫃檯，並排站在同一片光裡；這座城市裡沒有人會覺得提起它們其中任何一樣時該壓"
-            "低聲音。"
-        ),
-        exterior=settlement_node_ref("capital_altoria", "great_temple"),  # 大神殿前
-        doorway_key_zh="光明神殿",
-        doorway_aliases=("temple", "cathedral", "church"),
+        room=interior_room_ref("altoria_temple", "altoria_temple"),
         host_name="艾莉安娜‧寒水",
         host_race="human",
         host_subrace=None,
@@ -94,16 +85,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         key="altoria_sanctum",
         settlement_key="capital_altoria",
         kind=PlaceKind.SANCTUM_SHOP,
-        room_name_zh="聖潔王都聖所",
-        room_desc_zh=(
-            "聖所開在中殿旁邊，同一個屋簷、同一排窗，暖的光、洗淨的亞麻布、臉盆裡備好的溫水，一面牆邊是一張和城裡任何店面沒有兩樣的商品櫃，禮儀與"
-            "安養器物的層架、玻璃瓶、軟布祭袍摺得整整齊齊，標價與補貨的方式跟雜貨店一模一樣。執事們手臂下夾著賬簿，在櫃檯與廊底客房之間來回，喊執"
-            "事名字的聲調跟喊祝禱時完全一樣。敬拜、事工、買賣在同一棟屋簷下、毫不避人。光明教會就是這樣過日子，聖所公開營生這件事，整個大陸都"
-            "知道，跟酒館賣酒沒有兩樣。"
-        ),
-        exterior=settlement_node_ref("capital_altoria", "great_temple"),  # 大神殿前
-        doorway_key_zh="聖所",
-        doorway_aliases=("sanctum", "church sanctum"),
+        room=interior_room_ref("altoria_sanctum", "altoria_sanctum"),
         host_name="羅海西亞‧芬威克",
         host_race="human",
         host_subrace=None,
@@ -138,16 +120,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         key="altoria_palace",
         settlement_key="capital_altoria",
         kind=PlaceKind.PALACE,
-        room_name_zh="聖潔王都王宮",
-        room_desc_zh=(
-            "聖潔王都的王座通道在自己屋簷下升起，磨亮的石材正是這座王都立足的崖壁顏色，立柱之間的寬度夠得過一支儀仗，最遠端是三級臺的矮臺，王椅在"
-            "臺後俯瞰整座大殿的全長。它宏偉、潔淨，而且正在等待，門口沒有衛兵，地上沒有跪求的人，沒有任何聲音在大理石上迴盪。這間屋子遲早要裝進的"
-            "東西、一座王宮該有的每個故事，都還沒有被寫出來，大殿也懶得假裝不是這樣。沿著它走完一趟的人會聽見的唯一聲音是自己的腳步，那才是這座城"
-            "市頭上這頂王冠最忠實的描述。"
-        ),
-        exterior=settlement_node_ref("capital_altoria", "palace_forecourt"),  # 王宮前庭
-        doorway_key_zh="王宮",
-        doorway_aliases=("palace", "royal palace"),
+        room=interior_room_ref("altoria_palace", "altoria_palace"),
     ),
     # 聖潔王都貴族區衛所 — the noble quarter's watch post. The document's
     # 守門衛兵隊長 belongs to a restriction this change deliberately does not
@@ -157,15 +130,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         key="altoria_noble_watch",
         settlement_key="capital_altoria",
         kind=PlaceKind.WATCH_POST,
-        room_name_zh="聖潔王都貴族區衛所",
-        room_desc_zh=(
-            "聖潔王都的貴族區衛所是一間縱長的屋子，堆著盾牌、疊著斗篷，兩頭各一座火盆，門邊一張登記桌，要是還有什麼人到訪需要登記，就會被寫在這張"
-            "桌上。街區的巡邏按整點輪過這裡。牆上沒有任何一張是命令，屋裡也沒有任何一樣東西會阻擋人，當初蓋這駐所的人把地面從門到桌留空，像一戶"
-            "沒有訪客的人家把客廳的門敞著。"
-        ),
-        exterior=settlement_node_ref("capital_altoria", "noble_quarter"),  # 貴族區前
-        doorway_key_zh="貴族區衛所",
-        doorway_aliases=("noble watch", "watch post"),
+        room=interior_room_ref("altoria_noble_watch", "altoria_noble_watch"),
         host_name="古利安‧鷹守",
         host_race="human",
         host_subrace=None,
@@ -189,15 +154,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         key="altoria_drill_yard",
         settlement_key="capital_altoria",
         kind=PlaceKind.TRAINING_GROUND,
-        room_name_zh="聖潔王都校場",
-        room_desc_zh=(
-            "聖潔王都的校場是上城牆下一片耙平的泥地，練習樁一排排立著，圍繩的握處磨得發白，一條長凳，是那種一整個上午的招式練下來會讓人一身汗的長"
-            "凳。王都的徵兵在白天於此操練，公會到傍晚才來用屬於它的時段，樁上的痕跡來自一百雙不同的手。場子裡沒有任何東西會自己磨快一刀或評定一階"
-            "，它是這座城市來做「任何地面都肯承接的那種功課」的地方，只因為在這裡，每個人都看得見標準在哪裡。"
-        ),
-        exterior=settlement_node_ref("capital_altoria", "training_ground"),  # 校場外
-        doorway_key_zh="校場",
-        doorway_aliases=("drill yard", "training ground"),
+        room=interior_room_ref("altoria_drill_yard", "altoria_drill_yard"),
         host_name="伊沃‧高丘",
         host_race="human",
         host_subrace=None,
@@ -226,16 +183,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         key="altoria_academy",
         settlement_key="capital_altoria",
         kind=PlaceKind.ACADEMY,
-        room_name_zh="聖潔王都王立魔法學院",
-        room_desc_zh=(
-            "聖潔王都的學院把講課收在同一個屋簷下，一間長廳，階梯式的長椅面對著示範場，無論幾點都燈光明亮到能讀書，廳旁是一間書庫，王都藏的階級課"
-            "本照學生攀登的順序上架。學生在門外的階梯上爭論，裡面的講師回答問題的方式正是一所學校該有的樣子，一路答到底。院長的書桌正對著示範場；"
-            "這座城市懂得的每一條魔法階級階梯與八元素的知識，都出自像這樣某個地方，而王國的這一間，正是薇歐蕾特‧阿爾托利亞從前坐過的教"
-            "室。"
-        ),
-        exterior=settlement_node_ref("capital_altoria", "academy"),  # 學院前
-        doorway_key_zh="王立魔法學院",
-        doorway_aliases=("academy", "royal academy", "magic academy"),
+        room=interior_room_ref("altoria_academy", "altoria_academy"),
         host_name="奧德溫‧薩契",
         host_race="human",
         host_subrace=None,

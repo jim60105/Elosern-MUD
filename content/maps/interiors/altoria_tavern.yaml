@@ -1,0 +1,23 @@
+# Permanent interior authored source (schema version 1).
+# Converted once from the retired Python place room fields; this document is
+# the sole authority for the room's identity, name, prose, scene/art metadata
+# and its one exterior entrance relationship. The room id is the stable place
+# key a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: altoria_tavern
+rooms:
+  altoria_tavern:
+    name_zh: 聖潔王都醉月酒館
+    desc_zh: 聖潔王都的醉月酒館坐落在客棧巷得名的地方，低垂的琥珀燈色、鋸末與蛇麻的氣味，還有那條被十年倚案的旅客磨得發亮的吧台。桌子們朝壁爐擠成一堆堆各自的談話，而這間屋子唯一的規矩出自酒館老闆，在這裡什麼都可以談，被聽見的人也不會因此吃虧。消息、謠言與同伴才是這間屋子經營的東西；杯子只是佈景，桌上的東西什麼都不做，只是擱在那裡。
+    scene_archetype: tavern_interior
+    art_key: altoria_tavern
+connections: []
+exterior:
+  settlement: capital_altoria
+  node: inn_lane
+  room: altoria_tavern
+  doorway_key: 醉月酒館
+  doorway_aliases:
+  - tavern
+  - drinking hall

@@ -87,6 +87,11 @@ class _SceneFixture(EvenniaTestCase):
 
     def setUp(self) -> None:
         super().setUp()
+        # The room-art vocabulary is the authored interior world's, so the
+        # scene chain resolves against a published map world.
+        from world.tests.geography_fixture import publish_shipped_map_world
+
+        publish_shipped_map_world()
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.store_root = Path(self.temp.name)
@@ -690,7 +695,11 @@ class SceneTargetTests(_SceneFixture):
         location.room_art_key = "t_synth_room"
         location.scene_identity = "place:t_synth"
         with (
-            patch.object(scene_definitions, "ROOM_ART_KEY_SET", room_registry),
+            patch.object(
+                scene_definitions,
+                "room_art_key_set",
+                return_value=room_registry,
+            ),
             patch.object(art_view, "SCENE_ARCHETYPE_REGISTRY", scene_registry),
         ):
             target = scene_target_for(location)
@@ -707,7 +716,11 @@ class SceneTargetTests(_SceneFixture):
         location.scene_archetype = None
         location.room_art_key = "t_synth_unregistered"
         location.scene_identity = None
-        with patch.object(scene_definitions, "ROOM_ART_KEY_SET", room_registry):
+        with patch.object(
+                scene_definitions,
+                "room_art_key_set",
+                return_value=room_registry,
+            ):
             target = scene_target_for(location)
         self.assertEqual(target.room_art_key, "t_synth_unregistered")
         self.assertTrue(target.room_binding_invalid)
@@ -719,7 +732,11 @@ class SceneTargetTests(_SceneFixture):
         location = create_object(Room, key="t_synth_room_object", location=None)
         self.addCleanup(location.delete)
         location.room_art_key = {"not": "a key"}
-        with patch.object(scene_definitions, "ROOM_ART_KEY_SET", room_registry):
+        with patch.object(
+                scene_definitions,
+                "room_art_key_set",
+                return_value=room_registry,
+            ):
             target = scene_target_for(location)
         self.assertIsNone(target.room_art_key)
         self.assertTrue(target.room_binding_invalid)
