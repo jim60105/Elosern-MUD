@@ -20,6 +20,7 @@ import {
   siteRef,
   waterwayRef,
 } from "./continent.js";
+import { bendRef, compassLabel, roadLabel, roadRef } from "./settlement.js";
 
 export const DOMAIN_LABELS = Object.freeze({ continent: "大陸", settlement: "據點", interior: "室內" });
 
@@ -55,6 +56,39 @@ export function objectCatalog(world) {
         parentLabel: `${parent} › ${settlement.id}`,
         relativePath: settlement.relative_path,
         layer: null,
+      });
+    }
+    // Directed roads and their bends: editor-local references owned by the
+    // settlement document (no other document can name them).
+    for (const road of settlement.roads) {
+      const ref = roadRef(settlement.id, road.source, road.destination);
+      const length = road.length_m === null || road.length_m === undefined ? "—" : `${road.length_m} m`;
+      catalog.set(ref, {
+        ref,
+        kind: "road",
+        domain: "settlement",
+        mapId: settlement.id,
+        id: ref,
+        label: `道路 ${roadLabel(settlement, road)}`,
+        parentLabel: `${parent} › ${settlement.id}`,
+        relativePath: settlement.relative_path,
+        layer: null,
+        frame: `有向道路 ${road.source} → ${road.destination}，方向 ${road.direction}（${compassLabel(road.direction)}）；物理長度 ${length}（核心計算）；彎點 ${road.bends.length} 個（據點地方座標，公尺）`,
+      });
+      road.bends.forEach((bend, index) => {
+        const bendId = bendRef(ref, index);
+        catalog.set(bendId, {
+          ref: bendId,
+          kind: "bend",
+          domain: "settlement",
+          mapId: settlement.id,
+          id: bendId,
+          label: `道路 ${roadLabel(settlement, road)} · 彎點 ${index + 1}`,
+          parentLabel: `${parent} › ${settlement.id}`,
+          relativePath: settlement.relative_path,
+          layer: null,
+          frame: `座標：東 ${bend[0]} m、北 ${bend[1]} m（據點地方座標，公尺）`,
+        });
       });
     }
   }

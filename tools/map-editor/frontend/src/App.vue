@@ -7,8 +7,10 @@
 // (adopting external changes, held behind open drafts until 載入新版), keeps
 // the selection by qualified identity, and runs guarded single-document
 // commands (interior room layout moves; continental geometry, locations,
-// districts, footprints and bindings) with undo/redo of the manual segment. Copying the OMP context only writes plain
-// text to the clipboard; it starts nothing.
+// districts, footprints and bindings; local maps, settlement nodes,
+// prototypes, directed roads and bends) with undo/redo of the manual
+// segment. Copying the OMP context only writes plain text to the clipboard;
+// it starts nothing.
 // Authored text is rendered with text interpolation only (never v-html).
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import MapCanvas from "./components/MapCanvas.vue";
@@ -17,6 +19,7 @@ import NavigationPanel from "./components/NavigationPanel.vue";
 import InspectorPanel from "./components/InspectorPanel.vue";
 import DiagnosticsStrip from "./components/DiagnosticsStrip.vue";
 import ContinentInspector from "./components/ContinentInspector.vue";
+import SettlementInspector from "./components/SettlementInspector.vue";
 import {
   KM,
   cellOfMetres,
@@ -35,6 +38,20 @@ import {
   storedFromMetres,
   footprintCell,
 } from "./lib/continent.js";
+import {
+  NUDGE_M,
+  deleteNodes,
+  findSettlement,
+  groupMoves,
+  moveBend,
+  moveNodes,
+  nextId as nextNodeId,
+  nodeBlockers,
+  oneDocumentNodes,
+  parseSettlementRef,
+  roundPoint,
+  settlementRemoval,
+} from "./lib/settlement.js";
 import { CONNECTING, DISCONNECTED, createWorkspaceClient } from "./lib/workspace_client.js";
 import { ADOPT, HOLD_DRAFT, HOLD_RESTART, followDecision, preserveSelection } from "./lib/following.js";
 import { workspaceBanner } from "./lib/banner.js";
@@ -69,10 +86,16 @@ const layoutDrafts = ref(0);
 // other's count.
 const continentDrafts = ref(0);
 const leadDrafts = ref(0);
-const draftCount = computed(() => layoutDrafts.value + continentDrafts.value + leadDrafts.value);
+const settlementDrafts = ref(0);
+const settlementLeadDrafts = ref(0);
+const draftCount = computed(
+  () => layoutDrafts.value + continentDrafts.value + leadDrafts.value + settlementDrafts.value + settlementLeadDrafts.value,
+);
 // Continent tool state: a two-click waterway start, an open creation form
 // and a hint when a tool has no target. Never persisted, never sent.
 const pendingStart = ref(null);
+// Settlement road tool: the chosen source node while the destination is picked.
+const roadStart = ref(null);
 const creation = ref(null);
 const toolHint = ref(null);
 // The snapshot on screen (commands are built against it), the newest held
@@ -242,11 +265,15 @@ const refusal = computed(() => {
 
 function refusalFor(refs, rows) {
   const location = refs.length === 1 && refs[0].startsWith("location:");
+  // Settlement nodes: every map reference (roads either way, gates, the city
+  // gate, exteriors, landmarks) must be removed first, as the service guard
+  // requires; external rows come from the index lookup.
+  const nodes = oneDocumentNodes(refs);
   return deletionRefusal({
     externalStatus: workspace.value?.external_context_status,
     summary: summary.value,
-    relations: rows,
-    internalBlocks: location,
+    relations: nodes ? [...nodeBlockers(world.value, refs), ...rows.filter((row) => row.external)] : rows,
+    internalBlocks: location || Boolean(nodes),
   });
 }
 const results = computed(() => searchObjects(catalog.value, query.value));
@@ -401,6 +428,10 @@ function toggleLayer(key) {
 
 // -- selection ---------------------------------------------------------------
 function choose({ ref, toggle = false, range = false }) {
+  if (domain.value === "settlement" && tool.value === "road" && parseSettlementRef(ref)?.kind === "node") {
+    pickRoadEnd(parseSettlementRef(ref).nodeId);
+    return;
+  }
   selection.value = nextSelection(selection.value, ref, { toggle, range, order: objects.value.map((mark) => mark.id) });
   if (drawers.value && selection.value.length && !toggle && !range) drawer.value = "inspector";
 }
@@ -428,8 +459,16 @@ const selectedRoom = computed(() => {
   const position = interior && storedPosition(interior, room.roomId);
   return position ? { ...room, position } : null;
 });
-const layoutMovable = computed(() => (domain.value === "interior" || domain.value === "continent") && Boolean(world.value));
-const placing = computed(() => domain.value === "continent" && tool.value !== "select");
+const layoutMovable = computed(() => Boolean(world.value));
+const placing = computed(
+  () => (domain.value === "continent" && tool.value !== "select") || (domain.value === "settlement" && tool.value === "node"),
+);
+// Nodes of one settlement document selected on the settlement map (the
+// group a drag, Shift+arrow or the inspector's delta moves together).
+const selectedNodes = computed(() => (domain.value === "settlement" ? oneDocumentNodes(selection.value) : null));
+const showSettlementInspector = computed(
+  () => domain.value === "settlement" && Boolean(world.value) && Boolean(findSettlement(world.value, currentMapId.value)),
+);
 const pendingPoints = computed(() => (pendingStart.value ? [pendingStart.value.point] : []));
 const showContinentInspector = computed(
   () =>
@@ -438,8 +477,9 @@ const showContinentInspector = computed(
     (Boolean(creation.value) || Boolean(toolHint.value) || (selected.value && (parseContinentRef(selected.value) || selected.value.startsWith("location:")))),
 );
 
-watch([tool, domain], () => {
+watch([tool, domain, currentMapId], () => {
   pendingStart.value = null;
+  roadStart.value = null;
   creation.value = null;
   toolHint.value = null;
 });
@@ -485,6 +525,10 @@ function continentMove(id, point) {
 
 function onPlace({ point }) {
   const current = world.value;
+  if (current && domain.value === "settlement" && tool.value === "node") {
+    placeNode(point);
+    return;
+  }
   if (!current || domain.value !== "continent") return;
   toolHint.value = null;
   const cell = cellOfMetres(current, point);
@@ -536,6 +580,88 @@ function onPlace({ point }) {
   if (drawers.value && (creation.value || toolHint.value)) drawer.value = "inspector";
 }
 
+// -- settlement commands ------------------------------------------------------
+// Road tool: the first chosen node is the source, the second the
+// destination; the creation form then asks for the authored direction(s).
+function pickRoadEnd(nodeId) {
+  toolHint.value = null;
+  if (!roadStart.value) {
+    roadStart.value = nodeId;
+    creation.value = null;
+    toolHint.value = "道路：再選取終點節點；Esc 取消。";
+  } else {
+    const source = roadStart.value;
+    roadStart.value = null;
+    creation.value = { type: "road", defaults: { source, destination: nodeId, direction: "", two_way: false, return_direction: "" } };
+  }
+  if (drawers.value) drawer.value = "inspector";
+}
+
+function placeNode(point) {
+  const settlement = findSettlement(world.value, currentMapId.value);
+  if (!settlement) return;
+  const [x, y] = roundPoint(point);
+  creation.value = {
+    type: "node",
+    defaults: {
+      id: nextNodeId("node", settlement.nodes.map((row) => row.id)),
+      x: String(x),
+      y: String(y),
+      key: "",
+      desc: "",
+      prototype_parent: "grid_room",
+      anchor_key: null,
+    },
+  };
+  if (drawers.value) drawer.value = "inspector";
+}
+
+// A drag of one node, or of a node inside a one-document multi-selection
+// (the whole group moves by one integer metre delta), or of a bend.
+function settlementMove(id, point) {
+  const parsed = parseSettlementRef(id);
+  const settlement = parsed && findSettlement(world.value, parsed.settlementId);
+  if (!settlement) return null;
+  const [x, y] = roundPoint(point);
+  if (parsed.kind === "bend") {
+    const road = settlement.roads.find((row) => row.source === parsed.source && row.destination === parsed.destination);
+    const bend = road?.bends[parsed.index];
+    return bend && (bend[0] !== x || bend[1] !== y) ? moveBend(settlement.id, parsed.source, parsed.destination, parsed.index, [x, y]) : null;
+  }
+  if (parsed.kind !== "node") return null;
+  const node = settlement.nodes.find((row) => row.id === parsed.nodeId);
+  if (!node) return null;
+  const dx = x - node.local_m[0];
+  const dy = y - node.local_m[1];
+  if (!dx && !dy) return null;
+  const group = oneDocumentNodes(selection.value);
+  const ids = group && group.settlementId === settlement.id && group.nodeIds.includes(node.id) ? group.nodeIds : [node.id];
+  return moveNodes(settlement.id, groupMoves(settlement, ids, dx, dy));
+}
+
+function nudgeNodes([dx, dy]) {
+  const group = selectedNodes.value;
+  // Built against the snapshot current when its turn comes.
+  commands.submit((current) => {
+    const settlement = findSettlement(current.world, group.settlementId);
+    if (!settlement || !group.nodeIds.every((nodeId) => settlement.nodes.some((row) => row.id === nodeId))) return null;
+    // The layout grid's ArrowUp is -y; the settlement frame is north-up.
+    return documentCommand(current, moveNodes(settlement.id, groupMoves(settlement, group.nodeIds, dx * NUDGE_M, -dy * NUDGE_M)));
+  });
+}
+
+function onCreateMap(descriptor, settlementId) {
+  send(descriptor).then((result) => {
+    if (result?.changed) navigate({ domain: "settlement", mapId: settlementId });
+  });
+}
+
+function openCreation(request) {
+  roadStart.value = null;
+  toolHint.value = null;
+  creation.value = request;
+}
+
 function cellSize() {
   return (world.value?.continent?.cell_size_km ?? 1) * KM;
 }
@@ -549,11 +675,20 @@ function onCreate(descriptor, ref) {
 
 function cancelTool() {
   pendingStart.value = null;
+  roadStart.value = null;
   creation.value = null;
   toolHint.value = null;
 }
 
 function onCanvasMove({ id, point, settle }) {
+  if (domain.value === "settlement") {
+    const descriptor = settlementMove(id, point);
+    if (!selection.value.includes(id)) selection.value = [id];
+    if (!descriptor) return settle();
+    // A refused move (a coordinate already taken) settles back to the snapshot.
+    send(descriptor).finally(settle);
+    return;
+  }
   if (domain.value === "continent") {
     const descriptor = continentMove(id, point);
     selection.value = [id];
@@ -703,10 +838,10 @@ function onKeydown(event) {
     mac,
     text: isTextTarget(event.target),
     drawerOpen: Boolean(drawer.value),
-    toolActive: tool.value !== "select" || Boolean(creation.value || pendingStart.value),
+    toolActive: tool.value !== "select" || Boolean(creation.value || pendingStart.value || roadStart.value),
     refusalShown: Boolean(refusal.value),
     hasSelection: selection.value.length > 0,
-    nudgeScope: Boolean(selectedRoom.value) && inNudgeScope(event.target),
+    nudgeScope: (Boolean(selectedRoom.value) || Boolean(selectedNodes.value)) && inNudgeScope(event.target),
     canReturn: returnStack.value.length > 0,
     domains: DOMAIN_KEYS,
     tools: toolKeys(domain.value),
@@ -748,6 +883,10 @@ function onKeydown(event) {
       commands.redo();
       break;
     case "nudge": {
+      if (selectedNodes.value) {
+        nudgeNodes(action.delta);
+        break;
+      }
       const { interiorId, roomId } = selectedRoom.value;
       submitMove(interiorId, roomId, ([x, y]) => [x + action.delta[0], y + action.delta[1]]);
       break;
@@ -770,6 +909,15 @@ function requestDelete() {
   if (!selection.value.length) return;
   if (selection.value.length === 1 && world.value) {
     const ref = selection.value[0];
+    const settlementRemovalCommand = settlementRemoval(ref);
+    if (settlementRemovalCommand) {
+      // Roads and bends are owned by their settlement document only.
+      const parsed = parseSettlementRef(ref);
+      send(settlementRemovalCommand).then((result) => {
+        if (result?.changed) selection.value = parsed.kind === "bend" ? [parsed.road] : [];
+      });
+      return;
+    }
     const removal = removalOf(world.value, ref);
     if (removal) {
       // Geometry removals remove no qualified object: no index is involved.
@@ -788,6 +936,16 @@ function requestDelete() {
         });
         return;
       }
+    }
+  }
+  const nodes = world.value ? oneDocumentNodes(selection.value) : null;
+  if (nodes) {
+    const rows = incomingOf(world.value, workspace.value?.external_incoming_references ?? {}, selection.value);
+    if (refusalFor(selection.value, rows).key === NOTHING_REFUSES) {
+      send(deleteNodes(nodes.settlementId, nodes.nodeIds)).then((result) => {
+        if (result?.changed) selection.value = [];
+      });
+      return;
     }
   }
   refusalShown.value = true;
@@ -1010,6 +1168,25 @@ async function onChip(key) {
           @select="(ref) => (selection = [ref])"
           @follow="follow"
           @drafts="leadDrafts = $event"
+          @create-map="onCreateMap"
+        />
+        <SettlementInspector
+          v-if="showSettlementInspector && !record"
+          :key="`${formEpoch}:settlement-lead`"
+          :world="world"
+          :workspace="workspace"
+          :settlement-id="currentMapId"
+          :selection="selection"
+          :creation="creation"
+          :hint="toolHint"
+          :submit="send"
+          @create="onCreate"
+          @cancel="cancelTool"
+          @open="openCreation"
+          @select="(ref) => (selection = [ref])"
+          @follow="follow"
+          @delete="requestDelete"
+          @drafts="settlementLeadDrafts = $event"
         />
         </template>
         <template v-if="selectedRoom">
@@ -1037,6 +1214,25 @@ async function onChip(key) {
           @select="(ref) => (selection = [ref])"
           @follow="follow"
           @drafts="continentDrafts = $event"
+          @create-map="onCreateMap"
+        />
+        <SettlementInspector
+          v-if="showSettlementInspector && record"
+          :key="`${formEpoch}:${selected ?? ''}`"
+          :world="world"
+          :workspace="workspace"
+          :settlement-id="currentMapId"
+          :selection="selection"
+          :creation="creation"
+          :hint="toolHint"
+          :submit="send"
+          @create="onCreate"
+          @cancel="cancelTool"
+          @open="openCreation"
+          @select="(ref) => (selection = [ref])"
+          @follow="follow"
+          @delete="requestDelete"
+          @drafts="settlementDrafts = $event"
         />
       </InspectorPanel>
     </aside>

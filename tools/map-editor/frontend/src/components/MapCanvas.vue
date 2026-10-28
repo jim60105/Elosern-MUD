@@ -17,6 +17,9 @@
 // `draggable` (control-point diamonds, locations, sites, fords, rooms) uses
 // the same one-release-one-move drag. With a placing tool, a click on the map
 // emits `place` (scene point) instead of selecting.
+// Settlement: node marks and bend diamonds drag the same way; a directed
+// road is chosen by clicking its line, and the selected road shows its
+// direction chevrons at the start of each segment (pointing downstream).
 // Authored labels render through text interpolation only.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
@@ -150,7 +153,12 @@ const links = computed(() =>
     ? props.scene.links.map((link) => {
         const mid = at(link.points[Math.floor(link.points.length / 2)]);
         const start = at(link.points[0]);
-        return { ...link, d: path(link.points), labelAt: link.points.length > 2 ? mid : { x: (start.x + at(link.points.at(-1)).x) / 2, y: (start.y + at(link.points.at(-1)).y) / 2 } };
+        return {
+          ...link,
+          d: path(link.points),
+          labelAt: link.points.length > 2 ? mid : { x: (start.x + at(link.points.at(-1)).x) / 2, y: (start.y + at(link.points.at(-1)).y) / 2 },
+          chevrons: link.selected ? chevrons(link.points.map(at)) : [],
+        };
       })
     : [],
 );
@@ -266,15 +274,22 @@ function onSurfaceClick(event) {
     return;
   }
   if (!view.value || event.target.closest(".map-mark, .map-pill")) return;
+  // Pointer capture (taken for a possible drag) may retarget the click to
+  // the host: read the element under the pointer instead of the event target.
+  const under = document.elementFromPoint?.(event.clientX, event.clientY) ?? event.target;
+  const markElement = under?.closest?.(".map-mark");
+  if (markElement) {
+    const mark = props.scene?.marks.find((item) => item.id === markElement.dataset.qualifiedRef);
+    if (mark) select(mark, event);
+    return;
+  }
   if (props.placing) {
     emit("place", { point: unproject(view.value, frame.value, pixelOf(event)) });
     return;
   }
-  // Pointer capture may retarget the click to the host: read the element
-  // under the pointer instead of the event target.
-  const under = document.elementFromPoint?.(event.clientX, event.clientY) ?? event.target;
-  const shape = under?.closest?.("[data-shape-ref]");
-  if (shape) emit("select", { ref: shape.dataset.shapeRef, toggle: Boolean(event.ctrlKey || event.metaKey), range: false });
+  const shape = under?.closest?.("[data-shape-ref], [data-link-ref]");
+  const ref = shape?.dataset.shapeRef ?? shape?.dataset.linkRef;
+  if (ref) emit("select", { ref, toggle: Boolean(event.ctrlKey || event.metaKey), range: false });
 }
 
 function select(mark, event = {}) {
@@ -321,6 +336,25 @@ const bar = computed(() => {
     return null;
   }
 });
+
+// One chevron per segment, 60 % along it, pointing from start to end.
+function chevrons(points) {
+  const marks = [];
+  for (let i = 0; i + 1 < points.length; i += 1) {
+    const a = points[i];
+    const b = points[i + 1];
+    const length = Math.hypot(b.x - a.x, b.y - a.y);
+    if (length < 16) continue;
+    const ux = (b.x - a.x) / length;
+    const uy = (b.y - a.y) / length;
+    const x = a.x + (b.x - a.x) * 0.6;
+    const y = a.y + (b.y - a.y) * 0.6;
+    marks.push(
+      `M${(x - 7 * ux - 5 * uy).toFixed(1)} ${(y - 7 * uy + 5 * ux).toFixed(1)} L${x.toFixed(1)} ${y.toFixed(1)} L${(x - 7 * ux + 5 * uy).toFixed(1)} ${(y - 7 * uy - 5 * ux).toFixed(1)}`,
+    );
+  }
+  return marks;
+}
 
 function brackets(at) {
   const r = 18;
@@ -389,9 +423,18 @@ defineExpose({ fit, focusMark });
         :data-shape-ref="shape.selectable ? shape.ref : null"
         :data-derived="shape.derived ? 'true' : null"
       />
-      <g v-for="link in links" :key="link.id" class="map-link" :class="`map-link--${link.kind}`" :data-link="link.id">
+      <g
+        v-for="link in links"
+        :key="link.id"
+        class="map-link"
+        :class="[`map-link--${link.kind}`, { 'map-link--selected': link.selected, 'map-link--selectable': link.ref }]"
+        :data-link="link.id"
+        :data-link-ref="link.ref ?? null"
+      >
+        <path v-if="link.ref" :d="link.d" class="map-link__hit" />
         <path :d="link.d" class="map-link__casing" />
         <path :d="link.d" class="map-link__core" :class="{ 'map-link__core--oneway': !link.twoWay }" />
+        <path v-for="(chevron, index) in link.chevrons" :key="index" :d="chevron" class="map-link__chevron" data-direction-chevron />
         <text v-if="link.label" :x="link.labelAt.x" :y="link.labelAt.y - 6" class="map-link__label">{{ link.label }}</text>
       </g>
       <g
@@ -428,6 +471,7 @@ defineExpose({ fit, focusMark });
           <text y="-14" class="map-mark__label">{{ mark.label }}</text>
         </template>
         <template v-else>
+          <circle r="16" class="map-mark__hit" />
           <template v-if="chosen.has(mark.id)">
             <circle r="14" class="map-mark__ring" />
             <path :d="brackets({ x: 0, y: 0 })" class="map-mark__brackets" />

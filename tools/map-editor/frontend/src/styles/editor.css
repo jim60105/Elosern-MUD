@@ -314,6 +314,33 @@ select {
   stroke-dasharray: 8 5;
 }
 
+.map-link__hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14;
+}
+
+.map-link--selectable {
+  cursor: pointer;
+}
+
+.map-link--selected .map-link__casing {
+  stroke: var(--gold-600);
+  stroke-width: 8;
+}
+
+.map-link--selected .map-link__core {
+  stroke: var(--gold-300);
+}
+
+.map-link__chevron {
+  fill: none;
+  stroke: var(--gold-300);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .map-link__label {
   font-size: var(--text-xs);
   fill: var(--paper-500);
@@ -322,6 +349,11 @@ select {
 
 .map-mark {
   cursor: pointer;
+}
+
+.map-mark__hit {
+  fill: transparent;
+  stroke: none;
 }
 
 .map-mark__dot {
