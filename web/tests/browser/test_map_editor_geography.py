@@ -19,6 +19,7 @@ from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 from ruamel.yaml import YAML
+from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 EDITOR_TESTS = REPO_ROOT / "tools" / "map-editor" / "tests"
@@ -201,6 +202,7 @@ class MapEditorGeographyBrowserTest(unittest.TestCase):
         self.assertEqual(self.posts, [])
         self.assertEqual(self.changed(), set())
 
+    @covers_requirement("map-editor-geography::continental-authored-inputs-have-direct-and-explicit-editing-controls")
     def test_a_new_location_without_a_local_map_is_searchable_and_fabricates_nothing(self):
         self.start()
         page = self.open()
@@ -250,6 +252,7 @@ class MapEditorGeographyBrowserTest(unittest.TestCase):
         )
         self.assertEqual(self.changed(), set())
 
+    @covers_requirement("map-editor-geography::continental-authored-inputs-have-direct-and-explicit-editing-controls")
     def test_footprint_cells_and_a_district_landmark_by_keyboard_write_only_their_owner(self):
         self.start()
         page = self.open()

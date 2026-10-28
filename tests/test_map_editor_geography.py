@@ -17,6 +17,7 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EDITOR_TESTS = REPO_ROOT / "tools" / "map-editor" / "tests"
@@ -91,6 +92,7 @@ class GeographyProcessTests(unittest.TestCase):
         session = editor.session()
         editor.reload(session["token"], session["session_generation"])
 
+    @covers_requirement("map-editor-geography::continental-authored-inputs-have-direct-and-explicit-editing-controls")
     def test_a_river_point_saves_one_document_recomputes_terrain_and_stales_the_partition(self):
         editor = self.start()
         # The synthetic workspace has no artifact, so the service reports no
@@ -119,6 +121,7 @@ class GeographyProcessTests(unittest.TestCase):
         status, _ = self.send(editor, "move_control_point", CONTINENT, {"feature": RIVER, "index": 0, "point": [20, 24]})
         self.assertEqual(status, 200)
 
+    @covers_requirement("map-editor-geography::continental-authored-inputs-have-direct-and-explicit-editing-controls")
     def test_a_location_and_its_local_map_are_separate_commands(self):
         editor = self.start()
         before = synthetic.tree_digest(self.workspace)
@@ -149,6 +152,7 @@ class GeographyProcessTests(unittest.TestCase):
                 self.assertEqual(status, expected)
         self.assertEqual(self.changed(before), set())
 
+    @covers_requirement("map-editor-geography::continental-authored-inputs-have-direct-and-explicit-editing-controls")
     def test_footprint_and_binding_write_only_the_settlement(self):
         editor = self.start()
         before = synthetic.tree_digest(self.workspace)
