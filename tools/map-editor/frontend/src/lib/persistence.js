@@ -45,6 +45,8 @@ export function saveChip(state, savedAt) {
 }
 
 const COMMAND_LABELS = {
+  partition_generate: "重新產生分區",
+  partition_cancel: "取消分區產生",
   move_interior_layout: "移動房間版面",
   remove_interior_layout: "移除版面文件",
   move_control_point: "移動控制點",
@@ -91,6 +93,15 @@ export function persistenceBanner(workspace, failure) {
   }
   if (!failure) return null;
   const document = failure.documentId ? `${failure.documentId}：` : "";
+  if (failure.details?.reason === "partition_generating") {
+    return {
+      key: "partition-generating",
+      tone: "warn",
+      title: `▲「${commandLabel(failure.command)}」未存檔：分區產生中`,
+      text: `${document}分區產生期間不寫入世界資料；產生完成或取消後再操作。磁碟上仍是上次讀取的版本。`,
+      action: "reload",
+    };
+  }
   return {
     key: failure.code === "save_failed" ? "save-failed" : "save-rejected",
     tone: "seal",

@@ -50,6 +50,8 @@ const props = defineProps({
   tool: { type: String, default: "select" },
   frameLabel: { type: String, default: "" },
   stale: { type: Boolean, default: false },
+  // The drawn partition outlines belong to older inputs (persistent label).
+  olderPartition: { type: Boolean, default: false },
   label: { type: String, default: "" },
   movable: { type: Boolean, default: false },
   busy: { type: Boolean, default: false },
@@ -463,7 +465,11 @@ defineExpose({ fit, focusMark });
         :data-shape="shape.id"
         :data-shape-ref="shape.selectable ? shape.ref : null"
         :data-derived="shape.derived ? 'true' : null"
-      />
+        :data-district="shape.district ?? null"
+        :data-older-input="shape.older ? 'true' : null"
+      >
+        <title v-if="shape.derived && shape.label">{{ shape.label }}</title>
+      </path>
       <g
         v-for="link in links"
         :key="link.id"
@@ -563,5 +569,8 @@ defineExpose({ fit, focusMark });
     </p>
     <p v-if="scene?.kind === 'interior'" class="map-canvas__note">版面僅供編輯器使用 · 不代表距離或座標</p>
     <span v-if="stale" class="map-canvas__badge">▲ 過期預覽</span>
+    <span v-if="olderPartition" class="map-canvas__badge map-canvas__badge--partition" data-older-partition>
+      ▲ 分區輸出屬於舊輸入 · 不可作為遊戲就緒
+    </span>
   </div>
 </template>
