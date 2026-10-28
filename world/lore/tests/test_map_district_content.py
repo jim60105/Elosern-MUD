@@ -23,6 +23,7 @@ from elosern_map_core.references import ReferenceIndex
 from tools import map_district_partition as generator
 from tools.spec_traceability import covers_requirement
 from world.lore import map_districts
+from world.maps import runtime
 from world.lore.anchors import AnchorKind, anchor_geography, anchors
 from world.lore.map_districts import (
     DISTRICTS_PATH,
@@ -168,10 +169,22 @@ class ShippedDistrictContractTests(unittest.TestCase):
                 for key, entry in WILDERNESS_ENTRY_REGISTRY.items()
                 if all(gate.z_map_key != landmark.map_id for gate in entry.gates)
             }
-            from world.lore import wilderness_entry
+            from dataclasses import replace
+            from types import MappingProxyType
 
-            with mock.patch.object(wilderness_entry, "WILDERNESS_ENTRY_REGISTRY", others):
+            from world.maps import map_data
+            from world.tests.geography_fixture import publish_settlements
+
+            published = map_data.current()
+            without_gates = replace(
+                published,
+                wilderness_entries=MappingProxyType(others),
+            )
+            publish_settlements(without_gates)
+            try:
                 site = production_terrain().grid_site(landmark.map_id, node.coordinate)
+            finally:
+                publish_settlements(published)
             self.assertIsNotNone(site)
             self.assertFalse(site.reachable)
 

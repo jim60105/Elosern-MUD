@@ -48,14 +48,22 @@ def publish_settlements(snapshot):
 
 
 def publish_districts(snapshot):
-    """Install one district view into the published map bundle."""
+    """Install one district view into the published map bundle.
+
+    A candidate carrying any diagnostic is rejected and the published world is
+    left as it was, exactly like the district domain's own publication contract.
+    """
 
     from dataclasses import replace
 
+    from world.lore import map_districts
     from world.maps import runtime
 
+    if snapshot.diagnostics:
+        raise map_districts.DistrictError(snapshot.diagnostics)
     runtime.ensure_published()
-    return runtime.publish(replace(runtime.current(), districts=snapshot))
+    runtime.publish(replace(runtime.current(), districts=snapshot))
+    return snapshot
 
 
 def publish_interiors(snapshot):

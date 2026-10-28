@@ -23,7 +23,6 @@ from elosern_map_core.sources import discover_source_paths
 from tools.spec_traceability import covers_requirement
 from world.lore import map_districts
 from world.lore.map_districts import (
-from world.tests.geography_fixture import publish_districts
     DISTRICTS_PATH,
     DistrictError,
     DistrictNotLoaded,
@@ -31,6 +30,7 @@ from world.tests.geography_fixture import publish_districts
     diagnose_districts,
     parse_districts_document,
 )
+from world.tests.geography_fixture import publish_districts
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOTS = ("commands", "server", "typeclasses", "web", "world", "tools", "tests")

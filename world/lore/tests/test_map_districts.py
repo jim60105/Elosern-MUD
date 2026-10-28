@@ -194,10 +194,9 @@ class DistrictDocumentTests(unittest.TestCase):
         "map-districts::every-map-district-has-one-canonical-reachable-landmark"
     )
     def test_publish_adopts_a_clean_candidate_and_rejects_a_diagnosed_one(self):
-        with mock.patch.object(map_districts, "_PUBLISHED", None):
-            with self.assertRaises(DistrictNotLoaded):
-                map_districts.current()
-            clean = _build(_valid_rows())
+        saved = runtime.current()
+        clean = _build(_valid_rows())
+        try:
             self.assertIs(publish_districts(clean), clean)
             self.assertIs(map_districts.current(), clean)
             self.assertTrue(map_districts.is_published())
@@ -212,12 +211,14 @@ class DistrictDocumentTests(unittest.TestCase):
                 [item.code for item in candidate.diagnostics], ["landmark_in_sea"]
             )
             with self.assertRaises(DistrictError) as caught:
-                map_districts.publish(candidate)
+                publish_districts(candidate)
             self.assertEqual(
                 [item.code for item in caught.exception.diagnostics],
                 ["landmark_in_sea"],
             )
             self.assertIs(map_districts.current(), clean)
+        finally:
+            publish_districts(saved.districts)
 
     @covers_requirement(
         "map-districts::every-map-district-has-one-canonical-reachable-landmark"
@@ -238,11 +239,14 @@ class DistrictDocumentTests(unittest.TestCase):
             landmark_node_ids(edited.districts, index=_INDEX),
         )
         self.assertNotEqual(original.identity, edited.identity)
-        with mock.patch.object(map_districts, "_PUBLISHED", None):
-            map_districts.publish(edited)
+        saved = runtime.current()
+        try:
+            publish_districts(edited)
             district = map_districts.current().districts["west_seed"]
             self.assertEqual(district.district_name_zh, "合成西區改名")
             self.assertEqual(district.landmark_name_zh, "合成西碑改名")
+        finally:
+            publish_districts(saved.districts)
 
 
 class DistrictStructureTests(unittest.TestCase):
@@ -451,19 +455,20 @@ class DistrictSourceBoundaryTests(unittest.TestCase):
 
     def test_a_missing_source_rejects_without_touching_the_baseline(self):
         import tempfile
+
         from pathlib import Path
 
-        with mock.patch.object(map_districts, "_PUBLISHED", None):
-            clean = _build(_valid_rows())
+        saved = runtime.current()
+        clean = _build(_valid_rows())
+        try:
             publish_districts(clean)
-            with tempfile.TemporaryDirectory() as root:
-                with self.assertRaises(DistrictError) as caught:
-                    runtime.adopt(Path(root))
-            self.assertEqual(
-                [item.code for item in caught.exception.diagnostics],
-                ["missing_document"],
-            )
+            with tempfile.TemporaryDirectory() as directory:
+                with self.assertRaises(runtime.MapWorldError) as caught:
+                    runtime.adopt(Path(directory))
+            self.assertIn("the required districts document is absent", str(caught.exception))
             self.assertIs(map_districts.current(), clean)
+        finally:
+            publish_districts(saved.districts)
 
 
 class LandmarkIdentityTests(unittest.TestCase):

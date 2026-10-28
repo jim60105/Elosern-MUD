@@ -204,7 +204,6 @@ LANDMARK_DOMAINS: tuple[str, ...] = (
     "settlement_node",
     "wilderness_cell",
     "location",
-    "interior_room",
 )
 
 
