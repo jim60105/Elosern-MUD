@@ -113,13 +113,13 @@ def test_semantic_work_in_progress_loads_with_diagnostics_and_stays_writable(wor
     }
 
 
-def test_a_structural_failure_at_startup_has_no_preview_and_pauses_writes(workspace):
+def test_a_structural_failure_at_startup_has_no_preview(workspace):
     path = workspace / "content/maps/locations.yaml"
     path.write_text(path.read_text(encoding="utf-8") + "unexpected_field: 1\n", encoding="utf-8")
     state = _state(workspace)
     assert state["preview_state"] == "unavailable"
     assert state["world"] is None
-    assert state["write_pause"] == {"paused": True, "reason": "unavailable_preview"}
+    assert state["write_pause"] == {"paused": False, "reason": None}
     [diagnostic] = [d for d in state["candidate_diagnostics"] if d["relative_path"] == "content/maps/locations.yaml"]
     assert diagnostic["line"] is not None
 

@@ -13,12 +13,18 @@ Routes in this slice (later slices add their named domain commands only):
 
 There is no generic patch, file write, path mutation, shell, Python or remote
 account route, and no handoff/resume/return route.
+
+Continuous file following (:mod:`elosern_map_editor.watching`) rereads the
+workspace after coalesced directory notifications and reconciles every read
+against the committed fingerprint ledger; there is no turn, ownership or
+handoff state.
 """
 
 from __future__ import annotations
 
 import asyncio
 import threading
+import time
 import json
 import secrets
 import uuid
@@ -101,6 +107,16 @@ class EditorService:
         self.published_at: str | None = None
         self.latest: WorkspaceRead | None = None
         self.latest_at: str | None = None
+        #: The committed fingerprint ledger: the source/layout presence map
+        #: the service last committed to (its last adopted loaded read, or
+        #: that map plus its own write's result). A fresh read equal to it is
+        #: the service's own output; any other loaded map is an external
+        #: change. Failed reads never move it.
+        self.committed: dict[str, str] | None = None
+        #: The last adopted external change (``sequence`` 0: none yet).
+        self.external_change: dict[str, Any] = {"sequence": 0, "at": None, "documents": []}
+        #: Watch coordinator status (see :mod:`elosern_map_editor.watching`).
+        self.following: dict[str, Any] = {"active": False, "batches": 0, "error": None}
         # Startup is a fresh disk read with this new session identity.
         self._adopt(read_workspace(self.workspace, config.limits))
 
@@ -110,21 +126,24 @@ class EditorService:
     ) -> bool:
         """Record one read; return whether the observable state changed.
 
-        ``expected`` is the source/layout fingerprint map an own write should
-        have produced. History survives only a loaded read whose map equals
-        it (or, for a reread, equals the previous map); any other adopted map,
-        or a failed read, is an external change and clears the history.
+        ``expected`` is the fingerprint map an own write should have produced;
+        otherwise the read is reconciled against the committed ledger. A
+        loaded read whose map differs is an adopted external change: the
+        history is cleared and the change is recorded. A failed read clears
+        the history and keeps the last preview (stale) and the ledger.
         ``bump`` forces one revision change (an own write moved the history).
         """
 
-        previous = self.latest.fingerprint_map if self.latest is not None else None
+        baseline = expected if expected is not None else self.committed
+        now = _now()
         if read.loaded:
-            baseline = expected if expected is not None else previous
-            if read.fingerprint_map != baseline:
+            current = read.fingerprint_map
+            if baseline is not None and current != baseline:
                 self.history.clear()
+                self._record_external(baseline, current, now)
+            self.committed = current
         else:
             self.history.clear()
-        now = _now()
         if self.latest is not None and read.digest == self.latest.digest:
             # Same observable state: record the check, publish nothing.
             self.latest_at = now
@@ -137,6 +156,16 @@ class EditorService:
         self.snapshot_revision += 1
         return True
 
+    def _record_external(self, baseline: dict[str, str], current: dict[str, str], now: str) -> None:
+        changed = sorted(
+            path for path in set(baseline) | set(current) if baseline.get(path) != current.get(path)
+        )
+        self.external_change = {
+            "sequence": self.external_change["sequence"] + 1,
+            "at": now,
+            "documents": changed,
+        }
+
     @property
     def preview_state(self) -> str:
         if self.latest is not None and self.latest.loaded:
@@ -145,12 +174,17 @@ class EditorService:
 
     @property
     def write_pause(self) -> dict[str, Any]:
+        """The explicit write pause, orthogonal to the preview state.
+
+        Only an uncertain publication (``save_uncertain`` or a failed reread
+        after publication) pauses writes until an explicit reread loads. A
+        stale or unavailable preview is the separate ``preview_state``
+        condition; both are checked at admission.
+        """
+
         if self.uncertain is not None:
             return {"paused": True, "reason": "uncertain_durability"}
-        state = self.preview_state
-        if state == PREVIEW_CURRENT:
-            return {"paused": False, "reason": None}
-        return {"paused": True, "reason": f"{state}_preview"}
+        return {"paused": False, "reason": None}
 
     def _invalidate(self) -> None:
         """An observable change that is not a new read (pause, history)."""
@@ -191,6 +225,8 @@ class EditorService:
             "history": self.history.describe(),
             "pending_intent": self.uncertain,
             "uncertain_outcome": self.uncertain_outcome,
+            "external_change": dict(self.external_change, documents=list(self.external_change["documents"])),
+            "following": dict(self.following),
         }
 
     async def reload(self) -> bool:
@@ -205,6 +241,34 @@ class EditorService:
         if changed:
             self.broadcaster.publish("invalidate", self.status())
         return changed
+
+    async def follow(self) -> bool:
+        """Reconcile the workspace after coalesced directory notifications.
+
+        Serialized with commands and rereads under the service lock. It never
+        resolves an uncertain publication (only the explicit reread does).
+        """
+
+        async with self._lock:
+            changed = await asyncio.shield(run_in_threadpool(self.reconcile))
+        if changed:
+            self.broadcaster.publish("invalidate", self.status())
+        return changed
+
+    def reconcile(self) -> bool:
+        """One watcher reread and its reconciliation (caller holds the lock).
+
+        A candidate that does not load is read once more after the settle
+        interval before it is published as stale, so a write caught half-way
+        (truncate-then-write) does not cost the history.
+        """
+
+        read = read_workspace(self.workspace, self.config.limits)
+        if not read.loaded and self.config.settle_seconds > 0:
+            time.sleep(self.config.settle_seconds)
+            read = read_workspace(self.workspace, self.config.limits)
+        with self._state:
+            return self._adopt(read)
 
     def _resolve(self, read: WorkspaceRead) -> bool:
         changed = self._adopt(read)
@@ -257,6 +321,14 @@ class EditorService:
         pause = self.write_pause
         if pause["paused"]:
             raise CommandError(423, "write_paused", "writes are paused", reason=pause["reason"])
+        preview = self.preview_state
+        if preview != PREVIEW_CURRENT:
+            # World-data and layout writes wait for a loadable candidate;
+            # recovery is automatic on the next loadable change.
+            raise CommandError(
+                423, "write_paused", "writes are rejected while the preview is not current",
+                reason=f"{preview}_preview",
+            )
         return envelope
 
     def _current(self, document_id: str, expected: str) -> Current:
@@ -327,8 +399,8 @@ class EditorService:
 
         validate_candidate(self.workspace, self.config.limits, effect)
         result = self._publish(command, effect, before.fingerprint)
-        assert self.latest is not None
-        expected_map = dict(self.latest.fingerprint_map)
+        assert self.committed is not None
+        expected_map = dict(self.committed)
         if result == ABSENT:
             expected_map.pop(effect.relative_path, None)
         else:
@@ -345,11 +417,28 @@ class EditorService:
             ) from error
         # History, the new read and the revision change together, once.
         with self._state:
-            if direction is None:
-                self.history.record(segment, Entry(command, effect.relative_path, before, Presence(result, effect.text)))
+            actual = read.fingerprint_map
+            if read.loaded and actual.get(effect.relative_path, ABSENT) == result:
+                if actual != expected_map:
+                    # Another document changed externally meanwhile: the
+                    # segment ends there, and this guarded operation starts
+                    # the next one (a history move has nothing left to move).
+                    self.history.clear()
+                    self._record_external(expected_map, actual, _now())
+                    if direction is None:
+                        self.history.record(
+                            segment, Entry(command, effect.relative_path, before, Presence(result, effect.text))
+                        )
+                elif direction is None:
+                    self.history.record(segment, Entry(command, effect.relative_path, before, Presence(result, effect.text)))
+                else:
+                    self.history.confirm(direction)
+                self.committed = actual
+                self._adopt(read, actual, bump=True)
             else:
-                self.history.confirm(direction)
-            self._adopt(read, expected_map, bump=True)
+                # Our own document is not what we wrote (or the read failed):
+                # nothing is recorded; the reconciliation clears the history.
+                self._adopt(read, expected_map, bump=True)
         self._notify = True
         return {**self.status(), "changed": True, "document_id": effect.relative_path, "fingerprint": result}
 
@@ -465,8 +554,18 @@ def _lifespan(service: EditorService):
 
     @asynccontextmanager
     async def lifespan(app):
-        yield
-        service.broadcaster.close()
+        coordinator = None
+        if service.config.watch:
+            from .watching import WatchCoordinator
+
+            coordinator = WatchCoordinator(service)
+            coordinator.start()
+        try:
+            yield
+        finally:
+            if coordinator is not None:
+                await coordinator.stop()
+            service.broadcaster.close()
 
     return lifespan
 
