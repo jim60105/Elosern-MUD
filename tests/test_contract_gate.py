@@ -31,7 +31,7 @@ class ContractGateTests(unittest.TestCase):
         self.assertEqual(contract_gate.main(["no-such-gate"]), 2)
 
     def test_every_bundled_gate_is_selectable_and_the_contracts_are_named(self):
-        self.assertEqual(list(contract_gate.GATES), ["traceability", "observability", "test-data", "manifests", "contracts"])
+        self.assertEqual(list(contract_gate.GATES), ["reference-context", "traceability", "observability", "test-data", "manifests", "contracts"])
         self.assertIn("tests.test_evennia_test_optimization_contract", contract_gate.CONTRACT_MODULES)
         self.assertIn("tests.test_webclient_frozen_contract", contract_gate.CONTRACT_MODULES)
 
