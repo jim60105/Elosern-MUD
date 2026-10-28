@@ -26,6 +26,7 @@ from elosern_map_core import (
     decode_reference_context,
     diagnose_world,
     discover_external_sources,
+    gate_approach_cell,
     load_authoring_world,
     local_to_world_m,
     make_source_document,
@@ -340,6 +341,19 @@ def _footprint(settlement) -> dict[str, Any] | None:
     }
 
 
+def _wilderness_entry(settlement) -> dict[str, Any] | None:
+    """The authored entry, each gate with its core-computed approach cell."""
+
+    data = thaw(settlement.data.get("wilderness_entry"))
+    entry = settlement.wilderness_entry
+    if data is None or entry is None:
+        return data
+    for gate in data["gates"]:
+        cell = gate_approach_cell(entry, gate["return_direction"])
+        gate["approach_cell"] = None if cell is None else _cell(cell)
+    return data
+
+
 def _project(world, layouts: Mapping[str, dict[str, Any]]) -> dict[str, Any]:
     continent = world.continent
     terrain = continent.terrain
@@ -396,7 +410,7 @@ def _project(world, layouts: Mapping[str, dict[str, Any]]) -> dict[str, Any]:
                 },
                 "nodes": nodes,
                 "roads": roads,
-                "wilderness_entry": thaw(settlement.data.get("wilderness_entry")),
+                "wilderness_entry": _wilderness_entry(settlement),
                 "footprint": _footprint(settlement),
                 "city_gate": thaw(settlement.data.get("city_gate")),
                 "options": thaw(settlement.data.get("options")),
