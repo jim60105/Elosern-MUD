@@ -135,6 +135,18 @@ class MapEditorInteriorBrowserTest(unittest.TestCase):
         page.locator('[data-region="canvas"]').focus()
         page.keyboard.press("n")
         page.locator('[data-creation="room"]').wait_for()
+        # Selecting a room while the form is open keeps what was typed.
+        page.fill('[data-creation-field="name_zh"]', "草稿名")
+        page.click(f'[data-object="{BACK}"]')
+        self.assertEqual(page.locator('[data-creation-field="name_zh"]').input_value(), "草稿名")
+        # A cancelled form returns to 選取, and N opens it again.
+        page.click("[data-creation-cancel]")
+        self.assertEqual(page.locator('[data-creation="room"]').count(), 0)
+        page.locator('[data-region="canvas"]').focus()
+        page.keyboard.press("n")
+        page.locator('[data-creation="room"]').wait_for()
+        self.assertEqual(self.names(), [])
+        page.fill('[data-creation-field="name_zh"]', "")
         page.fill('[data-creation-field="id"]', "store")
         page.click("[data-creation-submit]")
         # The name is required: nothing is sent yet.

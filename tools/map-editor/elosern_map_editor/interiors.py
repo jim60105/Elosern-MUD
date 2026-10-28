@@ -402,10 +402,18 @@ def _check_endpoints(data: dict[str, Any], source: str, destination: str, prefix
 
 
 class _Connection(_Interior):
+    #: ``label`` names a new connection (full name rules) or looks up an
+    #: authored one, which may predate the editor's rules and must stay
+    #: editable and removable.
+    new_label = False
+
     def check_arguments(self, world, arguments):
         _identifier(arguments["source"], "source")
         _identifier(arguments["destination"], "destination")
-        _label(arguments["label"], "label")
+        if self.new_label:
+            _label(arguments["label"], "label")
+        elif not isinstance(arguments["label"], str) or not arguments["label"] or len(arguments["label"]) > 4096:
+            raise _invalid("label names an authored connection")
         self.check_connection(arguments)
 
     def check_connection(self, arguments) -> None:
@@ -414,6 +422,7 @@ class _Connection(_Interior):
 
 class CreateConnection(_Connection):
     name = "create_connection"
+    new_label = True
     keys = frozenset({"interior_id", "source", "destination", "label", "return_label"})
 
     def check_connection(self, arguments):

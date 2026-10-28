@@ -785,6 +785,9 @@ function cancelTool() {
   connectionStart.value = null;
   creation.value = null;
   toolHint.value = null;
+  // The interior tools act when chosen (房間 opens its form at once), so a
+  // cancelled form returns to 選取 and choosing the tool again reopens it.
+  if (domain.value === "interior") tool.value = "select";
 }
 
 function onCanvasMove({ id, point, settle }) {

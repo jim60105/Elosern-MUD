@@ -472,13 +472,15 @@ def check_room_identities(baseline, candidate) -> None:
     not block unrelated edits; only one this candidate introduces refuses.
     """
 
-    before = {room_id for room_id, owners in _room_owners(baseline).items() if len(owners) > 1}
+    before = _room_owners(baseline)
     rows = [
         {"code": "duplicate_room_identity", "category": "structure", "object_id": room_id,
          "message": f"room {room_id!r} would be declared by interiors {', '.join(owners)}",
          "field_path": f"rooms.{room_id}"}
         for room_id, owners in sorted(_room_owners(candidate).items())
-        if len(owners) > 1 and room_id not in before
+        # A duplicate is new when the room gains an owner beyond a baseline
+        # that already shared it (or had one owner, or none).
+        if len(owners) > 1 and not set(owners) <= set(before.get(room_id, ()))
     ]
     if rows:
         raise CommandError(

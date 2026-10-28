@@ -401,3 +401,50 @@ def test_rejected_arrangements_write_nothing(workspace, document, positions, sta
     answer = _send(editor, "arrange_interior_layout", document, {"interior_id": HALL, "positions": positions})
     assert answer[0] == status and answer[1]["error"]["code"] == code
     assert fixture.tree_digest(workspace) == before
+
+
+def test_an_authored_label_outside_the_editor_rules_stays_editable_and_removable(workspace):
+    data = _data(workspace)
+    data["connections"][0]["label"] = " in "
+    (workspace / INTERIOR).write_text(fixture.yaml_text(data), encoding="utf-8")
+    editor = Editor(workspace)
+    status, body = _send(editor, "set_connection", INTERIOR, {**_connection("front", "back", " in "),
+                                                             "value": {"source": "front", "destination": "back",
+                                                                       "label": "in"}})
+    assert status == 200, body
+    assert ("front", "back", "in") in {(c["source"], c["destination"], c["label"]) for c in _data(workspace)["connections"]}
+    data["connections"][0]["label"] = " in "
+    (workspace / INTERIOR).write_text(fixture.yaml_text(data), encoding="utf-8")
+    editor.reload()
+    status, body = _send(editor, "delete_connection", INTERIOR, _connection("front", "back", " in "))
+    assert status == 200, body
+    assert len(_data(workspace)["connections"]) == 1
+
+
+def test_a_room_shared_on_disk_cannot_gain_a_third_interior(workspace):
+    def interior(interior_id, rooms):
+        return {"version": 1, "kind": "interior", "id": interior_id, "rooms": {key: _fields() for key in rooms},
+                "connections": [], "interior_links": [], "exterior": None}
+
+    (workspace / ANNEX).write_text(fixture.yaml_text(interior("synthetic_annex", ["back"])), encoding="utf-8")
+    third = "content/maps/interiors/synthetic_third.yaml"
+    (workspace / third).write_text(fixture.yaml_text(interior("synthetic_third", ["third_room"])), encoding="utf-8")
+    editor = Editor(workspace)
+    before = fixture.tree_digest(workspace)
+    status, body = _send(editor, "create_room", third, {"interior_id": "synthetic_third", "room_id": "back",
+                                                        "fields": _fields()})
+    assert status == 422
+    assert fixture.tree_digest(workspace) == before
+
+
+def test_a_recreated_interior_shows_its_left_over_layout_positions(workspace):
+    fixture.write_reference_context(workspace)
+    editor = Editor(workspace)
+    assert _create_annex(editor)[0] == 200
+    assert _send(editor, "arrange_interior_layout", ANNEX_LAYOUT, {
+        "interior_id": "synthetic_annex", "positions": [{"room_id": "annex_lobby", "x": 7, "y": 2}]})[0] == 200
+    assert _send(editor, "delete_interior", ANNEX, {"interior_id": "synthetic_annex"})[0] == 200
+    assert _create_annex(editor)[0] == 200
+    annex = next(row for row in editor.state()["world"]["interiors"] if row["id"] == "synthetic_annex")
+    assert annex["layout_relative_path"] == ANNEX_LAYOUT
+    assert annex["rooms"][0]["layout_position"] == [7, 2]

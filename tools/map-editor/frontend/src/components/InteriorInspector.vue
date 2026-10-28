@@ -133,6 +133,16 @@ watch(
   },
   { immediate: true },
 );
+// Typed values live on in the page-owned creation request: selecting an
+// object while the form is open remounts this inspector (another instance),
+// and the form must come back as typed, not reset to its defaults.
+watch(
+  form,
+  (value) => {
+    if (props.creation?.defaults) Object.assign(props.creation.defaults, value);
+  },
+  { deep: true },
+);
 const submitted = ref(false);
 watch(() => props.creation, () => (submitted.value = false));
 const takenRoom = (id) => props.world.interiors.find((row) => row.rooms.some((item) => item.id === id)) ?? null;
