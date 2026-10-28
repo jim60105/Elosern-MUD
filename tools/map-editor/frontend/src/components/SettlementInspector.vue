@@ -56,6 +56,10 @@ const props = defineProps({
   hint: { type: String, default: null },
   // Queues one command descriptor and resolves with the service's answer.
   submit: { type: Function, required: true },
+  // Selects a reference; a plain callback because the answer can arrive
+  // after this instance unmounted (a retargeted road or a new bend changes
+  // the selected reference, which re-keys this instance).
+  choose: { type: Function, required: true },
 });
 const emit = defineEmits(["create", "cancel", "select", "follow", "drafts", "open", "delete"]);
 
@@ -168,8 +172,9 @@ const reverse = computed(() => (road.value ? findRoad(settlement.value, road.val
 function retarget(part, value) {
   const next = { source: road.value.source, destination: road.value.destination, direction: road.value.direction, [part]: value };
   if (!next.direction) return;
+  const id = settlement.value.id;
   send(setRoad(settlement.value.id, road.value.source, road.value.destination, next)).then((result) => {
-    if (result?.changed && part !== "direction") emit("select", roadRef(settlement.value.id, next.source, next.destination));
+    if (result?.changed && part !== "direction") props.choose(roadRef(id, next.source, next.destination));
   });
 }
 function setBendAxis(index, axis, value) {
@@ -179,14 +184,15 @@ function setBendAxis(index, axis, value) {
 }
 function addBend(index, before) {
   const insertion = bendInsertion(settlement.value, road.value, index, before);
+  const owner = roadRef(settlement.value.id, road.value.source, road.value.destination);
   send(insertBend(settlement.value.id, road.value.source, road.value.destination, insertion.index, insertion.point)).then((result) => {
-    if (result?.changed) emit("select", bendRef(roadRef(settlement.value.id, road.value?.source ?? single.value.source, road.value?.destination ?? single.value.destination), insertion.index));
+    if (result?.changed) props.choose(bendRef(owner, insertion.index));
   });
 }
 function dropBend(index) {
   const owner = single.value.road;
   send(removeBend(settlement.value.id, road.value.source, road.value.destination, index)).then((result) => {
-    if (result?.changed) emit("select", owner);
+    if (result?.changed) props.choose(owner);
   });
 }
 
