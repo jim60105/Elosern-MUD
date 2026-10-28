@@ -31,6 +31,7 @@ from .authoring import (
     settlement_route,
     compile_runtime,
     diagnose_world,
+    gate_approach_cell,
     load_authoring_world,
     terrain_definition,
 )
@@ -219,6 +220,7 @@ __all__ = [
     "compass_direction",
     "decode_partition",
     "diagnose_world",
+    "gate_approach_cell",
     "discover_source_documents",
     "discover_source_paths",
     "document_from_data",

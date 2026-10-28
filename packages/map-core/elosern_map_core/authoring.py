@@ -443,7 +443,7 @@ def _structural_diagnostics(
                         )
                     )
                 seen_directions.add(gate.return_direction)
-                if _approach_cell(entry, gate.return_direction) is None:
+                if gate_approach_cell(entry, gate.return_direction) is None:
                     diagnostics.append(
                         _diagnostic(
                             "invalid_gate",
@@ -582,7 +582,7 @@ def _structural_diagnostics(
     return diagnostics
 
 
-def _approach_cell(
+def gate_approach_cell(
     entry: Any,
     return_direction: str,
 ) -> tuple[int, int] | None:
@@ -679,7 +679,7 @@ def _semantic_diagnostics(world: AuthoringWorld) -> list[Diagnostic]:
         reachable_cache[settlement_id] = _reachable_nodes(settlement)
         if settlement.wilderness_entry is not None:
             for gate in settlement.wilderness_entry.gates:
-                approach = _approach_cell(
+                approach = gate_approach_cell(
                     settlement.wilderness_entry,
                     gate.return_direction,
                 )
@@ -1149,6 +1149,7 @@ __all__ = [
     "build_settlement_graph",
     "compile_runtime",
     "diagnose_world",
+    "gate_approach_cell",
     "load_authoring_world",
     "road_lengths",
     "settlement_route",
