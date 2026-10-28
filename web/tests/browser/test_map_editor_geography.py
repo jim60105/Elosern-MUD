@@ -289,6 +289,21 @@ class MapEditorGeographyBrowserTest(unittest.TestCase):
         page.click("[data-diagnostics-toggle]")
         self.assertGreaterEqual(page.locator('[data-diagnostic="unreachable_landmark"]').count(), 1)
 
+    def test_clicking_a_feature_shape_selects_it_and_shows_its_handles(self):
+        self.start()
+        page = self.open()
+        river = page.locator(f'[data-shape-ref="{RIVER}"]')
+        box = river.bounding_box()
+        # A quarter along the straight synthetic river, away from its ford.
+        page.mouse.click(box["x"] + box["width"] * 0.25, box["y"] + box["height"] / 2)
+        self.wait_for(
+            lambda: page.locator("[data-inspector-ref]").count() == 1
+            and page.locator("[data-inspector-ref]").inner_text() == RIVER,
+            "a click on the river shape did not select it",
+        )
+        self.assertEqual(page.locator('[data-kind="handle"]').count(), 2)
+        self.assertEqual(self.posts, [])
+
     def test_derived_borders_have_no_handles_at_the_large_viewport(self):
         self.start()
         page = self.open(LARGE)

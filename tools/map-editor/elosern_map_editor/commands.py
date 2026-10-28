@@ -426,6 +426,8 @@ def removed_objects(workspace: ConfinedWorkspace, limits: Limits, effect: Effect
     return tuple(sorted(_object_keys(baseline) - _object_keys(candidate)))
 
 
+# Keep _document_keys and internal_references in step: every reference kind
+# scanned below must name an object kind this function can report removed.
 def _document_keys(document) -> set[str]:
     kind = getattr(document, "kind", None)
     if kind == "locations":
@@ -497,10 +499,11 @@ def check_internal_references(world, removed: set[str]) -> None:
 
     rows = internal_references(world, removed)
     if rows:
+        named = "; ".join(f"{row['source']} {row['field_path']}" for row in rows[:3])
         raise CommandError(
             409,
             "deletion_refused",
-            "other map documents still refer to an object this operation removes",
+            f"other map documents still refer to an object this operation removes ({named})",
             guard="internal",
             internal_references=rows,
             removed=sorted(removed),

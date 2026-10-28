@@ -123,16 +123,19 @@ const pendingMarks = computed(() => (view.value ? props.pending.map((point) => a
 
 // The terrain preview as one image (painted once per snapshot), placed by
 // projecting its south-west and north-east corners.
+// Keyed on the preview object itself (stable within one snapshot), so a
+// selection change that rebuilds the scene does not re-encode the image.
+const rasterPreview = computed(() => props.scene?.raster?.preview ?? null);
 const rasterHref = computed(() => {
-  const raster = props.scene?.raster;
-  if (!raster || typeof document === "undefined") return null;
-  const { columns, rows } = raster.preview;
+  const preview = rasterPreview.value;
+  if (!preview || typeof document === "undefined") return null;
+  const { columns, rows } = preview;
   const canvas = document.createElement("canvas");
   canvas.width = columns;
   canvas.height = rows;
   const context = canvas.getContext("2d");
   if (!context) return null;
-  context.putImageData(new ImageData(previewPixels(raster.preview), columns, rows), 0, 0);
+  context.putImageData(new ImageData(previewPixels(preview), columns, rows), 0, 0);
   return canvas.toDataURL("image/png");
 });
 const rasterBox = computed(() => {
@@ -267,7 +270,10 @@ function onSurfaceClick(event) {
     emit("place", { point: unproject(view.value, frame.value, pixelOf(event)) });
     return;
   }
-  const shape = event.target.closest("[data-shape-ref]");
+  // Pointer capture may retarget the click to the host: read the element
+  // under the pointer instead of the event target.
+  const under = document.elementFromPoint?.(event.clientX, event.clientY) ?? event.target;
+  const shape = under?.closest?.("[data-shape-ref]");
   if (shape) emit("select", { ref: shape.dataset.shapeRef, toggle: Boolean(event.ctrlKey || event.metaKey), range: false });
 }
 

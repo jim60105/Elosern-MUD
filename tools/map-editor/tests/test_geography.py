@@ -443,3 +443,24 @@ def test_geography_commands_are_rejected_while_the_preview_is_stale(workspace):
         status, body = _send(editor, name, document, arguments)
         assert (status, body["error"]["code"], body["error"]["reason"]) == (423, "write_paused", "stale_preview")
     assert fixture.tree_digest(workspace) == before
+
+
+
+def test_undoing_a_creation_that_gained_a_reference_is_refused_and_keeps_history(workspace):
+    """Undo is the same guarded removal: a reference written on disk (not yet
+    adopted) refuses it, names the referrer and leaves disk and history."""
+
+    editor = Editor(workspace)
+    assert _send(editor, "create_location", LOCATIONS, NEW_LOCATION)[0] == 200
+    data = fixture.districts_data()
+    data["districts"]["synthetic_district"]["landmark"] = {
+        "domain": "location", "map_id": None, "object_id": "new_ruin", "cell": None,
+    }
+    (workspace / DISTRICTS).write_text(fixture.yaml_text(data), encoding="utf-8")
+    before = fixture.tree_digest(workspace)
+    head = editor.state()["history"]["undo"]
+    status, body = editor.undo()
+    assert (status, body["error"]["code"], body["error"]["guard"]) == (409, "deletion_refused", "internal")
+    assert DISTRICTS in body["error"]["message"]
+    assert fixture.tree_digest(workspace) == before
+    assert editor.state()["history"]["undo"] == head

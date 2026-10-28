@@ -64,8 +64,12 @@ const diagnosticsOpen = ref(false);
 const persistence = ref({ inFlight: 0, failure: null, savedAt: null, lastDocument: null });
 // Open field drafts of the layout fields and the continent inspector.
 const layoutDrafts = ref(0);
+// One counter per inspector placement: the lead-slot and record-slot
+// instances can mount and unmount in either order without overwriting the
+// other's count.
 const continentDrafts = ref(0);
-const draftCount = computed(() => layoutDrafts.value + continentDrafts.value);
+const leadDrafts = ref(0);
+const draftCount = computed(() => layoutDrafts.value + continentDrafts.value + leadDrafts.value);
 // Continent tool state: a two-click waterway start, an open creation form
 // and a hint when a tool has no target. Never persisted, never sent.
 const pendingStart = ref(null);
@@ -1005,7 +1009,7 @@ async function onChip(key) {
           @cancel="cancelTool"
           @select="(ref) => (selection = [ref])"
           @follow="follow"
-          @drafts="continentDrafts = $event"
+          @drafts="leadDrafts = $event"
         />
         </template>
         <template v-if="selectedRoom">

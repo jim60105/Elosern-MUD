@@ -81,7 +81,8 @@
         "web.tests.browser.test_browser_creation_viewport_pointer.PointerCreationJourneys.test_pointer_click_on_submit_emits_exactly_one_custom_save",
         "web.tests.browser.test_browser_party_acceptance.PartyAcceptanceBrowserTest.test_cancelled_exit_keeps_the_whole_draft_and_a_committed_exit_settles_once",
         "web.tests.browser.test_browser_party_acceptance.PartyAcceptanceBrowserTest.test_member_journey_commands_a_companion_skill_and_item_and_revises_a_choice",
-        "web.tests.browser.test_browser_party_acceptance.PartyAcceptanceBrowserTest.test_unfinished_draft_survives_reconnect_without_replaying_intent"
+        "web.tests.browser.test_browser_party_acceptance.PartyAcceptanceBrowserTest.test_unfinished_draft_survives_reconnect_without_replaying_intent",
+        "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_clicking_a_feature_shape_selects_it_and_shows_its_handles"
       ]
     },
     {
