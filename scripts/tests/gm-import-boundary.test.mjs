@@ -75,6 +75,8 @@ test("allowed token and font imports pass in every spelling", () => {
 const FORBIDDEN = {
   "game component (JS import)": ["web/admin-app/a.js", 'import TopBar from "../webclient-app/components/TopBar.vue";'],
   "app-shell stylesheet": ["web/admin-app/a.js", 'import "../webclient-app/styles/app-shell.css";'],
+  // The editor's wider allowlist is opt-in; the GM default stays tokens/fonts.
+  "ui-scale library (editor-only allowance)": ["web/admin-app/a.js", 'import "../webclient-app/lib/ui_scale.js";'],
   "alternate relative path": ["web/admin-app/lib/a.js", 'import "../../admin-app/../webclient-app/styles/./app-shell.css";'],
   "alias to a non-token file": ["web/admin-app/a.js", 'import "@elosern/styles/app-shell.css";'],
   "alias escaping the styles dir": ["web/admin-app/a.js", 'import "@elosern/styles/../stores/game.js";'],

@@ -1,0 +1,7 @@
+# The editor frontend is its own pnpm workspace root with its own lock, so its
+# dependencies install independently of the game's root workspace.
+packages:
+  - "."
+
+allowBuilds:
+  esbuild: true

@@ -60,6 +60,12 @@ jobs:
         working-directory: packages/map-core
         run: uv run --locked --extra generation python -m pytest tests
 
+      - name: Run map-editor service tests
+        # The standalone editor service keeps its own project and lock and must
+        # run without Evennia, Django or the game's dependency set.
+        working-directory: tools/map-editor
+        run: uv run --locked python -m pytest tests
+
       - name: Validate map reference context freshness
         run: uv run --locked python -m tools.map_reference_context --check
 
@@ -201,6 +207,10 @@ jobs:
           npm install --global pnpm@12.5.1
           (cd w-a && pnpm install --frozen-lockfile && pnpm run build && pnpm run build:gm)
           (cd w-b && pnpm install --frozen-lockfile && pnpm run build && pnpm run build:gm)
+          # The standalone map editor frontend has its own pnpm workspace/lock;
+          # its browser tests serve this dist from the editor service.
+          (cd w-a/tools/map-editor/frontend && pnpm install --frozen-lockfile && pnpm run build)
+          (cd w-b/tools/map-editor/frontend && pnpm install --frozen-lockfile && pnpm run build)
 
       - name: Install Chromium for browser acceptance
         run: uv run --locked playwright install --with-deps chromium
@@ -308,6 +318,18 @@ jobs:
       - name: Run map-view primitive tests
         run: pnpm run test:map-view
 
+      - name: Install standalone map editor frontend
+        run: pnpm --dir tools/map-editor/frontend install --frozen-lockfile
+
+      - name: Check map editor import boundary
+        run: pnpm --dir tools/map-editor/frontend run test:boundary
+
+      - name: Run map editor frontend tests
+        run: pnpm --dir tools/map-editor/frontend test
+
+      - name: Build map editor frontend with Vite
+        run: pnpm --dir tools/map-editor/frontend run build
+
       - name: Build Storybook component showcase
         run: pnpm run build-storybook
 
@@ -320,6 +342,7 @@ jobs:
           test -s web/static/webclient/app/dist/index.css
           test -s web/static/gm/dist/index.js
           test -s web/static/gm/dist/index.css
+          test -s tools/map-editor/frontend/dist/index.html
 
   top-level:
     needs: preflight

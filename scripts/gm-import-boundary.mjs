@@ -24,18 +24,23 @@ export const GAME_ROOTS = Object.freeze(["web/webclient-app", "web/static/webcli
 // Allowed game-tree files, relative to web/webclient-app (anchored).
 export const ALLOWED_GAME_FILES = Object.freeze([/^styles\/tokens\.css$/, /^styles\/fonts[A-Za-z0-9_-]*\.css$/]);
 
+// The source files a scan covers (exported so a caller can report coverage).
+export function listScannedSources(dir, ignoreDirs = ["node_modules"]) {
+  return listSources(dir, ignoreDirs);
+}
+
 function extensionOf(file) {
   const index = file.lastIndexOf(".");
   return index === -1 ? "" : file.slice(index);
 }
 
-function listSources(dir) {
+function listSources(dir, ignoreDirs = ["node_modules"]) {
   const out = [];
   for (const entry of readdirSync(dir)) {
-    if (entry === "node_modules" || entry.startsWith(".")) continue;
+    if (ignoreDirs.includes(entry) || entry.startsWith(".")) continue;
     const path = join(dir, entry);
     const stat = statSync(path);
-    if (stat.isDirectory()) out.push(...listSources(path));
+    if (stat.isDirectory()) out.push(...listSources(path, ignoreDirs));
     else if (SOURCE_EXTENSIONS.has(extensionOf(entry))) out.push(path);
   }
   return out.sort();
@@ -141,24 +146,35 @@ function within(path, root) {
   return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
 }
 
-export function checkResolved(resolved, { repoRoot }) {
+export function checkResolved(resolved, { repoRoot, allowedGameFiles = ALLOWED_GAME_FILES }) {
   const gameApp = normalize(join(repoRoot, "web/webclient-app"));
   for (const root of GAME_ROOTS) {
     const absRoot = normalize(join(repoRoot, root));
     if (!within(resolved, absRoot)) continue;
     if (absRoot === gameApp) {
       const rel = relative(gameApp, resolved).split(sep).join("/");
-      if (ALLOWED_GAME_FILES.some((pattern) => pattern.test(rel))) return true;
+      if (allowedGameFiles.some((pattern) => pattern.test(rel))) return true;
     }
     return false;
   }
   return true;
 }
 
-export function scanBoundary({ appRoot, repoRoot, aliases }) {
+// `allowedGameFiles` (anchored patterns relative to web/webclient-app)
+// defaults to the GM allowlist; another independent app (the standalone map
+// editor) reuses the same scanner with its own exact allowlist. `ignoreDirs`
+// names directories (by entry name) that hold no authored source, such as a
+// build output inside the app root.
+export function scanBoundary({
+  appRoot,
+  repoRoot,
+  aliases,
+  allowedGameFiles = ALLOWED_GAME_FILES,
+  ignoreDirs = ["node_modules"],
+}) {
   const violations = [];
   const realRepo = normalize(repoRoot);
-  for (const file of listSources(appRoot)) {
+  for (const file of listSources(appRoot, ignoreDirs)) {
     const source = readFileSync(file, "utf-8");
     const from = relative(realRepo, normalize(file)).split(sep).join("/");
     for (const { specifier, kind } of extractReferences(file, source)) {
@@ -169,7 +185,7 @@ export function scanBoundary({ appRoot, repoRoot, aliases }) {
       if (!specifier || isExternal(specifier)) continue;
       const resolved = resolveSpecifier(specifier, file, { repoRoot: realRepo, aliases });
       if (resolved === null) continue;
-      if (!checkResolved(resolved, { repoRoot: realRepo })) {
+      if (!checkResolved(resolved, { repoRoot: realRepo, allowedGameFiles })) {
         violations.push({
           source: from,
           specifier,
