@@ -94,11 +94,10 @@ export function createCommandClient({
     state.inFlight += 1;
     emit();
     const task = tail.then(async () => {
+      let payload = null;
       try {
         if (ticket !== generation) return null; // dropped after an earlier failure
-        const payload = await run(build);
-        await refetch();
-        return payload;
+        payload = await run(build);
       } catch (error) {
         generation += 1;
         state.failure = error.failure ?? {
@@ -107,12 +106,17 @@ export function createCommandClient({
           message: String(error?.message ?? error),
           documentId: null,
         };
-        await refetch();
-        return null;
-      } finally {
-        state.inFlight -= 1;
-        emit();
       }
+      try {
+        // A refetch problem is the workspace client's to report; it never
+        // turns an acknowledged command into a failure.
+        await refetch();
+      } catch {
+        // The workspace client records its own fetch error state.
+      }
+      state.inFlight -= 1;
+      emit();
+      return payload;
     });
     tail = task;
     return task;

@@ -244,6 +244,17 @@ def test_a_publication_error_is_classified_by_errno(workspace, error, code):
     assert editor.state()["write_pause"]["paused"] is (code == "save_uncertain")
 
 
+def test_a_filesystem_without_hard_links_still_creates_exclusively(workspace):
+    faults = Faults()
+    faults.armed["publish"] = OSError(errno.EPERM, "Operation not permitted")
+    editor = Editor(workspace, fault=faults)
+    status, body = editor.move("back", 1, 1)
+    assert status == 200, body
+    assert body["fingerprint"] == sha(workspace / LAYOUT)
+    assert _no_temporaries(workspace)
+    assert editor.positions()["back"] == [1, 1]
+
+
 def test_uncertain_durability_pauses_until_a_reread_without_retrying(workspace):
     faults = Faults()
     editor = Editor(workspace, fault=faults)
@@ -284,6 +295,33 @@ def test_a_reread_that_does_not_load_keeps_the_uncertain_pause(workspace):
     (workspace / INTERIOR).write_text(fixture.yaml_text(fixture.interior_data()), encoding="utf-8")
     editor.reload()
     assert editor.state()["write_pause"]["paused"] is False
+
+
+def test_a_failed_reread_after_publication_pauses_with_one_revision_step(workspace, monkeypatch):
+    from elosern_map_editor import app as app_module
+
+    editor = Editor(workspace)
+    revision = editor.state()["snapshot_revision"]
+    assert editor.move("back", 1, 1)[0] == 200
+    # One own write is exactly one revision step.
+    assert editor.state()["snapshot_revision"] == revision + 1
+    real = app_module.read_workspace
+
+    def broken(*args):
+        raise OSError(errno.EIO, "I/O error")
+
+    monkeypatch.setattr(app_module, "read_workspace", broken)
+    status, body = editor.move("back", 2, 2)
+    assert (status, body["error"]["code"]) == (500, "reread_failed")
+    monkeypatch.setattr(app_module, "read_workspace", real)
+    state = editor.state()
+    assert state["write_pause"]["reason"] == "uncertain_durability"
+    assert editor.move("back", 3, 3)[1]["error"]["code"] == "write_paused"
+    editor.reload()
+    state = editor.state()
+    assert state["uncertain_outcome"]["landed"] == "intended"
+    assert state["write_pause"]["paused"] is False
+    assert editor.positions()["back"] == [2, 2]
 
 
 def test_leftover_temporary_names_are_never_discovered(workspace):

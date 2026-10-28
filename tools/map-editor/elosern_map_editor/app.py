@@ -18,6 +18,7 @@ account route, and no handoff/resume/return route.
 from __future__ import annotations
 
 import asyncio
+import threading
 import json
 import secrets
 import uuid
@@ -85,6 +86,9 @@ class EditorService:
         self.session = Session.create()
         self.broadcaster = Broadcaster()
         self._lock = asyncio.Lock()
+        #: Guards the observable state (read, history, pause, revision) so a
+        #: concurrent GET never sees a half-applied command.
+        self._state = threading.RLock()
         self.writer = DocumentWriter(self.workspace, config.limits.max_document_bytes, fault=fault)
         self.history = History()
         #: The pending intent of a publication whose durability is unknown;
@@ -101,13 +105,16 @@ class EditorService:
         self._adopt(read_workspace(self.workspace, config.limits))
 
     # -- state -----------------------------------------------------------
-    def _adopt(self, read: WorkspaceRead, expected: dict[str, str] | None = None) -> bool:
+    def _adopt(
+        self, read: WorkspaceRead, expected: dict[str, str] | None = None, *, bump: bool = False
+    ) -> bool:
         """Record one read; return whether the observable state changed.
 
         ``expected`` is the source/layout fingerprint map an own write should
         have produced. History survives only a loaded read whose map equals
         it (or, for a reread, equals the previous map); any other adopted map,
         or a failed read, is an external change and clears the history.
+        ``bump`` forces one revision change (an own write moved the history).
         """
 
         previous = self.latest.fingerprint_map if self.latest is not None else None
@@ -121,7 +128,9 @@ class EditorService:
         if self.latest is not None and read.digest == self.latest.digest:
             # Same observable state: record the check, publish nothing.
             self.latest_at = now
-            return False
+            if bump:
+                self.snapshot_revision += 1
+            return bump
         self.latest, self.latest_at = read, now
         if read.loaded:
             self.published, self.published_at = read, now
@@ -149,13 +158,18 @@ class EditorService:
         self.snapshot_revision += 1
 
     def status(self) -> dict[str, Any]:
-        return {
-            "session_generation": self.session.generation,
-            "snapshot_revision": self.snapshot_revision,
-            "preview_state": self.preview_state,
-        }
+        with self._state:
+            return {
+                "session_generation": self.session.generation,
+                "snapshot_revision": self.snapshot_revision,
+                "preview_state": self.preview_state,
+            }
 
     def workspace_state(self) -> dict[str, Any]:
+        with self._state:
+            return self._workspace_state()
+
+    def _workspace_state(self) -> dict[str, Any]:
         latest = self.latest
         published = self.published
         assert latest is not None
@@ -186,26 +200,31 @@ class EditorService:
             read = await asyncio.shield(
                 run_in_threadpool(read_workspace, self.workspace, self.config.limits)
             )
-            changed = self._adopt(read)
-            if self.uncertain is not None and read.loaded:
-                # Only a loadable reread resolves an uncertain publication. It
-                # reports what is on disk; it never claims a save, and the
-                # history of the interrupted segment is not kept.
-                intent = self.uncertain
-                found = read.fingerprint_map.get(intent["document_id"], ABSENT)
-                if found == intent["intended_fingerprint"]:
-                    landed = "intended"
-                elif found == intent["baseline_fingerprint"]:
-                    landed = "baseline"
-                else:
-                    landed = "other"
-                self.uncertain = None
-                self.uncertain_outcome = {**intent, "found_fingerprint": found, "landed": landed}
-                self.history.clear()
-                self._invalidate()
-                changed = True
+            with self._state:
+                changed = self._resolve(read)
         if changed:
             self.broadcaster.publish("invalidate", self.status())
+        return changed
+
+    def _resolve(self, read: WorkspaceRead) -> bool:
+        changed = self._adopt(read)
+        if self.uncertain is not None and read.loaded:
+            # Only a loadable reread resolves an uncertain publication. It
+            # reports what is on disk; it never claims a save, and the
+            # history of the interrupted segment is not kept.
+            intent = self.uncertain
+            found = read.fingerprint_map.get(intent["document_id"], ABSENT)
+            if found == intent["intended_fingerprint"]:
+                landed = "intended"
+            elif found == intent["baseline_fingerprint"]:
+                landed = "baseline"
+            else:
+                landed = "other"
+            self.uncertain = None
+            self.uncertain_outcome = {**intent, "found_fingerprint": found, "landed": landed}
+            self.history.clear()
+            self._invalidate()
+            changed = True
         return changed
 
     # -- commands --------------------------------------------------------
@@ -308,37 +327,52 @@ class EditorService:
 
         validate_candidate(self.workspace, self.config.limits, effect)
         result = self._publish(command, effect, before.fingerprint)
-        if direction is None:
-            self.history.record(segment, Entry(command, effect.relative_path, before, Presence(result, effect.text)))
-        else:
-            self.history.confirm(direction)
         assert self.latest is not None
         expected_map = dict(self.latest.fingerprint_map)
         if result == ABSENT:
             expected_map.pop(effect.relative_path, None)
         else:
             expected_map[effect.relative_path] = result
-        self._adopt(read_workspace(self.workspace, self.config.limits), expected_map)
-        # A history move is observable even when the reread equals a former state.
-        self._invalidate()
+        try:
+            read = read_workspace(self.workspace, self.config.limits)
+        except Exception as error:
+            # Published, but the service cannot see what it now holds: stop
+            # writing and require a reread instead of trusting stale state.
+            self._pause(command, effect, before.fingerprint, f"the reread after publication failed: {error}")
+            raise CommandError(
+                500, "reread_failed", "the document was written but could not be reread; reread before writing",
+                document_id=effect.relative_path,
+            ) from error
+        # History, the new read and the revision change together, once.
+        with self._state:
+            if direction is None:
+                self.history.record(segment, Entry(command, effect.relative_path, before, Presence(result, effect.text)))
+            else:
+                self.history.confirm(direction)
+            self._adopt(read, expected_map, bump=True)
         self._notify = True
         return {**self.status(), "changed": True, "document_id": effect.relative_path, "fingerprint": result}
+
+    def _pause(self, command: str, effect: Effect, baseline: str, reason: str) -> None:
+        with self._state:
+            self.uncertain = {
+                "command": command,
+                "document_id": effect.relative_path,
+                "action": effect.action,
+                "baseline_fingerprint": baseline,
+                "intended_fingerprint": effect.result,
+                "reason": reason,
+            }
+            self.uncertain_outcome = None
+            # The stacks stay as they were; the resolving reread clears them.
+            self._invalidate()
+        self._notify = True
 
     def _publish(self, command: str, effect: Effect, expected: str) -> str:
         try:
             return self.writer.publish(effect, expected)
         except SaveUncertain as error:
-            self.uncertain = {
-                "command": command,
-                "document_id": effect.relative_path,
-                "action": effect.action,
-                "baseline_fingerprint": expected,
-                "intended_fingerprint": effect.result,
-                "reason": str(error),
-            }
-            self.uncertain_outcome = None
-            self._invalidate()
-            self._notify = True
+            self._pause(command, effect, expected, str(error))
             raise CommandError(500, "save_uncertain", str(error), document_id=effect.relative_path) from error
         except StaleDocument as error:
             raise CommandError(409, "stale_document", str(error), document_id=effect.relative_path) from error

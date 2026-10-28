@@ -86,10 +86,7 @@ class MapEditorPersistenceBrowserTest(unittest.TestCase):
         return page
 
     def settle(self, page) -> None:
-        page.wait_for_function(
-            "() => !document.querySelector('[data-chip=\"save\"].chip--busy')", timeout=15000
-        )
-        page.wait_for_timeout(200)
+        # The client stays busy until the answer and its refetch are in.
         page.wait_for_function(
             "() => !document.querySelector('[data-chip=\"save\"].chip--busy')", timeout=15000
         )
@@ -109,6 +106,9 @@ class MapEditorPersistenceBrowserTest(unittest.TestCase):
         state = self.editor.workspace_state()
         rooms = state["world"]["interiors"][0]["rooms"]
         return {room["id"]: room["layout_position"] for room in rooms}
+
+    def names(self) -> list[str]:
+        return [url.rsplit("/", 1)[1] for url in self.posts]
 
     def back(self):
         """The saved layout position of the dragged room, or None (yet)."""
@@ -158,16 +158,15 @@ class MapEditorPersistenceBrowserTest(unittest.TestCase):
     def test_escape_cancels_a_drag_and_shift_arrow_nudges_one_step_per_press(self):
         page = self.open()
         self.drag(page, BACK, 260, 0, cancel=True)
-        self.page.wait_for_timeout(500)
-        self.assertFalse(self.layout.exists())
-        self.assertEqual(self.posts, [])
         page.click(f'[data-object="{BACK}"]')
         page.keyboard.press("Shift+ArrowRight")
         page.keyboard.press("Shift+ArrowRight")
         page.keyboard.press("Shift+ArrowDown")
         self.wait_for(lambda: self.back() == [3, 1], "three nudges were not saved")
         self.settle(page)
-        self.assertEqual(len(self.posts), 3)
+        # Commands are strictly ordered: exactly the three nudges were sent,
+        # so the cancelled drag sent nothing before them.
+        self.assertEqual(self.names(), ["move_interior_layout"] * 3)
         history = self.editor.workspace_state()["history"]
         self.assertIsNotNone(history["undo"])
         page.keyboard.press("Control+z")
@@ -187,9 +186,6 @@ class MapEditorPersistenceBrowserTest(unittest.TestCase):
         self.assertEqual(field.get_attribute("aria-invalid"), "true")
         # Save flushes accepted work only; it never forces the draft.
         field.press("Control+s")
-        self.page.wait_for_timeout(500)
-        self.assertFalse(self.layout.exists())
-        self.assertEqual(self.posts, [])
         field.press("Escape")
         self.assertEqual(field.input_value(), saved_value)
         self.assertIsNone(field.get_attribute("data-draft"))
@@ -197,8 +193,11 @@ class MapEditorPersistenceBrowserTest(unittest.TestCase):
         self.assertEqual(page.locator('[data-layout-fields]').count(), 1)
         field.fill("4")
         field.press("Tab")
-        self.wait_for(lambda: (self.back() or [None])[0] == 4, "a blurred complete draft was not saved")
-        self.assertEqual(len(self.posts), 1)
+        self.wait_for(lambda: self.back() == [4, 0], "a blurred complete draft was not saved")
+        self.settle(page)
+        # Only the confirmed value was ever sent: neither Enter on the
+        # incomplete draft nor Save submitted it.
+        self.assertEqual(self.names(), ["move_interior_layout"])
 
     def test_a_refreshed_page_does_not_inherit_undo_history(self):
         page = self.open()
@@ -211,9 +210,14 @@ class MapEditorPersistenceBrowserTest(unittest.TestCase):
         page.wait_for_selector('[data-preview-state="current"]', timeout=15000)
         self.posts.clear()
         page.keyboard.press("Control+z")
-        self.page.wait_for_timeout(500)
-        self.assertEqual(self.posts, [])
-        self.assertEqual(hashlib.sha256(self.layout.read_bytes()).hexdigest(), saved)
+        # A later command proves the undo key sent nothing before it.
+        page.click('[data-domain-tab="interior"]')
+        page.click(f'[data-object="{BACK}"]')
+        page.keyboard.press("Shift+ArrowRight")
+        self.wait_for(lambda: self.back() == [3, 0], "the post-refresh nudge was not saved")
+        self.settle(page)
+        self.assertEqual(self.names(), ["move_interior_layout"])
+        self.assertNotEqual(hashlib.sha256(self.layout.read_bytes()).hexdigest(), saved)
 
     def test_a_failed_save_is_reported_with_the_baseline_intact_and_no_retry(self):
         if hasattr(os, "geteuid") and os.geteuid() == 0:
@@ -229,13 +233,13 @@ class MapEditorPersistenceBrowserTest(unittest.TestCase):
         page.keyboard.press("Shift+ArrowRight")
         page.wait_for_selector('[data-banner="save-failed"]', timeout=15000)
         self.assertEqual(page.locator('[data-chip="save"].chip--seal').count(), 1)
-        self.page.wait_for_timeout(500)
+        self.settle(page)
         self.assertEqual(self.layout.read_bytes(), first)
-        self.assertEqual(len(self.posts), 2)
         self.layout.parent.chmod(0o755)
         page.click('[data-banner-action="reload"]')
         page.wait_for_function("() => !document.querySelector('[data-banner]')", timeout=15000)
-        self.assertEqual(self.posts[-1].rsplit("/", 1)[1], "reload")
+        # No automatic retry happened between the failure and the reread.
+        self.assertEqual(self.names(), ["move_interior_layout", "move_interior_layout", "reload"])
         self.assertEqual(self.stored()["back"], [2, 0])
 
 

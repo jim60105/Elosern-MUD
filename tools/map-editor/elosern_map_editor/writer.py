@@ -299,6 +299,9 @@ class DocumentWriter:
             finally:
                 os.close(fd)
         except OSError as error:
+            # Do not leave a truncated document behind; whether even that
+            # removal is durable is unknown, so the outcome stays uncertain.
+            _discard(parent, name)
             raise SaveUncertain(f"the document was partly created: {error.strerror}", path) from error
 
 

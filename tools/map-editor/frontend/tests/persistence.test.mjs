@@ -143,6 +143,28 @@ test("undo and redo send the head of this page's own segment only", async () => 
   assert.equal(posts.length, 1);
 });
 
+test("a refetch problem never turns an acknowledged command into a failure", async () => {
+  const posts = [];
+  const workspace = { session_generation: "s1", snapshot_revision: 1, world: { layouts: [] }, history: {} };
+  const client = createCommandClient({
+    fetchImpl: async (url, options = {}) => {
+      if (url === "/api/session") return { ok: true, json: async () => ({ token: "t", session_generation: "s1" }) };
+      posts.push(url);
+      return { ok: true, status: 200, json: async () => ({ changed: true, document_id: "d" }) };
+    },
+    getWorkspace: () => workspace,
+    refetch: async () => {
+      throw new Error("offline");
+    },
+    segment: "seg",
+  });
+  const payload = await client.submit(move(1));
+  assert.equal(payload.changed, true);
+  assert.equal(client.state().failure, null);
+  assert.equal(client.state().inFlight, 0);
+  assert.equal(posts.length, 1);
+});
+
 test("a no-op build sends nothing and an explicit reread clears the failure", async () => {
   const { client, posts } = service([{ status: 409, body: { error: { code: "stale_document", message: "changed" } } }]);
   await client.submit(() => null);

@@ -109,7 +109,8 @@ rereads are strictly serial:
    (`validation_failed`, 422, with file/field/line diagnostics). An
    object-removing effect must also pass the execution-time external-reference
    guard of §8 (`deletion_refused`, 409, with the reasons);
-7. publication (§3.3): `save_failed` or `save_uncertain` (500).
+7. publication (§3.3): `save_failed`, `save_uncertain` or `reread_failed`
+   (500).
 
 Clients never name a file operation. Each named handler returns exactly one
 internal create, replace or remove effect for its owning document:
@@ -134,6 +135,8 @@ completed operation is one command and one history entry. Keystrokes stay
 drafts: an incomplete value keeps the draft with an inline error and writes
 nothing. Escape restores the saved value, and Escape during a drag cancels it.
 Save (Ctrl/⌘+S) waits for accepted operations and never forces a draft.
+A complete draft is confirmed whenever the field loses focus, so clicking
+elsewhere saves it; an incomplete draft is never written by any path.
 Leaving the page with a draft or a pending save asks for confirmation. Drafts
 are never restored.
 
@@ -175,11 +178,16 @@ refused. Generated artifacts are never writable.
 | Flush the parent directory | failure: `save_uncertain` |
 
 A filesystem without hard links falls back to an exclusive create of the
-target, and a failure after that has begun is uncertain. A temporary name is
+target, and a failure after that has begun is uncertain (the partial file is
+removed when possible). Directories created for a failed or rejected create
+stay empty and are never discovered as documents. A temporary name is
 never discovered as a document, because it does not end in `.yaml`.
 
 `save_uncertain` pauses every command (`write_pause.reason` is
-`uncertain_durability`). The workspace state then carries `pending_intent`:
+`uncertain_durability`). So does `reread_failed`: the publication succeeded
+but the service's own reread afterwards raised, so it no longer knows what it
+holds. A successful command changes `snapshot_revision` exactly once, with
+its history move and new read applied together. The workspace state then carries `pending_intent`:
 the command, document, baseline and intended fingerprints. Nothing is retried.
 The banner's 重新讀取 action (`POST /api/reload`) clears the pause only when
 the reread loads. That reread clears the history and records in
