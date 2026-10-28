@@ -20,6 +20,8 @@ from pathlib import Path
 
 from ruamel.yaml import YAML
 
+from tools.spec_traceability import covers_requirement
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EDITOR_TESTS = REPO_ROOT / "tools" / "map-editor" / "tests"
 
@@ -88,6 +90,7 @@ class InteriorProcessTests(unittest.TestCase):
     def data(self, document=INTERIOR):
         return YAML(typ="safe", pure=True).load((self.workspace / document).read_text(encoding="utf-8"))
 
+    @covers_requirement("map-editor-interiors::interior-editing-keeps-topology-separate-from-presentation-layout")
     def test_a_standalone_interior_and_room_write_only_their_document(self):
         editor = self.start()
         before = synthetic.tree_digest(self.workspace)
@@ -108,6 +111,7 @@ class InteriorProcessTests(unittest.TestCase):
         self.assertEqual([room["id"] for room in rooms], ["annex_lobby", "annex_store"])
         self.assertTrue(all(room["layout_position"] is None for room in rooms))
 
+    @covers_requirement("map-editor-interiors::interior-editing-keeps-topology-separate-from-presentation-layout")
     def test_a_duplicated_room_has_a_new_identity_and_no_relationship(self):
         editor = self.start()
         connections = self.data()["connections"]
@@ -127,6 +131,7 @@ class InteriorProcessTests(unittest.TestCase):
         self.assertEqual(status, 422)
         self.assertEqual(self.changed(before), set())
 
+    @covers_requirement("map-editor-interiors::interior-editing-keeps-topology-separate-from-presentation-layout")
     def test_an_existing_service_room_keeps_its_identity_when_its_prose_changes(self):
         key = f"interior_room:{HALL}:back"
         synthetic.write_reference_context(self.workspace, incoming={key: [{
@@ -149,6 +154,7 @@ class InteriorProcessTests(unittest.TestCase):
         self.assertEqual(status, 409)
         self.assertEqual(self.changed(before), set())
 
+    @covers_requirement("map-editor-interiors::interior-editing-keeps-topology-separate-from-presentation-layout")
     def test_layout_operations_leave_the_world_and_its_routes_unchanged(self):
         editor = self.start()
         state = editor.workspace_state()
