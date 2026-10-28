@@ -25,6 +25,8 @@ import time
 import unittest
 from pathlib import Path
 
+from tools.spec_traceability import covers_requirement
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EDITOR_TESTS = REPO_ROOT / "tools" / "map-editor" / "tests"
 
@@ -118,6 +120,8 @@ class PartitionJobProcessTests(unittest.TestCase):
             arguments={"location_id": synthetic.LOCATION_ID, "field": "display_name_zh", "value": value},
         )
 
+    @covers_requirement("map-editor-generation::explicit-generation-isolates-inputs-and-guards-publication")
+    @covers_requirement("map-editor-generation::partition-status-distinguishes-source-persistence-from-output-freshness")
     def test_unchanged_input_publishes_the_core_output_and_an_edit_only_marks_it_stale(self):
         workspace = synthetic.write_partitionable_workspace(self.root / "workspace")
         editor = self.start(workspace)
@@ -142,6 +146,7 @@ class PartitionJobProcessTests(unittest.TestCase):
             state["partition_status"]["input_signature"], state["partition_status"]["expected_signature"]
         )
 
+    @covers_requirement("map-editor-generation::explicit-generation-isolates-inputs-and-guards-publication")
     def test_browsing_then_cancelling_keeps_the_last_output_and_admits_nothing_else(self):
         workspace = synthetic.write_slow_partition_workspace(self.root / "workspace")
         prior = _sentinel(workspace)
@@ -167,6 +172,7 @@ class PartitionJobProcessTests(unittest.TestCase):
         # The world is writable again once the job ended.
         self.assertEqual(self.location_edit(editor, "改名城")[0], 200)
 
+    @covers_requirement("map-editor-generation::explicit-generation-isolates-inputs-and-guards-publication")
     def test_an_external_source_replace_during_generation_prevents_current_publication(self):
         workspace = synthetic.write_slow_partition_workspace(self.root / "workspace")
         prior = _sentinel(workspace)
