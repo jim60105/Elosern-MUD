@@ -196,7 +196,7 @@ class WatchCoordinator:
         delay = self._retry
         while True:
             try:
-                await self._watch(self.plan())
+                await self._watch(await asyncio.to_thread(self.plan))
                 delay = self._retry  # a plan change: restart at once
             except asyncio.CancelledError:
                 raise
@@ -251,11 +251,17 @@ class WatchCoordinator:
                     if task.done():
                         task.result()  # re-raises the watcher's failure
                 trigger.clear()
-                await self.service.follow()
+                try:
+                    await self.service.follow()
+                except Exception as error:  # noqa: BLE001 - reported; the next batch rereads
+                    # A failed reread is not a watcher failure: keep watching.
+                    self._status(error=f"reconcile failed: {type(error).__name__}: {error}")
+                    continue
                 with self.service._state:
                     self.service.following["batches"] += 1
                     self.service.following.update(active=True, error=None)
-                if self.plan() != plan:
+                # Plan computation reads the reference context: off the loop.
+                if await asyncio.to_thread(self.plan) != plan:
                     return
         finally:
             stop.set()

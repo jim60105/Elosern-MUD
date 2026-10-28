@@ -134,7 +134,7 @@ class EditorService:
         ``bump`` forces one revision change (an own write moved the history).
         """
 
-        baseline = expected if expected is not None else self.committed
+        baseline = expected if expected is not None else self._ledger(read)
         now = _now()
         if read.loaded:
             current = read.fingerprint_map
@@ -155,6 +155,27 @@ class EditorService:
             self.published, self.published_at = read, now
         self.snapshot_revision += 1
         return True
+
+    def _ledger(self, read: WorkspaceRead) -> dict[str, str] | None:
+        """The committed ledger, accepting either outcome of an uncertain write.
+
+        While a publication is uncertain, its document may hold the intended
+        or the baseline presence; both are the service's own output.
+        """
+
+        intent = self.uncertain
+        if intent is None or self.committed is None or not read.loaded:
+            return self.committed
+        document = intent["document_id"]
+        found = read.fingerprint_map.get(document, ABSENT)
+        if found not in (intent["intended_fingerprint"], intent["baseline_fingerprint"]):
+            return self.committed
+        ledger = dict(self.committed)
+        if found == ABSENT:
+            ledger.pop(document, None)
+        else:
+            ledger[document] = found
+        return ledger
 
     def _record_external(self, baseline: dict[str, str], current: dict[str, str], now: str) -> None:
         changed = sorted(
@@ -233,9 +254,7 @@ class EditorService:
         async with self._lock:
             # Shielded: a cancelled request cannot release the lock while its
             # worker thread is still reading, so rereads stay strictly serial.
-            read = await asyncio.shield(
-                run_in_threadpool(read_workspace, self.workspace, self.config.limits)
-            )
+            read = await _finish(run_in_threadpool(read_workspace, self.workspace, self.config.limits))
             with self._state:
                 changed = self._resolve(read)
         if changed:
@@ -250,7 +269,7 @@ class EditorService:
         """
 
         async with self._lock:
-            changed = await asyncio.shield(run_in_threadpool(self.reconcile))
+            changed = await _finish(run_in_threadpool(self.reconcile))
         if changed:
             self.broadcaster.publish("invalidate", self.status())
         return changed
@@ -297,7 +316,7 @@ class EditorService:
             try:
                 # Shielded like the reread: a cancelled request cannot release
                 # the lock while its worker thread may still be publishing.
-                return await asyncio.shield(run_in_threadpool(self._execute, name, raw))
+                return await _finish(run_in_threadpool(self._execute, name, raw))
             finally:
                 if self._notify:
                     self._notify = False
@@ -410,6 +429,9 @@ class EditorService:
         except Exception as error:
             # Published, but the service cannot see what it now holds: stop
             # writing and require a reread instead of trusting stale state.
+            # The write itself published: the ledger includes it.
+            with self._state:
+                self.committed = expected_map
             self._pause(command, effect, before.fingerprint, f"the reread after publication failed: {error}")
             raise CommandError(
                 500, "reread_failed", "the document was written but could not be reread; reread before writing",
@@ -436,7 +458,10 @@ class EditorService:
                 self.committed = actual
                 self._adopt(read, actual, bump=True)
             else:
-                # Our own document is not what we wrote (or the read failed):
+                # Our own document is not what we wrote (or the read failed).
+                # The write did publish, so the ledger includes it: only the
+                # differences from it are external.
+                self.committed = expected_map
                 # nothing is recorded; the reconciliation clears the history.
                 self._adopt(read, expected_map, bump=True)
         self._notify = True
@@ -467,6 +492,29 @@ class EditorService:
             raise CommandError(409, "stale_document", str(error), document_id=effect.relative_path) from error
         except WriteError as error:
             raise CommandError(500, error.code, str(error), document_id=effect.relative_path) from error
+
+
+async def _finish(awaitable):
+    """Await work that holds the service lock to its end, even if cancelled.
+
+    A cancelled request or a stopping coordinator must not release the lock
+    while its worker thread still reads or publishes, so rereads and commands
+    stay strictly serial; the cancellation is re-raised afterwards.
+    """
+
+    task = asyncio.ensure_future(awaitable)
+    cancelled = False
+    while True:
+        try:
+            result = await asyncio.shield(task)
+            break
+        except asyncio.CancelledError:
+            if task.done():
+                raise
+            cancelled = True
+    if cancelled:
+        raise asyncio.CancelledError
+    return result
 
 
 def _error(status: int, code: str, message: str) -> Response:

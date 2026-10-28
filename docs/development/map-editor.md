@@ -236,14 +236,17 @@ in `following.error` and retried with a backoff of 2 s up to 30 s.
 **Reconciliation.** Each batch is one complete fresh read under the service
 lock, compared with the *committed fingerprint ledger*: the source/layout
 presence map the service last committed to. That is its last adopted loaded
-read, or that map plus its own write's result (absence included). No path or
-event is ever suppressed because it was recently saved.
+read, or that map plus its own write's result (absence included). A write
+that published counts as committed even when the service's own reread after
+it failed or did not load. While a publication is uncertain, either its
+intended or its baseline presence is own output. No path or event is ever
+suppressed because it was recently saved.
 
 | Fresh read | Effect |
 | --- | --- |
 | Loads and equals the ledger | The service's own output, however delayed or coalesced the notification was: history kept, nothing published (unless an artifact status changed) |
 | Loads and differs | An external change, adopted automatically as the new snapshot: history cleared, and `external_change` records the differing documents |
-| Does not load | Read once more after the settle interval, in case a write was caught half-way. If it still fails, the last preview is kept and marked `stale` (or `unavailable` with no prior preview), and `candidate_diagnostics` gives file, field and line. The history is cleared, the ledger is kept, and commands are rejected (`stale_preview`). The next loadable change recovers automatically. Nothing is ever rewritten from memory. |
+| Does not load | Read once more after the settle interval, in case a write was caught half-way. If it still fails, the last preview is kept and marked `stale` (or `unavailable` with no prior preview), and `candidate_diagnostics` gives file, field and line. The history is cleared, the ledger is not moved by the failed read, and commands are rejected (`stale_preview`). The next loadable change recovers automatically. Nothing is ever rewritten from memory. |
 
 Restoring the exact committed bytes after a failure is not an external
 change, but the failure already ended the segment. The same fingerprint
@@ -273,7 +276,9 @@ held:
   adopts it. Once no draft is left and no command is in flight, the held
   snapshot is adopted silently. A draft confirmed meanwhile is still sent
   against the snapshot it was typed on, and it is rejected without changing
-  disk. Without drafts, adoption is silent apart from the 檔案同步 chip.
+  disk. Snapshots after that command (its own result included) stay held
+  until the drafts are resolved. Without drafts, adoption is silent apart
+  from the 檔案同步 chip.
 - **Selection.** Domain, open maps, canvas view and selection are preserved
   by qualified identity. A selection removed by the external change is
   cleared, and the inspector names it.
@@ -285,7 +290,10 @@ held:
   successful command.
 - **Disconnected.** The last snapshot stays on screen, inspectable and
   marked stale. Every queued command is abandoned, so nothing is replayed. A
-  reconnect to the same session refetches automatically.
+  command already sent when the connection dropped is reported as failed;
+  whether it landed is shown by the next read, and the fingerprint guard
+  protects any later write. A reconnect to the same session refetches
+  automatically.
 - **Restarted service.** A new session (new generation and token) is held.
   The old snapshot stays stale, and the old tab's writes are rejected
   (`unauthorized` for the old token, `stale_session` for the old

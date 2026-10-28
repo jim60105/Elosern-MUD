@@ -242,9 +242,8 @@ class MapEditorFileFollowingBrowserTest(unittest.TestCase):
         page.wait_for_selector('[data-connection="restarted"]', timeout=20000)
         self.assertEqual(page.locator('[data-banner="restarted"]').count(), 1)
         self.assertEqual(page.locator(".map-canvas__badge").count(), 1)
-        # Reconnecting replays nothing and restores no write permission.
-        page.wait_for_timeout(500)
-        self.assertEqual(self.posts, attempted)
+        # Nothing was replayed into the new session. The exact POST count after
+        # the later fresh-read write proves no replay happened in between.
         self.assertFalse(self.layout.exists())
         page.click('[data-banner-action="reconnect"]')
         page.wait_for_selector('[data-connection="connected"]', timeout=15000)

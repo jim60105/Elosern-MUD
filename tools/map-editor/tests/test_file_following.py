@@ -389,3 +389,49 @@ def test_a_restart_rejects_the_old_tab_and_writes_after_a_fresh_read(workspace):
     assert state["history"]["undo"] is None
     assert restarted.move("back", 3, 3)[0] == 200
     assert restarted.positions()["back"] == [3, 3]
+
+
+# -- the ledger after uncertain or interrupted own writes --------------------
+def test_an_uncertain_own_write_is_never_reported_as_an_external_change(workspace):
+    faults = Faults()
+    editor = Editor(workspace, fault=faults)
+    assert editor.move("back", 1, 1)[0] == 200
+    faults.armed["flush_directory"] = OSError(errno.EIO, "I/O error")
+    assert editor.move("back", 2, 2)[1]["error"]["code"] == "save_uncertain"
+    editor.follow()
+    assert editor.state()["external_change"]["sequence"] == 0
+    assert editor.reload()[0] == 200
+    state = editor.state()
+    assert state["uncertain_outcome"]["landed"] == "intended"
+    assert state["external_change"]["sequence"] == 0
+    # The resolved ledger includes the landed write: no spurious change later.
+    assert editor.follow() is False
+    assert editor.state()["external_change"]["sequence"] == 0
+
+
+def test_a_write_whose_reread_failed_is_still_own_output(workspace, monkeypatch):
+    from elosern_map_editor import app as app_module
+
+    editor = Editor(workspace)
+    assert editor.move("back", 1, 1)[0] == 200
+    real = app_module.read_workspace
+    monkeypatch.setattr(app_module, "read_workspace", lambda *args: (_ for _ in ()).throw(OSError(errno.EIO, "x")))
+    assert editor.move("back", 2, 2)[1]["error"]["code"] == "reread_failed"
+    monkeypatch.setattr(app_module, "read_workspace", real)
+    assert editor.reload()[0] == 200
+    assert editor.state()["external_change"]["sequence"] == 0
+
+
+def test_an_own_write_landing_while_another_document_breaks_is_own_after_recovery(workspace):
+    faults = Faults()
+    editor = Editor(workspace, fault=faults)
+    original = (workspace / SETTLEMENT).read_text(encoding="utf-8")
+    faults.armed["flush_directory"] = lambda: (workspace / SETTLEMENT).write_text(MALFORMED, encoding="utf-8")
+    assert editor.move("back", 1, 1)[0] == 200
+    assert editor.state()["preview_state"] == "stale"
+    (workspace / SETTLEMENT).write_text(original, encoding="utf-8")
+    assert editor.follow() is True
+    state = editor.state()
+    assert state["preview_state"] == "current"
+    # Only a genuinely external difference would be listed; the layout is ours.
+    assert state["external_change"]["sequence"] == 0
