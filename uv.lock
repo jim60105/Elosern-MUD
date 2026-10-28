@@ -505,7 +505,12 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "ruamel-yaml", specifier = ">=0.19.1" }]
+requires-dist = [
+    { name = "numpy", marker = "extra == 'generation'", specifier = ">=2.3" },
+    { name = "ruamel-yaml", specifier = ">=0.19.1" },
+    { name = "scipy", marker = "extra == 'generation'", specifier = ">=1.16" },
+]
+provides-extras = ["generation"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=8.4.2" }]

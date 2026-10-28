@@ -1,4 +1,4 @@
-"""Map-district partition mechanics over miniature synthetic continents.
+"""District-partition generation and lightweight artifact mechanics.
 
 Every fixture here is a file-local ASCII raster, one character per
 one-kilometre cell, drawn north row first:
@@ -10,33 +10,47 @@ one-kilometre cell, drawn north row first:
 
 Every other land cell is the ``plain`` region. Frames are a whole number of
 5 km tiles. Expected owners are drawn independently in the tests, never
-derived from the partitioner. Shipped geography is covered by the production
-recomputation test in ``world.maps.tests.test_map_district_partition``.
+derived from the partitioner. The shipped artifact is covered by the game's
+data-contract test; the runtime adapter's no-generation-import claim is
+covered by ``tests.test_map_partition_independence``.
 """
 
+from __future__ import annotations
+
 import json
+import random
 import unittest
 
 import numpy as np
 
-from tools.map_district_partition import (
-    MIXED,
+from elosern_map_core.partition import (
     DistrictSeed,
     Partition,
     PartitionError,
     PartitionInput,
+    PartitionInputSnapshot,
     compute_outlines,
     compute_partition,
     encode,
-    generate,
+    generate_partition,
+    partition_input,
     serialize,
 )
-from tools.spec_traceability import covers_requirement
-from world.maps.district_partition import decode_partition
-
+from elosern_map_core.partition_codec import (
+    MIXED,
+    PARTITION_ALGORITHM_VERSION,
+    PartitionDocumentError,
+    decode_partition,
+    partition_freshness,
+    partition_source_signature,
+    read_partition_metadata,
+)
+from elosern_map_core.sources import make_source_document
+from elosern_map_core.terrain import REGION_KEYS, TerrainDefinition
 
 _NATIONS = ("a", "b")
 _REGIONS = ("forest", "plain")
+_SIGNATURE = "synthetic"
 
 
 def _input(rows, *districts):
@@ -56,7 +70,17 @@ def _input(rows, *districts):
             walkable[y, x] = char in "abfg"
             nation[y, x] = 1 if char in "aAf" else 2
             region[y, x] = 1 if char in "fg" else 2
-    return PartitionInput(size, land, walkable, nation, _NATIONS, region, _REGIONS, tuple(districts))
+    return PartitionInput(
+        size,
+        land,
+        walkable,
+        nation,
+        _NATIONS,
+        region,
+        _REGIONS,
+        tuple(districts),
+        source_signature=_SIGNATURE,
+    )
 
 
 def _seed(key, x, y):
@@ -87,9 +111,6 @@ def _segments(rings):
 
 
 class BarrierPropagationTests(unittest.TestCase):
-    @covers_requirement(
-        "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
-    )
     def test_national_border_splits_a_tile_and_stays_closed_at_a_ford(self):
         # A border river (blocked A cells) with a ford gap at x=7 separates
         # nation a (south) from nation b (north). The ford lets travellers
@@ -116,9 +137,6 @@ class BarrierPropagationTests(unittest.TestCase):
         partition = compute_partition(_input(rows, _seed("south", 1, 1), _seed("north", 8, 8)))
         self.assertEqual(_owners(partition, rows), ["n" * 10] * 5 + ["s" * 10] * 5)
 
-    @covers_requirement(
-        "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
-    )
     def test_same_nation_ford_and_pass_stay_open(self):
         # The same river inside one nation: its ford joins both banks, so a
         # single southern seed reaches the northern bank and no component is
@@ -140,9 +158,6 @@ class BarrierPropagationTests(unittest.TestCase):
         self.assertTrue(partition.domain[4, 7])
         self.assertFalse(partition.domain[4, 0])
 
-    @covers_requirement(
-        "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
-    )
     def test_diagonal_wall_rejects_corner_cutting(self):
         # A one-cell anti-diagonal ridge (x + y == 9) is 8-connected but its
         # far side touches the near side diagonally on every step. Beta sits
@@ -164,9 +179,6 @@ class BarrierPropagationTests(unittest.TestCase):
         # (6, 4) fall into two fragments.
         self.assertNotEqual(partition.fragment[3, 5], partition.fragment[4, 6])
 
-    @covers_requirement(
-        "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
-    )
     def test_equal_distance_goes_to_the_smaller_key(self):
         # Three tile columns in one row band: the middle tile is one coarse
         # step from both seeds, so the smaller key takes it on either side.
@@ -178,9 +190,6 @@ class BarrierPropagationTests(unittest.TestCase):
                 self.assertEqual(partition.owner_at((2, 7)), west)
                 self.assertEqual(partition.owner_at((12, 7)), east)
 
-    @covers_requirement(
-        "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
-    )
     def test_blocked_inland_cell_takes_the_nearest_same_nation_owner(self):
         # A 3 by 3 blocked block of nation a (x 4..6) borders nation b at
         # x=7. Its eastern cell (6, 5) is one kilometre from b ground, but it
@@ -202,9 +211,6 @@ class BarrierPropagationTests(unittest.TestCase):
 
 
 class RegionAndLandmarkTests(unittest.TestCase):
-    @covers_requirement(
-        "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
-    )
     def test_region_district_takes_its_region_across_nations_first(self):
         # The forest band (f = nation a, g = nation b) crosses the border
         # and a mid-tile edge. Its single district owns all of it, even the
@@ -233,9 +239,6 @@ class RegionAndLandmarkTests(unittest.TestCase):
             compute_partition(_input(rows, forest, _seed("west", 0, 9), _seed("east", 9, 0)))
         self.assertIn("west: landmark (0, 9) lies in region land", caught.exception.problems)
 
-    @covers_requirement(
-        "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
-    )
     def test_grid_landmark_in_a_footprint_injects_at_its_routed_approach(self):
         # A settlement footprint (blocked A ring x 3..7, y 3..7) encloses a
         # walkable courtyard (5, 5). The landmark cell (4, 4) is inside the
@@ -271,9 +274,6 @@ class RegionAndLandmarkTests(unittest.TestCase):
         self.assertEqual(partition.owner_at((1, 5)), "west")
         self.assertEqual(partition.owner_at((14, 14)), "far")
 
-    @covers_requirement(
-        "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
-    )
     def test_footprint_conflicts_and_border_mismatch_fail(self):
         rows = ["a" * 5 + "b" * 5] * 10
         rows = [row[:4] + "AB" + row[6:] if 3 <= i <= 4 else row for i, row in enumerate(rows)]
@@ -319,20 +319,14 @@ class FrozenEncodingTests(unittest.TestCase):
     def _input(self):
         return _input(self._ROWS, _seed("west", 0, 0), _seed("east", 9, 9))
 
-    @covers_requirement(
-        "map-district-partition::frozen-partition-and-outlines-reproduce-deterministically-offline"
-    )
     def test_regeneration_is_byte_identical_and_line_oriented(self):
-        first, second = generate(self._input()), generate(self._input())
+        first, second = generate_partition(self._input()), generate_partition(self._input())
         self.assertEqual(first, second)
         self.assertTrue(first.endswith("}\n"))
         document = json.loads(first)
         self.assertEqual(serialize(document), first)
         self.assertNotIn(".", json.dumps(document["outlines"]))  # integer metres only
 
-    @covers_requirement(
-        "map-district-partition::frozen-partition-and-outlines-reproduce-deterministically-offline"
-    )
     def test_runs_decode_to_the_exact_ownership_with_sea_distinguished(self):
         inp = self._input()
         partition = compute_partition(inp)
@@ -348,16 +342,37 @@ class FrozenEncodingTests(unittest.TestCase):
                 self.assertEqual(decoded.district_at((x, y)), partition.owner_at((x, y)), (x, y))
         self.assertIsNone(decoded.district_at((10, 0)))
 
-    @covers_requirement(
-        "map-district-partition::frozen-partition-and-outlines-reproduce-deterministically-offline"
-    )
     def test_changed_inputs_change_the_artifact(self):
-        baseline = generate(self._input())
+        baseline = generate_partition(self._input())
         moved = _input(self._ROWS, _seed("west", 0, 0), _seed("east", 9, 0))
-        self.assertNotEqual(generate(moved), baseline)
+        self.assertNotEqual(generate_partition(moved), baseline)
         changed = _input([row.replace("A", "a") for row in self._ROWS], *self._input().districts)
-        regenerated = generate(changed)
+        regenerated = generate_partition(changed)
         self.assertNotEqual(json.loads(regenerated)["fingerprint"], json.loads(baseline)["fingerprint"])
+
+    def test_the_artifact_carries_the_algorithm_version_and_source_signature(self):
+        inp = _input(self._ROWS, _seed("west", 0, 0), _seed("east", 9, 9))
+        document = json.loads(generate_partition(inp))
+        self.assertEqual(document["algorithm_version"], PARTITION_ALGORITHM_VERSION)
+        self.assertEqual(document["source_signature"], _SIGNATURE)
+        metadata = read_partition_metadata(document)
+        self.assertEqual(metadata.algorithm_version, PARTITION_ALGORITHM_VERSION)
+        self.assertEqual(metadata.source_signature, _SIGNATURE)
+
+    def test_missing_source_signature_is_rejected(self):
+        inp = PartitionInput(
+            self._input().size,
+            self._input().land,
+            self._input().walkable,
+            self._input().nation,
+            _NATIONS,
+            self._input().region,
+            _REGIONS,
+            self._input().districts,
+        )
+        with self.assertRaises(PartitionError) as caught:
+            generate_partition(inp)
+        self.assertIn("carries no source signature", caught.exception.problems[0])
 
 
 class OutlineTests(unittest.TestCase):
@@ -376,7 +391,7 @@ class OutlineTests(unittest.TestCase):
         land = owner > 0
         inp = PartitionInput(
             size, land, land, nation, _NATIONS, np.full((size, size), 2, dtype=np.uint8),
-            _REGIONS, (),
+            _REGIONS, (), source_signature=_SIGNATURE,
         )
         partition = Partition(keys, owner, land, land, np.full((size, size), -1))
         return compute_outlines(partition, inp)
@@ -394,9 +409,6 @@ class OutlineTests(unittest.TestCase):
                 on_frame = all(p[0] in (0, edge_m) or p[1] in (0, edge_m) for p in (start, end))
                 self.assertTrue(on_frame or (end, start) in others, (key, start, end))
 
-    @covers_requirement(
-        "map-district-partition::frozen-partition-and-outlines-reproduce-deterministically-offline"
-    )
     def test_neighbours_share_smoothed_pieces_and_junctions_stay_exact(self):
         rows = [
             "xxxxxxxyyy",
@@ -418,9 +430,6 @@ class OutlineTests(unittest.TestCase):
         self.assertNotIn((4000, 6000), points)
         self.assertIn((3000, 5000), points)  # the x/y/z junction is exact
 
-    @covers_requirement(
-        "map-district-partition::frozen-partition-and-outlines-reproduce-deterministically-offline"
-    )
     def test_national_enclave_keeps_exact_geometry_and_a_matching_hole(self):
         rows = ["pppppp", "pqqqpp", "pqqqpp", "pppppp", "pppppp", "pppppp"]
         nations = ["aaaaaa", "abbbaa", "abbbaa", "aaaaaa", "aaaaaa", "aaaaaa"]
@@ -433,9 +442,6 @@ class OutlineTests(unittest.TestCase):
         self.assertEqual(sorted(hole), sorted(outlines["q"][0]))
         self.assertSharedBoundaries(outlines, 6)
 
-    @covers_requirement(
-        "map-district-partition::frozen-partition-and-outlines-reproduce-deterministically-offline"
-    )
     def test_checkerboard_vertex_splits_diagonal_cells(self):
         rows = ["rs", "sr"]
         outlines = self._outlines(rows)
@@ -443,9 +449,6 @@ class OutlineTests(unittest.TestCase):
         self.assertEqual(len(outlines["s"]), 2)
         self.assertSharedBoundaries(outlines, 2)
 
-    @covers_requirement(
-        "map-district-partition::frozen-partition-and-outlines-reproduce-deterministically-offline"
-    )
     def test_island_against_sea_is_one_counter_clockwise_ring(self):
         rows = [".....", ".ppp.", ".ppp.", ".ppp.", "....."]
         outlines = self._outlines(rows)
@@ -526,12 +529,7 @@ def _oracle_owners(inp, seeds):
 
 
 class OracleAgreementTests(unittest.TestCase):
-    @covers_requirement(
-        "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
-    )
     def test_fragment_dijkstra_matches_a_naive_cell_search_on_unit_tiles(self):
-        import random
-
         rng = random.Random(20261023)
         checked = 0
         for _ in range(12):
@@ -551,7 +549,7 @@ class OracleAgreementTests(unittest.TestCase):
             seeds = tuple(_seed(f"d{index}", x, y) for index, (x, y) in enumerate(picks))
             inp = PartitionInput(
                 size, base.land, base.walkable, base.nation, _NATIONS, base.region, _REGIONS,
-                seeds, tile=1,
+                seeds, tile=1, source_signature=_SIGNATURE,
             )
             expected = _oracle_owners(inp, seeds)
             if expected is None:
@@ -595,17 +593,11 @@ class FootprintPocketTests(unittest.TestCase):
         )
         return DistrictSeed("town", "voronoi", (3, 3), approaches=((7, 4),), footprint=footprint)
 
-    @covers_requirement(
-        "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
-    )
     def test_pocket_enclosed_by_a_claimed_footprint_joins_it(self):
         rows = self._rows()
         partition = compute_partition(_input(rows, self._town(rows), _seed("far", 9, 9)))
         self.assertEqual(partition.owner_at((4, 4)), "town")
 
-    @covers_requirement(
-        "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
-    )
     def test_pocket_of_another_nation_or_open_to_the_outside_is_not_absorbed(self):
         rows = self._rows(pocket="b")
         with self.assertRaises(PartitionError) as caught:
@@ -621,12 +613,7 @@ class FootprintPocketTests(unittest.TestCase):
 
 
 class DecoderValidationTests(unittest.TestCase):
-    @covers_requirement(
-        "map-district-partition::frozen-partition-and-outlines-reproduce-deterministically-offline"
-    )
     def test_malformed_documents_are_rejected(self):
-        from world.maps.district_partition import DistrictPartitionError
-
         inp = FrozenEncodingTests()._input()
         document = encode(compute_partition(inp), inp)
         mutations = {
@@ -639,6 +626,154 @@ class DecoderValidationTests(unittest.TestCase):
             with self.subTest(rule=rule):
                 broken = json.loads(json.dumps(document))
                 mutate(broken)
-                with self.assertRaises(DistrictPartitionError) as caught:
-                    decode_partition(broken)
+                with self.assertRaises(PartitionDocumentError) as caught:
+                    decode_partition(broken, is_land=lambda cell: True)
                 self.assertIn(rule, str(caught.exception))
+
+
+def _terrain(frame=20):
+    return TerrainDefinition(
+        frame_cells=frame,
+        mainland_boundary_km=((0, 0), (frame, 0), (frame, frame), (0, frame)),
+        forest_edge=((0, 12), (frame - 1, 12)),
+        waterway_routes={"river": ((frame - 1, 8), (0, 8))},
+        waterway_fords={},
+        border_river_key="river",
+        ridge_base_x=5,
+        ridge_period=5,
+        ridge_step=1,
+        ridge_min_x=0,
+        ridge_max_x=frame - 1,
+        ridge_north_limit=frame - 1,
+        ridge_passes=((0, 0),),
+        coastal_y_max=3,
+        mountain_corridor_half_width=1,
+        region_flavors={key: ("x", "y") for key in REGION_KEYS},
+    )
+
+
+class SnapshotAssemblyTests(unittest.TestCase):
+    def _snapshot(self, **overrides):
+        values = {
+            "terrain": _terrain(),
+            "nation_names": ("altoria", "grandia", "valhalla"),
+            "region_names": tuple(sorted(REGION_KEYS)),
+            "footprints": frozenset({(2, 2), (3, 2)}),
+            "districts": (_seed("west", 1, 1), _seed("east", 18, 18)),
+            "source_signature": _SIGNATURE,
+        }
+        values.update(overrides)
+        return PartitionInputSnapshot(**values)
+
+    def test_the_rasters_follow_the_explicit_snapshot(self):
+        from elosern_map_core.terrain import (
+            is_land_cell,
+            is_passable_terrain,
+            nominal_nation_for_coordinates,
+            region_for_coordinates,
+        )
+
+        snapshot = self._snapshot()
+        inp = partition_input(snapshot)
+        self.assertEqual(inp.size, snapshot.size)
+        self.assertEqual(inp.source_signature, _SIGNATURE)
+        for y in range(inp.size):
+            for x in range(inp.size):
+                cell = (x, y)
+                self.assertEqual(bool(inp.land[y, x]), is_land_cell(snapshot.terrain, cell), cell)
+                expected_walkable = (
+                    is_passable_terrain(snapshot.terrain, cell)
+                    and cell not in snapshot.footprints
+                )
+                self.assertEqual(bool(inp.walkable[y, x]), expected_walkable, cell)
+                if inp.land[y, x]:
+                    self.assertEqual(
+                        inp.nation_names[inp.nation[y, x] - 1],
+                        nominal_nation_for_coordinates(snapshot.terrain, x, y),
+                        cell,
+                    )
+                    self.assertEqual(
+                        inp.region_names[inp.region[y, x] - 1],
+                        region_for_coordinates(snapshot.terrain, x, y),
+                        cell,
+                    )
+        self.assertFalse(inp.walkable[2, 2])
+
+    def test_an_undeclared_identifier_is_rejected_with_the_cell(self):
+        snapshot = self._snapshot(nation_names=("altoria", "grandia"))
+        with self.assertRaises(PartitionError) as caught:
+            partition_input(snapshot)
+        self.assertIn("undeclared nation 'valhalla'", caught.exception.problems[0])
+
+    def test_assembly_is_deterministic_and_carries_the_signature(self):
+        first, second = partition_input(self._snapshot()), partition_input(self._snapshot())
+        self.assertTrue(np.array_equal(first.land, second.land))
+        self.assertTrue(np.array_equal(first.walkable, second.walkable))
+        self.assertTrue(np.array_equal(first.nation, second.nation))
+        self.assertTrue(np.array_equal(first.region, second.region))
+        self.assertEqual(first.source_signature, _SIGNATURE)
+
+
+class FreshnessTests(unittest.TestCase):
+    def _documents(self):
+        return [
+            make_source_document("content/maps/continent.yaml", "continent: 1\n"),
+            make_source_document("content/maps/districts.yaml", "districts: 1\n"),
+            make_source_document("content/maps/settlements/a.yaml", "settlement: 1\n"),
+            make_source_document("content/maps/interiors/a.yaml", "interior: 1\n"),
+        ]
+
+    def _metadata(self, signature, algorithm=PARTITION_ALGORITHM_VERSION):
+        return read_partition_metadata(
+            {
+                "version": 2,
+                "algorithm_version": algorithm,
+                "source_signature": signature,
+                "fingerprint": "0" * 64,
+            }
+        )
+
+    def test_the_signature_covers_partition_sources_only(self):
+        baseline = partition_source_signature(self._documents())
+        self.assertEqual(baseline, partition_source_signature(list(reversed(self._documents()))))
+        interior_only = [
+            document
+            for document in self._documents()
+            if document.relative_path != "content/maps/interiors/a.yaml"
+        ] + [make_source_document("content/maps/interiors/a.yaml", "interior: 2\n")]
+        self.assertEqual(baseline, partition_source_signature(interior_only))
+
+    def test_a_source_edit_or_membership_change_invalidates_freshness(self):
+        baseline = partition_source_signature(self._documents())
+        edited = [
+            make_source_document("content/maps/continent.yaml", "continent: 2\n")
+            if document.relative_path == "content/maps/continent.yaml"
+            else document
+            for document in self._documents()
+        ]
+        self.assertTrue(partition_freshness(self._metadata(baseline), baseline).current)
+        self.assertFalse(
+            partition_freshness(self._metadata(baseline), partition_source_signature(edited)).current
+        )
+        removed = [
+            document
+            for document in self._documents()
+            if document.relative_path != "content/maps/districts.yaml"
+        ]
+        self.assertFalse(
+            partition_freshness(self._metadata(baseline), partition_source_signature(removed)).current
+        )
+        added = self._documents() + [
+            make_source_document("content/maps/settlements/b.yaml", "settlement: 1\n")
+        ]
+        self.assertFalse(
+            partition_freshness(self._metadata(baseline), partition_source_signature(added)).current
+        )
+
+    def test_an_algorithm_bump_or_missing_signature_is_stale(self):
+        signature = partition_source_signature(self._documents())
+        bumped = self._metadata(signature, algorithm=PARTITION_ALGORITHM_VERSION + 1)
+        current = partition_freshness(bumped, signature)
+        self.assertFalse(current.current)
+        self.assertEqual(current.algorithm_version, PARTITION_ALGORITHM_VERSION + 1)
+        self.assertFalse(partition_freshness(self._metadata(signature), None).current)

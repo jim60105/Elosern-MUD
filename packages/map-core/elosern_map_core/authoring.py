@@ -43,6 +43,12 @@ from .documents import (
 )
 from .sources import SourceDocument, fingerprint_text, is_world_source
 from .sparse import SparseGraphError, SparseNode, SparseRoad, SparseSettlementGraph
+from .partition_codec import (
+    PARTITION_ALGORITHM_VERSION,
+    PARTITION_SOURCE_KINDS,
+    PartitionFreshness,
+    partition_source_signature,
+)
 from .references import (
     ReferenceError,
     ReferenceIndex,
@@ -56,8 +62,6 @@ from .terrain import (
 )
 
 EXTERNAL_RESULT_VERSION = 1
-PARTITION_ALGORITHM_VERSION = 1
-PARTITION_SOURCE_KINDS = frozenset({"continent", "locations", "districts", "settlement"})
 WORLD_SOURCE_KINDS = frozenset({"continent", "locations", "districts", "settlement", "interior"})
 _OPPOSITE_DIRECTION = {
     "n": "s",
@@ -97,15 +101,6 @@ class AuthoritativeExternalResult:
 
 
 @dataclass(frozen=True, slots=True)
-class PartitionFreshness:
-    """The generated partition artifact's freshness for one input signature."""
-
-    algorithm_version: int
-    input_signature: str
-    current: bool
-
-
-@dataclass(frozen=True, slots=True)
 class AuthoringWorld:
     """A structurally complete, loadable authored world (may be unfinished)."""
 
@@ -135,11 +130,7 @@ class AuthoringWorld:
 
     @property
     def partition_signature(self) -> str:
-        return _combined_fingerprint(
-            document
-            for document in self.documents
-            if document.kind in PARTITION_SOURCE_KINDS
-        )
+        return partition_source_signature(self.documents)
 
 
 @dataclass(frozen=True, slots=True)
