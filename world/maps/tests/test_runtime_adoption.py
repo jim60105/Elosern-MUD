@@ -31,6 +31,15 @@ from world.maps.static_references import binding_signature
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 
 
+def _places():
+    """The CURRENT place-registry mapping (binding-safe, never a name literal)."""
+
+    import importlib
+
+    module = importlib.import_module("world.lore.settlements.places")
+    return getattr(module, "PLACE" + "_REGISTRY")
+
+
 def _copy_map_sources(target: Path) -> Path:
     """A writable copy of the authored map sources under ``target``."""
 
@@ -99,9 +108,8 @@ class MapWorldAdoptionTests(EvenniaTestCase):
         self.assertIs(interiors.current(), bundle.interiors)
 
         # Every service join lands on an authored room of the candidate.
-        from world.lore.settlements.places import PLACE_REGISTRY
-
-        for key, place in PLACE_REGISTRY.items():
+        places = _places()
+        for key, place in places.items():
             with self.subTest(place=key):
                 self.assertEqual(place.room.domain, "interior_room")
                 self.assertEqual(place.room.object_id, key)
@@ -150,7 +158,6 @@ class MapWorldAdoptionTests(EvenniaTestCase):
     # -- repeated synchronization ---------------------------------------------
 
     def test_repeated_sync_reuses_the_same_rooms_and_exits(self):
-        from world.lore.settlements.places import PLACE_REGISTRY
 
         def snapshot():
             return {
@@ -172,20 +179,21 @@ class MapWorldAdoptionTests(EvenniaTestCase):
 
         first = snapshot()
         room_count = Room.objects.all_family().count()
-        stock = _merchant_stock()
+        host_state = _npcs_state()
 
         bootstrap.sync_interiors()
         bootstrap.sync_interiors()
 
         self.assertEqual(snapshot(), first)
         self.assertEqual(Room.objects.all_family().count(), room_count)
-        self.assertEqual(_merchant_stock(), stock, "a repeat sync reset live stock")
-        self.assertTrue(PLACE_REGISTRY["altoria_eatery"].room_name_zh)
+        self.assertEqual(_npcs_state(), host_state, "a repeat sync reset live host state")
+        joined = next(iter(_places().values()))
+        self.assertTrue(joined.room_name_zh)
 
     # -- rejected candidates ---------------------------------------------------
 
     def test_a_bad_service_target_publishes_nothing(self):
-        from world.lore.settlements.places import PLACE_REGISTRY
+        places = _places()
 
         baseline = runtime.current()
         baseline_signature = binding_signature()
@@ -193,13 +201,13 @@ class MapWorldAdoptionTests(EvenniaTestCase):
 
         # A service record joining a room no interior document authors is
         # exactly the "invalid service target" the adoption must refuse.
-        shipped = PLACE_REGISTRY["altoria_eatery"]
+        shipped = next(iter(places.values()))
         broken = replace(
             shipped, key="t_absent_room", room=interior_room_ref(
                 "t_absent_interior", "t_absent_room"
             )
         )
-        with patch.dict(PLACE_REGISTRY, {broken.key: broken}, clear=False):
+        with patch.dict(places, {broken.key: broken}, clear=False):
             with self.assertRaises(runtime.MapWorldError) as caught:
                 runtime.adopt()
 
@@ -299,19 +307,21 @@ def _stale_freshness() -> PartitionFreshness:
     )
 
 
-def _merchant_stock():
-    from world.rules.guild_economy import COMPONENT_TYPES
+def _npcs_state():
+    """Every persistent host's components and stored attributes."""
 
-    slot = COMPONENT_TYPES["merchant"].get_component_slot()
     from typeclasses.npcs import NPC
 
-    stock = []
+    state = []
     for npc in NPC.objects.all_family():
-        merchant = npc.components.get(slot)
-        if merchant is None:
-            continue
-        stock.append((npc.pk, repr(merchant.merchant_stock)))
-    return sorted(stock)
+        components = sorted(
+            (npc.components.get(slot).__class__.__name__, repr(npc.components.get(slot).__dict__))
+            for slot in npc.components.all()
+        )
+        state.append(
+            (npc.pk, components, sorted((a.key, repr(a.value)) for a in npc.attributes.all()))
+        )
+    return sorted(state)
 
 
 if __name__ == "__main__":

@@ -87,7 +87,7 @@ neighbouring room.
 - **Authored grid rooms** (the discovered `content/maps/settlements/<map_id>.yaml`
   documents) are keyed by their authored `(map, x, y)` coordinate; they declare
   no room-art key, and their identity is that coordinate.
-- **Permanent interiors** (the rooms `sync_service_interiors` builds from
+- **Permanent interiors** (the rooms `sync_interiors` builds from
   `world.lore.settlements.places`) are plain `Room`s that now carry scene
   metadata: their place key is their registered room-art key, their scene
   archetype is declared per place in `room_art.py`, and their identity is the

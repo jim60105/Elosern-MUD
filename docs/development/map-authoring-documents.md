@@ -88,7 +88,7 @@ landmark:
 This document is the sole district authority: `world/lore/map_districts.py`
 loads and validates it against the published terrain and settlement/location
 bindings, then publishes one immutable snapshot (startup step
-`district_source_publication`). Structure faults reject the load; sea, blocked
+the map-world adoption step). Structure faults reject the load; sea, blocked
 or unreachable landmarks, region disagreement and insufficient declared
 spacing are saveable semantic diagnostics that reject runtime adoption only.
 Landmarks are never authored as coordinates, so moving a settlement node moves

@@ -23,7 +23,7 @@ def interior_room(
     name_zh: str,
     desc_zh: str,
     *,
-    scene_archetype: str | None = "tavern_interior",
+    scene_archetype: str | None = "t_synth_scene",
     art_key: str | None = None,
 ) -> dict:
     """One authored room declaration for :func:`interior_document`."""

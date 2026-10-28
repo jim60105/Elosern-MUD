@@ -84,7 +84,7 @@ uv run evennia start
 ```
 Evennia 開機流程會自動呼叫 `server/conf/at_server_startstop.py` 中的 `at_server_start()`，按 `STARTUP_STEP_ORDER` 執行世界與 NPC 全新同步：
 1. `npc_persona_roster_validation`：在世界同步前執行，嚴格檢驗所有靜態名冊設定、人物卡規範與對話表引用。
-2. `sync_grid` 與 `sync_service_interiors`：同步王都、城鎮網格與服務室內空間地圖。
+2. `sync_grid` 與 `sync_interiors`：同步王都、城鎮網格與永久室內空間（`content/maps/interiors/`）。
 3. `sync_quest_runtime`：初始化任務系統執行期環境。
 4. `sync_guild_economy`：透過 `sync_service_content` 自動生成所有公會服務主持人（Host）與考核官，並直接賦予標準人物設定卡與內容標記。
 5. `sync_npc_schedules`：為全體 NPC 綁定生活日程標記。

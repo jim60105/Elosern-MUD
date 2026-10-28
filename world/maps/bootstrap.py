@@ -312,6 +312,20 @@ def _interior_plan(snapshot):
     return room_edges, exterior_edges, skipped
 
 
+def _evict_batch_cache() -> None:
+    """Drop the identity map after a rolled-back interior batch.
+
+    The database rollback restores the rows, but this batch created rooms and
+    exits and rewrote their attributes in the same process, and the idmapper
+    would keep serving those live objects. The global flush is the engine's own
+    recovery idiom; this path only runs when the batch refused to commit.
+    """
+
+    from evennia.utils.idmapper.models import flush_cache
+
+    flush_cache()
+
+
 def _apply_interior_edges(room_edges, exterior_edges) -> None:
     """Converge every planned interior edge, then retire the unplanned ones.
 

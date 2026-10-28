@@ -45,7 +45,7 @@ def _room(name: str = "合成房間", *, art_key: str | None = None) -> dict:
     return {
         "name_zh": name,
         "desc_zh": "Synthetic interior prose.",
-        "scene_archetype": "tavern_interior",
+        "scene_archetype": "t_synth_scene",
         "art_key": art_key,
     }
 
@@ -80,7 +80,7 @@ class InteriorSourceTests(unittest.TestCase):
         room = snapshot.room("t_shop_room")
         self.assertEqual(room.interior_id, "t_shop")
         self.assertEqual(room.name_zh, "合成商店")
-        self.assertEqual(room.scene_archetype, "tavern_interior")
+        self.assertEqual(room.scene_archetype, "t_synth_scene")
         self.assertEqual(room.art_key, "t_shop_art")
         self.assertEqual(snapshot.room_art_keys, {"t_shop_room": "t_shop_art"})
         # A document-level identity distinct from its rooms is the supported
