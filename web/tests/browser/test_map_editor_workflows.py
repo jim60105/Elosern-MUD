@@ -593,8 +593,9 @@ class _FollowingAcceptance(_EditorBrowser):
         self.in_viewport('[data-banner="restarted"]')
         # A write from the old session is refused and never replayed.
         page.click(f'[data-object="{YARD}"]')
-        page.keyboard.press("Shift+ArrowRight")
-        page.wait_for_timeout(1000)
+        with page.expect_response(lambda response: "/api/commands/" in response.url) as answer:
+            page.keyboard.press("Shift+ArrowRight")
+        self.assertEqual((answer.value.status, answer.value.json()["error"]["code"]), (409, "stale_session"))
         self.settle()
         self.assertEqual(self.changed(), set())
         attempted = len(self.posts)

@@ -13,8 +13,9 @@ round-tripped), and check the committed effects:
 * a stale partition, a structural error or an invalid external reference
   rejects the candidate with the published registry and the persistent
   baseline unchanged;
-* removing an occupied node is still refused by the live-dependent prune
-  guard, and the prior bundle is restored.
+* removing a node whose room is still live (occupied, and the destination of
+  persisted road exits) is still refused by the live-dependent prune guard,
+  and the prior bundle is restored.
 
 The node and the interior under test are chosen from the published bundle by
 their dependents, never by shipped name, so the checks follow the data.
@@ -260,11 +261,18 @@ class FinalYamlAdoptionTests(_CandidateCase):
 
         # A structural error: a road to a node the document does not declare.
         settlement.write_text(original, encoding="utf-8")
-        self.edit(settlement, lambda data: data["roads"].append(
-            {"source": node.node_id, "destination": "t_undeclared_node", "direction": "n", "bends": []}
-        ))
-        with self.regenerated_partition(), self.assertRaises(runtime.MapWorldError):
+        def undeclared_road(data):
+            used = {road["direction"] for road in data["roads"] if road["source"] == node.node_id}
+            direction = next(d for d in ("n", "ne", "e", "se", "s", "sw", "w", "nw") if d not in used)
+            data["roads"].append(
+                {"source": node.node_id, "destination": "t_undeclared_node", "direction": direction, "bends": []}
+            )
+
+        self.edit(settlement, undeclared_road)
+        with self.regenerated_partition(), self.assertRaises(runtime.MapWorldError) as caught:
             runtime.adopt(self.root)
+        self.assertTrue(any("t_undeclared_node" in problem for problem in caught.exception.problems),
+                        caught.exception.problems)
         self.assert_baseline(bundle, signature, persistent)
 
         # An invalid external reference: an interior whose room a service
@@ -281,11 +289,17 @@ class FinalYamlAdoptionTests(_CandidateCase):
         )
         self.assertIsNotNone(target, "no unlinked interior hosts a service place")
         (self.root / documents[target].relative_path).unlink()
-        with self.assertRaises(runtime.MapWorldError):
+        missing = joined & set(documents[target].rooms)
+        with self.assertRaises(runtime.MapWorldError) as caught:
             runtime.adopt(self.root)
+        # The service place join names the room the candidate no longer authors.
+        self.assertTrue(
+            any(room in problem for problem in caught.exception.problems for room in missing),
+            caught.exception.problems,
+        )
         self.assert_baseline(bundle, signature, persistent)
 
-    def test_removing_an_occupied_node_is_refused_and_rolls_back(self):
+    def test_removing_a_live_referenced_node_is_refused_and_rolls_back(self):
         dependents = _node_dependents()
         candidates = sorted(
             (map_id, node_id)
