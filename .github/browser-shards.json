@@ -30,7 +30,13 @@
         "web.tests.browser.test_browser_combat_scales.CombatMenuBrowserTest.test_combat_dock_renders_mockup_grid_and_detail_at_both_viewports",
         "web.tests.browser.test_browser_combat_panels.CombatMenuBrowserTest.test_combat_rebuilds_keyboard_menu_after_round",
         "web.tests.browser.test_browser_combat_panels.CombatMenuBrowserTest.test_combat_renders_at_minimum_viewport",
-        "web.tests.browser.test_browser_services_quest_drawer.KeyboardServiceDrawerJourneys.test_keyboard_service_journey_frameless_drawer"
+        "web.tests.browser.test_browser_services_quest_drawer.KeyboardServiceDrawerJourneys.test_keyboard_service_journey_frameless_drawer",
+        "web.tests.browser.test_map_editor_standalone.MapEditorStandaloneBrowserTest.test_continent_settlement_and_interior_snapshots_render",
+        "web.tests.browser.test_map_editor_standalone.MapEditorStandaloneBrowserTest.test_local_build_assets_load_with_node_unavailable_and_network_denied",
+        "web.tests.browser.test_map_editor_standalone.MapEditorStandaloneBrowserTest.test_game_theme_scales_without_the_game_shell",
+        "web.tests.browser.test_map_editor_standalone.MapEditorStandaloneBrowserTest.test_authored_prose_and_scene_ids_stay_inert_text",
+        "web.tests.browser.test_map_editor_standalone.MapEditorStalePreviewBrowserTest.test_a_failed_reread_keeps_the_last_preview_marked_stale",
+        "web.tests.browser.test_map_editor_standalone.MapEditorStalePreviewBrowserTest.test_an_unloadable_workspace_shows_no_preview_with_diagnostics"
       ],
       "files_b": [
         "web.tests.browser.test_browser_combat_scales.CombatMenuBrowserTest.test_master_scale_step_casts_at_the_chosen_magnitude",
