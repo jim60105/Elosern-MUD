@@ -148,9 +148,33 @@ const rasterBox = computed(() => {
   const ne = at({ x: raster.east, y: raster.north });
   return { x: Math.min(sw.x, ne.x), y: Math.min(sw.y, ne.y), width: Math.abs(ne.x - sw.x), height: Math.abs(sw.y - ne.y) };
 });
+// A curved link (interior connections): a quadratic arc bowed to the right of
+// travel, so a two-way pair separates into two arrows; it always carries one
+// direction chevron. Pixel space only: nothing here is a distance.
+const CURVE_PX = 26;
+function curved(link) {
+  const a = at(link.points[0]);
+  const b = at(link.points.at(-1));
+  const length = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  const normal = { x: -(b.y - a.y) / length, y: (b.x - a.x) / length };
+  const control = { x: (a.x + b.x) / 2 + normal.x * CURVE_PX, y: (a.y + b.y) / 2 + normal.y * CURVE_PX };
+  const pointAt = (t) => ({
+    x: (1 - t) * (1 - t) * a.x + 2 * (1 - t) * t * control.x + t * t * b.x,
+    y: (1 - t) * (1 - t) * a.y + 2 * (1 - t) * t * control.y + t * t * b.y,
+  });
+  const middle = pointAt(0.5);
+  return {
+    ...link,
+    d: `M${a.x.toFixed(1)} ${a.y.toFixed(1)} Q${control.x.toFixed(1)} ${control.y.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`,
+    labelAt: { x: middle.x + normal.x * 12, y: middle.y + normal.y * 12 + 6 },
+    chevrons: [chevronAt(pointAt(0.55), pointAt(0.6), pointAt(0.5))],
+  };
+}
+
 const links = computed(() =>
   view.value && props.scene
     ? props.scene.links.map((link) => {
+        if (link.curve) return curved(link);
         const mid = at(link.points[Math.floor(link.points.length / 2)]);
         const start = at(link.points[0]);
         return {
@@ -360,6 +384,15 @@ function chevrons(points) {
     );
   }
   return marks;
+}
+
+// One chevron at `tip`, pointing along `from` -> `to`.
+function chevronAt(tip, to, from) {
+  const length = Math.hypot(to.x - from.x, to.y - from.y) || 1;
+  const ux = (to.x - from.x) / length;
+  const uy = (to.y - from.y) / length;
+  const { x, y } = tip;
+  return `M${(x - 7 * ux - 5 * uy).toFixed(1)} ${(y - 7 * uy + 5 * ux).toFixed(1)} L${x.toFixed(1)} ${y.toFixed(1)} L${(x - 7 * ux + 5 * uy).toFixed(1)} ${(y - 7 * uy - 5 * ux).toFixed(1)}`;
 }
 
 function brackets(at) {

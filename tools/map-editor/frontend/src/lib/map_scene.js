@@ -27,6 +27,7 @@ import {
 } from "./continent.js";
 
 import { bendRef, parseSettlementRef, roadLabel, roadRef } from "./settlement.js";
+import { connectionLabels, connectionRef, reverseOf, roomName } from "./interior.js";
 
 export { INTERIOR_COLUMNS } from "./layout_edit.js";
 
@@ -268,8 +269,12 @@ export function interiorPositions(interior) {
   return positions;
 }
 
-export function interiorScene(interior) {
+// Rooms are cards; each directed connection is a selectable curved arrow (a
+// two-way pair bends apart and reads `去 ⇄ 回` once). `items` is the object
+// list: rooms, then connections.
+export function interiorScene(interior, selection = []) {
   const positions = interiorPositions(interior);
+  const chosen = new Set(selection);
   const marks = interior.rooms.map((room) => ({
     id: room.qualified_ref,
     kind: "room",
@@ -279,18 +284,32 @@ export function interiorScene(interior) {
     draggable: true,
     ...positions.get(room.id),
   }));
-  const pairs = new Set(interior.connections.map((c) => `${c.source}>${c.destination}`));
-  const links = interior.connections
-    .filter((connection) => positions.has(connection.source) && positions.has(connection.destination))
-    .map((connection) => ({
-      id: `connection:${interior.id}:${connection.source}>${connection.destination}`,
+  const labels = connectionLabels(interior);
+  const links = [];
+  interior.connections.forEach((connection, index) => {
+    if (!positions.has(connection.source) || !positions.has(connection.destination)) return;
+    const ref = connectionRef(interior.id, connection.source, connection.destination, connection.label);
+    links.push({
+      id: `connection:${interior.id}:${index}`,
+      ref,
       kind: "connection",
-      label: connection.label,
-      twoWay: pairs.has(`${connection.destination}>${connection.source}`),
+      label: labels.get(`${index}`),
+      twoWay: Boolean(reverseOf(interior, connection)),
+      curve: true,
+      arrow: true,
+      selected: chosen.has(ref),
       points: [positions.get(connection.source), positions.get(connection.destination)],
-    }));
+    });
+  });
+  const items = [
+    ...interior.rooms.map((room) => ({ id: room.qualified_ref, label: room.name_zh })),
+    ...interior.connections.map((connection) => ({
+      id: connectionRef(interior.id, connection.source, connection.destination, connection.label),
+      label: `連接 ${roomName(interior, connection.source)} → ${roomName(interior, connection.destination)}（${connection.label}）`,
+    })),
+  ];
   const bounds = boundsOfPoints(marks.length ? marks : [{ x: 0, y: 0 }]);
-  return { kind: "interior", unit: null, bounds, shapes: [], marks, links };
+  return { kind: "interior", unit: null, bounds, shapes: [], marks, links, items };
 }
 
 export function sceneFor(world, domain, mapId, selection = []) {
@@ -301,5 +320,5 @@ export function sceneFor(world, domain, mapId, selection = []) {
     return settlement ? settlementScene(settlement, selection) : null;
   }
   const interior = world.interiors.find((item) => item.id === mapId);
-  return interior ? interiorScene(interior) : null;
+  return interior ? interiorScene(interior, selection) : null;
 }
