@@ -18,6 +18,8 @@ import time
 import unittest
 from pathlib import Path
 
+from tools.spec_traceability import covers_requirement
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EDITOR_TESTS = REPO_ROOT / "tools" / "map-editor" / "tests"
 
@@ -96,6 +98,9 @@ class _EditorCase(unittest.TestCase):
 
 
 class ExternalChangeProcessTests(_EditorCase):
+    @covers_requirement(
+        "map-editor-file-following::external-changes-are-followed-without-overwriting-them",
+    )
     def test_a_loadable_external_replacement_is_adopted_without_an_editor_write(self):
         with harness.EditorProcess(self.workspace) as editor:
             self.assertEqual(_move(editor, 1, 1, "absent")[0], 200)
@@ -112,6 +117,9 @@ class ExternalChangeProcessTests(_EditorCase):
         # No editor-side write happened after the external one.
         self.assertEqual(self.layout.read_text(encoding="utf-8"), _layout(7, 8))
 
+    @covers_requirement(
+        "map-editor-file-following::external-changes-are-followed-without-overwriting-them",
+    )
     def test_a_save_racing_an_external_replacement_is_rejected_with_the_external_bytes_intact(self):
         with harness.EditorProcess(self.workspace) as editor:
             self.assertEqual(_move(editor, 1, 1, "absent")[0], 200)

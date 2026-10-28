@@ -15,6 +15,8 @@ import time
 import unittest
 from pathlib import Path
 
+from tools.spec_traceability import covers_requirement
+
 from tests.test_map_editor_file_following import (
     LAYOUT,
     _back,
@@ -44,6 +46,10 @@ def _quiet(editor) -> None:
 
 
 class WatchingProcessTests(_EditorCase):
+    @covers_requirement(
+        "map-editor-file-following::external-changes-are-followed-without-overwriting-them",
+        "map-editor-file-following::watching-and-reconnect-retain-truthful-preview-state",
+    )
     def test_own_saves_keep_history_and_a_later_external_replacement_is_adopted(self):
         with harness.EditorProcess(self.workspace) as editor:
             _quiet(editor)
@@ -66,6 +72,9 @@ class WatchingProcessTests(_EditorCase):
             self.assertIsNone(state["history"]["undo"])
             self.assertEqual(_back(state), [5, 6])
 
+    @covers_requirement(
+        "map-editor-file-following::watching-and-reconnect-retain-truthful-preview-state",
+    )
     def test_malformed_yaml_keeps_a_stale_preview_until_the_correction_is_adopted(self):
         path = self.workspace / SETTLEMENT
         with harness.EditorProcess(self.workspace) as editor:
@@ -87,6 +96,9 @@ class WatchingProcessTests(_EditorCase):
             wait_for(lambda: editor.workspace_state()["preview_state"] == "current", "no automatic recovery")
             self.assertEqual(_move(editor, 1, 1, "absent")[0], 200)
 
+    @covers_requirement(
+        "map-editor-file-following::watching-and-reconnect-retain-truthful-preview-state",
+    )
     def test_a_restart_rejects_the_old_session_and_writes_after_a_fresh_read(self):
         port = harness.free_port()
         with harness.EditorProcess(self.workspace, port=port) as editor:
