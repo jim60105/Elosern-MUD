@@ -31,6 +31,18 @@ function choose(ref, event) {
 function result(ref, event) {
   emit("result", { ref, toggle: Boolean(event.ctrlKey || event.metaKey) });
 }
+
+function selectLayer(key, event) {
+  emit("layer", key);
+  // The parent applies accepted navigation through the controlled prop.
+  event.target.checked = !props.hidden.includes(key);
+}
+
+function selectMap(event) {
+  emit("map", event.target.value);
+  // Navigation can be refused while a field draft remains unresolved.
+  event.target.value = props.currentMapId ?? "";
+}
 </script>
 
 <template>
@@ -44,7 +56,7 @@ function result(ref, event) {
               type="checkbox"
               :checked="!hidden.includes(layer.key)"
               :data-layer="layer.key"
-              @change="emit('layer', layer.key)"
+              @change="selectLayer(layer.key, $event)"
             />
             {{ layer.label }}
           </label>
@@ -87,7 +99,7 @@ function result(ref, event) {
         class="nav__map-select"
         :aria-label="domain === 'settlement' ? '據點地圖' : '室內地圖'"
         :value="currentMapId"
-        @change="emit('map', $event.target.value)"
+        @change="selectMap"
       >
         <option v-for="id in mapOptions" :key="id" :value="id">{{ id }}</option>
       </select>

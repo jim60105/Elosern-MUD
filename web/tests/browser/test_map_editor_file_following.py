@@ -92,8 +92,8 @@ class MapEditorFileFollowingBrowserTest(unittest.TestCase):
             self._playwright.stop()
 
     # -- helpers ---------------------------------------------------------
-    def open(self):
-        context = self._browser.new_context(viewport={"width": REFERENCE[0], "height": REFERENCE[1]})
+    def open(self, *, browser=None):
+        context = (browser or self._browser).new_context(viewport={"width": REFERENCE[0], "height": REFERENCE[1]})
         page = context.new_page()
         page.on("request", lambda request: request.method == "POST" and self.posts.append(request.url))
         page.goto(self.editor.origin + "/")
@@ -167,6 +167,166 @@ class MapEditorFileFollowingBrowserTest(unittest.TestCase):
         self.assertIsNone(field.get_attribute("data-draft"))
         self.assertEqual(self.names(), [])
         self.assertEqual(self.layout.read_text(encoding="utf-8"), _layout(7, 8))
+
+    def test_tab_reaches_load_new_version_without_confirming_a_held_draft(self):
+        firefox = self._playwright.firefox.launch(headless=True)
+        self.addCleanup(firefox.close)
+        case = 0
+        for browser_name, browser in (("chromium", self._browser), ("firefox", firefox)):
+            for viewport in (REFERENCE, (725, 395)):
+                for kind, key in (("layout", "Tab"), ("name", "Shift+Tab")):
+                    with self.subTest(browser=browser_name, viewport=viewport, field=kind):
+                        case += 1
+                        page = self.open(browser=browser)
+                        page.click(f'[data-object="{BACK}"]')
+                        page.set_viewport_size({"width": viewport[0], "height": viewport[1]})
+                        compact = viewport != REFERENCE
+                        if compact:
+                            page.click('[data-drawer-toggle="inspector"]')
+                            page.wait_for_selector('[data-region="inspector"][aria-modal="true"]')
+                        if kind == "layout":
+                            selector = '[data-layout-field="x"]'
+                            path = self.layout
+                            external = _layout(10 + case, 20 + case)
+                            expected = str(10 + case)
+                            draft = "4"
+                        else:
+                            selector = '[data-field-input="room-name_zh"]'
+                            path = self.workspace / INTERIOR
+                            data = synthetic.interior_data()
+                            expected = f"External room {case}"
+                            data["rooms"]["back"]["name_zh"] = expected
+                            external = synthetic.yaml_text(data)
+                            draft = "Unconfirmed room"
+                        field = page.locator(selector)
+                        field.fill(draft)
+                        _replace(path, external)
+                        page.wait_for_selector('[data-banner="external-draft"]', timeout=20000)
+                        field.press(key)
+                        action = page.locator('[data-banner-action="adopt"]')
+                        self.assertTrue(action.evaluate("(element) => element === document.activeElement"))
+                        self.assertEqual(field.input_value(), draft)
+                        self.assertEqual(field.get_attribute("data-draft"), "true")
+                        self.assertEqual(page.locator('[data-banner="external-draft"]').count(), 1)
+                        self.assertEqual(page.locator('[data-banner="save-rejected"]').count(), 0)
+                        self.assertEqual(page.locator('[data-region="inspector"][aria-modal="true"]').count(), 0)
+                        self.assertEqual(self.names(), [])
+                        action.press("Enter")
+                        page.wait_for_function(
+                            "([selector, value]) => document.querySelector(selector)?.value === value"
+                            " && !document.querySelector('[data-banner]')",
+                            arg=[selector, expected], timeout=15000,
+                        )
+                        self.assertIsNone(field.get_attribute("data-draft"))
+                        self.assertEqual(self.names(), [])
+                        self.assertEqual(path.read_text(encoding="utf-8"), external)
+                        page.context.close()
+
+    def test_an_invalid_draft_cannot_be_removed_by_selection_or_navigation(self):
+        annex = synthetic.interior_data()
+        annex["id"] = "synthetic_z_annex"
+        annex["rooms"] = {"annex_room": annex["rooms"]["back"]}
+        annex["connections"] = []
+        annex["exterior"]["room"] = "annex_room"
+        _replace(
+            self.workspace / "content/maps/interiors/synthetic_z_annex.yaml",
+            synthetic.yaml_text(annex),
+        )
+        page = self.open()
+        page.wait_for_function(
+            "() => [...document.querySelector('.nav__map-select').options]"
+            ".some(option => option.value === 'synthetic_z_annex')", timeout=20000,
+        )
+        page.click(f'[data-object="{BACK}"]')
+        field = page.locator('[data-layout-field="x"]')
+        field.fill("1o")
+        _replace(self.layout, _layout(7, 8))
+        page.wait_for_selector('[data-banner="external-draft"]', timeout=20000)
+        page.click(f'[data-object="{FRONT}"]')
+        self.wait_for(
+            lambda: field.evaluate("(element) => element === document.activeElement"),
+            "the unresolved layout draft was not refocused",
+        )
+        self.assertEqual(page.locator("[data-inspector-ref]").text_content(), BACK)
+        self.assertEqual(field.input_value(), "1o")
+        self.assertEqual(field.get_attribute("data-draft"), "true")
+        self.assertEqual(field.get_attribute("aria-invalid"), "true")
+        self.assertEqual(page.locator('[data-banner="external-draft"]').count(), 1)
+        page.select_option(".nav__map-select", "synthetic_z_annex")
+        self.wait_for(
+            lambda: field.evaluate("(element) => element === document.activeElement"),
+            "the map dropdown did not preserve the unresolved draft",
+        )
+        self.assertEqual(page.locator(".nav__map-select").input_value(), synthetic.INTERIOR_ID)
+        self.assertEqual(page.locator("[data-inspector-ref]").text_content(), BACK)
+        self.assertEqual(field.input_value(), "1o")
+        self.assertEqual(page.locator('[data-banner="external-draft"]').count(), 1)
+        page.click('[data-domain-tab="settlement"]')
+        self.assertEqual(page.locator('[data-domain-tab="interior"][aria-pressed="true"]').count(), 1)
+        self.assertEqual(field.input_value(), "1o")
+        self.assertEqual(self.names(), [])
+        box = page.locator(f'[data-qualified-ref="{FRONT}"]').bounding_box()
+        x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+        page.mouse.move(x, y)
+        page.mouse.down()
+        page.mouse.move(x + 60, y + 30, steps=4)
+        page.mouse.up()
+        self.wait_for(
+            lambda: field.evaluate("(element) => element === document.activeElement"),
+            "dragging another room removed the unresolved draft",
+        )
+        self.assertEqual(page.locator("[data-inspector-ref]").text_content(), BACK)
+        self.assertEqual(field.input_value(), "1o")
+        self.assertEqual(self.names(), [])
+        field.press("Escape")
+        page.wait_for_function(
+            "() => document.querySelector('[data-layout-field=\"x\"]')?.value === '7'"
+            " && !document.querySelector('[data-banner]')", timeout=15000,
+        )
+        self.assertEqual(self.names(), [])
+        self.assertEqual(self.layout.read_text(encoding="utf-8"), _layout(7, 8))
+        page.click(f'[data-object="{FRONT}"]')
+        self.wait_for(
+            lambda: page.locator("[data-inspector-ref]").text_content() == FRONT,
+            "selection stayed blocked after explicit draft cancellation",
+        )
+        # A valid blur still confirms once before navigation removes its field.
+        page.click(f'[data-object="{BACK}"]')
+        field.fill("9")
+        page.click(f'[data-object="{FRONT}"]')
+        self.wait_for(lambda: self.back() == [9, 8], "valid blur confirmation was blocked")
+        self.settle(page)
+        self.assertEqual(self.names(), ["move_interior_layout"])
+
+    def test_hiding_a_layer_cannot_remove_an_invalid_field_draft(self):
+        page = self.open()
+        page.click('[data-domain-tab="continent"]')
+        river = "continent:waterway:synthetic_river"
+        page.click(f'[data-object="{river}"]')
+        page.click(f'[data-object="{river}#0"]')
+        field = page.locator('[data-field-input="point-0"]')
+        saved = field.input_value()
+        field.fill("1o")
+        page.click('[data-layer="water"]')
+        self.wait_for(
+            lambda: field.evaluate("(element) => element === document.activeElement"),
+            "the unresolved control-point draft was not refocused",
+        )
+        self.assertEqual(field.input_value(), "1o")
+        self.assertEqual(field.get_attribute("data-draft"), "true")
+        self.assertEqual(field.get_attribute("aria-invalid"), "true")
+        self.assertEqual(page.locator("[data-inspector-ref]").text_content(), f"{river}#0")
+        self.assertTrue(page.locator('[data-layer="water"]').is_checked())
+        self.assertEqual(self.names(), [])
+        field.press("Escape")
+        self.assertEqual(field.input_value(), saved)
+        page.click('[data-layer="water"]')
+        self.wait_for(
+            lambda: page.locator(f'[data-object="{river}#0"]').count() == 0,
+            "the layer stayed blocked after explicit draft cancellation",
+        )
+        self.assertFalse(page.locator('[data-layer="water"]').is_checked())
+        self.assertEqual(self.names(), [])
 
     def test_a_draft_confirmed_against_the_old_snapshot_is_rejected_without_changing_disk(self):
         page = self.open()

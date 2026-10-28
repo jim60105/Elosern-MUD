@@ -177,6 +177,9 @@ nothing. Escape restores the saved value, and Escape during a drag cancels it.
 Save (Ctrl/⌘+S) waits for accepted operations and never forces a draft.
 A complete draft is confirmed whenever the field loses focus, so clicking
 elsewhere saves it; an incomplete draft is never written by any path.
+Navigation that would remove an unresolved field returns focus to that field,
+including selection changes, layer hiding and another object's drag. Resolve
+the draft with a valid confirmation or Escape before leaving it.
 Leaving the page with a draft or a pending save asks for confirmation. Drafts
 are never restored.
 
@@ -305,7 +308,11 @@ held:
 - **External change with an open field draft.** It is held behind the
   banner 檔案已被外部修改（有草稿）, which names the changed documents and the
   drafts and history that will be discarded. 載入新版 discards the drafts and
-  adopts it. Once no draft is left and no command is in flight, the held
+  adopts it. Tab or Shift+Tab from a held draft focuses 載入新版 without
+  confirming the draft; an open inspector drawer closes so the action is
+  outside any modal focus trap. Enter on that button explicitly discards the
+  draft. Other blur confirmations retain their usual behavior. Once no draft
+  is left and no command is in flight, the held
   snapshot is adopted silently. A draft confirmed meanwhile is still sent
   against the snapshot it was typed on, and it is rejected without changing
   disk. Snapshots after that command (its own result included) stay held

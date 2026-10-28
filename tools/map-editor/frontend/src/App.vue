@@ -418,10 +418,23 @@ function show(key, mapId) {
   if (mapId) mapIds.value = { ...mapIds.value, [key]: mapId };
 }
 
+async function canLeaveFields() {
+  // Blur may have confirmed a valid value. Let its draft state finish updating
+  // before allowing navigation to remove the field that owns it.
+  await nextTick();
+  const field = root.value?.querySelector("[data-region='inspector'] [data-draft='true']");
+  if (!field) return true;
+  if (drawers.value) drawer.value = "inspector";
+  await nextTick();
+  field.focus();
+  return false;
+}
+
 // Cross-map navigation (search, diagnostics, relationships, local maps)
 // keeps return context; focus lands on the destination's inspector heading,
 // or on the canvas for a map-level target.
 async function navigate({ domain: key, mapId = null, refs = [], layer = null }) {
+  if (!(await canLeaveFields())) return;
   const before = here();
   const destination = key === "continent" ? null : mapId ?? mapIds.value[key];
   const moved = before.domain !== key || before.mapId !== destination;
@@ -442,6 +455,7 @@ async function settleFocus(toInspector) {
 }
 
 async function goBack() {
+  if (!(await canLeaveFields())) return;
   const entry = returnStack.value.at(-1);
   if (!entry) return;
   returnStack.value = returnStack.value.slice(0, -1);
@@ -453,12 +467,20 @@ async function goBack() {
   await settleFocus(selection.value.length > 0);
 }
 
-function openDomain(key) {
+async function openDomain(key) {
+  if (!(await canLeaveFields())) return;
   show(key);
   selection.value = [];
 }
 
-function openTreeEntry(entry) {
+async function openMap(id) {
+  if (!(await canLeaveFields())) return;
+  show(domain.value, id);
+  selection.value = [];
+}
+
+async function openTreeEntry(entry) {
+  if (!(await canLeaveFields())) return;
   if (entry.domain === "continent") {
     show("continent");
     selection.value = entry.id.startsWith("location:") ? [entry.id] : [];
@@ -481,19 +503,26 @@ function goDiagnostic(row) {
   navigate({ domain: target.domain, mapId: target.mapId, refs: target.ref ? [target.ref] : [], layer: target.layer });
 }
 
-function toggleLayer(key) {
-  hiddenLayers.value = hiddenLayers.value.includes(key)
+async function toggleLayer(key) {
+  const hidden = hiddenLayers.value.includes(key)
     ? hiddenLayers.value.filter((item) => item !== key)
     : [...hiddenLayers.value, key];
-  if (domain.value !== "continent") return;
+  if (domain.value !== "continent") {
+    hiddenLayers.value = hidden;
+    return;
+  }
   // A selected object on a now-hidden layer leaves the selection.
-  const visible = new Set(objects.value.map((mark) => mark.id));
+  const next = visibleScene(fullScene.value, hidden);
+  const visible = new Set((next?.items ?? next?.marks ?? []).map((mark) => mark.id));
   const kept = selection.value.filter((ref) => catalog.value.get(ref)?.domain !== "continent" || visible.has(ref));
+  if (kept.length !== selection.value.length && !(await canLeaveFields())) return;
+  hiddenLayers.value = hidden;
   if (kept.length !== selection.value.length) selection.value = kept;
 }
 
 // -- selection ---------------------------------------------------------------
-function choose({ ref, toggle = false, range = false }) {
+async function choose({ ref, toggle = false, range = false }) {
+  if (!(await canLeaveFields())) return;
   // 入口 E / 外部入口 E: the chosen node or room opens the entrance form.
   if (tool.value === "entrance" && domain.value === "settlement" && parseSettlementRef(ref)?.kind === "node") {
     openEntrance(entranceRequest(currentMapId.value, parseSettlementRef(ref).nodeId, "settlement"), ref);
@@ -515,8 +544,9 @@ function choose({ ref, toggle = false, range = false }) {
   if (drawers.value && selection.value.length && !toggle && !range) drawer.value = "inspector";
 }
 
-function chooseResult({ ref, toggle }) {
+async function chooseResult({ ref, toggle }) {
   if (toggle) {
+    if (!(await canLeaveFields())) return;
     selection.value = nextSelection(selection.value, ref, { toggle: true });
     return;
   }
@@ -542,7 +572,8 @@ function openEntrance(request, ref) {
 
 // A plain callback for inspectors whose command answer can arrive after
 // they unmounted: select one reference, or nothing.
-function selectRef(ref) {
+async function selectRef(ref) {
+  if (!(await canLeaveFields())) return;
   selection.value = ref ? [ref] : [];
 }
 
@@ -695,7 +726,8 @@ function continentMove(id, point) {
   return null;
 }
 
-function onPlace({ point }) {
+async function onPlace({ point }) {
+  if (!(await canLeaveFields())) return;
   const current = world.value;
   if (current && domain.value === "settlement" && tool.value === "node") {
     placeNode(point);
@@ -718,7 +750,7 @@ function onPlace({ point }) {
     else index = insertionIndex(points.map((entry) => entry.m), point, { closed: parsed.kind === "mainland" });
     const stored = storedFromMetres(current, parsed.feature, point);
     send(insertPoint(parsed.feature, index, stored)).then((result) => {
-      if (result?.changed) selection.value = [`${parsed.feature}#${index}`];
+      if (result?.changed) selectRef(`${parsed.feature}#${index}`);
     });
   } else if (tool.value === "waterway") {
     if (!pendingStart.value) {
@@ -845,8 +877,9 @@ function cellSize() {
 function onCreate(descriptor, ref, mapId = null) {
   creation.value = null;
   if (domain.value === "interior") tool.value = "select";
-  send(descriptor).then((result) => {
+  send(descriptor).then(async (result) => {
     if (!result?.changed) return;
+    if (!(await canLeaveFields())) return;
     // A new interior opens on its first room.
     if (mapId) mapIds.value = { ...mapIds.value, interior: mapId };
     if (ref) selection.value = [ref];
@@ -864,7 +897,8 @@ function cancelTool() {
   if (domain.value === "interior") tool.value = "select";
 }
 
-function onCanvasMove({ id, point, settle }) {
+async function onCanvasMove({ id, point, settle }) {
+  if (!(await canLeaveFields())) return settle();
   if (domain.value === "settlement") {
     const descriptor = settlementMove(id, point);
     if (!selection.value.includes(id)) selection.value = [id];
@@ -1007,12 +1041,35 @@ function isContextCopy(event) {
   return !(textSelection && !textSelection.isCollapsed && String(textSelection).trim());
 }
 
+function onFieldBlur(event) {
+  // Moving to the explicit discard action must leave its draft unconfirmed.
+  if (
+    hold.value === HOLD_DRAFT &&
+    event.target?.matches?.("input[data-draft='true'], textarea[data-draft='true']") &&
+    event.relatedTarget?.matches?.("[data-banner-action='adopt']")
+  ) event.stopPropagation();
+}
+
 function onKeydown(event) {
   if (!commands) return;
   if (isContextCopy(event)) {
     event.preventDefault();
     copyContext();
     return;
+  }
+  if (
+    event.key === "Tab" && !event.altKey && !event.ctrlKey && !event.metaKey &&
+    hold.value === HOLD_DRAFT && event.target?.matches?.("input[data-draft='true'], textarea[data-draft='true']")
+  ) {
+    const action = root.value?.querySelector("[data-banner-action='adopt']");
+    if (action) {
+      event.preventDefault();
+      // Tab in either direction reaches the resolution action. Close a modal
+      // drawer, then focus synchronously before Vue can hide the draft field.
+      drawer.value = null;
+      action.focus();
+      return;
+    }
   }
   if (event.key === "Tab" && drawer.value) {
     trapTab(event);
@@ -1048,7 +1105,7 @@ function onKeydown(event) {
         cancelTool();
       }
       else if (action.target === "refusal") refusalShown.value = false;
-      else selection.value = [];
+      else selectRef(null);
       break;
     case "save":
       // Save flushes accepted operations; it never forces a field draft.
@@ -1089,7 +1146,8 @@ function onKeydown(event) {
   }
 }
 
-function requestDelete() {
+async function requestDelete() {
+  if (!(await canLeaveFields())) return;
   if (!selection.value.length) return;
   if (selection.value.length === 1 && world.value) {
     const ref = selection.value[0];
@@ -1218,6 +1276,7 @@ async function onChip(key) {
     :data-preview-state="workspace?.preview_state ?? 'loading'"
     :data-connection="connectionState"
     :data-layout="drawers ? 'drawers' : 'columns'"
+    @blur.capture="onFieldBlur"
   >
     <header class="editor__header" role="banner" tabindex="-1" data-region="header" aria-label="工作區">
       <span class="editor__seal" aria-hidden="true">✎</span>
@@ -1325,7 +1384,7 @@ async function onChip(key) {
         @choose="choose"
         @result="chooseResult"
         @query="query = $event"
-        @map="(id) => { show(domain, id); selection = []; }"
+        @map="openMap"
       />
     </nav>
 
