@@ -5,9 +5,9 @@
 // canvas and inspector columns (drawers when they cannot fit); and the
 // diagnostics strip. The page follows the workspace files continuously
 // (adopting external changes, held behind open drafts until 載入新版), keeps
-// the selection by qualified identity, and runs the first document commands
-// (interior room layout moves) as guarded single-document operations with
-// undo/redo of the manual segment. Copying the OMP context only writes plain
+// the selection by qualified identity, and runs guarded single-document
+// commands (interior room layout moves; continental geometry, locations,
+// districts, footprints and bindings) with undo/redo of the manual segment. Copying the OMP context only writes plain
 // text to the clipboard; it starts nothing.
 // Authored text is rendered with text interpolation only (never v-html).
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
@@ -16,6 +16,25 @@ import LayoutPositionFields from "./components/LayoutPositionFields.vue";
 import NavigationPanel from "./components/NavigationPanel.vue";
 import InspectorPanel from "./components/InspectorPanel.vue";
 import DiagnosticsStrip from "./components/DiagnosticsStrip.vue";
+import ContinentInspector from "./components/ContinentInspector.vue";
+import {
+  KM,
+  cellOfMetres,
+  deleteLocation,
+  documentCommand,
+  featurePoints,
+  insertPoint,
+  insertionIndex,
+  locationField,
+  movePoint,
+  nextId,
+  parseContinentRef,
+  removalOf,
+  sameStored,
+  siteField,
+  storedFromMetres,
+  footprintCell,
+} from "./lib/continent.js";
 import { CONNECTING, DISCONNECTED, createWorkspaceClient } from "./lib/workspace_client.js";
 import { ADOPT, HOLD_DRAFT, HOLD_RESTART, followDecision, preserveSelection } from "./lib/following.js";
 import { workspaceBanner } from "./lib/banner.js";
@@ -30,7 +49,7 @@ import { searchObjects } from "./lib/search.js";
 import { nextSelection } from "./lib/selection.js";
 import { selectionSummary } from "./lib/selection_owner.js";
 import { incomingOf, relationsOf } from "./lib/relations.js";
-import { deletionRefusal } from "./lib/deletion.js";
+import { UNAVAILABLE as NOTHING_REFUSES, deletionRefusal } from "./lib/deletion.js";
 import { diagnosticGroups, groupCounts } from "./lib/diagnostics.js";
 import { defaultHiddenLayers, visibleScene } from "./lib/layers.js";
 import { ompContext } from "./lib/context_copy.js";
@@ -43,7 +62,15 @@ const mapIds = ref({ settlement: null, interior: null });
 const selection = ref([]);
 const diagnosticsOpen = ref(false);
 const persistence = ref({ inFlight: 0, failure: null, savedAt: null, lastDocument: null });
-const draftCount = ref(0);
+// Open field drafts of the layout fields and the continent inspector.
+const layoutDrafts = ref(0);
+const continentDrafts = ref(0);
+const draftCount = computed(() => layoutDrafts.value + continentDrafts.value);
+// Continent tool state: a two-click waterway start, an open creation form
+// and a hint when a tool has no target. Never persisted, never sent.
+const pendingStart = ref(null);
+const creation = ref(null);
+const toolHint = ref(null);
 // The snapshot on screen (commands are built against it), the newest held
 // one, why it is held, and a form epoch that discards drafts when bumped.
 const displayed = ref(null);
@@ -191,13 +218,13 @@ const DOMAINS = [
 ];
 const FRAMES = { continent: "地理座標（公尺）· 1 km 格", settlement: "地方座標（公尺）", interior: "版面格（非距離）" };
 const currentMapId = computed(() => (domain.value === "continent" ? null : mapIds.value[domain.value]));
-const fullScene = computed(() => sceneFor(world.value, domain.value, currentMapId.value));
+const fullScene = computed(() => sceneFor(world.value, domain.value, currentMapId.value, selection.value));
 const scene = computed(() => visibleScene(fullScene.value, hiddenLayers.value));
 const title = computed(() => crumbFor(domain.value, currentMapId.value));
 const sourcePath = computed(() => sourcePathFor(world.value, domain.value, currentMapId.value));
 const frameLabel = computed(() => [FRAMES[domain.value], sourcePath.value].filter(Boolean).join(" · "));
 const tree = computed(() => worldTree(world.value));
-const objects = computed(() => scene.value?.marks ?? []);
+const objects = computed(() => scene.value?.items ?? scene.value?.marks ?? []);
 const record = computed(() => inspect(world.value, selected.value));
 const summary = computed(() => selectionSummary(catalog.value, selection.value));
 const relations = computed(() =>
@@ -206,8 +233,18 @@ const relations = computed(() =>
 const refusal = computed(() => {
   if (!refusalShown.value || !selection.value.length) return null;
   const rows = incomingOf(world.value, workspace.value?.external_incoming_references ?? {}, selection.value);
-  return deletionRefusal({ externalStatus: workspace.value?.external_context_status, summary: summary.value, relations: rows });
+  return refusalFor(selection.value, rows);
 });
+
+function refusalFor(refs, rows) {
+  const location = refs.length === 1 && refs[0].startsWith("location:");
+  return deletionRefusal({
+    externalStatus: workspace.value?.external_context_status,
+    summary: summary.value,
+    relations: rows,
+    internalBlocks: location,
+  });
+}
 const results = computed(() => searchObjects(catalog.value, query.value));
 const tools = computed(() => TOOLS[domain.value] ?? []);
 const drawers = computed(() => useDrawers(viewport.value));
@@ -387,7 +424,21 @@ const selectedRoom = computed(() => {
   const position = interior && storedPosition(interior, room.roomId);
   return position ? { ...room, position } : null;
 });
-const layoutMovable = computed(() => domain.value === "interior" && Boolean(world.value));
+const layoutMovable = computed(() => (domain.value === "interior" || domain.value === "continent") && Boolean(world.value));
+const placing = computed(() => domain.value === "continent" && tool.value !== "select");
+const pendingPoints = computed(() => (pendingStart.value ? [pendingStart.value.point] : []));
+const showContinentInspector = computed(
+  () =>
+    domain.value === "continent" &&
+    Boolean(world.value) &&
+    (Boolean(creation.value) || Boolean(toolHint.value) || (selected.value && (parseContinentRef(selected.value) || selected.value.startsWith("location:")))),
+);
+
+watch([tool, domain], () => {
+  pendingStart.value = null;
+  creation.value = null;
+  toolHint.value = null;
+});
 
 function submitMove(interiorId, roomId, positionOf) {
   // Built when its turn comes, against the snapshot the previous command left.
@@ -401,7 +452,111 @@ function submitMove(interiorId, roomId, positionOf) {
   });
 }
 
+// -- continent commands ------------------------------------------------------
+// One descriptor is one named command, built against the snapshot that is
+// current when its turn comes (fingerprint included).
+function send(descriptor) {
+  return commands.submit((current) => documentCommand(current, descriptor));
+}
+
+function continentMove(id, point) {
+  const parsed = parseContinentRef(id);
+  if (parsed?.feature && parsed.index !== null) {
+    const entry = featurePoints(world.value, parsed.feature)[parsed.index];
+    const stored = storedFromMetres(world.value, id, point);
+    return entry && !sameStored(entry.stored, stored) ? movePoint(id, stored) : null;
+  }
+  if (parsed?.kind === "site") {
+    const site = world.value.continent.harbor_sites.find((row) => row.id === parsed.id);
+    const cell = cellOfMetres(world.value, point);
+    return site && !sameStored(site.cell, cell) ? siteField(parsed.id, "cell", cell) : null;
+  }
+  const location = world.value.locations.find((row) => row.qualified_ref === id);
+  if (location) {
+    const cell = cellOfMetres(world.value, point);
+    return sameStored(location.cell, cell) ? null : locationField(location.id, "cell", cell);
+  }
+  return null;
+}
+
+function onPlace({ point }) {
+  const current = world.value;
+  if (!current || domain.value !== "continent") return;
+  toolHint.value = null;
+  const cell = cellOfMetres(current, point);
+  if (tool.value === "point") {
+    const ref = selected.value;
+    const parsed = parseContinentRef(ref);
+    if (!parsed?.feature) {
+      toolHint.value = "加控制點：先選取大陸海岸線、林線或一條水系（或其中一個控制點）。";
+      return;
+    }
+    const points = featurePoints(current, parsed.feature);
+    let index;
+    if (parsed.kind === "ford") index = points.length;
+    else if (parsed.index !== null) index = parsed.index + 1;
+    else index = insertionIndex(points.map((entry) => entry.m), point, { closed: parsed.kind === "mainland" });
+    const stored = storedFromMetres(current, parsed.feature, point);
+    send(insertPoint(parsed.feature, index, stored)).then((result) => {
+      if (result?.changed) selection.value = [`${parsed.feature}#${index}`];
+    });
+  } else if (tool.value === "waterway") {
+    if (!pendingStart.value) {
+      pendingStart.value = { cell, point: { x: (cell[0] + 0.5) * cellSize(), y: (cell[1] + 0.5) * cellSize() } };
+      toolHint.value = "水系：再點一次終點；Esc 取消。";
+      return;
+    }
+    const start = pendingStart.value.cell;
+    pendingStart.value = null;
+    const ids = current.continent.waterways.map((row) => row.id);
+    creation.value = { type: "waterway", route: [start, cell], defaults: { id: nextId("waterway", ids) } };
+  } else if (tool.value === "ridge") {
+    creation.value = { type: "pass", defaults: { id: "pass", y_min: String(cell[1]), y_max: String(cell[1] + 2) } };
+  } else if (tool.value === "location") {
+    const ids = [...current.locations.map((row) => row.id), ...current.continent.harbor_sites.map((row) => row.id)];
+    creation.value = {
+      type: "location",
+      cell,
+      defaults: { id: nextId("location", ids), as: "location", kind: "dungeon", display_name_zh: "", description: "" },
+    };
+  } else if (tool.value === "footprint") {
+    const parsed = parseContinentRef(selected.value);
+    const settlement = parsed?.kind === "footprint" ? current.settlements.find((row) => row.id === parsed.id) : null;
+    if (!settlement?.footprint) {
+      toolHint.value = "佔地：先選取一個據點佔地（物件清單或地點的檢查器）。";
+      return;
+    }
+    const filled = settlement.footprint.cells.some(([x, y]) => x === cell[0] && y === cell[1]);
+    send(footprintCell(current, settlement.id, cell, !filled));
+  }
+  if (drawers.value && (creation.value || toolHint.value)) drawer.value = "inspector";
+}
+
+function cellSize() {
+  return (world.value?.continent?.cell_size_km ?? 1) * KM;
+}
+
+function onCreate(descriptor, ref) {
+  creation.value = null;
+  send(descriptor).then((result) => {
+    if (result?.changed && ref) selection.value = [ref];
+  });
+}
+
+function cancelTool() {
+  pendingStart.value = null;
+  creation.value = null;
+  toolHint.value = null;
+}
+
 function onCanvasMove({ id, point, settle }) {
+  if (domain.value === "continent") {
+    const descriptor = continentMove(id, point);
+    selection.value = [id];
+    if (!descriptor) return settle();
+    send(descriptor).finally(settle);
+    return;
+  }
   const room = parseRoomRef(id);
   if (!room) return settle();
   selection.value = [id];
@@ -544,7 +699,7 @@ function onKeydown(event) {
     mac,
     text: isTextTarget(event.target),
     drawerOpen: Boolean(drawer.value),
-    toolActive: tool.value !== "select",
+    toolActive: tool.value !== "select" || Boolean(creation.value || pendingStart.value),
     refusalShown: Boolean(refusal.value),
     hasSelection: selection.value.length > 0,
     nudgeScope: Boolean(selectedRoom.value) && inNudgeScope(event.target),
@@ -565,7 +720,10 @@ function onKeydown(event) {
       break;
     case "escape":
       if (action.target === "drawer") closeDrawer();
-      else if (action.target === "tool") tool.value = "select";
+      else if (action.target === "tool") {
+        tool.value = "select";
+        cancelTool();
+      }
       else if (action.target === "refusal") refusalShown.value = false;
       else selection.value = [];
       break;
@@ -606,6 +764,28 @@ function onKeydown(event) {
 
 function requestDelete() {
   if (!selection.value.length) return;
+  if (selection.value.length === 1 && world.value) {
+    const ref = selection.value[0];
+    const removal = removalOf(world.value, ref);
+    if (removal) {
+      // Geometry removals remove no qualified object: no index is involved.
+      const feature = parseContinentRef(ref)?.feature;
+      send(removal).then((result) => {
+        if (result?.changed) selection.value = feature && parseContinentRef(ref).kind !== "ford" ? [feature] : [];
+      });
+      return;
+    }
+    if (ref.startsWith("location:")) {
+      const rows = incomingOf(world.value, workspace.value?.external_incoming_references ?? {}, [ref]);
+      if (refusalFor([ref], rows).key === NOTHING_REFUSES) {
+        const id = ref.slice("location:".length);
+        send(deleteLocation(id)).then((result) => {
+          if (result?.changed) selection.value = [];
+        });
+        return;
+      }
+    }
+  }
   refusalShown.value = true;
   nextTick(() => root.value?.querySelector("[data-delete-refusal]")?.scrollIntoView({ block: "nearest" }));
 }
@@ -772,10 +952,13 @@ async function onChip(key) {
         :busy="persistence.inFlight > 0"
         :tools="tools"
         :tool="tool"
+        :placing="placing"
+        :pending="pendingPoints"
         :frame-label="frameLabel"
         @select="choose"
         @enter="onCanvasEnter"
         @move="onCanvasMove"
+        @place="onPlace"
         @tool="tool = $event"
       />
       <div v-else-if="workspace && !world" class="no-preview" data-no-preview>
@@ -808,6 +991,23 @@ async function onChip(key) {
         @copy="copyContext"
         @delete="requestDelete"
       >
+        <template #lead>
+        <ContinentInspector
+          v-if="showContinentInspector && !record"
+          :key="`${formEpoch}:lead`"
+          :world="world"
+          :workspace="workspace"
+          :selected="null"
+          :creation="creation"
+          :hint="toolHint"
+          @send="send"
+          @create="onCreate"
+          @cancel="cancelTool"
+          @select="(ref) => (selection = [ref])"
+          @follow="follow"
+          @drafts="continentDrafts = $event"
+        />
+        </template>
         <template v-if="selectedRoom">
           <h3 class="section-label">版面位置</h3>
           <LayoutPositionFields
@@ -815,10 +1015,25 @@ async function onChip(key) {
             :room-ref="selected"
             :position="selectedRoom.position"
             @confirm="onFieldConfirm"
-            @drafts="draftCount = $event"
+            @drafts="layoutDrafts = $event"
           />
           <p class="inspector__note">只寫入 {{ `content/map-editor-layouts/${selectedRoom.interiorId}.yaml` }}；不改變世界座標或距離。</p>
         </template>
+        <ContinentInspector
+          v-if="showContinentInspector && record"
+          :key="`${formEpoch}:${selected ?? ''}`"
+          :world="world"
+          :workspace="workspace"
+          :selected="selected"
+          :creation="creation"
+          :hint="toolHint"
+          @send="send"
+          @create="onCreate"
+          @cancel="cancelTool"
+          @select="(ref) => (selection = [ref])"
+          @follow="follow"
+          @drafts="continentDrafts = $event"
+        />
       </InspectorPanel>
     </aside>
 

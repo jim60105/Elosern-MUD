@@ -38,6 +38,7 @@ export function currentness({ workspace, connection, hold }) {
 }
 
 function coordinates(world, entry) {
+  if (entry.frame) return [oneLine(entry.frame)];
   if (entry.kind === "location") {
     const location = world.locations.find((row) => row.qualified_ref === entry.ref);
     return [

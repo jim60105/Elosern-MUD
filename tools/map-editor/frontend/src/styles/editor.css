@@ -1018,3 +1018,190 @@ select {
   overflow-wrap: anywhere;
   text-align: right;
 }
+
+/* -- continent tools (frontend design §4.1) --------------------------------- */
+.map-canvas__raster {
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+.map-shape--selectable {
+  cursor: pointer;
+}
+
+.map-shape--water--border {
+  stroke-width: 4;
+}
+
+.map-shape--ridge {
+  fill: none;
+  stroke: var(--paper-500);
+  stroke-width: 2.5;
+  stroke-dasharray: 2 3;
+}
+
+.map-shape--border {
+  fill: none;
+  stroke: var(--paper-300);
+  stroke-width: 1.5;
+  stroke-dasharray: 10 4 2 4;
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+.map-shape--footprint {
+  fill: rgba(199, 154, 74, 0.35);
+  stroke: var(--gold-500);
+  stroke-width: 1;
+}
+
+.map-shape--selected {
+  stroke: var(--gold-300);
+  stroke-width: 3.5;
+}
+
+.map-mark__handle {
+  fill: var(--ink-950);
+  stroke: var(--gold-400);
+  stroke-width: 2;
+}
+
+.map-mark--selected .map-mark__handle {
+  fill: var(--gold-300);
+}
+
+.map-mark__handle--pending {
+  stroke-dasharray: 3 2;
+  fill: none;
+}
+
+.map-mark__ford,
+.map-mark__pass {
+  fill: none;
+  stroke: var(--paper-100);
+  stroke-width: 2;
+}
+
+.map-mark__site {
+  fill: none;
+  stroke: var(--gold-500);
+  stroke-width: 2;
+}
+
+.map-mark:focus-visible .map-mark__handle,
+.map-mark:focus-visible .map-mark__site {
+  stroke: var(--gold-300);
+  stroke-width: 3;
+}
+
+.continent-inspector {
+  display: grid;
+  gap: calc(8px * var(--ui-scale));
+}
+
+.continent-inspector .ok {
+  color: var(--ok);
+}
+
+.continent-inspector .warn {
+  color: var(--warn);
+}
+
+.creation,
+.landmark {
+  display: grid;
+  gap: calc(6px * var(--ui-scale));
+}
+
+.draft-field {
+  display: grid;
+  gap: calc(2px * var(--ui-scale));
+  font-size: var(--text-xs);
+  color: var(--paper-500);
+}
+
+.draft-field__unit {
+  margin-left: 0.5em;
+  font-family: var(--f-mono);
+  color: var(--gold-400);
+}
+
+.draft-field__input {
+  width: 100%;
+  padding: calc(4px * var(--ui-scale)) calc(8px * var(--ui-scale));
+  border: 1px solid var(--band-edge-dim);
+  border-radius: 4px;
+  background: rgba(11, 13, 16, 0.6);
+  color: var(--paper-100);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+
+.draft-field__input:focus-visible {
+  outline: 2px solid var(--gold-300);
+  outline-offset: 2px;
+}
+
+.draft-field__input--draft {
+  border-bottom: 1px dashed var(--gold-500);
+  background: rgba(199, 154, 74, 0.1);
+}
+
+.draft-field__input--error {
+  border-color: var(--seal-500);
+}
+
+.draft-field__hint {
+  min-height: 1lh;
+  font-size: var(--text-xs);
+  color: var(--gold-400);
+}
+
+.draft-field__hint[data-field-error] {
+  color: var(--seal-400);
+}
+
+.footprint-grid {
+  display: grid;
+  gap: 0;
+  overflow-x: auto;
+  font-size: var(--text-xs);
+}
+
+.footprint-grid__row {
+  display: flex;
+  align-items: center;
+}
+
+.footprint-grid__axis {
+  min-width: 4.5ch;
+  color: var(--paper-500);
+}
+
+.footprint-grid__cell {
+  width: 1.6em;
+  height: 1.6em;
+  padding: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--paper-500);
+  font: inherit;
+  cursor: pointer;
+}
+
+.footprint-grid__cell--filled {
+  color: var(--gold-300);
+}
+
+.footprint-grid__cell--current {
+  border-color: var(--band-edge);
+}
+
+.footprint-grid__cell:focus-visible {
+  outline: 2px solid var(--gold-300);
+}
+
+.footprint-grid__legend {
+  margin: calc(4px * var(--ui-scale)) 0 0;
+  color: var(--paper-500);
+}

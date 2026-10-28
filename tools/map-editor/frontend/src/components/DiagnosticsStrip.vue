@@ -26,7 +26,7 @@ const emit = defineEmits(["toggle", "go"]);
       <span class="diagnostics__count diagnostics__count--seal" data-count="errors">✕ {{ counts.errors }}</span>
       <span class="diagnostics__count diagnostics__count--warn" data-count="warnings">▲ {{ counts.warnings }}</span>
       <span v-for="item in summary" :key="item" class="diagnostics__muted">· {{ item }}</span>
-      <span v-if="lastDocument" class="diagnostics__muted mono" data-last-saved>版面檔：{{ lastDocument }}</span>
+      <span v-if="lastDocument" class="diagnostics__muted mono" data-last-saved>上次存檔：{{ lastDocument }}</span>
       <span class="diagnostics__notice" role="status" :data-copy-notice="notice?.state ?? null">{{ notice?.text ?? "" }}</span>
       <span class="diagnostics__hint">{{ hints }}</span>
     </div>

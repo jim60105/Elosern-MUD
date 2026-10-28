@@ -11,6 +11,12 @@
 // host to focus the inspector. Ctrl/⌘-click toggles, Shift-click extends.
 // Floating chrome: tool pill (top left), zoom pill (top right), north arrow,
 // scale bar and coordinate frame (bottom left).
+// Continent: the core's terrain preview raster sits under the authored
+// shapes; a selectable shape (a feature) is chosen by click; derived shapes
+// (national borders) have no handler and no handle. Any mark flagged
+// `draggable` (control-point diamonds, locations, sites, fords, rooms) uses
+// the same one-release-one-move drag. With a placing tool, a click on the map
+// emits `place` (scene point) instead of selecting.
 // Authored labels render through text interpolation only.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
@@ -30,6 +36,7 @@ import {
   DRAG_THRESHOLD_PX,
 } from "@elosern/map-view";
 import { nearestInDirection } from "../lib/keyboard.js";
+import { previewPixels } from "../lib/continent.js";
 
 const props = defineProps({
   scene: { type: Object, default: null },
@@ -41,8 +48,12 @@ const props = defineProps({
   label: { type: String, default: "" },
   movable: { type: Boolean, default: false },
   busy: { type: Boolean, default: false },
+  // Tools whose canvas click places something (emits `place` with the point).
+  placing: { type: Boolean, default: false },
+  // Pending tool points (scene metres), drawn as dashed diamonds.
+  pending: { type: Array, default: () => [] },
 });
-const emit = defineEmits(["select", "enter", "move", "tool"]);
+const emit = defineEmits(["select", "enter", "move", "tool", "place"]);
 const chosen = computed(() => new Set(props.selected));
 // { id, point } while a mark is dragged or its move awaits the service.
 const draft = ref(null);
@@ -108,6 +119,29 @@ const path = (points, closed = false) =>
 const shapes = computed(() =>
   view.value && props.scene ? props.scene.shapes.map((shape) => ({ ...shape, d: path(shape.points, shape.type === "polygon") })) : [],
 );
+const pendingMarks = computed(() => (view.value ? props.pending.map((point) => at(point)) : []));
+
+// The terrain preview as one image (painted once per snapshot), placed by
+// projecting its south-west and north-east corners.
+const rasterHref = computed(() => {
+  const raster = props.scene?.raster;
+  if (!raster || typeof document === "undefined") return null;
+  const { columns, rows } = raster.preview;
+  const canvas = document.createElement("canvas");
+  canvas.width = columns;
+  canvas.height = rows;
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+  context.putImageData(new ImageData(previewPixels(raster.preview), columns, rows), 0, 0);
+  return canvas.toDataURL("image/png");
+});
+const rasterBox = computed(() => {
+  const raster = props.scene?.raster;
+  if (!raster || !view.value) return null;
+  const sw = at({ x: raster.west, y: raster.south });
+  const ne = at({ x: raster.east, y: raster.north });
+  return { x: Math.min(sw.x, ne.x), y: Math.min(sw.y, ne.y), width: Math.abs(ne.x - sw.x), height: Math.abs(sw.y - ne.y) };
+});
 const links = computed(() =>
   view.value && props.scene
     ? props.scene.links.map((link) => {
@@ -132,6 +166,7 @@ const lattice = computed(() =>
 
 // Pointer pan and wheel zoom (view only; no world change), and room drags.
 let drag = null;
+let panned = false;
 let markDrag = null;
 let suppressClick = false;
 function pixelOf(event) {
@@ -154,11 +189,12 @@ function onDragKey(event) {
 }
 function onPointerDown(event) {
   if (event.button !== 0) return;
+  panned = false;
   // Floating chrome keeps its own clicks; only the map surface pans.
   if (event.target.closest(".map-pill")) return;
   const markElement = event.target.closest(".map-mark");
   if (markElement) {
-    if (!props.movable || markElement.dataset.kind !== "room" || props.busy || !view.value) return;
+    if (!props.movable || markElement.dataset.draggable !== "true" || props.busy || !view.value) return;
     markDrag = { id: markElement.dataset.qualifiedRef, x: event.clientX, y: event.clientY, moved: false };
     window.addEventListener("keydown", onDragKey, true);
     host.value.setPointerCapture?.(event.pointerId);
@@ -179,6 +215,7 @@ function onPointerMove(event) {
   const dy = event.clientY - drag.y;
   if (!drag.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
   drag.moved = true;
+  panned = true;
   view.value = panByPixels(view.value, frame.value, dx, dy);
   drag.x = event.clientX;
   drag.y = event.clientY;
@@ -216,6 +253,22 @@ function onWheel(event) {
     x: event.clientX - rect.left,
     y: event.clientY - rect.top,
   });
+}
+
+// A click on the map surface (not a mark, not chrome): place with a placing
+// tool, else choose the clicked feature. A pan never counts as a click.
+function onSurfaceClick(event) {
+  if (panned) {
+    panned = false;
+    return;
+  }
+  if (!view.value || event.target.closest(".map-mark, .map-pill")) return;
+  if (props.placing) {
+    emit("place", { point: unproject(view.value, frame.value, pixelOf(event)) });
+    return;
+  }
+  const shape = event.target.closest("[data-shape-ref]");
+  if (shape) emit("select", { ref: shape.dataset.shapeRef, toggle: Boolean(event.ctrlKey || event.metaKey), range: false });
 }
 
 function select(mark, event = {}) {
@@ -290,6 +343,7 @@ defineExpose({ fit, focusMark });
     @pointerup="onPointerUp"
     @pointercancel="onPointerCancel"
     @wheel.prevent="onWheel"
+    @click="onSurfaceClick"
   >
     <svg v-if="scene && view" class="map-canvas__svg" :viewBox="`0 0 ${frame.width} ${frame.height}`" role="img" :aria-label="label">
       <defs v-if="lattice">
@@ -305,7 +359,30 @@ defineExpose({ fit, focusMark });
         </pattern>
       </defs>
       <rect v-if="lattice" width="100%" height="100%" fill="url(#map-editor-dots)" />
-      <path v-for="shape in shapes" :key="shape.id" :d="shape.d" :class="`map-shape map-shape--${shape.role}`" :data-shape="shape.id" />
+      <image
+        v-if="rasterHref && rasterBox"
+        :href="rasterHref"
+        :x="rasterBox.x"
+        :y="rasterBox.y"
+        :width="rasterBox.width"
+        :height="rasterBox.height"
+        preserveAspectRatio="none"
+        class="map-canvas__raster"
+        data-terrain-preview
+      />
+      <path
+        v-for="shape in shapes"
+        :key="shape.id"
+        :d="shape.d"
+        :class="[
+          'map-shape',
+          ...shape.role.split(' ').map((role) => `map-shape--${role}`),
+          { 'map-shape--selected': shape.selected, 'map-shape--selectable': shape.selectable },
+        ]"
+        :data-shape="shape.id"
+        :data-shape-ref="shape.selectable ? shape.ref : null"
+        :data-derived="shape.derived ? 'true' : null"
+      />
       <g v-for="link in links" :key="link.id" class="map-link" :class="`map-link--${link.kind}`" :data-link="link.id">
         <path :d="link.d" class="map-link__casing" />
         <path :d="link.d" class="map-link__core" :class="{ 'map-link__core--oneway': !link.twoWay }" />
@@ -319,6 +396,7 @@ defineExpose({ fit, focusMark });
         :data-draft="mark.draft ? 'true' : null"
         :transform="`translate(${mark.at.x.toFixed(1)} ${mark.at.y.toFixed(1)})`"
         :data-kind="mark.kind"
+        :data-draggable="mark.draggable ? 'true' : null"
         :data-qualified-ref="mark.id"
         role="button"
         tabindex="0"
@@ -332,6 +410,17 @@ defineExpose({ fit, focusMark });
           <text y="-3" class="map-mark__card-name">{{ mark.label }}</text>
           <text y="17" class="map-mark__card-id">{{ mark.detail }}</text>
         </template>
+        <template v-else-if="mark.kind === 'handle'">
+          <circle v-if="chosen.has(mark.id)" r="14" class="map-mark__ring" />
+          <rect x="-6" y="-6" width="12" height="12" transform="rotate(45)" class="map-mark__handle" />
+        </template>
+        <template v-else-if="mark.kind === 'ford' || mark.kind === 'pass' || mark.kind === 'site'">
+          <circle v-if="chosen.has(mark.id)" r="14" class="map-mark__ring" />
+          <path v-if="mark.kind === 'ford'" d="M-8 -4 h16 M-8 4 h16" class="map-mark__ford" />
+          <path v-else-if="mark.kind === 'pass'" d="M-9 0 h18 M-5 -6 v12 M5 -6 v12" class="map-mark__pass" />
+          <rect v-else x="-5" y="-5" width="10" height="10" class="map-mark__site" />
+          <text y="-14" class="map-mark__label">{{ mark.label }}</text>
+        </template>
         <template v-else>
           <template v-if="chosen.has(mark.id)">
             <circle r="14" class="map-mark__ring" />
@@ -341,6 +430,9 @@ defineExpose({ fit, focusMark });
           <circle v-else :r="NODE_DOT_R" class="map-mark__dot" />
           <text y="-14" class="map-mark__label">{{ mark.label }}</text>
         </template>
+      </g>
+      <g v-for="(point, index) in pendingMarks" :key="`pending-${index}`" :transform="`translate(${point.x.toFixed(1)} ${point.y.toFixed(1)})`" data-pending-point>
+        <rect x="-6" y="-6" width="12" height="12" transform="rotate(45)" class="map-mark__handle map-mark__handle--pending" />
       </g>
     </svg>
     <div class="map-pill map-pill--tools" role="toolbar" aria-label="工具">
