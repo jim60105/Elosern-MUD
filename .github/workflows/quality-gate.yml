@@ -55,8 +55,10 @@ jobs:
       - name: Run map-core package tests
         # The pure map package keeps its own project and lock; it must stay
         # importable and green without Evennia or Django in the environment.
+        # The generation extra is only for the offline partition generator;
+        # the runtime codec/freshness tests also run without it in the root suite.
         working-directory: packages/map-core
-        run: uv run --locked python -m pytest tests
+        run: uv run --locked --extra generation python -m pytest tests
 
       - name: Run Node DOM-independent test suite
         run: node --test web/static/webclient/js/tests/*.test.js
