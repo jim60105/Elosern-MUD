@@ -291,3 +291,44 @@ def test_workspace_discovery_and_freshness(tmp_path: Path):
     stale = check_workspace_freshness(doc, tmp_path)
     assert not stale.current
     assert stale.status == STATUS_CHANGED
+
+
+def test_malformed_incoming_reference_key_disagreement():
+    doc = _sample_document()
+    data = doc.to_dict()
+    # Move the north_gate entry under a mismatched key
+    entry = data["incoming_references"].pop("settlement_node:altoria_capital:north_gate")
+    data["incoming_references"]["settlement_node:altoria_capital:other_gate"] = entry
+
+    with pytest.raises(ReferenceContextError, match="disagrees with map key"):
+        decode_reference_context(json.dumps(data))
+
+
+def test_execute_guarded_destructive_operation_behavior():
+    from elosern_map_core.reference_context import execute_guarded_destructive_operation
+
+    doc = _sample_document()
+    fresh = ReferenceContextFreshness(current=True, status=STATUS_CURRENT, reasons=())
+    stale = ReferenceContextFreshness(current=False, status=STATUS_CHANGED, reasons=("changed",))
+
+    op_called = []
+    def op():
+        op_called.append(True)
+
+    referenced = QualifiedRef("settlement_node", "altoria_capital", "north_gate")
+    free = QualifiedRef("settlement_node", "altoria_capital", "free_node")
+
+    # Refused when stale
+    res1 = execute_guarded_destructive_operation(doc, free, stale, op)
+    assert not res1.executed
+    assert not op_called
+
+    # Refused when referenced
+    res2 = execute_guarded_destructive_operation(doc, referenced, fresh, op)
+    assert not res2.executed
+    assert not op_called
+
+    # Allowed when fresh and free
+    res3 = execute_guarded_destructive_operation(doc, free, fresh, op)
+    assert res3.executed
+    assert op_called == [True]

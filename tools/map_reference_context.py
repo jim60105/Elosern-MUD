@@ -46,7 +46,7 @@ DISCOVERY_RULES: tuple[str, ...] = (
     "world/rules/**/*.py",
     "world/rules/**/*.yaml",
     "tools/map_reference_context.py",
-    "packages/map-core/elosern_map_core/reference_context.py",
+    "packages/map-core/elosern_map_core/**/*.py",
 )
 
 

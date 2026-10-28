@@ -46,6 +46,15 @@ DELETION_ALLOWED = "allowed"
 DELETION_REFUSED_UNAVAILABLE = "unavailable"
 DELETION_REFUSED_REFERENCED = "referenced"
 
+@dataclass(frozen=True, slots=True)
+class GuardedExecutionResult:
+    """The result of executing a destructive command or undo operation under reference guards."""
+
+    executed: bool
+    status: str
+    reasons: tuple[str, ...] = ()
+    incoming_references: tuple[IncomingReference, ...] = ()
+
 
 class ReferenceContextError(ValueError):
     """The reference-context document is malformed or invalid."""
@@ -312,7 +321,16 @@ def decode_reference_context(source: str | Mapping[str, Any]) -> ReferenceContex
     for key, rows in incoming_raw.items():
         if not isinstance(key, str) or not isinstance(rows, (list, tuple)):
             raise ReferenceContextError(f"incoming references for {key!r} must be a list")
-        incoming_references[key] = tuple(IncomingReference.from_dict(row) for row in rows)
+        parsed_rows = []
+        for row in rows:
+            ref = IncomingReference.from_dict(row)
+            actual_key = canonical_target_key(ref.target)
+            if actual_key != key:
+                raise ReferenceContextError(
+                    f"incoming reference target {actual_key!r} disagrees with map key {key!r}"
+                )
+            parsed_rows.append(ref)
+        incoming_references[key] = tuple(parsed_rows)
 
     manifest_raw = data.get("source_manifest")
     if not isinstance(manifest_raw, Mapping):
@@ -338,6 +356,35 @@ def decode_reference_context(source: str | Mapping[str, Any]) -> ReferenceContex
         source_manifest=source_manifest,
         discovery_rules=discovery_rules,
         fingerprint=fingerprint,
+    )
+
+
+def execute_guarded_destructive_operation(
+    context: ReferenceContextDocument,
+    target: QualifiedRef | str,
+    freshness: ReferenceContextFreshness,
+    operation: Any,
+) -> GuardedExecutionResult:
+    """Execute an object-removing command or undo operation only if reference context permits.
+
+    Evaluates execution-time reference context freshness and incoming static references.
+    If context is unavailable or target is referenced, refuses execution without calling
+    ``operation``, leaving disk and history state untouched.
+    """
+    decision = context.check_deletion_safety(target, freshness)
+    if not decision.allowed:
+        return GuardedExecutionResult(
+            executed=False,
+            status=decision.status,
+            reasons=decision.reasons,
+            incoming_references=decision.incoming_references,
+        )
+    operation()
+    return GuardedExecutionResult(
+        executed=True,
+        status=DELETION_ALLOWED,
+        reasons=(),
+        incoming_references=(),
     )
 
 

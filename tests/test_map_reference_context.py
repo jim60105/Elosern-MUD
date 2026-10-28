@@ -59,28 +59,32 @@ class FatalDatabaseAccessTests(unittest.TestCase):
 
     def test_export_in_subprocess_with_guarded_database(self):
         script = """
+import django.db.backends.base.base as base
+from django.db import OperationalError
+
+# Install fatal guard before bootstrap and game imports
+def _fatal(*args, **kwargs):
+    raise OperationalError("Live DB access forbidden during bootstrap or export")
+
+base.BaseDatabaseWrapper.connect = _fatal
+base.BaseDatabaseWrapper.cursor = _fatal
+base.BaseDatabaseWrapper._cursor = _fatal
+
 from tools import map_reference_context as exp
 exp._bootstrap()
+text = exp.export_reference_context_text()
+assert len(text) > 1000
 
-# Install fatal guard on all database operations
-from unittest.mock import patch
-from django.db.backends.base.base import BaseDatabaseWrapper
+# Also prove that direct queries during export are caught and fatal
+from evennia.server.models import ServerConfig
+try:
+    ServerConfig.objects.count()
+    failed = False
+except OperationalError:
+    failed = True
+assert failed, "database guard did not catch direct query"
 
-def _fatal(*args, **kwargs):
-    raise RuntimeError("Fatal DB access")
-
-with patch.object(BaseDatabaseWrapper, "connect", _fatal), patch.object(BaseDatabaseWrapper, "cursor", _fatal), patch.object(BaseDatabaseWrapper, "_cursor", _fatal):
-    text = exp.export_reference_context_text()
-    assert len(text) > 1000
-
-    # Also prove that any attempt to touch DB would fail
-    from evennia.server.models import ServerConfig
-    try:
-        ServerConfig.objects.count()
-        failed = False
-    except RuntimeError:
-        failed = True
-    assert failed, "database guard did not catch direct query"
+print("SUBPROCESS_SUCCESS")
 
 print("SUBPROCESS_SUCCESS")
 """
@@ -286,6 +290,7 @@ assert "world" not in sys.modules
 
 from elosern_map_core.reference_context import (
     decode_reference_context,
+    check_workspace_freshness,
     check_reference_context_freshness,
     STATUS_CURRENT,
 )
@@ -295,16 +300,7 @@ doc_path = Path("content/map-reference-context.json")
 content = doc_path.read_text(encoding="utf-8")
 doc = decode_reference_context(content)
 
-# Build file hashes purely from disk
-manifest = doc.source_manifest
-hashes = {}
-import hashlib
-for path_str in manifest:
-    p = Path(path_str)
-    if p.is_file():
-        hashes[path_str] = hashlib.sha256(p.read_bytes()).hexdigest()
-
-freshness = check_reference_context_freshness(doc, hashes, discovered_files=list(manifest.keys()))
+freshness = check_workspace_freshness(doc, Path("."))
 assert freshness.current, f"expected current, got {freshness.status}: {freshness.reasons}"
 assert "evennia" not in sys.modules
 assert "django" not in sys.modules
@@ -320,6 +316,82 @@ print("INDEPENDENT_CHECK_OK")
         self.assertIn("INDEPENDENT_CHECK_OK", result.stdout, msg=f"stdout={result.stdout}\nstderr={result.stderr}")
         self.assertEqual(result.returncode, 0)
 
+    def test_external_source_change_causes_destructive_command_and_undo_to_refuse(self):
+        """WHEN an external dependency changes while index bytes & browser snapshot are unchanged
+        THEN execution-time check reports unavailable and refuses deletion including undo,
+        without changing disk or history.
+        """
+        from elosern_map_core.reference_context import (
+            compute_dependency_fingerprint,
+            execute_guarded_destructive_operation,
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            # Create external source
+            ext_dir = tmp_root / "world" / "lore"
+            ext_dir.mkdir(parents=True)
+            ext_file = ext_dir / "places.py"
+            ext_file.write_text("DATA = 'original'", encoding="utf-8")
+
+            # Create authoring map document
+            map_dir = tmp_root / "content" / "maps" / "settlements"
+            map_dir.mkdir(parents=True)
+            map_file = map_dir / "settlement_test.yaml"
+            original_map_yaml = "nodes:\n  node_a: [10, 10]\n  node_b: [20, 20]\n"
+            map_file.write_text(original_map_yaml, encoding="utf-8")
+
+            # Generate reference context for this workspace
+            import hashlib
+            manifest = {"world/lore/places.py": hashlib.sha256(ext_file.read_bytes()).hexdigest()}
+            rules = ("world/lore/**/*.py",)
+            doc = ReferenceContextDocument(
+                schema_version=SCHEMA_VERSION,
+                exporter_version=EXPORTER_VERSION,
+                external_identifiers={},
+                incoming_references={},
+                source_manifest=manifest,
+                discovery_rules=rules,
+                fingerprint=compute_dependency_fingerprint(manifest, SCHEMA_VERSION, EXPORTER_VERSION, rules),
+            )
+
+            # Establish initial command history
+            # An undo stack containing: [initial_state, after_create_node_b]
+            history_stack = ["action:create_node_b"]
+
+            # Scenario: an external file changes on disk while doc and browser snapshot remain unchanged!
+            ext_file.write_text("DATA = 'modified_content'", encoding="utf-8")
+
+            # 1. Attempt destructive command (delete node_a)
+            freshness_check = check_workspace_freshness(doc, tmp_root)
+            self.assertFalse(freshness_check.current)
+            self.assertEqual(freshness_check.status, STATUS_CHANGED)
+
+            target = QualifiedRef("settlement_node", "settlement_test", "node_a")
+            def delete_op():
+                map_file.write_text("nodes:\n  node_b: [20, 20]\n", encoding="utf-8")
+                history_stack.append("action:delete_node_a")
+
+            result = execute_guarded_destructive_operation(doc, target, freshness_check, delete_op)
+            self.assertFalse(result.executed)
+            self.assertEqual(result.status, DELETION_REFUSED_UNAVAILABLE)
+            # Verify disk is byte-for-byte unchanged
+            self.assertEqual(map_file.read_text(encoding="utf-8"), original_map_yaml)
+            # Verify history stack is unchanged
+            self.assertEqual(history_stack, ["action:create_node_b"])
+
+            # 2. Attempt object-removing undo (undoing creation of node_b)
+            def undo_remove_op():
+                map_file.write_text("nodes:\n  node_a: [10, 10]\n", encoding="utf-8")
+                history_stack.pop()
+
+            undo_target = QualifiedRef("settlement_node", "settlement_test", "node_b")
+            undo_result = execute_guarded_destructive_operation(doc, undo_target, freshness_check, undo_remove_op)
+            self.assertFalse(undo_result.executed)
+            self.assertEqual(undo_result.status, DELETION_REFUSED_UNAVAILABLE)
+            # Verify disk is STILL byte-for-byte unchanged
+            self.assertEqual(map_file.read_text(encoding="utf-8"), original_map_yaml)
+            # Verify history stack is STILL unchanged
+            self.assertEqual(history_stack, ["action:create_node_b"])
 
 class DeletionSafetyAndUndoRefusalTests(unittest.TestCase):
     """External source changes before deletion cause destructive commands and undo-remove to refuse."""
@@ -338,7 +410,7 @@ class DeletionSafetyAndUndoRefusalTests(unittest.TestCase):
         self.assertFalse(freshness.current)
 
         # Attempt to delete an unreferenced object
-        unreferenced_target = QualifiedRef("settlement_node", "capital_altoria", "free_unreferenced_node")
+        unreferenced_target = QualifiedRef("settlement_node", "t_synth_settlement", "t_synth_free_node")
         decision = self.doc.check_deletion_safety(unreferenced_target, freshness)
 
         # Must refuse because external context is unavailable
@@ -348,14 +420,15 @@ class DeletionSafetyAndUndoRefusalTests(unittest.TestCase):
 
     def test_referenced_target_refuses_deletion_even_when_fresh(self):
         freshness = ReferenceContextFreshness(current=True, status=STATUS_CURRENT, reasons=())
-        # Pick a target that is referenced by a place
-        target_room = QualifiedRef("interior_room", "altoria_tailor", "altoria_tailor")
+        # Pick a target that has an incoming reference
+        first_ref_row = next(iter(self.doc.incoming_references.values()))[0]
+        target_room = first_ref_row.target
         decision = self.doc.check_deletion_safety(target_room, freshness)
 
         self.assertFalse(decision.allowed)
         self.assertEqual(decision.status, DELETION_REFUSED_REFERENCED)
         self.assertTrue(len(decision.incoming_references) > 0)
-        self.assertTrue(any("place:altoria_tailor" in r for r in decision.reasons))
+        self.assertTrue(any(first_ref_row.source in r for r in decision.reasons))
 
     def test_unreferenced_target_allows_deletion_when_fresh(self):
         freshness = ReferenceContextFreshness(current=True, status=STATUS_CURRENT, reasons=())
