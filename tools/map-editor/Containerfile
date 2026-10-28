@@ -1,0 +1,90 @@
+# syntax=docker/dockerfile:1
+# Standalone map editor image (tools/map-editor, docs/development/map-editor.md).
+#
+# A local, game-free service: no Evennia, Django, game database, Node runtime
+# or CDN asset at run time. The repository checkout is mounted at /workspace so
+# the editor reads and autosaves the authored YAML sources of the checkout.
+#
+# Build from the repository root (the frontend needs packages/map-view and the
+# allowlisted web/webclient-app styles, fonts and ui-scale file):
+#   podman build -f tools/map-editor/Containerfile \
+#     --ignorefile tools/map-editor/.containerignore \
+#     -t localhost/elosern-map-editor:dev .
+#
+# scripts/podman-map-editor.sh wraps both steps.
+
+########################################
+# Editor frontend build (Vue 3 + Vite)
+########################################
+FROM docker.io/library/node:24-slim AS frontend
+
+WORKDIR /build
+
+# Pinned to match packageManager in tools/map-editor/frontend/package.json.
+RUN npm install --global pnpm@12.5.1
+
+# Manifests first, so a source-only change reuses the locked dependency layer.
+COPY tools/map-editor/frontend/package.json tools/map-editor/frontend/pnpm-lock.yaml \
+    tools/map-editor/frontend/pnpm-workspace.yaml tools/map-editor/frontend/
+COPY packages/map-view/ packages/map-view/
+RUN --mount=type=cache,id=pnpm-map-editor,target=/root/.local/share/pnpm/store \
+    pnpm --dir tools/map-editor/frontend install --frozen-lockfile
+
+COPY tools/map-editor/frontend/ tools/map-editor/frontend/
+# The editor build aliases exactly these three game-tree sources (design
+# tokens, font faces, ui-scale). Nothing else from the game application shell
+# enters the build or the image.
+COPY web/webclient-app/styles/ web/webclient-app/styles/
+COPY web/webclient-app/fonts/ web/webclient-app/fonts/
+COPY web/webclient-app/lib/ui_scale.js web/webclient-app/lib/ui_scale.js
+RUN pnpm --dir tools/map-editor/frontend run build
+
+########################################
+# Editor service runtime
+########################################
+FROM docker.io/library/python:3.13-slim AS runtime
+
+ARG UID=1001
+
+COPY --from=ghcr.io/astral-sh/uv@sha256:606e70c71c852d03f611b1e56a195d08648507018a7057fab82c4974c4eae105 /uv /uvx /bin/
+
+ENV UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=0 \
+    UV_PROJECT_ENVIRONMENT=/venv \
+    VIRTUAL_ENV=/venv \
+    PATH="/venv/bin:$PATH" \
+    PYTHONDONTWRITEBYTECODE=1 \
+    HOME=/tmp
+
+WORKDIR /build
+
+# The editor project's own lock, with the core's `generation` extra (NumPy and
+# SciPy) for explicit partition jobs. The root game project is never installed.
+COPY tools/map-editor/pyproject.toml tools/map-editor/uv.lock tools/map-editor/README.md \
+    tools/map-editor/
+COPY packages/map-core/pyproject.toml packages/map-core/README.md packages/map-core/
+COPY packages/map-core/elosern_map_core/ packages/map-core/elosern_map_core/
+COPY tools/map-editor/elosern_map_editor/ tools/map-editor/elosern_map_editor/
+RUN --mount=type=cache,id=uv-map-editor,target=/root/.cache/uv \
+    uv sync --locked --no-dev --no-editable --project tools/map-editor
+
+# The built workspace, served by the service from --frontend-dist. Node and
+# pnpm stay in the build stage; the running editor needs neither.
+COPY --from=frontend /build/tools/map-editor/frontend/dist /app/frontend/dist
+
+# Non-root, arbitrary-UID friendly: the compose/script run passes the host UID
+# with --userns=keep-id so autosaved YAML stays owned by the invoking user.
+RUN groupadd --gid "$UID" editor && \
+    useradd --uid "$UID" --gid editor --shell /usr/sbin/nologin --no-create-home editor && \
+    chmod -R a+rX /app /venv
+
+WORKDIR /workspace
+EXPOSE 8765
+USER $UID
+
+# Only loopback binds are accepted, so the container must share the host network
+# namespace for http://127.0.0.1:8765 to be reachable (scripts/podman-map-editor.sh).
+ENTRYPOINT ["python", "-m", "elosern_map_editor", \
+            "--workspace", "/workspace", \
+            "--frontend-dist", "/app/frontend/dist"]
+CMD ["--port", "8765"]

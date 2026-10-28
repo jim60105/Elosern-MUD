@@ -1,0 +1,68 @@
+# Build-context exclusions for the standalone map editor image. Used explicitly:
+#   podman build --ignorefile tools/map-editor/.containerignore \
+#     -f tools/map-editor/Containerfile .
+# Patterns are relative to the repository root. Only tools/map-editor,
+# packages/, and the allowlisted web/webclient-app styles, fonts and ui-scale
+# file are copied by tools/map-editor/Containerfile; everything else is context
+# transfer the build never reaches.
+
+# ==========================================
+# Repository metadata, tooling and local state
+# ==========================================
+.git/
+.codegraph/
+.storybook/
+.storybook-out/
+.storybook-out.lock
+.superpowers/
+.worktrees/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.var/
+.coverage
+coverage.xml
+.env
+.env.*
+tmp/
+
+# ==========================================
+# Python and Node dependency/build output
+# ==========================================
+**/__pycache__/
+**/*.py[cod]
+**/node_modules/
+**/dist/
+**/*.sqlite3
+
+# ==========================================
+# Game content and game-only trees
+# ==========================================
+# Mounted into the container at run time as the editable workspace.
+content/
+# Never read by the editor service.
+world/
+commands/
+typeclasses/
+server/
+docs/
+openspec/
+tests/
+scripts/
+prompts/
+art-seed/
+art-official/
+third_party/
+
+# ==========================================
+# Game frontend (only styles/, fonts/ and lib/ui_scale.js are copied)
+# ==========================================
+web/static/
+web/tests/
+web/admin-app/
+web/webclient-app/assets/
+web/webclient-app/components/
+web/webclient-app/composables/
+web/webclient-app/stores/
+web/webclient-app/stories/
+web/webclient-app/tests/

@@ -43,6 +43,28 @@ API keeps working (restart the service after building). Only loopback
 addresses are accepted for `--host`, and `--port` must be an explicit port: an
 ephemeral `0` is refused because the Host/Origin allowlist names the port.
 
+### 1.1 Container launch (Podman)
+
+`scripts/podman-map-editor.sh` builds `tools/map-editor/Containerfile` and runs
+the editor in a container, mirroring `scripts/podman-build-run.sh` for the game.
+Node and pnpm stay inside the build stage, so the host needs only Podman:
+
+```console
+./scripts/podman-map-editor.sh                 # build, then serve on 127.0.0.1:8765
+./scripts/podman-map-editor.sh --no-build      # reuse the existing local image
+./scripts/podman-map-editor.sh --port 9000     # another port
+./scripts/podman-map-editor.sh --workspace /path/to/repo
+```
+
+The image carries the service environment and the built workspace; the checkout
+itself is mounted read-write at `/workspace`, so autosaved YAML lands in the
+working tree. The container shares the host network namespace because the
+service binds loopback only and its Host/Origin allowlist names
+`127.0.0.1:<port>`; a published port could never reach it. It runs with
+`--userns=keep-id` so saved files stay owned by the invoking user, and it is
+independent of the game container. Logs: `podman logs -f elosern-map-editor`;
+stop: `podman stop elosern-map-editor`.
+
 Checks:
 
 ```console
