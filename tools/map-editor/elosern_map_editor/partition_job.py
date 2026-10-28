@@ -228,7 +228,9 @@ class PartitionJobs:
     def _run(self, job_id, payload, on_output, on_failure) -> None:
         try:
             process = subprocess.Popen(
-                [sys.executable, "-m", "elosern_map_editor.partition_worker"],
+                # Isolated mode: no user site, environment paths or cwd on
+                # the child's import path, only the editor's own environment.
+                [sys.executable, "-I", "-m", "elosern_map_editor.partition_worker"],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
