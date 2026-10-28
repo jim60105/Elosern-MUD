@@ -21,12 +21,16 @@ The offline partition SHALL reserve all region-district terrain first and partit
 - **THEN** the pocket belongs to that landmark's district with its footprint, while any other unseeded walkable component fails generation with its coordinates
 
 ### Requirement: Frozen partition and outlines reproduce deterministically offline
-The partition and smoothed outlines SHALL be stored as version-controlled frozen data with row run-length encoding of ownership. Recomputing from the same authored geography and registry SHALL reproduce the stored data. Runtime district lookup SHALL read frozen data without running the partitioner.
+Frozen partition data SHALL reproduce from identical explicit map inputs and algorithm version, carry their dependency signature and support lightweight runtime decoding/freshness checks without generation dependencies.
 
 #### Scenario: Regeneration has stable output
-- **WHEN** the tool runs twice with identical inputs and deterministic tie ordering
-- **THEN** ownership runs and smoothed outlines match each other and committed data byte for byte
+- **WHEN** the partitioner runs twice on identical synthetic inputs and deterministic tie ordering
+- **THEN** ownership runs and outlines match byte for byte
 
 #### Scenario: Stale generated data is detected
-- **WHEN** a registry or geography change alters ownership without regeneration
-- **THEN** the recomputation test fails with a mismatch rather than silently adopting runtime computation
+- **WHEN** a relevant source value or membership changes without regeneration
+- **THEN** signature validation rejects game freshness without raster generation or NumPy/SciPy imports
+
+#### Scenario: Independent generation
+- **WHEN** a core snapshot is partitioned in the generation environment with game imports blocked
+- **THEN** input assembly and partition complete using the extracted existing rules and the game adapter reads the same artifact format
