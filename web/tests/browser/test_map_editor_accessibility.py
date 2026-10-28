@@ -22,6 +22,8 @@ from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
+from tools.spec_traceability import covers_requirement
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 EDITOR_TESTS = REPO_ROOT / "tools" / "map-editor" / "tests"
 REFERENCE = (1451, 790, 1)
@@ -280,6 +282,10 @@ class _AccessibilityBrowser(unittest.TestCase):
 
 
 class MapEditorAccessibilityBrowserTest(_AccessibilityBrowser):
+    @covers_requirement(
+        "map-editor-interaction::workspace-navigation-and-diagnostics-identify-source-context",
+        "map-editor-interaction::essential-workspace-operations-have-keyboard-and-reflow-access",
+    )
     def test_search_tells_equal_names_apart_and_alt_left_returns(self):
         self.start(add_annex)
         page = self.open()
@@ -306,6 +312,9 @@ class MapEditorAccessibilityBrowserTest(_AccessibilityBrowser):
         self.assertEqual(page.locator("[data-return]").count(), 0)
         self.assertEqual(self.posts, [])
 
+    @covers_requirement(
+        "map-editor-interaction::workspace-navigation-and-diagnostics-identify-source-context",
+    )
     def test_diagnostics_locate_targets_and_reveal_a_hidden_layer(self):
         self.start(cut_gate_road, stale_partition)
         page = self.open()
@@ -336,6 +345,9 @@ class MapEditorAccessibilityBrowserTest(_AccessibilityBrowser):
         self.assertEqual(self.posts, [])
         self.disk_unchanged()
 
+    @covers_requirement(
+        "map-editor-interaction::workspace-navigation-and-diagnostics-identify-source-context",
+    )
     def test_an_unknown_index_explains_refused_deletion_and_editing_still_saves(self):
         self.start()
         page = self.open()
@@ -356,6 +368,9 @@ class MapEditorAccessibilityBrowserTest(_AccessibilityBrowser):
         self.wait_for(layout.exists, "the nudge was not saved")
         self.assertEqual([url.rsplit("/", 1)[1] for url in self.posts], ["move_interior_layout"])
 
+    @covers_requirement(
+        "map-editor-interaction::workspace-navigation-and-diagnostics-identify-source-context",
+    )
     def test_a_referenced_object_lists_its_references_inline_and_writes_nothing(self):
         record = {"source": "place:synthetic_front", "source_domain": "places", "source_file": "external/declarations.txt"}
         target = {"domain": "interior_room", "map_id": synthetic.INTERIOR_ID, "object_id": "front", "cell": None}
@@ -380,6 +395,9 @@ class MapEditorAccessibilityBrowserTest(_AccessibilityBrowser):
         self.assertEqual(self.posts, [])
         self.disk_unchanged()
 
+    @covers_requirement(
+        "map-editor-interaction::selection-context-is-a-copy-only-external-bridge",
+    )
     def test_a_stale_multi_selection_copies_every_source_without_secrets_or_actions(self):
         self.start()
         page = self.open(permissions=["clipboard-read", "clipboard-write"])
@@ -415,6 +433,9 @@ class MapEditorAccessibilityBrowserTest(_AccessibilityBrowser):
         self.assertEqual(page.locator('[data-copy-notice="ok"]').count(), 1)
         self.assertEqual(self.posts, [])
 
+    @covers_requirement(
+        "map-editor-interaction::essential-workspace-operations-have-keyboard-and-reflow-access",
+    )
     def test_supported_viewports_keep_status_and_operations_reachable(self):
         self.start(dense_diagnostics)
         for viewport, layout in ((REFERENCE, "columns"), (LARGE, "columns"), (ZOOM_200, "drawers")):
@@ -445,6 +466,9 @@ class MapEditorAccessibilityBrowserTest(_AccessibilityBrowser):
             page.context.close()
         self.assertEqual(self.posts, [])
 
+    @covers_requirement(
+        "map-editor-interaction::essential-workspace-operations-have-keyboard-and-reflow-access",
+    )
     def test_keyboard_only_workflow_in_chromium(self):
         self.keyboard_workflow()
 
@@ -452,6 +476,9 @@ class MapEditorAccessibilityBrowserTest(_AccessibilityBrowser):
 class MapEditorAccessibilityFirefoxTest(_AccessibilityBrowser):
     BROWSER = "firefox"
 
+    @covers_requirement(
+        "map-editor-interaction::essential-workspace-operations-have-keyboard-and-reflow-access",
+    )
     def test_keyboard_only_workflow_in_firefox(self):
         self.keyboard_workflow()
 
