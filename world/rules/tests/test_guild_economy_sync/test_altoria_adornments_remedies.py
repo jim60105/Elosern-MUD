@@ -29,7 +29,7 @@ from world.rules.guild_config import get_catalog
 from world.rules.guild_economy import sync_service_content
 from world.skills.equipment import list_items
 
-from ._support import ServiceContentIsolation, _places, _settlements
+from ._support import ServiceContentIsolation, _places, _settlements, room_name
 
 
 def _specialist_places():
@@ -136,7 +136,7 @@ class AdornmentsRemediesSyncTests(
                 self.assertIn("你買了", purchase)
                 # The listing is headed by the shop's OWN room name, so the
                 # two specialists can never echo each other's counter.
-                self.assertIn(place.room_name_zh, listing)
+                self.assertIn(room_name(place), listing)
                 self.assertIn("營業中", listing)
                 for row in config.offers:
                     self.assertIn(row.item_key, listing)

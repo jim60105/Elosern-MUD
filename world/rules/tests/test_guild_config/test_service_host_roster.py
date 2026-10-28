@@ -29,10 +29,30 @@ from world.rules.guild_config import load_guild_catalog
 from world.rules.guild_config import validate_service_hosts
 from world.rules.npc_capabilities import capability, person_bound, place_bound
 import unittest
+from world.tests.geography_fixture import publish_shipped_map_world
 from ._support import (
     CatalogRegistryIsolation,
     raw_rulebook,
 )
+
+
+publish_shipped_map_world()
+
+
+def authored_room(place):
+    """The published interior room one service place joins."""
+
+    from world.maps import interiors
+
+    return interiors.current().room(place.room.object_id)
+
+
+def authored_exterior(place):
+    """The authored exterior entrance of the place's joined room."""
+
+    from world.maps import interiors
+
+    return interiors.current().exteriors[place.room.object_id]
 
 
 def _hosted_places():
@@ -561,8 +581,8 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
                 self.assertEqual(
                     (
                         place.kind.value,
-                        place.exterior.object_id,
-                        place.doorway_key_zh,
+                        authored_exterior(place).node,
+                        authored_exterior(place).doorway_key,
                         place.host_race,
                         place.host_sex,
                         place.assortment_keys,
@@ -610,8 +630,8 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
                 self.assertEqual(
                     (
                         place.kind.value,
-                        place.exterior.object_id,
-                        place.doorway_key_zh,
+                        authored_exterior(place).node,
+                        authored_exterior(place).doorway_key,
                         place.host_race,
                         place.host_sex,
                         place.assortment_keys,
@@ -674,8 +694,8 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
                 self.assertEqual(
                     (
                         place.kind.value,
-                        place.exterior.object_id,
-                        place.doorway_key_zh,
+                        authored_exterior(place).node,
+                        authored_exterior(place).doorway_key,
                         place.host_race,
                         place.host_sex,
                         place.assortment_keys,

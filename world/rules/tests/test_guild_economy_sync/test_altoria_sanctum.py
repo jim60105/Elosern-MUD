@@ -53,6 +53,9 @@ from ._support import (
     _places,
     _settlements,
     _shops,
+    doorway_key,
+    exterior_key,
+    room_desc,
 )
 
 
@@ -178,10 +181,10 @@ class AltoriaSanctumTests(ServiceContentIsolation, EvenniaTestCase):
             sync_service_content()
         temple, sanctum = _temple_place(), _sanctum_place()
         self.assertEqual(
-            temple.exterior, sanctum.exterior,
+            exterior_key(temple), exterior_key(sanctum),
             "the two counters no longer share the temple steps",
         )
-        self.assertNotEqual(temple.doorway_key_zh, sanctum.doorway_key_zh)
+        self.assertNotEqual(doorway_key(temple), doorway_key(sanctum))
         exterior = _exterior(temple)
         self.assertIsNotNone(exterior)
         self.assertIs(_exterior(sanctum), exterior)
@@ -190,10 +193,10 @@ class AltoriaSanctumTests(ServiceContentIsolation, EvenniaTestCase):
                 interiors = self._interiors(place)
                 self.assertEqual(len(interiors), 1, place.kind)
                 interior = interiors[0]
-                self.assertEqual(interior.db.desc, place.room_desc_zh)
+                self.assertEqual(interior.db.desc, room_desc(place))
                 doorways = [
                     exit_obj for exit_obj in exterior.exits
-                    if exit_obj.key == place.doorway_key_zh
+                    if exit_obj.key == doorway_key(place)
                 ]
                 self.assertEqual(len(doorways), 1, place.kind)
                 self.assertIs(doorways[0].destination, interior)
@@ -212,7 +215,7 @@ class AltoriaSanctumTests(ServiceContentIsolation, EvenniaTestCase):
                 self.assertEqual(
                     len([
                         e for e in _exterior(place).exits
-                        if e.key == place.doorway_key_zh
+                        if e.key == doorway_key(place)
                     ]),
                     1,
                 )
@@ -271,7 +274,7 @@ class AltoriaSanctumTests(ServiceContentIsolation, EvenniaTestCase):
         for place in (temple, sanctum):
             with self.subTest(place=place.kind):
                 doorway = next(
-                    e for e in exterior.exits if e.key == place.doorway_key_zh
+                    e for e in exterior.exits if e.key == doorway_key(place)
                 )
                 # No lock, no prerequisite: the default traversal access
                 # check is all the doorway consults, and the stock exit
@@ -293,7 +296,7 @@ class AltoriaSanctumTests(ServiceContentIsolation, EvenniaTestCase):
         # of this building frames the ministry or its shop as concealed.
         prose = "".join(
             (
-                temple.room_desc_zh, sanctum.room_desc_zh,
+                room_desc(temple), room_desc(sanctum),
                 _table_text(temple), _table_text(sanctum),
             )
         )

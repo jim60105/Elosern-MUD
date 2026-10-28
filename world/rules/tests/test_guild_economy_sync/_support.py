@@ -91,6 +91,66 @@ def _subraces():
 def _npc_profiles():
     return _live_registry("world.lore.npc_profiles", "NPC_PROFILE" + "_REGISTRY")
 
+
+def authored_room(place):
+    """The published interior room one service place joins."""
+
+    from world.maps import interiors
+
+    return interiors.current().room(place.room.object_id)
+
+
+def room_name(place) -> str:
+    """The joined room's authored display name."""
+
+    return authored_room(place).name_zh
+
+
+def room_desc(place) -> str:
+    """The joined room's authored prose."""
+
+    return authored_room(place).desc_zh
+
+
+def authored_exterior(place):
+    """The authored exterior entrance of the room one place joins."""
+
+    from world.maps import interiors
+
+    return interiors.current().exteriors.get(place.room.object_id)
+
+
+def doorway_key(place) -> str:
+    """The authored doorway name of the place's joined room."""
+
+    return authored_exterior(place).doorway_key
+
+
+def exterior_key(place) -> tuple[str, str]:
+    """The ``(settlement, node)`` identity of the place's shared frontage."""
+
+    exterior = authored_exterior(place)
+    return (exterior.settlement, exterior.node)
+
+
+def exterior_node(place) -> str:
+    """The authored settlement node the place's interior opens onto."""
+
+    return authored_exterior(place).node
+
+
+def place_frontage_xyz(place):
+    """The current grid address of the place's interior exterior."""
+
+    from elosern_map_core.references import settlement_node_ref
+    from world.maps.static_references import settlement_node_xyz
+
+    exterior = authored_exterior(place)
+    return settlement_node_xyz(
+        settlement_node_ref(exterior.settlement, exterior.node)
+    )
+
+
 def _place_by_kind(kind: str):
     """The live place row of one service kind (registry-ordered first match)."""
     return next(place for place in _places().values() if place.kind == kind)

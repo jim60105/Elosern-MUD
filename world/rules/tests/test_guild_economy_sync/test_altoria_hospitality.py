@@ -50,10 +50,13 @@ from world.skills.handler import INNATE_SKILL_ORDER
 from ._support import (
     ServiceContentIsolation,
     _live_registry,
-    _places,
     _place_by_kind,
+    _places,
     _restore_places_snapshot,
     _settlements,
+    doorway_key,
+    exterior_key,
+    room_desc,
 )
 
 
@@ -149,13 +152,13 @@ class AltoriaHospitalityTests(ServiceContentIsolation, EvenniaTestCase):
                 interiors = search_object_by_tag(place.key)
                 self.assertEqual(len(interiors), 1, place.kind)
                 interior = interiors[0]
-                self.assertEqual(interior.db.desc, place.room_desc_zh)
+                self.assertEqual(interior.db.desc, room_desc(place))
                 exterior = _exterior(place)
                 self.assertIsNotNone(exterior, place.kind)
                 doorways = [
                     exit_obj
                     for exit_obj in exterior.exits
-                    if exit_obj.key == place.doorway_key_zh
+                    if exit_obj.key == doorway_key(place)
                 ]
                 self.assertEqual(len(doorways), 1, place.kind)
                 doorway = doorways[0]
@@ -190,7 +193,7 @@ class AltoriaHospitalityTests(ServiceContentIsolation, EvenniaTestCase):
                         [
                             e
                             for e in _exterior(place).exits
-                            if e.key == place.doorway_key_zh
+                            if e.key == doorway_key(place)
                         ]
                     ),
                     1,
@@ -203,16 +206,16 @@ class AltoriaHospitalityTests(ServiceContentIsolation, EvenniaTestCase):
         tavern = _place_by_kind("tavern")
         inn = _place_by_kind("lodging")
         self.assertEqual(
-            tavern.exterior, inn.exterior,
+            exterior_key(tavern), exterior_key(inn),
             "the inn and the tavern no longer share the inn lane",
         )
-        self.assertNotEqual(tavern.doorway_key_zh, inn.doorway_key_zh)
+        self.assertNotEqual(doorway_key(tavern), doorway_key(inn))
         exterior = _exterior(tavern)
         self.assertIs(_exterior(inn), exterior)
         for place in (tavern, inn):
             with self.subTest(place=place.kind):
                 doorways = [
-                    e for e in exterior.exits if e.key == place.doorway_key_zh
+                    e for e in exterior.exits if e.key == doorway_key(place)
                 ]
                 self.assertEqual(len(doorways), 1)
                 self.assertIs(doorways[0].destination, _interior(place))
@@ -287,7 +290,7 @@ class AltoriaHospitalityTests(ServiceContentIsolation, EvenniaTestCase):
         for place in places:
             exterior = _exterior(place)
             for doorway in list(exterior.exits):
-                if doorway.key == place.doorway_key_zh:
+                if doorway.key == doorway_key(place):
                     doorway.delete()
             interior = _interior(place)
             for back_exit in list(interior.exits):

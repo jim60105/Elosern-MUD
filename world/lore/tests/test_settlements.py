@@ -9,6 +9,7 @@ from dataclasses import replace
 from unittest import mock
 
 from world.lore.anchors import anchors
+from elosern_map_core.references import interior_room_ref
 from world.lore.settlements.places import (
     PLACE_REGISTRY,
     place_capabilities,
@@ -24,11 +25,11 @@ from world.lore.settlements.settlements import (
 )
 from world.lore.settlements.shops import SHOP_REGISTRY
 from world.rules.npc_capabilities import capability, place_bound
-from world.tests.geography_fixture import publish_shipped_geography
+from world.tests.geography_fixture import publish_shipped_map_world
 
 
 def setUpModule():
-    publish_shipped_geography()
+    publish_shipped_map_world()
 
 
 def _place_fields(place) -> tuple:
@@ -38,15 +39,19 @@ def _place_fields(place) -> tuple:
     profile key and the offered-item keys: those follow the current place-to-
     roster correspondence and the shop registry, and belong to no snapshot.
     """
+    from world.maps import interiors
+
+    room = interiors.current().room(place.room.object_id)
+    exterior = interiors.current().exteriors.get(room.room_id)
     return (
         place.key,
         place.settlement_key,
         place.kind,
-        place.room_name_zh,
-        place.room_desc_zh,
-        place.exterior.object_id,
-        place.doorway_key_zh,
-        place.doorway_aliases,
+        room.name_zh,
+        room.desc_zh,
+        None if exterior is None else exterior.node,
+        None if exterior is None else exterior.doorway_key,
+        () if exterior is None else exterior.doorway_aliases,
         place.host_race,
         place.host_subrace,
         place.host_sex,
@@ -349,7 +354,7 @@ class PlaceRegistryTests(unittest.TestCase):
         dwelling = self._plant(
             self.store,
             kind=PlaceKind.HOME,
-            room_name_zh="合成 dwelling",
+            room=interior_room_ref("t_synth_dwelling", "t_offense_place"),
         )
         try:
             validate_place_registry({"t_offense_place": dwelling})
@@ -369,10 +374,21 @@ class PlaceRegistryTests(unittest.TestCase):
         # capital five's addresses are the altoria-capital-replan exteriors;
         # every other field these rows transcribe is untouched by the replan
         # (the neutrality gate: test_capital_places_keep_their_identities).
-        self.assertEqual(self.guild.room_name_zh, "阿爾托利亞冒險者公會大廳")
-        self.assertEqual(self.guild.exterior.object_id, "guild_forecourt")  # 公會前
-        self.assertEqual(self.store.room_name_zh, "阿爾托利亞雜貨店")
-        self.assertEqual(self.store.exterior.object_id, "market_street")  # 市場街
+        from world.maps import interiors
+
+        published = interiors.current()
+        self.assertEqual(
+            published.room(self.guild.room.object_id).name_zh, "阿爾托利亞冒險者公會大廳"
+        )
+        self.assertEqual(
+            published.exteriors[self.guild.room.object_id].node, "guild_forecourt"
+        )  # 公會前
+        self.assertEqual(
+            published.room(self.store.room.object_id).name_zh, "阿爾托利亞雜貨店"
+        )
+        self.assertEqual(
+            published.exteriors[self.store.room.object_id].node, "market_street"
+        )  # 市場街
 
     def test_shipped_hosts_author_human_race_and_default_sex(self):
         # host_race/host_subrace/host_sex are creation-time authored identity,
@@ -402,10 +418,18 @@ class PlaceRegistryTests(unittest.TestCase):
         }
         for key, (room_name, exterior, doorway) in expected.items():
             with self.subTest(place=key):
+                from world.maps import interiors
+
+                published = interiors.current()
                 place = PLACE_REGISTRY[key]
-                self.assertEqual(place.room_name_zh, room_name)
-                self.assertEqual(place.exterior.object_id, exterior)
-                self.assertEqual(place.doorway_key_zh, doorway)
+                authored = published.room(place.room.object_id)
+                self.assertEqual(authored.name_zh, room_name)
+                self.assertEqual(
+                    published.exteriors[authored.room_id].node, exterior
+                )
+                self.assertEqual(
+                    published.exteriors[authored.room_id].doorway_key, doorway
+                )
                 # The derived shop row follows this place's own declaration:
                 # its identity and its assortment keys are the place's, and no
                 # shop row exists for a place that authors no shop identity.
@@ -670,59 +694,16 @@ class PlaceRegistryTests(unittest.TestCase):
 
     # ---- shared exteriors (altoria-place-slices) ----------------------------
 
-    def _alley(self, key, doorway):
-        """One synthetic place on the shared craft-alley exterior."""
-        return replace(
-            self.guild,
-            key=key,
-            components=tuple(
-                replace(declaration, binding=place_bound(key))
-                for declaration in self.guild.components
-            ),
-            room_name_zh=f"合成巷道室 {key}",
-            exterior=PLACE_REGISTRY["altoria_forge"].exterior,
-            doorway_key_zh=doorway,
+    def test_a_place_join_is_unique_per_room_identity(self):
+        # The place key IS the permanent room identity, so a row joining any
+        # other room is rejected rather than silently spawning a second room
+        # for one service location.
+        broken = replace(
+            self.store, room=interior_room_ref("t_store_interior", "t_other_room")
         )
-
-    @covers_requirement(
-        "settlement-place-registry::a-place-is-the-single-authored-record-of-one-service-location"
-    )
-    def test_two_places_may_share_an_exterior_with_different_doorway_names(self):
-        # One street, two doors (the craft-alley shape): a distinct doorway
-        # name per place is the whole condition, and it loads. The sync side
-        # — that such a pair really yields two doorways — is covered over the
-        # live seams in world/maps/tests/test_service_interiors.py.
-        pair = {
-            place.key: place
-            for place in (
-                self._alley("t_alley_place_a", "合成鍛造鋪門"),
-                self._alley("t_alley_place_b", "合成裁縫坊門"),
-            )
-        }
-        try:
-            validate_place_registry(pair)
-        except ValueError as error:  # pragma: no cover - failure path is the fail below
-            self.fail(f"distinct doorways on one exterior rejected: {error}")
-
-    @covers_requirement(
-        "settlement-place-registry::a-place-is-the-single-authored-record-of-one-service-location"
-    )
-    def test_two_places_sharing_an_exterior_and_doorway_name_are_rejected(self):
-        # Two identical doorway names on one exterior collapse into one exit
-        # and silently lose a location, so the collision fails load naming
-        # both places and the shared name.
-        pair = {
-            place.key: place
-            for place in (
-                self._alley("t_alley_place_a", "合成巷門"),
-                self._alley("t_alley_place_b", "合成巷門"),
-            )
-        }
         with self.assertRaises(ValueError) as caught:
-            validate_place_registry(pair)
-        message = str(caught.exception)
-        for fragment in ("t_alley_place_a", "t_alley_place_b", "合成巷門"):
-            self.assertIn(fragment, message)
+            validate_place_registry({"t_offline_store": broken})
+        self.assertIn("t_offline_store", str(caught.exception))
 
 
 class DerivedShopRegistryTests(unittest.TestCase):

@@ -68,6 +68,9 @@ from ._support import (
     _live_registry,
     _places,
     _restore_places_snapshot,
+    doorway_key,
+    exterior_key,
+    room_desc,
 )
 
 
@@ -151,7 +154,7 @@ def _doorway(place):
     doorways = [
         exit_obj
         for exit_obj in _exterior(place).exits
-        if exit_obj.key == place.doorway_key_zh
+        if exit_obj.key == doorway_key(place)
     ]
     assert len(doorways) == 1, place.key
     return doorways[0]
@@ -285,7 +288,7 @@ class AltoriaLearningExchangeTests(ServiceContentIsolation, EvenniaTestCase):
                 interiors = search_object_by_tag(place.key)
                 self.assertEqual(len(interiors), 1, place.kind)
                 interior = interiors[0]
-                self.assertEqual(interior.db.desc, place.room_desc_zh)
+                self.assertEqual(interior.db.desc, room_desc(place))
                 exterior = _exterior(place)
                 self.assertIsNotNone(exterior, place.kind)
                 doorway = _doorway(place)
@@ -327,7 +330,7 @@ class AltoriaLearningExchangeTests(ServiceContentIsolation, EvenniaTestCase):
                         [
                             e
                             for e in _exterior(place).exits
-                            if e.key == place.doorway_key_zh
+                            if e.key == doorway_key(place)
                         ]
                     ),
                     1,
@@ -351,24 +354,24 @@ class AltoriaLearningExchangeTests(ServiceContentIsolation, EvenniaTestCase):
         # a doorway collision would fail here as a lost room and in the
         # registry loader as a rejected record.
         for anchor in (_stalls(), _merchant_hall()):
-            with self.subTest(exterior=anchor.exterior):
+            with self.subTest(exterior=exterior_key(anchor)):
                 z = _settlement_z(anchor)
                 co_residents = [
                     place
                     for place in _places_tuple()
                     if place.settlement_key == anchor.settlement_key
-                    and place.exterior == anchor.exterior
+                    and exterior_key(place) == exterior_key(anchor)
                 ]
                 exterior = _exterior(anchor)
                 door_keys = [
                     exit_obj.key
                     for exit_obj in exterior.exits
-                    if exit_obj.key in {place.doorway_key_zh for place in co_residents}
+                    if exit_obj.key in {doorway_key(place) for place in co_residents}
                 ]
                 self.assertEqual(len(door_keys), len(set(door_keys)), "doorway collision")
                 self.assertEqual(
                     sorted(door_keys),
-                    sorted(place.doorway_key_zh for place in co_residents),
+                    sorted(doorway_key(place) for place in co_residents),
                 )
                 interiors = set()
                 for place in co_residents:
@@ -575,7 +578,7 @@ class AltoriaLearningExchangeTests(ServiceContentIsolation, EvenniaTestCase):
                 del _places()[place.key]
                 exterior = _exterior(place)
                 for doorway in list(exterior.exits):
-                    if doorway.key == place.doorway_key_zh:
+                    if doorway.key == doorway_key(place):
                         doorway.delete()
                 interior = _interior(place)
                 for back_exit in list(interior.exits):

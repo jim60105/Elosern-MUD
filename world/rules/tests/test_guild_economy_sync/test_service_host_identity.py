@@ -25,7 +25,12 @@ from world.rules.guild_config import get_catalog
 from world.rules.guild_config import load_catalog_into_cache
 from world.rules.guild_economy import ServiceHostIntegrityError
 from world.rules.guild_economy import sync_service_content
+from elosern_map_core.references import interior_room_ref
 from world.lore.settlements.places import place_shop_identity
+from world.tests.interior_fixture import (
+    published_interiors,
+    synthetic_exterior_interior,
+)
 from world.rules.npc_capabilities import capability, place_bound, validate_capabilities
 from world.rules.npc_persona import provenance_profile_key
 from ._support import (
@@ -49,6 +54,8 @@ from ._support import (
     before_row_components,
     canonical_host,
     components_with,
+    room_desc,
+    room_name,
     synthetic_profile,
 )
 
@@ -317,10 +324,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         new_place = dataclasses.replace(
             _place_by_kind("general_store"),
             key="t_trading_post",
-            room_name_zh="測試交易站",
-            room_desc_zh="A synthetic trading post with no module constant.",
-            doorway_key_zh="測試交易站往來通道",
-            doorway_aliases=("test trading post",),
+            room=interior_room_ref("t_trading_post", "t_trading_post"),
             host_name="測試商人",
             host_race="human",
             host_subrace=None,
@@ -366,6 +370,9 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         }
         with (
             patch.dict(_places(), {"t_trading_post": new_place}),
+            published_interiors(
+                synthetic_exterior_interior("t_trading_post", "測試交易站", "測試交易站往來通道")
+            ),
             patch.dict(_shops(), {"t_trading_post": new_shop}),
             patch.object(
                 guild_economy,
@@ -384,12 +391,14 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             load_catalog_into_cache()
             sync_interiors()
             sync_service_content()
+            interior = search_object_by_tag("t_trading_post")[0]
+            from world.maps.static_references import place_exterior_xyz
 
-        interior = search_object_by_tag("t_trading_post")[0]
+            exterior = GridRoom.objects.filter_xyz(
+                xyz=place_exterior_xyz(new_place)
+            ).first()
+
         self.assertIsNotNone(interior)
-        from world.maps.static_references import place_exterior_xyz
-
-        exterior = GridRoom.objects.filter_xyz(xyz=place_exterior_xyz(new_place)).first()
         self.assertIsNotNone(exterior)
         self.assertIn(interior, {exit_obj.destination for exit_obj in exterior.exits})
         self.assertIn(
@@ -445,10 +454,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         hostless = dataclasses.replace(
             _place_by_kind("general_store"),
             key="t_forecourt",
-            room_name_zh="測試宮前庭",
-            room_desc_zh="A host-less landmark: a room that simply exists.",
-            doorway_key_zh="測試宮前庭入口",
-            doorway_aliases=("test forecourt",),
+            room=interior_room_ref("t_forecourt", "t_forecourt"),
             host_name=None,
             host_race=None,
             host_subrace=None,
@@ -457,7 +463,12 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             assortment_keys=(),
             components=(),
         )
-        with patch.dict(_places(), {"t_forecourt": hostless}):
+        with (
+            patch.dict(_places(), {"t_forecourt": hostless}),
+            published_interiors(
+                synthetic_exterior_interior("t_forecourt", "測試宮前庭", "測試宮前庭入口")
+            ),
+        ):
             load_catalog_into_cache()
             # The roster derivation skipped the row: no anchor, no service id.
             self.assertNotIn("t_forecourt", {row.spawn_room for row in get_catalog().service_hosts})
@@ -466,8 +477,8 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
 
             interior = search_object_by_tag("t_forecourt")[0]
             self.assertIsInstance(interior, Room)
-            self.assertEqual(interior.key, hostless.room_name_zh)
-            self.assertEqual(interior.db.desc, hostless.room_desc_zh)
+            self.assertEqual(interior.key, room_name(hostless))
+            self.assertEqual(interior.db.desc, room_desc(hostless))
             from world.maps.static_references import place_exterior_xyz
 
             exterior = GridRoom.objects.filter_xyz(

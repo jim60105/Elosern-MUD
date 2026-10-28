@@ -100,6 +100,29 @@ def published_interiors(*documents, replace_existing: bool = False):
         runtime.publish(previous)
 
 
+def synthetic_exterior_interior(
+    room_id: str, name_zh: str, doorway_key: str
+) -> object:
+    """One synthetic room opening onto an existing, materialized street.
+
+    The exterior is borrowed from the published world (the first authored
+    exterior entrance), so the doorway pair materializes for a test that needs a
+    reachable synthetic room without naming shipped content.
+    """
+
+    from world.maps import interiors
+
+    published = interiors.current()
+    anchor = next(iter(published.exteriors.values()))
+    return interior_document(
+        room_id,
+        {room_id: interior_room(name_zh, "A synthetic room with no module constant.", art_key=room_id)},
+        exterior=interior_exterior(
+            anchor.settlement, anchor.node, room_id, doorway_key
+        ),
+    )
+
+
 def build_synthetic_interiors(*documents):
     """One composed interior world holding exactly ``documents`` (nothing published)."""
 
@@ -121,4 +144,5 @@ __all__ = [
     "interior_exterior",
     "interior_room",
     "published_interiors",
+    "synthetic_exterior_interior",
 ]

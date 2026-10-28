@@ -690,7 +690,11 @@ class SceneTargetTests(_SceneFixture):
         location.room_art_key = "t_synth_room"
         location.scene_identity = "place:t_synth"
         with (
-            patch.object(scene_definitions, "ROOM_ART_KEY_SET", room_registry),
+            patch.object(
+                scene_definitions,
+                "room_art_key_set",
+                return_value=room_registry,
+            ),
             patch.object(art_view, "SCENE_ARCHETYPE_REGISTRY", scene_registry),
         ):
             target = scene_target_for(location)
@@ -707,7 +711,11 @@ class SceneTargetTests(_SceneFixture):
         location.scene_archetype = None
         location.room_art_key = "t_synth_unregistered"
         location.scene_identity = None
-        with patch.object(scene_definitions, "ROOM_ART_KEY_SET", room_registry):
+        with patch.object(
+                scene_definitions,
+                "room_art_key_set",
+                return_value=room_registry,
+            ):
             target = scene_target_for(location)
         self.assertEqual(target.room_art_key, "t_synth_unregistered")
         self.assertTrue(target.room_binding_invalid)
@@ -719,7 +727,11 @@ class SceneTargetTests(_SceneFixture):
         location = create_object(Room, key="t_synth_room_object", location=None)
         self.addCleanup(location.delete)
         location.room_art_key = {"not": "a key"}
-        with patch.object(scene_definitions, "ROOM_ART_KEY_SET", room_registry):
+        with patch.object(
+                scene_definitions,
+                "room_art_key_set",
+                return_value=room_registry,
+            ):
             target = scene_target_for(location)
         self.assertIsNone(target.room_art_key)
         self.assertTrue(target.room_binding_invalid)
