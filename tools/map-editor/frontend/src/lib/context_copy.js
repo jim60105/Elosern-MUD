@@ -9,15 +9,29 @@
 import { DOMAIN_LABELS } from "./objects.js";
 import { DISCONNECTED } from "./workspace_client.js";
 import { HOLD_RESTART } from "./following.js";
-import { clock, firstFailure } from "./status.js";
+import { clock } from "./status.js";
 import { storedPosition } from "./layout_edit.js";
+
+// Authored text joins line-based text as one line: no pasted line can look
+// like a separate instruction.
+function oneLine(value) {
+  return String(value ?? "").replace(/\s+/g, " ").trim();
+}
+
+// The first failing location only (path:line); the loader's message is left
+// out, so nothing it embeds (an absolute path, a value) reaches the clipboard.
+function failingLocation(workspace) {
+  const [first] = workspace?.candidate_diagnostics ?? [];
+  if (!first?.relative_path) return null;
+  return first.line ? `${first.relative_path}:${first.line}` : first.relative_path;
+}
 
 export function currentness({ workspace, connection, hold }) {
   const at = clock(workspace?.snapshot_read_at);
   if (connection === DISCONNECTED) return { current: false, text: `過期預覽（服務未連線；最後可用版本 ${at}）` };
   if (hold === HOLD_RESTART) return { current: false, text: `過期預覽（服務已重啟；最後可用版本 ${at}）` };
   if (workspace?.preview_state === "stale") {
-    const failing = firstFailure(workspace);
+    const failing = failingLocation(workspace);
     return { current: false, text: `過期預覽（最後可用版本 ${at}${failing ? `；目前檔案無法載入：${failing}` : ""}）` };
   }
   return { current: true, text: `現行檔案（讀取於 ${at}）` };
@@ -66,7 +80,7 @@ export function ompContext({ workspace, connection = null, hold = null, catalog,
   const documents = new Set(entries.map((entry) => entry.relativePath));
   lines.push(`選取 ${entries.length} 個物件（${documents.size} 份文件）：`);
   for (const entry of entries) {
-    lines.push(`- ${entry.ref}（${entry.label}）`);
+    lines.push(`- ${entry.ref}（${oneLine(entry.label)}）`);
     lines.push(`  領域：${DOMAIN_LABELS[entry.domain]} ${entry.domain}${entry.mapId ? ` · 地圖 ${entry.mapId}` : ""}`);
     lines.push(`  文件：${entry.relativePath}`);
     for (const line of coordinates(world, entry)) lines.push(`  ${line}`);

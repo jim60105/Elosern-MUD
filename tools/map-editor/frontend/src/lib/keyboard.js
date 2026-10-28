@@ -41,7 +41,8 @@ export function resolveKey(event, ctx = {}) {
   if (composing(event)) return null;
   const mac = Boolean(ctx.mac);
   const primary = primaryModifier(event, mac);
-  const key = event.key;
+  // Autofill and some synthetic events carry no key.
+  const key = String(event.key ?? "");
   if (key === "F6" && !event.ctrlKey && !event.metaKey && !event.altKey) {
     return ctx.drawerOpen ? { type: "trap" } : { type: "region", step: event.shiftKey ? -1 : 1 };
   }

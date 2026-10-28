@@ -29,7 +29,7 @@ import { locate, objectCatalog } from "./lib/objects.js";
 import { searchObjects } from "./lib/search.js";
 import { nextSelection } from "./lib/selection.js";
 import { selectionSummary } from "./lib/selection_owner.js";
-import { relationsOf } from "./lib/relations.js";
+import { incomingOf, relationsOf } from "./lib/relations.js";
 import { deletionRefusal } from "./lib/deletion.js";
 import { diagnosticGroups, groupCounts } from "./lib/diagnostics.js";
 import { defaultHiddenLayers, visibleScene } from "./lib/layers.js";
@@ -205,7 +205,7 @@ const relations = computed(() =>
 );
 const refusal = computed(() => {
   if (!refusalShown.value || !selection.value.length) return null;
-  const rows = relations.value ? relations.value.incoming : [];
+  const rows = incomingOf(world.value, workspace.value?.external_incoming_references ?? {}, selection.value);
   return deletionRefusal({ externalStatus: workspace.value?.external_context_status, summary: summary.value, relations: rows });
 });
 const results = computed(() => searchObjects(catalog.value, query.value));
@@ -311,9 +311,12 @@ async function goBack() {
   const entry = returnStack.value.at(-1);
   if (!entry) return;
   returnStack.value = returnStack.value.slice(0, -1);
-  show(entry.domain, entry.mapId);
-  selection.value = entry.selection;
-  await settleFocus(entry.selection.length > 0);
+  // The files may have changed since: return only to what still exists.
+  const maps = entry.domain === "settlement" ? world.value?.settlements : world.value?.interiors;
+  const mapId = entry.domain === "continent" || maps?.some((item) => item.id === entry.mapId) ? entry.mapId : null;
+  show(entry.domain, mapId);
+  selection.value = entry.selection.filter((ref) => catalog.value.has(ref));
+  await settleFocus(selection.value.length > 0);
 }
 
 function openDomain(key) {
@@ -348,8 +351,11 @@ function toggleLayer(key) {
   hiddenLayers.value = hiddenLayers.value.includes(key)
     ? hiddenLayers.value.filter((item) => item !== key)
     : [...hiddenLayers.value, key];
+  if (domain.value !== "continent") return;
+  // A selected object on a now-hidden layer leaves the selection.
   const visible = new Set(objects.value.map((mark) => mark.id));
-  selection.value = selection.value.filter((ref) => catalog.value.get(ref)?.domain !== "continent" || visible.has(ref));
+  const kept = selection.value.filter((ref) => catalog.value.get(ref)?.domain !== "continent" || visible.has(ref));
+  if (kept.length !== selection.value.length) selection.value = kept;
 }
 
 // -- selection ---------------------------------------------------------------
@@ -433,7 +439,8 @@ function onCopy(event) {
     const textSelection = window.getSelection?.();
     if (textSelection && !textSelection.isCollapsed && String(textSelection).trim()) return;
   }
-  event.clipboardData?.setData("text/plain", contextText());
+  if (!event.clipboardData) return;
+  event.clipboardData.setData("text/plain", contextText());
   event.preventDefault();
   notice("ok");
 }
@@ -450,7 +457,11 @@ function copyContext() {
     forceCopy = false;
   }
   if (done) return;
-  navigator.clipboard?.writeText(contextText()).then(
+  if (!navigator.clipboard) {
+    notice("failed");
+    return;
+  }
+  navigator.clipboard.writeText(contextText()).then(
     () => notice("ok"),
     () => notice("failed"),
   );
@@ -512,7 +523,7 @@ function inNudgeScope(target) {
 // page keeps the browser's own copy.
 function isContextCopy(event) {
   const primary = mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
-  if (!primary || event.altKey || event.shiftKey || event.isComposing || event.key.toLowerCase() !== "c") return false;
+  if (!primary || event.altKey || event.shiftKey || event.isComposing || String(event.key ?? "").toLowerCase() !== "c") return false;
   if (isTextTarget(event.target)) return false;
   const textSelection = window.getSelection?.();
   return !(textSelection && !textSelection.isCollapsed && String(textSelection).trim());

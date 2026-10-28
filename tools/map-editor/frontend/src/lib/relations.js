@@ -191,3 +191,21 @@ export function relationsOf(world, incomingExternal, ref) {
   if (!found) return null;
   return { outgoing: found.outgoing, incoming: [...found.incoming, ...externalRows(incomingExternal, ref)] };
 }
+
+// Incoming relationships of every selected object (one row per distinct
+// declaration), so the delete explanation of a multi-selection names the
+// external references of each member as the service guard would.
+export function incomingOf(world, incomingExternal, refs) {
+  const rows = [];
+  const seen = new Set();
+  for (const ref of refs ?? []) {
+    for (const row of relationsOf(world, incomingExternal, ref)?.incoming ?? []) {
+      const key = JSON.stringify([ref, row.kind, row.label, row.ref, row.source]);
+      if (!seen.has(key)) {
+        seen.add(key);
+        rows.push(row);
+      }
+    }
+  }
+  return rows;
+}
