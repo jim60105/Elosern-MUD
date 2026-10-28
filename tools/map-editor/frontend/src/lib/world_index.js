@@ -7,6 +7,7 @@
 import { companionText, featurePoints, frameOf, parseContinentRef } from "./continent.js";
 import { featureLabel } from "./map_scene.js";
 import { compassLabel, findRoad, findSettlement, nodeName, parseSettlementRef, roadLabel } from "./settlement.js";
+import { findConnection, findInterior, parseInteriorRef, reverseOf, roomName } from "./interior.js";
 
 export function worldTree(world) {
   if (!world) return [];
@@ -88,10 +89,33 @@ function roomRecord(interior, room) {
     qualifiedRef: room.qualified_ref,
     relativePath: interior.relative_path,
     fields: [
+      row("ID", room.id),
       row("場景", room.scene_archetype),
       row("美術", room.art_key),
       row("描述", room.desc_zh),
       row("版面", interior.layout_relative_path ?? "無版面文件（依清單排列）"),
+    ],
+  };
+}
+
+// A directed interior connection (editable fields are the interior
+// inspector's; these rows are read-only context). No length exists.
+function connectionRecord(world, ref) {
+  const parsed = parseInteriorRef(ref);
+  if (parsed?.kind !== "connection") return null;
+  const interior = findInterior(world, parsed.interiorId);
+  const connection = findConnection(interior, parsed.source, parsed.destination, parsed.label);
+  if (!connection) return null;
+  const back = reverseOf(interior, connection);
+  return {
+    title: `${roomName(interior, connection.source)} → ${roomName(interior, connection.destination)}`,
+    qualifiedRef: ref,
+    relativePath: interior.relative_path,
+    fields: [
+      row("起點", `${roomName(interior, connection.source)}（${connection.source}）`),
+      row("終點", `${roomName(interior, connection.destination)}（${connection.destination}）`),
+      row("名稱", connection.label),
+      row("方向", back ? `雙向（回程「${back.label}」）` : "單向"),
     ],
   };
 }
@@ -199,6 +223,8 @@ export function inspect(world, qualifiedRef) {
   if (continental) return continental;
   const road = roadRecord(world, qualifiedRef);
   if (road) return road;
+  const connection = connectionRecord(world, qualifiedRef);
+  if (connection) return connection;
   for (const location of world.locations) {
     if (location.qualified_ref === qualifiedRef) return locationRecord(world, location);
   }

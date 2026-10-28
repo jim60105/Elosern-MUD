@@ -290,6 +290,19 @@ class _AccessibilityBrowser(unittest.TestCase):
         self.assertEqual(self.posts, [])
 
 
+SIDE = f"interior_room:{synthetic.INTERIOR_ID}:side"
+
+
+def _add_side_room(root: Path) -> None:
+    """Give the synthetic interior one room that no map document names."""
+
+    path = root / f"content/maps/interiors/{synthetic.INTERIOR_ID}.yaml"
+    data = synthetic.interior_data()
+    data["rooms"]["side"] = {"name_zh": "側室", "desc_zh": "A synthetic side room.", "scene_archetype": None,
+                             "art_key": None}
+    path.write_text(synthetic.yaml_text(data), encoding="utf-8")
+
+
 class MapEditorAccessibilityBrowserTest(_AccessibilityBrowser):
     @covers_requirement(
         "map-editor-interaction::workspace-navigation-and-diagnostics-identify-source-context",
@@ -358,14 +371,15 @@ class MapEditorAccessibilityBrowserTest(_AccessibilityBrowser):
         "map-editor-interaction::workspace-navigation-and-diagnostics-identify-source-context",
     )
     def test_an_unknown_index_explains_refused_deletion_and_editing_still_saves(self):
-        self.start()
+        # A room no map document names: only the unknown index refuses it.
+        self.start(_add_side_room)
         page = self.open()
         self.assertFalse(self.editor.workspace_state()["external_context_status"]["current"])
         self.assertEqual(page.locator('[data-chip="index"]').get_attribute("data-chip-state"), "unavailable")
         page.click('[data-chip="index"]')
         self.assertGreaterEqual(page.locator('[data-diagnostic-class="external"]').count(), 1)
         page.click('[data-domain-tab="interior"]')
-        page.click(f'[data-object="{BACK}"]')
+        page.click(f'[data-object="{SIDE}"]')
         page.keyboard.press("Delete")
         self.assertEqual(page.locator('[data-delete-refusal="index-unavailable"]').count(), 1)
         self.assertEqual(self.posts, [])
@@ -394,10 +408,13 @@ class MapEditorAccessibilityBrowserTest(_AccessibilityBrowser):
         page.click('[data-action="delete"]')
         self.assertEqual(page.locator('[data-delete-refusal="referenced"]').count(), 1)
         self.assertEqual(page.locator("[data-refusal-reference]").count(), 1)
-        internal = page.locator(f'[data-refusal-internal] [data-follow="{BACK}"]')
-        self.assertEqual(internal.count(), 1)
-        internal.click()
-        self.wait_for(lambda: self.inspected(page) == BACK, "the reference was not followed")
+        # The map references that must go first link to their declarations
+        # (the connections to and from `back`).
+        followed = f"connection:{synthetic.INTERIOR_ID}:front>back/in"
+        for target in (followed, f"connection:{synthetic.INTERIOR_ID}:back>front/out"):
+            self.assertEqual(page.locator(f'[data-refusal-internal] [data-follow="{target}"]').count(), 1)
+        page.locator(f'[data-refusal-internal] [data-follow="{followed}"]').click()
+        self.wait_for(lambda: self.inspected(page) == followed, "the reference was not followed")
         self.assertEqual(page.locator("[data-return]").count(), 1)
         page.keyboard.press("Alt+ArrowLeft")
         self.wait_for(lambda: self.inspected(page) == FRONT, "Alt+Left did not return to the refused object")

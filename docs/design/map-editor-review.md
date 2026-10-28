@@ -10,7 +10,9 @@ interactions only.
 **Reviewed slices:** `map-editor-interaction-shell` (P14), the workbench
 shell; `map-editor-continent-tools` (P15), the continent screen of design
 §4.1 (see "Continent tools review"); `map-editor-settlement-tools` (P16), the
-settlement screen of design §4.2 (see "Settlement tools review").
+settlement screen of design §4.2 (see "Settlement tools review");
+`map-editor-interior-tools` (P17), the interior screen of design §4.3 (see
+"Interior tools review").
 **Viewports:** 1451x790 (reference), 2560x1440, and 200 % zoom of the
 reference emulated as a 725x395 CSS viewport at device scale 2 (it reproduces
 the layout width, not every media feature of a real browser zoom).
@@ -43,11 +45,11 @@ the layout width, not every media feature of a real browser zoom).
 | Add a location without a local map | §4.1 | Matches (P15): the 地點 tool's creation form writes only `locations.yaml`; the new location is searchable, tagged 無本地圖 and fabricates no rooms. |
 | Move a settlement node | §4.2 | Matches (P16): a node drag, or a confirmed `m 地方` field, is one settlement-document command; the ID, the authored road directions and the listed relations (gate, interior entrance, landmark) are unchanged, and the core lengths update. |
 | Create a bidirectional street | §4.2 | Matches (P16): the 道路 R tool picks source then destination; the form requires a chosen direction and, with 建立雙向, a return direction; one command saves two directed rows with core lengths. |
-| Rearrange an interior | §4.3 | Matches: drag, Shift+arrow and layout fields write only the layout file, named in the strip after a save; 自動排列 arrives with `map-editor-interior-tools`. |
+| Rearrange an interior | §4.3 | Matches (P17): drag, Shift+arrow, the editor-only layout fields and 自動排列 write only the layout file, named in the strip after a save; the world fingerprint and every route length stay unchanged. |
 | Edit an entrance | §4.4 | Shell ready: entrance relations link both ends with return context; 前往另一端 and 更換端點… arrive with `map-editor-entrance-tools`. |
 | Incomplete number / duplicate identity | §5.3 | Matches for numbers (inline error, focus kept, nothing written). Settlement creation forms (P16) state a duplicate node ID inline with a link to the existing node, and the service refuses a duplicate ID, coordinate or ordered road with nothing written. |
 | Save semantic work-in-progress | §8 | Matches: the save chip shows saved while the strip lists unfinished rows; nothing claims game readiness. |
-| Remove a referenced object | §5.4 | Matches for locations (P15): a location still named by a local map, anchor or landmark, or by a current external index, shows 無法刪除 inline with its references and 不會連帶刪除; an unreferenced one is one undoable command checked again on the fresh disk baseline. Settlement nodes (P16) list every road, gate, city gate, interior entrance and landmark that must be removed first, each linked; an unreferenced node with a current index is one command. Rooms arrive with `map-editor-interior-tools`. |
+| Remove a referenced object | §5.4 | Matches for locations (P15): a location still named by a local map, anchor or landmark, or by a current external index, shows 無法刪除 inline with its references and 不會連帶刪除; an unreferenced one is one undoable command checked again on the fresh disk baseline. Settlement nodes (P16) list every road, gate, city gate, interior entrance and landmark that must be removed first, each linked; an unreferenced node with a current index is one command. Rooms (P17) list every connection, the exterior, interior link and landmark that must go first, each linked; a room joined by a service place or host is refused by the current index; connections are removed directly. |
 | Stale or missing external index | §5.4 | Matches: 索引 chip, an external diagnostics row explaining unsupported external claims, and the inline refusal; editing continues. |
 | ~~Fail a save during handoff~~ | — | Withdrawn by D3; a failed save is §5.2 ②. |
 | Browse while AI edits | §1.1 | Matches (P13): no mode; external changes load automatically. |
@@ -58,7 +60,7 @@ the layout width, not every media feature of a real browser zoom).
 | Source change during partition generation | §9 | Shell ready: 分區 chip and partition diagnostics; generation arrives with `map-editor-partition-jobs`. |
 | Selected object moves or disappears | §1.1 | Matches: the selection (also a multi-selection) is kept by identity and removed members are named. |
 | Copy context for OMP | §1.1 | Matches: plain text with qualified IDs, relative paths, frames and units and currentness; no token, ownership claim or action. |
-| Keyboard-only edits | §6 | Matches for the shell, layout edits, continent edits and settlement edits (N, R, object-list road endpoints, schema-typed fields, Shift+arrow group nudges); interior and entrance edits follow their changes. |
+| Keyboard-only edits | §6 | Matches for the shell, layout edits, continent edits and settlement edits (N, R, object-list road endpoints, schema-typed fields, Shift+arrow group nudges) and interior edits (N, R, object-list connection endpoints, room fields, 自動排列); entrance edits follow their change. |
 | Long names and 200 % zoom | §2 | Matches: headings, IDs and tree rows wrap or break anywhere; side columns become drawers; status chips stay in the viewport. |
 
 ## Continent tools review
@@ -100,3 +102,22 @@ wording and visual polish here; the tests establish only mechanisms. A
 | New local map | 建立本地圖 in a location's inspector (ID, anchor cell, local anchor, optional map options) writes one new settlement document, opens it and shows ▲ 尚無節點 as unfinished. | Matches |
 | Duplicate and route preview | 複製為新節點 asks for a new ID and states what is not copied (and the anchor demotion); 路徑預覽 lists the core planner's steps and total, marked when the snapshot has moved on. A reviewer should judge whether the route preview belongs below the roads. | Matches |
 | Duplicate identity (§5.3) | The node and duplicate forms state an existing ID inline with 前往現有節點, which selects that node; the service refuses it as well. | Matches |
+
+## Interior tools review
+
+Rows for the interior screen of design §4.3, delivered by
+`map-editor-interior-tools` (P17). The person reviewing judges tone, wording
+and visual polish here; the tests establish only mechanisms. A "Ready" row
+lists the elements a later change completes.
+
+| Element (design §) | Review notes | Disposition |
+| --- | --- | --- |
+| Rooms (§4.3) | Cards with the name and the monospace ID on a plain gradient canvas with no dot field, north arrow or scale; the fixed note 版面僅供編輯器使用 · 不代表距離或座標 at the bottom right. A reviewer should check card overlap when rooms sit one layout step apart at 1451x790. | Matches |
+| Connections (§4.3) | Curved arrows with one direction chevron each; a two-way pair bends apart and reads `去 ⇄ 回` once; the room inspector marks 單向 rows and a second exit with the same name. Judge whether the chevron reads clearly where an arrow passes close to a card. | Matches |
+| Tools (§4.3, §6) | 選取 V, 房間 N (opens the creation form at once, since a room has no position), 連接 R (source then destination room, then the name and optional 建立雙向) and 自動排列 in the tool pill. 外部入口 E is registered by `map-editor-entrance-tools`. | Matches (E: Ready, P18) |
+| Room fields | Name, multiline description, scene from the current index (✓/✕/▲ status; free text when the index is not current) and art key; the ID is shown read-only. | Matches |
+| Service rooms (§4.3) | A 服務 · 唯讀 section lists the joining `places` / `service_hosts` records from the index, or states that a standalone room needs none. Host and goods authoring stays out of the editor. | Matches |
+| Layout writes (§4.3) | Drag, Shift+arrow, the 版面 X/Y fields (labelled editor-only) and 自動排列 write only `content/map-editor-layouts/<id>.yaml`; the strip names it after the save. Creating a room writes no layout; the new room appears at the list position. 自動排列's button states that it overwrites the layout and can be undone. | Matches |
+| The exterior entrance (§4.3) | The dashed exterior card and editing of the exterior and interior links arrive with the entrance tools; the room inspector lists the entrance as a relation. | Ready, P18 |
+| New and removed interiors | ＋ 新室內 creates a standalone interior with its first room and opens it; 刪除室內文件 sends one command that the service guards like a room deletion and leaves the layout for cleanup. A reviewer should judge whether removing a whole document needs more emphasis than an inline action. | Matches |
+| Duplicate identity (§5.3) | The room forms state an ID already used by any interior inline with 前往現有房間; the service refuses it on the fresh disk as well. | Matches |

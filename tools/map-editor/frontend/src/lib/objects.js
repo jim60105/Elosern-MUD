@@ -21,6 +21,7 @@ import {
   waterwayRef,
 } from "./continent.js";
 import { bendRef, compassLabel, roadLabel, roadRef } from "./settlement.js";
+import { connectionRef, reverseOf } from "./interior.js";
 
 export const DOMAIN_LABELS = Object.freeze({ continent: "大陸", settlement: "據點", interior: "室內" });
 
@@ -107,6 +108,24 @@ export function objectCatalog(world) {
         parentLabel: parent,
         relativePath: interior.relative_path,
         layer: null,
+      });
+    }
+    // Directed connections: editor-local references owned by the interior
+    // document only. Interiors have no coordinates and no distances.
+    for (const connection of interior.connections) {
+      const ref = connectionRef(interior.id, connection.source, connection.destination, connection.label);
+      catalog.set(ref, {
+        ref,
+        kind: "connection",
+        domain: "interior",
+        mapId: interior.id,
+        id: ref,
+        // Room IDs, not names: searching a room's name finds the room itself.
+        label: `連接 ${connection.source} → ${connection.destination}（${connection.label}）`,
+        parentLabel: parent,
+        relativePath: interior.relative_path,
+        layer: null,
+        frame: `有向連接 ${connection.source} → ${connection.destination}，名稱「${connection.label}」${reverseOf(interior, connection) ? "（雙向之一）" : "（單向）"}；室內沒有座標、距離或路線長度`,
       });
     }
   }

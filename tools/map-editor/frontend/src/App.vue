@@ -6,11 +6,11 @@
 // diagnostics strip. The page follows the workspace files continuously
 // (adopting external changes, held behind open drafts until 載入新版), keeps
 // the selection by qualified identity, and runs guarded single-document
-// commands (interior room layout moves; continental geometry, locations,
-// districts, footprints and bindings; local maps, settlement nodes,
-// prototypes, directed roads and bends) with undo/redo of the manual
-// segment. Copying the OMP context only writes plain text to the clipboard;
-// it starts nothing.
+// commands (interior documents, rooms, named connections and editor-only
+// layouts; continental geometry, locations, districts, footprints and
+// bindings; local maps, settlement nodes, prototypes, directed roads and
+// bends) with undo/redo of the manual segment. Copying the OMP context only
+// writes plain text to the clipboard; it starts nothing.
 // Authored text is rendered with text interpolation only (never v-html).
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import MapCanvas from "./components/MapCanvas.vue";
@@ -20,6 +20,7 @@ import InspectorPanel from "./components/InspectorPanel.vue";
 import DiagnosticsStrip from "./components/DiagnosticsStrip.vue";
 import ContinentInspector from "./components/ContinentInspector.vue";
 import SettlementInspector from "./components/SettlementInspector.vue";
+import InteriorInspector from "./components/InteriorInspector.vue";
 import {
   KM,
   cellOfMetres,
@@ -56,7 +57,16 @@ import { CONNECTING, DISCONNECTED, createWorkspaceClient } from "./lib/workspace
 import { ADOPT, HOLD_DRAFT, HOLD_RESTART, followDecision, preserveSelection } from "./lib/following.js";
 import { workspaceBanner } from "./lib/banner.js";
 import { createCommandClient } from "./lib/command_client.js";
-import { findInterior, fromScene, moveCommand, parseRoomRef, storedPosition } from "./lib/layout_edit.js";
+import { findInterior, fromScene, layoutFingerprint, moveCommand, parseRoomRef, storedPosition } from "./lib/layout_edit.js";
+import {
+  arrangeLayout,
+  arrangement,
+  deleteInterior,
+  deleteRoom,
+  interiorRemoval,
+  parseInteriorRef,
+  roomBlockers,
+} from "./lib/interior.js";
 import { saveChip, saveState, FAILED, UNCERTAIN } from "./lib/persistence.js";
 import { sceneFor } from "./lib/map_scene.js";
 import { indexChip, partitionChip, syncChip } from "./lib/status.js";
@@ -88,14 +98,25 @@ const continentDrafts = ref(0);
 const leadDrafts = ref(0);
 const settlementDrafts = ref(0);
 const settlementLeadDrafts = ref(0);
+const interiorDrafts = ref(0);
+const interiorLeadDrafts = ref(0);
 const draftCount = computed(
-  () => layoutDrafts.value + continentDrafts.value + leadDrafts.value + settlementDrafts.value + settlementLeadDrafts.value,
+  () =>
+    layoutDrafts.value +
+    continentDrafts.value +
+    leadDrafts.value +
+    settlementDrafts.value +
+    settlementLeadDrafts.value +
+    interiorDrafts.value +
+    interiorLeadDrafts.value,
 );
 // Continent tool state: a two-click waterway start, an open creation form
 // and a hint when a tool has no target. Never persisted, never sent.
 const pendingStart = ref(null);
 // Settlement road tool: the chosen source node while the destination is picked.
 const roadStart = ref(null);
+// Interior connection tool: the chosen source room while the destination is picked.
+const connectionStart = ref(null);
 const creation = ref(null);
 const toolHint = ref(null);
 // The snapshot on screen (commands are built against it), the newest held
@@ -269,11 +290,17 @@ function refusalFor(refs, rows) {
   // gate, exteriors, landmarks) must be removed first, as the service guard
   // requires; external rows come from the index lookup.
   const nodes = oneDocumentNodes(refs);
+  // Interior rooms: connections either way, the exterior, interior links and
+  // landmarks must be removed first, as the service guard requires.
+  const room = refs.length === 1 && parseInteriorRef(refs[0])?.kind === "room";
+  let relations = rows;
+  if (nodes) relations = [...nodeBlockers(world.value, refs), ...rows.filter((row) => row.external)];
+  else if (room) relations = [...roomBlockers(world.value, refs[0]), ...rows.filter((row) => row.external)];
   return deletionRefusal({
     externalStatus: workspace.value?.external_context_status,
     summary: summary.value,
-    relations: nodes ? [...nodeBlockers(world.value, refs), ...rows.filter((row) => row.external)] : rows,
-    internalBlocks: location || Boolean(nodes),
+    relations,
+    internalBlocks: location || Boolean(nodes) || room,
   });
 }
 const results = computed(() => searchObjects(catalog.value, query.value));
@@ -432,6 +459,10 @@ function choose({ ref, toggle = false, range = false }) {
     pickRoadEnd(parseSettlementRef(ref).nodeId);
     return;
   }
+  if (domain.value === "interior" && tool.value === "connection" && parseInteriorRef(ref)?.kind === "room") {
+    pickConnectionEnd(parseInteriorRef(ref).roomId);
+    return;
+  }
   selection.value = nextSelection(selection.value, ref, { toggle, range, order: objects.value.map((mark) => mark.id) });
   if (drawers.value && selection.value.length && !toggle && !range) drawer.value = "inspector";
 }
@@ -469,6 +500,7 @@ const selectedNodes = computed(() => (domain.value === "settlement" ? oneDocumen
 const showSettlementInspector = computed(
   () => domain.value === "settlement" && Boolean(world.value) && Boolean(findSettlement(world.value, currentMapId.value)),
 );
+const showInteriorInspector = computed(() => domain.value === "interior" && Boolean(world.value));
 const pendingPoints = computed(() => (pendingStart.value ? [pendingStart.value.point] : []));
 const showContinentInspector = computed(
   () =>
@@ -480,8 +512,23 @@ const showContinentInspector = computed(
 watch([tool, domain, currentMapId], () => {
   pendingStart.value = null;
   roadStart.value = null;
+  connectionStart.value = null;
   creation.value = null;
   toolHint.value = null;
+});
+// Interior tools (registered after the reset above, so they run after it):
+// 房間 N opens the creation form at once (a room has no position to click),
+// 連接 R waits for two rooms, 自動排列 runs once and returns to 選取.
+watch(tool, (key) => {
+  if (domain.value !== "interior" || !world.value) return;
+  if (key === "room") openInteriorCreation();
+  else if (key === "connection") {
+    toolHint.value = "連接：選取起點房間（畫布或物件清單），再選取終點房間；Esc 取消。";
+    if (drawers.value) drawer.value = "inspector";
+  } else if (key === "arrange") {
+    tool.value = "select";
+    arrangeInterior();
+  }
 });
 
 function submitMove(interiorId, roomId, positionOf) {
@@ -493,6 +540,57 @@ function submitMove(interiorId, roomId, positionOf) {
     const to = positionOf(from);
     if (to[0] === from[0] && to[1] === from[1]) return null;
     return moveCommand(current.world, interiorId, roomId, to);
+  });
+}
+
+// -- interior room, connection and layout commands ---------------------------
+function allRoomIds(current) {
+  return (current?.interiors ?? []).flatMap((row) => row.rooms.map((item) => item.id));
+}
+
+function openInteriorCreation() {
+  const current = world.value;
+  const ids = current.interiors.map((row) => row.id);
+  const roomId = nextId("room", allRoomIds(current));
+  creation.value = findInterior(current, currentMapId.value)
+    ? { type: "room", defaults: { id: roomId, name_zh: "", desc_zh: "" } }
+    : { type: "interior", defaults: { interior_id: nextId("interior", ids), id: roomId, name_zh: "", desc_zh: "" } };
+  if (drawers.value) drawer.value = "inspector";
+  nextTick(() => root.value?.querySelector("[data-creation-field='id'], [data-creation-field='interior_id']")?.focus());
+}
+
+function pickConnectionEnd(roomId) {
+  toolHint.value = null;
+  if (!connectionStart.value) {
+    connectionStart.value = roomId;
+    creation.value = null;
+    toolHint.value = "連接：再選取終點房間；Esc 取消。";
+  } else if (connectionStart.value === roomId) {
+    toolHint.value = "連接：終點需為另一個房間；Esc 取消。";
+  } else {
+    const source = connectionStart.value;
+    connectionStart.value = null;
+    creation.value = { type: "connection", defaults: { source, destination: roomId, label: "", two_way: false, return_label: "" } };
+  }
+  if (drawers.value) drawer.value = "inspector";
+}
+
+// 自動排列: one layout command, built against the snapshot current when its
+// turn comes; only the layout document is written.
+function arrangeInterior() {
+  const interiorId = currentMapId.value;
+  if (!interiorId) return;
+  commands.submit((current) => {
+    const interior = findInterior(current.world, interiorId);
+    if (!interior?.rooms.length) return null;
+    const descriptor = arrangeLayout(interiorId, arrangement(interior));
+    return { ...descriptor, expected: layoutFingerprint(current.world, interiorId) };
+  });
+}
+
+function onDeleteInterior(interiorId) {
+  send(deleteInterior(interiorId)).then((result) => {
+    if (result?.changed) selection.value = [];
   });
 }
 
@@ -661,6 +759,7 @@ function onCreateMap(descriptor, settlementId) {
 
 function openCreation(request) {
   roadStart.value = null;
+  connectionStart.value = null;
   toolHint.value = null;
   creation.value = request;
 }
@@ -669,18 +768,26 @@ function cellSize() {
   return (world.value?.continent?.cell_size_km ?? 1) * KM;
 }
 
-function onCreate(descriptor, ref) {
+function onCreate(descriptor, ref, mapId = null) {
   creation.value = null;
+  if (domain.value === "interior") tool.value = "select";
   send(descriptor).then((result) => {
-    if (result?.changed && ref) selection.value = [ref];
+    if (!result?.changed) return;
+    // A new interior opens on its first room.
+    if (mapId) mapIds.value = { ...mapIds.value, interior: mapId };
+    if (ref) selection.value = [ref];
   });
 }
 
 function cancelTool() {
   pendingStart.value = null;
   roadStart.value = null;
+  connectionStart.value = null;
   creation.value = null;
   toolHint.value = null;
+  // The interior tools act when chosen (房間 opens its form at once), so a
+  // cancelled form returns to 選取 and choosing the tool again reopens it.
+  if (domain.value === "interior") tool.value = "select";
 }
 
 function onCanvasMove({ id, point, settle }) {
@@ -841,7 +948,7 @@ function onKeydown(event) {
     mac,
     text: isTextTarget(event.target),
     drawerOpen: Boolean(drawer.value),
-    toolActive: tool.value !== "select" || Boolean(creation.value || pendingStart.value || roadStart.value),
+    toolActive: tool.value !== "select" || Boolean(creation.value || pendingStart.value || roadStart.value || connectionStart.value),
     refusalShown: Boolean(refusal.value),
     hasSelection: selection.value.length > 0,
     nudgeScope: (Boolean(selectedRoom.value) || Boolean(selectedNodes.value)) && inNudgeScope(event.target),
@@ -920,6 +1027,24 @@ function requestDelete() {
         if (result?.changed) selection.value = parsed.kind === "bend" ? [parsed.road] : [];
       });
       return;
+    }
+    const connectionRemoval = interiorRemoval(ref);
+    if (connectionRemoval) {
+      // Connections are owned by their interior document only.
+      send(connectionRemoval).then((result) => {
+        if (result?.changed) selection.value = [];
+      });
+      return;
+    }
+    const room = parseInteriorRef(ref);
+    if (room?.kind === "room") {
+      const rows = incomingOf(world.value, workspace.value?.external_incoming_references ?? {}, [ref]);
+      if (refusalFor([ref], rows).key === NOTHING_REFUSES) {
+        send(deleteRoom(room.interiorId, room.roomId)).then((result) => {
+          if (result?.changed) selection.value = [];
+        });
+        return;
+      }
     }
     const removal = removalOf(world.value, ref);
     if (removal) {
@@ -1191,9 +1316,29 @@ async function onChip(key) {
           @delete="requestDelete"
           @drafts="settlementLeadDrafts = $event"
         />
+        <InteriorInspector
+          v-if="showInteriorInspector && !record"
+          :key="`${formEpoch}:interior-lead`"
+          :world="world"
+          :workspace="workspace"
+          :interior-id="currentMapId"
+          :selection="selection"
+          :creation="creation"
+          :hint="toolHint"
+          :submit="send"
+          :choose="(ref) => (selection = [ref])"
+          @create="onCreate"
+          @cancel="cancelTool"
+          @open="openCreation"
+          @select="(ref) => (selection = [ref])"
+          @delete="requestDelete"
+          @arrange="arrangeInterior"
+          @delete-interior="onDeleteInterior"
+          @drafts="interiorLeadDrafts = $event"
+        />
         </template>
         <template v-if="selectedRoom">
-          <h3 class="section-label">版面位置</h3>
+          <h3 class="section-label">版面位置 · 僅供編輯器</h3>
           <LayoutPositionFields
             :key="formEpoch"
             :room-ref="selected"
@@ -1201,8 +1346,28 @@ async function onChip(key) {
             @confirm="onFieldConfirm"
             @drafts="layoutDrafts = $event"
           />
-          <p class="inspector__note">只寫入 {{ `content/map-editor-layouts/${selectedRoom.interiorId}.yaml` }}；不改變世界座標或距離。</p>
+          <p class="inspector__note">只寫入 {{ `content/map-editor-layouts/${selectedRoom.interiorId}.yaml` }}；版面格不是公尺、距離或世界座標。</p>
         </template>
+        <InteriorInspector
+          v-if="showInteriorInspector && record"
+          :key="`${formEpoch}:${selected ?? ''}`"
+          :world="world"
+          :workspace="workspace"
+          :interior-id="currentMapId"
+          :selection="selection"
+          :creation="creation"
+          :hint="toolHint"
+          :submit="send"
+          :choose="(ref) => (selection = [ref])"
+          @create="onCreate"
+          @cancel="cancelTool"
+          @open="openCreation"
+          @select="(ref) => (selection = [ref])"
+          @delete="requestDelete"
+          @arrange="arrangeInterior"
+          @delete-interior="onDeleteInterior"
+          @drafts="interiorDrafts = $event"
+        />
         <ContinentInspector
           v-if="showContinentInspector && record"
           :key="`${formEpoch}:${selected ?? ''}`"

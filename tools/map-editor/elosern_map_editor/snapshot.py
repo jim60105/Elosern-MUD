@@ -590,7 +590,7 @@ SCENE_FAMILY = "scene_archetypes"
 
 
 def _scene_statuses(context: ExternalContext, projection: dict[str, Any]):
-    """Mark every settlement node's scene reference, return the offered set.
+    """Mark every settlement node's and interior room's scene reference, return the offered set.
 
     ``scene_status`` is ``none`` (no scene), ``valid`` or ``invalid`` against
     the current index's scene identifiers, or ``unavailable`` when the index
@@ -599,15 +599,16 @@ def _scene_statuses(context: ExternalContext, projection: dict[str, Any]):
 
     current = context.document is not None and context.freshness is not None and context.freshness.current
     scenes = context.document.identifier_set(SCENE_FAMILY) if current else None
-    for settlement in projection["settlements"]:
-        for node in settlement["nodes"]:
-            scene = node["scene_archetype"]
-            if scene is None:
-                node["scene_status"] = "none"
-            elif scenes is None:
-                node["scene_status"] = "unavailable"
-            else:
-                node["scene_status"] = "valid" if scene in scenes else "invalid"
+    marked = [node for settlement in projection["settlements"] for node in settlement["nodes"]]
+    marked += [room for interior in projection["interiors"] for room in interior["rooms"]]
+    for item in marked:
+        scene = item["scene_archetype"]
+        if scene is None:
+            item["scene_status"] = "none"
+        elif scenes is None:
+            item["scene_status"] = "unavailable"
+        else:
+            item["scene_status"] = "valid" if scene in scenes else "invalid"
     return ((SCENE_FAMILY, tuple(sorted(scenes))),) if scenes is not None else ()
 
 
