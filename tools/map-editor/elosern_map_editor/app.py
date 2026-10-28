@@ -591,7 +591,8 @@ def create_app(config: EditorConfig, *, fault=None) -> Starlette:
         destination = request.query_params.get("destination", "")
         if not all(_IDENTIFIER.fullmatch(value) and len(value) <= 128 for value in (settlement_id, source, destination)):
             return _error(400, "invalid_query", "settlement, source and destination are authored identifiers")
-        result = service.route(settlement_id, source, destination)
+        # The planner runs off the event loop over the immutable snapshot.
+        result = await run_in_threadpool(service.route, settlement_id, source, destination)
         if result is None:
             return _error(404, "unknown_settlement", f"there is no settlement {settlement_id!r} in the snapshot")
         return JSONResponse(result)

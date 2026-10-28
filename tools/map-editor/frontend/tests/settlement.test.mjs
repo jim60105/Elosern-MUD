@@ -207,9 +207,16 @@ test("roads and bends are catalogued under their settlement document", () => {
 
 test("a node with map references lists every blocker and refuses deletion", () => {
   const data = world();
-  const kinds = (refs) => nodeBlockers(data, refs).map((row) => row.kind).sort();
-  assert.deepEqual(kinds(["settlement_node:town:a"]), ["城門", "道路", "道路", "野外入口"].sort());
-  assert.equal(kinds(["settlement_node:town:b"]).length, 3); // two roads and the interior exterior
+  const rows = (refs) => nodeBlockers(data, refs);
+  // a: both roads (linked), the wilderness gate and the city gate (no link).
+  const forA = rows(["settlement_node:town:a"]);
+  assert.equal(forA.length, 4);
+  assert.deepEqual(forA.filter((row) => row.ref).map((row) => row.ref), [roadRef("town", "a", "b"), roadRef("town", "b", "a")]);
+  assert.ok(forA.every((row) => row.source === S && row.external === false));
+  // b: two roads and the interior exterior, declared by the interior.
+  const forB = rows(["settlement_node:town:b"]);
+  assert.equal(forB.length, 3);
+  assert.deepEqual(forB.filter((row) => row.source !== S).map((row) => row.ref), ["interior_room:hall:front"]);
   assert.equal(nodeBlockers(data, ["settlement_node:town:c"])[0].ref, "district:d");
   assert.deepEqual(nodeBlockers(data, ["settlement_node:town:lone"]), []);
   const refusal = deletionRefusal({

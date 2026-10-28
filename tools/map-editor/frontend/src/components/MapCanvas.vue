@@ -274,6 +274,12 @@ function onSurfaceClick(event) {
     return;
   }
   if (!view.value || event.target.closest(".map-mark, .map-pill")) return;
+  // A finished or cancelled mark drag ends with this click wherever it was
+  // released: it is consumed here, never turned into a placement.
+  if (suppressClick) {
+    suppressClick = false;
+    return;
+  }
   // Pointer capture (taken for a possible drag) may retarget the click to
   // the host: read the element under the pointer instead of the event target.
   const under = document.elementFromPoint?.(event.clientX, event.clientY) ?? event.target;

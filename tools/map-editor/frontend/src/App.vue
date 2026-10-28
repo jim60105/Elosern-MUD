@@ -589,6 +589,9 @@ function pickRoadEnd(nodeId) {
     roadStart.value = nodeId;
     creation.value = null;
     toolHint.value = "道路：再選取終點節點；Esc 取消。";
+  } else if (roadStart.value === nodeId) {
+    // A road never returns to its source: keep waiting for another node.
+    toolHint.value = "道路：終點需為另一個節點；Esc 取消。";
   } else {
     const source = roadStart.value;
     roadStart.value = null;
