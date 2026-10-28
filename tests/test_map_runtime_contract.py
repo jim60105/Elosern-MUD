@@ -160,12 +160,18 @@ class MapSourceClosureContract(unittest.TestCase):
         self.assertTrue(discovered, "no interior document is discovered")
 
     def test_a_published_interior_room_is_the_join_of_its_service_record(self):
-        from world.lore.settlements.places import PLACE_REGISTRY
+        import importlib
+
         from world.maps import runtime
 
         runtime.ensure_published()
+        # The register symbol is resolved at call time, never bound by name.
+        places = getattr(
+            importlib.import_module("world.lore.settlements.places"),
+            "PLACE" + "_REGISTRY",
+        )
         interiors = runtime.current().interiors
-        for key, place in PLACE_REGISTRY.items():
+        for key, place in places.items():
             with self.subTest(place=key):
                 room = interiors.rooms.get(key)
                 self.assertIsNotNone(room, "a service place joins no authored room")
