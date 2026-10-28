@@ -7,6 +7,9 @@
 // turns an authored identifier into a URL.
 
 import { boundsOfPoints, UNITS } from "@elosern/map-view";
+import { storedPosition, toScene } from "./layout_edit.js";
+
+export { INTERIOR_COLUMNS } from "./layout_edit.js";
 
 const KM = 1000;
 
@@ -76,19 +79,9 @@ export function settlementScene(settlement) {
 
 // Interior rooms carry no coordinates: an editor layout position is used when
 // one exists, otherwise a deterministic list order. Neither is a distance.
-export const INTERIOR_COLUMNS = 3;
-
 export function interiorPositions(interior) {
   const positions = new Map();
-  interior.rooms.forEach((room, index) => {
-    const layout = room.layout_position;
-    positions.set(
-      room.id,
-      layout
-        ? { x: layout[0], y: -layout[1] }
-        : { x: index % INTERIOR_COLUMNS, y: -Math.floor(index / INTERIOR_COLUMNS) },
-    );
-  });
+  for (const room of interior.rooms) positions.set(room.id, toScene(storedPosition(interior, room.id)));
   return positions;
 }
 

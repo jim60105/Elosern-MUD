@@ -1,6 +1,11 @@
 <script setup>
-// The read-only map surface. Projection, fit, pan and zoom come from the
-// shared @elosern/map-view primitives; selection and theme are this host's.
+// The map surface. Projection, fit, pan and zoom come from the shared
+// @elosern/map-view primitives; selection and theme are this host's. With
+// `movable`, an interior room card can be dragged: the drag is a draft drawn
+// at the pointer, Escape cancels it, and only the release emits one `move`
+// (scene point) -- the host turns that into one saved command. The card stays
+// at its draft place until the host settles that command; no new drag
+// starts while `busy`.
 // Authored labels render through text interpolation only.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
@@ -11,6 +16,7 @@ import {
   panByPixels,
   project,
   resolveTheme,
+  unproject,
   themeVars,
   wheelFactor,
   zoomBy,
@@ -22,8 +28,12 @@ const props = defineProps({
   selected: { type: String, default: null },
   stale: { type: Boolean, default: false },
   label: { type: String, default: "" },
+  movable: { type: Boolean, default: false },
+  busy: { type: Boolean, default: false },
 });
-const emit = defineEmits(["select"]);
+const emit = defineEmits(["select", "move"]);
+// { id, point } while a mark is dragged or its move awaits the service.
+const draft = ref(null);
 
 const host = ref(null);
 const frame = ref(null);
@@ -93,20 +103,60 @@ const links = computed(() =>
     : [],
 );
 const marks = computed(() =>
-  view.value && props.scene ? props.scene.marks.map((mark) => ({ ...mark, at: at(mark) })) : [],
+  view.value && props.scene
+    ? props.scene.marks.map((mark) => ({
+        ...mark,
+        at: at(draft.value?.id === mark.id ? draft.value.point : mark),
+        draft: draft.value?.id === mark.id,
+      }))
+    : [],
 );
 const lattice = computed(() =>
   view.value && frame.value && props.scene?.unit ? dotField(view.value, frame.value, props.scene.unit, 36) : null,
 );
 
-// Pointer pan and wheel zoom (view only; no world change).
+// Pointer pan and wheel zoom (view only; no world change), and room drags.
 let drag = null;
+let markDrag = null;
+let suppressClick = false;
+function pixelOf(event) {
+  const rect = host.value.getBoundingClientRect();
+  return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+}
+function cancelMarkDrag() {
+  if (!markDrag) return;
+  markDrag = null;
+  draft.value = null;
+  window.removeEventListener("keydown", onDragKey, true);
+}
+function onDragKey(event) {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    event.stopPropagation();
+    suppressClick = true;
+    cancelMarkDrag();
+  }
+}
 function onPointerDown(event) {
-  if (event.button !== 0 || event.target.closest(".map-mark")) return;
+  if (event.button !== 0) return;
+  const markElement = event.target.closest(".map-mark");
+  if (markElement) {
+    if (!props.movable || markElement.dataset.kind !== "room" || props.busy || !view.value) return;
+    markDrag = { id: markElement.dataset.qualifiedRef, x: event.clientX, y: event.clientY, moved: false };
+    window.addEventListener("keydown", onDragKey, true);
+    host.value.setPointerCapture?.(event.pointerId);
+    return;
+  }
   drag = { x: event.clientX, y: event.clientY, moved: false };
   host.value.setPointerCapture?.(event.pointerId);
 }
 function onPointerMove(event) {
+  if (markDrag) {
+    if (!markDrag.moved && Math.hypot(event.clientX - markDrag.x, event.clientY - markDrag.y) < DRAG_THRESHOLD_PX) return;
+    markDrag.moved = true;
+    draft.value = { id: markDrag.id, point: unproject(view.value, frame.value, pixelOf(event)) };
+    return;
+  }
   if (!drag || !view.value) return;
   const dx = event.clientX - drag.x;
   const dy = event.clientY - drag.y;
@@ -118,7 +168,30 @@ function onPointerMove(event) {
 }
 function onPointerUp() {
   drag = null;
+  if (!markDrag) return;
+  const { id, moved } = markDrag;
+  markDrag = null;
+  window.removeEventListener("keydown", onDragKey, true);
+  if (!moved || !draft.value) {
+    draft.value = null;
+    return;
+  }
+  suppressClick = true;
+  // The draft stays drawn until the host settles the command it started.
+  const pending = draft.value;
+  emit("move", {
+    id,
+    point: pending.point,
+    settle: () => {
+      if (draft.value === pending) draft.value = null;
+    },
+  });
 }
+function onPointerCancel() {
+  drag = null;
+  cancelMarkDrag();
+}
+onBeforeUnmount(() => window.removeEventListener("keydown", onDragKey, true));
 function onWheel(event) {
   if (!view.value) return;
   const rect = host.value.getBoundingClientRect();
@@ -129,6 +202,10 @@ function onWheel(event) {
 }
 
 function select(mark) {
+  if (suppressClick) {
+    suppressClick = false;
+    return;
+  }
   emit("select", mark.id);
 }
 
@@ -145,7 +222,7 @@ defineExpose({ fit });
     @pointerdown="onPointerDown"
     @pointermove="onPointerMove"
     @pointerup="onPointerUp"
-    @pointercancel="onPointerUp"
+    @pointercancel="onPointerCancel"
     @wheel.prevent="onWheel"
   >
     <svg v-if="scene && view" class="map-canvas__svg" :viewBox="`0 0 ${frame.width} ${frame.height}`" role="img" :aria-label="label">
@@ -172,7 +249,8 @@ defineExpose({ fit });
         v-for="mark in marks"
         :key="mark.id"
         class="map-mark"
-        :class="[`map-mark--${mark.role}`, { 'map-mark--selected': mark.id === selected }]"
+        :class="[`map-mark--${mark.role}`, { 'map-mark--selected': mark.id === selected, 'map-mark--draft': mark.draft }]"
+        :data-draft="mark.draft ? 'true' : null"
         :transform="`translate(${mark.at.x.toFixed(1)} ${mark.at.y.toFixed(1)})`"
         :data-kind="mark.kind"
         :data-qualified-ref="mark.id"

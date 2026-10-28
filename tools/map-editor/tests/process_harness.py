@@ -215,6 +215,33 @@ class EditorProcess:
         )
 
 
+def command(editor: "EditorProcess", name: str, *, document_id: str, expected: str, arguments: dict,
+            segment: str = "wrapper-segment", **overrides):
+    """POST one named command with a complete, current envelope."""
+
+    session = editor.session()
+    state = editor.workspace_state()
+    body = {
+        "session_generation": session["session_generation"],
+        "snapshot_revision": state["snapshot_revision"],
+        "segment": segment,
+        "document_id": document_id,
+        "expected_document_fingerprint": expected,
+        "arguments": arguments,
+    }
+    body.update(overrides)
+    return editor.request(
+        "POST",
+        f"/api/commands/{name}",
+        headers={
+            "Origin": editor.origin,
+            "X-Map-Editor-Token": session["token"],
+            "Content-Type": "application/json",
+        },
+        body=json.dumps(body),
+    )
+
+
 def load_by_path(name: str, path: Path):
     """Import a stand-alone helper module (e.g. the synthetic workspace) by path."""
 
@@ -229,6 +256,7 @@ def load_by_path(name: str, path: Path):
 
 __all__ = [
     "EditorProcess",
+    "command",
     "EditorUnavailable",
     "FRONTEND_DIST",
     "PROJECT",

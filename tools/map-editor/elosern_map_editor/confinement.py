@@ -99,6 +99,46 @@ class ConfinedWorkspace:
             raise
         return fd
 
+    def open_writable_parent(self, relative_path: object, *, create: bool = False) -> tuple[int, str]:
+        """``(parent_fd, name)`` for a writable source/layout document.
+
+        Generated artifacts are never writable. With ``create`` a missing
+        directory is made one component at a time below the workspace root,
+        through the same no-follow descriptor walk, so a linked directory is
+        refused instead of followed. The caller closes ``parent_fd``.
+        """
+
+        canonical = resolve_document_id(relative_path)
+        if canonical in ARTIFACTS:
+            raise ConfinementError("not_writable", canonical, "generated artifacts are read-only")
+        parts = split_relative(canonical)
+        fd = os.open(self.root, _DIR_FLAGS)
+        try:
+            for part in parts[:-1]:
+                try:
+                    next_fd = os.open(part, _DIR_FLAGS, dir_fd=fd)
+                except FileNotFoundError:
+                    if not create:
+                        raise ConfinementError("missing", canonical, "the directory does not exist") from None
+                    try:
+                        os.mkdir(part, 0o777, dir_fd=fd)
+                        # The new entry is durable only once its parent is flushed.
+                        os.fsync(fd)
+                    except FileExistsError:
+                        pass
+                    try:
+                        next_fd = os.open(part, _DIR_FLAGS, dir_fd=fd)
+                    except OSError as error:
+                        raise _walk_error(error, canonical, fd, part) from error
+                except OSError as error:
+                    raise _walk_error(error, canonical, fd, part) from error
+                os.close(fd)
+                fd = next_fd
+        except BaseException:
+            os.close(fd)
+            raise
+        return fd, parts[-1]
+
     def _read(self, relative_path: str, parts: tuple[str, ...], limit: int) -> bytes:
         parent = self._open_directory(parts[:-1], relative_path)
         try:
