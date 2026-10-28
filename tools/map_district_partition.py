@@ -48,7 +48,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 DATA_PATH = REPOSITORY_ROOT / "world" / "maps" / "data" / "district_partition.json"
 
 
-def _districts() -> tuple[DistrictSeed, ...]:
+def district_seeds() -> tuple[DistrictSeed, ...]:
     """Resolve every published district into the partition's seed form."""
     from world.lore import map_districts, wilderness_entry
     from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
@@ -146,7 +146,7 @@ def map_input_snapshot(root: str | Path | None = None) -> PartitionInputSnapshot
         nation_names=tuple(sorted(NATION_REGISTRY)),
         region_names=tuple(sorted(regions())),
         footprints=_footprint_cells(),
-        districts=_districts(),
+        districts=district_seeds(),
         source_signature=partition_source_signature(discover_source_documents(base)),
     )
 
