@@ -87,6 +87,11 @@ class _SceneFixture(EvenniaTestCase):
 
     def setUp(self) -> None:
         super().setUp()
+        # The room-art vocabulary is the authored interior world's, so the
+        # scene chain resolves against a published map world.
+        from world.tests.geography_fixture import publish_shipped_map_world
+
+        publish_shipped_map_world()
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.store_root = Path(self.temp.name)

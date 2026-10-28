@@ -441,11 +441,14 @@ class PlaceRegistryTests(unittest.TestCase):
                 self.assertEqual(shop.assortment_keys, place.assortment_keys)
 
     def _plant(self, place, **changes):
+        # The re-keyed row joins its own authored room: a place key IS the
+        # permanent room identity, so the plant cannot keep the source join.
         planted = {
+            "room": interior_room_ref("t_offense_room", "t_offense_place"),
             "components": tuple(
                 replace(declaration, binding=place_bound("t_offense_place"))
                 for declaration in place.components
-            )
+            ),
         }
         planted.update(changes)
         return replace(place, key="t_offense_place", **planted)
@@ -508,6 +511,7 @@ class PlaceRegistryTests(unittest.TestCase):
         duplicate = replace(
             self.store,
             key="t_second_shop_place",
+            room=interior_room_ref("t_second_shop_room", "t_second_shop_place"),
             components=(
                 capability(
                     "merchant",
@@ -532,6 +536,7 @@ class PlaceRegistryTests(unittest.TestCase):
         """One synthetic place authoring no host at all (every field defaulted)."""
         base = dict(
             key=key,
+            room=interior_room_ref(f"{key}_room", key),
             host_name=None,
             host_race=None,
             host_subrace=None,
@@ -683,7 +688,12 @@ class PlaceRegistryTests(unittest.TestCase):
         # npc-persona-host-examiner-producers: host_profile_key joins HOST_IDENTITY_FIELDS.
         # A place authoring a complete host but no host_profile_key fails load naming the
         # place and listing host_profile_key as missing.
-        complete_without_profile = replace(self.store, key="t_store_place", host_profile_key=None)
+        complete_without_profile = replace(
+            self.store,
+            key="t_store_place",
+            room=interior_room_ref("t_store_room", "t_store_place"),
+            host_profile_key=None,
+        )
         with self.assertRaises(ValueError) as caught:
             validate_place_registry({"t_store_place": complete_without_profile})
         message = str(caught.exception)
