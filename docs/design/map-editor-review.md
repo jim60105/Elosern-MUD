@@ -9,7 +9,8 @@ interactions only.
 
 **Reviewed slices:** `map-editor-interaction-shell` (P14), the workbench
 shell; `map-editor-continent-tools` (P15), the continent screen of design
-§4.1 (see "Continent tools review").
+§4.1 (see "Continent tools review"); `map-editor-settlement-tools` (P16), the
+settlement screen of design §4.2 (see "Settlement tools review").
 **Viewports:** 1451x790 (reference), 2560x1440, and 200 % zoom of the
 reference emulated as a 725x395 CSS viewport at device scale 2 (it reproduces
 the layout width, not every media feature of a real browser zoom).
@@ -40,13 +41,13 @@ the layout width, not every media feature of a real browser zoom).
 | --- | --- | --- |
 | Move a river control point | §4.1 | Matches (P15): diamond handles on the selected waterway; the release, or a confirmed `1 km 格` field, is one `continent.yaml` command; the core terrain preview redraws and the 分區 chip turns ▲ 過期. |
 | Add a location without a local map | §4.1 | Matches (P15): the 地點 tool's creation form writes only `locations.yaml`; the new location is searchable, tagged 無本地圖 and fabricates no rooms. |
-| Move a settlement node | §4.2 | Shell ready: the inspector lists the node's directed relations from authored fields; moving arrives with `map-editor-settlement-tools`. |
-| Create a bidirectional street | §4.2 | Shell ready: roads read as directed rows; the road tool with 建立雙向 arrives with `map-editor-settlement-tools`. |
+| Move a settlement node | §4.2 | Matches (P16): a node drag, or a confirmed `m 地方` field, is one settlement-document command; the ID, the authored road directions and the listed relations (gate, interior entrance, landmark) are unchanged, and the core lengths update. |
+| Create a bidirectional street | §4.2 | Matches (P16): the 道路 R tool picks source then destination; the form requires a chosen direction and, with 建立雙向, a return direction; one command saves two directed rows with core lengths. |
 | Rearrange an interior | §4.3 | Matches: drag, Shift+arrow and layout fields write only the layout file, named in the strip after a save; 自動排列 arrives with `map-editor-interior-tools`. |
 | Edit an entrance | §4.4 | Shell ready: entrance relations link both ends with return context; 前往另一端 and 更換端點… arrive with `map-editor-entrance-tools`. |
-| Incomplete number / duplicate identity | §5.3 | Matches for numbers (inline error, focus kept, nothing written); duplicate identity arrives with the identity-editing domain tools. |
+| Incomplete number / duplicate identity | §5.3 | Matches for numbers (inline error, focus kept, nothing written). Settlement creation forms (P16) state a duplicate node ID inline with a link to the existing node, and the service refuses a duplicate ID, coordinate or ordered road with nothing written. |
 | Save semantic work-in-progress | §8 | Matches: the save chip shows saved while the strip lists unfinished rows; nothing claims game readiness. |
-| Remove a referenced object | §5.4 | Matches for locations (P15): a location still named by a local map, anchor or landmark, or by a current external index, shows 無法刪除 inline with its references and 不會連帶刪除; an unreferenced one is one undoable command checked again on the fresh disk baseline. Nodes and rooms arrive with their domain tools. |
+| Remove a referenced object | §5.4 | Matches for locations (P15): a location still named by a local map, anchor or landmark, or by a current external index, shows 無法刪除 inline with its references and 不會連帶刪除; an unreferenced one is one undoable command checked again on the fresh disk baseline. Settlement nodes (P16) list every road, gate, city gate, interior entrance and landmark that must be removed first, each linked; an unreferenced node with a current index is one command. Rooms arrive with `map-editor-interior-tools`. |
 | Stale or missing external index | §5.4 | Matches: 索引 chip, an external diagnostics row explaining unsupported external claims, and the inline refusal; editing continues. |
 | ~~Fail a save during handoff~~ | — | Withdrawn by D3; a failed save is §5.2 ②. |
 | Browse while AI edits | §1.1 | Matches (P13): no mode; external changes load automatically. |
@@ -57,7 +58,7 @@ the layout width, not every media feature of a real browser zoom).
 | Source change during partition generation | §9 | Shell ready: 分區 chip and partition diagnostics; generation arrives with `map-editor-partition-jobs`. |
 | Selected object moves or disappears | §1.1 | Matches: the selection (also a multi-selection) is kept by identity and removed members are named. |
 | Copy context for OMP | §1.1 | Matches: plain text with qualified IDs, relative paths, frames and units and currentness; no token, ownership claim or action. |
-| Keyboard-only edits | §6 | Matches for the shell and layout edits; domain edits follow their changes. |
+| Keyboard-only edits | §6 | Matches for the shell, layout edits, continent edits and settlement edits (N, R, object-list road endpoints, schema-typed fields, Shift+arrow group nudges); interior and entrance edits follow their changes. |
 | Long names and 200 % zoom | §2 | Matches: headings, IDs and tree rows wrap or break anywhere; side columns become drawers; status chips stay in the viewport. |
 
 ## Continent tools review
@@ -78,3 +79,24 @@ the elements a later change completes.
 | Binding | Anchor cell `1 km 格` and local anchor `m 地方`, with the world-metre rule stated; interiors get no metres. | Matches |
 | Derived results (§4.1, §3) | The inspector section shows the terrain preview state and the partition's input signature against the current one. National borders draw dash-dot ink with no handles. 重新產生分區 and the partition district outlines arrive with `map-editor-partition-jobs`, which also adds rejection of commands during generation (its task 1.2). | Matches (regeneration: Ready, P19) |
 | Region prose and classifier fields | Name, nation keys, scene and one-variant-per-line descriptions; a variant containing a line break is shown as external-edit only. A reviewer should confirm that this is acceptable for authored prose. | Matches |
+
+## Settlement tools review
+
+Rows for the settlement screen of design §4.2, delivered by
+`map-editor-settlement-tools` (P16). The person reviewing judges tone,
+wording and visual polish here; the tests establish only mechanisms. A
+"Ready" row lists the elements a later change completes.
+
+| Element (design §) | Review notes | Disposition |
+| --- | --- | --- |
+| Tools (§4.2, §6) | 選取 V, 節點 N and 道路 R in the tool pill; Escape cancels a picked road source or an open form first. 入口 E is registered by `map-editor-entrance-tools`. | Matches (E: Ready, P18) |
+| Nodes (§4.2) | Area-map node glyphs with the gate arch; a larger transparent hit area; the inspector shows the name, prototype (with the anchor location for an anchor room), scene, typeclass, multiline description and the position in `m 地方` (east/north), each typed from the core schema. Check field order and density at 1451x790. | Matches |
+| Scene references | A select of the current index's scene archetypes with ✓/✕ status; when the index is not current a free text field with ▲ 無法驗證. A reviewer should confirm that the status line reads clearly beside the field. | Matches |
+| Roads (§4.2) | Directed rows `東北 → Yard · 500 m` and `← 南 來自 Yard`, using compass names (the codes appear in the road inspector); length is the core's. A selected road draws gold casing and downstream chevrons; one-way roads keep the dashed core. | Matches |
+| Creating a road (§4.2) | 道路 R: source then destination (canvas or object list), then a form with explicit 去程方向, 建立雙向 and 回程方向; no direction is pre-selected. The node inspector's ⟶ 新道路 and the road inspector's 建立反向道路 open the same form. | Matches |
+| Bends (§4.2) | Diamond handles on the selected road; numeric rows, 加彎點, 前方插入 / 後方插入 / 移除彎點. | Matches |
+| Moving a node (§4.2) | Drag, `m 地方` fields or Shift+arrow (10 m); ID and authored directions unchanged; relations listed the same after the move. A refused move (a taken coordinate) snaps back with the banner reason. | Matches |
+| Multi-selection (§4.2) | Ctrl/Shift in the object list; the inspector shows the count, owning document, mixed values as `—`, a group delta and 刪除這些節點. A cross-document selection shows 跨文件的選取只能檢視與複製 and no mutation actions. | Matches |
+| New local map | 建立本地圖 in a location's inspector (ID, anchor cell, local anchor, optional map options) writes one new settlement document, opens it and shows ▲ 尚無節點 as unfinished. | Matches |
+| Duplicate and route preview | 複製為新節點 asks for a new ID and states what is not copied (and the anchor demotion); 路徑預覽 lists the core planner's steps and total, marked when the snapshot has moved on. A reviewer should judge whether the route preview belongs below the roads. | Matches |
+| Duplicate identity (§5.3) | The node and duplicate forms state an existing ID inline with 前往現有節點, which selects that node; the service refuses it as well. | Matches |
