@@ -6,6 +6,7 @@
 
 import { companionText, featurePoints, frameOf, parseContinentRef } from "./continent.js";
 import { featureLabel } from "./map_scene.js";
+import { compassLabel, findRoad, findSettlement, nodeName, parseSettlementRef, roadLabel } from "./settlement.js";
 
 export function worldTree(world) {
   if (!world) return [];
@@ -70,7 +71,9 @@ function nodeRecord(settlement, node) {
     qualifiedRef: node.qualified_ref,
     relativePath: settlement.relative_path,
     fields: [
+      row("ID", node.id),
       row("原型", node.prototype_parent),
+      row("錨點地點", node.anchor_key),
       row("位置", `${node.local_m[0]} m 東, ${node.local_m[1]} m 北（地方）`),
       row("世界座標", `${node.world_m[0]} m 東, ${node.world_m[1]} m 北`),
       row("場景", node.scene_archetype),
@@ -157,10 +160,45 @@ function continentRecord(world, ref) {
   return null;
 }
 
+// A directed road or one of its bends (editable fields are the settlement
+// inspector's; these rows are read-only context, the length is the core's).
+function roadRecord(world, ref) {
+  const parsed = parseSettlementRef(ref);
+  if (!parsed || parsed.kind === "node") return null;
+  const settlement = findSettlement(world, parsed.settlementId);
+  const road = findRoad(settlement, parsed.source, parsed.destination);
+  if (!road) return null;
+  const length = road.length_m === null || road.length_m === undefined ? "—" : `${road.length_m} m（核心計算的物理長度）`;
+  if (parsed.kind === "bend") {
+    const bend = road.bends[parsed.index];
+    if (!bend) return null;
+    return {
+      title: `${roadLabel(settlement, road)} · 彎點 ${parsed.index + 1}`,
+      qualifiedRef: ref,
+      relativePath: settlement.relative_path,
+      fields: [row("座標", `${bend[0]} m 東, ${bend[1]} m 北（地方）`), row("道路長度", length)],
+    };
+  }
+  return {
+    title: roadLabel(settlement, road),
+    qualifiedRef: ref,
+    relativePath: settlement.relative_path,
+    fields: [
+      row("起點", `${nodeName(settlement, road.source)}（${road.source}）`),
+      row("終點", `${nodeName(settlement, road.destination)}（${road.destination}）`),
+      row("方向", `${compassLabel(road.direction)}（${road.direction}）`),
+      row("長度", length),
+      row("彎點", `${road.bends.length} 個`),
+    ],
+  };
+}
+
 export function inspect(world, qualifiedRef) {
   if (!world || !qualifiedRef) return null;
   const continental = continentRecord(world, qualifiedRef);
   if (continental) return continental;
+  const road = roadRecord(world, qualifiedRef);
+  if (road) return road;
   for (const location of world.locations) {
     if (location.qualified_ref === qualifiedRef) return locationRecord(world, location);
   }

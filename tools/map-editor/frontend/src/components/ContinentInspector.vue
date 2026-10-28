@@ -8,7 +8,7 @@
 // results section. Every change is emitted as one named single-document
 // command descriptor; the service validates it. Nothing is pre-disabled.
 // Authored text renders through text interpolation only.
-import { computed, onBeforeUnmount, reactive, watch } from "vue";
+import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
 import DraftField from "./DraftField.vue";
 import FootprintGrid from "./FootprintGrid.vue";
 import {
@@ -44,6 +44,7 @@ import {
   waterwayRef,
 } from "../lib/continent.js";
 import { partitionChip } from "../lib/status.js";
+import { createSettlement } from "../lib/settlement.js";
 
 const props = defineProps({
   world: { type: Object, required: true },
@@ -52,7 +53,7 @@ const props = defineProps({
   creation: { type: Object, default: null },
   hint: { type: String, default: null },
 });
-const emit = defineEmits(["send", "create", "cancel", "select", "follow", "drafts"]);
+const emit = defineEmits(["send", "create", "cancel", "select", "follow", "drafts", "create-map"]);
 
 // Draft counts of every open field, summed for the page's follow hold.
 const counts = reactive({});
@@ -278,6 +279,61 @@ function onFormKey(event) {
     event.preventDefault();
     submitCreation();
   }
+}
+
+// -- a new local map for the selected location (one new settlement document) --
+const mapForm = reactive({ open: false, id: "", anchor_x: "", anchor_y: "", local_e: "0", local_n: "0", range: "", mode: "" });
+function openMapForm() {
+  const taken = new Set(props.world.settlements.map((row) => row.id));
+  let id = location.value.id;
+  for (let n = 2; taken.has(id); n += 1) id = `${location.value.id}_${n}`;
+  Object.assign(mapForm, {
+    open: true,
+    id,
+    anchor_x: String(location.value.cell[0]),
+    anchor_y: String(location.value.cell[1]),
+    local_e: "0",
+    local_n: "0",
+    range: "",
+    mode: "",
+  });
+}
+watch(() => mapForm.open, (open) => {
+  counts.mapForm = open ? 1 : 0;
+});
+watch(() => props.selected, () => {
+  mapForm.open = false;
+});
+const mapFormError = computed(() => {
+  if (!mapForm.open) return null;
+  if (!/^[a-z][a-z0-9_]*$/.test(mapForm.id)) return "ID 需為小寫英文、數字與底線，並以字母開頭。";
+  if (props.world.settlements.some((row) => row.id === mapForm.id)) return "這個據點 ID 已存在。";
+  if (![mapForm.anchor_x, mapForm.anchor_y].every((value) => /^\d+$/.test(String(value).trim()))) return "錨點格需要非負整數（1 km 格）。";
+  if (![mapForm.local_e, mapForm.local_n].every((value) => /^-?\d+$/.test(String(value).trim()))) return "地方錨點需要整數公尺。";
+  const range = String(mapForm.range).trim();
+  const mode = String(mapForm.mode).trim();
+  if ((range || mode) && !(/^\d+$/.test(range) && mode)) return "地圖選項需同時填寫整數視野與模式，或都留空。";
+  return null;
+});
+const mapFormShown = ref(false);
+function submitMapForm() {
+  mapFormShown.value = true;
+  if (mapFormError.value) return;
+  const range = String(mapForm.range).trim();
+  const options = range ? { map_visual_range: Number(range), map_mode: String(mapForm.mode).trim() } : null;
+  emit(
+    "create-map",
+    createSettlement(
+      mapForm.id,
+      location.value.id,
+      [Number(mapForm.anchor_x), Number(mapForm.anchor_y)],
+      [Number(mapForm.local_e), Number(mapForm.local_n)],
+      options,
+    ),
+    mapForm.id,
+  );
+  mapForm.open = false;
+  mapFormShown.value = false;
 }
 
 // -- derived results ---------------------------------------------------------------
@@ -513,12 +569,49 @@ const short = (value) => (value ? String(value).slice(0, 8) : "—");
     <!-- location -->
     <template v-else-if="location">
       <h3 class="section-label">本地圖</h3>
-      <p v-if="!location.local_maps.length" class="inspector__muted" data-local-map="absent">無本地圖 · 不會顯示或建立任何房間；建立本地圖是另一個據點文件指令。</p>
+      <p v-if="!location.local_maps.length" class="inspector__muted" data-local-map="absent">無本地圖 · 不會顯示或建立任何房間；建立本地圖只寫入一份新的據點文件。</p>
       <ul v-else class="plain">
         <li v-for="mapId in location.local_maps" :key="mapId">
           <button type="button" class="button" :data-open-local-map="mapId" @click="emit('follow', `settlement:${mapId}`)">開啟本地圖 {{ mapId }}</button>
         </li>
       </ul>
+      <button v-if="!mapForm.open" type="button" class="button" data-action="create-local-map" @click="openMapForm">＋ 建立本地圖</button>
+      <form v-else class="creation" data-creation="settlement" @submit.prevent="submitMapForm" @keydown.esc.stop.prevent="mapForm.open = false">
+        <label class="draft-field">
+          <span class="draft-field__label">據點 ID（建立後不可更改）</span>
+          <input v-model="mapForm.id" class="draft-field__input mono" data-map-field="id" />
+        </label>
+        <label class="draft-field">
+          <span class="draft-field__label">錨點東向格<span class="draft-field__unit">{{ FRAME_CELL }}</span></span>
+          <input v-model="mapForm.anchor_x" class="draft-field__input mono" data-map-field="anchor_x" />
+        </label>
+        <label class="draft-field">
+          <span class="draft-field__label">錨點北向格<span class="draft-field__unit">{{ FRAME_CELL }}</span></span>
+          <input v-model="mapForm.anchor_y" class="draft-field__input mono" data-map-field="anchor_y" />
+        </label>
+        <label class="draft-field">
+          <span class="draft-field__label">地方錨點東<span class="draft-field__unit">{{ FRAME_LOCAL_M }}</span></span>
+          <input v-model="mapForm.local_e" class="draft-field__input mono" data-map-field="local_e" />
+        </label>
+        <label class="draft-field">
+          <span class="draft-field__label">地方錨點北<span class="draft-field__unit">{{ FRAME_LOCAL_M }}</span></span>
+          <input v-model="mapForm.local_n" class="draft-field__input mono" data-map-field="local_n" />
+        </label>
+        <label class="draft-field">
+          <span class="draft-field__label">地圖選項：視野（可留空）</span>
+          <input v-model="mapForm.range" class="draft-field__input mono" data-map-field="range" />
+        </label>
+        <label class="draft-field">
+          <span class="draft-field__label">地圖選項：模式（可留空）</span>
+          <input v-model="mapForm.mode" class="draft-field__input mono" data-map-field="mode" />
+        </label>
+        <p class="inspector__muted">新地圖沒有節點或道路，會標示為未完成；不會寫入地點文件。</p>
+        <p v-if="mapFormShown && mapFormError" class="draft-field__hint" data-field-error="local-map">{{ mapFormError }}</p>
+        <div class="inspector__actions">
+          <button type="submit" class="button" data-map-submit>＋ 建立本地圖</button>
+          <button type="button" class="button" @click="mapForm.open = false">取消 Esc</button>
+        </div>
+      </form>
       <DraftField label="名稱" field-key="location-name" :value="location.display_name_zh" @confirm="send(locationField(location.id, 'display_name_zh', $event))" @drafts="track('location-name')($event)" />
       <DraftField label="種類" field-key="location-kind" type="select" :options="LOCATION_KINDS" :value="location.kind" @confirm="send(locationField(location.id, 'kind', $event))" />
       <DraftField label="描述" field-key="location-description" type="textarea" :value="location.description" @confirm="send(locationField(location.id, 'description', $event))" @drafts="track('location-description')($event)" />

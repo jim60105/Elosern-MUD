@@ -13,9 +13,9 @@ export function useDrawers({ width, scale = 1 }) {
   return width < (NAV_MIN + INSPECTOR_MIN + CANVAS_MIN) * factor;
 }
 
-// Tools per domain (frontend design §4, §6). The continent tools are
-// registered with their commands; the settlement and interior tool slices add
-// theirs (node/room N, road/connection R, entrance E, ...).
+// Tools per domain (frontend design §4, §6). The continent and settlement
+// tools are registered with their commands; the interior and entrance tool
+// slices add theirs (room N, connection R, entrance E, ...).
 export const TOOLS = Object.freeze({
   continent: [
     { key: "select", label: "選取", glyph: "⌖", hotkey: "v" },
@@ -25,7 +25,11 @@ export const TOOLS = Object.freeze({
     { key: "location", label: "地點", glyph: "▲" },
     { key: "footprint", label: "佔地", glyph: "▦" },
   ],
-  settlement: [{ key: "select", label: "選取", glyph: "⌖", hotkey: "v" }],
+  settlement: [
+    { key: "select", label: "選取", glyph: "⌖", hotkey: "v" },
+    { key: "node", label: "節點", glyph: "●", hotkey: "n" },
+    { key: "road", label: "道路", glyph: "⟶", hotkey: "r" },
+  ],
   interior: [{ key: "select", label: "選取", glyph: "⌖", hotkey: "v" }],
 });
 

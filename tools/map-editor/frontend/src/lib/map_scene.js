@@ -26,6 +26,8 @@ import {
   waterwayRef,
 } from "./continent.js";
 
+import { bendRef, parseSettlementRef, roadLabel, roadRef } from "./settlement.js";
+
 export { INTERIOR_COLUMNS } from "./layout_edit.js";
 
 const KM = CONTINENT_KM;
@@ -192,34 +194,70 @@ export function featureLabel(featureRef) {
   return parsed.id;
 }
 
-export function settlementScene(settlement) {
+// A settlement: node marks (draggable), directed roads (selectable links
+// through their authored bends) and, for the selected road or bend, the bend
+// diamonds and the road's direction chevron. `items` is the object list:
+// nodes, then roads. An empty new map draws nothing and fabricates nothing.
+export function settlementScene(settlement, selection = []) {
   const nodes = new Map(settlement.nodes.map((node) => [node.id, node]));
   const gates = new Set();
   if (settlement.city_gate) gates.add(settlement.city_gate.node);
   for (const gate of settlement.wilderness_entry?.gates ?? []) gates.add(gate.destination_node);
+  const chosen = new Set(selection);
+  const activeRoads = new Set(
+    selection
+      .map(parseSettlementRef)
+      .filter((parsed) => parsed && parsed.settlementId === settlement.id && parsed.kind !== "node")
+      .map((parsed) => parsed.road),
+  );
   const marks = settlement.nodes.map((node) => ({
     id: node.qualified_ref,
     kind: "node",
     label: node.key,
     role: gates.has(node.id) ? "gate" : "node",
     gateway: gates.has(node.id),
+    draggable: true,
     ...point(node.local_m),
   }));
   const pairs = new Set(settlement.roads.map((road) => `${road.source}>${road.destination}`));
-  const links = settlement.roads.map((road) => {
-    const from = nodes.get(road.source);
-    const to = nodes.get(road.destination);
-    return {
-      id: `road:${settlement.id}:${road.id}`,
-      kind: "road",
-      direction: road.direction,
-      lengthM: road.length_m,
-      twoWay: pairs.has(`${road.destination}>${road.source}`),
-      points: [from.local_m, ...road.bends, to.local_m].map(point),
-    };
-  });
-  const bounds = boundsOfPoints([...marks, ...links.flatMap((link) => link.points)]);
-  return { kind: "settlement", unit: UNITS.m, bounds, shapes: [], marks, links };
+  const links = settlement.roads
+    .filter((road) => nodes.has(road.source) && nodes.has(road.destination))
+    .map((road) => {
+      const ref = roadRef(settlement.id, road.source, road.destination);
+      const points = [nodes.get(road.source).local_m, ...road.bends, nodes.get(road.destination).local_m].map(point);
+      return {
+        id: `road:${settlement.id}:${road.id}`,
+        ref,
+        kind: "road",
+        direction: road.direction,
+        lengthM: road.length_m,
+        twoWay: pairs.has(`${road.destination}>${road.source}`),
+        selected: activeRoads.has(ref),
+        points,
+      };
+    });
+  for (const link of links) {
+    if (!link.selected) continue;
+    const road = settlement.roads.find((item) => roadRef(settlement.id, item.source, item.destination) === link.ref);
+    road.bends.forEach((bend, index) => {
+      marks.push({
+        id: bendRef(link.ref, index),
+        kind: "handle",
+        label: `${roadLabel(settlement, road)} · 彎點 ${index + 1}`,
+        role: "handle",
+        draggable: true,
+        selected: chosen.has(bendRef(link.ref, index)),
+        ...point(bend),
+      });
+    });
+  }
+  const items = [
+    ...settlement.nodes.map((node) => ({ id: node.qualified_ref, label: node.key })),
+    ...settlement.roads.map((road) => ({ id: roadRef(settlement.id, road.source, road.destination), label: `道路 ${roadLabel(settlement, road)}` })),
+  ];
+  const drawn = [...marks, ...links.flatMap((link) => link.points)];
+  const bounds = boundsOfPoints(drawn.length ? drawn : [{ x: 0, y: 0 }]);
+  return { kind: "settlement", unit: UNITS.m, bounds, shapes: [], marks, links, items };
 }
 
 // Interior rooms carry no coordinates: an editor layout position is used when
@@ -260,7 +298,7 @@ export function sceneFor(world, domain, mapId, selection = []) {
   if (domain === "continent") return continentScene(world, selection);
   if (domain === "settlement") {
     const settlement = world.settlements.find((item) => item.id === mapId);
-    return settlement ? settlementScene(settlement) : null;
+    return settlement ? settlementScene(settlement, selection) : null;
   }
   const interior = world.interiors.find((item) => item.id === mapId);
   return interior ? interiorScene(interior) : null;

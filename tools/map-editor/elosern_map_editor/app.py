@@ -7,6 +7,10 @@ Routes in this slice (later slices add their named domain commands only):
 ``GET  /api/session``    same-origin token bootstrap
 ``GET  /api/workspace``  one complete replacement of the authoritative state
 ``GET  /api/events``     SSE ``status``/``invalidate`` notifications
+``GET  /api/settlements/<id>/route?source=&destination=``
+                         read-only route preview of the published snapshot
+                         (the core's planner: steps, authored directions and
+                         physical lengths), stamped with its snapshot revision
 ``POST /api/reload``     authenticated reread of the current disk files
 ``POST /api/commands/<name>`` one named single-document command, undo or redo
                          (see :mod:`elosern_map_editor.commands`)
@@ -26,6 +30,7 @@ import asyncio
 import threading
 import time
 import json
+import re
 import secrets
 import uuid
 from dataclasses import dataclass
@@ -33,7 +38,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from elosern_map_core import schema
+from elosern_map_core import schema, settlement_route
+from elosern_map_core.schema import IDENTIFIER_PATTERN
 from starlette.applications import Starlette
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
@@ -57,6 +63,8 @@ from .history import Entry, History, Presence
 from .security import AdmissionMiddleware, error_body
 from .snapshot import WorkspaceRead, read_workspace
 from .writer import ABSENT, DocumentWriter, Effect, SaveUncertain, StaleDocument, WriteError
+
+_IDENTIFIER = re.compile(IDENTIFIER_PATTERN)
 
 PREVIEW_CURRENT = "current"
 PREVIEW_STALE = "stale"
@@ -245,6 +253,9 @@ class EditorService:
             "external_incoming_references": {
                 ref: list(rows) for ref, rows in (published.external_incoming_references if published else ())
             },
+            "external_identifiers": {
+                family: list(values) for family, values in (published.external_identifiers if published else ())
+            },
             "partition_status": latest.partition_status,
             "history": self.history.describe(),
             "pending_intent": self.uncertain,
@@ -252,6 +263,22 @@ class EditorService:
             "external_change": dict(self.external_change, documents=list(self.external_change["documents"])),
             "following": dict(self.following),
         }
+
+    def route(self, settlement_id: str, source: str, destination: str) -> dict[str, Any] | None:
+        """The core's route preview over the published snapshot, or None.
+
+        One consistent (read, revision) pair is taken under the state lock;
+        the immutable world is then read outside it. Nothing is written.
+        """
+
+        with self._state:
+            published, revision = self.published, self.snapshot_revision
+        world = published.authoring if published is not None else None
+        settlement = world.settlements.get(settlement_id) if world is not None else None
+        if settlement is None:
+            return None
+        preview = settlement_route(settlement_id, settlement, source, destination)
+        return {"snapshot_revision": revision, "settlement_id": settlement_id, **preview.as_dict()}
 
     async def reload(self) -> bool:
         async with self._lock:
@@ -558,6 +585,18 @@ def create_app(config: EditorConfig, *, fault=None) -> Starlette:
             headers={"x-accel-buffering": "no"},
         )
 
+    async def route(request: Request) -> Response:
+        settlement_id = request.path_params["settlement_id"]
+        source = request.query_params.get("source", "")
+        destination = request.query_params.get("destination", "")
+        if not all(_IDENTIFIER.fullmatch(value) and len(value) <= 128 for value in (settlement_id, source, destination)):
+            return _error(400, "invalid_query", "settlement, source and destination are authored identifiers")
+        # The planner runs off the event loop over the immutable snapshot.
+        result = await run_in_threadpool(service.route, settlement_id, source, destination)
+        if result is None:
+            return _error(404, "unknown_settlement", f"there is no settlement {settlement_id!r} in the snapshot")
+        return JSONResponse(result)
+
     async def reload(request: Request) -> Response:
         try:
             body = json.loads(await request.body())
@@ -582,6 +621,7 @@ def create_app(config: EditorConfig, *, fault=None) -> Starlette:
         Route("/api/session", session, methods=["GET"]),
         Route("/api/workspace", workspace, methods=["GET"]),
         Route("/api/events", events, methods=["GET"]),
+        Route("/api/settlements/{settlement_id}/route", route, methods=["GET"]),
         Route("/api/reload", reload, methods=["POST"]),
         Route("/api/commands/{name}", command, methods=["POST"]),
     ]

@@ -7,6 +7,8 @@
 // Row: { kind, label, ref (navigable qualified or map reference, or null),
 //        source (workspace-relative declaring document), external }
 
+import { compassLabel } from "./settlement.js";
+
 function roomName(interior, roomId) {
   return interior.rooms.find((room) => room.id === roomId)?.name_zh ?? roomId;
 }
@@ -49,7 +51,7 @@ function nodeRelations(world, settlement, node) {
     .filter((road) => road.source === node.id)
     .map((road) => ({
       kind: "道路",
-      label: `${road.direction} → ${nodeKey(settlement, road.destination)}${road.length_m === null ? "" : ` · ${Math.round(road.length_m)} m`}`,
+      label: `${compassLabel(road.direction)} → ${nodeKey(settlement, road.destination)}${road.length_m === null ? "" : ` · ${Math.round(road.length_m)} m`}`,
       ref: ref(road.destination),
       source: path,
       external: false,
@@ -58,7 +60,7 @@ function nodeRelations(world, settlement, node) {
     .filter((road) => road.destination === node.id)
     .map((road) => ({
       kind: "道路",
-      label: `← ${road.direction} 來自 ${nodeKey(settlement, road.source)}`,
+      label: `← ${compassLabel(road.direction)} 來自 ${nodeKey(settlement, road.source)}`,
       ref: ref(road.source),
       source: path,
       external: false,

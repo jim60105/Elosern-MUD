@@ -53,11 +53,13 @@ uv run --locked python -m unittest tests.test_map_editor_persistence
 uv run --locked python -m unittest tests.test_map_editor_file_following
 uv run --locked python -m unittest tests.test_map_editor_watching
 uv run --locked python -m unittest tests.test_map_editor_geography
+uv run --locked python -m unittest tests.test_map_editor_settlements
 uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_standalone
 uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_persistence
 uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_file_following
 uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_accessibility
 uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_geography
+uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_settlements
 ```
 
 The accessibility module runs its keyboard workflow in Chromium and Firefox
@@ -360,7 +362,9 @@ the inspector drawer.
   selection; an index that is not current (external references unknown, so
   deletion is refused while inspection and editing continue); external
   references of a current index (what the service guard enforces); otherwise
-  no delete command exists yet for that object. Map-internal incoming
+  the object's delete command is sent, or the block states that its kind
+  has no delete command yet. For locations and settlement nodes the
+  map-internal references refuse first (§3.8, §3.9). Map-internal incoming
   references are listed alongside as references a deletion would leave
   dangling; nothing cascades.
 - **Diagnostics.** Rows grouped as structure, external index and references,
@@ -394,14 +398,14 @@ the inspector drawer.
 ### 3.7 Mandatory domain dependencies
 
 The shell's domain commands arrive with their changes. Delivered:
-`map-editor-continent-tools` (§3.8). The batch's remaining changes must
-deliver, through their own domain modules:
+`map-editor-continent-tools` (§3.8) and `map-editor-settlement-tools`
+(§3.9). The batch's remaining changes must deliver, through their own domain
+modules:
 
 | Change | Delivers on this shell |
 | --- | --- |
-| `map-editor-settlement-tools` | Node N, road R (建立雙向), bends, node fields, multi-selection edits, node delete |
 | `map-editor-interior-tools` | Room N, connection R, 自動排列, room fields, room delete |
-| `map-editor-entrance-tools` | Entrance E, 前往另一端, 更換端點… with the qualified-object selector (`[data-object-selector]`) |
+| `map-editor-entrance-tools` | Entrance E (on the settlement screen as well), 前往另一端, 更換端點… with the qualified-object selector (`[data-object-selector]`) |
 | `map-editor-partition-jobs` | Partition district drawables, 分區 chip and inspector regenerate/cancel, and rejection of every command route (geography included) while a generation runs |
 
 Each registers its tools in `TOOLS` (`src/lib/workbench.js`), sends its own
@@ -467,6 +471,93 @@ read-only 衍生結果 section with the terrain preview state and the partition'
 input signature against the current one. Geometry deletions send their
 command directly; a location delete first shows the inline refusal while a
 map or external reference remains.
+
+### 3.9 Settlement tools
+
+Service handlers live in `elosern_map_editor/settlements.py`; each writes
+exactly one document, `content/maps/settlements/<settlement_id>.yaml`.
+Positions and bends are integer metres in the settlement's local east/north
+frame (`m 地方`). Directions are authored values: no command, and nothing in
+the browser, infers or recomputes a compass direction from positions.
+
+| Command | Arguments |
+| --- | --- |
+| `create_settlement` | `settlement_id` (new), `location_id` (existing), `anchor_cell`, `local_anchor_m`, `options` (`{map_visual_range, map_mode}` or `null`); expected presence `absent` |
+| `set_settlement_field` | `field` `options` or `exit_prototype`, `value` (`null` removes it) |
+| `create_node` | `node_id` (new) and `fields` with every node field (`x_m`, `y_m`, `prototype_parent`, `key`, `desc`, `anchor_key`, `typeclass`, `scene_archetype`) |
+| `duplicate_node` | `node_id`, `new_node_id`, `x_m`, `y_m` |
+| `set_node_fields` | `node_id`, `fields` (any node field except the position; `prototype_parent` and `anchor_key` together) |
+| `move_nodes` | `moves` `[{node_id, x_m, y_m}, ...]`: one or several nodes in one operation |
+| `delete_nodes` | `node_ids` |
+| `create_road` | `source`, `destination`, `direction`, `bends`, `return` (`{direction, bends}` adds the reverse entry in the same operation, or `null`) |
+| `set_road` | `source`, `destination` of an existing road and `value` `{source, destination, direction}`; bends are kept |
+| `delete_road` | `source`, `destination` |
+| `insert_bend`, `move_bend`, `remove_bend` | `source`, `destination`, `index`, `point` `[x_m, y_m]` (insert/move) |
+
+Every command carries `settlement_id` and is refused as `cross_document` when
+its `document_id` names another document. Lists (moves, deleted nodes, bends)
+hold at most 1,000 entries. Field values are validated by the core schema and
+the candidate world by the authoring gate: a duplicate node ID, a duplicate
+coordinate, a duplicate ordered road, a second road leaving a node in the same
+direction, a self-loop or an unknown endpoint is refused with nothing written.
+Unfinished connectivity (an unconnected node, an unreachable landmark) is
+saved work in progress with its diagnostic.
+
+- **A new local map** writes only its settlement document: no location data,
+  since a location's local maps derive from `location_ref`. It has no nodes
+  or roads and the core diagnoses it `empty_graph` (semantic), so it is never
+  presented as playable. Undo removes the file.
+- **Identity.** Established IDs are read-only; new nodes need new IDs.
+  `duplicate_node` copies the ordinary values (name, description, scene,
+  typeclass, prototype) under a new ID and copies no relationship: no road,
+  gate, city gate, interior exterior or landmark. An `anchor_room` copy
+  becomes a `grid_room` without an anchor key, because the anchor binds the
+  one room of its location.
+- **Moves** keep the node ID, every authored road direction and every
+  dependent selector (gates, interior exteriors, district landmarks, external
+  references by qualified ID); the core recomputes the road lengths.
+- **Deletion never cascades.** `delete_nodes` is refused (409
+  `deletion_refused`, guard `internal`) while a road in either direction, a
+  wilderness gate, the city gate, an interior exterior or a district
+  landmark names one of the nodes, also for a road between two deleted
+  nodes; remove those first. The shared internal guard on the fresh disk
+  baseline also reports interior exteriors for any object-removing effect,
+  including an undo. Then the execution-time external reference check
+  applies (§8). Roads and bends are owned by their settlement document only
+  and are removed directly.
+
+The projection adds each node's `typeclass` and `scene_status` (`none`,
+`valid`, `invalid` against the current index's `scene_archetypes`, or
+`unavailable` when the index is not current), each settlement's `options`
+and `exit_prototype`, and road `length_m` from the core's `road_lengths`
+(present also for maps whose graph cannot be built, such as an empty one).
+`GET /api/workspace` carries `external_identifiers.scene_archetypes` only
+while the index is current. `GET /api/settlements/<id>/route?source=&destination=`
+is a read-only preview of the core planner (`settlement_route`) over the
+published snapshot: `status` (`route`, `no_route`, `unknown_node`,
+`unavailable`), each step's authored direction and length, the total, and
+the `snapshot_revision` it was computed for; the inspector marks a result
+that belongs to an older revision.
+
+On the page the tools are 選取 V, 節點 N (a creation form at the clicked
+point, rounded to whole metres) and 道路 R (choose the source node, then the
+destination, on the canvas or in the object list; the form requires the
+direction and, with 建立雙向, the return direction). 入口 E arrives with
+`map-editor-entrance-tools`. Dragging a node or a bend diamond is one
+command on release (Escape cancels); a node dragged inside a one-document
+multi-selection moves the group by one integer delta, and a refused move
+returns to the saved position. Every edit has a non-drag path: the node
+inspector's schema-typed fields (name, prototype with its anchor location,
+scene from the current index, typeclass, description) and `m 地方` position
+fields, 複製為新節點, ⟶ 新道路, the directed road rows (`北 → 北門 · 65 m`,
+`← 北 來自 鐘樓廣場`) and the core route preview; the road inspector's
+endpoint and direction selectors, length, bend rows with 前方插入/後方插入/
+移除彎點 and 建立反向道路; the multi-selection's mixed values (`—`), group
+delta and Shift+arrow (10 m per press). A selection spanning documents is
+inspect/copy only. The location inspector's 建立本地圖 creates a local map
+and opens it. Rejection of commands while a partition generation runs is
+added by `map-editor-partition-jobs`.
+
 ## 4. Security Model and Limitations
 
 - **Loopback only.** The service binds a loopback address and answers only

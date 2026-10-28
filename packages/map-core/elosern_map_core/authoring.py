@@ -42,7 +42,13 @@ from .documents import (
     SettlementDocument,
 )
 from .sources import SourceDocument, fingerprint_text, is_world_source
-from .sparse import SparseGraphError, SparseNode, SparseRoad, SparseSettlementGraph
+from .sparse import (
+    SparseGraphError,
+    SparseNode,
+    SparseRoad,
+    SparseSettlementGraph,
+    polyline_length,
+)
 from .partition_codec import (
     PARTITION_ALGORITHM_VERSION,
     PARTITION_SOURCE_KINDS,
@@ -1021,15 +1027,130 @@ def build_settlement_graph(
     )
 
 
+def road_lengths(settlement: SettlementDocument) -> Mapping[tuple[str, str], float]:
+    """Physical polyline length in metres of every declared road.
+
+    Keyed by the road's ordered ``(source, destination)`` identity. The
+    length runs from the source node through the authored bend points to the
+    destination node in the settlement's local metre frame. It is computed
+    per road, so it exists even when the whole graph cannot be built (an
+    empty or unfinished map); a road naming an unknown node has no length.
+    """
+
+    lengths: dict[tuple[str, str], float] = {}
+    for road in settlement.roads:
+        source = settlement.nodes.get(road.source)
+        destination = settlement.nodes.get(road.destination)
+        if source is None or destination is None:
+            continue
+        points = (
+            source.coordinate,
+            *((bend.x_m, bend.y_m) for bend in road.bends),
+            destination.coordinate,
+        )
+        lengths[(road.source, road.destination)] = polyline_length(points)
+    return MappingProxyType(lengths)
+
+
+@dataclass(frozen=True, slots=True)
+class RouteStepPreview:
+    """One directed road of a route preview, with its physical length."""
+
+    source: str
+    destination: str
+    direction: str
+    length_m: float
+
+
+ROUTE_FOUND = "route"
+ROUTE_NONE = "no_route"
+ROUTE_UNKNOWN_NODE = "unknown_node"
+ROUTE_UNAVAILABLE = "unavailable"
+
+
+@dataclass(frozen=True, slots=True)
+class RoutePreview:
+    """The shortest authored route between two nodes of one settlement.
+
+    ``status`` is ``route`` (``steps`` and the total ``length_m``),
+    ``no_route`` (the directed roads do not connect them), ``unknown_node``
+    or ``unavailable`` (the graph cannot be built; ``reason`` says why).
+    """
+
+    status: str
+    source: str
+    destination: str
+    steps: tuple[RouteStepPreview, ...] = ()
+    length_m: float | None = None
+    reason: str | None = None
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "status": self.status,
+            "source": self.source,
+            "destination": self.destination,
+            "steps": [
+                {
+                    "source": step.source,
+                    "destination": step.destination,
+                    "direction": step.direction,
+                    "length_m": step.length_m,
+                }
+                for step in self.steps
+            ],
+            "length_m": self.length_m,
+            "reason": self.reason,
+        }
+
+
+def settlement_route(
+    settlement_id: str,
+    settlement: SettlementDocument,
+    source: str,
+    destination: str,
+) -> RoutePreview:
+    """Preview the route the game's planner would take (read-only)."""
+
+    if source not in settlement.nodes or destination not in settlement.nodes:
+        return RoutePreview(ROUTE_UNKNOWN_NODE, source, destination)
+    try:
+        graph = build_settlement_graph(settlement_id, settlement)
+    except SparseGraphError as error:
+        return RoutePreview(ROUTE_UNAVAILABLE, source, destination, reason=str(error))
+    edges = graph.route(source, destination)
+    if edges is None:
+        return RoutePreview(ROUTE_NONE, source, destination)
+    steps = tuple(
+        RouteStepPreview(
+            edge.source.node_id,
+            edge.destination.node_id,
+            edge.direction,
+            edge.length,
+        )
+        for edge in edges
+    )
+    return RoutePreview(
+        ROUTE_FOUND,
+        source,
+        destination,
+        steps,
+        sum(step.length_m for step in steps),
+    )
+
+
 __all__ = [
     "AuthoritativeExternalResult",
     "AuthoringWorld",
     "PARTITION_ALGORITHM_VERSION",
     "PartitionFreshness",
+    "RoutePreview",
+    "RouteStepPreview",
     "RuntimeMapSnapshot",
     "build_settlement_graph",
     "compile_runtime",
     "diagnose_world",
     "load_authoring_world",
+    "road_lengths",
+    "settlement_route",
     "terrain_definition",
 ]
