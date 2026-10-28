@@ -26,9 +26,11 @@ Handlers in this slice:
     The explicit layout-cleanup command (service-only in this slice). It never
     cascades from, or into, a world document.
 
-World-document handlers (continent geometry, locations, districts and the
-settlement-owned footprint and binding) derive from :class:`DocumentCommand`
-and live in :mod:`elosern_map_editor.geography`.
+World-document handlers derive from :class:`DocumentCommand` (or, for a
+document creation, implement ``target``/``effect`` directly): continent
+geometry, locations, districts and the settlement-owned footprint and
+binding live in :mod:`elosern_map_editor.geography`; local maps, nodes,
+prototypes, roads and bends in :mod:`elosern_map_editor.settlements`.
 
 ``undo`` and ``redo`` (``arguments: {}``) apply the inverse/forward effect of
 the current segment's top history entry through the same path.
@@ -350,8 +352,9 @@ def refused_value(code: str, message: str, field_path: str) -> CommandError:
 
 def _registry():
     from .geography import GEOGRAPHY_HANDLERS
+    from .settlements import SETTLEMENT_HANDLERS
 
-    handlers = (MoveInteriorLayout(), RemoveInteriorLayout(), *GEOGRAPHY_HANDLERS)
+    handlers = (MoveInteriorLayout(), RemoveInteriorLayout(), *GEOGRAPHY_HANDLERS, *SETTLEMENT_HANDLERS)
     return {handler.name: handler for handler in handlers}
 
 
@@ -486,6 +489,14 @@ def internal_references(world, removed: set[str]) -> list[dict[str, Any]]:
             if key in removed:
                 rows.append({"target": key, "kind": "anchor_key", "source": settlement.relative_path,
                              "object_id": node_id, "field_path": f"nodes.{node_id}.anchor_key"})
+    for interior_id, interior in sorted(world.interiors.items()):
+        exterior = interior.exterior
+        if exterior is None:
+            continue
+        key = canonical_target_key(settlement_node_ref(exterior.settlement, exterior.node))
+        if key in removed:
+            rows.append({"target": key, "kind": "exterior", "source": interior.relative_path,
+                         "object_id": interior_id, "field_path": "exterior.node"})
     for district_id, district in world.districts.districts.items():
         key = _landmark_key(district.landmark)
         if key in removed:

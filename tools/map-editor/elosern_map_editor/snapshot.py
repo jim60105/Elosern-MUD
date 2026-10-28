@@ -12,7 +12,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from elosern_map_core import (
@@ -21,8 +21,6 @@ from elosern_map_core import (
     ReferenceContextError,
     ReferenceContextFreshness,
     PartitionDocumentError,
-    SparseGraphError,
-    build_settlement_graph,
     cell_center_m,
     check_reference_context_freshness,
     decode_reference_context,
@@ -34,6 +32,7 @@ from elosern_map_core import (
     parse_document,
     partition_freshness,
     read_partition_metadata,
+    road_lengths,
     terrain_definition,
     terrain_preview,
 )
@@ -100,6 +99,13 @@ class WorkspaceRead:
     #: present whenever the index decoded, even when it is not current, and an
     #: index that is not current can never prove that a target is unreferenced.
     external_incoming_references: tuple[tuple[str, tuple[dict[str, Any], ...]], ...] = ()
+    #: External identifier sets the editor offers as options (only the
+    #: ``scene_archetypes`` family), present only while the index is current.
+    external_identifiers: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    #: The loaded immutable authoring world behind ``world`` (read-only
+    #: previews such as the route endpoint). Not part of the observable
+    #: digest: it is derived from the same documents.
+    authoring: Any = field(default=None, compare=False, repr=False)
 
     @property
     def fingerprint_map(self) -> dict[str, str]:
@@ -112,7 +118,7 @@ class WorkspaceRead:
         payload = json.dumps(
             [self.loaded, self.documents, self.world, self.diagnostics,
              self.external_context_status, self.partition_status, self.fingerprints,
-             self.external_incoming_references],
+             self.external_incoming_references, self.external_identifiers],
             sort_keys=True,
             ensure_ascii=False,
             default=str,
@@ -347,10 +353,7 @@ def _project(world, layouts: Mapping[str, dict[str, Any]]) -> dict[str, Any]:
 
     settlements = []
     for settlement_id, settlement in sorted(world.settlements.items()):
-        try:
-            graph = build_settlement_graph(settlement_id, settlement)
-        except SparseGraphError:
-            graph = None
+        lengths = road_lengths(settlement)
         binding = settlement.binding
         nodes = []
         for node_id, node in settlement.nodes.items():
@@ -364,13 +367,14 @@ def _project(world, layouts: Mapping[str, dict[str, Any]]) -> dict[str, Any]:
                     "prototype_parent": node.prototype_parent,
                     "scene_archetype": node.scene_archetype,
                     "anchor_key": node.anchor_key,
+                    "typeclass": node.typeclass,
                     "local_m": [node.x_m, node.y_m],
                     "world_m": [int(world_m[0]), int(world_m[1])],
                 }
             )
         roads = []
         for road in settlement.roads:
-            edge = graph.edge(road.source, road.destination) if graph is not None else None
+            length = lengths.get((road.source, road.destination))
             roads.append(
                 {
                     "id": f"{road.source}>{road.destination}",
@@ -378,7 +382,7 @@ def _project(world, layouts: Mapping[str, dict[str, Any]]) -> dict[str, Any]:
                     "destination": road.destination,
                     "direction": road.direction,
                     "bends": [[bend.x_m, bend.y_m] for bend in road.bends],
-                    "length_m": round(edge.length, 3) if edge is not None else None,
+                    "length_m": round(length, 3) if length is not None else None,
                 }
             )
         settlements.append(
@@ -395,6 +399,8 @@ def _project(world, layouts: Mapping[str, dict[str, Any]]) -> dict[str, Any]:
                 "wilderness_entry": thaw(settlement.data.get("wilderness_entry")),
                 "footprint": _footprint(settlement),
                 "city_gate": thaw(settlement.data.get("city_gate")),
+                "options": thaw(settlement.data.get("options")),
+                "exit_prototype": thaw(settlement.data.get("exit_prototype")),
                 "interiors": interiors_by_settlement.get(settlement_id, []),
             }
         )
@@ -543,6 +549,7 @@ def read_workspace(workspace: ConfinedWorkspace, limits: Limits) -> WorkspaceRea
     )
     projection = _project(world, layouts)
     incoming = _incoming_references(context, projection)
+    identifiers = _scene_statuses(context, projection)
     documents = tuple(
         {
             "relative_path": document.relative_path,
@@ -562,6 +569,8 @@ def read_workspace(workspace: ConfinedWorkspace, limits: Limits) -> WorkspaceRea
         partition_status=partition,
         fingerprints=presence,
         external_incoming_references=incoming,
+        external_identifiers=identifiers,
+        authoring=world,
     )
 
 
@@ -574,6 +583,32 @@ def _projected_refs(projection: Mapping[str, Any]):
     for interior in projection["interiors"]:
         for room in interior["rooms"]:
             yield room["qualified_ref"]
+
+
+#: The external identifier family that names scene references.
+SCENE_FAMILY = "scene_archetypes"
+
+
+def _scene_statuses(context: ExternalContext, projection: dict[str, Any]):
+    """Mark every settlement node's scene reference, return the offered set.
+
+    ``scene_status`` is ``none`` (no scene), ``valid`` or ``invalid`` against
+    the current index's scene identifiers, or ``unavailable`` when the index
+    is missing, incompatible or not current (it can then prove nothing).
+    """
+
+    current = context.document is not None and context.freshness is not None and context.freshness.current
+    scenes = context.document.identifier_set(SCENE_FAMILY) if current else None
+    for settlement in projection["settlements"]:
+        for node in settlement["nodes"]:
+            scene = node["scene_archetype"]
+            if scene is None:
+                node["scene_status"] = "none"
+            elif scenes is None:
+                node["scene_status"] = "unavailable"
+            else:
+                node["scene_status"] = "valid" if scene in scenes else "invalid"
+    return ((SCENE_FAMILY, tuple(sorted(scenes))),) if scenes is not None else ()
 
 
 def _incoming_references(context: ExternalContext, projection: Mapping[str, Any]):
