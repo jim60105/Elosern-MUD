@@ -7,7 +7,9 @@ Tone, wording quality and visual polish are judged here by a person. They are
 not requirements pinned by tests: the tests establish mechanisms and
 interactions only.
 
-**Reviewed slice:** `map-editor-interaction-shell` (P14), the workbench shell.
+**Reviewed slices:** `map-editor-interaction-shell` (P14), the workbench
+shell; `map-editor-continent-tools` (P15), the continent screen of design
+§4.1 (see "Continent tools review").
 **Viewports:** 1451x790 (reference), 2560x1440, and 200 % zoom of the
 reference emulated as a 725x395 CSS viewport at device scale 2 (it reproduces
 the layout width, not every media feature of a real browser zoom).
@@ -36,15 +38,15 @@ the layout width, not every media feature of a real browser zoom).
 
 | Requirements §10 scenario | Design | Disposition and notes |
 | --- | --- | --- |
-| Move a river control point | §4.1 | Shell ready: layers, inspector frame/unit fields and 分區 chip are in place; control points arrive with `map-editor-continent-tools`. |
-| Add a location without a local map | §4.1 | Shell ready: 無本地圖 tags in the tree and inspector, and search finds every location; creation arrives with `map-editor-continent-tools`. |
+| Move a river control point | §4.1 | Matches (P15): diamond handles on the selected waterway; the release, or a confirmed `1 km 格` field, is one `continent.yaml` command; the core terrain preview redraws and the 分區 chip turns ▲ 過期. |
+| Add a location without a local map | §4.1 | Matches (P15): the 地點 tool's creation form writes only `locations.yaml`; the new location is searchable, tagged 無本地圖 and fabricates no rooms. |
 | Move a settlement node | §4.2 | Shell ready: the inspector lists the node's directed relations from authored fields; moving arrives with `map-editor-settlement-tools`. |
 | Create a bidirectional street | §4.2 | Shell ready: roads read as directed rows; the road tool with 建立雙向 arrives with `map-editor-settlement-tools`. |
 | Rearrange an interior | §4.3 | Matches: drag, Shift+arrow and layout fields write only the layout file, named in the strip after a save; 自動排列 arrives with `map-editor-interior-tools`. |
 | Edit an entrance | §4.4 | Shell ready: entrance relations link both ends with return context; 前往另一端 and 更換端點… arrive with `map-editor-entrance-tools`. |
 | Incomplete number / duplicate identity | §5.3 | Matches for numbers (inline error, focus kept, nothing written); duplicate identity arrives with the identity-editing domain tools. |
 | Save semantic work-in-progress | §8 | Matches: the save chip shows saved while the strip lists unfinished rows; nothing claims game readiness. |
-| Remove a referenced object | §5.4 | Shell ready: Delete shows the inline explanation (external references listed, internal references shown as dangling, 不會連帶刪除); the delete commands arrive with the domain tools, and the service guard stays the authority. |
+| Remove a referenced object | §5.4 | Matches for locations (P15): a location still named by a local map, anchor or landmark, or by a current external index, shows 無法刪除 inline with its references and 不會連帶刪除; an unreferenced one is one undoable command checked again on the fresh disk baseline. Nodes and rooms arrive with their domain tools. |
 | Stale or missing external index | §5.4 | Matches: 索引 chip, an external diagnostics row explaining unsupported external claims, and the inline refusal; editing continues. |
 | ~~Fail a save during handoff~~ | — | Withdrawn by D3; a failed save is §5.2 ②. |
 | Browse while AI edits | §1.1 | Matches (P13): no mode; external changes load automatically. |
@@ -57,3 +59,22 @@ the layout width, not every media feature of a real browser zoom).
 | Copy context for OMP | §1.1 | Matches: plain text with qualified IDs, relative paths, frames and units and currentness; no token, ownership claim or action. |
 | Keyboard-only edits | §6 | Matches for the shell and layout edits; domain edits follow their changes. |
 | Long names and 200 % zoom | §2 | Matches: headings, IDs and tree rows wrap or break anywhere; side columns become drawers; status chips stay in the viewport. |
+
+## Continent tools review
+
+Rows for the continent screen of design §4.1, delivered by
+`map-editor-continent-tools` (P15). The person reviewing judges tone, wording and
+visual polish here; the tests establish only mechanisms. A "Ready" row lists
+the elements a later change completes.
+
+| Element (design §) | Review notes | Disposition |
+| --- | --- | --- |
+| Layers (§4.1) | 地形與通行 holds the core terrain preview raster, the coast and the forest edge; 水系 the waterways; 山脊・隘口・渡口 the ridge walls, pass ticks and fords; 地點 the locations and reserved sites; 據點佔地 the footprint cells (hidden by default); 分區（衍生・唯讀） the derived national borders. Region tints are muted. A reviewer should check legibility against the dot field at both viewports. | Matches |
+| Tools (§4.1, §6) | 選取 V, 加控制點 A, 水系, 山脊, 地點, 佔地 in the tool pill; Escape cancels an incomplete tool operation first. 水系, 山脊 and 地點 complete in an inspector creation form whose new ID is confirmed before creation. | Matches |
+| Control points (§4.1) | Diamond handles appear only on the selected feature. The heading names the point, 隸屬 links the feature, the fields carry `km 地理` (coast) or `1 km 格` (everything else) with the other frame read-only, and 前方插入 / 後方插入 / 移除控制點 sit below. | Matches |
+| Footprint masks (§4.1) | Painted cells on the canvas with the 佔地 tool; the inspector's monospace `#`/`.` grid (north row first, one-cell margin, arrows and Space) writes only the owning settlement. Review the grid density of the 9-row Altoria mask at 1451x790. | Matches |
+| Locations without a local map (§4.1) | 無本地圖 in the tree and the inspector with no rooms; 開啟本地圖 for settlement-derived local maps. | Matches |
+| Districts and landmarks | Names, kind and region membership, plus a structured landmark selector (domain, map, object or cell). Saving a landmark that is not reachable shows ▲ in the diagnostics strip. | Matches |
+| Binding | Anchor cell `1 km 格` and local anchor `m 地方`, with the world-metre rule stated; interiors get no metres. | Matches |
+| Derived results (§4.1, §3) | The inspector section shows the terrain preview state and the partition's input signature against the current one. National borders draw dash-dot ink with no handles. 重新產生分區 and the partition district outlines arrive with `map-editor-partition-jobs`, which also adds rejection of commands during generation (its task 1.2). | Matches (regeneration: Ready, P19) |
+| Region prose and classifier fields | Name, nation keys, scene and one-variant-per-line descriptions; a variant containing a line break is shown as external-edit only. A reviewer should confirm that this is acceptable for authored prose. | Matches |

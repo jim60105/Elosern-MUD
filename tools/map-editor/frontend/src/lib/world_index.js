@@ -4,6 +4,9 @@
 // value stays a plain string or number for text interpolation. Nothing here
 // builds markup or a URL from authored content.
 
+import { companionText, featurePoints, frameOf, parseContinentRef } from "./continent.js";
+import { featureLabel } from "./map_scene.js";
+
 export function worldTree(world) {
   if (!world) return [];
   const settlements = new Map(world.settlements.map((s) => [s.id, s]));
@@ -90,8 +93,74 @@ function roomRecord(interior, room) {
   };
 }
 
+// Continental features, points and declarations (editable fields are the
+// continent inspector's; these rows are read-only context).
+function continentRecord(world, ref) {
+  const parsed = parseContinentRef(ref);
+  const continent = world.continent;
+  if (!parsed || !continent) return null;
+  const path = continent.relative_path;
+  const base = (title, fields, relativePath = path, extra = {}) => ({ title, qualifiedRef: ref, relativePath, fields, ...extra });
+  if (parsed.feature) {
+    const points = featurePoints(world, parsed.feature);
+    if (parsed.index !== null) {
+      const entry = points[parsed.index];
+      if (!entry) return null;
+      const noun = parsed.kind === "ford" ? "渡口" : "控制點";
+      return base(`${featureLabel(parsed.feature)} · ${noun} ${parsed.index + 1}`, [
+        row("座標", `${entry.stored[0]}, ${entry.stored[1]}（${frameOf(ref)}）`),
+        row("對應", companionText(world, ref, entry.stored)),
+      ], path, { owner: parsed.kind === "ford" ? `continent:waterway:${parsed.id}` : parsed.feature, ownerLabel: featureLabel(parsed.feature), pointCount: points.length });
+    }
+    if (parsed.kind === "waterway" && !continent.waterways.some((item) => item.id === parsed.id)) return null;
+    const fields = [row("控制點", `${points.length} 個（${frameOf(ref)}）`)];
+    if (parsed.kind === "waterway") {
+      const waterway = continent.waterways.find((item) => item.id === parsed.id);
+      fields.push(row("渡口", `${waterway.fords.length} 個`), row("國界河", waterway.id === continent.border_river_key ? "是" : "否"));
+    }
+    return base(featureLabel(parsed.feature), fields);
+  }
+  if (parsed.kind === "ridge") {
+    return base("中央山脊", [row("隘口", `${continent.ridge?.passes?.length ?? 0} 個`), row("單位", "欄／列索引與格數（1 km 格）")]);
+  }
+  if (parsed.kind === "pass") {
+    const pass = continent.ridge?.passes?.[parsed.index];
+    if (!pass) return null;
+    return base(`隘口 ${parsed.index + 1}`, [row("列範圍", `${pass.y_min}–${pass.y_max}（1 km 格）`)]);
+  }
+  if (parsed.kind === "site") {
+    const site = (continent.harbor_sites ?? []).find((item) => item.id === parsed.id);
+    if (!site) return null;
+    return base(site.display_name, [
+      row("格", `${site.cell[0]}, ${site.cell[1]}（1 km 格）`),
+      row("中心", `${site.centre_m[0]} m 東, ${site.centre_m[1]} m 北（地理）`),
+    ]);
+  }
+  if (parsed.kind === "region") {
+    const region = (continent.regions ?? []).find((item) => item.id === parsed.id);
+    if (!region) return null;
+    return base(region.display_name_zh, [row("鍵", region.id), row("說明", "分類由核心依地形輸入推導，無可編輯座標")]);
+  }
+  if (parsed.kind === "district") {
+    const district = (world.districts ?? []).find((item) => item.id === parsed.id);
+    if (!district) return null;
+    return base(district.district_name_zh, [row("種類", district.kind), row("地形區", district.region_key)], district.relative_path);
+  }
+  if (parsed.kind === "footprint") {
+    const settlement = world.settlements.find((item) => item.id === parsed.id);
+    if (!settlement?.footprint) return null;
+    return base(`${settlement.id} 佔地`, [
+      row("原點", `${settlement.footprint.origin[0]}, ${settlement.footprint.origin[1]}（1 km 格）`),
+      row("佔地格", `${settlement.footprint.cells.length} 格`),
+    ], settlement.relative_path);
+  }
+  return null;
+}
+
 export function inspect(world, qualifiedRef) {
   if (!world || !qualifiedRef) return null;
+  const continental = continentRecord(world, qualifiedRef);
+  if (continental) return continental;
   for (const location of world.locations) {
     if (location.qualified_ref === qualifiedRef) return locationRecord(world, location);
   }

@@ -19,7 +19,10 @@
         "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_settings_prose_scale_is_a_client_local_preference",
         "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_slash_focuses_the_always_present_field",
         "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest",
-        "web.tests.browser.test_vue_typography.VueTypographyBrowserTest"
+        "web.tests.browser.test_vue_typography.VueTypographyBrowserTest",
+        "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_a_location_with_a_local_map_opens_it_and_refuses_deletion",
+        "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_footprint_cells_and_a_district_landmark_by_keyboard_write_only_their_owner",
+        "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_derived_borders_have_no_handles_at_the_large_viewport"
       ]
     },
     {
@@ -66,7 +69,10 @@
         "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_focus_stays_on_action_dock_in_combat",
         "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_pointer_root_row_click_activates_once",
         "web.tests.browser.test_browser_services_dispatch.ReconnectJourney.test_reconnect_rebuilds_services_and_discards_unsubmitted_quantity",
-        "web.tests.browser.test_browser_party_acceptance.PartyManagementFixtureSmokeBrowserTest.test_dedicated_fixture_publishes_members_merchant_and_lineage"
+        "web.tests.browser.test_browser_party_acceptance.PartyManagementFixtureSmokeBrowserTest.test_dedicated_fixture_publishes_members_merchant_and_lineage",
+        "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_a_river_point_drag_is_one_continent_command_that_stales_the_partition",
+        "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_an_incomplete_number_writes_nothing_and_escape_restores_it",
+        "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_a_new_location_without_a_local_map_is_searchable_and_fabricates_nothing"
       ],
       "files_b": [
         "web.tests.browser.test_browser_action_feedback.ActionFeedbackBrowserTest.test_failed_concept_surfaces_one_crit_toast_above_the_overlay",
@@ -75,7 +81,8 @@
         "web.tests.browser.test_browser_creation_viewport_pointer.PointerCreationJourneys.test_pointer_click_on_submit_emits_exactly_one_custom_save",
         "web.tests.browser.test_browser_party_acceptance.PartyAcceptanceBrowserTest.test_cancelled_exit_keeps_the_whole_draft_and_a_committed_exit_settles_once",
         "web.tests.browser.test_browser_party_acceptance.PartyAcceptanceBrowserTest.test_member_journey_commands_a_companion_skill_and_item_and_revises_a_choice",
-        "web.tests.browser.test_browser_party_acceptance.PartyAcceptanceBrowserTest.test_unfinished_draft_survives_reconnect_without_replaying_intent"
+        "web.tests.browser.test_browser_party_acceptance.PartyAcceptanceBrowserTest.test_unfinished_draft_survives_reconnect_without_replaying_intent",
+        "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_clicking_a_feature_shape_selects_it_and_shows_its_handles"
       ]
     },
     {

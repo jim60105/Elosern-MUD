@@ -115,6 +115,11 @@ take the definition first: `region_for_coordinates`, `nominal_nation_for_coordin
 footprint_cells, cell)`, `forest_edge_row`, `border_river_row`,
 `terrain_description`, `national_borders`, `region_search_boxes`
 (`definition.region_search_boxes`), plus the rasterizer helpers.
+`terrain_definition(continent)` builds the definition from a continent
+document, and `terrain_preview(definition, max_side=90)` samples the same rules
+on a bounded grid (region and surface codes from `PREVIEW_SURFACES`), with the
+closed ridge walls between pass windows, the pass centres and the derived
+national borders. The map editor draws it as read-only derived output.
 
 The forest edge must be X-increasing and the border river X-decreasing; both are
 validated at construction because their per-column row tables are single-valued.

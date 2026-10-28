@@ -36,6 +36,8 @@ defineExpose({ focusHeading, focusFirstField });
 
 <template>
   <div ref="root" class="inspector">
+    <!-- Tool forms and hints that need no selected object. -->
+    <slot name="lead" />
     <template v-if="summary && summary.count > 1">
       <h2 class="section-label">檢查器 · 多重選取</h2>
       <h3 class="inspector__title" tabindex="-1" data-inspector-title>已選取 {{ summary.count }} 個物件</h3>
@@ -109,7 +111,7 @@ defineExpose({ focusHeading, focusFirstField });
         <p v-for="(reason, index) in refusal.reasons" :key="index" class="mono refusal__reason">{{ reason }}</p>
       </template>
       <template v-else-if="refusal.key === REFERENCED">
-        <strong>✕ 無法刪除：仍有 {{ refusal.external.length }} 個外部引用</strong>
+        <strong>✕ 無法刪除：仍有 {{ refusal.count ?? refusal.external.length }} 個{{ refusal.internalBlocks ? "" : "外部" }}引用</strong>
         <ul class="plain">
           <li v-for="(row, index) in refusal.external" :key="index" data-refusal-reference>
             {{ row.kind }} · {{ row.label }} <span class="mono refusal__reason">{{ row.source }}</span>
@@ -122,7 +124,7 @@ defineExpose({ focusHeading, focusFirstField });
         <p class="inspector__muted">沒有寫入任何檔案；刪除會由各領域工具提供，並由服務端檢查引用。</p>
       </template>
       <template v-if="refusal.internal?.length">
-        <p class="inspector__muted">同時仍被地圖資料引用（刪除會留下失效引用，不會連帶刪除）：</p>
+        <p class="inspector__muted">{{ refusal.internalBlocks ? "仍被其他地圖文件引用（先移除這些引用；不會連帶刪除）：" : "同時仍被地圖資料引用（刪除會留下失效引用，不會連帶刪除）：" }}</p>
         <ul class="plain">
           <li v-for="(row, index) in refusal.internal" :key="index" data-refusal-internal>
             {{ row.kind }} ·

@@ -26,6 +26,10 @@ Handlers in this slice:
     The explicit layout-cleanup command (service-only in this slice). It never
     cascades from, or into, a world document.
 
+World-document handlers (continent geometry, locations, districts and the
+settlement-owned footprint and binding) derive from :class:`DocumentCommand`
+and live in :mod:`elosern_map_editor.geography`.
+
 ``undo`` and ``redo`` (``arguments: {}``) apply the inverse/forward effect of
 the current segment's top history entry through the same path.
 """
@@ -34,6 +38,7 @@ from __future__ import annotations
 
 import json
 import re
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
@@ -276,7 +281,81 @@ class RemoveInteriorLayout:
         return Effect(REMOVE, envelope.document_id)
 
 
-HANDLERS = {handler.name: handler for handler in (MoveInteriorLayout(), RemoveInteriorLayout())}
+class DocumentCommand:
+    """One named command that replaces one existing world document.
+
+    Subclasses name ``keys`` (the exact argument keys), derive their ``owner``
+    document from the arguments, type-check the arguments in ``check`` (a
+    friendly early refusal may consult the published projection) and change
+    the thawed document data in ``mutate``. The complete candidate document
+    is then validated by the core schema while serializing (comments of
+    retained objects are kept), and the complete candidate world by the
+    authoring gate in :func:`validate_candidate`.
+    """
+
+    name = ""
+    keys: frozenset[str] = frozenset()
+
+    def owner(self, arguments: dict[str, Any]) -> str:  # pragma: no cover - abstract
+        raise NotImplementedError
+
+    def check(self, world: dict[str, Any], arguments: dict[str, Any]) -> None:
+        """Type-check the arguments (raise :class:`CommandError`)."""
+
+    def mutate(self, data: dict[str, Any], arguments: dict[str, Any]) -> None:  # pragma: no cover
+        raise NotImplementedError
+
+    def target(self, world: dict[str, Any], envelope: Envelope) -> str:
+        _exact_keys(envelope.arguments, set(self.keys))
+        self.check(world, envelope.arguments)
+        owner = self.owner(envelope.arguments)
+        if envelope.document_id != owner:
+            raise CommandError(
+                400,
+                "cross_document",
+                "a command mutates exactly one owning document; this one names another",
+                owner=owner,
+            )
+        return owner
+
+    def effect(self, envelope: Envelope, current: Current) -> Effect | None:
+        if current.text is None:
+            raise CommandError(409, "stale_document", f"{envelope.document_id} does not exist")
+        try:
+            parsed = parse_document(envelope.document_id, current.text)
+        except AuthoringError as error:
+            raise _gate_failure(error) from error
+        data = thaw(parsed.document.data)
+        baseline = deepcopy(data)
+        self.mutate(data, envelope.arguments)
+        if data == baseline:
+            return None
+        try:
+            text = serialize_document(document_from_data(envelope.document_id, data), parsed.round_trip)
+        except AuthoringError as error:
+            raise _gate_failure(error) from error
+        return Effect(REPLACE, envelope.document_id, text)
+
+
+def refused_value(code: str, message: str, field_path: str) -> CommandError:
+    """A domain refusal of one command value; nothing is written."""
+
+    return CommandError(
+        422,
+        "validation_failed",
+        message,
+        diagnostics=[{"code": code, "category": "structure", "message": message, "field_path": field_path}],
+    )
+
+
+def _registry():
+    from .geography import GEOGRAPHY_HANDLERS
+
+    handlers = (MoveInteriorLayout(), RemoveInteriorLayout(), *GEOGRAPHY_HANDLERS)
+    return {handler.name: handler for handler in handlers}
+
+
+HANDLERS = _registry()
 COMMANDS = frozenset(HANDLERS) | frozenset(HISTORY_COMMANDS)
 
 
@@ -336,6 +415,7 @@ def removed_objects(workspace: ConfinedWorkspace, limits: Limits, effect: Effect
                     diagnostics=[{"code": "unknown_interior", "relative_path": path}],
                 )
         return ()
+    check_internal_references(baseline, _document_removals(baseline, path, effect.text))
     candidate_sources = [source for source in sources if source.relative_path != path]
     if effect.text is not None:
         candidate_sources.append(make_source_document(path, effect.text))
@@ -344,6 +424,90 @@ def removed_objects(workspace: ConfinedWorkspace, limits: Limits, effect: Effect
     except AuthoringError as error:
         raise _gate_failure(error) from error
     return tuple(sorted(_object_keys(baseline) - _object_keys(candidate)))
+
+
+# Keep _document_keys and internal_references in step: every reference kind
+# scanned below must name an object kind this function can report removed.
+def _document_keys(document) -> set[str]:
+    kind = getattr(document, "kind", None)
+    if kind == "locations":
+        return {canonical_target_key(location_ref(key)) for key in document.locations}
+    if kind == "settlement":
+        return {canonical_target_key(settlement_node_ref(document.identity, key)) for key in document.nodes}
+    if kind == "interior":
+        return {canonical_target_key(interior_room_ref(document.identity, key)) for key in document.rooms}
+    return set()
+
+
+def _document_removals(baseline, path: str, text: str | None) -> set[str]:
+    """Map objects of ``path`` that the candidate text no longer declares.
+
+    Computed from that one document, so it is known even when the candidate
+    world would not load because something still refers to a removed object.
+    """
+
+    before = next((document for document in baseline.documents if document.relative_path == path), None)
+    if before is None:
+        return set()
+    if text is None:
+        return _document_keys(before)
+    try:
+        after = parse_document(path, text).document
+    except AuthoringError as error:
+        raise _gate_failure(error) from error
+    return _document_keys(before) - _document_keys(after)
+
+
+def _landmark_key(landmark) -> str | None:
+    if landmark.domain == "location" and landmark.object_id:
+        return canonical_target_key(location_ref(landmark.object_id))
+    if landmark.domain == "settlement_node" and landmark.map_id and landmark.object_id:
+        return canonical_target_key(settlement_node_ref(landmark.map_id, landmark.object_id))
+    if landmark.domain == "interior_room" and landmark.map_id and landmark.object_id:
+        return canonical_target_key(interior_room_ref(landmark.map_id, landmark.object_id))
+    return None
+
+
+def internal_references(world, removed: set[str]) -> list[dict[str, Any]]:
+    """Map-internal references in other documents to the removed objects."""
+
+    rows: list[dict[str, Any]] = []
+    if not removed:
+        return rows
+    for settlement_id, settlement in sorted(world.settlements.items()):
+        key = canonical_target_key(location_ref(settlement.location_ref))
+        if key in removed:
+            rows.append({"target": key, "kind": "location_ref", "source": settlement.relative_path,
+                         "object_id": settlement_id, "field_path": "location_ref"})
+        for node_id, node in settlement.nodes.items():
+            if node.anchor_key is None:
+                continue
+            key = canonical_target_key(location_ref(node.anchor_key))
+            if key in removed:
+                rows.append({"target": key, "kind": "anchor_key", "source": settlement.relative_path,
+                             "object_id": node_id, "field_path": f"nodes.{node_id}.anchor_key"})
+    for district_id, district in world.districts.districts.items():
+        key = _landmark_key(district.landmark)
+        if key in removed:
+            rows.append({"target": key, "kind": "landmark", "source": world.districts.relative_path,
+                         "object_id": district_id, "field_path": f"districts.{district_id}.landmark"})
+    return rows
+
+
+def check_internal_references(world, removed: set[str]) -> None:
+    """Refuse a removal that would leave a map reference dangling (no cascade)."""
+
+    rows = internal_references(world, removed)
+    if rows:
+        named = "; ".join(f"{row['source']} {row['field_path']}" for row in rows[:3])
+        raise CommandError(
+            409,
+            "deletion_refused",
+            f"other map documents still refer to an object this operation removes ({named})",
+            guard="internal",
+            internal_references=rows,
+            removed=sorted(removed),
+        )
 
 
 def check_removal(workspace: ConfinedWorkspace, limits: Limits, removed: tuple[str, ...]) -> None:
@@ -391,11 +555,14 @@ __all__ = [
     "COMMANDS",
     "CommandError",
     "Current",
+    "DocumentCommand",
     "Envelope",
     "HANDLERS",
     "HISTORY_COMMANDS",
     "layout_document_id",
+    "internal_references",
     "parse_envelope",
+    "refused_value",
     "removed_objects",
     "validate_candidate",
 ]

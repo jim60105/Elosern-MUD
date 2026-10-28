@@ -553,3 +553,13 @@ def test_snapshot_and_documents_are_immutable():
         world.settlements["demo_map"].data["nodes"]["plaza"]["x_m"] = 1
     with pytest.raises(dataclasses.FrozenInstanceError):
         world.settlements["demo_map"].nodes["plaza"].x_m = 1
+
+
+def test_mask_cells_list_every_hash_cell_even_for_a_point_shape():
+    from elosern_map_core.documents import WildernessEntryDeclaration
+
+    point = WildernessEntryDeclaration(shape=(".#",), origin=(5, 7), gates=())
+    assert point.footprint_cells == frozenset()
+    assert point.mask_cells == frozenset({(6, 7)})
+    block = WildernessEntryDeclaration(shape=("#.", "##"), origin=(1, 2), gates=())
+    assert block.mask_cells == block.footprint_cells == frozenset({(1, 2), (1, 3), (2, 3)})

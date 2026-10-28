@@ -34,7 +34,10 @@ from elosern_map_core import (
     parse_document,
     partition_freshness,
     read_partition_metadata,
+    terrain_definition,
+    terrain_preview,
 )
+from elosern_map_core.terrain import PREVIEW_SURFACES
 from elosern_map_core.diagnostics import STRUCTURE, sorted_diagnostics
 from elosern_map_core.reference_context import ReferenceContextDocument
 
@@ -287,6 +290,50 @@ def _cell(cell) -> list[int]:
     return [int(cell[0]), int(cell[1])]
 
 
+def _terrain_preview(continent) -> dict[str, Any]:
+    """The core's derived terrain preview of the current inputs (cell units).
+
+    Recomputed on every read from the authored inputs alone; nothing here
+    classifies a cell. Inconsistent inputs (a saveable semantic diagnostic)
+    have no preview, with the core's reason.
+    """
+
+    try:
+        preview = terrain_preview(terrain_definition(continent))
+    except (ValueError, TypeError) as error:
+        return {"status": "unavailable", "reason": str(error)}
+    return {
+        "status": "current",
+        "step": preview.step,
+        "columns": preview.columns,
+        "rows": preview.rows,
+        "regions": list(preview.regions),
+        "surfaces": list(PREVIEW_SURFACES),
+        "samples": list(preview.samples),
+        "ridge_walls": [[_cell(point) for point in wall] for wall in preview.ridge_walls],
+        "passes": [
+            {"index": index, "y_min": low, "y_max": high, "centre": _cell(centre)}
+            for index, (low, high, centre) in enumerate(preview.passes)
+        ],
+        "national_borders": [
+            {"nation_keys": list(border.nation_keys), "points": [_cell(point) for point in border.points]}
+            for border in preview.national_borders
+        ],
+        "borders_reason": preview.borders_reason,
+    }
+
+
+def _footprint(settlement) -> dict[str, Any] | None:
+    entry = settlement.wilderness_entry
+    if entry is None:
+        return None
+    return {
+        "shape": list(entry.shape),
+        "origin": _cell(entry.origin),
+        "cells": sorted(_cell(cell) for cell in entry.mask_cells),
+    }
+
+
 def _project(world, layouts: Mapping[str, dict[str, Any]]) -> dict[str, Any]:
     continent = world.continent
     terrain = continent.terrain
@@ -346,6 +393,7 @@ def _project(world, layouts: Mapping[str, dict[str, Any]]) -> dict[str, Any]:
                 "nodes": nodes,
                 "roads": roads,
                 "wilderness_entry": thaw(settlement.data.get("wilderness_entry")),
+                "footprint": _footprint(settlement),
                 "city_gate": thaw(settlement.data.get("city_gate")),
                 "interiors": interiors_by_settlement.get(settlement_id, []),
             }
@@ -393,6 +441,7 @@ def _project(world, layouts: Mapping[str, dict[str, Any]]) -> dict[str, Any]:
                     "route": [_cell(cell) for cell in waterway.route],
                     "route_m": [list(cell_center_m(cell)) for cell in waterway.route],
                     "fords": [_cell(cell) for cell in waterway.fords],
+                    "fords_m": [list(cell_center_m(cell)) for cell in waterway.fords],
                 }
                 for waterway_id, waterway in sorted(terrain.waterways.items())
             ],
@@ -407,9 +456,13 @@ def _project(world, layouts: Mapping[str, dict[str, Any]]) -> dict[str, Any]:
                 for site in continent.harbor_sites.values()
             ],
             "regions": [
-                {"id": region.region_id, "display_name_zh": region.display_name_zh, "nation_key": region.nation_key}
-                for region in continent.regions.values()
+                {"id": region_id, **thaw(region)}
+                for region_id, region in sorted(continent.data["regions"].items())
             ],
+            "ridge": thaw(continent.data["terrain"]["ridge"]),
+            "coastal_y_max": continent.data["terrain"]["coastal_y_max"],
+            "border_river_key": continent.data["terrain"]["border_river_key"],
+            "terrain_preview": _terrain_preview(continent),
         },
         "locations": [
             {

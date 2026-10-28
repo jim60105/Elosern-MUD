@@ -604,7 +604,9 @@ def _approach_cell(
     return None
 
 
-def _terrain_definition(continent: ContinentDocument) -> TerrainDefinition:
+def terrain_definition(continent: ContinentDocument) -> TerrainDefinition:
+    """The deterministic terrain rules' explicit inputs for one continent document."""
+
     terrain = continent.terrain
     return TerrainDefinition(
         frame_cells=terrain.frame_cells,
@@ -636,7 +638,7 @@ def _semantic_diagnostics(world: AuthoringWorld) -> list[Diagnostic]:
     diagnostics: list[Diagnostic] = []
     terrain: TerrainDefinition | None
     try:
-        terrain = _terrain_definition(world.continent)
+        terrain = terrain_definition(world.continent)
     except (ValueError, TypeError) as error:
         terrain = None
         diagnostics.append(
@@ -1029,4 +1031,5 @@ __all__ = [
     "compile_runtime",
     "diagnose_world",
     "load_authoring_world",
+    "terrain_definition",
 ]
