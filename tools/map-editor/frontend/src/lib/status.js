@@ -16,6 +16,10 @@ export function syncChip(workspace, connection) {
   if (!workspace) return { tone: "neutral", glyph: "⟳", text: "讀取中" };
   if (workspace.preview_state === "unavailable") return { tone: "seal", glyph: "⦸", text: "無可用預覽" };
   if (workspace.preview_state === "stale") return { tone: "warn", glyph: "▲", text: "預覽過期 · YAML 錯誤" };
+  const external = workspace.external_change;
+  if (external?.sequence && external.at === workspace.snapshot_read_at) {
+    return { tone: "ok", glyph: "◉", text: `已載入外部變更 ${clock(external.at)}` };
+  }
   return { tone: "ok", glyph: "◉", text: `已同步 ${clock(workspace.snapshot_read_at)}` };
 }
 
@@ -51,6 +55,7 @@ export function priorityBanner(workspace, connection) {
       text: workspace
         ? `畫面停留在 ${clock(workspace.checked_at)} 的快照，現在無法寫入。重新連線後會自動重新讀取。`
         : "無法連線到地圖編纂服務。",
+      action: "reconnect",
     };
   }
   if (!workspace) return null;

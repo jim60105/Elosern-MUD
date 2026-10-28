@@ -3,7 +3,7 @@
 // Typing makes a draft that is never written: Enter or blur confirms a
 // complete integer as one operation, Escape restores the saved value, and an
 // incomplete value keeps the draft with an inline error and writes nothing.
-import { computed, reactive, watch } from "vue";
+import { computed, onBeforeUnmount, reactive, watch } from "vue";
 import { parseIntegerDraft } from "../lib/persistence.js";
 
 const props = defineProps({
@@ -21,6 +21,8 @@ const errors = reactive({});
 
 const count = computed(() => Object.keys(drafts).length);
 watch(count, (value) => emit("drafts", value), { immediate: true });
+// An unmounted form (deselection, or drafts discarded by 載入新版) holds none.
+onBeforeUnmount(() => emit("drafts", 0));
 // Another room is a new form; its drafts were resolved or cancelled by now.
 watch(
   () => props.roomRef,
