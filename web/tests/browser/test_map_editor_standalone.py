@@ -20,6 +20,8 @@ from urllib.parse import urlparse
 
 from playwright.sync_api import sync_playwright
 
+from tools.spec_traceability import covers_requirement
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 EDITOR_TESTS = REPO_ROOT / "tools" / "map-editor" / "tests"
 FRONTEND = REPO_ROOT / "tools" / "map-editor" / "frontend"
@@ -110,6 +112,8 @@ class MapEditorStandaloneBrowserTest(_StandaloneEditorBrowser):
         shutil.rmtree(cls.root, ignore_errors=True)
         super().tearDownClass()
 
+    @covers_requirement("map-editor-service::editor-runs-without-game-services-or-dependencies")
+
     def test_continent_settlement_and_interior_snapshots_render(self):
         page = self.open()
         world = self.state["world"]
@@ -135,6 +139,8 @@ class MapEditorStandaloneBrowserTest(_StandaloneEditorBrowser):
         self.assertEqual(page.locator('[data-kind="room"]').count(), len(world["interiors"][0]["rooms"]))
         self.assert_only_local_requests()
 
+    @covers_requirement("map-editor-service::editor-runs-without-game-services-or-dependencies")
+
     def test_local_build_assets_load_with_node_unavailable_and_network_denied(self):
         self.assertIsNone(shutil.which("node", path=self.editor._empty_path))
         page = self.open()
@@ -147,6 +153,8 @@ class MapEditorStandaloneBrowserTest(_StandaloneEditorBrowser):
         self.assertTrue(all(name.startswith(own) for name in fonts))
         self.assertEqual(page.locator(".map-mark").count() > 0, True)
         self.assert_only_local_requests()
+
+    @covers_requirement("map-editor-service::editor-runs-without-game-services-or-dependencies")
 
     def test_game_theme_scales_without_the_game_shell(self):
         scan = subprocess.run(
@@ -191,6 +199,8 @@ class MapEditorStandaloneBrowserTest(_StandaloneEditorBrowser):
             self.assertGreater(float(title.evaluate("el => parseFloat(getComputedStyle(el).fontSize)")), 16 * scale)
             page.context.close()
         self.assert_only_local_requests()
+
+    @covers_requirement("map-editor-service::local-api-confines-and-authorizes-workspace-access")
 
     def test_authored_prose_and_scene_ids_stay_inert_text(self):
         page = self.open()

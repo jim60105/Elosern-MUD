@@ -17,6 +17,7 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EDITOR_TESTS = REPO_ROOT / "tools" / "map-editor" / "tests"
@@ -57,6 +58,7 @@ class _EditorCase(unittest.TestCase):
 
 
 class EditorEnvironmentTests(_EditorCase):
+    @covers_requirement("map-editor-service::editor-runs-without-game-services-or-dependencies")
     def test_the_editor_interpreter_has_no_game_framework_or_game_modules(self):
         code = (
             "import importlib.util, json, sys\n"
@@ -84,6 +86,7 @@ class EditorEnvironmentTests(_EditorCase):
 
 
 class EditorHttpBoundaryTests(_EditorCase):
+    @covers_requirement("map-editor-service::local-api-confines-and-authorizes-workspace-access")
     def test_foreign_unauthenticated_and_oversized_requests_change_nothing(self):
         before = synthetic.tree_digest(self.workspace)
         with harness.EditorProcess(self.workspace) as editor:
@@ -112,6 +115,8 @@ class EditorHttpBoundaryTests(_EditorCase):
             self.assertEqual(status, 404)
             self.assertEqual(editor.workspace_state()["snapshot_revision"], revision)
         self.assertEqual(synthetic.tree_digest(self.workspace), before)
+
+    @covers_requirement("map-editor-service::local-api-confines-and-authorizes-workspace-access")
 
     def test_an_escaping_linked_source_is_refused_and_its_target_never_served(self):
         outside = self.root / "outside.yaml"
