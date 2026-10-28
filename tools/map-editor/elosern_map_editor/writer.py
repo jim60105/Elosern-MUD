@@ -1,10 +1,12 @@
-"""The only source/layout file writer: one guarded single-document effect.
+"""The only workspace file writer: one guarded single-document effect.
 
 A named command handler produces exactly one :class:`Effect` -- create,
 replace or remove of one canonical document -- and the executor hands it to
 :meth:`DocumentWriter.publish` together with the expected presence (the
-content fingerprint, or :data:`ABSENT`). Nothing else in the service writes a
-workspace file.
+content fingerprint, or :data:`ABSENT`). The partition job's output is the one
+generated artifact it publishes (:meth:`DocumentWriter.publish_partition_artifact`,
+the same guarded replacement). Nothing else in the service writes a workspace
+file.
 
 Publication, with the parent directory reached through the confined
 no-follow descriptor walk:
@@ -151,7 +153,9 @@ class DocumentWriter:
             self.fault(stage)
 
     # -- reads -----------------------------------------------------------
-    def _presence_at(self, parent: int, name: str) -> tuple[str, bytes | None, int | None]:
+    def _presence_at(
+        self, parent: int, name: str, limit: int | None = None
+    ) -> tuple[str, bytes | None, int | None]:
         """``(presence, bytes, mode)`` of one entry under an open directory."""
 
         try:
@@ -164,7 +168,7 @@ class DocumentWriter:
             info = os.fstat(fd)
             if not stat.S_ISREG(info.st_mode):
                 return "unreadable:not_regular_file", None, None
-            if info.st_size > self.max_document_bytes:
+            if info.st_size > (self.max_document_bytes if limit is None else limit):
                 return "unreadable:too_large", None, None
             chunks = []
             while chunk := os.read(fd, 1024 * 1024):
@@ -204,8 +208,49 @@ class DocumentWriter:
             raise SaveFailed(f"cannot reach the document: {error}", path) from error
         except OSError as error:
             raise SaveFailed(f"cannot reach the document: {error.strerror}", path) from error
+        return self._publish_at(parent, name, effect, expected)
+
+    def read_partition_artifact(self, limit: int) -> str:
+        """The partition artifact's current presence (content hash or ABSENT)."""
+
         try:
-            current, _, mode = self._presence_at(parent, name)
+            parent, name = self.workspace.open_partition_artifact_parent()
+        except ConfinementError as error:
+            return ABSENT if error.code == "missing" else f"unreadable:{error.code}"
+        except OSError as error:
+            return f"unreadable:{errno.errorcode.get(error.errno, error.errno)}"
+        try:
+            presence, _, _ = self._presence_at(parent, name, limit)
+            return presence
+        finally:
+            os.close(parent)
+
+    def publish_partition_artifact(self, text: str, expected: str, limit: int) -> str:
+        """Publish the partition job's output if disk still holds ``expected``.
+
+        The same guarded atomic replacement as a source document (sibling
+        temporary file, flush, rename or link, directory flush), reached only
+        through :meth:`ConfinedWorkspace.open_partition_artifact_parent`.
+        ``expected`` is the artifact presence captured when the job started,
+        so an artifact replaced by someone else meanwhile is never
+        overwritten. Raises the same :class:`WriteError` outcomes.
+        """
+
+        from .confinement import PARTITION_ARTIFACT
+
+        effect = Effect(CREATE if expected == ABSENT else REPLACE, PARTITION_ARTIFACT, text)
+        try:
+            parent, name = self.workspace.open_partition_artifact_parent(create=True)
+        except (ConfinementError, OSError) as error:
+            raise SaveFailed(f"cannot reach the artifact: {error}", PARTITION_ARTIFACT) from error
+        return self._publish_at(parent, name, effect, expected, limit)
+
+    def _publish_at(
+        self, parent: int, name: str, effect: Effect, expected: str, limit: int | None = None
+    ) -> str:
+        path = effect.relative_path
+        try:
+            current, _, mode = self._presence_at(parent, name, limit)
             if current != expected:
                 raise StaleDocument("the document changed on disk; reread before writing", path)
             if effect.action == REMOVE:

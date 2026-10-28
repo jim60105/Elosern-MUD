@@ -52,12 +52,12 @@ def free_port() -> int:
 class LiveServer:
     """A real uvicorn server on a loopback port in a background thread."""
 
-    def __init__(self, config: EditorConfig) -> None:
+    def __init__(self, config: EditorConfig, **hooks) -> None:
         import uvicorn
 
         from elosern_map_editor.app import create_app, service_of
 
-        self.app = create_app(config)
+        self.app = create_app(config, **hooks)
         self.service = service_of(self.app)
         self.port = config.port
         self.server = uvicorn.Server(

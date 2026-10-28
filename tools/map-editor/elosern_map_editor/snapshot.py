@@ -214,6 +214,8 @@ def _partition_status(workspace: ConfinedWorkspace, limits: Limits, world) -> tu
     return (
         {
             **base,
+            # The artifact bytes' identity: a client keys its outline fetch on it.
+            "artifact_fingerprint": hashlib.sha256(raw).hexdigest(),
             "status": "current" if freshness.current else "stale",
             "current": freshness.current,
             "algorithm_version": metadata.algorithm_version,

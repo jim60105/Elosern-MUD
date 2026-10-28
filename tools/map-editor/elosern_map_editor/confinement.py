@@ -6,7 +6,9 @@ inside the allowlisted roots:
 - world sources and editor layouts, exactly the paths the core recognises
   (``elosern_map_core.sources.expected_document``) under ``content/maps`` and
   ``content/map-editor-layouts``;
-- the two generated, read-only artifacts.
+- the two generated artifacts, read-only to every command; only the
+  partition job publishes the partition artifact
+  (:meth:`ConfinedWorkspace.open_partition_artifact_parent`).
 
 Confinement is enforced at the actual open, not by an earlier path check: the
 file is reached by walking from a directory descriptor of the real workspace
@@ -111,6 +113,20 @@ class ConfinedWorkspace:
         canonical = resolve_document_id(relative_path)
         if canonical in ARTIFACTS:
             raise ConfinementError("not_writable", canonical, "generated artifacts are read-only")
+        return self._walk_parent(canonical, create=create)
+
+    def open_partition_artifact_parent(self, *, create: bool = False) -> tuple[int, str]:
+        """``(parent_fd, name)`` of the partition artifact, for its job only.
+
+        The partition job's guarded publication is the single writer of a
+        generated artifact (no command, route or client names this path).
+        The reference-context artifact stays read-only. With ``create``
+        missing directories are made through the same no-follow walk.
+        """
+
+        return self._walk_parent(PARTITION_ARTIFACT, create=create)
+
+    def _walk_parent(self, canonical: str, *, create: bool) -> tuple[int, str]:
         parts = split_relative(canonical)
         fd = os.open(self.root, _DIR_FLAGS)
         try:

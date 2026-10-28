@@ -14,6 +14,10 @@ Routes in this slice (later slices add their named domain commands only):
 ``POST /api/reload``     authenticated reread of the current disk files
 ``POST /api/commands/<name>`` one named single-document command, undo or redo
                          (see :mod:`elosern_map_editor.commands`)
+``POST /api/partition/generate`` admit one explicit partition job
+``POST /api/partition/cancel``   cancel the generating partition job
+``GET  /api/partition/outlines`` the current artifact's district outlines
+                         (see :mod:`elosern_map_editor.partition_job`)
 
 There is no generic patch, file write, path mutation, shell, Python or remote
 account route, and no handoff/resume/return route.
@@ -27,6 +31,7 @@ handoff state.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import threading
 import time
 import json
@@ -38,8 +43,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from elosern_map_core import schema, settlement_route
+from elosern_map_core import decode_partition, partition_source_signature, schema, settlement_route
+from elosern_map_core.partition_codec import PartitionDocumentError
 from elosern_map_core.schema import IDENTIFIER_PATTERN
+from elosern_map_core.sources import is_world_source
 from starlette.applications import Starlette
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
@@ -57,11 +64,20 @@ from .commands import (
     validate_candidate,
 )
 from .config import EditorConfig
-from .confinement import ConfinedWorkspace
+from .confinement import PARTITION_ARTIFACT, ConfinedWorkspace, ConfinementError
 from .events import Broadcaster, format_event
 from .history import Entry, History, Presence
+from .partition_job import (
+    CANCELLED,
+    FAILED,
+    GENERATING,
+    SUCCEEDED,
+    JobRejected,
+    PartitionJobs,
+    request_payload,
+)
 from .security import AdmissionMiddleware, error_body
-from .snapshot import WorkspaceRead, read_workspace
+from .snapshot import WorkspaceRead, read_sources, read_workspace
 from .writer import ABSENT, DocumentWriter, Effect, SaveUncertain, StaleDocument, WriteError
 
 _IDENTIFIER = re.compile(IDENTIFIER_PATTERN)
@@ -87,14 +103,202 @@ def _now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 
-class EditorService:
+class _PartitionMethods:
+    """Partition-job admission, cancellation, publication and outlines.
+
+    Part of :class:`EditorService` (kept separate only for readability).
+    """
+
+    # -- admission -------------------------------------------------------
+    async def start_partition(self, raw: bytes) -> dict[str, Any]:
+        self._loop = asyncio.get_running_loop()
+        async with self._lock:
+            result = await _finish(run_in_threadpool(self._start_partition_io, raw))
+        self.broadcaster.publish("invalidate", self.status())
+        return result
+
+    def _start_partition_io(self, raw: bytes) -> dict[str, Any]:
+        with self._io:
+            return self._start_partition(raw)
+
+    def _start_partition(self, raw: bytes) -> dict[str, Any]:
+        body = _json_body(raw, {"session_generation", "snapshot_revision"})
+        if body["session_generation"] != self.session.generation:
+            raise JobRejected(409, "stale_session", "the session changed; reread before generating")
+        if body["snapshot_revision"] != self.snapshot_revision:
+            raise JobRejected(
+                409, "stale_snapshot", "the snapshot changed; reread before generating",
+                snapshot_revision=self.snapshot_revision,
+            )
+        pause = self.write_pause
+        if pause["paused"]:
+            raise JobRejected(423, "write_paused", "writes are paused", reason=pause["reason"])
+        if self.preview_state != PREVIEW_CURRENT:
+            raise JobRejected(
+                423, "write_paused", "generation waits for a current preview",
+                reason=f"{self.preview_state}_preview",
+            )
+        if self.partitions.running:
+            raise JobRejected(409, "job_running", "a partition job is already running",
+                              job=self.partitions.describe())
+        assert self.published is not None and self.published.authoring is not None
+        signature = self.published.authoring.partition_signature
+        limits = self.config.limits
+        sources, refused, _ = read_sources(self.workspace, limits, self.workspace.discover_world())
+        if refused or partition_source_signature(sources) != signature:
+            raise JobRejected(409, "stale_snapshot", "the partition sources changed on disk; reread before generating")
+        artifact = self.writer.read_partition_artifact(limits.max_artifact_bytes)
+        if artifact.startswith("unreadable:"):
+            raise JobRejected(409, "artifact_unreadable", f"the partition artifact cannot be guarded ({artifact})")
+        with self._state:
+            job_id = self.partitions.begin(signature)
+            self._invalidate()
+        self.partitions.launch(
+            job_id,
+            request_payload(sources, signature),
+            lambda job, text: self._publish_partition(job, text, signature, artifact),
+            self._partition_failed,
+        )
+        return {**self.status(), "job": self.partitions.describe()}
+
+    # -- cancellation ----------------------------------------------------
+    async def cancel_partition(self, raw: bytes) -> dict[str, Any]:
+        self._loop = asyncio.get_running_loop()
+        body = _json_body(raw, {"session_generation"})
+        if body["session_generation"] != self.session.generation:
+            raise JobRejected(409, "stale_session", "the session changed; reread before cancelling")
+        result = await run_in_threadpool(self._cancel_partition)
+        self.broadcaster.publish("invalidate", self.status())
+        return result
+
+    def _cancel_partition(self) -> dict[str, Any]:
+        with self._state:
+            job = self.partitions.cancel()
+            if job is not None:
+                self._invalidate()
+        if job is None:
+            # Already published, publishing, failed or idle: report the job's
+            # own state; a replaced artifact is never rolled back.
+            raise JobRejected(409, "job_not_running", "no partition job is generating",
+                              job=self.partitions.describe())
+        return {**self.status(), "job": job}
+
+    # -- job thread callbacks --------------------------------------------
+    def _notify_threadsafe(self) -> None:
+        loop = self._loop
+        if loop is None:
+            return
+        status = self.status()
+        try:
+            loop.call_soon_threadsafe(self.broadcaster.publish, "invalidate", status)
+        except RuntimeError:
+            # observability: ignore R2: the editor service has no game logging
+            # facade; the loop has stopped, so no stream is left to notify
+            # (the job state above is already recorded).
+            pass
+
+    def _partition_failed(self, job_id: str, reason: str, problems: list[str]) -> None:
+        with self._state:
+            if self.partitions.finish(job_id, FAILED, reason=reason, problems=problems,
+                                      expect=frozenset({GENERATING})):
+                self._invalidate()
+        self._notify_threadsafe()
+
+    def _publication_refusal(self, signature: str, artifact: str) -> tuple[str, str] | None:
+        """Why the job's output may not be published now (caller holds I/O)."""
+
+        if self.write_pause["paused"]:
+            return "write_paused", "writes are paused; the result was not published"
+        if self.preview_state != PREVIEW_CURRENT:
+            return "stale_preview", "the preview is not current; the result was not published"
+        limits = self.config.limits
+        sources, refused, _ = read_sources(self.workspace, limits, self.workspace.discover_world())
+        if refused or partition_source_signature(sources) != signature:
+            return "inputs_changed", "a partition source changed during generation; the result was discarded"
+        if self.writer.read_partition_artifact(limits.max_artifact_bytes) != artifact:
+            return "artifact_changed", "the partition artifact changed during generation; it was not overwritten"
+        return None
+
+    def _publish_partition(self, job_id: str, text: str, signature: str, artifact: str) -> None:
+        with self._io:
+            if not self.partitions.to_publishing(job_id):
+                return
+            refusal = self._publication_refusal(signature, artifact)
+            fingerprint = None
+            if refusal is None:
+                try:
+                    fingerprint = self.writer.publish_partition_artifact(
+                        text, artifact, self.config.limits.max_artifact_bytes
+                    )
+                except StaleDocument as error:
+                    refusal = ("artifact_changed", str(error))
+                except SaveUncertain as error:
+                    refusal = ("publish_uncertain", str(error))
+                except WriteError as error:
+                    refusal = ("publish_failed", str(error))
+            try:
+                read = read_workspace(self.workspace, self.config.limits)
+            except Exception as error:  # noqa: BLE001 - reported on the job
+                read = None
+                refusal = refusal or ("reread_failed", f"the artifact was written but could not be reread: {error}")
+            with self._state:
+                if read is not None:
+                    self._adopt(read)
+                if refusal is None:
+                    self.partitions.finish(job_id, SUCCEEDED, fingerprint=fingerprint)
+                else:
+                    self.partitions.finish(job_id, FAILED, reason=refusal[0], problems=[refusal[1]],
+                                           fingerprint=fingerprint)
+                self._invalidate()
+        self._notify_threadsafe()
+
+    # -- outlines --------------------------------------------------------
+    def partition_outlines(self) -> dict[str, Any] | None:
+        """The current artifact's district outlines (metres), or None."""
+
+        try:
+            raw = self.workspace.read_document(PARTITION_ARTIFACT, self.config.limits.max_artifact_bytes)
+            document = json.loads(raw.decode("utf-8"))
+            # Outlines need no land rule; the decode still shape-checks them.
+            partition = decode_partition(document, is_land=lambda cell: False)
+        except (ConfinementError, PartitionDocumentError, UnicodeDecodeError, ValueError):
+            # observability: ignore R2: the editor service has no game logging
+            # facade; partition_status already reports the unusable artifact.
+            return None
+        return {
+            "artifact_fingerprint": hashlib.sha256(raw).hexdigest(),
+            "input_signature": document["source_signature"],
+            "outlines": {key: [list(ring) for ring in rings] for key, rings in partition.outlines.items()},
+        }
+
+
+def _json_body(raw: bytes, keys: set[str]) -> dict[str, Any]:
+    try:
+        body = json.loads(raw)
+    except (ValueError, UnicodeDecodeError):
+        raise JobRejected(400, "invalid_body", "the body is not JSON") from None
+    if not isinstance(body, dict) or set(body) != keys:
+        raise JobRejected(400, "invalid_body", f"the body carries exactly {', '.join(sorted(keys))}")
+    if "snapshot_revision" in keys and (
+        isinstance(body["snapshot_revision"], bool) or not isinstance(body["snapshot_revision"], int)
+    ):
+        raise JobRejected(400, "invalid_body", "snapshot_revision is an integer")
+    return body
+
+
+
+class EditorService(_PartitionMethods):
     """Session, published snapshot, the serialized writer and its history.
 
     Every reread and every command runs under one lock, so source/layout
     writes are strictly serial and each sees the state the previous one left.
+    The workspace I/O of commands, rereads, partition-job admission and
+    partition publication additionally runs under one thread lock, because a
+    partition job publishes from its own thread (lock order: I/O, then
+    state, then the job's leaf lock).
     """
 
-    def __init__(self, config: EditorConfig, *, fault=None) -> None:
+    def __init__(self, config: EditorConfig, *, fault=None, partition_hook=None) -> None:
         self.config = config
         self.workspace = ConfinedWorkspace(config.workspace_root)
         self.session = Session.create()
@@ -103,6 +307,16 @@ class EditorService:
         #: Guards the observable state (read, history, pause, revision) so a
         #: concurrent GET never sees a half-applied command.
         self._state = threading.RLock()
+        #: Serializes workspace I/O across request threads and the job thread.
+        self._io = threading.Lock()
+        #: The event loop that delivers notifications from the job thread.
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self.partitions = PartitionJobs(
+            timeout_seconds=config.partition_timeout_seconds,
+            # The answer carries the artifact text JSON-escaped once.
+            max_output_bytes=2 * config.limits.max_artifact_bytes,
+            hook=partition_hook,
+        )
         self.writer = DocumentWriter(self.workspace, config.limits.max_document_bytes, fault=fault)
         self.history = History()
         #: The pending intent of a publication whose durability is unknown;
@@ -150,6 +364,9 @@ class EditorService:
                 self.history.clear()
                 self._record_external(baseline, current, now)
             self.committed = current
+            # A loaded read with other partition inputs ends a generating job.
+            if read.authoring is not None:
+                self.partitions.invalidate(read.authoring.partition_signature)
         else:
             self.history.clear()
         if self.latest is not None and read.digest == self.latest.digest:
@@ -256,13 +473,26 @@ class EditorService:
             "external_identifiers": {
                 family: list(values) for family, values in (published.external_identifiers if published else ())
             },
-            "partition_status": latest.partition_status,
+            "partition_status": self._partition_status(latest),
+            "partition_job": self.partitions.describe(),
             "history": self.history.describe(),
             "pending_intent": self.uncertain,
             "uncertain_outcome": self.uncertain_outcome,
             "external_change": dict(self.external_change, documents=list(self.external_change["documents"])),
             "following": dict(self.following),
         }
+
+    def _partition_status(self, latest: WorkspaceRead) -> dict[str, Any]:
+        """The artifact freshness plus explicit game readiness.
+
+        ``game_ready`` is true only for an artifact that describes the current
+        inputs and whose last publication was not of uncertain durability.
+        """
+
+        job = self.partitions.describe()
+        status = dict(latest.partition_status)
+        status["game_ready"] = bool(status.get("current")) and job["reason"] != "publish_uncertain"
+        return status
 
     def route(self, settlement_id: str, source: str, destination: str) -> dict[str, Any] | None:
         """The core's route preview over the published snapshot, or None.
@@ -284,12 +514,16 @@ class EditorService:
         async with self._lock:
             # Shielded: a cancelled request cannot release the lock while its
             # worker thread is still reading, so rereads stay strictly serial.
-            read = await _finish(run_in_threadpool(read_workspace, self.workspace, self.config.limits))
-            with self._state:
-                changed = self._resolve(read)
+            changed = await _finish(run_in_threadpool(self._reload_io))
         if changed:
             self.broadcaster.publish("invalidate", self.status())
         return changed
+
+    def _reload_io(self) -> bool:
+        with self._io:
+            read = read_workspace(self.workspace, self.config.limits)
+            with self._state:
+                return self._resolve(read)
 
     async def follow(self) -> bool:
         """Reconcile the workspace after coalesced directory notifications.
@@ -312,12 +546,13 @@ class EditorService:
         (truncate-then-write) does not cost the history.
         """
 
-        read = read_workspace(self.workspace, self.config.limits)
-        if not read.loaded and self.config.settle_seconds > 0:
-            time.sleep(self.config.settle_seconds)
+        with self._io:
             read = read_workspace(self.workspace, self.config.limits)
-        with self._state:
-            return self._adopt(read)
+            if not read.loaded and self.config.settle_seconds > 0:
+                time.sleep(self.config.settle_seconds)
+                read = read_workspace(self.workspace, self.config.limits)
+            with self._state:
+                return self._adopt(read)
 
     def _resolve(self, read: WorkspaceRead) -> bool:
         changed = self._adopt(read)
@@ -346,13 +581,33 @@ class EditorService:
             try:
                 # Shielded like the reread: a cancelled request cannot release
                 # the lock while its worker thread may still be publishing.
-                return await _finish(run_in_threadpool(self._execute, name, raw))
+                return await _finish(run_in_threadpool(self._execute_io, name, raw))
             finally:
                 if self._notify:
                     self._notify = False
                     self.broadcaster.publish("invalidate", self.status())
 
     _notify = False
+
+    def _execute_io(self, name: str, raw: bytes) -> dict[str, Any]:
+        with self._io:
+            return self._execute(name, raw)
+
+    def _refuse_during_generation(self, relative_path: str) -> None:
+        """World-data writes wait for the partition job; layouts do not.
+
+        An editor layout cannot change a generation input, so layout commands
+        (and their undo/redo) stay admitted while a job runs.
+        """
+
+        if self.partitions.running and is_world_source(relative_path):
+            raise CommandError(
+                423,
+                "write_paused",
+                "world-data writes are rejected while the partition is generating",
+                reason="partition_generating",
+                document_id=relative_path,
+            )
 
     def _admit(self, name: str, raw: bytes) -> Envelope:
         if name not in COMMANDS:
@@ -378,6 +633,7 @@ class EditorService:
                 423, "write_paused", "writes are rejected while the preview is not current",
                 reason=f"{preview}_preview",
             )
+        self._refuse_during_generation(envelope.document_id)
         return envelope
 
     def _current(self, document_id: str, expected: str) -> Current:
@@ -446,6 +702,8 @@ class EditorService:
         ``direction`` is ``undo``/``redo`` for a history move, else ``None``.
         """
 
+        # The authoritative exclusion check, keyed on the effect's own path.
+        self._refuse_during_generation(effect.relative_path)
         validate_candidate(self.workspace, self.config.limits, effect)
         result = self._publish(command, effect, before.fingerprint)
         assert self.committed is not None
@@ -551,10 +809,10 @@ def _error(status: int, code: str, message: str) -> Response:
     return Response(error_body(code, message), status_code=status, media_type="application/json")
 
 
-def create_app(config: EditorConfig, *, fault=None) -> Starlette:
-    """The service app; ``fault`` is the writer's test-only fault hook."""
+def create_app(config: EditorConfig, *, fault=None, partition_hook=None) -> Starlette:
+    """The service app; ``fault``/``partition_hook`` are test-only hooks."""
 
-    service = EditorService(config, fault=fault)
+    service = EditorService(config, fault=fault, partition_hook=partition_hook)
     dist = Path(config.frontend_dist)
 
     async def index(request: Request) -> Response:
@@ -616,6 +874,29 @@ def create_app(config: EditorConfig, *, fault=None) -> Starlette:
             return Response(error.body(), status_code=error.status, media_type="application/json")
         return JSONResponse(result)
 
+    def _rejected(error: JobRejected) -> Response:
+        return JSONResponse(
+            {"error": {"code": error.code, "message": str(error), **error.details}}, status_code=error.status
+        )
+
+    async def generate(request: Request) -> Response:
+        try:
+            return JSONResponse(await service.start_partition(await request.body()))
+        except JobRejected as error:
+            return _rejected(error)
+
+    async def cancel(request: Request) -> Response:
+        try:
+            return JSONResponse(await service.cancel_partition(await request.body()))
+        except JobRejected as error:
+            return _rejected(error)
+
+    async def outlines(request: Request) -> Response:
+        result = await run_in_threadpool(service.partition_outlines)
+        if result is None:
+            return _error(404, "partition_unavailable", "the partition artifact is missing or malformed")
+        return JSONResponse(result)
+
     routes = [
         Route("/", index, methods=["GET", "HEAD"]),
         Route("/api/session", session, methods=["GET"]),
@@ -624,6 +905,9 @@ def create_app(config: EditorConfig, *, fault=None) -> Starlette:
         Route("/api/settlements/{settlement_id}/route", route, methods=["GET"]),
         Route("/api/reload", reload, methods=["POST"]),
         Route("/api/commands/{name}", command, methods=["POST"]),
+        Route("/api/partition/generate", generate, methods=["POST"]),
+        Route("/api/partition/cancel", cancel, methods=["POST"]),
+        Route("/api/partition/outlines", outlines, methods=["GET"]),
     ]
     assets = dist / "assets"
     if assets.is_dir():
@@ -645,6 +929,7 @@ def _lifespan(service: EditorService):
 
     @asynccontextmanager
     async def lifespan(app):
+        service._loop = asyncio.get_running_loop()
         coordinator = None
         if service.config.watch:
             from .watching import WatchCoordinator
@@ -656,6 +941,7 @@ def _lifespan(service: EditorService):
         finally:
             if coordinator is not None:
                 await coordinator.stop()
+            service.partitions.shutdown()
             service.broadcaster.close()
 
     return lifespan
