@@ -490,10 +490,12 @@ class AcceptedDestinationsConsumerTests(RegistryIsolationMixin, EvenniaTest):
     def test_registered_interior_and_instance_origins_are_read_only(self):
         from typeclasses.rooms import Room
 
-        # The mechanism test patches the live binding without naming the
-        # shipped catalog symbol, as the synthetic kit resolves it.
-        places_module = importlib.import_module("world.lore.settlements.places")
-        place_registry = getattr(places_module, "PLACE" + "_REGISTRY")
+        from world.tests.interior_fixture import (
+            interior_document,
+            interior_exterior,
+            interior_room,
+            published_interiors,
+        )
 
         interior = create_object(Room, key="Synthetic service")
         interior.tags.add("t_service")
@@ -505,11 +507,35 @@ class AcceptedDestinationsConsumerTests(RegistryIsolationMixin, EvenniaTest):
         nested = create_object(InstanceRoom, key="Synthetic nested")
         nested.attributes.add("origin_room", instance)
         self.char1.db.quest_log = [to_storage(_record(name)) for name in ("anchor", "grid", "site", "hunt")]
-        places = {
-            "t_service": SimpleNamespace(settlement_key="town"),
-            "t_second": SimpleNamespace(settlement_key="town"),
-        }
-        with mock.patch.dict(place_registry, places, clear=True):
+
+        def _interiors(second_settlement: str | None):
+            """Publish one authored room per tag: `t_second` may move or vanish."""
+
+            documents = [
+                interior_document(
+                    "t_service",
+                    {"t_service": interior_room("合成服務室", "A synthetic service room.")},
+                    exterior=interior_exterior(
+                        "town", "town_node", "t_service", "合成服務門"
+                    ),
+                )
+            ]
+            if second_settlement is not None:
+                documents.append(
+                    interior_document(
+                        "t_second",
+                        {"t_second": interior_room("合成第二室", "A second synthetic room.")},
+                        exterior=interior_exterior(
+                            second_settlement,
+                            "town_node",
+                            "t_second",
+                            "合成第二門",
+                        ),
+                    )
+                )
+            return documents
+
+        with published_interiors(*_interiors("town")):
             for room in (interior, instance):
                 self.char1.location = room
                 before = self._snapshot()
@@ -528,15 +554,30 @@ class AcceptedDestinationsConsumerTests(RegistryIsolationMixin, EvenniaTest):
                 self.assertEqual(bound.node_id, encode_room(int(room.id)))
                 self.assertIsNone(bound.world_cell)
                 self.assertEqual(self._snapshot(), before)
-            self.assertFalse(orphan.attributes.has("origin_room"))
-            for anchor in ("ruin", "missing"):
-                places["t_second"] = SimpleNamespace(settlement_key=anchor)
-                with mock.patch.dict(place_registry, places, clear=True):
-                    self.assertIsNone(actor_world_cell(SimpleNamespace(location=interior)))
-            with mock.patch.dict(place_registry, {"t_service": SimpleNamespace(settlement_key="missing")}, clear=True):
-                self.assertIsNone(actor_world_cell(SimpleNamespace(location=interior)))
-            with mock.patch.dict(place_registry, {}, clear=True):
-                self.assertIsNone(actor_world_cell(SimpleNamespace(location=interior)))
+            # A second authored enclosing anchor makes the room ambiguous: an
+            # arbitrary one is never chosen.
+            for settlement in ("ruin", "missing"):
+                with self.subTest(second_settlement=settlement):
+                    with published_interiors(
+                        *_interiors(settlement), replace_existing=True
+                    ):
+                        self.assertIsNone(
+                            actor_world_cell(SimpleNamespace(location=interior))
+                        )
+            # A room whose only tag names no authored interior is
+            # unlocatable: no arbitrary enclosure is invented for it.
+            unregistered = create_object(Room, key="Synthetic unregistered")
+            unregistered.tags.add("t_second")
+            with published_interiors(*_interiors(None), replace_existing=True):
+                self.assertIsNone(
+                    actor_world_cell(SimpleNamespace(location=unregistered))
+                )
+            # Restoring the authored room locates it again.
+            with published_interiors(*_interiors("town"), replace_existing=True):
+                self.assertEqual(
+                    actor_world_cell(SimpleNamespace(location=unregistered)),
+                    (300, 400),
+                )
 
     def test_empty_or_missing_quest_log_resolves_to_nothing(self):
         self.char1.db.quest_log = None
