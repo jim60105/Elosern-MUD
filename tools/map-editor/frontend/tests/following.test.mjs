@@ -98,9 +98,19 @@ test("a rejection ends only with a snapshot newer than the one it observed", asy
   release();
   await commands.submit(build);
   assert.equal(commands.state().failure.code, "stale_snapshot");
-  commands.clearRejection(5);
+  commands.clearRejection(snap("a", 5));
   assert.equal(commands.state().failure.code, "stale_snapshot");
-  commands.clearRejection(6);
+  commands.clearRejection(snap("a", 6));
+  assert.equal(commands.state().failure, null);
+});
+
+test("a fresh read of another session ends a rejection", async () => {
+  const { commands, release } = client([{ status: 503, body: { error: { code: "network_error", message: "m" } } }]);
+  release();
+  await commands.submit(build);
+  commands.clearRejection(snap("a", 1));
+  assert.ok(commands.state().failure);
+  commands.clearRejection(snap("b", 1));
   assert.equal(commands.state().failure, null);
 });
 
@@ -108,6 +118,6 @@ test("save failures are never cleared by a newer snapshot", async () => {
   const { commands, release } = client([{ status: 500, body: { error: { code: "save_failed", message: "m" } } }]);
   release();
   await commands.submit(build);
-  commands.clearRejection(99);
+  commands.clearRejection(snap("b", 99));
   assert.equal(commands.state().failure.code, "save_failed");
 });

@@ -86,6 +86,7 @@ export function createCommandClient({
           details: error,
           // The newest snapshot revision known when it was rejected.
           observedRevision: Math.max(workspace.snapshot_revision, error.snapshot_revision ?? 0),
+          observedSession: workspace.session_generation,
         },
       });
     }
@@ -115,6 +116,7 @@ export function createCommandClient({
           message: String(error?.message ?? error),
           documentId: null,
           observedRevision: getWorkspace()?.snapshot_revision ?? 0,
+          observedSession: getWorkspace()?.session_generation ?? null,
         };
       }
       try {
@@ -169,11 +171,15 @@ export function createCommandClient({
     generation += 1;
   }
 
-  // A newer snapshot ends a rejection's banner; save failures and uncertain
-  // results stay until the explicit reread.
-  function clearRejection(revision) {
+  // A newer snapshot (or a fresh read of another session) ends a rejection's
+  // banner; save failures and uncertain results stay until the explicit reread.
+  function clearRejection(workspace) {
     const failure = state.failure;
-    if (!failure || PERSISTENT.has(failure.code) || !(revision > failure.observedRevision)) return;
+    if (!failure || !workspace || PERSISTENT.has(failure.code)) return;
+    const newer =
+      workspace.session_generation !== failure.observedSession ||
+      workspace.snapshot_revision > failure.observedRevision;
+    if (!newer) return;
     state.failure = null;
     emit();
   }

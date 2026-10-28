@@ -75,7 +75,7 @@ function adopt(next) {
   displayed.value = next;
   pending.value = null;
   hold.value = null;
-  if (next) commands?.clearRejection(next.snapshot_revision);
+  if (next) commands?.clearRejection(next);
 }
 
 function offer(incoming) {
@@ -89,9 +89,11 @@ function offer(incoming) {
   }
 }
 
-// The last draft resolved: nothing is lost by adopting the held change now.
-watch(draftCount, (count) => {
-  if (count === 0 && hold.value === HOLD_DRAFT) adopt(pending.value);
+// The last draft resolved and its command (if confirmed) has its answer:
+// nothing is lost by adopting the held change now. A confirmed draft is
+// therefore always built against the snapshot it was typed on.
+watch([draftCount, () => persistence.value.inFlight], ([count, inFlight]) => {
+  if (count === 0 && inFlight === 0 && hold.value === HOLD_DRAFT) adopt(pending.value);
 });
 
 // A lost connection abandons queued commands: nothing is replayed later.

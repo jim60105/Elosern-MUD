@@ -36,7 +36,10 @@
         "web.tests.browser.test_map_editor_standalone.MapEditorStandaloneBrowserTest.test_game_theme_scales_without_the_game_shell",
         "web.tests.browser.test_map_editor_standalone.MapEditorStandaloneBrowserTest.test_authored_prose_and_scene_ids_stay_inert_text",
         "web.tests.browser.test_map_editor_standalone.MapEditorStalePreviewBrowserTest.test_a_failed_reread_keeps_the_last_preview_marked_stale",
-        "web.tests.browser.test_map_editor_standalone.MapEditorStalePreviewBrowserTest.test_an_unloadable_workspace_shows_no_preview_with_diagnostics"
+        "web.tests.browser.test_map_editor_standalone.MapEditorStalePreviewBrowserTest.test_an_unloadable_workspace_shows_no_preview_with_diagnostics",
+        "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_a_loadable_external_change_is_adopted_with_the_view_and_selection_kept",
+        "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_an_open_draft_holds_the_external_change_until_load_new_version",
+        "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_a_draft_confirmed_against_the_old_snapshot_is_rejected_without_changing_disk"
       ],
       "files_b": [
         "web.tests.browser.test_browser_combat_scales.CombatMenuBrowserTest.test_master_scale_step_casts_at_the_chosen_magnitude",
@@ -48,7 +51,10 @@
         "web.tests.browser.test_map_editor_persistence.MapEditorPersistenceBrowserTest.test_escape_cancels_a_drag_and_shift_arrow_nudges_one_step_per_press",
         "web.tests.browser.test_map_editor_persistence.MapEditorPersistenceBrowserTest.test_an_incomplete_field_draft_is_never_written_and_escape_restores_it",
         "web.tests.browser.test_map_editor_persistence.MapEditorPersistenceBrowserTest.test_a_refreshed_page_does_not_inherit_undo_history",
-        "web.tests.browser.test_map_editor_persistence.MapEditorPersistenceBrowserTest.test_a_failed_save_is_reported_with_the_baseline_intact_and_no_retry"
+        "web.tests.browser.test_map_editor_persistence.MapEditorPersistenceBrowserTest.test_a_failed_save_is_reported_with_the_baseline_intact_and_no_retry",
+        "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_malformed_yaml_is_shown_stale_and_recovers_automatically",
+        "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_an_externally_removed_selection_is_cleared_with_a_notice",
+        "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_a_restart_keeps_a_stale_inspectable_snapshot_and_needs_an_explicit_read"
       ]
     },
     {
