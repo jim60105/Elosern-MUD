@@ -30,7 +30,9 @@ World-document handlers derive from :class:`DocumentCommand` (or, for a
 document creation, implement ``target``/``effect`` directly): continent
 geometry, locations, districts and the settlement-owned footprint and
 binding live in :mod:`elosern_map_editor.geography`; local maps, nodes,
-prototypes, roads and bends in :mod:`elosern_map_editor.settlements`.
+prototypes, roads and bends in :mod:`elosern_map_editor.settlements`;
+interior documents, rooms, connections and the multi-room layout
+arrangement in :mod:`elosern_map_editor.interiors`.
 
 ``undo`` and ``redo`` (``arguments: {}``) apply the inverse/forward effect of
 the current segment's top history entry through the same path.
@@ -246,26 +248,41 @@ class MoveInteriorLayout:
 
     def effect(self, envelope: Envelope, current: Current) -> Effect | None:
         arguments = envelope.arguments
-        interior_id, room_id = arguments["interior_id"], arguments["room_id"]
-        position = {"x": arguments["x"], "y": arguments["y"]}
-        if current.text is None:
-            data = {"version": 1, "kind": "layout", "id": interior_id, "positions": {room_id: position}}
-            retained = None
-        else:
-            try:
-                parsed = parse_document(envelope.document_id, current.text)
-            except AuthoringError as error:
-                raise _gate_failure(error) from error
-            data = thaw(parsed.document.data)
-            if data["positions"].get(room_id) == position:
-                return None
-            data["positions"][room_id] = position
-            retained = parsed.round_trip
+        return layout_effect(
+            envelope.document_id, current, arguments["interior_id"],
+            {arguments["room_id"]: (arguments["x"], arguments["y"])},
+        )
+
+
+def layout_effect(
+    document_id: str, current: Current, interior_id: str, positions: dict[str, tuple[int, int]]
+) -> Effect | None:
+    """Set editor-only positions of rooms in one layout document.
+
+    Creates the absent document with only these rooms, or merges them into
+    the existing one keeping its comments and every other position. ``None``
+    when every position is already stored.
+    """
+
+    wanted = {room_id: {"x": x, "y": y} for room_id, (x, y) in positions.items()}
+    if current.text is None:
+        data = {"version": 1, "kind": "layout", "id": interior_id, "positions": wanted}
+        retained = None
+    else:
         try:
-            text = serialize_document(document_from_data(envelope.document_id, data), retained)
+            parsed = parse_document(document_id, current.text)
         except AuthoringError as error:
             raise _gate_failure(error) from error
-        return Effect(REPLACE if current.text is not None else CREATE, envelope.document_id, text)
+        data = thaw(parsed.document.data)
+        if all(data["positions"].get(room_id) == position for room_id, position in wanted.items()):
+            return None
+        data["positions"].update(wanted)
+        retained = parsed.round_trip
+    try:
+        text = serialize_document(document_from_data(document_id, data), retained)
+    except AuthoringError as error:
+        raise _gate_failure(error) from error
+    return Effect(REPLACE if current.text is not None else CREATE, document_id, text)
 
 
 class RemoveInteriorLayout:
@@ -352,9 +369,16 @@ def refused_value(code: str, message: str, field_path: str) -> CommandError:
 
 def _registry():
     from .geography import GEOGRAPHY_HANDLERS
+    from .interiors import INTERIOR_HANDLERS
     from .settlements import SETTLEMENT_HANDLERS
 
-    handlers = (MoveInteriorLayout(), RemoveInteriorLayout(), *GEOGRAPHY_HANDLERS, *SETTLEMENT_HANDLERS)
+    handlers = (
+        MoveInteriorLayout(),
+        RemoveInteriorLayout(),
+        *GEOGRAPHY_HANDLERS,
+        *SETTLEMENT_HANDLERS,
+        *INTERIOR_HANDLERS,
+    )
     return {handler.name: handler for handler in handlers}
 
 
@@ -426,7 +450,43 @@ def removed_objects(workspace: ConfinedWorkspace, limits: Limits, effect: Effect
         candidate = load_authoring_world(candidate_sources)
     except AuthoringError as error:
         raise _gate_failure(error) from error
+    check_room_identities(baseline, candidate)
     return tuple(sorted(_object_keys(baseline) - _object_keys(candidate)))
+
+
+def _room_owners(world) -> dict[str, list[str]]:
+    owners: dict[str, list[str]] = {}
+    for interior_id, interior in sorted(world.interiors.items()):
+        for room_id in interior.rooms:
+            owners.setdefault(room_id, []).append(interior_id)
+    return owners
+
+
+def check_room_identities(baseline, candidate) -> None:
+    """Refuse a candidate that newly declares one room ID in two interiors.
+
+    The game's interior snapshot gives a permanent room one identity across
+    every interior; the core authoring gate does not check it, so the editor
+    mirrors that rule for every world-source effect (commands, undo and redo)
+    on the fresh disk baseline. A duplicate the baseline already holds does
+    not block unrelated edits; only one this candidate introduces refuses.
+    """
+
+    before = {room_id for room_id, owners in _room_owners(baseline).items() if len(owners) > 1}
+    rows = [
+        {"code": "duplicate_room_identity", "category": "structure", "object_id": room_id,
+         "message": f"room {room_id!r} would be declared by interiors {', '.join(owners)}",
+         "field_path": f"rooms.{room_id}"}
+        for room_id, owners in sorted(_room_owners(candidate).items())
+        if len(owners) > 1 and room_id not in before
+    ]
+    if rows:
+        raise CommandError(
+            422,
+            "validation_failed",
+            "a permanent room has one identity across every interior",
+            diagnostics=rows,
+        )
 
 
 # Keep _document_keys and internal_references in step: every reference kind
@@ -497,6 +557,14 @@ def internal_references(world, removed: set[str]) -> list[dict[str, Any]]:
         if key in removed:
             rows.append({"target": key, "kind": "exterior", "source": interior.relative_path,
                          "object_id": interior_id, "field_path": "exterior.node"})
+    for interior_id, interior in sorted(world.interiors.items()):
+        for index, link in enumerate(interior.interior_links):
+            if link.target_interior == interior_id:
+                continue  # a same-document link is the removing handler's concern
+            key = canonical_target_key(interior_room_ref(link.target_interior, link.target_room))
+            if key in removed:
+                rows.append({"target": key, "kind": "interior_link", "source": interior.relative_path,
+                             "object_id": interior_id, "field_path": f"interior_links[{index}].target_room"})
     for district_id, district in world.districts.districts.items():
         key = _landmark_key(district.landmark)
         if key in removed:
@@ -570,6 +638,8 @@ __all__ = [
     "Envelope",
     "HANDLERS",
     "HISTORY_COMMANDS",
+    "MAX_LAYOUT_COORDINATE",
+    "check_room_identities",
     "layout_document_id",
     "internal_references",
     "parse_envelope",
