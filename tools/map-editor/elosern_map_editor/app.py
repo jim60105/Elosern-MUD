@@ -80,9 +80,11 @@ class EditorService:
     def _adopt(self, read: WorkspaceRead) -> bool:
         """Record one read; return whether the observable state changed."""
 
-        if self.latest is not None and read.digest == self.latest.digest:
-            return False
         now = _now()
+        if self.latest is not None and read.digest == self.latest.digest:
+            # Same observable state: record the check, publish nothing.
+            self.latest_at = now
+            return False
         self.latest, self.latest_at = read, now
         if read.loaded:
             self.published, self.published_at = read, now
@@ -132,7 +134,11 @@ class EditorService:
 
     async def reload(self) -> bool:
         async with self._lock:
-            read = await run_in_threadpool(read_workspace, self.workspace, self.config.limits)
+            # Shielded: a cancelled request cannot release the lock while its
+            # worker thread is still reading, so rereads stay strictly serial.
+            read = await asyncio.shield(
+                run_in_threadpool(read_workspace, self.workspace, self.config.limits)
+            )
             changed = self._adopt(read)
         if changed:
             self.broadcaster.publish("invalidate", self.status())
@@ -167,9 +173,10 @@ def create_app(config: EditorConfig) -> Starlette:
         return JSONResponse(service.workspace_state())
 
     async def events(request: Request) -> Response:
-        first = format_event("status", service.status())
         return StreamingResponse(
-            service.broadcaster.stream(first, config.heartbeat_seconds),
+            service.broadcaster.stream(
+                lambda: format_event("status", service.status()), config.heartbeat_seconds
+            ),
             media_type="text/event-stream",
             headers={"x-accel-buffering": "no"},
         )

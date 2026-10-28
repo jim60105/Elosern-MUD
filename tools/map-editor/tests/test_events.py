@@ -119,8 +119,12 @@ def test_an_unchanged_reread_publishes_nothing(workspace):
     port = free_port()
     with LiveServer(make_config(workspace, port=port)):
         session = _session(port)
+        before = _request(port, "GET", "/api/workspace")[1]["checked_at"]
+        time.sleep(1.1)
         status, body = _reload(port, session["token"], session["session_generation"])
         assert (status, body["changed"], body["snapshot_revision"]) == (200, False, 1)
+        # The check is recorded even though nothing was published.
+        assert _request(port, "GET", "/api/workspace")[1]["checked_at"] > before
 
 
 def test_a_failed_reread_keeps_the_last_preview_as_stale_and_pauses_writes(workspace):

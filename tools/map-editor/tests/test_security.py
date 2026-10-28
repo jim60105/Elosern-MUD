@@ -167,3 +167,46 @@ def test_authored_prose_and_scene_ids_travel_as_inert_json_strings(harness):
     assert nodes["gate"]["scene_archetype"] == fixture.URL_LIKE_SCENE
     assert "connect-src 'self'" in response.headers["content-security-policy"]
     assert "img-src 'self' data:" in response.headers["content-security-policy"]
+
+
+def test_host_names_compare_case_insensitively(harness):
+    client, *_ = harness
+    assert client.get("/api/workspace", headers={"Host": f"LOCALHOST:{PORT}"}).status_code == 200
+
+
+def test_duplicated_admission_headers_are_refused(workspace, dist):
+    import asyncio
+
+    application = create_app(make_config(workspace, dist))
+    service = service_of(application)
+    token = service.session.token
+
+    def call(headers):
+        sent = []
+
+        async def receive():
+            return {"type": "http.request", "body": b"{}", "more_body": False}
+
+        async def send(message):
+            sent.append(message)
+
+        scope = {
+            "type": "http",
+            "method": "POST",
+            "path": "/api/reload",
+            "headers": [(k.encode(), v.encode()) for k, v in headers],
+        }
+        asyncio.run(application(scope, receive, send))
+        return sent[0]["status"], json.loads(sent[1]["body"])["error"]["code"]
+
+    base = [
+        ("host", f"127.0.0.1:{PORT}"),
+        ("origin", ORIGIN),
+        ("x-map-editor-token", token),
+        ("content-type", "application/json"),
+    ]
+    assert call(base + [("host", f"127.0.0.1:{PORT}")]) == (403, "forbidden_host")
+    assert call(base + [("origin", ORIGIN)]) == (403, "forbidden_origin")
+    assert call(base + [("x-map-editor-token", token)]) == (401, "unauthorized")
+    assert call(base + [("content-length", "2"), ("content-length", "2")]) == (400, "invalid_content_length")
+    assert service.snapshot_revision == 1

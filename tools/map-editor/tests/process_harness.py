@@ -29,7 +29,16 @@ _SCRUBBED = {"PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV", "PYTHONSTARTUP"}
 
 
 class EditorUnavailable(RuntimeError):
-    """uv is missing or the editor environment cannot be synchronised."""
+    """uv is missing or the editor environment cannot be synchronised.
+
+    Callers may skip on it locally, but never in CI: see :func:`skip_allowed`.
+    """
+
+
+def skip_allowed() -> bool:
+    """A missing editor environment is a skip locally and a failure in CI."""
+
+    return not os.environ.get("CI")
 
 
 def scrubbed_env(path: str | None = None) -> dict[str, str]:

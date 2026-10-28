@@ -102,6 +102,20 @@ or account route.
 - **Bounds.** Documents (2 MiB), artifacts (8 MiB), the document count, the
   external-source count and their per-file and total bytes are bounded with
   `fstat` before reading or parsing.
+- **Confinement limits.** The descriptor walk relies on POSIX `O_NOFOLLOW`,
+  `O_DIRECTORY` and `dir_fd`, so the service supports Linux and macOS only.
+  Hard links are not detected: a hard link inside the workspace to an outside
+  file reads as an ordinary file. Its content is only parsed or hashed, never
+  served raw. The reference index's discovery rules are expanded by the core's
+  glob before the external-source count bound applies, so a very broad rule in
+  a hand-edited index costs a full enumeration on each reread. The committed
+  index is generated, so this is accepted rather than bounded here.
+- **No path-taking route yet.** This slice has no route that accepts a
+  document path (the reread takes only the session). Traversal refusal is
+  therefore proven on the shared `resolve_document_id` policy, at discovery
+  with real links, on static assets, and by refusing extra reread body keys.
+  The first slice that adds a path- or document-id-taking route must add its
+  HTTP traversal test.
 - **Inert content.** Authored prose and scene identifiers are rendered as
   text, never markup, and are never turned into URLs. Every response carries a
   Content Security Policy (`default-src 'self'`, no inline script, no

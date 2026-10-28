@@ -131,7 +131,8 @@ class AdmissionMiddleware:
             return values[0]
 
         host = single("host")
-        if host is None or host not in self.allowed_hosts:
+        # Host names are case-insensitive; the allowlist is lower-case.
+        if host is None or host.lower() not in self.allowed_hosts:
             return 403, "forbidden_host", "the Host header is not this local service"
         origin = single("origin")
         if origin is not None and origin not in self.allowed_origins:

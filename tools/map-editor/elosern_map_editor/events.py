@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from typing import Any
 
 _CLOSE = object()
@@ -49,13 +49,18 @@ class Broadcaster:
             _force_close(queue)
         self._queues.clear()
 
-    async def stream(self, first: bytes, heartbeat_seconds: float) -> AsyncIterator[bytes]:
+    async def stream(
+        self, first: Callable[[], bytes], heartbeat_seconds: float
+    ) -> AsyncIterator[bytes]:
         queue: asyncio.Queue = asyncio.Queue(self._queue_size)
         if self._closed:
             return
         self._queues.add(queue)
+        # The first status is taken only after the queue is registered, with no
+        # await in between, so no invalidation can fall between the two.
+        opening = first()
         try:
-            yield b"retry: 2000\n\n" + first
+            yield b"retry: 2000\n\n" + opening
             while True:
                 try:
                     message = await asyncio.wait_for(queue.get(), heartbeat_seconds)
