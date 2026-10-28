@@ -326,6 +326,31 @@ class MapEditorSettlementBrowserTest(unittest.TestCase):
         self.assertEqual(self.names(), ["move_bend", "insert_bend"])
         self.assertEqual(self.changed(), {SETTLEMENT})
 
+    def test_a_retargeted_road_and_a_new_bend_stay_selected(self):
+        def add_shed(root):
+            data = synthetic.settlement_data()
+            data["nodes"]["shed"] = dict(data["nodes"]["yard"], x_m=600, y_m=0, desc="A shed.")
+            (root / SETTLEMENT).write_text(synthetic.yaml_text(data), encoding="utf-8")
+
+        self.start(add_shed)
+        page = self.open()
+        page.click(f'[data-object="{BACK_ROAD}"]')
+        page.select_option('[data-field-input="road-source"]', "shed")
+        moved = f"road:{TOWN}:shed>gate"
+        self.wait_for(lambda: self.data()["roads"][1]["source"] == "shed", "the road was not retargeted")
+        self.settle(page)
+        # The inspector that sent the command was re-keyed by the new
+        # reference; the selection still follows the retargeted road.
+        self.wait_for(lambda: page.locator("[data-inspector-ref]").count() == 1
+                      and page.locator("[data-inspector-ref]").inner_text() == moved,
+                      "the selection did not follow the retargeted road")
+        page.click('[data-action="add-bend"]')
+        self.wait_for(lambda: len(self.data()["roads"][1]["bends"]) == 2, "the bend was not added")
+        self.settle(page)
+        self.wait_for(lambda: page.locator("[data-inspector-ref]").inner_text() == f"{moved}#1",
+                      "the selection did not follow the new bend")
+        self.assertEqual(self.names(), ["set_road", "insert_bend"])
+
     def test_a_new_local_map_from_a_location_is_empty_and_unfinished(self):
         self.start()
         page = self.open(settlement=False)

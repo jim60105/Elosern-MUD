@@ -14,6 +14,7 @@ from elosern_map_core.authoring import (
     PartitionFreshness,
     compile_runtime,
     diagnose_world,
+    gate_approach_cell,
     load_authoring_world,
 )
 from elosern_map_core.codec import document_from_data, serialize_document
@@ -147,6 +148,19 @@ def test_blocked_approach_is_a_semantic_diagnostic():
     data["wilderness_entry"]["origin"] = {"cell_x": 15, "cell_y": 20}
     world = load_authoring_world(fixtures.custom_sources(settlement=data))
     assert "blocked_approach" in {item.code for item in world.diagnostics}
+
+
+def test_gate_approach_cell_follows_the_authored_mask_rule():
+    from elosern_map_core.documents import WildernessEntryDeclaration
+
+    point = WildernessEntryDeclaration(shape=("#",), origin=(7, 9), gates=())
+    assert gate_approach_cell(point, "n") == (7, 9)
+    # A 3x1 strip: walking from the midpoint (11, 4) opposite the return
+    # direction leaves the mask on the first cell outside it.
+    strip = WildernessEntryDeclaration(shape=("###",), origin=(10, 4), gates=())
+    assert gate_approach_cell(strip, "w") == (13, 4)
+    assert gate_approach_cell(strip, "e") == (9, 4)
+    assert gate_approach_cell(WildernessEntryDeclaration(shape=("...",), origin=(0, 0), gates=()), "n") is None
 
 
 def test_interiors_load_and_resolve_their_references():

@@ -10,6 +10,7 @@
 // decide validity.
 
 import { LAYOUT_DIRECTORY, layoutDocumentId } from "./layout_edit.js";
+import { exteriorRef, linkRef } from "./relationship_refs.js";
 
 export { layoutDocumentId };
 
@@ -126,14 +127,14 @@ export function roomBlockers(world, ref) {
   }
   const exterior = interior.exterior;
   if (exterior?.room === roomId) {
-    rows.push({ kind: "入口", label: `⌂ ${exterior.settlement} · ${exterior.node}`, ref: `settlement_node:${exterior.settlement}:${exterior.node}`, source: path, external: false });
+    rows.push({ kind: "入口", label: `⌂ ${exterior.settlement} · ${exterior.node}`, ref: exteriorRef(interior.id), source: path, external: false });
   }
   for (const other of world.interiors) {
     for (const link of other.interior_links ?? []) {
       const own = other.id === interior.id && link.source_room === roomId;
       const target = link.target_interior === interior.id && link.target_room === roomId;
       if (own || target) {
-        rows.push({ kind: "室內連結", label: `${other.id} · ${link.source_room} → ${link.target_interior} · ${link.target_room}`, ref: roomRef(other.id, link.source_room), source: other.relative_path, external: false });
+        rows.push({ kind: "室內連結", label: `${other.id} · ${link.source_room} → ${link.target_interior} · ${link.target_room}`, ref: linkRef(other.id, link), source: other.relative_path, external: false });
       }
     }
   }

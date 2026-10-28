@@ -1,13 +1,15 @@
 // Directed relationships of one map object, read from authored projection
 // fields only (roads, connections, entrances, links, gates, landmarks, local
 // maps and anchors) plus the external incoming references the service looked
-// up in the reference index. Nothing is derived: no reachability, length or
+// up in the reference index. Entrance rows link to their relationship
+// (both endpoints, labels and 前往另一端 live there). Nothing is derived: no reachability, length or
 // geometry is computed here. Each row names the document that declares it.
 //
 // Row: { kind, label, ref (navigable qualified or map reference, or null),
 //        source (workspace-relative declaring document), external }
 
 import { compassLabel } from "./settlement.js";
+import { cityGateRef, exteriorRef, gateRef, linkRef } from "./relationship_refs.js";
 
 function roomName(interior, roomId) {
   return interior.rooms.find((room) => room.id === roomId)?.name_zh ?? roomId;
@@ -71,18 +73,18 @@ function nodeRelations(world, settlement, node) {
       incoming.push({
         kind: "入口",
         label: `⌂ ${interior.id} · ${roomName(interior, exterior.room)} ⇄ ${node.key}`,
-        ref: `interior_room:${interior.id}:${exterior.room}`,
+        ref: exteriorRef(interior.id),
         source: interior.relative_path,
         external: false,
       });
     }
   }
   if (settlement.city_gate?.node === node.id) {
-    incoming.push({ kind: "城門", label: settlement.city_gate.exit_key ?? node.key, ref: null, source: path, external: false });
+    incoming.push({ kind: "城門", label: settlement.city_gate.exit_key ?? node.key, ref: cityGateRef(settlement.id), source: path, external: false });
   }
   for (const gate of settlement.wilderness_entry?.gates ?? []) {
     if (gate.destination_node === node.id) {
-      incoming.push({ kind: "野外入口", label: `${gate.return_direction} → ${node.key}`, ref: null, source: path, external: false });
+      incoming.push({ kind: "野外入口", label: `${compassLabel(gate.return_direction)} → ${node.key}`, ref: gateRef(settlement.id, gate.return_direction), source: path, external: false });
     }
   }
   incoming.push(
@@ -118,7 +120,7 @@ function roomRelations(world, interior, room) {
     outgoing.push({
       kind: "入口",
       label: `⌂ ${nodeKey(settlement, exterior.node)}（${exterior.settlement}）⇄ ${room.name_zh}`,
-      ref: `settlement_node:${exterior.settlement}:${exterior.node}`,
+      ref: exteriorRef(interior.id),
       source: path,
       external: false,
     });
@@ -128,7 +130,7 @@ function roomRelations(world, interior, room) {
       outgoing.push({
         kind: "室內連結",
         label: `${link.label ?? ""} → ${link.target_interior} · ${link.target_room}`.trim(),
-        ref: `interior_room:${link.target_interior}:${link.target_room}`,
+        ref: linkRef(interior.id, link),
         source: path,
         external: false,
       });
@@ -140,7 +142,7 @@ function roomRelations(world, interior, room) {
         incoming.push({
           kind: "室內連結",
           label: `← ${link.label ?? ""} 來自 ${other.id} · ${roomName(other, link.source_room)}`,
-          ref: `interior_room:${other.id}:${link.source_room}`,
+          ref: linkRef(other.id, link),
           source: other.relative_path,
           external: false,
         });

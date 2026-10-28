@@ -32,7 +32,9 @@ geometry, locations, districts and the settlement-owned footprint and
 binding live in :mod:`elosern_map_editor.geography`; local maps, nodes,
 prototypes, roads and bends in :mod:`elosern_map_editor.settlements`;
 interior documents, rooms, connections and the multi-room layout
-arrangement in :mod:`elosern_map_editor.interiors`.
+arrangement in :mod:`elosern_map_editor.interiors`; the entrance
+relationships (wilderness gates, the starting-room entry, interior exteriors
+and interior links) in :mod:`elosern_map_editor.relationships`.
 
 ``undo`` and ``redo`` (``arguments: {}``) apply the inverse/forward effect of
 the current segment's top history entry through the same path.
@@ -370,6 +372,7 @@ def refused_value(code: str, message: str, field_path: str) -> CommandError:
 def _registry():
     from .geography import GEOGRAPHY_HANDLERS
     from .interiors import INTERIOR_HANDLERS
+    from .relationships import RELATIONSHIP_HANDLERS
     from .settlements import SETTLEMENT_HANDLERS
 
     handlers = (
@@ -378,6 +381,7 @@ def _registry():
         *GEOGRAPHY_HANDLERS,
         *SETTLEMENT_HANDLERS,
         *INTERIOR_HANDLERS,
+        *RELATIONSHIP_HANDLERS,
     )
     return {handler.name: handler for handler in handlers}
 
@@ -387,12 +391,39 @@ COMMANDS = frozenset(HANDLERS) | frozenset(HISTORY_COMMANDS)
 
 
 # -- candidate validation --------------------------------------------------
+#: Authored fields that hold one entrance relationship, and its kind.
+_RELATIONSHIP_FIELDS = (
+    ("wilderness_entry.gates", "wilderness_gate"),
+    ("city_gate", "city_gate"),
+    ("exterior", "exterior"),
+    ("interior_links", "interior_link"),
+)
+
+
+def relationship_of(field_path: str) -> str | None:
+    """The entrance relationship kind an authored field path belongs to."""
+
+    for prefix, kind in _RELATIONSHIP_FIELDS:
+        if field_path == prefix or field_path.startswith((f"{prefix}.", f"{prefix}[")):
+            return kind
+    return None
+
+
 def _gate_failure(error: AuthoringError) -> CommandError:
+    rows = []
+    for item in error.diagnostics:
+        row = item.as_dict()
+        # A gate failure on an entrance field names its relationship and
+        # owning document, exactly like the handlers' own endpoint refusals.
+        kind = relationship_of(row.get("field_path") or "")
+        if kind is not None:
+            row.update(relationship=kind, owner=row.get("relative_path"))
+        rows.append(row)
     return CommandError(
         422,
         "validation_failed",
         "the candidate does not pass the authoring gate",
-        diagnostics=[item.as_dict() for item in error.diagnostics],
+        diagnostics=rows,
     )
 
 
@@ -451,6 +482,7 @@ def removed_objects(workspace: ConfinedWorkspace, limits: Limits, effect: Effect
     except AuthoringError as error:
         raise _gate_failure(error) from error
     check_room_identities(baseline, candidate)
+    check_doorways(baseline, candidate)
     return tuple(sorted(_object_keys(baseline) - _object_keys(candidate)))
 
 
@@ -487,6 +519,45 @@ def check_room_identities(baseline, candidate) -> None:
             422,
             "validation_failed",
             "a permanent room has one identity across every interior",
+            diagnostics=rows,
+        )
+
+
+def _doorway_owners(world) -> dict[tuple[str, str, str], list[str]]:
+    owners: dict[tuple[str, str, str], list[str]] = {}
+    for interior_id, interior in sorted(world.interiors.items()):
+        exterior = interior.exterior
+        if exterior is not None:
+            owners.setdefault((exterior.settlement, exterior.node, exterior.doorway_key), []).append(interior_id)
+    return owners
+
+
+def check_doorways(baseline, candidate) -> None:
+    """Refuse a candidate that newly gives two interiors one doorway.
+
+    The game refuses two interiors that open onto the same settlement node
+    under the same doorway name (the exact (settlement, node, doorway_key)
+    tuple, as the game compares it; aliases are not compared); the core gate does
+    not check it, so the editor mirrors that rule for every world-source
+    effect on the fresh disk baseline. A duplicate the baseline already holds
+    does not block unrelated edits; only one this candidate introduces
+    refuses.
+    """
+
+    before = _doorway_owners(baseline)
+    rows = [
+        {"code": "duplicate_doorway", "category": "structure", "relationship": "exterior",
+         "object_id": ",".join(owners), "field_path": "exterior.doorway_key",
+         "message": f"interiors {', '.join(owners)} would open onto {settlement}:{node} "
+                    f"under the same doorway {doorway!r}"}
+        for (settlement, node, doorway), owners in sorted(_doorway_owners(candidate).items())
+        if len(owners) > 1 and not set(owners) <= set(before.get((settlement, node, doorway), ()))
+    ]
+    if rows:
+        raise CommandError(
+            422,
+            "validation_failed",
+            "two interiors on one settlement node need different doorway names",
             diagnostics=rows,
         )
 
@@ -641,11 +712,13 @@ __all__ = [
     "HANDLERS",
     "HISTORY_COMMANDS",
     "MAX_LAYOUT_COORDINATE",
+    "check_doorways",
     "check_room_identities",
     "layout_document_id",
     "internal_references",
     "parse_envelope",
     "refused_value",
+    "relationship_of",
     "removed_objects",
     "validate_candidate",
 ]

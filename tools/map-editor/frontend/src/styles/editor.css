@@ -622,6 +622,56 @@ select {
   cursor: grab;
 }
 
+/* -- entrance relationships (frontend design §4.3, §4.4) ------------------ */
+.map-mark__card--exterior {
+  fill: var(--panel-solid);
+  stroke-dasharray: 6 4;
+}
+
+.map-link--exterior .map-link__core {
+  stroke-dasharray: 4 4;
+}
+
+.relationship__label {
+  color: var(--gold-300);
+}
+
+.relationship__name {
+  color: var(--paper-500);
+}
+
+.object-selector {
+  margin-top: var(--sp-2);
+  border: 1px solid var(--band-edge-dim);
+  border-radius: 6px;
+  padding: var(--sp-2);
+}
+
+.object-selector__results {
+  max-height: calc(220px * var(--ui-scale, 1));
+  overflow-y: auto;
+}
+
+.object-selector__choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--sp-2);
+  padding: 2px var(--sp-2);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.object-selector__choice--active {
+  box-shadow: inset 3px 0 0 var(--gold-400);
+  background: rgba(228, 200, 142, 0.08);
+}
+
+.creation__kinds {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
 /* -- interaction shell (frontend design §2-§6) ---------------------------- */
 .editor__header,
 .editor__nav,

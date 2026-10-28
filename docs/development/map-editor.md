@@ -79,7 +79,7 @@ an empty `PATH`, so neither the game's packages nor Node can be reached.
 | `GET /api/workspace` | One complete replacement of the authoritative state: `session_generation`, `snapshot_revision`, `write_pause`, `preview_state` (`current`/`stale`/`unavailable`), `snapshot_read_at`, `checked_at`, `schema` (the core schema), `documents` (path, kind, id, fingerprint, values), `world` (the core-derived projection), `diagnostics`, `candidate_diagnostics` (the failing read while stale or unavailable), `external_context_status`, `partition_status`, `history`, `pending_intent`, `uncertain_outcome`, `external_change` (`sequence`, `at` and the changed `documents` of the last adopted external change; §3.4) and `following` (`active`, reconciled `batches`, the last watcher `error`). `write_pause` is only the explicit pause of an uncertain publication; the stale or unavailable preview is the separate `preview_state`. |
 | `GET /api/events` | Server-sent events: `status` on connect and `invalidate` after a published change, each carrying only `session_generation`, `snapshot_revision` and `preview_state`. A client refetches `/api/workspace` on every invalidation and on a reconnect status that names another session or revision. Nothing is patched or merged. |
 | `POST /api/reload` | Authenticated explicit reread of the current disk files. A loadable read publishes and is the only way to resolve an uncertain publication. A structural failure keeps the last preview and marks it `stale`. An identical read publishes nothing. It never writes a file. |
-| `POST /api/commands/<name>` | One named single-document command (the layout commands of §3.1, the geography commands of §3.8, the settlement commands of §3.9, the interior commands of §3.10) or `undo`/`redo` of the current segment (see §3). |
+| `POST /api/commands/<name>` | One named single-document command (the layout commands of §3.1, the geography commands of §3.8, the settlement commands of §3.9, the interior commands of §3.10, the entrance commands of §3.11) or `undo`/`redo` of the current segment (see §3). |
 | `GET /api/session` | Same-origin launch-token bootstrap (see §4). |
 
 `external_incoming_references` maps the `qualified_ref` of every projected
@@ -365,8 +365,10 @@ the inspector drawer.
   deletion is refused while inspection and editing continue); external
   references of a current index (what the service guard enforces); otherwise
   the object's delete command is sent, or the block states that its kind
-  has no delete command yet. For locations and settlement nodes the
-  map-internal references refuse first (§3.8, §3.9). Map-internal incoming
+  has no delete command yet. For locations, settlement nodes and interior
+  rooms the map-internal references refuse first (§3.8 to §3.10), each
+  linked to its declaration (an entrance to its relationship, §3.11). A
+  selected relationship, road or connection is removed directly. Map-internal incoming
   references are listed alongside as references a deletion would leave
   dangling; nothing cascades.
 - **Diagnostics.** Rows grouped as structure, external index and references,
@@ -400,13 +402,13 @@ the inspector drawer.
 ### 3.7 Mandatory domain dependencies
 
 The shell's domain commands arrive with their changes. Delivered:
-`map-editor-continent-tools` (§3.8), `map-editor-settlement-tools` (§3.9)
-and `map-editor-interior-tools` (§3.10). The batch's remaining changes must
-deliver, through their own domain modules:
+`map-editor-continent-tools` (§3.8), `map-editor-settlement-tools` (§3.9),
+`map-editor-interior-tools` (§3.10) and `map-editor-entrance-tools`
+(§3.11). The batch's remaining change must deliver, through its own domain
+modules:
 
 | Change | Delivers on this shell |
 | --- | --- |
-| `map-editor-entrance-tools` | Entrance E (on the settlement screen as well), 前往另一端, 更換端點… with the qualified-object selector (`[data-object-selector]`) |
 | `map-editor-partition-jobs` | Partition district drawables, 分區 chip and inspector regenerate/cancel, and rejection of every command route (geography included) while a generation runs |
 
 Each registers its tools in `TOOLS` (`src/lib/workbench.js`), sends its own
@@ -543,8 +545,7 @@ that belongs to an older revision.
 On the page the tools are 選取 V, 節點 N (a creation form at the clicked
 point, rounded to whole metres) and 道路 R (choose the source node, then the
 destination, on the canvas or in the object list; the form requires the
-direction and, with 建立雙向, the return direction). 入口 E arrives with
-`map-editor-entrance-tools`. Dragging a node or a bend diamond is one
+direction and, with 建立雙向, the return direction), and 入口 E (§3.11). Dragging a node or a bend diamond is one
 command on release (Escape cancels); a node dragged inside a one-document
 multi-selection moves the group by one integer delta, and a refused move
 returns to the saved position. Every edit has a non-drag path: the node
@@ -628,8 +629,7 @@ source room, then the destination, on the canvas or in the object list; the
 form requires the name and, with 建立雙向, the return name) and 自動排列 (one
 `arrange_interior_layout` command: columns by connection distance from the
 entrance room, rows in authored order, unreached rooms after them; it
-overwrites the arranged positions and is undoable). 外部入口 E arrives with
-`map-editor-entrance-tools`. Rooms are cards and connections curved arrows,
+overwrites the arranged positions and is undoable), and 外部入口 E (§3.11). Rooms are cards and connections curved arrows,
 each with one direction chevron; a two-way pair reads `去 ⇄ 回` once.
 Selecting a connection selects its editor-local reference
 `connection:<interior>:<source>><destination>/<percent-encoded name>`, which
@@ -640,6 +640,114 @@ connection inspector's endpoint selectors and name field with 建立反向連接
 the editor-only 版面 X/Y fields, Shift+arrow, and the open interior's ＋ 新房間,
 自動排列, ＋ 新室內 and 刪除室內文件. After a layout save the diagnostics strip
 names the layout document.
+
+### 3.11 Entrance tools
+
+Service handlers live in `elosern_map_editor/relationships.py`. Every
+entrance relationship is stored once, in its owning document, with both of
+its endpoints and every directional label it has. No command writes a
+mirrored reverse record, and a two-way meaning is never a second file
+operation. Editing one relationship writes only its owner.
+
+| Command | Owner | Arguments |
+| --- | --- | --- |
+| `create_wilderness_gate` | settlement | `settlement_id`, `return_direction`, `node`. Without a wilderness entry, a one-cell point entry is created at the binding's anchor cell (grow it with the continent 佔地 tool) |
+| `set_wilderness_gate` | settlement | `settlement_id`, `return_direction` of an existing gate, `value` `{return_direction, node}` |
+| `delete_wilderness_gate` | settlement | `settlement_id`, `return_direction`. The last gate is refused (`last_gate`): an entry keeps at least one gate |
+| `remove_wilderness_entry` | settlement | `settlement_id`: the explicit removal of the whole entry, its footprint mask included (undoable) |
+| `set_city_gate` | settlement | `settlement_id`, `value` `{node, exit_key, exit_aliases}` or `null` |
+| `set_exterior` | interior | `interior_id`, `value` `{room, node, doorway_key, doorway_aliases}` or `null` |
+| `create_interior_link` | interior | `interior_id`, `source`, `target`, `label`, `return_label` (a name makes the link two-way in the same record, `null` one-way) |
+| `set_interior_link` | interior | `interior_id`, `source`, `target`, `label` of an existing link and `value` `{source, target, label, return_label}` |
+| `delete_interior_link` | interior | `interior_id`, `source`, `target`, `label` |
+
+- **Endpoints are qualified IDs** (`settlement_node:<map>:<node>`,
+  `interior_room:<map>:<room>`), never a display name or an unlabelled
+  coordinate. Gates and the start entry land on a node of their own
+  settlement. An exterior joins a room of its own interior to any settlement
+  node. A link joins a room of its own interior to any interior's room, never
+  the same room. Each of the following answers 422 with nothing written: a
+  refused endpoint (`invalid_endpoint`, `wrong_domain`, `wrong_map`,
+  `unknown_target`, `self_loop`), a duplicate gate direction or link, and the
+  last gate. The diagnostic names the `relationship` (`wilderness_gate`,
+  `city_gate`, `exterior`, `interior_link`), its `owner` document and the
+  argument `field_path`. An authoring-gate failure on an entrance field gets
+  the same attribution, for example a target that disappeared from disk
+  after the page loaded.
+- **The start entry is one-way.** The starting room is not a map object, so
+  its entry has no return field. A value that names one (`return_label`,
+  `return`, ...) is refused with 400, naming the key. The inspector states
+  that the entry cannot become two-way.
+- **Doorway names.** The game refuses two interiors that open onto the same
+  settlement node under one doorway name (aliases are not compared).
+  `check_doorways` (`commands.py`) mirrors that rule on the fresh disk
+  baseline for every world-source effect, undo and redo included. It refuses
+  (`duplicate_doorway`) only a duplicate the candidate introduces.
+- **No index is needed.** A relationship is not a qualified object that any
+  other document can name, so removing one needs no reference index, just
+  like removing a road or a connection. Deleting an endpoint object is still
+  the existing guarded command (§3.8 to §3.10, §8). While a relationship
+  still names the object, the deletion is refused, and the inline refusal
+  links that relationship. Removing the relationship and later deleting the
+  object are two separate, complete operations. Nothing cascades.
+
+The projection gives each wilderness gate an `approach_cell`: the wilderness
+cell that the core's `gate_approach_cell` computes from the mask and the
+return direction. It is read-only, and the browser derives no geometry.
+
+On the page, relationships use editor-local references:
+
+- `gate:<settlement>:<return_direction>`
+- `city_gate:<settlement>`
+- `exterior:<interior>`
+- `interior_link:<interior>:<source>><target_interior>:<target_room>/<percent-encoded label>`
+
+They are catalogued on their owner's map. Search, the object list,
+selection preservation by identity and the OMP context therefore include
+them. Search matches a relationship by ID; searching a node or room name
+finds the object itself. The interior draws its exterior as a fixed, dashed
+card one layout column left of its room. The settlement lists its gates and
+start entry in the object list.
+
+- **Tools.** 入口 E (settlement) and 外部入口 E (interior) wait for a node or a
+  room on the canvas or in the object list. Picking one selects it and opens
+  the entrance form.
+  - On a settlement, the form offers a wilderness gate or the one-way start
+    entry. The gate's return direction is chosen, never inferred. The start
+    entry takes an exit name and aliases.
+  - In an interior, the form offers the exterior doorway or an interior
+    link. The doorway takes a node chosen with the qualified-object selector,
+    a doorway name and aliases. The link takes a target chosen with the
+    selector, a name, and, with 建立雙向, a return name.
+  - The node and room inspectors open the same form through ⌂ 新入口.
+- **Relationship inspector.** The heading names both ends. The record rows
+  give the owner document as the one record and the direction: 雙向, 單向,
+  or a fixed 單向 for the start entry. Each endpoint shows:
+  - its domain;
+  - its qualified ID as a link;
+  - the end's name and directional label;
+  - its current coordinates where the projection has them: a node's local
+    metres, or a gate's approach cell, which links to the settlement's
+    continental footprint.
+
+  The inspector's actions:
+  - 前往另一端 navigates to the endpoint that is off the map on display
+    (otherwise the target), keeping the return context of §3.6.
+  - 更換端點… opens the qualified-object selector.
+  - Fields edit the labels, aliases, gate direction and link return name.
+  - 移除這個關係, the generic ✕ 刪除 and the Delete key each remove the
+    relationship with one command. A gate also offers the explicit
+    whole-entry removal.
+- **Qualified-object selector** (`[data-object-selector]`). Search the
+  allowed objects by name, ID or qualified ID. Each result shows its parent
+  map and qualified ID, and equal names are marked. ArrowUp and ArrowDown
+  move, Enter chooses, and Escape closes the selector and returns focus to
+  the trigger. The page's single-key shortcuts never act inside it.
+- **Relations and refusals.** The node and room relation rows list each
+  entrance from either side and link to the relationship: an interior's
+  exterior appears on its node, and a link on both of its rooms. A refused
+  node or room deletion links each entrance that must go first. Core
+  diagnostics on `city_gate` and `exterior` fields locate the relationship.
 
 ## 4. Security Model and Limitations
 

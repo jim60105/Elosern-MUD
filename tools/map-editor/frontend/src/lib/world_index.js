@@ -8,6 +8,7 @@ import { companionText, featurePoints, frameOf, parseContinentRef } from "./cont
 import { featureLabel } from "./map_scene.js";
 import { compassLabel, findRoad, findSettlement, nodeName, parseSettlementRef, roadLabel } from "./settlement.js";
 import { findConnection, findInterior, parseInteriorRef, reverseOf, roomName } from "./interior.js";
+import { relationshipView } from "./relationships.js";
 
 export function worldTree(world) {
   if (!world) return [];
@@ -217,8 +218,29 @@ function roadRecord(world, ref) {
   };
 }
 
+// An entrance relationship (frontend design §4.4): both end names, the
+// owning document as the one record, and its direction meaning. Endpoints,
+// labels and actions are the relationship inspector's.
+function relationshipRecord(world, ref) {
+  const view = relationshipView(world, ref);
+  if (!view) return null;
+  return {
+    title: view.title,
+    qualifiedRef: ref,
+    relativePath: view.ownerPath,
+    relationship: view.kind,
+    fields: [
+      row("種類", view.kindLabel),
+      row("擁有者", `${view.ownerPath} · 單一紀錄`),
+      row("方向", view.twoWay ? "雙向" : view.oneWayFixed ? "單向（固定，不能改為雙向）" : "單向"),
+    ],
+  };
+}
+
 export function inspect(world, qualifiedRef) {
   if (!world || !qualifiedRef) return null;
+  const relationship = relationshipRecord(world, qualifiedRef);
+  if (relationship) return relationship;
   const continental = continentRecord(world, qualifiedRef);
   if (continental) return continental;
   const road = roadRecord(world, qualifiedRef);

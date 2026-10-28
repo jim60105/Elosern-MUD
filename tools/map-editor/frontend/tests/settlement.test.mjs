@@ -182,8 +182,9 @@ test("the selected road shows its bend handles and chevrons; nodes are draggable
   assert.deepEqual(chosen.links.map((link) => link.selected), [false, true]);
   // Selecting a bend keeps its road's handles.
   assert.equal(settlementScene(settlement, [bendRef(road, 0)]).marks.filter((mark) => mark.kind === "handle").length, 1);
-  // The object list holds nodes then roads.
-  assert.deepEqual(chosen.items.map((item) => item.id).slice(-2), [roadRef("town", "a", "b"), road]);
+  // The object list holds nodes, then roads, then the settlement's entrances.
+  assert.deepEqual(chosen.items.map((item) => item.id).filter((id) => id.startsWith("road:")), [roadRef("town", "a", "b"), road]);
+  assert.deepEqual(chosen.items.map((item) => item.id).slice(-2), ["gate:town:n", "city_gate:town"]);
 });
 
 test("an empty new map draws nothing and fabricates nothing", () => {
@@ -208,15 +209,16 @@ test("roads and bends are catalogued under their settlement document", () => {
 test("a node with map references lists every blocker and refuses deletion", () => {
   const data = world();
   const rows = (refs) => nodeBlockers(data, refs);
-  // a: both roads (linked), the wilderness gate and the city gate (no link).
+  // a: both roads, the wilderness gate and the city gate, each linked to the
+  // declaration that is removed separately.
   const forA = rows(["settlement_node:town:a"]);
   assert.equal(forA.length, 4);
-  assert.deepEqual(forA.filter((row) => row.ref).map((row) => row.ref), [roadRef("town", "a", "b"), roadRef("town", "b", "a")]);
+  assert.deepEqual(forA.map((row) => row.ref), [roadRef("town", "a", "b"), roadRef("town", "b", "a"), "gate:town:n", "city_gate:town"]);
   assert.ok(forA.every((row) => row.source === S && row.external === false));
   // b: two roads and the interior exterior, declared by the interior.
   const forB = rows(["settlement_node:town:b"]);
   assert.equal(forB.length, 3);
-  assert.deepEqual(forB.filter((row) => row.source !== S).map((row) => row.ref), ["interior_room:hall:front"]);
+  assert.deepEqual(forB.filter((row) => row.source !== S).map((row) => row.ref), ["exterior:hall"]);
   assert.equal(nodeBlockers(data, ["settlement_node:town:c"])[0].ref, "district:d");
   assert.deepEqual(nodeBlockers(data, ["settlement_node:town:lone"]), []);
   const refusal = deletionRefusal({
