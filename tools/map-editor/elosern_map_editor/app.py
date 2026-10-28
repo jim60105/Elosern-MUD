@@ -153,12 +153,15 @@ class _PartitionMethods:
         with self._state:
             job_id = self.partitions.begin(signature)
             self._invalidate()
-        self.partitions.launch(
-            job_id,
-            request_payload(sources, signature),
-            lambda job, text: self._publish_partition(job, text, signature, artifact),
-            self._partition_failed,
-        )
+        try:
+            self.partitions.launch(
+                job_id,
+                request_payload(sources, signature),
+                lambda job, text: self._publish_partition(job, text, signature, artifact),
+                self._partition_failed,
+            )
+        except Exception as error:  # noqa: BLE001 - recorded on the job
+            self._partition_failed(job_id, "internal_error", [f"the partition job did not start: {error!r}"])
         return {**self.status(), "job": self.partitions.describe()}
 
     # -- cancellation ----------------------------------------------------
@@ -198,9 +201,10 @@ class _PartitionMethods:
             pass
 
     def _partition_failed(self, job_id: str, reason: str, problems: list[str]) -> None:
+        # Generating or publishing: an unexpected error in either phase must
+        # end the job (a cancel cannot end a publishing one).
         with self._state:
-            if self.partitions.finish(job_id, FAILED, reason=reason, problems=problems,
-                                      expect=frozenset({GENERATING})):
+            if self.partitions.finish(job_id, FAILED, reason=reason, problems=problems):
                 self._invalidate()
         self._notify_threadsafe()
 
@@ -223,34 +227,45 @@ class _PartitionMethods:
         with self._io:
             if not self.partitions.to_publishing(job_id):
                 return
-            refusal = self._publication_refusal(signature, artifact)
-            fingerprint = None
-            if refusal is None:
-                try:
-                    fingerprint = self.writer.publish_partition_artifact(
-                        text, artifact, self.config.limits.max_artifact_bytes
-                    )
-                except StaleDocument as error:
-                    refusal = ("artifact_changed", str(error))
-                except SaveUncertain as error:
-                    refusal = ("publish_uncertain", str(error))
-                except WriteError as error:
-                    refusal = ("publish_failed", str(error))
             try:
-                read = read_workspace(self.workspace, self.config.limits)
-            except Exception as error:  # noqa: BLE001 - reported on the job
-                read = None
-                refusal = refusal or ("reread_failed", f"the artifact was written but could not be reread: {error}")
-            with self._state:
-                if read is not None:
-                    self._adopt(read)
-                if refusal is None:
-                    self.partitions.finish(job_id, SUCCEEDED, fingerprint=fingerprint)
-                else:
-                    self.partitions.finish(job_id, FAILED, reason=refusal[0], problems=[refusal[1]],
-                                           fingerprint=fingerprint)
-                self._invalidate()
+                self._publish_claimed(job_id, text, signature, artifact)
+            except Exception as error:  # noqa: BLE001 - recorded on the job
+                with self._state:
+                    if self.partitions.finish(job_id, FAILED, reason="internal_error",
+                                              problems=[f"the publication failed unexpectedly: {error!r}"]):
+                        self._invalidate()
         self._notify_threadsafe()
+
+    def _publish_claimed(self, job_id: str, text: str, signature: str, artifact: str) -> None:
+        """Recheck and publish one claimed job (caller holds the I/O lock)."""
+
+        refusal = self._publication_refusal(signature, artifact)
+        fingerprint = None
+        if refusal is None:
+            try:
+                fingerprint = self.writer.publish_partition_artifact(
+                    text, artifact, self.config.limits.max_artifact_bytes
+                )
+            except StaleDocument as error:
+                refusal = ("artifact_changed", str(error))
+            except SaveUncertain as error:
+                refusal = ("publish_uncertain", str(error))
+            except WriteError as error:
+                refusal = ("publish_failed", str(error))
+        try:
+            read = read_workspace(self.workspace, self.config.limits)
+        except Exception as error:  # noqa: BLE001 - reported on the job
+            read = None
+            refusal = refusal or ("reread_failed", f"the artifact was written but could not be reread: {error}")
+        with self._state:
+            if read is not None:
+                self._adopt(read)
+            if refusal is None:
+                self.partitions.finish(job_id, SUCCEEDED, fingerprint=fingerprint)
+            else:
+                self.partitions.finish(job_id, FAILED, reason=refusal[0], problems=[refusal[1]],
+                                       fingerprint=fingerprint)
+            self._invalidate()
 
     # -- outlines --------------------------------------------------------
     def partition_outlines(self) -> dict[str, Any] | None:

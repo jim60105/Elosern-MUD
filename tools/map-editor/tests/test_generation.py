@@ -382,3 +382,45 @@ def test_requests_stay_responsive_while_a_job_runs(partitionable):
         gate.release.set()
         assert server.service.partitions.describe()["state"] == "cancelled"
         assert not (partitionable / ARTIFACT).exists()
+
+
+# -- unexpected errors never leave a job running ---------------------------------
+def test_an_unexpected_publication_error_ends_the_job_and_admits_writes(partitionable, monkeypatch):
+    prior = write_sentinel(partitionable)
+    editor = Editor(partitionable)
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("injected recheck failure")
+
+    monkeypatch.setattr(editor.service, "_publication_refusal", broken)
+    editor.partition("generate")
+    job = settle(editor)
+    assert job["state"] == "failed" and job["reason"] == "internal_error"
+    assert any("injected recheck failure" in line for line in job["problems"])
+    assert (partitionable / ARTIFACT).read_bytes() == prior
+    assert editor.service.partitions.running is False
+    assert rename_district(editor)[0] == 200
+    assert editor.partition("generate")[0] == 200
+
+
+def test_an_unexpected_job_thread_error_ends_the_job(partitionable):
+    def hook(stage: str) -> None:
+        if stage == "generated":
+            raise RuntimeError("injected thread failure")
+
+    editor = Editor(partitionable, partition_hook=hook)
+    editor.partition("generate")
+    job = settle(editor)
+    assert job["state"] == "failed" and job["reason"] == "internal_error"
+    assert not (partitionable / ARTIFACT).exists()
+    assert rename_district(editor)[0] == 200
+
+
+def test_an_oversized_answer_fails_and_keeps_the_prior_artifact(partitionable):
+    prior = write_sentinel(partitionable)
+    editor = Editor(partitionable)
+    editor.service.partitions.max_output_bytes = 16
+    editor.partition("generate")
+    job = settle(editor)
+    assert job["state"] == "failed" and job["reason"] == "output_too_large"
+    assert (partitionable / ARTIFACT).read_bytes() == prior

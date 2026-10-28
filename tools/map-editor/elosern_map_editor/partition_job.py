@@ -227,6 +227,16 @@ class PartitionJobs:
 
     def _run(self, job_id, payload, on_output, on_failure) -> None:
         try:
+            self._execute(job_id, payload, on_output, on_failure)
+        except Exception as error:
+            # observability: ignore R2: the editor service has no game logging
+            # facade; the error is recorded on the job, because no unexpected
+            # error may leave it running (that would refuse every world-data
+            # write until a restart).
+            on_failure(job_id, "internal_error", [f"the partition job failed unexpectedly: {error!r}"])
+
+    def _execute(self, job_id, payload, on_output, on_failure) -> None:
+        try:
             process = subprocess.Popen(
                 # Isolated mode: no user site, environment paths or cwd on
                 # the child's import path, only the editor's own environment.
@@ -250,6 +260,8 @@ class PartitionJobs:
             out, err = process.communicate(payload, timeout=self.timeout_seconds)
         except subprocess.TimeoutExpired:
             _kill(process)
+            # Reap the ended child and close its pipes.
+            process.communicate()
             on_failure(job_id, "timeout", [f"generation exceeded {self.timeout_seconds:g} s"])
             return
         finally:
@@ -269,6 +281,9 @@ class PartitionJobs:
             result = json.loads(out.decode("utf-8"))
         except (UnicodeDecodeError, ValueError) as error:
             on_failure(job_id, "worker_failed", [f"the generation process answered malformed output: {error}"])
+            return
+        if not isinstance(result, dict) or (result.get("ok") and not isinstance(result.get("text"), str)):
+            on_failure(job_id, "worker_failed", ["the generation process answered an unexpected document"])
             return
         if not result.get("ok"):
             on_failure(job_id, str(result.get("code") or "generation_failed"), list(result.get("problems") or []))

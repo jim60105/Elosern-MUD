@@ -814,7 +814,9 @@ change is no external change (history stays).
 `succeeded`, `cancelled`, `failed` with a `reason` (`generation_failed`,
 `inputs_invalid`, `inputs_changed`, `write_paused`, `stale_preview`,
 `artifact_changed`, `publish_failed`, `publish_uncertain`, `reread_failed`,
-`timeout`, `worker_failed`, `output_too_large`) and bounded `problems`. A
+`timeout`, `worker_failed`, `output_too_large`, `internal_error`) and bounded
+`problems`. Any unexpected error in the job thread or the publication ends
+the job as `internal_error`, so no failure leaves world-data writes refused. A
 cancel, a failure or a timeout never touches the last artifact.
 `POST /api/partition/cancel` ends a generating job; while or after
 publication it answers `job_not_running` (409) with the job's own state, so
@@ -843,8 +845,14 @@ with its own reason.
 running job (its child is killed) and the next session starts idle. The
 publication recheck and the replacement are not atomic against another
 process writing the same files, exactly like source writes; an external
-writer must not regenerate the artifact concurrently. The child has a wall
-clock bound but no memory bound.
+writer must not regenerate the artifact concurrently. A source change that
+lands after the publication recheck but before the reread leaves the job
+`succeeded` with an artifact for the captured inputs; the reread then
+reports it stale (`game_ready` false, the chip offers 重新產生), so it is
+never labelled current. The withheld readiness after `publish_uncertain` is
+session state: after a restart the artifact's freshness is again read from
+disk alone. The child has a wall-clock bound but no memory bound, and its
+answer is buffered before the size check; this is a developer-only tool.
 
 ## 4. Security Model and Limitations
 

@@ -278,11 +278,18 @@ watch(
   () => workspace.value?.partition_status?.artifact_fingerprint ?? null,
   async (fingerprint) => {
     if (!fingerprint || partitionOutlines.value?.artifact_fingerprint === fingerprint) return;
+    let outlines = null;
     try {
       const response = await window.fetch("/api/partition/outlines", { credentials: "same-origin", cache: "no-store" });
-      partitionOutlines.value = response.ok ? await response.json() : null;
+      outlines = response.ok ? await response.json() : null;
     } catch {
-      partitionOutlines.value = null;
+      outlines = null;
+    }
+    // A late answer for an artifact that is no longer displayed is dropped;
+    // only outlines of the displayed artifact are kept (a newer artifact than
+    // the status names is fetched again with the next snapshot).
+    if (outlines?.artifact_fingerprint === (workspace.value?.partition_status?.artifact_fingerprint ?? null)) {
+      partitionOutlines.value = outlines;
     }
   },
   { immediate: true },
