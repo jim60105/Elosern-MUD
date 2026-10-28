@@ -252,7 +252,9 @@ def _polyline(
     )
 
 
-def _polyline_length(points: Sequence[tuple[int, int]]) -> float:
+def polyline_length(points: Sequence[tuple[int, int]]) -> float:
+    """Physical length in metres of an integer metre polyline (sum of hypot)."""
+
     return sum(
         hypot(end[0] - start[0], end[1] - start[1])
         for start, end in zip(points, points[1:])
@@ -353,7 +355,7 @@ class SparseSettlementGraph:
                 source=source,
                 destination=destination,
                 direction=direction,
-                length=_polyline_length(
+                length=polyline_length(
                     _polyline(source, road, destination, physical=True)
                 ),
             )

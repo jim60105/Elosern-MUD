@@ -121,6 +121,15 @@ on a bounded grid (region and surface codes from `PREVIEW_SURFACES`), with the
 closed ridge walls between pass windows, the pass centres and the derived
 national borders. The map editor draws it as read-only derived output.
 
+Settlement previews: `road_lengths(settlement)` returns the physical polyline
+length in metres of every declared road (source node, authored bends,
+destination node), keyed by its ordered `(source, destination)` identity, and
+exists even for an empty or unfinished map. `settlement_route(settlement_id,
+settlement, source, destination)` returns a `RoutePreview` (`route`,
+`no_route`, `unknown_node` or `unavailable` with the core's reason) from the
+same planner the game uses, with each step's authored direction and length.
+`polyline_length(points)` is the shared length rule.
+
 The forest edge must be X-increasing and the border river X-decreasing; both are
 validated at construction because their per-column row tables are single-valued.
 `region_flavors` must cover every region key in `REGION_KEYS`.
