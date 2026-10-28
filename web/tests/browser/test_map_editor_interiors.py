@@ -139,9 +139,16 @@ class MapEditorInteriorBrowserTest(unittest.TestCase):
         page.fill('[data-creation-field="name_zh"]', "草稿名")
         page.click(f'[data-object="{BACK}"]')
         self.assertEqual(page.locator('[data-creation-field="name_zh"]').input_value(), "草稿名")
-        # A cancelled form returns to 選取, and N opens it again.
-        page.click("[data-creation-cancel]")
+        # A valid form cancelled with Enter must not submit before the native
+        # button click. Cancellation returns to 選取, and N opens it again.
+        page.fill('[data-creation-field="id"]', "cancelled_room")
+        page.locator("[data-creation-submit]").press("Enter")
+        self.assertEqual(page.locator('[data-creation="room"]').count(), 1)
+        self.assertEqual(self.names(), [])
+        page.locator("[data-creation-cancel]").press("Enter")
         self.assertEqual(page.locator('[data-creation="room"]').count(), 0)
+        self.assertEqual(self.names(), [])
+        self.assertEqual(self.changed(), set())
         page.locator('[data-region="canvas"]').focus()
         page.keyboard.press("n")
         page.locator('[data-creation="room"]').wait_for()
@@ -152,7 +159,7 @@ class MapEditorInteriorBrowserTest(unittest.TestCase):
         # The name is required: nothing is sent yet.
         self.assertEqual(page.locator('[data-field-error="creation"]').count(), 1)
         page.fill('[data-creation-field="name_zh"]', "倉庫")
-        page.click("[data-creation-submit]")
+        page.locator('[data-creation-field="name_zh"]').press("Enter")
         self.wait_for(lambda: "store" in self.data()["rooms"], "the room was not created")
         self.settle(page)
         self.assertEqual(self.names(), ["create_room"])
@@ -186,6 +193,9 @@ class MapEditorInteriorBrowserTest(unittest.TestCase):
         self.assertEqual(page.locator('[data-field-error="creation"]').count(), 1)
         self.assertEqual(self.names(), [])
         page.fill('[data-creation-field="return_label"]', "門 / 後")
+        page.locator('[data-creation-field="two_way"]').press("Enter")
+        self.assertEqual(page.locator('[data-creation="connection"]').count(), 1)
+        self.assertEqual(self.names(), [])
         page.click("[data-creation-submit]")
         self.wait_for(lambda: ("back", "front", "門 / 前") in self.triples(), "the connection was not created")
         self.settle(page)

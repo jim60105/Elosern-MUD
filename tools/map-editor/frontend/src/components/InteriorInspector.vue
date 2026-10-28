@@ -197,14 +197,25 @@ function submitCreation() {
     emit("create", createRoom(id, form.id, fields()), roomRef(id, form.id));
   }
 }
+// Match EntranceForm's text/select rule and block implicit native submission
+// from other inputs and submit buttons. Ordinary buttons retain activation.
+const NON_TEXT = new Set(["button", "submit", "reset", "checkbox", "radio"]);
+function submitsOnEnter(target) {
+  const tag = String(target?.tagName ?? "").toLowerCase();
+  if (tag === "select") return true;
+  return tag === "input" && !NON_TEXT.has(String(target.type ?? "text").toLowerCase());
+}
 function onFormKey(event) {
   if (event.key === "Escape") {
     event.preventDefault();
     event.stopPropagation();
     emit("cancel");
-  } else if (event.key === "Enter" && !event.isComposing && event.target.tagName !== "TEXTAREA") {
+  } else if (event.key === "Enter" && !event.isComposing && submitsOnEnter(event.target)) {
     event.preventDefault();
     submitCreation();
+  } else if (event.key === "Enter" && !event.isComposing &&
+    (event.target.tagName === "INPUT" || event.target.type === "submit")) {
+    event.preventDefault();
   }
 }
 const TITLES = { interior: "新室內", room: "新房間", duplicate: "複製為新房間", connection: "新連接" };

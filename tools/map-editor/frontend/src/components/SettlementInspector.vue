@@ -312,14 +312,25 @@ function submitCreation() {
     emit("create", createNode(id, form.id, fields), `settlement_node:${id}:${form.id}`);
   }
 }
+// Match EntranceForm's text/select rule and block implicit native submission
+// from other inputs and submit buttons. Ordinary buttons retain activation.
+const NON_TEXT = new Set(["button", "submit", "reset", "checkbox", "radio"]);
+function submitsOnEnter(target) {
+  const tag = String(target?.tagName ?? "").toLowerCase();
+  if (tag === "select") return true;
+  return tag === "input" && !NON_TEXT.has(String(target.type ?? "text").toLowerCase());
+}
 function onFormKey(event) {
   if (event.key === "Escape") {
     event.preventDefault();
     event.stopPropagation();
     emit("cancel");
-  } else if (event.key === "Enter" && !event.isComposing && event.target.tagName !== "TEXTAREA") {
+  } else if (event.key === "Enter" && !event.isComposing && submitsOnEnter(event.target)) {
     event.preventDefault();
     submitCreation();
+  } else if (event.key === "Enter" && !event.isComposing &&
+    (event.target.tagName === "INPUT" || event.target.type === "submit")) {
+    event.preventDefault();
   }
 }
 const TITLES = { node: "新節點", road: "新道路", duplicate: "複製為新節點" };

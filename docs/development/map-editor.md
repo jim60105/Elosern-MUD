@@ -67,6 +67,10 @@ uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.te
 
 The accessibility module runs its keyboard workflow in Chromium and Firefox
 (`uv run --locked playwright install chromium firefox`).
+Settlement and interior creation forms submit on Enter only from text inputs
+and selects. Enter on Create or a checkbox does not post a command. Ordinary
+buttons retain native activation, so Enter on Cancel closes a valid form
+without posting a command; pointer activation of Create still submits.
 
 The two repository-level checks start the service as a child process from
 `tools/map-editor/.venv` (synchronised with
