@@ -242,6 +242,9 @@ class EditorService:
             "diagnostics": list(published.diagnostics) if published else [],
             "candidate_diagnostics": list(latest.diagnostics) if failed else [],
             "external_context_status": latest.external_context_status,
+            "external_incoming_references": {
+                ref: list(rows) for ref, rows in (published.external_incoming_references if published else ())
+            },
             "partition_status": latest.partition_status,
             "history": self.history.describe(),
             "pending_intent": self.uncertain,
