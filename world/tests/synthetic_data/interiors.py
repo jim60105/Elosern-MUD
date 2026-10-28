@@ -18,7 +18,7 @@ SYNTH_INTERIORS: dict[str, dict] = {
         "room": {
             "name_zh": "合成苔徑公會廳",
             "desc_zh": "A synthetic guild hall for the mossgate stand-in world.",
-            "scene_archetype": "t_synth_scene",
+            "scene_archetype": None,
             "art_key": "t_mossgate_guild_hall",
         },
         "exterior": {
@@ -33,7 +33,7 @@ SYNTH_INTERIORS: dict[str, dict] = {
         "room": {
             "name_zh": "合成苔徑雜貨店",
             "desc_zh": "A synthetic general store for the mossgate stand-in world.",
-            "scene_archetype": "t_synth_scene",
+            "scene_archetype": None,
             "art_key": "t_mossgate_store",
         },
         "exterior": {
@@ -50,7 +50,7 @@ SYNTH_INTERIORS: dict[str, dict] = {
             "desc_zh": (
                 "A synthetic gathering clearing: a place that exists with no host."
             ),
-            "scene_archetype": "t_synth_scene",
+            "scene_archetype": None,
             "art_key": "t_mossgate_plaza",
         },
         "exterior": {
