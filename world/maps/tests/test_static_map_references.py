@@ -53,11 +53,17 @@ from world.maps.static_references import (
 )
 from world.rules.map_district_lighting import lit_district_keys
 from world.rules.map_knowledge import KNOWLEDGE_ATTR, encode_grid, parse_knowledge
-from world.tests.geography_fixture import publish_shipped_geography
+from world.tests.geography_fixture import publish_shipped_map_world
+from world.tests.interior_fixture import (
+    build_synthetic_interiors,
+    interior_document,
+    interior_exterior,
+    interior_room,
+)
 
 
 def setUpModule():
-    publish_shipped_geography()
+    publish_shipped_map_world()
 
 MAP = "t_ref_map"
 
@@ -132,11 +138,31 @@ class ReferenceResolutionTests(unittest.TestCase):
 class StaticFamilyMovementTests(EvenniaTest):
     """Every migrated family resolves the same identity at a new coordinate."""
 
+    def setUp(self):
+        super().setUp()
+        self._interiors = build_synthetic_interiors(
+            interior_document(
+                "t_ref_interior",
+                {"t_ref_place": interior_room("合成參照室", "Synthetic reference interior.")},
+                exterior=interior_exterior(MAP, "shop", "t_ref_place", "測試門"),
+            )
+        )
+        patcher = mock.patch(
+            "world.maps.interiors._PUBLISHED", self._interiors
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def _declarations(self):
         district = DistrictDeclaration(
             "t_district", "測試區", "測試碑", settlement_node_ref(MAP, "anchor"), "voronoi", None
         )
-        place = mock.Mock(key="t_place", exterior=settlement_node_ref(MAP, "shop"))
+        place = PlaceDefinition(
+            key="t_ref_place",
+            settlement_key="t_settlement",
+            kind=PlaceKind.HOME,
+            room=interior_room_ref("t_ref_interior", "t_ref_place"),
+        )
         return district, place
 
     @covers_requirement("map-object-references::static-references-resolve-by-authored-identity")
@@ -155,7 +181,10 @@ class StaticFamilyMovementTests(EvenniaTest):
         with mock.patch.object(map_data, "SETTLEMENT_GRAPHS", {MAP: _graph(40, 40)}):
             # Declarations are untouched; only the current binding moved.
             self.assertEqual(district.landmark, settlement_node_ref(MAP, "anchor"))
-            self.assertEqual(place.exterior, settlement_node_ref(MAP, "shop"))
+            authored = self._interiors.exteriors["t_ref_place"]
+            self.assertEqual(
+                (authored.settlement, authored.node), (MAP, "shop")
+            )
             self.assertEqual(settlement_node_xyz(settlement_node_ref(MAP, "anchor")), (40, 40, MAP))
             self.assertEqual(place_exterior_xyz(place), (50, 40, MAP))
             self.assertEqual(landmark_node_id(district), encode_grid(MAP, 40, 40))
@@ -359,11 +388,16 @@ class IntegratedMovedNodeTests(EvenniaTest):
             key="t_ref_place",
             settlement_key="t_settlement",
             kind=PlaceKind.HOME,
-            room_name_zh="合成參照室",
-            room_desc_zh="Synthetic reference interior.",
-            exterior=settlement_node_ref(MAP, "shop"),
-            doorway_key_zh="測試門",
-            doorway_aliases=(),
+            room=interior_room_ref("t_ref_interior", "t_ref_place"),
+        )
+
+    def _interiors(self):
+        return build_synthetic_interiors(
+            interior_document(
+                "t_ref_interior",
+                {"t_ref_place": interior_room("合成參照室", "Synthetic reference interior.")},
+                exterior=interior_exterior(MAP, "shop", "t_ref_place", "測試門"),
+            )
         )
 
     def _district(self):
@@ -416,6 +450,10 @@ class IntegratedMovedNodeTests(EvenniaTest):
             ),
             (room_art, "GRID_NODE_SCENE_ARCHETYPES", art),
             (bootstrap_module, "GRID_NODE_SCENE_ARCHETYPES", art),
+            (
+                "world.maps.interiors._PUBLISHED",
+                self._interiors(),
+            ),
         ):
             if isinstance(entry[0], str):
                 path, value = entry

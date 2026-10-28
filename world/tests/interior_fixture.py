@@ -100,6 +100,14 @@ def published_interiors(*documents, replace_existing: bool = False):
         runtime.publish(previous)
 
 
+def build_synthetic_interiors(*documents):
+    """One composed interior world holding exactly ``documents`` (nothing published)."""
+
+    return build_interiors(
+        MappingProxyType({document.identity: document for document in documents})
+    )
+
+
 def empty_interiors():
     """The composed (empty) interior world, for a scope with no authored rooms."""
 
@@ -107,6 +115,7 @@ def empty_interiors():
 
 
 __all__ = [
+    "build_synthetic_interiors",
     "empty_interiors",
     "interior_document",
     "interior_exterior",

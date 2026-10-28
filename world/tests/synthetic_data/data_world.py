@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from types import MappingProxyType
-from elosern_map_core.references import settlement_node_ref
+from elosern_map_core.references import interior_room_ref
 from world.lore.anchors import Anchor, AnchorKind
 from world.lore.dialogue.conditions import All, Carries, Exposure, RaceIs
 from world.lore.dialogue.shape import AuthoredDialogue, AuthoredTopic, SceneVariant
@@ -231,11 +231,7 @@ SYNTH_PLACES: dict[str, PlaceDefinition] = {
         key="t_mossgate_guild_hall",
         settlement_key="t_mossgate",
         kind=PlaceKind.GUILD_HALL,
-        room_name_zh="合成苔徑公會廳",
-        room_desc_zh="A synthetic guild hall for the mossgate stand-in world.",
-        exterior=settlement_node_ref("t_mossgate", "t_guild_hall"),
-        doorway_key_zh="合成公會廳入口",
-        doorway_aliases=("synthetic hall",),
+        room=interior_room_ref("t_mossgate_guild_hall", "t_mossgate_guild_hall"),
         host_name="合成苔徑會長",
         host_race="human",
         host_subrace=None,
@@ -259,11 +255,7 @@ SYNTH_PLACES: dict[str, PlaceDefinition] = {
         key="t_mossgate_store",
         settlement_key="t_mossgate",
         kind=PlaceKind.GENERAL_STORE,
-        room_name_zh="合成苔徑雜貨店",
-        room_desc_zh="A synthetic general store for the mossgate stand-in world.",
-        exterior=settlement_node_ref("t_mossgate", "t_store"),
-        doorway_key_zh="合成雜貨店入口",
-        doorway_aliases=("synthetic store",),
+        room=interior_room_ref("t_mossgate_store", "t_mossgate_store"),
         host_name="合成苔徑店主",
         host_race="human",
         host_subrace=None,
@@ -287,11 +279,7 @@ SYNTH_PLACES: dict[str, PlaceDefinition] = {
         key="t_mossgate_plaza",
         settlement_key="t_mossgate",
         kind=PlaceKind.HOME,
-        room_name_zh="合成苔徑村中廣場",
-        room_desc_zh="A synthetic gathering clearing: a place that exists with no host.",
-        exterior=settlement_node_ref("t_mossgate", "t_plaza"),
-        doorway_key_zh="合成廣場入口",
-        doorway_aliases=("synthetic plaza",),
+        room=interior_room_ref("t_mossgate_plaza", "t_mossgate_plaza"),
     ),
 }
 

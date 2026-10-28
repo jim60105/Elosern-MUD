@@ -21,15 +21,14 @@ from evennia.utils.test_resources import EvenniaTest
 from tools.spec_traceability import covers_requirement
 from typeclasses.rooms import GridRoom, InstanceRoom, Room, TerrainRoom
 from world.art.scene_definitions import (
-    ROOM_ART_KEY_SET,
     is_registered_room_art_key,
     is_registered_scene_key,
+    room_art_key_set,
 )
 from world.maps.bootstrap import sync_grid, sync_interiors
 from world.maps.instance import spawn_instance_room
 from world.maps.room_art import (
     GRID_NODE_SCENE_ARCHETYPES,
-    PLACE_SCENE_ARCHETYPES,
     grid_scene_identity,
     instance_scene_identity,
     place_scene_identity,
@@ -41,11 +40,11 @@ from world.maps.wilderness_provider import (
     ElosernWildernessMapProvider,
     region_for_coordinates,
 )
-from world.tests.geography_fixture import publish_shipped_geography
+from world.tests.geography_fixture import publish_shipped_map_world
 
 
 def setUpModule():
-    publish_shipped_geography()
+    publish_shipped_map_world()
 
 
 
@@ -56,7 +55,7 @@ def _live_places():
 
 
 def _registered_room_art_key():
-    return sorted(ROOM_ART_KEY_SET)[0]
+    return sorted(room_art_key_set())[0]
 
 
 def _registered_scene_archetype():
@@ -130,37 +129,50 @@ class PermanentInteriorArtMetadataTests(EvenniaTest):
         "room-art-metadata::room-official-references-are-explicit-authored-keys"
     )
     def test_new_interior_carries_metadata_that_survives_reload(self):
+        from world.maps import interiors
+
         sync_interiors()
         place = next(iter(_live_places().values()))
-        interior = search_object_by_tag(place.key)[0]
+        authored = interiors.current().room(place.room.object_id)
+        interior = search_object_by_tag(authored.room_id)[0]
 
-        self.assertEqual(interior.scene_archetype, PLACE_SCENE_ARCHETYPES[place.key])
+        self.assertEqual(interior.scene_archetype, authored.scene_archetype)
         self.assertTrue(is_registered_scene_key(interior.scene_archetype))
-        self.assertEqual(interior.room_art_key, place.key)
-        self.assertTrue(is_registered_room_art_key(interior.room_art_key))
-        self.assertEqual(interior.scene_identity, place_scene_identity(place.key))
+        # The artwork key is the authored one; a room that declares none has
+        # no per-room override and renders its archetype chain.
+        self.assertEqual(interior.room_art_key, authored.art_key)
+        if authored.art_key is not None:
+            self.assertTrue(is_registered_room_art_key(interior.room_art_key))
+        self.assertEqual(
+            interior.scene_identity, place_scene_identity(authored.room_id)
+        )
 
         # Reload from the database: the facts are stored, not instance-only.
         reloaded = Room.objects.get(pk=interior.pk)
-        self.assertEqual(reloaded.scene_archetype, PLACE_SCENE_ARCHETYPES[place.key])
-        self.assertEqual(reloaded.room_art_key, place.key)
-        self.assertEqual(reloaded.scene_identity, place_scene_identity(place.key))
+        self.assertEqual(reloaded.scene_archetype, authored.scene_archetype)
+        self.assertEqual(reloaded.room_art_key, authored.art_key)
+        self.assertEqual(
+            reloaded.scene_identity, place_scene_identity(authored.room_id)
+        )
 
     def test_repeated_startup_reapplies_interior_metadata_without_duplicates(self):
+        from world.maps import interiors
+
         sync_interiors()
         count = Room.objects.all_family().count()
         place = next(iter(_live_places().values()))
-        interior = search_object_by_tag(place.key)[0]
+        authored = interiors.current().room(place.room.object_id)
+        interior = search_object_by_tag(authored.room_id)[0]
         interior.scene_archetype = None
+        interior.room_art_key = None
         interior.save()
 
         sync_interiors()
 
         self.assertEqual(Room.objects.all_family().count(), count)
-        self.assertEqual(
-            search_object_by_tag(place.key)[0].scene_archetype,
-            PLACE_SCENE_ARCHETYPES[place.key],
-        )
+        converged = search_object_by_tag(authored.room_id)[0]
+        self.assertEqual(converged.scene_archetype, authored.scene_archetype)
+        self.assertEqual(converged.room_art_key, authored.art_key)
 
 
 class PooledWildernessRoomArtTests(EvenniaTest):

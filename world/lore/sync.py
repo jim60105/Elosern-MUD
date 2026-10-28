@@ -166,6 +166,11 @@ def sync_all() -> None:
     from world.maps import runtime
 
     runtime.ensure_published()
+    # Every authored static map target resolves against the adopted world
+    # before the first mirrored Script is created or updated.
+    from world.maps.static_references import validate_static_references
+
+    validate_static_references()
     # wilderness-anchor-footprint: malformed authored wilderness data fails at
     # startup, before any lore:wilderness_entries:* Script is created or
     # updated.

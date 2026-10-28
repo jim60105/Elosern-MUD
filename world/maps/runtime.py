@@ -396,10 +396,26 @@ def adopt(root: str | Path | None = None) -> MapWorld:
     failed persistent synchronization restores it.
     """
 
+    from world.maps.static_references import validate_static_references
+
+    global _BUNDLE, _PENDING, _PENDING_SETTLED
+
     world = load_candidate(root)
     previous = _BUNDLE
     _install(world)
-    global _PENDING, _PENDING_SETTLED
+    try:
+        # The game-side declaration registries (city gates, anchor placements,
+        # wilderness gates, place joins, district landmarks, grid art) are read
+        # through the bundle this process now holds: reject a world whose own
+        # registries disagree before anything is persisted, and leave the
+        # previous bundle in place.
+        validate_static_references()
+    except BaseException:
+        if previous is None:
+            _BUNDLE = None
+        else:
+            _install(previous)
+        raise
     _PENDING = previous
     _PENDING_SETTLED = False
     return world
