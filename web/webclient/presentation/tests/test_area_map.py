@@ -34,6 +34,13 @@ from web.webclient.presentation.area_map import (
     bearing_and_distance,
     fog_of_war,
 )
+
+from world.tests.interior_fixture import (
+    interior_document,
+    interior_exterior,
+    interior_room,
+    published_interiors,
+)
 from web.webclient.presentation.coordinator import PresentationCoordinator
 from web.webclient.presentation.map_panels import (
     AREA_MAX_BYTES,
@@ -378,8 +385,16 @@ class RoomGraphAreaTests(EvenniaTestCase):
         instance.attributes.add("origin_room", self.rooms["a"])
         self.char.db.quest_log = [to_storage(_record(name)) for name in ("anchor", "grid", "site", "hunt")]
         with mock.patch.dict("world.quests.definitions.QUEST_DEFINITION_REGISTRY", _DEFINITIONS), \
-             mock.patch.dict("world.lore.settlements.places.PLACE_REGISTRY",
-                             {"t_service": SimpleNamespace(settlement_key="service")}, clear=True), \
+             published_interiors(
+                 interior_document(
+                     "t_service",
+                     {"t_service": interior_room("合成服務", "A synthetic service room.")},
+                     exterior=interior_exterior(
+                         "service", "service_node", "t_service", "合成門"
+                     ),
+                 ),
+                 replace_existing=True,
+             ), \
              mock.patch.dict(_GEOGRAPHY, {"service": SimpleNamespace(cell=(0, 0))}):
             for room in (self.rooms["a"], instance):
                 self.char.location = room
