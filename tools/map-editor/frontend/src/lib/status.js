@@ -23,19 +23,22 @@ export function syncChip(workspace, connection) {
   return { tone: "ok", glyph: "◉", text: `已同步 ${clock(workspace.snapshot_read_at)}` };
 }
 
+// `state` names the condition for the page (and its tests); text is copy.
 export function indexChip(workspace) {
   const status = workspace?.external_context_status;
-  if (!status) return { tone: "neutral", glyph: "⟳", text: "索引" };
-  if (status.current) return { tone: "ok", glyph: "✓", text: "索引 現行" };
-  return { tone: "warn", glyph: "▲", text: "索引不可用 · 無法刪除" };
+  if (!status) return { tone: "neutral", glyph: "⟳", text: "索引", state: "loading" };
+  const invalid = (workspace?.diagnostics ?? []).filter((item) => item.category === "external").length;
+  if (!status.current) return { tone: "warn", glyph: "▲", text: "索引不可用 · 無法刪除", state: "unavailable" };
+  if (invalid) return { tone: "seal", glyph: "✕", text: `外部引用無效 ${invalid}`, state: "invalid" };
+  return { tone: "ok", glyph: "✓", text: "索引 現行", state: "current" };
 }
 
 export function partitionChip(workspace) {
   const status = workspace?.partition_status;
-  if (!status) return { tone: "neutral", glyph: "⟳", text: "分區" };
-  if (status.status === "current") return { tone: "ok", glyph: "✓", text: "分區 現行" };
-  if (status.status === "stale") return { tone: "warn", glyph: "▲", text: "分區過期" };
-  return { tone: "seal", glyph: "⦸", text: "分區不可用" };
+  if (!status) return { tone: "neutral", glyph: "⟳", text: "分區", state: "loading" };
+  if (status.status === "current") return { tone: "ok", glyph: "✓", text: "分區 現行", state: "current" };
+  if (status.status === "stale") return { tone: "warn", glyph: "▲", text: "分區過期", state: "stale" };
+  return { tone: "seal", glyph: "⦸", text: "分區不可用", state: "unavailable" };
 }
 
 export function firstFailure(workspace) {
@@ -76,14 +79,4 @@ export function priorityBanner(workspace, connection) {
     };
   }
   return null;
-}
-
-export function diagnosticCounts(diagnostics) {
-  let errors = 0;
-  let warnings = 0;
-  for (const item of diagnostics ?? []) {
-    if (item.category === "structure" || item.category === "external") errors += 1;
-    else warnings += 1;
-  }
-  return { errors, warnings };
 }

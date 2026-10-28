@@ -39,8 +39,11 @@ export function changedDocuments(displayed, pending) {
   return pending.external_change?.documents ?? [];
 }
 
-// Keep a selection by qualified identity; report one that no longer exists.
-export function preserveSelection(selected, exists) {
-  if (!selected) return { selected: null, removed: null };
-  return exists(selected) ? { selected, removed: null } : { selected: null, removed: selected };
+// Keep a selection by qualified identity; report the references that no
+// longer exist.
+export function preserveSelection(refs, exists) {
+  const kept = [];
+  const removed = [];
+  for (const ref of refs ?? []) (exists(ref) ? kept : removed).push(ref);
+  return { kept, removed };
 }

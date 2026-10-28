@@ -113,14 +113,18 @@
         "web.tests.browser.test_browser_combat_panels.CombatMenuBrowserTest.test_disabled_reason_is_visible_without_packet",
         "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_party_exit_cancel_keeps_the_draft_and_the_clock",
         "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_terminal_outcome_publishes_fresh_exploration_panels",
-        "web.tests.browser.test_browser_services_quest_drawer.ServicesUnavailableJourney.test_unavailable_services_drawer_renders_reason_only"
+        "web.tests.browser.test_browser_services_quest_drawer.ServicesUnavailableJourney.test_unavailable_services_drawer_renders_reason_only",
+        "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_search_tells_equal_names_apart_and_alt_left_returns",
+        "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_diagnostics_locate_targets_and_reveal_a_hidden_layer"
       ],
       "files_b": [
         "web.tests.browser.test_browser_creation_reconnect.ReconnectPresetCreationJourney.test_reconnect_restores_preset_stage_and_never_auto_activates",
         "web.tests.browser.test_browser_inventory_actions.InventoryActionJourneys.test_backpack_row_actions_echo_their_typed_commands",
         "web.tests.browser.test_browser_inventory_actions.InventoryActionJourneys.test_dialogs_and_dispatch_state_fail_closed_across_interruptions",
         "web.tests.browser.test_browser_inventory_actions.InventoryActionJourneys.test_keyboard_and_pointer_item_actions_are_confirmation_protected",
-        "web.tests.browser.test_browser_console_saves.ConsoleSnapshotFailureBrowserTest.test_snapshot_failure_refuses_before_mutation_and_keeps_the_baseline"
+        "web.tests.browser.test_browser_console_saves.ConsoleSnapshotFailureBrowserTest.test_snapshot_failure_refuses_before_mutation_and_keeps_the_baseline",
+        "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_an_unknown_index_explains_refused_deletion_and_editing_still_saves",
+        "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_a_referenced_object_lists_its_references_inline_and_writes_nothing"
       ]
     },
     {
@@ -286,7 +290,9 @@
         "web.tests.browser.test_browser_exploration_frame.ExplorationBrowserTest.test_open_overview_follows_a_committed_move",
         "web.tests.browser.test_browser_exploration_actions.ExplorationBrowserTest.test_safe_wait_until_dawn_advances_the_clock",
         "web.tests.browser.test_browser_exploration_actions.ExplorationBrowserTest.test_rest_entry_tile_form_dispatch_path",
-        "web.tests.browser.test_browser_exploration_actions.ExplorationBrowserTest.test_stale_and_tampered_submissions_do_nothing"
+        "web.tests.browser.test_browser_exploration_actions.ExplorationBrowserTest.test_stale_and_tampered_submissions_do_nothing",
+        "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_a_stale_multi_selection_copies_every_source_without_secrets_or_actions",
+        "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_supported_viewports_keep_status_and_operations_reachable"
       ],
       "files_b": [
         "web.tests.browser.test_browser_combat_rejection.CombatReconnectBrowserTest.test_confirmed_action_disconnect_shows_no_uncertain_notice",
@@ -294,7 +300,9 @@
         "web.tests.browser.test_browser_combat_rejection.CombatReconnectBrowserTest.test_reconnect_resumes_same_session_without_new_round",
         "web.tests.browser.test_browser_creation_reset_draft.ResetAndDraftJourneys.test_escape_preserves_the_saved_draft",
         "web.tests.browser.test_browser_exit_compass.ExitCompassBrowserTest.test_holding_a_direction_walks_until_a_dead_end",
-        "web.tests.browser.test_browser_exit_compass.ExitCompassBrowserTest.test_a_disabled_exit_reads_its_reason_from_the_readout"
+        "web.tests.browser.test_browser_exit_compass.ExitCompassBrowserTest.test_a_disabled_exit_reads_its_reason_from_the_readout",
+        "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_keyboard_only_workflow_in_chromium",
+        "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityFirefoxTest.test_keyboard_only_workflow_in_firefox"
       ]
     },
     {

@@ -91,6 +91,12 @@ class WorkspaceRead:
     #: layout document: the raw-byte content fingerprint, or ``unreadable:<code>``
     #: for an entry that was refused. Generated artifacts are not included.
     fingerprints: tuple[tuple[str, str], ...] = ()
+    #: ``{qualified_ref: [incoming reference, ...]}`` from the reference
+    #: context for every projected map object that has one, looked up through
+    #: the core's own ``incoming_references_for``. Informative only: it is
+    #: present whenever the index decoded, even when it is not current, and an
+    #: index that is not current can never prove that a target is unreferenced.
+    external_incoming_references: tuple[tuple[str, tuple[dict[str, Any], ...]], ...] = ()
 
     @property
     def fingerprint_map(self) -> dict[str, str]:
@@ -102,7 +108,8 @@ class WorkspaceRead:
 
         payload = json.dumps(
             [self.loaded, self.documents, self.world, self.diagnostics,
-             self.external_context_status, self.partition_status, self.fingerprints],
+             self.external_context_status, self.partition_status, self.fingerprints,
+             self.external_incoming_references],
             sort_keys=True,
             ensure_ascii=False,
             default=str,
@@ -446,7 +453,8 @@ def read_workspace(workspace: ConfinedWorkspace, limits: Limits) -> WorkspaceRea
     sources, refused, fingerprints = read_sources(workspace, limits, workspace.discover_world())
     layout_sources, layout_refused, layout_fingerprints = _read_layout_sources(workspace, limits)
     presence = tuple(sorted({**fingerprints, **layout_fingerprints}.items()))
-    external = read_external_context(workspace, limits).status
+    context = read_external_context(workspace, limits)
+    external = context.status
     document_rows = tuple(
         {"relative_path": source.relative_path, "fingerprint": source.fingerprint}
         for source in sorted(sources, key=lambda item: item.relative_path)
@@ -481,6 +489,7 @@ def read_workspace(workspace: ConfinedWorkspace, limits: Limits) -> WorkspaceRea
         (*diagnose_world(world, partition_freshness=freshness), *layout_diagnostics)
     )
     projection = _project(world, layouts)
+    incoming = _incoming_references(context, projection)
     documents = tuple(
         {
             "relative_path": document.relative_path,
@@ -499,7 +508,32 @@ def read_workspace(workspace: ConfinedWorkspace, limits: Limits) -> WorkspaceRea
         external_context_status=external,
         partition_status=partition,
         fingerprints=presence,
+        external_incoming_references=incoming,
     )
+
+
+def _projected_refs(projection: Mapping[str, Any]):
+    for location in projection["locations"]:
+        yield location["qualified_ref"]
+    for settlement in projection["settlements"]:
+        for node in settlement["nodes"]:
+            yield node["qualified_ref"]
+    for interior in projection["interiors"]:
+        for room in interior["rooms"]:
+            yield room["qualified_ref"]
+
+
+def _incoming_references(context: ExternalContext, projection: Mapping[str, Any]):
+    """Incoming external references of the projected objects only (bounded)."""
+
+    if context.document is None:
+        return ()
+    rows = []
+    for ref in _projected_refs(projection):
+        found = context.document.incoming_references_for(ref)
+        if found:
+            rows.append((ref, tuple(item.to_dict() for item in found)))
+    return tuple(sorted(rows))
 
 
 __all__ = [

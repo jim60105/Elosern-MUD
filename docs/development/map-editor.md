@@ -13,8 +13,10 @@ drawn with `@elosern/map-view`. The first document commands rearrange interior
 room layouts, with service-owned autosave, overwrite guards and undo/redo of
 the manual segment (§3). The service follows the workspace files
 continuously (§3.4) and the page recovers from stale previews, disconnects
-and restarts without a handoff (§3.5). Further domain commands and the full
-workbench arrive in later slices.
+and restarts without a handoff (§3.5). The workbench shell (§3.6) provides
+navigation, search, selection, inspection, diagnostics, the copy-only OMP
+context and the keyboard contract. Further domain commands arrive in later
+slices (§3.7).
 
 ## 1. Launch
 
@@ -53,7 +55,11 @@ uv run --locked python -m unittest tests.test_map_editor_watching
 uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_standalone
 uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_persistence
 uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_file_following
+uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_accessibility
 ```
+
+The accessibility module runs its keyboard workflow in Chromium and Firefox
+(`uv run --locked playwright install chromium firefox`).
 
 The two repository-level checks start the service as a child process from
 `tools/map-editor/.venv` (synchronised with
@@ -69,6 +75,13 @@ an empty `PATH`, so neither the game's packages nor Node can be reached.
 | `POST /api/reload` | Authenticated explicit reread of the current disk files. A loadable read publishes and is the only way to resolve an uncertain publication. A structural failure keeps the last preview and marks it `stale`. An identical read publishes nothing. It never writes a file. |
 | `POST /api/commands/<name>` | One named single-document command (`move_interior_layout`, `remove_interior_layout`) or `undo`/`redo` of the current segment (see §3). |
 | `GET /api/session` | Same-origin launch-token bootstrap (see §4). |
+
+`external_incoming_references` maps the `qualified_ref` of every projected
+location, settlement node and interior room that the reference index names to
+its incoming external references (looked up with the core's
+`incoming_references_for`, so the payload stays bounded to projected objects).
+It is present whenever the index decoded, current or not; only a current index
+can support a deletion, and the execution-time guard of §8 stays the authority.
 
 `snapshot_revision` is an invalidation counter. It changes whenever the
 observable state changes (a new world, or a new stale or unavailable status),
@@ -166,9 +179,9 @@ source or layout change it did not write, and when a read fails to load
 (§3.4). Changes to the generated artifacts do not count. A service restart is a new
 session with no history. Commands are never replayed after a reconnect.
 
-Only one owning document is mutated per operation. The browser has no
-multi-selection gesture in this slice. A selection that spans documents is
-reported as unavailable, and the service refuses it as `cross_document`.
+Only one owning document is mutated per operation. A multi-selection (§3.6)
+is inspect/copy only in this slice; a selection that spans documents states
+so, and the service refuses it as `cross_document`.
 
 ### 3.3 Durability
 
@@ -305,6 +318,89 @@ Banner priority, highest first: disconnected or restarted, failed or
 uncertain save, external change with drafts, rejected command, stale or
 unavailable preview.
 
+### 3.6 Workbench interaction
+
+The page is the three-column workbench of the frontend design §2: header
+(domain tabs on 1/2/3, breadcrumb, return button, status chips), one priority
+banner, navigation, canvas, inspector and the diagnostics strip. When the
+viewport cannot hold both side columns beside a 480 px canvas (all widths
+times `--ui-scale`), as at 200 % zoom of the 1451x790 reference, the columns
+become drawers opened from the header (導覽, 檢查器). An open drawer traps Tab,
+Escape closes it and returns focus to its toggle, and selecting an object opens
+the inspector drawer.
+
+- **Navigation.** Continent layer visibility (a view preference that never
+  writes), the world tree with 無本地圖 tags, search by name, ID or qualified
+  reference (each result shows its parent map and source document, and equal
+  names are marked), and the object list, the keyboard/text alternative to the
+  canvas. Click selects one object; Ctrl/⌘ toggles one in or out and Shift
+  extends over the object list (also with Enter). Ctrl/⌘ on a search result
+  adds it across maps and documents.
+- **Return context.** Following a search result, a diagnostic or a
+  relationship pushes the previous map and selection on a stack (capped at
+  20, no consecutive duplicates). The 「← 返回」 button and Alt+← pop it. Focus
+  lands on the destination's inspector heading, or the canvas for a map-level
+  target.
+- **Inspection.** One object shows its copyable qualified ID and source path,
+  fields with unit and frame, and directed relationships read from authored
+  fields (roads, connections, entrances, interior links, gates, landmarks,
+  local maps, anchors) plus the indexed external references. Nothing is
+  derived: no reachability, length or geometry is computed in the browser. A
+  multi-selection lists every object and owning document; a selection that
+  spans documents is inspect/copy only, with 跨文件的選取只能檢視與複製 in
+  place of mutation actions.
+- **Delete.** The Delete key and the inspector action show an inline
+  explanation and never write or ask for confirmation. Order: a cross-document
+  selection; an index that is not current (external references unknown, so
+  deletion is refused while inspection and editing continue); external
+  references of a current index (what the service guard enforces); otherwise
+  no delete command exists yet for that object. Map-internal incoming
+  references are listed alongside as references a deletion would leave
+  dangling; nothing cascades.
+- **Diagnostics.** Rows grouped as structure, external index and references,
+  service and save, unfinished (semantic) and partition. Each names its
+  object, file, field and line. A row of the loaded snapshot whose target
+  resolves offers 前往, or 顯示圖層並前往 when the target sits on a hidden
+  continent layer. Rows of a read that did not load, or with a reference that
+  does not resolve, keep file:line without navigation (there is no source
+  editor). The 檔案同步, 索引 and 分區 chips expand the strip; 存檔 focuses the
+  banner action while a save failed or is uncertain.
+- **OMP context.** Ctrl/⌘+C outside text fields (and with no text selected on
+  the page) or the inspector's 複製 OMP 脈絡 action writes plain text to the
+  clipboard: every selected qualified ID with its domain, map, relative source
+  path and coordinates with frame and unit (or the layout grid, stated as
+  editor-only), and whether it came from the current files or a stale preview
+  (naming the first failing file and line). It is built from an allowlist of
+  snapshot fields, so the launch token, session, segment, fingerprints and
+  absolute paths never appear. It states no ownership and starts nothing.
+- **Keyboard.** F6/Shift+F6 cycle header, navigation, canvas, inspector and
+  diagnostics. On the canvas, Tab walks the marks in object-list order, an
+  arrow moves focus to the nearest mark in that direction, and Enter selects
+  and focuses the first inspector field. Shift+arrow nudges a single selected
+  room when focus is on the canvas or the object list. Ctrl/⌘+Z and
+  Shift+Ctrl/⌘+Z (⌘ on macOS, Ctrl elsewhere) undo and redo; Delete; `/` or
+  Ctrl/⌘+K focus search; Escape closes an open drawer, then cancels a tool,
+  then the delete explanation, then the selection (a field draft and a drag
+  consume their own Escape first). Single-key shortcuts never act in a text
+  input, select or `[data-object-selector]`, during IME composition or with a
+  modifier; inside a field its own undo, delete and copy apply.
+
+### 3.7 Mandatory domain dependencies
+
+This shell deliberately ships no domain command beyond interior layout moves.
+The batch's later changes must deliver, through their own domain modules:
+
+| Change | Delivers on this shell |
+| --- | --- |
+| `map-editor-continent-tools` | Continent tools (control points A, waterway, ridge, location, footprint grid), drawables for the ridge and footprint layers, location delete |
+| `map-editor-settlement-tools` | Node N, road R (建立雙向), bends, node fields, multi-selection edits, node delete |
+| `map-editor-interior-tools` | Room N, connection R, 自動排列, room fields, room delete |
+| `map-editor-entrance-tools` | Entrance E, 前往另一端, 更換端點… with the qualified-object selector (`[data-object-selector]`) |
+| `map-editor-partition-jobs` | Partition drawables, and 分區 chip regenerate/cancel |
+
+Each registers its tools in `TOOLS` (`src/lib/workbench.js`), sends its own
+named single-document command, and lets the service's refusal (for example
+`deletion_refused`) replace the shell's explanatory delete block.
 ## 4. Security Model and Limitations
 
 - **Loopback only.** The service binds a loopback address and answers only

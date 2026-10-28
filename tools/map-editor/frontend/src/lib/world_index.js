@@ -62,8 +62,6 @@ function locationRecord(world, location) {
 }
 
 function nodeRecord(settlement, node) {
-  const outgoing = settlement.roads.filter((road) => road.source === node.id);
-  const incoming = settlement.roads.filter((road) => road.destination === node.id);
   return {
     title: node.key,
     qualifiedRef: node.qualified_ref,
@@ -74,10 +72,6 @@ function nodeRecord(settlement, node) {
       row("世界座標", `${node.world_m[0]} m 東, ${node.world_m[1]} m 北`),
       row("場景", node.scene_archetype),
       row("描述", node.desc),
-      ...outgoing.map((road) =>
-        row("道路", `${road.direction} → ${road.destination}${road.length_m === null ? "" : ` · ${Math.round(road.length_m)} m`}`),
-      ),
-      ...incoming.map((road) => row("來路", `← ${road.direction} 來自 ${road.source}`)),
     ],
   };
 }
@@ -92,9 +86,6 @@ function roomRecord(interior, room) {
       row("美術", room.art_key),
       row("描述", room.desc_zh),
       row("版面", interior.layout_relative_path ?? "無版面文件（依清單排列）"),
-      ...interior.connections
-        .filter((connection) => connection.source === room.id)
-        .map((connection) => row("連接", `${connection.label} → ${connection.destination}`)),
     ],
   };
 }

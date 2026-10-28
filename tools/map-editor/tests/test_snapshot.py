@@ -175,3 +175,34 @@ def test_the_external_byte_budget_bounds_hashing(workspace):
     fixture.write_reference_context(workspace)
     status = _state(workspace, limits=Limits(max_external_total_bytes=4))["external_context_status"]
     assert status["status"] == "unavailable"
+
+
+def test_external_incoming_references_are_looked_up_for_every_projected_object(workspace):
+    front = f"interior_room:{fixture.INTERIOR_ID}:front"
+    yard = f"settlement_node:{fixture.SETTLEMENT_ID}:yard"
+    place = f"location:{fixture.LOCATION_ID}"
+    record = {"source": "place:synthetic", "source_domain": "places", "source_file": "external/declarations.txt"}
+
+    def incoming(key, domain, map_id, object_id):
+        return {key: [dict(record, target={"domain": domain, "map_id": map_id, "object_id": object_id, "cell": None})]}
+
+    references = {
+        **incoming(front, "interior_room", fixture.INTERIOR_ID, "front"),
+        **incoming(yard, "settlement_node", fixture.SETTLEMENT_ID, "yard"),
+        **incoming(place, "location", None, fixture.LOCATION_ID),
+        # A target the projection does not hold is never forwarded.
+        **incoming("interior_room:elsewhere:room", "interior_room", "elsewhere", "room"),
+    }
+    assert _state(workspace)["external_incoming_references"] == {}
+    fixture.write_reference_context(workspace, incoming=references)
+    state = _state(workspace)
+    assert state["external_context_status"]["current"] is True
+    forwarded = state["external_incoming_references"]
+    # The projected qualified_ref of every object kind is the core's canonical key.
+    assert set(forwarded) == {front, yard, place}
+    assert forwarded[front][0]["source_file"] == "external/declarations.txt"
+    # A stale index still reports what it says, alongside its non-current status.
+    (workspace / "external/declarations.txt").write_text("changed\n", encoding="utf-8")
+    stale = _state(workspace)
+    assert stale["external_context_status"]["current"] is False
+    assert set(stale["external_incoming_references"]) == {front, yard, place}
