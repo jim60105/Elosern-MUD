@@ -23,6 +23,8 @@ from pathlib import Path
 
 from ruamel.yaml import YAML
 
+from tools.spec_traceability import covers_requirement
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EDITOR_TESTS = REPO_ROOT / "tools" / "map-editor" / "tests"
 
@@ -91,6 +93,7 @@ class SettlementProcessTests(unittest.TestCase):
     def settlement(state, settlement_id=TOWN):
         return next(row for row in state["world"]["settlements"] if row["id"] == settlement_id)
 
+    @covers_requirement("map-editor-settlement-graphs::settlement-tools-preserve-stable-graph-identity-and-explicit-direction")
     def test_a_new_local_map_writes_only_its_document_and_is_unfinished(self):
         editor = self.start()
         before = synthetic.tree_digest(self.workspace)
@@ -107,6 +110,7 @@ class SettlementProcessTests(unittest.TestCase):
         self.assertEqual([(row["relative_path"], row["category"]) for row in unfinished], [(NEW_MAP, "semantic")])
         self.assertEqual(self.data(NEW_MAP)["nodes"], {})
 
+    @covers_requirement("map-editor-settlement-graphs::settlement-tools-preserve-stable-graph-identity-and-explicit-direction")
     def test_moving_a_referenced_node_keeps_its_id_directions_and_dependents(self):
         editor = self.start()
         directions = {(road["source"], road["destination"]): road["direction"] for road in self.data()["roads"]}
@@ -127,6 +131,7 @@ class SettlementProcessTests(unittest.TestCase):
         self.assertEqual(state["world"]["districts"][0]["landmark"]["object_id"], "yard")
         self.assertIn("yard", {row["id"] for row in settlement["nodes"]})
 
+    @covers_requirement("map-editor-settlement-graphs::settlement-tools-preserve-stable-graph-identity-and-explicit-direction")
     def test_a_two_way_street_is_two_directed_entries_in_one_save(self):
         editor = self.start()
         fields = {"x_m": 600, "y_m": 0, "prototype_parent": "grid_room", "key": "Well", "desc": "",
