@@ -10,7 +10,9 @@
         "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_self_skill_submits_no_target_field",
         "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_single_skill_target_flow",
         "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_skill_frame_refreshes_on_panel_update",
-        "web.tests.browser.test_browser_services_guild.GuildTurninJourneys.test_completed_quest_turnin"
+        "web.tests.browser.test_browser_services_guild.GuildTurninJourneys.test_completed_quest_turnin",
+        "web.tests.browser.test_map_editor_workflows.MapEditorWorkflowsChromiumTest.test_continental_authoring_reloads_in_the_core_after_every_operation",
+        "web.tests.browser.test_map_editor_workflows.MapEditorFollowingLargeChromiumTest.test_a_save_racing_an_external_write_is_refused_by_the_fingerprint_guard"
       ],
       "files_b": [
         "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_command_line_hint_names_history_and_completion_and_controls_share_the_walk",
@@ -82,7 +84,8 @@
         "web.tests.browser.test_browser_party_acceptance.PartyAcceptanceBrowserTest.test_cancelled_exit_keeps_the_whole_draft_and_a_committed_exit_settles_once",
         "web.tests.browser.test_browser_party_acceptance.PartyAcceptanceBrowserTest.test_member_journey_commands_a_companion_skill_and_item_and_revises_a_choice",
         "web.tests.browser.test_browser_party_acceptance.PartyAcceptanceBrowserTest.test_unfinished_draft_survives_reconnect_without_replaying_intent",
-        "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_clicking_a_feature_shape_selects_it_and_shows_its_handles"
+        "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_clicking_a_feature_shape_selects_it_and_shows_its_handles",
+        "web.tests.browser.test_map_editor_workflows.MapEditorFollowingLargeChromiumTest.test_malformed_then_corrected_files_recover_and_semantic_work_in_progress_loads"
       ]
     },
     {
@@ -134,7 +137,8 @@
         "web.tests.browser.test_browser_console_saves.ConsoleSnapshotFailureBrowserTest.test_snapshot_failure_refuses_before_mutation_and_keeps_the_baseline",
         "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_an_unknown_index_explains_refused_deletion_and_editing_still_saves",
         "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_a_referenced_object_lists_its_references_inline_and_writes_nothing",
-        "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_the_road_tool_creates_a_two_way_street_in_one_command"
+        "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_the_road_tool_creates_a_two_way_street_in_one_command",
+        "web.tests.browser.test_map_editor_workflows.MapEditorFollowingLargeChromiumTest.test_an_old_tab_after_a_restart_reads_again_before_writing"
       ]
     },
     {
@@ -206,7 +210,9 @@
         "web.tests.browser.test_harness.StartupSerializationTests",
         "web.tests.browser.test_browser_console_saves.ConsoleSaveConfigurationTests",
         "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_the_room_tool_creates_a_standalone_room_without_a_layout_write",
-        "web.tests.browser.test_map_editor_generation.MapEditorGenerationBrowserTest.test_only_the_explicit_controls_regenerate_and_old_outlines_are_labelled"
+        "web.tests.browser.test_map_editor_generation.MapEditorGenerationBrowserTest.test_only_the_explicit_controls_regenerate_and_old_outlines_are_labelled",
+        "web.tests.browser.test_map_editor_workflows.MapEditorWorkflowsChromiumTest.test_local_map_and_interior_authoring_reloads_in_the_core_after_every_operation",
+        "web.tests.browser.test_map_editor_workflows.MapEditorFollowingReferenceFirefoxTest.test_external_changes_are_adopted_or_held_behind_an_open_draft"
       ]
     },
     {
@@ -220,7 +226,8 @@
         "web.tests.browser.test_incremental_sync.IncrementalSyncBrowserTests.test_graphical_and_text_checkpoint_sequence",
         "web.tests.browser.test_incremental_sync.IncrementalSyncBrowserTests.test_oversized_snapshot_and_delta_adopt_once",
         "web.tests.browser.test_incremental_sync.IncrementalSyncBrowserTests.test_missing_publication_recovers_complete_baseline",
-        "web.tests.browser.test_incremental_sync.IncrementalSyncBrowserTests.test_failed_recovery_and_alignment_preserve_local_state"
+        "web.tests.browser.test_incremental_sync.IncrementalSyncBrowserTests.test_failed_recovery_and_alignment_preserve_local_state",
+        "web.tests.browser.test_map_editor_workflows.MapEditorFollowingReferenceFirefoxTest.test_a_save_racing_an_external_write_is_refused_by_the_fingerprint_guard"
       ],
       "files_b": [
         "web.tests.browser.test_browser_creation_concept.ConceptCreationJourneys.test_concept_field_journey_to_activation_at_the_capped_viewport",
@@ -229,7 +236,9 @@
         "web.tests.browser.test_browser_console_saves.ConsoleSaveIsolationBrowserTest.test_first_protected_teleport_saves_the_before_state_privately",
         "web.tests.browser.test_browser_synth_lineage.SynthLineageBrowserTest.test_synthetic_member_lineage_matches_text_and_panel",
         "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_the_connection_tool_creates_a_two_way_pair_in_one_command_and_undo_removes_it",
-        "web.tests.browser.test_map_editor_relationships.MapEditorRelationshipBrowserTest.test_the_settlement_entrance_tool_adds_a_gate_with_one_settlement_write"
+        "web.tests.browser.test_map_editor_relationships.MapEditorRelationshipBrowserTest.test_the_settlement_entrance_tool_adds_a_gate_with_one_settlement_write",
+        "web.tests.browser.test_map_editor_workflows.MapEditorWorkflowsFirefoxTest.test_continental_authoring_reloads_in_the_core_after_every_operation",
+        "web.tests.browser.test_map_editor_workflows.MapEditorFollowingReferenceFirefoxTest.test_malformed_then_corrected_files_recover_and_semantic_work_in_progress_loads"
       ]
     },
     {
@@ -242,7 +251,9 @@
         "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_talk_open_enters_the_dialogue_in_one_step",
         "web.tests.browser.test_browser_exploration_actions.ExplorationBrowserTest.test_unsafe_skip_rejects_before_any_clock_advance",
         "web.tests.browser.test_browser_local_map_layout_variants.LayoutVariantsBrowserTest",
-        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_pointer_opened_choices_highlight_the_first_choice_without_answering"
+        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_pointer_opened_choices_highlight_the_first_choice_without_answering",
+        "web.tests.browser.test_map_editor_workflows.MapEditorWorkflowsFirefoxTest.test_local_map_and_interior_authoring_reloads_in_the_core_after_every_operation",
+        "web.tests.browser.test_map_editor_workflows.MapEditorFollowingReferenceFirefoxTest.test_an_old_tab_after_a_restart_reads_again_before_writing"
       ],
       "files_b": [
         "web.tests.browser.test_browser_creation_custom.CustomCreationJourneys.test_out_of_range_apparent_age_rejected_independently",
@@ -293,7 +304,9 @@
         "web.tests.browser.test_browser_services_shop.ShopJourneys.test_sell_and_repeated_inventory_without_use_control",
         "web.tests.browser.test_browser_services_shop.ShopCompanionJourneys.test_buy_potions_for_a_companion",
         "web.tests.browser.test_browser_services_shop.ShopCompanionJourneys.test_possessed_shop_opens_at_the_large_acceptance_viewport",
-        "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_auto_arrange_writes_only_the_layout_and_names_it"
+        "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_auto_arrange_writes_only_the_layout_and_names_it",
+        "web.tests.browser.test_map_editor_workflows.MapEditorFollowingReferenceChromiumTest.test_external_changes_are_adopted_or_held_behind_an_open_draft",
+        "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityFirefoxTest.test_supported_viewports_keep_status_and_operations_reachable_in_firefox"
       ]
     },
     {
@@ -356,7 +369,8 @@
         "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_real_mouse_double_click_pushes_one_frame",
         "web.tests.browser.test_browser_services_guild.GuildExamAppointmentJourney.test_appointment_journey_at_the_reference_viewport",
         "web.tests.browser.test_browser_services_guild.GuildExamAppointmentJourney.test_appointment_journey_at_the_wide_viewport",
-        "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_a_bend_drag_is_one_command_and_keeps_the_direction_at_the_large_viewport"
+        "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_a_bend_drag_is_one_command_and_keeps_the_direction_at_the_large_viewport",
+        "web.tests.browser.test_map_editor_workflows.MapEditorFollowingReferenceChromiumTest.test_a_save_racing_an_external_write_is_refused_by_the_fingerprint_guard"
       ],
       "files_b": [
         "web.tests.browser.test_browser_options_surface.OptionsSurfaceBrowserTest",
@@ -383,7 +397,8 @@
         "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_rapid_double_activation_pushes_one_frame",
         "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_a_referenced_node_refuses_deletion_and_an_unreferenced_one_is_deleted",
         "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_room_fields_by_keyboard_keep_the_id_and_a_connection_is_relabelled",
-        "web.tests.browser.test_map_editor_generation.MapEditorGenerationBrowserTest.test_browsing_then_cancelling_keeps_the_last_artifact_and_refuses_world_edits"
+        "web.tests.browser.test_map_editor_generation.MapEditorGenerationBrowserTest.test_browsing_then_cancelling_keeps_the_last_artifact_and_refuses_world_edits",
+        "web.tests.browser.test_map_editor_workflows.MapEditorFollowingReferenceChromiumTest.test_malformed_then_corrected_files_recover_and_semantic_work_in_progress_loads"
       ],
       "files_b": [
         "web.tests.browser.test_browser_art.ArtPendingSceneTest.test_pending_generating_notice_clears_dock_and_command_line",
@@ -524,7 +539,8 @@
         "web.tests.browser.test_browser_layout.ContextualHudStandingJourneyTest",
         "web.tests.browser.test_browser_drawer_content.DrawerContentBrowserTest.test_status_opens_the_party_window_hero_and_no_drawer_stands_art",
         "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_prototype_name_and_scene_fields_by_keyboard",
-        "web.tests.browser.test_map_editor_relationships.MapEditorRelationshipBrowserTest.test_a_referenced_node_locates_its_exterior_which_is_removed_before_the_node"
+        "web.tests.browser.test_map_editor_relationships.MapEditorRelationshipBrowserTest.test_a_referenced_node_locates_its_exterior_which_is_removed_before_the_node",
+        "web.tests.browser.test_map_editor_workflows.MapEditorFollowingReferenceChromiumTest.test_an_old_tab_after_a_restart_reads_again_before_writing"
       ],
       "files_b": [
         "web.tests.browser.test_browser_creation_reset_draft.ResetAndDraftJourneys.test_escape_from_reset_confirm_returns_to_form_without_mutation",
@@ -572,7 +588,8 @@
         "web.tests.browser.test_browser_unified_scenes.UnifiedScenesBrowserTest.test_room_precedence_retention_movement_and_fullview",
         "web.tests.browser.test_browser_dream_artwork.DreamArtworkBrowserTest.test_offline_dream_and_official_failure_use_shared_scene",
         "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_list_multi_selection_moves_as_one_command_and_cross_document_is_inspect_only",
-        "web.tests.browser.test_map_editor_generation.MapEditorGenerationBrowserTest.test_an_external_source_change_during_a_job_never_shows_it_current"
+        "web.tests.browser.test_map_editor_generation.MapEditorGenerationBrowserTest.test_an_external_source_change_during_a_job_never_shows_it_current",
+        "web.tests.browser.test_map_editor_workflows.MapEditorFollowingLargeChromiumTest.test_external_changes_are_adopted_or_held_behind_an_open_draft"
       ],
       "files_b": [
         "web.tests.browser.test_browser_npc_persona_editor_edges.NpcPersonaEditorEdgesBrowserTest.test_late_read_does_not_seed_different_npc",

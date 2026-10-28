@@ -1286,11 +1286,14 @@ async function onChip(key) {
       <section v-if="banner" class="banner" :class="`banner--${banner.tone}`" :data-banner="banner.key">
         <strong class="banner__title">{{ banner.title }}</strong>
         <span class="banner__text">{{ banner.text }}</span>
+        <!-- A pointer press keeps focus in an open draft field: its blur would
+             confirm the draft that 載入新版 is meant to discard. -->
         <button
           v-if="banner.action"
           type="button"
           class="banner__action"
           :data-banner-action="banner.action"
+          @mousedown.prevent
           @click="onBannerAction(banner.action)"
         >
           {{ BANNER_ACTIONS[banner.action] }}

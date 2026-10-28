@@ -108,6 +108,16 @@ def dense_diagnostics(workspace: Path, count: int = 60) -> None:
     write(workspace, "content/maps/locations.yaml", locations)
 
 
+def long_multiline_node(workspace: Path) -> None:
+    """A node with a long Chinese name and a multiline description."""
+
+    data = synthetic.settlement_data()
+    data["roads"] = [road for road in data["roads"] if road["source"] != "gate"]
+    data["nodes"]["yard"]["key"] = "很長的庭院節點名稱" * 8
+    data["nodes"]["yard"]["desc"] = "第一行描述。\n第二行描述。\n第三行描述。"
+    write(workspace, SETTLEMENT, data)
+
+
 class _AccessibilityBrowser(unittest.TestCase):
     BROWSER = "chromium"
 
@@ -197,6 +207,52 @@ class _AccessibilityBrowser(unittest.TestCase):
 
     def disk_unchanged(self) -> None:
         self.assertEqual(synthetic.tree_digest(self.workspace), self.baseline)
+
+    # -- viewport reflow, shared by Chromium and Firefox ---------------------
+    def viewport_reflow(self):
+        self.start(dense_diagnostics, long_multiline_node)
+        for viewport, layout in ((REFERENCE, "columns"), (LARGE, "columns"), (ZOOM_200, "drawers")):
+            page = self.open(viewport)
+            width, height = viewport[0], viewport[1]
+            self.assertEqual(page.locator(".editor").get_attribute("data-layout"), layout)
+            page.click("[data-diagnostics-toggle]")
+            listing = page.locator("[data-diagnostics-list]")
+            self.assertGreaterEqual(page.locator("[data-diagnostic]").count(), 60)
+            self.assertTrue(listing.evaluate("el => el.scrollHeight > el.clientHeight"))
+            for chip in ("save", "sync", "index", "partition"):
+                box = page.locator(f'[data-chip="{chip}"]').bounding_box()
+                self.assertIsNotNone(box)
+                self.assertGreaterEqual(box["x"], 0)
+                self.assertLessEqual(box["x"] + box["width"], width + 0.5)
+                self.assertLessEqual(box["y"] + box["height"], height + 0.5)
+            self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)
+            if layout == "drawers":
+                self.assertEqual(page.locator("[data-drawer-toggle]").count(), 2)
+                page.click('[data-drawer-toggle="nav"]')
+            else:
+                self.assertEqual(page.locator("[data-drawer-toggle]").count(), 0)
+            row = page.locator(f'[data-tree="location:{synthetic.BARE_LOCATION_ID}"]')
+            self.assertTrue(row.is_visible())
+            self.assertTrue(row.evaluate("el => el.scrollWidth <= el.clientWidth + 1"))
+            nav = page.locator('[data-region="nav"]').bounding_box()
+            self.assertLessEqual(nav["x"] + nav["width"], width + 0.5)
+            # The long name of a node with a multiline description wraps in
+            # the inspector heading, with no horizontal page scroll.
+            if layout == "drawers":
+                page.keyboard.press("Escape")
+            page.click('[data-domain-tab="settlement"]')
+            if layout == "drawers":
+                page.click('[data-drawer-toggle="nav"]')
+            page.click(f'[data-object="{YARD}"]')
+            self.wait_for(lambda: self.inspected(page) == YARD, "the long-named node was not selected")
+            heading = page.locator("[data-inspector-title]")
+            self.assertTrue(heading.is_visible())
+            self.assertTrue(heading.evaluate("el => el.scrollWidth <= el.clientWidth + 1"))
+            box = heading.bounding_box()
+            self.assertLessEqual(box["x"] + box["width"], width + 0.5)
+            self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)
+            page.context.close()
+        self.assertEqual(self.posts, [])
 
     # -- the keyboard-only workflow, shared by Chromium and Firefox ----------
     def keyboard_workflow(self):
@@ -463,34 +519,7 @@ class MapEditorAccessibilityBrowserTest(_AccessibilityBrowser):
         "map-editor-interaction::essential-workspace-operations-have-keyboard-and-reflow-access",
     )
     def test_supported_viewports_keep_status_and_operations_reachable(self):
-        self.start(dense_diagnostics)
-        for viewport, layout in ((REFERENCE, "columns"), (LARGE, "columns"), (ZOOM_200, "drawers")):
-            page = self.open(viewport)
-            width, height = viewport[0], viewport[1]
-            self.assertEqual(page.locator(".editor").get_attribute("data-layout"), layout)
-            page.click("[data-diagnostics-toggle]")
-            listing = page.locator("[data-diagnostics-list]")
-            self.assertGreaterEqual(page.locator("[data-diagnostic]").count(), 60)
-            self.assertTrue(listing.evaluate("el => el.scrollHeight > el.clientHeight"))
-            for chip in ("save", "sync", "index", "partition"):
-                box = page.locator(f'[data-chip="{chip}"]').bounding_box()
-                self.assertIsNotNone(box)
-                self.assertGreaterEqual(box["x"], 0)
-                self.assertLessEqual(box["x"] + box["width"], width + 0.5)
-                self.assertLessEqual(box["y"] + box["height"], height + 0.5)
-            self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)
-            if layout == "drawers":
-                self.assertEqual(page.locator("[data-drawer-toggle]").count(), 2)
-                page.click('[data-drawer-toggle="nav"]')
-            else:
-                self.assertEqual(page.locator("[data-drawer-toggle]").count(), 0)
-            row = page.locator(f'[data-tree="location:{synthetic.BARE_LOCATION_ID}"]')
-            self.assertTrue(row.is_visible())
-            self.assertTrue(row.evaluate("el => el.scrollWidth <= el.clientWidth + 1"))
-            nav = page.locator('[data-region="nav"]').bounding_box()
-            self.assertLessEqual(nav["x"] + nav["width"], width + 0.5)
-            page.context.close()
-        self.assertEqual(self.posts, [])
+        self.viewport_reflow()
 
     @covers_requirement(
         "map-editor-interaction::essential-workspace-operations-have-keyboard-and-reflow-access",
@@ -507,6 +536,12 @@ class MapEditorAccessibilityFirefoxTest(_AccessibilityBrowser):
     )
     def test_keyboard_only_workflow_in_firefox(self):
         self.keyboard_workflow()
+
+    @covers_requirement(
+        "map-editor-interaction::essential-workspace-operations-have-keyboard-and-reflow-access",
+    )
+    def test_supported_viewports_keep_status_and_operations_reachable_in_firefox(self):
+        self.viewport_reflow()
 
 
 if __name__ == "__main__":

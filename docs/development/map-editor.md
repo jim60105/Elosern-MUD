@@ -17,6 +17,7 @@ and restarts without a handoff (§3.5). The workbench shell (§3.6) provides
 navigation, search, selection, inspection, diagnostics, the copy-only OMP
 context and the keyboard contract. Further domain commands arrive in later
 slices (§3.7). Partition regeneration is an explicit background job (§3.12).
+The integrated acceptance evidence and its focused commands are in §9.
 
 ## 1. Launch
 
@@ -970,7 +971,52 @@ When external context is unavailable or an incoming reference exists:
 - Ordinary non-destructive editing (moving nodes, adjusting attributes, inspecting diagnostics) remains available.
 
 ### Live Database Safety
-The editor operates on static authoring documents and does not connect to or query the live game database (`ObjectDB`). It cannot certify live save dependents (e.g., players currently occupying a room or dynamic exits). Live occupied room safety and persistent room preservation remain strictly game-side responsibilities enforced during runtime synchronization (`sync_map_world`).
+The editor operates on static authoring documents and does not connect to or query the live game database (`ObjectDB`). It cannot certify live save dependents (e.g., players currently occupying a room or dynamic exits). Live occupied room safety and persistent room preservation remain strictly game-side responsibilities enforced during runtime adoption and synchronization (`world.maps.runtime.adopt` and `world.maps.runtime.synchronize`). The editor's static checks are authoring diagnostics, not an authoritative live-save validation, and its status chips never claim game readiness.
 
 ### Geometry Exclusion
 The reference index records stable authored identities (e.g. `settlement_node:capital_altoria:central_plaza`), not derived spatial coordinates or grid wire strings (`grid:capital_altoria:100:200`). Moving a node coordinate alone does not alter the external reference index or its dependency fingerprint.
+
+## 9. Integrated Acceptance
+
+The integrated acceptance evidence (map-editor-integrated-acceptance) chains the
+focused slice checks into whole sessions. It adds no behaviour of its own:
+every test drives the independently installed service (its own locked
+environment, scrubbed environment, empty `PATH`, real watcher; no game server,
+Evennia, Django or database) or the game's existing map owners, and asserts the
+effect on disk, in the core reload or in the committed persistent world.
+
+| Evidence | Owner | Scenarios |
+| --- | --- | --- |
+| Manual authoring workflows | `web/tests/browser/test_map_editor_workflows.py`, `MapEditorWorkflows{Chromium,Firefox}Test` | Location, control point, footprint cell and district landmark in one session; node, two-way road, room, two-way connection, exterior endpoint (keyboard selector) and layout drag in another. After each operation exactly the owning document changed and the map core, run in the editor's interpreter, reloads the files with the new value; the final continental files load in a freshly started service. Chromium also copies the OMP context with a user gesture (Playwright grants no clipboard permission in Firefox, a deliberate gap). |
+| Continuous file following | same module, `MapEditorFollowing{ReferenceChromium,LargeChromium,ReferenceFirefox}Test` (1451x790 and 2560x1440) | Automatic adoption with the selection kept; a change held behind an open draft, resolved by 載入新版 (pointer) or Esc (keyboard) with no write; the fingerprint-guard race (an external replacement lands after the page built its command and before the service checks the disk: `stale_document`, external bytes kept, no merge or retry); malformed to corrected YAML with semantic work in progress; an old tab after a restart; an externally removed selection. |
+| Reflow and keyboard | `web/tests/browser/test_map_editor_accessibility.py` | The keyboard-only workflow and the viewport reflow (dense diagnostics, long Chinese names, a multiline description, 200 % zoom emulated as 725x395 at scale 2) in Chromium and Firefox. |
+| Independent jobs and deletion | `tests/test_map_editor_independent_environment.py` | Cancel and input change keep the prior artifact byte-identical until a current run publishes the core's own output; a current index refuses an externally referenced room, a missing index refuses every deletion while edits save; nothing else appears in the workspace and the editor interpreter has no game framework. |
+| Game adoption of final YAML | `world/maps/tests/test_editor_final_yaml_adoption.py` | A moved, occupied and observed node with an interior entrance and further gate, landmark or art dependents keeps its room, exits, occupant, home, inbound exits and knowledge ticks; static declarations resolve to the new position; a repeated synchronization changes nothing. A stale partition, a structural error and an invalid external reference leave the registry and the persistent baseline unchanged; removing a node whose room is still live (occupied and the destination of persisted exits) is refused by the prune guard and rolled back. |
+
+The game test stands in for the editor's partition regeneration by signing the
+committed artifact metadata for the candidate inputs, because the game reads
+the committed repository artifact and every settlement edit makes it stale.
+`partition_freshness` itself still runs (it compares the format, algorithm and
+source signature), and the stale case uses the committed artifact unchanged.
+
+Reproducible focused runs, from the repository root (build the frontend first,
+see §1):
+
+```console
+uv run --locked playwright install chromium firefox
+uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_workflows
+uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_accessibility
+uv run --locked python -m unittest tests.test_map_editor_independent_environment
+uv run --locked --env-file=<file> evennia test --settings test_settings.py --keepdb world.maps.tests.test_editor_final_yaml_adoption
+uv run --locked python -m tools.contract_gate
+```
+
+`<file>` contains `MUD_TEST_SETTINGS=1`. CI runs the same evidence without a
+separate entry point: the editor package tests in the preflight job
+(`tools/map-editor`, its own lock), the repository wrappers in the top-level
+job (`CI` turns an unavailable editor environment into a failure instead of a
+skip), the browser methods in the shards listed in
+`.github/browser-shards.json` (Chromium and Firefox are installed there and the
+editor frontend is built in both workspaces), and `world.maps` in its evennia
+shard. The full managed browser suite and `tools.spec_traceability verify
+--evidence` remain CI-owned.

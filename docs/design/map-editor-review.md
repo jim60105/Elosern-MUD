@@ -16,7 +16,9 @@ settlement screen of design §4.2 (see "Settlement tools review");
 entrances of design §4.4 and the deletion refusal of §5.4 (see "Entrance
 tools review"); `map-editor-partition-jobs` (P19), the 分區 chip actions,
 the regenerate control and the derived district outlines of design §3, §4.1
-and §5.1 (see "Partition jobs review").
+and §5.1 (see "Partition jobs review"); `map-editor-integrated-acceptance`
+(P20), the whole editor in Chromium and Firefox at both viewports (see
+"Integrated acceptance review").
 **Viewports:** 1451x790 (reference), 2560x1440, and 200 % zoom of the
 reference emulated as a 725x395 CSS viewport at device scale 2 (it reproduces
 the layout width, not every media feature of a real browser zoom).
@@ -28,6 +30,7 @@ the layout width, not every media feature of a real browser zoom).
 | Matches | The shell presents the scenario as the design describes. |
 | Shell ready | The shell's part (chips, banner, diagnostics, inspector, keyboard) is in place; the scenario's domain command arrives in the named later change. |
 | Withdrawn | The design withdrew the scenario. |
+| Flagged | The mechanism works; a person must decide whether the presentation is acceptable. |
 
 ## Shell-wide review
 
@@ -157,3 +160,26 @@ tone, wording and visual polish here; the tests establish only mechanisms.
 | Older-input output (§5.1, architecture §9) | Outlines of an artifact for older inputs fade to the warning tone. The canvas keeps the label ▲ 分區輸出屬於舊輸入 · 不可作為遊戲就緒 at the bottom right while they are shown, and the inspector repeats it. Judge the label's placement against the frame label at both viewports. | Matches |
 | Rejection during generation (§5.2) | A world-data edit during a job is refused by the service and shown in the banner slot as ▲「<command>」未存檔：分區產生中; layout edits still save. Browsing, inspection, search and cancellation stay available. | Matches |
 | Cancel after completion | A cancel that arrives after publication finds no running job; the chip and inspector show the completed state, with no rollback claim. | Matches |
+
+## Integrated acceptance review
+
+Rows for the whole editor in desktop Chromium and Firefox, delivered by
+`map-editor-integrated-acceptance` (P20), which replaced the withdrawn
+handoff/return smoke paths (design §9). The mechanism behind each row is
+established by the named test; the person reviewing judges how the
+scenario reads and looks at both viewports. "Flagged" marks an observation
+from the implementer's screenshots that a person should decide on.
+
+| Scenario (design §) | Owning test, viewports, browsers | Review notes | Disposition |
+| --- | --- | --- | --- |
+| Continental authoring session (§4.1) | `test_map_editor_workflows` `MapEditorWorkflows*Test`, 1451x790, Chromium and Firefox | Location, control point, footprint cell and landmark in one session; each writes only its owner and reloads in the core. | Matches |
+| Local map and interior session (§4.2–§4.4) | same, 1451x790, Chromium and Firefox | Node, two-way road, room, two-way connection, exterior endpoint by the keyboard selector, layout drag. | Matches |
+| Automatic adoption (§1.1) | `MapEditorFollowing*Test`, 1451x790 and 2560x1440, Chromium; 1451x790, Firefox | Silent apart from the 同步 chip time; selection and inspector kept. | Matches |
+| External change with a draft (§5.2 ③) | same | The banner names the document and the discarded drafts and history; 載入新版 discards the draft without writing (a pointer press no longer confirms the draft by blurring it), Esc resolves it from the keyboard. Tabbing to the banner button still confirms the draft by blur, which the guard then rejects; judge whether that is acceptable for keyboard users. | Matches (keyboard Tab path: Flagged) |
+| Fingerprint-guard race (§1.1) | same | The rejected save shows in the banner; the external version follows; nothing is merged or retried. | Matches |
+| Malformed then corrected YAML (§5.2 ④) | same | Stale badge and banner with `path:line — reason`; recovery is automatic and semantic diagnostics stay listed. | Matches |
+| Old tab after a restart (§5.2 ①) | same | 重新連線並讀取 is required before a write; nothing replayed. | Matches |
+| Inspector field width | screenshots of the draft and stale states at both viewports | At 1451x790 in Firefox and at 2560x1440 in Chromium the inspector's text inputs (名稱, 描述) reach past the column's right edge and are clipped; the page itself does not scroll horizontally. | Flagged |
+| Copy context for OMP (§1.1) | `MapEditorWorkflowsChromiumTest`, Chromium only | Playwright grants no clipboard permission in Firefox; the Firefox copy path is reviewed by hand. | Matches (Firefox: Flagged) |
+| Reflow, long names, 200 % zoom (§2) | `test_map_editor_accessibility`, all three layouts, Chromium and Firefox | Long Chinese node names wrap in the inspector heading; drawers at 200 %. | Matches |
+| Game readiness claims | manual check of chips, banner and strip | The editor never labels its static checks as live-save validation or game readiness; persistent safety stays with the game's adoption and synchronization (`world/maps/tests/test_editor_final_yaml_adoption.py`). | Matches |
