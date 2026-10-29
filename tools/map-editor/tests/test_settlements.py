@@ -324,23 +324,32 @@ def test_a_move_west_of_the_origin_re_origins_the_frame_without_moving_world_geo
     """The authored metres are the grid coordinate, so a negative drag shifts the frame."""
 
     editor = Editor(workspace)
+    before = {row["id"]: row["world_m"] for row in _settlement(editor.state())["nodes"]}
+    before_bytes = (workspace / SETTLEMENT).read_bytes()
     status, body = _send(editor, "move_nodes", SETTLEMENT, {"settlement_id": TOWN, "moves": [
-        {"node_id": "yard", "x_m": -100, "y_m": 400}]})
+        {"node_id": "yard", "x_m": -100, "y_m": -400}]})
     assert status == 200, body
     data = _data(workspace)
-    # Every node and bend translated by the same +100 m: the minimum is zero.
+    # Every node and bend translated by the same (+100, +400) m: both minima 0.
     assert {node_id: (node["x_m"], node["y_m"]) for node_id, node in data["nodes"].items()} == {
-        "gate": (100, 0),
-        "yard": (0, 400),
+        "gate": (100, 400),
+        "yard": (0, 0),
     }
-    assert data["roads"][1]["bends"] == [{"x_m": 400, "y_m": 0}]
+    assert data["roads"][1]["bends"] == [{"x_m": 400, "y_m": 400}]
     # World positions are the ones the author produced: the transform subtracts
     # the anchor node, which moved with its peers.
     settlement = _settlement(editor.state())
     assert {row["id"]: row["world_m"] for row in settlement["nodes"]} == {
         "gate": [5500, 5500],
-        "yard": [5400, 5900],
+        "yard": [5400, 5100],
     }
+    assert settlement["world_frame"]["local_anchor_m"] == [100, 400]
+    # One command, one undo entry: undo restores the exact previous bytes.
+    assert editor.undo()[0] == 200
+    assert (workspace / SETTLEMENT).read_bytes() == before_bytes
+    assert {row["id"]: row["world_m"] for row in _settlement(editor.state())["nodes"]} == before
+    assert editor.redo()[0] == 200
+    assert (workspace / SETTLEMENT).read_bytes() != before_bytes
 
 
 def test_a_node_of_another_settlement_is_a_cross_document_command(workspace):
