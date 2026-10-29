@@ -249,12 +249,29 @@ class WildernessEntryValidationTests(unittest.TestCase):
         "wilderness-gateway::wilderness-entry-registry-authored-data-is-validated-before-persistence"
     )
     def test_sync_all_refuses_to_mirror_malformed_registry(self):
-        from world.lore.sync import sync_all
+        from world.lore.sync import sync_all, search_script
+        from world.maps import runtime
         from world.maps.runtime import MapWorldError
+        from elosern_map_core.sources import make_source_document
 
-        with patch("world.maps.runtime.ensure_published", side_effect=MapWorldError(["malformed wilderness entry"])):
-            with self.assertRaises(MapWorldError):
-                sync_all()
+        saved = runtime._BUNDLE
+        runtime._uninstall()
+        try:
+            sources = list(runtime._read_sources(None))
+            malformed_sources = []
+            for src in sources:
+                if src.relative_path.endswith("capital_altoria.yaml"):
+                    text = src.text.replace('    - "#######"\n    - "#######"', '    - "......."\n    - "......."')
+                    malformed_sources.append(make_source_document(src.relative_path, text))
+                else:
+                    malformed_sources.append(src)
+            with patch("world.maps.runtime._read_sources", return_value=tuple(malformed_sources)):
+                with self.assertRaises(MapWorldError) as caught:
+                    sync_all()
+                self.assertIn("not 4-connected", str(caught.exception))
+        finally:
+            if saved is not None:
+                runtime._install(saved)
 
 class WildernessEntryBoundsTests(unittest.TestCase):
     def test_entry_cells_are_within_provider_bounds(self):

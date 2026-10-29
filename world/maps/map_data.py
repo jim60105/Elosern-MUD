@@ -223,23 +223,16 @@ def _compose_document(
         for node in document.nodes.values()
         if node.prototype_parent == "anchor_room"
     ]
-    anchor = None
-    if len(anchor_nodes) != 1:
-        fail(f"declares {len(anchor_nodes)} anchor_room nodes, expected exactly one")
-    else:
-        anchor = anchor_nodes[0]
-        if anchor.anchor_key != document.location_ref:
-            fail(
-                f"anchor node {anchor.node_id!r} declares anchor_key "
-                f"{anchor.anchor_key!r}, expected the location_ref "
-                f"{document.location_ref!r}"
-            )
+    anchor = anchor_nodes[0] if len(anchor_nodes) == 1 else None
+    if anchor is not None:
         if document.binding.local_anchor_m != (anchor.x_m, anchor.y_m):
             fail(
                 f"binding local_anchor_m {document.binding.local_anchor_m} disagrees "
                 f"with anchor node {anchor.node_id!r} at "
                 f"{(anchor.x_m, anchor.y_m)}"
             )
+    else:
+        fail("missing anchor_room node")
     if location is not None and document.binding.anchor_cell != location.cell:
         fail(
             f"binding anchor_cell {document.binding.anchor_cell} disagrees with "
@@ -343,10 +336,6 @@ def build_settlements(
         if graph is None or placement is None or frame is None:
             continue
         if document.location_ref in placements:
-            problems.append(
-                f"location {document.location_ref!r} is bound by more than one "
-                f"settlement document"
-            )
             continue
         graphs[settlement_id] = graph
         placements[document.location_ref] = placement

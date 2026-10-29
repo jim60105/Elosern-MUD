@@ -436,10 +436,17 @@ class AuthoringRequirementTests(unittest.TestCase):
             diagnose_settlement_rules,
             diagnose_interior_rules,
         )
+        from world.maps.map_data import build_settlements, SettlementError
 
         # 1. Valid control: no diagnostics
         valid_world = fixtures.loaded_world()
         self.assertEqual(valid_world.diagnostics, ())
+        game_snapshot = build_settlements(
+            valid_world.settlements,
+            valid_world.locations,
+            frame_cells=valid_world.continent.terrain.frame_cells,
+        )
+        self.assertTrue(game_snapshot.settlements)
         self.assertEqual(
             diagnose_settlement_rules(
                 valid_world.settlements,
@@ -450,7 +457,7 @@ class AuthoringRequirementTests(unittest.TestCase):
         )
         self.assertEqual(diagnose_interior_rules(valid_world.interiors), [])
 
-        # 2. Missing anchor room: saveable WIP in core, rejected by runtime compile
+        # 2. Missing anchor room: saveable WIP in core, rejected by runtime compile and game adoption
         no_anchor_data = fixtures.settlement_data()
         no_anchor_data["nodes"]["gate"]["prototype_parent"] = "grid_room"
         no_anchor_data["nodes"]["gate"]["anchor_key"] = None
@@ -459,8 +466,14 @@ class AuthoringRequirementTests(unittest.TestCase):
         with self.assertRaises(RuntimeRejection) as captured:
             compile_runtime(world, fixtures.valid_external(world), fixtures.current_freshness(world))
         self.assertIn("missing_anchor_room", {d.code for d in captured.exception.diagnostics})
+        with self.assertRaises(SettlementError):
+            build_settlements(
+                world.settlements,
+                world.locations,
+                frame_cells=world.continent.terrain.frame_cells,
+            )
 
-        # 3. Disconnected footprint: saveable WIP in core, rejected by runtime compile
+        # 3. Disconnected footprint: saveable WIP in core, rejected by runtime compile and game adoption
         disc_data = fixtures.settlement_data()
         disc_data["wilderness_entry"] = {
             "shape": ["#.#"],
@@ -472,6 +485,28 @@ class AuthoringRequirementTests(unittest.TestCase):
         with self.assertRaises(RuntimeRejection) as captured:
             compile_runtime(world_disc, fixtures.valid_external(world_disc), fixtures.current_freshness(world_disc))
         self.assertIn("disconnected_footprint", {d.code for d in captured.exception.diagnostics})
+        with self.assertRaises(SettlementError):
+            build_settlements(
+                world_disc.settlements,
+                world_disc.locations,
+                frame_cells=world_disc.continent.terrain.frame_cells,
+            )
+
+        # 4. Multiple anchor rooms: structure rejection in core and game adoption
+        multi_anchor_data = fixtures.settlement_data()
+        multi_anchor_data["nodes"]["plaza"]["prototype_parent"] = "anchor_room"
+        multi_anchor_data["nodes"]["plaza"]["anchor_key"] = "demo_location"
+        with self.assertRaises(AuthoringError) as core_captured:
+            load_authoring_world(fixtures.custom_sources(settlement=multi_anchor_data))
+        self.assertIn("multiple_anchor_rooms", {d.code for d in core_captured.exception.diagnostics})
+        cand_multi = document_from_data(fixtures.SETTLEMENT_PATH, multi_anchor_data)
+        with self.assertRaises(SettlementError) as game_captured:
+            build_settlements(
+                {"demo_map": cand_multi},
+                valid_world.locations,
+                frame_cells=valid_world.continent.terrain.frame_cells,
+            )
+        self.assertIn("expected at most one", str(game_captured.exception))
 
 
 if __name__ == "__main__":
