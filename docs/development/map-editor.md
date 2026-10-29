@@ -99,6 +99,24 @@ The two repository-level checks start the service as a child process from
 `uv sync --locked --project tools/map-editor`) with a scrubbed environment and
 an empty `PATH`, so neither the game's packages nor Node can be reached.
 
+### 1.2 Offline capture build
+
+The offline map capture page is a second build of the same frontend sources.
+It needs no service, dev server, Node runtime or network once built:
+
+```console
+pnpm --dir tools/map-editor/frontend run build:capture
+```
+
+That writes `tools/map-editor/frontend/capture-dist/index.html`: the map host
+and one classic (IIFE) script, a relative stylesheet and the same locally
+emitted font files as the editor, all addressed with relative paths so the page
+opens from a `file://` URL. `vite.capture.config.js` reuses the editor's
+aliases and the import boundary of §5; the normal `build` and `dist/` output
+are unchanged, and both build directories stay untracked. The generated page
+contains no authored payload — the runner calls
+`window.renderMapCapture(payload)` (§10).
+
 ## 2. API
 
 | Route | Purpose |
@@ -1128,3 +1146,137 @@ skip), the browser methods in the shards listed in
 editor frontend is built in both workspaces), and `world.maps` in its evennia
 shard. The full managed browser suite and `tools.spec_traceability verify
 --evidence` remain CI-owned.
+
+## 10. Offline Render Surface
+
+The capture page (§1.2) draws one authoring view from an in-memory payload. It
+reuses the editor's own drawing and theme and adds no second renderer, no
+service access and no mutation behaviour.
+
+### 10.1 Shared surface, separate hosts
+
+`src/components/MapSurface.vue` owns every painted map element: the dot-field
+background, the terrain preview raster, authored and derived shapes, links
+(bent roads, curved interior connections, the dashed exterior link) and marks
+(nodes, gate glyphs, locations, sites, fords, passes, control-point handles and
+the room/exterior cards), with every label drawn through text interpolation.
+It owns no camera, no selection and no chrome.
+
+`src/components/MapCanvas.vue` stays the interactive host: it measures the
+frame, fits the camera, pans and zooms, runs pointer and keyboard interaction,
+draws drag drafts, and renders the tool pill, zoom pill, north arrow, scale bar
+and coordinate frame. `src/capture.js` with
+`src/components/CaptureApp.vue` is the offline host: an exact pixel frame, an
+empty selection, no mutation handlers, no chrome and no workbench state.
+
+### 10.2 Capture request and coordinate frames
+
+`window.renderMapCapture({world, partition, view, map_id, width, height,
+bounds, hidden_layers})` resolves `{bounds, units, axes}` after the local font
+faces, the terrain raster and the laid-out paint are complete, and rejects with
+the underlying error otherwise (also left on `window.__mapCaptureState`). A
+partial render is never reported as ready.
+
+| `view` | Scene coordinates | `units` | `axes` | Boundary conversion |
+| --- | --- | --- | --- | --- |
+| `continent` | metres | `km` | `{x: "east", y: "north"}` | CLI kilometres ×1000; reported bounds ÷1000 |
+| `settlement` | metres | `m` | `{x: "east", y: "north"}` | none |
+| `interior` | north-positive layout units | `layout` | `{x: "right", y: "down"}` | CLI `[minX,minY,maxX,maxY]` → scene `[minX,-maxY,maxX,-minY]`; reported back in the same reverse order |
+
+`bounds` selects an explicit region in the CLI's frame; `null` fits the whole
+map. The scene boundary conversions and the camera arithmetic live in
+`src/lib/capture.js` and are pure, so the same rules can be checked without a
+browser.
+
+**Explicit region.** The requested rectangle keeps its centre and is grown on
+its narrower axis to the output aspect ratio, then mapped to the image edge
+with one uniform scale. Nothing is clamped, recentred or margin-padded:
+`[0,0,10,20]` kilometres at 200×100 pixels reports `[-15,0,25,20]`, and
+interior `[1,2,5,8]` at 100×100 reports `[0,2,6,8]`. A region with no objects,
+or one that reaches beyond the map, behaves identically, and content outside
+the region clips at the image edge.
+
+**Full-map fit.** The reference extent comes from the complete unfiltered
+scene: every authored point, every link vertex (authored road bends included),
+every mark anchor and the terrain raster corners. Because cards, glyphs and
+labels are pixel-sized, the fit then converges on what is actually painted —
+measured from the browser after the local fonts load — growing the extent
+monotonically for a bounded number of iterations (at most eight, settling
+below 0.5 % growth). The result keeps every painted card and label inside the
+image at a 1280×960 output; positive but tiny output sizes are still accepted,
+scaled uniformly, without an undocumented minimum size and without promising
+readable detail.
+
+Layer hiding never enters the camera: the fit is computed on the unfiltered
+scene, so the camera, the reported bounds and the background are identical
+whatever the caller hides.
+
+### 10.3 Layer ownership
+
+Every layer defaults to on for a capture, independently of the editor's stored
+preferences and without writing or reading them.
+
+| `view` | Geometry layers | Labels |
+| --- | --- | --- |
+| `continent` | `terrain` (mainland, terrain/passability raster, forest edge), `water` (waterways), `ridge` (ridge walls, passes, fords), `locations` (locations and reserved harbour sites), `footprint` (settlement footprints), `partition` (derived national borders and district outlines) | `labels` |
+| `settlement` | `nodes` (node marks including gate glyphs), `roads` (authored directed bent links) | `labels` |
+| `interior` | `rooms` (room cards), `connections` (within-interior links and their direction chevrons), `exterior` (the doorway card and its dashed link) | `labels` |
+
+Hiding a geometry layer removes that layer's drawables together with their own
+labels; `labels` removes text only, so cards, glyphs and direction indicators
+stay. `nodes`/`rooms` and `roads`/`connections` are independent in both
+directions. Hiding every applicable layer leaves the normal background (the
+dot field for the metric views, the page gradient for an interior) at the same
+camera.
+
+### 10.4 Verification
+
+Focused runs, from the repository root (build both outputs first, §1 and
+§1.2):
+
+```console
+cd tools/map-editor/frontend
+node --test tests/capture.test.mjs          # frames, aspect expansion, layers
+node scripts/import-boundary.mjs            # the §5 allowlist, capture output excluded
+pnpm run build && pnpm run build:capture     # editor and capture bundles
+cd ../../..
+uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_capture_surface
+```
+
+`web/tests/browser/test_map_capture_surface.py` opens the built page from
+`file://` with every HTTP and HTTPS request aborted. It renders the synthetic
+workspace's three views, asserts the exact reported bounds and the projected
+mark positions for a requested region, checks that measured labels and cards
+lie inside the image, walks every view's layers (geometry alone, labels alone,
+everything hidden at an unchanged camera), confirms authored hostile text and
+URL-shaped names stay inert, and proves a missing script never reports
+readiness. `MapSurfaceEditorSmokeBrowserTest` in the same module drives the
+extracted surface through the interactive host: a click selects one mark, a
+pointer drag pans by exactly the pointer travel without writing anything, the
+zoom pill changes the level and 適配 restores it, and one node drag is exactly
+one `move_nodes` command that changes only the settlement document.
+
+### 10.5 Human review record
+
+Reviewed 2026-10-29 against the synthetic workspace (its place names, one
+river with a ford, one ridge pass, two settlement nodes with two directed
+roads, two interior rooms with a two-way connection and an exterior card),
+rendered by the commands above and captured per view at 1280×960:
+
+- **Continent**: map-only composition with no header, navigation, inspector,
+  tools, zoom controls, frame text, badge, selection ring or handle; the
+  mainland boundary, forest edge, river, ford, ridge walls and terrain preview
+  raster read in the editor's own colours; 合成城, 合成荒野, 隘口 1（4–5）and
+  `synthetic_river · 渡口 1` are legible at the 16 px floor with no clipped or
+  substituted glyphs.
+- **Settlement**: dot-field background with the gate glyph, the yard node and
+  both bent roads; `Gate` and `Yard` sit fully inside the image with visible
+  margin, and no direction chevron appears without a selection (unchanged from
+  the editor).
+- **Interior**: three cards (the dashed exterior card naming the other map and
+  node, 前廳/front, 後室/back), two curved arrows with one chevron each and the
+  `in ⇄ out` connection text; 前廳 and 後室 render from the local Traditional
+  Chinese faces without clipping.
+- **Explicit region** `[0,0,10,20]` kilometres at 200×100: the image is exactly
+  the requested extent (reported `[-15,0,25,20]`) and content beyond it clips
+  at the edge, as intended for a regional capture.
