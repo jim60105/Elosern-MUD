@@ -542,48 +542,98 @@ def _project(world, layouts: Mapping[str, dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def read_workspace(workspace: ConfinedWorkspace, limits: Limits) -> WorkspaceRead:
-    """One fresh confined read of the complete workspace."""
+# -- shared load and projection --------------------------------------------
+@dataclass(frozen=True, slots=True)
+class SourceLoad:
+    """One confined source/layout/core load and its projection (never writes).
+
+    ``read_workspace`` and the capture adapter consume this operation and apply
+    their own policy to :attr:`structure`: the interactive editor keeps a
+    partial layout projection and reports the diagnostics, while capture
+    refuses it.
+    """
+
+    #: The loaded immutable authoring world, or ``None`` when the source set
+    #: could not be loaded at all.
+    world: Any | None
+    #: The JSON-ready projection of :attr:`world` (``None`` without a world).
+    projection: dict[str, Any] | None
+    #: Every diagnostic the layout documents produced.
+    layout_diagnostics: tuple[Diagnostic, ...]
+    #: The structure-category diagnostics of this read: a non-empty value means
+    #: the sources or layouts cannot be admitted by a caller that requires a
+    #: structurally sound workspace.
+    structure: tuple[Diagnostic, ...]
+    #: ``(relative_path, presence)`` for the world sources and layouts.
+    fingerprints: tuple[tuple[str, str], ...]
+    #: ``{relative_path, fingerprint}`` of the readable world sources.
+    source_rows: tuple[dict[str, str], ...]
+
+
+def load_sources(workspace: ConfinedWorkspace, limits: Limits) -> SourceLoad:
+    """Discover the workspace sources once, read each once, load and project it."""
 
     sources, refused, fingerprints = read_sources(workspace, limits, workspace.discover_world())
     layout_sources, layout_refused, layout_fingerprints = _read_layout_sources(workspace, limits)
     presence = tuple(sorted({**fingerprints, **layout_fingerprints}.items()))
-    context = read_external_context(workspace, limits)
-    external = context.status
-    document_rows = tuple(
+    source_rows = tuple(
         {"relative_path": source.relative_path, "fingerprint": source.fingerprint}
         for source in sorted(sources, key=lambda item: item.relative_path)
     )
     if refused:
-        partition, _ = _partition_status(workspace, limits, None)
-        return WorkspaceRead(
-            loaded=False,
-            documents=document_rows,
+        return SourceLoad(
             world=None,
-            diagnostics=tuple(item.as_dict() for item in sorted_diagnostics(refused)),
-            external_context_status=external,
-            partition_status=partition,
+            projection=None,
+            layout_diagnostics=(),
+            structure=tuple(sorted_diagnostics(refused)),
             fingerprints=presence,
+            source_rows=source_rows,
         )
     try:
         world = load_authoring_world(sources)
     except AuthoringError as error:
+        return SourceLoad(
+            world=None,
+            projection=None,
+            layout_diagnostics=(),
+            structure=error.diagnostics,
+            fingerprints=presence,
+            source_rows=source_rows,
+        )
+    layouts, layout_diagnostics = _parse_layouts(layout_sources, layout_refused)
+    return SourceLoad(
+        world=world,
+        projection=_project(world, layouts),
+        layout_diagnostics=sorted_diagnostics(layout_diagnostics),
+        structure=tuple(item for item in layout_diagnostics if item.category == STRUCTURE),
+        fingerprints=presence,
+        source_rows=source_rows,
+    )
+
+
+def read_workspace(workspace: ConfinedWorkspace, limits: Limits) -> WorkspaceRead:
+    """One fresh confined read of the complete workspace."""
+
+    load = load_sources(workspace, limits)
+    context = read_external_context(workspace, limits)
+    external = context.status
+    if load.world is None:
         partition, _ = _partition_status(workspace, limits, None)
         return WorkspaceRead(
             loaded=False,
-            documents=document_rows,
+            documents=load.source_rows,
             world=None,
-            diagnostics=tuple(item.as_dict() for item in error.diagnostics),
+            diagnostics=tuple(item.as_dict() for item in load.structure),
             external_context_status=external,
             partition_status=partition,
-            fingerprints=presence,
+            fingerprints=load.fingerprints,
         )
-    layouts, layout_diagnostics = _parse_layouts(layout_sources, layout_refused)
+    world = load.world
     partition, freshness = _partition_status(workspace, limits, world)
     diagnostics = sorted_diagnostics(
-        (*diagnose_world(world, partition_freshness=freshness), *layout_diagnostics)
+        (*diagnose_world(world, partition_freshness=freshness), *load.layout_diagnostics)
     )
-    projection = _project(world, layouts)
+    projection = load.projection
     incoming = _incoming_references(context, projection)
     identifiers = _scene_statuses(context, projection)
     documents = tuple(
@@ -603,7 +653,7 @@ def read_workspace(workspace: ConfinedWorkspace, limits: Limits) -> WorkspaceRea
         diagnostics=tuple(item.as_dict() for item in diagnostics),
         external_context_status=external,
         partition_status=partition,
-        fingerprints=presence,
+        fingerprints=load.fingerprints,
         external_incoming_references=incoming,
         external_identifiers=identifiers,
         authoring=world,
@@ -663,7 +713,9 @@ def _incoming_references(context: ExternalContext, projection: Mapping[str, Any]
 
 __all__ = [
     "ExternalContext",
+    "SourceLoad",
     "WorkspaceRead",
+    "load_sources",
     "read_external_context",
     "read_sources",
     "read_workspace",
