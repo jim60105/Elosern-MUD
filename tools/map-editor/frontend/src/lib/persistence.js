@@ -68,7 +68,6 @@ const COMMAND_LABELS = {
   create_district: "建立分區",
   set_district_field: "修改分區",
   set_footprint_cell: "修改佔地格",
-  set_binding: "修改綁定",
   undo: "復原",
   redo: "重做",
 };

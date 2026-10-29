@@ -153,19 +153,24 @@ class GeographyProcessTests(unittest.TestCase):
         self.assertEqual(self.changed(before), set())
 
     @covers_requirement("map-editor-geography::continental-authored-inputs-have-direct-and-explicit-editing-controls")
-    def test_footprint_and_binding_write_only_the_settlement(self):
+    def test_footprint_writes_only_the_settlement_and_binding_is_gone(self):
         editor = self.start()
         before = synthetic.tree_digest(self.workspace)
         status, _ = self.send(editor, "set_footprint_cell", SETTLEMENT,
                               {"settlement_id": synthetic.SETTLEMENT_ID, "cell": [6, 5], "filled": True})
         self.assertEqual(status, 200)
+        # The removed command is unknown and writes nothing.
         status, _ = self.send(editor, "set_binding", SETTLEMENT,
                               {"settlement_id": synthetic.SETTLEMENT_ID, "anchor_cell": [6, 5], "local_anchor_m": [0, 0]})
-        self.assertEqual(status, 200)
+        self.assertEqual(status, 404)
         self.assertEqual(self.changed(before), {SETTLEMENT})
         settlement = editor.workspace_state()["world"]["settlements"][0]
         self.assertEqual(settlement["footprint"]["cells"], [[5, 5], [6, 5]])
-        self.assertEqual(settlement["binding"]["anchor_cell"], [6, 5])
+        # Growth to the east keeps the origin, so the offset stays (0, 0).
+        self.assertEqual(settlement["footprint"]["offset"], [0, 0])
+        self.assertEqual(settlement["footprint"]["shape"], ["##"])
+        self.assertNotIn("binding", settlement)
+        self.assertEqual(settlement["world_frame"], {"anchor_cell": [5, 5], "local_anchor_m": [0, 0]})
 
     def test_a_stale_preview_rejects_geography_commands(self):
         editor = self.start()

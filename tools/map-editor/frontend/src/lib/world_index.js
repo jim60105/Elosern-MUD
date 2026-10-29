@@ -77,7 +77,12 @@ function nodeRecord(settlement, node) {
       row("原型", node.prototype_parent),
       row("錨點地點", node.anchor_key),
       row("位置", `${node.local_m[0]} m 東, ${node.local_m[1]} m 北（地方）`),
-      row("世界座標", `${node.world_m[0]} m 東, ${node.world_m[1]} m 北`),
+      row(
+        "世界座標",
+        node.world_m
+          ? `${node.world_m[0]} m 東, ${node.world_m[1]} m 北`
+          : "未定（缺錨點房間或地點）",
+      ),
       row("場景", node.scene_archetype),
       row("描述", node.desc),
     ],

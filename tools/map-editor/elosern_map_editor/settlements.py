@@ -3,17 +3,22 @@
 Every handler writes exactly one document,
 ``content/maps/settlements/<settlement_id>.yaml``:
 
-``create_settlement`` ``{settlement_id, location_id, anchor_cell, local_anchor_m, options}``
+``create_settlement`` ``{settlement_id, location_id, options}``
     Create a new local map for an existing location (expected presence
     ``absent``). The document starts with no nodes and no roads: the core
     diagnoses it as an unfinished (``empty_graph``) map, never a playable
     one. Nothing is written to the location document; a location's local
-    maps are derived from ``location_ref``.
+    maps are derived from ``location_ref``, and the world frame comes from
+    that location's cell plus the ``anchor_room`` node the map later declares,
+    so creation authors no coordinate at all.
 ``set_settlement_field`` ``{settlement_id, field, value}``
     ``options`` (``{map_visual_range, map_mode}``) or ``exit_prototype``
     (``{prototype_parent, typeclass}``); ``null`` removes the optional mapping.
 ``create_node`` ``{settlement_id, node_id, fields}``
-    A new stable node ID with every node field given explicitly.
+    A new stable node ID with every node field given explicitly. The first
+    node of an empty map becomes the ``anchor_room`` of its location
+    (``anchor_key`` equal to ``location_ref``), keeping the entered ID,
+    position and other fields; later nodes keep their authored prototypes.
 ``duplicate_node`` ``{settlement_id, node_id, new_node_id, x_m, y_m}``
     A new node with a new stable ID copying the ordinary values (name,
     description, typeclass, scene and prototype). No relationship is copied:
@@ -197,7 +202,7 @@ class CreateSettlement:
     """Create one new settlement document (the only owner it writes)."""
 
     name = "create_settlement"
-    keys = frozenset({"settlement_id", "location_id", "anchor_cell", "local_anchor_m", "options"})
+    keys = frozenset({"settlement_id", "location_id", "options"})
 
     def target(self, world: dict[str, Any], envelope: Envelope) -> str:
         arguments = envelope.arguments
@@ -205,14 +210,6 @@ class CreateSettlement:
             raise _invalid(f"arguments carry exactly {', '.join(sorted(self.keys))}")
         settlement_id = _identifier(arguments["settlement_id"], "settlement_id")
         location_id = _identifier(arguments["location_id"], "location_id")
-        anchor = arguments["anchor_cell"]
-        if (
-            not isinstance(anchor, list)
-            or len(anchor) != 2
-            or not all(isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= MAX_METRES for value in anchor)
-        ):
-            raise _invalid("anchor_cell is [cell_x, cell_y] of non-negative integers")
-        _point(arguments["local_anchor_m"], "local_anchor_m")
         _options(arguments["options"], "options")
         owner = settlement_document(settlement_id)
         if envelope.document_id != owner:
@@ -228,20 +225,17 @@ class CreateSettlement:
             raise _unknown("location", location_id, "arguments.location_id")
         return owner
 
-    def effect(self, envelope: Envelope, current: Current) -> Effect | None:
+    def effect(
+        self, envelope: Envelope, current: Current, world: dict[str, Any]
+    ) -> Effect | None:
         if current.text is not None:
             raise CommandError(409, "stale_document", f"{envelope.document_id} already exists")
         arguments = envelope.arguments
-        east, north = arguments["local_anchor_m"]
         data: dict[str, Any] = {
             "version": 1,
             "kind": "settlement",
             "id": arguments["settlement_id"],
             "location_ref": arguments["location_id"],
-            "binding": {
-                "anchor_cell": {"cell_x": arguments["anchor_cell"][0], "cell_y": arguments["anchor_cell"][1]},
-                "local_anchor_m": {"east_m": east, "north_m": north},
-            },
         }
         options = _options(arguments["options"], "options")
         if options is not None:
@@ -299,7 +293,14 @@ class CreateNode(_Settlement):
         if node_id in data["nodes"]:
             raise _duplicate(node_id, "arguments.node_id")
         fields = arguments["fields"]
-        data["nodes"][node_id] = {key: fields[key] for key in CREATE_NODE_FIELDS}
+        node = {key: fields[key] for key in CREATE_NODE_FIELDS}
+        if not data["nodes"]:
+            # The map's first node is its anchor: it is the local metre point
+            # that sits on the location cell's centre, so a location drag moves
+            # the whole graph without any authored coordinate.
+            node["prototype_parent"] = "anchor_room"
+            node["anchor_key"] = data["location_ref"]
+        data["nodes"][node_id] = node
 
 
 class DuplicateNode(_Settlement):

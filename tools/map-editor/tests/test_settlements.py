@@ -71,7 +71,7 @@ def _create_node(editor, node_id="well", x=600, y=0, **overrides):
 
 def _create_map(editor, **overrides):
     arguments = {"settlement_id": "wild_camp", "location_id": fixture.BARE_LOCATION_ID,
-                 "anchor_cell": [30, 12], "local_anchor_m": [0, 0], "options": None}
+                 "options": None}
     arguments.update(overrides)
     return _send(editor, "create_settlement", NEW_MAP, arguments)
 
@@ -108,8 +108,9 @@ def test_a_new_local_map_writes_only_its_document_and_stays_unfinished(workspace
         ({"settlement_id": TOWN}, 400, "cross_document"),
         ({"location_id": "ghost"}, 422, "validation_failed"),
         ({"settlement_id": "../escape"}, 400, "invalid_command"),
-        ({"anchor_cell": [-1, 2]}, 400, "invalid_command"),
-        ({"local_anchor_m": [1.5, 0]}, 400, "invalid_command"),
+        # The removed creation frame arguments are unknown, never accepted.
+        ({"anchor_cell": [30, 12]}, 400, "invalid_command"),
+        ({"local_anchor_m": [0, 0]}, 400, "invalid_command"),
         ({"options": {"map_mode": "nodes"}}, 400, "invalid_command"),
         ({"options": {"map_visual_range": 0, "map_mode": "nodes"}}, 422, "validation_failed"),
     ],
@@ -127,7 +128,7 @@ def test_an_existing_settlement_id_is_refused(workspace):
     before = fixture.tree_digest(workspace)
     status, body = _send(editor, "create_settlement", SETTLEMENT,
                          {"settlement_id": TOWN, "location_id": fixture.LOCATION_ID,
-                          "anchor_cell": [5, 5], "local_anchor_m": [0, 0], "options": None})
+                          "options": None})
     assert (status, body["error"]["diagnostics"][0]["code"]) == (422, "duplicate_identifier")
     assert fixture.tree_digest(workspace) == before
 

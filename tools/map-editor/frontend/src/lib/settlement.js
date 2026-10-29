@@ -216,13 +216,8 @@ const command = (name, settlementId, args) => ({
   arguments: { settlement_id: settlementId, ...args },
 });
 
-export const createSettlement = (settlementId, locationId, anchorCell, localAnchor, options) =>
-  command("create_settlement", settlementId, {
-    location_id: locationId,
-    anchor_cell: anchorCell,
-    local_anchor_m: localAnchor,
-    options,
-  });
+export const createSettlement = (settlementId, locationId, options) =>
+  command("create_settlement", settlementId, { location_id: locationId, options });
 export const settlementField = (settlementId, field, value) => command("set_settlement_field", settlementId, { field, value });
 export const createNode = (settlementId, nodeId, fields) => command("create_node", settlementId, { node_id: nodeId, fields });
 export const duplicateNode = (settlementId, nodeId, newNodeId, [x, y]) =>

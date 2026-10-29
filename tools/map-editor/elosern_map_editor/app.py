@@ -690,9 +690,10 @@ class EditorService(_PartitionMethods):
         else:
             assert self.published is not None and self.published.world is not None
             handler = HANDLERS[name]
-            handler.target(self.published.world, envelope)
+            world = self.published.world
+            handler.target(world, envelope)
             current = self._current(envelope.document_id, envelope.expected)
-            effect = handler.effect(envelope, current)
+            effect = handler.effect(envelope, current, world)
             if effect is None:
                 return {**self.status(), "changed": False, "document_id": envelope.document_id,
                         "fingerprint": current.fingerprint}

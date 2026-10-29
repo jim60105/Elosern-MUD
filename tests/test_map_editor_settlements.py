@@ -98,8 +98,7 @@ class SettlementProcessTests(unittest.TestCase):
         editor = self.start()
         before = synthetic.tree_digest(self.workspace)
         status, body = self.send(editor, "create_settlement", NEW_MAP, {
-            "settlement_id": "wild_camp", "location_id": synthetic.BARE_LOCATION_ID, "anchor_cell": [30, 12],
-            "local_anchor_m": [0, 0], "options": None})
+            "settlement_id": "wild_camp", "location_id": synthetic.BARE_LOCATION_ID, "options": None})
         self.assertEqual(status, 200, body)
         self.assertEqual(self.changed(before), {NEW_MAP})
         self.assertEqual(_sha(self.workspace / LOCATIONS), before[LOCATIONS])

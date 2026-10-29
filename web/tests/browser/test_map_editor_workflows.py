@@ -119,6 +119,66 @@ def _settlement_with_yard_at(x_m: int, **changes) -> str:
     return synthetic.yaml_text(data)
 
 
+def _derived_geometry(core: dict) -> dict:
+    """A settlement's derived geometry, computed independently of the core.
+
+    ``world_m = location cell centre + local metres - anchor node position``
+    and the mask origin is the location cell plus the authored offset. Nothing
+    here calls the implementation under test.
+    """
+
+    location = core["documents"][LOCATIONS]["locations"][synthetic.LOCATION_ID]
+    cell = (location["cell"]["cell_x"], location["cell"]["cell_y"])
+    settlement = core["documents"][SETTLEMENT]
+    nodes = settlement["nodes"]
+    anchor = next(
+        node for node in nodes.values() if node["prototype_parent"] == "anchor_room"
+    )
+    entry = settlement["wilderness_entry"]
+    origin = (cell[0] + entry["offset"]["dx"], cell[1] + entry["offset"]["dy"])
+    hashes = [
+        (origin[0] + column, origin[1] + row)
+        for row, line in enumerate(entry["shape"])
+        for column, character in enumerate(line)
+        if character == "#"
+    ]
+    mask_rows = [
+        row
+        for row, line in enumerate(entry["shape"])
+        for character in line
+        if character == "#"
+    ]
+    mask_columns = [
+        column
+        for line in entry["shape"]
+        for column, character in enumerate(line)
+        if character == "#"
+    ]
+    midpoint = (
+        origin[0] + (min(mask_columns) + max(mask_columns)) // 2,
+        origin[1] + (min(mask_rows) + max(mask_rows)) // 2,
+    )
+    # The synthetic entry is a one-cell point mask: its single hash cell is the
+    # approach cell for every authored gate.
+    approaches = {
+        gate["return_direction"]: list(midpoint) for gate in entry["gates"]
+    }
+    return {
+        "cell": cell,
+        "world_m": {
+            node_id: [
+                1000 * cell[0] + 500 + node["x_m"] - anchor["x_m"],
+                1000 * cell[1] + 500 + node["y_m"] - anchor["y_m"],
+            ]
+            for node_id, node in nodes.items()
+        },
+        "origin": list(origin),
+        "mask_cells": sorted(list(hash_cell) for hash_cell in hashes),
+        "midpoint": list(midpoint),
+        "approach_cells": approaches,
+    }
+
+
 class _EditorBrowser(unittest.TestCase):
     BROWSER = "chromium"
     VIEWPORT = REFERENCE
@@ -233,9 +293,10 @@ class _EditorBrowser(unittest.TestCase):
         self.assertLessEqual(box["x"] + box["width"], self.VIEWPORT[0] + 0.5)
         self.assertLessEqual(box["y"] + box["height"], self.VIEWPORT[1] + 0.5)
 
-    def drag(self, locator, dx: float, dy: float) -> None:
+    def drag(self, locator, dx: float, dy: float, *, offset=(0.0, 0.0)) -> None:
         box = locator.bounding_box()
-        x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+        x = box["x"] + box["width"] / 2 + offset[0]
+        y = box["y"] + box["height"] / 2 + offset[1]
         self.page.mouse.move(x, y)
         self.page.mouse.down()
         for index in range(1, 6):
@@ -313,6 +374,95 @@ class _AuthoringWorkflows(_EditorBrowser):
         self.assertEqual(state["preview_state"], "current")
         self.assertIn("synthetic_ruin", {row["id"] for row in state["world"]["locations"]})
         self.assertEqual(self.core()["fingerprint"], final)
+
+    def location_drag_workflow(self) -> None:
+        """One drag of a settlement-backed location, then undo, redo and restart."""
+
+        self.start()
+        page = self.open()
+        mark = page.locator(f'[data-qualified-ref="location:{synthetic.LOCATION_ID}"]')
+        mark.wait_for()
+        self.assertEqual(mark.get_attribute("data-draggable"), "true")
+        # The group's box also covers its label, which takes no pointer events;
+        # drag the mark's own hit circle.
+        hit = mark.locator("circle.map-mark__hit")
+        settlement_bytes = _sha(self.workspace / SETTLEMENT)
+        locations_bytes = _sha(self.workspace / LOCATIONS)
+        before = _derived_geometry(self.core())
+        self.mark()
+
+        # One drag: one location-cell command and one history entry.
+        # Two cells east and one north: the 40-cell frame fits the reference
+        # viewport, so a smaller delta can stay inside one cell.
+        # The neighbouring pass mark covers the top half of this mark's hit
+        # area, so the drag starts on its lower half.
+        self.drag(hit, 60, -45, offset=(0, 12))
+        self.wait_for(
+            lambda: self.data(LOCATIONS)["locations"][synthetic.LOCATION_ID]["cell"]
+            != {"cell_x": before["cell"][0], "cell_y": before["cell"][1]},
+            "the location was not moved",
+        )
+        core = self.step("set_location_field", LOCATIONS)
+        after = _derived_geometry(core)
+        self.assertNotEqual(after["cell"], before["cell"])
+        delta = (after["cell"][0] - before["cell"][0], after["cell"][1] - before["cell"][1])
+        # The settlement document is byte-identical: the location is the only
+        # authored authority the gesture wrote.
+        self.assertEqual(_sha(self.workspace / SETTLEMENT), settlement_bytes)
+        for node_id, position in before["world_m"].items():
+            self.assertEqual(
+                after["world_m"][node_id],
+                [position[0] + 1000 * delta[0], position[1] + 1000 * delta[1]],
+                node_id,
+            )
+        self.assertEqual(
+            after["origin"], [before["origin"][0] + delta[0], before["origin"][1] + delta[1]]
+        )
+        self.assertEqual(
+            after["mask_cells"],
+            [[cell[0] + delta[0], cell[1] + delta[1]] for cell in before["mask_cells"]],
+        )
+        self.assertEqual(
+            after["midpoint"],
+            [before["midpoint"][0] + delta[0], before["midpoint"][1] + delta[1]],
+        )
+        for direction, cell in before["approach_cells"].items():
+            self.assertEqual(
+                after["approach_cells"][direction],
+                [cell[0] + delta[0], cell[1] + delta[1]],
+                direction,
+            )
+        # A centred point entry: the mask midpoint is the location cell.
+        self.assertEqual(list(after["cell"]), after["midpoint"])
+
+        # One undo returns the location, and with it every derived value.
+        page.keyboard.press("Control+z")
+        self.step("undo", LOCATIONS)
+        self.assertEqual(_sha(self.workspace / LOCATIONS), locations_bytes)
+        self.assertEqual(_derived_geometry(self.core()), before)
+
+        # One redo restores the moved world.
+        page.keyboard.press("Control+Shift+z")
+        self.step("redo", LOCATIONS)
+        self.assertEqual(_derived_geometry(self.core()), after)
+
+        # A freshly started service derives the same translated geometry.
+        self.editor.__exit__(None, None, None)
+        with harness.EditorProcess(self.workspace) as fresh:
+            state = fresh.workspace_state()
+        self.assertEqual(state["preview_state"], "current")
+        settlement = state["world"]["settlements"][0]
+        self.assertEqual(
+            {node["id"]: node["world_m"] for node in settlement["nodes"]},
+            {node_id: list(position) for node_id, position in after["world_m"].items()},
+        )
+        self.assertEqual(
+            settlement["footprint"]["cells"], after["mask_cells"]
+        )
+        self.assertEqual(
+            [row["approach_cell"] for row in settlement["wilderness_entry"]["gates"]],
+            [after["approach_cells"][row["return_direction"]] for row in settlement["wilderness_entry"]["gates"]],
+        )
 
     def local_map_workflow(self, *, copy_context: bool = False) -> None:
         self.start()
@@ -440,6 +590,9 @@ class MapEditorWorkflowsChromiumTest(_AuthoringWorkflows):
     def test_local_map_and_interior_authoring_reloads_in_the_core_after_every_operation(self):
         self.local_map_workflow(copy_context=True)
 
+    def test_a_location_drag_is_one_command_and_undo_redo_and_restart_agree(self):
+        self.location_drag_workflow()
+
 
 class MapEditorWorkflowsFirefoxTest(_AuthoringWorkflows):
     BROWSER = "firefox"
@@ -451,6 +604,9 @@ class MapEditorWorkflowsFirefoxTest(_AuthoringWorkflows):
         # Playwright grants no clipboard permissions in Firefox: the copied
         # context is checked in Chromium only.
         self.local_map_workflow()
+
+    def test_a_location_drag_is_one_command_and_undo_redo_and_restart_agree(self):
+        self.location_drag_workflow()
 
 
 # -- continuous file following ---------------------------------------------------

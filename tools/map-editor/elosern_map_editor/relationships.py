@@ -8,8 +8,8 @@ Settlement-owned (``content/maps/settlements/<settlement_id>.yaml``):
 
 ``create_wilderness_gate`` ``{settlement_id, return_direction, node}``
     One wilderness gate onto a node of this settlement. A settlement without
-    a wilderness entry gets a one-cell point entry at its binding's anchor
-    cell, which the continent footprint tool can then grow.
+    a wilderness entry gets a one-cell point entry at offset ``(0,0)`` from its
+    location cell, which the continent footprint tool can then grow.
 ``set_wilderness_gate`` ``{settlement_id, return_direction, value: {return_direction, node}}``
 ``delete_wilderness_gate`` ``{settlement_id, return_direction}``
     The last gate is refused: an entry keeps at least one gate.
@@ -191,10 +191,12 @@ class CreateWildernessGate(_SettlementEntrance):
         gate = {"return_direction": arguments["return_direction"], "destination_node": node_id}
         entry = data.get("wilderness_entry")
         if entry is None:
-            # A point entry at the binding's anchor cell (no footprint cells).
+            # A point entry at the settlement's location cell: offset (0,0)
+            # means the single hash sits on that cell, so no document authors
+            # a geographic coordinate and a later location move carries it.
             data["wilderness_entry"] = {
                 "shape": ["#"],
-                "origin": dict(data["binding"]["anchor_cell"]),
+                "offset": {"dx": 0, "dy": 0},
                 "gates": [gate],
             }
             return

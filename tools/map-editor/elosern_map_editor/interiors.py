@@ -194,7 +194,9 @@ class CreateInterior:
         _refuse_taken_room(world, room_id, "arguments.room_id")
         return owner
 
-    def effect(self, envelope: Envelope, current: Current) -> Effect | None:
+    def effect(
+        self, envelope: Envelope, current: Current, world: dict[str, Any]
+    ) -> Effect | None:
         if current.text is not None:
             raise CommandError(409, "stale_document", f"{envelope.document_id} already exists")
         arguments = envelope.arguments
@@ -229,7 +231,9 @@ class DeleteInterior:
             raise _cross_document(owner)
         return owner
 
-    def effect(self, envelope: Envelope, current: Current) -> Effect | None:
+    def effect(
+        self, envelope: Envelope, current: Current, world: dict[str, Any]
+    ) -> Effect | None:
         if current.text is None:
             raise CommandError(409, "stale_document", f"{envelope.document_id} does not exist")
         return Effect(REMOVE, envelope.document_id)
@@ -528,7 +532,9 @@ class ArrangeInteriorLayout:
                 raise _unknown("room", room_id, "arguments.positions")
         return owner
 
-    def effect(self, envelope: Envelope, current: Current) -> Effect | None:
+    def effect(
+        self, envelope: Envelope, current: Current, world: dict[str, Any]
+    ) -> Effect | None:
         return layout_effect(
             envelope.document_id, current, envelope.arguments["interior_id"],
             self._positions(envelope.arguments["positions"]),
