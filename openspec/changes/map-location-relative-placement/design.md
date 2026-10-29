@@ -94,11 +94,11 @@ First record a temporary, read-only baseline from committed pre-change sources, 
 
 For unchanged committed geography, regenerate from the converted candidate and compare the complete serialized partition after excluding only `source_signature`; the geometric input fingerprint, owner data, outlines and all other fields must match the committed artifact. `partition_codec.partition_source_signature` hashes raw file fingerprints, so schema-only edits necessarily change that metadata. Do not spoof the old signature or weaken freshness to obtain whole-file equality. Run both the skill regeneration `--check` and `tools.map_district_partition --check` against the newly generated artifact.
 
-Then recover the current live session deliberately. It has already been applied by another process and the stash is empty according to the assignment; do not apply/drop a stash or replace any source from HEAD. Preserve Ciaran node positions, Ciaran location `(1366,554)` pending confirmation, and Fionnen `(1465,1237)`. The stale Ciaran absolute origin is evidence of the bug, so subtracting its old origin from the already-moved location would encode the bug as a nonzero offset. Instead carry the committed location-relative offset established above (currently a centered point entry) into the live document, preserving its intended moved entrance. Recompute local anchor from the edited anchor node, never from stale binding.
+Then recover the current live session deliberately. It has already been applied by another process and the stash is empty according to the assignment; do not apply/drop a stash or replace any source from HEAD. The user confirmed Ciaran's location `(1366,554)` is intended. Keep it, Fionnen `(1465,1237)` and the edited Ciaran node positions. The stale Ciaran absolute origin is evidence of the bug, so subtracting its old origin from the already-moved location would encode the bug as a nonzero offset. Instead carry the committed location-relative offset established above (currently a centered point entry) into the live document, preserving its intended moved entrance. Recompute local anchor from the edited anchor node, never from stale binding.
 
-Before the recovery write, confirm the other process is no longer writing these owners and ask the Ciaran question below. If the user confirms the move, keep it; if they give another intended cell, apply only that instructed cell before regeneration. No arbitrary relocation or terrain change is authorized. Regenerate the entire partition from the recovered final YAML; the partial dirty JSON is never a regeneration input or accepted baseline. Core diagnostics must report any genuine terrain/collision failure at the chosen destination; obtain a valid intended cell from the user if it is not game-ready. Do not suppress those diagnostics or invent a fallback cell.
+Before the recovery write, confirm the other process is no longer writing these owners. The destination decision is resolved; no arbitrary relocation or terrain change is authorized. Regenerate the entire partition from the recovered final YAML; the partial dirty JSON is never a regeneration input or accepted baseline. Require clean core map diagnostics at the confirmed destination before final adoption. A genuine terrain/collision failure there requires user input as a diagnostic outcome; do not suppress it or invent a fallback cell.
 
-Refresh `content/map-reference-context.json` again after this slice's final core/lore implementation changes, using `uv run --locked python -m tools.map_reference_context`, and run the same command with `--check`. Its discovery closure hashes core/lore source bytes, so even schema-only implementation changes require this refresh. Run from the final valid recovered world; before recovery is resolved, the isolated valid conversion candidate can establish exporter/freshness evidence without touching the live files. Commit the refreshed index with this cutover, preserving incoming-reference semantics and the existing dependency closure. A stale index must not silently disable deletion or object-removing undo after the fix.
+Refresh `content/map-reference-context.json` again after this slice's final core/lore implementation changes, using `uv run --locked python -m tools.map_reference_context`, and run the same command with `--check`. Its discovery closure hashes core/lore source bytes, so even schema-only implementation changes require this refresh. Run from the final valid recovered world; before live recovery is complete, the isolated valid conversion candidate can establish exporter/freshness evidence without touching the live files. Commit the refreshed index with this cutover, preserving incoming-reference semantics and the existing dependency closure. A stale index must not silently disable deletion or object-removing undo after the fix.
 
 This recovery happens during implementation, never while preparing this proposal. A temporary conversion report records the captured baseline revision, compared outputs and regeneration results. Remove scratch exporters/comparators after recording evidence in the apply handoff.
 
@@ -129,7 +129,7 @@ Use independent synthetic arithmetic such as the spec's `(10,20)` L and `(100,20
 | 5 | ADOPT-LOCATION / ADOPT-POINT in final-YAML occupied-room test with real regeneration |
 | 6 | EDIT-BROWSER in the named browser workflow file and shard manifest |
 | 7 | D8's exact documentation inventory, human review of wording |
-| 8 | D6 live recovery, explicit Ciaran answer and full partition regeneration |
+| 8 | D6 live recovery at the confirmed Ciaran cell, retained Fionnen/node edits and full partition regeneration |
 
 ### D8. Required documentation changes
 
@@ -148,9 +148,9 @@ Human review uses `tmp/map-editor-location-move-handoff.md` and the approved edi
 
 There is no compatibility or persistent-data migration. Convert the two authored settlement documents and every fixture/caller with the schema change. Prepare byte-comparison evidence from isolated committed inputs, retain user edits according to D6, then regenerate from the final intended YAML. Rollback before release is an ordinary coordinated source reversal; never restore over user edits or accept a partially generated artifact.
 
-## Open Questions
+## Confirmed recovery decision
 
-Is Ciaran's live target `(1366, 554)` intended? This is unresolved. Record the answer before final data recovery/adoption. It changes the chosen authored location, not the schema, command contract or task breakdown. Planning preserves the three dirty files unchanged.
+The user confirmed Ciaran's target `(1366, 554)`. Keep Fionnen `(1465, 1237)` and Ciaran's node edits. No destination design question remains. Recovery follows D6, preserving the committed relative point-entry offset and deriving the local anchor from the edited anchor node. Clean core map diagnostics remain required; an observed terrain/collision failure would require further user input. Planning preserves the three dirty files unchanged.
 
 ## Verification plan
 
