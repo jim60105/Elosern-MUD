@@ -81,7 +81,11 @@ def _install_synthetic_catalogs_if_flagged() -> None:
         importlib.import_module(dotted)
     from world.tests.synthetic_data import install_synthetic_catalogs
 
-    install_synthetic_catalogs()
+    # Browser journeys walk the authored settlements and permanent rooms, so
+    # this install keeps that world live beside the kit's content: the shipped
+    # scene vocabulary and rooms stay published, and the kit's own rooms,
+    # anchors and placements join them.
+    install_synthetic_catalogs(borrow_authored_world=True)
 
     import world.quests.catalog as _quest_catalog
     from world.tests.synthetic_data import SYNTH_QUESTS
@@ -203,6 +207,22 @@ def at_server_start():
     def _synth_startup_step(name, run, **kwargs):
         if name == "sync_guild_economy":
             return None
+        if name == "map_world_adoption":
+            # The authored settlement/interior sources name the shipped scene
+            # vocabulary and the shipped settlement identities, so a candidate
+            # composed after the t_-only install is rejected outright. The kit
+            # import already adopted and validated the authored world BEFORE
+            # the install swapped the catalogs (``synthetic_data.vocab``), and
+            # ``_install_synthetic_catalogs_if_flagged`` added the kit's own
+            # permanent rooms to that bundle, so the world is adopted here.
+            # Re-adopting would also discard the kit rooms the seed and this
+            # module publish. A process that reached this step with nothing
+            # published still runs the real step and fails loudly.
+            from world.maps import runtime
+
+            if runtime.is_published():
+                return None
+            return original(name, run, **kwargs)
         if name == "npc_persona_roster_validation":
             # This gate owns the shipped inventory, profiles and examples.
             # Validate their matching catalogs, then restore every synthetic

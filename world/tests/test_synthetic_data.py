@@ -772,6 +772,20 @@ class ProcessInstallTests(unittest.TestCase):
     @covers_requirement(
         "test-data-independence::the-kit-installs-process-wide-for-separate-test-processes"
     )
+    def test_partial_install_leaves_the_authored_map_world_untouched(self):
+        """Only a place-catalog swap changes what the map world publishes."""
+        from world.maps import runtime
+
+        previous = runtime.ensure_published()
+        self.addCleanup(kit.uninstall_synthetic_catalogs)
+        self.assertTrue(kit.install_synthetic_catalogs(("npc_tiers",)))
+        self.assertIs(runtime.current(), previous)
+        self.assertTrue(kit.uninstall_synthetic_catalogs())
+        self.assertIs(runtime.current(), previous)
+
+    @covers_requirement(
+        "test-data-independence::the-kit-installs-process-wide-for-separate-test-processes"
+    )
     def test_install_resolves_import_time_derived_projection_before_swapping(self):
         """The process install pins module-scope derivations to shipped rows."""
         baseline = getattr(importlib.import_module(DERIVED_MODULE), DERIVED_SYMBOL)
