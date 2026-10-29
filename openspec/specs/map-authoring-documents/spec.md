@@ -28,7 +28,7 @@ Map YAML SHALL accept only restricted data-only values and preserve retained sta
 - **THEN** unmodified semantic values and those comments remain, and the emitted document passes the same parser
 
 ### Requirement: Authoring diagnostics and runtime acceptance have distinct gates
-Authoring load SHALL use shared map diagnostics to reject invalid structure and permit semantically unfinished maps, while runtime acceptance rejects those map errors and requires authoritative external-reference and artifact-freshness validation.
+Authoring load SHALL use shared map diagnostics to reject invalid structure and permit semantically unfinished maps, while runtime acceptance rejects blocking map errors and requires authoritative external-reference and artifact-freshness validation without treating advisory midpoint disagreement as an error.
 
 #### Scenario: Saveable unfinished world
 - **WHEN** a valid empty graph or inaccessible landmark is loaded
@@ -59,5 +59,9 @@ Authoring load SHALL use shared map diagnostics to reject invalid structure and 
 - **THEN** the core reports a structure diagnostic naming both owners and game adoption rejects without changing the previously published world or persistent rooms
 
 #### Scenario: DIAG-AGREEMENT independently invalid candidate matrix
-- **WHEN** each shared rule above is violated separately in an otherwise valid synthetic world and loaded through the core and game candidate path
-- **THEN** each core code/category/source identifies that rule, the game rejects through the shared diagnostic, and the static checker reports the same decision without a second rule implementation
+- **WHEN** each remaining former game-only rule is violated separately in an otherwise valid synthetic world and loaded through the core and game candidate path
+- **THEN** each core code/category/source identifies that rule, the game rejects through the shared diagnostic, and the static checker reports the same decision without a second rule implementation; removed binding fields fail schema validation
+
+#### Scenario: DIAG-MIDPOINT advisory location disagreement
+- **WHEN** mask growth moves its valid hash-cell midpoint away from the location cell while all blocking geometry, external and freshness checks pass
+- **THEN** authoring saves and emits a semantic warning, runtime adoption remains permitted, and a blocking terrain/collision diagnostic still rejects independently of that warning
