@@ -864,8 +864,19 @@ class GateApproachCostTests(EvenniaTest):
                 wilderness_entries=MappingProxyType(entries),
             )
         )
+        # The settlement frame is the *location's* cell, so the synthetic
+        # anchor needs a geographic row of its own: the mask midpoint never
+        # supplies the frame.
+        from world.lore import anchors as anchors_module
+        from world.lore.anchors import GeographicAnchor
+
+        geography = dict(anchors_module.anchor_geography())
+        geography["t_gate_anchor"] = GeographicAnchor(
+            anchor_key="t_gate_anchor", cell=(100, 100), geographic_constraint="synthetic"
+        )
         with (
             patch.object(map_data, "SETTLEMENT_GRAPHS", {"t_gate_map": graph}),
+            patch.object(anchors_module, "anchor_geography", return_value=geography),
         ):
             try:
                 from world.maps.wilderness_destination import gate_approach_distance_m

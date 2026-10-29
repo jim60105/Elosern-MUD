@@ -50,6 +50,7 @@ from world.lore.wilderness_entry import (
     WildernessGate,
 )
 from elosern_map_core.authoring import diagnose_settlement_rules
+from elosern_map_core.diagnostics import blocking
 from world.maps.city_gates import CityGateDef
 from world.maps.published import PublishedKeySet, PublishedView
 
@@ -224,20 +225,8 @@ def _compose_document(
         if node.prototype_parent == "anchor_room"
     ]
     anchor = anchor_nodes[0] if len(anchor_nodes) == 1 else None
-    if anchor is not None:
-        if document.binding.local_anchor_m != (anchor.x_m, anchor.y_m):
-            fail(
-                f"binding local_anchor_m {document.binding.local_anchor_m} disagrees "
-                f"with anchor node {anchor.node_id!r} at "
-                f"{(anchor.x_m, anchor.y_m)}"
-            )
-    elif not anchor_nodes:
+    if anchor is None and not anchor_nodes:
         fail("missing anchor_room node")
-    if location is not None and document.binding.anchor_cell != location.cell:
-        fail(
-            f"binding anchor_cell {document.binding.anchor_cell} disagrees with "
-            f"location {document.location_ref!r} cell {location.cell}"
-        )
 
     scene_archetypes: dict[QualifiedRef, str] = {}
     for node in document.nodes.values():
@@ -265,7 +254,7 @@ def _compose_document(
             )
 
     wilderness_entry = None
-    if document.wilderness_entry is not None:
+    if document.wilderness_entry is not None and location is not None:
         entry = document.wilderness_entry
         unknown = [
             gate.destination_node
@@ -275,10 +264,11 @@ def _compose_document(
         for node_id in unknown:
             fail(f"wilderness gate destination {node_id!r} is not an authored node")
         if not unknown:
+            geometry = entry.geometry(location.cell)
             wilderness_entry = WildernessEntryPoint(
                 anchor_key=document.location_ref,
                 shape=entry.shape,
-                origin_xy=entry.origin,
+                origin_xy=geometry.origin,
                 gates=tuple(
                     WildernessGate(
                         gate.return_direction,
@@ -297,7 +287,7 @@ def _compose_document(
         anchor_key=document.location_ref,
         node=settlement_node_ref(settlement_id, anchor.node_id),
     )
-    frame = LocalFrameAnchor(document.location_ref, document.binding.local_anchor_m)
+    frame = LocalFrameAnchor(document.location_ref, (anchor.x_m, anchor.y_m))
     return graph, placement, frame, city_gate, wilderness_entry, scene_archetypes
 
 
@@ -349,11 +339,13 @@ def build_settlements(
             entries[entry.anchor_key] = entry
         scene_archetypes.update(scenes)
 
-    for diag in diagnose_settlement_rules(
-        settlements,
-        locations=locations,
-        frame_cells=frame_cells,
-        terrain=None,
+    for diag in blocking(
+        diagnose_settlement_rules(
+            settlements,
+            locations=locations,
+            frame_cells=frame_cells,
+            terrain=None,
+        )
     ):
         if diag.message not in problems:
             problems.append(diag.message)

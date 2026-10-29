@@ -39,6 +39,7 @@ from elosern_map_core.partition import (  # noqa: E402
     partition_input,
     world_snapshot,
 )
+from elosern_map_core.diagnostics import blocking as blocking_diagnostics  # noqa: E402
 
 
 def _load(root: Path):
@@ -56,7 +57,13 @@ def main(argv: list[str]) -> int:
         for item in error.diagnostics:
             print("  -", item.message)
         return 2
-    blocking = [d for d in diagnose_world(world) if d.code != "stale_partition"]
+    # A stale artifact is what this script regenerates, and an advisory warning
+    # never refuses generation; only real blocking diagnostics do.
+    blocking = [
+        d
+        for d in blocking_diagnostics(diagnose_world(world))
+        if d.code != "stale_partition"
+    ]
     context, _ = _load_reference(root)
     problems, _warnings = game_rules(world, context)
     if blocking or problems:

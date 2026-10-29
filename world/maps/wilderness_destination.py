@@ -148,8 +148,11 @@ def settlement_world_position_m(
     ``world_position_m = wilderness_anchor_center_m + local_position_m -
     local_anchor_position_m`` (world-map-scale design §5.3). The local anchor
     is the settlement graph's own anchor node's authored physical position, and
-    the wilderness anchor is the center of the entry's anchor cell at the
-    declared cell span. ``None`` means the graph or the anchor node is absent.
+    the wilderness anchor is the center of the *location's* cell at the declared
+    cell span -- the settlement's one geographic authority. A mask whose
+    midpoint legitimately sits off that cell never moves the settlement.
+    ``None`` means the graph, the anchor node or the published location is
+    absent.
     """
 
     placement = ANCHOR_PLACEMENT_REGISTRY.get(entry.anchor_key)
@@ -159,15 +162,24 @@ def settlement_world_position_m(
     if graph is None:
         return None
     anchor = _anchor_node(graph)
-    anchor_cell = entry.anchor_cell
-    if anchor is None or anchor_cell is None:
+    location_cell = _location_cell(entry.anchor_key)
+    if anchor is None or location_cell is None:
         return None
-    world_anchor = cell_center_m(anchor_cell, cell_size_m)
+    world_anchor = cell_center_m(location_cell, cell_size_m)
     local_anchor = anchor.physical_coordinate
     return (
         world_anchor[0] + local_position_m[0] - local_anchor[0],
         world_anchor[1] + local_position_m[1] - local_anchor[1],
     )
+
+
+def _location_cell(anchor_key: str) -> tuple[int, int] | None:
+    """The published geographic cell of one settlement anchor key, or ``None``."""
+
+    from world.lore.anchors import anchor_geography
+
+    geographic = anchor_geography().get(anchor_key)
+    return None if geographic is None else geographic.cell
 
 
 def gate_approach_distance_m(

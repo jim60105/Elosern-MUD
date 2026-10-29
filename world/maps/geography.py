@@ -404,12 +404,15 @@ def build_geography(
     # candidate's own frame and walkability must be checked here: publication
     # must never precede a rejection that a later sync would raise.
     from elosern_map_core.authoring import diagnose_settlement_rules
+    from elosern_map_core.diagnostics import blocking
 
-    for diag in diagnose_settlement_rules(
-        settlements.settlements,
-        locations=locations,
-        frame_cells=terrain.frame_cells,
-        terrain=terrain,
+    for diag in blocking(
+        diagnose_settlement_rules(
+            settlements.settlements,
+            locations=locations,
+            frame_cells=terrain.frame_cells,
+            terrain=terrain,
+        )
     ):
         if diag.message not in problems:
             problems.append(diag.message)

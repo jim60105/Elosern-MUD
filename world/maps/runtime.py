@@ -48,6 +48,7 @@ from elosern_map_core.authoring import (
     compile_runtime,
     load_authoring_world,
 )
+from elosern_map_core.diagnostics import blocking
 from elosern_map_core.documents import QualifiedRef
 from elosern_map_core.partition_codec import PartitionFreshness, partition_freshness
 from elosern_map_core.sources import SourceDocument, discover_source_documents
@@ -284,7 +285,9 @@ def compose(root: str | Path | None = None) -> ComposedWorld:
     except AuthoringError as error:
         raise MapWorldError(item.message for item in error.diagnostics) from error
 
-    problems: list[str] = [item.message for item in world.diagnostics]
+    # Advisory warnings describe the map; only blocking diagnostics refuse the
+    # candidate, exactly as ``compile_runtime`` decides.
+    problems: list[str] = [item.message for item in blocking(world.diagnostics)]
     settlements: SettlementSnapshot | None = None
     geography_snapshot = None
     interiors: InteriorSnapshot | None = None

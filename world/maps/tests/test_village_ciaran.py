@@ -128,7 +128,8 @@ class VillageCiaranMapTests(EvenniaTestCase):
         self.assertEqual(len(anchors), 1)
         anchor = anchors[0]
         self.assertEqual(anchor.anchor_key, self.document.location_ref)
-        self.assertEqual(self.document.binding.local_anchor_m, anchor.coordinate)
+        # The frame is derived: the unique anchor_room *is* the local anchor.
+        self.assertEqual(self.document.local_anchor_m, anchor.coordinate)
         self.assertEqual(
             [node.node_id for node in self.graph.nodes.values() if node.is_anchor],
             [anchor.node_id],

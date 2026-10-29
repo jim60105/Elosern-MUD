@@ -12,8 +12,9 @@ It reports three layers, in order:
    semantic work-in-progress diagnostics (saveable, not game-ready), with the
    current partition freshness supplied;
 2. game-adoption cross-file rules the core does not check but the game
-   enforces at startup (binding/anchor agreement, footprint geometry, scene
-   identifiers, doorway names, district spacing ...);
+   enforces at startup (scene identifiers, landmark cells, district spacing
+   ...). Footprint, anchor and gate geometry belong to the core's own
+   diagnostics, so nothing is re-implemented here;
 3. generated-artifact freshness: the district partition and the external
    reference context.
 
@@ -30,7 +31,7 @@ from pathlib import Path
 
 from elosern_map_core import diagnose_world, discover_source_documents, load_authoring_world
 from elosern_map_core.authoring import terrain_definition
-from elosern_map_core.diagnostics import AuthoringError
+from elosern_map_core.diagnostics import AuthoringError, blocking
 from elosern_map_core.geometry import cell_center_m, local_to_world_m
 from elosern_map_core.partition_codec import (
     PartitionDocumentError,
@@ -116,31 +117,19 @@ def game_rules(world, context) -> tuple[list[str], list[str]]:
 
     for sid, settlement in sorted(world.settlements.items()):
         label = f"settlement {sid!r}"
-        anchors = [n for n in settlement.nodes.values() if n.prototype_parent == "anchor_room"]
-        for node in anchors:
-            if settlement.binding.local_anchor_m != (node.x_m, node.y_m):
-                problems.append(
-                    f"{label} binding.local_anchor_m {settlement.binding.local_anchor_m} != "
-                    f"anchor node {node.node_id!r} position {(node.x_m, node.y_m)}"
-                )
         location = locations.get(settlement.location_ref)
-        if location is not None and settlement.binding.anchor_cell != location.cell:
-            problems.append(
-                f"{label} binding.anchor_cell {settlement.binding.anchor_cell} != "
-                f"location {settlement.location_ref!r} cell {location.cell} "
-                "(move both together)"
-            )
         for node in settlement.nodes.values():
             check_scene(f"{label} node {node.node_id!r}", node.scene_archetype)
 
-        entry = settlement.wilderness_entry
-        if entry is not None and location is not None:
-            anchor_cell = entry.anchor_cell
+        if location is not None:
+            geometry = settlement.wilderness_geometry(location.cell)
+            anchor_cell = None if geometry is None else geometry.anchor_cell
             if anchor_cell is not None and anchor_cell != location.cell:
                 warnings.append(
                     f"{label} footprint anchor cell {anchor_cell} (mask bounding-box midpoint) "
                     f"!= location cell {location.cell}: the world-map marker and the real "
-                    "wilderness entrance are in different places"
+                    "wilderness entrance are in different places (advisory; the core "
+                    "reports the same warning)"
                 )
 
     for iid, interior in sorted(world.interiors.items()):
@@ -166,9 +155,11 @@ def game_rules(world, context) -> tuple[list[str], list[str]]:
         elif ref.domain == "settlement_node" and ref.map_id in world.settlements:
             settlement = world.settlements[ref.map_id]
             node = settlement.nodes.get(ref.object_id)
-            if node is not None:
+            location = locations.get(settlement.location_ref)
+            local_anchor = settlement.local_anchor_m
+            if node is not None and location is not None and local_anchor is not None:
                 position = local_to_world_m(
-                    settlement.binding.anchor_cell, settlement.binding.local_anchor_m, (node.x_m, node.y_m)
+                    location.cell, local_anchor, (node.x_m, node.y_m)
                 )
         if position is not None:
             seeds[did] = position
@@ -219,7 +210,8 @@ def main(argv: list[str]) -> int:
     print(f"reference context: {context_state}")
     if context_state != "current":
         print("  regenerate: `uv run --locked python -m tools.map_reference_context` (deletions stay refused until current)")
-    blocked = bool(diagnostics or problems or partition_state != "current")
+    # Advisory warnings are reported above but never make the world unready.
+    blocked = bool(blocking(diagnostics) or problems or partition_state != "current")
     print("RESULT:", "not game-ready" if blocked else "game-ready as far as static checks can tell")
     return 1 if blocked else 0
 
