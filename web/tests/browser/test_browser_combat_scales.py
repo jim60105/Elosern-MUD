@@ -607,15 +607,30 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self._engage(page)
         panel = self._combat_panel(page)
         roles = self._roles()
-        by_key = {
-            skill["key"]: skill
-            for category in panel["choices"]["skills"]
-            for group in category["groups"]
-            for skill in group["skills"]
-        }
+        def _by_key(view):
+            return {
+                skill["key"]: skill
+                for category in view["choices"]["skills"]
+                for group in category["groups"]
+                for skill in group["skills"]
+            }
+
+        # The engagement's first committed panel can precede the catalog
+        # registration that fills ``choices``; re-read until the seeded
+        # ladder row appears in a later revision.
+        by_key = _by_key(panel)
+        deadline = time.monotonic() + 15
+        while roles["ladder_key"] not in by_key and time.monotonic() < deadline:
+            page.wait_for_timeout(250)
+            by_key = _by_key(self._combat_panel(page))
         # The seeded mastery entitles only the ladder skill; every other
         # skill omits the field entirely, so a non-master's panel would
         # reveal nothing at all.
+        self.assertIn(
+            roles["ladder_key"],
+            by_key,
+            f"the mastered element's ladder row is absent; committed rows: {sorted(by_key)}",
+        )
         ladder = by_key[roles["ladder_key"]]
         self.assertIn("freeform_scales", ladder)
         self.assertEqual(
