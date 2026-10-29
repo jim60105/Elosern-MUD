@@ -439,67 +439,39 @@ The wilderness traversal context SHALL remain distinct for the existing flight w
   read each other's constant; the amended scenario above asserts exactly that
 
 ### Requirement: WILDERNESS_ENTRY_REGISTRY authored data is validated before persistence
-`world/lore/wilderness_entry.py` SHALL provide `validate_wilderness_entries()`, a pure DB-free
-check of the whole registry, and `world/lore/sync.py`'s mirror step SHALL run it before mirroring,
-so malformed data fails at startup instead of producing an unwalkable world. It uses the provider's
-shared walkability rule (frame, mainland, passable terrain, footprint exclusion), so no authored
-footprint or approach names impassable ground. The shipped registry SHALL pass.
+The game SHALL use the shared DB-free core map diagnostics before publishing or mirroring wilderness entries, rejecting malformed masks, invalid targets and unprovisionable terrain or gate geometry without duplicating the rejection rules.
 
 #### Scenario: The shipped registry validates
-- **WHEN** `validate_wilderness_entries()` is called against the shipped
-  `WILDERNESS_ENTRY_REGISTRY`
-- **THEN** it raises nothing
+- **WHEN** the current authored world is loaded through the game candidate path before lore mirroring
+- **THEN** valid wilderness entries compose without a map rejection and the mirror uses that validated world
 
 #### Scenario: Malformed authored entries are each rejected
-- **WHEN** `validate_wilderness_entries()` is called with a registry patched to contain one
-  malformed entry at a time, including an empty mask, out-of-bounds `#` cell, disconnected footprint,
-  non-canonical or duplicated `return_direction`, gate face not crossing the footprint,
-  point-shape entry with zero or two gates, `grid_xy` outside its map, or unknown `anchor_key`
-- **THEN** each patch raises a validation error naming the offending entry and the rejected rule
+- **WHEN** a synthetic source candidate contains one malformed entry at a time, including an empty mask, out-of-bounds hash cell, disconnected footprint, non-canonical or duplicated return_direction, gate face not crossing the footprint, point shape with zero or two gates, unknown destination node, or unknown location_ref
+- **THEN** the shared core schema or map diagnostics name the entry and rejected rule before any publication or mirroring
 
 #### Scenario: Malformed masks and colliding geometry are each rejected
-- **WHEN** `validate_wilderness_entries()` is called with a registry patched to contain one
-  malformed entry at a time, including ragged mask rows, a character outside `#`/`.`, an all-`.` mask, a
-  mask whose bounding-box midpoint falls on a `.` cell, two entries whose footprints overlap, a
-  footprint containing another entry's gate approach cell, two gates sharing one destination
-  `(grid_xy, z_map_key)` room, or a point anchor with a provider-invalid neighbor direction
-- **THEN** each patch raises a validation error naming the offending entry and the rejected rule
+- **WHEN** one candidate at a time contains ragged rows, an illegal character, an all-dot mask, a midpoint on a dot, overlapping footprints, a footprint containing another gate approach, duplicate gate destination rooms, or a point entry with a provider-invalid authored neighbor
+- **THEN** the core rejects invalid structure or diagnoses semantic map errors and the game rejects the candidate through those same rules
 
 #### Scenario: sync_all refuses to mirror a malformed registry
-- **WHEN** `sync_all()` runs with the wilderness registry patched to a malformed entry
-- **THEN** the run fails with the validation error before any `lore:wilderness_entries:*` Script
-  is created or updated
+- **WHEN** startup synchronization is given an authored candidate with a malformed wilderness entry
+- **THEN** core validation rejects before any wilderness-entry lore record is created or updated, without a game-local validator rechecking the same rules
 
 #### Scenario: Per-entry rejection conditions
-- **WHEN** `validate_wilderness_entries()` checks an entry
-- **THEN** it SHALL reject: an empty mask or one with no `#`; any `#` cell outside the
-  provider's frame or on impassable terrain; a footprint whose `#` cells are not 4-connected; a
-  `return_direction` that is not a canonical wilderness direction or is duplicated within one
-  entry; a footprint-entry gate whose approach-cell ray from `anchor_cell` crosses no footprint
-  cell or whose approach cell is not a walkable cell outside the footprint; a point-shape
-  entry with any number of gates other than exactly one, or whose anchor cell or authored
-  entry-direction neighbour is not walkable; a `grid_xy` outside the extent of the
-  map named by its `z_map_key`; and an `anchor_key` absent from `ANCHOR_PLACEMENT_REGISTRY`
+- **WHEN** the shared validator checks wilderness entries
+- **THEN** it rejects invalid mask grammar or unknown targets and diagnoses hash cells outside the frame or on impassable terrain, disconnected footprints, invalid exterior rays or approaches, point entries without exactly one gate, or point anchors and authored-direction neighbors that are not provider-valid
 
 #### Scenario: Mask shape and anchor cell well-formedness
-- **WHEN** an entry's mask and derived anchor cell are validated
-- **THEN** the mask SHALL be a well-formed rectangle, every row the same non-empty length,
-  containing only `#` and `.`; the
-  derived `anchor_cell` SHALL itself be a `#` cell
+- **WHEN** an entry's mask and derived midpoint are validated
+- **THEN** a non-empty rectangle containing only hash and dot cells and at least one hash is required, and a non-point mask whose midpoint is outside its hash cells has a blocking semantic diagnostic
 
 #### Scenario: Global cross-entry constraints
-- **WHEN** the validator checks the registry globally
-- **THEN** two entries SHALL NOT have overlapping footprints; no footprint SHALL contain
-  another entry's gate approach cell or point-shape anchor cell; two gates SHALL NOT share the
-  same `(approach_cell, return_direction)` pair; and two gates SHALL NOT share the same
-  destination `(grid_xy, z_map_key)` room; one grid room hosts exactly one WildernessGateExit
-  slot, so a second gate on that room would silently displace the first at provisioning time
+- **WHEN** the core checks all entries together
+- **THEN** footprints do not overlap or contain another entry's approach or point anchor, gate approach-cell/direction pairs are unique, and each destination room hosts at most one wilderness gate
 
 #### Scenario: Point-shape anchors need all neighbors provider-valid
-- **WHEN** a point-shape entry is validated
-- **THEN** its anchor cell and the neighbor its authored `return_direction` leads to SHALL be
-  provider-valid walkable terrain; the other seven neighbors follow ordinary terrain validity, so a
-  coastal cave may be authored next to water
+- **WHEN** a point entry is validated
+- **THEN** its hash anchor and authored return_direction neighbor must be provider-valid walkable terrain while the other directions follow ordinary terrain validity
 
 ### Requirement: Physical footprints and concealed point entries preserve approaches
 Urban routing masks SHALL rasterize authored irregular physical footprints. Capital south/east gates SHALL retain facing and exact transformed entrance geometry with exterior approaches outside the mask. Ciaran SHALL be a hidden point entrance without a village-wide wilderness obstacle.
