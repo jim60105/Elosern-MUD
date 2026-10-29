@@ -93,6 +93,34 @@ def _metres(value: Any, label: str) -> int:
     return value
 
 
+def _normalize_frame(data: dict[str, Any]) -> None:
+    """Re-origin the local metre frame so no node coordinate is negative.
+
+    A settlement node's authored metres ARE its grid coordinate, so the frame
+    must stay non-negative, while the frame's own origin is arbitrary: a
+    location drag moves the whole map without editing it. An edit that would
+    push a node west or south of zero therefore translates every node and road
+    bend by the same delta. World geometry is unchanged -- the shared transform
+    subtracts the anchor node, which moves with its peers -- so the author's
+    intended positions are kept.
+    """
+
+    nodes = data.get("nodes") or {}
+    if not nodes:
+        return
+    dx = max(0, -min(int(node["x_m"]) for node in nodes.values()))
+    dy = max(0, -min(int(node["y_m"]) for node in nodes.values()))
+    if not dx and not dy:
+        return
+    for node in nodes.values():
+        node["x_m"] = int(node["x_m"]) + dx
+        node["y_m"] = int(node["y_m"]) + dy
+    for road in data.get("roads") or ():
+        for bend in road.get("bends") or ():
+            bend["x_m"] = int(bend["x_m"]) + dx
+            bend["y_m"] = int(bend["y_m"]) + dy
+
+
 def _point(value: Any, label: str) -> dict[str, int]:
     if not isinstance(value, list) or len(value) != 2:
         raise _invalid(f"{label} is [x_m, y_m]")
@@ -301,6 +329,7 @@ class CreateNode(_Settlement):
             node["prototype_parent"] = "anchor_room"
             node["anchor_key"] = data["location_ref"]
         data["nodes"][node_id] = node
+        _normalize_frame(data)
 
 
 class DuplicateNode(_Settlement):
@@ -329,6 +358,7 @@ class DuplicateNode(_Settlement):
             "typeclass": original.get("typeclass"),
             "scene_archetype": original.get("scene_archetype"),
         }
+        _normalize_frame(data)
 
 
 class SetNodeFields(_Settlement):
@@ -373,6 +403,7 @@ class MoveNodes(_Settlement):
         for node_id, x, y in self._moves(arguments["moves"]):
             node = _node(data, node_id, "arguments.moves")
             node["x_m"], node["y_m"] = x, y
+        _normalize_frame(data)
 
 
 def same_document_references(data: dict[str, Any], node_ids: set[str], relative_path: str) -> list[dict[str, Any]]:

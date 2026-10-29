@@ -577,7 +577,12 @@ saved work in progress with its diagnostic.
   one room of its location.
 - **Moves** keep the node ID, every authored road direction and every
   dependent selector (gates, interior exteriors, district landmarks, external
-  references by qualified ID); the core recomputes the road lengths.
+  references by qualified ID); the core recomputes the road lengths. Authored
+  metres are the map's non-negative grid coordinates, so a move that would
+  leave a node west or south of the frame origin re-origins the whole document
+  in the same write: every node and road bend translates by the same delta,
+  which changes no world position (the transform subtracts the anchor node)
+  and no road length.
 - **Deletion never cascades.** `delete_nodes` is refused (409
   `deletion_refused`, guard `internal`) while a road in either direction, a
   wilderness gate, the city gate, an interior exterior or a district

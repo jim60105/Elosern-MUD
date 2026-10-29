@@ -320,6 +320,29 @@ def test_invalid_moves_write_nothing(workspace, moves, status):
     assert fixture.tree_digest(workspace) == before
 
 
+def test_a_move_west_of_the_origin_re_origins_the_frame_without_moving_world_geometry(workspace):
+    """The authored metres are the grid coordinate, so a negative drag shifts the frame."""
+
+    editor = Editor(workspace)
+    status, body = _send(editor, "move_nodes", SETTLEMENT, {"settlement_id": TOWN, "moves": [
+        {"node_id": "yard", "x_m": -100, "y_m": 400}]})
+    assert status == 200, body
+    data = _data(workspace)
+    # Every node and bend translated by the same +100 m: the minimum is zero.
+    assert {node_id: (node["x_m"], node["y_m"]) for node_id, node in data["nodes"].items()} == {
+        "gate": (100, 0),
+        "yard": (0, 400),
+    }
+    assert data["roads"][1]["bends"] == [{"x_m": 400, "y_m": 0}]
+    # World positions are the ones the author produced: the transform subtracts
+    # the anchor node, which moved with its peers.
+    settlement = _settlement(editor.state())
+    assert {row["id"]: row["world_m"] for row in settlement["nodes"]} == {
+        "gate": [5500, 5500],
+        "yard": [5400, 5900],
+    }
+
+
 def test_a_node_of_another_settlement_is_a_cross_document_command(workspace):
     editor = Editor(workspace)
     assert _create_map(editor)[0] == 200
@@ -387,7 +410,8 @@ def test_road_edits_keep_identity_rules_and_never_recompute_direction(workspace)
     assert _send(editor, "set_road", SETTLEMENT, {"settlement_id": TOWN, "source": "yard", "destination": "gate",
                                                   "value": {"source": "yard", "destination": "well", "direction": "s"}})[0] == 200
     roads = _roads(workspace)
-    assert ("yard", "gate") not in roads and roads[("yard", "well")]["bends"] == [{"x_m": 300, "y_m": 0}]
+    # The move to y=-5 re-origined the frame by +5, so the kept bend moved with it.
+    assert ("yard", "gate") not in roads and roads[("yard", "well")]["bends"] == [{"x_m": 300, "y_m": 5}]
     before = fixture.tree_digest(workspace)
     cases = [
         ({**edit, "value": {"source": "gate", "destination": "gate", "direction": "n"}}, 422),

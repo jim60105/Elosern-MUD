@@ -53,10 +53,13 @@ closure that does not resolve before startup synchronization writes anything.
   midpoint and every gate approach by the same cell delta. Dragging the
   `anchor_room` node instead changes the local frame: the anchor stays on the
   location cell's centre and every untouched node shifts by the negative local
-  delta, while the location and the mask stay fixed.
+  delta, while the location and the mask stay fixed. A drag that would leave a
+  node west or south of the frame origin re-origins the whole document by
+  translating every node and road bend, because the authored metres are the
+  map's non-negative grid coordinates and the origin itself carries no meaning.
 - The measured baselines at the 1.25 m/s healthy settlement speed are 2,193 s
-  （南門→中央廣場，~37 min）, 5,618 s（南門→王宮前庭，~94 min）and 431 s
-  （隱密小徑→長老古樹下，~7 min）. Unequal segment lengths charge and display
+  （南門→中央廣場，~37 min）, 5,618 s（南門→王宮前庭，~94 min）and 647 s
+  （隱密小徑→長老古樹下，~11 min）. Unequal segment lengths charge and display
   unequally.
 
 ## In-place cutover
