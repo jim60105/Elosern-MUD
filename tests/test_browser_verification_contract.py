@@ -75,7 +75,7 @@ class BrowserVerificationContractTests(unittest.TestCase):
             "playwright install --with-deps chromium",
             jobs["browser"]["steps"][
                 [step["name"] for step in jobs["browser"]["steps"]].index(
-                    "Install Chromium for browser acceptance"
+                    "Install Chromium and Firefox for browser acceptance"
                 )
             ]["run"],
         )
