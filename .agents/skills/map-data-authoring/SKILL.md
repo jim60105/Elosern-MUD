@@ -104,7 +104,7 @@ indistinguishable from editor output:
 
 ## Cross-file invariants and validation ownership
 
-Core diagnostics check settlement anchor node presence/uniqueness and key match, footprint mask grammar and 4-connectedness, mask hash and approach cell validity, footprint and gate collisions, point gate counts and entry directions, and interior room ID and doorway uniqueness. A settlement authors **no** world frame and **no** absolute footprint origin: its frame is its location cell plus its unique `anchor_room`, and its mask origin is that cell plus the entry's signed `offset{dx, dy}`.
+Core diagnostics check settlement anchor node presence/uniqueness and key match, non-negative node coordinates, footprint mask grammar and 4-connectedness, mask hash and approach cell validity, footprint and gate collisions, point gate counts and entry directions, and interior room ID and doorway uniqueness. A settlement authors **no** world frame and **no** absolute footprint origin: its frame is its location cell plus its unique `anchor_room`, and its mask origin is that cell plus the entry's signed `offset{dx, dy}`.
 
 The remaining game-side cross-file rules are enforced during candidate composition before publication:
 
@@ -112,6 +112,7 @@ The remaining game-side cross-file rules are enforced during candidate compositi
 | --- | --- |
 | a location's `cell` (moving a town on the continent) | nothing else in the settlement document. Every node's world metres, the mask, its midpoint and every gate approach translate by the same delta; the document stays byte-identical. |
 | the `anchor_room` node's `x_m`/`y_m` | nothing else. The anchor stays on the location cell's centre and every untouched node's world position shifts by the negative local delta; the location and the mask stay fixed. |
+| any node's `x_m`/`y_m` into negative metres | re-origin the whole document: translate every node and road bend by the same delta. The authored pair is the node's grid coordinate, which must stay non-negative, and a pure translation changes no world position or road length. |
 | a Voronoi district landmark | ≥ 100 km from every other Voronoi landmark, unique district and landmark names |
 | any `scene_archetype` or `nation_key` | must be in the reference index's registered identifier sets |
 

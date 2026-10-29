@@ -152,6 +152,23 @@ def diagnose_settlement_structure(
     cells = location_cells_of(locations)
 
     for settlement_id, settlement in sorted(settlements.items()):
+        # A settlement node's authored local metres ARE its xyzgrid coordinate
+        # (``build_settlement_graph`` converts them into the room address), and
+        # the shared node-ID encoder rejects negative pairs. A negative
+        # position is unrepresentable structure, never WIP.
+        for node_id, node in sorted(settlement.nodes.items()):
+            if node.x_m < 0 or node.y_m < 0:
+                diagnostics.append(
+                    _diagnostic(
+                        "invalid_field_value",
+                        STRUCTURE,
+                        f"node {node_id!r} position ({node.x_m}, {node.y_m}) is negative; "
+                        "settlement metres are the map's non-negative grid coordinates",
+                        document=settlement,
+                        field_path="nodes",
+                        object_id=settlement_id,
+                    )
+                )
         if locations is not None:
             loc_keys = set(locations.locations) if hasattr(locations, "locations") else set(locations)
             if settlement.location_ref not in loc_keys:

@@ -306,6 +306,12 @@ def _bad_settlement(mutator) -> dict:
             lambda data: data.__setitem__("location_ref", "nowhere"),
             "unknown_reference",
         ),
+        (
+            # The authored metres are the map's xyzgrid identity, which the
+            # shared node-ID encoder only accepts as a non-negative pair.
+            lambda data: data["nodes"]["gate"].__setitem__("x_m", -1),
+            "invalid_field_value",
+        ),
     ],
 )
 def test_structural_defects_are_load_rejections(mutator, code):

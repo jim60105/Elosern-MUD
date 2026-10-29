@@ -72,6 +72,11 @@ move carries the whole settlement and no document has to repeat a coordinate.
   Road length is the polyline length source → bends → destination, and it
   drives travel time. A move that doubles a road's length doubles its walking
   time.
+- Both `x_m` and `y_m` of every node are **non-negative**: the authored metre
+  pair is the node's grid coordinate on its own map, so a negative one is a
+  structure diagnostic. The frame origin itself carries no meaning, so keep the
+  graph inside it by re-origining the whole document (every node and road
+  bend by the same delta) rather than by changing one node's world position.
 - To duplicate a node, copy its ordinary fields under a new ID and a new
   position. Copy no relationships. A copy of an `anchor_room` becomes a
   `grid_room` with an empty `anchor_key`.

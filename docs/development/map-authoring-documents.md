@@ -121,7 +121,10 @@ untouched node by the negative local delta; the mask and the location stay put.
   `^[a-z][a-z0-9_]*$`): `x_m`, `y_m`, `prototype_parent`
   (`grid_room`|`anchor_room`), `key`, `desc`, `anchor_key` (required exactly for
   `anchor_room`), `typeclass` (nullable), `scene_archetype` (nullable).
-  Node coordinates are unique.
+  Node coordinates are unique, and both are non-negative: the authored metres
+  are the node's grid coordinate on its own map, so a negative pair is a
+  structure diagnostic rather than unfinished work. The frame's origin is
+  arbitrary, so move the whole graph instead of pushing one node below zero.
 - `roads[]`: `source`, `destination`, `direction`
   (`n`/`ne`/`e`/`se`/`s`/`sw`/`w`/`nw`), `bends[]` (`{x_m,y_m}`, optional).
   Endpoints must exist, self-loops and duplicate ordered roads are rejected,
