@@ -343,10 +343,10 @@ def validate_monster_species_registry(
 ) -> None:
     """Raise :class:`MonsterSpeciesRegistryError` unless every row is valid.
 
-    Pure and DB-free, mirroring ``world/lore/wilderness_entry.py``'s
-    ``validate_wilderness_entries`` shape: the module-level registries are
-    validated through this one function while they are built, so a malformed
-    authored row can never be observed by a consumer.
+    Pure and DB-free, mirroring the shared core map diagnostics' validate-
+    before-publication shape: the module-level registries are validated through
+    this one function while they are built, so a malformed authored row can
+    never be observed by a consumer.
 
     ``key_violation_face`` is the shared stable-key contract's predicate
     (``world.art.subjects.subject_key_violation``). It stays optional because
