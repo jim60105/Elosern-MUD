@@ -18,6 +18,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from tools.spec_traceability import covers_requirement
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EDITOR_TESTS = REPO_ROOT / "tools" / "map-editor" / "tests"
 
@@ -168,6 +170,10 @@ class _CaptureCase(unittest.TestCase):
 
 
 class CaptureSnapshotPayloadTests(_CaptureCase):
+    @covers_requirement(
+        "map-capture-snapshots::capture-snapshots-are-confined-and-read-only",
+        "map-capture-snapshots::visible-continental-partition-requires-current-decoded-output",
+    )
     def test_the_editor_environment_loads_the_complete_snapshot_with_a_single_read(self):
         root = self.partitioned()
         _write_layout(root)
@@ -219,6 +225,7 @@ class CaptureSnapshotPayloadTests(_CaptureCase):
         )
         self.assert_unchanged(root, before)
 
+    @covers_requirement("map-capture-snapshots::capture-snapshots-are-confined-and-read-only")
     def test_a_later_source_change_is_outside_the_snapshot(self):
         root = self.workspace()
         first = _probe(root, view="settlement", map_id=synthetic.SETTLEMENT_ID)["payload"]
@@ -233,6 +240,9 @@ class CaptureSnapshotPayloadTests(_CaptureCase):
         self.assertEqual(later_keys["yard"], "Renamed yard")
         self.assertIsNone(first["partition"])
 
+    @covers_requirement(
+        "map-capture-snapshots::capture-distinguishes-malformed-input-from-semantic-work-in-progress"
+    )
     def test_semantic_work_in_progress_loads_without_a_reference_index(self):
         root = self.workspace()
         settlement = synthetic.settlement_data()
@@ -275,6 +285,9 @@ class CaptureSnapshotPayloadTests(_CaptureCase):
 
 
 class CaptureSnapshotRefusalTests(_CaptureCase):
+    @covers_requirement(
+        "map-capture-snapshots::capture-distinguishes-malformed-input-from-semantic-work-in-progress"
+    )
     def test_a_malformed_layout_is_refused_and_never_becomes_a_fallback(self):
         root = self.workspace()
         layout = root / LAYOUT
@@ -294,6 +307,9 @@ class CaptureSnapshotRefusalTests(_CaptureCase):
         self.assert_unchanged(root, before)
         self.assertEqual(_sha(layout), before[LAYOUT])
 
+    @covers_requirement(
+        "map-capture-snapshots::capture-distinguishes-malformed-input-from-semantic-work-in-progress"
+    )
     def test_a_malformed_source_is_refused(self):
         root = self.workspace()
         locations = root / "content/maps/locations.yaml"
@@ -326,6 +342,9 @@ class CaptureSnapshotRefusalTests(_CaptureCase):
 
 
 class CaptureSnapshotPartitionTests(_CaptureCase):
+    @covers_requirement(
+        "map-capture-snapshots::visible-continental-partition-requires-current-decoded-output"
+    )
     def test_missing_malformed_and_stale_output_is_refused_with_guidance(self):
         root = synthetic.write_partitionable_workspace(self.root / "workspace")
 
@@ -363,6 +382,9 @@ class CaptureSnapshotPartitionTests(_CaptureCase):
         self.assertEqual((root / ARTIFACT).read_bytes(), prior)
         self.assert_unchanged(root, before)
 
+    @covers_requirement(
+        "map-capture-snapshots::visible-continental-partition-requires-current-decoded-output"
+    )
     def test_hidden_partition_and_other_views_never_need_the_artifact(self):
         root = self.workspace()
         before = synthetic.tree_digest(root)

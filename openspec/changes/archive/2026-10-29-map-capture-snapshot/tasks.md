@@ -12,5 +12,5 @@
 
 ## 3. Final integration and evidence
 
-- [ ] 3.1 Attach each new requirement to substantive discoverable top-level adapter tests using canonical IDs obtained from an equivalent merged spec tree; record any meaningful provisional nearest-current associations/reasons while active and verify zero uncovered post-sync requirements without inventing IDs or tests that only assert forwarding.
+- [X] 3.1 Attach each new requirement to substantive discoverable top-level adapter tests using canonical IDs obtained from an equivalent merged spec tree; record any meaningful provisional nearest-current associations/reasons while active and verify zero uncovered post-sync requirements without inventing IDs or tests that only assert forwarding.
 - [X] 3.2 Run `uv run --locked --project tools/map-editor python -m pytest tools/map-editor/tests/test_capture_snapshot.py tools/map-editor/tests/test_snapshot.py tools/map-editor/tests/test_confinement.py` from root, the focused `uv run --locked python -m unittest tests.test_map_capture_snapshot`, `openspec validate map-capture-snapshot --strict` and `uv run --locked python -m tools.contract_gate`; record observed loader/partition/read-only outcomes. Do not run full CI suites or implement browser/command functionality in this slice.
