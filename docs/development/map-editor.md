@@ -1297,3 +1297,192 @@ rendered by the commands above and captured per view at 1280×960:
 - **Explicit region** `[0,0,10,20]` kilometres at 200×100: the image is exactly
   the requested extent (reported `[-15,0,25,20]`) and content beyond it clips
   at the edge, as intended for a regional capture.
+
+## 11. Offline Image Capture Command
+
+One documented invocation turns one authored view into one lossless image
+without a service, a dev server or Node. It composes the two owners above
+rather than reimplementing them: `capture_snapshot.load_capture_snapshot` for
+the read-only projection (§3.13) and the built map-only page (§10) for the
+drawing.
+
+### 11.1 Ownership and setup
+
+| Piece | Owner |
+| --- | --- |
+| Thin command entry | `.agents/skills/map-data-authoring/scripts/capture_map.py` (argument-independent; calls `main()`) |
+| Orchestration | `tools/map-editor/elosern_map_editor/capture.py` |
+| Dependencies | optional developer group `capture` in `tools/map-editor/pyproject.toml` (Playwright + Pillow), locked in that project's `uv.lock` |
+| Rendering | `tools/map-editor/frontend/capture-dist/` from `build:capture` (§1.2) |
+
+The group is optional on purpose: the editor service and its default test
+environment install neither Playwright nor Pillow. Playwright is pinned to the
+same version the repository's browser suites use, so one installed Chromium
+build serves both. Prepare the environment explicitly; the command installs
+nothing at runtime (`--no-sync`) and reports the missing step instead.
+
+```console
+uv sync --locked --project tools/map-editor --group capture
+uv run --locked --project tools/map-editor --group capture playwright install chromium
+pnpm --dir tools/map-editor/frontend install --frozen-lockfile
+pnpm --dir tools/map-editor/frontend run build:capture
+```
+
+Runtime, from the source workspace root:
+
+```console
+uv run --locked --no-sync --project tools/map-editor --group capture python \
+    .agents/skills/map-data-authoring/scripts/capture_map.py \
+    --view continent --output /tmp/continent.webp
+```
+
+### 11.2 Argument, layer and output rules
+
+The authoritative user-facing tables (arguments, defaults, units, per-view
+layers, examples, refusal behaviour, the success object and the read-the-image
+workflow) live in
+`.agents/skills/map-data-authoring/references/verification.md#capturing-an-image-of-a-map`
+and are summarised in `SKILL.md`. Implementation notes:
+
+- `argparse` runs with `allow_abbrev=False`; `--show`, quality sliders, AVIF/
+  JPEG, service URLs and any unknown flag are rejected. Argument validation
+  raises `CaptureError` instead of exiting, so the command always reports one
+  short stderr diagnosis and never a Python traceback.
+- The layer vocabulary is per view (`LAYERS`): unknown names and layers of
+  another view are refused with the applicable list. Repeats deduplicate and
+  sort.
+- Bounds must be four finite numbers with strictly increasing axes; dimensions
+  must be positive integers; the suffix must spell the selected format
+  (case-insensitive) and the parent directory must exist. The final path
+  component is never resolved, so replacing a symlink replaces the link.
+- Validation happens before the snapshot is loaded and before a browser is
+  launched.
+
+### 11.3 Render, encode, publish
+
+1. `load_capture_snapshot(cwd, view=…, map_id=…, hidden_layers=…)` reads the
+   workspace once. Its refusals (`structure`, `unknown_map`, `wrong_view`,
+   `invalid_*`, `partition_unavailable` with reason `missing`/`malformed`/
+   `stale`) pass through with their guidance; partition guidance names both
+   `regenerate_partition.py` and `--hide partition`.
+2. A fresh headless Chromium context is opened with the requested viewport,
+   device scale factor 1 and service workers blocked. Every `http`/`https`
+   request is aborted and recorded, and a WebSocket is refused before it can
+   connect to any server (`route_web_socket` without a server connection).
+   Any recorded attempt fails the capture after the render, so a page that
+   reaches for the network can never publish an image.
+3. The page is the built `capture-dist/index.html` opened by `file:` URL. The
+   payload (world projection, partition outlines, view, map id, size, bounds,
+   hidden layers) is passed as structured data to
+   `window.renderMapCapture` — never interpolated into HTML or source.
+4. Readiness is awaited inside one race against a 20 s deadline; the same
+   bound applies to the navigation and the screenshot. There is no fixed
+   sleep and no capture before the entry resolves `{bounds, units, axes}`. A
+   page whose script is missing, whose fonts never settle, or whose fit cannot
+   hold the map rejects the promise and the run.
+5. `[data-capture-stage]` is screenshotted as PNG at exactly the requested
+   pixels; the decoded size is checked and re-encoded with Pillow (`WEBP` with
+   `lossless=True`, or `PNG`). Both are lossless copies of the same pixels.
+6. The stage file is written in the destination directory, flushed and
+   `fsync`ed, then `os.replace`d into place. The destination is never opened
+   for writing, and the success JSON is serialized before the replacement, so
+   a failure cannot damage an existing image, publish a partial file, or print
+   a result that describes an old image. Replacement is the last filesystem
+   step; if writing the already-serialized document to stdout fails afterwards
+   (a closed pipe, a stream that rejects the write), the image stays published
+   and the command refuses with `report_failed`, naming the file it wrote.
+7. Page, context, browser and Playwright are closed in a `finally` chain that
+   swallows teardown errors so every later step still runs; the stage file is
+   removed on success and failure. No browser survives a refused render.
+
+On success, exactly one JSON object on stdout carries `image_path` (absolute),
+`view`, `map_id` (null for the continent), `format`, `width`, `height`,
+`bounds` (the expanded camera in the view's own frame), `units`, `axes`,
+`hidden_layers` and the snapshot `diagnostics`. Exit 0 means the image was
+produced; it never means the map is game-ready.
+
+### 11.4 Focused checks
+
+```console
+# Command orchestration, staging and browser lifetime (editor environment + capture group).
+uv run --locked --project tools/map-editor --group capture python -m pytest tools/map-editor/tests/test_capture.py
+
+# Real subprocess captures and the refusal matrix (repository root).
+uv run --locked python -m unittest tests.test_map_image_capture
+
+# Real browser page and readiness contract (build the capture page first, §1.2).
+uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_image_capture
+```
+
+`tools/map-editor/tests/test_capture.py` covers the argument/path matrix,
+staging with injected `os.replace`/`fsync` failures, teardown ordering with a
+recorded fake browser, and real throwaway pages for deadline expiry, a missing
+entry script and a network attempt (the Pillow/Playwright cases skip when the
+optional group is not installed).
+`tests/test_map_image_capture.py` runs the real command in the editor's
+capture environment against a temporary synthetic workspace and checks the
+published bytes, the success object, the whole refusal matrix, partition
+refusals with their guidance, unchanged digests and no temporary leftovers.
+`web/tests/browser/test_map_image_capture.py` drives the same command against
+the built page (see §11.6 for its assertions).
+
+### 11.5 Human review record
+
+Reviewed 2026-10-29 in this checkout. Every capture below ran with
+`unshare -rn`, an empty network namespace: no editor service (the host's
+service on 127.0.0.1:8765 was unreachable) and no route to any asset. The
+command double-checks this itself by failing on any attempted HTTP/WebSocket
+request, and no such attempt occurred.
+
+```console
+unshare -rn tools/map-editor/.venv/bin/python -I .agents/skills/map-data-authoring/scripts/capture_map.py \
+    --view continent --output /tmp/map-capture-review/continent.webp
+unshare -rn tools/map-editor/.venv/bin/python -I .agents/skills/map-data-authoring/scripts/capture_map.py \
+    --view settlement --map capital_altoria --output /tmp/map-capture-review/altoria.webp
+unshare -rn tools/map-editor/.venv/bin/python -I .agents/skills/map-data-authoring/scripts/capture_map.py \
+    --view interior --map altoria_tavern --output /tmp/map-capture-review/tavern.webp
+unshare -rn tools/map-editor/.venv/bin/python -I .agents/skills/map-data-authoring/scripts/capture_map.py \
+    --view continent --format png --output /tmp/map-capture-review/continent.png
+```
+
+Observed success objects: continent `bounds` in kilometres
+≈`[-568.6, -71.1, 3220.9, 2771.1]`, settlement in metres
+≈`[-750.8, -136.9, 8443.6, 6758.9]`, interior in layout units
+≈`[-1.12, -0.47, 0.12, 0.47]` with `axes {x: right, y: down}`; all at
+1280×960 with no diagnostics (this checkout's partition and reference index
+are current). Every layer of every view was then hidden in a separate real
+capture at 640×480: all twelve succeeded and each reported exactly the same
+`bounds` as its view's all-visible capture, so hiding never moved the camera.
+
+The images were actually opened with the agent's image reader, which decoded
+both `image/webp` and `image/png` (no silent conversion was needed):
+
+- **Continent (WebP, 1280×960)**: map-only, no chrome. Mainland boundary,
+  passability raster, forest edge, ridge column with three pass glyphs, rivers
+  with ford bars, harbour squares and all district boundaries read as in the
+  editor. Labels 永夜迷宮, 幽月谷村, 龍之巢穴, 咆哮王城, 翠綠森林村, 煌煌帝都,
+  暗影谷村, 魔導遺跡, 聖煌王都 are legible Traditional Chinese with no tofu.
+  At 1280×960 the harbour-site names crowd the location labels on the south
+  coast; a regional `--bounds` capture is the documented way to read them.
+- **Settlement (WebP, 1280×960)**: dot-field background, the complete node
+  graph with both directed directions, gate glyphs at 東門 and 南門, and
+  readable labels (王宮前庭, 上城門, 大神殿前, 中央廣場, 東市, 碼頭, …). Road
+  bends follow the authored coordinates and the topology matches the document.
+- **Interior (WebP, 1280×960)**: the dashed exterior card naming
+  `capital_altoria / 客棧巷` and its link to the 聖潔王都醉月酒館 card, with
+  readable Traditional Chinese labels. Every repository interior is a
+  single-room document, so the card pair and the wide fallback spacing are the
+  real repository result; multi-room layout and fallback positions are covered
+  by the synthetic tests instead. Hidden `labels` removed text but kept the
+  cards, and hidden `exterior` removed the card and its dashed link.
+- **Continent labels hidden (PNG, 640×480)**: no text remains while harbour
+  squares, ford bars, pass glyphs and the dotted background stay, at the same
+  camera as the labelled capture.
+- **Settlement roads hidden (PNG, 640×480)**: node marks with labels remain,
+  every road and bend is gone, and the gate glyphs stay.
+
+Source, layout, partition and reference-index digests were unchanged before
+and after the review (`git status` shows no modification under `content/` or
+`world/`). No stage, `*.tmp` or browser artefact remained in the output
+directory. §10.4's interactive-surface smoke remains applicable unchanged:
+this change adds no frontend code and the shared surface was not modified.
