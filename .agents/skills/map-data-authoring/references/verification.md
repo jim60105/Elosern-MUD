@@ -122,6 +122,12 @@ user really wants may still need a game-side decision.
 - `unreachable_landmark` / `blocked_approach`: a district landmark or gate
   approach lands on sea, ridge or river, or cannot reach the rest of the map.
   Move the landmark, or open a pass or ford.
-- `binding.anchor_cell != location cell`: you moved one side of a town only.
-  Move the other side to match.
+- `footprint_location_offset` (`severity: warning`): the mask's bounding-box
+  midpoint no longer equals the location cell. It is advisory — the world-map
+  marker and the wilderness entrance are then in different places — and it
+  never blocks saving, generation or adoption. Shift `wilderness_entry.offset`
+  if you want them to coincide.
+- `missing_anchor_room` / `multiple_anchor_rooms` / `anchor_location_mismatch`:
+  the map needs exactly one `anchor_room` whose `anchor_key` is its
+  `location_ref`. Nothing is promoted automatically; fix the node itself.
 - `stale_partition`: expected after any partition-input edit. Regenerate it.

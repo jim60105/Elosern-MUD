@@ -11,6 +11,8 @@ authoritative map.
 | Concern | Unit / owner |
 | --- | --- |
 | Settlement node coordinate | integer metres in the settlement's local frame (`x` east, `y` north), declared in `content/maps/settlements/<map_id>.yaml` |
+| Settlement world frame | `locations[location_ref].cell` plus the settlement's unique `anchor_room` node; derived by `elosern_map_core.geometry.local_to_world_m`, never authored twice |
+| Wilderness footprint origin | `locations[location_ref].cell` plus the entry's signed `offset{dx, dy}`; no absolute origin is authored |
 | Road length | Euclidean distance between the authored endpoints, owned by `packages/map-core/elosern_map_core/sparse.py` |
 | Road compass exit | authored per directed road (`direction`); an oblique metre delta never renames an exit |
 | Source discovery and publication | `world/maps/map_data.py` (sorted discovery, validated candidate, immutable snapshot) |
@@ -45,6 +47,13 @@ closure that does not resolve before startup synchronization writes anything.
   direction and the authored capital shortcuts（工匠巷↔校場外 `ne/sw`、
   大神殿前↔東市 `se/nw`). `options` holds the map-wide visual-range settings and
   `exit_prototype` the wildcard exit override.
+- A document authors no binding and no absolute footprint origin. Dragging the
+  location on the continent (one command, one undo entry, only
+  `locations.yaml`) translates every node's world metres, the mask, its
+  midpoint and every gate approach by the same cell delta. Dragging the
+  `anchor_room` node instead changes the local frame: the anchor stays on the
+  location cell's centre and every untouched node shifts by the negative local
+  delta, while the location and the mask stay fixed.
 - The measured baselines at the 1.25 m/s healthy settlement speed are 2,193 s
   （南門→中央廣場，~37 min）, 5,618 s（南門→王宮前庭，~94 min）and 431 s
   （隱密小徑→長老古樹下，~7 min）. Unequal segment lengths charge and display

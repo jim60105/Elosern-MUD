@@ -16,7 +16,7 @@ through the locked local dependency declared in the root `pyproject.toml`.
 | --- | --- |
 | Sparse nodes, explicit roads, validation, route planning | `packages/map-core/elosern_map_core/sparse.py` |
 | Contrib `XYMap` adaptation for synthetic/builder maps | `world/maps/xymap_graph.py` |
-| Authored settlement documents (nodes, roads, prototypes, options, binding, entrances) | `content/maps/settlements/<map_id>.yaml` |
+| Authored settlement documents (nodes, roads, prototypes, options, location-relative entrances) | `content/maps/settlements/<map_id>.yaml` |
 | Explicit load, cross-document validation and immutable publication | `world/maps/map_data.py` |
 | Read-only registry views over the published snapshot | `world/maps/published.py` plus the owning registry modules |
 | Persistent room/exit convergence | `world/maps/bootstrap.py::sync_grid` |
@@ -61,8 +61,7 @@ no Python registration and no reverse location list.
 
 `world/maps/map_data.py` reads the documents and `content/maps/locations.yaml`,
 validates every settlement's own declaration (one anchor room whose
-`anchor_key` is the `location_ref`, a binding that agrees with that node and
-with the location cell, authored gate/wilderness destinations, registered scene
+`anchor_key` is the `location_ref`, authored gate/wilderness destinations, registered scene
 archetypes) and the cross-document rules (no duplicate location binding, the
 terrain-independent wilderness footprint/gate rules), then publishes one
 immutable `SettlementSnapshot`. A rejected candidate raises `SettlementError`
