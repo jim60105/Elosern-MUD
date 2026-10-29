@@ -208,9 +208,13 @@ jobs:
           (cd w-a && pnpm install --frozen-lockfile && pnpm run build && pnpm run build:gm)
           (cd w-b && pnpm install --frozen-lockfile && pnpm run build && pnpm run build:gm)
           # The standalone map editor frontend has its own pnpm workspace/lock;
-          # its browser tests serve this dist from the editor service.
+          # its browser tests serve this dist from the editor service, and the
+          # capture-surface and capture-command journeys open the file-loadable
+          # capture page (capture-dist) directly.
           (cd w-a/tools/map-editor/frontend && pnpm install --frozen-lockfile && pnpm run build)
           (cd w-b/tools/map-editor/frontend && pnpm install --frozen-lockfile && pnpm run build)
+          (cd w-a/tools/map-editor/frontend && pnpm run build:capture)
+          (cd w-b/tools/map-editor/frontend && pnpm run build:capture)
 
       - name: Install Chromium and Firefox for browser acceptance
         run: uv run --locked playwright install --with-deps chromium firefox
@@ -330,6 +334,9 @@ jobs:
       - name: Build map editor frontend with Vite
         run: pnpm --dir tools/map-editor/frontend run build
 
+      - name: Build the offline capture page with Vite
+        run: pnpm --dir tools/map-editor/frontend run build:capture
+
       - name: Build Storybook component showcase
         run: pnpm run build-storybook
 
@@ -343,6 +350,7 @@ jobs:
           test -s web/static/gm/dist/index.js
           test -s web/static/gm/dist/index.css
           test -s tools/map-editor/frontend/dist/index.html
+          test -s tools/map-editor/frontend/capture-dist/index.html
 
   top-level:
     needs: preflight
@@ -373,6 +381,16 @@ jobs:
 
       - name: Sync locked environment
         run: uv sync --locked
+
+      - name: Prepare the map editor capture toolchain
+        # tests/test_map_image_capture.py runs the offline capture command,
+        # which loads the file-loadable capture page and renders it in
+        # headless Chromium from the editor's own capture environment
+        # (capture.py::build_missing and ::SETUP_GUIDANCE name both halves).
+        run: |
+          pnpm --dir tools/map-editor/frontend install --frozen-lockfile
+          pnpm --dir tools/map-editor/frontend run build:capture
+          uv run --locked --project tools/map-editor --group capture playwright install --with-deps chromium
 
       - name: Run top-level regression suite with coverage
         env:
