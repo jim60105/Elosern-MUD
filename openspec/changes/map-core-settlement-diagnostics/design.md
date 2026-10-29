@@ -69,6 +69,14 @@ Update shard manifests only if new test modules/classes/methods require it. Exis
 
 Update `docs/development/map-authoring-documents.md` validation ownership and `.agents/skills/map-data-authoring/SKILL.md`'s invariant table and check descriptions. Mark moved rules core-owned; retain binding repair advice until the next change removes those fields. Update skill `scripts/check_map_sources.py` with the delegation. Human reviewers use `tmp/map-editor-location-move-handoff.md` and `docs/superpowers/specs/2026-10-26-map-editor-design.md` to review completeness and prose. No new requirement pins a document's wording or a shipped-data roster.
 
+### D5. Refresh the external-reference context with each slice
+
+`tools/map_reference_context.py` discovers and hashes `packages/map-core/elosern_map_core/**/*.py` and `world/lore/**/*.py`, including files changed here. Coordinate-only edits do not invalidate that context, but implementation edits do. Regenerate and commit `content/map-reference-context.json` after this slice's final core/lore changes, then run `uv run --locked python -m tools.map_reference_context --check`. The dependent change regenerates it again after its own code cutover. Do not remove dependencies or weaken freshness checks to avoid regeneration.
+
+The exporter bootstraps through `runtime.compose()` and has no source-root CLI argument. The protected live reproduction still violates binding equalities at this intermediate stage. Generate/check in a temporary repository copy containing this slice's final implementation and valid committed pre-change authored geography; run the module from that copy so module `__file__` roots and imports agree. Do not restore files over the user's sources. Copy back only the generated reference-context artifact and verify its source manifest matches the actual changed core/lore code; editable map YAML is excluded from that manifest. Use the same valid copy for the broader contract gate while the root remains the unresolved reproduction. Its result is evidence for the isolated candidate, never a claim that the dirty live world was adopted.
+
+This necessary generated index is the only artifact refresh in this slice. The partition remains untouched. Existing reference-context freshness/deletion tests establish the unchanged mechanism; no new data-pinning requirement is introduced.
+
 ## Risks / Trade-offs
 
 - Game validation previously short-circuits while core aggregates. Mitigation: deterministic codes and independently invalid inputs prevent message-order coupling.
@@ -78,8 +86,8 @@ Update `docs/development/map-authoring-documents.md` validation ownership and `.
 
 ## Migration Plan
 
-No data or compatibility migration. Land shared rules, switch every game/checker caller, and delete the former implementations in the same implementation change. No schema or authored sources change here. Rollback is a normal source change before release, with no persisted map-state conversion.
+No data or compatibility migration. Land shared rules, switch every game/checker caller, delete the former implementations and refresh the generated reference context in the same implementation change. No schema or authored sources change here. Rollback is a normal source change before release, with no persisted map-state conversion.
 
 ## Verification plan
 
-During implementation, run the focused core authoring tests, `tests.test_map_authoring_contract`, affected settlement/interior/lore game tests with the guarded Evennia env-file command, the skill checker on an independently valid workspace, `tools.contract_gate`, and `openspec validate map-core-settlement-diagnostics --strict`. An expected error from the live reproduction is not a successful world-validation claim. Proposal creation runs only OpenSpec artifact validation.
+During implementation, run the focused core authoring tests, `tests.test_map_authoring_contract`, affected settlement/interior/lore game tests with the guarded Evennia env-file command, the skill checker on an independently valid workspace, reference-context generation/check and `tools.contract_gate` in the valid isolated candidate described in D5, and `openspec validate map-core-settlement-diagnostics --strict`. An expected error from the live reproduction is not a successful world-validation claim. Proposal creation runs only OpenSpec artifact validation.
