@@ -308,7 +308,7 @@ tile run.
 | `world/maps/runtime.py` | `compose`, `adopt`, `synchronize`, `current` | The one map composition root: complete-candidate validation, one immutable bundle, and the persistent synchronization that commits it. |
 | `world/maps/geography.py` | `build_geography`, `current` | Composition of the immutable `GeographySnapshot` from the candidate documents; every consumer reads the adopted `current()`. |
 | `world/lore/wilderness_regions.py` | `regions`, `harbor_sites`, `frame_cells`, `mainland_boundary_km`, `is_wilderness_cell`, `mainland_area_km2`, `is_on_mainland` | Thin read-only accessors over the published snapshot, bound into `elosern_map_core.geometry`; boundary points count as land. |
-| `world/lore/anchors.py` | `anchors`, `anchor_geography`, `ANCHOR_LORE`, `LOCAL_FRAME_ANCHOR_REGISTRY`, `world_position_m` | The composed location views (map-facing fields plus the non-map nation/population/floor lore joined by identity). The frame anchors are the published settlement documents' anchor bindings, keyed by `location_ref`; the transform itself is `elosern_map_core.geometry.local_to_world_m`. |
+| `world/lore/anchors.py` | `anchors`, `anchor_geography`, `ANCHOR_LORE`, `LOCAL_FRAME_ANCHOR_REGISTRY`, `world_position_m` | The composed location views (map-facing fields plus the non-map nation/population/floor lore joined by identity). The frame anchors are *derived* from each published settlement document's unique `anchor_room` node, keyed by `location_ref`; the transform itself is `elosern_map_core.geometry.local_to_world_m`, applied to that location's cell. |
 | `world/lore/nations.py` | `CONTINENT_AREA_KM2`, `CONTINENT_POPULATION`, `ELVEN_POPULATION`, `NEUTRAL_LANDS_AREA_KM2`, `NEUTRAL_LANDS_POPULATION`, `CAPITAL_POPULATION_SHARE` | Rounded continental totals. The neutral lands have no separate regional population total. |
 | `world/lore/nations.py` | `Nation.territory_km2`, `CapitalSupport`, `CAPITAL_SUPPORT_REGISTRY` | National area targets and the authored regional food/storage/water support (Valhalla additionally declares pastoral production and trade). |
 
@@ -324,10 +324,11 @@ Nothing in the declarations creates per-cell population or resource state.
   (`elosern_map_core.geometry.cell_center_m`).
 - Settlement positions are integer metres east/north. Their `z` coordinate
   remains the logical grid/layer and is never physical elevation.
-- Cross-layer geometry uses the bound local anchor:
-  `world_m = wilderness_anchor_center_m + local_m - local_anchor_m`
-  (`world_position_m`). Altoria's plaza `(3500, 2850)` binds to cell
-  `(860, 1080)`; Ciaran's plaza `(220, 305)` binds to cell `(1340, 1220)`.
+- Cross-layer geometry uses the location cell and the settlement's own anchor
+  node: `world_m = cell_center_m(locations[location_ref].cell) + local_m -
+  anchor_room_position_m` (`world_position_m`). A location drag therefore moves
+  the settlement without editing its document, and an `anchor_room` drag keeps
+  that node on the location cell's centre while the untouched nodes shift.
 - Never subtract settlement-local metres directly from wilderness cell indices.
   Interiors without coordinates stay coordinate-free connected scenes.
 - The frame describes one continent. No planet size or further continent is

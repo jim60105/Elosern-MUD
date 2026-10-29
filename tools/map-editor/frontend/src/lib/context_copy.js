@@ -48,8 +48,11 @@ function coordinates(world, entry) {
   if (entry.kind === "node") {
     const settlement = world.settlements.find((row) => row.id === entry.mapId);
     const node = settlement.nodes.find((row) => row.qualified_ref === entry.ref);
+    const worldText = node.world_m
+      ? `世界 東 ${node.world_m[0]} m、北 ${node.world_m[1]} m（大陸地理座標，公尺）`
+      : "世界座標未定（缺錨點房間或地點）";
     return [
-      `座標：東 ${node.local_m[0]} m、北 ${node.local_m[1]} m（據點地方座標，公尺）；世界 東 ${node.world_m[0]} m、北 ${node.world_m[1]} m（大陸地理座標，公尺）`,
+      `座標：東 ${node.local_m[0]} m、北 ${node.local_m[1]} m（據點地方座標，公尺）；${worldText}`,
     ];
   }
   const interior = world.interiors.find((row) => row.id === entry.mapId);

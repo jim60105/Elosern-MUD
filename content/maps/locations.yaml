@@ -64,8 +64,8 @@ locations:
     display_name_zh: 暗影谷村
     description: Ciaran village underground on the western side of the neutral central range.
     cell:
-      cell_x: 1340
-      cell_y: 1220
+      cell_x: 1366
+      cell_y: 554
     geographic_constraint: Underground settlement on the western flank of the central mountains
     scene_archetype:
   village_eolas:
@@ -82,7 +82,7 @@ locations:
     display_name_zh: 翠綠森林村
     description: Fionnen village on the eastern side of the neutral central range.
     cell:
-      cell_x: 1490
-      cell_y: 1510
+      cell_x: 1465
+      cell_y: 1237
     geographic_constraint: Forest on the eastern mountain flank
     scene_archetype:

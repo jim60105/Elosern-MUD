@@ -25,12 +25,12 @@ Rules and joins:
 - A location **never** lists its local maps. A settlement declares
   `location_ref: <location_id>`, and the editor's 開啟本地圖 follows that
   field. At most one settlement may bind a location.
-- **Moving a location**: if a settlement binds it, the settlement's
-  `binding.anchor_cell` **must** equal the new `cell`. Normally you also shift
-  `wilderness_entry.origin` by the same delta, so the footprint's
-  bounding-box midpoint lands on the new cell (see
-  [settlements.md](settlements.md)). The cell must be inside the frame and on
-  the mainland. A footprint must also be walkable: no ridge wall or river.
+- **Moving a location**: change `cell` and nothing else. The settlement's world
+  frame comes from this cell and its unique `anchor_room`, and its footprint
+  origin is this cell plus the entry's offset, so every node's world metres,
+  the mask, its midpoint and every gate approach translate by the same delta
+  (see [settlements.md](settlements.md)). The cell must be inside the frame and
+  on the mainland. A footprint must also be walkable: no ridge wall or river.
 - Political affiliation, population and dungeon floor counts are **not**
   map fields. They live in `ANCHOR_LORE` (`world/lore/anchors.py`). Every
   `ANCHOR_LORE` row must have a location with the same id. Nation capitals

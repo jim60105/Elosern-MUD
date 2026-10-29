@@ -475,20 +475,29 @@ local anchor is metres (`m 地方`).
 | `add_site`, `set_site_field`, `remove_site` | continent | reserved (harbour) sites: `site_id`, `display_name`, `role`, `cell` |
 | `create_location`, `set_location_field`, `delete_location` | locations | a new `location_id` plus `kind`, `display_name_zh`, `description`, `geographic_constraint`, `scene_archetype`, `cell`; established IDs are never renamed |
 | `create_district`, `set_district_field` | districts | names, `membership` `{kind, region_key}` (set together) and a stable qualified `landmark` `{domain, map_id, object_id, cell}` |
-| `set_footprint_cell` | settlement | `settlement_id`, absolute `cell`, `filled`; a filled cell outside the mask grows it with `.` (at most 64x64) |
-| `set_binding` | settlement | `settlement_id`, `anchor_cell`, `local_anchor_m` |
+| `set_footprint_cell` | settlement | `settlement_id`, absolute `cell`, `filled`; a filled cell outside the mask grows it with `.` (at most 64x64). The saved value is the mask's offset from the settlement's location cell, so existing `#` cells keep their absolute positions and a later location move carries the whole mask |
 
 Creating a location never creates a local map, room or settlement document;
 a local map is a separate settlement command. Locations derive their local
 maps from settlement `location_ref` values, so 開啟本地圖 appears only when one
 exists and 無本地圖 otherwise.
 
+There is no editable binding and no `set_binding` command: a settlement's world
+frame is derived from its location cell and its unique `anchor_room` node. A
+location drag on the continent is therefore one `set_location_field` command
+and one undo entry writing only `locations.yaml`; the reloaded core translates
+every node's world metres, the mask and every gate approach by the drag delta,
+and the partition becomes stale without being rewritten.
+
 The projection adds the core's `terrain_preview` (`terrain_preview()` over
 `terrain_definition()` of the current inputs, sampled on at most 90x90 cells
 with region and surface codes, the closed ridge walls between passes, pass
 centres and the derived national borders), the ridge, coastal and
 border-river fields, full region fields, ford centres and each settlement's
-`footprint` (`shape`, `origin`, `cells`). Inconsistent terrain inputs save as
+`footprint` (`shape`, the authored `offset`, and the derived absolute `origin`
+and `cells`), plus each settlement's derived `world_frame`
+(`anchor_cell`, `local_anchor_m`) and node `world_m` — `null` while the frame is
+unavailable (no anchor room yet). Inconsistent terrain inputs save as
 diagnosed work in progress with `terrain_preview.status: unavailable`.
 
 Derived output is never written and never handled: a committed change to a
@@ -524,7 +533,7 @@ the browser, infers or recomputes a compass direction from positions.
 
 | Command | Arguments |
 | --- | --- |
-| `create_settlement` | `settlement_id` (new), `location_id` (existing), `anchor_cell`, `local_anchor_m`, `options` (`{map_visual_range, map_mode}` or `null`); expected presence `absent` |
+| `create_settlement` | `settlement_id` (new), `location_id` (existing), `options` (`{map_visual_range, map_mode}` or `null`); expected presence `absent`. The document starts with no binding, no nodes and no roads, so it is diagnosed unfinished rather than playable; the first `create_node` becomes the `anchor_room` of that location (`anchor_key` equal to `location_ref`) and supplies the local frame |
 | `set_settlement_field` | `field` `options` or `exit_prototype`, `value` (`null` removes it) |
 | `create_node` | `node_id` (new) and `fields` with every node field (`x_m`, `y_m`, `prototype_parent`, `key`, `desc`, `anchor_key`, `typeclass`, `scene_archetype`) |
 | `duplicate_node` | `node_id`, `new_node_id`, `x_m`, `y_m` |
@@ -548,7 +557,18 @@ saved work in progress with its diagnostic.
 - **A new local map** writes only its settlement document: no location data,
   since a location's local maps derive from `location_ref`. It has no nodes
   or roads and the core diagnoses it `empty_graph` (semantic), so it is never
-  presented as playable. Undo removes the file.
+  presented as playable. Its first created node becomes the `anchor_room` of
+  that location (the entered ID, position and other fields are kept) and is
+  what places the graph on the continent. Undo removes the file.
+- **The anchor node owns the local frame.** Moving `anchor_room` alone changes
+  one settlement command and one undo entry: the anchor stays on the location
+  cell's centre, the location and the footprint stay fixed, and every
+  untouched node's world position shifts by the negative local delta. A group
+  move that includes the anchor shifts each moved node and the anchor
+  together, so the selected nodes keep their world positions. Deleting the
+  anchor from a non-empty graph promotes nothing: the map reports
+  `missing_anchor_room` until the user supplies one through the existing
+  prototype fields, and the core rejects a second `anchor_room`.
 - **Identity.** Established IDs are read-only; new nodes need new IDs.
   `duplicate_node` copies the ordinary values (name, description, scene,
   typeclass, prototype) under a new ID and copies no relationship: no road,
@@ -690,7 +710,7 @@ operation. Editing one relationship writes only its owner.
 
 | Command | Owner | Arguments |
 | --- | --- | --- |
-| `create_wilderness_gate` | settlement | `settlement_id`, `return_direction`, `node`. Without a wilderness entry, a one-cell point entry is created at the binding's anchor cell (grow it with the continent 佔地 tool) |
+| `create_wilderness_gate` | settlement | `settlement_id`, `return_direction`, `node`. Without a wilderness entry, a one-cell point entry is created at offset `(0, 0)` — its hash cell is the location cell — and the continent 佔地 tool can then grow it |
 | `set_wilderness_gate` | settlement | `settlement_id`, `return_direction` of an existing gate, `value` `{return_direction, node}` |
 | `delete_wilderness_gate` | settlement | `settlement_id`, `return_direction`. The last gate is refused (`last_gate`): an entry keeps at least one gate |
 | `remove_wilderness_entry` | settlement | `settlement_id`: the explicit removal of the whole entry, its footprint mask included (undoable) |

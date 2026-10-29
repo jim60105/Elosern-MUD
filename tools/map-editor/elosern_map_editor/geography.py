@@ -1,4 +1,4 @@
-"""Named geography commands: continent, locations, districts, footprints, bindings.
+"""Named geography commands: continent, locations, districts and footprints.
 
 Every handler here is a :class:`~elosern_map_editor.commands.DocumentCommand`
 that replaces exactly one existing world document:
@@ -38,10 +38,12 @@ that replaces exactly one existing world document:
 
 ``content/maps/settlements/<settlement_id>.yaml``
     ``set_footprint_cell`` ``{settlement_id, cell, filled}`` toggles one
-    wilderness cell of the settlement-owned footprint mask (growing the mask
-    with ``.`` when the cell lies outside it) and ``set_binding``
-    ``{settlement_id, anchor_cell, local_anchor_m}`` sets the local/world
-    binding. Interior positions are never assigned metres.
+    absolute wilderness cell of the settlement-owned footprint mask (growing
+    the mask with ``.`` when the cell lies outside it). The saved value is the
+    mask's offset from the settlement's location cell, so the absolute-cell
+    contract never leaks an origin into the document. There is no editable
+    binding: the world frame comes from the location cell and the unique
+    ``anchor_room`` node. Interior positions are never assigned metres.
 
 Arguments are type-checked here; field values are then validated by the core
 schema and the complete world by the authoring gate. Established IDs are
@@ -597,29 +599,48 @@ class SetDistrictField(_Districts):
         _apply_district(district, arguments["field"], _field_value(_DISTRICT_FIELDS, arguments))
 
 
-# -- settlement-owned footprint and binding ----------------------------------
+# -- settlement-owned footprint ----------------------------------------------
 class _Settlement(DocumentCommand):
     def owner(self, arguments: dict[str, Any]) -> str:
         return settlement_document(arguments["settlement_id"])
 
 
-def toggled_mask(entry: dict[str, Any], cell: tuple[int, int], filled: bool) -> tuple[list[str], dict[str, int]]:
-    """The mask and origin with one absolute wilderness cell set or cleared.
+def _location_cell(world: dict[str, Any] | None, location_ref: str) -> tuple[int, int] | None:
+    """The authored cell of ``location_ref`` in the published projection."""
 
-    Mask row ``r`` / column ``c`` is cell ``(origin_x + c, origin_y + r)``. A
-    filled cell outside the mask grows it with ``.`` (shifting the origin
-    west/south as needed); clearing a cell outside it changes nothing. Gates
-    are directions and nodes, not cells, so growth never moves them.
+    for row in (world or {}).get("locations", []):
+        if row.get("id") == location_ref:
+            return (int(row["cell"][0]), int(row["cell"][1]))
+    return None
+
+
+def toggled_mask(
+    entry: dict[str, Any],
+    cell: tuple[int, int],
+    filled: bool,
+    *,
+    location_cell: tuple[int, int],
+) -> tuple[list[str], dict[str, int]]:
+    """The mask and location-relative offset with one absolute cell set or cleared.
+
+    Mask row ``r`` / column ``c`` is the absolute cell ``location_cell +
+    entry offset + (c, r)``. A filled cell outside the mask grows it with ``.``
+    (moving the offset west/south as needed); clearing a cell outside it
+    changes nothing. The saved offset is always relative to ``location_cell``,
+    so existing ``#`` cells keep their absolute positions and a later location
+    move translates the whole mask. Gates are directions and nodes, not cells,
+    so growth never moves them.
     """
 
     shape = [str(row) for row in entry["shape"]]
-    origin_x, origin_y = entry["origin"]["cell_x"], entry["origin"]["cell_y"]
+    origin_x = location_cell[0] + int(entry["offset"]["dx"])
+    origin_y = location_cell[1] + int(entry["offset"]["dy"])
     width, height = len(shape[0]), len(shape)
     x, y = cell
     inside = origin_x <= x < origin_x + width and origin_y <= y < origin_y + height
     if not inside:
         if not filled:
-            return shape, dict(entry["origin"])
+            return shape, dict(entry["offset"])
         west, south = min(origin_x, x), min(origin_y, y)
         east, north = max(origin_x + width - 1, x), max(origin_y + height - 1, y)
         new_width, new_height = east - west + 1, north - south + 1
@@ -639,19 +660,29 @@ def toggled_mask(entry: dict[str, Any], cell: tuple[int, int], filled: bool) -> 
     line = list(shape[row])
     line[column] = "#" if filled else "."
     shape[row] = "".join(line)
-    return shape, {"cell_x": origin_x, "cell_y": origin_y}
+    return shape, {
+        "dx": origin_x - location_cell[0],
+        "dy": origin_y - location_cell[1],
+    }
 
 
 class SetFootprintCell(_Settlement):
     name = "set_footprint_cell"
     keys = frozenset({"settlement_id", "cell", "filled"})
 
+    def dependencies(self, world, arguments):
+        # The absolute-cell contract converts through the published location
+        # cell, so a location document that changed after the snapshot must be
+        # reread before this command can be admitted.
+        locations = (world or {}).get("locations") or ()
+        return tuple({row["relative_path"] for row in locations})
+
     def check(self, world, arguments):
         _identifier(arguments["settlement_id"], "settlement_id")
         _pair(arguments["cell"], "cell", minimum=0)
         _bool(arguments["filled"], "filled")
 
-    def mutate(self, data, arguments):
+    def mutate_with_world(self, data, arguments, world):
         entry = data.get("wilderness_entry")
         if entry is None:
             raise refused_value(
@@ -659,26 +690,21 @@ class SetFootprintCell(_Settlement):
                 "this settlement declares no wilderness entry footprint",
                 "wilderness_entry",
             )
-        shape, origin = toggled_mask(entry, _pair(arguments["cell"], "cell", minimum=0), arguments["filled"])
+        location_cell = _location_cell(world, data["location_ref"])
+        if location_cell is None:
+            raise refused_value(
+                "unknown_location",
+                f"the location {data['location_ref']!r} of this settlement is not in the published world",
+                "location_ref",
+            )
+        shape, offset = toggled_mask(
+            entry,
+            _pair(arguments["cell"], "cell", minimum=0),
+            arguments["filled"],
+            location_cell=location_cell,
+        )
         entry["shape"] = shape
-        entry["origin"] = origin
-
-
-class SetBinding(_Settlement):
-    name = "set_binding"
-    keys = frozenset({"settlement_id", "anchor_cell", "local_anchor_m"})
-
-    def check(self, world, arguments):
-        _identifier(arguments["settlement_id"], "settlement_id")
-        _cell(arguments["anchor_cell"], "anchor_cell")
-        _pair(arguments["local_anchor_m"], "local_anchor_m")
-
-    def mutate(self, data, arguments):
-        east, north = _pair(arguments["local_anchor_m"], "local_anchor_m")
-        data["binding"] = {
-            "anchor_cell": _cell(arguments["anchor_cell"], "anchor_cell"),
-            "local_anchor_m": {"east_m": east, "north_m": north},
-        }
+        entry["offset"] = offset
 
 
 GEOGRAPHY_HANDLERS = (
@@ -701,7 +727,6 @@ GEOGRAPHY_HANDLERS = (
     CreateDistrict(),
     SetDistrictField(),
     SetFootprintCell(),
-    SetBinding(),
 )
 
 __all__ = ["GEOGRAPHY_HANDLERS", "MAX_MASK_SIDE", "settlement_document", "toggled_mask"]

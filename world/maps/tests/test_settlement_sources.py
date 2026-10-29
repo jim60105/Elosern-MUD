@@ -39,13 +39,6 @@ version: 1
 kind: settlement
 id: t_third
 location_ref: village_eolas
-binding:
-  anchor_cell:
-    cell_x: 1410
-    cell_y: 2150
-  local_anchor_m:
-    east_m: 20
-    north_m: 30
 options:
   map_visual_range: 2
   map_mode: nodes
@@ -81,9 +74,9 @@ roads:
 wilderness_entry:
   shape:
     - "#"
-  origin:
-    cell_x: 1410
-    cell_y: 2150
+  offset:
+    dx: 0
+    dy: 0
   gates:
     - return_direction: n
       destination_node: plaza
@@ -220,7 +213,7 @@ class SettlementGraphFidelityTests(unittest.TestCase):
     @covers_requirement(
         "map-settlement-sources::settlement-documents-own-complete-local-map-declarations"
     )
-    def test_moving_a_bound_node_changes_the_binding_not_the_identity(self):
+    def test_moving_a_node_changes_its_place_not_the_anchor_frame(self):
         moved = _THIRD.replace("x_m: 120", "x_m: 220")
         snapshot = _build([_document(moved)])
         graph = snapshot.graphs["t_third"]
@@ -230,7 +223,8 @@ class SettlementGraphFidelityTests(unittest.TestCase):
         self.assertEqual(edge.destination.node_id, "path")
         # The authored direction is kept, never recomputed from the delta.
         self.assertEqual(edge.direction, "e")
-        # The anchor binding is untouched by a non-anchor node move.
+        # The derived frame (location cell plus the anchor node) is untouched
+        # by a non-anchor node move.
         self.assertEqual(
             snapshot.local_frame_anchors["village_eolas"].local_anchor_m, (20, 30)
         )
@@ -295,24 +289,29 @@ class SettlementCandidateRejectionTests(unittest.TestCase):
         ).replace("    anchor_key: village_eolas", "    anchor_key:")
         self._rejected([_document(no_anchor)], "anchor_room node")
 
-    def test_a_binding_that_disagrees_with_the_anchor_node_is_refused(self):
-        self._rejected(
-            [_document(_THIRD.replace("east_m: 20", "east_m: 21"))],
-            "disagrees with anchor node",
+    def test_a_removed_duplicate_authority_is_refused(self):
+        binding = _THIRD.replace(
+            "location_ref: village_eolas",
+            "location_ref: village_eolas\n"
+            "binding:\n"
+            "  anchor_cell:\n"
+            "    cell_x: 1410\n"
+            "    cell_y: 2150\n"
+            "  local_anchor_m:\n"
+            "    east_m: 20\n"
+            "    north_m: 30",
         )
+        with self.assertRaises(AuthoringError) as caught:
+            _build([_document(binding)])
+        self.assertIn("unknown_field", {item.code for item in caught.exception.diagnostics})
 
-    def test_a_binding_that_disagrees_with_the_location_cell_is_refused(self):
-        self._rejected(
-            [
-                _document(
-                    _THIRD.replace(
-                        "    cell_y: 2150\n  local_anchor_m",
-                        "    cell_y: 2160\n  local_anchor_m",
-                    )
-                )
-            ],
-            "disagrees with location",
+        absolute_origin = _THIRD.replace(
+            "  offset:\n    dx: 0\n    dy: 0",
+            "  origin:\n    cell_x: 1410\n    cell_y: 2150",
         )
+        with self.assertRaises(AuthoringError) as caught:
+            _build([_document(absolute_origin)])
+        self.assertIn("unknown_field", {item.code for item in caught.exception.diagnostics})
 
     def test_an_unregistered_scene_archetype_is_refused(self):
         self._rejected(

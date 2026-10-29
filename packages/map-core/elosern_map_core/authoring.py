@@ -24,13 +24,16 @@ from typing import Any, Iterable, Mapping
 
 from .codec import parse_document
 from .diagnostics import (
+    ERROR,
     EXTERNAL,
     FRESHNESS,
     SEMANTIC,
     STRUCTURE,
+    WARNING,
     AuthoringError,
     Diagnostic,
     RuntimeRejection,
+    blocking,
     sorted_diagnostics,
 )
 from .documents import (
@@ -40,6 +43,7 @@ from .documents import (
     InteriorDocument,
     LocationsDocument,
     SettlementDocument,
+    WildernessEntryGeometry,
 )
 from .geometry import is_within_frame
 from .sources import SourceDocument, fingerprint_text, is_world_source
@@ -91,6 +95,52 @@ _DIRECTION_DELTAS = {
 }
 
 
+def location_cells_of(
+    locations: LocationsDocument | Mapping[str, Any] | None,
+) -> dict[str, tuple[int, int]]:
+    """Every authored location's cell, from a document or a raw mapping.
+
+    A settlement owns no geographic coordinate: its frame and its wilderness
+    entry resolve against the cell this returns for its ``location_ref``.
+    Only a real integer pair is accepted -- nothing is coerced -- and a row
+    without one is left out here so that :func:`diagnose_settlement_structure`
+    can report it instead of geometry silently disappearing.
+    """
+
+    if locations is None:
+        return {}
+    rows = getattr(locations, "locations", locations)
+    cells: dict[str, tuple[int, int]] = {}
+    for key, value in rows.items():
+        cell = getattr(value, "cell", None)
+        if cell is None and isinstance(value, Mapping):
+            raw = value.get("cell")
+            if isinstance(raw, Mapping):
+                cell = (raw.get("cell_x"), raw.get("cell_y"))
+        if cell is None or len(cell) != 2:
+            continue
+        if not all(isinstance(item, int) and not isinstance(item, bool) for item in cell):
+            continue
+        cells[str(key)] = (cell[0], cell[1])
+    return cells
+
+
+def _entry_geometries(
+    settlements: Mapping[str, SettlementDocument],
+    location_cells: Mapping[str, tuple[int, int]],
+) -> dict[str, WildernessEntryGeometry]:
+    """Each settlement's absolute entry geometry, for the locations it names."""
+
+    geometries: dict[str, WildernessEntryGeometry] = {}
+    for settlement_id, settlement in settlements.items():
+        entry = settlement.wilderness_entry
+        location_cell = location_cells.get(settlement.location_ref)
+        if entry is None or location_cell is None:
+            continue
+        geometries[settlement_id] = entry.geometry(location_cell)
+    return geometries
+
+
 def diagnose_settlement_structure(
     settlements: Mapping[str, SettlementDocument],
     locations: LocationsDocument | Mapping[str, Any] | None = None,
@@ -99,6 +149,7 @@ def diagnose_settlement_structure(
     diagnostics: list[Diagnostic] = []
     bound_locations: dict[str, str] = {}
     seen_destinations: dict[tuple[str, str], tuple[str, str]] = {}
+    cells = location_cells_of(locations)
 
     for settlement_id, settlement in sorted(settlements.items()):
         if locations is not None:
@@ -109,6 +160,20 @@ def diagnose_settlement_structure(
                         "unknown_reference",
                         STRUCTURE,
                         f"location_ref {settlement.location_ref!r} is not an authored location",
+                        document=settlement,
+                        field_path="location_ref",
+                        object_id=settlement_id,
+                    )
+                )
+            elif settlement.location_ref not in cells:
+                # A location without a usable integer cell cannot place the
+                # settlement; say so instead of silently dropping its geometry.
+                diagnostics.append(
+                    _diagnostic(
+                        "invalid_field_value",
+                        STRUCTURE,
+                        f"location {settlement.location_ref!r} declares no integer cell, "
+                        "so the settlement cannot be placed",
                         document=settlement,
                         field_path="location_ref",
                         object_id=settlement_id,
@@ -242,6 +307,8 @@ def diagnose_settlement_semantics(
 ) -> list[Diagnostic]:
     """Semantic diagnostics for settlement documents (saveable WIP, rejected by runtime/game)."""
     diagnostics: list[Diagnostic] = []
+    location_cells = location_cells_of(locations)
+    geometries = _entry_geometries(settlements, location_cells)
 
     for settlement_id, settlement in sorted(settlements.items()):
         anchor_nodes = [
@@ -264,29 +331,29 @@ def diagnose_settlement_semantics(
     point_anchors: dict[str, tuple[int, int]] = {}
 
     for settlement_id, settlement in sorted(settlements.items()):
-        entry = settlement.wilderness_entry
-        if entry is None:
+        geometry = geometries.get(settlement_id)
+        if geometry is None:
             continue
 
-        all_footprints[settlement_id] = entry.footprint_cells
-        if entry.is_point_shape and entry.anchor_cell is not None:
-            point_anchors[settlement_id] = entry.anchor_cell
+        all_footprints[settlement_id] = geometry.footprint_cells
+        if geometry.is_point_shape and geometry.anchor_cell is not None:
+            point_anchors[settlement_id] = geometry.anchor_cell
 
-        if entry.is_point_shape:
-            if len(entry.gates) > 1:
+        if geometry.is_point_shape:
+            if len(geometry.gates) > 1:
                 diagnostics.append(
                     _diagnostic(
                         "point_gate_count",
                         SEMANTIC,
                         f"settlement {settlement_id!r} point-shape entry must have exactly one gate, "
-                        f"found {len(entry.gates)}",
+                        f"found {len(geometry.gates)}",
                         document=settlement,
                         field_path="wilderness_entry.gates",
                         object_id=settlement_id,
                     )
                 )
         else:
-            cells = entry.footprint_cells
+            cells = geometry.footprint_cells
             if cells:
                 start = next(iter(cells))
                 seen = {start}
@@ -310,7 +377,7 @@ def diagnose_settlement_semantics(
                         )
                     )
 
-            anchor_cell = entry.anchor_cell
+            anchor_cell = geometry.anchor_cell
             if anchor_cell is not None and anchor_cell not in cells:
                 diagnostics.append(
                     _diagnostic(
@@ -323,7 +390,7 @@ def diagnose_settlement_semantics(
                     )
                 )
 
-        for cell in sorted(entry.mask_cells):
+        for cell in sorted(geometry.mask_cells):
             if frame_cells is not None and not is_within_frame(frame_cells, cell):
                 diagnostics.append(
                     _diagnostic(
@@ -375,13 +442,36 @@ def diagnose_settlement_semantics(
                     )
                 )
 
+    for settlement_id, geometry in sorted(geometries.items()):
+        anchor_cell = geometry.anchor_cell
+        location_cell = location_cells.get(settlements[settlement_id].location_ref)
+        if anchor_cell is None or location_cell is None or anchor_cell == location_cell:
+            continue
+        if not geometry.is_point_shape and anchor_cell not in geometry.footprint_cells:
+            # The mask is already diagnosed; an advisory about its midpoint
+            # would name a disagreement the reader cannot act on yet.
+            continue
+        diagnostics.append(
+            _diagnostic(
+                "footprint_location_offset",
+                SEMANTIC,
+                f"settlement {settlement_id!r} footprint midpoint {anchor_cell} is not "
+                f"its location cell {location_cell}; the world-map marker and the "
+                "wilderness entrance are in different places (advisory)",
+                document=settlements[settlement_id],
+                field_path="wilderness_entry.offset",
+                object_id=settlement_id,
+                severity=WARNING,
+            )
+        )
+
     seen_gate_keys: dict[tuple[tuple[int, int], str], str] = {}
     for sid, settlement in sorted(settlements.items()):
-        entry = settlement.wilderness_entry
-        if entry is None:
+        geometry = geometries.get(sid)
+        if geometry is None:
             continue
-        for gate in entry.gates:
-            approach = gate_approach_cell(entry, gate.return_direction, frame_cells=frame_cells)
+        for gate in geometry.gates:
+            approach = gate_approach_cell(geometry, gate.return_direction, frame_cells=frame_cells)
             if approach is None:
                 diagnostics.append(
                     _diagnostic(
@@ -413,7 +503,7 @@ def diagnose_settlement_semantics(
             else:
                 seen_gate_keys[gate_key] = sid
 
-            if not entry.is_point_shape:
+            if not geometry.is_point_shape:
                 for other_sid, other_fp in sorted(all_footprints.items()):
                     if other_sid != sid and approach in other_fp:
                         diagnostics.append(
@@ -454,12 +544,12 @@ def diagnose_settlement_semantics(
                         )
                     )
 
-            if entry.is_point_shape and entry.anchor_cell is not None:
+            if geometry.is_point_shape and geometry.anchor_cell is not None:
                 delta = _DIRECTION_DELTAS.get(gate.return_direction)
                 if delta is None:
                     continue
                 dx, dy = delta
-                neighbor = (entry.anchor_cell[0] + dx, entry.anchor_cell[1] + dy)
+                neighbor = (geometry.anchor_cell[0] + dx, geometry.anchor_cell[1] + dy)
                 neighbor_invalid = False
                 reason = ""
                 if frame_cells is not None and not is_within_frame(frame_cells, neighbor):
@@ -477,7 +567,7 @@ def diagnose_settlement_semantics(
                         _diagnostic(
                             "blocked_point_neighbor",
                             SEMANTIC,
-                            f"settlement {sid!r} point anchor {entry.anchor_cell} has invalid neighbor "
+                            f"settlement {sid!r} point anchor {geometry.anchor_cell} has invalid neighbor "
                             f"{neighbor} ({reason}) in its entry direction {gate.return_direction!r}",
                             document=settlement,
                             field_path="wilderness_entry.gates",
@@ -596,6 +686,7 @@ def _diagnostic(
     field_path: str = "",
     relative_path: str | None = None,
     object_id: str | None = None,
+    severity: str = ERROR,
 ) -> Diagnostic:
     location = None
     if document is not None:
@@ -610,6 +701,7 @@ def _diagnostic(
         line=location.line if location else None,
         column=location.column if location else None,
         object_id=object_id,
+        severity=severity,
     )
 
 
@@ -987,13 +1079,15 @@ def _structural_diagnostics(
 
 
 def gate_approach_cell(
-    entry: Any,
+    geometry: Any,
     return_direction: str,
     *,
     frame_cells: int | None = None,
 ) -> tuple[int, int] | None:
     """The exterior cell a traveller stands on to take one authored gate.
 
+    ``geometry`` is an entry's absolute geometry, resolved against an explicit
+    location cell; an authored offset is never an origin here.
     Point-shape entries (exactly one ``#``) use the anchor cell itself. A
     footprint entry walks from the footprint's bounding-box midpoint along the
     face opposite the gate's return direction while inside the footprint; the
@@ -1006,14 +1100,14 @@ def gate_approach_cell(
     - frame_cells is given and the approach cell is outside frame_cells.
     """
 
-    anchor = entry.anchor_cell
+    anchor = geometry.anchor_cell
     if anchor is None:
         return None
-    if entry.is_point_shape:
+    if geometry.is_point_shape:
         if frame_cells is not None and not is_within_frame(frame_cells, anchor):
             return None
         return anchor
-    footprint = entry.footprint_cells
+    footprint = geometry.footprint_cells
     if anchor not in footprint:
         return None
     direction = _OPPOSITE_DIRECTION.get(return_direction)
@@ -1021,7 +1115,7 @@ def gate_approach_cell(
         return None
     delta_x, delta_y = _DIRECTION_DELTAS[direction]
     cell = anchor
-    max_steps = len(entry.shape) * max(len(entry.shape[0]), 1) + 2
+    max_steps = len(geometry.shape) * max(len(geometry.shape[0]), 1) + 2
     for _ in range(max_steps):
         if frame_cells is not None and not is_within_frame(frame_cells, cell):
             return None
@@ -1080,9 +1174,10 @@ def _semantic_diagnostics(world: AuthoringWorld) -> list[Diagnostic]:
             )
         )
     footprints: set[tuple[int, int]] = set()
-    for settlement in world.settlements.values():
-        if settlement.wilderness_entry is not None:
-            footprints.update(settlement.wilderness_entry.footprint_cells)
+    for geometry in _entry_geometries(
+        world.settlements, location_cells_of(world.locations)
+    ).values():
+        footprints.update(geometry.footprint_cells)
 
     reachable_cache: dict[str, frozenset[str]] = {}
     for settlement_id, settlement in world.settlements.items():
@@ -1267,7 +1362,10 @@ def compile_runtime(
 ) -> RuntimeMapSnapshot:
     """Build the immutable runtime snapshot, or reject the candidate."""
 
-    diagnostics: list[Diagnostic] = list(world.diagnostics)
+    # Advisory warnings describe the map; they never refuse publication, so
+    # the rejection accumulator starts with the blocking diagnostics only and
+    # every later check appends its own errors to that same list.
+    diagnostics: list[Diagnostic] = list(blocking(world.diagnostics))
     if diagnostics:
         raise RuntimeRejection(sorted_diagnostics(diagnostics))
 

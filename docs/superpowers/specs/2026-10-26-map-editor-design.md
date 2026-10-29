@@ -88,7 +88,7 @@ NumPy/SciPy are optional generation dependencies of the core. The editor install
 | `content/maps/continent.yaml` | Wilderness frame, mainland boundary, terrain-region declarations and descriptions, classifier parameters, waterways, forest boundaries, ridge/pass/ford declarations, and reserved geographic sites. |
 | `content/maps/locations.yaml` | Static geographic location identities, map-facing kinds/names/descriptions, and geographic cells. Local-map associations are derived from map-owned location references. |
 | `content/maps/districts.yaml` | District identities/names, kinds, region membership, and stable landmark references. |
-| `content/maps/settlements/<map_id>.yaml` | Settlement/map identity and location reference, local-frame binding, footprint and wilderness entrances, room nodes/prototypes, roads, map options, and map-owned scene references. |
+| `content/maps/settlements/<map_id>.yaml` | Settlement/map identity and location reference, location-relative footprint and wilderness entrances, room nodes/prototypes, roads, map options, and map-owned scene references. The world frame is derived (location cell plus the unique `anchor_room`), never authored here. |
 | `content/maps/interiors/<interior_id>.yaml` | Permanent room identities, names/descriptions, internal connections, scene references, and exterior entrance relationships. |
 | `content/map-editor-layouts/<interior_id>.yaml` | Editor-only room layout positions. Excluded from gameplay geometry and runtime snapshots. |
 | `world/maps/data/district_partition.json` | Existing generated, read-only district partition artifact. Never an alternative editable map source. |
@@ -110,7 +110,7 @@ Existing identities are retained during migration. Existing service-place keys t
 
 The editor does not rename established IDs or cascade-delete external data. It supports creating new IDs, editing ordinary attributes, and deleting an object after its references are explicitly removed.
 
-Coordinates remain spatial values. Coordinate-based game wire identities, map-knowledge IDs, and scene addresses are derived at their existing game boundaries from the current binding. They do not become the authored reference authority.
+Coordinates remain spatial values. Coordinate-based game wire identities, map-knowledge IDs, and scene addresses are derived at their existing game boundaries from the current authored references. They do not become the authored reference authority.
 
 ### 4.3 Coordinate contract
 
@@ -119,9 +119,10 @@ Coordinates remain spatial values. Coordinate-based game wire identities, map-kn
 | Wilderness | Integer one-kilometre cell indices within the declared frame. A cell is an area; its representative point is its centre. |
 | Continental geometry | Explicitly named kilometre or metre fields; no unlabelled mixing with cell indices. |
 | Settlement | Integer metres in the settlement's local east/north frame. Logical map/layer identity is not elevation. |
+| Wilderness footprint | A mask shape plus a signed integer cell offset from the settlement's location cell. The absolute origin, hash cells and gate approach cells are derived; the editor's footprint control still accepts absolute cells and converts at the owning boundary. |
 | Permanent interior | No physical coordinates. Editor-layout positions are presentation-only values. |
 
-Preserve the current cell-centre offset and cross-layer transform. World metres equal wilderness anchor-cell centre plus local metres minus the local anchor binding. Settlement rendering uses uniform physical scale. Moving a node does not change its slug, infer a new compass exit, or move its interior-layout preferences into physical geometry.
+Preserve the current cell-centre offset and cross-layer transform. World metres equal the settlement's location-cell centre plus local metres minus the unique `anchor_room` node's position, and the wilderness footprint is the location cell plus its authored signed offset. One location drag therefore moves the settlement and its entrances together, while an `anchor_room` drag re-frames the local graph and leaves the location and the mask fixed. Settlement rendering uses uniform physical scale. Moving a node does not change its slug, infer a new compass exit, or move its interior-layout preferences into physical geometry.
 
 ### 4.4 Safe YAML and round trips
 
@@ -138,7 +139,7 @@ Preserve comments attached to retained stable-ID objects and unmodified document
 | Settlement `PROTOTYPES`, `NODE_IDS`, `ROADS`, `XYMAP_DATA` | Settlement YAML and core assembly; remove the old authored Python tables and roster imports. Preserve prototype semantics and map options. |
 | `SparseNode`, `SparseRoad`, sparse validation/routing | Core; keep game/contrib adaptation outside it. Migrate all callsites rather than retain re-export shims. |
 | Wilderness geometry/constants and deterministic classification in `wilderness_regions.py` / `wilderness_provider.py` | Editable declarations in continent YAML; calculations in core; contrib room/provider integration remains game-side. |
-| Anchor geographic cells and local-frame/placement bindings | Location/settlement YAML with qualified node references; remove competing Python placement tables. |
+| Anchor geographic cells and derived local frames | Location YAML cells plus each settlement's unique `anchor_room` node; remove competing Python placement tables. |
 | Anchor map identity, map-facing name/kind/description | Location YAML. Game lore composition joins non-spatial records by the existing identity. |
 | Political affiliation, population, floor-count lore, nation/economy/NPC metadata | Existing Python lore owners; not inferred from map geometry or migrated as map fields. |
 | Wilderness footprint masks, entry gates, starting-room city entry | Settlement-owned YAML relationships; resolve current coordinates in game adapters. |

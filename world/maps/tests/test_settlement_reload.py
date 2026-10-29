@@ -26,13 +26,6 @@ version: 1
 kind: settlement
 id: t_reload
 location_ref: village_eolas
-binding:
-  anchor_cell:
-    cell_x: 1410
-    cell_y: 2150
-  local_anchor_m:
-    east_m: 100
-    north_m: 100
 options:
   map_visual_range: 2
   map_mode: nodes
@@ -68,9 +61,9 @@ roads:
 wilderness_entry:
   shape:
     - "#"
-  origin:
-    cell_x: 1410
-    cell_y: 2150
+  offset:
+    dx: 0
+    dy: 0
   gates:
     - return_direction: n
       destination_node: plaza

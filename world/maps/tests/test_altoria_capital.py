@@ -142,7 +142,8 @@ class AltoriaCapitalMapTests(EvenniaTestCase):
         self.assertEqual(len(anchors), 1)
         anchor = anchors[0]
         self.assertEqual(anchor.anchor_key, self.document.location_ref)
-        self.assertEqual(self.document.binding.local_anchor_m, anchor.coordinate)
+        # The frame is derived: the unique anchor_room *is* the local anchor.
+        self.assertEqual(self.document.local_anchor_m, anchor.coordinate)
         self.assertEqual(
             [node.node_id for node in self.graph.nodes.values() if node.is_anchor],
             [anchor.node_id],
@@ -234,7 +235,7 @@ class AltoriaCapitalMapTests(EvenniaTestCase):
         )
 
     @covers_requirement("movement-cost-charging::physical-gate-approaches-are-charged-exactly-once")
-    def test_gate_approach_distance_uses_the_authored_binding(self):
+    def test_gate_approach_distance_uses_the_derived_location_frame(self):
         from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
         from world.maps.wilderness_destination import gate_approach_distance_m
 
@@ -243,8 +244,8 @@ class AltoriaCapitalMapTests(EvenniaTestCase):
             with self.subTest(direction=gate.return_direction):
                 node = self.document.nodes[gate.destination.object_id]
                 world = local_to_world_m(
-                    self.document.binding.anchor_cell,
-                    self.document.binding.local_anchor_m,
+                    self._location_cell(),
+                    self.document.local_anchor_m,
                     node.coordinate,
                 )
                 approach = cell_center_m(entry.approach_cell(gate))
@@ -253,6 +254,48 @@ class AltoriaCapitalMapTests(EvenniaTestCase):
                     hypot(world[0] - approach[0], world[1] - approach[1]),
                     places=6,
                 )
+
+    @covers_requirement(
+        "map-settlement-sources::settlement-documents-own-complete-local-map-declarations"
+    )
+    def test_an_asymmetric_mask_never_moves_the_settlement_frame(self):
+        from dataclasses import replace
+
+        from world.lore.anchors import anchor_geography
+        from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+        from world.maps.wilderness_destination import settlement_world_position_m
+
+        entry = WILDERNESS_ENTRY_REGISTRY[self.document.location_ref]
+        location_cell = self._location_cell()
+        # A mask whose bounding-box midpoint sits two cells west of the
+        # location cell: the frame must still come from the location.
+        asymmetric = replace(
+            entry,
+            shape=("#####", "##...", "#...."),
+            origin_xy=(location_cell[0] - 4, location_cell[1] - 1),
+        )
+        self.assertNotEqual(asymmetric.anchor_cell, location_cell)
+        self.assertEqual(anchor_geography()[entry.anchor_key].cell, location_cell)
+
+        anchor = next(node for node in self.graph.nodes.values() if node.is_anchor)
+        local = (anchor.physical_coordinate[0] + 70, anchor.physical_coordinate[1] + 80)
+        self.assertEqual(
+            settlement_world_position_m(asymmetric, local, cell_size_m=1000),
+            (
+                location_cell[0] * 1000 + 500 + 70,
+                location_cell[1] * 1000 + 500 + 80,
+            ),
+        )
+        # The same local point keeps its world position when the mask changes.
+        self.assertEqual(
+            settlement_world_position_m(asymmetric, local, cell_size_m=1000),
+            settlement_world_position_m(entry, local, cell_size_m=1000),
+        )
+
+    def _location_cell(self):
+        from world.lore.anchors import anchor_geography
+
+        return anchor_geography()[self.document.location_ref].cell
 
 
 class _Probe:

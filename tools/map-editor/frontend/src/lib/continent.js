@@ -236,11 +236,6 @@ export const footprintCell = (world, settlementId, cell, filled) => ({
   documentId: settlementDocument(world, settlementId),
   arguments: { settlement_id: settlementId, cell, filled },
 });
-export const binding = (world, settlementId, anchorCell, localAnchor) => ({
-  name: "set_binding",
-  documentId: settlementDocument(world, settlementId),
-  arguments: { settlement_id: settlementId, anchor_cell: anchorCell, local_anchor_m: localAnchor },
-});
 
 // The removal command of a selected continental object, or null when this
 // kind has no delete command (the inline explanation says so).
@@ -258,7 +253,9 @@ export function removalOf(world, ref) {
 // The editable grid of one footprint: the mask plus a one-cell margin, north
 // row first, so a neighbouring cell can be filled from the keyboard.
 export function footprintGrid(footprint) {
-  if (!footprint) return null;
+  // ``origin`` is derived from the settlement's location cell and the mask
+  // offset; an unfinished map without a resolvable frame has none to show.
+  if (!footprint || !footprint.origin) return null;
   const filled = new Set(footprint.cells.map(([x, y]) => `${x},${y}`));
   const [ox, oy] = footprint.origin;
   const width = footprint.shape[0]?.length ?? 0;

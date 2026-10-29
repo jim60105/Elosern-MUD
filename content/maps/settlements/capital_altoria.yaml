@@ -1,6 +1,6 @@
 # Settlement local map authored source (schema version 1).
 # Converted once from the retired Python declaration; this document is
-# the sole authority for the graph, prototypes, binding, options,
+# the sole authority for the graph, prototypes, options,
 # entrances and map-owned scene associations. `location_ref` is the only
 # reverse link: a location's local map is discovered by this field, so a
 # new map for an existing location needs no Python registration.
@@ -8,13 +8,6 @@ version: 1
 kind: settlement
 id: capital_altoria
 location_ref: capital_altoria
-binding:
-  anchor_cell:
-    cell_x: 860
-    cell_y: 1080
-  local_anchor_m:
-    east_m: 3500
-    north_m: 2850
 options:
   map_visual_range: 2
   map_mode: nodes
@@ -379,9 +372,9 @@ wilderness_entry:
     - "#..#.##"
     - "####..."
     - "..##..."
-  origin:
-    cell_x: 857
-    cell_y: 1076
+  offset:
+    dx: -3
+    dy: -4
   gates:
     - return_direction: n
       destination_node: south_gate

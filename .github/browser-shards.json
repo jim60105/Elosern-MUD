@@ -215,6 +215,7 @@
         "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_the_room_tool_creates_a_standalone_room_without_a_layout_write",
         "web.tests.browser.test_map_editor_generation.MapEditorGenerationBrowserTest.test_only_the_explicit_controls_regenerate_and_old_outlines_are_labelled",
         "web.tests.browser.test_map_editor_workflows.MapEditorWorkflowsChromiumTest.test_local_map_and_interior_authoring_reloads_in_the_core_after_every_operation",
+        "web.tests.browser.test_map_editor_workflows.MapEditorWorkflowsChromiumTest.test_a_location_drag_is_one_command_and_undo_redo_and_restart_agree",
         "web.tests.browser.test_map_editor_workflows.MapEditorFollowingReferenceFirefoxTest.test_external_changes_are_adopted_or_held_behind_an_open_draft"
       ]
     },
@@ -241,6 +242,7 @@
         "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_the_connection_tool_creates_a_two_way_pair_in_one_command_and_undo_removes_it",
         "web.tests.browser.test_map_editor_relationships.MapEditorRelationshipBrowserTest.test_the_settlement_entrance_tool_adds_a_gate_with_one_settlement_write",
         "web.tests.browser.test_map_editor_workflows.MapEditorWorkflowsFirefoxTest.test_continental_authoring_reloads_in_the_core_after_every_operation",
+        "web.tests.browser.test_map_editor_workflows.MapEditorWorkflowsFirefoxTest.test_a_location_drag_is_one_command_and_undo_redo_and_restart_agree",
         "web.tests.browser.test_map_editor_workflows.MapEditorFollowingReferenceFirefoxTest.test_malformed_then_corrected_files_recover_and_semantic_work_in_progress_loads"
       ]
     },

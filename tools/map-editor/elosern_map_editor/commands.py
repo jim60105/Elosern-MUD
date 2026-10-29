@@ -28,8 +28,8 @@ Handlers in this slice:
 
 World-document handlers derive from :class:`DocumentCommand` (or, for a
 document creation, implement ``target``/``effect`` directly): continent
-geometry, locations, districts and the settlement-owned footprint and
-binding live in :mod:`elosern_map_editor.geography`; local maps, nodes,
+geometry, locations, districts and the settlement-owned footprint live in
+:mod:`elosern_map_editor.geography`; local maps, nodes,
 prototypes, roads and bends in :mod:`elosern_map_editor.settlements`;
 interior documents, rooms, connections and the multi-room layout
 arrangement in :mod:`elosern_map_editor.interiors`; the entrance
@@ -248,7 +248,9 @@ class MoveInteriorLayout:
             )
         return owner
 
-    def effect(self, envelope: Envelope, current: Current) -> Effect | None:
+    def effect(
+        self, envelope: Envelope, current: Current, world: dict[str, Any]
+    ) -> Effect | None:
         arguments = envelope.arguments
         return layout_effect(
             envelope.document_id, current, arguments["interior_id"],
@@ -296,7 +298,9 @@ class RemoveInteriorLayout:
         # The interior need not exist: cleaning up an orphaned layout is allowed.
         return _check_owner(envelope.document_id, interior_id)
 
-    def effect(self, envelope: Envelope, current: Current) -> Effect | None:
+    def effect(
+        self, envelope: Envelope, current: Current, world: dict[str, Any]
+    ) -> Effect | None:
         if current.text is None:
             raise CommandError(409, "stale_document", "there is no layout document to remove")
         return Effect(REMOVE, envelope.document_id)
@@ -326,6 +330,31 @@ class DocumentCommand:
     def mutate(self, data: dict[str, Any], arguments: dict[str, Any]) -> None:  # pragma: no cover
         raise NotImplementedError
 
+    def mutate_with_world(
+        self, data: dict[str, Any], arguments: dict[str, Any], world: dict[str, Any]
+    ) -> None:
+        """Change the thawed data; ``world`` is the published projection.
+
+        The projection is the same read-only snapshot :meth:`target` validated
+        against, so a handler may resolve a value another document owns (a
+        settlement's location cell) without opening a second document or
+        writing outside its one owner. The default needs no such context.
+        """
+
+        self.mutate(data, arguments)
+
+    def dependencies(
+        self, world: dict[str, Any], arguments: dict[str, Any]
+    ) -> tuple[str, ...]:
+        """Documents other than the owner whose published value this command reads.
+
+        The service refuses the command when such a document changed on disk
+        after the snapshot the value came from, so a conversion can never use
+        a stale frame. The default reads no other document.
+        """
+
+        return ()
+
     def target(self, world: dict[str, Any], envelope: Envelope) -> str:
         _exact_keys(envelope.arguments, set(self.keys))
         self.check(world, envelope.arguments)
@@ -339,7 +368,9 @@ class DocumentCommand:
             )
         return owner
 
-    def effect(self, envelope: Envelope, current: Current) -> Effect | None:
+    def effect(
+        self, envelope: Envelope, current: Current, world: dict[str, Any]
+    ) -> Effect | None:
         if current.text is None:
             raise CommandError(409, "stale_document", f"{envelope.document_id} does not exist")
         try:
@@ -348,7 +379,7 @@ class DocumentCommand:
             raise _gate_failure(error) from error
         data = thaw(parsed.document.data)
         baseline = deepcopy(data)
-        self.mutate(data, envelope.arguments)
+        self.mutate_with_world(data, envelope.arguments, world)
         if data == baseline:
             return None
         try:
@@ -367,6 +398,19 @@ def refused_value(code: str, message: str, field_path: str) -> CommandError:
         message,
         diagnostics=[{"code": code, "category": "structure", "message": message, "field_path": field_path}],
     )
+
+
+def dependencies_of(
+    handler: Any, world: dict[str, Any], arguments: dict[str, Any]
+) -> tuple[str, ...]:
+    """The documents ``handler`` reads besides its owner.
+
+    Document-creation handlers implement ``target``/``effect`` directly and
+    declare no dependency, so the protocol stays optional.
+    """
+
+    method = getattr(handler, "dependencies", None)
+    return () if method is None else method(world, arguments)
 
 
 def _registry():

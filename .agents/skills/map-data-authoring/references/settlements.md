@@ -11,9 +11,6 @@ version: 1
 kind: settlement
 id: village_ciaran
 location_ref: village_ciaran          # the location this map belongs to (the only link)
-binding:                              # how the local frame sits on the continent
-  anchor_cell: {cell_x: 1340, cell_y: 1220}   # MUST equal locations.<location_ref>.cell
-  local_anchor_m: {east_m: 220, north_m: 305} # MUST equal the anchor_room node's (x_m, y_m)
 options:                              # optional
   map_visual_range: 2
   map_mode: nodes
@@ -39,7 +36,7 @@ roads:                                # DIRECTED: A→B and B→A are two entrie
 wilderness_entry:                     # nullable (write the key with an empty value)
   shape:                              # footprint mask rows of '#'/'.'
     - '#'
-  origin: {cell_x: 1340, cell_y: 1220}
+  offset: {dx: 0, dy: 0}              # signed cell delta from the location cell
   gates:                              # ≥ 1
     - return_direction: n
       destination_node: hidden_path
@@ -52,14 +49,22 @@ city_gate:                            # nullable: the one-way entry from the sta
 `wilderness_entry` and `city_gate` are nullable but **required keys**. Write
 `city_gate:` with an empty value when a map has none.
 
+There is no `binding`. The world frame is derived from
+`locations[location_ref].cell` and the unique `anchor_room` node, so a location
+move carries the whole settlement and no document has to repeat a coordinate.
+
 ## Nodes
 
 - Every node needs every field. Node coordinates are unique within the map.
 - **Exactly one `anchor_room` per settlement**, with `anchor_key:
   <location_ref>`. It is the room that stands on the location's continental
-  cell, and `binding.local_anchor_m` must equal its position. If you move the
-  anchor node, update `local_anchor_m` with it. Every other node is
-  `grid_room` with an empty `anchor_key`.
+  cell: the game derives the local frame from its `(x_m, y_m)`. Moving the
+  anchor node therefore re-frames the graph — the anchor stays on the location
+  cell's centre and every untouched node's world position shifts by the
+  negative local delta — while the location and the footprint stay fixed. A
+  second `anchor_room` is a structure error, and a missing one is saveable
+  work in progress. Every other node is `grid_room` with an empty
+  `anchor_key`.
 - Moving a node only changes `x_m`/`y_m`. Its ID, every road direction, the
   gates, interior exteriors and district landmarks all keep pointing at it.
   The road lengths are recomputed from geometry, and nothing stores them.
@@ -94,7 +99,8 @@ city_gate:                            # nullable: the one-way entry from the sta
 
 The entry is how the continent-scale wilderness connects to this map.
 
-- **The mask runs from south to north.** Cell `(origin_x + column,
+- **The mask runs from south to north.** The mask origin is
+  `locations[location_ref].cell + offset`, and cell `(origin_x + column,
   origin_y + row)` is footprint when `shape[row][column] == '#'`. The **first**
   YAML row is therefore the **southern** edge, and higher rows lie further
   north. Rows must all have the same length and use only `#` and `.`.
@@ -119,10 +125,11 @@ The entry is how the continent-scale wilderness connects to this map.
   - each gate uses a distinct destination node;
   - each approach cell is walkable;
   - the last gate cannot be deleted without removing the whole entry.
-- To move the settlement on the continent, shift `origin` by the same delta
-  as the location cell and `binding.anchor_cell`. The editor's 佔地 tool grows
-  the mask with `.` padding (at most 64×64). Hand edits must keep it
-  rectangular.
+- To move the settlement on the continent, move the location cell only; the
+  mask, its midpoint and every gate approach follow it. To move the mask
+  within the settlement, change `offset`. The editor's 佔地 tool takes absolute
+  cells, grows the mask with `.` padding (at most 64×64) and saves the
+  converted offset. Hand edits must keep it rectangular.
 
 ## City gate
 
@@ -137,13 +144,12 @@ can start in need it.
 2. Create `content/maps/settlements/<new_map_id>.yaml` with these fields:
    - `version`, `kind`, `id`;
    - `location_ref`;
-   - `binding`, with `anchor_cell` set to the location cell;
    - optionally `options` and `exit_prototype`; copying them from
      `village_ciaran` is a sensible default;
-   - `nodes`, which must include one `anchor_room` at `local_anchor_m`;
+   - `nodes`, which must include one `anchor_room`;
    - `roads`;
-   - `wilderness_entry`, usually a point mask at the location cell with one
-     gate to the anchor or a gate node;
+   - `wilderness_entry`, usually a point mask at offset `(0, 0)` (the location
+     cell) with one gate to the anchor or a gate node;
    - `city_gate:`, empty unless asked.
 3. A map with no nodes loads, but is diagnosed `empty_graph`. That is saveable
    work in progress and not playable.
@@ -174,7 +180,7 @@ The editor provides these commands:
 - `insert_bend`, `move_bend`, `remove_bend`;
 - entrances: `create_wilderness_gate`, `set_wilderness_gate`,
   `delete_wilderness_gate`, `remove_wilderness_entry`, `set_city_gate`;
-- continent tools that write this file: `set_footprint_cell`, `set_binding`.
+- continent tools that write this file: `set_footprint_cell`.
 
-The editor does not cascade `set_binding` into `locations.yaml`, or the
-reverse. When you move a town, update both files yourself.
+There is no `set_binding` command: it was removed with the duplicated
+authorities. Moving a town is one location edit and nothing else.

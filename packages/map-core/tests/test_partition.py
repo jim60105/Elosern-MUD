@@ -794,7 +794,7 @@ class WorldSnapshotTests(unittest.TestCase):
         settlement["nodes"]["shed"] = dict(settlement["nodes"]["plaza"], x_m=900, y_m=900, key="Shed")
         settlement["wilderness_entry"] = {
             "shape": ["##", "##"],
-            "origin": {"cell_x": 4, "cell_y": 4},
+            "offset": {"dx": -1, "dy": -1},
             "gates": [
                 {"return_direction": "n", "destination_node": "gate"},
                 {"return_direction": "w", "destination_node": "shed"},

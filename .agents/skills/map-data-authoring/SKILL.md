@@ -104,16 +104,21 @@ indistinguishable from editor output:
 
 ## Cross-file invariants and validation ownership
 
-Core diagnostics now check settlement anchor node presence/uniqueness and key match, footprint mask grammar and 4-connectedness, mask hash and approach cell validity, footprint and gate collisions, point gate counts and entry directions, and interior room ID and doorway uniqueness.
+Core diagnostics check settlement anchor node presence/uniqueness and key match, footprint mask grammar and 4-connectedness, mask hash and approach cell validity, footprint and gate collisions, point gate counts and entry directions, and interior room ID and doorway uniqueness. A settlement authors **no** world frame and **no** absolute footprint origin: its frame is its location cell plus its unique `anchor_room`, and its mask origin is that cell plus the entry's signed `offset{dx, dy}`.
 
 The remaining game-side cross-file rules are enforced during candidate composition before publication:
 
 | When you change… | Also keep consistent |
 | --- | --- |
-| a location's `cell` (moving a town on the continent) | its settlement's `binding.anchor_cell` (must be equal), and normally `wilderness_entry.origin` so the mask's bounding-box midpoint is still the location cell. |
-| the `anchor_room` node's `x_m`/`y_m` | `binding.local_anchor_m` (must be equal) until placement-schema cutover |
+| a location's `cell` (moving a town on the continent) | nothing else in the settlement document. Every node's world metres, the mask, its midpoint and every gate approach translate by the same delta; the document stays byte-identical. |
+| the `anchor_room` node's `x_m`/`y_m` | nothing else. The anchor stays on the location cell's centre and every untouched node's world position shifts by the negative local delta; the location and the mask stay fixed. |
 | a Voronoi district landmark | ≥ 100 km from every other Voronoi landmark, unique district and landmark names |
 | any `scene_archetype` or `nation_key` | must be in the reference index's registered identifier sets |
+
+A valid mask whose bounding-box midpoint differs from its location cell is
+reported as `footprint_location_offset` with `severity: warning`. It is
+advisory: it never blocks saving, generation or adoption, and nothing
+re-centres the mask for you.
 
 Anything that feeds the district partition makes the committed partition
 stale. That includes continent terrain, locations, districts and **any**
@@ -161,12 +166,16 @@ These are short recipes. Each reference file has the details.
 
 - **Move a town/village/dungeon on the continent.**
   1. Set `locations.<id>.cell`.
-  2. In `settlements/<map>.yaml`, set `binding.anchor_cell` to the same value.
-  3. Shift `wilderness_entry.origin` by the same delta, so the footprint
-     moves with the town.
-  4. Run the check. The new cells must be walkable land, the footprint must
+  2. Change nothing else: the settlement's world frame and footprint follow
+     the location cell, so the whole town and its wilderness entrances move
+     together.
+  3. Run the check. The new cells must be walkable land, the footprint must
      not overlap another footprint, and the gate approaches must stay valid.
-  5. Regenerate the partition.
+  4. Regenerate the partition.
+- **Re-shape a wilderness footprint.** Set `wilderness_entry.shape` and its
+  `offset`; the offset is a signed cell delta from the location cell, and row
+  zero is the southern row. The editor's 佔地 tool takes absolute cells and
+  saves the converted offset for you.
 - **Add a street node and a two-way road.** Add `nodes.<new_id>` with every
   node field. Then append **two** entries to `roads`: A→B with its direction,
   and B→A with the opposite or authored return direction. One node never has

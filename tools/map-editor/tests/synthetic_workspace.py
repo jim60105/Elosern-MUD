@@ -138,10 +138,6 @@ def settlement_data() -> dict:
         "kind": "settlement",
         "id": SETTLEMENT_ID,
         "location_ref": LOCATION_ID,
-        "binding": {
-            "anchor_cell": {"cell_x": 5, "cell_y": 5},
-            "local_anchor_m": {"east_m": 0, "north_m": 0},
-        },
         "options": {"map_visual_range": 2, "map_mode": "nodes"},
         "exit_prototype": {"prototype_parent": "xyz_exit", "typeclass": "tests.Exit"},
         "nodes": {
@@ -172,7 +168,7 @@ def settlement_data() -> dict:
         ],
         "wilderness_entry": {
             "shape": ["#"],
-            "origin": {"cell_x": 5, "cell_y": 5},
+            "offset": {"dx": 0, "dy": 0},
             "gates": [{"return_direction": "n", "destination_node": "gate"}],
         },
         "city_gate": {"node": "gate", "exit_key": "Gate", "exit_aliases": ["gate"]},

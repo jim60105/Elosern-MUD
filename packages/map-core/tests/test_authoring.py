@@ -144,25 +144,31 @@ def test_unreachable_landmark_is_saveable_work_in_progress():
 
 def test_blocked_approach_is_a_semantic_diagnostic():
     data = fixtures.settlement_data()
-    data["binding"]["anchor_cell"] = {"cell_x": 15, "cell_y": 21}
-    data["wilderness_entry"]["origin"] = {"cell_x": 14, "cell_y": 21}
+    # The settlement frame follows its location cell, so the location moves and
+    # the mask keeps its absolute cells through the offset.
+    locations = fixtures.locations_data()
+    locations["locations"]["demo_location"]["cell"] = {"cell_x": 15, "cell_y": 21}
+    data["wilderness_entry"]["offset"] = {"dx": -1, "dy": 0}
     data["wilderness_entry"]["shape"] = ["###"]
     data["wilderness_entry"]["gates"] = [{"return_direction": "n", "destination_node": "gate"}]
-    world = load_authoring_world(fixtures.custom_sources(settlement=data))
+    world = load_authoring_world(
+        fixtures.custom_sources(settlement=data, locations=locations)
+    )
     assert "blocked_approach" in {item.code for item in world.diagnostics}
 
 
 def test_gate_approach_cell_follows_the_authored_mask_rule():
     from elosern_map_core.documents import WildernessEntryDeclaration
 
-    point = WildernessEntryDeclaration(shape=("#",), origin=(7, 9), gates=())
+    point = WildernessEntryDeclaration(shape=("#",), offset=(7, 9), gates=()).geometry((0, 0))
     assert gate_approach_cell(point, "n") == (7, 9)
     # A 3x1 strip: walking from the midpoint (11, 4) opposite the return
     # direction leaves the mask on the first cell outside it.
-    strip = WildernessEntryDeclaration(shape=("###",), origin=(10, 4), gates=())
+    strip = WildernessEntryDeclaration(shape=("###",), offset=(10, 4), gates=()).geometry((0, 0))
     assert gate_approach_cell(strip, "w") == (13, 4)
     assert gate_approach_cell(strip, "e") == (9, 4)
-    assert gate_approach_cell(WildernessEntryDeclaration(shape=("...",), origin=(0, 0), gates=()), "n") is None
+    empty = WildernessEntryDeclaration(shape=("...",), offset=(0, 0), gates=()).geometry((0, 0))
+    assert gate_approach_cell(empty, "n") is None
 
 
 def test_interiors_load_and_resolve_their_references():
@@ -574,10 +580,10 @@ def test_snapshot_and_documents_are_immutable():
 def test_mask_cells_list_every_hash_cell_even_for_a_point_shape():
     from elosern_map_core.documents import WildernessEntryDeclaration
 
-    point = WildernessEntryDeclaration(shape=(".#",), origin=(5, 7), gates=())
+    point = WildernessEntryDeclaration(shape=(".#",), offset=(5, 7), gates=()).geometry((0, 0))
     assert point.footprint_cells == frozenset()
     assert point.mask_cells == frozenset({(6, 7)})
-    block = WildernessEntryDeclaration(shape=("#.", "##"), origin=(1, 2), gates=())
+    block = WildernessEntryDeclaration(shape=("#.", "##"), offset=(1, 2), gates=()).geometry((0, 0))
     assert block.mask_cells == block.footprint_cells == frozenset({(1, 2), (1, 3), (2, 3)})
 
 
@@ -606,7 +612,7 @@ def test_d2_matrix_structure_diagnostics():
     second_settlement["id"] = "second_map"
     second_settlement["wilderness_entry"] = {
         "shape": ["#"],
-        "origin": {"cell_x": 6, "cell_y": 6},
+        "offset": {"dx": 1, "dy": 1},
         "gates": [{"return_direction": "n", "destination_node": "gate"}],
     }
     second_src = fixtures.make_source_document(
@@ -653,7 +659,7 @@ def test_d2_matrix_structure_diagnostics():
     data_dup_gate = fixtures.settlement_data()
     data_dup_gate["wilderness_entry"] = {
         "shape": ["###"],
-        "origin": {"cell_x": 5, "cell_y": 5},
+        "offset": {"dx": 0, "dy": 0},
         "gates": [
             {"return_direction": "n", "destination_node": "gate"},
             {"return_direction": "s", "destination_node": "gate"},
@@ -693,7 +699,7 @@ def test_d2_matrix_semantic_diagnostics():
     data_point_gates = fixtures.settlement_data()
     data_point_gates["wilderness_entry"] = {
         "shape": ["#"],
-        "origin": {"cell_x": 5, "cell_y": 5},
+        "offset": {"dx": 0, "dy": 0},
         "gates": [
             {"return_direction": "n", "destination_node": "gate"},
             {"return_direction": "s", "destination_node": "plaza"},
@@ -707,7 +713,7 @@ def test_d2_matrix_semantic_diagnostics():
     data_disc = fixtures.settlement_data()
     data_disc["wilderness_entry"] = {
         "shape": ["#.#"],
-        "origin": {"cell_x": 5, "cell_y": 5},
+        "offset": {"dx": 0, "dy": 0},
         "gates": [{"return_direction": "n", "destination_node": "gate"}],
     }
     world = load_authoring_world(fixtures.custom_sources(settlement=data_disc))
@@ -718,7 +724,7 @@ def test_d2_matrix_semantic_diagnostics():
     data_anchor_dot = fixtures.settlement_data()
     data_anchor_dot["wilderness_entry"] = {
         "shape": ["###", "#.#", "###"],
-        "origin": {"cell_x": 5, "cell_y": 5},
+        "offset": {"dx": 0, "dy": 0},
         "gates": [{"return_direction": "n", "destination_node": "gate"}],
     }
     world = load_authoring_world(fixtures.custom_sources(settlement=data_anchor_dot))
@@ -729,7 +735,7 @@ def test_d2_matrix_semantic_diagnostics():
     data_out_frame = fixtures.settlement_data()
     data_out_frame["wilderness_entry"] = {
         "shape": ["#"],
-        "origin": {"cell_x": 45, "cell_y": 5},
+        "offset": {"dx": 40, "dy": 0},
         "gates": [{"return_direction": "n", "destination_node": "gate"}],
     }
     world = load_authoring_world(fixtures.custom_sources(settlement=data_out_frame))
@@ -739,7 +745,7 @@ def test_d2_matrix_semantic_diagnostics():
     data_impassable = fixtures.settlement_data()
     data_impassable["wilderness_entry"] = {
         "shape": ["#"],
-        "origin": {"cell_x": 15, "cell_y": 20},  # summit ridge
+        "offset": {"dx": 10, "dy": 15},  # summit ridge
         "gates": [{"return_direction": "n", "destination_node": "gate"}],
     }
     world = load_authoring_world(fixtures.custom_sources(settlement=data_impassable))
@@ -750,7 +756,7 @@ def test_d2_matrix_semantic_diagnostics():
     data_leaves_frame = fixtures.settlement_data()
     data_leaves_frame["wilderness_entry"] = {
         "shape": ["###"],
-        "origin": {"cell_x": 37, "cell_y": 5},
+        "offset": {"dx": 32, "dy": 0},
         "gates": [{"return_direction": "w", "destination_node": "gate"}],  # exit to east leaves frame (x=40)
     }
     world = load_authoring_world(fixtures.custom_sources(settlement=data_leaves_frame))
@@ -761,7 +767,7 @@ def test_d2_matrix_semantic_diagnostics():
     data1 = fixtures.settlement_data()
     data1["wilderness_entry"] = {
         "shape": ["##", "##"],
-        "origin": {"cell_x": 5, "cell_y": 5},
+        "offset": {"dx": 0, "dy": 0},
         "gates": [{"return_direction": "n", "destination_node": "gate"}],
     }
     data2 = fixtures.settlement_data()
@@ -770,7 +776,7 @@ def test_d2_matrix_semantic_diagnostics():
     data2["nodes"]["gate"]["anchor_key"] = "second_location"
     data2["wilderness_entry"] = {
         "shape": ["##", "##"],
-        "origin": {"cell_x": 6, "cell_y": 5},  # overlaps with (6, 5), (6, 6)
+        "offset": {"dx": 0, "dy": 0},  # overlaps with (6, 5), (6, 6)
         "gates": [{"return_direction": "s", "destination_node": "gate"}],
     }
     locs = fixtures.locations_data()
@@ -796,7 +802,7 @@ def test_d2_matrix_semantic_diagnostics():
     data_g1 = fixtures.settlement_data()
     data_g1["wilderness_entry"] = {
         "shape": ["###"],
-        "origin": {"cell_x": 5, "cell_y": 5},
+        "offset": {"dx": 0, "dy": 0},
         "gates": [{"return_direction": "n", "destination_node": "gate"}],  # approach is (6, 4)
     }
     data_g2 = fixtures.settlement_data()
@@ -805,7 +811,7 @@ def test_d2_matrix_semantic_diagnostics():
     data_g2["nodes"]["gate"]["anchor_key"] = "second_location"
     data_g2["wilderness_entry"] = {
         "shape": ["#"],
-        "origin": {"cell_x": 6, "cell_y": 4},
+        "offset": {"dx": 0, "dy": -1},
         "gates": [{"return_direction": "w", "destination_node": "gate"}],  # point anchor is (6, 4)
     }
     src_g1 = fixtures.make_source_document("content/maps/settlements/demo_map.yaml", fixtures.yaml_text(data_g1))
@@ -817,7 +823,7 @@ def test_d2_matrix_semantic_diagnostics():
     # duplicate_gate_approach
     data_g2["wilderness_entry"] = {
         "shape": ["###"],
-        "origin": {"cell_x": 5, "cell_y": 5},
+        "offset": {"dx": -1, "dy": 0},
         "gates": [{"return_direction": "n", "destination_node": "gate"}],
     }
     src_g2_dup = fixtures.make_source_document("content/maps/settlements/second_map.yaml", fixtures.yaml_text(data_g2))
@@ -830,9 +836,242 @@ def test_d2_matrix_semantic_diagnostics():
     # origin at (15, 21), return_direction "n" -> neighbor at (15, 20) which is impassable ridge
     data_point_blocked["wilderness_entry"] = {
         "shape": ["#"],
-        "origin": {"cell_x": 15, "cell_y": 21},
+        "offset": {"dx": 10, "dy": 16},
         "gates": [{"return_direction": "s", "destination_node": "gate"}],  # delta for s is (0, -1) -> neighbor (15, 20)
     }
     world = load_authoring_world(fixtures.custom_sources(settlement=data_point_blocked))
     diag = next(d for d in world.diagnostics if d.code == "blocked_point_neighbor")
     assert diag.category == "semantic"
+
+
+# -- location-relative placement ------------------------------------------------
+def _placed_settlement(
+    *,
+    location_cell,
+    anchor_m=(100, 200),
+    node_m=(170, 280),
+    offset=(-1, 2),
+    shape=("###", ".##", "###"),
+):
+    """A synthetic settlement whose only geographic input is its location cell."""
+
+    locations = fixtures.locations_data()
+    locations["locations"]["demo_location"]["cell"] = {
+        "cell_x": location_cell[0],
+        "cell_y": location_cell[1],
+    }
+    settlement = fixtures.settlement_data()
+    settlement["nodes"]["gate"].update(x_m=anchor_m[0], y_m=anchor_m[1])
+    settlement["nodes"]["plaza"].update(x_m=node_m[0], y_m=node_m[1])
+    settlement["wilderness_entry"] = {
+        "shape": list(shape),
+        "offset": {"dx": offset[0], "dy": offset[1]},
+        "gates": [
+            {"return_direction": "n", "destination_node": "gate"},
+            {"return_direction": "w", "destination_node": "plaza"},
+        ],
+    }
+    return settlement, locations
+
+
+def _placed_world(**arguments):
+    settlement, locations = _placed_settlement(**arguments)
+    return load_authoring_world(
+        fixtures.custom_sources(settlement=settlement, locations=locations)
+    )
+
+
+def _world_m(location_cell, anchor_m, local_m):
+    """Independent transform: cell centre plus local offset from the anchor."""
+
+    return (
+        1000 * location_cell[0] + 500 + local_m[0] - anchor_m[0],
+        1000 * location_cell[1] + 500 + local_m[1] - anchor_m[1],
+    )
+
+
+def test_place_location_translates_every_derived_geometry_rigidly():
+    before = _placed_world(location_cell=(10, 20))
+    after = _placed_world(location_cell=(12, 23))
+
+    document_before = before.settlements["demo_map"]
+    document_after = after.settlements["demo_map"]
+    # The document itself is byte-identical: only the location moved.
+    assert serialize_document(document_before) == serialize_document(document_after)
+
+    anchor = document_after.local_anchor_m
+    assert anchor == (100, 200)
+    assert _world_m((10, 20), anchor, (170, 280)) == (10570, 20580)
+    assert _world_m((12, 23), anchor, (170, 280)) == (12570, 23580)
+
+    geometry_before = document_before.wilderness_geometry((10, 20))
+    geometry_after = document_after.wilderness_geometry((12, 23))
+    assert geometry_before.origin == (9, 22)
+    assert geometry_after.origin == (11, 25)
+    assert {
+        (cell[0] + 2, cell[1] + 3) for cell in geometry_before.mask_cells
+    } == set(geometry_after.mask_cells)
+    assert geometry_before.anchor_cell == (10, 23)
+    assert geometry_after.anchor_cell == (12, 26)
+    for direction in ("n", "w"):
+        moved = gate_approach_cell(geometry_before, direction)
+        assert gate_approach_cell(geometry_after, direction) == (
+            moved[0] + 2,
+            moved[1] + 3,
+        )
+
+
+def test_place_anchor_owns_the_local_frame_and_leaves_the_footprint_alone():
+    before = _placed_world(location_cell=(10, 20))
+    after = _placed_world(location_cell=(10, 20), anchor_m=(130, 250))
+
+    assert after.settlements["demo_map"].local_anchor_m == (130, 250)
+    # The anchor sits on the location cell centre either way.
+    assert _world_m((10, 20), (100, 200), (100, 200)) == (10500, 20500)
+    assert _world_m((10, 20), (130, 250), (130, 250)) == (10500, 20500)
+    # An untouched node shifts by the negative local anchor delta.
+    assert _world_m((10, 20), (100, 200), (170, 280)) == (10570, 20580)
+    assert _world_m((10, 20), (130, 250), (170, 280)) == (10540, 20530)
+
+    geometry_before = before.settlements["demo_map"].wilderness_geometry((10, 20))
+    geometry_after = after.settlements["demo_map"].wilderness_geometry((10, 20))
+    assert geometry_before == geometry_after
+
+
+def test_place_offset_uses_the_row_convention_and_point_semantics():
+    settlement, locations = _placed_settlement(location_cell=(10, 20))
+    world = load_authoring_world(
+        fixtures.custom_sources(settlement=settlement, locations=locations)
+    )
+    geometry = world.settlements["demo_map"].wilderness_geometry((10, 20))
+
+    # Rows grow north from row zero, columns east from the origin column.
+    assert geometry.origin == (9, 22)
+    assert geometry.hash_cell(0, 0) == (9, 22)
+    assert geometry.hash_cell(2, 2) == (11, 24)
+    assert geometry.anchor_cell == (10, 23)
+    assert gate_approach_cell(geometry, "n") == (10, 21)
+    assert gate_approach_cell(geometry, "w") == (12, 23)
+
+    from elosern_map_core.documents import WildernessEntryDeclaration
+
+    single = WildernessEntryDeclaration(shape=("#",), offset=(0, 0), gates=()).geometry(
+        (10, 20)
+    )
+    assert single.footprint_cells == frozenset()
+    assert single.mask_cells == frozenset({(10, 20)})
+    assert single.anchor_cell == (10, 20)
+    assert gate_approach_cell(single, "n") == (10, 20)
+
+
+@pytest.mark.parametrize(
+    "mutator",
+    [
+        lambda data: data.__setitem__(
+            "binding",
+            {
+                "anchor_cell": {"cell_x": 5, "cell_y": 5},
+                "local_anchor_m": {"east_m": 0, "north_m": 0},
+            },
+        ),
+        lambda data: data["wilderness_entry"].__setitem__(
+            "origin", {"cell_x": 5, "cell_y": 5}
+        ),
+        lambda data: data["wilderness_entry"].__setitem__("offset", {"dx": 1.5, "dy": 0}),
+        lambda data: data["wilderness_entry"].__setitem__("offset", {"dx": "1", "dy": 0}),
+        lambda data: data["wilderness_entry"].__setitem__("offset", {"dx": True, "dy": 0}),
+        lambda data: data["wilderness_entry"].__setitem__(
+            "offset", {"dx": 0, "dy": 0, "origin": 1}
+        ),
+    ],
+)
+def test_place_schema_rejects_every_duplicate_authority(mutator):
+    data = fixtures.settlement_data()
+    mutator(data)
+    with pytest.raises(AuthoringError) as captured:
+        document_from_data(SETTLEMENT_PATH, data)
+    assert _codes(captured.value) & {"unknown_field", "invalid_field_value"}
+
+
+def test_place_schema_accepts_signed_integer_offsets():
+    data = fixtures.settlement_data()
+    data["wilderness_entry"]["offset"] = {"dx": -5, "dy": 7}
+    document = document_from_data(SETTLEMENT_PATH, data)
+    assert document.wilderness_entry.offset == (-5, 7)
+
+
+def _warning_world():
+    """A world whose only diagnostic is the advisory midpoint disagreement."""
+
+    settlement = fixtures.settlement_data()
+    settlement["wilderness_entry"]["offset"] = {"dx": 0, "dy": 1}
+    world = load_authoring_world(fixtures.custom_sources(settlement=settlement))
+    return world
+
+
+def test_midpoint_disagreement_is_an_advisory_warning_that_does_not_block():
+    world = _warning_world()
+    diagnostics = diagnose_world(world)
+    assert [item.code for item in diagnostics] == ["footprint_location_offset"]
+    warning = diagnostics[0]
+    assert warning.category == "semantic"
+    assert warning.severity == "warning"
+
+    # The same candidate still compiles: a warning is not a rejection.
+    snapshot = compile_runtime(
+        world,
+        fixtures.valid_external(world),
+        fixtures.current_freshness(world),
+    )
+    assert snapshot.fingerprint == world.fingerprint
+    # And the warning is reported with its severity for any consumer.
+    assert warning.as_dict()["severity"] == "warning"
+
+
+def test_a_warning_never_masks_a_blocking_diagnostic():
+    settlement = fixtures.settlement_data()
+    # Midpoint off the location cell (a warning) and the mask outside the frame
+    # (a blocking semantic error) at the same time.
+    settlement["wilderness_entry"]["offset"] = {"dx": 40, "dy": 0}
+    world = load_authoring_world(fixtures.custom_sources(settlement=settlement))
+    codes = {item.code for item in diagnose_world(world)}
+    assert {"footprint_location_offset", "invalid_footprint_cell"} <= codes
+    with pytest.raises(RuntimeRejection) as captured:
+        compile_runtime(
+            world,
+            fixtures.valid_external(world),
+            fixtures.current_freshness(world),
+        )
+    assert "invalid_footprint_cell" in {item.code for item in captured.value.diagnostics}
+    assert "footprint_location_offset" not in {
+        item.code for item in captured.value.diagnostics
+    }
+
+
+def test_a_warning_does_not_bypass_external_or_freshness_gates():
+    world = _warning_world()
+    invalid_external = AuthoritativeExternalResult(
+        version=1,
+        fingerprint="external-evidence",
+        world_fingerprint=world.fingerprint,
+        valid=False,
+        reason="a scene target is missing",
+    )
+    with pytest.raises(RuntimeRejection) as captured:
+        compile_runtime(
+            world,
+            invalid_external,
+            fixtures.current_freshness(world),
+        )
+    assert "external_reference_invalid" in {
+        item.code for item in captured.value.diagnostics
+    }
+
+    stale = PartitionFreshness(
+        algorithm_version=PARTITION_ALGORITHM_VERSION,
+        input_signature="different-inputs",
+        current=True,
+    )
+    with pytest.raises(RuntimeRejection) as captured:
+        compile_runtime(world, fixtures.valid_external(world), stale)
+    assert "stale_partition" in {item.code for item in captured.value.diagnostics}

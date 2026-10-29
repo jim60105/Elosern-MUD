@@ -172,7 +172,7 @@ def settlement_data(
     elif entry is True:
         entry = {
             "shape": ["#"],
-            "origin": {"cell_x": 5, "cell_y": 5},
+            "offset": {"dx": 0, "dy": 0},
             "gates": [{"return_direction": "n", "destination_node": "gate"}],
         }
     return {
@@ -180,10 +180,6 @@ def settlement_data(
         "kind": "settlement",
         "id": "demo_map",
         "location_ref": "demo_location",
-        "binding": {
-            "anchor_cell": {"cell_x": 5, "cell_y": 5},
-            "local_anchor_m": {"east_m": 0, "north_m": 0},
-        },
         "options": {"map_visual_range": 2, "map_mode": "nodes"},
         "exit_prototype": {
             "prototype_parent": "xyz_exit",

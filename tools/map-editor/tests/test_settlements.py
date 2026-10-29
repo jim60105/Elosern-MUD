@@ -71,7 +71,7 @@ def _create_node(editor, node_id="well", x=600, y=0, **overrides):
 
 def _create_map(editor, **overrides):
     arguments = {"settlement_id": "wild_camp", "location_id": fixture.BARE_LOCATION_ID,
-                 "anchor_cell": [30, 12], "local_anchor_m": [0, 0], "options": None}
+                 "options": None}
     arguments.update(overrides)
     return _send(editor, "create_settlement", NEW_MAP, arguments)
 
@@ -108,8 +108,9 @@ def test_a_new_local_map_writes_only_its_document_and_stays_unfinished(workspace
         ({"settlement_id": TOWN}, 400, "cross_document"),
         ({"location_id": "ghost"}, 422, "validation_failed"),
         ({"settlement_id": "../escape"}, 400, "invalid_command"),
-        ({"anchor_cell": [-1, 2]}, 400, "invalid_command"),
-        ({"local_anchor_m": [1.5, 0]}, 400, "invalid_command"),
+        # The removed creation frame arguments are unknown, never accepted.
+        ({"anchor_cell": [30, 12]}, 400, "invalid_command"),
+        ({"local_anchor_m": [0, 0]}, 400, "invalid_command"),
         ({"options": {"map_mode": "nodes"}}, 400, "invalid_command"),
         ({"options": {"map_visual_range": 0, "map_mode": "nodes"}}, 422, "validation_failed"),
     ],
@@ -127,7 +128,7 @@ def test_an_existing_settlement_id_is_refused(workspace):
     before = fixture.tree_digest(workspace)
     status, body = _send(editor, "create_settlement", SETTLEMENT,
                          {"settlement_id": TOWN, "location_id": fixture.LOCATION_ID,
-                          "anchor_cell": [5, 5], "local_anchor_m": [0, 0], "options": None})
+                          "options": None})
     assert (status, body["error"]["diagnostics"][0]["code"]) == (422, "duplicate_identifier")
     assert fixture.tree_digest(workspace) == before
 
@@ -248,6 +249,58 @@ def test_moving_nodes_keeps_ids_directions_and_dependents(workspace):
     # A move undoes to the exact bytes.
     assert editor.undo()[0] == 200
     assert fixture.tree_digest(workspace) == before
+
+
+def test_the_first_node_places_the_map_and_an_anchor_move_reframes_the_graph(workspace):
+    """The anchor node is the local frame; the projection is the evidence."""
+
+    editor = Editor(workspace)
+    status, body = _create_map(editor, options=None)
+    assert (status, body["changed"]) == (200, True)
+    state = editor.state()
+    assert _settlement(state, "wild_camp")["world_frame"] is None
+
+    # The first created node becomes the anchor of the location, keeping the
+    # entered id, position and prose.
+    status, body = _send(editor, "create_node", NEW_MAP, {"settlement_id": "wild_camp", "node_id": "camp", "fields": {
+        **_node_fields(100, 200), "key": "Camp", "desc": "A camp.", "prototype_parent": "grid_room"}})
+    assert status == 200, body
+    node = _data(workspace, NEW_MAP)["nodes"]["camp"]
+    assert (node["prototype_parent"], node["anchor_key"]) == ("anchor_room", fixture.BARE_LOCATION_ID)
+    assert (node["x_m"], node["y_m"], node["key"]) == (100, 200, "Camp")
+    settlement = _settlement(editor.state(), "wild_camp")
+    # The bare location is cell (30, 12): its centre plus (100, 200) - (100, 200).
+    assert settlement["world_frame"] == {"anchor_cell": [30, 12], "local_anchor_m": [100, 200]}
+    assert [row["world_m"] for row in settlement["nodes"]] == [[30500, 12500]]
+
+    # A second node sits in the same local frame.
+    status, body = _send(editor, "create_node", NEW_MAP, {"settlement_id": "wild_camp", "node_id": "tent", "fields": {
+        **_node_fields(170, 280), "key": "Tent", "desc": "A tent."}})
+    assert status == 200, body
+    settlement = _settlement(editor.state(), "wild_camp")
+    world = {row["id"]: row["world_m"] for row in settlement["nodes"]}
+    assert world == {"camp": [30500, 12500], "tent": [30570, 12580]}
+    footprint = settlement["wilderness_entry"]  # none yet: the map has no gate
+    assert footprint is None
+
+    # Moving the anchor alone keeps it on the location cell's centre and shifts
+    # every untouched node by the negative local delta.
+    status, body = _send(editor, "move_nodes", NEW_MAP, {"settlement_id": "wild_camp", "moves": [
+        {"node_id": "camp", "x_m": 130, "y_m": 250}]})
+    assert status == 200, body
+    settlement = _settlement(editor.state(), "wild_camp")
+    assert settlement["world_frame"] == {"anchor_cell": [30, 12], "local_anchor_m": [130, 250]}
+    assert {row["id"]: row["world_m"] for row in settlement["nodes"]} == {
+        "camp": [30500, 12500],
+        "tent": [30540, 12530],
+    }
+    # One undo restores the previous frame and both world positions.
+    assert editor.undo()[0] == 200
+    settlement = _settlement(editor.state(), "wild_camp")
+    assert {row["id"]: row["world_m"] for row in settlement["nodes"]} == {
+        "camp": [30500, 12500],
+        "tent": [30570, 12580],
+    }
 
 
 @pytest.mark.parametrize(

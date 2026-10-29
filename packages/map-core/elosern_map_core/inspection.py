@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Sequence
 
 from .authoring import diagnose_world, load_authoring_world
-from .diagnostics import AuthoringError, RuntimeRejection
+from .diagnostics import AuthoringError, RuntimeRejection, blocking
 from .schema import schema
 from .sources import discover_source_documents
 
@@ -64,8 +64,9 @@ def _inspect(root: Path) -> tuple[int, str]:
             "diagnostics": [item.as_dict() for item in diagnostics],
             # Runtime readiness additionally needs the authoritative external
             # result and current partition artifact, which inspection does not
-            # receive; it stays explicitly unknown here.
-            "semantic_ready": not diagnostics,
+            # receive; it stays explicitly unknown here. Advisory warnings are
+            # reported above without making the candidate unready.
+            "semantic_ready": not blocking(diagnostics),
             "runtime_ready": None,
         },
         ensure_ascii=False,

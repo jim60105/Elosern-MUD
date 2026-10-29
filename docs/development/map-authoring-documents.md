@@ -96,10 +96,26 @@ the district's canonical visited identity without editing this document.
 
 ### settlement
 
-`location_ref`, `binding{anchor_cell, local_anchor_m}`, optional
-`options{map_visual_range, map_mode}`, optional `exit_prototype`
-(`prototype_parent: xyz_exit`, `typeclass`), `nodes{}`, `roads[]`, optional
-`wilderness_entry`, optional `city_gate`.
+`location_ref`, optional `options{map_visual_range, map_mode}`, optional
+`exit_prototype` (`prototype_parent: xyz_exit`, `typeclass`), `nodes{}`,
+`roads[]`, optional `wilderness_entry`, optional `city_gate`.
+
+A settlement document authors **no geographic coordinate and no world frame**.
+`location_ref` names the location that owns the cell, the unique `anchor_room`
+node supplies the local metre point, and the wilderness entry supplies a signed
+cell offset. The one transform is
+
+```
+world_m(P)      = cell_center_m(locations[location_ref].cell) + P - anchor_room
+entry_origin    = locations[location_ref].cell + wilderness_entry.offset
+hash_cell(r, c) = entry_origin + (c, r)      # row zero is the south row
+```
+
+so moving the location cell translates every node's world metres, the mask,
+its obstacle cells, its midpoint and every gate approach by the same delta,
+with the settlement document byte-identical. Moving the `anchor_room` node
+instead keeps the anchor on the location cell's centre and shifts every
+untouched node by the negative local delta; the mask and the location stay put.
 
 - `nodes.<node_id>` (the id is the stable identity and matches
   `^[a-z][a-z0-9_]*$`): `x_m`, `y_m`, `prototype_parent`
@@ -110,8 +126,11 @@ the district's canonical visited identity without editing this document.
   (`n`/`ne`/`e`/`se`/`s`/`sw`/`w`/`nw`), `bends[]` (`{x_m,y_m}`, optional).
   Endpoints must exist, self-loops and duplicate ordered roads are rejected,
   and one node may not declare the same outgoing compass direction twice.
-- `wilderness_entry`: `shape[]` (`#`/`.` footprint mask rows), `origin`,
-  `gates[]` (`return_direction`, `destination_node`).
+- `wilderness_entry`: `shape[]` (`#`/`.` footprint mask rows),
+  `offset{dx, dy}` (signed integer cell delta from the location cell),
+  `gates[]` (`return_direction`, `destination_node`). A one-`#` mask is a point
+  entry: it owns no obstacle cells, and its single hash cell is both the
+  wilderness entrance and every gate's approach cell.
 - `city_gate`: `node`, `exit_key`, `exit_aliases[]`.
 
 ### interior
@@ -164,9 +183,11 @@ unchanged.
 ## Gates and diagnostics
 
 Diagnostics are typed values with a stable `code`, a `category` (`structure`,
-`semantic`, `external`, `freshness`), canonical `relative_path`, dotted
+`semantic`, `external`, `freshness`), a `severity` (`error` by default, or
+`warning` for advisory evidence), canonical `relative_path`, dotted
 `field_path`, optional qualified `object_id` and one-based `line`/`column`.
-They are emitted in deterministic order.
+They are emitted in deterministic order. Only `severity: error` refuses a gate;
+`blocking(diagnostics)` is the one filter every readiness boundary applies.
 
 - **Structure** blocks load and writing: invalid YAML/values, unknown
   fields/versions/kinds, identity/stem mismatch, duplicate keys, coordinates or
@@ -188,12 +209,17 @@ They are emitted in deterministic order.
   Loading returns an
   `AuthoringWorld` with these diagnostics; structured editing and saving remain
   possible.
+  `footprint_location_offset` is the one advisory entry here: a valid mask whose
+  bounding-box midpoint differs from its location cell is reported with
+  `severity: warning`, so it never blocks saving, generation or adoption and
+  never re-centres the mask.
 - **External/freshness** gate runtime adoption only.
-  Remaining game-side checks (coordinate binding equalities, external scene archetypes,
-  nations, district spacing and static references) gate candidate composition and adoption.
+  Remaining game-side checks (external scene archetypes, nations, district
+  spacing and static references) gate candidate composition and adoption.
 
 `compile_runtime(world, authoritative_external_result, partition_freshness)`
-raises `RuntimeRejection` when the world has any diagnostic, when the external
+raises `RuntimeRejection` when the world has any blocking diagnostic (warnings
+are reported but never refuse), when the external
 result is missing, invalid, unsupported-version, fingerprint-less or bound to a
 different world fingerprint, or when the partition freshness is missing, stale,
 from a different input signature or from an unsupported algorithm version. Only

@@ -332,26 +332,35 @@ def _terrain_preview(continent) -> dict[str, Any]:
     }
 
 
-def _footprint(settlement) -> dict[str, Any] | None:
+def _footprint(settlement, location_cell) -> dict[str, Any] | None:
+    """The authored mask with its derived absolute origin and cells.
+
+    The document owns only the offset from its location cell; ``origin`` and
+    ``cells`` are projected for the read-only grid so the editor never has to
+    add a cell itself.
+    """
+
     entry = settlement.wilderness_entry
     if entry is None:
         return None
+    geometry = None if location_cell is None else entry.geometry(location_cell)
     return {
         "shape": list(entry.shape),
-        "origin": _cell(entry.origin),
-        "cells": sorted(_cell(cell) for cell in entry.mask_cells),
+        "offset": [int(entry.offset[0]), int(entry.offset[1])],
+        "origin": None if geometry is None else _cell(geometry.origin),
+        "cells": [] if geometry is None else sorted(_cell(cell) for cell in geometry.mask_cells),
     }
 
 
-def _wilderness_entry(settlement) -> dict[str, Any] | None:
+def _wilderness_entry(settlement, location_cell) -> dict[str, Any] | None:
     """The authored entry, each gate with its core-computed approach cell."""
 
     data = thaw(settlement.data.get("wilderness_entry"))
-    entry = settlement.wilderness_entry
-    if data is None or entry is None:
+    geometry = settlement.wilderness_geometry(location_cell) if location_cell is not None else None
+    if data is None or geometry is None:
         return data
     for gate in data["gates"]:
-        cell = gate_approach_cell(entry, gate["return_direction"])
+        cell = gate_approach_cell(geometry, gate["return_direction"])
         gate["approach_cell"] = None if cell is None else _cell(cell)
     return data
 
@@ -370,10 +379,24 @@ def _project(world, layouts: Mapping[str, dict[str, Any]]) -> dict[str, Any]:
     settlements = []
     for settlement_id, settlement in sorted(world.settlements.items()):
         lengths = road_lengths(settlement)
-        binding = settlement.binding
+        location = world.locations.locations.get(settlement.location_ref)
+        location_cell = None if location is None else location.cell
+        local_anchor = settlement.local_anchor_m
+        world_frame = (
+            None
+            if location_cell is None or local_anchor is None
+            else {
+                "anchor_cell": _cell(location_cell),
+                "local_anchor_m": [int(local_anchor[0]), int(local_anchor[1])],
+            }
+        )
         nodes = []
         for node_id, node in settlement.nodes.items():
-            world_m = local_to_world_m(binding.anchor_cell, binding.local_anchor_m, node.coordinate)
+            world_m = (
+                None
+                if world_frame is None
+                else local_to_world_m(location_cell, local_anchor, node.coordinate)
+            )
             nodes.append(
                 {
                     "id": node_id,
@@ -385,7 +408,7 @@ def _project(world, layouts: Mapping[str, dict[str, Any]]) -> dict[str, Any]:
                     "anchor_key": node.anchor_key,
                     "typeclass": node.typeclass,
                     "local_m": [node.x_m, node.y_m],
-                    "world_m": [int(world_m[0]), int(world_m[1])],
+                    "world_m": None if world_m is None else [int(world_m[0]), int(world_m[1])],
                 }
             )
         roads = []
@@ -406,14 +429,11 @@ def _project(world, layouts: Mapping[str, dict[str, Any]]) -> dict[str, Any]:
                 "id": settlement_id,
                 "relative_path": settlement.relative_path,
                 "location_ref": settlement.location_ref,
-                "binding": {
-                    "anchor_cell": _cell(binding.anchor_cell),
-                    "local_anchor_m": list(binding.local_anchor_m),
-                },
+                "world_frame": world_frame,
                 "nodes": nodes,
                 "roads": roads,
-                "wilderness_entry": _wilderness_entry(settlement),
-                "footprint": _footprint(settlement),
+                "wilderness_entry": _wilderness_entry(settlement, location_cell),
+                "footprint": _footprint(settlement, location_cell),
                 "city_gate": thaw(settlement.data.get("city_gate")),
                 "options": thaw(settlement.data.get("options")),
                 "exit_prototype": thaw(settlement.data.get("exit_prototype")),

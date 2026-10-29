@@ -282,7 +282,6 @@ def test_the_fresh_baseline_guard_refuses_an_anchor_the_snapshot_has_not_seen(wo
     outpost = fixture.settlement_data()
     outpost["id"] = "synthetic_outpost"
     outpost["location_ref"] = fixture.BARE_LOCATION_ID
-    outpost["binding"]["anchor_cell"] = {"cell_x": 30, "cell_y": 12}
     outpost["nodes"]["gate"]["anchor_key"] = fixture.BARE_LOCATION_ID
     outpost["wilderness_entry"] = None
     outpost["city_gate"] = None
@@ -358,17 +357,19 @@ def test_district_membership_and_creation(workspace):
     assert status == 409 and body["error"]["internal_references"][0]["kind"] == "landmark"
 
 
-# -- footprint and binding ----------------------------------------------------------
+# -- footprint ----------------------------------------------------------------------
 def test_footprint_cells_write_only_the_settlement_and_grow_the_mask(workspace):
     editor = Editor(workspace)
     before = fixture.tree_digest(workspace)
     assert _send(editor, "set_footprint_cell", SETTLEMENT, {"settlement_id": fixture.SETTLEMENT_ID, "cell": [4, 6], "filled": True})[0] == 200
     _others_unchanged(before, fixture.tree_digest(workspace), SETTLEMENT)
     entry = _data(workspace, SETTLEMENT)["wilderness_entry"]
-    assert entry["origin"] == {"cell_x": 4, "cell_y": 5}
+    # The saved value is the offset from the location cell (5, 5), never an origin.
+    assert entry["offset"] == {"dx": -1, "dy": 0}
     assert entry["shape"] == [".#", "#."]
     footprint = editor.state()["world"]["settlements"][0]["footprint"]
     assert footprint["cells"] == [[4, 6], [5, 5]]
+    assert footprint["origin"] == [4, 5]
     assert _send(editor, "set_footprint_cell", SETTLEMENT, {"settlement_id": fixture.SETTLEMENT_ID, "cell": [4, 6], "filled": False})[0] == 200
     assert _data(workspace, SETTLEMENT)["wilderness_entry"]["shape"] == [".#", ".."]
     # Clearing the last '#' is refused by the core mask rule.
@@ -379,24 +380,73 @@ def test_footprint_cells_write_only_the_settlement_and_grow_the_mask(workspace):
 
 
 def test_mask_growth_keeps_every_existing_cell(workspace):
-    entry = {"shape": ["#.", "##"], "origin": {"cell_x": 10, "cell_y": 10}}
-    shape, origin = toggled_mask(entry, (8, 13), True)
-    assert origin == {"cell_x": 8, "cell_y": 10}
-    cells = {(origin["cell_x"] + c, origin["cell_y"] + r) for r, line in enumerate(shape) for c, ch in enumerate(line) if ch == "#"}
+    location_cell = (10, 10)
+    entry = {"shape": ["#.", "##"], "offset": {"dx": 0, "dy": 0}}
+    shape, offset = toggled_mask(entry, (8, 13), True, location_cell=location_cell)
+    assert offset == {"dx": -2, "dy": 0}
+    cells = {
+        (location_cell[0] + offset["dx"] + c, location_cell[1] + offset["dy"] + r)
+        for r, line in enumerate(shape)
+        for c, ch in enumerate(line)
+        if ch == "#"
+    }
     assert cells == {(10, 10), (10, 11), (11, 11), (8, 13)}
-    assert toggled_mask(entry, (30, 30), False) == (["#.", "##"], {"cell_x": 10, "cell_y": 10})
+    assert toggled_mask(entry, (30, 30), False, location_cell=location_cell) == (
+        ["#.", "##"],
+        {"dx": 0, "dy": 0},
+    )
     with pytest.raises(Exception):
-        toggled_mask(entry, (10 + MAX_MASK_SIDE, 10), True)
+        toggled_mask(entry, (10 + MAX_MASK_SIDE, 10), True, location_cell=location_cell)
 
 
-def test_the_binding_is_settlement_owned(workspace):
+def test_the_removed_binding_command_is_unknown_and_writes_nothing(workspace):
     editor = Editor(workspace)
     before = fixture.tree_digest(workspace)
     arguments = {"settlement_id": fixture.SETTLEMENT_ID, "anchor_cell": [6, 5], "local_anchor_m": [100, -50]}
-    assert _send(editor, "set_binding", SETTLEMENT, arguments)[0] == 200
-    _others_unchanged(before, fixture.tree_digest(workspace), SETTLEMENT)
-    binding = editor.state()["world"]["settlements"][0]["binding"]
-    assert binding == {"anchor_cell": [6, 5], "local_anchor_m": [100, -50]}
+    status, body = _send(editor, "set_binding", SETTLEMENT, arguments)
+    assert status == 404
+    assert body["error"]["code"] == "unknown_command"
+    assert fixture.tree_digest(workspace) == before
+    # The projection exposes only the derived frame, never editable coordinates.
+    settlement = editor.state()["world"]["settlements"][0]
+    assert "binding" not in settlement
+    assert settlement["world_frame"]["anchor_cell"] == [5, 5]
+    assert settlement["world_frame"]["local_anchor_m"] == [0, 0]
+
+
+def test_footprint_conversion_refuses_a_location_changed_after_the_snapshot(workspace):
+    """The absolute-cell contract never converts through a stale location cell."""
+
+    editor = Editor(workspace)
+    locations = _data(workspace, LOCATIONS)
+    locations["locations"][fixture.LOCATION_ID]["cell"] = {"cell_x": 6, "cell_y": 6}
+    (workspace / LOCATIONS).write_text(fixture.yaml_text(locations), encoding="utf-8")
+    before = fixture.tree_digest(workspace)
+
+    status, body = _send(
+        editor,
+        "set_footprint_cell",
+        SETTLEMENT,
+        {"settlement_id": fixture.SETTLEMENT_ID, "cell": [6, 5], "filled": True},
+    )
+    assert (status, body["error"]["code"]) == (409, "stale_document")
+    assert "reread" in body["error"]["message"]
+    assert fixture.tree_digest(workspace) == before
+
+    # After the reread the same command converts through the new cell.
+    editor.reload()
+    assert _send(
+        editor,
+        "set_footprint_cell",
+        SETTLEMENT,
+        {"settlement_id": fixture.SETTLEMENT_ID, "cell": [6, 5], "filled": True},
+    )[0] == 200
+    entry = _data(workspace, SETTLEMENT)["wilderness_entry"]
+    assert entry["offset"] == {"dx": 0, "dy": -1}
+    assert entry["shape"] == ["#", "#"]
+    footprint = editor.state()["world"]["settlements"][0]["footprint"]
+    assert footprint["origin"] == [6, 5]
+    assert footprint["cells"] == [[6, 5], [6, 6]]
 
 
 def test_a_command_naming_another_document_is_cross_document(workspace):
@@ -447,7 +497,7 @@ def test_geography_commands_are_rejected_while_the_preview_is_stale(workspace):
     for name, document, arguments in (
         ("move_control_point", CONTINENT, {"feature": RIVER, "index": 0, "point": [20, 25]}),
         ("create_location", LOCATIONS, NEW_LOCATION),
-        ("set_binding", SETTLEMENT, {"settlement_id": fixture.SETTLEMENT_ID, "anchor_cell": [6, 5], "local_anchor_m": [0, 0]}),
+        ("set_footprint_cell", SETTLEMENT, {"settlement_id": fixture.SETTLEMENT_ID, "cell": [6, 6], "filled": True}),
     ):
         status, body = _send(editor, name, document, arguments)
         assert (status, body["error"]["code"], body["error"]["reason"]) == (423, "write_paused", "stale_preview")

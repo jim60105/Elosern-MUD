@@ -4,7 +4,7 @@
 // insert/remove actions, ridge and terrain parameters, passes, waterways,
 // region prose/classifier fields, reserved sites, locations (with 開啟本地圖
 // or 無本地圖), districts with a structured landmark selector, footprint
-// masks and settlement bindings, the tool creation forms, and the derived
+// masks, the tool creation forms, and the derived
 // results section. Every change is emitted as one named single-document
 // command descriptor; the service validates it. Nothing is pre-disabled.
 // Authored text renders through text interpolation only.
@@ -14,12 +14,10 @@ import FootprintGrid from "./FootprintGrid.vue";
 import {
   FRAME_CELL,
   FRAME_KM,
-  FRAME_LOCAL_M,
   RIDGE,
   addPass,
   addSite,
   addWaterway,
-  binding,
   createLocation,
   districtField,
   featurePoints,
@@ -211,14 +209,6 @@ function setMembership(kind, regionKey) {
   send(districtField(district.value.id, "membership", { kind, region_key: key }));
 }
 
-// -- bindings ------------------------------------------------------------------
-function setBinding(settlement, part, axis, value) {
-  const anchor = [...settlement.binding.anchor_cell];
-  const local = [...settlement.binding.local_anchor_m];
-  (part === "anchor" ? anchor : local)[axis] = value;
-  send(binding(props.world, settlement.id, anchor, local));
-}
-
 // -- creation forms ---------------------------------------------------------------
 const form = reactive({});
 watch(
@@ -282,7 +272,7 @@ function onFormKey(event) {
 }
 
 // -- a new local map for the selected location (one new settlement document) --
-const mapForm = reactive({ open: false, id: "", anchor_x: "", anchor_y: "", local_e: "0", local_n: "0", range: "", mode: "" });
+const mapForm = reactive({ open: false, id: "", range: "", mode: "" });
 function openMapForm() {
   const taken = new Set(props.world.settlements.map((row) => row.id));
   let id = location.value.id;
@@ -290,10 +280,6 @@ function openMapForm() {
   Object.assign(mapForm, {
     open: true,
     id,
-    anchor_x: String(location.value.cell[0]),
-    anchor_y: String(location.value.cell[1]),
-    local_e: "0",
-    local_n: "0",
     range: "",
     mode: "",
   });
@@ -308,8 +294,6 @@ const mapFormError = computed(() => {
   if (!mapForm.open) return null;
   if (!/^[a-z][a-z0-9_]*$/.test(mapForm.id)) return "ID 需為小寫英文、數字與底線，並以字母開頭。";
   if (props.world.settlements.some((row) => row.id === mapForm.id)) return "這個據點 ID 已存在。";
-  if (![mapForm.anchor_x, mapForm.anchor_y].every((value) => /^\d+$/.test(String(value).trim()))) return "錨點格需要非負整數（1 km 格）。";
-  if (![mapForm.local_e, mapForm.local_n].every((value) => /^-?\d+$/.test(String(value).trim()))) return "地方錨點需要整數公尺。";
   const range = String(mapForm.range).trim();
   const mode = String(mapForm.mode).trim();
   if ((range || mode) && !(/^\d+$/.test(range) && mode)) return "地圖選項需同時填寫整數視野與模式，或都留空。";
@@ -323,13 +307,7 @@ function submitMapForm() {
   const options = range ? { map_visual_range: Number(range), map_mode: String(mapForm.mode).trim() } : null;
   emit(
     "create-map",
-    createSettlement(
-      mapForm.id,
-      location.value.id,
-      [Number(mapForm.anchor_x), Number(mapForm.anchor_y)],
-      [Number(mapForm.local_e), Number(mapForm.local_n)],
-      options,
-    ),
+    createSettlement(mapForm.id, location.value.id, options),
     mapForm.id,
   );
   mapForm.open = false;
@@ -584,22 +562,6 @@ const generating = computed(() => partitionState.value.state === "generating");
           <input v-model="mapForm.id" class="draft-field__input mono" data-map-field="id" />
         </label>
         <label class="draft-field">
-          <span class="draft-field__label">錨點東向格<span class="draft-field__unit">{{ FRAME_CELL }}</span></span>
-          <input v-model="mapForm.anchor_x" class="draft-field__input mono" data-map-field="anchor_x" />
-        </label>
-        <label class="draft-field">
-          <span class="draft-field__label">錨點北向格<span class="draft-field__unit">{{ FRAME_CELL }}</span></span>
-          <input v-model="mapForm.anchor_y" class="draft-field__input mono" data-map-field="anchor_y" />
-        </label>
-        <label class="draft-field">
-          <span class="draft-field__label">地方錨點東<span class="draft-field__unit">{{ FRAME_LOCAL_M }}</span></span>
-          <input v-model="mapForm.local_e" class="draft-field__input mono" data-map-field="local_e" />
-        </label>
-        <label class="draft-field">
-          <span class="draft-field__label">地方錨點北<span class="draft-field__unit">{{ FRAME_LOCAL_M }}</span></span>
-          <input v-model="mapForm.local_n" class="draft-field__input mono" data-map-field="local_n" />
-        </label>
-        <label class="draft-field">
           <span class="draft-field__label">地圖選項：視野（可留空）</span>
           <input v-model="mapForm.range" class="draft-field__input mono" data-map-field="range" />
         </label>
@@ -607,7 +569,9 @@ const generating = computed(() => partitionState.value.state === "generating");
           <span class="draft-field__label">地圖選項：模式（可留空）</span>
           <input v-model="mapForm.mode" class="draft-field__input mono" data-map-field="mode" />
         </label>
-        <p class="inspector__muted">新地圖沒有節點或道路，會標示為未完成；不會寫入地點文件。</p>
+        <p class="inspector__muted">
+          新地圖沒有節點或道路，會標示為未完成；不會寫入地點文件。第一個建立的房間會成為錨點房間。
+        </p>
         <p v-if="mapFormShown && mapFormError" class="draft-field__hint" data-field-error="local-map">{{ mapFormError }}</p>
         <div class="inspector__actions">
           <button type="submit" class="button" data-map-submit>＋ 建立本地圖</button>
@@ -694,7 +658,7 @@ const generating = computed(() => partitionState.value.state === "generating");
       </form>
     </template>
 
-    <!-- footprint and binding -->
+    <!-- footprint -->
     <template v-else-if="footprintSettlement">
       <h3 class="section-label">佔地遮罩 · {{ FRAME_CELL }}</h3>
       <FootprintGrid
@@ -703,30 +667,10 @@ const generating = computed(() => partitionState.value.state === "generating");
         @toggle="send(footprintCell(world, footprintSettlement.id, $event.cell, $event.filled))"
       />
       <p class="inspector__note">只寫入 {{ footprintSettlement.relative_path }}；「佔地」工具也可在畫布上逐格切換。</p>
-      <h3 class="section-label">綁定 · 地方 ⇄ 世界</h3>
-      <DraftField
-        v-for="(axis, index) in ['錨點東向格', '錨點北向格']"
-        :key="`anchor-${index}`"
-        :label="axis"
-        :field-key="`binding-anchor-${index}`"
-        type="int"
-        :unit="FRAME_CELL"
-        :value="footprintSettlement.binding.anchor_cell[index]"
-        @confirm="setBinding(footprintSettlement, 'anchor', index, $event)"
-        @drafts="track(`binding-anchor-${index}`)($event)"
-      />
-      <DraftField
-        v-for="(axis, index) in ['地方錨點東', '地方錨點北']"
-        :key="`local-${index}`"
-        :label="axis"
-        :field-key="`binding-local-${index}`"
-        type="int"
-        :unit="FRAME_LOCAL_M"
-        :value="footprintSettlement.binding.local_anchor_m[index]"
-        @confirm="setBinding(footprintSettlement, 'local', index, $event)"
-        @drafts="track(`binding-local-${index}`)($event)"
-      />
-      <p class="inspector__note">世界公尺 = 錨點格中心 + 地方公尺 − 地方錨點；室內房間沒有公尺座標。</p>
+      <p class="inspector__note">
+        世界公尺 = 地點格中心 + 地方公尺 − 錨點房間；移動地點只寫入地點文件，遮罩與閘門入口跟著平移。
+        室內房間沒有公尺座標。
+      </p>
     </template>
 
     <!-- derived results (design §4.1) -->

@@ -102,12 +102,12 @@ def test_the_last_gate_is_refused_and_the_whole_entry_is_an_explicit_removal(wor
     assert status == 200, body
     assert _changed(before, workspace) == {SETTLEMENT}
     assert _data(workspace, SETTLEMENT)["wilderness_entry"] is None
-    # A first gate creates a one-cell point entry at the binding's anchor cell.
+    # A first gate creates a one-cell point entry at the location cell.
     status, body = _send(editor, "create_wilderness_gate", SETTLEMENT,
                          {"settlement_id": TOWN, "return_direction": "s", "node": YARD})
     assert status == 200, body
     assert _data(workspace, SETTLEMENT)["wilderness_entry"] == {
-        "shape": ["#"], "origin": {"cell_x": 5, "cell_y": 5},
+        "shape": ["#"], "offset": {"dx": 0, "dy": 0},
         "gates": [{"return_direction": "s", "destination_node": "yard"}]}
 
 
