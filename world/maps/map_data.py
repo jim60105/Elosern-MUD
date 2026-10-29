@@ -48,8 +48,8 @@ from world.lore.anchors import LocalFrameAnchor
 from world.lore.wilderness_entry import (
     WildernessEntryPoint,
     WildernessGate,
-    validate_wilderness_entries,
 )
+from elosern_map_core.authoring import diagnose_settlement_rules
 from world.maps.city_gates import CityGateDef
 from world.maps.published import PublishedKeySet, PublishedView
 
@@ -360,31 +360,14 @@ def build_settlements(
             entries[entry.anchor_key] = entry
         scene_archetypes.update(scenes)
 
-    if not problems:
-        index = ReferenceIndex.build(
-            settlement_nodes=[
-                (settlement_id, node_id, node.coordinate)
-                for settlement_id, graph in graphs.items()
-                for node_id, node in graph.nodes.items()
-            ]
-        )
-        extents = {
-            settlement_id: {node.coordinate for node in graph.nodes.values()}
-            for settlement_id, graph in graphs.items()
-        }
-        try:
-            validate_wilderness_entries(
-                MappingProxyType(entries),
-                index=index,
-                placements=MappingProxyType(placements),
-                extents=extents,
-                bounds=(frame_cells - 1, frame_cells - 1),
-                # Terrain validity needs the geography candidate; the geometry,
-                # identity, uniqueness and footprint rules do not.
-                walkable=lambda cell: True,
-            )
-        except ValueError as error:
-            problems.append(str(error))
+    for diag in diagnose_settlement_rules(
+        settlements,
+        locations=locations,
+        frame_cells=frame_cells,
+        terrain=None,
+    ):
+        if diag.message not in problems:
+            problems.append(diag.message)
 
     if problems:
         raise SettlementError(problems)

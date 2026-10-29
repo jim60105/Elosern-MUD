@@ -26,7 +26,7 @@ from .nations import NATION_REGISTRY
 from .races import RACE_REGISTRY, STATIC_TIER_REGISTRY, SUBRACE_REGISTRY
 from .settlements import PLACE_REGISTRY, SETTLEMENT_REGISTRY
 from .titles import FIXED_TITLE_REGISTRY
-from .wilderness_entry import WILDERNESS_ENTRY_REGISTRY, validate_wilderness_entries
+from .wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 
 
 class LoreRecord(DefaultScript):
@@ -171,10 +171,6 @@ def sync_all() -> None:
     from world.maps.static_references import validate_static_references
 
     validate_static_references()
-    # wilderness-anchor-footprint: malformed authored wilderness data fails at
-    # startup, before any lore:wilderness_entries:* Script is created or
-    # updated.
-    validate_wilderness_entries()
 
     for category, registry in _ALL_REGISTRIES.items():
         if category in _NAMED_STEP_CATEGORIES:

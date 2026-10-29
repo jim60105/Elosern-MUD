@@ -48,10 +48,6 @@ from elosern_map_core.terrain import is_land_cell, is_walkable_cell, is_within_f
 PARTITION_PATH = "world/maps/data/district_partition.json"
 REFERENCE_PATH = "content/map-reference-context.json"
 MIN_VORONOI_SPACING_KM = 100  # mirrors world/lore/map_districts.py
-DELTAS = {
-    "n": (0, 1), "ne": (1, 1), "e": (1, 0), "se": (1, -1),
-    "s": (0, -1), "sw": (-1, -1), "w": (-1, 0), "nw": (-1, 1),
-}
 
 
 def _diag_line(item: dict) -> str:
@@ -119,27 +115,10 @@ def game_rules(world, context) -> tuple[list[str], list[str]]:
                 if nation is not None and nation not in nations:
                     problems.append(f"region {key!r} names unknown nation {nation!r}")
 
-    bound_locations: dict[str, str] = {}
-    footprints: dict[str, frozenset] = {}
-    point_anchors: dict[str, tuple] = {}
-    approaches: list[tuple[str, str, tuple | None]] = []
     for sid, settlement in sorted(world.settlements.items()):
         label = f"settlement {sid!r}"
-        if settlement.location_ref in bound_locations:
-            problems.append(
-                f"{label} binds location {settlement.location_ref!r} already bound by "
-                f"{bound_locations[settlement.location_ref]!r}"
-            )
-        bound_locations[settlement.location_ref] = sid
         anchors = [n for n in settlement.nodes.values() if n.prototype_parent == "anchor_room"]
-        if settlement.nodes and len(anchors) != 1:
-            problems.append(f"{label} declares {len(anchors)} anchor_room nodes, expected exactly one")
         for node in anchors:
-            if node.anchor_key != settlement.location_ref:
-                problems.append(
-                    f"{label} anchor node {node.node_id!r} anchor_key {node.anchor_key!r} "
-                    f"!= location_ref {settlement.location_ref!r}"
-                )
             if settlement.binding.local_anchor_m != (node.x_m, node.y_m):
                 problems.append(
                     f"{label} binding.local_anchor_m {settlement.binding.local_anchor_m} != "
@@ -156,102 +135,18 @@ def game_rules(world, context) -> tuple[list[str], list[str]]:
             check_scene(f"{label} node {node.node_id!r}", node.scene_archetype)
 
         entry = settlement.wilderness_entry
-        if entry is None:
-            continue
-        cells = entry.mask_cells
-        widths = {len(row) for row in entry.shape}
-        if len(widths) != 1:
-            problems.append(f"{label} wilderness_entry.shape is ragged")
-        for cell in sorted(cells):
-            if not is_walkable_cell(terrain, cell):
-                problems.append(f"{label} footprint cell {cell} is not walkable terrain")
-        anchor_cell = entry.anchor_cell
-        if location is not None and anchor_cell is not None and anchor_cell != location.cell:
-            warnings.append(
-                f"{label} footprint anchor cell {anchor_cell} (mask bounding-box midpoint) "
-                f"!= location cell {location.cell}: the world-map marker and the real "
-                "wilderness entrance are in different places"
-            )
-        if not cells:
-            problems.append(f"{label} wilderness_entry.shape has no '#' cell")
-            continue
-        if entry.is_point_shape:
-            point_anchors[sid] = anchor_cell
-            if len(entry.gates) != 1:
-                problems.append(f"{label} point-shape entry must have exactly one gate")
-        else:
-            seen = set()
-            stack = [next(iter(cells))]
-            while stack:
-                cx, cy = stack.pop()
-                if (cx, cy) in seen:
-                    continue
-                seen.add((cx, cy))
-                stack.extend(c for c in ((cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1)) if c in cells)
-            if seen != set(cells):
-                problems.append(f"{label} footprint '#' cells are not 4-connected")
-            if anchor_cell not in cells:
-                problems.append(f"{label} footprint anchor cell {anchor_cell} is not a '#' cell")
-        footprints[sid] = entry.footprint_cells
-        destinations = [gate.destination_node for gate in entry.gates]
-        if len(set(destinations)) != len(destinations):
-            problems.append(f"{label} two wilderness gates share one destination node")
-        for gate in entry.gates:
-            approach = gate_approach_cell(entry, gate.return_direction)
-            approaches.append((sid, gate.return_direction, approach))
-            if approach is None:
-                problems.append(f"{label} gate {gate.return_direction!r} has no approach cell")
-            elif entry.is_point_shape:
-                dx, dy = DELTAS[gate.return_direction]
-                neighbour = (anchor_cell[0] + dx, anchor_cell[1] + dy)
-                if not is_walkable_cell(terrain, neighbour):
-                    problems.append(
-                        f"{label} point anchor {anchor_cell} has unwalkable neighbour {neighbour} "
-                        f"in its gate direction {gate.return_direction!r}"
-                    )
-            elif not is_walkable_cell(terrain, approach):
-                problems.append(f"{label} gate {gate.return_direction!r} approach {approach} is not walkable")
+        if entry is not None and location is not None:
+            anchor_cell = entry.anchor_cell
+            if anchor_cell is not None and anchor_cell != location.cell:
+                warnings.append(
+                    f"{label} footprint anchor cell {anchor_cell} (mask bounding-box midpoint) "
+                    f"!= location cell {location.cell}: the world-map marker and the real "
+                    "wilderness entrance are in different places"
+                )
 
-    for sid, cells in footprints.items():
-        for other, other_cells in footprints.items():
-            if other > sid and cells & other_cells:
-                problems.append(f"settlement {sid!r} footprint overlaps {other!r}")
-        for other, point in point_anchors.items():
-            if other != sid and point in cells:
-                problems.append(f"settlement {sid!r} footprint contains the point anchor of {other!r}")
-    seen_keys = set()
-    for sid, direction, approach in approaches:
-        if approach is None:
-            continue
-        for other, point in point_anchors.items():
-            if other != sid and approach == point:
-                problems.append(f"settlement {sid!r} gate {direction!r} approach {approach} is the point anchor of {other!r}")
-        if (approach, direction) in seen_keys:
-            problems.append(f"settlement {sid!r} gate {direction!r} collides with another gate's approach")
-        seen_keys.add((approach, direction))
-        for other, cells in footprints.items():
-            if other != sid and approach in cells:
-                problems.append(f"settlement {sid!r} gate {direction!r} approach {approach} lies inside {other!r}")
-
-    room_owner: dict[str, str] = {}
-    doorways: dict[tuple, str] = {}
     for iid, interior in sorted(world.interiors.items()):
         for room in interior.rooms.values():
             check_scene(f"interior {iid!r} room {room.room_id!r}", room.scene_archetype)
-            if room.room_id in room_owner:
-                problems.append(
-                    f"room id {room.room_id!r} is declared by both {room_owner[room.room_id]!r} and {iid!r}"
-                )
-            room_owner.setdefault(room.room_id, iid)
-        exterior = interior.exterior
-        if exterior is not None:
-            key = (exterior.settlement, exterior.node, exterior.doorway_key)
-            if key in doorways:
-                problems.append(
-                    f"interiors {doorways[key]!r} and {iid!r} open onto {exterior.settlement}:"
-                    f"{exterior.node} with the same doorway_key {exterior.doorway_key!r}"
-                )
-            doorways.setdefault(key, iid)
 
     seen_names: dict[tuple, str] = {}
     seeds: dict[str, tuple] = {}

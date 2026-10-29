@@ -423,6 +423,56 @@ class AuthoringRequirementTests(unittest.TestCase):
             {item.code for item in captured.exception.diagnostics},
         )
 
+    @covers_requirement(
+        "map-authoring-documents::"
+        "authoring-diagnostics-and-runtime-acceptance-have-distinct-gates"
+    )
+    @covers_requirement(
+        "wilderness-gateway::"
+        "wilderness-entry-registry-authored-data-is-validated-before-persistence"
+    )
+    def test_core_and_game_diagnostics_agreement_matrix(self):
+        from elosern_map_core.authoring import (
+            diagnose_settlement_rules,
+            diagnose_interior_rules,
+        )
+
+        # 1. Valid control: no diagnostics
+        valid_world = fixtures.loaded_world()
+        self.assertEqual(valid_world.diagnostics, ())
+        self.assertEqual(
+            diagnose_settlement_rules(
+                valid_world.settlements,
+                locations=valid_world.locations,
+                frame_cells=valid_world.continent.terrain.frame_cells,
+            ),
+            [],
+        )
+        self.assertEqual(diagnose_interior_rules(valid_world.interiors), [])
+
+        # 2. Missing anchor room: saveable WIP in core, rejected by runtime compile
+        no_anchor_data = fixtures.settlement_data()
+        no_anchor_data["nodes"]["gate"]["prototype_parent"] = "grid_room"
+        no_anchor_data["nodes"]["gate"]["anchor_key"] = None
+        world = load_authoring_world(fixtures.custom_sources(settlement=no_anchor_data))
+        self.assertIn("missing_anchor_room", {d.code for d in world.diagnostics})
+        with self.assertRaises(RuntimeRejection) as captured:
+            compile_runtime(world, fixtures.valid_external(world), fixtures.current_freshness(world))
+        self.assertIn("missing_anchor_room", {d.code for d in captured.exception.diagnostics})
+
+        # 3. Disconnected footprint: saveable WIP in core, rejected by runtime compile
+        disc_data = fixtures.settlement_data()
+        disc_data["wilderness_entry"] = {
+            "shape": ["#.#"],
+            "origin": {"cell_x": 5, "cell_y": 5},
+            "gates": [{"return_direction": "n", "destination_node": "gate"}],
+        }
+        world_disc = load_authoring_world(fixtures.custom_sources(settlement=disc_data))
+        self.assertIn("disconnected_footprint", {d.code for d in world_disc.diagnostics})
+        with self.assertRaises(RuntimeRejection) as captured:
+            compile_runtime(world_disc, fixtures.valid_external(world_disc), fixtures.current_freshness(world_disc))
+        self.assertIn("disconnected_footprint", {d.code for d in captured.exception.diagnostics})
+
 
 if __name__ == "__main__":
     unittest.main()
