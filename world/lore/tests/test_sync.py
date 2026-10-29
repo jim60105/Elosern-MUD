@@ -167,21 +167,39 @@ class LoreSyncTests(EvenniaTestCase):
         "wilderness-gateway::wilderness-entry-registry-authored-data-is-validated-before-persistence"
     )
     def test_sync_all_refuses_to_mirror_a_malformed_registry(self):
-        from world.lore.wilderness_entry import WildernessEntryPoint
-        from world.maps import map_data
+        from unittest.mock import patch
 
-        malformed = WildernessEntryPoint("capital_altoria", (), (0, 0), ())
-        previous = map_data.current()
-        entries = dict(previous.wilderness_entries)
-        entries["capital_altoria"] = malformed
-        publish_settlements(
-            replace(previous, wilderness_entries=MappingProxyType(entries))
-        )
+        from elosern_map_core.sources import make_source_document
+        from world.maps import runtime
+        from world.maps.runtime import MapWorldError
+
+        # The rejection is core-owned and candidate-scoped: it runs while the
+        # authored sources are adopted, before any mirror write exists.
+        saved = runtime._BUNDLE
+        runtime._uninstall()
         try:
-            with self.assertRaises(ValueError):
-                sync_all()
+            malformed_sources = []
+            for source in runtime._read_sources(None):
+                if source.relative_path.endswith("capital_altoria.yaml"):
+                    text = source.text.replace(
+                        '    - "#######"\n    - "#######"',
+                        '    - "......."\n    - "......."',
+                    )
+                    malformed_sources.append(
+                        make_source_document(source.relative_path, text)
+                    )
+                else:
+                    malformed_sources.append(source)
+            with patch(
+                "world.maps.runtime._read_sources",
+                return_value=tuple(malformed_sources),
+            ):
+                with self.assertRaises(MapWorldError) as caught:
+                    sync_all()
+            self.assertIn("not 4-connected", str(caught.exception))
         finally:
-            publish_settlements(previous)
+            if saved is not None:
+                runtime._install(saved)
         # Nothing was created: the validation error precedes every mirror write.
         self.assertEqual(
             ScriptDB.objects.filter(db_key__startswith="lore:wilderness_entries:").count(), 0

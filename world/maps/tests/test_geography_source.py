@@ -159,7 +159,10 @@ class ShippedGeographyPublicationTests(EvenniaTest):
                 _settlements(),
                 fingerprints=dict(before.fingerprints),
             )
-        self.assertIn("not provider-valid", str(captured.exception))
+        self.assertIn(
+            "gate 'w' approach (864, 1080) is not walkable wilderness",
+            str(captured.exception),
+        )
         self.assertIs(geography.current(), before)
         self.assertEqual(geography.current().identity, identities)
 
