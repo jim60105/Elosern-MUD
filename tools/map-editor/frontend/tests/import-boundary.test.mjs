@@ -84,6 +84,7 @@ test("a CSS import of the game shell and a non-literal dynamic import fail close
 test("build output and dependencies are not scanned as authored source", () => {
   const violations = scan({
     [`${APP}/dist/assets/index.js`]: "const m = await import(name);",
+    [`${APP}/capture-dist/assets/index.js`]: "const m = await import(name);",
     [`${APP}/node_modules/x/index.js`]: 'import "../../../../../web/webclient-app/stores/game.js";',
   });
   assert.deepEqual(violations, []);
