@@ -30,6 +30,7 @@ import { unproject } from "@elosern/map-view";
 import CaptureApp from "./components/CaptureApp.vue";
 import {
   CAPTURE_VIEWS,
+  boxContains,
   boxOfView,
   captureAxes,
   captureScene,
@@ -134,15 +135,21 @@ function paintedBox(view, frame) {
 async function fitCamera({ scene, frame, view, label }) {
   const extent = sceneExtent(scene) ?? scene.bounds;
   if (!extent) throw new Error("capture: the scene has no reference geometry to fit");
-  const { bounds } = await convergeFit(extent, async (candidate) => {
+  const { bounds, converged } = await convergeFit(extent, async (candidate) => {
     const camera = fitView(candidate, frame);
     await show({ scene, view: camera, frame, label });
     return paintedBox(camera, frame);
   });
-  return fitView(bounds, frame);
+  return { camera: fitView(bounds, frame), converged };
 }
 
+// A capture is one image, not a stream: two callers sharing the surface would
+// measure each other's render. Refuse an overlapping call explicitly.
+let rendering = false;
+
 window.renderMapCapture = async (payload) => {
+  if (rendering) throw new Error("capture: a render is already in progress");
+  rendering = true;
   report.status = "rendering";
   report.error = null;
   report.bounds = null;
@@ -153,15 +160,34 @@ window.renderMapCapture = async (payload) => {
     const { view, frame, bounds } = request;
     const scene = sceneFor(request.world, view, request.mapId, [], { partition: request.partition });
     if (!scene) throw new Error(`capture: no ${view} map ${request.mapId ?? ""} in the payload`.trim());
-    const camera = bounds
-      ? viewOfBox(expandToAspect(sceneFrameBounds(view, bounds), frame.width, frame.height), frame)
-      : await fitCamera({ scene, frame, view, label: view });
+    let camera = null;
+    let converged = true;
+    if (bounds) {
+      camera = viewOfBox(expandToAspect(sceneFrameBounds(view, bounds), frame.width, frame.height), frame);
+    } else {
+      ({ camera, converged } = await fitCamera({ scene, frame, view, label: view }));
+    }
     await show({
       scene: captureScene(scene, view, request.hidden),
       view: camera,
       frame,
       label: view,
     });
+    // An automatic fit promises the whole painted map. The measured painted
+    // box at the final camera decides, not the convergence flag alone: a size
+    // too small for the cards and labels it must hold is refused instead of
+    // resolving a clipped image. Explicit bounds clip by definition.
+    if (!bounds) {
+      const painted = paintedBox(camera, frame);
+      // An all-hidden surface paints only its background and is contained by
+      // definition; anything painted beyond the image is a refused fit.
+      if (painted && !boxContains(boxOfView(camera, frame), painted, 1e-6)) {
+        throw new Error(
+          `capture: the whole map does not fit ${frame.width}x${frame.height} pixels` +
+            `${converged ? "" : " (fit did not settle)"}; request explicit bounds or a larger size`,
+        );
+      }
+    }
     const result = {
       bounds: frameBoundsOf(view, boxOfView(camera, frame)),
       units: captureUnits(view),
@@ -176,5 +202,7 @@ window.renderMapCapture = async (payload) => {
     report.status = "error";
     report.error = String(error?.message ?? error);
     throw error;
+  } finally {
+    rendering = false;
   }
 };

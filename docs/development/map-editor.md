@@ -1207,6 +1207,20 @@ image at a 1280×960 output; positive but tiny output sizes are still accepted,
 scaled uniformly, without an undocumented minimum size and without promising
 readable detail.
 
+The measured painted box at the final camera decides success, not the
+convergence flag alone: a size too small to hold the cards and labels the map
+must show is refused with an explicit error instead of resolving a clipped
+image, and the caller can ask for explicit bounds (which clip by design) or a
+larger size. One page renders one image at a time; an overlapping call is
+refused rather than sharing the surface with a render in flight.
+
+Readiness re-reads `document.fonts.ready` after forcing style and layout for
+the newly inserted text — the promise is already resolved until a layout
+starts the face loads — repeats that (bounded) while any face is still
+loading, then rejects if any local face ended in the error state. A capture
+that introduces a family, weight or unicode-range subset the previous one did
+not use therefore still waits for it.
+
 Layer hiding never enters the camera: the fit is computed on the unfiltered
 scene, so the camera, the reported bounds and the background are identical
 whatever the caller hides.
@@ -1249,12 +1263,15 @@ workspace's three views, asserts the exact reported bounds and the projected
 mark positions for a requested region, checks that measured labels and cards
 lie inside the image, walks every view's layers (geometry alone, labels alone,
 everything hidden at an unchanged camera), confirms authored hostile text and
-URL-shaped names stay inert, and proves a missing script never reports
-readiness. `MapSurfaceEditorSmokeBrowserTest` in the same module drives the
+URL-shaped names stay inert, proves a missing script never reports readiness,
+holds readiness behind a deliberately delayed font file, waits for a face a
+later capture introduces, and refuses an automatic fit that cannot hold the
+surface. `MapSurfaceEditorSmokeBrowserTest` in the same module drives the
 extracted surface through the interactive host: a click selects one mark, a
 pointer drag pans by exactly the pointer travel without writing anything, the
-zoom pill changes the level and 適配 restores it, and one node drag is exactly
-one `move_nodes` command that changes only the settlement document.
+wheel scales the surface by one uniform factor about one anchor and the
+opposite wheel restores it, and one node drag is exactly one `move_nodes`
+command that changes only the settlement document.
 
 ### 10.5 Human review record
 

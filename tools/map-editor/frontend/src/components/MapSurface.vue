@@ -172,11 +172,29 @@ function brackets(at) {
 
 function onMarkClick(mark, event) {
   if (!props.interactive) return;
+  // One selection path: the host's surface click handler ignores marks, and
+  // stopping the bubble keeps that true if its handler is ever reordered.
+  event.stopPropagation();
   emit("mark-select", mark, event);
 }
 function onMarkKey(mark, event) {
   if (!props.interactive) return;
   emit("mark-key", mark, event);
+}
+
+// The faces settle only after the newly inserted text has been laid out:
+// `document.fonts.ready` is already resolved until a layout starts the face
+// loads, so force style/layout and re-read it (bounded) before judging errors.
+async function settleFonts() {
+  if (!document.fonts) return;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    element.value?.getBoundingClientRect?.();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await document.fonts.ready;
+    if (document.fonts.status !== "loading") break;
+  }
+  const failed = [...document.fonts].filter((face) => face.status === "error");
+  if (failed.length) throw new Error(`map surface: ${failed.length} local font face(s) failed to load`);
 }
 
 // Readiness for a host that must not report a partial paint: the local font
@@ -185,9 +203,7 @@ function onMarkKey(mark, event) {
 const decodedRaster = new Set();
 async function ready() {
   if (typeof document === "undefined") return;
-  if (document.fonts?.ready) await document.fonts.ready;
-  const failed = [...(document.fonts ?? [])].filter((face) => face.status === "error");
-  if (failed.length) throw new Error(`map surface: ${failed.length} local font face(s) failed to load`);
+  await settleFonts();
   await nextTick();
   const href = element.value?.querySelector?.("image[data-terrain-preview]")?.getAttribute("href");
   if (href && !decodedRaster.has(href)) {

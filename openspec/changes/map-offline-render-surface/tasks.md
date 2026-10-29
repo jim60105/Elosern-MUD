@@ -27,8 +27,16 @@
   - Both classes are registered once, in shard 1 `files_a`; `tests.test_evennia_test_optimization_contract.TestOwnershipContractTests.test_browser_method_labels_preserve_exact_ownership` passes.
   - Canonical-ID association is deliberately deferred to the archive step: `map-offline-rendering` has no canonical requirement IDs until the archive syncs the main spec, and this change adds no `covers_requirement` annotation. The provisional association is recorded below instead of guessed into code.
 - [x] 3.3 Run the focused `frontend/tests/capture.test.mjs`, import-boundary gate, capture and normal editor builds, one affected capture browser class and the smallest existing editor interaction class; record actual inspected synthetic images and human composition/Traditional Chinese glyph review in `docs/development/map-editor.md`, then run `openspec validate map-offline-render-surface --strict` and `uv run --locked python -m tools.contract_gate` from root. Full managed-browser and complete evidence runs stay CI-owned.
-  - `node --test tests/capture.test.mjs` 15/15; `pnpm test` 118/118; `node scripts/import-boundary.mjs` 51 sources, 0 violations; `pnpm run build` and `pnpm run build:capture` clean; `test_map_capture_surface` 16/16; `MapEditorStandaloneBrowserTest` + the geography selection method pass; `openspec validate --strict` valid; `tools.contract_gate` passed all six stages.
+  - `node --test tests/capture.test.mjs` 15/15; `pnpm test` 118/118; `node scripts/import-boundary.mjs` 51 sources, 0 violations; `pnpm run build` and `pnpm run build:capture` clean; `test_map_capture_surface` 18/18 (13 capture + 5 readiness/rejection cases, 1 interaction smoke); `MapEditorStandaloneBrowserTest` + the geography selection method pass; `openspec validate --strict` valid; `tools.contract_gate` passed all six stages.
   - Human review recorded in `docs/development/map-editor.md` §10.5.
+
+## Review follow-ups (post-implementation critique)
+
+- Blocking, adopted: an automatic fit now proves containment from the measured painted box at the final camera and refuses the request when the surface cannot fit (explicit bounds keep clipping by design); readiness now re-reads `document.fonts.ready` after forcing style/layout for the newly inserted text and loops while any face is still loading, so a face introduced by a later capture cannot be missed; overlapping `renderMapCapture` calls are refused; mark clicks stop propagating so selection has exactly one path.
+- Non-blocking, adopted: an explicit concurrency contract instead of shared mutable render state.
+- Rejected: the reported double-selection defect — the host's `onSurfaceClick` returns at `event.target.closest(".map-mark, .map-pill")` before reading `suppressClick` or `elementFromPoint`, so a mark click never reaches it; the found defect was in the summarized excerpt, not the code. `stopPropagation` was still added so the single path survives reordering.
+- Deferred: stroke-inclusive extents are not measured explicitly; the 24 px fit margin covers the current stroke widths, and the containment check verifies the painted boxes the browser reports.
+- Deferred: the HTML rewrite stays a targeted rewrite of Vite's emitted page with `base: "./"`; an HTML-aware transform is more machinery than one static page justifies.
 
 ## Provisional requirement association (for the archive step)
 

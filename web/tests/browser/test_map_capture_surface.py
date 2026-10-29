@@ -292,6 +292,31 @@ class MapCaptureSurfaceBrowserTest(unittest.TestCase):
         self.assertEqual(probe["links"], len(self.world["settlements"][0]["roads"]))
         page.context.close()
 
+    def test_faces_introduced_by_a_later_capture_still_settle_before_readiness(self):
+        page = self.open()
+        first = self.render(page, self.payload("settlement", synthetic.SETTLEMENT_ID))
+        self.assertEqual(first["status"], "ready", first)
+        before = len([url for url in self.requests if url.endswith(".woff2")])
+        second = self.render(page, self.payload("interior", synthetic.INTERIOR_ID))
+        self.assertEqual(second["status"], "ready", second)
+        after = len([url for url in self.requests if url.endswith(".woff2")])
+        self.assertGreater(after, before, "the second capture needed a face the first did not")
+        self.assertEqual(second["fontsAfter"], "loaded")
+        texts = self.probe(page)["texts"]
+        self.assertTrue(texts, "the second capture paints labels")
+        self.assertTrue(all(item["right"] - item["left"] > 0 for item in texts), "measured ink, not fallback tofu")
+        page.context.close()
+
+    def test_an_automatic_fit_that_cannot_hold_the_surface_is_refused(self):
+        # The interior cards are 200 px wide; an automatic fit into 80x80
+        # pixels cannot contain them, so the request must not resolve.
+        page = self.open(viewport=(320, 320))
+        with self.assertRaises(Exception) as raised:
+            self.render(page, self.payload("interior", synthetic.INTERIOR_ID, width=80, height=80))
+        self.assertIn("does not fit", str(raised.exception))
+        self.assertEqual(page.evaluate("() => window.__mapCaptureState.status"), "error")
+        page.context.close()
+
     # -- layer ownership ------------------------------------------------------
 
     def test_hidden_geometry_takes_only_its_own_labels(self):
