@@ -912,6 +912,57 @@ session state: after a restart the artifact's freshness is again read from
 disk alone. The child has a wall-clock bound but no memory bound, and its
 answer is buffered before the size check; this is a developer-only tool.
 
+### 3.13 Capture snapshot loader
+
+`elosern_map_editor/snapshot.py` owns the one confined read of the workspace
+and the projection of it: `load_sources()` discovers the world sources and the
+editor layouts once, reads each discovered document once through
+`ConfinedWorkspace`, loads them with `elosern_map_core`, parses the layouts and
+projects the world (`_project`). `read_workspace()` builds the editor's read
+model from that operation and keeps the interactive editor's policy: a layout
+document that fails to parse produces diagnostics and a partial layout
+projection, a refused or unloadable source set produces an unloaded read.
+
+`elosern_map_editor/capture_snapshot.py` is the one-shot read-only consumer for
+offline map capture. `load_capture_snapshot(root, *, view, map_id,
+hidden_layers)` returns JSON-ready `{world, partition, diagnostics}`, or raises
+`CaptureSnapshotError` with a stable `code`; it never returns partial data, and
+it never starts the service, the writer, the watcher, a partition job or the
+game. `world` is the same projection the editor reads (interior layouts,
+`layout_position` absent for a room the layout does not place, continental
+terrain preview). `diagnostics` are the sorted structured diagnostics;
+an external-reference index that is missing or not current is reported as one
+advisory (`warning`) diagnostic and never gates the capture.
+
+Two policies are capture-specific:
+
+- **Structure blocks, semantics stay visible.** Any source or layout
+  structure diagnostic — a refused path, an unloadable document, a malformed
+  or duplicate-key layout, an out-of-range coordinate — refuses the capture
+  with the diagnostics instead of falling back to deterministic positions.
+  Loadable semantic work in progress (unresolved references, unreachable
+  nodes) still captures, with its diagnostics. Nothing is persisted, so a
+  fallback position stays a renderer input only.
+- **Partition output is admitted only where it is drawn.** Only
+  `view == "continent"` without the `partition` layer hidden reads
+  `world/maps/data/district_partition.json`. It is decoded through the shared
+  core codec with the loaded mainland land rule, so valid metadata over a
+  corrupt body is refused too, and its freshness is compared against the
+  partition signature of the world this invocation loaded — the freshness of
+  one snapshot, never a second read of the files. A missing, malformed or
+  stale artifact raises `partition_unavailable` with the reason and the
+  recovery guidance: regenerate it with
+  `uv run --locked --project tools/map-editor python .agents/skills/map-data-authoring/scripts/regenerate_partition.py`
+  or hide the layer with `--hide partition`. Hidden partition and the
+  settlement/interior views never open the artifact, and their terrain
+  preview still derives from the loaded source.
+
+Argument shape is the caller's: this loader validates the view name, that a
+settlement/interior request names an authored document of that view (an absent
+id is `unknown_map`, an id of the other view is `wrong_view`) and that a
+continent request names none. The capture command above it owns the layer
+vocabulary, bounds, sizes and output format.
+
 ## 4. Security Model and Limitations
 
 - **Loopback only.** The service binds a loopback address and answers only
