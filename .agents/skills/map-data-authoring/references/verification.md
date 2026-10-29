@@ -131,3 +131,210 @@ user really wants may still need a game-side decision.
   the map needs exactly one `anchor_room` whose `anchor_key` is its
   `location_ref`. Nothing is promoted automatically; fix the node itself.
 - `stale_partition`: expected after any partition-input edit. Regenerate it.
+
+## Capturing an image of a map
+
+`capture_map.py` produces one image of one authored view — continent,
+settlement or interior — without starting the editor, the game or a browser
+session of your own. It reads the current disk sources once, draws them with
+the editor's own map surface in a disposable headless browser, and publishes
+the image atomically. The YAML stays the source of truth; the image is a
+derived artefact you read, never a file you commit.
+
+### Setup (once per checkout)
+
+The capture runtime is an optional developer group of the independent editor
+project, so it never becomes a game dependency. Prepare it explicitly; the
+command itself installs nothing.
+
+```console
+uv sync --locked --project tools/map-editor --group capture
+uv run --locked --project tools/map-editor --group capture playwright install chromium
+pnpm --dir tools/map-editor/frontend install --frozen-lockfile
+pnpm --dir tools/map-editor/frontend run build:capture
+```
+
+The last command writes `tools/map-editor/frontend/capture-dist/`, the
+file-based map-only page the capture opens; it is untracked build output. A
+missing environment, browser build or page is reported with the command that
+fixes it, never installed on your behalf.
+
+### Usage
+
+Run from the repository root (the working directory supplies the sources and
+resolves a relative `--output`):
+
+```console
+uv run --locked --no-sync --project tools/map-editor --group capture python \
+    .agents/skills/map-data-authoring/scripts/capture_map.py \
+    --view continent --output /tmp/continent.webp
+```
+
+| Argument | Accepted values | Default |
+| --- | --- | --- |
+| `--view` | `continent`, `settlement`, `interior` | required |
+| `--map` | the document ID of a settlement or interior | required for those views, forbidden for `continent` |
+| `--bounds MIN_X MIN_Y MAX_X MAX_Y` | four finite numbers, `MIN_X < MAX_X` and `MIN_Y < MAX_Y` | absent: fit the whole map |
+| `--width` / `--height` | positive integer pixels | `1280` / `960` |
+| `--hide LAYER [LAYER ...]` | repeatable; applicable layer names of the selected view | none: every layer visible |
+| `--format` | `webp` (lossless), `png` (lossless) | `webp` |
+| `--output` | image path; extension must match `--format`, parent directory must exist | required |
+
+There is no `--show`, no quality slider and no service URL. Unknown flags,
+abbreviations, unknown or cross-view layers, fractional or nonpositive
+dimensions, non-finite or degenerate bounds, an unsupported format, a
+mismatched suffix and a missing parent are all refused before anything is
+rendered. Repeated `--hide` names are de-duplicated and reported sorted.
+Hiding every layer is allowed and yields the plain background at the same
+camera.
+
+### Finding an ID
+
+`--map` takes the document ID, which is the file stem:
+
+- settlements: `content/maps/settlements/<map_id>.yaml`, for example
+  `capital_altoria`;
+- interiors: `content/maps/interiors/<interior_id>.yaml`.
+
+The continent is a single document and takes no ID. If a document is not on
+disk it does not exist; there is no map-list API to add.
+
+### Coordinate frames
+
+`--bounds` and the reported `bounds` use the view's own frame, never a mixed
+one:
+
+| `view` | Input and result frame | `units` | `axes` |
+| --- | --- | --- | --- |
+| `continent` | continental kilometres (`east_km` grows east, `north_km` north) | `km` | `{x: east, y: north}` |
+| `settlement` | authored local metres (`x_m`, `y_m`) | `m` | `{x: east, y: north}` |
+| `interior` | editor layout units (`x` right, `y` down) | `layout` | `{x: right, y: down}` |
+
+An explicit rectangle keeps its centre and is grown on its narrower axis to
+the output aspect ratio, with one uniform scale; the result is never clipped,
+stretched or recentred, and may reach beyond the map or contain no objects.
+The reported `bounds` is the expanded rectangle actually drawn, so it can be
+wider than what you asked for. Content outside a tightly requested region is
+clipped at the image edge — ask for a larger region instead of a bigger
+padding. A full-map fit grows the extent until the map's own cards and labels
+fit; an output size too small for them is refused with an explicit error
+rather than a silently cropped image.
+
+### Layers
+
+Every layer is visible by default, independently of the editor's own
+preferences. `--hide` removes a layer for this one image only.
+
+| `view` | Layer | Content hidden |
+| --- | --- | --- |
+| `continent` | `terrain` | mainland, terrain/passability raster, forest edge |
+| `continent` | `water` | waterways |
+| `continent` | `ridge` | ridge walls, passes, fords |
+| `continent` | `locations` | locations and reserved harbour sites |
+| `continent` | `footprint` | settlement wilderness footprints |
+| `continent` | `partition` | derived national boundaries and district outlines |
+| `settlement` | `nodes` | street nodes, including gate glyphs |
+| `settlement` | `roads` | authored directed roads and their bends |
+| `interior` | `rooms` | room cards |
+| `interior` | `connections` | within-interior connections and their direction indicators |
+| `interior` | `exterior` | the exterior doorway card and its link |
+| all | `labels` | object names, IDs and connection text |
+
+Hiding a geometry layer removes that layer's drawables and its own labels.
+`labels` removes text only: cards, glyphs and direction indicators stay.
+`nodes`/`roads` and `rooms`/`connections` are independent in both directions.
+Hiding a layer never moves the camera; the reported `bounds` is identical.
+
+### Examples
+
+```console
+# Default continent overview: 1280x960 lossless WebP, every layer on.
+uv run --locked --no-sync --project tools/map-editor --group capture python \
+    .agents/skills/map-data-authoring/scripts/capture_map.py \
+    --view continent --output /tmp/continent.webp
+
+# One settlement, without its labels, as PNG.
+uv run --locked --no-sync --project tools/map-editor --group capture python \
+    .agents/skills/map-data-authoring/scripts/capture_map.py \
+    --view settlement --map capital_altoria --hide labels \
+    --format png --output /tmp/altoria.png
+
+# One interior against its layout frame, several layers hidden.
+uv run --locked --no-sync --project tools/map-editor --group capture python \
+    .agents/skills/map-data-authoring/scripts/capture_map.py \
+    --view interior --map altoria_tavern --hide labels exterior \
+    --output /tmp/tavern.webp
+
+# A regional continent crop in kilometres, at a portrait aspect ratio.
+uv run --locked --no-sync --project tools/map-editor --group capture python \
+    .agents/skills/map-data-authoring/scripts/capture_map.py \
+    --view continent --bounds 100 200 180 260 \
+    --width 960 --height 1280 --output /tmp/region.webp
+```
+
+### The success object and exit status
+
+On success the command prints exactly one JSON object on stdout:
+
+```json
+{"image_path": "/abs/path/continent.webp", "view": "continent", "map_id": null,
+ "format": "webp", "width": 1280, "height": 960,
+ "bounds": [-3.5, 0, 43.5, 40], "units": "km",
+ "axes": {"x": "east", "y": "north"}, "hidden_layers": [],
+ "diagnostics": []}
+```
+
+`image_path` is absolute; `map_id` is `null` only for the continent;
+`hidden_layers` is sorted and de-duplicated; `diagnostics` is the structured
+source result of the snapshot that was drawn. Exit status `0` means one image
+was produced. It does **not** mean the map is game-ready, and it is not an
+inspection of the image. Run `check_map_sources.py` for readiness.
+
+Every refusal exits nonzero with a short message on stderr and publishes no
+partial image. An existing file at `--output` is replaced only after the
+complete image has been encoded; a failure before that replacement leaves the
+previous file byte-identical and removes temporary files.
+
+Replacement is the last filesystem step. If the image has already replaced the
+destination and writing the success object to stdout then fails (for example a
+closed pipe), the command exits nonzero with a `report_failed` message naming
+the published image: it does not delete or hide an image it already produced,
+and it never claims an image it did not write.
+
+### Read the image after capturing
+
+A successful command is not a look at the map. After capturing, read
+`image_path` with your image-reading tool and describe what is actually
+visible: composition, readable Traditional Chinese labels, geometry.
+
+- If your tool cannot decode WebP, rerun the same request with `--format png`
+  and a `.png` path. The command never changes format on your behalf.
+- For small labels, capture an overview first, then a targeted regional
+  capture. Do not generate extra images speculatively.
+- Compressed file size and model token use are different measurements. Do not
+  claim token savings from WebP, do not assume WebP is always smaller, and do
+  not lower quality for such claims: both formats are lossless.
+
+### Partition refusal on a continent capture
+
+The `partition` layer draws a generated artefact,
+`world/maps/data/district_partition.json`. A continent capture with that layer
+visible requires a current, decodable artefact. If it is missing, malformed or
+stale, the capture is refused with the reason and two ways forward:
+
+1. regenerate it — `regenerate_partition.py` above, or the editor's 分區
+   chip — and capture again;
+2. hide it for this image with `--hide partition`.
+
+Never regenerate the artefact only to make a capture succeed when the work is
+not ready to be game-ready, and never hand-edit it. Settlement and interior
+captures, and a continent capture with `partition` hidden, never read the
+artefact.
+
+### Sources that do not load
+
+A structural source or layout error refuses the capture and reports the
+diagnostics: the editor would freeze on the same files. Loadable semantic work
+in progress still captures, with its diagnostics in the result, because seeing
+the map is useful before it is finished. A missing or stale reference index is
+an advisory warning and does not block a capture.

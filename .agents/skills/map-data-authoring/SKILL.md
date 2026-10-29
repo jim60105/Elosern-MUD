@@ -161,6 +161,45 @@ is not game-ready until you regenerate the partition.
 5. **Report** which documents you changed, each object by qualified ID, the
    check result, and anything left stale or unfinished.
 
+## Seeing a map
+
+When the work needs eyes on the map, capture it instead of guessing from
+YAML. `capture_map.py` draws one view — continent, settlement or interior —
+from the current disk sources, in a disposable offline browser, and publishes
+a lossless image. No editor, game or server is needed. Full parameter, layer
+and format reference: [verification.md](references/verification.md#capturing-an-image-of-a-map).
+Settlements take their document ID (`content/maps/settlements/<id>.yaml`);
+interiors take theirs (`content/maps/interiors/<id>.yaml`); the continent
+takes none.
+
+```console
+# Once per checkout.
+uv sync --locked --project tools/map-editor --group capture
+uv run --locked --project tools/map-editor --group capture playwright install chromium
+pnpm --dir tools/map-editor/frontend install --frozen-lockfile
+pnpm --dir tools/map-editor/frontend run build:capture
+
+# One image: 1280x960 lossless WebP, all layers, whole map.
+uv run --locked --no-sync --project tools/map-editor --group capture python \
+    .agents/skills/map-data-authoring/scripts/capture_map.py \
+    --view continent --output /tmp/continent.webp
+```
+
+Every layer is on unless you pass `--hide` (`terrain`, `water`, `ridge`,
+`locations`, `footprint`, `partition`, `labels` for the continent; `nodes`,
+`roads`, `labels` for a settlement; `rooms`, `connections`, `exterior`,
+`labels` for an interior). `--bounds` is in that view's own frame — kilometres,
+authored metres, or layout units — and `--format png` is available when your
+image tool cannot read WebP. A continent capture with `partition` visible
+needs a current partition artefact; regenerate it or pass `--hide partition`.
+
+Then **read the image**. A zero exit status only means the file was written.
+Open `image_path` with your image-reading tool and describe what is really
+there; if the tool cannot decode WebP, rerun with `--format png` and a `.png`
+path rather than converting silently. Capture once at overview size, then a
+regional `--bounds` view for small labels. Do not claim token savings from
+WebP: bytes and model tokens are different measurements.
+
 ## Common tasks
 
 These are short recipes. Each reference file has the details.
