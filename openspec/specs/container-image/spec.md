@@ -9,8 +9,14 @@ The project SHALL provide a Podman-focused multi-stage `Containerfile` with a
 downloader stage that verifies the init binary, a builder stage, an
 application-layout stage that prepares the runtime tree and permissions, and a
 final stage carrying only the resulting virtual environment, init binary,
-application code, and the build-acquired default removal model. Model acquisition
-SHALL follow locked dependency installation and precede application-source copying.
+application code, the build-acquired default removal model, and their runtime
+system dependencies. Model acquisition SHALL follow locked dependency
+installation and precede application-source copying.
+
+#### Scenario: The idmapper memory probe has ps available
+- **WHEN** the served server runs its periodic idmapper cache maintenance
+- **THEN** `ps` exists in the runtime image, so the resident-memory probe returns a
+  number instead of raising and the cache cap stays operational
 
 #### Scenario: Builder artifacts do not reach the runtime image
 - **WHEN** the image is built with `podman build` from the `Containerfile`

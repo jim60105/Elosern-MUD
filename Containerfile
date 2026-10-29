@@ -149,8 +149,19 @@ RUN find /app -type d -exec chmod 0755 {} + && \
 FROM docker.io/library/python:3.13-slim AS final
 
 ARG UID
+ARG TARGETARCH
+ARG TARGETVARIANT
 
 RUN pip uninstall --yes pip setuptools wheel
+
+# Evennia's idmapper memory probe shells out to `ps` during server
+# maintenance. Without procps that probe raises ValueError every cycle and the
+# cache cap never runs, so the runtime image carries it as a system utility.
+# Cache mounts keep the package archives and index lists out of the image layer.
+RUN --mount=type=cache,id=apt-$TARGETARCH$TARGETVARIANT,sharing=locked,target=/var/cache/apt \
+    --mount=type=cache,id=aptlists-$TARGETARCH$TARGETVARIANT,sharing=locked,target=/var/lib/apt/lists \
+    apt-get update && apt-get install -y --no-install-recommends procps
+
 RUN groupadd --gid "$UID" evennia && \
     useradd --uid "$UID" --gid evennia --groups root --create-home --shell /usr/sbin/nologin evennia
 

@@ -91,7 +91,25 @@ class ContainerContractTests(unittest.TestCase):
         self.assertRegex(final, r"COPY --link[^\n]*--from=builder /venv /venv")
         self.assertRegex(final, r"COPY --link[^\n]*--from=download /dumb-init")
         self.assertRegex(final, r"COPY --link[^\n]*--from=app-layout /app /app")
-        self.assertNotRegex(final, r"apt-get|/root/\.cache/uv|\b(?:gcc|g\+\+|make)\b")
+        self.assertNotRegex(final, r"/root/\.cache/uv|\b(?:gcc|g\+\+|make)\b")
+        self.assertRegex(
+            final,
+            r"apt-get install -y --no-install-recommends procps",
+            "the idmapper memory probe requires ps in the runtime image",
+        )
+        # Package indexes and archives live in architecture-scoped cache mounts,
+        # never in the image layer.
+        self.assertIn(
+            "--mount=type=cache,id=apt-$TARGETARCH$TARGETVARIANT,sharing=locked,"
+            "target=/var/cache/apt",
+            final,
+        )
+        self.assertIn(
+            "--mount=type=cache,id=aptlists-$TARGETARCH$TARGETVARIANT,sharing=locked,"
+            "target=/var/lib/apt/lists",
+            final,
+        )
+        self.assertIn("ARG TARGETARCH", final)
 
     @covers_requirement("container-image::non-root-arbitrary-uid-capable-runtime")
     def test_runtime_user_and_writable_mounts_support_arbitrary_uid_with_root_group(self):
