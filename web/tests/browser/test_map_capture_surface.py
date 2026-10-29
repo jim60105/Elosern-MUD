@@ -9,6 +9,23 @@ an in-memory object through `window.renderMapCapture`.
 The assertions are about painted geometry, visibility and the readiness
 signal — synthetic values and measured positions, never shipped names, literal
 SVG or counts from repository map content.
+
+The canonical requirement IDs are slug-derived from the synced main spec; the
+``covers_requirement`` annotations below were applied at this change's archive
+sync, when the `map-offline-rendering` capability entered the traceability
+index (the procedure `web/tests/browser/test_browser_action_feedback.py`
+documents):
+
+- map-offline-rendering::offline-map-rendering-is-isolated-and-map-only
+    -> the three-view local-file journeys with network denied, the inert
+       hostile-label journey, and the interactive host's
+       selection/pan/zoom/one-mark-move smoke
+- map-offline-rendering::capture-cameras-preserve-coordinate-frames-and-requested-extent
+    -> the continent kilometre conversion, the interior down-positive layout
+       bounds and the full-fit card/label containment journeys
+- map-offline-rendering::capture-visibility-is-view-scoped-and-independent
+    -> the per-layer ownership, label independence, settlement nodes/roads
+       independence and all-hidden background journeys
 """
 
 from __future__ import annotations
@@ -25,6 +42,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from playwright.sync_api import sync_playwright
+from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 FRONTEND = REPO_ROOT / "tools" / "map-editor" / "frontend"
@@ -202,6 +220,7 @@ class MapCaptureSurfaceBrowserTest(unittest.TestCase):
 
     # -- one page, one selected view, no service ------------------------------
 
+    @covers_requirement("map-offline-rendering::offline-map-rendering-is-isolated-and-map-only")
     def test_each_view_renders_from_a_file_page_with_network_denied(self):
         expected_marks = {
             "continent": self.continent_mark_count(),
@@ -229,6 +248,7 @@ class MapCaptureSurfaceBrowserTest(unittest.TestCase):
             self.assert_only_file_requests()
             page.context.close()
 
+    @covers_requirement("map-offline-rendering::capture-cameras-preserve-coordinate-frames-and-requested-extent")
     def test_the_continent_camera_converts_kilometres_and_keeps_one_scale(self):
         page = self.open()
         outcome = self.render(page, self.payload("continent", width=200, height=100, bounds=[0, 0, 10, 20]))
@@ -255,6 +275,7 @@ class MapCaptureSurfaceBrowserTest(unittest.TestCase):
             self.assertAlmostEqual(rendered[index][1], north_px, delta=0.15, msg=f"location {index} north")
         page.context.close()
 
+    @covers_requirement("map-offline-rendering::capture-cameras-preserve-coordinate-frames-and-requested-extent")
     def test_the_interior_camera_reports_down_positive_layout_units(self):
         page = self.open()
         outcome = self.render(
@@ -271,6 +292,7 @@ class MapCaptureSurfaceBrowserTest(unittest.TestCase):
         self.assertTrue(probe["texts"], "the selected extent still paints its content")
         page.context.close()
 
+    @covers_requirement("map-offline-rendering::capture-cameras-preserve-coordinate-frames-and-requested-extent")
     def test_a_full_fit_keeps_cards_and_measured_labels_inside_the_image(self):
         for view, map_id in (
             ("continent", None),
@@ -319,6 +341,7 @@ class MapCaptureSurfaceBrowserTest(unittest.TestCase):
 
     # -- layer ownership ------------------------------------------------------
 
+    @covers_requirement("map-offline-rendering::capture-visibility-is-view-scoped-and-independent")
     def test_hidden_geometry_takes_only_its_own_labels(self):
         page = self.open()
         everything = self.render(page, self.payload("continent"))
@@ -337,6 +360,7 @@ class MapCaptureSurfaceBrowserTest(unittest.TestCase):
         self.assertLess(len(reduced["texts"]), len(full["texts"]))
         page.context.close()
 
+    @covers_requirement("map-offline-rendering::capture-visibility-is-view-scoped-and-independent")
     def test_every_continent_layer_hides_exactly_its_own_geometry(self):
         # A footprint cell and a district outline make the two layers that the
         # synthetic workspace's own sources do not carry; both arrive as
@@ -370,6 +394,7 @@ class MapCaptureSurfaceBrowserTest(unittest.TestCase):
         self.assertEqual(seen, everything, "the layer classification covers every drawable")
         page.context.close()
 
+    @covers_requirement("map-offline-rendering::capture-visibility-is-view-scoped-and-independent")
     def test_hiding_labels_keeps_cards_glyphs_and_direction_indicators(self):
         page = self.open()
         full_render = self.render(page, self.payload("interior", synthetic.INTERIOR_ID))
@@ -387,6 +412,7 @@ class MapCaptureSurfaceBrowserTest(unittest.TestCase):
         self.assertEqual(probe["chevrons"], full["chevrons"])
         page.context.close()
 
+    @covers_requirement("map-offline-rendering::capture-visibility-is-view-scoped-and-independent")
     def test_settlement_nodes_and_roads_are_independent(self):
         page = self.open()
         roads_hidden = self.render(page, self.payload("settlement", synthetic.SETTLEMENT_ID, hidden_layers=["roads"]))
@@ -402,6 +428,7 @@ class MapCaptureSurfaceBrowserTest(unittest.TestCase):
         self.assertEqual(probe["links"], len(self.world["settlements"][0]["roads"]))
         page.context.close()
 
+    @covers_requirement("map-offline-rendering::capture-visibility-is-view-scoped-and-independent")
     def test_everything_hidden_leaves_the_background_at_the_same_camera(self):
         for view, map_id, layers, background in (
             ("continent", None, CONTINENT_LAYERS, 1),
@@ -426,6 +453,7 @@ class MapCaptureSurfaceBrowserTest(unittest.TestCase):
 
     # -- inert content, readiness and rejection -------------------------------
 
+    @covers_requirement("map-offline-rendering::offline-map-rendering-is-isolated-and-map-only")
     def test_authored_text_and_url_like_names_stay_inert(self):
         world = json.loads(json.dumps(self.world))
         world["locations"][0]["display_name_zh"] = synthetic.HOSTILE_DESC
@@ -600,6 +628,7 @@ class MapSurfaceEditorSmokeBrowserTest(unittest.TestCase):
         self.assertIsNotNone(point, "the canvas has no pointer-free area")
         return point
 
+    @covers_requirement("map-offline-rendering::offline-map-rendering-is-isolated-and-map-only")
     def test_selection_pan_zoom_and_one_mark_move_still_work(self):
         page = self.open()
         gate = self.node("gate")
