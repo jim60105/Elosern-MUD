@@ -32,6 +32,12 @@ required-version = ">=0.12.0"
 elosern-map-core = { path = "../../packages/map-core", editable = true }
 
 [dependency-groups]
+capture = [
+    "pillow>=11.0",
+    # The same browser automation runtime the repository's browser suites use,
+    # so one installed Chromium build serves both and versions never drift.
+    "playwright==1.62.0",
+]
 dev = [
     "httpx>=0.28",
     "pytest>=8.4.2",
