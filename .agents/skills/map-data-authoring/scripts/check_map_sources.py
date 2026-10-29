@@ -26,11 +26,10 @@ from __future__ import annotations
 import json
 import math
 import sys
-from collections import defaultdict
 from pathlib import Path
 
 from elosern_map_core import diagnose_world, discover_source_documents, load_authoring_world
-from elosern_map_core.authoring import gate_approach_cell, terrain_definition
+from elosern_map_core.authoring import terrain_definition
 from elosern_map_core.diagnostics import AuthoringError
 from elosern_map_core.geometry import cell_center_m, local_to_world_m
 from elosern_map_core.partition_codec import (
@@ -43,7 +42,7 @@ from elosern_map_core.reference_context import (
     check_workspace_freshness,
     decode_reference_context,
 )
-from elosern_map_core.terrain import is_land_cell, is_walkable_cell, is_within_frame
+from elosern_map_core.terrain import is_land_cell, is_within_frame
 
 PARTITION_PATH = "world/maps/data/district_partition.json"
 REFERENCE_PATH = "content/map-reference-context.json"

@@ -8,11 +8,10 @@ mirror in ``world.lore.sync`` is a projection of it). All geometry helpers are
 pure and derived from the authored mask — consumers never re-derive it.
 """
 
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from elosern_map_core.documents import QualifiedRef
-from elosern_map_core.references import ReferenceError, settlement_node_ref, settlement_position
 
 from world.maps.published import PublishedView
 
@@ -35,7 +34,7 @@ DIRECTION_DELTAS: dict[str, tuple[int, int]] = {
 
 # The provider owns the live frame bounds. They are imported lazily at call
 # time (module scope would be a lore -> world.maps import cycle), so the
-# authoring contract can never drift from the runtime frame it validates.
+# runtime geometry can never drift from the provider frame it uses.
 def _provider_bounds() -> tuple[int, int]:
     from world.maps.wilderness_provider import WILDERNESS_MAX_X, WILDERNESS_MAX_Y
 
@@ -88,9 +87,8 @@ class WildernessEntryPoint:
     anchor cell is an ordinary terrain-validity wilderness step, so a concealed
     entry never hijacks an unrelated route.
 
-    ``anchor_key`` must exist in ``world.lore.anchor_placement.
-    ANCHOR_PLACEMENT_REGISTRY``; ``validate_wilderness_entries`` enforces it
-    at sync time, not the dataclass.
+    ``anchor_key`` resolves against change 12's placement registry; shared
+    core diagnostics enforce this before publication.
     """
 
     anchor_key: str
@@ -158,8 +156,7 @@ class WildernessEntryPoint:
         """The exterior cell a wilderness traveler stands on to take ``gate``.
 
         ``bounds`` defaults to the published provider frame; a candidate
-        validator passes its own explicit ``(max_x, max_y)`` so it never has
-        to publish a world to check one.
+        passes its own explicit ``(max_x, max_y)`` to check bounds directly.
 
         Point-shape entries: the anchor cell itself (identity pinned by the
         wilderness-gateway registry requirement). Footprint entries: walk from

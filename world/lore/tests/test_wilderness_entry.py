@@ -249,7 +249,7 @@ class WildernessEntryValidationTests(unittest.TestCase):
         "wilderness-gateway::wilderness-entry-registry-authored-data-is-validated-before-persistence"
     )
     def test_sync_all_refuses_to_mirror_malformed_registry(self):
-        from world.lore.sync import sync_all, search_script
+        from world.lore.sync import sync_all
         from world.maps import runtime
         from world.maps.runtime import MapWorldError
         from elosern_map_core.sources import make_source_document
@@ -265,10 +265,12 @@ class WildernessEntryValidationTests(unittest.TestCase):
                     malformed_sources.append(make_source_document(src.relative_path, text))
                 else:
                     malformed_sources.append(src)
-            with patch("world.maps.runtime._read_sources", return_value=tuple(malformed_sources)):
-                with self.assertRaises(MapWorldError) as caught:
-                    sync_all()
-                self.assertIn("not 4-connected", str(caught.exception))
+            with patch("world.lore.sync.sync_one") as mock_sync_one:
+                with patch("world.maps.runtime._read_sources", return_value=tuple(malformed_sources)):
+                    with self.assertRaises(MapWorldError) as caught:
+                        sync_all()
+                    self.assertIn("not 4-connected", str(caught.exception))
+                mock_sync_one.assert_not_called()
         finally:
             if saved is not None:
                 runtime._install(saved)
@@ -293,3 +295,25 @@ class WildernessEntryBoundsTests(unittest.TestCase):
         for entry in WILDERNESS_ENTRY_REGISTRY.values():
             for gate in entry.gates:
                 self.assertGreater(entry.approach_cell(gate)[1], 0)
+
+    def test_core_and_runtime_gate_approach_calculations_agree(self):
+        from elosern_map_core.authoring import (
+            gate_approach_cell,
+            _DIRECTION_DELTAS as CORE_DELTAS,
+            _OPPOSITE_DIRECTION as CORE_OPPOSITE,
+        )
+        from world.lore.wilderness_entry import DIRECTION_DELTAS, OPPOSITE_DIRECTION
+
+        self.assertEqual(CORE_DELTAS, DIRECTION_DELTAS)
+        self.assertEqual(CORE_OPPOSITE, OPPOSITE_DIRECTION)
+
+        for anchor_key, entry in WILDERNESS_ENTRY_REGISTRY.items():
+            for gate in entry.gates:
+                game_approach = entry.approach_cell(gate)
+                core_approach = gate_approach_cell(entry, gate.return_direction)
+                self.assertIsNotNone(game_approach)
+                self.assertEqual(
+                    core_approach,
+                    game_approach,
+                    f"Mismatch on {anchor_key} gate {gate.return_direction}",
+                )

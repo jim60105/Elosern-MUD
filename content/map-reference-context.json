@@ -176,7 +176,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "49bb09dcd3fe2cc8e396cdb792a5e841db7f8550c16961a32bc9e0928e163641",
+  "fingerprint": "44d8cd8e6b97cf9b123656d1f3b6856f23d5e4f0ffc33a63f62ac6590ef5a0d6",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -887,7 +887,7 @@
   "source_manifest": {
     "packages/map-core/elosern_map_core/__init__.py": "15039a3e8883650850e42e8ff8e6e1b9d9d1835cd54aac55e4eee98e853124d5",
     "packages/map-core/elosern_map_core/__main__.py": "13613e2202d4caa31c5ec535d8cd34392f04058a9fcf1f8f54df1a737deb0528",
-    "packages/map-core/elosern_map_core/authoring.py": "60a4eb655b7bfe46fd77ef6afdb2153b88055d0c65e7ab0d77e06f1e554e0dcb",
+    "packages/map-core/elosern_map_core/authoring.py": "811e07cdfe69ba5639525648430262e3c29011fdc9c2a587e8d41382ea0c7290",
     "packages/map-core/elosern_map_core/codec.py": "432eb131d27b408d0a1e967f2818be1f464729981b0067d10b871dabe8e8ad93",
     "packages/map-core/elosern_map_core/diagnostics.py": "b97cd0cb1eb552084c43053d57b96a89e3ce84a2215295756dba8f879dab2303",
     "packages/map-core/elosern_map_core/documents.py": "1a1c6aa02c1cf0a1fd94ec2170c5fd737cb24c059af852657790b09cee8268c9",
@@ -979,7 +979,7 @@
     "world/lore/starting_kits.py": "7a030a0bc4cdf985868f6cdb5dd6bf7362afdbba3e4194f2316431fc84571fa8",
     "world/lore/sync.py": "3d492f49db024b956d51edcd9b075fbc87b4e265295fb01c20422c0faf5585e4",
     "world/lore/titles.py": "5878ad1e457a6a644a0ad9b93035c55d6f7a7649e266049b2bfd66d4dc860793",
-    "world/lore/wilderness_entry.py": "3a9370aef67f379b95681466a0a389a4c9b9a8d04b565cc5bb093eeb75830f9c",
+    "world/lore/wilderness_entry.py": "68eb52bcdc05a965e95f5f42d61a273354cec01c0de18eb4babe5da6645031be",
     "world/lore/wilderness_regions.py": "0030b1e84e3708466201a877aaf124a6b869d2ed04fe56c3ee66f2035ef0577e",
     "world/quests/__init__.py": "1ee2230f6b2f2893c1c1c71a339ccd2aabad28c2425c80d5989ac963d13a7f0d",
     "world/quests/acquire.py": "d7eb47755b3f8df62964fde5e2bb2302381dad7a82b3ff37eee804900382dfc8",

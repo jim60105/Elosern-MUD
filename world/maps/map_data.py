@@ -231,7 +231,7 @@ def _compose_document(
                 f"with anchor node {anchor.node_id!r} at "
                 f"{(anchor.x_m, anchor.y_m)}"
             )
-    else:
+    elif not anchor_nodes:
         fail("missing anchor_room node")
     if location is not None and document.binding.anchor_cell != location.cell:
         fail(
@@ -289,7 +289,7 @@ def _compose_document(
             )
 
     problems.extend(defects)
-    if defects:
+    if defects or anchor is None:
         return None, None, None, None, None, {}
 
     assert anchor is not None and location is not None

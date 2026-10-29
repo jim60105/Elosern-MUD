@@ -146,6 +146,10 @@ def _validate(
 
     problems: list[str] = [diag.message for diag in diagnose_interior_rules(documents)]
 
+    # The exterior room membership and interior link target checks below mirror
+    # core _structural_diagnostics, remaining load-bearing here so direct
+    # callers of build_interiors() validate candidate integrity even when not
+    # running through full AuthoringWorld loading.
     for interior_id in sorted(documents):
         document = documents[interior_id]
         exterior = document.exterior

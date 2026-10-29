@@ -64,7 +64,6 @@ from .references import (
 from .terrain import (
     REGION_KEYS,
     TerrainDefinition,
-    is_valid_wilderness_cell,
     is_walkable_cell,
 )
 
@@ -102,6 +101,19 @@ def diagnose_settlement_structure(
     seen_destinations: dict[tuple[str, str], tuple[str, str]] = {}
 
     for settlement_id, settlement in sorted(settlements.items()):
+        if locations is not None:
+            loc_keys = set(locations.locations) if hasattr(locations, "locations") else set(locations)
+            if settlement.location_ref not in loc_keys:
+                diagnostics.append(
+                    _diagnostic(
+                        "unknown_reference",
+                        STRUCTURE,
+                        f"location_ref {settlement.location_ref!r} is not an authored location",
+                        document=settlement,
+                        field_path="location_ref",
+                        object_id=settlement_id,
+                    )
+                )
         if settlement.location_ref in bound_locations:
             first_id = bound_locations[settlement.location_ref]
             diagnostics.append(
@@ -443,7 +455,10 @@ def diagnose_settlement_semantics(
                     )
 
             if entry.is_point_shape and entry.anchor_cell is not None:
-                dx, dy = _DIRECTION_DELTAS[gate.return_direction]
+                delta = _DIRECTION_DELTAS.get(gate.return_direction)
+                if delta is None:
+                    continue
+                dx, dy = delta
                 neighbor = (entry.anchor_cell[0] + dx, entry.anchor_cell[1] + dy)
                 neighbor_invalid = False
                 reason = ""
@@ -774,17 +789,6 @@ def _structural_diagnostics(
         )
 
     for settlement_id, settlement in settlements.items():
-        if settlement.location_ref not in locations.locations:
-            diagnostics.append(
-                _diagnostic(
-                    "unknown_reference",
-                    STRUCTURE,
-                    f"location_ref {settlement.location_ref!r} is not an authored location",
-                    document=settlement,
-                    field_path="location_ref",
-                    object_id=settlement_id,
-                )
-            )
         node_ids = set(settlement.nodes)
         for road in settlement.roads:
             for field, endpoint in (
