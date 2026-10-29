@@ -12,7 +12,8 @@ locations:
     cell:
       cell_x: 860
       cell_y: 1080
-    geographic_constraint: Western river valley and hills; riverfront below northern terraces
+    geographic_constraint: Western river valley and hills; riverfront below 
+      northern terraces
     scene_archetype:
   capital_grandia:
     kind: capital
@@ -28,8 +29,8 @@ locations:
     display_name_zh: 咆哮王城
     description: Capital of the Valhalla Beast Kingdom.
     cell:
-      cell_x: 780
-      cell_y: 1910
+      cell_x: 730
+      cell_y: 1605
     geographic_constraint: Northwestern highland forest and tribal routes
     scene_archetype:
   dungeon_arcane_ruins:
@@ -46,32 +47,37 @@ locations:
     display_name_zh: 龍之巢穴
     description: A known dungeon in the eastern Grandia Empire.
     cell:
-      cell_x: 2340
-      cell_y: 1220
+      cell_x: 1815
+      cell_y: 2149
     geographic_constraint: Remote eastern Grandia
     scene_archetype:
   dungeon_eternal_night:
     kind: dungeon
     display_name_zh: 永夜迷宮
-    description: A northern deep-forest dungeon under Valhalla's nominal but unenforced claim.
+    description: A northern deep-forest dungeon under Valhalla's nominal but 
+      unenforced claim.
     cell:
       cell_x: 900
       cell_y: 2350
-    geographic_constraint: Northern deep forest under nominal Valhalla jurisdiction
+    geographic_constraint: Northern deep forest under nominal Valhalla 
+      jurisdiction
     scene_archetype:
   village_ciaran:
     kind: elven_village
     display_name_zh: 暗影谷村
-    description: Ciaran village underground on the western side of the neutral central range.
+    description: Ciaran village underground on the western side of the neutral 
+      central range.
     cell:
       cell_x: 1366
       cell_y: 554
-    geographic_constraint: Underground settlement on the western flank of the central mountains
+    geographic_constraint: Underground settlement on the western flank of the 
+      central mountains
     scene_archetype:
   village_eolas:
     kind: elven_village
     display_name_zh: 幽月谷村
-    description: Hidden Eolas village in a northern valley of the neutral central range.
+    description: Hidden Eolas village in a northern valley of the neutral 
+      central range.
     cell:
       cell_x: 1410
       cell_y: 2150
@@ -80,7 +86,8 @@ locations:
   village_fionnen:
     kind: elven_village
     display_name_zh: 翠綠森林村
-    description: Fionnen village on the eastern side of the neutral central range.
+    description: Fionnen village on the eastern side of the neutral central 
+      range.
     cell:
       cell_x: 1465
       cell_y: 1237
