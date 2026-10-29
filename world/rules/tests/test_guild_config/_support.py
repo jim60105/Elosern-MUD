@@ -219,7 +219,18 @@ def _price_shop_env(
 
 @contextmanager
 def _price_shop_scope(*envs):
-    """Patch the registries for one or more synthetic price-shop environments."""
+    """Patch the registries for one or more synthetic price-shop environments.
+
+    A shop row's display name is its place's authored room name, so the scope
+    also publishes one synthetic interior document per environment: the place
+    row joins an authored room, never a copied name.
+    """
+    from world.tests.interior_fixture import (
+        interior_document,
+        interior_room,
+        published_interiors,
+    )
+
     items: dict = {}
     bands: dict = {}
     assortments: dict = {}
@@ -231,7 +242,23 @@ def _price_shop_scope(*envs):
         assortments.update(env["assortments"])
         shops.update(env["shops"])
         places.update(env["places"])
-    with mock.patch.dict(ITEM_REGISTRY, items, clear=False), \
+    documents = [
+        interior_document(
+            place.room.object_id,
+            {
+                place.room.object_id: interior_room(
+                    f"合成店鋪{place.key}", "A synthetic price-shop room."
+                )
+            },
+        )
+        for place in places.values()
+        if place.room.object_id is not None
+    ]
+    # The interior publication adopts the authored map world first, so it must
+    # be the outermost entry: composing that world validates the LIVE place
+    # registry, which the synthetic rows below replace.
+    with published_interiors(*documents), \
+         mock.patch.dict(ITEM_REGISTRY, items, clear=False), \
          mock.patch.dict(PRICE_TABLE, bands, clear=False), \
          mock.patch.dict(ASSORTMENT_REGISTRY, assortments, clear=False), \
          mock.patch.dict(SHOP_REGISTRY, shops, clear=True), \

@@ -440,7 +440,7 @@ class ServiceDiscoveryCommandTests(_ServiceTextBase):
         self.assertIn(f"{dialogue_host.key}說：招呼:{dialogue_host.key}", answer)
 
 
-class TargetedShopCommandTests(_ServiceTextBase):
+class TargetedShopCommandTests(_ServiceTextBase, QuestRegistryIsolation):
     def setUp(self):
         open_synthetic_scope(
             self,
@@ -454,6 +454,12 @@ class TargetedShopCommandTests(_ServiceTextBase):
             "shops",
         )
         super().setUp()
+        # Production bootstrap, not a shipped-content reference: a settled
+        # trade raises affinity, and the affinity rulebook validates its
+        # cap-break quest key against the REGISTERED quest catalog
+        # (world/rules/affinity_config.py), exactly as the server does at
+        # startup.
+        register_catalog()
         install_synthetic_catalog(
             self,
             synth_catalog(
