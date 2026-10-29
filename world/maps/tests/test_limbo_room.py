@@ -127,13 +127,35 @@ class LimboRoomTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
         self.assertTrue(any(LIMBO_KEY in str(call) for call in warn.call_args_list))
 
     @covers_requirement("limbo-room::sync-limbo-converges-the-starting-room-idempotently-at-server-start")
-    def test_at_server_start_calls_sync_limbo_before_sync_grid(self):
+    def test_at_server_start_converges_limbo_before_the_settlement_grid(self):
         from server.conf.at_server_startstop import STARTUP_STEP_ORDER
+        from world.maps import bootstrap, runtime
 
-        self.assertLess(
-            STARTUP_STEP_ORDER.index("sync_limbo"),
-            STARTUP_STEP_ORDER.index("sync_grid"),
-        )
+        # The starting room, every settlement graph and every permanent
+        # interior converge in ONE boot step, so the ordering this guards is
+        # the step body's own: the starting room converges (its legacy key is
+        # renamed to the canonical one) before the settlement grid bridges into
+        # it. A grid-first synchronization would bridge from the legacy key.
+        self.assertIn("sync_map_world", STARTUP_STEP_ORDER)
+        create_object(Room, key=LIMBO_LEGACY_KEY, location=None)
+        seen = {}
+        sync_grid_original = bootstrap.sync_grid
+
+        def recording_sync_grid():
+            room = self._limbo()
+            seen["key"] = None if room is None else room.key
+            return sync_grid_original()
+
+        with patch.object(bootstrap, "sync_grid", recording_sync_grid):
+            runtime.synchronize()
+
+        self.assertEqual(seen.get("key"), LIMBO_KEY)
+        bridge = [
+            exit_obj
+            for exit_obj in self._limbo().exits
+            if exit_obj.destination == self._south_gate()
+        ]
+        self.assertEqual([exit_obj.key for exit_obj in bridge], [_gate_row().exit_key])
 
     @covers_requirement("limbo-room::sync-limbo-converges-the-starting-room-idempotently-at-server-start")
     def test_at_server_start_renames_legacy_room_and_bridges_it(self):

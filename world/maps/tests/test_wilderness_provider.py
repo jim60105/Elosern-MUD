@@ -20,7 +20,7 @@ from evennia.utils.test_resources import EvenniaTest
 from elosern_map_core.terrain import rasterize_routes, ridge_center_x, route_row_at
 
 from typeclasses.rooms import TerrainRoom
-from world.art.scene_definitions import ROOM_ART_KEY_SET
+from world.art.scene_definitions import room_art_key_set
 from world.maps.room_art import wilderness_scene_identity
 from world.maps.wilderness_provider import (
     LONG_DIRECTIONS,
@@ -591,7 +591,7 @@ class MapProviderTests(EvenniaTest):
         # identity -- the stale key can never leak into another coordinate.
         room = create_object(TerrainRoom, key="pooled-art")
         self.provider.at_prepare_room(EAST_APPROACH, None, room)
-        room.room_art_key = sorted(ROOM_ART_KEY_SET)[0]
+        room.room_art_key = sorted(room_art_key_set())[0]
         identity_a = room.scene_identity
         # Equal archetypes, different coordinates: both cells are Altoria hills.
         coordinate_b = (860, 1090)

@@ -57,7 +57,7 @@ class NoGenerativeImportTests(unittest.TestCase):
             STARTUP_STEP_ORDER.index("sync_guild_economy"),
         )
         self.assertLess(
-            STARTUP_STEP_ORDER.index("sync_grid"),
+            STARTUP_STEP_ORDER.index("sync_map_world"),
             STARTUP_STEP_ORDER.index("sync_guild_economy"),
         )
 
@@ -81,7 +81,7 @@ class NoGenerativeImportTests(unittest.TestCase):
         from server.conf.at_server_startstop import STARTUP_STEP_ORDER
 
         for sync in (
-            "sync_interiors",
+            "sync_map_world",
             "sync_quest_runtime",
             "sync_guild_economy",
             "sync_npc_schedules",

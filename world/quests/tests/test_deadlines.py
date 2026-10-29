@@ -167,7 +167,7 @@ class DeadlineSettlementTests(QuestRegistryIsolation, EvenniaTestCase):
             STARTUP_STEP_ORDER.index("sync_quest_runtime"),
         )
         self.assertLess(
-            STARTUP_STEP_ORDER.index("sync_grid"),
+            STARTUP_STEP_ORDER.index("sync_map_world"),
             STARTUP_STEP_ORDER.index("sync_quest_runtime"),
         )
         self.assertLess(

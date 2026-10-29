@@ -286,7 +286,7 @@ SCENARIO_TO_TEST = {
         "interiors", "ServiceInteriorTests", "test_grid_topology_is_unchanged"
     ),
     "Both interiors are reachable and permanent": ref(
-        "interiors", "ServiceInteriorTests", "test_fresh_sync_creates_one_permanent_interior_per_place"
+        "interiors", "ServiceInteriorTests", "test_fresh_sync_creates_one_room_per_authored_interior"
     ),
     "Interiors do not become xyzgrid nodes": ref(
         "interiors", "ServiceInteriorTests", "test_interiors_are_not_xyzgrid_nodes"
