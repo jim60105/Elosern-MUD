@@ -47,7 +47,9 @@
         "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_tab_reaches_load_new_version_without_confirming_a_held_draft",
         "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_an_invalid_draft_cannot_be_removed_by_selection_or_navigation",
         "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_hiding_a_layer_cannot_remove_an_invalid_field_draft",
-        "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_a_draft_confirmed_against_the_old_snapshot_is_rejected_without_changing_disk"
+        "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_a_draft_confirmed_against_the_old_snapshot_is_rejected_without_changing_disk",
+        "web.tests.browser.test_map_capture_surface.MapCaptureSurfaceBrowserTest",
+        "web.tests.browser.test_map_capture_surface.MapSurfaceEditorSmokeBrowserTest"
       ],
       "files_b": [
         "web.tests.browser.test_browser_combat_scales.CombatMenuBrowserTest.test_master_scale_step_casts_at_the_chosen_magnitude",

@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>地圖擷取</title>
+  </head>
+  <body>
+    <!-- The map host and nothing else: no header, navigation, inspector,
+         diagnostics, controls or status. The payload arrives through
+         window.renderMapCapture; it is never embedded in this document.
+         `build:capture` bundles this page as one classic script with
+         relative asset paths, so it loads from the filesystem. -->
+    <div id="map-capture"></div>
+    <script type="module" src="../src/capture.js"></script>
+  </body>
+</html>

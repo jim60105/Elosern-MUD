@@ -1,16 +1,19 @@
 <script setup>
-// The map surface. Projection, fit, pan and zoom come from the shared
-// @elosern/map-view primitives; selection and theme are this host's. With
-// `movable`, an interior room card can be dragged: the drag is a draft drawn
-// at the pointer, Escape cancels it, and only the release emits one `move`
-// (scene point) -- the host turns that into one saved command. The card stays
-// at its draft place until the host settles that command; no new drag
-// starts while `busy`.
+// The interactive map canvas: the workbench host of the shared map surface
+// (MapSurface.vue). Projection, fit, pan and zoom come from the shared
+// @elosern/map-view primitives; selection, the camera and theme are this
+// host's. With `movable`, an interior room card can be dragged: the drag is a
+// draft drawn at the pointer, Escape cancels it, and only the release emits
+// one `move` (scene point) -- the host turns that into one saved command. The
+// card stays at its draft place until the host settles that command; no new
+// drag starts while `busy`.
 // Keyboard: Tab walks the marks in object-list order, an arrow key moves
 // focus to the nearest mark in that direction, Enter selects and asks the
 // host to focus the inspector. Ctrl/⌘-click toggles, Shift-click extends.
 // Floating chrome: tool pill (top left), zoom pill (top right), north arrow,
-// scale bar and coordinate frame (bottom left).
+// scale bar and coordinate frame (bottom left). Every painted element comes
+// from MapSurface; this file only adds the camera, the chrome and the
+// interaction.
 // Continent: the core's terrain preview raster sits under the authored
 // shapes; a selectable shape (a feature) is chosen by click; derived shapes
 // (national borders) have no handler and no handle. Any mark flagged
@@ -25,15 +28,11 @@
 // Authored labels render through text interpolation only.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
-  dotField,
   fitBounds,
-  gatePath,
-  NODE_DOT_R,
   panByPixels,
-  project,
   resolveTheme,
-  unproject,
   themeVars,
+  unproject,
   wheelFactor,
   zoomBy,
   scaleBar,
@@ -41,7 +40,7 @@ import {
   DRAG_THRESHOLD_PX,
 } from "@elosern/map-view";
 import { nearestInDirection } from "../lib/keyboard.js";
-import { previewPixels } from "../lib/continent.js";
+import MapSurface from "./MapSurface.vue";
 
 const props = defineProps({
   scene: { type: Object, default: null },
@@ -61,11 +60,11 @@ const props = defineProps({
   pending: { type: Array, default: () => [] },
 });
 const emit = defineEmits(["select", "enter", "move", "tool", "place"]);
-const chosen = computed(() => new Set(props.selected));
 // { id, point } while a mark is dragged or its move awaits the service.
 const draft = ref(null);
 
 const host = ref(null);
+const surface = ref(null);
 const frame = ref(null);
 const view = ref(null);
 const fitted = ref(null);
@@ -119,90 +118,6 @@ watch(
   },
 );
 
-const at = (point) => (view.value && frame.value ? project(view.value, frame.value, point) : { x: 0, y: 0 });
-const path = (points, closed = false) =>
-  points.map((p, i) => `${i ? "L" : "M"}${at(p).x.toFixed(1)} ${at(p).y.toFixed(1)}`).join(" ") + (closed ? " Z" : "");
-
-const shapes = computed(() =>
-  view.value && props.scene ? props.scene.shapes.map((shape) => ({ ...shape, d: path(shape.points, shape.type === "polygon") })) : [],
-);
-const pendingMarks = computed(() => (view.value ? props.pending.map((point) => at(point)) : []));
-
-// The terrain preview as one image (painted once per snapshot), placed by
-// projecting its south-west and north-east corners.
-// Keyed on the preview object itself (stable within one snapshot), so a
-// selection change that rebuilds the scene does not re-encode the image.
-const rasterPreview = computed(() => props.scene?.raster?.preview ?? null);
-const rasterHref = computed(() => {
-  const preview = rasterPreview.value;
-  if (!preview || typeof document === "undefined") return null;
-  const { columns, rows } = preview;
-  const canvas = document.createElement("canvas");
-  canvas.width = columns;
-  canvas.height = rows;
-  const context = canvas.getContext("2d");
-  if (!context) return null;
-  context.putImageData(new ImageData(previewPixels(preview), columns, rows), 0, 0);
-  return canvas.toDataURL("image/png");
-});
-const rasterBox = computed(() => {
-  const raster = props.scene?.raster;
-  if (!raster || !view.value) return null;
-  const sw = at({ x: raster.west, y: raster.south });
-  const ne = at({ x: raster.east, y: raster.north });
-  return { x: Math.min(sw.x, ne.x), y: Math.min(sw.y, ne.y), width: Math.abs(ne.x - sw.x), height: Math.abs(sw.y - ne.y) };
-});
-// A curved link (interior connections): a quadratic arc bowed to the right of
-// travel, so a two-way pair separates into two arrows; it always carries one
-// direction chevron. Pixel space only: nothing here is a distance.
-const CURVE_PX = 26;
-function curved(link) {
-  const a = at(link.points[0]);
-  const b = at(link.points.at(-1));
-  const length = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-  const normal = { x: -(b.y - a.y) / length, y: (b.x - a.x) / length };
-  const control = { x: (a.x + b.x) / 2 + normal.x * CURVE_PX, y: (a.y + b.y) / 2 + normal.y * CURVE_PX };
-  const pointAt = (t) => ({
-    x: (1 - t) * (1 - t) * a.x + 2 * (1 - t) * t * control.x + t * t * b.x,
-    y: (1 - t) * (1 - t) * a.y + 2 * (1 - t) * t * control.y + t * t * b.y,
-  });
-  const middle = pointAt(0.5);
-  return {
-    ...link,
-    d: `M${a.x.toFixed(1)} ${a.y.toFixed(1)} Q${control.x.toFixed(1)} ${control.y.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`,
-    labelAt: { x: middle.x + normal.x * 12, y: middle.y + normal.y * 12 + 6 },
-    chevrons: [chevronAt(pointAt(0.55), pointAt(0.6), pointAt(0.5))],
-  };
-}
-
-const links = computed(() =>
-  view.value && props.scene
-    ? props.scene.links.map((link) => {
-        if (link.curve) return curved(link);
-        const mid = at(link.points[Math.floor(link.points.length / 2)]);
-        const start = at(link.points[0]);
-        return {
-          ...link,
-          d: path(link.points),
-          labelAt: link.points.length > 2 ? mid : { x: (start.x + at(link.points.at(-1)).x) / 2, y: (start.y + at(link.points.at(-1)).y) / 2 },
-          chevrons: link.selected ? chevrons(link.points.map(at)) : [],
-        };
-      })
-    : [],
-);
-const marks = computed(() =>
-  view.value && props.scene
-    ? props.scene.marks.map((mark) => ({
-        ...mark,
-        at: at(draft.value?.id === mark.id ? draft.value.point : mark),
-        draft: draft.value?.id === mark.id,
-      }))
-    : [],
-);
-const lattice = computed(() =>
-  view.value && frame.value && props.scene?.unit ? dotField(view.value, frame.value, props.scene.unit, 36) : null,
-);
-
 // Pointer pan and wheel zoom (view only; no world change), and room drags.
 let drag = null;
 let panned = false;
@@ -246,7 +161,7 @@ function onPointerMove(event) {
   if (markDrag) {
     if (!markDrag.moved && Math.hypot(event.clientX - markDrag.x, event.clientY - markDrag.y) < DRAG_THRESHOLD_PX) return;
     markDrag.moved = true;
-    draft.value = { id: markDrag.id, point: unproject(view.value, frame.value, pixelOf(event)) };
+    draft.value = { id: markDrag.id, point: unprojectPixel(pixelOf(event)) };
     return;
   }
   if (!drag || !view.value) return;
@@ -318,7 +233,7 @@ function onSurfaceClick(event) {
     return;
   }
   if (props.placing) {
-    emit("place", { point: unproject(view.value, frame.value, pixelOf(event)) });
+    emit("place", { point: unprojectPixel(pixelOf(event)) });
     return;
   }
   const shape = under?.closest?.("[data-shape-ref], [data-link-ref]");
@@ -371,44 +286,9 @@ const bar = computed(() => {
   }
 });
 
-// One chevron per segment, 60 % along it, pointing from start to end.
-function chevrons(points) {
-  const marks = [];
-  for (let i = 0; i + 1 < points.length; i += 1) {
-    const a = points[i];
-    const b = points[i + 1];
-    const length = Math.hypot(b.x - a.x, b.y - a.y);
-    if (length < 16) continue;
-    const ux = (b.x - a.x) / length;
-    const uy = (b.y - a.y) / length;
-    const x = a.x + (b.x - a.x) * 0.6;
-    const y = a.y + (b.y - a.y) * 0.6;
-    marks.push(
-      `M${(x - 7 * ux - 5 * uy).toFixed(1)} ${(y - 7 * uy + 5 * ux).toFixed(1)} L${x.toFixed(1)} ${y.toFixed(1)} L${(x - 7 * ux + 5 * uy).toFixed(1)} ${(y - 7 * uy - 5 * ux).toFixed(1)}`,
-    );
-  }
-  return marks;
-}
-
-// One chevron at `tip`, pointing along `from` -> `to`.
-function chevronAt(tip, to, from) {
-  const length = Math.hypot(to.x - from.x, to.y - from.y) || 1;
-  const ux = (to.x - from.x) / length;
-  const uy = (to.y - from.y) / length;
-  const { x, y } = tip;
-  return `M${(x - 7 * ux - 5 * uy).toFixed(1)} ${(y - 7 * uy + 5 * ux).toFixed(1)} L${x.toFixed(1)} ${y.toFixed(1)} L${(x - 7 * ux + 5 * uy).toFixed(1)} ${(y - 7 * uy - 5 * ux).toFixed(1)}`;
-}
-
-function brackets(at) {
-  const r = 18;
-  const l = 6;
-  const { x, y } = at;
-  return [
-    `M${x - r} ${y - r + l} v${-l} h${l}`,
-    `M${x + r} ${y - r + l} v${-l} h${-l}`,
-    `M${x - r} ${y + r - l} v${l} h${l}`,
-    `M${x + r} ${y + r - l} v${l} h${-l}`,
-  ].join(" ");
+// Frame pixel -> scene point (the shared inverse projection).
+function unprojectPixel(pixel) {
+  return unproject(view.value, frame.value, pixel);
 }
 
 defineExpose({ fit, focusMark });
@@ -428,115 +308,19 @@ defineExpose({ fit, focusMark });
     @wheel.prevent="onWheel"
     @click="onSurfaceClick"
   >
-    <svg v-if="scene && view" class="map-canvas__svg" :viewBox="`0 0 ${frame.width} ${frame.height}`" role="img" :aria-label="label">
-      <defs v-if="lattice">
-        <pattern
-          id="map-editor-dots"
-          :width="lattice.spacingPx"
-          :height="lattice.spacingPx"
-          patternUnits="userSpaceOnUse"
-          :x="lattice.offsetX"
-          :y="lattice.offsetY"
-        >
-          <circle cx="0" cy="0" r="1.2" class="map-canvas__dot" />
-        </pattern>
-      </defs>
-      <rect v-if="lattice" width="100%" height="100%" fill="url(#map-editor-dots)" />
-      <image
-        v-if="rasterHref && rasterBox"
-        :href="rasterHref"
-        :x="rasterBox.x"
-        :y="rasterBox.y"
-        :width="rasterBox.width"
-        :height="rasterBox.height"
-        preserveAspectRatio="none"
-        class="map-canvas__raster"
-        data-terrain-preview
-      />
-      <path
-        v-for="shape in shapes"
-        :key="shape.id"
-        :d="shape.d"
-        :class="[
-          'map-shape',
-          ...shape.role.split(' ').map((role) => `map-shape--${role}`),
-          { 'map-shape--selected': shape.selected, 'map-shape--selectable': shape.selectable },
-        ]"
-        :data-shape="shape.id"
-        :data-shape-ref="shape.selectable ? shape.ref : null"
-        :data-derived="shape.derived ? 'true' : null"
-        :data-district="shape.district ?? null"
-        :data-older-input="shape.older ? 'true' : null"
-      >
-        <title v-if="shape.derived && shape.label">{{ shape.label }}</title>
-      </path>
-      <g
-        v-for="link in links"
-        :key="link.id"
-        class="map-link"
-        :class="[`map-link--${link.kind}`, { 'map-link--selected': link.selected, 'map-link--selectable': link.ref }]"
-        :data-link="link.id"
-        :data-link-ref="link.ref ?? null"
-      >
-        <path v-if="link.ref" :d="link.d" class="map-link__hit" />
-        <path :d="link.d" class="map-link__casing" />
-        <path :d="link.d" class="map-link__core" :class="{ 'map-link__core--oneway': !link.twoWay }" />
-        <path v-for="(chevron, index) in link.chevrons" :key="index" :d="chevron" class="map-link__chevron" data-direction-chevron />
-        <text v-if="link.label" :x="link.labelAt.x" :y="link.labelAt.y - 6" class="map-link__label">{{ link.label }}</text>
-      </g>
-      <g
-        v-for="mark in marks"
-        :key="mark.id"
-        class="map-mark"
-        :class="[`map-mark--${mark.role}`, { 'map-mark--selected': chosen.has(mark.id), 'map-mark--draft': mark.draft }]"
-        :data-draft="mark.draft ? 'true' : null"
-        :transform="`translate(${mark.at.x.toFixed(1)} ${mark.at.y.toFixed(1)})`"
-        :data-kind="mark.kind"
-        :data-draggable="mark.draggable ? 'true' : null"
-        :data-qualified-ref="mark.id"
-        role="button"
-        tabindex="0"
-        :aria-label="mark.label"
-        :aria-pressed="chosen.has(mark.id)"
-        @click="select(mark, $event)"
-        @keydown="onMarkKey(mark, $event)"
-      >
-        <template v-if="mark.kind === 'room'">
-          <rect x="-100" y="-26" width="200" height="52" rx="6" class="map-mark__card" />
-          <text y="-3" class="map-mark__card-name">{{ mark.label }}</text>
-          <text y="17" class="map-mark__card-id">{{ mark.detail }}</text>
-        </template>
-        <template v-else-if="mark.kind === 'exterior'">
-          <rect x="-100" y="-26" width="200" height="52" rx="6" class="map-mark__card map-mark__card--exterior" />
-          <text y="-3" class="map-mark__card-name">{{ mark.label }}</text>
-          <text y="17" class="map-mark__card-id">{{ mark.detail }}</text>
-        </template>
-        <template v-else-if="mark.kind === 'handle'">
-          <circle v-if="chosen.has(mark.id)" r="14" class="map-mark__ring" />
-          <rect x="-6" y="-6" width="12" height="12" transform="rotate(45)" class="map-mark__handle" />
-        </template>
-        <template v-else-if="mark.kind === 'ford' || mark.kind === 'pass' || mark.kind === 'site'">
-          <circle v-if="chosen.has(mark.id)" r="14" class="map-mark__ring" />
-          <path v-if="mark.kind === 'ford'" d="M-8 -4 h16 M-8 4 h16" class="map-mark__ford" />
-          <path v-else-if="mark.kind === 'pass'" d="M-9 0 h18 M-5 -6 v12 M5 -6 v12" class="map-mark__pass" />
-          <rect v-else x="-5" y="-5" width="10" height="10" class="map-mark__site" />
-          <text y="-14" class="map-mark__label">{{ mark.label }}</text>
-        </template>
-        <template v-else>
-          <circle r="16" class="map-mark__hit" />
-          <template v-if="chosen.has(mark.id)">
-            <circle r="14" class="map-mark__ring" />
-            <path :d="brackets({ x: 0, y: 0 })" class="map-mark__brackets" />
-          </template>
-          <path v-if="mark.gateway" :d="gatePath()" class="map-mark__gate" />
-          <circle v-else :r="NODE_DOT_R" class="map-mark__dot" />
-          <text y="-14" class="map-mark__label">{{ mark.label }}</text>
-        </template>
-      </g>
-      <g v-for="(point, index) in pendingMarks" :key="`pending-${index}`" :transform="`translate(${point.x.toFixed(1)} ${point.y.toFixed(1)})`" data-pending-point>
-        <rect x="-6" y="-6" width="12" height="12" transform="rotate(45)" class="map-mark__handle map-mark__handle--pending" />
-      </g>
-    </svg>
+    <MapSurface
+      ref="surface"
+      :scene="scene"
+      :view="view"
+      :frame="frame"
+      :selected="selected"
+      :draft="draft"
+      :pending="pending"
+      :label="label"
+      interactive
+      @mark-select="select"
+      @mark-key="onMarkKey"
+    />
     <div class="map-pill map-pill--tools" role="toolbar" aria-label="工具">
       <button
         v-for="item in tools"

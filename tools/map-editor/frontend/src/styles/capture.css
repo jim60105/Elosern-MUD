@@ -1,0 +1,29 @@
+/* Offline capture page: the map surface and nothing else.
+ *
+ * The stage is exactly the requested pixel frame, so one scene unit maps to
+ * the same number of device pixels the geometry was fitted in. The page
+ * background and the stage gradient repeat the editor canvas so a capture
+ * looks like the workbench's map, without its chrome. */
+
+:root {
+  /* A capture is a fixed-size image: no viewport-dependent scale. */
+  --ui-scale: 1;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--ink-950);
+}
+
+#map-capture {
+  display: block;
+}
+
+.capture {
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(ellipse at center, var(--ink-860), var(--ink-950));
+}

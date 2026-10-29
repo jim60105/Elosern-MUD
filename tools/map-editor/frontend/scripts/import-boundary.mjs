@@ -4,15 +4,15 @@
 // tokens.css, styles/fonts*.css and the pure lib/ui_scale.js. It reuses the
 // GM portal's scanner (scripts/gm-import-boundary.mjs) with the editor's own
 // exact allowlist and aliases, so both apps resolve references identically.
-// The build output (dist/), dependency trees and the node tests (fixture strings,
-// never bundled) are not scanned.
+// The build outputs (dist/, capture-dist/), dependency trees and the node tests
+// (fixture strings, never bundled) are not scanned.
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { formatViolations, listScannedSources, scanBoundary } from "../../../../scripts/gm-import-boundary.mjs";
 import { EDITOR_ALIASES, EDITOR_ALLOWED_GAME_FILES } from "../editor-aliases.mjs";
 
-export const EDITOR_IGNORE_DIRS = Object.freeze(["node_modules", "dist", "tests"]);
+export const EDITOR_IGNORE_DIRS = Object.freeze(["node_modules", "dist", "capture-dist", "tests"]);
 
 export function scanEditorBoundary({ appRoot, repoRoot }) {
   return scanBoundary({
