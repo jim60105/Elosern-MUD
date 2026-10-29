@@ -228,6 +228,9 @@ class MapEditorFileFollowingBrowserTest(unittest.TestCase):
         annex["rooms"] = {"annex_room": annex["rooms"]["back"]}
         annex["connections"] = []
         annex["exterior"]["room"] = "annex_room"
+        # One settlement node hosts at most one doorway with a given key
+        # (shared core structure rule), so the annex needs its own.
+        annex["exterior"]["doorway_key"] = "Annex Door"
         _replace(
             self.workspace / "content/maps/interiors/synthetic_z_annex.yaml",
             synthetic.yaml_text(annex),

@@ -49,6 +49,16 @@ YARD = f"settlement_node:{TOWN}:yard"
 BACK_ROAD = f"road:{TOWN}:yard>gate"
 
 
+def without_anchor(workspace: Path) -> None:
+    """Leave the map anchorless so a promotion is the first anchor, not a second."""
+
+    data = synthetic.settlement_data()
+    gate = data["nodes"]["gate"]
+    gate["prototype_parent"] = "grid_room"
+    gate["anchor_key"] = None
+    (workspace / SETTLEMENT).write_text(synthetic.yaml_text(data), encoding="utf-8")
+
+
 class MapEditorSettlementBrowserTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -225,7 +235,9 @@ class MapEditorSettlementBrowserTest(unittest.TestCase):
         self.wait_for(lambda: rows.count() == 2, "both directed rows were not listed")
 
     def test_prototype_name_and_scene_fields_by_keyboard(self):
-        self.start()
+        # One settlement has at most one anchor_room (shared core structure
+        # rule), so the promotion test starts from a map without one.
+        self.start(without_anchor)
         page = self.open()
         row = page.locator(f'[data-object="{YARD}"]')
         row.focus()

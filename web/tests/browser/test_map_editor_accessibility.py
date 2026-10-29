@@ -55,7 +55,7 @@ LAYOUT = f"content/map-editor-layouts/{synthetic.INTERIOR_ID}.yaml"
 YARD = f"settlement_node:{synthetic.SETTLEMENT_ID}:yard"
 FRONT = f"interior_room:{synthetic.INTERIOR_ID}:front"
 BACK = f"interior_room:{synthetic.INTERIOR_ID}:back"
-ANNEX_FRONT = f"interior_room:{ANNEX_ID}:front"
+ANNEX_FRONT = f"interior_room:{ANNEX_ID}:annex_front"
 PARTITION = "world/maps/data/district_partition.json"
 
 
@@ -66,11 +66,13 @@ def write(workspace: Path, relative: str, data: dict) -> None:
 
 
 def add_annex(workspace: Path) -> None:
-    """A second interior whose only room has the same name as ``front``."""
+    """A second interior whose only room has ``front``'s name, not its identity."""
 
     data = synthetic.interior_data()
     data["id"] = ANNEX_ID
-    data["rooms"] = {"front": copy.deepcopy(data["rooms"]["front"])}
+    # A persistent room identity is global (the core rejects a shared id), so
+    # only the display name is shared: that is what the search must tell apart.
+    data["rooms"] = {"annex_front": copy.deepcopy(data["rooms"]["front"])}
     data["connections"] = []
     data["exterior"] = None
     write(workspace, ANNEX, data)
