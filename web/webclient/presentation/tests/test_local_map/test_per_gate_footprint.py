@@ -5,6 +5,7 @@ from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 from typeclasses.rooms import GridRoom, InstanceRoom, Room
 from web.webclient.presentation.registry import build_production_registry
 from world.maps.bootstrap import sync_grid, sync_wilderness
+from world.maps.wilderness_provider import is_valid_wilderness_cell
 from world.rules.map_knowledge import record_arrival
 
 from ._support import (
@@ -84,11 +85,22 @@ class LocalMapPerGateFootprintTests(EvenniaTest):
         sx, sy = SOUTH_APPROACH
         minx, maxx = min(self.FOOTPRINT_X), max(self.FOOTPRINT_X)
         miny, maxy = min(self.FOOTPRINT_Y), max(self.FOOTPRINT_Y)
+        # The top row faces the capital's own river on one column, so the
+        # north-facing vantage is the top-row cell whose neighbour is walkable
+        # ground -- never a fixed offset into the mask.
+        north_vantages = [
+            (x, maxy + 1)
+            for x, y in sorted(self._CELLS)
+            if y == maxy and is_valid_wilderness_cell((x, maxy + 1))
+        ]
+        self.assertTrue(
+            north_vantages, "the footprint keeps one walkable north-facing vantage"
+        )
         vantages = [
             ((minx - 1, sy + 3), "e"),  # west of the mask -> footprint face
             ((maxx + 1, sy), "w"),      # east of the mask -> footprint face
             ((minx, miny - 1), "n"),    # south of the mask -> footprint face
-            ((minx + 2, maxy + 1), "s"),  # north of the mask -> footprint face
+            *((cell, "s") for cell in north_vantages),  # north of the mask -> footprint face
         ]
         for coordinates, blocked in vantages:
             with self.subTest(vantage=coordinates, direction=blocked):
