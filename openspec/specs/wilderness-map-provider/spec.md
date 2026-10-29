@@ -26,10 +26,9 @@ mainland, ridge, water, footprints).
 - **THEN** both return `False`
 
 #### Scenario: Anchor footprint cells are invalid
-- **WHEN** `is_valid_coordinates` is checked for the `capital_altoria` anchor cell `(860, 1080)`,
-  a corner footprint cell `(857, 1076)`, and the two gate approach cells `(860, 1077)` and
-  `(864, 1080)`
-- **THEN** the two footprint cells return `False` and the two approach cells return `True`
+- **WHEN** `is_valid_coordinates` is checked for a registered settlement's derived anchor cell, a
+  cell of its derived footprint mask, and each of its gates' derived approach cells
+- **THEN** the footprint cells return `False` and the approach cells return `True`
 
 #### Scenario: Registry patches change footprint validity without patching the provider
 - **WHEN** a test patches `WILDERNESS_ENTRY_REGISTRY` with an extra point-shape entry and with an
@@ -90,15 +89,15 @@ region table; the hook SHALL also initialize monster population.
   scene archetype for `(x2, y2)`, not the value computed for `(x1, y1)`
 
 #### Scenario: at_prepare_room opens exactly the gate exit at an approach cell
-- **WHEN** `at_prepare_room((860, 1077), caller, room)` is called on a `TerrainRoom` carrying the
+- **WHEN** `at_prepare_room` is called at a registry gate's derived `approach_cell` on a `TerrainRoom` carrying the
   eight directional exits
 - **THEN** the `"north"` exit's locks allow `traverse` and `view`, and no other exit's locks are
   modified by the hook
 
 #### Scenario: at_prepare_room touches no locks away from approach cells
-- **WHEN** `at_prepare_room` is called for an ordinary wilderness cell or for the opposite gate's
-  approach cell `(864, 1080)`
-- **THEN** at the ordinary cell no exit's locks are modified, and at `(864, 1080)` only the
+- **WHEN** `at_prepare_room` is called for an ordinary wilderness cell or for another gate's
+  approach cell
+- **THEN** at the ordinary cell no exit's locks are modified, and at another gate's approach cell only the
   `"west"` exit's locks are opened; an approach cell never opens another gate's exit
 
 #### Scenario: A point-shape anchor opens only its authored gate direction
@@ -109,7 +108,7 @@ region table; the hook SHALL also initialize monster population.
   matching the resolver's authored-direction gateway advertisement at that cell
 
 #### Scenario: A gate lock does not leak when the pooled room moves to a non-approach coordinate
-- **WHEN** a pooled `TerrainRoom` was activated at `(860, 1077)` (opening its `"north"` exit) and is
+- **WHEN** a pooled `TerrainRoom` was activated at a gate's approach cell (opening that gate's exit) and is
   later activated at a coordinate that is not any approach cell
 - **THEN** the stock activation pass recomputes every self-loop exit's locks from provider
   validity before `at_prepare_room` runs, and after activation no exit carries a hook-opened

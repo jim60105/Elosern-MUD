@@ -112,13 +112,13 @@ land on their anchor cell.
 #### Scenario: Traversing a gate exit places the object at that gate's approach cell
 - **WHEN** a character traverses a `WildernessGateExit` configured for
   `("capital_altoria", gate facing 南門)`
-- **THEN** the character's new location is a `TerrainRoom` whose `.coordinates` equals the `"n"`
-  gate's `approach_cell` `(860, 1077)` (the cell outside the footprint, never a footprint cell), and
+- **THEN** the character's new location is a `TerrainRoom` whose `.coordinates` equals that gate's
+  derived `approach_cell` (the cell outside the footprint, never a footprint cell), and
   its map-knowledge record contains the corresponding `wild:elosern:<x>:<y>` node
 
 #### Scenario: Traversing the other gate lands at the other gate's approach cell
 - **WHEN** a character traverses the `WildernessGateExit` provisioned on the East Gate room
-- **THEN** the arrival coordinates equal the `"w"` gate's `approach_cell` `(864, 1080)`,
+- **THEN** the arrival coordinates equal that gate's derived `approach_cell`,
   independent of which gate was used before
 
 #### Scenario: A successful traversal advances the world clock by the wilderness_move cost
@@ -192,19 +192,19 @@ on `approach_cell(gate)` and that gate's `return_direction`, SHALL move the trav
 coordinate in that settlement's local frame.
 
 #### Scenario: Traversing north from the south approach cell returns through the south gate
-- **WHEN** a character at `(860, 1077)` traverses the `"north"` exit
+- **WHEN** a character at the south gate's derived approach cell traverses the `"north"` exit
 - **THEN** the character's new location is the `capital_altoria` 南門 `GridRoom` object at grid
   `(3050, 150, "capital_altoria")`
 
 #### Scenario: Traversing west from the east approach cell returns through the east gate
-- **WHEN** a character at `(864, 1080)` traverses the `"west"` exit
+- **WHEN** a character at the east gate's derived approach cell traverses the `"west"` exit
 - **THEN** the character's new location is the `capital_altoria` East Gate `GridRoom` object at
   grid `(6500, 3010, "capital_altoria")` (the same object instance that existed before the character
   first entered the wilderness through it)
 
 #### Scenario: The return direction at the wrong approach cell is not a gateway
-- **WHEN** a character at `(860, 1077)` traverses `"south"`, or a character at `(864, 1080)` traverses
-  `"east"`
+- **WHEN** a character at a gate's approach cell traverses a direction other than that gate's
+  `return_direction`
 - **THEN** the traversal routes like the stock `WildernessExit` (ordinary coordinate movement to
   the provider-valid neighbor), reaching no grid room
 

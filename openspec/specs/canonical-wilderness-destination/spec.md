@@ -26,20 +26,18 @@ provider-invalid neighbor, else the adjacent `wild:` node. A point-shape entry a
 - **THEN** it returns `wild:elosern:500:701` (the true neighbor cell), not the current node
 
 #### Scenario: A gate step resolves to its grid room
-- **WHEN** the resolver is asked for the north direction from the south approach cell `(860, 1077)`
-- **THEN** it returns the `grid:` node of the 南門 room `(3050, 150, "capital_altoria")`, and the west
-  direction from the east approach cell `(864, 1080)` returns the `grid:` node of the East Gate
-  room `(6500, 3010, "capital_altoria")`
+- **WHEN** the resolver is asked for a registered gate's `return_direction` at its derived approach
+  cell
+- **THEN** it returns the `grid:` node of that gate's authored destination room
 
 #### Scenario: The non-gate direction at an approach cell is an ordinary step
-- **WHEN** the resolver is asked for the south direction from `(860, 1077)` or the north direction
-  from `(864, 1080)`
+- **WHEN** the resolver is asked for any direction other than a gate's `return_direction` at that
+  gate's approach cell
 - **THEN** it returns the ordinary adjacent `wild:` node, not a `grid:` node
 
 #### Scenario: A step into an anchor footprint resolves to None
-- **WHEN** the resolver is asked for the east direction from `(856, 1080)` (neighbor `(857, 1080)`,
-  a footprint cell that is not any gate's approach cell) or for the west direction from
-  `(864, 1081)` (neighbor `(863, 1081)`, likewise)
+- **WHEN** the resolver is asked for a direction from a cell outside the footprint toward an
+  adjacent footprint cell that is not any gate's approach cell
 - **THEN** both return `None`, matching the stock step refusal toward a provider-invalid cell
 
 #### Scenario: Resolver and traversal agree on every direction around a gate

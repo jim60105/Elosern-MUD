@@ -72,12 +72,10 @@ formula constants remain contract; the prose stays the source declaration, never
   variants at index `(x * 92821 + y * 68917) % len(variants)`, and that region is
   `region_for_coordinates(x, y)`
 
-#### Scenario: A fixed coordinate produces a literal, spec-pinned string
-- **WHEN** `terrain_description(860, 1080)` is called (the `capital_altoria` anchor cell, which
-  `region_for_coordinates` resolves to `"western_hills_valleys"`)
-- **THEN** the fixed formula selects index `2` of that region's declared variants; the literal prose
-  is the continent source's own declaration, preserved by the conversion comparison rather than
-  copied into a second approval table
+#### Scenario: The selected variant is authored data, never a copied literal
+- **WHEN** `terrain_description(x, y)` is called for any in-frame coordinate
+- **THEN** the returned string is the continent source's own declared variant at the fixed formula's
+  index, never a second approval table or a test-side copy
 
 #### Scenario: The constants and flavor text are contract, not discretion
 - **WHEN** the formula's constants (`92821`, `68917`) and the continent source's
