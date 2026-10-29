@@ -108,7 +108,7 @@ class AnchorPlacementRegistryTests(unittest.TestCase):
         self.assertTrue(LocalFrameAnchor.__dataclass_params__.frozen)
         self.assertEqual(
             world_position_m("capital_altoria", (3500, 2850)),
-            (860_500, 1_080_500),
+            (850_500, 1_024_500),
         )
         self.assertEqual(
             world_position_m("village_ciaran", (479, 305)),
@@ -117,7 +117,7 @@ class AnchorPlacementRegistryTests(unittest.TestCase):
         # Altoria's south gate sits 450 m west and 2,700 m south of the plaza.
         self.assertEqual(
             world_position_m("capital_altoria", (3050, 150)),
-            (860_500 - 450, 1_080_500 - 2700),
+            (850_500 - 450, 1_024_500 - 2700),
         )
 
     @covers_requirement(

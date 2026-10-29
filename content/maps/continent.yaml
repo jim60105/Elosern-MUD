@@ -222,8 +222,8 @@ terrain:
       fords:
       - cell_x: 1150
         cell_y: 1363
-      - cell_x: 830
-        cell_y: 1370
+      - cell_x: 823
+        cell_y: 1366
       - cell_x: 450
         cell_y: 1345
     capital_river:

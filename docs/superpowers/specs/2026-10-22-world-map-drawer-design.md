@@ -32,7 +32,7 @@ These amend the parent design's §6. They are real terrain, not display layers.
 Add a river, provisionally named 界河, to `WATERWAY_ROUTES` in `world/maps/wilderness_provider.py`.
 
 - Course, in wilderness cells: rises on the central range's western flank near `(1300, 1410)` and flows west, meandering between Y 1290 and Y 1410, to the west coast near `(170, 1290)`. Intermediate bends follow the shape `(1100, 1350)`, `(900, 1380)`, `(650, 1310)`, `(400, 1340)`; the exact vertices are authoring discretion inside that band, provided the mouth is on the coast and the source meets the mountain corridor.
-- Three fords: the principal one near `(830, 1370)` on the line between the Altoria and Valhalla capitals, plus one upstream and one downstream. Every other river cell is impassable on foot.
+- Three fords: the principal one near `(823, 1366)` on the line between the Altoria and Valhalla capitals, plus one upstream and one downstream. Every other river cell is impassable on foot.
 - The river is the Altoria–Valhalla border.
 
 ### 3.2 Northern deep forest edge

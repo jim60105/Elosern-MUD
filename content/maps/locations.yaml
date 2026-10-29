@@ -29,8 +29,8 @@ locations:
     display_name_zh: 咆哮王城
     description: Capital of the Valhalla Beast Kingdom.
     cell:
-      cell_x: 730
-      cell_y: 1605
+      cell_x: 780
+      cell_y: 1910
     geographic_constraint: Northwestern highland forest and tribal routes
     scene_archetype:
   dungeon_arcane_ruins:

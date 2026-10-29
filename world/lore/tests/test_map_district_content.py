@@ -445,7 +445,8 @@ class WalkableComponentContractTests(unittest.TestCase):
     )
     def test_fords_join_the_banks_and_gateways_share_one_component(self):
         components = walkable_components()
-        x = 830  # the principal border-river ford's column
+        # The declared principal border-river ford's own column.
+        x = geography.current().terrain.waterway_fords["border_river"][1][0]
         south = components.component((x, wilderness_provider.border_river_row(x) - 3))
         north = components.component((x, wilderness_provider.border_river_row(x) + 3))
         self.assertIsNotNone(south)

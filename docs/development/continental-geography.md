@@ -82,7 +82,7 @@ existing rasterizer lays exactly one water cell per column and
 `border_river_row(x)` returns that cell. Corner cutting is forbidden for
 diagonal steps, so the one-cell line is a complete barrier; its three fords
 (the same waterway's `fords`: upstream `(1150, 1363)`, principal
-`(830, 1370)` on the line between the Altoria and Valhalla capitals,
+`(823, 1366)` on the line between the Altoria and Valhalla capitals,
 downstream `(450, 1345)`) are the only crossings west of the source. East of
 the source the mountain corridor and the ridge passes still connect the two
 banks over mountain-trail ground.

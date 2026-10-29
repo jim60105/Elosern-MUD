@@ -335,8 +335,14 @@ class MapProviderTests(EvenniaTest):
 
     @covers_requirement("wilderness-map-provider::elosernwildernessmapprovider-bounds-the-map-to-the-declared-one-kilometer-frame")
     def test_anchor_footprint_cells_are_invalid_and_approach_cells_are_valid(self):
+        entry = live_anchor_entry()
         self.assertFalse(self.provider.is_valid_coordinates(None, CAPITAL_ANCHOR))
-        self.assertFalse(self.provider.is_valid_coordinates(None, (857, 1076)))
+        # Every derived footprint cell is refused: the mask is authored data,
+        # so the check enumerates the registry row instead of remembering one
+        # coordinate the next settlement move would invalidate.
+        self.assertTrue(entry.footprint_cells)
+        for cell in entry.footprint_cells:
+            self.assertFalse(self.provider.is_valid_coordinates(None, cell), cell)
         self.assertTrue(self.provider.is_valid_coordinates(None, SOUTH_APPROACH))
         self.assertTrue(self.provider.is_valid_coordinates(None, EAST_APPROACH))
 
