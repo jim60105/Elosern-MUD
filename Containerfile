@@ -105,6 +105,11 @@ COPY --chown=root:0 web/ /app/web/
 COPY --chown=root:0 commands/ /app/commands/
 COPY --chown=root:0 typeclasses/ /app/typeclasses/
 COPY --chown=root:0 world/ /app/world/
+# Authored static content, read from the repository root at runtime:
+# world/maps/runtime.py, world/maps/geography.py and world/lore/map_districts.py
+# discover content/maps/*.yaml (and content/map-reference-context.json) from
+# REPOSITORY_ROOT=/app. Without this tree world adoption fails at startup.
+COPY --chown=root:0 content/ /app/content/
 COPY --chown=root:0 tools/ /app/tools/
 # Vendored CC BY name corpus: world/lore/names.py parses it at import time, so
 # the runtime tree must carry it (npc-namegen-lore-registry D8).

@@ -357,6 +357,26 @@ class ContainerContractTests(unittest.TestCase):
             "the build context must include the prompt data folder",
         )
 
+    @covers_requirement("container-image::multi-stage-containerfile")
+    def test_authored_static_content_is_baked_into_the_runtime_tree(self):
+        # The map runtime resolves the authored document root from the
+        # application tree (``REPOSITORY_ROOT`` is /app inside the image), so an
+        # image without this tree rejects every world adoption at startup and
+        # the game never presents a world.
+        layout = _stage(_read("Containerfile"), "app-layout")
+        content_copy = "COPY --chown=root:0 content/ /app/content/"
+        self.assertIn(content_copy, layout)
+        self.assertLess(
+            layout.index(content_copy),
+            layout.index("find /app -type d -exec chmod 0755"),
+            "the authored tree must land before permission normalization",
+        )
+        ignored = set(_read(".containerignore").splitlines())
+        self.assertFalse(
+            [line for line in ignored if "content/" in line],
+            "the build context must include the authored content folder",
+        )
+
     @covers_requirement("art-gallery-seed-sync::bulk-seed-art-lives-outside-git-behind-one-directory-root-setting")
     def test_seed_art_is_mounted_read_only_and_never_baked_or_committed(self):
         compose = yaml.safe_load(_read("compose.yaml"))
