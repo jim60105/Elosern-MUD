@@ -251,6 +251,58 @@ def test_moving_nodes_keeps_ids_directions_and_dependents(workspace):
     assert fixture.tree_digest(workspace) == before
 
 
+def test_the_first_node_places_the_map_and_an_anchor_move_reframes_the_graph(workspace):
+    """The anchor node is the local frame; the projection is the evidence."""
+
+    editor = Editor(workspace)
+    status, body = _create_map(editor, options=None)
+    assert (status, body["changed"]) == (200, True)
+    state = editor.state()
+    assert _settlement(state, "wild_camp")["world_frame"] is None
+
+    # The first created node becomes the anchor of the location, keeping the
+    # entered id, position and prose.
+    status, body = _send(editor, "create_node", NEW_MAP, {"settlement_id": "wild_camp", "node_id": "camp", "fields": {
+        **_node_fields(100, 200), "key": "Camp", "desc": "A camp.", "prototype_parent": "grid_room"}})
+    assert status == 200, body
+    node = _data(workspace, NEW_MAP)["nodes"]["camp"]
+    assert (node["prototype_parent"], node["anchor_key"]) == ("anchor_room", fixture.BARE_LOCATION_ID)
+    assert (node["x_m"], node["y_m"], node["key"]) == (100, 200, "Camp")
+    settlement = _settlement(editor.state(), "wild_camp")
+    # The bare location is cell (30, 12): its centre plus (100, 200) - (100, 200).
+    assert settlement["world_frame"] == {"anchor_cell": [30, 12], "local_anchor_m": [100, 200]}
+    assert [row["world_m"] for row in settlement["nodes"]] == [[30500, 12500]]
+
+    # A second node sits in the same local frame.
+    status, body = _send(editor, "create_node", NEW_MAP, {"settlement_id": "wild_camp", "node_id": "tent", "fields": {
+        **_node_fields(170, 280), "key": "Tent", "desc": "A tent."}})
+    assert status == 200, body
+    settlement = _settlement(editor.state(), "wild_camp")
+    world = {row["id"]: row["world_m"] for row in settlement["nodes"]}
+    assert world == {"camp": [30500, 12500], "tent": [30570, 12580]}
+    footprint = settlement["wilderness_entry"]  # none yet: the map has no gate
+    assert footprint is None
+
+    # Moving the anchor alone keeps it on the location cell's centre and shifts
+    # every untouched node by the negative local delta.
+    status, body = _send(editor, "move_nodes", NEW_MAP, {"settlement_id": "wild_camp", "moves": [
+        {"node_id": "camp", "x_m": 130, "y_m": 250}]})
+    assert status == 200, body
+    settlement = _settlement(editor.state(), "wild_camp")
+    assert settlement["world_frame"] == {"anchor_cell": [30, 12], "local_anchor_m": [130, 250]}
+    assert {row["id"]: row["world_m"] for row in settlement["nodes"]} == {
+        "camp": [30500, 12500],
+        "tent": [30540, 12530],
+    }
+    # One undo restores the previous frame and both world positions.
+    assert editor.undo()[0] == 200
+    settlement = _settlement(editor.state(), "wild_camp")
+    assert {row["id"]: row["world_m"] for row in settlement["nodes"]} == {
+        "camp": [30500, 12500],
+        "tent": [30570, 12580],
+    }
+
+
 @pytest.mark.parametrize(
     ("moves", "status"),
     [

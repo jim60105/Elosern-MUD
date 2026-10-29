@@ -414,6 +414,41 @@ def test_the_removed_binding_command_is_unknown_and_writes_nothing(workspace):
     assert settlement["world_frame"]["local_anchor_m"] == [0, 0]
 
 
+def test_footprint_conversion_refuses_a_location_changed_after_the_snapshot(workspace):
+    """The absolute-cell contract never converts through a stale location cell."""
+
+    editor = Editor(workspace)
+    locations = _data(workspace, LOCATIONS)
+    locations["locations"][fixture.LOCATION_ID]["cell"] = {"cell_x": 6, "cell_y": 6}
+    (workspace / LOCATIONS).write_text(fixture.yaml_text(locations), encoding="utf-8")
+    before = fixture.tree_digest(workspace)
+
+    status, body = _send(
+        editor,
+        "set_footprint_cell",
+        SETTLEMENT,
+        {"settlement_id": fixture.SETTLEMENT_ID, "cell": [6, 5], "filled": True},
+    )
+    assert (status, body["error"]["code"]) == (409, "stale_document")
+    assert "reread" in body["error"]["message"]
+    assert fixture.tree_digest(workspace) == before
+
+    # After the reread the same command converts through the new cell.
+    editor.reload()
+    assert _send(
+        editor,
+        "set_footprint_cell",
+        SETTLEMENT,
+        {"settlement_id": fixture.SETTLEMENT_ID, "cell": [6, 5], "filled": True},
+    )[0] == 200
+    entry = _data(workspace, SETTLEMENT)["wilderness_entry"]
+    assert entry["offset"] == {"dx": 0, "dy": -1}
+    assert entry["shape"] == ["#", "#"]
+    footprint = editor.state()["world"]["settlements"][0]["footprint"]
+    assert footprint["origin"] == [6, 5]
+    assert footprint["cells"] == [[6, 5], [6, 6]]
+
+
 def test_a_command_naming_another_document_is_cross_document(workspace):
     editor = Editor(workspace)
     before = fixture.tree_digest(workspace)

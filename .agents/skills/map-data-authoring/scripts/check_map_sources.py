@@ -117,20 +117,8 @@ def game_rules(world, context) -> tuple[list[str], list[str]]:
 
     for sid, settlement in sorted(world.settlements.items()):
         label = f"settlement {sid!r}"
-        location = locations.get(settlement.location_ref)
         for node in settlement.nodes.values():
             check_scene(f"{label} node {node.node_id!r}", node.scene_archetype)
-
-        if location is not None:
-            geometry = settlement.wilderness_geometry(location.cell)
-            anchor_cell = None if geometry is None else geometry.anchor_cell
-            if anchor_cell is not None and anchor_cell != location.cell:
-                warnings.append(
-                    f"{label} footprint anchor cell {anchor_cell} (mask bounding-box midpoint) "
-                    f"!= location cell {location.cell}: the world-map marker and the real "
-                    "wilderness entrance are in different places (advisory; the core "
-                    "reports the same warning)"
-                )
 
     for iid, interior in sorted(world.interiors.items()):
         for room in interior.rooms.values():

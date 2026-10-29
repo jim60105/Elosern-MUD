@@ -301,9 +301,11 @@ def build_settlements(
     """Validate one candidate and compose its immutable game views.
 
     Every rejection a published consumer could later trip over (duplicate
-    location binding, a binding that disagrees with its anchor node or
-    location, an unknown gate destination, an unregistered scene archetype and
-    the terrain-independent wilderness footprint/gate rules) is completed here.
+    location binding, a missing or ambiguous anchor node, an unknown gate
+    destination, an unregistered scene archetype and the terrain-independent
+    wilderness footprint/gate rules) is completed here. The world frame and the
+    entry origin are *derived* from the location cell and the anchor node, so
+    no authored coordinate can disagree with them.
     Terrain-dependent wilderness checks belong to the geography candidate,
     which re-runs the same validator against its own frame and walkability.
     ``frame_cells`` is the authored continental frame the wilderness cells are

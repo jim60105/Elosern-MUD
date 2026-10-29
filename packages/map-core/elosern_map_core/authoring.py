@@ -102,6 +102,9 @@ def location_cells_of(
 
     A settlement owns no geographic coordinate: its frame and its wilderness
     entry resolve against the cell this returns for its ``location_ref``.
+    Only a real integer pair is accepted -- nothing is coerced -- and a row
+    without one is left out here so that :func:`diagnose_settlement_structure`
+    can report it instead of geometry silently disappearing.
     """
 
     if locations is None:
@@ -114,9 +117,11 @@ def location_cells_of(
             raw = value.get("cell")
             if isinstance(raw, Mapping):
                 cell = (raw.get("cell_x"), raw.get("cell_y"))
-        if cell is None or cell[0] is None or cell[1] is None:
+        if cell is None or len(cell) != 2:
             continue
-        cells[str(key)] = (int(cell[0]), int(cell[1]))
+        if not all(isinstance(item, int) and not isinstance(item, bool) for item in cell):
+            continue
+        cells[str(key)] = (cell[0], cell[1])
     return cells
 
 
@@ -144,6 +149,7 @@ def diagnose_settlement_structure(
     diagnostics: list[Diagnostic] = []
     bound_locations: dict[str, str] = {}
     seen_destinations: dict[tuple[str, str], tuple[str, str]] = {}
+    cells = location_cells_of(locations)
 
     for settlement_id, settlement in sorted(settlements.items()):
         if locations is not None:
@@ -154,6 +160,20 @@ def diagnose_settlement_structure(
                         "unknown_reference",
                         STRUCTURE,
                         f"location_ref {settlement.location_ref!r} is not an authored location",
+                        document=settlement,
+                        field_path="location_ref",
+                        object_id=settlement_id,
+                    )
+                )
+            elif settlement.location_ref not in cells:
+                # A location without a usable integer cell cannot place the
+                # settlement; say so instead of silently dropping its geometry.
+                diagnostics.append(
+                    _diagnostic(
+                        "invalid_field_value",
+                        STRUCTURE,
+                        f"location {settlement.location_ref!r} declares no integer cell, "
+                        "so the settlement cannot be placed",
                         document=settlement,
                         field_path="location_ref",
                         object_id=settlement_id,

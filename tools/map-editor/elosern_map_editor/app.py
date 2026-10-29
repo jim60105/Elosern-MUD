@@ -60,6 +60,7 @@ from .commands import (
     CommandError,
     Current,
     Envelope,
+    dependencies_of,
     parse_envelope,
     validate_candidate,
 )
@@ -673,6 +674,29 @@ class EditorService(_PartitionMethods):
         except UnicodeDecodeError:
             raise CommandError(422, "validation_failed", "the document is not valid UTF-8") from None
 
+    def _require_fresh_dependency(self, document_id: str) -> None:
+        """Refuse when a document this command converts from changed on disk.
+
+        A handler may resolve a value another document owns (the settlement's
+        location cell) from the published projection. If that document no
+        longer matches the disk, the conversion would use a stale frame, so
+        nothing is written and the client rereads.
+        """
+
+        published = (
+            self.published.fingerprint_map.get(document_id, ABSENT)
+            if self.published is not None
+            else ABSENT
+        )
+        fingerprint, _ = self.writer.read(document_id)
+        if fingerprint != published:
+            raise CommandError(
+                409,
+                "stale_document",
+                f"{document_id} changed after this snapshot; reread before writing",
+                fingerprint=fingerprint,
+            )
+
     def _execute(self, name: str, raw: bytes) -> dict[str, Any]:
         envelope = self._admit(name, raw)
         if name in ("undo", "redo"):
@@ -693,6 +717,8 @@ class EditorService(_PartitionMethods):
             world = self.published.world
             handler.target(world, envelope)
             current = self._current(envelope.document_id, envelope.expected)
+            for dependency in dependencies_of(handler, world, envelope.arguments):
+                self._require_fresh_dependency(dependency)
             effect = handler.effect(envelope, current, world)
             if effect is None:
                 return {**self.status(), "changed": False, "document_id": envelope.document_id,

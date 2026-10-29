@@ -85,7 +85,7 @@ the elements a later change completes.
 | Footprint masks (§4.1) | Painted cells on the canvas with the 佔地 tool; the inspector's monospace `#`/`.` grid (north row first, one-cell margin, arrows and Space) writes only the owning settlement. Review the grid density of the 9-row Altoria mask at 1451x790. | Matches |
 | Locations without a local map (§4.1) | 無本地圖 in the tree and the inspector with no rooms; 開啟本地圖 for settlement-derived local maps. | Matches |
 | Districts and landmarks | Names, kind and region membership, plus a structured landmark selector (domain, map, object or cell). Saving a landmark that is not reachable shows ▲ in the diagnostics strip. | Matches |
-| Binding | Anchor cell `1 km 格` and local anchor `m 地方`, with the world-metre rule stated; interiors get no metres. | Matches |
+| World frame (§4.3) | No editable binding: the inspector states that world metres are the location cell centre plus local metres minus the anchor room, that a location drag moves the mask and gates with the town, and that interiors get no metres. | Matches (binding controls withdrawn by `map-location-relative-placement`) |
 | Derived results (§4.1, §3) | The inspector section shows the terrain preview state, the partition's input signature against the current one and 重新產生分區 / 取消產生 (P19). National borders draw dash-dot ink with no handles; the district outlines are described under "Partition jobs review". | Matches |
 | Region prose and classifier fields | Name, nation keys, scene and one-variant-per-line descriptions; a variant containing a line break is shown as external-edit only. A reviewer should confirm that this is acceptable for authored prose. | Matches |
 

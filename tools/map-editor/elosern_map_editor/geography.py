@@ -670,6 +670,13 @@ class SetFootprintCell(_Settlement):
     name = "set_footprint_cell"
     keys = frozenset({"settlement_id", "cell", "filled"})
 
+    def dependencies(self, world, arguments):
+        # The absolute-cell contract converts through the published location
+        # cell, so a location document that changed after the snapshot must be
+        # reread before this command can be admitted.
+        locations = (world or {}).get("locations") or ()
+        return tuple({row["relative_path"] for row in locations})
+
     def check(self, world, arguments):
         _identifier(arguments["settlement_id"], "settlement_id")
         _pair(arguments["cell"], "cell", minimum=0)

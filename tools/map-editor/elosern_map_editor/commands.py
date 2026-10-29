@@ -343,6 +343,18 @@ class DocumentCommand:
 
         self.mutate(data, arguments)
 
+    def dependencies(
+        self, world: dict[str, Any], arguments: dict[str, Any]
+    ) -> tuple[str, ...]:
+        """Documents other than the owner whose published value this command reads.
+
+        The service refuses the command when such a document changed on disk
+        after the snapshot the value came from, so a conversion can never use
+        a stale frame. The default reads no other document.
+        """
+
+        return ()
+
     def target(self, world: dict[str, Any], envelope: Envelope) -> str:
         _exact_keys(envelope.arguments, set(self.keys))
         self.check(world, envelope.arguments)
@@ -386,6 +398,19 @@ def refused_value(code: str, message: str, field_path: str) -> CommandError:
         message,
         diagnostics=[{"code": code, "category": "structure", "message": message, "field_path": field_path}],
     )
+
+
+def dependencies_of(
+    handler: Any, world: dict[str, Any], arguments: dict[str, Any]
+) -> tuple[str, ...]:
+    """The documents ``handler`` reads besides its owner.
+
+    Document-creation handlers implement ``target``/``effect`` directly and
+    declare no dependency, so the protocol stays optional.
+    """
+
+    method = getattr(handler, "dependencies", None)
+    return () if method is None else method(world, arguments)
 
 
 def _registry():

@@ -684,6 +684,36 @@ class AuthoringRequirementTests(unittest.TestCase):
         disc_problems, _ = checker.game_rules(disc_world, context)
         self.assertEqual(disc_problems, base_problems)
 
+        # A warning-only candidate: the advisory is reported with its severity
+        # and neither the checker's exit status nor the game composition
+        # refuses it.
+        from elosern_map_core.diagnostics import blocking
+
+        from world.maps.map_data import build_settlements
+
+        warned = fixtures.settlement_data()
+        warned["wilderness_entry"]["offset"] = {"dx": 0, "dy": 1}
+        warned_world = load_authoring_world(fixtures.custom_sources(settlement=warned))
+        warned_diags = checker.diagnose_world(warned_world)
+        warning = next(d for d in warned_diags if d.code == "footprint_location_offset")
+        self.assertEqual((warning.category, warning.severity), ("semantic", "warning"))
+        self.assertEqual(blocking(warned_diags), ())
+        warned_problems, _ = checker.game_rules(warned_world, context)
+        self.assertEqual(warned_problems, base_problems)
+        build_settlements(warned_world.settlements, warned_world.locations, frame_cells=40)
+
+        # The same advisory beside a blocking fault is still refused.
+        blocked = fixtures.settlement_data()
+        blocked["wilderness_entry"]["offset"] = {"dx": 40, "dy": 0}
+        blocked_world = load_authoring_world(fixtures.custom_sources(settlement=blocked))
+        blocked_diags = checker.diagnose_world(blocked_world)
+        self.assertIn("invalid_footprint_cell", {d.code for d in blocking(blocked_diags)})
+        self.assertNotIn("footprint_location_offset", {d.code for d in blocking(blocked_diags)})
+        with self.assertRaises(Exception):
+            build_settlements(
+                blocked_world.settlements, blocked_world.locations, frame_cells=40
+            )
+
     def test_schema_unrepresentable_defects_are_rejected(self):
         cases = [
             ("empty mask", {"shape": []}, "invalid_mask"),
