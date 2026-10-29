@@ -161,21 +161,26 @@ def test_a_room_id_of_another_interior_is_refused_on_the_fresh_disk(workspace):
     before = fixture.tree_digest(workspace)
     status, body = _create_room(editor, "cellar", interior="synthetic_annex", document=ANNEX)
     assert status == 422
-    assert [row["code"] for row in body["error"]["diagnostics"]] == ["duplicate_room_identity"]
+    assert [row["code"] for row in body["error"]["diagnostics"]] == ["duplicate_interior_room"]
     assert fixture.tree_digest(workspace) == before
 
 
-def test_a_duplicate_the_baseline_already_holds_does_not_block_other_edits(workspace):
-    data = _data(workspace)
+def test_a_duplicate_the_baseline_already_holds_is_a_core_structure_error(workspace):
+    # The shared core gate owns room identity, so a duplicate already on disk
+    # makes the world unloadable: the editor keeps no current preview and
+    # refuses every write until the documents are fixed.
     annex = {"version": 1, "kind": "interior", "id": "synthetic_annex",
              "rooms": {"back": _fields(name="重複")}, "connections": [], "interior_links": [], "exterior": None}
     (workspace / ANNEX).write_text(fixture.yaml_text(annex), encoding="utf-8")
-    assert "back" in data["rooms"]
     editor = Editor(workspace)
+    state = editor.state()
+    assert state["preview_state"] == "unavailable"
+    assert "duplicate_interior_room" in {row["code"] for row in state["candidate_diagnostics"]}
+    before = fixture.tree_digest(workspace)
     status, body = _send(editor, "set_room_fields", INTERIOR, {"interior_id": HALL, "room_id": "front",
                                                                "fields": {"name_zh": "新前廳"}})
-    assert status == 200, body
-    assert _data(workspace)["rooms"]["front"]["name_zh"] == "新前廳"
+    assert (status, body["error"]["code"]) == (423, "write_paused")
+    assert fixture.tree_digest(workspace) == before
 
 
 def test_editing_prose_keeps_the_room_identity_and_its_service_join(workspace):
@@ -419,22 +424,6 @@ def test_an_authored_label_outside_the_editor_rules_stays_editable_and_removable
     status, body = _send(editor, "delete_connection", INTERIOR, _connection("front", "back", " in "))
     assert status == 200, body
     assert len(_data(workspace)["connections"]) == 1
-
-
-def test_a_room_shared_on_disk_cannot_gain_a_third_interior(workspace):
-    def interior(interior_id, rooms):
-        return {"version": 1, "kind": "interior", "id": interior_id, "rooms": {key: _fields() for key in rooms},
-                "connections": [], "interior_links": [], "exterior": None}
-
-    (workspace / ANNEX).write_text(fixture.yaml_text(interior("synthetic_annex", ["back"])), encoding="utf-8")
-    third = "content/maps/interiors/synthetic_third.yaml"
-    (workspace / third).write_text(fixture.yaml_text(interior("synthetic_third", ["third_room"])), encoding="utf-8")
-    editor = Editor(workspace)
-    before = fixture.tree_digest(workspace)
-    status, body = _send(editor, "create_room", third, {"interior_id": "synthetic_third", "room_id": "back",
-                                                        "fields": _fields()})
-    assert status == 422
-    assert fixture.tree_digest(workspace) == before
 
 
 def test_a_recreated_interior_shows_its_left_over_layout_positions(workspace):

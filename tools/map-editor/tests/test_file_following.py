@@ -36,6 +36,20 @@ def _replace_atomically(path, text: str) -> None:
     os.replace(temporary, path)
 
 
+def _cellar_data() -> dict:
+    """An externally authored interior with room IDs of its own."""
+
+    data = fixture.interior_data()
+    data["id"] = "synthetic_cellar"
+    data["rooms"] = {
+        "cellar_north": data["rooms"]["front"],
+        "cellar_south": data["rooms"]["back"],
+    }
+    data["connections"] = []
+    data["exterior"] = None
+    return data
+
+
 def _with_history(workspace) -> Editor:
     """A segment with one undo and one redo entry over an existing layout."""
 
@@ -179,18 +193,14 @@ def test_external_creates_and_deletes_are_adopted_with_history_cleared(workspace
     editor = Editor(workspace)
     assert editor.move("back", 1, 1)[0] == 200
     if change == "create":
-        data = fixture.interior_data()
-        data["id"] = "synthetic_cellar"
-        data["exterior"] = None
+        data = _cellar_data()
         path = f"content/maps/interiors/{data['id']}.yaml"
         (workspace / path).write_text(fixture.yaml_text(data), encoding="utf-8")
     elif change == "delete_layout":
         path = LAYOUT
         (workspace / LAYOUT).unlink()
     else:
-        data = fixture.interior_data()
-        data["id"] = "synthetic_cellar"
-        data["exterior"] = None
+        data = _cellar_data()
         path = f"content/maps/interiors/{data['id']}.yaml"
         (workspace / path).write_text(fixture.yaml_text(data), encoding="utf-8")
         editor.follow()

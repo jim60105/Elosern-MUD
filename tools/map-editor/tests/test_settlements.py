@@ -197,10 +197,13 @@ def test_node_fields_follow_the_core_schema(workspace):
     assert _send(editor, "set_node_fields", SETTLEMENT, {"settlement_id": TOWN, "node_id": "yard", "fields": fields})[0] == 200
     node = _data(workspace)["nodes"]["yard"]
     assert {key: node[key] for key in fields} == fields
-    # Switching the prototype carries the anchor key with it.
+    # One settlement has one anchor_room: demote the bound node first, then
+    # switching the prototype carries the anchor key with it.
+    assert _send(editor, "set_node_fields", SETTLEMENT, {"settlement_id": TOWN, "node_id": "gate", "fields": {
+        "prototype_parent": "grid_room", "anchor_key": None}})[0] == 200
     assert _send(editor, "set_node_fields", SETTLEMENT, {"settlement_id": TOWN, "node_id": "yard", "fields": {
-        "prototype_parent": "anchor_room", "anchor_key": fixture.BARE_LOCATION_ID}})[0] == 200
-    assert _data(workspace)["nodes"]["yard"]["anchor_key"] == fixture.BARE_LOCATION_ID
+        "prototype_parent": "anchor_room", "anchor_key": fixture.LOCATION_ID}})[0] == 200
+    assert _data(workspace)["nodes"]["yard"]["anchor_key"] == fixture.LOCATION_ID
     before = fixture.tree_digest(workspace)
     cases = [
         ({"prototype_parent": "grid_room"}, 422),  # anchor_key forbidden for grid_room

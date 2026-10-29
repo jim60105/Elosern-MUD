@@ -628,14 +628,14 @@ route length.
   (`[index % 3, ⌊index / 3⌋]`) until a later, distinct layout command places
   it.
 - **Identity.** Room and interior IDs are read-only once created. The game
-  gives a permanent room one identity across every interior, which the core
-  authoring gate does not check, so `check_room_identities` (`commands.py`)
-  mirrors that rule on the fresh disk baseline for every interior effect,
-  undo and redo included. It refuses (`duplicate_room_identity`) only a
-  duplicate the candidate introduces, so a duplicate already on disk does not
-  block unrelated edits. `duplicate_room` copies the ordinary values (name,
-  description, scene, art key) and no relationship: no connection, exterior,
-  interior link or landmark, and no incoming reference is retargeted.
+  gives a permanent room one identity across every interior, and the shared
+  core authoring gate rejects such a candidate (`duplicate_interior_room`)
+  for every interior effect, undo and redo included. A duplicate already on
+  disk makes the world structure-invalid, so the editor keeps no current
+  preview and refuses writes until the documents are fixed. `duplicate_room`
+  copies the ordinary values (name, description, scene, art key) and no
+  relationship: no connection, exterior, interior link or landmark, and no
+  incoming reference is retargeted.
 - **Service rooms.** Existing service-place keys stay the room IDs that
   service and host records join. The inspector lists the joining `places` and
   `service_hosts` records from the reference index read-only; editing a
@@ -718,10 +718,9 @@ operation. Editing one relationship writes only its owner.
   `return`, ...) is refused with 400, naming the key. The inspector states
   that the entry cannot become two-way.
 - **Doorway names.** The game refuses two interiors that open onto the same
-  settlement node under one doorway name (aliases are not compared).
-  `check_doorways` (`commands.py`) mirrors that rule on the fresh disk
-  baseline for every world-source effect, undo and redo included. It refuses
-  (`duplicate_doorway`) only a duplicate the candidate introduces.
+  settlement node under one doorway name (aliases are not compared) and the
+  shared core authoring gate reports `duplicate_doorway` for such a candidate
+  on every world-source effect, undo and redo included.
 - **No index is needed.** A relationship is not a qualified object that any
   other document can name, so removing one needs no reference index, just
   like removing a road or a connection. Deleting an endpoint object is still

@@ -192,6 +192,10 @@ def test_settlement_creation_undo_is_an_object_removing_guarded_inverse(workspac
     service = editor.service
     data = fixture.settlement_data()
     data["id"] = "synthetic_village"
+    # One location binds one settlement: the created document claims the bare
+    # location the synthetic town does not use.
+    data["location_ref"] = fixture.BARE_LOCATION_ID
+    data["binding"]["anchor_cell"] = {"cell_x": 30, "cell_y": 12}
     data["nodes"]["gate"]["prototype_parent"] = "grid_room"
     data["nodes"]["gate"]["anchor_key"] = None
     data["wilderness_entry"] = None
