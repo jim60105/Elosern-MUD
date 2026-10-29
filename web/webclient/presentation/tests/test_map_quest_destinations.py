@@ -61,6 +61,14 @@ _GEOGRAPHY = {
 }
 _PLACEMENTS = {
     "town": SimpleNamespace(anchor_key="town", zcoord="town_map", node=object()),
+    # The same anchor's settlement-space identity: a permanent interior's
+    # authored exterior names the settlement map its rooms open onto, and a
+    # place's authored display name joins that room. A settlement and its map
+    # are two published facts, so both rows exist here.
+    "town_settlement": SimpleNamespace(anchor_key="town", zcoord="town", node=object()),
+    "service_settlement": SimpleNamespace(
+        anchor_key="service", zcoord="service", node=object()
+    ),
 }
 _TOWN_NODES = {(10, 20), (35, 60)}
 _SITES = {

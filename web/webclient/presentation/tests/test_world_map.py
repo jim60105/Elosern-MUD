@@ -131,6 +131,7 @@ class WorldMapPrivacyTests(TestCase):
 
     def test_coordinate_free_interior_uses_canonical_place_and_unknown_is_unavailable(self):
         from typeclasses.rooms import Room, InstanceRoom
+        import web.webclient.presentation.map_quest_destinations as resolver
         room=Mock(spec=Room)
         room.tags.all.return_value=["t_interior"]
         actor=NS(location=room)
@@ -144,8 +145,10 @@ class WorldMapPrivacyTests(TestCase):
                 ),
                 replace_existing=True,
              ), \
-             patch("web.webclient.presentation.map_quest_destinations.anchor_geography",
-                   lambda: {"t_anchor":NS(cell=(123,456))}):
+             patch.object(resolver,"anchor_geography",
+                   lambda: {"t_anchor":NS(cell=(123,456))}), \
+             patch.object(resolver,"ANCHOR_PLACEMENT_REGISTRY",
+                   {"t_anchor":NS(anchor_key="t_anchor",zcoord="t_anchor")}):
             self.assertEqual(panel.geometry.current_point(actor),(123.5,456.5))
             instance=Mock(spec=InstanceRoom)
             instance.attributes.get.return_value=room
