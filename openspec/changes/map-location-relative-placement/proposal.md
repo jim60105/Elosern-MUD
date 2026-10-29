@@ -12,6 +12,7 @@ A continent-location drag saves `locations.yaml` while the settlement repeats th
 - Preserve absolute-cell footprint editing APIs. Make midpoint/location disagreement a saveable advisory semantic warning, independent of actual blocking geometry diagnostics.
 - Remove binding arguments from settlement creation, retain empty-map WIP behavior, and use a zero-offset point entry when the first wilderness gate is created.
 - Extend synthetic process/browser and committed game-adoption tests. Convert the two authored documents with temporary derived-output comparison, then regenerate the partition from final sources.
+- Refresh `content/map-reference-context.json` after final core/lore changes and check its freshness, preserving the editor's external-reference and deletion/history gates.
 - Update the handoff's developer docs and map-authoring skill recipes. Preserve the user's live location and node edits during implementation recovery; never reuse the partial partition JSON.
 
 ## Capabilities
@@ -30,7 +31,7 @@ None.
 
 ## Impact
 
-Core schema/documents, references, partition and authoring; editor geography/settlements/relationships/snapshot and minimal frontend caller removal; game map/lore adapters and partition producer; both settlement YAMLs and regenerated partition; affected fixtures and shard declarations. No new UI controls, multi-document drag writes, topology/prose edits, release bump, compatibility layer or persistent-state migration.
+Core schema/documents, references, partition and authoring; editor geography/settlements/relationships/snapshot and minimal frontend caller removal; game map/lore adapters and partition producer; both settlement YAMLs, regenerated partition and reference context; affected fixtures and shard declarations. No new UI controls, multi-document drag writes, topology/prose edits, release bump, compatibility layer or persistent-state migration.
 
 Human review of documentation and the reduced inspector uses `tmp/map-editor-location-move-handoff.md`, `docs/superpowers/specs/2026-10-26-map-editor-design.md`, and `docs/superpowers/specs/2026-10-26-map-editor-frontend-design.md`. Wording and visual polish are human-reviewed rather than tested; executable contracts have behavioral tests.
 
@@ -38,7 +39,7 @@ Human review of documentation and the reduced inspector uses `tmp/map-editor-loc
 
 depends-on: map-core-settlement-diagnostics
 
-Code-conflicts: shared `authoring.py`, game map adapters, core/game/editor fixtures, the skill checker and map docs require serial application after the prerequisite. Both changes modify the same existing authoring-gates requirement; this delta contains its complete post-prerequisite form.
+Code-conflicts: shared `authoring.py`, game map adapters, core/game/editor fixtures, the skill checker, generated reference context and map docs require serial application after the prerequisite. Both changes modify the same existing authoring-gates requirement; this delta contains its complete post-prerequisite form.
 
 ## Scope and evidence boundary
 
