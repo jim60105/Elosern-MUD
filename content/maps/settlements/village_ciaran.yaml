@@ -1,6 +1,6 @@
 # Settlement local map authored source (schema version 1).
 # Converted once from the retired Python declaration; this document is
-# the sole authority for the graph, prototypes, binding, options,
+# the sole authority for the graph, prototypes, options,
 # entrances and map-owned scene associations. `location_ref` is the only
 # reverse link: a location's local map is discovered by this field, so a
 # new map for an existing location needs no Python registration.
@@ -8,13 +8,6 @@ version: 1
 kind: settlement
 id: village_ciaran
 location_ref: village_ciaran
-binding:
-  anchor_cell:
-    cell_x: 1340
-    cell_y: 1220
-  local_anchor_m:
-    east_m: 220
-    north_m: 305
 options:
   map_visual_range: 2
   map_mode: nodes
@@ -41,8 +34,8 @@ nodes:
     typeclass:
     scene_archetype: wilderness_path
   hidden_path:
-    x_m: 35
-    y_m: 270
+    x_m: -259
+    y_m: 192
     prototype_parent: grid_room
     key: 隱密小徑
     desc: 藤蔓與落葉幾乎掩住了這條小徑；不認得這片林子的人，縱使走進去也看不出來。
@@ -95,8 +88,8 @@ nodes:
     typeclass:
     scene_archetype: forest_path
   elder_tree:
-    x_m: 165
-    y_m: 650
+    x_m: 226
+    y_m: 618
     prototype_parent: grid_room
     key: 長老古樹下
     desc: 再往北，林子更老。最老的那株巨樹寬得數人合抱，盤根之間有磨平的坐石；族裡老一輩的決定，多在這棵樹下說出口。平日這裡安靜，只餘風穿過樹冠的聲音。
@@ -170,9 +163,9 @@ roads:
 wilderness_entry:
   shape:
     - "#"
-  origin:
-    cell_x: 1340
-    cell_y: 1220
+  offset:
+    dx: 0
+    dy: 0
   gates:
     - return_direction: n
       destination_node: hidden_path
