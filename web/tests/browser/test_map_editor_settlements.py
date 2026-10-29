@@ -279,9 +279,13 @@ class MapEditorSettlementBrowserTest(unittest.TestCase):
         self.assertEqual(self.names(), ["move_nodes"])
         nodes = self.data()["nodes"]
         self.assertEqual(nodes["gate"]["x_m"] - before["gate"][0], nodes["yard"]["x_m"] - before["yard"][0])
-        page.fill('[data-group-field="y"]', "-40")
+        # A negative delta here would cross the frame origin, and the editor
+        # re-origins the whole document rather than authoring a negative grid
+        # coordinate (see the editor guide): keep the delta inside the frame so
+        # the document itself shows it.
+        page.fill('[data-group-field="y"]', "40")
         page.click("[data-group-submit]")
-        self.wait_for(lambda: self.data()["nodes"]["yard"]["y_m"] == before["yard"][1] - 40, "group delta not saved")
+        self.wait_for(lambda: self.data()["nodes"]["yard"]["y_m"] == before["yard"][1] + 40, "group delta not saved")
         self.settle(page)
         self.assertEqual(self.names(), ["move_nodes", "move_nodes"])
         self.assertEqual(self.changed(), {SETTLEMENT})
