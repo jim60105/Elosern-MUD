@@ -143,11 +143,16 @@ class ShippedGeographyPublicationTests(EvenniaTest):
     def test_gateway_approach_is_validated_before_publication(self):
         before = geography.current()
         identities = before.identity
+        entry = _settlements().wilderness_entries["capital_altoria"]
+        gate = entry.gate_for("w")
+        self.assertIsNotNone(gate)
+        approach = entry.approach_cell(gate)
+        self.assertIsNotNone(approach)
         data = _plain(before.continent.data)
         data["terrain"]["waterways"]["t_approach_water"] = {
             "route": [
-                {"cell_x": 864, "cell_y": 1080},
-                {"cell_x": 864, "cell_y": 1079},
+                {"cell_x": approach[0], "cell_y": approach[1]},
+                {"cell_x": approach[0], "cell_y": approach[1] - 1},
             ],
             "fords": [],
         }
@@ -160,7 +165,7 @@ class ShippedGeographyPublicationTests(EvenniaTest):
                 fingerprints=dict(before.fingerprints),
             )
         self.assertIn(
-            "gate 'w' approach (864, 1080) is not walkable wilderness",
+            f"gate 'w' approach {approach} is not walkable wilderness",
             str(captured.exception),
         )
         self.assertIs(geography.current(), before)
@@ -274,10 +279,8 @@ class SnapshotIsolationTests(unittest.TestCase):
         before = retained.grid_site("capital_altoria", (3500, 2850))
         self.assertIsNotNone(before)
         data = _plain(first.locations.data)
-        data["locations"]["capital_altoria"]["cell"] = {
-            "cell_x": 861,
-            "cell_y": 1080,
-        }
+        cell = data["locations"]["capital_altoria"]["cell"]
+        cell["cell_x"] += 1
         moved = document_from_data(geography.LOCATIONS_PATH, data)
         second = geography.build_geography(
             first.continent,

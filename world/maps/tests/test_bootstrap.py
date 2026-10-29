@@ -655,11 +655,11 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         sync_wilderness()
         east_gate = self._gate_exits()[1][0]
         east_gate.at_traverse(self.char1, self._east_gate())
-        self.assertEqual(self.char1.location.coordinates, (864, 1080))
+        self.assertEqual(self.char1.location.coordinates, (854, 1024))
         self.char1.move_to(self._east_gate())
         south_gate = self._gate_exits(self._south_gate())[1][0]
         south_gate.at_traverse(self.char1, self._south_gate())
-        self.assertEqual(self.char1.location.coordinates, (860, 1077))
+        self.assertEqual(self.char1.location.coordinates, (850, 1021))
 
     def test_sync_wilderness_is_idempotent(self):
         create_object(Room, key=LIMBO_KEY, location=None)
@@ -819,23 +819,23 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         )
 
         script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
-        ok = enter_wilderness(self.char1, coordinates=(864, 1080), name=WILDERNESS_NAME)
+        ok = enter_wilderness(self.char1, coordinates=(854, 1024), name=WILDERNESS_NAME)
         self.assertTrue(ok)
         room = self.char1.location
-        self.assertEqual(room.ndb.active_desc, terrain_description(864, 1080))
+        self.assertEqual(room.ndb.active_desc, terrain_description(854, 1024))
         room.ndb.active_desc = None  # wipe like a restart would
         room.ndb.someother = 1
         # The returned room is retained (account still present); re-running
         # sync_wilderness must re-prepare it.
         sync_wilderness()
-        self.assertEqual(room.ndb.active_desc, terrain_description(864, 1080))
+        self.assertEqual(room.ndb.active_desc, terrain_description(854, 1024))
         self.assertEqual(
             room.scene_archetype,
-            regions()[region_for_coordinates(864, 1080)].scene_archetype,
+            regions()[region_for_coordinates(854, 1024)].scene_archetype,
         )
         self.assertEqual(
             room.scene_identity,
-            wilderness_scene_identity(WILDERNESS_NAME, 864, 1080),
+            wilderness_scene_identity(WILDERNESS_NAME, 854, 1024),
         )
 
     def test_sync_wilderness_heals_miskeyed_gate(self):

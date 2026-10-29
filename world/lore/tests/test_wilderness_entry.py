@@ -48,7 +48,7 @@ class WildernessEntryRegistryShapeTests(unittest.TestCase):
         )
         self.assertEqual(_capital().anchor_key, "capital_altoria")
         self.assertEqual(_capital().hash_cell_count, 40)
-        self.assertEqual(_capital().origin_xy, (857, 1076))
+        self.assertEqual(_capital().origin_xy, (847, 1020))
         self.assertEqual(
             [
                 (gate.return_direction, gate.z_map_key, gate.destination.object_id)
@@ -113,7 +113,7 @@ class WildernessEntryRegistryShapeTests(unittest.TestCase):
             ),
         )
         self.assertEqual(_capital().hash_cell_count, 40)
-        self.assertEqual(_capital().anchor_cell, (860, 1080))
+        self.assertEqual(_capital().anchor_cell, (850, 1024))
         self.assertIn(_capital().anchor_cell, _capital().footprint_cells)
         self.assertEqual(
             _capital().footprint_cells,
@@ -124,8 +124,8 @@ class WildernessEntryRegistryShapeTests(unittest.TestCase):
                 if char == "#"
             ),
         )
-        self.assertEqual(_capital().approach_cell(_capital().gate_for("n")), (860, 1077))
-        self.assertEqual(_capital().approach_cell(_capital().gate_for("w")), (864, 1080))
+        self.assertEqual(_capital().approach_cell(_capital().gate_for("n")), (850, 1021))
+        self.assertEqual(_capital().approach_cell(_capital().gate_for("w")), (854, 1024))
         self.assertFalse(_capital().is_point_shape)
         # 4-connected: every mask cell is reachable from the anchor cell.
         seen = {_capital().anchor_cell}

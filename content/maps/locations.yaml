@@ -10,8 +10,8 @@ locations:
     display_name_zh: 聖潔王都
     description: Capital of the Altoria Kingdom.
     cell:
-      cell_x: 860
-      cell_y: 1080
+      cell_x: 850
+      cell_y: 1024
     geographic_constraint: Western river valley and hills; riverfront below 
       northern terraces
     scene_archetype:

@@ -55,7 +55,7 @@ def representative_payload():
     from world.lore.map_districts import current, landmark_node_ids
     landmarks=landmark_node_ids()
     districts=sorted(current().districts.values(),key=lambda row:sum(
-        (a-b)**2 for a,b in zip(world_node_point(landmarks[row.district_id]),(860.5,1080.5))))
+        (a-b)**2 for a,b in zip(world_node_point(landmarks[row.district_id]),(850.5,1024.5))))
     return _assemble({landmarks[row.district_id] for row in districts[:REPRESENTATIVE_LIT_DISTRICTS]},[])
 
 
