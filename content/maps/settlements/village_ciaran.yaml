@@ -16,7 +16,7 @@ exit_prototype:
   typeclass: typeclasses.exits.CostedXYZExit
 nodes:
   stream_bend:
-    x_m: 430
+    x_m: 689
     y_m: 85
     prototype_parent: grid_room
     key: 溪畔下游
@@ -25,7 +25,7 @@ nodes:
     typeclass:
     scene_archetype: wilderness_path
   stream_path:
-    x_m: 245
+    x_m: 504
     y_m: 135
     prototype_parent: grid_room
     key: 溪畔小徑
@@ -34,7 +34,7 @@ nodes:
     typeclass:
     scene_archetype: wilderness_path
   hidden_path:
-    x_m: -259
+    x_m: 0
     y_m: 192
     prototype_parent: grid_room
     key: 隱密小徑
@@ -43,7 +43,7 @@ nodes:
     typeclass:
     scene_archetype: forest_path
   herb_garden:
-    x_m: 590
+    x_m: 849
     y_m: 300
     prototype_parent: grid_room
     key: 藥草園
@@ -52,7 +52,7 @@ nodes:
     typeclass:
     scene_archetype: forest_path
   village_plaza:
-    x_m: 220
+    x_m: 479
     y_m: 305
     prototype_parent: anchor_room
     key: 村中廣場
@@ -61,7 +61,7 @@ nodes:
     typeclass:
     scene_archetype: city_street
   training_clearing:
-    x_m: 405
+    x_m: 664
     y_m: 335
     prototype_parent: grid_room
     key: 練刀場
@@ -70,7 +70,7 @@ nodes:
     typeclass:
     scene_archetype: city_street
   old_tree_north:
-    x_m: 200
+    x_m: 459
     y_m: 465
     prototype_parent: grid_room
     key: 村北古樹下
@@ -79,7 +79,7 @@ nodes:
     typeclass:
     scene_archetype: forest_path
   weaving_slope:
-    x_m: 390
+    x_m: 649
     y_m: 495
     prototype_parent: grid_room
     key: 織房坡
@@ -88,7 +88,7 @@ nodes:
     typeclass:
     scene_archetype: forest_path
   elder_tree:
-    x_m: 226
+    x_m: 485
     y_m: 618
     prototype_parent: grid_room
     key: 長老古樹下
@@ -97,7 +97,7 @@ nodes:
     typeclass:
     scene_archetype: forest_path
   silver_leaf_slope:
-    x_m: 440
+    x_m: 699
     y_m: 665
     prototype_parent: grid_room
     key: 銀葉坡
