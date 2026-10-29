@@ -593,6 +593,18 @@ class MapSurfaceEditorSmokeBrowserTest(unittest.TestCase):
         now = synthetic.tree_digest(self.workspace)
         return {path for path in set(self.digest) | set(now) if self.digest.get(path) != now.get(path)}
 
+    def yard_position(self) -> list[int]:
+        """The saved position the service reports, not the file on disk.
+
+        A command publishes the document before it adopts the reread, so a
+        digest change alone is not a commit signal.
+        """
+
+        state = self.editor.workspace_state()
+        return next(
+            node for node in state["world"]["settlements"][0]["nodes"] if node["id"] == "yard"
+        )["local_m"]
+
     def wait_for(self, page, predicate, message: str) -> None:
         deadline = time.monotonic() + 15
         while time.monotonic() < deadline:
@@ -688,13 +700,12 @@ class MapSurfaceEditorSmokeBrowserTest(unittest.TestCase):
         page.mouse.up()
         self.wait_for(
             page,
-            lambda: self.changed() == {f"content/maps/settlements/{synthetic.SETTLEMENT_ID}.yaml"},
+            lambda: self.changed() == {f"content/maps/settlements/{synthetic.SETTLEMENT_ID}.yaml"}
+            and self.yard_position() != [300, 400],
             "the drag release did not save the node",
         )
         self.assertEqual([url.rsplit("/", 1)[1] for url in self.posts], ["move_nodes"])
-        state = self.editor.workspace_state()
-        moved = next(node for node in state["world"]["settlements"][0]["nodes"] if node["id"] == "yard")
-        self.assertNotEqual(moved["local_m"], [300, 400], "the saved position is the dragged one")
+        self.assertNotEqual(self.yard_position(), [300, 400], "the saved position is the dragged one")
         page.context.close()
 
 if __name__ == "__main__":
