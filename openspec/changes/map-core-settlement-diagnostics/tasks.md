@@ -4,10 +4,10 @@ One engineer-day, approximately 8 hours including focused verification. Apply be
 
 ## 1. Shared core rules (3 hours)
 
-- [ ] 1.1 Extract the design D2 anchor, location-ownership and interior room/doorway rules into candidate-scoped core structure/semantic diagnostics; verify missing-anchor and empty-graph WIP and stable provenance with the matrix tests in 1.3.
-- [ ] 1.2 Move the complete existing wilderness mask/terrain/gate rule set into the same core boundary, including point hash cells versus obstacle cells, per-direction neighbor validity, global approach and destination collisions; verify the matrix retains existing schema checks without duplicate diagnostics.
-- [ ] 1.3 Add independent synthetic core cases and valid controls in `packages/map-core/tests/test_authoring.py` for every D2 matrix row and the pre-existing wilderness malformed cases, asserting code/category/owner and load-versus-runtime effect.
-- [ ] 1.4 Update `docs/development/map-authoring-documents.md` validation ownership and human-review its category descriptions against the D2 matrix and approved editor design.
+- [x] 1.1 Extract the design D2 anchor, location-ownership and interior room/doorway rules into candidate-scoped core structure/semantic diagnostics; verify missing-anchor and empty-graph WIP and stable provenance with the matrix tests in 1.3.
+- [x] 1.2 Move the complete existing wilderness mask/terrain/gate rule set into the same core boundary, including point hash cells versus obstacle cells, per-direction neighbor validity, global approach and destination collisions; verify the matrix retains existing schema checks without duplicate diagnostics.
+- [x] 1.3 Add independent synthetic core cases and valid controls in `packages/map-core/tests/test_authoring.py` for every D2 matrix row and the pre-existing wilderness malformed cases, asserting code/category/owner and load-versus-runtime effect.
+- [x] 1.4 Update `docs/development/map-authoring-documents.md` validation ownership and human-review its category descriptions against the D2 matrix and approved editor design.
 
 ## 2. Consumer cutover and agreement (3 hours)
 

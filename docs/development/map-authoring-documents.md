@@ -171,14 +171,26 @@ They are emitted in deterministic order.
 - **Structure** blocks load and writing: invalid YAML/values, unknown
   fields/versions/kinds, identity/stem mismatch, duplicate keys, coordinates or
   roads, unknown endpoints/references, self-loops, duplicate outgoing
-  directions, invalid masks/gates, fingerprint mismatch and unsupported source
-  paths.
-- **Semantic** is saveable unfinished map work: `empty_graph`,
-  `unreachable_landmark`, `blocked_approach`, `terrain_inconsistent`, and
-  `stale_partition` when a freshness value is supplied. Loading returns an
+  directions, multiple anchor rooms (`multiple_anchor_rooms`), anchor key mismatch
+  (`anchor_location_mismatch`), duplicate location bindings across settlements
+  (`duplicate_location_binding`), duplicate interior room identities (`duplicate_interior_room`),
+  duplicate doorway keys on one exterior node (`duplicate_doorway`), duplicate gate
+  destinations (`duplicate_gate_destination`), fingerprint mismatch and unsupported source paths.
+- **Semantic** is saveable unfinished map work: missing anchor rooms (`missing_anchor_room`,
+  including empty graphs `empty_graph`), point mask gate count (`point_gate_count`),
+  disconnected footprints (`disconnected_footprint`), non-point midpoints missing hash cells
+  (`invalid_footprint_anchor`), footprint/point cells outside the frame or on impassable terrain
+  (`invalid_footprint_cell`), overlapping footprints or point containment (`overlapping_footprint`),
+  undefined/out-of-frame approach rays (`invalid_gate_approach`), blocked approach terrain
+  (`blocked_approach`), gate approach collisions (`gate_approach_collision`), duplicate gate
+  approaches (`duplicate_gate_approach`), invalid point return neighbors (`blocked_point_neighbor`),
+  `unreachable_landmark`, `terrain_inconsistent`, and `stale_partition` when a freshness value is supplied.
+  Loading returns an
   `AuthoringWorld` with these diagnostics; structured editing and saving remain
   possible.
 - **External/freshness** gate runtime adoption only.
+  Remaining game-side checks (coordinate binding equalities, external scene archetypes,
+  nations, district spacing and static references) gate candidate composition and adoption.
 
 `compile_runtime(world, authoritative_external_result, partition_freshness)`
 raises `RuntimeRejection` when the world has any diagnostic, when the external
