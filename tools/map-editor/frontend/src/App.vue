@@ -554,10 +554,25 @@ async function chooseResult({ ref, toggle }) {
   if (target) navigate({ domain: target.domain, mapId: target.mapId, refs: [ref], layer: catalog.value.get(ref)?.layer });
 }
 
+// Enter from the canvas asks the inspector for the picked object's first
+// editable field (the heading when it has none). The picked object's own form
+// can mount one tick after the selection lands, so the request stays pending
+// and is retried when the record or the picked room's block arrives.
+const pendingInspectorFocus = ref(false);
+
+function focusInspectorField() {
+  const region = root.value?.querySelector("[data-region='inspector']");
+  const field = region?.querySelector("input:not([type='checkbox']), textarea, select");
+  const target = field ?? region?.querySelector("[data-inspector-title]");
+  if (!target) return false;
+  target.focus();
+  return true;
+}
+
 async function onCanvasEnter() {
   if (drawers.value) drawer.value = "inspector";
   await nextTick();
-  inspectorRef.value?.focusFirstField();
+  pendingInspectorFocus.value = !focusInspectorField();
 }
 
 // The picked node or room becomes the selection, so its inspector holds the
@@ -584,6 +599,11 @@ const selectedRoom = computed(() => {
   const interior = findInterior(world.value, room.interiorId);
   const position = interior && storedPosition(interior, room.roomId);
   return position ? { ...room, position } : null;
+});
+watch([record, selectedRoom], async () => {
+  if (!pendingInspectorFocus.value) return;
+  await nextTick();
+  if (focusInspectorField()) pendingInspectorFocus.value = false;
 });
 const layoutMovable = computed(() => Boolean(world.value));
 const placing = computed(

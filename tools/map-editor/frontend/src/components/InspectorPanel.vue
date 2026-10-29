@@ -24,14 +24,7 @@ function focusHeading() {
   root.value?.querySelector("[data-inspector-title]")?.focus();
 }
 
-// The first editable field, else the heading (Enter from the canvas).
-function focusFirstField() {
-  const field = root.value?.querySelector("input:not([type='checkbox']), textarea, select");
-  if (field) field.focus();
-  else focusHeading();
-}
-
-defineExpose({ focusHeading, focusFirstField });
+defineExpose({ focusHeading });
 </script>
 
 <template>
