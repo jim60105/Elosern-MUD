@@ -29,6 +29,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from playwright.sync_api import sync_playwright
+from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CAPTURE_DIST = REPO_ROOT / "tools" / "map-editor" / "frontend" / "capture-dist"
@@ -172,6 +173,7 @@ class MapImageCaptureBrowserTest(unittest.TestCase):
 
     # -- page contract -------------------------------------------------------
 
+    @covers_requirement("map-image-capture::one-shot-capture-closes-resources-and-isolates-failures")
     def test_the_loader_payload_renders_map_only_at_the_exact_pixel_rectangle(self):
         page = self.open()
         payload = {**self.payload, "width": 320, "height": 240}
@@ -206,6 +208,7 @@ class MapImageCaptureBrowserTest(unittest.TestCase):
         self.assertEqual(png_size(shot), (900, 700))
         page.context.close()
 
+    @covers_requirement("map-image-capture::one-shot-capture-closes-resources-and-isolates-failures")
     def test_readiness_waits_for_a_delayed_local_face(self):
         delay = 0.4
         served: list[str] = []
@@ -231,6 +234,7 @@ class MapImageCaptureBrowserTest(unittest.TestCase):
         self.assertGreater(outcome["texts"], 0)
         page.context.close()
 
+    @covers_requirement("map-image-capture::one-shot-capture-closes-resources-and-isolates-failures")
     def test_a_page_without_the_entry_script_never_reports_readiness(self):
         broken = self.root / "broken-capture"
         shutil.copytree(CAPTURE_DIST, broken, dirs_exist_ok=True)
@@ -265,6 +269,7 @@ class MapImageCaptureBrowserTest(unittest.TestCase):
             timeout=300,
         )
 
+    @covers_requirement("map-image-capture::one-shot-capture-closes-resources-and-isolates-failures")
     def test_the_command_publishes_one_exact_image_and_leaves_the_sources_untouched(self):
         before = synthetic.tree_digest(self.workspace)
         destination = self.captures() / "synthetic-town.png"
@@ -282,6 +287,7 @@ class MapImageCaptureBrowserTest(unittest.TestCase):
         self.assertEqual(synthetic.tree_digest(self.workspace), before)
         self.assertEqual([path.name for path in destination.parent.iterdir()], ["synthetic-town.png"])
 
+    @covers_requirement("map-image-capture::one-shot-capture-closes-resources-and-isolates-failures")
     def test_a_refused_command_publishes_nothing_and_preserves_an_existing_image(self):
         before = synthetic.tree_digest(self.workspace)
         destination = self.captures() / "existing.png"

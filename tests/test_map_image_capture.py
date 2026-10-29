@@ -23,6 +23,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from tools.spec_traceability import covers_requirement
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EDITOR_TESTS = REPO_ROOT / "tools" / "map-editor" / "tests"
 PROJECT = REPO_ROOT / "tools" / "map-editor"
@@ -269,6 +271,8 @@ class _CaptureCase(unittest.TestCase):
 
 
 class CaptureInvocationTests(_CaptureCase):
+    @covers_requirement("map-image-capture::capture-invocation-selects-exactly-one-validated-map-view")
+    @covers_requirement("map-image-capture::successful-capture-reports-one-structured-result")
     def test_continent_defaults_publish_one_lossless_image_with_camera_metadata(self):
         root = self.partitioned()
         before = synthetic.tree_digest(root)
@@ -296,6 +300,8 @@ class CaptureInvocationTests(_CaptureCase):
         self.assertEqual(synthetic.tree_digest(root), before)
         self.assertEqual([path.name for path in self.output.iterdir()], ["overview.webp"])
 
+    @covers_requirement("map-image-capture::capture-invocation-selects-exactly-one-validated-map-view")
+    @covers_requirement("map-image-capture::successful-capture-reports-one-structured-result")
     def test_settlement_and_interior_report_their_own_frames(self):
         root = self.plain()
         before = synthetic.tree_digest(root)
@@ -316,6 +322,7 @@ class CaptureInvocationTests(_CaptureCase):
         self.assert_image(self.output / "hall.webp", interior, image_format="webp")
         self.assertEqual(synthetic.tree_digest(root), before)
 
+    @covers_requirement("map-image-capture::successful-capture-reports-one-structured-result")
     def test_explicit_regions_expand_to_each_output_aspect_ratio(self):
         self.partitioned()
 
@@ -345,6 +352,7 @@ class CaptureInvocationTests(_CaptureCase):
         self.assertEqual((interior["units"], interior["axes"]), ("layout", {"x": "right", "y": "down"}))
         self.assert_image(self.output / "region.png", interior, image_format="png")
 
+    @covers_requirement("map-image-capture::capture-publishes-exact-lossless-images-atomically")
     def test_both_formats_decode_to_the_same_lossless_pixels(self):
         self.plain()
         arguments = (
@@ -363,6 +371,7 @@ class CaptureInvocationTests(_CaptureCase):
         self.assertEqual((first["format"], second["format"]), ("WEBP", "PNG"))
         self.assertEqual((webp["format"], png["format"]), ("webp", "png"))
 
+    @covers_requirement("map-image-capture::capture-invocation-selects-exactly-one-validated-map-view")
     def test_every_layer_can_be_hidden_and_the_camera_does_not_move(self):
         cases = (
             ("continent", None, ("terrain", "water", "ridge", "locations", "footprint", "partition", "labels")),
@@ -396,6 +405,7 @@ class CaptureInvocationTests(_CaptureCase):
             self.assertEqual(hidden["bounds"], baseline["bounds"])
             self.assert_image(self.output / f"{view}-none.webp", hidden, image_format="webp")
 
+    @covers_requirement("map-image-capture::capture-invocation-selects-exactly-one-validated-map-view")
     def test_repeated_hides_are_deduplicated_and_sorted(self):
         self.plain()
         document = self.succeeded(
@@ -405,6 +415,7 @@ class CaptureInvocationTests(_CaptureCase):
         )
         self.assertEqual(document["hidden_layers"], ["labels", "nodes"])
 
+    @covers_requirement("map-image-capture::capture-publishes-exact-lossless-images-atomically")
     def test_replacing_an_existing_image_is_atomic_and_reports_the_new_one(self):
         self.plain()
         destination = self.output / "replace.webp"
@@ -433,6 +444,7 @@ class CaptureInvocationTests(_CaptureCase):
         self.assertEqual(document["image_path"], str((nested / "town.webp").resolve()))
         self.assert_image(nested / "town.webp", document, image_format="webp")
 
+    @covers_requirement("map-image-capture::successful-capture-reports-one-structured-result")
     def test_a_non_ascii_destination_survives_an_ascii_stdout(self):
         self.plain()
         environment = harness.scrubbed_env()
@@ -460,6 +472,7 @@ class CaptureInvocationTests(_CaptureCase):
         self.assertEqual(document["image_path"], destination)
         self.assert_image(Path(destination), document, image_format="webp")
 
+    @covers_requirement("map-image-capture::one-shot-capture-closes-resources-and-isolates-failures")
     def test_the_command_needs_no_node_runtime_and_no_editor_service(self):
         self.plain()
         environment = harness.scrubbed_env()
@@ -480,6 +493,7 @@ class CaptureInvocationTests(_CaptureCase):
 
 
 class CaptureRefusalTests(_CaptureCase):
+    @covers_requirement("map-image-capture::capture-invocation-selects-exactly-one-validated-map-view")
     def test_bad_flags_and_identity_publish_nothing(self):
         self.plain()
         cases = (
@@ -497,6 +511,7 @@ class CaptureRefusalTests(_CaptureCase):
                 self.refused(*arguments, code=code)
         self.assertEqual(list(self.output.iterdir()), [])
 
+    @covers_requirement("map-image-capture::capture-invocation-selects-exactly-one-validated-map-view")
     def test_layers_are_view_scoped(self):
         self.plain()
         for view, map_id, layer in (
@@ -511,6 +526,7 @@ class CaptureRefusalTests(_CaptureCase):
                     code="unknown_layer",
                 )
 
+    @covers_requirement("map-image-capture::capture-invocation-selects-exactly-one-validated-map-view")
     def test_bounds_and_dimensions_are_validated_before_rendering(self):
         self.plain()
         identity = ("--view", "settlement", "--map", synthetic.SETTLEMENT_ID, "--output", self.out("a.webp"))
@@ -528,6 +544,7 @@ class CaptureRefusalTests(_CaptureCase):
                 self.refused(*identity, *dimensions, code="invalid_argument")
         self.assertEqual(list(self.output.iterdir()), [])
 
+    @covers_requirement("map-image-capture::capture-invocation-selects-exactly-one-validated-map-view")
     def test_output_paths_are_validated_before_rendering(self):
         self.plain()
         identity = ("--view", "settlement", "--map", synthetic.SETTLEMENT_ID)
@@ -542,6 +559,7 @@ class CaptureRefusalTests(_CaptureCase):
             with self.subTest(arguments=arguments):
                 self.refused(*identity, *arguments, code=code)
 
+    @covers_requirement("map-image-capture::capture-invocation-selects-exactly-one-validated-map-view")
     def test_map_identity_refusals_name_the_problem(self):
         self.plain()
         self.refused(
@@ -558,6 +576,7 @@ class CaptureRefusalTests(_CaptureCase):
         )
         self.assertEqual(list(self.output.iterdir()), [])
 
+    @covers_requirement("map-image-capture::one-shot-capture-closes-resources-and-isolates-failures")
     def test_partition_refusals_explain_regenerate_or_hide(self):
         missing = self.plain()
         stderr = self.refused(
@@ -587,6 +606,7 @@ class CaptureRefusalTests(_CaptureCase):
         )
         self.assertEqual(sorted(path.name for path in self.output.iterdir()), ["hidden.webp", "settlement.webp"])
 
+    @covers_requirement("map-image-capture::one-shot-capture-closes-resources-and-isolates-failures")
     def test_structural_source_errors_refuse_the_capture(self):
         root = self.plain()
         (root / DOCUMENTS[1]).write_text("locations: [not: yaml", encoding="utf-8")
@@ -598,6 +618,7 @@ class CaptureRefusalTests(_CaptureCase):
         self.assertTrue(stderr.strip())
         self.assertEqual(list(self.output.iterdir()), [])
 
+    @covers_requirement("map-image-capture::capture-publishes-exact-lossless-images-atomically")
     def test_a_failed_render_preserves_an_existing_image(self):
         self.plain()
         destination = self.output / "existing.webp"
@@ -615,6 +636,7 @@ class CaptureRefusalTests(_CaptureCase):
         self.assertEqual(destination.read_bytes(), previous)
         self.assertEqual([path.name for path in self.output.iterdir()], ["existing.webp"])
 
+    @covers_requirement("map-image-capture::capture-publishes-exact-lossless-images-atomically")
     def test_a_refusal_after_a_success_still_reports_no_output(self):
         self.plain()
         self.succeeded(
@@ -636,6 +658,7 @@ class CaptureRefusalTests(_CaptureCase):
 
 
 class CaptureReadOnlyTests(_CaptureCase):
+    @covers_requirement("map-image-capture::one-shot-capture-closes-resources-and-isolates-failures")
     def test_sources_layouts_partition_and_index_are_never_modified(self):
         root = synthetic.write_partitionable_workspace(self.workspace)
         install_partition(root)
