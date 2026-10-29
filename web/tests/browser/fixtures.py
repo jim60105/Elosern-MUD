@@ -168,7 +168,16 @@ def create_runtime(prefix: str = "elosern-browser-") -> BrowserRuntime:
     Ports are deliberately not allocated here: the harness allocates them
     under its runner-local startup lock (``BrowserRuntime.allocate_ports``),
     closing the release-then-bind race against sibling harness processes.
+
+    The calling test process also reads map consumers directly (a journey
+    that teleports to a registered gate room resolves its node through the
+    published settlement world), so this is the one place that process
+    publishes the authored map world. Nothing loads at import time by design,
+    and one publication is enough for every test in the process.
     """
+    from world.maps import runtime as map_runtime
+
+    map_runtime.ensure_published()
     root_dir = Path(tempfile.mkdtemp(prefix=prefix))
     log_dir = root_dir / "logs"
     media_dir = root_dir / "media"

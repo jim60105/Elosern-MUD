@@ -49,6 +49,14 @@ def main() -> None:
     # shared synthetic guild-economy catalog.
     from web.tests.browser.browser_startstop import _install_synthetic_catalogs_if_flagged
 
+    # A map consumer read here (the scene fixture caches the authored room-art
+    # vocabulary) needs the adopted world, and the authored sources only
+    # compose against the catalogs they were authored with: publish before the
+    # install swaps them. Under the install the kit then republishes the world
+    # its own catalogs describe.
+    from world.maps import runtime as map_runtime
+
+    map_runtime.ensure_published()
     _install_synthetic_catalogs_if_flagged()
 
     # The dedicated party-management acceptance fixture is accepted only in
