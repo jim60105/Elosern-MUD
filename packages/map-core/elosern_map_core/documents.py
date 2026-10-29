@@ -31,8 +31,8 @@ def _cell(value: Mapping[str, Any]) -> Cell:
     return (int(value["cell_x"]), int(value["cell_y"]))
 
 
-def _point_m(value: Mapping[str, Any]) -> PointM:
-    return (int(value["east_m"]), int(value["north_m"]))
+def _offset(value: Mapping[str, Any]) -> Cell:
+    return (int(value["dx"]), int(value["dy"]))
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,7 +83,14 @@ class GateDeclaration:
 
 
 @dataclass(frozen=True, slots=True)
-class WildernessEntryDeclaration:
+class WildernessEntryGeometry:
+    """One entry's absolute cell geometry, resolved against a location cell.
+
+    A declaration authors only a signed offset; this value is the derived view
+    a consumer builds when it has the explicit location cell. Nothing here
+    reads a published location, so an offset can never be used as an origin.
+    """
+
     shape: tuple[str, ...]
     origin: Cell
     gates: tuple[GateDeclaration, ...]
@@ -95,6 +102,11 @@ class WildernessEntryDeclaration:
     @property
     def is_point_shape(self) -> bool:
         return self.hash_cell_count == 1
+
+    def hash_cell(self, row: int, column: int) -> Cell:
+        """The absolute cell of one mask row/column (row zero is the south row)."""
+
+        return (self.origin[0] + column, self.origin[1] + row)
 
     @property
     def footprint_cells(self) -> frozenset[Cell]:
@@ -139,16 +151,36 @@ class WildernessEntryDeclaration:
 
 
 @dataclass(frozen=True, slots=True)
+class WildernessEntryDeclaration:
+    """One authored entry: a mask shape and a signed cell offset from the location."""
+
+    shape: tuple[str, ...]
+    offset: Cell
+    gates: tuple[GateDeclaration, ...]
+
+    @property
+    def hash_cell_count(self) -> int:
+        return sum(row.count("#") for row in self.shape)
+
+    @property
+    def is_point_shape(self) -> bool:
+        return self.hash_cell_count == 1
+
+    def geometry(self, location_cell: Cell) -> WildernessEntryGeometry:
+        """The absolute geometry of this entry for one explicit location cell."""
+
+        return WildernessEntryGeometry(
+            shape=self.shape,
+            origin=(location_cell[0] + self.offset[0], location_cell[1] + self.offset[1]),
+            gates=self.gates,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class CityGateDeclaration:
     node: str
     exit_key: str
     exit_aliases: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True, slots=True)
-class BindingDeclaration:
-    anchor_cell: Cell
-    local_anchor_m: PointM
 
 
 @dataclass(frozen=True, slots=True)
@@ -429,7 +461,6 @@ class DistrictsDocument(AuthoringDocument):
 @dataclass(frozen=True, slots=True)
 class SettlementDocument(AuthoringDocument):
     location_ref: str = field(init=False, repr=False)
-    binding: BindingDeclaration = field(init=False, repr=False)
     nodes: Mapping[str, NodeDeclaration] = field(init=False, repr=False)
     roads: tuple[RoadDeclaration, ...] = field(init=False, repr=False)
     wilderness_entry: WildernessEntryDeclaration | None = field(
@@ -447,7 +478,7 @@ class SettlementDocument(AuthoringDocument):
         if entry_data is not None:
             entry = WildernessEntryDeclaration(
                 shape=tuple(str(row) for row in entry_data["shape"]),
-                origin=_cell(entry_data["origin"]),
+                offset=_offset(entry_data["offset"]),
                 gates=tuple(
                     GateDeclaration(
                         return_direction=str(gate["return_direction"]),
@@ -467,14 +498,6 @@ class SettlementDocument(AuthoringDocument):
                 ),
             )
         object.__setattr__(self, "location_ref", str(data["location_ref"]))
-        object.__setattr__(
-            self,
-            "binding",
-            BindingDeclaration(
-                anchor_cell=_cell(data["binding"]["anchor_cell"]),
-                local_anchor_m=_point_m(data["binding"]["local_anchor_m"]),
-            ),
-        )
         object.__setattr__(
             self,
             "nodes",
@@ -510,6 +533,28 @@ class SettlementDocument(AuthoringDocument):
         if self.city_gate is not None:
             nodes.add(self.city_gate.node)
         return frozenset(nodes)
+
+    @property
+    def anchor_node(self) -> NodeDeclaration | None:
+        """The unique ``anchor_room`` node, or ``None`` when it is absent/ambiguous."""
+
+        anchors = [
+            node for node in self.nodes.values() if node.prototype_parent == "anchor_room"
+        ]
+        return anchors[0] if len(anchors) == 1 else None
+
+    @property
+    def local_anchor_m(self) -> PointM | None:
+        """The local metre point that sits on the location cell's centre."""
+
+        anchor = self.anchor_node
+        return None if anchor is None else anchor.coordinate
+
+    def wilderness_geometry(self, location_cell: Cell) -> WildernessEntryGeometry | None:
+        """This settlement's absolute entry geometry for one explicit location cell."""
+
+        entry = self.wilderness_entry
+        return None if entry is None else entry.geometry(location_cell)
 
 
 @dataclass(frozen=True, slots=True)
@@ -640,7 +685,6 @@ def build_document(
 __all__ = [
     "AuthoringDocument",
     "Bend",
-    "BindingDeclaration",
     "CityGateDeclaration",
     "ConnectionDeclaration",
     "ContinentDocument",
@@ -664,5 +708,6 @@ __all__ = [
     "TerrainDeclaration",
     "WaterwayDeclaration",
     "WildernessEntryDeclaration",
+    "WildernessEntryGeometry",
     "build_document",
 ]

@@ -12,6 +12,10 @@ Categories are the acceptance gates:
 ``semantic``    the candidate loads and saves but is unfinished map work.
 ``external``    the authoritative game-side external result is unusable.
 ``freshness``   the required generated artifact does not describe this world.
+
+Severity is orthogonal to the category: every diagnostic defaults to
+``error`` and blocks its gate, while a ``warning`` is advisory evidence a
+consumer may display without refusing the candidate.
 """
 
 from __future__ import annotations
@@ -23,6 +27,9 @@ STRUCTURE = "structure"
 SEMANTIC = "semantic"
 EXTERNAL = "external"
 FRESHNESS = "freshness"
+
+ERROR = "error"
+WARNING = "warning"
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +55,8 @@ class Diagnostic:
     line: int | None = None
     column: int | None = None
     object_id: str | None = None
+    #: ``error`` blocks its gate; ``warning`` is advisory only.
+    severity: str = ERROR
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -59,6 +68,7 @@ class Diagnostic:
             "line": self.line,
             "column": self.column,
             "object_id": self.object_id,
+            "severity": self.severity,
         }
 
 
@@ -77,6 +87,16 @@ def diagnostic_sort_key(diagnostic: Diagnostic) -> tuple:
 
 def sorted_diagnostics(diagnostics) -> tuple[Diagnostic, ...]:
     return tuple(sorted(diagnostics, key=diagnostic_sort_key))
+
+
+def blocking(diagnostics) -> tuple[Diagnostic, ...]:
+    """The diagnostics that refuse a gate, in their emitted order.
+
+    A warning never blocks save, adoption or generation; every readiness
+    boundary filters with this helper instead of testing for an empty tuple.
+    """
+
+    return tuple(item for item in diagnostics if item.severity != WARNING)
 
 
 class AuthoringError(ValueError):

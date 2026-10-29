@@ -61,6 +61,7 @@ from .authoring import (
     AuthoringWorld,
     build_settlement_graph,
     gate_approach_cell,
+    location_cells_of,
     terrain_definition,
 )
 from .geometry import local_to_world_m
@@ -275,18 +276,26 @@ def world_snapshot(world: AuthoringWorld) -> PartitionInputSnapshot:
     * the source signature is :attr:`AuthoringWorld.partition_signature`.
 
     A landmark that cannot seed (an interior room, an unknown map or node)
-    raises :class:`PartitionError` naming the district.
+    raises :class:`PartitionError` naming the district, and so does a grid
+    landmark whose settlement has no resolvable frame (a location cell and one
+    ``anchor_room`` node). Nothing here invents a frame for unfinished work.
     """
 
     terrain = terrain_definition(world.continent)
+    location_cells = location_cells_of(world.locations)
     entries = [
-        (settlement_id, settlement, settlement.wilderness_entry)
+        (
+            settlement_id,
+            settlement,
+            settlement.wilderness_geometry(location_cells[settlement.location_ref]),
+        )
         for settlement_id, settlement in sorted(world.settlements.items())
         if settlement.wilderness_entry is not None
+        and settlement.location_ref in location_cells
     ]
     footprints: set[Cell] = set()
-    for _, _, entry in entries:
-        footprints.update(entry.footprint_cells)
+    for _, _, entry_geometry in entries:
+        footprints.update(entry_geometry.footprint_cells)
     graphs: dict[str, Any] = {}
     problems: list[str] = []
     seeds: list[DistrictSeed] = []
@@ -309,23 +318,30 @@ def world_snapshot(world: AuthoringWorld) -> PartitionInputSnapshot:
                 f"{landmark.object_id} cannot seed the partition"
             )
             continue
-        binding = settlement.binding
+        location_cell = location_cells.get(settlement.location_ref)
+        local_anchor = settlement.local_anchor_m
+        if location_cell is None or local_anchor is None:
+            problems.append(
+                f"{district_id}: settlement {landmark.map_id!r} has no resolvable frame "
+                "(a location cell and one anchor_room node)"
+            )
+            continue
         east, north = local_to_world_m(
-            binding.anchor_cell, binding.local_anchor_m, (node.x_m, node.y_m)
+            location_cell, local_anchor, (node.x_m, node.y_m)
         )
         cell = (east // CELL_M, north // CELL_M)
         footprint: frozenset[Cell] = frozenset()
-        for _, _, entry in entries:
-            if cell in entry.footprint_cells:
-                footprint = entry.footprint_cells
+        for _, _, entry_geometry in entries:
+            if cell in entry_geometry.footprint_cells:
+                footprint = entry_geometry.footprint_cells
         approaches: set[Cell] = set()
-        entry = settlement.wilderness_entry
-        if entry is not None:
+        geometry = settlement.wilderness_geometry(location_cell)
+        if geometry is not None:
             graph = graphs.get(landmark.map_id)
             if graph is None:
                 graph = graphs[landmark.map_id] = build_settlement_graph(landmark.map_id, settlement)
-            for gate in entry.gates:
-                approach = gate_approach_cell(entry, gate.return_direction)
+            for gate in geometry.gates:
+                approach = gate_approach_cell(geometry, gate.return_direction)
                 if approach is None or gate.destination_node not in settlement.nodes:
                     continue
                 if graph.route(gate.destination_node, node.node_id) is not None:

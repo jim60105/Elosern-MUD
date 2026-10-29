@@ -135,7 +135,7 @@ def test_integer_fields_reject_booleans_fractions_and_numeric_strings(value):
 def test_unknown_root_nested_and_prototype_fields_are_rejected():
     for mutator in (
         lambda data: data.__setitem__("mystery", 1),
-        lambda data: data["binding"].__setitem__("mystery", 1),
+        lambda data: data["wilderness_entry"]["offset"].__setitem__("mystery", 1),
         lambda data: data["nodes"]["plaza"].__setitem__("mystery", 1),
     ):
         with pytest.raises(AuthoringError) as captured:
@@ -173,9 +173,6 @@ version: 1
 kind: settlement
 id: demo_map
 location_ref: demo_location  # location comment
-binding:
-  anchor_cell: {cell_x: 5, cell_y: 5}
-  local_anchor_m: {east_m: 0, north_m: 0}
 options: {map_visual_range: 2, map_mode: nodes}
 exit_prototype: {prototype_parent: xyz_exit, typeclass: tests.Exit}
 nodes:
@@ -214,7 +211,7 @@ wilderness_entry:
   shape:
     - "#.."
     - "###"
-  origin: {cell_x: 5, cell_y: 5}
+  offset: {dx: 0, dy: 0}
   gates:
     - {return_direction: n, destination_node: gate}
 city_gate: {node: gate, exit_key: Gate, exit_aliases: [gate]}

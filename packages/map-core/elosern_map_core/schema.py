@@ -108,18 +108,6 @@ def _cell(*, required: bool = True) -> dict:
     )
 
 
-def _point_m(*, required: bool = True) -> dict:
-    """One settlement-local metre point: explicit ``east_m``/``north_m``."""
-
-    return _mapping(
-        {
-            "east_m": _int(),
-            "north_m": _int(),
-        },
-        required=required,
-    )
-
-
 def _bend() -> dict:
     return _mapping({"x_m": _int(), "y_m": _int()})
 
@@ -221,10 +209,26 @@ _GATE = _mapping(
     },
 )
 
+
+def _offset_cell() -> dict:
+    """One signed wilderness cell delta relative to the location cell.
+
+    ``dx``/``dy`` are ordinary core integers: signed, never a boolean, and
+    carrying no offset-specific bound beyond the shared integer rule.
+    """
+
+    return _mapping(
+        {
+            "dx": _int(),
+            "dy": _int(),
+        }
+    )
+
+
 _WILDERNESS_ENTRY = _mapping(
     {
         "shape": _list(_str(min_length=1), mask=True, min_items=1),
-        "origin": _cell(),
+        "offset": _offset_cell(),
         "gates": _list(_GATE, min_items=1),
     },
 )
@@ -426,7 +430,7 @@ _DOCUMENT_KINDS: dict[str, dict[str, Any]] = {
         "rules": [],
     },
     "settlement": {
-        "description": "One settlement local map: binding, nodes, roads and entrances.",
+        "description": "One settlement local map: nodes, roads and location-relative entrances.",
         "source": "content/maps/settlements/<id>.yaml",
         "identity": "file_stem",
         "fields": {
@@ -436,12 +440,6 @@ _DOCUMENT_KINDS: dict[str, dict[str, Any]] = {
             "location_ref": _str(
                 pattern=IDENTIFIER_PATTERN,
                 reference="locations",
-            ),
-            "binding": _mapping(
-                {
-                    "anchor_cell": _cell(),
-                    "local_anchor_m": _point_m(),
-                }
             ),
             "options": _mapping(
                 {

@@ -43,10 +43,6 @@ def _settlement(nodes: dict, roads: list) -> object:
             "kind": "settlement",
             "id": "preview_map",
             "location_ref": "somewhere",
-            "binding": {
-                "anchor_cell": {"cell_x": 1, "cell_y": 1},
-                "local_anchor_m": {"east_m": 0, "north_m": 0},
-            },
             "nodes": nodes,
             "roads": roads,
             "wilderness_entry": None,
