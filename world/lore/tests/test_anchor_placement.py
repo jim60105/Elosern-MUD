@@ -40,7 +40,7 @@ class AnchorPlacementRegistryTests(unittest.TestCase):
         village = ANCHOR_PLACEMENT_REGISTRY["village_ciaran"]
         self.assertEqual(village.anchor_key, "village_ciaran")
         self.assertEqual(village.zcoord, "village_ciaran")
-        self.assertEqual(anchor_entrance_xyz(village), (220, 305, "village_ciaran"))
+        self.assertEqual(anchor_entrance_xyz(village), (479, 305, "village_ciaran"))
         self.assertEqual(village.node.object_id, "village_plaza")
 
     @covers_requirement("anchor-placement::every-placement-s-anchor-key-resolves-against-anchor-registry")
@@ -102,7 +102,7 @@ class AnchorPlacementRegistryTests(unittest.TestCase):
             },
             {
                 "capital_altoria": (3500, 2850),
-                "village_ciaran": (220, 305),
+                "village_ciaran": (479, 305),
             },
         )
         self.assertTrue(LocalFrameAnchor.__dataclass_params__.frozen)
@@ -111,8 +111,8 @@ class AnchorPlacementRegistryTests(unittest.TestCase):
             (860_500, 1_080_500),
         )
         self.assertEqual(
-            world_position_m("village_ciaran", (220, 305)),
-            (1_340_500, 1_220_500),
+            world_position_m("village_ciaran", (479, 305)),
+            (1_366_500, 554_500),
         )
         # Altoria's south gate sits 450 m west and 2,700 m south of the plaza.
         self.assertEqual(

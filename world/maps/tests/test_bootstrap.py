@@ -792,7 +792,7 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         ][0]
 
         gate_exit.at_traverse(self.char1, entrance_room)
-        self.assertEqual(self.char1.location.coordinates, (1340, 1220))
+        self.assertEqual(self.char1.location.coordinates, (1366, 554))
 
         north = [e for e in self.char1.location.exits if e.key == "north"][0]
         north.at_traverse(self.char1, self.char1.location)

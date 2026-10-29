@@ -43,7 +43,7 @@ Wilderness cell indices SHALL map to absolute meter centers as (1000X+500,1000Y+
 
 #### Scenario: Bound local anchors
 - **WHEN** Altoria and Ciaran local frames are transformed
-- **THEN** world_m = cell_center_m + local_m - local_anchor_m; Altoria (3500,2850) binds to (860,1080), Ciaran (220,305) to (1340,1220); z is never elevation.
+- **THEN** world_m = cell_center_m(location cell) + local_m - anchor_room_m; Altoria's plaza (3500,2850) binds its location cell (860,1080) and Ciaran's plaza (479,305) binds (1366,554); z is never elevation.
 
 #### Scenario: Single-continent authority
 - **WHEN** the enclosing frame is read

@@ -79,12 +79,12 @@ class WildernessEntryRegistryShapeTests(unittest.TestCase):
     )
     def test_village_derived_geometry_matches_the_authored_mask(self):
         village = WILDERNESS_ENTRY_REGISTRY["village_ciaran"]
-        self.assertEqual(village.origin_xy, (1340, 1220))
+        self.assertEqual(village.origin_xy, (1366, 554))
         self.assertEqual(village.shape, ("#",))
-        self.assertEqual(village.anchor_cell, (1340, 1220))
+        self.assertEqual(village.anchor_cell, (1366, 554))
         # Point semantics: the approach cell IS the anchor cell, and only the
         # authored direction is the gateway.
-        self.assertEqual(village.approach_cell(village.gate_for("n")), (1340, 1220))
+        self.assertEqual(village.approach_cell(village.gate_for("n")), (1366, 554))
         gate = village.gate_for("n")
         # The gate returns to the village's entrance node on its own map.
         self.assertEqual(
@@ -214,7 +214,7 @@ class WildernessEntryValidationTests(unittest.TestCase):
         malformed_data = dict(shipped["capital_altoria"].data)
         malformed_data["wilderness_entry"] = {
             "shape": ["#.#"],
-            "origin": {"cell_x": 58, "cell_y": 98},
+            "offset": {"dx": 58, "dy": 98},
             "gates": [{"return_direction": "n", "destination_node": "south_gate"}],
         }
         candidate = document_from_data(shipped["capital_altoria"].relative_path, malformed_data)
@@ -230,10 +230,10 @@ class WildernessEntryValidationTests(unittest.TestCase):
         point_data = dict(shipped["village_ciaran"].data)
         point_data["wilderness_entry"] = {
             "shape": ["#"],
-            "origin": {"cell_x": 35, "cell_y": 270},
+            "offset": {"dx": 35, "dy": 270},
             "gates": [
-                {"return_direction": "n", "destination_node": "entrance"},
-                {"return_direction": "s", "destination_node": "plaza"},
+                {"return_direction": "n", "destination_node": "hidden_path"},
+                {"return_direction": "s", "destination_node": "village_plaza"},
             ],
         }
         candidate_point = document_from_data(shipped["village_ciaran"].relative_path, point_data)

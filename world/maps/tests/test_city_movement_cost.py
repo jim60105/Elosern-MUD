@@ -32,9 +32,9 @@ MOVE = CLOCK_YAML["command_defaults"]["move"]
 # Pinned physical durations from the authored meter positions (world-map-scale
 # §8/§9) at the settlement 1.25 m/s calibration, rounded upward once:
 #   南門 (3050,150) -> 南大道 (3140,1050): hypot(90,900)=904.49 m -> 724 s
-#   隱密小徑 (35,270) -> 村中廣場 (220,305): hypot(185,35)=188.28 m -> 151 s
+#   隱密小徑 (0,192) -> 村中廣場 (479,305): hypot(479,113)=492.15 m -> 394 s
 SOUTH_GATE_TO_AVENUE_SECONDS = 724
-HIDDEN_PATH_TO_PLAZA_SECONDS = 151
+HIDDEN_PATH_TO_PLAZA_SECONDS = 394
 
 
 class SampleCityCostedExitTests(EvenniaTest):
