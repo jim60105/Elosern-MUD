@@ -1,7 +1,7 @@
 # Map Authoring Images for Vision-Capable Agents
 
 **Date:** 2026-10-29
-**Status:** Design sections approved in conversation; written-spec review pending.
+**Status:** Approved by the user on 2026-10-29, including written-spec review.
 **Implementation status:** Not implemented by this document.
 **Scope:** Extend `.agents/skills/map-data-authoring/` with an offline, read-only image command for continent, settlement, and interior maps.
 
