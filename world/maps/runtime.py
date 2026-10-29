@@ -284,7 +284,7 @@ def compose(root: str | Path | None = None) -> ComposedWorld:
     except AuthoringError as error:
         raise MapWorldError(item.message for item in error.diagnostics) from error
 
-    problems: list[str] = []
+    problems: list[str] = [item.message for item in world.diagnostics]
     settlements: SettlementSnapshot | None = None
     geography_snapshot = None
     interiors: InteriorSnapshot | None = None

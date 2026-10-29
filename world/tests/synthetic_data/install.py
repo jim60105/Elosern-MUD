@@ -132,7 +132,7 @@ def _publish_kit_world(*, borrow_authored_world: bool):
 
     The remaining map views are never merged. A kit wilderness entry borrows a
     shipped destination node, so merging it would register two gates into one
-    room (``validate_wilderness_entries`` rejects exactly that), and a kit gate
+    room (the shared core map diagnostics reject exactly that), and a kit gate
     row is keyed by the settlement identity it borrows, so merging it would
     rename the authored world's starting-room exits. Regions need no merge
     either: the browser harness widens the authored partition for the kit's

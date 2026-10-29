@@ -144,8 +144,10 @@ def test_unreachable_landmark_is_saveable_work_in_progress():
 
 def test_blocked_approach_is_a_semantic_diagnostic():
     data = fixtures.settlement_data()
-    data["binding"]["anchor_cell"] = {"cell_x": 15, "cell_y": 20}
-    data["wilderness_entry"]["origin"] = {"cell_x": 15, "cell_y": 20}
+    data["binding"]["anchor_cell"] = {"cell_x": 15, "cell_y": 21}
+    data["wilderness_entry"]["origin"] = {"cell_x": 14, "cell_y": 21}
+    data["wilderness_entry"]["shape"] = ["###"]
+    data["wilderness_entry"]["gates"] = [{"return_direction": "n", "destination_node": "gate"}]
     world = load_authoring_world(fixtures.custom_sources(settlement=data))
     assert "blocked_approach" in {item.code for item in world.diagnostics}
 
@@ -577,3 +579,260 @@ def test_mask_cells_list_every_hash_cell_even_for_a_point_shape():
     assert point.mask_cells == frozenset({(6, 7)})
     block = WildernessEntryDeclaration(shape=("#.", "##"), origin=(1, 2), gates=())
     assert block.mask_cells == block.footprint_cells == frozenset({(1, 2), (1, 3), (2, 3)})
+
+
+def test_d2_matrix_structure_diagnostics():
+    # 1. multiple_anchor_rooms
+    data_multi = fixtures.settlement_data()
+    data_multi["nodes"]["plaza"]["prototype_parent"] = "anchor_room"
+    data_multi["nodes"]["plaza"]["anchor_key"] = "demo_location"
+    with pytest.raises(AuthoringError) as captured:
+        load_authoring_world(fixtures.custom_sources(settlement=data_multi))
+    diag = next(d for d in captured.value.diagnostics if d.code == "multiple_anchor_rooms")
+    assert diag.category == "structure"
+    assert diag.object_id == "demo_map"
+
+    # 2. anchor_location_mismatch
+    data_mismatch = fixtures.settlement_data()
+    data_mismatch["nodes"]["gate"]["anchor_key"] = "wrong_location"
+    with pytest.raises(AuthoringError) as captured:
+        load_authoring_world(fixtures.custom_sources(settlement=data_mismatch))
+    diag = next(d for d in captured.value.diagnostics if d.code == "anchor_location_mismatch")
+    assert diag.category == "structure"
+    assert diag.object_id == "demo_map"
+
+    # 3. duplicate_location_binding
+    second_settlement = fixtures.settlement_data()
+    second_settlement["id"] = "second_map"
+    second_settlement["wilderness_entry"] = {
+        "shape": ["#"],
+        "origin": {"cell_x": 6, "cell_y": 6},
+        "gates": [{"return_direction": "n", "destination_node": "gate"}],
+    }
+    second_src = fixtures.make_source_document(
+        "content/maps/settlements/second_map.yaml",
+        fixtures.yaml_text(second_settlement),
+    )
+    with pytest.raises(AuthoringError) as captured:
+        load_authoring_world([*fixtures.source_documents(), second_src])
+    diag = next(d for d in captured.value.diagnostics if d.code == "duplicate_location_binding")
+    assert diag.category == "structure"
+    assert "demo_map" in diag.message and "second_map" in diag.message
+
+    # 4. duplicate_interior_room
+    int1 = fixtures.interior_data("shop")
+    int2 = fixtures.interior_data("inn")
+    int2["rooms"] = {"hall": dict(int1["rooms"]["hall"])}
+    int2["connections"] = []
+    int2["exterior"] = None
+    with pytest.raises(AuthoringError) as captured:
+        load_authoring_world(fixtures.custom_sources(interiors={"shop": int1, "inn": int2}))
+    diag = next(d for d in captured.value.diagnostics if d.code == "duplicate_interior_room")
+    assert diag.category == "structure"
+    assert "shop" in diag.message and "inn" in diag.message
+
+    # 5. duplicate_doorway
+    int_d1 = fixtures.interior_data("shop")
+    int_d2 = fixtures.interior_data("inn")
+    int_d2["rooms"] = {"inn_room": dict(int_d1["rooms"]["hall"])}
+    int_d2["connections"] = []
+    int_d2["exterior"] = {
+        "settlement": "demo_map",
+        "node": int_d1["exterior"]["node"],
+        "room": "inn_room",
+        "doorway_key": int_d1["exterior"]["doorway_key"],
+        "doorway_aliases": [],
+    }
+    with pytest.raises(AuthoringError) as captured:
+        load_authoring_world(fixtures.custom_sources(interiors={"shop": int_d1, "inn": int_d2}))
+    diag = next(d for d in captured.value.diagnostics if d.code == "duplicate_doorway")
+    assert diag.category == "structure"
+    assert "shop" in diag.message and "inn" in diag.message
+
+    # 6. duplicate_gate_destination
+    data_dup_gate = fixtures.settlement_data()
+    data_dup_gate["wilderness_entry"] = {
+        "shape": ["###"],
+        "origin": {"cell_x": 5, "cell_y": 5},
+        "gates": [
+            {"return_direction": "n", "destination_node": "gate"},
+            {"return_direction": "s", "destination_node": "gate"},
+        ],
+    }
+    with pytest.raises(AuthoringError) as captured:
+        load_authoring_world(fixtures.custom_sources(settlement=data_dup_gate))
+    diag = next(d for d in captured.value.diagnostics if d.code == "duplicate_gate_destination")
+    assert diag.category == "structure"
+    assert diag.object_id == "demo_map"
+
+
+def test_d2_matrix_semantic_diagnostics():
+    # Control: valid world has no diagnostics and compiles
+    valid_world = fixtures.loaded_world()
+    assert not valid_world.diagnostics
+    snapshot = compile_runtime(
+        valid_world,
+        fixtures.valid_external(valid_world),
+        fixtures.current_freshness(valid_world),
+    )
+    assert snapshot is not None
+
+    # 1. missing_anchor_room (saveable WIP, rejected by compile_runtime)
+    data_no_anchor = fixtures.settlement_data()
+    data_no_anchor["nodes"]["gate"]["prototype_parent"] = "grid_room"
+    data_no_anchor["nodes"]["gate"]["anchor_key"] = None
+    world = load_authoring_world(fixtures.custom_sources(settlement=data_no_anchor))
+    diag = next(d for d in world.diagnostics if d.code == "missing_anchor_room")
+    assert diag.category == "semantic"
+    assert diag.object_id == "demo_map"
+    with pytest.raises(RuntimeRejection) as captured:
+        compile_runtime(world, fixtures.valid_external(world), fixtures.current_freshness(world))
+    assert "missing_anchor_room" in {d.code for d in captured.value.diagnostics}
+
+    # 2. point_gate_count
+    data_point_gates = fixtures.settlement_data()
+    data_point_gates["wilderness_entry"] = {
+        "shape": ["#"],
+        "origin": {"cell_x": 5, "cell_y": 5},
+        "gates": [
+            {"return_direction": "n", "destination_node": "gate"},
+            {"return_direction": "s", "destination_node": "plaza"},
+        ],
+    }
+    world = load_authoring_world(fixtures.custom_sources(settlement=data_point_gates))
+    diag = next(d for d in world.diagnostics if d.code == "point_gate_count")
+    assert diag.category == "semantic"
+
+    # 3. disconnected_footprint
+    data_disc = fixtures.settlement_data()
+    data_disc["wilderness_entry"] = {
+        "shape": ["#.#"],
+        "origin": {"cell_x": 5, "cell_y": 5},
+        "gates": [{"return_direction": "n", "destination_node": "gate"}],
+    }
+    world = load_authoring_world(fixtures.custom_sources(settlement=data_disc))
+    diag = next(d for d in world.diagnostics if d.code == "disconnected_footprint")
+    assert diag.category == "semantic"
+
+    # 4. invalid_footprint_anchor
+    data_anchor_dot = fixtures.settlement_data()
+    data_anchor_dot["wilderness_entry"] = {
+        "shape": ["###", "#.#", "###"],
+        "origin": {"cell_x": 5, "cell_y": 5},
+        "gates": [{"return_direction": "n", "destination_node": "gate"}],
+    }
+    world = load_authoring_world(fixtures.custom_sources(settlement=data_anchor_dot))
+    diag = next(d for d in world.diagnostics if d.code == "invalid_footprint_anchor")
+    assert diag.category == "semantic"
+
+    # 5. invalid_footprint_cell (outside frame and impassable terrain)
+    data_out_frame = fixtures.settlement_data()
+    data_out_frame["wilderness_entry"] = {
+        "shape": ["#"],
+        "origin": {"cell_x": 45, "cell_y": 5},
+        "gates": [{"return_direction": "n", "destination_node": "gate"}],
+    }
+    world = load_authoring_world(fixtures.custom_sources(settlement=data_out_frame))
+    diag = next(d for d in world.diagnostics if d.code == "invalid_footprint_cell")
+    assert diag.category == "semantic"
+
+    data_impassable = fixtures.settlement_data()
+    data_impassable["wilderness_entry"] = {
+        "shape": ["#"],
+        "origin": {"cell_x": 15, "cell_y": 20},  # summit ridge
+        "gates": [{"return_direction": "n", "destination_node": "gate"}],
+    }
+    world = load_authoring_world(fixtures.custom_sources(settlement=data_impassable))
+    diag = next(d for d in world.diagnostics if d.code == "invalid_footprint_cell")
+    assert diag.category == "semantic"
+
+    # 6. invalid_gate_approach (approach ray leaves frame)
+    data_leaves_frame = fixtures.settlement_data()
+    data_leaves_frame["wilderness_entry"] = {
+        "shape": ["###"],
+        "origin": {"cell_x": 37, "cell_y": 5},
+        "gates": [{"return_direction": "w", "destination_node": "gate"}],  # exit to east leaves frame (x=40)
+    }
+    world = load_authoring_world(fixtures.custom_sources(settlement=data_leaves_frame))
+    diag = next(d for d in world.diagnostics if d.code == "invalid_gate_approach")
+    assert diag.category == "semantic"
+
+    # 7. overlapping_footprint (footprint overlap and point-anchor containment)
+    data1 = fixtures.settlement_data()
+    data1["wilderness_entry"] = {
+        "shape": ["##", "##"],
+        "origin": {"cell_x": 5, "cell_y": 5},
+        "gates": [{"return_direction": "n", "destination_node": "gate"}],
+    }
+    data2 = fixtures.settlement_data()
+    data2["id"] = "second_map"
+    data2["location_ref"] = "second_location"
+    data2["nodes"]["gate"]["anchor_key"] = "second_location"
+    data2["wilderness_entry"] = {
+        "shape": ["##", "##"],
+        "origin": {"cell_x": 6, "cell_y": 5},  # overlaps with (6, 5), (6, 6)
+        "gates": [{"return_direction": "s", "destination_node": "gate"}],
+    }
+    locs = fixtures.locations_data()
+    locs["locations"]["second_location"] = {
+        "kind": "capital",
+        "display_name_zh": "第二城",
+        "description": "Second town",
+        "cell": {"cell_x": 6, "cell_y": 5},
+        "geographic_constraint": "synthetic",
+        "scene_archetype": None,
+    }
+    src1 = fixtures.make_source_document("content/maps/settlements/demo_map.yaml", fixtures.yaml_text(data1))
+    src2 = fixtures.make_source_document("content/maps/settlements/second_map.yaml", fixtures.yaml_text(data2))
+    loc_src = fixtures.make_source_document("content/maps/locations.yaml", fixtures.yaml_text(locs))
+    cont_src = fixtures.make_source_document("content/maps/continent.yaml", fixtures.yaml_text(fixtures.continent_data()))
+    dist_src = fixtures.make_source_document("content/maps/districts.yaml", fixtures.yaml_text(fixtures.districts_data()))
+    world = load_authoring_world([cont_src, loc_src, dist_src, src1, src2])
+    diag = next(d for d in world.diagnostics if d.code == "overlapping_footprint")
+    assert diag.category == "semantic"
+    assert "second_map" in diag.message or "demo_map" in diag.message
+
+    # 8. gate_approach_collision & duplicate_gate_approach
+    data_g1 = fixtures.settlement_data()
+    data_g1["wilderness_entry"] = {
+        "shape": ["###"],
+        "origin": {"cell_x": 5, "cell_y": 5},
+        "gates": [{"return_direction": "n", "destination_node": "gate"}],  # approach is (6, 4)
+    }
+    data_g2 = fixtures.settlement_data()
+    data_g2["id"] = "second_map"
+    data_g2["location_ref"] = "second_location"
+    data_g2["nodes"]["gate"]["anchor_key"] = "second_location"
+    data_g2["wilderness_entry"] = {
+        "shape": ["#"],
+        "origin": {"cell_x": 6, "cell_y": 4},
+        "gates": [{"return_direction": "w", "destination_node": "gate"}],  # point anchor is (6, 4)
+    }
+    src_g1 = fixtures.make_source_document("content/maps/settlements/demo_map.yaml", fixtures.yaml_text(data_g1))
+    src_g2 = fixtures.make_source_document("content/maps/settlements/second_map.yaml", fixtures.yaml_text(data_g2))
+    world = load_authoring_world([cont_src, loc_src, dist_src, src_g1, src_g2])
+    diag_coll = next(d for d in world.diagnostics if d.code == "gate_approach_collision")
+    assert diag_coll.category == "semantic"
+
+    # duplicate_gate_approach
+    data_g2["wilderness_entry"] = {
+        "shape": ["###"],
+        "origin": {"cell_x": 5, "cell_y": 5},
+        "gates": [{"return_direction": "n", "destination_node": "gate"}],
+    }
+    src_g2_dup = fixtures.make_source_document("content/maps/settlements/second_map.yaml", fixtures.yaml_text(data_g2))
+    world_dup = load_authoring_world([cont_src, loc_src, dist_src, src_g1, src_g2_dup])
+    diag_dup = next(d for d in world_dup.diagnostics if d.code == "duplicate_gate_approach")
+    assert diag_dup.category == "semantic"
+
+    # 9. blocked_point_neighbor
+    data_point_blocked = fixtures.settlement_data()
+    # origin at (15, 21), return_direction "n" -> neighbor at (15, 20) which is impassable ridge
+    data_point_blocked["wilderness_entry"] = {
+        "shape": ["#"],
+        "origin": {"cell_x": 15, "cell_y": 21},
+        "gates": [{"return_direction": "s", "destination_node": "gate"}],  # delta for s is (0, -1) -> neighbor (15, 20)
+    }
+    world = load_authoring_world(fixtures.custom_sources(settlement=data_point_blocked))
+    diag = next(d for d in world.diagnostics if d.code == "blocked_point_neighbor")
+    assert diag.category == "semantic"

@@ -41,6 +41,7 @@ from .documents import (
     LocationsDocument,
     SettlementDocument,
 )
+from .geometry import is_within_frame
 from .sources import SourceDocument, fingerprint_text, is_world_source
 from .sparse import (
     SparseGraphError,
@@ -63,7 +64,6 @@ from .references import (
 from .terrain import (
     REGION_KEYS,
     TerrainDefinition,
-    is_valid_wilderness_cell,
     is_walkable_cell,
 )
 
@@ -89,6 +89,429 @@ _DIRECTION_DELTAS = {
     "w": (-1, 0),
     "nw": (-1, 1),
 }
+
+
+def diagnose_settlement_structure(
+    settlements: Mapping[str, SettlementDocument],
+    locations: LocationsDocument | Mapping[str, Any] | None = None,
+) -> list[Diagnostic]:
+    """Structure diagnostics for settlement documents (rejection on load/mutation)."""
+    diagnostics: list[Diagnostic] = []
+    bound_locations: dict[str, str] = {}
+    seen_destinations: dict[tuple[str, str], tuple[str, str]] = {}
+
+    for settlement_id, settlement in sorted(settlements.items()):
+        if locations is not None:
+            loc_keys = set(locations.locations) if hasattr(locations, "locations") else set(locations)
+            if settlement.location_ref not in loc_keys:
+                diagnostics.append(
+                    _diagnostic(
+                        "unknown_reference",
+                        STRUCTURE,
+                        f"location_ref {settlement.location_ref!r} is not an authored location",
+                        document=settlement,
+                        field_path="location_ref",
+                        object_id=settlement_id,
+                    )
+                )
+        if settlement.location_ref in bound_locations:
+            first_id = bound_locations[settlement.location_ref]
+            diagnostics.append(
+                _diagnostic(
+                    "duplicate_location_binding",
+                    STRUCTURE,
+                    f"settlement {settlement_id!r} binds location {settlement.location_ref!r} "
+                    f"already bound by {first_id!r}",
+                    document=settlement,
+                    field_path="location_ref",
+                    object_id=settlement_id,
+                )
+            )
+        else:
+            bound_locations[settlement.location_ref] = settlement_id
+
+        anchor_nodes = [
+            n for n in settlement.nodes.values()
+            if n.prototype_parent == "anchor_room"
+        ]
+        if len(anchor_nodes) > 1:
+            diagnostics.append(
+                _diagnostic(
+                    "multiple_anchor_rooms",
+                    STRUCTURE,
+                    f"settlement {settlement_id!r} declares {len(anchor_nodes)} anchor_room nodes, "
+                    "expected at most one",
+                    document=settlement,
+                    field_path="nodes",
+                    object_id=settlement_id,
+                )
+            )
+        elif len(anchor_nodes) == 1:
+            anchor = anchor_nodes[0]
+            if anchor.anchor_key != settlement.location_ref:
+                diagnostics.append(
+                    _diagnostic(
+                        "anchor_location_mismatch",
+                        STRUCTURE,
+                        f"settlement {settlement_id!r} anchor node {anchor.node_id!r} "
+                        f"declares anchor_key {anchor.anchor_key!r}, expected location_ref {settlement.location_ref!r}",
+                        document=settlement,
+                        field_path="nodes",
+                        object_id=settlement_id,
+                    )
+                )
+
+        entry = settlement.wilderness_entry
+        if entry is not None:
+            for gate in entry.gates:
+                target_room = (settlement_id, gate.destination_node)
+                if target_room in seen_destinations:
+                    first_id, first_dir = seen_destinations[target_room]
+                    diagnostics.append(
+                        _diagnostic(
+                            "duplicate_gate_destination",
+                            STRUCTURE,
+                            f"settlement {settlement_id!r} gate {gate.return_direction!r} "
+                            f"shares destination room {target_room!r} with {first_id!r} gate {first_dir!r}",
+                            document=settlement,
+                            field_path="wilderness_entry.gates",
+                            object_id=settlement_id,
+                        )
+                    )
+                else:
+                    seen_destinations[target_room] = (settlement_id, gate.return_direction)
+
+    return diagnostics
+
+
+def diagnose_interior_structure(
+    interiors: Mapping[str, InteriorDocument],
+) -> list[Diagnostic]:
+    """Structure diagnostics for interior documents (rejection on load/mutation)."""
+    diagnostics: list[Diagnostic] = []
+    seen_rooms: dict[str, str] = {}
+    doorway_owners: dict[tuple[str, str, str], str] = {}
+
+    for interior_id, interior in sorted(interiors.items()):
+        for room_id in sorted(interior.rooms):
+            if room_id in seen_rooms:
+                first_id = seen_rooms[room_id]
+                diagnostics.append(
+                    _diagnostic(
+                        "duplicate_interior_room",
+                        STRUCTURE,
+                        f"room {room_id!r} is declared by interior {first_id!r} and interior {interior_id!r}; "
+                        "a persistent room has one identity",
+                        document=interior,
+                        field_path="rooms",
+                        object_id=interior_id,
+                    )
+                )
+            else:
+                seen_rooms[room_id] = interior_id
+
+        exterior = interior.exterior
+        if exterior is not None:
+            key = (exterior.settlement, exterior.node, exterior.doorway_key)
+            if key in doorway_owners:
+                first_id = doorway_owners[key]
+                diagnostics.append(
+                    _diagnostic(
+                        "duplicate_doorway",
+                        STRUCTURE,
+                        f"interiors {first_id!r} and {interior_id!r} both declare doorway {exterior.doorway_key!r} "
+                        f"on exterior {exterior.node!r} of {exterior.settlement!r}; two interiors on one exterior "
+                        "must name their doorways differently",
+                        document=interior,
+                        field_path="exterior.doorway_key",
+                        object_id=interior_id,
+                    )
+                )
+            else:
+                doorway_owners[key] = interior_id
+
+    return diagnostics
+
+
+def diagnose_settlement_semantics(
+    settlements: Mapping[str, SettlementDocument],
+    *,
+    locations: LocationsDocument | Mapping[str, Any] | None = None,
+    frame_cells: int | None = None,
+    terrain: TerrainDefinition | None = None,
+) -> list[Diagnostic]:
+    """Semantic diagnostics for settlement documents (saveable WIP, rejected by runtime/game)."""
+    diagnostics: list[Diagnostic] = []
+
+    for settlement_id, settlement in sorted(settlements.items()):
+        anchor_nodes = [
+            n for n in settlement.nodes.values()
+            if n.prototype_parent == "anchor_room"
+        ]
+        if not anchor_nodes:
+            diagnostics.append(
+                _diagnostic(
+                    "missing_anchor_room",
+                    SEMANTIC,
+                    f"settlement {settlement_id!r} declares no anchor_room node",
+                    document=settlement,
+                    field_path="nodes",
+                    object_id=settlement_id,
+                )
+            )
+
+    all_footprints: dict[str, frozenset[tuple[int, int]]] = {}
+    point_anchors: dict[str, tuple[int, int]] = {}
+
+    for settlement_id, settlement in sorted(settlements.items()):
+        entry = settlement.wilderness_entry
+        if entry is None:
+            continue
+
+        all_footprints[settlement_id] = entry.footprint_cells
+        if entry.is_point_shape and entry.anchor_cell is not None:
+            point_anchors[settlement_id] = entry.anchor_cell
+
+        if entry.is_point_shape:
+            if len(entry.gates) > 1:
+                diagnostics.append(
+                    _diagnostic(
+                        "point_gate_count",
+                        SEMANTIC,
+                        f"settlement {settlement_id!r} point-shape entry must have exactly one gate, "
+                        f"found {len(entry.gates)}",
+                        document=settlement,
+                        field_path="wilderness_entry.gates",
+                        object_id=settlement_id,
+                    )
+                )
+        else:
+            cells = entry.footprint_cells
+            if cells:
+                start = next(iter(cells))
+                seen = {start}
+                queue = [start]
+                while queue:
+                    cx, cy = queue.pop()
+                    for dx, dy in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+                        nxt = (cx + dx, cy + dy)
+                        if nxt in cells and nxt not in seen:
+                            seen.add(nxt)
+                            queue.append(nxt)
+                if seen != set(cells):
+                    diagnostics.append(
+                        _diagnostic(
+                            "disconnected_footprint",
+                            SEMANTIC,
+                            f"settlement {settlement_id!r} footprint '#' cells are not 4-connected",
+                            document=settlement,
+                            field_path="wilderness_entry.shape",
+                            object_id=settlement_id,
+                        )
+                    )
+
+            anchor_cell = entry.anchor_cell
+            if anchor_cell is not None and anchor_cell not in cells:
+                diagnostics.append(
+                    _diagnostic(
+                        "invalid_footprint_anchor",
+                        SEMANTIC,
+                        f"settlement {settlement_id!r} anchor_cell {anchor_cell} is not a '#' footprint cell",
+                        document=settlement,
+                        field_path="wilderness_entry.shape",
+                        object_id=settlement_id,
+                    )
+                )
+
+        for cell in sorted(entry.mask_cells):
+            if frame_cells is not None and not is_within_frame(frame_cells, cell):
+                diagnostics.append(
+                    _diagnostic(
+                        "invalid_footprint_cell",
+                        SEMANTIC,
+                        f"settlement {settlement_id!r} footprint cell {cell} is outside the frame",
+                        document=settlement,
+                        field_path="wilderness_entry.shape",
+                        object_id=settlement_id,
+                    )
+                )
+            elif terrain is not None and not is_walkable_cell(terrain, cell):
+                diagnostics.append(
+                    _diagnostic(
+                        "invalid_footprint_cell",
+                        SEMANTIC,
+                        f"settlement {settlement_id!r} footprint cell {cell} is not walkable terrain",
+                        document=settlement,
+                        field_path="wilderness_entry.shape",
+                        object_id=settlement_id,
+                    )
+                )
+
+    for sid, fp in sorted(all_footprints.items()):
+        if not fp:
+            continue
+        for other_sid, other_fp in sorted(all_footprints.items()):
+            if other_sid > sid and fp & other_fp:
+                diagnostics.append(
+                    _diagnostic(
+                        "overlapping_footprint",
+                        SEMANTIC,
+                        f"settlement {sid!r} footprint overlaps {other_sid!r}",
+                        document=settlements[sid],
+                        field_path="wilderness_entry.shape",
+                        object_id=sid,
+                    )
+                )
+        for other_sid, point_cell in sorted(point_anchors.items()):
+            if other_sid != sid and point_cell in fp:
+                diagnostics.append(
+                    _diagnostic(
+                        "overlapping_footprint",
+                        SEMANTIC,
+                        f"settlement {sid!r} footprint contains point anchor of {other_sid!r}",
+                        document=settlements[sid],
+                        field_path="wilderness_entry.shape",
+                        object_id=sid,
+                    )
+                )
+
+    seen_gate_keys: dict[tuple[tuple[int, int], str], str] = {}
+    for sid, settlement in sorted(settlements.items()):
+        entry = settlement.wilderness_entry
+        if entry is None:
+            continue
+        for gate in entry.gates:
+            approach = gate_approach_cell(entry, gate.return_direction, frame_cells=frame_cells)
+            if approach is None:
+                diagnostics.append(
+                    _diagnostic(
+                        "invalid_gate_approach",
+                        SEMANTIC,
+                        f"settlement {sid!r} gate {gate.return_direction!r} approach cell is undefined: "
+                        "its face ray crosses no footprint cell or never lands inside the frame",
+                        document=settlement,
+                        field_path="wilderness_entry.gates",
+                        object_id=sid,
+                    )
+                )
+                continue
+
+            gate_key = (approach, gate.return_direction)
+            if gate_key in seen_gate_keys:
+                first_sid = seen_gate_keys[gate_key]
+                diagnostics.append(
+                    _diagnostic(
+                        "duplicate_gate_approach",
+                        SEMANTIC,
+                        f"settlement {sid!r} gate {gate.return_direction!r} collides on "
+                        f"(approach_cell, return_direction) {gate_key} with {first_sid!r}",
+                        document=settlement,
+                        field_path="wilderness_entry.gates",
+                        object_id=sid,
+                    )
+                )
+            else:
+                seen_gate_keys[gate_key] = sid
+
+            if not entry.is_point_shape:
+                for other_sid, other_fp in sorted(all_footprints.items()):
+                    if other_sid != sid and approach in other_fp:
+                        diagnostics.append(
+                            _diagnostic(
+                                "gate_approach_collision",
+                                SEMANTIC,
+                                f"settlement {sid!r} gate {gate.return_direction!r} approach cell {approach} "
+                                f"lies inside footprint of {other_sid!r}",
+                                document=settlement,
+                                field_path="wilderness_entry.gates",
+                                object_id=sid,
+                            )
+                        )
+                if terrain is not None and not is_walkable_cell(terrain, approach):
+                    diagnostics.append(
+                        _diagnostic(
+                            "blocked_approach",
+                            SEMANTIC,
+                            f"settlement {sid!r} gate {gate.return_direction!r} approach "
+                            f"{approach!r} is not walkable wilderness",
+                            document=settlement,
+                            field_path="wilderness_entry.gates",
+                            object_id=sid,
+                        )
+                    )
+
+            for other_sid, point_cell in sorted(point_anchors.items()):
+                if other_sid != sid and approach == point_cell:
+                    diagnostics.append(
+                        _diagnostic(
+                            "gate_approach_collision",
+                            SEMANTIC,
+                            f"settlement {sid!r} gate {gate.return_direction!r} approach {approach} "
+                            f"is the point anchor of {other_sid!r}",
+                            document=settlement,
+                            field_path="wilderness_entry.gates",
+                            object_id=sid,
+                        )
+                    )
+
+            if entry.is_point_shape and entry.anchor_cell is not None:
+                delta = _DIRECTION_DELTAS.get(gate.return_direction)
+                if delta is None:
+                    continue
+                dx, dy = delta
+                neighbor = (entry.anchor_cell[0] + dx, entry.anchor_cell[1] + dy)
+                neighbor_invalid = False
+                reason = ""
+                if frame_cells is not None and not is_within_frame(frame_cells, neighbor):
+                    neighbor_invalid = True
+                    reason = "outside frame"
+                elif terrain is not None and not is_walkable_cell(terrain, neighbor):
+                    neighbor_invalid = True
+                    reason = "not walkable terrain"
+                elif any(neighbor in other_fp for other_fp in all_footprints.values()):
+                    neighbor_invalid = True
+                    reason = "inside a footprint"
+
+                if neighbor_invalid:
+                    diagnostics.append(
+                        _diagnostic(
+                            "blocked_point_neighbor",
+                            SEMANTIC,
+                            f"settlement {sid!r} point anchor {entry.anchor_cell} has invalid neighbor "
+                            f"{neighbor} ({reason}) in its entry direction {gate.return_direction!r}",
+                            document=settlement,
+                            field_path="wilderness_entry.gates",
+                            object_id=sid,
+                        )
+                    )
+
+    return diagnostics
+
+
+def diagnose_settlement_rules(
+    settlements: Mapping[str, SettlementDocument],
+    *,
+    locations: LocationsDocument | Mapping[str, Any] | None = None,
+    frame_cells: int | None = None,
+    terrain: TerrainDefinition | None = None,
+) -> list[Diagnostic]:
+    """All shared structure and semantic diagnostics for settlement documents."""
+    return (
+        diagnose_settlement_structure(settlements, locations=locations)
+        + diagnose_settlement_semantics(
+            settlements,
+            locations=locations,
+            frame_cells=frame_cells,
+            terrain=terrain,
+        )
+    )
+
+
+def diagnose_interior_rules(
+    interiors: Mapping[str, InteriorDocument],
+) -> list[Diagnostic]:
+    """All shared structure diagnostics for interior documents."""
+    return diagnose_interior_structure(interiors)
 
 
 @dataclass(frozen=True, slots=True)
@@ -366,17 +789,6 @@ def _structural_diagnostics(
         )
 
     for settlement_id, settlement in settlements.items():
-        if settlement.location_ref not in locations.locations:
-            diagnostics.append(
-                _diagnostic(
-                    "unknown_reference",
-                    STRUCTURE,
-                    f"location_ref {settlement.location_ref!r} is not an authored location",
-                    document=settlement,
-                    field_path="location_ref",
-                    object_id=settlement_id,
-                )
-            )
         node_ids = set(settlement.nodes)
         for road in settlement.roads:
             for field, endpoint in (
@@ -443,17 +855,9 @@ def _structural_diagnostics(
                         )
                     )
                 seen_directions.add(gate.return_direction)
-                if gate_approach_cell(entry, gate.return_direction) is None:
-                    diagnostics.append(
-                        _diagnostic(
-                            "invalid_gate",
-                            STRUCTURE,
-                            f"gate {gate.return_direction!r} never leaves the footprint",
-                            document=settlement,
-                            field_path="wilderness_entry.gates",
-                            object_id=settlement_id,
-                        )
-                    )
+
+    diagnostics.extend(diagnose_settlement_structure(settlements, locations))
+    diagnostics.extend(diagnose_interior_structure(interiors))
 
     reference_index = ReferenceIndex.from_documents(
         settlements=settlements,
@@ -585,6 +989,8 @@ def _structural_diagnostics(
 def gate_approach_cell(
     entry: Any,
     return_direction: str,
+    *,
+    frame_cells: int | None = None,
 ) -> tuple[int, int] | None:
     """The exterior cell a traveller stands on to take one authored gate.
 
@@ -592,20 +998,37 @@ def gate_approach_cell(
     footprint entry walks from the footprint's bounding-box midpoint along the
     face opposite the gate's return direction while inside the footprint; the
     first cell outside is the approach, exactly the authored mask rule.
+    Returns None if:
+    - anchor_cell is None
+    - for non-point shapes, anchor_cell is not in footprint_cells (ray does not start in footprint)
+    - the return direction is unknown
+    - ray never leaves the footprint or leaves the frame
+    - frame_cells is given and the approach cell is outside frame_cells.
     """
 
     anchor = entry.anchor_cell
     if anchor is None:
         return None
     if entry.is_point_shape:
+        if frame_cells is not None and not is_within_frame(frame_cells, anchor):
+            return None
         return anchor
     footprint = entry.footprint_cells
-    direction = _OPPOSITE_DIRECTION[return_direction]
+    if anchor not in footprint:
+        return None
+    direction = _OPPOSITE_DIRECTION.get(return_direction)
+    if direction is None:
+        return None
     delta_x, delta_y = _DIRECTION_DELTAS[direction]
     cell = anchor
-    for _ in range(len(entry.shape) * max(len(entry.shape[0]), 1) + 1):
+    max_steps = len(entry.shape) * max(len(entry.shape[0]), 1) + 2
+    for _ in range(max_steps):
+        if frame_cells is not None and not is_within_frame(frame_cells, cell):
+            return None
         cell = (cell[0] + delta_x, cell[1] + delta_y)
         if cell not in footprint:
+            if frame_cells is not None and not is_within_frame(frame_cells, cell):
+                return None
             return cell
     return None
 
@@ -677,25 +1100,15 @@ def _semantic_diagnostics(world: AuthoringWorld) -> list[Diagnostic]:
             reachable_cache[settlement_id] = frozenset()
             continue
         reachable_cache[settlement_id] = _reachable_nodes(settlement)
-        if settlement.wilderness_entry is not None:
-            for gate in settlement.wilderness_entry.gates:
-                approach = gate_approach_cell(
-                    settlement.wilderness_entry,
-                    gate.return_direction,
-                )
-                if terrain is not None and approach is not None:
-                    if not is_valid_wilderness_cell(terrain, footprints, approach):
-                        diagnostics.append(
-                            _diagnostic(
-                                "blocked_approach",
-                                SEMANTIC,
-                                f"gate {gate.return_direction!r} approach "
-                                f"{approach!r} is not walkable wilderness",
-                                document=settlement,
-                                field_path="wilderness_entry.gates",
-                                object_id=settlement_id,
-                            )
-                        )
+
+    diagnostics.extend(
+        diagnose_settlement_semantics(
+            world.settlements,
+            locations=world.locations,
+            frame_cells=world.continent.terrain.frame_cells,
+            terrain=terrain,
+        )
+    )
 
     interior_reachable = _reachable_interior_rooms(world, reachable_cache)
 
@@ -1148,6 +1561,11 @@ __all__ = [
     "RuntimeMapSnapshot",
     "build_settlement_graph",
     "compile_runtime",
+    "diagnose_interior_rules",
+    "diagnose_interior_structure",
+    "diagnose_settlement_rules",
+    "diagnose_settlement_semantics",
+    "diagnose_settlement_structure",
     "diagnose_world",
     "gate_approach_cell",
     "load_authoring_world",

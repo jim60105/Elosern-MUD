@@ -8,11 +8,10 @@ mirror in ``world.lore.sync`` is a projection of it). All geometry helpers are
 pure and derived from the authored mask — consumers never re-derive it.
 """
 
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from elosern_map_core.documents import QualifiedRef
-from elosern_map_core.references import ReferenceError, settlement_node_ref, settlement_position
 
 from world.maps.published import PublishedView
 
@@ -35,7 +34,7 @@ DIRECTION_DELTAS: dict[str, tuple[int, int]] = {
 
 # The provider owns the live frame bounds. They are imported lazily at call
 # time (module scope would be a lore -> world.maps import cycle), so the
-# authoring contract can never drift from the runtime frame it validates.
+# runtime geometry can never drift from the provider frame it uses.
 def _provider_bounds() -> tuple[int, int]:
     from world.maps.wilderness_provider import WILDERNESS_MAX_X, WILDERNESS_MAX_Y
 
@@ -88,9 +87,8 @@ class WildernessEntryPoint:
     anchor cell is an ordinary terrain-validity wilderness step, so a concealed
     entry never hijacks an unrelated route.
 
-    ``anchor_key`` must exist in ``world.lore.anchor_placement.
-    ANCHOR_PLACEMENT_REGISTRY``; ``validate_wilderness_entries`` enforces it
-    at sync time, not the dataclass.
+    ``anchor_key`` resolves against change 12's placement registry; shared
+    core diagnostics enforce this before publication.
     """
 
     anchor_key: str
@@ -158,8 +156,7 @@ class WildernessEntryPoint:
         """The exterior cell a wilderness traveler stands on to take ``gate``.
 
         ``bounds`` defaults to the published provider frame; a candidate
-        validator passes its own explicit ``(max_x, max_y)`` so it never has
-        to publish a world to check one.
+        passes its own explicit ``(max_x, max_y)`` to check bounds directly.
 
         Point-shape entries: the anchor cell itself (identity pinned by the
         wilderness-gateway registry requirement). Footprint entries: walk from
@@ -191,290 +188,12 @@ class WildernessEntryPoint:
         return cell
 
 
-def _footprint_ray_crosses(entry: WildernessEntryPoint, gate: WildernessGate) -> bool:
-    """Whether the gate's face ray starts inside the entry's footprint."""
-    anchor = entry.anchor_cell
-    return anchor is not None and anchor in entry.footprint_cells
-
-
-def _iter_map_extents() -> dict[str, set[tuple[int, int]]]:
-    """Prototype-coordinate extents per grid map key.
-
-    Deferred import: lore must not import ``world.maps`` at module scope, and
-    this is only consulted by a sync-time validation call. The published
-    settlement world is the single home of the sparse settlement graphs
-    (settlement-shops design §6.2 / §10); validation must see every map a gate
-    names or a second settlement's gate fails startup with
-    ``unknown z_map_key``. A candidate passes its own ``extents`` instead.
-    """
-    from world.maps.map_data import SETTLEMENT_GRAPHS
-
-    return {
-        map_id: {node.coordinate for node in graph.nodes.values()}
-        for map_id, graph in SETTLEMENT_GRAPHS.items()
-    }
-
-
 def _in_provider_rect(
     cell: tuple[int, int], bounds: tuple[int, int] | None = None
 ) -> bool:
     max_x, max_y = _provider_bounds() if bounds is None else bounds
     x, y = cell
     return 0 <= x <= max_x and 0 <= y <= max_y
-
-
-def _is_walkable_terrain(
-    cell: tuple[int, int], walkable: Callable[[tuple[int, int]], bool] | None = None
-) -> bool:
-    """Whether ``cell`` is land-side passable ground (the provider's rule).
-
-    Deferred import for the same lore/world.maps boundary reason as
-    :func:`_iter_map_extents`: the provider is the single owner of the terrain
-    model, and validation must never keep a second copy of it.
-    """
-    if walkable is not None:
-        return walkable(cell)
-    from world.maps.wilderness_provider import is_walkable_cell
-
-    return is_walkable_cell(cell)
-
-
-def validate_wilderness_entries(
-    registry: Mapping[str, WildernessEntryPoint] | None = None,
-    *,
-    index=None,
-    bounds: tuple[int, int] | None = None,
-    walkable: Callable[[tuple[int, int]], bool] | None = None,
-    placements: Mapping[str, object] | None = None,
-    extents: Mapping[str, set[tuple[int, int]]] | None = None,
-) -> None:
-    """Pure, DB-free validation of the whole authored registry (design D5).
-
-    Raises ``ValueError`` naming the offending entry and the rejected rule.
-    Called by ``world.lore.sync.sync_all()`` before mirroring so malformed
-    authored data fails at startup. ``index``, ``placements`` and ``extents``
-    are the current settlement-node bindings, anchor placements and per-map
-    node extents; production reads them from the published world, while a
-    candidate passes its own so validation never reads a partially assembled
-    registry. ``walkable`` defaults to the published terrain rule; a candidate
-    that has no terrain yet passes ``True`` for every cell and leaves the
-    terrain rules to the geography candidate.
-    """
-    if registry is None:
-        registry = WILDERNESS_ENTRY_REGISTRY
-
-    if placements is None:
-        from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
-
-        placements = ANCHOR_PLACEMENT_REGISTRY
-    if index is None:
-        from world.maps.static_references import settlement_reference_index
-
-        index = settlement_reference_index()
-    if extents is None:
-        extents = _iter_map_extents()
-
-    def in_frame(cell: tuple[int, int]) -> bool:
-        return _in_provider_rect(cell, bounds)
-
-    def is_walkable(cell: tuple[int, int]) -> bool:
-        return _is_walkable_terrain(cell, walkable)
-
-    def fail(anchor_key: str, rule: str) -> None:
-        raise ValueError(f"WILDERNESS_ENTRY_REGISTRY[{anchor_key!r}]: {rule}")
-
-    all_footprints: dict[str, frozenset[tuple[int, int]]] = {}
-    for anchor_key, entry in registry.items():
-        # -- anchor_key resolves against change 12's placement registry.
-        if entry.anchor_key not in placements:
-            fail(anchor_key, f"anchor_key {entry.anchor_key!r} absent from ANCHOR_PLACEMENT_REGISTRY")
-
-        # -- mask grammar: rectangle of '#'/'.' with at least one '#'.
-        if not entry.shape:
-            fail(anchor_key, "empty mask")
-        row_length = len(entry.shape[0])
-        if row_length == 0:
-            fail(anchor_key, "empty mask row")
-        for row_index, line in enumerate(entry.shape):
-            if len(line) != row_length:
-                fail(anchor_key, f"ragged mask: row {row_index} length {len(line)} != {row_length}")
-            for char in line:
-                if char not in "#.":
-                    fail(anchor_key, f"illegal mask character {char!r}")
-        if entry.hash_cell_count == 0:
-            fail(anchor_key, "mask contains no '#' cell")
-
-        # -- geometry: '#' cells inside the provider rectangle.
-        origin_x, origin_y = entry.origin_xy
-        for row, line in enumerate(entry.shape):
-            for col, cell in enumerate(line):
-                if cell == "#" and not in_frame(
-                    (origin_x + col, origin_y + row)
-                ):
-                    fail(
-                        anchor_key,
-                        f"footprint cell ({origin_x + col}, {origin_y + row}) outside provider rectangle",
-                    )
-                if cell == "#" and not is_walkable(
-                    (origin_x + col, origin_y + row)
-                ):
-                    fail(
-                        anchor_key,
-                        f"footprint cell ({origin_x + col}, {origin_y + row}) is not walkable terrain",
-                    )
-
-        footprint = entry.footprint_cells
-        anchor = entry.anchor_cell
-        if anchor is None:  # pragma: no cover - ruled out by no-'#' check
-            fail(anchor_key, "anchor_cell is undefined")
-        if not is_walkable(anchor):
-            fail(anchor_key, f"anchor_cell {anchor} is not walkable terrain")
-
-        if not entry.is_point_shape:
-            # -- footprint is 4-connected.
-            start = next(iter(footprint))
-            seen = {start}
-            queue = [start]
-            while queue:
-                cx, cy = queue.pop()
-                for dx, dy in ((0, 1), (0, -1), (1, 0), (-1, 0)):
-                    nxt = (cx + dx, cy + dy)
-                    if nxt in footprint and nxt not in seen:
-                        seen.add(nxt)
-                        queue.append(nxt)
-            if seen != footprint:
-                fail(anchor_key, "footprint '#' cells are not 4-connected")
-            # -- derived anchor cell is itself a '#' cell.
-            if anchor not in footprint:
-                fail(anchor_key, f"anchor_cell {anchor} is not a '#' footprint cell")
-        all_footprints[anchor_key] = footprint
-
-        # -- gates.
-        if entry.is_point_shape:
-            if len(entry.gates) != 1:
-                fail(anchor_key, f"point-shape entry must have exactly one gate, found {len(entry.gates)}")
-        directions: set[str] = set()
-        for gate in entry.gates:
-            if gate.return_direction not in CANONICAL_DIRECTIONS:
-                fail(anchor_key, f"non-canonical return_direction {gate.return_direction!r}")
-            if gate.return_direction in directions:
-                fail(anchor_key, f"duplicated return_direction {gate.return_direction!r}")
-            directions.add(gate.return_direction)
-            if not entry.is_point_shape and not _footprint_ray_crosses(entry, gate):
-                fail(
-                    anchor_key,
-                    f"gate {gate.return_direction!r} approach ray crosses no footprint cell",
-                )
-
-        # -- grid destination resolves to an authored node inside its map's
-        #    extent.
-        for gate in entry.gates:
-            try:
-                position = settlement_position(
-                    index,
-                    gate.destination,
-                    source=f"gate {gate.return_direction!r}",
-                )
-            except ReferenceError as error:
-                fail(anchor_key, str(error))
-            if gate.z_map_key not in extents:
-                fail(anchor_key, f"gate {gate.return_direction!r}: unknown z_map_key {gate.z_map_key!r}")
-            if position not in extents[gate.z_map_key]:
-                fail(
-                    anchor_key,
-                    f"gate {gate.return_direction!r}: destination {position} outside extent of {gate.z_map_key!r}",
-                )
-
-    # -- global cross-entry rules.
-    def provider_valid_outside_footprints(cell: tuple[int, int]) -> bool:
-        if not in_frame(cell) or not is_walkable(cell):
-            return False
-        return not any(cell in other for other in all_footprints.values())
-
-    seen_gate_keys: set[tuple[tuple[int, int], str]] = set()
-    seen_gate_rooms: set[tuple[str, tuple[int, int]]] = set()
-    gate_rooms: list[tuple[str, WildernessGate]] = []
-    for anchor_key, entry in registry.items():
-        footprint = all_footprints[anchor_key]
-        # -- two entries' footprints never overlap.
-        for other_key, other_footprint in all_footprints.items():
-            if other_key != anchor_key and footprint & other_footprint:
-                fail(anchor_key, f"footprint overlaps {other_key!r}")
-        # -- no footprint contains another entry's point-shape anchor cell.
-        if not entry.is_point_shape:
-            for other_key, other_entry in registry.items():
-                if other_key != anchor_key and other_entry.is_point_shape:
-                    other_anchor = other_entry.anchor_cell
-                    if other_anchor is not None and other_anchor in footprint:
-                        fail(anchor_key, f"footprint contains point anchor cell of {other_key!r}")
-        for gate in entry.gates:
-            approach = entry.approach_cell(gate, bounds=bounds)
-            if approach is None:
-                fail(
-                    anchor_key,
-                    f"gate {gate.return_direction!r} approach cell is undefined: its face ray "
-                    "crosses no footprint cell or never lands inside the provider rectangle",
-                )
-            # -- two gates never share the same (approach_cell, return_direction).
-            gate_key = (approach, gate.return_direction)
-            if gate_key in seen_gate_keys:
-                fail(anchor_key, f"gate {gate.return_direction!r} collides on (approach_cell, return_direction) {gate_key}")
-            seen_gate_keys.add(gate_key)
-            if not entry.is_point_shape:
-                # -- no footprint contains another entry's gate approach cell
-                #    (named before the generic provider-validity rule so the
-                #    collision reports its precise cause).
-                for other_key, other_footprint in all_footprints.items():
-                    if other_key != anchor_key and approach in other_footprint:
-                        fail(
-                            anchor_key,
-                            f"gate {gate.return_direction!r} approach cell {approach} lies inside footprint of {other_key!r}",
-                        )
-                # -- a footprint-entry approach cell is provider-valid and lies
-                #    outside every footprint (its own ray rule already excludes
-                #    its own footprint).
-                if not provider_valid_outside_footprints(approach):
-                    fail(
-                        anchor_key,
-                        f"gate {gate.return_direction!r} approach cell {approach} is not provider-valid outside every footprint",
-                    )
-            gate_rooms.append((anchor_key, gate))
-        # -- a point anchor is never another entry's gate approach cell.
-        if entry.is_point_shape and entry.anchor_cell is not None:
-            for other_key, other_entry in registry.items():
-                if other_key == anchor_key:
-                    continue
-                for other_gate in other_entry.gates:
-                    if other_entry.approach_cell(other_gate, bounds=bounds) == entry.anchor_cell:
-                        fail(
-                            anchor_key,
-                            f"point anchor cell is {other_key!r} gate {other_gate.return_direction!r} approach cell",
-                        )
-        # -- a point anchor advertises exactly one eligible entry direction;
-        #    the cell that direction leads to must be provider-valid. Other
-        #    directions are ordinary terrain steps and follow the provider's
-        #    own validity, so a coastal cave may be authored next to water.
-        if entry.is_point_shape and entry.anchor_cell is not None:
-            for gate in entry.gates:
-                dx, dy = DIRECTION_DELTAS[gate.return_direction]
-                neighbor = (entry.anchor_cell[0] + dx, entry.anchor_cell[1] + dy)
-                if not provider_valid_outside_footprints(neighbor):
-                    fail(
-                        anchor_key,
-                        f"point anchor {entry.anchor_cell} has provider-invalid neighbor {neighbor} in its entry direction",
-                    )
-
-    # -- one grid room hosts one gate: two gates sharing a destination room
-    #    would collide on the room's single WildernessGateExit slot and leave
-    #    one gate unprovisionable. Checked after the per-entry rules so every
-    #    more precise collision rule keeps naming its own cause.
-    for anchor_key, gate in gate_rooms:
-        gate_room = (gate.z_map_key, settlement_position(index, gate.destination))
-        if gate_room in seen_gate_rooms:
-            fail(anchor_key, f"gate {gate.return_direction!r} shares destination room {gate_room} with another gate")
-        seen_gate_rooms.add(gate_room)
-
-
 #: The composed wilderness gateways of the published settlements, keyed by the
 #: anchor (``location_ref``) whose footprint and gates they declare. A
 #: settlement with no ``wilderness_entry`` row has no wilderness gateway.

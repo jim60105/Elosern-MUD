@@ -142,42 +142,22 @@ def _validate(
     documents: Mapping[str, InteriorDocument],
 ) -> list[str]:
     """Every cross-document rule a published interior world must satisfy."""
+    from elosern_map_core.authoring import diagnose_interior_rules
 
-    problems: list[str] = []
-    seen_rooms: dict[str, str] = {}
-    doorway_owners: dict[tuple[str, str, str], str] = {}
+    problems: list[str] = [diag.message for diag in diagnose_interior_rules(documents)]
 
+    # The exterior room membership and interior link target checks below mirror
+    # core _structural_diagnostics, remaining load-bearing here so direct
+    # callers of build_interiors() validate candidate integrity even when not
+    # running through full AuthoringWorld loading.
     for interior_id in sorted(documents):
         document = documents[interior_id]
-        for room_id in document.rooms:
-            previous = seen_rooms.get(room_id)
-            if previous is not None:
-                problems.append(
-                    f"room {room_id!r} is declared by interior {previous!r} and "
-                    f"interior {interior_id!r}; a persistent room has one identity"
-                )
-                continue
-            seen_rooms[room_id] = interior_id
         exterior = document.exterior
-        if exterior is None:
-            continue
-        if exterior.room not in document.rooms:
+        if exterior is not None and exterior.room not in document.rooms:
             problems.append(
                 f"interior {interior_id!r} opens onto room {exterior.room!r}, "
                 "which it does not author"
             )
-            continue
-        doorway = (exterior.settlement, exterior.node, exterior.doorway_key)
-        previous = doorway_owners.get(doorway)
-        if previous is not None:
-            problems.append(
-                f"interiors {previous!r} and {interior_id!r} both declare doorway "
-                f"{exterior.doorway_key!r} on the exterior "
-                f"{exterior.node!r} of {exterior.settlement!r}; two interiors on "
-                "one exterior must name their doorways differently"
-            )
-            continue
-        doorway_owners[doorway] = interior_id
 
     for interior_id in sorted(documents):
         for link in documents[interior_id].interior_links:

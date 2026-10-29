@@ -277,14 +277,23 @@ def test_the_fresh_baseline_guard_refuses_an_anchor_the_snapshot_has_not_seen(wo
     """An external anchor added after the last read is still found on disk."""
 
     editor = Editor(workspace)
-    settlement = fixture.settlement_data()
-    settlement["nodes"]["yard"]["prototype_parent"] = "anchor_room"
-    settlement["nodes"]["yard"]["anchor_key"] = fixture.BARE_LOCATION_ID
-    (workspace / SETTLEMENT).write_text(fixture.yaml_text(settlement), encoding="utf-8")
+    # A new document binds the bare location: one anchor_room, keyed by its
+    # own location_ref, so the shared core gate accepts the fresh disk world.
+    outpost = fixture.settlement_data()
+    outpost["id"] = "synthetic_outpost"
+    outpost["location_ref"] = fixture.BARE_LOCATION_ID
+    outpost["binding"]["anchor_cell"] = {"cell_x": 30, "cell_y": 12}
+    outpost["nodes"]["gate"]["anchor_key"] = fixture.BARE_LOCATION_ID
+    outpost["wilderness_entry"] = None
+    outpost["city_gate"] = None
+    (workspace / "content/maps/settlements/synthetic_outpost.yaml").write_text(
+        fixture.yaml_text(outpost), encoding="utf-8"
+    )
     before = fixture.tree_digest(workspace)
     status, body = _send(editor, "delete_location", LOCATIONS, {"location_id": fixture.BARE_LOCATION_ID})
     assert (status, body["error"]["code"]) == (409, "deletion_refused")
-    assert body["error"]["internal_references"][0]["kind"] == "anchor_key"
+    kinds = {row["kind"] for row in body["error"]["internal_references"]}
+    assert {"location_ref", "anchor_key"} <= kinds
     assert fixture.tree_digest(workspace) == before
 
 

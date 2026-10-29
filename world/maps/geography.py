@@ -403,20 +403,16 @@ def build_geography(
     # Gateway footprints, anchors and approaches are terrain-dependent, so the
     # candidate's own frame and walkability must be checked here: publication
     # must never precede a rejection that a later sync would raise.
-    from elosern_map_core.terrain import is_walkable_cell as _core_is_walkable
-    from world.lore.wilderness_entry import validate_wilderness_entries
+    from elosern_map_core.authoring import diagnose_settlement_rules
 
-    try:
-        validate_wilderness_entries(
-            settlements.wilderness_entries,
-            index=settlements.reference_index,
-            placements=settlements.anchor_placements,
-            extents=settlements.node_extents,
-            bounds=(terrain.max_x, terrain.max_y),
-            walkable=lambda cell: _core_is_walkable(terrain, cell),
-        )
-    except ValueError as error:
-        problems.append(str(error))
+    for diag in diagnose_settlement_rules(
+        settlements.settlements,
+        locations=locations,
+        frame_cells=terrain.frame_cells,
+        terrain=terrain,
+    ):
+        if diag.message not in problems:
+            problems.append(diag.message)
     try:
         snapshot = GeographySnapshot(
             continent=continent,

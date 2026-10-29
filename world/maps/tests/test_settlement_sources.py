@@ -274,7 +274,7 @@ class SettlementCandidateRejectionTests(unittest.TestCase):
                 _document(),
                 _document(second, path="content/maps/settlements/t_other.yaml"),
             ],
-            "bound by more than one settlement",
+            "already bound by",
         )
 
     def test_an_unknown_location_reference_is_refused(self):
@@ -293,7 +293,7 @@ class SettlementCandidateRejectionTests(unittest.TestCase):
         no_anchor = _THIRD.replace(
             "prototype_parent: anchor_room", "prototype_parent: grid_room"
         ).replace("    anchor_key: village_eolas", "    anchor_key:")
-        self._rejected([_document(no_anchor)], "anchor_room nodes")
+        self._rejected([_document(no_anchor)], "anchor_room node")
 
     def test_a_binding_that_disagrees_with_the_anchor_node_is_refused(self):
         self._rejected(

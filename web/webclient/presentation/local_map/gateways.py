@@ -21,9 +21,9 @@ def _registered_gateways() -> list[tuple[tuple[int, int], tuple[tuple[int, int],
 
     Walks ``WILDERNESS_ENTRY_REGISTRY`` (deferred import, lore's own module
     boundary). A gate whose ``approach_cell`` is ``None`` is skipped, never
-    raised on -- the registry is validated at sync time
-    (``validate_wilderness_entries``) and this presenter must not go
-    unavailable on authored data (design D1).
+    raised on -- the shared core map diagnostics validate the registry before
+    publication and this presenter must not go unavailable on authored data
+    (design D1).
     """
     from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
     from world.maps.static_references import settlement_node_xy

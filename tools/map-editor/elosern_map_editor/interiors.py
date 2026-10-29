@@ -40,9 +40,9 @@ distance or a physical length in a source document.
     browser's 自動排列). It never touches a world document.
 
 A new room ID must not be declared by any interior: the game gives a
-permanent room one identity across every interior, and
-:func:`~elosern_map_editor.commands.check_room_identities` enforces that on
-the fresh disk baseline for every interior effect, undo and redo included.
+permanent room one identity across every interior, and the shared core
+authoring gate reports ``duplicate_interior_room`` for the candidate, so the
+editor refuses the write, undo and redo included.
 """
 
 from __future__ import annotations

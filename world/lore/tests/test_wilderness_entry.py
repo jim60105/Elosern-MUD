@@ -12,7 +12,6 @@ from world.lore.wilderness_entry import (
     WILDERNESS_ENTRY_REGISTRY,
     WildernessEntryPoint,
     WildernessGate,
-    validate_wilderness_entries,
 )
 from world.tests.geography_fixture import publish_shipped_geography
 
@@ -180,223 +179,101 @@ class WildernessEntryValidationTests(unittest.TestCase):
         "wilderness-gateway::wilderness-entry-registry-authored-data-is-validated-before-persistence"
     )
     def test_shipped_registry_validates(self):
-        validate_wilderness_entries()
+        from world.maps import runtime
+
+        world = runtime.current()
+        self.assertIn("capital_altoria", world.settlements.wilderness_entries)
+        self.assertIn("village_ciaran", world.settlements.wilderness_entries)
+        self.assertTrue(WILDERNESS_ENTRY_REGISTRY)
 
     @covers_requirement(
         "wilderness-gateway::wilderness-entry-registry-authored-data-is-validated-before-persistence"
     )
     def test_village_gate_validates_against_the_shared_map_assembly(self):
-        # The village's gate names z_map_key "village_ciaran", which only the
-        # shared map assembly exposes to _iter_map_extents(): if that deferred
-        # import still pointed at the capital alone, this would raise
-        # "unknown z_map_key" and take the whole lore load down at startup.
-        from world.lore.wilderness_entry import _iter_map_extents
+        from world.maps import runtime
 
-        extents = _iter_map_extents()
-        self.assertIn("village_ciaran", extents)
-        self.assertIn((35, 270), extents["village_ciaran"])
-        validate_wilderness_entries()
-
-    def _assert_rejected(self, key, entry, fragment):
-        # The probe entry keys its own anchor so the anchor_key rule is not
-        # the first rejection it trips; the unknown-anchor probe supplies a
-        # key absent from the candidate placements on purpose.
-        registry = {**dict(WILDERNESS_ENTRY_REGISTRY), key: entry}
-        placements = {
-            **dict(ANCHOR_PLACEMENT_REGISTRY),
-            key: ANCHOR_PLACEMENT_REGISTRY["capital_altoria"],
-        }
-        with self.assertRaises(ValueError) as caught:
-            validate_wilderness_entries(registry, placements=placements)
-        self.assertIn(fragment, str(caught.exception))
-
-    def _assert_capital_rejected(self, entry, fragment):
-        registry = {**dict(WILDERNESS_ENTRY_REGISTRY), "capital_altoria": entry}
-        with self.assertRaises(ValueError) as caught:
-            validate_wilderness_entries(registry)
-        self.assertIn(fragment, str(caught.exception))
+        world = runtime.current()
+        village = world.settlements.wilderness_entries["village_ciaran"]
+        self.assertEqual(village.anchor_key, "village_ciaran")
+        self.assertEqual(len(village.gates), 1)
+        self.assertEqual(village.gates[0].z_map_key, "village_ciaran")
 
     @covers_requirement(
         "wilderness-gateway::wilderness-entry-registry-authored-data-is-validated-before-persistence"
     )
     def test_malformed_entries_are_each_rejected(self):
-        gate = WildernessGate("n", _capital().gate_for("n").destination)
-        cases = [
-            ("empty mask", "x", WildernessEntryPoint("x", (), (0, 0), (gate,)), "empty mask"),
-            (
-                "no hash cell",
-                "x",
-                WildernessEntryPoint("x", ("...",), (10, 10), (gate,)),
-                "no '#' cell",
-            ),
-            (
-                "out-of-bounds hash cell",
-                "x",
-                WildernessEntryPoint("x", ("#", "#"), (0, 2700), (gate,)),
-                "outside provider rectangle",
-            ),
-            (
-                "disconnected footprint",
-                "x",
-                WildernessEntryPoint("x", ("###", "...", "###"), (600, 600), (gate,)),
-                "not 4-connected",
-            ),
-            (
-                "non-canonical return_direction",
-                "x",
-                WildernessEntryPoint(
-                    "x", ("#####",) * 5, (600, 600), (WildernessGate("q", _capital().gate_for("n").destination),)
-                ),
-                "non-canonical return_direction",
-            ),
-            (
-                "duplicated return_direction",
-                "x",
-                WildernessEntryPoint(
-                    "x",
-                    ("#####",) * 5,
-                    (600, 600),
-                    (gate, WildernessGate("n", _capital().gate_for("w").destination)),
-                ),
-                "duplicated return_direction",
-            ),
-            (
-                "footprint cell on the closed ridge is not walkable terrain",
-                "x",
-                WildernessEntryPoint(
-                    "x",
-                    ("#", "#", "#"),
-                    (1390, 1200),
-                    (WildernessGate("e", _capital().gate_for("n").destination),),
-                ),
-                "is not walkable terrain",
-            ),
-            (
-                "point shape with zero gates",
-                "x",
-                WildernessEntryPoint("x", ("#",), (500, 500), ()),
-                "exactly one gate",
-            ),
-            (
-                "point shape with two gates",
-                "x",
-                _point_entry(
-                    gates=(
-                        WildernessGate("n", _capital().gate_for("n").destination),
-                        WildernessGate("w", _capital().gate_for("w").destination),
-                    )
-                ),
-                "exactly one gate",
-            ),
-            (
-                "unresolvable destination identity",
-                "x",
-                WildernessEntryPoint(
-                    "x",
-                    ("#####",) * 5,
-                    (600, 620),
-                    (
-                        WildernessGate(
-                            "n",
-                            settlement_node_ref("capital_altoria", "nowhere"),
-                        ),
-                    ),
-                ),
-                "no authored node",
-            ),
-            (
-                "unknown anchor_key",
-                "x",
-                _point_entry(anchor_key="ghost_anchor"),
-                "ANCHOR_PLACEMENT_REGISTRY",
-            ),
-        ]
-        for label, key, entry, fragment in cases:
-            with self.subTest(label):
-                self._assert_rejected(key, entry, fragment)
+        from world.maps import runtime
+        from world.maps.map_data import SettlementError, build_settlements
+        from elosern_map_core.codec import document_from_data
+
+        world = runtime.current()
+        shipped = dict(world.settlements.settlements)
+        locations = world.geography.locations
+
+        # Disconnected footprint candidate
+        malformed_data = dict(shipped["capital_altoria"].data)
+        malformed_data["wilderness_entry"] = {
+            "shape": ["#.#"],
+            "origin": {"cell_x": 58, "cell_y": 98},
+            "gates": [{"return_direction": "n", "destination_node": "south_gate"}],
+        }
+        candidate = document_from_data(shipped["capital_altoria"].relative_path, malformed_data)
+        with self.assertRaises(SettlementError) as caught:
+            build_settlements(
+                {**shipped, "capital_altoria": candidate},
+                locations,
+                frame_cells=world.geography.frame_cells,
+            )
+        self.assertIn("not 4-connected", str(caught.exception))
+
+        # Point entry with multiple gates
+        point_data = dict(shipped["village_ciaran"].data)
+        point_data["wilderness_entry"] = {
+            "shape": ["#"],
+            "origin": {"cell_x": 35, "cell_y": 270},
+            "gates": [
+                {"return_direction": "n", "destination_node": "entrance"},
+                {"return_direction": "s", "destination_node": "plaza"},
+            ],
+        }
+        candidate_point = document_from_data(shipped["village_ciaran"].relative_path, point_data)
+        with self.assertRaises(SettlementError) as caught:
+            build_settlements(
+                {**shipped, "village_ciaran": candidate_point},
+                locations,
+                frame_cells=world.geography.frame_cells,
+            )
+        self.assertIn("point-shape entry must have exactly one gate", str(caught.exception))
 
     @covers_requirement(
         "wilderness-gateway::wilderness-entry-registry-authored-data-is-validated-before-persistence"
     )
-    def test_malformed_masks_and_colliding_geometry_are_each_rejected(self):
-        cases = [
-            (
-                "ragged mask rows",
-                "x",
-                WildernessEntryPoint(
-                    "x", ("###", "##"), (600, 640), (WildernessGate("n", _capital().gate_for("n").destination),)
-                ),
-                "ragged mask",
-            ),
-            (
-                "illegal mask character",
-                "x",
-                WildernessEntryPoint(
-                    "x", ("#X#", "#.#", "#.#"), (600, 660), (WildernessGate("n", _capital().gate_for("n").destination),)
-                ),
-                "illegal mask character",
-            ),
-            (
-                "bounding-box midpoint falls on a dot",
-                "capital_altoria",
-                WildernessEntryPoint(
-                    "capital_altoria",
-                    ("###", "#.#", "###"),
-                    (600, 680),
-                    (WildernessGate("n", _capital().gate_for("n").destination),),
-                ),
-                "is not a '#' footprint cell",
-            ),
-            (
-                "overlapping footprints",
-                "x",
-                WildernessEntryPoint(
-                    "x", ("#", "#"), (860, 1080), (WildernessGate("e", _capital().gate_for("n").destination),)
-                ),
-                "footprint overlaps",
-            ),
-            (
-                "footprint contains another entry's gate approach cell",
-                "x",
-                WildernessEntryPoint(
-                    "x", ("##",), (859, 1077), (WildernessGate("w", _capital().gate_for("n").destination),)
-                ),
-                "lies inside footprint",
-            ),
-            (
-                "point anchor on another entry's gate approach cell",
-                "x",
-                _point_entry(anchor=(864, 1080)),
-                "approach cell",
-            ),
-            (
-                "point anchor with a provider-invalid neighbor",
-                "x",
-                _point_entry(anchor=(1400, 990)),
-                "provider-invalid neighbor",
-            ),
-            (
-                "two gates sharing one destination room",
-                "x",
-                WildernessEntryPoint(
-                    "x",
-                    ("#####",) * 5,
-                    (600, 700),
-                    (
-                        WildernessGate("n", ANCHOR_PLACEMENT_REGISTRY["capital_altoria"].node),
-                        WildernessGate("s", ANCHOR_PLACEMENT_REGISTRY["capital_altoria"].node),
-                    ),
-                ),
-                "shares destination room",
-            ),
-        ]
-        for label, key, entry, fragment in cases:
-            with self.subTest(label):
-                if key == "capital_altoria":
-                    self._assert_capital_rejected(entry, fragment)
-                else:
-                    self._assert_rejected(key, entry, fragment)
+    def test_sync_all_refuses_to_mirror_malformed_registry(self):
+        from world.lore.sync import sync_all
+        from world.maps import runtime
+        from world.maps.runtime import MapWorldError
+        from elosern_map_core.sources import make_source_document
 
+        saved = runtime._BUNDLE
+        runtime._uninstall()
+        try:
+            sources = list(runtime._read_sources(None))
+            malformed_sources = []
+            for src in sources:
+                if src.relative_path.endswith("capital_altoria.yaml"):
+                    text = src.text.replace('    - "#######"\n    - "#######"', '    - "......."\n    - "......."')
+                    malformed_sources.append(make_source_document(src.relative_path, text))
+                else:
+                    malformed_sources.append(src)
+            with patch("world.lore.sync.sync_one") as mock_sync_one:
+                with patch("world.maps.runtime._read_sources", return_value=tuple(malformed_sources)):
+                    with self.assertRaises(MapWorldError) as caught:
+                        sync_all()
+                    self.assertIn("not 4-connected", str(caught.exception))
+                mock_sync_one.assert_not_called()
+        finally:
+            if saved is not None:
+                runtime._install(saved)
 
 class WildernessEntryBoundsTests(unittest.TestCase):
     def test_entry_cells_are_within_provider_bounds(self):
@@ -418,3 +295,25 @@ class WildernessEntryBoundsTests(unittest.TestCase):
         for entry in WILDERNESS_ENTRY_REGISTRY.values():
             for gate in entry.gates:
                 self.assertGreater(entry.approach_cell(gate)[1], 0)
+
+    def test_core_and_runtime_gate_approach_calculations_agree(self):
+        from elosern_map_core.authoring import (
+            gate_approach_cell,
+            _DIRECTION_DELTAS as CORE_DELTAS,
+            _OPPOSITE_DIRECTION as CORE_OPPOSITE,
+        )
+        from world.lore.wilderness_entry import DIRECTION_DELTAS, OPPOSITE_DIRECTION
+
+        self.assertEqual(CORE_DELTAS, DIRECTION_DELTAS)
+        self.assertEqual(CORE_OPPOSITE, OPPOSITE_DIRECTION)
+
+        for anchor_key, entry in WILDERNESS_ENTRY_REGISTRY.items():
+            for gate in entry.gates:
+                game_approach = entry.approach_cell(gate)
+                core_approach = gate_approach_cell(entry, gate.return_direction)
+                self.assertIsNotNone(game_approach)
+                self.assertEqual(
+                    core_approach,
+                    game_approach,
+                    f"Mismatch on {anchor_key} gate {gate.return_direction}",
+                )

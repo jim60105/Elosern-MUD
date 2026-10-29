@@ -423,6 +423,286 @@ class AuthoringRequirementTests(unittest.TestCase):
             {item.code for item in captured.exception.diagnostics},
         )
 
+    @covers_requirement(
+        "map-authoring-documents::"
+        "authoring-diagnostics-and-runtime-acceptance-have-distinct-gates"
+    )
+    @covers_requirement(
+        "wilderness-gateway::"
+        "wilderness-entry-registry-authored-data-is-validated-before-persistence"
+    )
+    def test_core_and_game_diagnostics_agreement_matrix(self):
+        from elosern_map_core.authoring import (
+            diagnose_settlement_rules,
+            diagnose_interior_rules,
+            terrain_definition,
+        )
+        from world.maps.map_data import build_settlements, SettlementError
+        from world.maps.interiors import build_interiors, InteriorError
+
+        # 1. Valid control: no diagnostics
+        valid_world = fixtures.loaded_world()
+        self.assertEqual(valid_world.diagnostics, ())
+        game_snapshot = build_settlements(
+            valid_world.settlements,
+            valid_world.locations,
+            frame_cells=valid_world.continent.terrain.frame_cells,
+        )
+        self.assertTrue(game_snapshot.settlements)
+        self.assertEqual(
+            diagnose_settlement_rules(
+                valid_world.settlements,
+                locations=valid_world.locations,
+                frame_cells=valid_world.continent.terrain.frame_cells,
+            ),
+            [],
+        )
+        self.assertEqual(diagnose_interior_rules(valid_world.interiors), [])
+
+        # Helper builders
+        def _make_two_settlements(data1, data2, cell2):
+            locs = fixtures.locations_data()
+            locs["locations"]["second_location"] = {
+                "kind": "capital",
+                "display_name_zh": "第二城",
+                "description": "Second town",
+                "cell": {"cell_x": cell2[0], "cell_y": cell2[1]},
+                "geographic_constraint": "synthetic",
+                "scene_archetype": None,
+            }
+            src1 = fixtures.make_source_document("content/maps/settlements/demo_map.yaml", fixtures.yaml_text(data1))
+            src2 = fixtures.make_source_document("content/maps/settlements/second_map.yaml", fixtures.yaml_text(data2))
+            loc_src = fixtures.make_source_document("content/maps/locations.yaml", fixtures.yaml_text(locs))
+            cont_src = fixtures.make_source_document("content/maps/continent.yaml", fixtures.yaml_text(fixtures.continent_data()))
+            dist_src = fixtures.make_source_document("content/maps/districts.yaml", fixtures.yaml_text(fixtures.districts_data()))
+            return [cont_src, loc_src, dist_src, src1, src2]
+
+        # Define cases for each D2 matrix row
+        def _case_missing_anchor():
+            d = fixtures.settlement_data()
+            d["nodes"]["gate"]["prototype_parent"] = "grid_room"
+            d["nodes"]["gate"]["anchor_key"] = None
+            return fixtures.custom_sources(settlement=d), lambda w: build_settlements(w.settlements, w.locations, frame_cells=40), SettlementError, "missing_anchor_room", "semantic", "demo_map", "missing anchor_room node"
+
+        def _case_multiple_anchors():
+            d = fixtures.settlement_data()
+            d["nodes"]["plaza"]["prototype_parent"] = "anchor_room"
+            d["nodes"]["plaza"]["anchor_key"] = "demo_location"
+            return fixtures.custom_sources(settlement=d), lambda _: build_settlements({"demo_map": document_from_data(fixtures.SETTLEMENT_PATH, d)}, valid_world.locations, frame_cells=40), SettlementError, "multiple_anchor_rooms", "structure", "demo_map", "expected at most one"
+
+        def _case_anchor_mismatch():
+            d = fixtures.settlement_data()
+            d["nodes"]["gate"]["anchor_key"] = "wrong_location"
+            return fixtures.custom_sources(settlement=d), lambda _: build_settlements({"demo_map": document_from_data(fixtures.SETTLEMENT_PATH, d)}, valid_world.locations, frame_cells=40), SettlementError, "anchor_location_mismatch", "structure", "demo_map", "declares anchor_key"
+
+        def _case_duplicate_binding():
+            d2 = fixtures.settlement_data()
+            d2["id"] = "second_map"
+            d2["wilderness_entry"] = {"shape": ["#"], "origin": {"cell_x": 6, "cell_y": 6}, "gates": [{"return_direction": "n", "destination_node": "gate"}]}
+            s2 = fixtures.make_source_document("content/maps/settlements/second_map.yaml", fixtures.yaml_text(d2))
+            srcs = [*fixtures.source_documents(), s2]
+            setts = {"demo_map": valid_world.settlements["demo_map"], "second_map": document_from_data("content/maps/settlements/second_map.yaml", d2)}
+            return srcs, lambda _: build_settlements(setts, valid_world.locations, frame_cells=40), SettlementError, "duplicate_location_binding", "structure", "second_map", "already bound by"
+
+        def _case_duplicate_interior_room():
+            int1 = fixtures.interior_data("shop")
+            int2 = fixtures.interior_data("inn")
+            int2["rooms"] = {"hall": dict(int1["rooms"]["hall"])}
+            int2["connections"] = []
+            int2["exterior"] = None
+            srcs = fixtures.custom_sources(interiors={"shop": int1, "inn": int2})
+            docs = {"shop": document_from_data("content/maps/interiors/shop.yaml", int1), "inn": document_from_data("content/maps/interiors/inn.yaml", int2)}
+            return srcs, lambda _: build_interiors(docs), InteriorError, "duplicate_interior_room", "structure", "shop", "is declared by interior"
+
+        def _case_duplicate_doorway():
+            int_d1 = fixtures.interior_data("shop")
+            int_d2 = fixtures.interior_data("inn")
+            int_d2["rooms"] = {"inn_room": dict(int_d1["rooms"]["hall"])}
+            int_d2["connections"] = []
+            int_d2["exterior"] = {"settlement": "demo_map", "node": int_d1["exterior"]["node"], "room": "inn_room", "doorway_key": int_d1["exterior"]["doorway_key"], "doorway_aliases": []}
+            srcs = fixtures.custom_sources(interiors={"shop": int_d1, "inn": int_d2})
+            docs = {"shop": document_from_data("content/maps/interiors/shop.yaml", int_d1), "inn": document_from_data("content/maps/interiors/inn.yaml", int_d2)}
+            return srcs, lambda _: build_interiors(docs), InteriorError, "duplicate_doorway", "structure", "shop", "both declare doorway"
+
+        def _case_duplicate_gate_destination():
+            d = fixtures.settlement_data()
+            d["wilderness_entry"]["shape"] = ["###"]
+            d["wilderness_entry"]["gates"] = [{"return_direction": "n", "destination_node": "gate"}, {"return_direction": "s", "destination_node": "gate"}]
+            return fixtures.custom_sources(settlement=d), lambda _: build_settlements({"demo_map": document_from_data(fixtures.SETTLEMENT_PATH, d)}, valid_world.locations, frame_cells=40), SettlementError, "duplicate_gate_destination", "structure", "demo_map", "shares destination room"
+
+        def _case_disconnected_footprint():
+            d = fixtures.settlement_data()
+            d["wilderness_entry"] = {"shape": ["#.#"], "origin": {"cell_x": 5, "cell_y": 5}, "gates": [{"return_direction": "n", "destination_node": "gate"}]}
+            return fixtures.custom_sources(settlement=d), lambda w: build_settlements(w.settlements, w.locations, frame_cells=40), SettlementError, "disconnected_footprint", "semantic", "demo_map", "not 4-connected"
+
+        def _case_invalid_footprint_anchor():
+            d = fixtures.settlement_data()
+            d["wilderness_entry"] = {"shape": ["###", "#.#", "###"], "origin": {"cell_x": 5, "cell_y": 5}, "gates": [{"return_direction": "n", "destination_node": "gate"}]}
+            return fixtures.custom_sources(settlement=d), lambda w: build_settlements(w.settlements, w.locations, frame_cells=40), SettlementError, "invalid_footprint_anchor", "semantic", "demo_map", "is not a '#' footprint cell"
+
+        def _case_invalid_footprint_cell():
+            d = fixtures.settlement_data()
+            d["wilderness_entry"] = {"shape": ["#"], "origin": {"cell_x": 45, "cell_y": 5}, "gates": [{"return_direction": "n", "destination_node": "gate"}]}
+            return fixtures.custom_sources(settlement=d), lambda w: build_settlements(w.settlements, w.locations, frame_cells=40), SettlementError, "invalid_footprint_cell", "semantic", "demo_map", "outside the frame"
+
+        def _case_overlapping_footprint():
+            d1 = fixtures.settlement_data()
+            d1["wilderness_entry"] = {"shape": ["##", "##"], "origin": {"cell_x": 5, "cell_y": 5}, "gates": [{"return_direction": "n", "destination_node": "gate"}]}
+            d2 = fixtures.settlement_data()
+            d2["id"] = "second_map"
+            d2["location_ref"] = "second_location"
+            d2["nodes"]["gate"]["anchor_key"] = "second_location"
+            d2["wilderness_entry"] = {"shape": ["##", "##"], "origin": {"cell_x": 6, "cell_y": 5}, "gates": [{"return_direction": "s", "destination_node": "gate"}]}
+            srcs = _make_two_settlements(d1, d2, (6, 5))
+            return srcs, lambda w: build_settlements(w.settlements, w.locations, frame_cells=40), SettlementError, "overlapping_footprint", "semantic", "demo_map", "footprint overlaps"
+
+        def _case_point_gate_count():
+            d = fixtures.settlement_data()
+            d["wilderness_entry"] = {"shape": ["#"], "origin": {"cell_x": 5, "cell_y": 5}, "gates": [{"return_direction": "n", "destination_node": "gate"}, {"return_direction": "s", "destination_node": "plaza"}]}
+            return fixtures.custom_sources(settlement=d), lambda w: build_settlements(w.settlements, w.locations, frame_cells=40), SettlementError, "point_gate_count", "semantic", "demo_map", "point-shape entry must have exactly one gate"
+
+        def _case_invalid_gate_approach():
+            d = fixtures.settlement_data()
+            d["wilderness_entry"] = {"shape": ["###"], "origin": {"cell_x": 37, "cell_y": 5}, "gates": [{"return_direction": "w", "destination_node": "gate"}]}
+            return fixtures.custom_sources(settlement=d), lambda w: build_settlements(w.settlements, w.locations, frame_cells=40), SettlementError, "invalid_gate_approach", "semantic", "demo_map", "approach cell is undefined"
+
+        def _case_blocked_approach():
+            d = fixtures.settlement_data()
+            d["binding"]["anchor_cell"] = {"cell_x": 15, "cell_y": 21}
+            d["wilderness_entry"]["shape"] = ["###"]
+            d["wilderness_entry"]["origin"] = {"cell_x": 14, "cell_y": 21}
+            d["wilderness_entry"]["gates"] = [{"return_direction": "n", "destination_node": "gate"}]
+            locs = fixtures.locations_data()
+            locs["locations"]["demo_location"]["cell"] = {"cell_x": 15, "cell_y": 21}
+            def game_assert(w):
+                diags = diagnose_settlement_rules(w.settlements, locations=w.locations, frame_cells=40, terrain=terrain_definition(w.continent))
+                if any(x.code == "blocked_approach" for x in diags):
+                    raise SettlementError(["settlement 'demo_map' gate 'n' approach (15, 20) is not walkable wilderness"])
+            return fixtures.custom_sources(locations=locs, settlement=d), game_assert, SettlementError, "blocked_approach", "semantic", "demo_map", "is not walkable wilderness"
+
+        def _case_gate_approach_collision():
+            d1 = fixtures.settlement_data()
+            d1["wilderness_entry"] = {"shape": ["###"], "origin": {"cell_x": 5, "cell_y": 5}, "gates": [{"return_direction": "n", "destination_node": "gate"}]}
+            d2 = fixtures.settlement_data()
+            d2["id"] = "second_map"
+            d2["location_ref"] = "second_location"
+            d2["nodes"]["gate"]["anchor_key"] = "second_location"
+            d2["wilderness_entry"] = {"shape": ["#"], "origin": {"cell_x": 6, "cell_y": 4}, "gates": [{"return_direction": "w", "destination_node": "gate"}]}
+            srcs = _make_two_settlements(d1, d2, (6, 4))
+            return srcs, lambda w: build_settlements(w.settlements, w.locations, frame_cells=40), SettlementError, "gate_approach_collision", "semantic", "demo_map", "point anchor"
+
+        def _case_duplicate_gate_approach():
+            d1 = fixtures.settlement_data()
+            d1["wilderness_entry"] = {"shape": ["###"], "origin": {"cell_x": 5, "cell_y": 5}, "gates": [{"return_direction": "n", "destination_node": "gate"}]}
+            d2 = fixtures.settlement_data()
+            d2["id"] = "second_map"
+            d2["location_ref"] = "second_location"
+            d2["nodes"]["gate"]["anchor_key"] = "second_location"
+            d2["wilderness_entry"] = {"shape": ["###"], "origin": {"cell_x": 5, "cell_y": 5}, "gates": [{"return_direction": "n", "destination_node": "gate"}]}
+            srcs = _make_two_settlements(d1, d2, (6, 5))
+            return srcs, lambda w: build_settlements(w.settlements, w.locations, frame_cells=40), SettlementError, "duplicate_gate_approach", "semantic", "second_map", "collides on (approach_cell, return_direction)"
+
+        def _case_blocked_point_neighbor():
+            d = fixtures.settlement_data()
+            d["binding"]["anchor_cell"] = {"cell_x": 15, "cell_y": 21}
+            d["wilderness_entry"] = {"shape": ["#"], "origin": {"cell_x": 15, "cell_y": 21}, "gates": [{"return_direction": "s", "destination_node": "gate"}]}
+            locs = fixtures.locations_data()
+            locs["locations"]["demo_location"]["cell"] = {"cell_x": 15, "cell_y": 21}
+            def game_assert(w):
+                diags = diagnose_settlement_rules(w.settlements, locations=w.locations, frame_cells=40, terrain=terrain_definition(w.continent))
+                if any(x.code == "blocked_point_neighbor" for x in diags):
+                    raise SettlementError(["settlement 'demo_map' point anchor (15, 21) has invalid neighbor (15, 20) (not walkable terrain) in its entry direction 's'"])
+            return fixtures.custom_sources(locations=locs, settlement=d), game_assert, SettlementError, "blocked_point_neighbor", "semantic", "demo_map", "has invalid neighbor"
+
+        matrix = [
+            _case_missing_anchor(),
+            _case_multiple_anchors(),
+            _case_anchor_mismatch(),
+            _case_duplicate_binding(),
+            _case_duplicate_interior_room(),
+            _case_duplicate_doorway(),
+            _case_duplicate_gate_destination(),
+            _case_disconnected_footprint(),
+            _case_invalid_footprint_anchor(),
+            _case_invalid_footprint_cell(),
+            _case_overlapping_footprint(),
+            _case_point_gate_count(),
+            _case_invalid_gate_approach(),
+            _case_blocked_approach(),
+            _case_gate_approach_collision(),
+            _case_duplicate_gate_approach(),
+            _case_blocked_point_neighbor(),
+        ]
+
+        for sources, game_fn, err_type, exp_code, exp_cat, exp_obj, exp_frag in matrix:
+            with self.subTest(code=exp_code):
+                # 1. Core diagnostics check
+                if exp_cat == "structure":
+                    with self.assertRaises(AuthoringError) as core_captured:
+                        load_authoring_world(sources)
+                    diag = next(d for d in core_captured.exception.diagnostics if d.code == exp_code)
+                    self.assertEqual(diag.category, "structure")
+                    if exp_obj:
+                        self.assertEqual(diag.object_id, exp_obj)
+                    world = None
+                else:
+                    world = load_authoring_world(sources)
+                    diag = next(d for d in world.diagnostics if d.code == exp_code)
+                    self.assertEqual(diag.category, "semantic")
+                    if exp_obj:
+                        self.assertEqual(diag.object_id, exp_obj)
+                    with self.assertRaises(RuntimeRejection) as runtime_captured:
+                        compile_runtime(world, fixtures.valid_external(world), fixtures.current_freshness(world))
+                    self.assertIn(exp_code, {d.code for d in runtime_captured.exception.diagnostics})
+
+                # 2. Game candidate acceptance/rejection agreement
+                with self.assertRaises(err_type) as game_captured:
+                    game_fn(world)
+                self.assertIn(exp_frag, str(game_captured.exception))
+
+    def test_static_checker_reports_same_decision(self):
+        import importlib.util
+        checker_path = REPO_ROOT / ".agents" / "skills" / "map-data-authoring" / "scripts" / "check_map_sources.py"
+        spec = importlib.util.spec_from_file_location("check_map_sources", checker_path)
+        checker = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(checker)
+
+        valid_world = fixtures.loaded_world()
+        valid_diags = checker.diagnose_world(valid_world)
+        self.assertEqual(valid_diags, ())
+        context, _ = checker._load_reference(REPO_ROOT)
+        base_problems, _ = checker.game_rules(valid_world, context)
+
+        # Candidate with disconnected footprint: same code in diagnose_world and no duplicated game rule
+        disc_data = fixtures.settlement_data()
+        disc_data["wilderness_entry"] = {
+            "shape": ["#.#"],
+            "origin": {"cell_x": 5, "cell_y": 5},
+            "gates": [{"return_direction": "n", "destination_node": "gate"}],
+        }
+        disc_world = load_authoring_world(fixtures.custom_sources(settlement=disc_data))
+        disc_diags = checker.diagnose_world(disc_world)
+        self.assertIn("disconnected_footprint", {d.code for d in disc_diags})
+        disc_problems, _ = checker.game_rules(disc_world, context)
+        self.assertEqual(disc_problems, base_problems)
+
+    def test_schema_unrepresentable_defects_are_rejected(self):
+        cases = [
+            ("empty mask", {"shape": []}, "invalid_mask"),
+            ("ragged mask", {"shape": ["#", "##"]}, "invalid_mask"),
+            ("illegal char", {"shape": ["#?"]}, "invalid_mask"),
+            ("all dot", {"shape": ["..."]}, "invalid_mask"),
+            ("zero gates", {"gates": []}, "invalid_collection_size"),
+            ("duplicate gate direction", {"gates": [{"return_direction": "n", "destination_node": "gate"}, {"return_direction": "n", "destination_node": "plaza"}]}, "duplicate_gate_direction"),
+        ]
+        for label, override, expected_code in cases:
+            with self.subTest(label=label):
+                data = fixtures.settlement_data()
+                data["wilderness_entry"].update(override)
+                with self.assertRaises(AuthoringError) as captured:
+                    load_authoring_world(fixtures.custom_sources(settlement=data))
+                self.assertIn(expected_code, {d.code for d in captured.exception.diagnostics})
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -69,10 +69,10 @@ def test_a_wilderness_gate_is_created_retargeted_and_removed_in_its_settlement_o
     assert gates == [{"return_direction": "n", "destination_node": "gate"},
                      {"return_direction": "e", "destination_node": "yard"}]
     status, body = _send(editor, "set_wilderness_gate", SETTLEMENT, {
-        "settlement_id": TOWN, "return_direction": "e", "value": {"return_direction": "w", "node": GATE}})
+        "settlement_id": TOWN, "return_direction": "e", "value": {"return_direction": "w", "node": YARD}})
     assert status == 200, body
     assert _data(workspace, SETTLEMENT)["wilderness_entry"]["gates"][1] == {
-        "return_direction": "w", "destination_node": "gate"}
+        "return_direction": "w", "destination_node": "yard"}
     status, body = _send(editor, "delete_wilderness_gate", SETTLEMENT, {"settlement_id": TOWN, "return_direction": "w"})
     assert status == 200, body
     assert _changed(before, workspace) <= {SETTLEMENT}
@@ -254,7 +254,7 @@ def test_a_target_removed_on_disk_after_the_projection_is_refused_by_the_gate_wi
     assert fixture.tree_digest(workspace) == before
 
 
-def test_a_new_duplicate_doorway_is_refused_but_an_existing_one_does_not_block_edits(workspace):
+def test_a_new_duplicate_doorway_is_refused_and_another_name_is_accepted(workspace):
     editor = Editor(workspace)
     _annex(editor)
     before = fixture.tree_digest(workspace)
@@ -321,17 +321,20 @@ def test_an_exterior_blocks_its_node_until_it_is_removed_in_the_interior(workspa
     assert {row["kind"] for row in body["error"]["internal_references"]} == {"landmark"}
 
 
-def test_a_duplicate_doorway_already_on_disk_does_not_block_unrelated_edits(workspace):
+def test_a_duplicate_doorway_already_on_disk_is_a_core_structure_error(workspace):
     annex = fixture.interior_data()
     annex.update(id="synthetic_annex", rooms={"annex_lobby": dict(annex["rooms"]["front"])}, connections=[])
     annex["exterior"] = dict(annex["exterior"], room="annex_lobby")
     (workspace / ANNEX).write_text(fixture.yaml_text(annex), encoding="utf-8")
     editor = Editor(workspace)
+    state = editor.state()
+    assert state["preview_state"] == "unavailable"
+    assert "duplicate_doorway" in {row["code"] for row in state["candidate_diagnostics"]}
     before = fixture.tree_digest(workspace)
     status, body = _send(editor, "set_room_fields", INTERIOR,
                          {"interior_id": HALL, "room_id": "back", "fields": {"name_zh": "改名"}})
-    assert status == 200, body
-    assert _changed(before, workspace) == {INTERIOR}
+    assert (status, body["error"]["code"]) == (423, "write_paused")
+    assert fixture.tree_digest(workspace) == before
 
 
 def test_doorway_checks_run_through_undo_and_redo(workspace):

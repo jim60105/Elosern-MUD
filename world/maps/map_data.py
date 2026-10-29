@@ -48,8 +48,8 @@ from world.lore.anchors import LocalFrameAnchor
 from world.lore.wilderness_entry import (
     WildernessEntryPoint,
     WildernessGate,
-    validate_wilderness_entries,
 )
+from elosern_map_core.authoring import diagnose_settlement_rules
 from world.maps.city_gates import CityGateDef
 from world.maps.published import PublishedKeySet, PublishedView
 
@@ -223,23 +223,16 @@ def _compose_document(
         for node in document.nodes.values()
         if node.prototype_parent == "anchor_room"
     ]
-    anchor = None
-    if len(anchor_nodes) != 1:
-        fail(f"declares {len(anchor_nodes)} anchor_room nodes, expected exactly one")
-    else:
-        anchor = anchor_nodes[0]
-        if anchor.anchor_key != document.location_ref:
-            fail(
-                f"anchor node {anchor.node_id!r} declares anchor_key "
-                f"{anchor.anchor_key!r}, expected the location_ref "
-                f"{document.location_ref!r}"
-            )
+    anchor = anchor_nodes[0] if len(anchor_nodes) == 1 else None
+    if anchor is not None:
         if document.binding.local_anchor_m != (anchor.x_m, anchor.y_m):
             fail(
                 f"binding local_anchor_m {document.binding.local_anchor_m} disagrees "
                 f"with anchor node {anchor.node_id!r} at "
                 f"{(anchor.x_m, anchor.y_m)}"
             )
+    elif not anchor_nodes:
+        fail("missing anchor_room node")
     if location is not None and document.binding.anchor_cell != location.cell:
         fail(
             f"binding anchor_cell {document.binding.anchor_cell} disagrees with "
@@ -296,7 +289,7 @@ def _compose_document(
             )
 
     problems.extend(defects)
-    if defects:
+    if defects or anchor is None:
         return None, None, None, None, None, {}
 
     assert anchor is not None and location is not None
@@ -343,10 +336,6 @@ def build_settlements(
         if graph is None or placement is None or frame is None:
             continue
         if document.location_ref in placements:
-            problems.append(
-                f"location {document.location_ref!r} is bound by more than one "
-                f"settlement document"
-            )
             continue
         graphs[settlement_id] = graph
         placements[document.location_ref] = placement
@@ -360,31 +349,14 @@ def build_settlements(
             entries[entry.anchor_key] = entry
         scene_archetypes.update(scenes)
 
-    if not problems:
-        index = ReferenceIndex.build(
-            settlement_nodes=[
-                (settlement_id, node_id, node.coordinate)
-                for settlement_id, graph in graphs.items()
-                for node_id, node in graph.nodes.items()
-            ]
-        )
-        extents = {
-            settlement_id: {node.coordinate for node in graph.nodes.values()}
-            for settlement_id, graph in graphs.items()
-        }
-        try:
-            validate_wilderness_entries(
-                MappingProxyType(entries),
-                index=index,
-                placements=MappingProxyType(placements),
-                extents=extents,
-                bounds=(frame_cells - 1, frame_cells - 1),
-                # Terrain validity needs the geography candidate; the geometry,
-                # identity, uniqueness and footprint rules do not.
-                walkable=lambda cell: True,
-            )
-        except ValueError as error:
-            problems.append(str(error))
+    for diag in diagnose_settlement_rules(
+        settlements,
+        locations=locations,
+        frame_cells=frame_cells,
+        terrain=None,
+    ):
+        if diag.message not in problems:
+            problems.append(diag.message)
 
     if problems:
         raise SettlementError(problems)

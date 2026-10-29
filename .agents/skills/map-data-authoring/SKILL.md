@@ -102,20 +102,18 @@ indistinguishable from editor output:
    catalogues. The map data only *references* scene archetypes and art keys
    that already exist.
 
-## Cross-file invariants the core does not check
+## Cross-file invariants and validation ownership
 
-The editor's loader accepts the following, but the **game refuses to start**
-on them. The check script reports each one:
+Core diagnostics now check settlement anchor node presence/uniqueness and key match, footprint mask grammar and 4-connectedness, mask hash and approach cell validity, footprint and gate collisions, point gate counts and entry directions, and interior room ID and doorway uniqueness.
+
+The remaining game-side cross-file rules are enforced during candidate composition before publication:
 
 | When you change… | Also keep consistent |
 | --- | --- |
-| a location's `cell` (moving a town on the continent) | its settlement's `binding.anchor_cell` (must be equal), and normally `wilderness_entry.origin` so the mask's bounding-box midpoint is still the location cell. All cells must be walkable land. |
-| the `anchor_room` node's `x_m`/`y_m` | `binding.local_anchor_m` (must be equal) |
-| which node is the `anchor_room` | exactly one per settlement, with `anchor_key: <location_ref>` |
-| a settlement's footprint mask or gates | 4-connected `#`, walkable cells, no overlap with other footprints, unique destination node per gate, a point mask (one `#`) has exactly one gate |
-| an interior `exterior` | no two interiors on one node share a `doorway_key` |
+| a location's `cell` (moving a town on the continent) | its settlement's `binding.anchor_cell` (must be equal), and normally `wilderness_entry.origin` so the mask's bounding-box midpoint is still the location cell. |
+| the `anchor_room` node's `x_m`/`y_m` | `binding.local_anchor_m` (must be equal) until placement-schema cutover |
 | a Voronoi district landmark | ≥ 100 km from every other Voronoi landmark, unique district and landmark names |
-| any `scene_archetype` | must be in the reference index's `scene_archetypes` |
+| any `scene_archetype` or `nation_key` | must be in the reference index's registered identifier sets |
 
 Anything that feeds the district partition makes the committed partition
 stale. That includes continent terrain, locations, districts and **any**
