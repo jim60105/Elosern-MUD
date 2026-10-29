@@ -42,6 +42,7 @@ synthetic = _load("synthetic_workspace")
 
 ARTIFACT = "world/maps/data/district_partition.json"
 INDEX = "content/map-reference-context.json"
+CONTINENT = "content/maps/continent.yaml"
 SETTLEMENT = f"content/maps/settlements/{synthetic.SETTLEMENT_ID}.yaml"
 DISTRICTS = "content/maps/districts.yaml"
 LAYOUT = f"content/map-editor-layouts/{synthetic.INTERIOR_ID}.yaml"
@@ -59,15 +60,22 @@ map_id = {map_id}
 hidden = {hidden}
 
 calls = []
-original = ConfinedWorkspace.read_document
+original_document = ConfinedWorkspace.read_document
+original_external = ConfinedWorkspace.read_external
 
 
-def counted(self, relative_path, limit):
+def counted_document(self, relative_path, limit):
     calls.append(relative_path)
-    return original(self, relative_path, limit)
+    return original_document(self, relative_path, limit)
 
 
-ConfinedWorkspace.read_document = counted
+def counted_external(self, relative_path, limit):
+    calls.append(relative_path)
+    return original_external(self, relative_path, limit)
+
+
+ConfinedWorkspace.read_document = counted_document
+ConfinedWorkspace.read_external = counted_external
 outcome = {{}}
 try:
     outcome["payload"] = capture_snapshot.load_capture_snapshot(
@@ -120,6 +128,29 @@ def _write_layout(root: Path) -> Path:
         encoding="utf-8",
     )
     return path
+
+
+def _write_overlapping_context(root: Path, paths) -> None:
+    """A reference index whose manifest also lists already-loaded documents."""
+
+    synthetic.write_reference_context(root)
+    target = root / INDEX
+    document = json.loads(target.read_text(encoding="utf-8"))
+    document["source_manifest"] = {
+        **document["source_manifest"],
+        **{path: _sha(root / path) for path in paths},
+    }
+    digest = hashlib.sha256()
+    digest.update(b"schema_version=1\n")
+    digest.update(b"exporter_version=1\n")
+    for rule in sorted(document["discovery_rules"]):
+        digest.update(f"rule:{rule}\n".encode("utf-8"))
+    for path, file_hash in sorted(document["source_manifest"].items()):
+        digest.update(f"{path}:{file_hash}\n".encode("utf-8"))
+    document["fingerprint"] = digest.hexdigest()
+    target.write_text(
+        json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 def _probe(root: Path, *, view: str, map_id: str | None = None, hidden=()) -> dict:
@@ -403,6 +434,53 @@ class CaptureSnapshotPartitionTests(_CaptureCase):
         self.assertFalse((root / ARTIFACT).exists())
         self.assertFalse((root / INDEX).exists())
         self.assert_unchanged(root, before)
+
+    @covers_requirement(
+        "map-capture-snapshots::visible-continental-partition-requires-current-decoded-output"
+    )
+    def test_inconsistent_terrain_refuses_visible_partition_with_typed_guidance(self):
+        # Inconsistent terrain is loadable semantic work in progress, so the
+        # refusal must stay the typed partition failure with recovery guidance
+        # instead of escaping as a bare terrain-construction error.
+        root = self.partitioned()
+        continent = synthetic.continent_data()
+        continent["terrain"]["forest_edge"] = [
+            {"cell_x": 0, "cell_y": 30},
+            {"cell_x": 0, "cell_y": 30},
+        ]
+        (root / CONTINENT).write_text(synthetic.yaml_text(continent), encoding="utf-8")
+        before = synthetic.tree_digest(root)
+
+        error = self.assert_refused(_probe(root, view="continent"), "partition_unavailable")
+        self.assertEqual(error["reason"], "stale", error)
+        self.assertIn("regenerate_partition.py", error["guidance"])
+        self.assertIn("--hide partition", error["guidance"])
+        self.assert_unchanged(root, before)
+
+        hidden = _probe(root, view="continent", hidden=["partition"])
+        self.assertNotIn("error", hidden, hidden.get("error"))
+        self.assertIsNone(hidden["payload"]["partition"])
+        codes = {item["code"] for item in hidden["payload"]["diagnostics"]}
+        self.assertIn("terrain_inconsistent", codes)
+        self.assertEqual(hidden["payload"]["world"]["continent"]["terrain_preview"]["status"], "unavailable")
+
+    @covers_requirement("map-capture-snapshots::capture-snapshots-are-confined-and-read-only")
+    def test_an_index_listing_loaded_documents_adds_no_second_read(self):
+        # An index entry naming an already-loaded source, or the partition
+        # artifact, must not cause a second read of it; a hidden partition must
+        # still never read the artifact at all.
+        root = self.partitioned()
+        _write_overlapping_context(root, [CONTINENT, ARTIFACT])
+
+        outcome = _probe(root, view="continent")
+        self.assertNotIn("error", outcome, outcome.get("error"))
+        self.assertEqual(outcome["calls"].count(CONTINENT), 1, outcome["calls"])
+        self.assertEqual(outcome["calls"].count(ARTIFACT), 1, outcome["calls"])
+
+        hidden = _probe(root, view="continent", hidden=["partition"])
+        self.assertNotIn("error", hidden, hidden.get("error"))
+        self.assertEqual(hidden["calls"].count(ARTIFACT), 0, hidden["calls"])
+        self.assertEqual(hidden["calls"].count(CONTINENT), 1, hidden["calls"])
 
 
 if __name__ == "__main__":  # pragma: no cover

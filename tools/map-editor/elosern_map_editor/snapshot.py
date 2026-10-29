@@ -240,8 +240,20 @@ class ExternalContext:
     freshness: ReferenceContextFreshness | None = None
 
 
-def read_external_context(workspace: ConfinedWorkspace, limits: Limits) -> ExternalContext:
-    """Fresh confined read of the reference context, re-hashing every source."""
+def read_external_context(
+    workspace: ConfinedWorkspace,
+    limits: Limits,
+    *,
+    known_hashes: Mapping[str, str] | None = None,
+    unread: Iterable[str] = (),
+) -> ExternalContext:
+    """Fresh confined read of the reference context, re-hashing every source.
+
+    ``known_hashes`` supplies digests of documents the caller already read, so
+    an index that lists them costs no second read. ``unread`` names candidate
+    paths the caller deliberately did not read: an index depending on them
+    cannot be shown current, so it is reported unavailable instead.
+    """
 
     base = {"relative_path": REFERENCE_CONTEXT_ARTIFACT}
 
@@ -264,12 +276,21 @@ def read_external_context(workspace: ConfinedWorkspace, limits: Limits) -> Exter
     except ConfinementError as error:
         return unavailable("unavailable", f"unsafe discovery rule or manifest path: {error.relative_path}")
     discovered = discover_external_sources(workspace.root, context.discovery_rules)
+    known = {path: digest for path, digest in (known_hashes or {}).items()}
+    skipped = {path.replace("\\", "/") for path in unread}
     candidates = sorted(set(discovered) | set(context.source_manifest))
     if len(candidates) > limits.max_external_files:
         return unavailable("unavailable", f"{len(candidates)} external sources exceed the limit")
     hashes: dict[str, str] = {}
     total = 0
+    unresolved: list[str] = []
     for relative_path in candidates:
+        if relative_path in known:
+            hashes[relative_path] = known[relative_path]
+            continue
+        if relative_path in skipped:
+            unresolved.append(relative_path)
+            continue
         try:
             data = workspace.read_external(relative_path, limits.max_external_file_bytes)
         except ConfinementError as error:
@@ -280,6 +301,11 @@ def read_external_context(workspace: ConfinedWorkspace, limits: Limits) -> Exter
         if total > limits.max_external_total_bytes:
             return unavailable("unavailable", "external sources exceed the total byte limit")
         hashes[relative_path] = hashlib.sha256(data).hexdigest()
+    if unresolved:
+        return unavailable(
+            "unavailable",
+            f"not read for this capture: {', '.join(sorted(unresolved))}",
+        )
     freshness = check_reference_context_freshness(context, hashes, discovered_files=discovered)
     return ExternalContext(
         {

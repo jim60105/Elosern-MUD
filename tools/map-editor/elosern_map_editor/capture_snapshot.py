@@ -18,6 +18,7 @@ fallback position, and nothing here runs a generator or starts the game.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Iterable, Mapping
 from typing import Any
@@ -170,8 +171,15 @@ def _context_diagnostic(status: Mapping[str, Any]) -> Diagnostic:
     )
 
 
-def _admit_partition(workspace: ConfinedWorkspace, limits: Limits, world) -> dict[str, Any]:
-    """Decode and freshness-check the artifact against the loaded world."""
+def _admit_partition(
+    workspace: ConfinedWorkspace, limits: Limits, world
+) -> tuple[dict[str, Any], str]:
+    """Decode and freshness-check the artifact against the loaded world.
+
+    Returns the outlines payload and the artifact digest this invocation read,
+    so the reference-context check can reuse it instead of reading the artifact
+    a second time.
+    """
 
     try:
         raw = workspace.read_document(PARTITION_ARTIFACT, limits.max_artifact_bytes)
@@ -190,12 +198,8 @@ def _admit_partition(workspace: ConfinedWorkspace, limits: Limits, world) -> dic
         raise _partition_error(
             "malformed", "the partition artifact is not a JSON object"
         )
-    terrain = terrain_definition(world.continent)
     try:
         metadata = read_partition_metadata(document)
-        partition = decode_partition(
-            document, is_land=lambda cell: is_land_cell(terrain, cell)
-        )
     except PartitionDocumentError as error:
         raise _partition_error(
             "malformed", f"the partition artifact is malformed: {error}"
@@ -211,12 +215,33 @@ def _admit_partition(workspace: ConfinedWorkspace, limits: Limits, world) -> dic
             "stale",
             "the partition artifact does not describe the map sources this invocation loaded",
         )
+    try:
+        terrain = terrain_definition(world.continent)
+    except (ValueError, TypeError) as error:
+        # Inconsistent authored terrain is loadable semantic work in progress,
+        # but no outline can be admitted without the land predicate it defines.
+        raise _partition_error(
+            "stale",
+            f"the loaded terrain cannot supply the partition land predicate: {error}",
+        ) from None
+    try:
+        partition = decode_partition(
+            document, is_land=lambda cell: is_land_cell(terrain, cell)
+        )
+    except PartitionDocumentError as error:
+        raise _partition_error(
+            "malformed", f"the partition artifact is malformed: {error}"
+        ) from None
+    except (AttributeError, TypeError, OverflowError) as error:
+        raise _partition_error(
+            "malformed", f"the partition artifact is malformed: {error}"
+        ) from None
     return {
         "outlines": {
             key: [list(ring) for ring in rings]
             for key, rings in partition.outlines.items()
         }
-    }
+    }, hashlib.sha256(raw).hexdigest()
 
 
 def load_capture_snapshot(
@@ -255,17 +280,25 @@ def load_capture_snapshot(
         *diagnose_world(world),
         *load.layout_diagnostics,
     ]
-    context = read_external_context(workspace, limits)
-    if not context.status["current"]:
-        diagnostics.append(_context_diagnostic(context.status))
     partition = (
         _admit_partition(workspace, limits, world)
         if view == "continent" and PARTITION_LAYER not in hidden
         else None
     )
+    known_hashes = dict(load.fingerprints)
+    if partition is not None:
+        known_hashes[PARTITION_ARTIFACT] = partition[1]
+    context = read_external_context(
+        workspace,
+        limits,
+        known_hashes=known_hashes,
+        unread=() if partition is not None else (PARTITION_ARTIFACT,),
+    )
+    if not context.status["current"]:
+        diagnostics.append(_context_diagnostic(context.status))
     return {
         "world": load.projection,
-        "partition": partition,
+        "partition": None if partition is None else partition[0],
         "diagnostics": [item.as_dict() for item in sorted_diagnostics(diagnostics)],
     }
 

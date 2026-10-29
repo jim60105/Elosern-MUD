@@ -634,6 +634,16 @@ class DecoderValidationTests(unittest.TestCase):
                     decode_partition(broken, is_land=lambda cell: True)
                 self.assertIn(message, str(caught.exception))
 
+    def test_an_oversized_run_is_refused_without_expanding_it(self):
+        # A fresh-looking body whose coarse row claims far more cells than the
+        # row holds must be refused before any expanded list is allocated.
+        inp = FrozenEncodingTests()._input()
+        document = encode(compute_partition(inp), inp)
+        document["coarse"][0] = [document["coarse"][0][0], 10**9]
+        with self.assertRaises(PartitionDocumentError) as caught:
+            decode_partition(document, is_land=lambda cell: True)
+        self.assertIn("runs decode to more than", str(caught.exception))
+
 
 def _terrain(frame=20):
     return TerrainDefinition(

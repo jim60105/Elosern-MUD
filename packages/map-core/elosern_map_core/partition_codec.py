@@ -218,6 +218,12 @@ def _expand(runs, length: int, what: str) -> tuple[int, ...]:
             raise PartitionDocumentError(f"{what} holds a malformed run")
         if not isinstance(value, int) or not isinstance(count, int) or count < 1:
             raise PartitionDocumentError(f"{what} holds a malformed run")
+        # Bound the allocation by the expected decoded length: a corrupt count
+        # must be refused, not materialized first.
+        if count > length - len(values):
+            raise PartitionDocumentError(
+                f"{what} runs decode to more than {length} values"
+            )
         values.extend([value] * count)
     if len(values) != length:
         raise PartitionDocumentError(
