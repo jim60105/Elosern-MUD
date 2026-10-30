@@ -264,19 +264,25 @@ Flags are computed by comparing state before and after the committed step. A ref
 
 The rules layer is planned as eleven OpenSpec changes, all sized at one workday including focused evidence and documentation, all still `phase=proposed`. Each owns one new capability and, where it changes an existing contract, the explicit `MODIFIED` requirement blocks it replaces.
 
-| # | Change | New capability | Depends on |
-| --- | --- | --- | --- |
-| 1 | `wilderness-elevation-shapes` | `wilderness-elevation-authoring` | none |
-| 2 | `wilderness-elevation-generation` | `wilderness-elevation-generation` | 1 |
-| 3 | `wilderness-elevation-runtime` | `wilderness-elevation-runtime` | 2 |
-| 4 | `wilderness-sight-rules` | `wilderness-sight` | 3 |
-| 5 | `wilderness-knowledge-chunks` | `wilderness-knowledge-chunks` | none |
-| 6 | `wilderness-ground-reveal` | `wilderness-ground-reveal` | 4, 5 |
-| 7 | `wilderness-population-view` | `wilderness-population-view` | none |
-| 8 | `wilderness-map-disclosure` | `wilderness-map-disclosure` | 6 |
-| 9 | `wilderness-area-map-reveal` | `wilderness-area-map-reveal` | 6, 7, 8 |
-| 10 | `wilderness-travel-planning` | `wilderness-travel-planning` | 9 |
-| 11 | `wilderness-travel-interrupts` | `wilderness-travel-interrupts` | 10 |
+| # | Change | New capability | Frontend visual | Depends on |
+| --- | --- | --- | --- | --- |
+| 1 | `wilderness-elevation-shapes` | `wilderness-elevation-authoring` | none | — |
+| 2 | `wilderness-elevation-generation` | `wilderness-elevation-generation` | none | 1 |
+| 3 | `wilderness-elevation-runtime` | `wilderness-elevation-runtime` | none | 2 |
+| 4 | `wilderness-sight-rules` | `wilderness-sight` | none | 3 |
+| 5 | `wilderness-knowledge-chunks` | `wilderness-knowledge-chunks` | none | — |
+| 6 | `wilderness-ground-reveal` | `wilderness-ground-reveal` | none | 4, 5 |
+| 7 | `wilderness-population-view` | `wilderness-population-view` | none | — |
+| 8 | `wilderness-map-disclosure` | `wilderness-map-disclosure` | data | 6 |
+| 9 | `wilderness-area-map-reveal` | `wilderness-area-map-reveal` | render | 6, 7, 8 |
+| 10 | `wilderness-travel-planning` | `wilderness-travel-planning` | none | 9 |
+| 11 | `wilderness-travel-interrupts` | `wilderness-travel-interrupts` | none | 10 |
+
+Frontend visual column: `none` is server or offline only; `data` changes values an existing frontend view already renders, with no component, style or story edit; `render` edits frontend rendering code.
+
+- Change 9 is the only one that edits view code (`AreaMapView.vue`, `lib/area_map_view.js`) and its Vitest view assertions, and it changes what the area map draws: unknown versus revealed terrain, remembered-but-unvisited cells, entities and markers.
+- Change 8 changes only inputs the existing compass and minimap already render — a nullable destination, a generic direction label instead of leaked terrain or identity — so it is player-visible without touching a component, style or story.
+- Change 11 extends frontend result-data validators only. Nothing renders interrupt flags until sub-project 2, which is why it is `none`.
 
 Modified existing capabilities: `map-knowledge` (5, 6), `webclient-local-map`, `webclient-exploration-menu` and `webclient-exit-compass` (8), `webclient-area-map` and `webclient-map-panel-protocol` (9), `webclient-exploration-menu` again for the optional walk form (11).
 
