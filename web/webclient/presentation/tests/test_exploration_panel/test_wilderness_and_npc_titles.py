@@ -122,6 +122,9 @@ class WildernessExplorationPresenterTests(EvenniaTestCase):
         return payload, withheld
 
     @covers_requirement("webclient-exploration-menu::exploration-move-rows-advertise-canonical-destinations")
+    @covers_requirement(
+        "wilderness-map-disclosure::all-wilderness-map-publishers-enforce-reveal-boundaries"
+    )
     def test_a_withheld_direction_keeps_an_opaque_enabled_row(self):
         from world.rules.wilderness_disclosure import DIRECTION_LABELS
 
@@ -158,6 +161,9 @@ class WildernessExplorationPresenterTests(EvenniaTestCase):
         self.assertTrue(row["disabled_reason"]["message"].strip())
 
     @covers_requirement("webclient-exploration-menu::explore-move-traverses-a-re-resolved-exit-through-the-shared-movement-path")
+    @covers_requirement(
+        "wilderness-map-disclosure::opaque-directional-controls-remain-executable"
+    )
     def test_a_withheld_direction_executes_through_the_production_move_seam(self):
         from world.maps.wilderness_destination import resolve_wilderness_destination
         from world.rules.map_knowledge import parse_knowledge

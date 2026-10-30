@@ -58,6 +58,22 @@ No coverage waiver is claimed and no delta requirement ID is hand-attached;
 those annotations are remounted by the sync that follows archive, once
 `tools.spec_traceability list` reports the new identifiers.
 
+### Remount after sync
+
+The sync generated the two identifiers above, and the mechanism tests were
+remounted onto them in the same archive commit. Every remount was made
+individually against what the test's inputs, actions and assertions actually
+establish; no identifier below was hand-composed or substituted globally, and
+the retained modified-requirement annotations stay in place because those
+tests still establish them.
+
+| Canonical identifier (from the tool) | Remounted tests | Why that test establishes it |
+| --- | --- | --- |
+| `wilderness-map-disclosure::all-wilderness-map-publishers-enforce-reveal-boundaries` | `test_local_map.test_wilderness.LocalMapWildernessDisclosureTests.test_a_radius_zero_forest_night_publishes_only_the_current_cell` | The local-map publisher branch: a synthetic radius-0 record leaves exactly the current cell, no neighbour node and no edge. |
+| `wilderness-map-disclosure::all-wilderness-map-publishers-enforce-reveal-boundaries` | `...test_a_hidden_gateway_is_omitted_until_its_gate_room_is_visited` | The visit-gated branch: no `grid:` identity or hidden name before the gate room's own visit, and permitted metadata after it. |
+| `wilderness-map-disclosure::all-wilderness-map-publishers-enforce-reveal-boundaries` | `test_exploration_panel.test_wilderness_and_npc_titles.WildernessExplorationPresenterTests.test_a_withheld_direction_keeps_an_opaque_enabled_row` | The exit publisher branch: the withheld rows publish a null destination and only a generic direction word, with the disclosed gateway row still canonical. |
+| `wilderness-map-disclosure::opaque-directional-controls-remain-executable` | `...test_a_withheld_direction_executes_through_the_production_move_seam` | A withheld row submits exactly `{exit_ref, current_node}` through the production `explore.move` adapter and the arrival records the canonical cell. |
+
 ### Scope note: on-demand area output
 
 This change owns the shared disclosure policy and the eager publications named

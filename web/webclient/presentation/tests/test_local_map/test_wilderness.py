@@ -510,6 +510,9 @@ class LocalMapWildernessDisclosureTests(EvenniaTest):
     @covers_requirement(
         "webclient-local-map::local-map-is-a-read-only-version-1-presentation-panel"
     )
+    @covers_requirement(
+        "wilderness-map-disclosure::all-wilderness-map-publishers-enforce-reveal-boundaries"
+    )
     def test_a_radius_zero_forest_night_publishes_only_the_current_cell(self):
         cell = self._away_cell()
         self._at_wild(cell)
@@ -553,6 +556,9 @@ class LocalMapWildernessDisclosureTests(EvenniaTest):
 
     @covers_requirement(
         "webclient-local-map::the-minimap-gate-nodes-match-traversal-in-both-directions"
+    )
+    @covers_requirement(
+        "wilderness-map-disclosure::all-wilderness-map-publishers-enforce-reveal-boundaries"
     )
     def test_a_hidden_gateway_is_omitted_until_its_gate_room_is_visited(self):
         point = self._point_entry()
