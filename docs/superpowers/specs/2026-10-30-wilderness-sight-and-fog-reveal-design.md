@@ -1,7 +1,7 @@
 # Wilderness Sight and Fog Reveal
 
 **Date:** 2026-10-30
-**Status:** Design approved by the user section by section on 2026-10-30. Written-spec review pending.
+**Status:** Design approved by the user section by section on 2026-10-30. Specified as eleven proposed OpenSpec changes (section 10); written-spec review pending.
 **Implementation status:** Not implemented by this document.
 **Scope:** Sub-project 1 of the [wilderness travel mode blueprint](2026-10-30-wilderness-travel-mode-blueprint-design.md). It defines the rules layer: ground sight, an elevation model, permanent fog reveal, distant sighting, the enlarged wilderness `area_map` window, the read-only `travel.plan` query, and per-step interrupt flags.
 
@@ -260,7 +260,68 @@ Flags are computed by comparing state before and after the committed step. A ref
 - `travel.plan` returns only the stable error codes in section 7.2 and never raises to the client.
 - Interrupt-flag computation failures are logged and produce no flags. They never fail an otherwise successful step.
 
-## 10. Testing
+## 10. Proposed change set
+
+The rules layer is planned as eleven OpenSpec changes, all sized at one workday including focused evidence and documentation, all still `phase=proposed`. Each owns one new capability and, where it changes an existing contract, the explicit `MODIFIED` requirement blocks it replaces.
+
+| # | Change | New capability | Depends on |
+| --- | --- | --- | --- |
+| 1 | `wilderness-elevation-shapes` | `wilderness-elevation-authoring` | none |
+| 2 | `wilderness-elevation-generation` | `wilderness-elevation-generation` | 1 |
+| 3 | `wilderness-elevation-runtime` | `wilderness-elevation-runtime` | 2 |
+| 4 | `wilderness-sight-rules` | `wilderness-sight` | 3 |
+| 5 | `wilderness-knowledge-chunks` | `wilderness-knowledge-chunks` | none |
+| 6 | `wilderness-ground-reveal` | `wilderness-ground-reveal` | 4, 5 |
+| 7 | `wilderness-population-view` | `wilderness-population-view` | none |
+| 8 | `wilderness-map-disclosure` | `wilderness-map-disclosure` | 6 |
+| 9 | `wilderness-area-map-reveal` | `wilderness-area-map-reveal` | 6, 7, 8 |
+| 10 | `wilderness-travel-planning` | `wilderness-travel-planning` | 9 |
+| 11 | `wilderness-travel-interrupts` | `wilderness-travel-interrupts` | 10 |
+
+Modified existing capabilities: `map-knowledge` (5, 6), `webclient-local-map`, `webclient-exploration-menu` and `webclient-exit-compass` (8), `webclient-area-map` and `webclient-map-panel-protocol` (9), `webclient-exploration-menu` again for the optional walk form (11).
+
+### 10.1 Dependency graph
+
+```mermaid
+graph TD
+  shapes[elevation-shapes] --> gen[elevation-generation]
+  gen --> runtime[elevation-runtime]
+  runtime --> sight[sight-rules]
+  chunks[knowledge-chunks] --> ground[ground-reveal]
+  sight --> ground
+  ground --> disclosure[map-disclosure]
+  pop[population-view] --> area[area-map-reveal]
+  ground --> area
+  disclosure --> area
+  area --> plan[travel-planning]
+  plan --> interrupts[travel-interrupts]
+```
+
+`knowledge-chunks` and `population-view` are independent roots; every other edge is a real prerequisite (a shared writer, a payload the consumer decodes, or a projection the dependent reads).
+
+### 10.2 Parallel implementation batch
+
+One change per worker and one worker per `.worktrees/<change>`; a wave may run its members concurrently. Only wave 1 widens beyond a single worker; the critical path is the elevation and reveal chain.
+
+| Wave | Changes in parallel | Why they may run together |
+| --- | --- | --- |
+| 1 | 1 `elevation-shapes`, 5 `knowledge-chunks`, 7 `population-view` | Three independent roots with no shared owner |
+| 2 | 2 `elevation-generation` | Needs the validated shape schema |
+| 3 | 3 `elevation-runtime` | Needs generated tiles |
+| 4 | 4 `sight-rules` | Reads the runtime elevation lookup |
+| 5 | 6 `ground-reveal` | Needs chunk storage and the sight functions |
+| 6 | 8 `map-disclosure` | Needs the reveal predicate |
+| 7 | 9 `area-map-reveal` | Needs reveal, population projection and the disclosure payload |
+| 8 | 10 `travel-planning` | Routes over the revealed window |
+| 9 | 11 `travel-interrupts` | Extends the planned walk contract |
+
+Ordering inside the batch that is not a build dependency:
+
+- `map-disclosure` lands before `travel-interrupts`; both modify `webclient-exploration-menu` and the exploration move-row payload, so the schema 5→6 nullable-destination cutover is integrated first and the optional `walk` field is added on top of it.
+- `map-disclosure` also lands before `area-map-reveal`, which stops assuming an unchanged `ExitCompass` for unknown neighbours.
+- All server slices may touch `.github/evennia-shards.json`, the protocol documents and the frozen parity audits; one integration owner serializes those edits even when the waves above run concurrently.
+
+## 11. Testing
 
 - **Elevation:**
   - The same inputs produce the same bytes.
@@ -285,7 +346,7 @@ Flags are computed by comparing state before and after the committed step. A ref
 - **Interrupt flags:** each flag has a raising case and a non-raising case; refused steps carry no flags.
 - **Performance:** with 20,000 wilderness visit records, building the window payload takes at most 50 ms and `travel.plan` at most 100 ms on the development machine.
 
-## 11. Out of scope
+## 12. Out of scope
 
 - Presentation of the map, markers, and routes (sub-project 2).
 - Camping (sub-project 3).
