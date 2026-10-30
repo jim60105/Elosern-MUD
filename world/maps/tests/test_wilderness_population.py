@@ -993,11 +993,6 @@ class WildernessPopulationViewTests(EvenniaTest):
         self.char1.race = "human"
         self.char1.apply_race_baseline()
 
-    def _bind_protective_session(self, cell: tuple[int, int], monster: Monster) -> None:
-        """Stand in ``cell`` and open the active session that freezes the pass."""
-        self._stand_in(cell)
-        engage(self.char1, monster)
-
     def _view_matches_materialization(self, cell: tuple[int, int]):
         """Assert the view projects exactly the living population reconciliation keeps.
 
