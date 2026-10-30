@@ -991,6 +991,7 @@ def build_advance_snapshot_registry(
     entities: Iterable[Any],
     *,
     mental_scope: Iterable[Any] = (),
+    ground_observer: tuple[Any, tuple[int, int]] | None = None,
 ) -> dict[int, SurfaceSnapshot]:
     """Build the merged pre-advance snapshot registry, keyed by object id.
 
@@ -1017,6 +1018,11 @@ def build_advance_snapshot_registry(
     single-call advance bound when an authored movement edge is that long;
     :meth:`WorldClock.advance_bounded` builds this registry once for the full
     window and then advances it in bounded pieces inside one transaction.
+
+    ``ground_observer`` is the explicit-skip observation input: the authorized
+    ``PlayerCharacter`` whose ``map_knowledge`` this advance may write, plus the
+    observed cell. Its entry is merged into the registry like any other surface,
+    so a failed advance or an enclosing owner restores it with everything else.
     """
     registry: dict[int, SurfaceSnapshot] = {}
 
@@ -1047,7 +1053,46 @@ def build_advance_snapshot_registry(
                 existing.attributes.update(snapshot.attributes)
                 if snapshot.location is not None:
                     existing.location = snapshot.location
+    if ground_observer is not None:
+        observer = ground_observer[0]
+        if hasattr(observer, "attributes"):
+            surface = ("map_knowledge", None)
+            snapshot = attribute_snapshot(observer, "map_knowledge")
+            existing = registry.get(id(observer))
+            if existing is None:
+                registry[id(observer)] = SurfaceSnapshot(
+                    attributes={surface: snapshot}
+                )
+            else:
+                existing.attributes[surface] = snapshot
     return registry
+
+
+def _observe_ground(
+    observer: Any,
+    cell: tuple[int, int],
+    tick: int,
+) -> None:
+    """Record one final-tick ground observation, if its radius is derivable.
+
+    A sight-rule or elevation failure logs and skips the observation; the
+    completed skip itself still commits. The writer owns its own no-throw
+    policy, so only an injected post-write fault escapes to the advance's
+    rollback handler (the path the rollback evidence exercises).
+    """
+    from world.rules.map_knowledge import record_ground_observation
+    from world.rules.sight import ground_radius_at
+
+    try:
+        radius = ground_radius_at(cell, WorldDateTime.from_tick(tick))
+    except Exception as error:
+        log_warn(
+            "ground_observation_radius_failed",
+            exc=error,
+            context={"tick": tick, "cell": f"{cell[0]},{cell[1]}"},
+        )
+        return
+    record_ground_observation(observer, cell, tick, radius)
 
 
 def _flush_deleted_instance(obj: Any) -> None:
@@ -1278,18 +1323,35 @@ class WorldClock:
         entities: Iterable[Any],
         *,
         mental: MentalPlan | None = None,
+        ground_observer: tuple[Any, tuple[int, int]] | None = None,
     ) -> list[ScheduledEvent]:
+        """Settle one interval of world time.
+
+        ``ground_observer`` is the narrow explicit-skip observation input: the
+        authorized ``PlayerCharacter`` and the cell to observe at the final
+        settled tick. Only :attr:`AdvanceSource.SKIP` may carry it; any other
+        source rejects before a single write. The observation runs after the
+        stages and tick persistence inside the same transaction, once, and only
+        for a positive interval.
+        """
         if seconds < 0:
             raise ValueError("seconds must be non-negative")
         if seconds > MAX_ADVANCE_SECONDS:
             raise ClockAdvanceBoundError(
                 f"advance of {seconds}s exceeds the {MAX_ADVANCE_SECONDS}s bound"
             )
+        if ground_observer is not None and source is not AdvanceSource.SKIP:
+            raise ValueError("ground observation requires AdvanceSource.SKIP")
         scope = tuple(entities)
         mental_scope = mental.scope if mental is not None else ()
         validate_advance_sleep_receipts(scope, mental_scope)
         registry = build_advance_snapshot_registry(
-            self, seconds, source, scope, mental_scope=mental_scope
+            self,
+            seconds,
+            source,
+            scope,
+            mental_scope=mental_scope,
+            ground_observer=ground_observer,
         )
         tick_snapshot = _snapshot_clock_tick(self)
         tick_from = self.tick
@@ -1300,6 +1362,9 @@ class WorldClock:
                 persist = getattr(self, "_persist", None)
                 if persist is not None:
                     persist(self.tick)
+                if ground_observer is not None and seconds > 0:
+                    observer, cell = ground_observer
+                    _observe_ground(observer, cell, self.tick)
                 # Boundary event fires only on the OUTERMOST durable commit:
                 # advance() runs nested inside item/combat transactions, so a
                 # savepoint exit alone must not leave a clock_advance line

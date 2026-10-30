@@ -28,6 +28,26 @@ Avoid full parse_knowledge scan for window lighting: exact membership checks ove
 
 B5/N4 are adopted through the named clock and continue_sleep owners above, without introducing a generic rollback journal. One-day breakdown is 1.5h arrival/max-radius tests, 2h explicit clock/skip observer and dual registry tests, 1.5h bounded union/lighting/hidden tests, 1h docs/traceability and 2h integration allowance. The mapping is this section: existing map-knowledge arrival/parser and movement-settlement-atomicity requirements before new IDs exist, plus the new observation/reveal requirements after equivalent-tree sync. Focused labels are the existing world/rules/tests/test_clock.py, test_sleep_receipt.py, test_movement_settlement.py and proposed test_ground_reveal.py.
 
+The per-requirement association and remount plan is recorded in the
+`### Temporary per-requirement mapping (pre-sync)` subsection of
+`## Evidence and requirement shape`; no delta requirement ID is claimed by a
+test before the equivalent-tree sync, and the maintained modified requirement
+keeps its current canonical ID.
+
+Post-implementation review disposition: the reviewer's blocking finding (a
+swallowed persistence failure inside the no-throw writer could leave the
+surrounding transaction unusable while the advance still returned) is fixed by
+isolating `_write_knowledge` in a nested savepoint and restoring the pre-write
+Attribute snapshot on failure; the corpus regression faults inside that seam
+and asserts the skip commits with unchanged durable and cached knowledge. The
+same review's non-blocking finding (rollback evidence only covered an absent
+record) is fixed by seeding existing history and asserting both the handler
+value and the raw stored row in the clock and sleep rollback tests. The
+multi-interval owner-continuation suggestion is dispositioned as covered by the
+delegated per-interval path: `continue_owner_sleep` adds no observation code of
+its own; each committed boundary interval is the already-tested `continue_sleep`
+call.
+
 - [wilderness-knowledge-chunks](../wilderness-knowledge-chunks/design.md) must land first.
 - [wilderness-sight-rules](../wilderness-sight-rules/design.md) must land first.
 
@@ -42,6 +62,23 @@ Implementation will be performed by gpt-luna-level workers. Follow the named own
 Use synthetic documents, policies and parties with independent expected results. Do not pin shipped data, text, markup or counts. Appearance/wording judgments are human-reviewed against the approved detailed design, outside SHALL requirements. For each requirement implement a discoverable test named from its mechanism, covering every delta scenario and both raising/non-raising cases. Test paths are named in Context. New package-local server tests join exactly one shard in .github/evennia-shards.json; avoid new modules when an existing test file is sufficient.
 
 Requirement IDs must come from tools.spec_traceability list on the equivalent merged spec tree, never hand-composed. Before sync associate only the nearest current canonical requirement and report the temporary mapping per docs/development/spec-test-traceability.md. Sync remounts to the generated IDs with no uncovered requirements or waiver. Modified requirements retain identity except an explicit RENAMED window title. Mechanism tests must exist before that sync.
+
+### Temporary per-requirement mapping (pre-sync)
+
+`tools.spec_traceability list` was run on this worktree's current spec tree. The
+new capability's requirements do not exist there yet, so no annotation below
+claims a delta ID; the sync remount must use the IDs the tool generates from the
+merged tree.
+
+| Delta requirement | Current annotation / evidence | Disposition |
+| --- | --- | --- |
+| `map-knowledge` MODIFIED: Arrival recording happens only at existing successful-arrival seams | `world.rules.tests.test_map_knowledge_integration` (`test_gate_entry_records_wilderness_node`, `test_wilderness_arrival_records_the_ground_radius_at_the_final_tick`, forbidden-path cases) carries the current canonical ID `map-knowledge::arrival-recording-happens-only-at-existing-successful-arrival-seams` | Identity is retained because the requirement is MODIFIED, not renamed; re-review every assertion at sync. |
+| ADDED: Ground observations are monotonic and transactional | Writer/arrival evidence: `test_ground_reveal.GroundObservationWriterTests` carries `map-knowledge::map-knowledge-py-is-the-sole-writer-of-a-versioned-visited-node-record`; skip evidence: `test_ground_reveal.SkipObservationTests`, `test_clock.OuterOwnerSeamTests.test_skip_observer_rolls_back_with_clock_failure`, `test_sleep_receipt.SleepEntryLifecycleTests.test_sleep_receipt_failure_restores_ground_observation` (no new-capability annotation) | Nearest current canonical requirements are the sole-writer and advance-atomicity requirements. Mount the generated `wilderness-ground-reveal` ID after sync. |
+| ADDED: Permanent reveal is a bounded read projection | `test_ground_reveal.GroundRevealProjectionTests` covers union/lit shortcut, chunk selection, hidden-plus-corrupt history, invalid envelope, frame cropping and read purity (no new-capability annotation) | No current canonical projection requirement exists; mount the generated `wilderness-ground-reveal` ID after sync. |
+
+Every scenario in both delta specs has a discoverable mechanism test named for
+its behaviour; the only annotations present are the existing canonical IDs
+above, and no guessed or hand-composed ID appears in test source.
 
 ## Risks / Trade-offs
 

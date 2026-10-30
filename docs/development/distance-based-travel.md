@@ -155,10 +155,81 @@ uv run --locked openspec validate integrate-fatigue-aware-traversal --strict
   （zh-TW，北起順時針，半區間平手取順時針側）、距離四捨五入到 5 公里（平手向上）、
   當前相位的側影，以及**只有在該分區已為角色點亮時**才出現的地標名稱。來源格、
   目標 ID 與分區鍵都不會序列化。
-- **只讀**：每次讀取都重算，不寫入地圖知識、不推進時鐘，也不會因為「看見」而點亮
-  任何分區；`sight` 的持久化屬後續的地面揭露變更。
+- **只讀**：每次讀取都重算、不推進時鐘。即時視野與遠方目擊本身仍不寫入任何狀態；
+  只有下述「地面揭露」會把已經站過的格子的最大視野半徑持久化。
 
 驗證：`uv run --locked python -m unittest world.rules.tests.test_sight`。這些測試
 一律注入合成政策、合成來源與固定時數，斷言機制（相位邊界、半徑組合與上限、
 圓盤邊緣、相位可見度、方位／距離平手、來源隱私與合併、政策拒絕），不綁定出貨
 數值或文案；側影與地標文案由人工依設計文件審閱。
+
+## 地圖知識與地面揭露
+
+`world/rules/map_knowledge.py` 仍是角色 `map_knowledge` 的唯一寫入者；地面揭露只
+新增一個窄入口，不新增第二份真相，也不儲存逐格的「已看見」點陣或燈光紀錄。
+
+| Concern | Owner |
+| --- | --- |
+| 荒野單格觀測寫入（首次／最後 tick、最大 `sight`） | `world/rules/map_knowledge.py::record_ground_observation`、`record_arrival` |
+| 抵達 seam | `typeclasses/exits.py::after_successful_movement`、`world/rules/party.py::_move_commander_body` |
+| 明確跳過的單次終點觀測 | `world/rules/clock.py::WorldClock.advance` 的 `ground_observer` 輸入 |
+| 跳過外層交易的觀測回滾面 | `continue_sleep` 的 `build_advance_snapshot_registry` 外層註冊 |
+| 純揭露投影 | `world/rules/map_knowledge.py::revealed_in_bounds`、`is_revealed` |
+| 分區歸屬與點亮判定 | `world/maps/district_partition.py::district_at`、`world/lore/map_districts.py::landmark_node_ids` |
+
+### 何時寫入
+
+- **抵達**：`record_arrival` 仍只在既有的成功移動 seam 呼叫。荒野抵達時，以實際
+  抵達後的時鐘 tick 與 `world/rules/sight.py::ground_radius_at` 算出的當格半徑寫入
+  該格；`first_seen_tick` 保留第一次、`last_seen_tick` 前進、`sight` 取
+  `max(舊值, 新半徑)`，永不下降。非荒野的 `grid:`／`room:` 仍只記 `{first,last}`。
+- **附身**：知識永遠屬於授權的 `PlayerCharacter`（指揮者）。附身時移動與跳過都只
+  寫指揮者的紀錄；被附身的同伴不會產生自己的歷史。觀測格是指揮者實際所在的荒野
+  格，不會借用遠端本體的另一格。
+- **明確跳過**：`WorldClock.advance` 的 `ground_observer=(角色, 格)` 是關鍵字專用
+  輸入，只允許 `AdvanceSource.SKIP`；其他來源帶此參數會在寫入前拒絕。真正的觀測
+  發生在階段結算與 tick 持久化之後、同一交易結束之前，只對正數區間執行一次。
+  `advance_wait`（等待／休息）與 `continue_sleep`（自願睡眠、全隊睡眠、強制睡眠
+  續行）只在實際結算秒數大於零時傳入觀察者；零秒、重播、拒絕、讀取、重連與傳送
+  都不會觀測。強制睡眠的每個已提交邊界區間由 `continue_sleep` 各自觀測一次，沒有
+  額外的上層或階段脈衝觀測。
+- **半徑取樣**：終點觀測以結算後的 tick 對應的光相重新計算半徑；抵達與跳過共用
+  `record_ground_observation`，因此同一格在同一天稍晚的較大視野會單調提升
+  `sight`。讀取失敗只留下診斷，不會因為觀測失敗而取消已完成的移動。
+- **回滾**：觀測寫入在時鐘交易內。`advance` 自己的快照註冊與 `continue_sleep` 的
+  外層快照註冊都包含該角色的 `map_knowledge`，所以階段、tick、收據或外層提交之後
+  的失敗會同時還原資料庫列與 Attribute 快取；沒有通用的回滾日誌或第二套機制。
+  寫入本身另包在巢狀 savepoint 內：持久化失敗只回滾該次觀測並還原寫入前的
+  Attribute 快照，因此「觀測失敗不中斷已完成的跳過」不會弄壞外層交易，也不會
+  留下與資料庫列不一致的快取。
+
+### 揭露投影（純讀）
+
+- `revealed_in_bounds(character, bounds)` 回傳查詢矩形內的已揭露格集合；
+  `is_revealed(character, cell)` 是同一投影的單格查詢。兩者都只讀，不寫紀錄、
+  不推進時鐘、不建立燈光或點陣狀態，結果會裁剪到查詢與荒野外框。
+- 先以**精確**的分區地標節點判定分區是否已點亮：只逐一檢查有限的地標 ID（`grid:`／
+  `room:` 查 `visited`；`wild:` 只解碼該地標所在 chunk），不整個
+  `parse_knowledge`。點亮的分區整區揭露。
+- 其餘格由已儲存的觀測圓盤聯集揭露：只解碼與「查詢矩形外擴 8 格」相交的 chunk，
+  對每個觀測以 `sight` 為半徑取 `in_ground_disc`，再裁剪回查詢。8 是
+  `MAX_GROUND_SIGHT_RADIUS`，因此不存在能影響查詢的遠方觀測。
+- 揭露只決定地形可見性：水域、阻擋與錨點足跡格可以是「已揭露但不可走」；隱藏
+  地點／精靈村落的地點身分仍需精確 `has_visited`，即時實體另由族群視圖處理。
+- **損壞處理**：信封／schema 無效時沒有可信的點亮集合，揭露為空且位元組保留；
+  查詢選中的觀測 chunk 損壞時保留原紀錄、記錄診斷，丟棄圓盤聯集，只讓獨立可讀的
+  精確地標歸屬揭露。
+
+驗證：
+
+```sh
+uv run --locked --env-file=<file> evennia test --settings test_settings.py --keepdb \
+  world.rules.tests.test_ground_reveal world.rules.tests.test_map_knowledge \
+  world.rules.tests.test_map_knowledge_integration world.rules.tests.test_sight \
+  world.rules.tests.test_clock world.rules.tests.test_sleep_receipt \
+  world.rules.tests.test_party_follow_possession
+```
+
+測試以合成 schema-2 紀錄、合成分區歸屬與注入的半徑斷言機制（單調最大半徑、首次
+保留、正數區間只觀測一次、排除路徑、兩層回滾、chunk 邊界聯集、點亮捷徑、損壞
+回退），不釘住出貨資料或文案。

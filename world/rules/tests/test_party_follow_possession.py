@@ -337,7 +337,8 @@ class PossessedWildernessFollowTests(PossessedFollowTestCase):
     def test_gate_entry_brings_the_whole_party(self):
         before = self._tick()
 
-        self.gate.at_traverse(self.npc, self.east_gate)
+        with patch("world.rules.sight.ground_radius_at", return_value=4):
+            self.gate.at_traverse(self.npc, self.east_gate)
 
         self.assertEqual(self.npc.location.coordinates, ENTRY_XY)
         self.assertEqual(self.char1.location.coordinates, ENTRY_XY)
@@ -345,6 +346,13 @@ class PossessedWildernessFollowTests(PossessedFollowTestCase):
         self.assertEqual(self._tick(), before + EAST_GATE_SECONDS)
         self.assertEqual(self._script().itemcoordinates.get(self.char1), ENTRY_XY)
         self.assertTrue(has_visited(self.char1, f"wild:{WILDERNESS_NAME}:{ENTRY_XY[0]}:{ENTRY_XY[1]}"))
+        commander_visit = {
+            visit.node_id: visit for visit in parse_knowledge(self.char1)
+        }[f"wild:{WILDERNESS_NAME}:{ENTRY_XY[0]}:{ENTRY_XY[1]}"]
+        self.assertEqual(commander_visit.sight, 4)
+        self.assertEqual(commander_visit.last_seen_tick, self._tick())
+        # The possessed companion never owns a knowledge history of its own.
+        self.assertIsNone(self.npc.attributes.get("map_knowledge"))
 
     @covers_requirement(
         "party-system::companions-follow-the-player-through-every-exit-traversal"

@@ -1144,6 +1144,51 @@ class OuterOwnerSeamTests(EvenniaTestCase):
         self.assertEqual(self.player.db.quest_log, before_log)
         self.assertEqual(self._raw_attribute(self.player, "quest_log"), before_log)
 
+    @covers_requirement(
+        "wilderness-ground-reveal::ground-observations-are-monotonic-and-transactional"
+    )
+    def test_skip_observer_rolls_back_with_clock_failure(self):
+        from world.rules import map_knowledge as knowledge
+
+        cell = (10, 20)
+        real_write = knowledge.record_ground_observation
+        real_write(self.player, cell, 5, 2)
+        prior = self.player.attributes.get("map_knowledge")
+        self.assertIsNotNone(prior)
+
+        def write_then_fail(character, observed_cell, tick, radius):
+            real_write(character, observed_cell, tick, radius)
+            raise RuntimeError("synthetic post-observation failure")
+
+        clock = WorldClock(1000)
+        with patch(
+            "world.rules.sight.ground_radius_at", return_value=3
+        ), patch(
+            "world.rules.map_knowledge.record_ground_observation",
+            side_effect=write_then_fail,
+        ), self.assertRaises(RuntimeError):
+            clock.advance(
+                60,
+                AdvanceSource.SKIP,
+                [self.player],
+                ground_observer=(self.player, cell),
+            )
+        self.assertEqual(clock.tick, 1000)
+        self.assertEqual(self.player.attributes.get("map_knowledge"), prior)
+        self.assertEqual(self._raw_attribute(self.player, "map_knowledge"), prior)
+
+    def test_ground_observer_is_rejected_for_a_non_skip_source(self):
+        clock = WorldClock(1000)
+        with self.assertRaises(ValueError):
+            clock.advance(
+                60,
+                AdvanceSource.COMMAND,
+                [self.player],
+                ground_observer=(self.player, (10, 20)),
+            )
+        self.assertEqual(clock.tick, 1000)
+        self.assertIsNone(self.player.attributes.get("map_knowledge"))
+
     def test_restore_warn_carries_the_advance_registry_stage_tag(self):
         """A failing registry-attribute restore logs the advance-side stage tag."""
         from world.quests.bootstrap import sync_quest_runtime

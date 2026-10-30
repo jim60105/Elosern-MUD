@@ -93,11 +93,7 @@ positive integer dbref.
 - **THEN** the node resolves as unavailable and is eligible for pruning
 
 ### Requirement: Arrival recording happens only at existing successful-arrival seams
-`world/rules/map_knowledge.py`'s `record_arrival` SHALL be invoked only from the project's existing
-successful-arrival seams: the shared movement-completion helper
-`typeclasses.exits.after_successful_movement`, which `MovementCostMixin.at_post_traverse`, the
-success branch of `WildernessGateExit.at_traverse`, and both success branches of
-`WildernessReturnExit.at_traverse` all call after `charge_movement`.
+record_arrival SHALL remain at existing successful movement-completion seams; wilderness ground observation SHALL also update at the end of a positive committed explicit skip, never from reads, replayed/refused operations or teleport-style relocation.
 
 #### Scenario: Grid traversal records the destination after success
 - **WHEN** a `PlayerCharacter` successfully traverses a `CostedXYZExit` or an ordinary `Exit`
@@ -131,6 +127,10 @@ success branch of `WildernessGateExit.at_traverse`, and both success branches of
 - **WHEN** `record_arrival` runs for a character anywhere in the world
 - **THEN** the derived node is computed from the character's current location, so grid, wilderness,
   instance, and interior each yield their canonical identity without per-seam node computation
+
+#### Scenario: Final skip observation
+- **WHEN** a positive explicit skip ends at a wilderness cell
+- **THEN** that final tick/radius is recorded transactionally without another arrival call
 
 ### Requirement: Reclaimed room knowledge is pruned transactionally with the room deletion
 `world/rules/map_knowledge.py::prune_reclaimed_room(room_id)` SHALL remove `room:<room_id>` from every
