@@ -8,6 +8,7 @@ Provide persistent neighbour aim and commit-paced held walking through the exist
 
 - Provide persistent neighbour aim and commit-paced held walking through the existing guarded movement path.
 - Add the focused behavior, production fixture/story and browser/server evidence specified in design.md and tasks.md.
+- Include the lifecycle/privacy/terminal-state corrections recorded in design.md under Blocking review disposition; they remain inside this slice's declared mechanisms.
 - **BREAKING** Any schema cutover described in design.md replaces its prior prerelease form, with no migration or compatibility path.
 
 ## Capabilities

@@ -4,7 +4,7 @@ Read design.md contracts before starting each group. Paths without a web/ prefix
 
 ## 1. Store queue
 
-- [ ] 1.1 Implement exact direction state/actions and timers in stores/elosern/travel.js, guarded activateExit calls and publishView projection. Add tests/travel/walking.test.js using fake timers for both completion orders, pooled room coordinates, foreign results, late commits, every cancellation and off motion. Update synchronization guidance for commit-qualified queue ownership. Acceptance: pnpm test -- web/webclient-app/tests/travel/walking.test.js exits0; no second send occurs at349ms or before the matching revision commits.
+- [ ] 1.1 Implement exact direction state/actions and timers in stores/elosern/travel.js, guarded activateExit calls and publishView projection. Add tests/travel/walking.test.js using fake timers for both completion orders, pooled room coordinates, foreign results, late commits, every cancellation and off motion. Update synchronization guidance for commit-qualified queue ownership. Acceptance: pnpm test -- web/webclient-app/tests/travel/walking.test.js exits0; no second send occurs at349ms or before the matching revision commits. Add a two-step held walk test whose first commit enters refreshing and whose area adoption resumes only after dwell; unavailable/invalid/retired cancels rather than resuming.
 
 ## 2. Inputs and working controls
 

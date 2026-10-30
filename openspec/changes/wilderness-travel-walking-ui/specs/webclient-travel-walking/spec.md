@@ -25,6 +25,10 @@ Held travel walking SHALL maintain a single store-owned pending step, advance on
 - **THEN** only the matching committed step increments progress and the next waits350ms or0 at off plus map/dispatch readiness
 
 #### Scenario: Cancellation table
-- **WHEN** release, any new key, Stop, refusal, disconnect, epoch change, blur, stale map or an opened card interrupts a held walk
+- **WHEN** release, any new key, Stop, refusal, disconnect, epoch change, blur, an unavailable/invalid/retired map or an opened card interrupts a held walk
 - **THEN** no further step sends and a late result cannot restart it; originating arrow auto-repeat alone does not cancel
+
+#### Scenario: Normal post-step refresh suspends rather than stops
+- **WHEN** the first committed step starts an ordinary area refresh during a held walk
+- **THEN** the walk survives refreshing, sends nothing until current map adoption and dwell complete, and can then send its second step
 
