@@ -1,0 +1,46 @@
+# Design
+
+## Context
+
+Observed owners and nearby test targets: area_map.py _wilderness_area; map_panels.py WILDERNESS_WINDOW/AREA_MAX_BYTES and mirrored JS protocol/panels/map_panels.js; map_parts codecs; lib/area_map_view.js and AreaMapView.vue; test_area_map.py/test_map_panel_protocol.py and existing Node/Vitest area-map tests.
+
+## Goals / Non-Goals
+
+Publish a filtered41-cell RLE window through existing map transport. Keep the named slice complete and independently runnable after prerequisites; dependent behavior is owned elsewhere.
+
+## Decisions
+
+Existing wilderness area generation exposes15x15 provider-valid node labels irrespective of visits. Replace that serializer with schema2 RLE. Bump AREA_MAP_SCHEMA_VERSION to2 on both ends, no v1 compatibility; other area graph shapes stay identical, world/local map schemas unchanged. Preserve common wilderness schema_version/available/layer/map_id/frame/current_node/title/district_name/cell_km/nodes/edges/quest_markers. Add exact window:{min_x,min_y,width:41,height:41}, rows, light_phase, ground_radius, entities, sightings. Origin=current-20, including negative boundary offsets. Rows are41 south-to-north arrays of adjacent runs with positive integer length summing41; equal adjacent runs merge. Out-of-frame positions are unknown.
+
+Unknown is exactly {length,kind:'unknown'}. Revealed is exactly {length,kind:'terrain',terrain,passable,band,tier,road,ford}; canonical terrain class, boolean flags, band0..15/tier0..3. Unknown may carry no terrain, validity, identity or hidden alternate metadata. Revealed blocked/water/footprint terrain stays present with passable=false. Road=false unless existing canonical geography/pricing actually supports one; do not add roads. nodes contains only known current/action/gateway/location metadata using existing exact node shape/visited distinction. No unknown cell facts through node labels/gateways. Hidden/elven villages need actual visits even in lit terrain. Actions are current legal revealed neighbours only, with existing canonical gateway replacement/exit_ref; unknown neighbour movement remains available through unchanged ExitCompass outside this map.
+
+Entities exact {id,cell:{x,y},kind,hostile,label}; stable nonsemantic observation token, kind hostile|npc|character, boolean hostile, label<=256 codepoints. Only current ground-disc entities serialize; remembered cells carry none. Sightings use the four-field approximate sight contract, never internal source keys/target coordinates. Caps:1681 nodes,2048 edges,32 quests,4096 entities,256 sightings, logical393216 bytes. Exceeding any bound logs and returns map_unavailable without truncation. Keep generic Python/JS list/depth/safety validators consistent with these limits. Reuse existing map/publication chunking, never increase generic frame size or push maps on movement.
+
+Minimal existing-view cutover is necessary to keep current drawer working: decode RLE terrain into ephemeral display cells in lib/area_map_view.js, merge sparse metadata/edges, update AreaMapView only to consume this normalized form, and delete obsolete wilderness15 handling. This is not TravelMap/HUD/input redesign. Do not derive sight, eligibility, route or clock client-side. Test existing selection/adjacent move/gateway behavior and other-layer geometry. Anti-peek assertions inspect all serialized branches including quest-marker exceptions: accepted quest identity remains existing intentional disclosure, never an excuse to add cell details.
+
+Use synthetic20000 visits, warmed presenter,20 timed samples, median<=50ms on development hardware with setup excluded; record runtime/hardware and independently assert selected-chunk parsing. Update existing protocol doc and frozen parity/audit fixtures. The old fifteen-cell requirement title is deliberately renamed to Wilderness area maps cover a revealed forty-one-cell neighbourhood, preserving its legal-neighbour and no-fabricated-node scenarios with new window bounds.
+
+## Dependency contracts
+
+- [wilderness-ground-reveal](../wilderness-ground-reveal/design.md) must land first.
+- [wilderness-population-view](../wilderness-population-view/design.md) must land first.
+
+## Planning and implementation boundaries
+
+This artifact set covers sub-project1 only. Read the [blueprint](../../../docs/superpowers/specs/2026-10-30-wilderness-travel-mode-blueprint-design.md) §7.1, the [detailed sight design](../../../docs/superpowers/specs/2026-10-30-wilderness-sight-and-fog-reveal-design.md) and [engine architecture](../../../docs/superpowers/specs/2026-07-29-ai-mud-engine-design.md) §§2/3/6.5/10. Preserve single-writer ownership and server exploration mode. No travel HUD/input queue/log/tint, camping/dream/art changes, authored geography/landmark-content changes, new roads, migrations or compatibility paths. Generated elevation and the approved sight rulebook are explicitly allowed.
+
+Implementation will be performed by gpt-luna-level workers. Follow the named owners and exact contracts; read each prerequisite design first. Do not invent downstream stubs or leave unresolved behavior to a worker. Each change is capped at one workday including focused evidence/docs. Independent roots can run concurrently only with one owner integrating shared test-manifest/doc edits.
+
+## Evidence and requirement shape
+
+Use synthetic documents, policies and parties with independent expected results. Do not pin shipped data, text, markup or counts. Appearance/wording judgments are human-reviewed against the approved detailed design, outside SHALL requirements. For each requirement implement a discoverable test named from its mechanism, covering every delta scenario and both raising/non-raising cases. Test paths are named in Context. New package-local server tests join exactly one shard in .github/evennia-shards.json; avoid new modules when an existing test file is sufficient.
+
+Requirement IDs must come from tools.spec_traceability list on the equivalent merged spec tree, never hand-composed. Before sync associate only the nearest current canonical requirement and report the temporary mapping per docs/development/spec-test-traceability.md. Sync remounts to the generated IDs with no uncovered requirements or waiver. Modified requirements retain identity except an explicit RENAMED window title. Mechanism tests must exist before that sync.
+
+## Risks / Trade-offs
+
+[Read side effects] -> Pure projections and object/Attribute/clock snapshots in integration tests. [Shared files] -> Serialize shard-manifest, schema and documentation changes even when roots are independent. [Data echo tests] -> Assert mechanics on synthetic fixtures and treat visual review separately. No new permanent lighting or walking state is allowed.
+
+## Rollout / Rollback
+
+Apply only after dependencies land. Development database reset is needed for the schema2 cutover; never automate deleting the user's database. No migration or dual decoder is added. Rollback is source reversal and a deliberate development reset where applicable. This proposal task does not start apply, sync or archive.
