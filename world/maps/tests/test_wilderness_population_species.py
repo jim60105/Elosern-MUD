@@ -22,6 +22,8 @@ from world.maps.wilderness_population import (
     ambient_variant_for_slot,
     ensure_population,
     species_rule_for_coordinates,
+    population_view,
+    ambient_population_decision,
 )
 from world.maps.wilderness_provider import (
     WILDERNESS_NAME,
@@ -355,3 +357,40 @@ class AmbientSpeciesReconciliationTests(BattlefieldIsolation, EvenniaTest):
         self.assertTrue(
             Monster.objects.filter(pk=victim.pk).exists()
         )
+
+    @covers_requirement(
+        "wilderness-monster-population::ensure-population-idempotently-places-and-respawns-monsters-at-a-coordinate"
+    )
+    def test_species_view_agrees_with_materialization_and_session_protection(self):
+        # Cell PROBE has 2 living species monsters placed in setUp
+        members = _species_members(self.wilderness, PROBE)
+        self.assertEqual(len(members), self.rule.quantity)
+
+        # View the populated cell; char1 is also at PROBE so filter monster facts
+        facts = population_view(self.wilderness, [PROBE])
+        monster_facts = [f for f in facts if f.kind == "monster"]
+        self.assertEqual(len(monster_facts), self.rule.quantity)
+        obs_keys = [f.observation_key for f in monster_facts]
+        self.assertTrue(all(k.startswith("population:elosern:") for k in obs_keys))
+        self.assertEqual(set(f.label for f in monster_facts), set(m.key for m in members))
+
+        # Now start an active combat session with victim
+        self.char1.race = "human"
+        self.char1.apply_race_baseline()
+        victim = members[0]
+        engage(self.char1, victim)
+        victim.traits.hp.current = 0
+
+        # Session is active and victim is defeated:
+        # View must project living participant/monsters as protected without spawning prospective replacements
+        decision = ambient_population_decision(self.wilderness, PROBE)
+        self.assertTrue(decision.is_session_protected)
+        self.assertEqual(decision.spawns_needed, ())
+
+        facts_protected = population_view(self.wilderness, [PROBE])
+        monster_facts_protected = [f for f in facts_protected if f.kind == "monster"]
+        # Only living member(s) projected; no prospective respawn while session is active
+        living_remaining = [m for m in members if m.pk != victim.pk]
+        self.assertEqual(len(monster_facts_protected), len(living_remaining))
+        self.assertEqual(monster_facts_protected[0].label, living_remaining[0].key)
+        self.assertIn(monster_facts_protected[0].observation_key, obs_keys)

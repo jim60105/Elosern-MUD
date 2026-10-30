@@ -146,7 +146,7 @@ A revealed cell exposes terrain class, passability, elevation band, prominence t
 
 Live sight is the disc of the current radius around the party's current cell. It is never persisted. It carries what changes over time:
 
-- **Hostile and other entities.** Their visibility is computed by a read-only population view that applies the same deterministic rules as `ensure_population` (baseline hash, hunting band, monster sites, currently registered entities) without creating or registering objects. `ensure_population` and the view share one rule function, so they cannot diverge.
+- **Hostile and other entities.** Their visibility is computed by a read-only population view (`world.maps.wilderness_population.population_view`) that applies the same deterministic rules as `ensure_population` (baseline hash, hunting band, species placement, monster sites, currently registered entities) without creating or registering objects. `ensure_population` and the view share the immutable `ambient_population_decision` rule function, so they cannot diverge. Ambient slots use stable observation keys `population:<wilderness>:<x>:<y>:<branch>:<slot>` across prospective and materialized states, while committed site members and foreign entities project stable `object:<dbid>` identities.
 - **Distant-sighting markers** (section 6).
 
 Revealed cells outside live sight show no entities.

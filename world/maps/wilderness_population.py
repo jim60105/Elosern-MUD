@@ -31,6 +31,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
+from collections.abc import Iterable
 
 from django.db import transaction
 from evennia.utils.create import create_object
@@ -46,7 +47,12 @@ from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.lore import wilderness_entry as _wilderness_entry_module
 from world.rules.monster_individual import construct_species_individual
 from world.maps.wilderness_provider import region_for_coordinates
+from world.maps.wilderness_provider import (
+    WILDERNESS_NAME,
+    is_valid_wilderness_cell,
+)
 from world.lore.monster_visuals import BASELINE_VISUAL_ROWS
+from world.rules.surfaces import persisted_hp as _persisted_hp
 
 # D-2 / wilderness-anchor-footprint: the entry coordinate is the capital's
 # EAST-GATE approach cell -- the exterior cell a traveler lands on leaving 東門
@@ -203,9 +209,220 @@ def ambient_variant_for_slot(
 
 def _stored_hp(monster: Monster) -> float:
     """Read the monster's stored HP without advancing a wall-clock gauge."""
-    from world.rules.action import _stored_trait_value
+    return _persisted_hp(monster)
 
-    return _stored_trait_value(monster.traits.hp)
+
+@dataclass(frozen=True, slots=True)
+class PopulationFact:
+    """One entity visible in the wilderness population view."""
+
+    observation_key: str
+    cell: tuple[int, int]
+    kind: str
+    hostile: bool
+    label: str
+
+
+@dataclass(frozen=True, slots=True)
+class ExpectedSlot:
+    """One deterministic slot expected by ambient population rules."""
+
+    slot: int
+    observation_key: str
+    name_zh: str
+    tier: str
+    art_species_key: str | None = None
+    species_key: str | None = None
+    variant_key: str | None = None
+    combat_traits: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class PopulationDecision:
+    """The immutable ambient population decision for one wilderness coordinate.
+
+    Reconciliation and the read-only population view both consume this common decision.
+    """
+
+    coordinates: tuple[int, int]
+    branch: str  # "hunting_band", "species", "baseline", "none"
+    rule: AmbientPlacementRule | None
+    expected_baseline: MonsterPopulation | None
+    slots: tuple[ExpectedSlot, ...]
+    assigned: tuple[tuple[ExpectedSlot, Monster | None], ...]
+    is_session_protected: bool
+    living_ambient: tuple[Monster, ...]
+    stale_ambient: tuple[Monster, ...]
+    spawns_needed: tuple[ExpectedSlot, ...]
+
+
+def ambient_observation_key(
+    wilderness_name: str, x: int, y: int, branch: str, slot: int
+) -> str:
+    """Format the stable observation key for an ambient population slot."""
+    return f"population:{wilderness_name}:{x}:{y}:{branch}:{slot}"
+
+
+def ambient_population_decision(
+    wilderness,
+    coordinates: tuple[int, int],
+    *,
+    session_participants: frozenset[int] | None = None,
+    existing_objs: Iterable[Any] | None = None,
+    capital_entry: tuple[int, int] | None = None,
+) -> PopulationDecision:
+    """Calculate the pure immutable population decision for one coordinate.
+
+    Consumes currently registered objects and active combat sessions to determine
+    living occupancy, stale cleanup, and missing slot deficit under the shared rules.
+    """
+    x, y = coordinates
+    wilderness_name = WILDERNESS_NAME
+    marker = _population_key(x, y)
+
+    if existing_objs is None:
+        matching = [
+            obj
+            for obj in wilderness.get_objs_at_coordinates(coordinates)
+            if isinstance(obj, Monster) and obj.db.population_key == marker
+        ]
+    else:
+        matching = [
+            obj
+            for obj in existing_objs
+            if isinstance(obj, Monster) and obj.db.population_key == marker
+        ]
+
+    if session_participants is None:
+        session_participants = _session_participant_ids()
+
+    is_protected = bool(matching and any(m.pk in session_participants for m in matching))
+
+    rule = species_rule_for_coordinates(x, y)
+    if rule is not None:
+        branch = "species"
+        target = min(rule.quantity, rule.capacity)
+        from world.lore.monster_species import MONSTER_VARIANT_REGISTRY
+
+        expected_slots: list[ExpectedSlot] = []
+        for slot in range(target):
+            v_key = ambient_variant_for_slot(rule, x, y, slot)
+            v_row = MONSTER_VARIANT_REGISTRY.get(v_key)
+            name_zh = v_row.display_name_zh if v_row else v_key
+            tier = v_row.threat_tier if v_row else "low"
+            s_key = variant_species_key(v_key)
+            obs_key = ambient_observation_key(wilderness_name, x, y, branch, slot)
+            expected_slots.append(
+                ExpectedSlot(
+                    slot=slot,
+                    observation_key=obs_key,
+                    name_zh=name_zh,
+                    tier=tier,
+                    art_species_key=None,
+                    species_key=s_key,
+                    variant_key=v_key,
+                )
+            )
+
+        living: list[Monster] = []
+        stale: list[Monster] = []
+        for m in matching:
+            if m.species_key and _persisted_hp(m) > 0:
+                living.append(m)
+            else:
+                stale.append(m)
+
+        # Sort living deterministically by pk so slot assignment is stable
+        living.sort(key=lambda obj: int(getattr(obj, "pk", 0) or 0))
+
+        # Assign living monsters to expected slots by variant_key
+        unassigned_slots = list(expected_slots)
+        assigned_pairs: list[tuple[ExpectedSlot, Monster | None]] = []
+        assigned_monsters: set[int] = set()
+
+        for slot_entry in expected_slots:
+            matched_monster = None
+            for m in living:
+                if m.pk not in assigned_monsters and m.variant_key == slot_entry.variant_key:
+                    assigned_monsters.add(m.pk)
+                    unassigned_slots.remove(slot_entry)
+                    matched_monster = m
+                    break
+            assigned_pairs.append((slot_entry, matched_monster))
+
+        budget = max(0, target - len(living))
+        spawns_needed = () if is_protected else tuple(unassigned_slots[:budget])
+
+        return PopulationDecision(
+            coordinates=coordinates,
+            branch=branch,
+            rule=rule,
+            expected_baseline=None,
+            slots=tuple(expected_slots),
+            assigned=tuple(assigned_pairs),
+            is_session_protected=is_protected,
+            living_ambient=tuple(living),
+            stale_ambient=tuple(stale),
+            spawns_needed=spawns_needed,
+        )
+
+    # Not species rule: hunting band or baseline model
+    in_band = (
+        max(abs(x - capital_entry[0]), abs(y - capital_entry[1])) <= _HUNTING_BAND_DISTANCE
+        if capital_entry is not None
+        else _in_hunting_band(x, y)
+    )
+    branch = "hunting_band" if in_band else "baseline"
+    expected = population_for_coordinates(x, y)
+
+    if expected is None:
+        return PopulationDecision(
+            coordinates=coordinates,
+            branch="none",
+            rule=None,
+            expected_baseline=None,
+            slots=(),
+            assigned=(),
+            is_session_protected=is_protected,
+            living_ambient=(),
+            stale_ambient=tuple(matching),
+            spawns_needed=(),
+        )
+
+    obs_key = ambient_observation_key(wilderness_name, x, y, branch, 0)
+    slot0 = ExpectedSlot(
+        slot=0,
+        observation_key=obs_key,
+        name_zh=expected.name_zh,
+        tier=expected.tier,
+        art_species_key=expected.art_species_key,
+        combat_traits=expected.combat_traits,
+    )
+
+    living = [m for m in matching if _persisted_hp(m) > 0 and _matches_expected(m, expected)]
+    stale = [m for m in matching if m not in living]
+    # If there are duplicates of living conformant monsters, only 1 is retained
+    living.sort(key=lambda obj: int(getattr(obj, "pk", 0) or 0))
+    retained_living: list[Monster] = []
+    if living:
+        retained_living = [living[0]]
+        stale.extend(living[1:])
+
+    assigned_pair = (slot0, retained_living[0] if retained_living else None)
+    spawns_needed = () if (retained_living or is_protected) else (slot0,)
+
+    return PopulationDecision(
+        coordinates=coordinates,
+        branch=branch,
+        rule=None,
+        expected_baseline=expected,
+        slots=(slot0,),
+        assigned=(assigned_pair,),
+        is_session_protected=is_protected,
+        living_ambient=tuple(retained_living),
+        stale_ambient=tuple(stale),
+        spawns_needed=spawns_needed,
+    )
 
 
 def _remove_monster(wilderness, monster: Monster) -> None:
@@ -288,6 +505,7 @@ def _spawn(wilderness, coordinates: tuple[int, int], expected: MonsterPopulation
 
         set_combat_traits(monster, expected.combat_traits)
     monster.db.population_key = _population_key(x, y)
+    monster.db.population_slot = 0
     wilderness.db.itemcoordinates[monster] = coordinates
     room = wilderness.db.rooms.get(coordinates)
     if room is not None:
@@ -299,6 +517,7 @@ def _spawn_species_individual(
     coordinates: tuple[int, int],
     variant_key: str,
     population_key: str,
+    slot: int = 0,
 ) -> Monster:
     """Create one species-bearing ambient individual through the construction owner.
 
@@ -314,6 +533,7 @@ def _spawn_species_individual(
         variant_species_key(variant_key), variant_key
     )
     individual.db.population_key = population_key
+    individual.db.population_slot = slot
     wilderness.db.itemcoordinates[individual] = coordinates
     room = wilderness.db.rooms.get(coordinates)
     if room is not None:
@@ -327,35 +547,16 @@ def _reconcile_ambient_species(
     """Reconcile the species-bearing ambient individuals of one coordinate.
 
     Only monsters carrying this coordinate's ambient ownership marker are
-    considered, so site-, quest-, story-, session-, and foreign-owned monsters
-    are never touched. Identity-less marker-matching rows are the branch
-    migration for a coordinate the species rules now cover: they are the same
-    model drift the tier-example branch already reconciles for itself, so they
-    are removed while the coordinate belongs to this branch. Living
-    species-bearing individuals are never deleted: the authored quantity is a
-    target and the authored capacity is a ceiling, never a reshuffle, so a
-    coordinate that already holds its population is left exactly as it is.
+    considered. When a persisted active combat session references any matching
+    monster, the whole pass is skipped. Stale and dead monsters are removed, and
+    deficits up to the authored quantity/capacity are spawned using the shared
+    immutable decision.
     """
-    x, y = coordinates
-    population_key = _population_key(x, y)
-    matching = [
-        obj
-        for obj in wilderness.get_objs_at_coordinates(coordinates)
-        if isinstance(obj, Monster) and obj.db.population_key == population_key
-    ]
-    if matching and any(
-        monster.pk in _session_participant_ids() for monster in matching
-    ):
-        # A persisted active combat session still references one of these
-        # monsters; skip the whole pass exactly as the tier-example branch
-        # does, so a participant is neither deleted nor duplicated.
+    decision = ambient_population_decision(wilderness, coordinates)
+    if decision.is_session_protected:
         return
 
-    living: list[Monster] = []
-    for monster in matching:
-        if monster.species_key and _stored_hp(monster) > 0:
-            living.append(monster)
-            continue
+    for monster in decision.stale_ambient:
         reason = "dead" if monster.species_key else "branch_migration"
         _remove_monster(wilderness, monster)
         _emit_ambient(
@@ -369,34 +570,20 @@ def _reconcile_ambient_species(
             },
         )
 
-    target = min(rule.quantity, rule.capacity)
-    expected = Counter(
-        ambient_variant_for_slot(rule, x, y, slot) for slot in range(target)
-    )
-    deficit = expected - Counter(monster.variant_key for monster in living)
-    # Both authored numbers are ceilings: the quantity is the population this
-    # coordinate maintains and the capacity the hard bound, so a living
-    # individual outside the selected variant multiset (an authoring change
-    # after it was placed) is preserved without letting the pass add past the
-    # authored quantity.
-    budget = max(0, target - len(living))
-    for variant_key in sorted(deficit):
-        for _ in range(deficit[variant_key]):
-            if budget <= 0:
-                break
-            individual = _spawn_species_individual(
-                wilderness, coordinates, variant_key, population_key
-            )
-            budget -= 1
-            _emit_ambient(
-                "monster_ambient_placed",
-                {
-                    "region": rule.region_key,
-                    "coordinate": coordinates,
-                    "species": individual.species_key,
-                    "variant": individual.variant_key,
-                },
-            )
+    population_key = _population_key(*coordinates)
+    for slot_entry in decision.spawns_needed:
+        individual = _spawn_species_individual(
+            wilderness, coordinates, slot_entry.variant_key, population_key, slot=slot_entry.slot
+        )
+        _emit_ambient(
+            "monster_ambient_placed",
+            {
+                "region": rule.region_key,
+                "coordinate": coordinates,
+                "species": individual.species_key,
+                "variant": individual.variant_key,
+            },
+        )
 
 
 def _matches_expected(monster: Monster, expected: MonsterPopulation) -> bool:
@@ -454,55 +641,202 @@ def _session_participant_ids() -> frozenset[int]:
 def ensure_population(wilderness, coordinates: tuple[int, int]) -> None:
     """Reconcile one wilderness coordinate against its deterministic population.
 
-    Two disjoint ambient branches cover the map: a coordinate whose region has
-    an authored species placement rule is reconciled by that rule, and every
-    other coordinate keeps the tier-example model's behaviour unchanged. The
-    hunting band stays tier-example, so the introductory hunt's pinned
-    behaviour is untouched.
-
-    Only ``Monster`` objects bearing the matching ``population_key`` marker are
-    ever reconciled. When a persisted active combat session references any
-    marker-matching monster, the whole pass is skipped so the participant is
-    neither deleted nor respawned before session restoration settles it
-    (fix-startup-session-restore-order D2). When the model returns ``None``,
-    every marker-matching monster is deleted (stale-cleanup); foreign monsters
-    are untouched. When it
-    returns a population, the coordinate is reconciled to exactly one living,
-    model-conformant marker-matching monster: if exactly one such monster
-    already exists (living, correct tier, correct key) nothing is written;
-    otherwise every marker-matching monster (dead, surplus, or stale) is removed
-    and one fresh ``Monster`` is created with its tier applied, the marker set,
-    registration in ``itemcoordinates``, and its location attached to the room
-    currently active at that coordinate, if any.
+    Two disjoint ambient branches cover the map: authored species placement rules
+    or the tier-example model (hunting band and baseline). When a persisted active
+    combat session references any marker-matching monster, reconciliation is skipped.
+    When the model returns None, stale monsters are removed. Otherwise, the coordinate
+    is reconciled to exactly one living, model-conformant monster.
     """
     x, y = coordinates
     rule = species_rule_for_coordinates(x, y)
     if rule is not None:
         _reconcile_ambient_species(wilderness, coordinates, rule)
         return
-    expected = population_for_coordinates(x, y)
-    key = _population_key(x, y)
-    matching = [
-        obj
-        for obj in wilderness.get_objs_at_coordinates(coordinates)
-        if isinstance(obj, Monster) and obj.db.population_key == key
-    ]
-    if matching:
-        participants = _session_participant_ids()
-        if any(monster.pk in participants for monster in matching):
-            # A persisted active combat session still references one of these
-            # monsters; skip the whole reconciliation pass so the participant
-            # is neither deleted nor respawned before session restoration
-            # settles it.
-            return
-    if expected is None:
-        for monster in matching:
+
+    decision = ambient_population_decision(wilderness, coordinates)
+    if decision.is_session_protected:
+        return
+
+    if decision.expected_baseline is None:
+        for monster in decision.stale_ambient:
             _remove_monster(wilderness, monster)
         return
-    if len(matching) == 1 and _matches_expected(matching[0], expected):
-        # Idempotency special case (D-3): exactly one living, model-conformant
-        # marker-matching monster already exists, so no write happens.
+
+    if len(decision.living_ambient) == 1 and not decision.stale_ambient:
+        # Idempotency: exactly one living, model-conformant monster already exists
         return
-    for monster in matching:
+
+    for monster in decision.stale_ambient:
         _remove_monster(wilderness, monster)
-    _spawn(wilderness, coordinates, expected)
+
+    if decision.spawns_needed:
+        _spawn(wilderness, coordinates, decision.expected_baseline)
+
+
+def population_view(
+    wilderness,
+    cells: Iterable[tuple[int, int]],
+) -> tuple[PopulationFact, ...]:
+    """Project visible population facts across requested cells without mutating state.
+
+    Consumes the shared ``ambient_population_decision`` for ambient slots and
+    ``site_living_members`` for monster sites. Foreign registered entities keep
+    their stable ``object:<dbid>`` identities.
+    """
+    from typeclasses.characters import PlayerCharacter
+    from typeclasses.npcs import LLMNPC, NPC
+    from world.maps.monster_sites import site_living_members
+
+    target_cells = set(cells)
+    if not target_cells:
+        return ()
+
+    wilderness_name = WILDERNESS_NAME
+
+    # 1. Single pass over itemcoordinates to index registrations by cell for requested cells
+    items_by_cell: dict[tuple[int, int], list[Any]] = {c: [] for c in target_cells}
+    for obj, coords in (wilderness.db.itemcoordinates or {}).items():
+        if obj is not None and coords in target_cells:
+            items_by_cell[coords].append(obj)
+
+    # 2. Cache session participants and capital entry once for the view pass
+    session_participants = _session_participant_ids()
+    cap_entry = capital_entry_xy()
+
+    # Cache site living members per site encountered
+    site_members_cache: dict[str, set[int]] = {}
+
+    facts: list[PopulationFact] = []
+
+    for cell in sorted(target_cells):
+        if not is_valid_wilderness_cell(cell):
+            # Materialization never happens on impassable or invalid wilderness cells
+            continue
+
+        cell_objs = items_by_cell[cell]
+
+        # A. Ambient decision for this cell
+        decision = ambient_population_decision(
+            wilderness,
+            cell,
+            session_participants=session_participants,
+            existing_objs=cell_objs,
+            capital_entry=cap_entry,
+        )
+
+        # Map living ambient monsters to their slots/keys
+        assigned_living: set[int] = set()
+        if decision.is_session_protected:
+            # Protected cell: project living matching monsters as-is; nothing prospective
+            for slot_entry, monster in decision.assigned:
+                if monster is not None:
+                    assigned_living.add(monster.pk)
+                    facts.append(
+                        PopulationFact(
+                            observation_key=slot_entry.observation_key,
+                            cell=cell,
+                            kind="monster",
+                            hostile=True,
+                            label=monster.key,
+                        )
+                    )
+        else:
+            for slot_entry, monster in decision.assigned:
+                if monster is not None:
+                    assigned_living.add(monster.pk)
+                    facts.append(
+                        PopulationFact(
+                            observation_key=slot_entry.observation_key,
+                            cell=cell,
+                            kind="monster",
+                            hostile=True,
+                            label=monster.key,
+                        )
+                    )
+                elif slot_entry in decision.spawns_needed:
+                    # Prospective slot
+                    facts.append(
+                        PopulationFact(
+                            observation_key=slot_entry.observation_key,
+                            cell=cell,
+                            kind="monster",
+                            hostile=True,
+                            label=slot_entry.name_zh,
+                        )
+                    )
+
+        # Hoisted: Any surplus living ambient monsters outside assigned slots
+        for m in decision.living_ambient:
+            if m.pk not in assigned_living and m.pk is not None:
+                facts.append(
+                    PopulationFact(
+                        observation_key=f"object:{m.pk}",
+                        cell=cell,
+                        kind="monster",
+                        hostile=True,
+                        label=m.key,
+                    )
+                )
+
+        # B. Registered non-ambient entities (site monsters, foreign monsters, characters, npcs)
+        ambient_marker = _population_key(*cell)
+        for obj in cell_objs:
+            pk = getattr(obj, "pk", None)
+            if pk is None:
+                continue
+
+            if isinstance(obj, Monster):
+                if obj.db.population_key == ambient_marker:
+                    # Already handled by ambient decision
+                    continue
+
+                site_key = obj.db.site_key
+                if site_key is not None:
+                    if site_key not in site_members_cache:
+                        res = site_living_members(site_key, wilderness=wilderness)
+                        site_members_cache[site_key] = {m.pk for m in res.members}
+                    if pk in site_members_cache[site_key]:
+                        facts.append(
+                            PopulationFact(
+                                observation_key=f"object:{pk}",
+                                cell=cell,
+                                kind="monster",
+                                hostile=True,
+                                label=obj.key,
+                            )
+                        )
+                    continue
+
+                # Foreign monster
+                if _persisted_hp(obj) > 0:
+                    facts.append(
+                        PopulationFact(
+                            observation_key=f"object:{pk}",
+                            cell=cell,
+                            kind="monster",
+                            hostile=True,
+                            label=obj.key,
+                        )
+                    )
+            elif isinstance(obj, PlayerCharacter):
+                facts.append(
+                    PopulationFact(
+                        observation_key=f"object:{pk}",
+                        cell=cell,
+                        kind="character",
+                        hostile=False,
+                        label=obj.key,
+                    )
+                )
+            elif isinstance(obj, (NPC, LLMNPC)):
+                facts.append(
+                    PopulationFact(
+                        observation_key=f"object:{pk}",
+                        cell=cell,
+                        kind="npc",
+                        hostile=False,
+                        label=obj.key,
+                    )
+                )
+
+    return tuple(facts)

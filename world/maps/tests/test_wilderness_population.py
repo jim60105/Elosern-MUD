@@ -41,6 +41,19 @@ from world.quests.catalog import register_catalog
 from world.quests.runtime import QuestState, read_records
 from world.quests.tests._fixtures import RegistryIsolationMixin
 from world.rules.combat_session import engage
+from world.maps.wilderness_population import (
+    ambient_population_decision,
+    population_view,
+)
+from world.rules.clock import get_world_clock
+from world.rules.surfaces import attribute_snapshot, snapshot_traits
+from world.maps.monster_sites import (
+    settle_monster_sites,
+    site_state,
+    site_living_members,
+)
+from typeclasses.npcs import NPC
+from evennia.objects.models import ObjectDB
 from world.rules.guild_economy import sync_guild_economy
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
@@ -77,6 +90,12 @@ def live_region_registry():
     from world.lore.wilderness_regions import regions
 
     return regions()
+
+
+def live_monster_site_registry():
+    return _live_registry(
+        ".".join(("world", "lore", "monster_placement")), "MONSTER_SITE" + "_REGISTRY"
+    )
 
 
 def live_anchor_entry():
@@ -705,3 +724,227 @@ class StartupSessionRestoreOrderTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(len(respawned), 1)
         self.assertNotEqual(respawned[0].pk, other.pk)
         self.assertGreater(respawned[0].traits.hp.current, 0)
+
+
+class WildernessPopulationViewTests(EvenniaTest):
+    def setUp(self):
+        super().setUp()
+        from evennia.contrib.grid.wilderness.wilderness import (
+            WildernessScript,
+            create_wilderness,
+            enter_wilderness,
+        )
+
+        self.script_cls = WildernessScript
+        create_wilderness(name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider())
+        self.script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
+        enter_wilderness(self.char1, coordinates=ENTRY_XY, name=WILDERNESS_NAME)
+        self.room = self.char1.location
+
+    @covers_requirement(
+        "wilderness-monster-population::ensure-population-idempotently-places-and-respawns-monsters-at-a-coordinate"
+    )
+    def test_view_agrees_with_entry_and_observation_identity_is_stable(self):
+        # NEARBY_BAND_XY is inside hunting band and currently unprepared/unmaterialized.
+        view_facts_before = population_view(self.script, [NEARBY_BAND_XY])
+        self.assertEqual(len(view_facts_before), 1)
+        fact_before = view_facts_before[0]
+        self.assertEqual(fact_before.cell, NEARBY_BAND_XY)
+        self.assertEqual(fact_before.kind, "monster")
+        self.assertTrue(fact_before.hostile)
+        self.assertTrue(fact_before.observation_key.startswith(f"population:{WILDERNESS_NAME}:"))
+        self.assertTrue(fact_before.observation_key.endswith(":hunting_band:0"))
+
+        # Now materialize via ensure_population
+        ensure_population(self.script, NEARBY_BAND_XY)
+        monsters = [
+            obj
+            for obj in self.script.get_objs_at_coordinates(NEARBY_BAND_XY)
+            if isinstance(obj, Monster)
+        ]
+        self.assertEqual(len(monsters), 1)
+        materialized = monsters[0]
+        self.assertEqual(materialized.key, fact_before.label)
+
+        # View again: the stable observation key must be identical
+        view_facts_after = population_view(self.script, [NEARBY_BAND_XY])
+        self.assertEqual(len(view_facts_after), 1)
+        fact_after = view_facts_after[0]
+        self.assertEqual(fact_after.observation_key, fact_before.observation_key)
+        self.assertEqual(fact_after.label, fact_before.label)
+        self.assertEqual(fact_after.cell, NEARBY_BAND_XY)
+
+        # Test baseline branch parity: a cell far from the hunting band with deterministic population
+        baseline_cell = (1250, 2420)
+        self.assertIsNotNone(population_for_coordinates(*baseline_cell))
+        facts_baseline_before = population_view(self.script, [baseline_cell])
+        self.assertEqual(len(facts_baseline_before), 1)
+        base_fact_before = facts_baseline_before[0]
+        self.assertEqual(base_fact_before.cell, baseline_cell)
+        self.assertTrue(base_fact_before.observation_key.endswith(":baseline:0"))
+
+        ensure_population(self.script, baseline_cell)
+        base_monsters = [
+            obj
+            for obj in self.script.get_objs_at_coordinates(baseline_cell)
+            if isinstance(obj, Monster)
+        ]
+        self.assertEqual(len(base_monsters), 1)
+        self.assertEqual(base_monsters[0].key, base_fact_before.label)
+
+        facts_baseline_after = population_view(self.script, [baseline_cell])
+        self.assertEqual(len(facts_baseline_after), 1)
+        self.assertEqual(facts_baseline_after[0].observation_key, base_fact_before.observation_key)
+        self.assertEqual(facts_baseline_after[0].label, base_fact_before.label)
+
+    @covers_requirement(
+        "wilderness-monster-population::ensure-population-idempotently-places-and-respawns-monsters-at-a-coordinate"
+    )
+    def test_view_produces_no_read_mutation(self):
+        unprepared_cell = (1200, 1200)
+        # Place a foreign NPC on another cell
+        foreign_npc = create_object(NPC, key="foreign_merchant")
+        self.script.db.itemcoordinates[foreign_npc] = (1200, 1201)
+
+        clock_before = get_world_clock().tick
+        objs_count_before = ObjectDB.objects.count()
+        rooms_count_before = len(self.script.db.rooms or {})
+        itemcoords_before = dict(self.script.db.itemcoordinates)
+        traits_snapshot_before = snapshot_traits(foreign_npc)
+        pop_key_snapshot_before = attribute_snapshot(foreign_npc, "population_key")
+
+        facts = population_view(self.script, [unprepared_cell, (1200, 1201)])
+        self.assertTrue(facts)
+
+        # Assert everything remains identical
+        self.assertEqual(get_world_clock().tick, clock_before)
+        self.assertEqual(ObjectDB.objects.count(), objs_count_before)
+        self.assertEqual(len(self.script.db.rooms or {}), rooms_count_before)
+        self.assertEqual(dict(self.script.db.itemcoordinates), itemcoords_before)
+        self.assertEqual(snapshot_traits(foreign_npc), traits_snapshot_before)
+        self.assertEqual(
+            attribute_snapshot(foreign_npc, "population_key"),
+            pop_key_snapshot_before,
+        )
+
+    @covers_requirement(
+        "wilderness-monster-population::ensure-population-idempotently-places-and-respawns-monsters-at-a-coordinate"
+    )
+    def test_population_view_does_not_recover_sites(self):
+        # Pick a site from registry
+        sites = live_monster_site_registry()
+        site_key = next(iter(sites))
+        site = sites[site_key]
+        cell = site.coordinates
+
+        # 1. Unpopulated site
+        self.assertIsNone(site_state(site_key, wilderness=self.script))
+        facts_unpopulated = population_view(self.script, [cell])
+        # Site is unpopulated -> site contributes no hypothetical members
+        site_facts = [f for f in facts_unpopulated if f.observation_key.startswith("object:")]
+        self.assertEqual(site_facts, [])
+        self.assertIsNone(site_state(site_key, wilderness=self.script))
+
+        # 2. Populate site via settlement clock
+        settle_monster_sites(0, 100)
+        state = site_state(site_key, wilderness=self.script)
+        self.assertEqual(state.state, "populated")
+        facts_populated = population_view(self.script, [cell])
+        site_facts_populated = [f for f in facts_populated if f.observation_key.startswith("object:")]
+        self.assertGreater(len(site_facts_populated), 0)
+        living_res = site_living_members(site_key, wilderness=self.script)
+        self.assertTrue(living_res.available)
+        expected_obs_keys = {f"object:{m.pk}" for m in living_res.members}
+        self.assertEqual(
+            {f.observation_key for f in site_facts_populated}, expected_obs_keys
+        )
+
+        # 3. Defeat members and settle to cleared
+        site_members = [
+            obj
+            for obj in self.script.get_objs_at_coordinates(cell)
+            if isinstance(obj, Monster) and obj.db.site_key == site_key
+        ]
+        for m in site_members:
+            m.traits.hp.current = 0
+        settle_monster_sites(100, 200)
+        cleared_state = site_state(site_key, wilderness=self.script)
+        self.assertEqual(cleared_state.state, "cleared")
+
+        # 4. Cleared / recovery-not-yet-settled site
+        facts_cleared = population_view(self.script, [cell])
+        site_facts_cleared = [f for f in facts_cleared if f.observation_key.startswith("object:")]
+        self.assertEqual(site_facts_cleared, [])
+        self.assertEqual(site_state(site_key, wilderness=self.script).state, "cleared")
+
+        # 5. Recovery condition matured but clock stage not yet settled
+        # Even if ticks elapsed pass recover_after_ticks, site_living_members and view remain cleared until settle
+        facts_recovery_due = population_view(self.script, [cell])
+        site_facts_due = [f for f in facts_recovery_due if f.observation_key.startswith("object:")]
+        self.assertEqual(site_facts_due, [])
+        self.assertEqual(site_state(site_key, wilderness=self.script).state, "cleared")
+
+    @covers_requirement(
+        "wilderness-monster-population::ensure-population-idempotently-places-and-respawns-monsters-at-a-coordinate"
+    )
+    def test_population_view_does_not_construct_traits(self):
+        # Create a Monster object with stored HP attributes but NO constructed trait handler
+        monster = create_object(Monster, key="dormant_guardian")
+        # Set raw attribute directly without touching monster.traits
+        monster.attributes.add("traits", {"hp": {"base": 10, "current": 10}}, category="traits")
+        self.script.db.itemcoordinates[monster] = (1500, 1500)
+
+        # Force the trait handler cold as in test_the_read_modifies_nothing_even_from_a_cold_trait_handler
+        monster.__dict__.pop("traits", None)
+        self.assertNotIn("traits", monster.__dict__)
+
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        with CaptureQueriesContext(connection) as queries:
+            facts = population_view(self.script, [(1500, 1500)])
+
+        guardian_fact = next((f for f in facts if f.observation_key == f"object:{monster.pk}"), None)
+        self.assertIsNotNone(guardian_fact)
+        self.assertEqual(guardian_fact.label, "dormant_guardian")
+
+        # Verify monster.traits was NOT constructed in instance __dict__
+        self.assertNotIn("traits", monster.__dict__)
+        # And raw attribute was not mutated
+        raw_traits = monster.attributes.get("traits", category="traits")
+        self.assertEqual(raw_traits, {"hp": {"base": 10, "current": 10}})
+
+        # Assert no SQL writes occurred during the read
+        writes = [
+            query["sql"]
+            for query in queries
+            if any(verb in query["sql"].lower() for verb in ("update", "insert", "delete"))
+        ]
+        self.assertEqual(writes, [])
+
+    @covers_requirement(
+        "wilderness-monster-population::ensure-population-idempotently-places-and-respawns-monsters-at-a-coordinate"
+    )
+    def test_foreign_and_character_entities_distinct_identities(self):
+        cell = (1600, 1600)
+        from typeclasses.characters import PlayerCharacter
+
+        char = create_object(PlayerCharacter, key="traveler_bob")
+        self.script.db.itemcoordinates[char] = cell
+
+        foreign_monster = create_object(Monster, key="wandering_beast")
+        foreign_monster.attributes.add("traits", {"hp": {"current": 25}}, category="traits")
+        self.script.db.itemcoordinates[foreign_monster] = cell
+
+        facts = population_view(self.script, [cell])
+        char_fact = next((f for f in facts if f.observation_key == f"object:{char.pk}"), None)
+        monster_fact = next((f for f in facts if f.observation_key == f"object:{foreign_monster.pk}"), None)
+
+        self.assertIsNotNone(char_fact)
+        self.assertEqual(char_fact.kind, "character")
+        self.assertFalse(char_fact.hostile)
+
+        self.assertIsNotNone(monster_fact)
+        self.assertEqual(monster_fact.kind, "monster")
+        self.assertTrue(monster_fact.hostile)
+        self.assertNotEqual(char_fact.observation_key, monster_fact.observation_key)

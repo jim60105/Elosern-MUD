@@ -32,6 +32,14 @@ Use synthetic documents, policies and parties with independent expected results.
 
 Requirement IDs must come from tools.spec_traceability list on the equivalent merged spec tree, never hand-composed. Before sync associate only the nearest current canonical requirement and report the temporary mapping per docs/development/spec-test-traceability.md. Sync remounts to the generated IDs with no uncovered requirements or waiver. Modified requirements retain identity except an explicit RENAMED window title. Mechanism tests must exist before that sync.
 
+Temporary requirement mapping:
+- `wilderness-population-view::population-reads-share-materialization-decisions`
+  -> canonical: `wilderness-monster-population::ensure-population-idempotently-places-and-respawns-monsters-at-a-coordinate`
+  (rationale: nearest canonical requirement governing deterministic population placement and reconciliation rules)
+- `wilderness-population-view::observation-identities-survive-materialization`
+  -> canonical: `wilderness-monster-population::ensure-population-idempotently-places-and-respawns-monsters-at-a-coordinate`
+  (rationale: nearest canonical requirement governing stable ambient population identity across spawn cycles)
+
 ## Risks / Trade-offs
 
 [Read side effects] -> Pure projections and object/Attribute/clock snapshots in integration tests. [Shared files] -> Serialize shard-manifest, schema and documentation changes even when roots are independent. [Data echo tests] -> Assert mechanics on synthetic fixtures and treat visual review separately. No new permanent lighting or walking state is allowed.
