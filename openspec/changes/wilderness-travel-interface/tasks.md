@@ -8,7 +8,7 @@ Read design.md contracts before starting each group. Paths without a web/ prefix
 
 ## 2. Refresh and shell
 
-- [ ] 2.1 Implement use-travel-map, AppClient slot branches, HudFrame travel hook and MapDrawer allowed-tab filtering; keep ordinary controls mounted until later slices replace them. Extend tests/world/map_drawer.test.js and tests/travel/refresh.test.js for both result/body orders, close/epoch changes and unavailable maps. Update webclient-app/AGENTS.md drawer-only refresh wording. Acceptance: pnpm test -- web/webclient-app/tests/travel/refresh.test.js web/webclient-app/tests/world/map_drawer.test.js exits 0; hidden area shortcut sends no request.
+- [ ] 2.1 Implement use-travel-map, AppClient slot branches, HudFrame travel hook and MapDrawer allowed-tab filtering; keep ordinary controls mounted until later slices replace them. Extend tests/world/map_drawer.test.js and tests/travel/refresh.test.js for both result/body orders, close/epoch changes and unavailable maps. Update webclient-app/AGENTS.md drawer-only refresh wording. Acceptance: pnpm test -- web/webclient-app/tests/travel/refresh.test.js web/webclient-app/tests/world/map_drawer.test.js exits 0; hidden area shortcut sends no request. Distinguish normal refreshing (suspend, keep Stop) from unavailable/invalid/retired (cancel). Wire accepted external full snapshot and explicit-sync recovery to one fresh area request even with unchanged position/time, excluding self-triggered map results; add a two-step-refresh and same-position recovery case.
 
 ## 3. Sleep facts and medallions
 

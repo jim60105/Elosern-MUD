@@ -28,6 +28,10 @@ The active travel stage SHALL request current area data through the existing on-
 - **WHEN** entry, committed movement, time change and look occur while aim/render/failed moves also change
 - **THEN** only committed refresh causes schedule coalesced requests through the single dispatch gate
 
+#### Scenario: Recovery at the same location
+- **WHEN** an area response is unavailable and a later external full snapshot or explicit sync commits unchanged position/time
+- **THEN** exactly one new area request can recover readiness, while its own map completion causes no recursive request
+
 ### Requirement: Medallions identify committed physiological subjects
 Travel medallions SHALL join each present member to its own committed portrait and fatigue facts, expose reserve and sleep with text or shape cues and identify the controlled body without deriving fatigue rules.
 
