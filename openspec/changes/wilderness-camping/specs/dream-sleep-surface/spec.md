@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Optional collaboration follows one accepted sleep result
-Optional dream entry SHALL require explicit opt-in while the authenticated owner sleeps without possession. An eligible voluntary sleep-entry `dream: true` SHALL record enter atomically with entry, without a question. Forced sleep SHALL never enter a dream. Rejected entry or failed owner/control/receipt revalidation SHALL write nothing. Ordinary false/absent flags SHALL record no answer; camp false SHALL record decline.
+Optional dream entry SHALL require explicit opt-in while the authenticated owner sleeps without possession. An eligible voluntary sleep-entry `dream: true` SHALL record enter atomically with entry, without a question. Forced sleep SHALL never enter a dream. Rejected entry or failed owner/control/receipt revalidation SHALL write nothing. Ordinary false/absent flags SHALL record no answer; camp false SHALL record decline for a sleeping owner.
 
 #### Scenario: Fully restored entry
 - **WHEN** until-recovered sleep has an already-met target
@@ -20,7 +20,7 @@ Optional dream entry SHALL require explicit opt-in while the authenticated owner
 - **THEN** only committed progress is retained and resumption never invents or repeats the interval
 
 #### Scenario: Released sleeping owner
-- **WHEN** owner sleep is followed by companion possession and explicit release while the owner remains asleep
+- **WHEN** unanswered owner sleep is followed by companion possession and explicit release while the owner remains asleep
 - **THEN** the question appears for the owner even with awake companions present
 
 #### Scenario: Confirmation rechecks current control
@@ -38,6 +38,10 @@ Optional dream entry SHALL require explicit opt-in while the authenticated owner
 #### Scenario: False and absent differ from camp decline
 - **WHEN** equivalent owner sleeps are started with ordinary false, ordinary absent, or camp false
 - **THEN** the ordinary requests record no answer and retain the question policy, while camp records explicit decline and exposes no later question
+
+#### Scenario: No sleeping owner receipt
+- **WHEN** camp recovery leaves an already-recovered owner awake while a companion sleeps
+- **THEN** no owner receipt or answer is fabricated and no owner-sleep question appears
 
 
 ### Requirement: Dream collaboration consumes the committed elapsed result

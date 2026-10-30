@@ -40,7 +40,7 @@ Voluntary sleep SHALL select the acting body unless party sleep is explicit, com
 - **THEN** only the safe prefix commits and due events, retained identity and resume behavior match existing sleep continuation
 
 ### Requirement: Sleep transports expose declared duration and recovery modes
-Text SHALL accept `sleep [all] [<duration>|until-recovered|until-dawn] [dream]`, `sleep continue` and `camp [<duration>|until-recovered|until-dawn] [dream]`, with existing aliases and dawn tokens 睡到天亮 / 天亮. Browser sleep SHALL select the same modes. Malformed input SHALL reject before writes. Camp SHALL use explicit party scope and the shared daypart default. Both command documents SHALL describe syntax and sleeping availability.
+Text SHALL accept `sleep [all] [<duration>|until-recovered|until-dawn]`, an optional terminal `dream` after an explicit mode, `sleep continue` and `camp [<duration>|until-recovered|until-dawn] [dream]`, with existing aliases and dawn tokens 睡到天亮 / 天亮. Browser sleep SHALL select the same modes. Malformed input SHALL reject before writes. Camp SHALL use party scope and the shared daypart default. Both command documents SHALL describe syntax and sleeping availability.
 
 #### Scenario: Transport parity
 - **WHEN** text `sleep all 2h` and a browser all-party duration request are separately issued against equivalent states

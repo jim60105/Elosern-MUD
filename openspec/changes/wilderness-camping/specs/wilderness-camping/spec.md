@@ -6,7 +6,7 @@ Provide a server-authoritative whole-party camp decision with guarded dream cons
 
 ### Requirement: Camp preview is read-only and authoritative
 
-`explore.camp_preview` SHALL accept no input and return current availability, stable refusal code/message, dream eligibility, default mode and both modes' wake/reserve predictions for selected present members. It SHALL use the same selection, safety and targets as camp, with no persistence, clock advance or implicit initialization.
+`explore.camp_preview` SHALL accept no input and return overall availability, default mode and each mode's availability, stable refusal code/message, dream eligibility and wake/reserve predictions for selected present members. It SHALL use camp's selection, safety and targets, with no persistence, clock advance or implicit initialization.
 
 #### Scenario: Preview parity
 - **WHEN** preview is followed by camp in an unchanged state with no intervening interruption
@@ -20,13 +20,25 @@ Provide a server-authoritative whole-party camp decision with guarded dream cons
 - **WHEN** combat, a hostile, an ineligible member or possession conflict prevents camp
 - **THEN** preview returns the same stable gate code and zh-TW message as camp, with no attribute, receipt, dream, clock or reveal writes
 
+#### Scenario: Mode-dependent eligibility
+- **WHEN** the owner or whole party is already fully recovered
+- **THEN** dawn can remain available while recovery is unavailable or cannot offer a dream; switching modes uses that mode's refusal and dream eligibility
+
+#### Scenario: Piecewise member prediction
+- **WHEN** a member starts awake/full or wakes before the latest selected sleeper
+- **THEN** its reserve prediction includes canonical awake consumption through the camp endpoint, while its own wake target remains distinct
+
 ### Requirement: Camp commits consent and continues accepted party sleep
 
-`explore.camp` SHALL accept exactly `{mode: "until-dawn" | "until-recovered", dream: boolean}`, atomically enter the selected party and record guarded enter or explicit decline, then use existing continuation or dream handoff. Refusal SHALL write nothing and return the preview gate code; true when unofferable SHALL reject without silently declining. Existing sleepers and remote members SHALL retain their plans.
+`explore.camp` SHALL accept exactly `{mode: "until-dawn" | "until-recovered", dream: boolean}`, atomically enter the selected party and record guarded enter or decline for a sleeping owner, then continue selected accepted plans or hand off to the dream. Refusal SHALL write nothing and return the preview gate code; true when unofferable SHALL reject without silently declining. Existing sleepers and remote members SHALL retain their plans.
 
 #### Scenario: Unchecked camp
 - **WHEN** a safe accepted camp has dream false
-- **THEN** the owner receipt records explicit decline without a question and accepted sleep continues through existing physiological boundaries until its retained continuation target or a real safety/interaction interruption
+- **THEN** an existing owner sleeping receipt records explicit decline without a question and selected accepted sleeps continue through existing boundaries until all selected plans wake or a real safety/interaction interruption
+
+#### Scenario: Recovered owner with tired companion
+- **WHEN** recovery camp selects a fully recovered awake owner and an unrecovered companion
+- **THEN** no owner receipt or answer is fabricated, no question appears, and the companion's accepted sleep continues to its wake or a real interruption with an idempotent camp result
 
 #### Scenario: Checked camp
 - **WHEN** dream true is accepted for the authenticated sleeping owner without companion possession
@@ -52,6 +64,10 @@ Accepted camping SHALL return actual elapsed time, member before/after reserves,
 - **WHEN** camp enters a dream and later departs or reconnects
 - **THEN** the entry response marks recovery pending with zero elapsed, and final/interrupt publication occurs once for that accepted camp using only committed intervals
 
+#### Scenario: Recovery across process loss
+- **WHEN** recovery restarts between intervals with due events, after the final interval commit or before travel-event publication
+- **THEN** durable progress restores the complete result/events and the same logical camp_result identity without replaying elapsed time; a safety pause reports interruption
+
 ### Requirement: Camp card selects only server-supplied choices
 
 The browser SHALL open a focused, Tab-trapped camp card from the leg action or forced-walking-sleep handoff, select the preview default, reset dream unchecked on every opening and submit one camp action on confirmation. Unavailable previews SHALL expose only cancellation and the server reason while the opener stays enabled. Cancellation SHALL return focus to its opener without sending camp.
@@ -63,6 +79,10 @@ The browser SHALL open a focused, Tab-trapped camp card from the leg action or f
 #### Scenario: Projection and refusal
 - **WHEN** a mode is selected or preview refuses
 - **THEN** available state shows supplied current time, wake and member current/predicted reserve; refusal replaces choices with the reason and cancellation, with no confirm dispatch
+
+#### Scenario: Selecting an unavailable mode
+- **WHEN** one mode refuses but the other is available
+- **THEN** the default remains server-selected, its refusal disables confirmation while the other tile stays reachable, and selecting an unofferable-dream mode clears the checkbox
 
 #### Scenario: Forced sleep shortcut
 - **WHEN** a walking member falls asleep and the existing handoff opens

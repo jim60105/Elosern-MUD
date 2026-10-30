@@ -8,7 +8,7 @@ Long wilderness journeys need repeated whole-party camps without separate sleep,
 
 - Add `until-dawn` using the next configured dawn anchor capped by maximum sleep, with text/browser parity and the 睡到天亮 / 天亮 tokens.
 - **BREAKING**: permit explicit dream opt-in in accepted sleep entry. Camp supplies an explicit decline when unchecked; ordinary absent/false flags preserve the existing question policy.
-- Add read-only `explore.camp_preview` and transactional `explore.camp`, sharing existing party entry, dream answer and interruptible continuation.
+- Add read-only `explore.camp_preview` with per-mode eligibility and transactional `explore.camp`, sharing existing party entry, dream answer and interruptible per-body continuation through the selected party's latest retained wake target.
 - Add the camp card and skippable campfire beat, replace only the existing `openTravelCamp()` destination, and prepend the forced-walking-sleep handoff shortcut.
 - Add text `camp [<mode>] [dream]` through the same camp operation. Update both command documents, operational traces and discoverable mechanism tests.
 
