@@ -1,6 +1,6 @@
 "use strict";
 
-// Exact version-1 area_map / world_map logical schemas (OpenSpec change
+// Exact area_map (schema 2) / world_map (schema 1) logical schemas (OpenSpec change
 // define-map-panel-protocol). Mirror of web/webclient/presentation/map_panels.py:
 // every constant, vocabulary and rule below must stay equal to the server
 // validator; a bidirectional Python/Node parity test pins them.
@@ -23,7 +23,7 @@ var MAX_DEPTH = 12;
 var MAX_FIELDS = 64;
 var MAX_STRING_CODE_POINTS = 2048;
 
-var AREA_MAP_SCHEMA_VERSION = 1;
+var AREA_MAP_SCHEMA_VERSION = 2;
 var WORLD_MAP_SCHEMA_VERSION = 1;
 var MAP_PANEL_SCHEMAS = { area_map: AREA_MAP_SCHEMA_VERSION, world_map: WORLD_MAP_SCHEMA_VERSION };
 
@@ -42,9 +42,27 @@ var AREA_MAX_NODES = 512;
 var AREA_MAX_EDGES = 2048;
 var AREA_MAX_QUEST_MARKERS = 32;
 var AREA_MAX_BYTES = 393216;
-var WILDERNESS_WINDOW = 15;
-var WILDERNESS_MAX_NODES = WILDERNESS_WINDOW * WILDERNESS_WINDOW;
 var AREA_MAX_CELL_KM = 1000;
+
+// Wilderness schema 2 (wilderness-area-map-reveal): a centred 41 x 41 window
+// of run-length-encoded rows, sparse nodes, live-sight entities and distant
+// sightings.
+var WILDERNESS_WINDOW = 41;
+var WILDERNESS_HALF_WINDOW = Math.floor(WILDERNESS_WINDOW / 2);
+var WILDERNESS_MAX_NODES = WILDERNESS_WINDOW * WILDERNESS_WINDOW;
+var WILDERNESS_MAX_ENTITIES = 4096;
+var WILDERNESS_MAX_SIGHTINGS = 256;
+var WILDERNESS_MAX_BAND = 15;
+var WILDERNESS_MAX_TIER = 3;
+var WILDERNESS_MAX_GROUND_RADIUS = 8;
+var SIGHTING_DISTANCE_STEP_KM = 5;
+var AREA_TERRAIN_CLASSES = ["open_ground", "hills", "mountain", "woodland", "water", "ridge", "sea", "settlement"];
+var AREA_LIGHT_PHASES = ["day", "dusk", "night", "dawn"];
+var AREA_ENTITY_KINDS = ["hostile", "npc", "character"];
+var SIGHTING_BEARINGS = [
+  "北", "北北東", "東北", "東北東", "東", "東南東", "東南", "南南東",
+  "南", "南南西", "西南", "西南西", "西", "西北西", "西北", "北北西",
+];
 
 var WORLD_MAX_BYTES = 2097152;
 var WORLD_MAX_POLYGON_POINTS = 8192;
@@ -80,6 +98,7 @@ var ROOM_GRAPH_MAP_ID_RE = /^[A-Za-z0-9_.:-]{1,128}$/;
 var MAP_ID_RE = /^[a-z0-9._]{1,64}$/;
 // eslint-disable-next-line no-control-regex
 var EXIT_REF_RE = /^[\x00-\x7f]{1,64}$/;
+var ENTITY_ID_RE = /^[0-9a-f]{16}$/;
 
 function fail(message) {
   throw new Error(message);
@@ -237,7 +256,18 @@ var AREA_COMMON_FIELDS = [
   "edges",
   "quest_markers",
 ];
-var AREA_WILDERNESS_FIELDS = AREA_COMMON_FIELDS.concat(["district_name", "cell_km"]);
+var AREA_WILDERNESS_FIELDS = AREA_COMMON_FIELDS.concat([
+  "district_name",
+  "cell_km",
+  "window",
+  "rows",
+  "light_phase",
+  "ground_radius",
+  "entities",
+  "sightings",
+]);
+var UNKNOWN_RUN_FIELDS = ["length", "kind"];
+var TERRAIN_RUN_FIELDS = ["length", "kind", "terrain", "passable", "band", "tier", "road", "ford"];
 
 function areaGateway(value) {
   if (value === null) {
@@ -327,6 +357,194 @@ function areaMarker(value) {
     title: text(value.title, "quest marker title", MAP_MAX_TITLE),
     tracked: bool(value.tracked, "quest marker tracked"),
     destination: normalized,
+  };
+}
+
+function wildWindow(value) {
+  exact(value, "window", ["min_x", "min_y", "width", "height"]);
+  var window = {
+    min_x: int(value.min_x, "window.min_x", MAP_COORD_MIN, MAP_COORD_MAX),
+    min_y: int(value.min_y, "window.min_y", MAP_COORD_MIN, MAP_COORD_MAX),
+    width: int(value.width, "window.width", 1, WILDERNESS_WINDOW),
+    height: int(value.height, "window.height", 1, WILDERNESS_WINDOW),
+  };
+  if (window.width !== WILDERNESS_WINDOW || window.height !== WILDERNESS_WINDOW) {
+    fail("the wilderness window must be " + WILDERNESS_WINDOW + " x " + WILDERNESS_WINDOW);
+  }
+  return window;
+}
+
+function wildRun(value) {
+  if (!isPlainObject(value)) {
+    fail("a row run must be a JSON object");
+  }
+  if (value.kind === "unknown") {
+    exact(value, "unknown run", UNKNOWN_RUN_FIELDS);
+    return { length: int(value.length, "run.length", 1, WILDERNESS_WINDOW), kind: "unknown" };
+  }
+  if (value.kind !== "terrain") {
+    fail("run.kind is not a stable value");
+  }
+  exact(value, "terrain run", TERRAIN_RUN_FIELDS);
+  if (AREA_TERRAIN_CLASSES.indexOf(value.terrain) === -1) {
+    fail("run.terrain is not a stable value");
+  }
+  return {
+    length: int(value.length, "run.length", 1, WILDERNESS_WINDOW),
+    kind: "terrain",
+    terrain: value.terrain,
+    passable: bool(value.passable, "run.passable"),
+    band: int(value.band, "run.band", 0, WILDERNESS_MAX_BAND),
+    tier: int(value.tier, "run.tier", 0, WILDERNESS_MAX_TIER),
+    road: bool(value.road, "run.road"),
+    ford: bool(value.ford, "run.ford"),
+  };
+}
+
+function sameRun(a, b) {
+  // Lengths are ignored: two neighbouring runs of equal facts are one run.
+  if (a.kind !== b.kind) return false;
+  if (a.kind === "unknown") return true;
+  return (
+    a.terrain === b.terrain &&
+    a.passable === b.passable &&
+    a.band === b.band &&
+    a.tier === b.tier &&
+    a.road === b.road &&
+    a.ford === b.ford
+  );
+}
+
+// The exact rows plus the set of revealed (terrain) window offsets "col,row".
+function wildRows(value) {
+  var revealed = new Set();
+  var rows = list(value, "rows", WILDERNESS_WINDOW, WILDERNESS_WINDOW).map(function (row, rowIndex) {
+    var runs = list(row, "row", 1, WILDERNESS_WINDOW).map(wildRun);
+    var column = 0;
+    runs.forEach(function (run, index) {
+      if (index > 0 && sameRun(run, runs[index - 1])) {
+        fail("equal adjacent runs must be merged");
+      }
+      if (run.kind === "terrain") {
+        for (var offset = 0; offset < run.length; offset++) {
+          revealed.add(column + offset + "," + rowIndex);
+        }
+      }
+      column += run.length;
+    });
+    if (column !== WILDERNESS_WINDOW) {
+      fail("a row's run lengths must sum to " + WILDERNESS_WINDOW);
+    }
+    return runs;
+  });
+  return { rows: rows, revealed: revealed };
+}
+
+function inGroundDisc(dx, dy, radius) {
+  var reach = radius + 0.5;
+  return dx * dx + dy * dy <= reach * reach;
+}
+
+function wildEntity(value) {
+  exact(value, "entity", ["id", "cell", "kind", "hostile", "label"]);
+  if (typeof value.id !== "string" || !ENTITY_ID_RE.test(value.id)) {
+    fail("entity.id must be a 16-character lowercase hex token");
+  }
+  var cell = exact(value.cell, "entity.cell", ["x", "y"]);
+  if (AREA_ENTITY_KINDS.indexOf(value.kind) === -1) {
+    fail("entity.kind is not a stable value");
+  }
+  return {
+    id: value.id,
+    cell: {
+      x: int(cell.x, "entity.cell.x", MAP_COORD_MIN, MAP_COORD_MAX),
+      y: int(cell.y, "entity.cell.y", MAP_COORD_MIN, MAP_COORD_MAX),
+    },
+    kind: value.kind,
+    hostile: bool(value.hostile, "entity.hostile"),
+    label: text(value.label, "entity.label", MAP_MAX_LABEL),
+  };
+}
+
+function wildSighting(value) {
+  exact(value, "sighting", ["bearing", "distance_km", "silhouette_zh", "name"]);
+  if (SIGHTING_BEARINGS.indexOf(value.bearing) === -1) {
+    fail("sighting.bearing is not a stable value");
+  }
+  var distance = int(value.distance_km, "sighting.distance_km", 0, MAP_COORD_MAX);
+  if (distance % SIGHTING_DISTANCE_STEP_KM !== 0) {
+    fail("sighting.distance_km must be a multiple of " + SIGHTING_DISTANCE_STEP_KM);
+  }
+  return {
+    bearing: value.bearing,
+    distance_km: distance,
+    silhouette_zh: text(value.silhouette_zh, "sighting.silhouette_zh", MAP_MAX_LABEL),
+    name: value.name === null ? null : text(value.name, "sighting.name", MAP_MAX_LABEL),
+  };
+}
+
+// The schema-2 wilderness fields, checked against the already-valid nodes.
+function wildernessBody(payload, nodes, current) {
+  var cellKm = number(payload.cell_km, "cell_km", 0, AREA_MAX_CELL_KM);
+  if (cellKm <= 0) {
+    fail("cell_km must be positive");
+  }
+  var window = wildWindow(payload.window);
+  var decoded = wildRows(payload.rows);
+  var minX = window.min_x;
+  var minY = window.min_y;
+  var parts = current.split(":");
+  var cx = Number(parts[2]);
+  var cy = Number(parts[3]);
+  if (cx - minX !== WILDERNESS_HALF_WINDOW || cy - minY !== WILDERNESS_HALF_WINDOW) {
+    fail("the wilderness window must be centred on the current cell");
+  }
+  nodes.forEach(function (node) {
+    var col = Math.floor(node.x / cellKm);
+    var row = Math.floor(node.y / cellKm);
+    var ox = col - minX;
+    var oy = row - minY;
+    if (ox < 0 || ox >= WILDERNESS_WINDOW || oy < 0 || oy >= WILDERNESS_WINDOW) {
+      fail("a wilderness node must lie inside the window");
+    }
+    if (node.id.indexOf("wild:") === 0) {
+      var idParts = node.id.split(":");
+      if (Number(idParts[2]) !== col || Number(idParts[3]) !== row) {
+        fail("a wild node's position must be its own cell");
+      }
+      if (!decoded.revealed.has(ox + "," + oy)) {
+        fail("a wild node must lie on a revealed cell");
+      }
+    } else if (Math.max(Math.abs(col - cx), Math.abs(row - cy)) !== 1) {
+      fail("a gateway node must be one step from the current cell");
+    }
+  });
+  var radius = int(payload.ground_radius, "ground_radius", 0, WILDERNESS_MAX_GROUND_RADIUS);
+  if (AREA_LIGHT_PHASES.indexOf(payload.light_phase) === -1) {
+    fail("light_phase is not a stable value");
+  }
+  var entities = list(payload.entities, "entities", 0, WILDERNESS_MAX_ENTITIES).map(wildEntity);
+  unique(entities.map(function (entity) { return entity.id; }), "entity ids");
+  entities.forEach(function (entity) {
+    var x = entity.cell.x;
+    var y = entity.cell.y;
+    if (!decoded.revealed.has(x - minX + "," + (y - minY))) {
+      fail("an entity must stand on a revealed window cell");
+    }
+    if (!inGroundDisc(x - cx, y - cy, radius)) {
+      fail("an entity must stand inside the current ground sight");
+    }
+  });
+  var sightings = list(payload.sightings, "sightings", 0, WILDERNESS_MAX_SIGHTINGS).map(wildSighting);
+  return {
+    district_name: text(payload.district_name, "district_name", MAP_MAX_TITLE),
+    cell_km: cellKm,
+    window: window,
+    rows: decoded.rows,
+    light_phase: payload.light_phase,
+    ground_radius: radius,
+    entities: entities,
+    sightings: sightings,
   };
 }
 
@@ -432,12 +650,7 @@ function validateAreaMapPanel(payload) {
     quest_markers: markers,
   };
   if (layer === "wilderness") {
-    result.district_name = text(payload.district_name, "district_name", MAP_MAX_TITLE);
-    var cellKm = number(payload.cell_km, "cell_km", 0, AREA_MAX_CELL_KM);
-    if (cellKm <= 0) {
-      fail("cell_km must be positive");
-    }
-    result.cell_km = cellKm;
+    Object.assign(result, wildernessBody(payload, nodes, current));
   }
   checkMapSafety(result, MAP_PANEL_DEPTH);
   return result;
@@ -798,7 +1011,18 @@ module.exports = {
     AREA_MAX_QUEST_MARKERS: AREA_MAX_QUEST_MARKERS,
     AREA_MAX_BYTES: AREA_MAX_BYTES,
     WILDERNESS_WINDOW: WILDERNESS_WINDOW,
+    WILDERNESS_HALF_WINDOW: WILDERNESS_HALF_WINDOW,
     WILDERNESS_MAX_NODES: WILDERNESS_MAX_NODES,
+    WILDERNESS_MAX_ENTITIES: WILDERNESS_MAX_ENTITIES,
+    WILDERNESS_MAX_SIGHTINGS: WILDERNESS_MAX_SIGHTINGS,
+    WILDERNESS_MAX_BAND: WILDERNESS_MAX_BAND,
+    WILDERNESS_MAX_TIER: WILDERNESS_MAX_TIER,
+    WILDERNESS_MAX_GROUND_RADIUS: WILDERNESS_MAX_GROUND_RADIUS,
+    SIGHTING_DISTANCE_STEP_KM: SIGHTING_DISTANCE_STEP_KM,
+    AREA_TERRAIN_CLASSES: AREA_TERRAIN_CLASSES,
+    AREA_LIGHT_PHASES: AREA_LIGHT_PHASES,
+    AREA_ENTITY_KINDS: AREA_ENTITY_KINDS,
+    SIGHTING_BEARINGS: SIGHTING_BEARINGS,
     AREA_MAX_CELL_KM: AREA_MAX_CELL_KM,
     WORLD_MAX_BYTES: WORLD_MAX_BYTES,
     WORLD_MAX_POLYGON_POINTS: WORLD_MAX_POLYGON_POINTS,
