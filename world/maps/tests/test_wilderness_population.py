@@ -7,6 +7,7 @@ from tools.spec_traceability import covers_requirement
 import inspect
 import unittest
 import importlib
+from collections import Counter
 from types import MappingProxyType
 from unittest.mock import patch
 
@@ -34,6 +35,7 @@ from world.tests.geography_fixture import publish_shipped_geography
 from world.maps.wilderness_provider import (
     WILDERNESS_NAME,
     ElosernWildernessMapProvider,
+    is_valid_wilderness_cell,
     region_for_coordinates,
 )
 from world.quests.bootstrap import sync_quest_runtime
@@ -42,7 +44,9 @@ from world.quests.runtime import QuestState, read_records
 from world.quests.tests._fixtures import RegistryIsolationMixin
 from world.rules.combat_session import engage
 from world.maps.wilderness_population import (
+    _spawn,
     ambient_population_decision,
+    species_rule_for_coordinates,
     population_view,
 )
 from world.rules.clock import get_world_clock
@@ -726,6 +730,20 @@ class StartupSessionRestoreOrderTests(BattlefieldIsolation, EvenniaTest):
         self.assertGreater(respawned[0].traits.hp.current, 0)
 
 
+def _empty_baseline_cell() -> tuple[int, int]:
+    """A walkable cell the tier-example model predicts no population for."""
+    for x in range(1200, 2000, 7):
+        for y in range(1200, 2000, 11):
+            cell = (x, y)
+            if not is_valid_wilderness_cell(cell):
+                continue
+            if species_rule_for_coordinates(*cell) is not None:
+                continue
+            if population_for_coordinates(*cell) is None:
+                return cell
+    raise AssertionError("no empty baseline wilderness cell in the scanned window")
+
+
 class WildernessPopulationViewTests(EvenniaTest):
     def setUp(self):
         super().setUp()
@@ -949,3 +967,155 @@ class WildernessPopulationViewTests(EvenniaTest):
         self.assertEqual(monster_fact.kind, "monster")
         self.assertTrue(monster_fact.hostile)
         self.assertNotEqual(char_fact.observation_key, monster_fact.observation_key)
+
+    # -- session protection: what materialization keeps, the view shows -----
+
+    def _marker_monsters(self, cell: tuple[int, int]) -> tuple[Monster, ...]:
+        marker = f"wilderness:{cell[0]}:{cell[1]}"
+        return tuple(
+            obj
+            for obj in self.script.get_objs_at_coordinates(cell)
+            if isinstance(obj, Monster) and obj.db.population_key == marker
+        )
+
+    def _living_marker_monsters(self, cell: tuple[int, int]) -> tuple[Monster, ...]:
+        return tuple(
+            monster
+            for monster in self._marker_monsters(cell)
+            if monster.traits.hp.current > 0
+        )
+
+    def _stand_in(self, cell: tuple[int, int]) -> None:
+        """Place the test character in ``cell`` so a monster there is present."""
+        from evennia.contrib.grid.wilderness.wilderness import enter_wilderness
+
+        enter_wilderness(self.char1, coordinates=cell, name=WILDERNESS_NAME)
+        self.char1.race = "human"
+        self.char1.apply_race_baseline()
+
+    def _bind_protective_session(self, cell: tuple[int, int], monster: Monster) -> None:
+        """Stand in ``cell`` and open the active session that freezes the pass."""
+        self._stand_in(cell)
+        engage(self.char1, monster)
+
+    def _view_matches_materialization(self, cell: tuple[int, int]):
+        """Assert the view projects exactly the living population reconciliation keeps.
+
+        Reconciliation runs first, so the monotone invariant is exercised from
+        the materializer's own result: every living marker-matching monster is
+        projected once and hostile, the ones that fill an expected slot under
+        their population key, the rest under their own ``object:<dbid>``.
+        """
+        ensure_population(self.script, cell)
+        living = {monster.pk: monster for monster in self._living_marker_monsters(cell)}
+        facts = [fact for fact in population_view(self.script, [cell]) if fact.kind == "monster"]
+        object_pks = {
+            int(fact.observation_key.split(":", 1)[1])
+            for fact in facts
+            if fact.observation_key.startswith("object:")
+        }
+        self.assertLessEqual(object_pks, set(living))
+        slot_facts = [fact for fact in facts if not fact.observation_key.startswith("object:")]
+        self.assertEqual(
+            Counter(fact.label for fact in slot_facts),
+            Counter(living[pk].key for pk in living if pk not in object_pks),
+        )
+        self.assertEqual(len(facts), len(living))
+        for fact in facts:
+            self.assertEqual(fact.cell, cell)
+            self.assertTrue(fact.hostile)
+        return facts, object_pks
+
+    @covers_requirement(
+        "wilderness-population-view::population-reads-share-materialization-decisions",
+        "wilderness-monster-population::population-reconciliation-never-destroys-an-active-session-participant",
+    )
+    def test_a_protected_drifted_baseline_monster_stays_visible(self):
+        """A protected monster whose model row drifted is live and must be projected."""
+        cell = (1250, 2420)
+        self.assertIsNotNone(population_for_coordinates(*cell))
+        self.assertIsNone(species_rule_for_coordinates(*cell))
+        self._stand_in(cell)
+        ensure_population(self.script, cell)
+        (monster,) = self._living_marker_monsters(cell)
+        # Model drift after materialization: the name no longer matches the model.
+        monster.key = "t_drifted_baseline_beast"
+        decision = ambient_population_decision(self.script, cell)
+        self.assertFalse(decision.is_session_protected)
+        engage(self.char1, monster)
+
+        # Pre-fix the frozen decision classified the drifted monster as stale and
+        # reported no living ambient member, so the view dropped a real enemy.
+        facts, object_pks = self._view_matches_materialization(cell)
+        self.assertEqual(object_pks, {monster.pk})
+        self.assertEqual([fact.label for fact in facts], [monster.key])
+
+    @covers_requirement(
+        "wilderness-population-view::population-reads-share-materialization-decisions",
+        "wilderness-monster-population::population-reconciliation-never-destroys-an-active-session-participant",
+    )
+    def test_a_protected_monster_on_a_now_empty_cell_stays_visible(self):
+        """A protected monster where the model predicts nothing is still projected."""
+        cell = _empty_baseline_cell()
+        self.assertIsNone(population_for_coordinates(*cell))
+        self._stand_in(cell)
+        ensure_population(self.script, cell)
+        self.assertEqual(self._marker_monsters(cell), ())
+
+        monster = create_object(Monster, key="t_protected_wanderer")
+        monster.threat_tier = next(iter(live_monster_tier_registry()))
+        monster.apply_monster_tier("floor")
+        monster.db.population_key = f"wilderness:{cell[0]}:{cell[1]}"
+        monster.location = self.char1.location
+        self.script.db.itemcoordinates[monster] = cell
+        engage(self.char1, monster)
+
+        # Pre-fix the no-population branch reported every match as stale, so the
+        # view omitted the living monster that reconciliation keeps.
+        facts, object_pks = self._view_matches_materialization(cell)
+        self.assertEqual(object_pks, {monster.pk})
+        self.assertEqual([fact.label for fact in facts], [monster.key])
+        self.assertEqual(self.script.db.itemcoordinates[monster], cell)
+        self.assertGreater(monster.traits.hp.current, 0)
+
+    @covers_requirement(
+        "wilderness-population-view::population-reads-share-materialization-decisions",
+        "wilderness-monster-population::population-reconciliation-never-destroys-an-active-session-participant",
+    )
+    def test_protected_duplicate_baseline_monsters_are_both_visible(self):
+        """Both retained duplicates keep a fact: the slot holder and the surplus."""
+        cell = (1250, 2420)
+        expected = population_for_coordinates(*cell)
+        self.assertIsNotNone(expected)
+        self._stand_in(cell)
+        ensure_population(self.script, cell)
+        (first,) = self._living_marker_monsters(cell)
+        _spawn(self.script, cell, expected)
+        second = next(
+            monster
+            for monster in self._living_marker_monsters(cell)
+            if monster.pk != first.pk
+        )
+        self.assertEqual(len(self._living_marker_monsters(cell)), 2)
+        engage(self.char1, second)
+
+        before = sorted(
+            monster.pk for monster in self._living_marker_monsters(cell)
+        )
+        # Pre-fix only the first retained duplicate reached the view; the second
+        # living enemy was skipped as an ambient-marker object.
+        facts, object_pks = self._view_matches_materialization(cell)
+        self.assertEqual(
+            sorted(
+                monster.pk for monster in self._living_marker_monsters(cell)
+            ),
+            before,
+        )
+        self.assertEqual(object_pks, {second.pk})
+        slot_facts = [fact for fact in facts if not fact.observation_key.startswith("object:")]
+        self.assertEqual(len(slot_facts), 1)
+        self.assertEqual(slot_facts[0].label, first.key)
+        self.assertEqual(
+            slot_facts[0].observation_key,
+            f"population:{WILDERNESS_NAME}:{cell[0]}:{cell[1]}:baseline:0",
+        )
