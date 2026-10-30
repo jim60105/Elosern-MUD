@@ -164,6 +164,25 @@ describe("resolveTargets disabled exits and absence", () => {
   it("a room with no exits has no targets", () => {
     expect(resolveTargets([], null)).toEqual({ angled: [], portals: [], cycle: [] });
   });
+
+  it("a withheld destination still aims by the server's direction word and never lights the map", () => {
+    // Schema 6: a legal wilderness direction whose cell is unrevealed commits
+    // a null destination. The compass keeps the opaque exit reference and the
+    // word bearing, and reports no minimap node -- so the aimed highlight
+    // (`target.destinationOnMap ? target.destination : null`) draws nothing.
+    const model = mapModel("wilderness", [node(CURRENT, 0, 0, "current")]);
+    const row = exitRow("7", "northeast", null);
+    const [target] = targetsFor([row], model).angled;
+    expect(target.angle).toBeCloseTo(45, 9);
+    expect(target.source).toBe("word");
+    expect(target.exitRef).toBe("7");
+    expect(target.enabled).toBe(true);
+    expect(target.destination).toBe(null);
+    expect(target.destinationOnMap).toBe(false);
+    expect(target.item.payload).toEqual({ exit_ref: "7", current_node: CURRENT });
+    // The walk step re-snaps to it on arrival and keeps submitting the row.
+    expect(nextStep({ angled: [target] }, target.angle).target).toBe(target);
+  });
 });
 
 describe("portal slots", () => {

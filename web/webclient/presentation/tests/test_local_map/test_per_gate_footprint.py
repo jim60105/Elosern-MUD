@@ -69,6 +69,15 @@ class LocalMapPerGateFootprintTests(EvenniaTest):
         entered = enter_wilderness(self.char1, coordinates=coordinates, name=WILDERNESS_NAME)
         self.assertTrue(entered, coordinates)
         record_arrival(self.char1)
+        # Pin the reveal precondition explicitly: one synthetic cell of ground
+        # sight reveals every adjacent cell, so a footprint assertion below can
+        # never pass merely because the disclosure filter withheld everything.
+        from world.rules.clock import get_world_clock
+        from world.rules.map_knowledge import record_ground_observation
+
+        record_ground_observation(
+            self.char1, tuple(coordinates), int(get_world_clock().tick), 1
+        )
 
     @covers_requirement(
         "webclient-local-map::local-map-is-a-read-only-version-1-presentation-panel"
@@ -108,6 +117,18 @@ class LocalMapPerGateFootprintTests(EvenniaTest):
                 payload = self._registry().render("local_map", _context(self.char1))
                 self.assertEqual(payload["layer"], "wilderness")
                 self.assertEqual(self._wild_node_ids(payload), set())
+                # The view is genuinely populated: the revealed, non-footprint
+                # neighbours are drawn, so the empty footprint set above is the
+                # provider rule's effect and not an empty payload.
+                drawn_wild = {
+                    node["id"]
+                    for node in payload["nodes"]
+                    if node["id"].startswith("wild:elosern:")
+                    and node["id"] != payload["current_node"]
+                }
+                self.assertTrue(
+                    drawn_wild, f"no revealed neighbour was drawn at {coordinates}"
+                )
                 edges = {
                     edge["label"]
                     for edge in payload["edges"]

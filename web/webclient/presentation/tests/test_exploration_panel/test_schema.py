@@ -82,6 +82,26 @@ class ExplorationSchemaTests(unittest.TestCase):
         with self.assertRaises(ProtocolValidationError):
             validate_exploration(_valid_panel(move=[_move_row(destination="not:a:node")]))
 
+    def test_a_withheld_destination_is_null_and_nothing_else_is(self):
+        # Schema 6: a directional wilderness row may withhold its target. The
+        # row keeps its exact key set and the nullable value is exactly null.
+        normalized = validate_exploration(
+            _valid_panel(
+                move=[
+                    _move_row(exit_ref="north", label="north", destination=None),
+                    _move_row(exit_ref="east", destination="room:9"),
+                ]
+            )
+        )
+        self.assertIsNone(normalized["move"][0]["destination"])
+        self.assertEqual(normalized["move"][1]["destination"], "room:9")
+        for withheld in ("", "null", "wild:", 0):
+            with self.subTest(destination=withheld):
+                with self.assertRaises(ProtocolValidationError):
+                    validate_exploration(
+                        _valid_panel(move=[_move_row(destination=withheld)])
+                    )
+
     def test_locked_move_row_requires_reason(self):
         with self.assertRaises(ProtocolValidationError):
             validate_exploration(

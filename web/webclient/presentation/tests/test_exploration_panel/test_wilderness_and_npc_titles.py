@@ -70,6 +70,118 @@ class WildernessExplorationPresenterTests(EvenniaTestCase):
     def _render(self):
         return build_production_registry().render("exploration", _context(self.char1))
 
+    def _pin_knowledge(self, sight, visited_grid=()):
+        """Replace the record with one synthetic wilderness visit."""
+        from world.maps.wilderness_provider import WILDERNESS_NAME
+        from world.rules.map_knowledge import CHUNK_CELLS, KNOWLEDGE_ATTR
+
+        x, y = self.char1.location.coordinates
+        offset = (y % CHUNK_CELLS) * CHUNK_CELLS + (x % CHUNK_CELLS)
+        chunk_key = f"{x // CHUNK_CELLS}:{y // CHUNK_CELLS}"
+        self.char1.attributes.add(
+            KNOWLEDGE_ATTR,
+            {
+                "schema_version": 2,
+                "visited": {
+                    node_id: {"first_seen_tick": 1, "last_seen_tick": 1}
+                    for node_id in visited_grid
+                },
+                "wilderness": {
+                    WILDERNESS_NAME: {
+                        chunk_key: {
+                            str(offset): {
+                                "first_seen_tick": 1,
+                                "last_seen_tick": 1,
+                                "sight": sight,
+                            }
+                        }
+                    }
+                },
+            },
+        )
+
+    def _withheld_rows(self):
+        """Stand at the east approach with a zero-sight record and read the rows."""
+        from world.rules.wilderness_disclosure import DIRECTION_LABELS
+
+        self.gate.at_traverse(self.char1, self.east_gate)
+        self._pin_knowledge(0)
+        payload = self._render()
+        self.assertTrue(payload["available"])
+        withheld = [row for row in payload["move"] if row["destination"] is None]
+        self.assertTrue(withheld, "a zero-sight record must withhold its neighbours")
+        for row in withheld:
+            with self.subTest(exit_ref=row["exit_ref"]):
+                self.assertEqual(
+                    set(row),
+                    {"exit_ref", "label", "destination", "enabled", "disabled_reason"},
+                )
+                self.assertIn(row["label"], DIRECTION_LABELS.values())
+                self.assertTrue(row["enabled"])
+                self.assertIsNone(row["disabled_reason"])
+        return payload, withheld
+
+    @covers_requirement("webclient-exploration-menu::exploration-move-rows-advertise-canonical-destinations")
+    def test_a_withheld_direction_keeps_an_opaque_enabled_row(self):
+        from world.rules.wilderness_disclosure import DIRECTION_LABELS
+
+        payload, withheld = self._withheld_rows()
+        # The registered gateway the player stands on stays disclosed; every
+        # ordinary step whose cell is unrevealed publishes a null target and
+        # only the generic direction word -- no terrain, region or settlement.
+        disclosed = [row for row in payload["move"] if row["destination"] is not None]
+        self.assertEqual(len(disclosed), 1)
+        self.assertEqual(disclosed[0]["label"], "west")
+        self.assertEqual(len(withheld), 5)
+        withheld_labels = {row["label"] for row in withheld}
+        self.assertEqual(
+            withheld_labels,
+            set(DIRECTION_LABELS.values()) - {"northwest", "southwest"} - {"west"},
+        )
+
+    @covers_requirement("webclient-exploration-menu::exploration-move-rows-advertise-canonical-destinations")
+    def test_a_locked_withheld_direction_keeps_its_server_reason(self):
+        self.gate.at_traverse(self.char1, self.east_gate)
+        room = self.char1.location
+        north = next(exit_obj for exit_obj in room.exits if exit_obj.key == "north")
+        north.locks.add("traverse:false()")
+        self._pin_knowledge(0)
+        payload = self._render()
+        row = next(
+            row
+            for row in payload["move"]
+            if row["exit_ref"] == str(int(north.id))
+        )
+        self.assertIsNone(row["destination"])
+        self.assertEqual(row["label"], "north")
+        self.assertFalse(row["enabled"])
+        self.assertTrue(row["disabled_reason"]["message"].strip())
+
+    @covers_requirement("webclient-exploration-menu::explore-move-traverses-a-re-resolved-exit-through-the-shared-movement-path")
+    def test_a_withheld_direction_executes_through_the_production_move_seam(self):
+        from world.maps.wilderness_destination import resolve_wilderness_destination
+        from world.rules.map_knowledge import parse_knowledge
+        from web.webclient.actions.exploration_actions import _move_adapter
+        from web.webclient.actions.node_ids import node_id_for_location
+
+        _, withheld = self._withheld_rows()
+        room = self.char1.location
+        row = next(row for row in withheld if row["label"] == "north")
+        expected = resolve_wilderness_destination(room, "north")
+        self.assertIsNotNone(expected)
+        # The compass submits only the opaque reference plus the current node.
+        result = _move_adapter(
+            self.char1,
+            {
+                "exit_ref": row["exit_ref"],
+                "current_node": node_id_for_location(room),
+            },
+        )
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(node_id_for_location(self.char1.location), expected)
+        visited = {visit.node_id for visit in parse_knowledge(self.char1)}
+        self.assertIn(expected, visited)
+
     @covers_requirement("webclient-exploration-menu::exploration-move-rows-advertise-canonical-destinations")
     def test_wilderness_move_rows_advertise_canonical_destinations(self):
         from typeclasses.rooms import TerrainRoom
