@@ -176,7 +176,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "890b6eb277513c46892a3f7a5b31812f6a2d490b2903258e35ddbf8ceca17ee5",
+  "fingerprint": "efd66d162a6dbe8aad8d415b8383ee588ed8ff30c061686f07736929248742b5",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -899,7 +899,7 @@
     "packages/map-core/elosern_map_core/partition_codec.py": "ddc5834c0e74e38f045c65e21fff95f65ae3360daa3b4192e87b1f19ae897e48",
     "packages/map-core/elosern_map_core/reference_context.py": "23b290c95e6a94f281bc8281c075a1074dab0e7aebb061237640de759607cd13",
     "packages/map-core/elosern_map_core/references.py": "64d5a263d1c9148979cf9af2806a2a5644ce81ba1757f0e41ad108c496dff513",
-    "packages/map-core/elosern_map_core/schema.py": "8ae1b84af20c0513a8c08e70c4a8b095cb3dba6f88a42108dca717bbcd97177c",
+    "packages/map-core/elosern_map_core/schema.py": "b852d8799f953e4539a5b4e93df18c8f06f495a4a4750e476ee4303a4a53166d",
     "packages/map-core/elosern_map_core/sources.py": "b0e4642835cac8ce8ffdf22e00092fef5af91a1c693fbbf083b21ab8e9469fff",
     "packages/map-core/elosern_map_core/sparse.py": "7ef86b108afd37af4cc79e604632aefd61195a4de7a32262b915cd0ebd7f2f3a",
     "packages/map-core/elosern_map_core/terrain.py": "d548b22a5337b85891b743b94a9bc6000c7122736edfe0ef98221a409b7dc20a",
@@ -1225,7 +1225,7 @@
     "world/rules/rulebook/sexual_act_effects.yaml": "d244cb388edf3b2dc76b498fe87e211655d68b0caf93651ed898d86440a983b8",
     "world/rules/rulebook/sexual_pleasure.yaml": "80dde75dfcb4d77b0dca20491f29de3fe34bfcaccb40072640311932153d0eb4",
     "world/rules/rulebook/sexual_resist.yaml": "a7146fe53b3e7e13e37691cdd5f2a47f0bc92ceb933beeff07d75b0a4da6237c",
-    "world/rules/rulebook/sight.yaml": "8b4637b8ce3394d0a847110ca680402b72e0572e5e5416c086a4c4cb26c27bb4",
+    "world/rules/rulebook/sight.yaml": "781dc0cac577e4f5fc3ca05a0bb72086d9e4c6d406af7c5f23c83448d688df80",
     "world/rules/rulebook/state_reactions.yaml": "49c0953d2fc03d60dcf065530c9b01d0127661018a4727379208a62f351667b1",
     "world/rules/rulebook/status_display.yaml": "e138c61d9972dc91dee1ef06ab5508ce5d7f9fc46f34295480eb8a3a71434c8a",
     "world/rules/service_gate.py": "8c9584aa8ddbcff0d6a83c7cc461a2674035f4a464c5d3ef7ff1ffe66f56fdfb",
@@ -1243,7 +1243,7 @@
     "world/rules/sexual_state/traits.py": "eb0b8495f68f47fb8b51654821200f22bfe7f008f1241ebc84e284833bf14f91",
     "world/rules/sexual_transitions.py": "69cf32779cfd749d35a7c6ffa62f1067698f3f30df04821b2efcccb98de67c87",
     "world/rules/shop_hours.py": "676d1dd1353d6758068c0b1c9d40e2f3db986cd97d1507a025982d124e04b366",
-    "world/rules/sight.py": "cca2c4b97476f4e4c6f1ad33169296f59a92338d1be207b196696dcf96002d57",
+    "world/rules/sight.py": "5af03573084d0cab14dadf36f8464a8e65a8b0f011de67a4437a3c3933246b87",
     "world/rules/skill_effects.py": "6fdffeed7109222c2d762b7784cb513631db43d5e1d8d8b7383a29d8e18a0856",
     "world/rules/skill_ownership.py": "a028bd224eb349c98ee829986dcdc9bdc518470ccf86ef719aba4ef8f0087205",
     "world/rules/skip_safety.py": "72088a1fd2bb12f9bf777805740ada42da4c5689c30e7cbfa94bd752fd4ff255",

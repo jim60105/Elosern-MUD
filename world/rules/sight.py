@@ -228,7 +228,12 @@ def _number(value: Any, label: str) -> float:
 
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise SightRulebookError(f"sight rulebook: {label} must be a number")
-    number = float(value)
+    try:
+        number = float(value)
+    except (OverflowError, ValueError):
+        raise SightRulebookError(
+            f"sight rulebook: {label} must be finite and non-negative, got {value!r}"
+        ) from None
     if not math.isfinite(number) or number < 0:
         raise SightRulebookError(
             f"sight rulebook: {label} must be finite and non-negative, got {value!r}"
@@ -679,9 +684,14 @@ def merge_sources(sources: Iterable[SightSource]) -> tuple[SightSource, ...]:
     Two constructs are the same place when they resolve to the same cell. The
     merged record keeps the largest daytime and night range of the group, so a
     day-only authored landmark never removes a settlement's night light, and
-    takes its identity, silhouettes and naming district from the authored
-    record first and then from the lowest ``source_key``, so iteration order
-    never decides the outcome. Nothing is dropped: merging only widens.
+    never drops a phase. Nothing is dropped: merging only widens.
+
+    Silhouettes come from the automatic settlement record when the group holds
+    one, because that is the validated kind/phase anonymity of the place; an
+    authored landmark silhouette only describes a landmark that is a source on
+    its own. The identity and the naming district come from the authored record
+    first, then from the lowest ``source_key`` and ``district_key``, so
+    iteration order never decides the outcome.
     """
 
     grouped: dict[tuple[int, int], list[SightSource]] = {}
@@ -689,16 +699,25 @@ def merge_sources(sources: Iterable[SightSource]) -> tuple[SightSource, ...]:
         grouped.setdefault(source.cell, []).append(source)
     merged: list[SightSource] = []
     for cell, group in grouped.items():
-        ordered = sorted(group, key=lambda source: (not source.authored, source.source_key))
+        ordered = sorted(
+            group,
+            key=lambda source: (
+                not source.authored,
+                source.source_key,
+                source.district_key or "",
+            ),
+        )
         first = ordered[0]
+        anonymous = [source for source in ordered if not source.authored]
+        silhouette = anonymous[0] if anonymous else first
         merged.append(
             SightSource(
                 source_key=first.source_key,
                 cell=cell,
                 sight_km=max(source.sight_km for source in ordered),
                 light_km=max(source.light_km for source in ordered),
-                silhouette_day=first.silhouette_day,
-                silhouette_night=first.silhouette_night,
+                silhouette_day=silhouette.silhouette_day,
+                silhouette_night=silhouette.silhouette_night,
                 district_key=first.district_key,
                 authored=first.authored,
             )
@@ -797,7 +816,7 @@ def published_vantage_cells() -> frozenset[tuple[int, int]]:
     for district in districts_current().districts.values():
         if not district.vantage:
             continue
-        cell = _landmark_cell(district.landmark, bindings)
+        cell = _vantage_cell(district.landmark, bindings)
         if cell is not None:
             cells.add(cell)
     return frozenset(cells)
@@ -830,8 +849,23 @@ def ground_radius_at(cell: tuple[int, int], calendar: Any) -> int:
 def published_distant_sources() -> tuple[SightSource, ...]:
     """Every committed distant source: authored landmarks and settlements."""
 
-    return merge_sources(
-        (*_published_landmark_rows(), *published_settlement_sources())
+    from world.lore.anchors import anchor_geography, anchors
+    from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+
+    return distant_sources(
+        _published_landmark_rows(),
+        settlement_placements(
+            {
+                key: anchor.kind.value
+                for key, anchor in anchors().items()
+                if key in anchor_geography()
+            },
+            {key: tuple(row.cell) for key, row in anchor_geography().items()},
+            {
+                key: entry.hash_cell_count
+                for key, entry in WILDERNESS_ENTRY_REGISTRY.items()
+            },
+        ),
     )
 
 
@@ -841,17 +875,98 @@ def published_settlement_sources() -> tuple[SightSource, ...]:
     from world.lore.anchors import anchor_geography, anchors
     from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 
-    placements = [
+    return settlement_sources(
+        settlement_placements(
+            {key: anchor.kind.value for key, anchor in anchors().items()},
+            {key: tuple(row.cell) for key, row in anchor_geography().items()},
+            {
+                key: entry.hash_cell_count
+                for key, entry in WILDERNESS_ENTRY_REGISTRY.items()
+            },
+        )
+    )
+
+
+def settlement_placements(
+    kinds: Mapping[str, str],
+    cells: Mapping[str, tuple[int, int]],
+    occupied_cells: Mapping[str, int],
+) -> tuple[SettlementFootprint, ...]:
+    """The automatic-source facts of every published wilderness entry.
+
+    Pure projection over three read-only views: an anchor without a geographic
+    cell or without an entry contributes no placement, so a partially published
+    world never invents a source.
+    """
+
+    return tuple(
         SettlementFootprint(
             anchor_key=anchor_key,
-            kind=anchors()[anchor_key].kind.value,
-            cell=tuple(geography.cell),
-            occupied_cells=entry.hash_cell_count,
+            kind=kinds[anchor_key],
+            cell=(int(cells[anchor_key][0]), int(cells[anchor_key][1])),
+            occupied_cells=occupied_cells[anchor_key],
         )
-        for anchor_key, entry in WILDERNESS_ENTRY_REGISTRY.items()
-        if anchor_key in anchors() and anchor_key in anchor_geography()
-    ]
-    return settlement_sources(placements)
+        for anchor_key in sorted(occupied_cells)
+        if anchor_key in kinds and anchor_key in cells
+    )
+
+
+def distant_sources(
+    landmark_rows: Iterable[LandmarkSighting],
+    placements: Iterable[SettlementFootprint],
+    *,
+    policy: SightPolicy | None = None,
+) -> tuple[SightSource, ...]:
+    """The merged sources of authored landmarks and automatic settlements."""
+
+    return merge_sources(
+        (
+            *landmark_sources(landmark_rows),
+            *settlement_sources(placements, policy=policy),
+        )
+    )
+
+
+def _vantage_cell(landmark: Any, bindings: Any) -> tuple[int, int] | None:
+    """The wilderness cell a ``vantage: true`` landmark actually stands on.
+
+    Unlike a sighting source, which normalises a settlement-node landmark to
+    the settlement's anchor cell, the widened-viewpoint eligibility belongs to
+    the land the referenced node itself occupies: a vantage landmark on a
+    non-anchor node widens sight there and follows the node when it moves.
+    """
+
+    if landmark.domain != "settlement_node":
+        return _landmark_cell(landmark, bindings)
+    projected = _settlement_node_position_m(landmark)
+    if projected is None:
+        return None
+    from elosern_map_core.geometry import cell_of_position
+
+    return cell_of_position(projected)
+
+
+def _settlement_node_position_m(landmark: Any) -> tuple[float, float] | None:
+    """One settlement node's current absolute continental position in metres."""
+
+    from elosern_map_core.geometry import local_to_world_m
+    from world.lore.anchors import anchor_geography
+    from world.maps.map_data import current as settlements_current
+
+    anchor_key = _location_ref_for_map_id(landmark.map_id)
+    if anchor_key is None or anchor_key not in anchor_geography():
+        return None
+    snapshot = settlements_current()
+    graph = snapshot.graphs.get(landmark.map_id)
+    frame = snapshot.local_frame_anchors.get(anchor_key)
+    if graph is None or frame is None:
+        return None
+    node = graph.nodes.get(landmark.object_id)
+    if node is None:
+        return None
+    return local_to_world_m(
+        anchor_geography()[anchor_key].cell, frame.local_anchor_m, node.coordinate
+    )
 
 
 def visible_distant_markers(
@@ -982,6 +1097,7 @@ __all__ = [
     "bearing_index",
     "bearing_label",
     "distant_markers",
+    "distant_sources",
     "ground_radius",
     "ground_radius_at",
     "in_ground_disc",
@@ -994,6 +1110,7 @@ __all__ = [
     "published_settlement_sources",
     "published_vantage_cells",
     "rounded_distance_km",
+    "settlement_placements",
     "settlement_sources",
     "sight_terrain_class",
     "validate_sight_region_coverage",

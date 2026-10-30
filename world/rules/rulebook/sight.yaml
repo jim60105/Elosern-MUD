@@ -27,9 +27,9 @@ terrain_radius:
 
 # Deterministic wilderness region keys (world.lore.wilderness_regions) mapped
 # onto the terrain rows above. Sight classifies terrain for visibility, which is
-# not the travel-cost terrain class: hills and valleys see further than open
-# plains at dusk. A published region without a row here is a publication error,
-# never a silent default.
+# not the travel-cost terrain class: hills and valleys are their own row, smaller
+# than open ground in every column but larger than woodland. A published region
+# without a row here is a publication error, never a silent default.
 region_terrain:
   north_deep_forest: woodland
   central_mountains: mountain

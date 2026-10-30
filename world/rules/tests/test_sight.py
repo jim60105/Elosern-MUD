@@ -22,6 +22,7 @@ from types import SimpleNamespace
 
 import yaml
 
+from world.lore.anchors import AnchorKind
 from world.rules.sight import (
     BEARINGS,
     HIDDEN_ANCHOR_KINDS,
@@ -36,6 +37,7 @@ from world.rules.sight import (
     bearing_index,
     bearing_label,
     distant_markers,
+    distant_sources,
     ground_radius,
     in_ground_disc,
     landmark_sources,
@@ -44,6 +46,7 @@ from world.rules.sight import (
     merge_sources,
     rounded_distance_km,
     settlement_sources,
+    settlement_placements,
     validate_sight_region_coverage,
 )
 
@@ -420,6 +423,55 @@ class DistantMarkerTests(unittest.TestCase):
         self.assertEqual(len(_markers(policy, merged, hour=12)), 1)
         self.assertEqual(len(_markers(policy, merged, hour=21)), 1)
 
+    def test_a_merged_unlit_place_keeps_the_anonymous_kind_silhouette(self):
+        policy = _synthetic_policy()
+        authored = _marker_source(
+            cell=(8, 0),
+            sight_km=30.0,
+            light_km=6.0,
+            silhouette_day="合成被動地標白日",
+            silhouette_night="合成被動地標夜色",
+        )
+        settlement = _marker_source(
+            source_key="settlement:t_town",
+            cell=(8, 0),
+            sight_km=6.0,
+            light_km=9.0,
+            silhouette_day="合成聚落白日",
+            silhouette_night="合成聚落燈火",
+            district_key=None,
+            authored=False,
+        )
+        merged = merge_sources([authored, settlement])
+        self.assertEqual(len(merged), 1)
+        # The place is a settlement, so its validated kind/phase anonymity wins
+        # even though an authored landmark description exists for the same cell.
+        self.assertEqual(merged[0].silhouette_day, "合成聚落白日")
+        self.assertEqual(merged[0].silhouette_night, "合成聚落燈火")
+        marker = _markers(policy, merged, hour=12, names={"t_district": "合成燈塔"})[0]
+        self.assertEqual(marker["silhouette_zh"], "合成聚落白日")
+        self.assertIsNone(marker["name"])
+        # Lighting its district only adds the permitted name.
+        lit = _markers(
+            policy, merged, hour=12, lit=("t_district",), names={"t_district": "合成燈塔"}
+        )[0]
+        self.assertEqual(lit["silhouette_zh"], "合成聚落白日")
+        self.assertEqual(lit["name"], "合成燈塔")
+
+    def test_merge_order_never_decides_conflicting_metadata(self):
+        policy = _synthetic_policy()
+        east = _marker_source(cell=(8, 0), district_key="t_east", sight_km=20.0)
+        west = _marker_source(
+            cell=(8, 0), source_key="landmark:t_west", district_key="t_west", sight_km=20.0
+        )
+        forward = merge_sources([east, west])
+        backward = merge_sources([west, east])
+        self.assertEqual(forward, backward)
+        self.assertEqual(forward[0].district_key, "t_east")
+        self.assertEqual(
+            _markers(policy, forward, hour=12), _markers(policy, backward, hour=12)
+        )
+
     def test_only_a_lit_district_adds_the_name_and_nothing_else_changes(self):
         policy = _synthetic_policy()
         source = _marker_source(cell=(10, 0))
@@ -481,6 +533,220 @@ class DistantMarkerTests(unittest.TestCase):
             sources[0].sight_km = 1.0
         # A different hour is a different projection of the same immutable input.
         self.assertNotEqual(_markers(policy, sources, hour=21, lit=lit), first)
+
+
+class PublishedCompositionTests(unittest.TestCase):
+    """The pure composition the published seams delegate to."""
+
+    def test_placements_skip_incomplete_views_and_stay_ordered(self):
+        placements = settlement_placements(
+            {"t_town": "capital", "t_glade": "elven_village"},
+            {"t_town": (4, 4), "t_glade": (6, 6), "t_cave": (9, 9)},
+            {"t_town": 4, "t_glade": 9, "t_cave": 1, "t_absent": 7},
+        )
+        # No kind (t_cave) or no cell (t_absent) means no placement at all.
+        self.assertEqual([row.anchor_key for row in placements], ["t_glade", "t_town"])
+        self.assertEqual([row.cell for row in placements], [(6, 6), (4, 4)])
+
+    def test_distant_sources_filter_hidden_and_zero_range_and_merge_a_settlement(self):
+        policy = _synthetic_policy()
+        rows = [
+            # A hidden place with a range is still not a source.
+            LandmarkSighting(
+                source_key="landmark:t_glade",
+                cell=(6, 6),
+                district_key="t_glade_district",
+                sight_km=40.0,
+                light_km=10.0,
+                silhouette_zh="合成林地側影",
+                hidden=True,
+            ),
+            # No authored range means no marker.
+            LandmarkSighting(
+                source_key="landmark:t_stone",
+                cell=(12, 0),
+                district_key="t_stone_district",
+                sight_km=0.0,
+                light_km=0.0,
+                silhouette_zh="合成石碑側影",
+            ),
+            # A landmark that references the settlement at the same place.
+            LandmarkSighting(
+                source_key="settlement:t_town",
+                cell=(4, 4),
+                district_key="t_town_district",
+                sight_km=25.0,
+                light_km=0.0,
+                silhouette_zh="合成被動地標白日",
+            ),
+        ]
+        placements = settlement_placements(
+            {"t_town": "capital", "t_glade": "elven_village"},
+            {"t_town": (4, 4), "t_glade": (6, 6)},
+            {"t_town": 4, "t_glade": 9},
+        )
+        sources = distant_sources(rows, placements, policy=policy)
+        # One merged settlement source: the hidden and rangeless rows are gone,
+        # and the elven village contributes no automatic source either.
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(sources[0].cell, (4, 4))
+        self.assertEqual(sources[0].sight_km, 25.0)
+        # The automatic settlement contributed its light range and anonymity.
+        self.assertEqual(sources[0].light_km, 2 * 1.0)
+        self.assertEqual(sources[0].silhouette_day, "合成城牆側影")
+
+    def test_the_sources_a_marker_read_needs_are_immutable(self):
+        sources = distant_sources([], [])
+        self.assertEqual(sources, ())
+
+
+class PublishedSeamTests(unittest.TestCase):
+    """The published seams over synthetic registries (no game world, no DB)."""
+
+    @staticmethod
+    def _published(*, landmarks=(), districts=True):
+        """Patch the published registry readers with synthetic views."""
+
+        from contextlib import ExitStack
+        from unittest.mock import patch
+
+        from world.lore import anchors as anchors_module
+        from world.lore import map_districts as districts_module
+        from world.lore import wilderness_entry as entry_module
+        from world.maps import static_references
+
+        registry = {
+            "t_town": SimpleNamespace(kind=AnchorKind.CAPITAL),
+            "t_glade": SimpleNamespace(kind=AnchorKind.ELVEN_VILLAGE),
+        }
+        geography = {
+            "t_town": SimpleNamespace(cell=(4, 4)),
+            "t_glade": SimpleNamespace(cell=(6, 6)),
+        }
+        entries = {
+            "t_town": SimpleNamespace(hash_cell_count=4),
+            "t_glade": SimpleNamespace(hash_cell_count=9),
+        }
+        district_registry = {
+            row.district_key: row
+            for row in (
+                SimpleNamespace(
+                    district_id="t_ridge",
+                    district_key="t_ridge",
+                    vantage=True,
+                    sight_km=22.0,
+                    light_km=4.0,
+                    silhouette_zh="合成山脊側影",
+                    landmark=SimpleNamespace(
+                        domain="wilderness_cell", object_id="ridge", map_id=None
+                    ),
+                ),
+                SimpleNamespace(
+                    district_id="t_glade",
+                    district_key="t_glade",
+                    vantage=False,
+                    sight_km=30.0,
+                    light_km=0.0,
+                    silhouette_zh="合成林地側影",
+                    landmark=SimpleNamespace(domain="location", object_id="t_glade", map_id=None),
+                ),
+                SimpleNamespace(
+                    district_id="t_stone",
+                    district_key="t_stone",
+                    vantage=False,
+                    sight_km=0.0,
+                    light_km=0.0,
+                    silhouette_zh="合成石碑側影",
+                    landmark=SimpleNamespace(
+                        domain="wilderness_cell", object_id="stone", map_id=None
+                    ),
+                ),
+                SimpleNamespace(
+                    district_id="t_town_spire",
+                    district_key="t_town_spire",
+                    vantage=False,
+                    sight_km=20.0,
+                    light_km=1.0,
+                    silhouette_zh="合成城塔側影",
+                    landmark=SimpleNamespace(
+                        domain="wilderness_cell", object_id="spire", map_id=None
+                    ),
+                ),
+            )
+        }
+        cells = {
+            "ridge": (9, 0),
+            "stone": (12, 0),
+            "spire": (4, 4),
+            "t_glade": (6, 6),
+        }
+
+        def fake_resolve(reference, *, index=None, source=""):
+            return SimpleNamespace(cell=cells[reference.object_id], position_m=None)
+
+        stack = ExitStack()
+        stack.enter_context(patch.object(anchors_module, "anchors", lambda: registry))
+        stack.enter_context(patch.object(anchors_module, "anchor_geography", lambda: geography))
+        stack.enter_context(patch.object(entry_module, "WILDERNESS_ENTRY_REGISTRY", entries))
+        stack.enter_context(patch.object(static_references, "map_reference_index", lambda: object()))
+        stack.enter_context(patch.object(static_references, "resolve_static", fake_resolve))
+        if districts:
+            stack.enter_context(
+                patch.object(
+                    districts_module,
+                    "current",
+                    lambda: SimpleNamespace(districts=district_registry),
+                )
+            )
+        return stack
+
+    def test_the_published_automatic_sources_come_from_the_live_registries(self):
+        from world.rules import sight
+
+        with self._published():
+            sources = sight.published_settlement_sources()
+        # The hidden elven village is never a source; the capital is, with its
+        # footprint-derived visibility and the policy silhouette.
+        self.assertEqual([source.source_key for source in sources], ["settlement:t_town"])
+        self.assertEqual(sources[0].cell, (4, 4))
+        factor = sight.POLICY.settlement_footprint_factor
+        # Four occupied cells -> a footprint size of two cells.
+        self.assertEqual(sources[0].sight_km, 2 * factor["day"])
+        self.assertEqual(sources[0].light_km, 2 * factor["night"])
+        self.assertEqual(
+            sources[0].silhouette_day, sight.POLICY.settlement_silhouettes["capital"]["day"]
+        )
+
+    def test_the_published_composition_filters_and_merges_district_landmarks(self):
+        from world.rules import sight
+
+        with self._published():
+            sources = sight.published_distant_sources()
+        by_cell = {source.cell: source for source in sources}
+        # The hidden place's ranged landmark is dropped entirely, and the
+        # rangeless stone landmark emits no marker either.
+        self.assertEqual(set(by_cell), {(9, 0), (4, 4)})
+        self.assertEqual(by_cell[(9, 0)].sight_km, 22.0)
+        # The settlement cell carries both the automatic source and the
+        # landmark that stands on it, merged once: ranges widen, and the
+        # validated settlement anonymity survives the merge.
+        merged = by_cell[(4, 4)]
+        self.assertEqual(merged.sight_km, 20.0)
+        # The automatic night light is larger than the landmark's own range.
+        self.assertEqual(
+            merged.light_km, max(1.0, 2 * sight.POLICY.settlement_footprint_factor["night"])
+        )
+        # The merged record keeps the settlement anonymity, not the authored
+        # landmark description, because the place is a settlement.
+        self.assertEqual(
+            merged.silhouette_day, sight.POLICY.settlement_silhouettes["capital"]["day"]
+        )
+
+    def test_a_vantage_flag_projects_the_landmark_cell_it_names(self):
+        from world.rules import sight
+
+        with self._published():
+            self.assertEqual(sight.published_vantage_cells(), frozenset({(9, 0)}))
 
 
 class PolicyValidationTests(unittest.TestCase):
@@ -567,6 +833,10 @@ class PolicyValidationTests(unittest.TestCase):
         infinite = _document()
         infinite["twilight_factor"] = float("inf")
         self.assertIn("twilight_factor", _rejected(self, infinite))
+        # An integer beyond the float range is a rulebook error, not a crash.
+        huge = _document()
+        huge["twilight_factor"] = 10**400
+        self.assertIn("twilight_factor", _rejected(self, huge))
         footprint = _document()
         footprint["settlement_footprint_factor"] = {"day": -1, "night": 1}
         self.assertIn("settlement_footprint_factor.day", _rejected(self, footprint))

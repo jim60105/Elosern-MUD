@@ -759,7 +759,12 @@ def _is_positive_number(value: Any) -> bool:
 
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return False
-    number = float(value)
+    try:
+        number = float(value)
+    except (OverflowError, ValueError):
+        # An unrepresentable integer is already reported by the scalar check;
+        # the rule only asks whether an authored positive range exists.
+        return True
     return math.isfinite(number) and number > 0
 
 
@@ -820,7 +825,12 @@ def _check_scalar(
         # an infinity or a NaN is not an authored value either.
         valid = not isinstance(value, bool) and isinstance(value, (int, float))
         if valid:
-            number = float(value)
+            try:
+                number = float(value)
+            except (OverflowError, ValueError):
+                # A decimal integer beyond the float range is a structural
+                # diagnostic, never an exception out of validation.
+                number = math.inf
             valid = math.isfinite(number)
             if valid and "min" in spec:
                 valid = number >= spec["min"]

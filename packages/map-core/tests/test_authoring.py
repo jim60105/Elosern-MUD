@@ -417,6 +417,8 @@ def test_district_sight_fields_survive_parse_and_serialization():
         ({"sight_km": -1, "silhouette_zh": "合成側影"}, "invalid_field_value"),
         ({"sight_km": "8", "silhouette_zh": "合成側影"}, "invalid_field_value"),
         ({"light_km": True, "silhouette_zh": "合成側影"}, "invalid_field_value"),
+        # A decimal integer beyond the float range is a diagnostic, not a crash.
+        ({"sight_km": 10**400, "silhouette_zh": "合成側影"}, "invalid_field_value"),
         # Vantage is a boolean.
         ({"vantage": "yes"}, "invalid_field_value"),
     ],
