@@ -99,3 +99,14 @@ The production exploration panel SHALL use exact schema6 fields and read-only ca
 #### Scenario: Undisclosed directional target
 - **WHEN** a synthetic unvisited wilderness neighbour remains outside reveal
 - **THEN** it has no local-map node or identifying exit metadata, while its enabled opaque direction can still submit exit_ref/current_node without a fabricated minimap highlight
+
+### Requirement: Exploration move rows advertise canonical destinations
+The exploration menu's wilderness move rows SHALL use the canonical destination resolver so a disclosed row's advertised destination equals the node the player actually arrives at, while a withheld wilderness direction keeps its row with a null destination and the server's generic direction word.
+
+#### Scenario: Move row destination matches actual arrival
+- **WHEN** the exploration menu lists a wilderness move row whose destination is revealed or whose gateway identity is disclosed; any asserted wilderness destination facts are revealed and location-identity permitted
+- **THEN** that row's destination is the canonical arrival node, including the gateway south row that returns to the grid
+
+#### Scenario: A withheld move row publishes no arrival identity
+- **WHEN** a wilderness direction resolves to an unrevealed cell or to an unvisited hidden entry; the reveal state is a synthetic record fixed by the test
+- **THEN** the row keeps its exact five keys, `enabled`, and any server-authored `disabled_reason`, publishes `destination: null` and the generic direction word as its label, and still submits exactly `{exit_ref, current_node}` so the step arrives at the canonical real cell
