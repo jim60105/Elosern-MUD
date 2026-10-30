@@ -26,7 +26,7 @@ Stages, in order:
    add or subtract ``amount`` bands weighted by the feather and ``flatten``
    blends towards ``target_band``; the band quantities are divided by the
    configuration's ``quantization_scale`` because quantization multiplies the
-   raster by it, which keeps one authored band worth exactly one band at any
+   raster by it, so an authored band keeps its meaning at the configured
    scale. ``no_prominence`` records a final override mask. The feather weight
    is 1 inside the shape and decreases linearly to 0 over ``feather`` cells
    outside it.
@@ -600,9 +600,10 @@ def _apply_shape(
     """Apply one authored shape, whose ``amount``/``target_band`` are in bands.
 
     The raster holds unquantized elevation units, which quantization later
-    multiplies by ``quantization_scale`` to obtain bands; dividing the authored
-    band quantities by that scale keeps one authored band worth exactly one
-    band at every configured scale.
+    multiplies by ``quantization_scale`` to obtain bands, so the authored band
+    quantities are divided by that scale to express them in the raster's own
+    units: an authored band stays one band at the configured scale instead of
+    being multiplied by it.
     """
 
     height, width = elevation.shape

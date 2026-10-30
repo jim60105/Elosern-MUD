@@ -441,8 +441,28 @@ class KnowledgeParseTests(_RegisteredVocabularyTests):
             side_effect=recording_decode,
         ):
             self.assertTrue(has_visited(char, node_id(*present)))
-            self.assertFalse(has_visited(char, node_id(0, 0)))
         self.assertEqual(decoded, [f"{present[0] // chunk_cells}:{present[1] // chunk_cells}"])
+
+        # An absent offset inside a populated chunk is exact too: the answer is
+        # False and only that chunk is decoded.
+        occupied_offsets = {int(offset) for offset in chunks["2:2"]}
+        absent_offset = next(
+            offset
+            for offset in range(chunk_cells * chunk_cells)
+            if offset not in occupied_offsets
+        )
+        absent_cell = (
+            2 * chunk_cells + absent_offset % chunk_cells,
+            2 * chunk_cells + absent_offset // chunk_cells,
+        )
+        self.assertNotIn(absent_cell, expected)
+        decoded.clear()
+        with patch(
+            "world.rules.map_knowledge._decode_chunk_entries",
+            side_effect=recording_decode,
+        ):
+            self.assertFalse(has_visited(char, node_id(*absent_cell)))
+        self.assertEqual(decoded, ["2:2"])
 
         # The full projection decodes every chunk, contains every visit exactly
         # once and is ordered deterministically by node ID.
