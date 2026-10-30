@@ -58,7 +58,7 @@ The displayed order is a safe serialized implementation order, not eight artific
 
 ## One-day implementation boundary
 
-Eight-hour envelope: 2h core mechanism, 2h consumer integration, 2h focused mechanism evidence, 1h existing docs/traceability and 1h integration allowance. Reuse the named existing helpers; do not expand into a new rules subsystem.
+Eight-hour envelope using the approved prototype's cosmetic functions only: 2h adapt buildStatic/maskAt/drawInk/paint and local-maximum tie logic to explicit grid inputs, 1h bounded cache/invalidation, 1h shared overlay glyph/chip wiring, 1h measured camera/zoom, 1.5h focused pixel/cache/browser budget evidence, 0.5h existing docs/traceability and 1h integration allowance. Port cosmetic interpolation, noise and canvas strokes as ordinary production modules; rewrite their prototype-global cellAt/elevationAt reads to the committed grid boundary. Do not port travel-model.js, canStep, findRoute, sightRadius, lightPhase, revealedMask, capacityByStage or any mock rule. HudFrame, the existing motion tokens, glyphs and resize patterns are reused rather than redesigned.
 
 ## Evidence and requirement shape
 
@@ -71,6 +71,10 @@ All commands run from repository root. Focused frontend command is `pnpm test --
 ## Risks / Trade-offs
 
 [Shared exact schemas] -> apply the cumulative deltas in dependency/conflict order and update both validators, fixtures, registrations and protocol documentation together. Observed runtime status4 supersedes stale main-spec version3 wording; base deliberately cuts to5 and leg to6, preserving physiological identity and all non-travel semantics. [Prototype rules] -> production imports only real protocol data and existing deterministic helpers. [Asynchronous commits] -> match request, epoch and committed revision before queue progress or current-map adoption. [One engineer-day] -> each slice owns one runnable vertical behavior, with focused evidence/docs included; no offline rules/camping work is hidden in a task.
+
+## Blocking review disposition
+
+N2 adopted. The one-day boundary now names eligible cosmetic prototype functions, forbidden mock-rule functions, existing component reuse and slice-specific hours. All six blocking findings were addressed across the batch; no requirement was replaced with human-judged copy/appearance evidence. This records remediation, not an unperformed second review.
 
 ## Migration Plan
 
