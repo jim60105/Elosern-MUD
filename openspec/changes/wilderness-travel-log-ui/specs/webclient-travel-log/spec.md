@@ -17,6 +17,10 @@ The server SHALL publish bounded typed travel notices with stable causal IDs and
 - **WHEN** every supported kind and malformed, extra-key or oversize entries cross Python and JS validation
 - **THEN** only exact bounded kind-specific records adopt, with no hidden source metadata or invented camp outcome
 
+#### Scenario: Concurrent causal groups do not overwrite notices
+- **WHEN** two groups queue before one drain and one group contains repeated or additional source facts
+- **THEN** each drained publication contains its own immutable ID-stable ordered batch, exact duplicate facts are inert and snapshot replay exposes only the latest published batch
+
 ### Requirement: Travel log retains typed chronological entries
 The travel band SHALL render a bounded chronological day-grouped typed log with time and non-colour kind cues in a polite live region, retaining ordinary prose only in the full log.
 
@@ -27,4 +31,8 @@ The travel band SHALL render a bounded chronological day-grouped typed log with 
 #### Scenario: Safe full look
 - **WHEN** a look event contains multiline prose or markup-like text
 - **THEN** the summary remains one entry and full prose stays safely readable without executing markup
+
+#### Scenario: Discrete refusal before queued walking exists
+- **WHEN** a matching ordinary explore.move fails during travel and its result repeats before or after walking UI is installed
+- **THEN** the common recognized-result hook adds one travel refusal and retains exactly the existing single full-log refusal; foreign results add neither
 
