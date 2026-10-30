@@ -16,7 +16,7 @@ Attach stateless commit-qualified interrupt flags to wilderness moves. This is a
 - `wilderness-travel-interrupts`: Attach stateless commit-qualified interrupt flags to wilderness moves.
 
 ### Modified Capabilities
-None.
+- `webclient-exploration-menu`: Accept the existing move request or the exact optional walk-context form, preserving exit/current-node admission.
 
 ## Impact
 
