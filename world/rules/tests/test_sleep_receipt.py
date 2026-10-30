@@ -51,6 +51,9 @@ from world.rules.time_skip import (
     enter_sleep,
     seconds_to_full_regen,
 )
+from world.tests.geography_fixture import publish_shipped_geography
+
+publish_shipped_geography()
 
 
 def _full_gauges(entity):
@@ -472,12 +475,17 @@ class SleepEntryLifecycleTests(EvenniaTest):
     def test_sleep_receipt_failure_restores_ground_observation(self):
         from typeclasses.rooms import TerrainRoom
         from world.rules import time_skip as skip_module
+        from world.rules.map_knowledge import record_ground_observation
+        from world.tests.raw_attributes import raw_attribute_value
 
         terrain = create_object(TerrainRoom, key="synthetic-sleep-terrain")
         terrain.ndb.active_coordinates = (12, 34)
         self.player.location = terrain
         entry = enter_sleep(self.player, mode=MODE_DURATION, seconds=600)
         before = int(get_world_clock().tick)
+        record_ground_observation(self.player, (12, 34), before, 2)
+        prior = self.player.attributes.get("map_knowledge")
+        self.assertIsNotNone(prior)
         real_write = skip_module.write_sleep_receipt
 
         def fail_on_interval_result(entity, receipt):
@@ -496,7 +504,8 @@ class SleepEntryLifecycleTests(EvenniaTest):
         self.assertEqual(int(get_world_clock().tick), before)
         # The outer owner registry restores the observation write too, so the
         # clock, physiology and knowledge caches never keep a rolled-back fact.
-        self.assertIsNone(self.player.attributes.get("map_knowledge"))
+        self.assertEqual(self.player.attributes.get("map_knowledge"), prior)
+        self.assertEqual(raw_attribute_value(self.player, "map_knowledge"), prior)
         self.assertIs(
             read_fatigue_state(self.player).posture, SleepPosture.VOLUNTARY
         )

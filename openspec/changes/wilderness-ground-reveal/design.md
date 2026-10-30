@@ -34,6 +34,20 @@ The per-requirement association and remount plan is recorded in the
 test before the equivalent-tree sync, and the maintained modified requirement
 keeps its current canonical ID.
 
+Post-implementation review disposition: the reviewer's blocking finding (a
+swallowed persistence failure inside the no-throw writer could leave the
+surrounding transaction unusable while the advance still returned) is fixed by
+isolating `_write_knowledge` in a nested savepoint and restoring the pre-write
+Attribute snapshot on failure; the corpus regression faults inside that seam
+and asserts the skip commits with unchanged durable and cached knowledge. The
+same review's non-blocking finding (rollback evidence only covered an absent
+record) is fixed by seeding existing history and asserting both the handler
+value and the raw stored row in the clock and sleep rollback tests. The
+multi-interval owner-continuation suggestion is dispositioned as covered by the
+delegated per-interval path: `continue_owner_sleep` adds no observation code of
+its own; each committed boundary interval is the already-tested `continue_sleep`
+call.
+
 - [wilderness-knowledge-chunks](../wilderness-knowledge-chunks/design.md) must land first.
 - [wilderness-sight-rules](../wilderness-sight-rules/design.md) must land first.
 

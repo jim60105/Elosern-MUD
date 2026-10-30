@@ -199,6 +199,9 @@ uv run --locked openspec validate integrate-fatigue-aware-traversal --strict
 - **回滾**：觀測寫入在時鐘交易內。`advance` 自己的快照註冊與 `continue_sleep` 的
   外層快照註冊都包含該角色的 `map_knowledge`，所以階段、tick、收據或外層提交之後
   的失敗會同時還原資料庫列與 Attribute 快取；沒有通用的回滾日誌或第二套機制。
+  寫入本身另包在巢狀 savepoint 內：持久化失敗只回滾該次觀測並還原寫入前的
+  Attribute 快照，因此「觀測失敗不中斷已完成的跳過」不會弄壞外層交易，也不會
+  留下與資料庫列不一致的快取。
 
 ### 揭露投影（純讀）
 

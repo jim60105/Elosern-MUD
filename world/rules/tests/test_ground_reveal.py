@@ -29,6 +29,7 @@ from world.rules.map_knowledge import (
 )
 from world.rules.skip_safety import SkipRejectReason
 from world.rules.sleep_receipt import read_sleep_receipt
+from world.tests.raw_attributes import raw_attribute_value
 from world.rules.time_skip import (
     MODE_DURATION,
     SkipRefused,
@@ -488,6 +489,35 @@ class SkipObservationTests(EvenniaTest):
             WorldClock(get_world_clock().tick).advance(60, AdvanceSource.COMMAND, [self.player])
         self.assertEqual(observe.call_count, 0)
         self.assertIsNone(self.player.attributes.get(KNOWLEDGE_ATTR))
+
+    def test_writer_persistence_failure_keeps_history_and_commits_the_skip(self):
+        before = get_world_clock().tick
+        record_ground_observation(self.player, self.cell, before, 2)
+        prior = self.player.attributes.get(KNOWLEDGE_ATTR)
+
+        from world.rules import map_knowledge as knowledge
+
+        real_write = knowledge._write_knowledge
+
+        def fail_after_write(character, record):
+            real_write(character, record)
+            raise RuntimeError("synthetic writer persistence failure")
+
+        with patch(
+            "world.rules.sight.ground_radius_at", return_value=7
+        ), patch.object(
+            knowledge, "_write_knowledge", side_effect=fail_after_write
+        ), patch.object(knowledge, "log_warn") as log_warn:
+            result = advance_wait(self.player, 60)
+
+        self.assertEqual(result.elapsed_seconds, 60)
+        self.assertEqual(int(get_world_clock().tick), before + 60)
+        self.assertEqual(self.player.attributes.get(KNOWLEDGE_ATTR), prior)
+        self.assertEqual(raw_attribute_value(self.player, KNOWLEDGE_ATTR), prior)
+        self.assertIn(
+            "map_knowledge_record_ground_observation_write_failed",
+            [call.args[0] for call in log_warn.call_args_list],
+        )
 
 
 if __name__ == "__main__":

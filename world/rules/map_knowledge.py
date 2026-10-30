@@ -570,7 +570,25 @@ def record_ground_observation(
             "sight": sight,
         }
         wild_dict[chunk_key] = chunk_data
-        _write_knowledge(character, record)
+        # Keep the no-throw policy without poisoning the caller's transaction:
+        # a savepoint contains a failed persistence, and the pre-write
+        # Attribute snapshot restores the in-process cache the failed save may
+        # already have changed.
+        from django.db import transaction
+
+        from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
+
+        snapshot = attribute_snapshot(character, KNOWLEDGE_ATTR)
+        try:
+            with transaction.atomic():
+                _write_knowledge(character, record)
+        except Exception as error:
+            restore_attribute_best_effort(character, KNOWLEDGE_ATTR, snapshot)
+            log_warn(
+                "map_knowledge_record_ground_observation_write_failed",
+                exc=error,
+                context={**context, "cell": f"{x},{y}"},
+            )
     except Exception as error:
         log_warn(
             "map_knowledge_record_ground_observation_failed",

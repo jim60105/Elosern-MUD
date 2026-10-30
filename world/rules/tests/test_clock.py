@@ -1149,6 +1149,9 @@ class OuterOwnerSeamTests(EvenniaTestCase):
 
         cell = (10, 20)
         real_write = knowledge.record_ground_observation
+        real_write(self.player, cell, 5, 2)
+        prior = self.player.attributes.get("map_knowledge")
+        self.assertIsNotNone(prior)
 
         def write_then_fail(character, observed_cell, tick, radius):
             real_write(character, observed_cell, tick, radius)
@@ -1168,7 +1171,8 @@ class OuterOwnerSeamTests(EvenniaTestCase):
                 ground_observer=(self.player, cell),
             )
         self.assertEqual(clock.tick, 1000)
-        self.assertIsNone(self.player.attributes.get("map_knowledge"))
+        self.assertEqual(self.player.attributes.get("map_knowledge"), prior)
+        self.assertEqual(self._raw_attribute(self.player, "map_knowledge"), prior)
 
     def test_ground_observer_is_rejected_for_a_non_skip_source(self):
         clock = WorldClock(1000)
