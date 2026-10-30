@@ -126,6 +126,38 @@ in kilometres from the player's world cell, rounded to 0.1. A marker is
 omitted when the player's world cell is unknown, as in an ordinary interior.
 Tracked markers come first, up to 32.
 
+## Wilderness disclosure (`local_map` and the exploration move rows)
+
+One server policy, `world/rules/wilderness_disclosure.py`, decides which
+wilderness facts a publisher may emit; every wilderness surface reads it, so no
+two surfaces can disagree about what one observer knows.
+
+- **Permanent reveal.** A `wild:` destination is disclosed only when
+  `world.rules.map_knowledge.revealed_in_bounds` reveals its cell (a lit
+  district, or the stored sight disc of a visit). Wilderness adjacency alone
+  grants nothing: in a radius-0 woodland night the minimap draws only the
+  current cell.
+- **Hidden entries need an actual visit.** Elven villages and dungeons publish
+  no name or canonical identity until the character has visited the gateway's
+  own gate room, even when the surrounding district is lit. Until then the
+  gateway node, its label, its `gateway` metadata and its edge are omitted
+  entirely; a revealed cell that merely touches such a gateway keeps its
+  ordinary region name.
+- **Current cell stays current.** `current_node` is always emitted with its
+  region label, and every other field set, bound and edge rule is unchanged.
+
+The exploration panel (`webclient-exploration-menu`, schema version 6) applies
+the same decision to its `move` rows. A wilderness direction whose destination
+is withheld keeps its row — the real Exit's opaque `exit_ref` and its
+enabled/lock state are existing control facts — but publishes
+`destination: null` and the server's generic direction word (`north`,
+`northeast`, ...) as its label. No terrain, settlement, coordinate or target
+identity reaches the row, `disabled_reason` never carries the disclosure
+decision, and every non-wilderness row keeps a canonical non-null destination.
+The compass therefore aims such a direction by its word, submits the unchanged
+`{exit_ref, current_node}` payload, and highlights no minimap node; the
+dialogue screen's exit list reads the same rows.
+
 A graph above the area node/edge ceilings, or a schema-valid body above the
 logical byte ceiling, becomes the `map_unavailable` panel. The publisher logs
 `area_map_over_bound` and never truncates the graph.
