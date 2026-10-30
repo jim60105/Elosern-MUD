@@ -482,3 +482,66 @@ class AmbientSpeciesReconciliationTests(BattlefieldIsolation, EvenniaTest):
         }
         self.assertEqual(resumed[keys[1]], survivor.key)
         self.assertEqual(resumed[keys[0]], replacement.key)
+
+    @covers_requirement(
+        "wilderness-population-view::population-reads-share-materialization-decisions",
+        "wilderness-monster-population::population-reconciliation-never-destroys-an-active-session-participant",
+    )
+    def test_a_protected_branch_migration_monster_stays_visible(self):
+        # A tier-example monster left at a coordinate an authored species rule
+        # has since taken over is still living and registered; a frozen pass
+        # keeps it, so the view must report it under its object identity.
+        from evennia.contrib.grid.wilderness.wilderness import enter_wilderness
+
+        cell = next(candidate for candidate in _region_cells(self.region) if candidate != PROBE)
+        enter_wilderness(self.char1, coordinates=cell, name=WILDERNESS_NAME)
+        self.assertEqual(len(_species_members(self.wilderness, cell)), self.rule.quantity)
+
+        migrated = create_object(Monster, key="t_branch_migration_beast")
+        migrated.threat_tier = _WITNESS_TIER
+        migrated.apply_monster_tier("floor")
+        migrated.db.population_key = _population_key(*cell)
+        migrated.location = self.char1.location
+        self.wilderness.db.itemcoordinates[migrated] = cell
+        self.assertIsNone(migrated.species_key)
+
+        self.char1.race = "human"
+        self.char1.apply_race_baseline()
+        engage(self.char1, migrated)
+
+        decision = ambient_population_decision(self.wilderness, cell)
+        self.assertTrue(decision.is_session_protected)
+        self.assertEqual(decision.spawns_needed, ())
+        living_pks = sorted(
+            member.pk
+            for member in self.wilderness.get_objs_at_coordinates(cell)
+            if isinstance(member, Monster)
+            and member.db.population_key == _population_key(*cell)
+            and _stored_hp(member) > 0
+        )
+        self.assertEqual(len(living_pks), self.rule.quantity + 1)
+
+        ensure_population(self.wilderness, cell)
+        self.assertEqual(
+            sorted(
+                member.pk
+                for member in self.wilderness.get_objs_at_coordinates(cell)
+                if isinstance(member, Monster)
+                and member.db.population_key == _population_key(*cell)
+                and _stored_hp(member) > 0
+            ),
+            living_pks,
+        )
+        facts = [
+            fact for fact in population_view(self.wilderness, [cell]) if fact.kind == "monster"
+        ]
+        # Pre-fix the species branch classified the living non-species monster
+        # as stale, so the view dropped an enemy materialization keeps.
+        self.assertEqual(len(facts), len(living_pks))
+        migrated_fact = next(
+            (fact for fact in facts if fact.observation_key == f"object:{migrated.pk}"),
+            None,
+        )
+        self.assertIsNotNone(migrated_fact)
+        self.assertEqual(migrated_fact.label, migrated.key)
+        self.assertTrue(migrated_fact.hostile)

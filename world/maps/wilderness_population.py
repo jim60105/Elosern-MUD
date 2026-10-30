@@ -387,6 +387,22 @@ def ambient_population_decision(
         budget = max(0, target - len(living))
         spawns_needed = () if is_protected else vacant_slots[:budget]
 
+        if is_protected:
+            # A frozen pass keeps every living marker-matching monster alive --
+            # a tier-example monster left at a coordinate an authored rule has
+            # since taken over included. Only species-bearing members can own a
+            # slot; the rest are reported under their own object identity.
+            retained_living = sorted(
+                (m for m in matching if _stored_hp(m) > 0),
+                key=lambda obj: int(getattr(obj, "pk", 0) or 0),
+            )
+            retained_pks = {m.pk for m in retained_living}
+            living_ambient = tuple(retained_living)
+            stale_ambient = tuple(m for m in matching if m.pk not in retained_pks)
+        else:
+            living_ambient = tuple(living)
+            stale_ambient = tuple(stale)
+
         return PopulationDecision(
             coordinates=coordinates,
             branch=branch,
@@ -395,8 +411,8 @@ def ambient_population_decision(
             slots=tuple(expected_slots),
             assigned=tuple(assigned_pairs),
             is_session_protected=is_protected,
-            living_ambient=tuple(living),
-            stale_ambient=tuple(stale),
+            living_ambient=living_ambient,
+            stale_ambient=stale_ambient,
             spawns_needed=spawns_needed,
         )
 
