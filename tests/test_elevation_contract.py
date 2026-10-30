@@ -127,10 +127,13 @@ _RUNTIME_PROBE = textwrap.dedent(
     assert not (BLOCKED & loaded), sorted(BLOCKED & loaded)
 
     import elosern_map_core
-    from elosern_map_core import geometry, partition_codec, sparse, terrain
+    from elosern_map_core import elevation_codec, geometry, partition_codec, sparse, terrain
+    from world.maps import elevation
 
     assert not hasattr(elosern_map_core, "generate_elevation")
     assert not hasattr(elosern_map_core, "elevation")
+    assert elevation_codec.ELEVATION_FORMAT_VERSION == 1
+    assert elevation.DATA_PATH.name == "wilderness_elevation.json"
     assert terrain.REGION_KEYS
     assert geometry.METRES_PER_WILDERNESS_CELL == 1000
     assert partition_codec.FORMAT_VERSION
@@ -175,7 +178,9 @@ class GenerationIsGameFreeTests(unittest.TestCase):
 class RuntimeWithoutGenerationExtraTests(unittest.TestCase):
     @covers_requirement(
         "wilderness-elevation-authoring::"
-        "elevation-shapes-reject-invalid-candidates"
+        "elevation-shapes-reject-invalid-candidates",
+        "wilderness-elevation-runtime::"
+        "runtime-elevation-rejects-stale-or-corrupt-artifacts",
     )
     def test_package_runtime_surface_imports_without_numpy_scipy_or_the_generator(
         self,

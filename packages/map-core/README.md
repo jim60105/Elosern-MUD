@@ -154,6 +154,34 @@ generation dependency):
 - `FORMAT_VERSION`, `MIXED`, `PARTITION_ALGORITHM_VERSION`,
   `PARTITION_SOURCE_KINDS`, `DistrictPartition`, `PartitionDocumentError`.
 
+### `elosern_map_core.elevation_codec`
+
+The runtime half of the compressed elevation artifact (standard library only, no
+generation dependency):
+
+- `read_elevation_metadata(document)` — `ElevationMetadata` (format version,
+  algorithm version, source signature, fingerprint, frame cells, tile cells 64,
+  data SHA-256) without expanding any raster.
+- `verify_elevation_data_integrity(document, expected_frame_cells=None)` —
+  verifies metadata, fingerprint and `data_sha256` covering all tiles in row-major
+  order without raster expansion.
+- `elevation_source_signature(continent_fingerprint, config_digest=..., algorithm_version=...)` —
+  the deterministic sorted input signature covering continent geometry, generator configuration
+  and algorithm version.
+- `elevation_fingerprint(source_signature)` — SHA-256 over canonical signature JSON.
+- `elevation_freshness(metadata, expected_source_signature, algorithm_version=...)` —
+  currency check against candidate sources, reporting specific changed sources when stale.
+- `encode_tile(bands, tiers, tx, ty, frame_cells, tile_cells=64)` /
+  `decode_tile(data_b64, tx, ty, frame_cells, tile_cells=64)` —
+  encode and decode one 64x64 tile with 4096-byte ceiling, trailing-data check, nibble
+  validation (reserved bits 2/3 zero) and zero-padded partial edge tile checks.
+- `encode_elevation_artifact(bands, tiers, frame_cells, continent_fingerprint, ...)` —
+  produces the full canonical JSON artifact text within the 4 MiB budget (`MAX_ELEVATION_BYTES`).
+- `ELEVATION_FORMAT_VERSION`, `ELEVATION_ALGORITHM_VERSION`, `ELEVATION_TILE_CELLS`,
+  `MAX_ELEVATION_BYTES`, `ElevationMetadata`, `ElevationFreshness`,
+  `ElevationDocumentError`, `ElevationCorruptionError`, `ElevationTileCorruptionError`,
+  `ElevationBoundsError`, `ElevationBudgetExceededError`.
+
 ### `elosern_map_core.partition` (the `generation` extra)
 
 The offline generator, imported only by the game's thin generator adapter

@@ -27,6 +27,10 @@ uv run --locked --project packages/map-core python -m elosern_map_core schema   
 uv run --locked --project tools/map-editor python .agents/skills/map-data-authoring/scripts/regenerate_partition.py
 uv run --locked --project tools/map-editor python .agents/skills/map-data-authoring/scripts/regenerate_partition.py --check
 
+# 3. Regenerate the wilderness elevation tiles with the editor environment (no game needed; a few seconds)
+uv run --locked --project tools/map-editor python .agents/skills/map-data-authoring/scripts/regenerate_elevation.py
+uv run --locked --project tools/map-editor python .agents/skills/map-data-authoring/scripts/regenerate_elevation.py --check
+
 # Game-side equivalents (need the game's Django/Evennia environment)
 uv run --locked python -m tools.map_district_partition [--check]
 uv run --locked python -m tools.map_reference_context [--check]
@@ -66,6 +70,23 @@ whose partition signature does not match the current sources.
   an external artifact write as a status change, not a source change.
 - Never hand-edit the JSON or copy it from another branch. A partial diff of
   this file is always wrong.
+
+## Wilderness elevation tiles (`content/maps/wilderness_elevation.json`)
+
+This is the deterministic physical relief and prominence tile bundle for the wilderness frame.
+It is generated, committed and read-only. The game and `check_map_sources.py` refuse to adopt
+a world whose elevation signature does not match the current sources.
+
+- **Inputs.** `continent.yaml` (coast, ridge, waterways, regions, `elevation_shapes`),
+  the default generator configuration, and the algorithm version. Whole-document
+  fingerprinting of `continent.yaml` is conservative: editing prose or scene archetypes
+  in `continent.yaml` invalidates the signature and requires running `regenerate_elevation.py`.
+- **Regenerate it after** the edit loads and the other checks are clean.
+  `regenerate_elevation.py` checks static sources, re-reads them before publishing,
+  and replaces the artifact atomically.
+- **Budget.** The serialized UTF-8 JSON text must remain within 4 MiB (`MAX_ELEVATION_BYTES`).
+  If the budget is exceeded, generation fails and leaves prior output intact.
+- Never hand-edit the JSON.
 
 ## External reference context (`content/map-reference-context.json`)
 

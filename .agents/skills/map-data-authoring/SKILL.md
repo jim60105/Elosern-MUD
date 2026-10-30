@@ -144,7 +144,7 @@ is not game-ready until you regenerate the partition.
    - structure errors: the editor freezes, fix these first;
    - core semantic diagnostics plus the game's cross-file rules: these block
      game adoption;
-   - partition and reference-index freshness.
+   - partition, elevation and reference-index freshness.
 
    Exit code 0 means the edit is game-ready as far as static checks can tell. A
    loadable work-in-progress result (exit 1) is acceptable mid-task, but say
@@ -158,6 +158,12 @@ is not game-ready until you regenerate the partition.
 
    The script refuses to run while other problems remain. If the editor is
    open, the user can press its 分區 chip instead. Do not run both at once.
+
+   For wilderness elevation tiles:
+
+   ```console
+   uv run --locked --project tools/map-editor python .agents/skills/map-data-authoring/scripts/regenerate_elevation.py
+   ```
 5. **Report** which documents you changed, each object by qualified ID, the
    check result, and anything left stale or unfinished.
 
