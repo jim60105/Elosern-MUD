@@ -12,7 +12,7 @@ Read design.md contracts before starting each group. Paths without a web/ prefix
 
 ## 3. Landmark dialog and focus
 
-- [ ] 3.1 Implement LandmarkCard with ArtworkPreview and existing focus trap; wire committed event-ID state and choices priority in AppClient/store, add tests/travel/landmark.test.js for art/disclosure, repeated arrivals, sleep priority, dismissal and epoch retirement. Add LandmarkArrival production story. Acceptance: pnpm test -- web/webclient-app/tests/travel/landmark.test.js exits0; Continue, Enter and Escape close once and restore map focus without restarting a walk.
+- [ ] 3.1 Implement LandmarkCard with ArtworkPreview and existing focus trap; wire committed event-ID state and choices priority in AppClient/store, add tests/travel/landmark.test.js for art/disclosure, repeated arrivals, sleep priority, dismissal and epoch retirement. Add LandmarkArrival production story. Acceptance: pnpm test -- web/webclient-app/tests/travel/landmark.test.js exits0; Continue, Enter and Escape close once and restore map focus without restarting a walk. Require exact canonical arrival_node binding plus epoch before opening; add delayed notice after a later move and higher-priority-card dismissal after departure, both of which discard the old arrival.
 
 ## 4. Complete production acceptance
 

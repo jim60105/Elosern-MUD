@@ -28,3 +28,7 @@ A committed typed landmark-arrival notice SHALL open one accessible arrival card
 - **WHEN** Enter/Escape closes an arrival or its epoch/room retires
 - **THEN** the card releases its trap, current-map focus returns only when appropriate and retired arrival content never reappears
 
+#### Scenario: Delayed arrival remains bound to its reached node
+- **WHEN** a typed arrival reaches the client after another move or a higher-priority card closes after departure
+- **THEN** its canonical arrival_node differs from current and no stale card opens, regardless of matching display name or artwork
+
