@@ -119,7 +119,11 @@ from world.rules.npc_services import (
 )
 from world.rules.service_view import build_services_view
 
-EXPLORATION_SCHEMA_VERSION = 5
+# Schema 6 (wilderness-map-disclosure D3): a wilderness move row's
+# ``destination`` is nullable when the direction's target is withheld; every
+# other row keeps a canonical non-null destination. Mirrored exactly by the
+# client validator.
+EXPLORATION_SCHEMA_VERSION = 6
 
 # Exact shared bounds (design D10) -- must stay equal in the JS validator.
 MAX_LOOK_ENTITIES = 32
@@ -490,7 +494,14 @@ def _validate_move_row(value: Any) -> dict[str, Any]:
     label = _require_str(value, "label", maximum=MAX_LABEL_CODE_POINTS)
     if not label.strip():
         raise ProtocolValidationError("exit label must be non-empty")
-    destination = _require_node_id(value["destination"], "destination")
+    # Nullable since schema 6: a directional wilderness row whose target is
+    # not disclosed publishes no identity. The producer keeps every other row
+    # canonical; the row syntax cannot carry a layer discriminator.
+    destination = (
+        None
+        if value["destination"] is None
+        else _require_node_id(value["destination"], "destination")
+    )
     enabled = _require_bool(value, "enabled")
     disabled_reason = _validate_disabled_reason(value["disabled_reason"])
     if disabled_reason is None:
@@ -600,17 +611,35 @@ def _move_rows(actor: Any) -> list[dict[str, Any]]:
     (fix-wilderness-web-navigation): the contrib's self-loop exits name the
     current room, and the registered gateway south exit actually returns to
     the grid, so ``exit_obj.destination`` can never be trusted there.
+
+    Schema 6 (wilderness-map-disclosure D3) adds one disclosure rule: a
+    wilderness direction whose resolved destination is unknown or visit-gated
+    keeps its row -- the real Exit's opaque ``exit_ref`` and its enabled/lock
+    state are existing control facts -- but publishes ``destination: null`` and
+    the server's generic compass-direction label. No terrain, settlement name,
+    coordinate or target identity reaches the row. Every non-wilderness row
+    keeps its canonical destination.
     """
     from typeclasses.rooms import TerrainRoom
     from world.maps.wilderness_destination import (
+        find_gateway,
         normalize_wilderness_direction,
         resolve_wilderness_destination,
+    )
+    from world.rules.wilderness_disclosure import (
+        WildernessDisclosure,
+        generic_direction_label,
     )
 
     location = getattr(actor, "location", None)
     if location is None:
         return []
     wilderness = isinstance(location, TerrainRoom)
+    disclosure = (
+        WildernessDisclosure.around(actor, location.coordinates)
+        if wilderness and location.coordinates is not None
+        else None
+    )
     exits_by_ref = {
         _exit_ref(exit_obj): exit_obj
         for exit_obj in location.exits
@@ -621,6 +650,8 @@ def _move_rows(actor: Any) -> list[dict[str, Any]]:
         exit_obj = exits_by_ref.get(entry.params["exit_ref"])
         if exit_obj is None:
             continue
+        label = entry.label
+        gateway_anchor = None
         if wilderness:
             direction = normalize_wilderness_direction(exit_obj.key)
             destination_node = (
@@ -628,15 +659,25 @@ def _move_rows(actor: Any) -> list[dict[str, Any]]:
                 if direction is not None
                 else None
             )
+            if direction is not None:
+                gateway_hit = find_gateway(location.coordinates, direction)
+                gateway_anchor = (
+                    gateway_hit[0].anchor_key if gateway_hit is not None else None
+                )
         else:
             destination_node = node_id_for_location(exit_obj.destination)
         if destination_node is None:
             continue
+        if disclosure is not None and not disclosure.destination_disclosed(
+            destination_node, gateway_anchor
+        ):
+            destination_node = None
+            label = generic_direction_label(direction) or label
         reason = entry.disabled_reason
         rows.append(
             {
                 "exit_ref": entry.params["exit_ref"],
-                "label": entry.label,
+                "label": label,
                 "destination": destination_node,
                 "enabled": entry.enabled,
                 "disabled_reason": (

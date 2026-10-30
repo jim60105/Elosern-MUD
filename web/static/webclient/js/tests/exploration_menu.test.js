@@ -48,7 +48,7 @@ function withServices(target) {
 function validPanel(overrides) {
   const panel = Object.assign(
     {
-      schema_version: 5,
+      schema_version: 6,
       available: true,
       kind: "exploration",
       move: [

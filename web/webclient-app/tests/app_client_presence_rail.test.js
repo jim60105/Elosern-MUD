@@ -1168,7 +1168,7 @@ describe("AppClient companion focus (reuse-lineup-person-focus)", () => {
     // not a departure: nothing is reported as having left.
     await commit({
       exploration: {
-        schema_version: 5,
+        schema_version: 6,
         available: false,
         reason: { code: "scene_lost", message: "場景暫時無法顯示" },
       },

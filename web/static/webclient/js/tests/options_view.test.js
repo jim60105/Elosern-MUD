@@ -12,7 +12,7 @@ const OptionCards = require("../elosern/option_cards.js");
 
 function panel(suggestions) {
   return {
-    schema_version: 5,
+    schema_version: 6,
     available: true,
     kind: "exploration",
     affordances: [],
@@ -82,7 +82,7 @@ test("zero-card degraded maps to the empty-state fallback", () => {
 
 test("a missing suggestions field maps to hidden as a compatibility guard", () => {
   const view = OptionCards.buildOptionsView({
-    schema_version: 5,
+    schema_version: 6,
     available: true,
     kind: "exploration",
     affordances: [],

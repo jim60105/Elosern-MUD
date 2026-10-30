@@ -40,7 +40,7 @@ export function explorationPanelFixture({
 } = {}) {
   const refFor = (identity) => (Object.hasOwn(portraits, identity) ? portraits[identity] : null);
   return {
-    schema_version: 5,
+    schema_version: 6,
     available: true,
     kind: "exploration",
     move: exits.map(exitRow),

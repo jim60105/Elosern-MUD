@@ -228,7 +228,7 @@ describe("declarative frame stack (store contract)", () => {
             base_revision: 1,
             panels: {
               exploration: {
-                schema_version: 5,
+                schema_version: 6,
                 available: false,
                 reason: { code: "scene_lost", message: "這片區域暫時不可用。" },
               },
@@ -499,7 +499,7 @@ describe("declarative frame stack (store contract)", () => {
             base_revision: 1,
             panels: {
               exploration: {
-                schema_version: 5,
+                schema_version: 6,
                 available: false,
                 reason: { code: "scene_lost", message: "這片區域暫時不可用。" },
               },

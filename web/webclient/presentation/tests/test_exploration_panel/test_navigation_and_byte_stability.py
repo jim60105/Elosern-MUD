@@ -200,7 +200,7 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
     def _render(self):
         return build_production_registry().render("exploration", _context(self.player))
 
-    def test_rule_table_fixture_payload_is_byte_identical_to_v5(self):
+    def test_rule_table_fixture_payload_is_byte_identical_to_v6(self):
         payload = self._render()
         # The plain NPC's disabled common slot is the one row whose reason text
         # is player-facing copy rather than a stable fact: the golden pins its
@@ -209,7 +209,7 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(
             comparable,
             {
-                "schema_version": 5,
+                "schema_version": 6,
                 "available": True,
                 "kind": "exploration",
                 "move": [
