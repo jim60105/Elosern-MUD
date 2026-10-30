@@ -27,3 +27,7 @@ Sight SHALL emit only currently visible non-hidden sources outside ground sight 
 #### Scenario: Name and source privacy
 - **WHEN** a visible source district lights or a landmark references a settlement
 - **THEN** only the permitted name changes, duplicate sources merge and no target coordinates or registry keys serialize
+
+#### Scenario: Automatic settlement silhouette is anonymous
+- **WHEN** an unlit non-hidden settlement has identifying name/description but no authored landmark silhouette
+- **THEN** its marker selects the validated kind/phase silhouette policy and never substitutes identifying location text; missing kind coverage rejects policy loading
