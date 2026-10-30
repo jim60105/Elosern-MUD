@@ -5,7 +5,7 @@
 - [x] 1.1 Implement exact bounded pure codec, source/data signatures and partial-edge encoding. Completion evidence is the corresponding delta scenario tests with synthetic inputs; update the named existing docs with this mechanism.
 - [x] 1.2 Implement atomic regeneration command; generate and commit full production artifact within budget. Completion evidence is the corresponding delta scenario tests with synthetic inputs; update the named existing docs with this mechanism.
 - [x] 1.3 Add pure runtime adapter/LRU and freshness/integrity checks before runtime adoption and in check_map_sources.py. Completion evidence is the corresponding delta scenario tests with synthetic inputs; update the named existing docs with this mechanism.
-- [ ] 1.4 Test stale/corrupt/oversize/edge/cache/import-without-numpy paths; update existing authoring documentation. Completion evidence is the corresponding delta scenario tests with synthetic inputs; update the named existing docs with this mechanism.
+- [x] 1.4 Test stale/corrupt/oversize/edge/cache/import-without-numpy paths; update existing authoring documentation. Completion evidence is the corresponding delta scenario tests with synthetic inputs; update the named existing docs with this mechanism.
 
 ## 2. Integration handoff
 
