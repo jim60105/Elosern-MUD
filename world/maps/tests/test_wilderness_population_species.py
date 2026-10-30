@@ -19,6 +19,7 @@ from world.maps.wilderness_population import (
     _coordinate_hash,
     _population_key,
     _stored_hp,
+    ambient_observation_key,
     ambient_variant_for_slot,
     ensure_population,
     species_rule_for_coordinates,
@@ -33,6 +34,7 @@ from world.maps.wilderness_provider import (
 )
 from world.maps import wilderness_provider
 from world.rules.combat_session import engage
+from world.rules.combat_session import clear_session
 from world.rules.monster_individual import construct_species_individual
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 from world.tests.geography_fixture import publish_shipped_geography
@@ -61,20 +63,25 @@ def _in_band(cell: tuple[int, int]) -> bool:
     ) <= BAND_RADIUS
 
 
+def _region_cells(region: str):
+    """Walkable cells of ``region`` over its authored search window, in order."""
+    x_min, x_max, y_min, y_max = wilderness_provider.region_search_boxes()[region]
+    for x in range(x_min, x_max + 1):
+        for y in range(y_min, y_max + 1):
+            cell = (x, y)
+            if is_valid_wilderness_cell(cell) and region_for_coordinates(x, y) == region:
+                yield cell
+
+
 def _first_cell(region: str, *, inside_band: bool) -> tuple[int, int]:
     """A walkable cell of ``region`` inside or outside the hunting band.
 
     Enumerated over the region's authored search window, so the fixture lookup
     stays a bounded local search rather than a frame sweep.
     """
-    x_min, x_max, y_min, y_max = wilderness_provider.region_search_boxes()[region]
-    for x in range(x_min, x_max + 1):
-        for y in range(y_min, y_max + 1):
-            cell = (x, y)
-            if not is_valid_wilderness_cell(cell) or region_for_coordinates(x, y) != region:
-                continue
-            if _in_band(cell) is inside_band:
-                return cell
+    for cell in _region_cells(region):
+        if _in_band(cell) is inside_band:
+            return cell
     raise AssertionError(f"no walkable {region} cell with inside_band={inside_band}")
 
 
@@ -365,19 +372,29 @@ class AmbientSpeciesReconciliationTests(BattlefieldIsolation, EvenniaTest):
         # Cell PROBE has 2 living species monsters placed in setUp
         members = _species_members(self.wilderness, PROBE)
         self.assertEqual(len(members), self.rule.quantity)
+        # Each individual's observation identity is the slot it persists.
+        keys = {
+            member.pk: ambient_observation_key(
+                WILDERNESS_NAME, PROBE[0], PROBE[1], "species", member.db.population_slot
+            )
+            for member in members
+        }
+        self.assertEqual(len(set(keys.values())), len(members))
 
         # View the populated cell; char1 is also at PROBE so filter monster facts
         facts = population_view(self.wilderness, [PROBE])
         monster_facts = [f for f in facts if f.kind == "monster"]
         self.assertEqual(len(monster_facts), self.rule.quantity)
-        obs_keys = [f.observation_key for f in monster_facts]
-        self.assertTrue(all(k.startswith("population:elosern:") for k in obs_keys))
-        self.assertEqual(set(f.label for f in monster_facts), set(m.key for m in members))
+        self.assertEqual(
+            {f.observation_key: f.label for f in monster_facts},
+            {keys[member.pk]: member.key for member in members},
+        )
 
-        # Now start an active combat session with victim
+        # Now start an active combat session with the slot-0 individual
         self.char1.race = "human"
         self.char1.apply_race_baseline()
-        victim = members[0]
+        victim = next(member for member in members if member.db.population_slot == 0)
+        survivor = next(member for member in members if member.pk != victim.pk)
         engage(self.char1, victim)
         victim.traits.hp.current = 0
 
@@ -389,8 +406,142 @@ class AmbientSpeciesReconciliationTests(BattlefieldIsolation, EvenniaTest):
 
         facts_protected = population_view(self.wilderness, [PROBE])
         monster_facts_protected = [f for f in facts_protected if f.kind == "monster"]
-        # Only living member(s) projected; no prospective respawn while session is active
-        living_remaining = [m for m in members if m.pk != victim.pk]
-        self.assertEqual(len(monster_facts_protected), len(living_remaining))
-        self.assertEqual(monster_facts_protected[0].label, living_remaining[0].key)
-        self.assertIn(monster_facts_protected[0].observation_key, obs_keys)
+        # Only the living survivor is projected, and under its own exact key:
+        # it never inherits the defeated individual's slot while the pass is
+        # frozen, and no prospective replacement appears.
+        self.assertEqual(
+            [(f.observation_key, f.label) for f in monster_facts_protected],
+            [(keys[survivor.pk], survivor.key)],
+        )
+
+    @covers_requirement(
+        "wilderness-population-view::observation-identities-survive-materialization",
+        "wilderness-population-view::population-reads-share-materialization-decisions",
+    )
+    def test_a_survivor_keeps_its_identity_when_the_slot_before_it_dies(self):
+        # One variant fills both slots, so matching survivors by variant alone
+        # would move the survivor into the defeated individual's slot.
+        narrow = AmbientPlacementRule(self.region, (ORDINARY,), 2, 3)
+        self.enterContext(
+            synthetic_registries(
+                "ambient_placements",
+                extra={"ambient_placements": {self.region: narrow}},
+            )
+        )
+        from evennia.contrib.grid.wilderness.wilderness import enter_wilderness
+
+        cell = next(candidate for candidate in _region_cells(self.region) if candidate != PROBE)
+        enter_wilderness(self.char1, coordinates=cell, name=WILDERNESS_NAME)
+
+        by_slot = {
+            member.db.population_slot: member
+            for member in _species_members(self.wilderness, cell)
+        }
+        self.assertEqual(set(by_slot), {0, 1})
+        self.assertEqual({member.variant_key for member in by_slot.values()}, {ORDINARY})
+        keys = {
+            slot: ambient_observation_key(
+                WILDERNESS_NAME, cell[0], cell[1], "species", slot
+            )
+            for slot in by_slot
+        }
+        victim, survivor = by_slot[0], by_slot[1]
+
+        self.char1.race = "human"
+        self.char1.apply_race_baseline()
+        engage(self.char1, victim)
+        victim.traits.hp.current = 0
+
+        decision = ambient_population_decision(self.wilderness, cell)
+        self.assertTrue(decision.is_session_protected)
+        self.assertEqual(decision.spawns_needed, ())
+        # Pre-fix the survivor was reassigned to slot 0, adopting the dead
+        # individual's observation identity.
+        projected = [
+            fact for fact in population_view(self.wilderness, [cell]) if fact.kind == "monster"
+        ]
+        self.assertEqual(
+            [(fact.observation_key, fact.label) for fact in projected],
+            [(keys[1], survivor.key)],
+        )
+
+        # Protection ends: reconciliation refills the vacant slot only.
+        clear_session(self.char1)
+        ensure_population(self.wilderness, cell)
+
+        living = _species_members(self.wilderness, cell)
+        self.assertEqual(len(living), 2)
+        self.assertIn(survivor.pk, [member.pk for member in living])
+        self.assertEqual(Monster.objects.get(pk=survivor.pk).db.population_slot, 1)
+        replacement = next(member for member in living if member.pk != survivor.pk)
+        self.assertEqual(replacement.db.population_slot, 0)
+        resumed = {
+            fact.observation_key: fact.label
+            for fact in population_view(self.wilderness, [cell])
+            if fact.kind == "monster"
+        }
+        self.assertEqual(resumed[keys[1]], survivor.key)
+        self.assertEqual(resumed[keys[0]], replacement.key)
+
+    @covers_requirement(
+        "wilderness-population-view::population-reads-share-materialization-decisions",
+        "wilderness-monster-population::population-reconciliation-never-destroys-an-active-session-participant",
+    )
+    def test_a_protected_branch_migration_monster_stays_visible(self):
+        # A tier-example monster left at a coordinate an authored species rule
+        # has since taken over is still living and registered; a frozen pass
+        # keeps it, so the view must report it under its object identity.
+        from evennia.contrib.grid.wilderness.wilderness import enter_wilderness
+
+        cell = next(candidate for candidate in _region_cells(self.region) if candidate != PROBE)
+        enter_wilderness(self.char1, coordinates=cell, name=WILDERNESS_NAME)
+        self.assertEqual(len(_species_members(self.wilderness, cell)), self.rule.quantity)
+
+        migrated = create_object(Monster, key="t_branch_migration_beast")
+        migrated.threat_tier = _WITNESS_TIER
+        migrated.apply_monster_tier("floor")
+        migrated.db.population_key = _population_key(*cell)
+        migrated.location = self.char1.location
+        self.wilderness.db.itemcoordinates[migrated] = cell
+        self.assertIsNone(migrated.species_key)
+
+        self.char1.race = "human"
+        self.char1.apply_race_baseline()
+        engage(self.char1, migrated)
+
+        decision = ambient_population_decision(self.wilderness, cell)
+        self.assertTrue(decision.is_session_protected)
+        self.assertEqual(decision.spawns_needed, ())
+        living_pks = sorted(
+            member.pk
+            for member in self.wilderness.get_objs_at_coordinates(cell)
+            if isinstance(member, Monster)
+            and member.db.population_key == _population_key(*cell)
+            and _stored_hp(member) > 0
+        )
+        self.assertEqual(len(living_pks), self.rule.quantity + 1)
+
+        ensure_population(self.wilderness, cell)
+        self.assertEqual(
+            sorted(
+                member.pk
+                for member in self.wilderness.get_objs_at_coordinates(cell)
+                if isinstance(member, Monster)
+                and member.db.population_key == _population_key(*cell)
+                and _stored_hp(member) > 0
+            ),
+            living_pks,
+        )
+        facts = [
+            fact for fact in population_view(self.wilderness, [cell]) if fact.kind == "monster"
+        ]
+        # Pre-fix the species branch classified the living non-species monster
+        # as stale, so the view dropped an enemy materialization keeps.
+        self.assertEqual(len(facts), len(living_pks))
+        migrated_fact = next(
+            (fact for fact in facts if fact.observation_key == f"object:{migrated.pk}"),
+            None,
+        )
+        self.assertIsNotNone(migrated_fact)
+        self.assertEqual(migrated_fact.label, migrated.key)
+        self.assertTrue(migrated_fact.hostile)

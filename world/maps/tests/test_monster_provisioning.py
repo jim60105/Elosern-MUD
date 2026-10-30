@@ -29,7 +29,9 @@ from world.maps.monster_sites import (
 from world.maps.wilderness_population import (
     _population_key,
     _stored_hp,
+    ambient_observation_key,
     ensure_population,
+    population_view,
 )
 from world.maps.wilderness_provider import (
     WILDERNESS_NAME,
@@ -264,6 +266,76 @@ class HuntProvisioningTests(ProvisioningWorldFixture, EvenniaTest):
             )
             self.assertGreater(_stored_hp(individual), 0)
             self.assertIn(self.wilderness.db.itemcoordinates[individual], cells)
+
+    @covers_requirement(
+        "wilderness-population-view::observation-identities-survive-materialization"
+    )
+    def test_supplementary_individuals_take_unique_slots_and_keep_them(self):
+        result = ensure_hunt_targets(
+            self.region,
+            SPECIES,
+            (ORDINARY,),
+            self.rule.capacity,
+            wilderness=self.wilderness,
+        )
+        self.assertTrue(result.created)
+        created_by_cell: dict[tuple[int, int], list[Monster]] = {}
+        for pk in result.created:
+            individual = Monster.objects.get(pk=pk)
+            created_by_cell.setdefault(
+                self.wilderness.db.itemcoordinates[individual], []
+            ).append(individual)
+        cell, created = next(
+            (cell, members)
+            for cell, members in created_by_cell.items()
+            if len(members) > 1
+        )
+
+        def ambient_slots() -> list[int]:
+            return [
+                obj.db.population_slot
+                for obj in self.wilderness.get_objs_at_coordinates(cell)
+                if isinstance(obj, Monster)
+                and obj.db.population_key == _population_key(*cell)
+            ]
+
+        # Pre-fix every supplementary individual was created in slot 0, so the
+        # cell held several individuals sharing one observation identity.
+        slots = ambient_slots()
+        self.assertEqual(len(set(slots)), len(slots))
+        self.assertEqual(sorted(slots), list(range(len(slots))))
+        self.assertTrue({member.db.population_slot for member in created} <= set(slots))
+
+        # Identities, and the slots that own them, survive the ambient pass.
+        before = {
+            obj.pk: obj.db.population_slot
+            for obj in self.wilderness.get_objs_at_coordinates(cell)
+            if isinstance(obj, Monster) and obj.db.population_key == _population_key(*cell)
+        }
+        ensure_population(self.wilderness, cell)
+        after = {
+            obj.pk: obj.db.population_slot
+            for obj in self.wilderness.get_objs_at_coordinates(cell)
+            if isinstance(obj, Monster) and obj.db.population_key == _population_key(*cell)
+        }
+        self.assertEqual(after, before)
+
+        target = min(self.rule.quantity, self.rule.capacity)
+        expected_keys = {
+            (
+                ambient_observation_key(WILDERNESS_NAME, cell[0], cell[1], "species", slot)
+                if slot < target
+                else f"object:{pk}"
+            )
+            for pk, slot in after.items()
+        }
+        facts = [
+            fact
+            for fact in population_view(self.wilderness, [cell])
+            if fact.kind == "monster"
+        ]
+        self.assertEqual(len(facts), len(after))
+        self.assertEqual({fact.observation_key for fact in facts}, expected_keys)
     def test_the_authored_capacity_ceiling_is_honored_per_coordinate(self):
         candidates = _candidate_cells(self.region, self.rule)
         saturated = next(iter(candidates))

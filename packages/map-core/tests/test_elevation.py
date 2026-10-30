@@ -306,6 +306,36 @@ def test_shapes_apply_in_declared_order_and_accumulate():
     assert raised_then_lowered.bands[10, 10] == 3
 
 
+def test_authored_band_operations_keep_their_meaning_at_a_non_unit_scale():
+    # ``amount`` and ``target_band`` are bands, while quantization multiplies the
+    # raster by ``quantization_scale``: at scale 2 an unadjusted flatten to band
+    # 4 would land on band 8 and a three-band raise would add six.
+    terrain = synthetic_terrain()
+    background = _background(terrain)
+    scaled = replace(DEFAULT_ELEVATION_CONFIG, quantization_scale=2.0)
+    base = [background, _circle("flatten", 10, 10, 2, target_band=8)]
+
+    baseline = generate_elevation(terrain, base, config=scaled)
+    assert baseline.bands[10, 10] == 8
+
+    flattened = generate_elevation(
+        terrain,
+        [background, _circle("flatten", 10, 10, 2, target_band=4)],
+        config=scaled,
+    )
+    assert flattened.bands[10, 10] == 4
+
+    raised = generate_elevation(
+        terrain, [*base, _circle("raise", 10, 10, 1, amount=3)], config=scaled
+    )
+    assert raised.bands[10, 10] == baseline.bands[10, 10] + 3
+
+    lowered = generate_elevation(
+        terrain, [*base, _circle("lower", 10, 10, 1, amount=5)], config=scaled
+    )
+    assert lowered.bands[10, 10] == baseline.bands[10, 10] - 5
+
+
 def test_circle_and_polygon_feather_weights_decrease_linearly():
     circle = _circle("raise", 10, 10, 3, feather=4, amount=1)
     circle_weight = shape_weight(circle, 32, 32)

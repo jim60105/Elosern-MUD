@@ -166,6 +166,25 @@ def _population_key(x: int, y: int) -> str:
     return f"wilderness:{x}:{y}"
 
 
+def ambient_slots_in_use(wilderness, coordinates: tuple[int, int]) -> set[int]:
+    """The population slots the ambient individuals at ``coordinates`` claim.
+
+    A slot is an individual's observation identity, stamped once at
+    construction and never reassigned, so any second creator at the same
+    coordinate must pick a free slot from this set -- otherwise two living
+    individuals would share one identity.
+    """
+    marker = _population_key(*coordinates)
+    slots: set[int] = set()
+    for obj in wilderness.get_objs_at_coordinates(coordinates):
+        if not isinstance(obj, Monster) or obj.db.population_key != marker:
+            continue
+        slot = obj.db.population_slot
+        if isinstance(slot, int) and not isinstance(slot, bool):
+            slots.add(slot)
+    return slots
+
+
 def _emit_ambient(event: str, context: Mapping[str, object]) -> None:
     """Schedule one ambient decision event on the enclosing durable commit.
 
@@ -332,26 +351,57 @@ def ambient_population_decision(
             else:
                 stale.append(m)
 
-        # Sort living deterministically by pk so slot assignment is stable
+        # Sort living deterministically by pk so a repeated slot stays stable
         living.sort(key=lambda obj: int(getattr(obj, "pk", 0) or 0))
 
-        # Assign living monsters to expected slots by variant_key
-        unassigned_slots = list(expected_slots)
-        assigned_pairs: list[tuple[ExpectedSlot, Monster | None]] = []
-        assigned_monsters: set[int] = set()
+        # The persisted slot is the individual's observation identity, assigned
+        # once at construction. Matching survivors by variant would hand a dead
+        # individual's identity to whoever survives it, corrupting every
+        # before/after sight comparison; the slot is validated here and never
+        # reassigned. Members outside the expected slots (supplementary
+        # provisioning, legacy reads) keep their own object identity and stay
+        # living, but occupy no slot.
+        expected_by_slot = {entry.slot: entry for entry in expected_slots}
+        occupied: dict[int, Monster] = {}
+        for m in living:
+            slot = m.db.population_slot
+            if (
+                isinstance(slot, int)
+                and not isinstance(slot, bool)
+                and slot in expected_by_slot
+                and slot not in occupied
+            ):
+                occupied[slot] = m
 
-        for slot_entry in expected_slots:
-            matched_monster = None
-            for m in living:
-                if m.pk not in assigned_monsters and m.variant_key == slot_entry.variant_key:
-                    assigned_monsters.add(m.pk)
-                    unassigned_slots.remove(slot_entry)
-                    matched_monster = m
-                    break
-            assigned_pairs.append((slot_entry, matched_monster))
-
+        assigned_pairs = tuple(
+            (slot_entry, occupied.get(slot_entry.slot))
+            for slot_entry in expected_slots
+        )
+        vacant_slots = tuple(
+            slot_entry
+            for slot_entry in expected_slots
+            if slot_entry.slot not in occupied
+        )
+        # Spawn only into genuinely vacant slots, and never beyond the authored
+        # quantity, so a surplus living member can never be doubled.
         budget = max(0, target - len(living))
-        spawns_needed = () if is_protected else tuple(unassigned_slots[:budget])
+        spawns_needed = () if is_protected else vacant_slots[:budget]
+
+        if is_protected:
+            # A frozen pass keeps every living marker-matching monster alive --
+            # a tier-example monster left at a coordinate an authored rule has
+            # since taken over included. Only species-bearing members can own a
+            # slot; the rest are reported under their own object identity.
+            retained_living = sorted(
+                (m for m in matching if _stored_hp(m) > 0),
+                key=lambda obj: int(getattr(obj, "pk", 0) or 0),
+            )
+            retained_pks = {m.pk for m in retained_living}
+            living_ambient = tuple(retained_living)
+            stale_ambient = tuple(m for m in matching if m.pk not in retained_pks)
+        else:
+            living_ambient = tuple(living)
+            stale_ambient = tuple(stale)
 
         return PopulationDecision(
             coordinates=coordinates,
@@ -361,8 +411,8 @@ def ambient_population_decision(
             slots=tuple(expected_slots),
             assigned=tuple(assigned_pairs),
             is_session_protected=is_protected,
-            living_ambient=tuple(living),
-            stale_ambient=tuple(stale),
+            living_ambient=living_ambient,
+            stale_ambient=stale_ambient,
             spawns_needed=spawns_needed,
         )
 
@@ -376,6 +426,18 @@ def ambient_population_decision(
     expected = population_for_coordinates(x, y)
 
     if expected is None:
+        # A frozen (session-protected) pass keeps every living marker-matching
+        # monster exactly as materialization does; only the dead ones are stale,
+        # and no prospective replacement is reported.
+        living = (
+            sorted(
+                (m for m in matching if _stored_hp(m) > 0),
+                key=lambda obj: int(getattr(obj, "pk", 0) or 0),
+            )
+            if is_protected
+            else []
+        )
+        living_pks = {m.pk for m in living}
         return PopulationDecision(
             coordinates=coordinates,
             branch="none",
@@ -384,8 +446,8 @@ def ambient_population_decision(
             slots=(),
             assigned=(),
             is_session_protected=is_protected,
-            living_ambient=(),
-            stale_ambient=tuple(matching),
+            living_ambient=tuple(living),
+            stale_ambient=tuple(m for m in matching if m.pk not in living_pks),
             spawns_needed=(),
         )
 
@@ -399,17 +461,28 @@ def ambient_population_decision(
         combat_traits=expected.combat_traits,
     )
 
-    living = [m for m in matching if _persisted_hp(m) > 0 and _matches_expected(m, expected)]
-    stale = [m for m in matching if m not in living]
-    # If there are duplicates of living conformant monsters, only 1 is retained
-    living.sort(key=lambda obj: int(getattr(obj, "pk", 0) or 0))
-    retained_living: list[Monster] = []
-    if living:
-        retained_living = [living[0]]
-        stale.extend(living[1:])
+    # The slot-0 ambient individual is the one living, model-conformant member:
+    # duplicates beyond the first stay registered but cannot occupy the slot.
+    living = sorted(
+        (m for m in matching if _stored_hp(m) > 0),
+        key=lambda obj: int(getattr(obj, "pk", 0) or 0),
+    )
+    conformant = [m for m in living if _matches_expected(m, expected)]
+    retained = conformant[0] if conformant else None
+    living_pks = {m.pk for m in living}
+    retained_pks = {retained.pk} if retained is not None else set()
+    if is_protected:
+        # A session freezes reconciliation, so materialization keeps every
+        # living marker-matching monster -- drifted names/tiers and duplicates
+        # included. Report exactly those and no prospective replacement.
+        stale = tuple(m for m in matching if m.pk not in living_pks)
+        living_ambient = tuple(living)
+    else:
+        stale = tuple(m for m in matching if m.pk not in retained_pks)
+        living_ambient = (retained,) if retained is not None else ()
 
-    assigned_pair = (slot0, retained_living[0] if retained_living else None)
-    spawns_needed = () if (retained_living or is_protected) else (slot0,)
+    assigned_pair = (slot0, retained)
+    spawns_needed = () if (retained is not None or is_protected) else (slot0,)
 
     return PopulationDecision(
         coordinates=coordinates,
@@ -419,8 +492,8 @@ def ambient_population_decision(
         slots=(slot0,),
         assigned=(assigned_pair,),
         is_session_protected=is_protected,
-        living_ambient=tuple(retained_living),
-        stale_ambient=tuple(stale),
+        living_ambient=living_ambient,
+        stale_ambient=stale,
         spawns_needed=spawns_needed,
     )
 
@@ -517,7 +590,8 @@ def _spawn_species_individual(
     coordinates: tuple[int, int],
     variant_key: str,
     population_key: str,
-    slot: int = 0,
+    *,
+    slot: int,
 ) -> Monster:
     """Create one species-bearing ambient individual through the construction owner.
 
@@ -528,6 +602,11 @@ def _spawn_species_individual(
     same ambient ownership marker as the tier-example population and is
     registered in the wilderness bookkeeping like every other wilderness
     monster.
+
+    ``slot`` is required: it is the individual's permanent observation
+    identity, so a caller creating into a coordinate that already holds
+    individuals must pass a free slot from :func:`ambient_slots_in_use`
+    rather than silently reusing another individual's identity.
     """
     individual = construct_species_individual(
         variant_species_key(variant_key), variant_key
@@ -681,7 +760,10 @@ def population_view(
 
     Consumes the shared ``ambient_population_decision`` for ambient slots and
     ``site_living_members`` for monster sites. Foreign registered entities keep
-    their stable ``object:<dbid>`` identities.
+    their stable ``object:<dbid>`` identities, and so does every ambient
+    monster that cannot occupy an expected slot -- a retained member of a
+    frozen (session-protected) pass, a drifted survivor, or an individually
+    provisioned extra -- because those objects are what materialization keeps.
     """
     from typeclasses.characters import PlayerCharacter
     from typeclasses.npcs import LLMNPC, NPC
@@ -724,48 +806,36 @@ def population_view(
             capital_entry=cap_entry,
         )
 
-        # Map living ambient monsters to their slots/keys
+        # Map living ambient monsters to their slots/keys. A prospective slot is
+        # reported only when reconciliation may materialize it, which a frozen
+        # (session-protected) decision never allows.
         assigned_living: set[int] = set()
-        if decision.is_session_protected:
-            # Protected cell: project living matching monsters as-is; nothing prospective
-            for slot_entry, monster in decision.assigned:
-                if monster is not None:
-                    assigned_living.add(monster.pk)
-                    facts.append(
-                        PopulationFact(
-                            observation_key=slot_entry.observation_key,
-                            cell=cell,
-                            kind="monster",
-                            hostile=True,
-                            label=monster.key,
-                        )
+        for slot_entry, monster in decision.assigned:
+            if monster is not None:
+                assigned_living.add(monster.pk)
+                facts.append(
+                    PopulationFact(
+                        observation_key=slot_entry.observation_key,
+                        cell=cell,
+                        kind="monster",
+                        hostile=True,
+                        label=monster.key,
                     )
-        else:
-            for slot_entry, monster in decision.assigned:
-                if monster is not None:
-                    assigned_living.add(monster.pk)
-                    facts.append(
-                        PopulationFact(
-                            observation_key=slot_entry.observation_key,
-                            cell=cell,
-                            kind="monster",
-                            hostile=True,
-                            label=monster.key,
-                        )
+                )
+            elif slot_entry in decision.spawns_needed:
+                # Prospective slot
+                facts.append(
+                    PopulationFact(
+                        observation_key=slot_entry.observation_key,
+                        cell=cell,
+                        kind="monster",
+                        hostile=True,
+                        label=slot_entry.name_zh,
                     )
-                elif slot_entry in decision.spawns_needed:
-                    # Prospective slot
-                    facts.append(
-                        PopulationFact(
-                            observation_key=slot_entry.observation_key,
-                            cell=cell,
-                            kind="monster",
-                            hostile=True,
-                            label=slot_entry.name_zh,
-                        )
-                    )
+                )
 
-        # Hoisted: Any surplus living ambient monsters outside assigned slots
+        # Retained living ambient monsters outside every assigned slot keep a
+        # distinct stable object identity, so no living enemy is ever omitted.
         for m in decision.living_ambient:
             if m.pk not in assigned_living and m.pk is not None:
                 facts.append(
