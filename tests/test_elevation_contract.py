@@ -178,7 +178,9 @@ class GenerationIsGameFreeTests(unittest.TestCase):
 class RuntimeWithoutGenerationExtraTests(unittest.TestCase):
     @covers_requirement(
         "wilderness-elevation-authoring::"
-        "elevation-shapes-reject-invalid-candidates"
+        "elevation-shapes-reject-invalid-candidates",
+        "wilderness-elevation-runtime::"
+        "runtime-elevation-rejects-stale-or-corrupt-artifacts",
     )
     def test_package_runtime_surface_imports_without_numpy_scipy_or_the_generator(
         self,

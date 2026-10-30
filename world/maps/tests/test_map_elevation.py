@@ -44,6 +44,10 @@ class ElevationRuntimeLogicTests(unittest.TestCase):
             clear_published_map_world()
         super().tearDown()
 
+    @covers_requirement(
+        "wilderness-elevation-runtime::"
+        "runtime-elevation-rejects-stale-or-corrupt-artifacts"
+    )
     def test_unloaded_lookup_raises_without_zero_fallback(self):
         """When no elevation runtime is installed, lookups must raise ElevationNotLoadedError."""
         clear_published_map_world()
@@ -55,6 +59,10 @@ class ElevationRuntimeLogicTests(unittest.TestCase):
         with self.assertRaises(elevation.ElevationNotLoadedError):
             elevation.cell_elevation(100, 100)
 
+    @covers_requirement(
+        "wilderness-elevation-runtime::"
+        "runtime-elevation-rejects-stale-or-corrupt-artifacts"
+    )
     def test_clear_published_world_clears_elevation_pointer(self):
         """Calling clear_published_map_world uninstall() must clear elevation."""
         publish_shipped_map_world()
@@ -64,6 +72,10 @@ class ElevationRuntimeLogicTests(unittest.TestCase):
         with self.assertRaises(elevation.ElevationNotLoadedError):
             elevation.band(0, 0)
 
+    @covers_requirement(
+        "wilderness-elevation-runtime::"
+        "runtime-elevation-rejects-stale-or-corrupt-artifacts"
+    )
     def test_bounds_checks_reject_out_of_frame_and_non_integers(self):
         """Cell lookups outside 0..frame_cells-1 or with invalid types must raise ElevationBoundsError."""
         publish_shipped_map_world()
@@ -88,6 +100,10 @@ class ElevationRuntimeLogicTests(unittest.TestCase):
         with self.assertRaises(ElevationBoundsError):
             active.cell_elevation("10", 10)  # str
 
+    @covers_requirement(
+        "wilderness-elevation-runtime::"
+        "runtime-elevation-rejects-stale-or-corrupt-artifacts"
+    )
     def test_lru_cache_capacity_strictly_bounded_to_128_and_evicts(self):
         """Accessing more than 128 unique tiles keeps the cache size at 128."""
         frame = 2700
@@ -119,6 +135,10 @@ class ElevationRuntimeLogicTests(unittest.TestCase):
         newest_tile = tiles_accessed[-1]
         self.assertIn(newest_tile, cache)
 
+    @covers_requirement(
+        "wilderness-elevation-runtime::"
+        "runtime-elevation-rejects-stale-or-corrupt-artifacts"
+    )
     def test_different_artifact_identity_does_not_hit_stale_cache(self):
         """Keys are tied to fingerprint, so a different artifact identity never hits old tiles."""
         active = elevation.current()
@@ -134,6 +154,10 @@ class ElevationRuntimeLogicTests(unittest.TestCase):
         self.assertNotIn((different_fp, 0, 0), cache)
         self.assertIsNone(cache.get((different_fp, 0, 0)))
 
+    @covers_requirement(
+        "wilderness-elevation-runtime::"
+        "runtime-elevation-rejects-stale-or-corrupt-artifacts"
+    )
     def test_runtime_lookups_match_packed_bytes_on_partial_frame(self):
         """Lookups must match packed bytes, including partial edge tiles ending inside the frame."""
         frame = 70  # ceil(70/64) = 2, so 2x2 = 4 tiles total
@@ -172,7 +196,11 @@ class ElevationRuntimeLogicTests(unittest.TestCase):
             self.assertEqual(synth_runtime.band(x, y), expected_band)
             self.assertEqual(synth_runtime.prominence_tier(x, y), expected_tier)
 
-    @covers_requirement("map-runtime-adoption::runtime-adoption-publishes-one-complete-validated-world")
+    @covers_requirement(
+        "map-runtime-adoption::runtime-adoption-publishes-one-complete-validated-world",
+        "wilderness-elevation-runtime::"
+        "runtime-elevation-rejects-stale-or-corrupt-artifacts",
+    )
     def test_admission_rejection_on_missing_or_corrupt_elevation_retains_prior_bundle(self):
         """If elevation is missing or corrupt, load_candidate fails and prior bundle survives."""
         publish_shipped_map_world()

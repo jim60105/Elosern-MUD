@@ -13,6 +13,8 @@ import unittest
 from unittest import mock
 import zlib
 
+from tools.spec_traceability import covers_requirement
+
 from elosern_map_core.elevation_codec import (
     DEFAULT_CONFIG_DIGEST,
     ELEVATION_ALGORITHM_VERSION,
@@ -48,6 +50,10 @@ class ElevationCodecTests(unittest.TestCase):
         self.assertNotIn("numpy", codec.__dict__)
         self.assertNotIn("scipy", codec.__dict__)
 
+    @covers_requirement(
+        "wilderness-elevation-runtime::"
+        "elevation-artifacts-are-bounded-and-source-identified"
+    )
     def test_round_trip_synthetic_frame_with_partial_edge_tiles(self):
         """A frame not divisible by 64 ceil-pads edge tiles with zero bytes."""
         frame = 100  # ceil(100 / 64) = 2, so 2x2 = 4 tiles total
@@ -81,16 +87,28 @@ class ElevationCodecTests(unittest.TestCase):
                             # Padded cells outside the frame must be 0
                             self.assertEqual(byte_val, 0)
 
+    @covers_requirement(
+        "wilderness-elevation-runtime::"
+        "runtime-elevation-rejects-stale-or-corrupt-artifacts"
+    )
     def test_tile_corrupt_base64_raises(self):
         with self.assertRaises(ElevationTileCorruptionError):
             decode_tile("not!valid!base64!==", 0, 0, frame_cells=64)
 
+    @covers_requirement(
+        "wilderness-elevation-runtime::"
+        "runtime-elevation-rejects-stale-or-corrupt-artifacts"
+    )
     def test_tile_corrupt_zlib_stream_raises(self):
         # Valid base64 but not valid zlib
         bad_zlib = base64.b64encode(b"hello world this is not zlib").decode("ascii")
         with self.assertRaises(ElevationTileCorruptionError):
             decode_tile(bad_zlib, 0, 0, frame_cells=64)
 
+    @covers_requirement(
+        "wilderness-elevation-runtime::"
+        "runtime-elevation-rejects-stale-or-corrupt-artifacts"
+    )
     def test_tile_trailing_data_raises(self):
         valid_bytes = bytes([0] * 4096)
         compressed = zlib.compress(valid_bytes) + b"trailing_garbage"
@@ -99,6 +117,10 @@ class ElevationCodecTests(unittest.TestCase):
             decode_tile(b64, 0, 0, frame_cells=64)
         self.assertIn("trailing unused data", str(caught.exception))
 
+    @covers_requirement(
+        "wilderness-elevation-runtime::"
+        "runtime-elevation-rejects-stale-or-corrupt-artifacts"
+    )
     def test_tile_exceeded_ceiling_raises(self):
         # 4097 bytes compressed
         oversize = bytes([0] * 4097)
@@ -107,6 +129,10 @@ class ElevationCodecTests(unittest.TestCase):
             decode_tile(b64, 0, 0, frame_cells=64)
         self.assertIn("exceeded 4096-byte output ceiling", str(caught.exception))
 
+    @covers_requirement(
+        "wilderness-elevation-runtime::"
+        "runtime-elevation-rejects-stale-or-corrupt-artifacts"
+    )
     def test_tile_non_zero_reserved_bits_raises(self):
         # Bit 2 is set (0x04)
         bad_bytes = bytearray(4096)
@@ -116,6 +142,10 @@ class ElevationCodecTests(unittest.TestCase):
             decode_tile(b64, 0, 0, frame_cells=64)
         self.assertIn("reserved bits", str(caught.exception))
 
+    @covers_requirement(
+        "wilderness-elevation-runtime::"
+        "runtime-elevation-rejects-stale-or-corrupt-artifacts"
+    )
     def test_tile_non_zero_padding_cell_raises(self):
         # Partial edge tile with frame=50, tile=64. Cell at lx=55, ly=0 is outside frame
         bad_bytes = bytearray(4096)
@@ -125,6 +155,10 @@ class ElevationCodecTests(unittest.TestCase):
             decode_tile(b64, 0, 0, frame_cells=50)
         self.assertIn("padding cell", str(caught.exception))
 
+    @covers_requirement(
+        "wilderness-elevation-runtime::"
+        "elevation-artifacts-are-bounded-and-source-identified"
+    )
     def test_encode_elevation_artifact_produces_valid_structure(self):
         frame = 70
         bands = [[1 for _ in range(frame)] for _ in range(frame)]
@@ -152,6 +186,10 @@ class ElevationCodecTests(unittest.TestCase):
         verified = verify_elevation_data_integrity(doc, expected_frame_cells=frame)
         self.assertEqual(verified.fingerprint, metadata.fingerprint)
 
+    @covers_requirement(
+        "wilderness-elevation-runtime::"
+        "elevation-artifacts-are-bounded-and-source-identified"
+    )
     def test_oversize_budget_rejection(self):
         # Mock tiles that exceed MAX_ELEVATION_BYTES
         frame = 64
@@ -163,6 +201,10 @@ class ElevationCodecTests(unittest.TestCase):
                 encode_elevation_artifact(bands, tiers, frame_cells=frame, continent_fingerprint="f" * 64)
             self.assertIn("exceeds", str(caught.exception))
 
+    @covers_requirement(
+        "wilderness-elevation-runtime::"
+        "elevation-artifacts-are-bounded-and-source-identified"
+    )
     def test_prior_bytes_survive_oversize_failure(self):
         """When artifact generation fails the size budget, an existing target file is not overwritten."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -183,6 +225,10 @@ class ElevationCodecTests(unittest.TestCase):
             # Target content must remain byte-identical to prior bytes
             self.assertEqual(target.read_bytes(), prior_bytes)
 
+    @covers_requirement(
+        "wilderness-elevation-runtime::"
+        "runtime-elevation-rejects-stale-or-corrupt-artifacts"
+    )
     def test_integrity_checks_detect_reordered_or_missing_tiles(self):
         frame = 128
         bands = [[0] * frame for _ in range(frame)]
@@ -221,6 +267,10 @@ class ElevationCodecTests(unittest.TestCase):
         with self.assertRaises(ElevationDocumentError):
             verify_elevation_data_integrity(doc, expected_frame_cells=2700)
 
+    @covers_requirement(
+        "wilderness-elevation-runtime::"
+        "elevation-artifacts-are-bounded-and-source-identified"
+    )
     def test_freshness_reporting_and_named_changed_source(self):
         continent_fp = "c" * 64
         sig = elevation_source_signature(continent_fp, DEFAULT_CONFIG_DIGEST, ELEVATION_ALGORITHM_VERSION)
