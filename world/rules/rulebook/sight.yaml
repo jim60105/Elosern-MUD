@@ -1,0 +1,76 @@
+# Wilderness sight rulebook (wilderness-sight-rules, detailed design §3 and §6).
+#
+# This document owns every light phase, ground-sight radius, sighting factor and
+# silhouette the deterministic sight rules consume. It is separate from
+# clock.yaml, whose dayparts are anchor hours only: a boundary hour here belongs
+# to the phase that starts at it.
+#
+# Units: ground radii are wilderness cells (1 km each), sighting ranges are
+# kilometres, factors are dimensionless multipliers. Nothing in this file is a
+# seconds authority; the clock owns time.
+
+# Light phases, one cyclic entry per phase. `column` selects the radius column
+# every table below is read with; dusk and dawn share the twilight column.
+# Every hour of the day is covered exactly once, starting at `start_hour`.
+phases:
+  - {name: day, start_hour: 7, column: day}
+  - {name: dusk, start_hour: 17, column: twilight}
+  - {name: night, start_hour: 19, column: night}
+  - {name: dawn, start_hour: 5, column: twilight}
+
+# Ground sight radius by the observer cell's terrain row, per column.
+terrain_radius:
+  open_ground: {day: 4, twilight: 3, night: 1}
+  hills: {day: 3, twilight: 2, night: 1}
+  mountain: {day: 2, twilight: 2, night: 1}
+  woodland: {day: 1, twilight: 1, night: 0}
+
+# Deterministic wilderness region keys (world.lore.wilderness_regions) mapped
+# onto the terrain rows above. Sight classifies terrain for visibility, which is
+# not the travel-cost terrain class: hills and valleys see further than open
+# plains at dusk. A published region without a row here is a publication error,
+# never a silent default.
+region_terrain:
+  north_deep_forest: woodland
+  central_mountains: mountain
+  southeast_coast: open_ground
+  eastern_plains: open_ground
+  southwest_coast: open_ground
+  northwest_highland_forest: woodland
+  western_hills_valleys: hills
+
+# Rows whose canopy closes the horizon: the prominence bonus is suppressed (the
+# cell is treated as tier 0) and no distant marker is emitted.
+canopy_terrain:
+  - woodland
+
+# Prominence bonus added to the terrain radius, indexed by elevation tier. The
+# canopy suppression above is applied before the addition; a vantage landmark
+# stays eligible on a canopy cell.
+prominence_bonus:
+  - {day: 0, twilight: 0, night: 0}
+  - {day: 1, twilight: 0, night: 0}
+  - {day: 2, twilight: 1, night: 0}
+  - {day: 3, twilight: 2, night: 0}
+
+# Ground sight of a cell holding a `vantage: true` landmark: the radius is the
+# larger of the terrain-derived radius and this row.
+vantage_radius: {day: 8, twilight: 5, night: 2}
+
+# Twilight visibility of a distant source: the daytime range times this factor.
+twilight_factor: 0.6
+
+# Non-hidden settlements appear by footprint: sqrt(occupied cells) times this
+# factor. At night they are light sources with their own, smaller factor; dusk
+# and dawn apply twilight_factor to the daytime range.
+settlement_footprint_factor: {day: 6, night: 2}
+
+# Anonymous silhouettes for a settlement that discloses no name. One entry per
+# supported non-hidden settlement kind (world.lore.anchors.AnchorKind minus the
+# hidden kinds), with a daylight and a night (light) description. Authors never
+# use a location's own authored name, description or registry key here; the
+# wording is reviewed as authored prose, not as a mechanism.
+settlement_silhouettes:
+  capital:
+    day: 遠方平原上展開的城牆與層疊高塔
+    night: 地平線上連成一片的城鎮燈火

@@ -253,12 +253,25 @@ class LocationDeclaration:
 
 @dataclass(frozen=True, slots=True)
 class DistrictDeclaration:
+    """One district and its optional distant-sighting authoring.
+
+    ``vantage`` marks the landmark's cell as a widened-viewpoint cell. An
+    authored ``sight_km``/``light_km`` range makes the landmark a distant
+    source while ``silhouette_zh`` is what a far viewer sees; the schema rejects
+    a positive range without that silhouette. Absent values stay absent: no
+    range, no source.
+    """
+
     district_id: str
     district_name_zh: str
     landmark_name_zh: str
     landmark: QualifiedRef
     kind: str
     region_key: str | None
+    vantage: bool = False
+    sight_km: float | None = None
+    light_km: float | None = None
+    silhouette_zh: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -359,6 +372,12 @@ def _qualified_ref(value: Mapping[str, Any]) -> QualifiedRef:
         object_id=value.get("object_id"),
         cell=_cell(cell) if cell is not None else None,
     )
+
+
+def _optional_number(value: Any) -> float | None:
+    """One optional authored number, kept as a float and never invented."""
+
+    return None if value is None else float(value)
 
 
 @dataclass(frozen=True, slots=True)
@@ -486,6 +505,10 @@ class DistrictsDocument(AuthoringDocument):
                 landmark=_qualified_ref(value["landmark"]),
                 kind=str(value["kind"]),
                 region_key=value.get("region_key"),
+                vantage=bool(value.get("vantage", False)),
+                sight_km=_optional_number(value.get("sight_km")),
+                light_km=_optional_number(value.get("light_km")),
+                silhouette_zh=value.get("silhouette_zh"),
             )
             for key, value in self.data["districts"].items()
         }
