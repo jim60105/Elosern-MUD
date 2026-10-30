@@ -472,6 +472,9 @@ class SleepEntryLifecycleTests(EvenniaTest):
         self.assertEqual(receipt.revision, 0)
         self.assertEqual(receipt.settled_through_tick, before)
 
+    @covers_requirement(
+        "wilderness-ground-reveal::ground-observations-are-monotonic-and-transactional"
+    )
     def test_sleep_receipt_failure_restores_ground_observation(self):
         from typeclasses.rooms import TerrainRoom
         from world.rules import time_skip as skip_module

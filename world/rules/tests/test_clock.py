@@ -1144,6 +1144,9 @@ class OuterOwnerSeamTests(EvenniaTestCase):
         self.assertEqual(self.player.db.quest_log, before_log)
         self.assertEqual(self._raw_attribute(self.player, "quest_log"), before_log)
 
+    @covers_requirement(
+        "wilderness-ground-reveal::ground-observations-are-monotonic-and-transactional"
+    )
     def test_skip_observer_rolls_back_with_clock_failure(self):
         from world.rules import map_knowledge as knowledge
 

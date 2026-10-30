@@ -102,6 +102,9 @@ class GroundRevealProjectionTests(unittest.TestCase):
         self.assertEqual(character.attributes.writes, [])
         return revealed
 
+    @covers_requirement(
+        "wilderness-ground-reveal::permanent-reveal-is-a-bounded-read-projection"
+    )
     def test_union_spans_chunk_edges_without_reading_distant_chunks(self):
         # Two visits one cell either side of the 64-cell chunk seam, each with
         # radius 1: a manually known 5x3 union.
@@ -151,6 +154,9 @@ class GroundRevealProjectionTests(unittest.TestCase):
         )
         self.assertEqual(set(decoded), {"0:0", "1:0"})
 
+    @covers_requirement(
+        "wilderness-ground-reveal::permanent-reveal-is-a-bounded-read-projection"
+    )
     def test_lit_district_shortcut_reveals_ownership_and_landmark_chunks_only(self):
         record = _record(
             {
@@ -194,6 +200,9 @@ class GroundRevealProjectionTests(unittest.TestCase):
         # two expanded observation chunks. Nothing else is touched.
         self.assertEqual(set(decoded), {"0:0", "1:0"})
 
+    @covers_requirement(
+        "wilderness-ground-reveal::permanent-reveal-is-a-bounded-read-projection"
+    )
     def test_corrupt_selected_chunk_keeps_lit_reveal_and_preserves_bytes(self):
         record = _record(
             {
@@ -228,6 +237,9 @@ class GroundRevealProjectionTests(unittest.TestCase):
         self.assertEqual(repr(record), before, "corruption retains the record bytes")
         log_warn.assert_called()
 
+    @covers_requirement(
+        "wilderness-ground-reveal::permanent-reveal-is-a-bounded-read-projection"
+    )
     def test_invalid_envelope_reveals_nothing(self):
         record = {"schema_version": 1, "visited": {}, "wilderness": {}}
         with patch("world.rules.map_knowledge.log_warn") as log_warn:
@@ -235,6 +247,9 @@ class GroundRevealProjectionTests(unittest.TestCase):
         log_warn.assert_called()
         self.assertEqual(record, {"schema_version": 1, "visited": {}, "wilderness": {}})
 
+    @covers_requirement(
+        "wilderness-ground-reveal::permanent-reveal-is-a-bounded-read-projection"
+    )
     def test_query_is_cropped_to_the_wilderness_frame(self):
         record = _record(
             {
@@ -258,6 +273,9 @@ class GroundRevealProjectionTests(unittest.TestCase):
             frozenset(),
         )
 
+    @covers_requirement(
+        "wilderness-ground-reveal::permanent-reveal-is-a-bounded-read-projection"
+    )
     def test_is_revealed_matches_the_bounded_projection(self):
         record = _record(
             {
@@ -278,6 +296,9 @@ class GroundRevealProjectionTests(unittest.TestCase):
             self.assertFalse(is_revealed(character, (1, 0)))
         self.assertEqual(character.attributes.writes, [])
 
+    @covers_requirement(
+        "wilderness-ground-reveal::permanent-reveal-is-a-bounded-read-projection"
+    )
     def test_hidden_terrain_reveals_without_location_identity(self):
         # (61, 61) lies inside the disc of the visited (60, 60) but has never
         # been visited: its terrain reveals while the exact-visit gate stays
@@ -307,6 +328,9 @@ class GroundRevealProjectionTests(unittest.TestCase):
 class GroundObservationWriterTests(EvenniaTest):
     @covers_requirement(
         "map-knowledge::map-knowledge-py-is-the-sole-writer-of-a-versioned-visited-node-record"
+    )
+    @covers_requirement(
+        "wilderness-ground-reveal::ground-observations-are-monotonic-and-transactional"
     )
     def test_observation_keeps_first_tick_and_maximum_sight(self):
         record_ground_observation(self.char1, CELL, 100, 3)
@@ -397,6 +421,9 @@ class SkipObservationTests(EvenniaTest):
     def _visit(self):
         return {v.node_id: v for v in parse_knowledge(self.player)}[_wild_node(*self.cell)]
 
+    @covers_requirement(
+        "wilderness-ground-reveal::ground-observations-are-monotonic-and-transactional"
+    )
     def test_positive_wait_observes_the_final_cell_once(self):
         before = get_world_clock().tick
         with patch("world.rules.sight.ground_radius_at", return_value=5), self._observe() as observe:
@@ -424,6 +451,9 @@ class SkipObservationTests(EvenniaTest):
             (before + 60, middle + 120, 7),
         )
 
+    @covers_requirement(
+        "wilderness-ground-reveal::ground-observations-are-monotonic-and-transactional"
+    )
     def test_truncated_wait_observes_its_actual_end(self):
         companion = create_object(NPC, key="forced-sleeper", location=self.terrain)
         companion.race = "human"
@@ -440,6 +470,9 @@ class SkipObservationTests(EvenniaTest):
         self.assertEqual(observe.call_args.args[2], before + 6000)
         self.assertEqual(self._visit().last_seen_tick, before + 6000)
 
+    @covers_requirement(
+        "wilderness-ground-reveal::ground-observations-are-monotonic-and-transactional"
+    )
     def test_zero_and_replayed_waits_never_observe(self):
         with patch("world.rules.sight.ground_radius_at", return_value=3), self._observe() as observe:
             advance_wait(self.player, 0)
@@ -449,6 +482,9 @@ class SkipObservationTests(EvenniaTest):
             advance_wait(self.player, 60, operation_id="synthetic-ground-once")
             self.assertEqual(observe.call_count, 1)
 
+    @covers_requirement(
+        "wilderness-ground-reveal::ground-observations-are-monotonic-and-transactional"
+    )
     def test_refused_wait_never_observes(self):
         with patch("world.rules.sight.ground_radius_at", return_value=3), patch(
             "world.rules.time_skip.evaluate_skip_safety",
@@ -459,6 +495,9 @@ class SkipObservationTests(EvenniaTest):
         self.assertEqual(observe.call_count, 0)
         self.assertIsNone(self.player.attributes.get(KNOWLEDGE_ATTR))
 
+    @covers_requirement(
+        "wilderness-ground-reveal::ground-observations-are-monotonic-and-transactional"
+    )
     def test_self_sleep_continuation_observes_once(self):
         entry = enter_sleep(self.player, mode=MODE_DURATION, seconds=600)
         with patch("world.rules.sight.ground_radius_at", return_value=6), self._observe() as observe:
@@ -466,6 +505,9 @@ class SkipObservationTests(EvenniaTest):
         observe.assert_called_once()
         self.assertEqual(self._visit().sight, 6)
 
+    @covers_requirement(
+        "wilderness-ground-reveal::ground-observations-are-monotonic-and-transactional"
+    )
     def test_party_sleep_continuation_observes_once(self):
         enter_party_sleep(self.player, mode=MODE_DURATION, seconds=600)
         with patch("world.rules.sight.ground_radius_at", return_value=2), self._observe() as observe:
@@ -473,6 +515,9 @@ class SkipObservationTests(EvenniaTest):
         observe.assert_called_once()
         self.assertEqual(self._visit().sight, 2)
 
+    @covers_requirement(
+        "wilderness-ground-reveal::ground-observations-are-monotonic-and-transactional"
+    )
     def test_forced_sleep_continuation_observes_once(self):
         write_fatigue_state(self.player, 2400, SleepPosture.AWAKE)
         advance_wait(self.player, 1200)
@@ -484,12 +529,18 @@ class SkipObservationTests(EvenniaTest):
         observe.assert_called_once()
         self.assertEqual(self._visit().sight, 1)
 
+    @covers_requirement(
+        "wilderness-ground-reveal::ground-observations-are-monotonic-and-transactional"
+    )
     def test_non_skip_advance_never_observes(self):
         with patch("world.rules.sight.ground_radius_at", return_value=3), self._observe() as observe:
             WorldClock(get_world_clock().tick).advance(60, AdvanceSource.COMMAND, [self.player])
         self.assertEqual(observe.call_count, 0)
         self.assertIsNone(self.player.attributes.get(KNOWLEDGE_ATTR))
 
+    @covers_requirement(
+        "wilderness-ground-reveal::ground-observations-are-monotonic-and-transactional"
+    )
     def test_writer_persistence_failure_keeps_history_and_commits_the_skip(self):
         before = get_world_clock().tick
         record_ground_observation(self.player, self.cell, before, 2)
