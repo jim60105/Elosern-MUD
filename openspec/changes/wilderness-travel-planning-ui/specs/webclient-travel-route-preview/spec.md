@@ -28,3 +28,7 @@ Travel destination input SHALL lock only disclosed current-window cells, preserv
 - **WHEN** a synthetic plan includes every stage, nightfall, a voluntary stop and later steps
 - **THEN** glyph/leg state follows supplied indices and durations, route fit preserves controls and no client route or eligibility is derived
 
+#### Scenario: Terminal sleep has a defined display
+- **WHEN** a valid plan includes an admitted forced_sleep terminal step
+- **THEN** data retains that stage and the route/leg show a severe-style tick with a sleep cue and accessible label, including its count and duration
+

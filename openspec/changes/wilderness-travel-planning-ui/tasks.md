@@ -12,7 +12,7 @@ Read design.md contracts before starting each group. Paths without a web/ prefix
 
 ## 3. Preview map and leg
 
-- [ ] 3.1 Extend shared travel glyphs, TravelMap route overlay and leg-model projection using the exact planner schema. Add tests/travel/preview.test.js with independently known stop/night indices and empty-plan behavior; add RoutePreview production story and update existing developer UI guidance. Acceptance: pnpm test -- web/webclient-app/tests/travel/preview.test.js exits0; paint-call count remains unchanged when only the plan overlay changes.
+- [ ] 3.1 Extend shared travel glyphs, TravelMap route overlay and leg-model projection using the exact planner schema. Add tests/travel/preview.test.js with independently known stop/night indices and empty-plan behavior; add RoutePreview production story and update existing developer UI guidance. Acceptance: pnpm test -- web/webclient-app/tests/travel/preview.test.js exits0; paint-call count remains unchanged when only the plan overlay changes. Exercise a canonical forced_sleep terminal step using LegPanel's shared severe-style-plus-crescent mapping, preserving the original stage and including its admitted count/duration.
 
 ## 4. Preview browser evidence
 
