@@ -359,7 +359,7 @@ class AmbientSpeciesReconciliationTests(BattlefieldIsolation, EvenniaTest):
         )
 
     @covers_requirement(
-        "wilderness-monster-population::ensure-population-idempotently-places-and-respawns-monsters-at-a-coordinate"
+        "wilderness-population-view::population-reads-share-materialization-decisions"
     )
     def test_species_view_agrees_with_materialization_and_session_protection(self):
         # Cell PROBE has 2 living species monsters placed in setUp

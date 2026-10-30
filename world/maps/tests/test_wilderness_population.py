@@ -742,7 +742,8 @@ class WildernessPopulationViewTests(EvenniaTest):
         self.room = self.char1.location
 
     @covers_requirement(
-        "wilderness-monster-population::ensure-population-idempotently-places-and-respawns-monsters-at-a-coordinate"
+        "wilderness-population-view::population-reads-share-materialization-decisions",
+        "wilderness-population-view::observation-identities-survive-materialization",
     )
     def test_view_agrees_with_entry_and_observation_identity_is_stable(self):
         # NEARBY_BAND_XY is inside hunting band and currently unprepared/unmaterialized.
@@ -798,7 +799,7 @@ class WildernessPopulationViewTests(EvenniaTest):
         self.assertEqual(facts_baseline_after[0].label, base_fact_before.label)
 
     @covers_requirement(
-        "wilderness-monster-population::ensure-population-idempotently-places-and-respawns-monsters-at-a-coordinate"
+        "wilderness-population-view::population-reads-share-materialization-decisions"
     )
     def test_view_produces_no_read_mutation(self):
         unprepared_cell = (1200, 1200)
@@ -828,7 +829,7 @@ class WildernessPopulationViewTests(EvenniaTest):
         )
 
     @covers_requirement(
-        "wilderness-monster-population::ensure-population-idempotently-places-and-respawns-monsters-at-a-coordinate"
+        "wilderness-population-view::population-reads-share-materialization-decisions"
     )
     def test_population_view_does_not_recover_sites(self):
         # Pick a site from registry
@@ -885,7 +886,7 @@ class WildernessPopulationViewTests(EvenniaTest):
         self.assertEqual(site_state(site_key, wilderness=self.script).state, "cleared")
 
     @covers_requirement(
-        "wilderness-monster-population::ensure-population-idempotently-places-and-respawns-monsters-at-a-coordinate"
+        "wilderness-population-view::population-reads-share-materialization-decisions"
     )
     def test_population_view_does_not_construct_traits(self):
         # Create a Monster object with stored HP attributes but NO constructed trait handler
@@ -923,7 +924,7 @@ class WildernessPopulationViewTests(EvenniaTest):
         self.assertEqual(writes, [])
 
     @covers_requirement(
-        "wilderness-monster-population::ensure-population-idempotently-places-and-respawns-monsters-at-a-coordinate"
+        "wilderness-population-view::observation-identities-survive-materialization"
     )
     def test_foreign_and_character_entities_distinct_identities(self):
         cell = (1600, 1600)
