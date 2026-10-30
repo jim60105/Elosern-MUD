@@ -176,7 +176,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "efd66d162a6dbe8aad8d415b8383ee588ed8ff30c061686f07736929248742b5",
+  "fingerprint": "67f433770e21bb0680d7a9c4cb6f59431ba631095276aabe546f93c694eef72c",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -1063,7 +1063,7 @@
     "world/rules/church.py": "d0d197ca2b70aa2623edeecf065f4d702789bfcfde32dc59d1e8b028397e7b52",
     "world/rules/church_rulebook.py": "7373da0ee3b9311dc8dbb1c768ff54437ad180a86307ef7fc2c6d3480f679f7e",
     "world/rules/city_gates.py": "769431ba2710458d3f6f560ef8eb5b9f0c0d704ebf29230246b59b9fec67232b",
-    "world/rules/clock.py": "57b710ee6c02de1c8e889d35081a9b3ced06506ad3fb3540fdb0692b0c43f3ff",
+    "world/rules/clock.py": "20221eeb19c67fbd56ac0c9ec930d1c0f715ba54922c4dc65b82b40bbc257e66",
     "world/rules/combat/__init__.py": "e6f030fbd5174ae8e7e32a0cd9e69ba46858d09cebbe1b523c72dcc5e24fa813",
     "world/rules/combat/battlefield.py": "5a47e4d18c6b65570d44f7738e3e06a349df736cc682dbe734c76438114450c4",
     "world/rules/combat/damage.py": "cd682fc18558639e403a5ddd3e77a005a77b50caa93bce5e344f48779fdd2d17",
@@ -1147,7 +1147,7 @@
     "world/rules/lore_knowledge.py": "04ee8bf163fc3b9ad5d0a428576650637204e37c8893b0e8fd5116a589ad0a02",
     "world/rules/map_discovery.py": "a97c3216776f3db32397c9a72050203922c7b6a6e51c006104208d1f245f10b3",
     "world/rules/map_district_lighting.py": "45e346cefbff57dc213b7b0110b1d8bf34ec284bff85e8cbc06fbae616648a36",
-    "world/rules/map_knowledge.py": "584482efe1f001d6fe741c6fa7180a396e56506c6cda99ae16ae2d1f2660b703",
+    "world/rules/map_knowledge.py": "f4aa1034c0a69e2211c7583923c5ff6a5e9197af5da9abb57bdc10bd629de3d8",
     "world/rules/mental_time.py": "e89e5712fa09366112ffdde03e64a9a0c6f0715c83cb24a4e9a3daa5867c095b",
     "world/rules/monster_ai/__init__.py": "29ffeb28deec7bfe06260a969811cd55cbb162dfc695399eb8ac601b13a0c748",
     "world/rules/monster_ai/candidates.py": "9d927d58e84924d338529e07532bbac30a2c1a40921f5237879c12f2e5ace662",
@@ -1273,7 +1273,7 @@
     "world/rules/surfaces.py": "ab43996e91df6657f8e627456906d5173f947aa92ff2546dd0bf8eefbbe8e429",
     "world/rules/target_facts.py": "18c850571b194d6fbaddf6d2ce329a2b6763e920e3050da97d3db1d3df04855b",
     "world/rules/targeting.py": "2eec94487a48b86133833dcbb9ac86477b381caa7fa8b095dd67b71640bc1a97",
-    "world/rules/time_skip.py": "6c98b765b50cbcda606047643c0672187372675aea46e0c34f7f7b9c0780e3bd",
+    "world/rules/time_skip.py": "9273c8bf4fa6c6fc8ca0f115c534e77001f8bb148c3b257db7056e4163775ea0",
     "world/rules/title_view.py": "16fea08f0dcd76d16f1e76db98feefd6c53ca329cff2a29ca7cbdd28167b518e",
     "world/rules/titles/__init__.py": "762b43d83b88d7ec146ee013dafc60ee9c79bd0fa3ed737f8e4063c6dde41543",
     "world/rules/titles/awards.py": "afd05d152bffdda198e80a42d5226d54db93af6dd818dd6d797c9775178b9f2e",

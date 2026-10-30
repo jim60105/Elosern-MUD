@@ -161,6 +161,27 @@ class MapKnowledgeSeamTests(EvenniaTest):
         self.assertIn(expected, _node_ids(self.char1))
 
     @covers_requirement("map-knowledge::arrival-recording-happens-only-at-existing-successful-arrival-seams")
+    def test_wilderness_arrival_records_the_ground_radius_at_the_final_tick(self):
+        # The sight boundary is injected, so the assertion establishes the
+        # arrival seam's use of the committed cell radius without pinning the
+        # shipped rulebook numbers.
+        with patch("world.rules.sight.ground_radius_at", return_value=5) as radius:
+            self.gate.at_traverse(self.char1, self.east_gate)
+        radius.assert_called_once()
+        self.assertEqual(radius.call_args.args[0], self.entry_xy)
+        tick = get_world_clock().tick
+        visits = {visit.node_id: visit for visit in parse_knowledge(self.char1)}
+        visit = visits[f"wild:{self.wild}:{self.entry_xy[0]}:{self.entry_xy[1]}"]
+        self.assertEqual((visit.last_seen_tick, visit.sight), (tick, 5))
+
+        # A non-wilderness arrival keeps the schema-2 pair and adds no sight.
+        self.char1.location = self.room1
+        exit_obj = create_object(Exit, key="bare", location=self.room1, destination=self.room2)
+        exit_obj.at_traverse(self.char1, self.room2)
+        rooms = {visit.node_id: visit for visit in parse_knowledge(self.char1)}
+        self.assertEqual(rooms[f"room:{self.room2.id}"].sight, 0)
+
+    @covers_requirement("map-knowledge::arrival-recording-happens-only-at-existing-successful-arrival-seams")
     def test_west_return_records_grid_node(self):
         self.gate.at_traverse(self.char1, self.east_gate)
         self._exit("west").at_traverse(self.char1, self.char1.location)

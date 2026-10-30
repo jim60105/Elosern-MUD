@@ -156,6 +156,7 @@
         "world.rules.tests.test_map_district_lighting",
         "world.rules.tests.test_map_knowledge",
         "world.rules.tests.test_map_knowledge_integration",
+        "world.rules.tests.test_ground_reveal",
         "world.rules.tests.test_church_lamb_seal",
         "world.rules.tests.test_monster_ai_candidates",
         "world.rules.tests.test_monster_ai_activation",
@@ -197,7 +198,6 @@
         "world.rules.tests.test_npc_capabilities",
         "world.rules.tests.test_npc_services",
         "world.rules.tests.test_dialogue_services",
-
         "world.rules.tests.test_rules_observability",
         "world.rules.tests.test_service_binding_persistence",
         "world.rules.tests.test_service_gate",

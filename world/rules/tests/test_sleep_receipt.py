@@ -469,6 +469,39 @@ class SleepEntryLifecycleTests(EvenniaTest):
         self.assertEqual(receipt.revision, 0)
         self.assertEqual(receipt.settled_through_tick, before)
 
+    def test_sleep_receipt_failure_restores_ground_observation(self):
+        from typeclasses.rooms import TerrainRoom
+        from world.rules import time_skip as skip_module
+
+        terrain = create_object(TerrainRoom, key="synthetic-sleep-terrain")
+        terrain.ndb.active_coordinates = (12, 34)
+        self.player.location = terrain
+        entry = enter_sleep(self.player, mode=MODE_DURATION, seconds=600)
+        before = int(get_world_clock().tick)
+        real_write = skip_module.write_sleep_receipt
+
+        def fail_on_interval_result(entity, receipt):
+            if receipt.last_result is not None:
+                raise RuntimeError("synthetic receipt failure")
+            return real_write(entity, receipt)
+
+        with patch(
+            "world.rules.sight.ground_radius_at", return_value=4
+        ), patch.object(
+            skip_module,
+            "write_sleep_receipt",
+            side_effect=fail_on_interval_result,
+        ), self.assertRaises(RuntimeError):
+            continue_sleep(self.player, entry)
+        self.assertEqual(int(get_world_clock().tick), before)
+        # The outer owner registry restores the observation write too, so the
+        # clock, physiology and knowledge caches never keep a rolled-back fact.
+        self.assertIsNone(self.player.attributes.get("map_knowledge"))
+        self.assertIs(
+            read_fatigue_state(self.player).posture, SleepPosture.VOLUNTARY
+        )
+        self.assertEqual(read_sleep_receipt(self.player).revision, 0)
+
     def test_two_continuations_at_one_revision_commit_once(self):
         entry = enter_sleep(self.player)
         first = continue_sleep(

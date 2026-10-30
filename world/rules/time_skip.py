@@ -472,12 +472,19 @@ def advance_wait(
     elapsed = planned_seconds(entities, limit, tick=clock.tick)
     commits: list[Any] = []
     mental = replace(plan_for(entities), record=commits)
+    observation = _ground_observation_target(actor)
     previous_booking = None
     if practice_skill is not None:
         previous_booking = actor.db.practice_booking
         actor.db.practice_booking = practice_skill
     try:
-        events = clock.advance(elapsed, AdvanceSource.SKIP, entities, mental=mental)
+        events = clock.advance(
+            elapsed,
+            AdvanceSource.SKIP,
+            entities,
+            mental=mental,
+            ground_observer=observation if elapsed > 0 else None,
+        )
     except Exception:
         # Clock rollback already restored its entry snapshot, which contains
         # this declaration; restoring the previous booking here keeps a failed
@@ -504,6 +511,42 @@ def _sleep_member(actor: Any, member_id: int | None) -> Any:
     return authorize_member(
         resolve_commander(actor), member_id, PURPOSE_ACT, anchor=actor
     )
+
+
+def _ground_observation_target(actor: Any) -> tuple[Any, tuple[int, int]] | None:
+    """The knowledge owner and the acting body's wilderness cell, or ``None``.
+
+    The owner is always the authorized ``PlayerCharacter`` (the acting player,
+    or the commander behind a possessed companion), so a skip never writes
+    companion history. The observed cell is the acting body's own cell -- the
+    design's "actual observed cell" -- never a remote owner body's, so a
+    separated owner cannot shift the observation to a cell the acting body is
+    not standing on.
+    """
+    from typeclasses.characters import PlayerCharacter
+    from typeclasses.rooms import TerrainRoom
+
+    try:
+        commander = resolve_commander(actor)
+    except PartyScopeError:  # observability: ignore R2: a non-player body has no map-knowledge owner
+        return None
+    if not isinstance(commander, PlayerCharacter):
+        return None
+    location = getattr(actor, "location", None)
+    if not isinstance(location, TerrainRoom):
+        return None
+    coordinates = location.coordinates
+    if coordinates is None:
+        return None
+    x, y = coordinates
+    if (
+        isinstance(x, bool)
+        or isinstance(y, bool)
+        or not isinstance(x, int)
+        or not isinstance(y, int)
+    ):
+        return None
+    return commander, (x, y)
 
 
 def _handoff_candidates(member: Any) -> tuple[Any, ...]:
@@ -830,8 +873,14 @@ def continue_sleep(
     entities = present_party_scope(actor)
     commits: list[Any] = []
     mental = replace(plan_for(entities), record=commits)
+    observation = _ground_observation_target(actor)
     registry = build_advance_snapshot_registry(
-        clock, 0, AdvanceSource.SKIP, entities, mental_scope=entities
+        clock,
+        0,
+        AdvanceSource.SKIP,
+        entities,
+        mental_scope=entities,
+        ground_observer=observation,
     )
     tick_snapshot = _snapshot_clock_tick(clock)
     elapsed = 0
@@ -873,7 +922,11 @@ def continue_sleep(
                 entities, remaining, tick=int(clock.tick)
             )
             events = clock.advance(
-                elapsed, AdvanceSource.SKIP, entities, mental=mental
+                elapsed,
+                AdvanceSource.SKIP,
+                entities,
+                mental=mental,
+                ground_observer=observation if elapsed > 0 else None,
             )
             updated = read_sleep_receipt(member)
             summary = render_skip_summary(elapsed, list(events))
