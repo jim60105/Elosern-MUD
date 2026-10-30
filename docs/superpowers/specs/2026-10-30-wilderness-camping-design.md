@@ -4,6 +4,7 @@
 **Status:** Design approved through the blueprint, the Storybook prototype, and the dream opt-in decision on 2026-10-30. Written-spec review pending.
 **Implementation status:** Not implemented by this document.
 **Scope:** Sub-project 3 of the [wilderness travel mode blueprint](2026-10-30-wilderness-travel-mode-blueprint-design.md). It covers one camp decision for the whole party, a new sleep-until-dawn mode, dream opt-in at sleep entry, the campfire beat, and the forced-sleep handoff shortcut. The visual reference is the prototype in `docs/design/wilderness-travel/` (`CampCard.vue`, `CampfireCard.vue`).
+**Proposals:** One OpenSpec change, `wilderness-camping`, listed with its dependency order and implementation batches in section 8.
 
 ## 1. Goal and boundaries
 
@@ -128,3 +129,42 @@ One new scene illustration is needed: a night campfire in open country, with ano
   - The camp card: keys, default tile, the checkbox unchecked on every open, the refusal state.
   - The campfire beat: early finish and motion `off`.
 - **Browser tests:** camping from the leg panel at dusk through to the map at dawn, and the handoff shortcut.
+
+## 8. Proposed change set and implementation batches
+
+Sub-project 3 is proposed as one OpenSpec change, `wilderness-camping`, sized to one engineer-day of runnable vertical behaviour. It lives under `openspec/changes/wilderness-camping/` and is proposal-only until applied.
+
+| # | Change | Scope | Direct prerequisites | Sibling conflicts | Frontend visual |
+| --- | --- | --- | --- | --- | --- |
+| 1 | `wilderness-camping` | `until-dawn` retained deadline, entry-time dream consent and atomic camp settlement, `explore.camp_preview` and `explore.camp`, the `camp` text alias, the camp card, the campfire beat, the forced-sleep handoff shortcut | none of its own; its browser half consumes `wilderness-travel-leg-ui` (`openTravelCamp()`) and `wilderness-travel-log-ui` (`TravelEvent`, closed `camp_result` params) | `AppClient`, the exploration dispatcher and protocol fixtures, the travel store, shard manifests | **yes** — `CampCard.vue` and `CampfireCard.vue`; the handoff adds a row to the existing menu and changes no other visual |
+
+The single proposal touches a frontend visual surface in task 4 and in the browser evidence of task 5. Tasks 1 to 3 are rules, protocol and text-command work with no new visible element: `until-dawn`, the preview, the action result and the `camp` alias change what the card can show, not any surface of their own. Task 4 carries the Storybook stories for the normal, interrupted, dream, refused and motion-off states, and task 5 carries the browser assertions; appearance and copy are human-reviewed against the prototype there. The blueprint's 1451×790 and 2560×1440 screenshot review is layout evidence for sub-project 2 and is not a requirement of this change, which adds no layout.
+
+One change rather than several is deliberate. Camp, ordinary `sleep [all] <mode> dream` and the text `camp` alias share a single atomic entry seam (`commit_sleep_entry`), so splitting them would force a second orchestration convention for the same transaction. The preview, the action result, the card and the beat also share one result contract; a split would have to freeze that contract across changes that cannot be reviewed together.
+
+### 8.1 Dependency order
+
+```mermaid
+graph TD
+  leg[wilderness-travel-leg-ui] --> card[task 4: camp card and beat]
+  log[wilderness-travel-log-ui] --> card
+  dawn[task 1: dawn and shared planning] --> consent[task 2: atomic consent and settlement]
+  consent --> proto[task 3: protocol and text parity]
+  proto --> card
+  card --> evidence[task 5: end-to-end evidence]
+```
+
+Tasks 1 and 2 are rules-only and can run while sight and reveal rules are being applied. They are not file-disjoint from sub-project 1: `wilderness-ground-reveal` extends `world/rules/time_skip.py::continue_sleep`'s outer snapshot and clock advancement, the same module task 1.1 extends for dawn validation, and both register test modules in `.github/evennia-shards.json`. Task 3 adds the adapters, validators and text command; task 4 needs the leg and log seams as well as task 3; task 5 needs every behaviour above.
+
+### 8.2 Parallel implementation batch
+
+The change is a single writer on `.worktrees/wilderness-camping`; the waves below describe what may run concurrently with it, not workers inside it.
+
+| Wave | Work in parallel | Visual? | Serialized inside the wave |
+| --- | --- | --- | --- |
+| 1 | Tasks 1–2 rules, concurrent with sub-project 1 rules changes | no — rules only | `world/rules/time_skip.py`, `world/rules/sleep_receipt.py`, `.github/evennia-shards.json` |
+| 2 | Task 3 protocol, dispatch and text parity, concurrent with sibling client changes that touch different components | no — validators, adapters and the text command; no new surface | `exploration_actions.py`, the dispatcher injection seam, protocol parity fixtures |
+| 3 | Task 4 card and beat, after `wilderness-travel-leg-ui` and `wilderness-travel-log-ui` land | **yes** — camp card, campfire beat, handoff row | `AppClient` `choices` chain, the travel store, the leg opener destination |
+| 4 | Task 5 evidence and traceability | **yes** — the browser assertions drive the wave 3 surfaces | `.github/evennia-shards.json`, `.github/browser-shards.json` |
+
+The hard serialization surface is the shared rules and client files named above: one integration owner holds `time_skip.py`, the sleep receipt surface, `AppClient`, the travel store, the protocol fixtures and the two shard manifests for the duration of a wave, because `wilderness-ground-reveal` and the sibling `wilderness-travel-*` changes edit the same files. No change in this set re-specifies party selection, safety gates, interruptible continuation, dream generation or the travel map.
