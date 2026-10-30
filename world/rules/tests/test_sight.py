@@ -1,4 +1,6 @@
-"""Focused tests for the pure wilderness sight rules (wilderness-sight-rules).
+"""Data-contract test: the sight rulebook's schema keys and loader rejection boundaries are the contract under test; every assertion injects a synthetic policy and never pins shipped values or wording
+
+Focused tests for the pure wilderness sight rules (wilderness-sight-rules).
 
 Every case injects a synthetic policy, synthetic sources and fixed calendar
 hours, so no expected value comes from the shipped rulebook, from a coordinate

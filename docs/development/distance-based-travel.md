@@ -125,3 +125,40 @@ uv run --locked openspec validate integrate-fatigue-aware-traversal --strict
 隊伍耗時與實際城門／荒野路段秒數由 `test_party_time_settlement.py`、
 `test_party_follow_possession.py`、`world/maps/tests/test_city_movement_cost.py`
 與 `test_altoria_capital.py`／`test_settlement_reload.py` 的機制斷言（路段長度即端點距離、耗時與距離成正比）。
+
+## 視野（ground sight 與遠方目擊）
+
+荒野視野與移動耗時共用同一組區域判定，但**不是**同一張地形表：移動分類看步速，
+視野分類看遮蔽與展望。這個子系統只計算是什麼、看得到什麼，不儲存任何狀態，
+也不點亮任何分區。
+
+| Concern | Owner |
+| --- | --- |
+| 光相（時段）、視野半徑列、突出度加成、展望加成、暮光與聚落足跡係數、聚落匿名側影 | `world/rules/rulebook/sight.yaml` |
+| 純計算：`light_phase`、`ground_radius`、`in_ground_disc`、`distant_markers` | `world/rules/sight.py` |
+| 區域→視野地形列的委派、格距 | `world/maps/wilderness_provider.py::sight_terrain_class`、`WILDERNESS_KM_PER_CELL` |
+| 每格突出度階級 | `world/maps/elevation.py::prominence_tier` |
+| 分區地標、聚落錨點與荒野入口足跡 | `world/lore/map_districts.py`、`world/lore/anchors.py`、`WILDERNESS_ENTRY_REGISTRY` |
+
+- **光相**：`day`、`dusk`、`night`、`dawn`；邊界小時屬於「由它開始」的相位，
+  暮光與黎明讀 `twilight` 列。這些相位與 `clock.yaml` 的 daypart 錨點無關。
+- **地面半徑** `r = max(terrain + prominence_bonus[tier], vantage 或 0)`。林地與
+  深林的樹冠把突出度階級壓成 0（展望地標仍然有效），半徑上限為 8 格。
+- **視野圓盤**：`dx² + dy² ≤ (r + 0.5)²`；半徑 0 只涵蓋自己所在的格。沒有遮蔽線
+  計算，也不做山口判定。
+- **遠方目擊**：分區地標可宣告 `sight_km`／`light_km`／`silhouette_zh`；非隱藏的
+  聚落由足跡面積（佔用格數的平方根）乘上作者係數自動成為來源，夜間是光源。
+  隱藏地點（精靈村落、副本）永遠不是來源；來源必須在當前可見距離內、且在即時
+  視野外；站在樹冠地形上完全看不到側影。同一地點的來源合併成一個標記，白天與
+  夜間的可見距離取各自最大值，所以「只有白天範圍的地標」不會蓋掉聚落的夜間燈火。
+- **標記內容**固定為 `{bearing, distance_km, silhouette_zh, name}`：16 方位
+  （zh-TW，北起順時針，半區間平手取順時針側）、距離四捨五入到 5 公里（平手向上）、
+  當前相位的側影，以及**只有在該分區已為角色點亮時**才出現的地標名稱。來源格、
+  目標 ID 與分區鍵都不會序列化。
+- **只讀**：每次讀取都重算，不寫入地圖知識、不推進時鐘，也不會因為「看見」而點亮
+  任何分區；`sight` 的持久化屬後續的地面揭露變更。
+
+驗證：`uv run --locked python -m unittest world.rules.tests.test_sight`。這些測試
+一律注入合成政策、合成來源與固定時數，斷言機制（相位邊界、半徑組合與上限、
+圓盤邊緣、相位可見度、方位／距離平手、來源隱私與合併、政策拒絕），不綁定出貨
+數值或文案；側影與地標文案由人工依設計文件審閱。

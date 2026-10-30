@@ -333,6 +333,48 @@ def test_district_landmarks_are_guarded_references(workspace):
     assert _data(workspace, DISTRICTS)["districts"]["synthetic_district"]["landmark"]["cell"] == {"cell_x": 20, "cell_y": 20}
 
 
+def test_district_sight_fields_are_projected_and_survive_an_unrelated_save(workspace):
+    # An authored district may carry a vantage flag, distant ranges and the
+    # silhouette a far viewer sees. The editor must show them and preserve them
+    # through any unrelated field write; it never invents a value of its own.
+    path = workspace / DISTRICTS
+    data = _data(workspace, DISTRICTS)
+    data["districts"]["synthetic_district"].update(
+        {"vantage": True, "sight_km": 12, "light_km": 4.5, "silhouette_zh": "合成側影"}
+    )
+    path.write_text(fixture.yaml_text(data), encoding="utf-8")
+
+    editor = Editor(workspace)
+    row = next(
+        item for item in editor.state()["world"]["districts"]
+        if item["id"] == "synthetic_district"
+    )
+    assert (row["vantage"], row["sight_km"], row["light_km"], row["silhouette_zh"]) == (
+        True, 12, 4.5, "合成側影",
+    )
+
+    assert _send(
+        editor, "set_district_field", DISTRICTS,
+        {"district_id": "synthetic_district", "field": "district_name_zh", "value": "改名區"},
+    )[0] == 200
+    saved = _data(workspace, DISTRICTS)["districts"]["synthetic_district"]
+    assert saved["district_name_zh"] == "改名區"
+    assert (
+        saved["vantage"], saved["sight_km"], saved["light_km"], saved["silhouette_zh"]
+    ) == (True, 12, 4.5, "合成側影")
+
+
+def test_a_district_without_sight_fields_projects_their_absence(workspace):
+    editor = Editor(workspace)
+    row = next(
+        item for item in editor.state()["world"]["districts"]
+        if item["id"] == "synthetic_district"
+    )
+    assert (row["vantage"], row["sight_km"], row["light_km"], row["silhouette_zh"]) == (
+        False, None, None, None,
+    )
+
+
 def test_district_membership_and_creation(workspace):
     editor = Editor(workspace)
     status, _ = _send(editor, "set_district_field", DISTRICTS,
