@@ -12,11 +12,46 @@
 #     -t localhost/elosern-map-editor:dev .
 #
 # scripts/podman-map-editor.sh wraps both steps.
+#
+# SELinux note (Podman/Fedora/RHEL, enforcing): this file uses only cache
+# mounts, never `--mount=type=bind` on host files, so no relabel option is
+# needed. The runtime workspace is a `:Z`-labelled volume in the wrapper script.
+ARG UID=1001
+ARG VERSION=EDGE
+ARG RELEASE=0
+
+########################################
+# Download stage
+########################################
+FROM docker.io/library/debian:bookworm-slim AS download
+
+ARG TARGETARCH
+ARG TARGETVARIANT
+
+RUN --mount=type=cache,id=apt-$TARGETARCH$TARGETVARIANT,sharing=locked,target=/var/cache/apt \
+    --mount=type=cache,id=aptlists-$TARGETARCH$TARGETVARIANT,sharing=locked,target=/var/lib/apt/lists \
+    apt-get update && \
+    apt-get install --yes --no-install-recommends ca-certificates curl
+
+# dumb-init is PID 1 so the editor receives SIGINT/SIGTERM directly and any
+# child process it spawns is reaped. Arch-aware download with SHA256 check.
+RUN case "${TARGETARCH}" in \
+      amd64) DUMBINIT_ARCH="x86_64"; DUMBINIT_SHA256="e874b55f3279ca41415d290c512a7ba9d08f98041b28ae7c2acb19a545f1c4df" ;; \
+      arm64) DUMBINIT_ARCH="aarch64"; DUMBINIT_SHA256="b7d648f97154a99c539b63c55979cd29f005f88430fb383007fe3458340b795e" ;; \
+      *) echo "unsupported architecture: ${TARGETARCH}" && exit 1 ;; \
+    esac && \
+    curl --fail --location --silent --show-error \
+      "https://github.com/Yelp/dumb-init/releases/download/v1.2.5/dumb-init_1.2.5_${DUMBINIT_ARCH}" \
+      --output /dumb-init && \
+    echo "${DUMBINIT_SHA256}  /dumb-init" | sha256sum --check
 
 ########################################
 # Editor frontend build (Vue 3 + Vite)
 ########################################
 FROM docker.io/library/node:24-slim AS frontend
+
+ARG TARGETARCH
+ARG TARGETVARIANT
 
 WORKDIR /build
 
@@ -24,67 +59,123 @@ WORKDIR /build
 RUN npm install --global pnpm@12.5.1
 
 # Manifests first, so a source-only change reuses the locked dependency layer.
-COPY tools/map-editor/frontend/package.json tools/map-editor/frontend/pnpm-lock.yaml \
+COPY --link tools/map-editor/frontend/package.json tools/map-editor/frontend/pnpm-lock.yaml \
     tools/map-editor/frontend/pnpm-workspace.yaml tools/map-editor/frontend/
-COPY packages/map-view/ packages/map-view/
-RUN --mount=type=cache,id=pnpm-map-editor,target=/root/.local/share/pnpm/store \
+COPY --link packages/map-view/ packages/map-view/
+RUN --mount=type=cache,id=pnpm-map-editor-$TARGETARCH$TARGETVARIANT,sharing=locked,target=/root/.local/share/pnpm/store \
     pnpm --dir tools/map-editor/frontend install --frozen-lockfile
 
-COPY tools/map-editor/frontend/ tools/map-editor/frontend/
+COPY --link tools/map-editor/frontend/ tools/map-editor/frontend/
 # The editor build aliases exactly these three game-tree sources (design
 # tokens, font faces, ui-scale). Nothing else from the game application shell
 # enters the build or the image.
-COPY web/webclient-app/styles/ web/webclient-app/styles/
-COPY web/webclient-app/fonts/ web/webclient-app/fonts/
-COPY web/webclient-app/lib/ui_scale.js web/webclient-app/lib/ui_scale.js
-RUN pnpm --dir tools/map-editor/frontend run build
+COPY --link web/webclient-app/styles/ web/webclient-app/styles/
+COPY --link web/webclient-app/fonts/ web/webclient-app/fonts/
+COPY --link web/webclient-app/lib/ui_scale.js web/webclient-app/lib/ui_scale.js
+RUN pnpm --dir tools/map-editor/frontend run build && \
+    chmod -R a+rX /build/tools/map-editor/frontend/dist
 
 ########################################
-# Editor service runtime
+# Python environment build
 ########################################
-FROM docker.io/library/python:3.13-slim AS runtime
+FROM docker.io/library/python:3.13-slim AS builder
 
-ARG UID=1001
+ARG TARGETARCH
+ARG TARGETVARIANT
 
 COPY --from=ghcr.io/astral-sh/uv@sha256:606e70c71c852d03f611b1e56a195d08648507018a7057fab82c4974c4eae105 /uv /uvx /bin/
 
 ENV UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=0 \
     UV_PROJECT_ENVIRONMENT=/venv \
-    VIRTUAL_ENV=/venv \
-    PATH="/venv/bin:$PATH" \
-    PYTHONDONTWRITEBYTECODE=1 \
-    HOME=/tmp
+    VIRTUAL_ENV=/venv
 
 WORKDIR /build
 
-# The editor project's own lock, with the core's `generation` extra (NumPy and
-# SciPy) for explicit partition jobs. The root game project is never installed.
-COPY tools/map-editor/pyproject.toml tools/map-editor/uv.lock tools/map-editor/README.md \
+# Step 1 — locked third-party dependencies only. The editor project's own lock
+# with the core's `generation` extra (NumPy and SciPy) for explicit partition
+# jobs; elosern-map-core is a path dependency, so its source is required here
+# too. `--no-install-project` keeps this layer valid across editor source edits.
+# The root game project is never installed.
+COPY --link tools/map-editor/pyproject.toml tools/map-editor/uv.lock tools/map-editor/README.md \
     tools/map-editor/
-COPY packages/map-core/pyproject.toml packages/map-core/README.md packages/map-core/
-COPY packages/map-core/elosern_map_core/ packages/map-core/elosern_map_core/
-COPY tools/map-editor/elosern_map_editor/ tools/map-editor/elosern_map_editor/
-RUN --mount=type=cache,id=uv-map-editor,target=/root/.cache/uv \
-    uv sync --locked --no-dev --no-editable --project tools/map-editor
+COPY --link packages/map-core/pyproject.toml packages/map-core/README.md packages/map-core/
+COPY --link packages/map-core/elosern_map_core/ packages/map-core/elosern_map_core/
+RUN --mount=type=cache,id=uv-map-editor-$TARGETARCH$TARGETVARIANT,sharing=locked,target=/root/.cache/uv \
+    uv sync --locked --no-dev --no-install-project --no-editable --project tools/map-editor
 
+# Step 2 — the editor package itself, installed into /venv so the runtime image
+# needs no source tree.
+COPY --link tools/map-editor/elosern_map_editor/ tools/map-editor/elosern_map_editor/
+RUN --mount=type=cache,id=uv-map-editor-$TARGETARCH$TARGETVARIANT,sharing=locked,target=/root/.cache/uv \
+    uv sync --locked --no-dev --no-editable --project tools/map-editor && \
+    chmod -R a+rX /venv
+
+########################################
+# Final stage
+########################################
+FROM docker.io/library/python:3.13-slim AS final
+
+ARG UID
+
+RUN pip uninstall --yes pip setuptools wheel
+
+# Non-root, arbitrary-UID friendly: image paths are owned by the default UID
+# with GID 0 and world-readable, so an OpenShift arbitrary UID can run the
+# service. It never writes outside /workspace. The compose/script run passes the
+# host UID with --userns=keep-id so autosaved YAML stays owned by the invoking
+# user.
+RUN groupadd --gid "$UID" editor && \
+    useradd --uid "$UID" --gid editor --groups root \
+        --shell /usr/sbin/nologin --no-create-home editor
+
+RUN install -d -m 755 -o "$UID" -g 0 /app /app/frontend && \
+    install -d -m 775 -o "$UID" -g 0 /licenses
+
+COPY --link --chown=$UID:0 --chmod=775 --from=download /dumb-init /usr/local/bin/dumb-init
+COPY --link --chown=$UID:0 --from=builder /venv /venv
 # The built workspace, served by the service from --frontend-dist. Node and
 # pnpm stay in the build stage; the running editor needs neither.
-COPY --from=frontend /build/tools/map-editor/frontend/dist /app/frontend/dist
+COPY --link --chown=$UID:0 --from=frontend /build/tools/map-editor/frontend/dist /app/frontend/dist
 
-# Non-root, arbitrary-UID friendly: the compose/script run passes the host UID
-# with --userns=keep-id so autosaved YAML stays owned by the invoking user.
-RUN groupadd --gid "$UID" editor && \
-    useradd --uid "$UID" --gid editor --shell /usr/sbin/nologin --no-create-home editor && \
-    chmod -R a+rX /app /venv
+ENV PATH="/venv/bin:$PATH" \
+    VIRTUAL_ENV=/venv \
+    HOME=/tmp \
+    PYTHONDONTWRITEBYTECODE=1
 
 WORKDIR /workspace
+
 EXPOSE 8765
+
 USER $UID
+# Uvicorn shuts down gracefully on SIGTERM and SIGINT, but it re-raises the
+# captured signal after shutdown. SIGINT then lands on asyncio's runner
+# handler and prints a KeyboardInterrupt traceback (exit 130); SIGTERM ends
+# the process quietly. `podman stop` therefore maps to a clean stop.
+STOPSIGNAL SIGTERM
 
 # Only loopback binds are accepted, so the container must share the host network
 # namespace for http://127.0.0.1:8765 to be reachable (scripts/podman-map-editor.sh).
-ENTRYPOINT ["python", "-m", "elosern_map_editor", \
-            "--workspace", "/workspace", \
-            "--frontend-dist", "/app/frontend/dist"]
+#
+# The editor creates map directories at run time (os.mkdir with 0o777), so
+# umask 0002 keeps GID-0 group-write on what it creates. `exec` replaces the
+# shell, leaving python as dumb-init's direct child for signal forwarding.
+# Fixed arguments stay in ENTRYPOINT; "$@" carries CMD, so appending
+# `--port N` still overrides the default.
+ENTRYPOINT ["dumb-init", "--", "sh", "-c", \
+            "umask 0002 && exec python -m elosern_map_editor --workspace /workspace --frontend-dist /app/frontend/dist \"$@\"", \
+            "elosern-map-editor"]
 CMD ["--port", "8765"]
+
+ARG VERSION
+ARG RELEASE
+# Buildah does not invalidate LABEL cache entries for changed ARG values alone.
+RUN test -n "$VERSION" && test -n "$RELEASE"
+# Repository carries no LICENSE file (root Containerfile: UNLICENSED), so
+# /licenses stays empty rather than shipping a fabricated license text.
+LABEL org.opencontainers.image.title="Elosern Map Editor" \
+      org.opencontainers.image.description="Standalone local map editor service for the Elosern authored map documents." \
+      org.opencontainers.image.source="https://github.com/jim60105/Elosern-MUD" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${RELEASE}" \
+      org.opencontainers.image.licenses="UNLICENSED"
