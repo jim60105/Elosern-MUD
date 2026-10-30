@@ -166,7 +166,7 @@ Visibility by light phase:
 
 Elevation does not change sighting distance.
 
-A source produces a marker when its distance from the party is within its current visibility and its cell is not inside live sight. A marker carries:
+A source produces a marker when its distance from the party is within its current visibility and its cell is not inside live sight. A party standing on a woodland or deep-forest cell sees no markers, because the canopy hides the horizon. A marker carries:
 
 - one of 16 compass bearings, named in zh-TW (for example 北北東);
 - the distance rounded to the nearest 5 km;
@@ -268,7 +268,7 @@ Flags are computed by comparing state before and after the committed step. A ref
   - Shapes apply in order, and their validation rejects bad input.
   - Directional autocorrelation shows no periodic spikes, which guards against stripe patterns.
   - The artifact stays within its size budget, and the fingerprint check fails after a geography edit without regeneration.
-- **Sight:** boundary values for every terrain, light-phase boundary hour, prominence tier, and vantage landmark; the woodland override; the disc formula at radii 0 and 8.
+- **Sight:** boundary values for every terrain, light-phase boundary hour, prominence tier, and vantage landmark; the woodland override; the disc formula at radii 0 and 8; no distant-sighting markers from woodland cells.
 - **Reveal:**
   - `sight` only increases and updates after a wait at the same cell.
   - Reads write nothing, and rollback leaves the record unchanged.
