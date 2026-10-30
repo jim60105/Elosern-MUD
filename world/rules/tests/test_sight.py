@@ -22,6 +22,7 @@ from types import SimpleNamespace
 
 import yaml
 
+from tools.spec_traceability import covers_requirement
 from world.lore.anchors import AnchorKind
 from world.rules.sight import (
     BEARINGS,
@@ -117,6 +118,9 @@ def _hour(hour: int) -> SimpleNamespace:
 class LightPhaseTests(unittest.TestCase):
     """Phase boundaries are inclusive at their start hour."""
 
+    @covers_requirement(
+        "wilderness-sight::ground-sight-derives-from-phase-and-observer-inputs"
+    )
     def test_every_phase_boundary_belongs_to_the_phase_that_starts_at_it(self):
         policy = _synthetic_policy()
         cases = {
@@ -154,6 +158,9 @@ class LightPhaseTests(unittest.TestCase):
 class GroundRadiusTests(unittest.TestCase):
     """The radius composition, its override rule and its hard maximum."""
 
+    @covers_requirement(
+        "wilderness-sight::ground-sight-derives-from-phase-and-observer-inputs"
+    )
     def test_terrain_and_prominence_add_while_a_vantage_overrides(self):
         policy = _synthetic_policy()
         noon = _hour(12)
@@ -174,6 +181,9 @@ class GroundRadiusTests(unittest.TestCase):
             ground_radius(_hour(5), GroundSightInputs("ridge", 2, True), policy=policy), 4
         )
 
+    @covers_requirement(
+        "wilderness-sight::ground-sight-derives-from-phase-and-observer-inputs"
+    )
     def test_canopy_suppresses_the_tier_but_a_vantage_stays_eligible(self):
         policy = _synthetic_policy()
         noon = _hour(12)
@@ -186,6 +196,9 @@ class GroundRadiusTests(unittest.TestCase):
             ground_radius(noon, GroundSightInputs("canopy", 3, True), policy=policy), 6
         )
 
+    @covers_requirement(
+        "wilderness-sight::ground-sight-derives-from-phase-and-observer-inputs"
+    )
     def test_the_hard_maximum_is_reachable_but_never_exceeded(self):
         policy = _synthetic_policy(vantage_radius={"day": 8, "twilight": 5, "night": 2})
         self.assertEqual(
@@ -207,6 +220,9 @@ class GroundRadiusTests(unittest.TestCase):
                 with self.assertRaises((ValueError, SightRulebookError)):
                     ground_radius(_hour(12), inputs, policy=policy)
 
+    @covers_requirement(
+        "wilderness-sight::ground-sight-derives-from-phase-and-observer-inputs"
+    )
     def test_a_policy_change_moves_only_the_corresponding_results(self):
         baseline = _synthetic_policy()
         # One terrain radius changes, and only the day column of that row.
@@ -231,18 +247,27 @@ class GroundRadiusTests(unittest.TestCase):
 class GroundDiscTests(unittest.TestCase):
     """The one disc predicate, including its radius 0 and radius 8 edges."""
 
+    @covers_requirement(
+        "wilderness-sight::ground-sight-derives-from-phase-and-observer-inputs"
+    )
     def test_radius_zero_covers_only_the_observer_cell(self):
         self.assertTrue(in_ground_disc((5, 5), (5, 5), 0))
         for target in ((6, 5), (5, 6), (6, 6), (4, 5)):
             with self.subTest(target=target):
                 self.assertFalse(in_ground_disc((5, 5), target, 0))
 
+    @covers_requirement(
+        "wilderness-sight::ground-sight-derives-from-phase-and-observer-inputs"
+    )
     def test_the_edge_is_the_half_cell_inclusive_circle(self):
         # radius 1: (1,1) is sqrt(2) ~ 1.414 <= 1.5, (2,0) is 2 > 1.5.
         self.assertTrue(in_ground_disc((0, 0), (1, 1), 1))
         self.assertFalse(in_ground_disc((0, 0), (2, 0), 1))
         self.assertTrue(in_ground_disc((0, 0), (1, 0), 1))
 
+    @covers_requirement(
+        "wilderness-sight::ground-sight-derives-from-phase-and-observer-inputs"
+    )
     def test_radius_eight_reaches_the_diagonal_inside_and_rejects_outside(self):
         # 5-5-... diagonal: 6 * sqrt(2) = 8.49 <= 8.5, 7 sqrt(2) = 9.9 > 8.5.
         self.assertTrue(in_ground_disc((10, 10), (16, 16), 8))
@@ -254,6 +279,9 @@ class GroundDiscTests(unittest.TestCase):
 class BearingAndDistanceTests(unittest.TestCase):
     """Sixteen north-clockwise sectors and 5 km rounding, ties clockwise/up."""
 
+    @covers_requirement(
+        "wilderness-sight::distant-sightings-disclose-approximate-current-observations"
+    )
     def test_sectors_are_north_clockwise_and_wrap_at_north(self):
         origin = (0, 0)
         cases = {
@@ -272,6 +300,9 @@ class BearingAndDistanceTests(unittest.TestCase):
         self.assertEqual(len(BEARINGS), 16)
         self.assertEqual(len(set(BEARINGS)), 16)
 
+    @covers_requirement(
+        "wilderness-sight::distant-sightings-disclose-approximate-current-observations"
+    )
     def test_a_half_sector_tie_goes_clockwise(self):
         # 11.25, 33.75 ... are the sector edges; a tie rounds to the sector that
         # starts there, which is the clockwise neighbour.
@@ -292,6 +323,9 @@ class BearingAndDistanceTests(unittest.TestCase):
         self.assertEqual(bearing_label((0, 0), (5, 5)), "東北")
         self.assertEqual(bearing_label((0, 0), (5, 12)), "北北東")
 
+    @covers_requirement(
+        "wilderness-sight::distant-sightings-disclose-approximate-current-observations"
+    )
     def test_distances_round_to_the_nearest_five_with_ties_upward(self):
         cases = {0: 0, 2.4: 0, 2.5: 5, 4.9: 5, 7.5: 10, 12.4: 10, 12.5: 15}
         for distance, expected in cases.items():
@@ -330,6 +364,9 @@ def _markers(policy, sources, *, observer=(0, 0), hour=12, terrain="meadow", lit
 class DistantMarkerTests(unittest.TestCase):
     """Visibility by phase and range, canopy, privacy and merging."""
 
+    @covers_requirement(
+        "wilderness-sight::distant-sightings-disclose-approximate-current-observations"
+    )
     def test_visibility_follows_the_phase_and_the_authored_range(self):
         policy = _synthetic_policy()
         source = _marker_source(cell=(14, 0), sight_km=10.0, light_km=0.0)
@@ -345,6 +382,9 @@ class DistantMarkerTests(unittest.TestCase):
         self.assertEqual(_markers(policy, [lighting], hour=21)[0]["silhouette_zh"], "合成夜間側影")
         self.assertEqual(_markers(policy, [lighting], hour=12), ())
 
+    @covers_requirement(
+        "wilderness-sight::distant-sightings-disclose-approximate-current-observations"
+    )
     def test_a_source_inside_live_sight_or_under_a_canopy_never_marks(self):
         policy = _synthetic_policy()
         # meadow day radius 2 + tier 0: a cell 2 cells away is inside, 3 outside.
@@ -354,6 +394,9 @@ class DistantMarkerTests(unittest.TestCase):
         self.assertEqual(len(_markers(policy, [outside], hour=12)), 1)
         self.assertEqual(_markers(policy, [outside], hour=12, terrain="canopy"), ())
 
+    @covers_requirement(
+        "wilderness-sight::distant-sightings-disclose-approximate-current-observations"
+    )
     def test_a_hidden_place_is_never_a_source_in_any_phase(self):
         policy = _synthetic_policy()
         for kind in sorted(HIDDEN_ANCHOR_KINDS):
@@ -376,6 +419,9 @@ class DistantMarkerTests(unittest.TestCase):
             with self.subTest(hour=hour):
                 self.assertEqual(_markers(policy, landmark_sources([hidden_landmark]), hour=hour), ())
 
+    @covers_requirement(
+        "wilderness-sight::distant-sightings-disclose-approximate-current-observations"
+    )
     def test_a_landmark_without_an_authored_range_produces_no_marker(self):
         policy = _synthetic_policy()
         silent = LandmarkSighting(
@@ -401,6 +447,9 @@ class DistantMarkerTests(unittest.TestCase):
         with self.assertRaises(SightRulebookError):
             landmark_sources([anonymous])
 
+    @covers_requirement(
+        "wilderness-sight::distant-sightings-disclose-approximate-current-observations"
+    )
     def test_duplicate_sources_merge_without_losing_a_night_light(self):
         policy = _synthetic_policy()
         authored = _marker_source(cell=(8, 0), sight_km=30.0, light_km=0.0)
@@ -423,6 +472,9 @@ class DistantMarkerTests(unittest.TestCase):
         self.assertEqual(len(_markers(policy, merged, hour=12)), 1)
         self.assertEqual(len(_markers(policy, merged, hour=21)), 1)
 
+    @covers_requirement(
+        "wilderness-sight::distant-sightings-disclose-approximate-current-observations"
+    )
     def test_a_merged_unlit_place_keeps_the_anonymous_kind_silhouette(self):
         policy = _synthetic_policy()
         authored = _marker_source(
@@ -458,6 +510,9 @@ class DistantMarkerTests(unittest.TestCase):
         self.assertEqual(lit["silhouette_zh"], "合成聚落白日")
         self.assertEqual(lit["name"], "合成燈塔")
 
+    @covers_requirement(
+        "wilderness-sight::distant-sightings-disclose-approximate-current-observations"
+    )
     def test_merge_order_never_decides_conflicting_metadata(self):
         policy = _synthetic_policy()
         east = _marker_source(cell=(8, 0), district_key="t_east", sight_km=20.0)
@@ -472,6 +527,9 @@ class DistantMarkerTests(unittest.TestCase):
             _markers(policy, forward, hour=12), _markers(policy, backward, hour=12)
         )
 
+    @covers_requirement(
+        "wilderness-sight::distant-sightings-disclose-approximate-current-observations"
+    )
     def test_only_a_lit_district_adds_the_name_and_nothing_else_changes(self):
         policy = _synthetic_policy()
         source = _marker_source(cell=(10, 0))
@@ -486,6 +544,9 @@ class DistantMarkerTests(unittest.TestCase):
             {key: value for key, value in unlit[0].items() if key != "name"},
         )
 
+    @covers_requirement(
+        "wilderness-sight::distant-sightings-disclose-approximate-current-observations"
+    )
     def test_unlit_settlement_uses_kind_silhouette_not_identity(self):
         policy = _synthetic_policy()
         # The identifying text a location carries: its anchor identity. None of
@@ -506,6 +567,9 @@ class DistantMarkerTests(unittest.TestCase):
         self.assertNotIn(sentinel_key, rendered)
         self.assertNotIn("capital", rendered)
 
+    @covers_requirement(
+        "wilderness-sight::distant-sightings-disclose-approximate-current-observations"
+    )
     def test_the_wire_marker_carries_no_source_cell_identity_or_district_key(self):
         policy = _synthetic_policy()
         source = _marker_source(cell=(10, 0))
@@ -518,6 +582,9 @@ class DistantMarkerTests(unittest.TestCase):
             with self.subTest(value=value):
                 self.assertNotIn(str(value), rendered)
 
+    @covers_requirement(
+        "wilderness-sight::distant-sightings-disclose-approximate-current-observations"
+    )
     def test_markers_are_recomputed_and_never_write_or_light_anything(self):
         policy = _synthetic_policy()
         sources = (_marker_source(cell=(10, 0)), _marker_source(cell=(-10, 0), source_key="landmark:t_west"))
@@ -849,6 +916,9 @@ class PolicyValidationTests(unittest.TestCase):
         document["canopy_terrain"] = ["t_absent_row"]
         self.assertIn("canopy rows without a terrain table", _rejected(self, document))
 
+    @covers_requirement(
+        "wilderness-sight::distant-sightings-disclose-approximate-current-observations"
+    )
     def test_missing_blank_and_over_bound_silhouettes_are_rejected(self):
         missing = _document()
         missing["settlement_silhouettes"] = {}
