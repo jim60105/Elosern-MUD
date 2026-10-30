@@ -45,6 +45,8 @@ IDENTIFIER_PATTERN = r"^[a-z][a-z0-9_]*$"
 COMPASS_DIRECTIONS = ("n", "ne", "e", "se", "s", "sw", "w", "nw")
 LOCATION_KINDS = ("capital", "elven_village", "dungeon")
 DISTRICT_KINDS = ("voronoi", "region")
+ELEVATION_SHAPES = ("circle", "polygon")
+ELEVATION_OPS = ("raise", "lower", "flatten", "no_prominence")
 QUALIFIED_REF_DOMAINS = (
     "settlement_node",
     "interior_room",
@@ -61,6 +63,8 @@ def _int(*, required: bool = True, min_value: int | None = None, **extra: Any) -
     spec: dict[str, Any] = {"type": "int", "required": required}
     if min_value is not None:
         spec["min"] = min_value
+    if "max_value" in extra:
+        spec["max"] = extra.pop("max_value")
     spec.update(extra)
     return spec
 
@@ -272,6 +276,94 @@ _RIDGE = _mapping(
     },
 )
 
+_ELEVATION_SHAPE = _mapping(
+    {
+        "shape": _enum(ELEVATION_SHAPES),
+        "op": _enum(ELEVATION_OPS),
+        "centre": _cell(required=False),
+        "radius": _int(min_value=1, required=False),
+        "vertices": _list(_cell(), min_items=3, max_items=1000, required=False),
+        "amount": _int(min_value=1, max_value=15, required=False),
+        "target_band": _int(min_value=0, max_value=15, required=False),
+        "feather": _int(min_value=1, required=False),
+        "note": _str(required=False),
+    },
+    rules=[
+        {
+            "rule": "required_when_equals",
+            "field": "centre",
+            "other": "shape",
+            "value": "circle",
+        },
+        {
+            "rule": "required_when_equals",
+            "field": "radius",
+            "other": "shape",
+            "value": "circle",
+        },
+        {
+            "rule": "forbidden_when_equals",
+            "field": "vertices",
+            "other": "shape",
+            "value": "circle",
+        },
+        {
+            "rule": "required_when_equals",
+            "field": "vertices",
+            "other": "shape",
+            "value": "polygon",
+        },
+        {
+            "rule": "forbidden_when_equals",
+            "field": "centre",
+            "other": "shape",
+            "value": "polygon",
+        },
+        {
+            "rule": "forbidden_when_equals",
+            "field": "radius",
+            "other": "shape",
+            "value": "polygon",
+        },
+        {
+            "rule": "required_when_in",
+            "field": "amount",
+            "other": "op",
+            "values": ["raise", "lower"],
+        },
+        {
+            "rule": "forbidden_when_in",
+            "field": "amount",
+            "other": "op",
+            "values": ["flatten", "no_prominence"],
+        },
+        {
+            "rule": "required_when_equals",
+            "field": "target_band",
+            "other": "op",
+            "value": "flatten",
+        },
+        {
+            "rule": "forbidden_when_in",
+            "field": "target_band",
+            "other": "op",
+            "values": ["raise", "lower", "no_prominence"],
+        },
+        {
+            "rule": "required_when_in",
+            "field": "feather",
+            "other": "op",
+            "values": ["raise", "lower", "flatten"],
+        },
+        {
+            "rule": "forbidden_when_equals",
+            "field": "feather",
+            "other": "op",
+            "value": "no_prominence",
+        },
+    ],
+)
+
 _WATERWAY = _mapping(
     {
         "route": _list(_cell(), min_items=2),
@@ -389,6 +481,7 @@ _DOCUMENT_KINDS: dict[str, dict[str, Any]] = {
                 {}, key_pattern=IDENTIFIER_PATTERN, items=_HARBOR_SITE
             ),
             "terrain": _TERRAIN,
+            "elevation_shapes": _list(_ELEVATION_SHAPE, max_items=1000, required=False),
         },
         "rules": [],
         "document_rules": [

@@ -333,6 +333,9 @@ def test_an_interior_artwork_key_must_be_an_identifier():
 def test_schema_is_machine_readable_and_mutation_isolated():
     first = schema()
     assert first["version"] == 1
+    continent_fields = first["document_kinds"]["continent"]["fields"]
+    assert "elevation_shapes" in continent_fields
+    assert continent_fields["elevation_shapes"]["required"] is False
     assert set(first["document_kinds"]) == {
         "continent",
         "locations",
@@ -345,18 +348,94 @@ def test_schema_is_machine_readable_and_mutation_isolated():
         "fields"
     ]
     assert {
-        "prototype_parent",
-        "anchor_key",
-        "key",
-        "desc",
-        "typeclass",
-        "scene_archetype",
         "x_m",
         "y_m",
+        "prototype_parent",
+        "key",
+        "desc",
+        "anchor_key",
+        "typeclass",
+        "scene_archetype",
     } <= set(node_fields)
-    first["document_kinds"]["settlement"]["fields"]["nodes"]["items"]["fields"][
-        "mystery"
-    ] = {"type": "str"}
-    assert "mystery" not in schema()["document_kinds"]["settlement"]["fields"][
-        "nodes"
-    ]["items"]["fields"]
+    first["document_kinds"]["continent"]["fields"]["version"]["min"] = 999
+    assert schema()["document_kinds"]["continent"]["fields"]["version"].get("min") != 999
+
+
+def test_continent_elevation_shapes_ordered_round_trip():
+    data = fixtures.continent_data()
+    data["elevation_shapes"] = [
+        {
+            "shape": "circle",
+            "op": "raise",
+            "centre": {"cell_x": 100, "cell_y": 150},
+            "radius": 25,
+            "amount": 7,
+            "feather": 5,
+            "note": "A volcanic dome",
+        },
+        {
+            "shape": "polygon",
+            "op": "flatten",
+            "vertices": [
+                {"cell_x": 300, "cell_y": 300},
+                {"cell_x": 400, "cell_y": 300},
+                {"cell_x": 350, "cell_y": 400},
+            ],
+            "target_band": 4,
+            "feather": 8,
+        },
+        {
+            "shape": "circle",
+            "op": "no_prominence",
+            "centre": {"cell_x": 500, "cell_y": 500},
+            "radius": 30,
+        },
+    ]
+    text = fixtures.yaml_text(data)
+    parsed = parse_document("content/maps/continent.yaml", text)
+    assert len(parsed.document.elevation_shapes) == 3
+    assert parsed.document.elevation_shapes[0].shape == "circle"
+    assert parsed.document.elevation_shapes[0].amount == 7
+    assert parsed.document.elevation_shapes[1].shape == "polygon"
+    assert parsed.document.elevation_shapes[1].target_band == 4
+    assert parsed.document.elevation_shapes[2].op == "no_prominence"
+
+    emitted = serialize_document(parsed.document, parsed.round_trip)
+    reparsed = parse_document("content/maps/continent.yaml", emitted)
+    assert len(reparsed.document.elevation_shapes) == 3
+    assert reparsed.document.elevation_shapes[0].centre == (100, 150)
+    assert reparsed.document.elevation_shapes[1].vertices == ((300, 300), (400, 300), (350, 400))
+    assert reparsed.document.elevation_shapes[2].feather is None
+
+
+def test_continent_elevation_shapes_omission_stays_omitted():
+    data = fixtures.continent_data()
+    assert "elevation_shapes" not in data
+    text = fixtures.yaml_text(data)
+    parsed = parse_document("content/maps/continent.yaml", text)
+    assert parsed.document.elevation_shapes == ()
+    emitted = serialize_document(parsed.document, parsed.round_trip)
+    assert "elevation_shapes" not in emitted
+
+
+@pytest.mark.parametrize(
+    "mutator",
+    [
+        lambda d: d["elevation_shapes"][0].__setitem__("amount", 16),
+        lambda d: d["elevation_shapes"][0].__setitem__("amount", 0),
+        lambda d: d["elevation_shapes"][0].__setitem__("amount", True),
+        lambda d: d["elevation_shapes"][0].__setitem__("feather", 0),
+        lambda d: d["elevation_shapes"][0].__setitem__("target_band", 5),  # forbidden for raise
+        lambda d: d["elevation_shapes"][0].__setitem__("vertices", [{"cell_x": 1, "cell_y": 1}]),  # forbidden for circle
+        lambda d: d["elevation_shapes"][0].__delitem__("centre"),  # required for circle
+        lambda d: d["elevation_shapes"][0].__setitem__("unknown_prop", 123),
+    ],
+)
+def test_continent_elevation_shapes_schema_rejections(mutator):
+    data = fixtures.continent_data()
+    data["elevation_shapes"] = [
+        {"shape": "circle", "op": "raise", "centre": {"cell_x": 100, "cell_y": 100}, "radius": 10, "amount": 5, "feather": 2}
+    ]
+    mutator(data)
+    with pytest.raises(AuthoringError):
+        parse_document("content/maps/continent.yaml", fixtures.yaml_text(data))

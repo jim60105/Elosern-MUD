@@ -45,7 +45,7 @@ from .documents import (
     SettlementDocument,
     WildernessEntryGeometry,
 )
-from .geometry import is_within_frame
+from .geometry import is_simple_polygon, is_within_frame
 from .sources import SourceDocument, fingerprint_text, is_world_source
 from .sparse import (
     SparseGraphError,
@@ -139,6 +139,92 @@ def _entry_geometries(
             continue
         geometries[settlement_id] = entry.geometry(location_cell)
     return geometries
+
+
+def diagnose_elevation_shapes(continent: ContinentDocument) -> list[Diagnostic]:
+    """Validate elevation shape geometries, footprint in-frame bounds and polygon simplicity."""
+    diagnostics: list[Diagnostic] = []
+    frame = continent.terrain.frame_cells
+    for idx, shape_decl in enumerate(continent.elevation_shapes):
+        field_prefix = f"elevation_shapes[{idx}]"
+        feather = shape_decl.feather or 0
+
+        if shape_decl.shape == "circle":
+            if shape_decl.centre is None or shape_decl.radius is None:
+                continue
+            cx, cy = shape_decl.centre
+            r = shape_decl.radius
+            # Center must be within frame
+            if not is_within_frame(frame, (cx, cy)):
+                diagnostics.append(
+                    _diagnostic(
+                        "elevation_shape_outside_frame",
+                        STRUCTURE,
+                        f"elevation shape {idx} centre ({cx}, {cy}) is outside frame [0, {frame})",
+                        document=continent,
+                        field_path=f"{field_prefix}.centre",
+                    )
+                )
+            # Footprint including feather must be within frame
+            min_x, max_x = cx - r - feather, cx + r + feather
+            min_y, max_y = cy - r - feather, cy + r + feather
+            if min_x < 0 or max_x >= frame or min_y < 0 or max_y >= frame:
+                diagnostics.append(
+                    _diagnostic(
+                        "elevation_shape_outside_frame",
+                        STRUCTURE,
+                        f"elevation shape {idx} footprint ([{min_x}, {max_x}], [{min_y}, {max_y}]) exceeds frame [0, {frame})",
+                        document=continent,
+                        field_path=field_prefix,
+                    )
+                )
+        elif shape_decl.shape == "polygon":
+            vertices = shape_decl.vertices
+            # Check polygon simplicity
+            ok, reason = is_simple_polygon(vertices)
+            if not ok:
+                code = (
+                    "degenerate_polygon"
+                    if ("degenerate" in reason or "duplicate" in reason or "vertices" in reason)
+                    else "self_intersecting_polygon"
+                )
+                diagnostics.append(
+                    _diagnostic(
+                        code,
+                        STRUCTURE,
+                        f"elevation shape {idx} polygon is invalid: {reason}",
+                        document=continent,
+                        field_path=f"{field_prefix}.vertices",
+                    )
+                )
+            # Check all vertices are in-frame and footprint including feather is in-frame
+            for v_idx, v in enumerate(vertices):
+                if not is_within_frame(frame, v):
+                    diagnostics.append(
+                        _diagnostic(
+                            "elevation_shape_outside_frame",
+                            STRUCTURE,
+                            f"elevation shape {idx} vertex {v_idx} ({v[0]}, {v[1]}) is outside frame [0, {frame})",
+                            document=continent,
+                            field_path=f"{field_prefix}.vertices[{v_idx}]",
+                        )
+                    )
+            if vertices:
+                min_x = min(v[0] for v in vertices) - feather
+                max_x = max(v[0] for v in vertices) + feather
+                min_y = min(v[1] for v in vertices) - feather
+                max_y = max(v[1] for v in vertices) + feather
+                if min_x < 0 or max_x >= frame or min_y < 0 or max_y >= frame:
+                    diagnostics.append(
+                        _diagnostic(
+                            "elevation_shape_outside_frame",
+                            STRUCTURE,
+                            f"elevation shape {idx} polygon footprint ([{min_x}, {max_x}], [{min_y}, {max_y}]) exceeds frame [0, {frame})",
+                            document=continent,
+                            field_path=field_prefix,
+                        )
+                    )
+    return diagnostics
 
 
 def diagnose_settlement_structure(
@@ -896,6 +982,8 @@ def _structural_diagnostics(
                 field_path="regions",
             )
         )
+
+    diagnostics.extend(diagnose_elevation_shapes(continent))
 
     for settlement_id, settlement in settlements.items():
         node_ids = set(settlement.nodes)
@@ -1676,6 +1764,7 @@ __all__ = [
     "RuntimeMapSnapshot",
     "build_settlement_graph",
     "compile_runtime",
+    "diagnose_elevation_shapes",
     "diagnose_interior_rules",
     "diagnose_interior_structure",
     "diagnose_settlement_rules",

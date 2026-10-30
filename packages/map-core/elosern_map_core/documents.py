@@ -209,6 +209,19 @@ class WaterwayDeclaration:
 
 
 @dataclass(frozen=True, slots=True)
+class ElevationShapeDeclaration:
+    shape: str
+    op: str
+    centre: Cell | None = None
+    radius: int | None = None
+    vertices: tuple[Cell, ...] = ()
+    amount: int | None = None
+    target_band: int | None = None
+    feather: int | None = None
+    note: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class TerrainDeclaration:
     frame_cells: int
     cell_size_km: int
@@ -353,6 +366,7 @@ class ContinentDocument(AuthoringDocument):
     regions: Mapping[str, RegionDeclaration] = field(init=False, repr=False)
     harbor_sites: Mapping[str, HarborSiteDeclaration] = field(init=False, repr=False)
     terrain: TerrainDeclaration = field(init=False, repr=False)
+    elevation_shapes: tuple[ElevationShapeDeclaration, ...] = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         super().__post_init__()
@@ -412,9 +426,29 @@ class ContinentDocument(AuthoringDocument):
             waterways=MappingProxyType(waterways),
             border_river_key=str(terrain_data["border_river_key"]),
         )
+        raw_shapes = data.get("elevation_shapes")
+        elevation_shapes = (
+            tuple(
+                ElevationShapeDeclaration(
+                    shape=str(item["shape"]),
+                    op=str(item["op"]),
+                    centre=_cell(item["centre"]) if item.get("centre") is not None else None,
+                    radius=int(item["radius"]) if item.get("radius") is not None else None,
+                    vertices=tuple(_cell(v) for v in item.get("vertices", ())),
+                    amount=int(item["amount"]) if item.get("amount") is not None else None,
+                    target_band=int(item["target_band"]) if item.get("target_band") is not None else None,
+                    feather=int(item["feather"]) if item.get("feather") is not None else None,
+                    note=str(item["note"]) if item.get("note") is not None else None,
+                )
+                for item in raw_shapes
+            )
+            if raw_shapes is not None
+            else ()
+        )
         object.__setattr__(self, "regions", MappingProxyType(regions))
         object.__setattr__(self, "harbor_sites", MappingProxyType(harbor_sites))
         object.__setattr__(self, "terrain", terrain)
+        object.__setattr__(self, "elevation_shapes", elevation_shapes)
 
 
 @dataclass(frozen=True, slots=True)
@@ -690,6 +724,7 @@ __all__ = [
     "ContinentDocument",
     "DistrictDeclaration",
     "DistrictsDocument",
+    "ElevationShapeDeclaration",
     "ExteriorDeclaration",
     "GateDeclaration",
     "HarborSiteDeclaration",

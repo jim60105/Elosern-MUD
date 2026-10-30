@@ -48,7 +48,7 @@ Every coordinate is explicitly named for its domain:
 ### continent
 
 `frame_cells`, `cell_size_km`, `mainland_boundary_km[]`, `regions{}`,
-`harbor_sites{}`, `terrain`.
+`harbor_sites{}`, `terrain`, optional `elevation_shapes[]`.
 
 - `mainland_boundary_km`: `{east_km, north_km}` vertices, at least three.
 - `regions.<id>`: `display_name_zh`, `nation_key` (nullable), `terrain_flavor_zh[]`,
@@ -61,6 +61,16 @@ Every coordinate is explicitly named for its domain:
   `waterways{}` (`{route[], fords[]}` per waterway), `border_river_key`.
   Terrain geometry is validated by the core `TerrainDefinition`; inconsistent
   inputs are a saveable `terrain_inconsistent` diagnostic.
+- `elevation_shapes`: optional ordered list of elevation shape operations.
+  Absent means empty and remains absent when serialized; an explicit list preserves order.
+  - `shape`: `circle` (with `centre: {cell_x, cell_y}` and positive integer `radius`)
+    or `polygon` (with `vertices: [{cell_x, cell_y}, ...]` of at least 3 distinct unclosed vertices).
+    Coordinates are north-positive cell indices.
+  - `op`: `raise` or `lower` (requires `amount: 1..15` and positive integer `feather`);
+    `flatten` (requires `target_band: 0..15` and positive integer `feather`);
+    or `no_prominence` (forbids `amount`, `target_band`, and `feather`).
+  - `note`: optional string.
+  - Candidate validation rejects unknown fields, booleans as integers, degenerate/self-intersecting polygons, and footprints including feathers outside `[0, frame_cells)`.
 
 ### locations
 
