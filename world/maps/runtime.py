@@ -103,6 +103,7 @@ class MapWorld:
     #: external result and partition freshness were both accepted.
     snapshot: RuntimeMapSnapshot | None
     partition: PartitionFreshness | None
+    elevation: Any | None = None
 
     @property
     def identity(self) -> str:
@@ -116,6 +117,9 @@ class MapWorld:
             self.interiors.identity,
         ):
             digest.update(part.encode("utf-8"))
+            digest.update(b"\0")
+        if self.elevation is not None:
+            digest.update(self.elevation.fingerprint.encode("utf-8"))
             digest.update(b"\0")
         return digest.hexdigest()
 
@@ -141,6 +145,7 @@ class ComposedWorld:
             interiors=self.interiors,
             snapshot=None,
             partition=None,
+            elevation=None,
         )
 
 
@@ -258,12 +263,13 @@ def _uninstall() -> None:
     """Forget the published world in every map reader (the not-loaded state)."""
 
     from world.lore import map_districts
-    from world.maps import geography, interiors, map_data
+    from world.maps import elevation, geography, interiors, map_data
 
     geography._PUBLISHED = None
     map_data._PUBLISHED = None
     map_districts._PUBLISHED = None
     interiors._PUBLISHED = None
+    elevation._install(None)
     global _BUNDLE
     _BUNDLE = None
 
@@ -407,6 +413,21 @@ def load_candidate(root: str | Path | None = None) -> MapWorld:
         snapshot = compile_runtime(world, external, freshness)
     except RuntimeRejection as error:
         raise MapWorldError(item.message for item in error.diagnostics) from error
+
+    from elosern_map_core.elevation_codec import ElevationDocumentError
+    from world.maps import elevation
+
+    try:
+        elevation_runtime = elevation.load_elevation(
+            root, expected_frame_cells=world.continent.terrain.frame_cells
+        )
+        continent_fp = world.fingerprints.get("content/maps/continent.yaml", "")
+        elev_freshness = elevation.freshness(elevation_runtime.metadata, continent_fp)
+        if not elev_freshness.current:
+            raise MapWorldError([f"elevation artifact is not current: {elev_freshness.reason}"])
+    except ElevationDocumentError as error:
+        raise MapWorldError([f"elevation artifact rejected: {error}"]) from error
+
     return MapWorld(
         geography=composed.geography,
         settlements=composed.settlements,
@@ -414,6 +435,7 @@ def load_candidate(root: str | Path | None = None) -> MapWorld:
         interiors=composed.interiors,
         snapshot=snapshot,
         partition=freshness,
+        elevation=elevation_runtime,
     )
 
 
@@ -428,12 +450,13 @@ def _install(world: MapWorld) -> None:
     """Point every map reader at one bundle (the single publication step)."""
 
     from world.lore import map_districts
-    from world.maps import geography, interiors, map_data
+    from world.maps import elevation, geography, interiors, map_data
 
     geography._install(world.geography)
     map_data._install(world.settlements)
     map_districts._install(world.districts)
     interiors._install(world.interiors)
+    elevation._install(world.elevation)
     global _BUNDLE
     _BUNDLE = world
 

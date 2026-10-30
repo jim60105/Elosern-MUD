@@ -60,6 +60,7 @@ def _keyword_names(tree: ast.Module) -> set[str]:
 class MapSourceOwnershipContract(unittest.TestCase):
     def test_no_module_authors_a_second_map_publication_authority(self):
         trees = _modules(
+            "world/maps/elevation.py",
             "world/maps/geography.py",
             "world/maps/map_data.py",
             "world/lore/map_districts.py",

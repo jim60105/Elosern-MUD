@@ -38,6 +38,12 @@ from elosern_map_core.partition_codec import (
     partition_freshness,
     read_partition_metadata,
 )
+from elosern_map_core.elevation_codec import (
+    ElevationDocumentError,
+    elevation_freshness,
+    elevation_source_signature,
+    verify_elevation_data_integrity,
+)
 from elosern_map_core.reference_context import (
     ReferenceContextError,
     check_workspace_freshness,
@@ -46,6 +52,7 @@ from elosern_map_core.reference_context import (
 from elosern_map_core.terrain import is_land_cell, is_within_frame
 
 PARTITION_PATH = "world/maps/data/district_partition.json"
+ELEVATION_PATH = "content/maps/wilderness_elevation.json"
 REFERENCE_PATH = "content/map-reference-context.json"
 MIN_VORONOI_SPACING_KM = 100  # mirrors world/lore/map_districts.py
 
@@ -80,6 +87,23 @@ def _partition(root: Path, world):
         return None, f"unreadable: {error}"
     freshness = partition_freshness(metadata, world.partition_signature)
     return freshness, "current" if freshness.current else "stale"
+
+
+def _elevation(root: Path, world):
+    path = root / ELEVATION_PATH
+    if not path.is_file():
+        return None, "missing"
+    try:
+        metadata = verify_elevation_data_integrity(
+            path.read_text(encoding="utf-8"),
+            expected_frame_cells=world.continent.terrain.frame_cells,
+        )
+    except (ElevationDocumentError, ValueError) as error:
+        return None, f"unreadable: {error}"
+    continent_fp = world.fingerprints.get("content/maps/continent.yaml", "")
+    expected_sig = elevation_source_signature(continent_fp)
+    freshness = elevation_freshness(metadata, expected_sig)
+    return freshness, "current" if freshness.current else f"stale ({freshness.reason})"
 
 
 def game_rules(world, context) -> tuple[list[str], list[str]]:
@@ -175,6 +199,7 @@ def main(argv: list[str]) -> int:
         return 2
 
     freshness, partition_state = _partition(root, world)
+    elev_freshness, elevation_state = _elevation(root, world)
     diagnostics = diagnose_world(world, partition_freshness=freshness)
     context, context_state = _load_reference(root)
     problems, warnings = game_rules(world, context)
@@ -195,11 +220,17 @@ def main(argv: list[str]) -> int:
             "  regenerate: `uv run --locked --project tools/map-editor python "
             ".agents/skills/map-data-authoring/scripts/regenerate_partition.py` (or the editor's 分區 chip)"
         )
+    print(f"wilderness elevation: {elevation_state}")
+    if elevation_state != "current":
+        print(
+            "  regenerate: `uv run --locked --project tools/map-editor python "
+            ".agents/skills/map-data-authoring/scripts/regenerate_elevation.py`"
+        )
     print(f"reference context: {context_state}")
     if context_state != "current":
         print("  regenerate: `uv run --locked python -m tools.map_reference_context` (deletions stay refused until current)")
     # Advisory warnings are reported above but never make the world unready.
-    blocked = bool(blocking(diagnostics) or problems or partition_state != "current")
+    blocked = bool(blocking(diagnostics) or problems or partition_state != "current" or elevation_state != "current")
     print("RESULT:", "not game-ready" if blocked else "game-ready as far as static checks can tell")
     return 1 if blocked else 0
 
