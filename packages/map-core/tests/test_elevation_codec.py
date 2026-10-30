@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import base64
+import contextlib
+import io
 import json
 import math
 import os
@@ -203,30 +205,6 @@ class ElevationCodecTests(unittest.TestCase):
 
     @covers_requirement(
         "wilderness-elevation-runtime::"
-        "elevation-artifacts-are-bounded-and-source-identified"
-    )
-    def test_prior_bytes_survive_oversize_failure(self):
-        """When artifact generation fails the size budget, an existing target file is not overwritten."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            target = Path(tmpdir) / "wilderness_elevation.json"
-            prior_bytes = b'{"prior": "valid_output_bytes"}\n'
-            target.write_bytes(prior_bytes)
-
-            frame = 64
-            bands = [[0] * frame for _ in range(frame)]
-            tiers = [[0] * frame for _ in range(frame)]
-
-            with mock.patch("elosern_map_core.elevation_codec.MAX_ELEVATION_BYTES", 50):
-                with self.assertRaises(ElevationBudgetExceededError):
-                    # Simulating regeneration workflow: encode raises budget error before atomic replacement
-                    text = encode_elevation_artifact(bands, tiers, frame_cells=frame, continent_fingerprint="f" * 64)
-                    target.write_text(text, encoding="utf-8")
-
-            # Target content must remain byte-identical to prior bytes
-            self.assertEqual(target.read_bytes(), prior_bytes)
-
-    @covers_requirement(
-        "wilderness-elevation-runtime::"
         "runtime-elevation-rejects-stale-or-corrupt-artifacts"
     )
     def test_integrity_checks_detect_reordered_or_missing_tiles(self):
@@ -306,6 +284,123 @@ class ElevationCodecTests(unittest.TestCase):
         stale_algo = elevation_freshness(metadata, sig, algorithm_version=99)
         self.assertFalse(stale_algo.current)
         self.assertIn("algorithm version", stale_algo.reason)
+
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_AUTHORING_SCRIPTS = _REPO_ROOT / ".agents" / "skills" / "map-data-authoring" / "scripts"
+
+
+def _publisher_module():
+    """Import the real regeneration entry point from the authoring skill."""
+    if str(_AUTHORING_SCRIPTS) not in sys.path:
+        sys.path.insert(0, str(_AUTHORING_SCRIPTS))
+    import regenerate_elevation
+
+    return regenerate_elevation
+
+
+def _synthetic_workspace(root: Path) -> None:
+    """Write a complete synthetic authored world under ``root``."""
+    import authoring_fixtures as fixtures
+
+    continent = fixtures.continent_data()
+    for region in continent["regions"].values():
+        # The game-adoption gate refuses a region without a scene archetype; the
+        # value is never resolved because no reference context exists here.
+        region["scene_archetype"] = "wilderness"
+    documents = {
+        "content/maps/continent.yaml": fixtures.yaml_text(continent),
+        "content/maps/locations.yaml": fixtures.yaml_text(fixtures.locations_data()),
+        "content/maps/districts.yaml": fixtures.yaml_text(fixtures.districts_data()),
+        "content/maps/settlements/demo_map.yaml": fixtures.yaml_text(
+            fixtures.settlement_data()
+        ),
+    }
+    for relative_path, text in documents.items():
+        path = root / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+
+
+class ElevationPublisherTests(unittest.TestCase):
+    """The real regeneration entry point never replaces prior bytes on refusal."""
+
+    def _run(self, publisher, root: Path) -> tuple[int, str]:
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            status = publisher.main(["regenerate_elevation.py", str(root)])
+        return status, output.getvalue()
+
+    def _temporary_artifacts(self, target: Path) -> list[str]:
+        """Leftover atomic-write temporaries beside the published artifact."""
+        return sorted(
+            path.name
+            for path in target.parent.iterdir()
+            if path.name.startswith(".wilderness_elevation.")
+        )
+
+    @covers_requirement(
+        "wilderness-elevation-runtime::"
+        "elevation-artifacts-are-bounded-and-source-identified"
+    )
+    def test_prior_bytes_survive_a_budget_rejection_from_the_real_publisher(self):
+        publisher = _publisher_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            _synthetic_workspace(root)
+            target = root / publisher.ELEVATION_PATH
+
+            # Control: this workspace really reaches the publisher, so the
+            # refusal below cannot pass by never publishing anything.
+            status, _output = self._run(publisher, root)
+            self.assertEqual(status, 0)
+            prior = target.read_bytes()
+            self.assertTrue(prior)
+
+            with mock.patch("elosern_map_core.elevation_codec.MAX_ELEVATION_BYTES", 50):
+                status, output = self._run(publisher, root)
+
+            self.assertEqual(status, 1)
+            self.assertIn("budget constraint", output)
+            self.assertEqual(target.read_bytes(), prior)
+            self.assertEqual(self._temporary_artifacts(target), [])
+
+    @covers_requirement(
+        "wilderness-elevation-runtime::"
+        "elevation-artifacts-are-bounded-and-source-identified"
+    )
+    def test_publisher_refuses_when_the_source_changes_before_publication(self):
+        publisher = _publisher_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            _synthetic_workspace(root)
+            target = root / publisher.ELEVATION_PATH
+            target.parent.mkdir(parents=True, exist_ok=True)
+            prior = b'{"prior": "bytes"}\n'
+            target.write_bytes(prior)
+
+            continent = root / "content/maps/continent.yaml"
+            real_generate = publisher.generate_elevation
+
+            def generate_then_edit_the_source(*args, **kwargs):
+                rasters = real_generate(*args, **kwargs)
+                continent.write_text(
+                    continent.read_text(encoding="utf-8") + "# edited mid-run\n",
+                    encoding="utf-8",
+                )
+                return rasters
+
+            with mock.patch.object(
+                publisher,
+                "generate_elevation",
+                side_effect=generate_then_edit_the_source,
+            ):
+                status, output = self._run(publisher, root)
+
+            self.assertEqual(status, 1)
+            self.assertIn("continent source changed during generation", output)
+            self.assertEqual(target.read_bytes(), prior)
+            self.assertEqual(self._temporary_artifacts(target), [])
 
 
 if __name__ == "__main__":
