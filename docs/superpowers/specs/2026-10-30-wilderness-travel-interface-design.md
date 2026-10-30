@@ -4,6 +4,7 @@
 **Status:** Design approved through the blueprint and the Storybook prototype on 2026-10-30. Written-spec review pending.
 **Implementation status:** Not implemented by this document.
 **Scope:** Sub-project 2 of the [wilderness travel mode blueprint](2026-10-30-wilderness-travel-mode-blueprint-design.md). It defines the browser travel layout (layout A), its components, the movement inputs and walking queue, the travel log, and the settlement transitions. It consumes the protocol defined in [Wilderness Sight and Fog Reveal](2026-10-30-wilderness-sight-and-fog-reveal-design.md).
+**Proposals:** Eight OpenSpec changes, listed with their dependency order and implementation batches in section 15.
 
 The approved visual reference is the prototype in `docs/design/wilderness-travel/` (Storybook `Design/WildernessTravel`). Where this spec and the prototype differ, this spec wins. The prototype's mock rules (`travel-model.js`) are not production code.
 
@@ -251,3 +252,34 @@ The card takes focus and returns it to the map when it closes.
 ## 14. Dependencies
 
 The layout, medallions, travel log, neighbour stepping, and held walking can ship before sub-project 1 through an adapter that turns today's node-form 15 × 15 `area_map` into the same decoded cell grid the run-length window produces. The destination input, route preview, distant sightings, and interrupt flags need sub-project 1.
+
+## 15. Proposal set and implementation batches
+
+Sub-project 2 is proposed as eight changes, each one engineer-day of runnable vertical behaviour. They live under `openspec/changes/<name>/` and are proposal-only until applied.
+
+| Order | Change | Scope | Direct prerequisites | Existing active prerequisites | Frontend visual |
+| --- | --- | --- | --- | --- | --- |
+| 1 | `wilderness-travel-interface` | Mode selection, `HudFrame` slot remapping, `MapDrawer` area-tab hiding, live map refresh, temporary adapter, `PartyMedallions` | none | none | yes — slot remap and `PartyMedallions.vue` |
+| 2 | `wilderness-travel-map-ui` | Canvas painting pipeline, shared glyph states, overlays, measured camera and zoom, repaint-budget evidence | 1 | none | yes — canvas painter, SVG/HTML overlays, camera and zoom |
+| 3 | `wilderness-travel-walking-ui` | Persistent neighbour aim, keyboard and pointer stepping, store-owned commit/dwell held walking | 1 | none | no — input and queue behaviour; only the temporary `TravelWalkControls` surface is visible and change 5 deletes it |
+| 4 | `wilderness-travel-log-ui` | Commit-qualified structured server notices, causal publication delivery, `TravelLog`, refusal handling | 1 | none | yes — `TravelLog.vue` band log and full-log hand-off |
+| 5 | `wilderness-travel-leg-ui` | Server-authored capacity and quotes, persisted pace and nightfall preferences, leg gauge, guarded actions | 3, 4 | none | yes — `LegPanel.vue` intent line, gauge, legend, controls |
+| 6 | `wilderness-travel-window-ui` | Shared run-length decoder cutover, disclosed annotations, authoritative sight and phase presentation, notice capture | 2, 4 | `wilderness-area-map-reveal` | partly — no new visible component; changes what the painted map and chips show from supplied facts |
+| 7 | `wilderness-travel-planning-ui` | Accessible destination selection, debounced current-only `travel.plan` queries, route previews | 5, 6 | `wilderness-travel-planning` | yes — destination cursor and route preview overlay |
+| 8 | `wilderness-travel-route-ui` | Guarded route execution, every supplied interrupt, short-stop replanning, landmark card focus | 7 | `wilderness-travel-interrupts` | yes — `LandmarkCard.vue` arrival card and focus hand-off |
+
+The visual column drives evidence, not scope: a `yes` or `partly` change carries the Storybook story and the 1451×790 / 2560×1440 screenshot review named in its `tasks.md`, and its appearance and copy are human-reviewed against the prototype. A `no` change is verified by behavioural Vitest and browser assertions only.
+
+### 15.1 Parallel implementation batches
+
+The order above is a safe serialized sequence, not eight build edges. Batches below run concurrently; each one has a single integration owner for the shared `AppClient`, travel store, status schema, protocol audits, and test manifests, because those files are the only hard serialization surface.
+
+| Batch | Changes | Visual? | Can run in parallel because | Serialized inside the batch |
+| --- | --- | --- | --- | --- |
+| A | 1 | yes | Root change; everything else depends on its slot remapping and store projection | — |
+| B | 2, 3, 4 | 2 and 4 yes, 3 no | All three need only batch A; map painting, input/queue, and log publication touch different components | `AppClient`, travel store, `docs/game` protocol notes, shard manifests |
+| C | 5, 6 | 5 yes, 6 partly | Both need batch B; 5 is client-only capacity and preferences, 6 is the decoder and sight presentation | Shared decoder extraction, `area_map` schema versus status schema ordering |
+| D | 7 | yes | Needs 5 for preferences and 6 for the window, plus sub-project 1's `wilderness-travel-planning` | — |
+| E | 8 | yes | Needs 7 for the queue and sub-project 1's `wilderness-travel-interrupts` | — |
+
+Changes 1 to 5 follow the adapter path and are implementable before sub-project 1 lands. Changes 6 to 8 wait on the named sub-project 1 changes; no change in this set re-specifies server sight, reveal, routing, or interrupt rules.
