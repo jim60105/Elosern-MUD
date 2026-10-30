@@ -3,7 +3,7 @@
 ## 1. Owned implementation and mechanism evidence
 
 - [ ] 1.1 Integrate actual-radius arrival observation and PlayerCharacter/possession ownership with movement tests. Completion evidence is the corresponding delta scenario tests with synthetic inputs; update the named existing docs with this mechanism.
-- [ ] 1.2 Integrate final-positive-skip observation inside shared clock/sleep transaction and compensation; test every skip path plus post-write fault. Completion evidence is the corresponding delta scenario tests with synthetic inputs; update the named existing docs with this mechanism.
+- [ ] 1.2 Add WorldClock.advance's explicit ground_observer input and final-tick write; register knowledge in both its snapshot and continue_sleep's outer snapshot, with advance_wait/continue_sleep passing the authorized observer. Verify named clock-failure and post-advance receipt-failure tests plus zero/replay exclusion; update skip ownership documentation.
 - [ ] 1.3 Implement bounded reveal/direct landmark checks, hidden gates and corrupt fallback with selected-chunk/no-write tests; update existing knowledge/protocol docs. Completion evidence is the corresponding delta scenario tests with synthetic inputs; update the named existing docs with this mechanism.
 
 ## 2. Integration handoff
