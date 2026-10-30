@@ -4,7 +4,7 @@
 
 - [ ] 1.1 Extract immutable shared expected-population decision without changing current reconciliation rules. Completion evidence is the corresponding delta scenario tests with synthetic inputs; update the named existing docs with this mechanism.
 - [ ] 1.2 Add read-only prospective/registered projection and stable slot identities; route materialization through the same decision. Completion evidence is the corresponding delta scenario tests with synthetic inputs; update the named existing docs with this mechanism.
-- [ ] 1.3 Add synthetic branch-equivalence, prospective identity and comprehensive no-write tests; document the public read contract. Completion evidence is the corresponding delta scenario tests with synthetic inputs; update the named existing docs with this mechanism.
+- [ ] 1.3 Add synthetic ambient branch-equivalence/prospective-identity tests and the named site-no-recovery/trait-no-construction regressions. Document that site_living_members remains the committed-only site reader and ensure_population owns ambient reconciliation only; verify all no-write snapshots.
 
 ## 2. Integration handoff
 
