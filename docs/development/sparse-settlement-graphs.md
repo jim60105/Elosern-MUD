@@ -109,7 +109,9 @@ changed. It then applies all plans in one transaction:
    owner (`world/rules/map_knowledge.remap_grid_identities`) rewrites the
    affected players' stored `grid:` ids inside the same transaction, keeping
    first/last-seen ticks and merging collapsed ids by earliest/latest tick. It
-   never records a new arrival.
+   never records a new arrival. Wilderness chunk knowledge is preserved untouched.
+   Map knowledge uses schema 2 (`{"schema_version": 2, "visited": {...}, "wilderness": {...}}`),
+   with chunk-addressed wilderness observations and development reset cutover.
 7. A failed transaction reloads every touched room/exit and resets the
    attribute caches of every knowledge record it journalled, so durable and
    process-local state both return to the pre-cutover values.

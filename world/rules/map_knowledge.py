@@ -24,6 +24,7 @@ snapshot/restore on failure.
 from collections.abc import Mapping
 from dataclasses import dataclass
 from copy import deepcopy
+import math
 from typing import Any
 
 from world.observability import log_info, log_warn
@@ -31,7 +32,10 @@ from world.maps import wilderness_provider
 from world.maps.wilderness_provider import WILDERNESS_NAME
 
 # The persisted record schema version. All stored records carry this literal.
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+CHUNK_CELLS = 64
+MAX_SIGHT = 8
+CHUNK_ENTRIES = 4096
 KNOWLEDGE_ATTR = "map_knowledge"
 
 # Node-ID bounds (mirrored by the D10a presentation payload table).
@@ -68,18 +72,70 @@ class NodeVisit:
     node_id: str
     first_seen_tick: int
     last_seen_tick: int
+    sight: int = 0
 
 
 def _is_non_negative_int(value: Any) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value >= 0
 
 
-def _validated_visits(record: Any) -> dict[str, dict[str, int]]:
-    """Strictly parse a stored record's ``visited`` mapping, raising on corrupt.
+def _is_valid_sight(value: Any) -> bool:
+    return (
+        isinstance(value, int)
+        and not isinstance(value, bool)
+        and 0 <= value <= MAX_SIGHT
+    )
 
-    The returned dict is a plain copy so the caller never mutates the stored
-    value through a shared reference. Node IDs must decode and ticks must be
-    non-negative integers.
+
+def _wilderness_frame_and_chunk_bounds() -> tuple[int, int, int, int]:
+    """Return (frame_x, frame_y, max_chunks_x, max_chunks_y).
+
+    WILDERNESS_MAX_X and WILDERNESS_MAX_Y are inclusive coordinates (0..max).
+    Frame cells are max + 1.
+    """
+    frame_x = wilderness_provider.WILDERNESS_MAX_X + 1
+    frame_y = wilderness_provider.WILDERNESS_MAX_Y + 1
+    max_chunks_x = math.ceil(frame_x / CHUNK_CELLS)
+    max_chunks_y = math.ceil(frame_y / CHUNK_CELLS)
+    return frame_x, frame_y, max_chunks_x, max_chunks_y
+
+
+def _is_canonical_decimal(key: Any) -> bool:
+    """Check if key is a canonical non-negative decimal string (no leading zeros unless '0')."""
+    if not isinstance(key, str) or not key.isdigit() or len(key) > 10:
+        return False
+    try:
+        return str(int(key)) == key
+    except ValueError:  # observability: ignore R2: predicate returns False on unparseable integer
+        return False
+
+
+def _parse_chunk_key(
+    key: Any, max_chunks_x: int, max_chunks_y: int
+) -> tuple[int, int]:
+    """Strictly parse a chunk key 'chunk_x:chunk_y'."""
+    if not isinstance(key, str):
+        raise KnowledgeError("chunk key must be a string")
+    parts = key.split(":")
+    if len(parts) != 2:
+        raise KnowledgeError(f"invalid chunk key format {key!r}")
+    cx_raw, cy_raw = parts
+    if not _is_canonical_decimal(cx_raw) or not _is_canonical_decimal(cy_raw):
+        raise KnowledgeError(f"non-canonical decimal in chunk key {key!r}")
+    cx = int(cx_raw)
+    cy = int(cy_raw)
+    if cx < 0 or cx >= max_chunks_x or cy < 0 or cy >= max_chunks_y:
+        raise KnowledgeError(
+            f"chunk coordinate ({cx}, {cy}) exceeds chunk bounds ({max_chunks_x}, {max_chunks_y})"
+        )
+    return cx, cy
+
+
+def _validate_record_envelope(record: Any) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Strictly validate top-level schema2 envelope and bounds.
+
+    Does NOT parse or decode chunk entries (lazy for selected chunks).
+    Returns (visited_dict, wilderness_chunks_dict).
     """
     if not isinstance(record, Mapping):
         raise KnowledgeError("map-knowledge record is not an object")
@@ -87,20 +143,159 @@ def _validated_visits(record: Any) -> dict[str, dict[str, int]]:
         raise KnowledgeError(
             f"map-knowledge record has unknown schema version {record.get('schema_version')!r}"
         )
+    if set(record) != {"schema_version", "visited", "wilderness"}:
+        raise KnowledgeError(
+            f"map-knowledge record has invalid top-level keys {set(record)!r}"
+        )
     visited = record.get("visited")
     if not isinstance(visited, Mapping):
         raise KnowledgeError("map-knowledge record has no visited mapping")
-    result: dict[str, dict[str, int]] = {}
     for node_id, value in visited.items():
-        decode_node(node_id)
-        if not isinstance(value, Mapping) or set(value) != {"first_seen_tick", "last_seen_tick"}:
-            raise KnowledgeError(f"visited entry {node_id!r} is not an observation pair")
+        decoded = decode_node(node_id)
+        if decoded.get("prefix") not in (_GRID_PREFIX, _ROOM_PREFIX):
+            raise KnowledgeError(
+                f"visited entry {node_id!r} has prefix {decoded.get('prefix')!r}, must be grid or room"
+            )
+        if not isinstance(value, Mapping) or set(value) != {
+            "first_seen_tick",
+            "last_seen_tick",
+        }:
+            raise KnowledgeError(
+                f"visited entry {node_id!r} is not an observation pair"
+            )
         first = value.get("first_seen_tick")
         last = value.get("last_seen_tick")
         if not _is_non_negative_int(first) or not _is_non_negative_int(last):
-            raise KnowledgeError(f"visited entry {node_id!r} has a non-integer tick")
-        result[node_id] = {"first_seen_tick": first, "last_seen_tick": last}
+            raise KnowledgeError(
+                f"visited entry {node_id!r} has a non-integer tick"
+            )
+        if first > last:
+            raise KnowledgeError(
+                f"visited entry {node_id!r} has first_seen_tick > last_seen_tick"
+            )
+
+    wilderness = record.get("wilderness")
+    if not isinstance(wilderness, Mapping):
+        raise KnowledgeError("map-knowledge record has no wilderness mapping")
+    if set(wilderness) - {WILDERNESS_NAME}:
+        raise KnowledgeError(
+            f"unknown wilderness name in record: {set(wilderness) - {WILDERNESS_NAME}!r}"
+        )
+
+    frame_x, frame_y, max_chunks_x, max_chunks_y = (
+        _wilderness_frame_and_chunk_bounds()
+    )
+    max_chunks = max_chunks_x * max_chunks_y
+    max_total_visits = frame_x * frame_y
+
+    chunks = wilderness.get(WILDERNESS_NAME, {})
+    if not isinstance(chunks, Mapping):
+        raise KnowledgeError("wilderness chunks mapping is not an object")
+
+    if len(chunks) > max_chunks:
+        raise KnowledgeError(
+            f"wilderness chunk count {len(chunks)} exceeds maximum bounds {max_chunks}"
+        )
+
+    total_wilderness_entries = 0
+    for chunk_key, chunk_data in chunks.items():
+        _parse_chunk_key(chunk_key, max_chunks_x, max_chunks_y)
+        if not isinstance(chunk_data, Mapping):
+            raise KnowledgeError(f"chunk {chunk_key!r} is not an object")
+        if len(chunk_data) == 0:
+            raise KnowledgeError(f"chunk {chunk_key!r} is empty")
+        if len(chunk_data) > CHUNK_ENTRIES:
+            raise KnowledgeError(
+                f"chunk {chunk_key!r} size {len(chunk_data)} exceeds {CHUNK_ENTRIES}"
+            )
+        total_wilderness_entries += len(chunk_data)
+
+    if total_wilderness_entries > max_total_visits:
+        raise KnowledgeError(
+            f"total wilderness entries {total_wilderness_entries} exceeds frame maximum {max_total_visits}"
+        )
+
+    return dict(visited), dict(chunks)
+
+
+def _decode_chunk_entries(
+    chunk_key: str, chunk_data: Mapping[Any, Any]
+) -> dict[int, dict[str, int]]:
+    """Parse and validate entries within one chunk.
+
+    Returns dict of offset -> {"first_seen_tick": int, "last_seen_tick": int, "sight": int}.
+    Checks that (x, y) resulting from offset does not exceed WILDERNESS_MAX_X/Y (edge padding check).
+    """
+    frame_x, frame_y, max_chunks_x, max_chunks_y = (
+        _wilderness_frame_and_chunk_bounds()
+    )
+    cx, cy = _parse_chunk_key(chunk_key, max_chunks_x, max_chunks_y)
+    result: dict[int, dict[str, int]] = {}
+
+    for offset_str, entry in chunk_data.items():
+        if not _is_canonical_decimal(offset_str):
+            raise KnowledgeError(
+                f"chunk offset {offset_str!r} is not a canonical decimal"
+            )
+        offset = int(offset_str)
+        if offset < 0 or offset >= CHUNK_ENTRIES:
+            raise KnowledgeError(
+                f"chunk offset {offset} out of bounds 0..{CHUNK_ENTRIES - 1}"
+            )
+        if not isinstance(entry, Mapping) or set(entry) != {
+            "first_seen_tick",
+            "last_seen_tick",
+            "sight",
+        }:
+            raise KnowledgeError(
+                f"chunk {chunk_key} offset {offset} is not an observation triple (first, last, sight)"
+            )
+        first = entry.get("first_seen_tick")
+        last = entry.get("last_seen_tick")
+        sight = entry.get("sight")
+        if not _is_non_negative_int(first) or not _is_non_negative_int(last):
+            raise KnowledgeError(
+                f"chunk {chunk_key} offset {offset} has non-integer tick"
+            )
+        if first > last:
+            raise KnowledgeError(
+                f"chunk {chunk_key} offset {offset} has first_seen_tick > last_seen_tick"
+            )
+        if not _is_valid_sight(sight):
+            raise KnowledgeError(
+                f"chunk {chunk_key} offset {offset} has invalid sight {sight!r}"
+            )
+        local_y = offset // CHUNK_CELLS
+        local_x = offset % CHUNK_CELLS
+        abs_x = cx * CHUNK_CELLS + local_x
+        abs_y = cy * CHUNK_CELLS + local_y
+        if (
+            abs_x > wilderness_provider.WILDERNESS_MAX_X
+            or abs_y > wilderness_provider.WILDERNESS_MAX_Y
+        ):
+            raise KnowledgeError(
+                f"chunk {chunk_key} offset {offset} maps to out-of-frame coordinates ({abs_x}, {abs_y})"
+            )
+        result[offset] = {
+            "first_seen_tick": first,
+            "last_seen_tick": last,
+            "sight": sight,
+        }
     return result
+
+
+def _validated_visits(
+    record: Any,
+) -> tuple[dict[str, dict[str, int]], dict[str, dict[int, dict[str, int]]]]:
+    """Strictly parse a stored schema2 record in full, raising on corrupt.
+
+    Returns (visited_dict, decoded_chunks_dict).
+    """
+    visited, chunks = _validate_record_envelope(record)
+    decoded_chunks: dict[str, dict[int, dict[str, int]]] = {}
+    for chunk_key, chunk_data in chunks.items():
+        decoded_chunks[chunk_key] = _decode_chunk_entries(chunk_key, chunk_data)
+    return visited, decoded_chunks
 
 
 def _registered_grid_bounds(z_map_key: str) -> tuple[int, int] | None:
@@ -283,10 +478,14 @@ def record_arrival(character: Any) -> None:
             return
         current = character.attributes.get(KNOWLEDGE_ATTR)
         if current is None:
-            record: dict[str, Any] = {"schema_version": SCHEMA_VERSION, "visited": {}}
+            record: dict[str, Any] = {
+                "schema_version": SCHEMA_VERSION,
+                "visited": {},
+                "wilderness": {},
+            }
         else:
             try:
-                visits = _validated_visits(current)
+                visited, chunks = _validate_record_envelope(current)
             except KnowledgeError as error:
                 log_warn(
                     "map_knowledge_record_corrupt",
@@ -294,20 +493,65 @@ def record_arrival(character: Any) -> None:
                     context={"obj": str(character), "key": KNOWLEDGE_ATTR},
                 )
                 return
-            record = {"schema_version": SCHEMA_VERSION, "visited": visits}
+            record = {
+                "schema_version": SCHEMA_VERSION,
+                "visited": visited,
+                "wilderness": {WILDERNESS_NAME: dict(chunks)},
+            }
 
         from world.rules.clock import get_world_clock
 
         tick = get_world_clock().tick
-        entry = record["visited"].get(node_id)
-        if entry is None:
-            record["visited"][node_id] = {"first_seen_tick": tick, "last_seen_tick": tick}
-        else:
-            record["visited"][node_id] = {
-                "first_seen_tick": entry["first_seen_tick"],
+        decoded = decode_node(node_id)
+        if decoded["prefix"] in (_GRID_PREFIX, _ROOM_PREFIX):
+            entry = record["visited"].get(node_id)
+            if entry is None:
+                record["visited"][node_id] = {
+                    "first_seen_tick": tick,
+                    "last_seen_tick": tick,
+                }
+            else:
+                record["visited"][node_id] = {
+                    "first_seen_tick": entry["first_seen_tick"],
+                    "last_seen_tick": tick,
+                }
+            character.attributes.add(KNOWLEDGE_ATTR, record)
+            return
+
+        if decoded["prefix"] == _WILD_PREFIX:
+            x = decoded["x"]
+            y = decoded["y"]
+            chunk_x = x // CHUNK_CELLS
+            chunk_y = y // CHUNK_CELLS
+            chunk_key = f"{chunk_x}:{chunk_y}"
+            offset = (y % CHUNK_CELLS) * CHUNK_CELLS + (x % CHUNK_CELLS)
+            offset_str = str(offset)
+
+            wild_dict = record["wilderness"].setdefault(WILDERNESS_NAME, {})
+            chunk_data = dict(wild_dict.get(chunk_key, {}))
+
+            try:
+                decoded_chunk = _decode_chunk_entries(chunk_key, chunk_data)
+            except KnowledgeError as error:
+                log_warn(
+                    "map_knowledge_record_corrupt",
+                    exc=error,
+                    context={"obj": str(character), "key": KNOWLEDGE_ATTR},
+                )
+                return
+
+            existing_entry = decoded_chunk.get(offset)
+            first_seen = tick if existing_entry is None else existing_entry["first_seen_tick"]
+            sight = 0 if existing_entry is None else max(existing_entry["sight"], 0)
+
+            chunk_data[offset_str] = {
+                "first_seen_tick": first_seen,
                 "last_seen_tick": tick,
+                "sight": sight,
             }
-        character.attributes.add(KNOWLEDGE_ATTR, record)
+            wild_dict[chunk_key] = chunk_data
+            character.attributes.add(KNOWLEDGE_ATTR, record)
+            return
     except Exception as error:
         log_warn(
             "map_knowledge_record_arrival_failed",
@@ -327,18 +571,134 @@ def parse_knowledge(character: Any) -> list[NodeVisit]:
     current = character.attributes.get(KNOWLEDGE_ATTR)
     if current is None:
         raise KnowledgeError("character has no map-knowledge record")
-    visits = _validated_visits(current)
-    return sorted(
-        (
+    visited, chunks = _validated_visits(current)
+    visits: list[NodeVisit] = []
+    for node_id, entry in visited.items():
+        visits.append(
             NodeVisit(
                 node_id=node_id,
                 first_seen_tick=entry["first_seen_tick"],
                 last_seen_tick=entry["last_seen_tick"],
+                sight=0,
             )
-            for node_id, entry in visits.items()
-        ),
-        key=lambda visit: visit.node_id,
-    )
+        )
+    for chunk_key, offsets in chunks.items():
+        cx, cy = (int(p) for p in chunk_key.split(":"))
+        for offset, entry in offsets.items():
+            local_y = offset // CHUNK_CELLS
+            local_x = offset % CHUNK_CELLS
+            abs_x = cx * CHUNK_CELLS + local_x
+            abs_y = cy * CHUNK_CELLS + local_y
+            wild_node_id = encode_wild(WILDERNESS_NAME, abs_x, abs_y)
+            visits.append(
+                NodeVisit(
+                    node_id=wild_node_id,
+                    first_seen_tick=entry["first_seen_tick"],
+                    last_seen_tick=entry["last_seen_tick"],
+                    sight=entry["sight"],
+                )
+            )
+    return sorted(visits, key=lambda visit: visit.node_id)
+
+
+def has_visited(character: Any, node_id: str) -> bool:
+    """Return whether ``character`` has visited ``node_id``.
+
+    Validates ``node_id`` via ``decode_node``. If invalid, raises :class:`NodeIDError`.
+    If the character has no map knowledge, returns ``False``.
+    Validates envelope. For ``grid:`` and ``room:`` checks in ``visited``.
+    For ``wild:`` validates only the containing chunk and checks for offset.
+    """
+    decoded = decode_node(node_id)
+    current = character.attributes.get(KNOWLEDGE_ATTR)
+    if current is None:
+        return False
+    visited, chunks = _validate_record_envelope(current)
+    prefix = decoded["prefix"]
+    if prefix in (_GRID_PREFIX, _ROOM_PREFIX):
+        return node_id in visited
+    if prefix == _WILD_PREFIX:
+        x = decoded["x"]
+        y = decoded["y"]
+        cx = x // CHUNK_CELLS
+        cy = y // CHUNK_CELLS
+        chunk_key = f"{cx}:{cy}"
+        chunk_data = chunks.get(chunk_key)
+        if not chunk_data:
+            return False
+        decoded_chunk = _decode_chunk_entries(chunk_key, chunk_data)
+        offset = (y % CHUNK_CELLS) * CHUNK_CELLS + (x % CHUNK_CELLS)
+        return offset in decoded_chunk
+    return False
+
+
+def visits_in_bounds(
+    character: Any, bounds: tuple[int, int, int, int], padding: int = 0
+) -> list[NodeVisit]:
+    """Return wilderness visits intersecting ``bounds`` (inclusive) expanded by ``padding``.
+
+    ``bounds`` must be a 4-tuple of non-boolean integers ``(min_x, min_y, max_x, max_y)``.
+    ``padding`` must be a non-boolean non-negative integer.
+    Raises :class:`KnowledgeError` on missing, malformed, or corrupt envelope, or if
+    any intersecting chunk is corrupt. Distant chunks outside the expanded query are
+    NOT decoded.
+    Returns a deterministically sorted list of :class:`NodeVisit` objects (sorted by node_id).
+    """
+    if (
+        not isinstance(bounds, tuple)
+        or len(bounds) != 4
+        or any(isinstance(v, bool) or not isinstance(v, int) for v in bounds)
+    ):
+        raise KnowledgeError("bounds must be a tuple of 4 non-boolean integers")
+    if isinstance(padding, bool) or not isinstance(padding, int) or padding < 0:
+        raise KnowledgeError("padding must be a non-boolean non-negative integer")
+
+    x0, y0, x1, y1 = bounds
+    if x0 > x1 or y0 > y1:
+        return []
+
+    current = character.attributes.get(KNOWLEDGE_ATTR)
+    if current is None:
+        raise KnowledgeError("character has no map-knowledge record")
+
+    visited, chunks = _validate_record_envelope(current)
+
+    min_x = max(0, x0 - padding)
+    min_y = max(0, y0 - padding)
+    max_x = min(wilderness_provider.WILDERNESS_MAX_X, x1 + padding)
+    max_y = min(wilderness_provider.WILDERNESS_MAX_Y, y1 + padding)
+
+    if min_x > max_x or min_y > max_y:
+        return []
+
+    min_cx = min_x // CHUNK_CELLS
+    max_cx = max_x // CHUNK_CELLS
+    min_cy = min_y // CHUNK_CELLS
+    max_cy = max_y // CHUNK_CELLS
+
+    results: list[NodeVisit] = []
+    for cy in range(min_cy, max_cy + 1):
+        for cx in range(min_cx, max_cx + 1):
+            chunk_key = f"{cx}:{cy}"
+            chunk_data = chunks.get(chunk_key)
+            if not chunk_data:
+                continue
+            decoded_chunk = _decode_chunk_entries(chunk_key, chunk_data)
+            for offset, entry in decoded_chunk.items():
+                local_y = offset // CHUNK_CELLS
+                local_x = offset % CHUNK_CELLS
+                abs_x = cx * CHUNK_CELLS + local_x
+                abs_y = cy * CHUNK_CELLS + local_y
+                if min_x <= abs_x <= max_x and min_y <= abs_y <= max_y:
+                    results.append(
+                        NodeVisit(
+                            node_id=encode_wild(WILDERNESS_NAME, abs_x, abs_y),
+                            first_seen_tick=entry["first_seen_tick"],
+                            last_seen_tick=entry["last_seen_tick"],
+                            sight=entry["sight"],
+                        )
+                    )
+    return sorted(results, key=lambda visit: visit.node_id)
 
 
 def _write_knowledge(character: Any, record: dict[str, Any]) -> None:
@@ -392,7 +752,7 @@ def remap_grid_identities(
     for character in _characters_with_knowledge():
         current = character.attributes.get(KNOWLEDGE_ATTR)
         try:
-            visits = _validated_visits(current)
+            visited, chunks = _validate_record_envelope(current)
         except KnowledgeError as error:
             log_warn(
                 "map_knowledge_remap_skipped_corrupt_record",
@@ -402,7 +762,7 @@ def remap_grid_identities(
             continue
         remapped: dict[str, dict[str, int]] = {}
         changed = False
-        for node_id, entry in visits.items():
+        for node_id, entry in visited.items():
             target = mapping.get(node_id, node_id)
             if target != node_id:
                 changed = True
@@ -428,7 +788,12 @@ def remap_grid_identities(
             # pre-startup record, never to a partially remapped one.
             journal.append((character, deepcopy(current)))
         _write_knowledge(
-            character, {"schema_version": SCHEMA_VERSION, "visited": remapped}
+            character,
+            {
+                "schema_version": SCHEMA_VERSION,
+                "visited": remapped,
+                "wilderness": {WILDERNESS_NAME: dict(chunks)},
+            },
         )
         written += 1
     if written:
@@ -459,7 +824,7 @@ def prune_reclaimed_room(room_id: int) -> bool:
     for character in _characters_with_knowledge():
         current = character.attributes.get(KNOWLEDGE_ATTR)
         try:
-            visits = _validated_visits(current)
+            visited, chunks = _validate_record_envelope(current)
         except KnowledgeError as error:
             log_warn(
                 "map_knowledge_prune_skipped_corrupt_record",
@@ -467,15 +832,22 @@ def prune_reclaimed_room(room_id: int) -> bool:
                 context={"obj": str(character), "key": KNOWLEDGE_ATTR, "room_id": room_id},
             )
             continue
-        if target not in visits:
+        if target not in visited:
             continue
         pruned = {
-            node_id: entry for node_id, entry in visits.items() if node_id != target
+            node_id: entry for node_id, entry in visited.items() if node_id != target
         }
         touched.append(character)
         snapshots.append(deepcopy(current))
         try:
-            _write_knowledge(character, {"schema_version": SCHEMA_VERSION, "visited": pruned})
+            _write_knowledge(
+                character,
+                {
+                    "schema_version": SCHEMA_VERSION,
+                    "visited": pruned,
+                    "wilderness": {WILDERNESS_NAME: dict(chunks)},
+                },
+            )
         except Exception as error:
             for character_restore, snapshot in zip(touched, snapshots):
                 try:

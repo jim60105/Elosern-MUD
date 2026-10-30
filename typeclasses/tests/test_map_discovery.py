@@ -169,10 +169,10 @@ class LandmarkArrivalTests(EvenniaTest):
 
         # A map read must independently reject the same dirty cache, without
         # relying on the narrative having already repaired it.
-        stored={"schema_version":1,"visited":{
+        stored={"schema_version":2,"visited":{
             visit.node_id:{"first_seen_tick":visit.first_seen_tick,"last_seen_tick":visit.last_seen_tick}
             for visit in parse_knowledge(self.char1)
-        }}
+        },"wilderness":{}}
         stored["visited"][self.district.landmark_node]={"first_seen_tick":0,"last_seen_tick":0}
         # Avoid SaverDict's persistence hook while recreating the failed-save
         # in-memory state. This assignment never writes the database.

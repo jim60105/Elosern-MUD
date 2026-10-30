@@ -154,11 +154,12 @@ class LocalMapGridGatewayTests(EvenniaTest):
         self.char1.location = self.south_gate
         record_arrival(self.char1)
         record = {
-            "schema_version": 1,
+            "schema_version": 2,
             "visited": {
                 _t_grid_id(*SOUTH_GATE_XYZ[:2]): {"first_seen_tick": 1, "last_seen_tick": 1},
                 _t_grid_id(*EAST_GATE_XYZ[:2]): {"first_seen_tick": 2, "last_seen_tick": 2},
             },
+            "wilderness": {},
         }
         self.char1.attributes.add("map_knowledge", record)
         with (

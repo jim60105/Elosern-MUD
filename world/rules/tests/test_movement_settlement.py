@@ -164,10 +164,11 @@ class MovementSettlementPlainExitTests(EvenniaTest):
         exit_obj = create_object(Exit, key="door", location=self.room1, destination=self.room2)
         self.char1.location = self.room1
         self.char1.db.map_knowledge = {
-            "schema_version": 1,
+            "schema_version": 2,
             "visited": {
                 f"room:{int(self.room1.pk)}": {"first_seen_tick": 5, "last_seen_tick": 5}
             },
+            "wilderness": {},
         }
         before = get_world_clock().tick
         snapshot = _snapshot_movement_state(
@@ -182,10 +183,11 @@ class MovementSettlementPlainExitTests(EvenniaTest):
         # and the clock script all keep their post-move values.
         self.char1.location = self.room2
         self.char1.db.map_knowledge = {
-            "schema_version": 1,
+            "schema_version": 2,
             "visited": {
                 f"room:{int(self.room2.pk)}": {"first_seen_tick": 5, "last_seen_tick": 5}
             },
+            "wilderness": {},
         }
         self.char1.db.quest_log = [{"quest_id": "divergent"}]
         self.room2.db.interacted = True

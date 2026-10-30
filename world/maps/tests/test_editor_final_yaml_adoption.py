@@ -230,6 +230,7 @@ class FinalYamlAdoptionTests(_CandidateCase):
         walker.attributes.add(KNOWLEDGE_ATTR, {
             "schema_version": SCHEMA_VERSION,
             "visited": {encode_grid(map_id, node.x, node.y): {"first_seen_tick": 4, "last_seen_tick": 9}},
+            "wilderness": {},
         })
         outbound = sorted(exit_obj.pk for exit_obj in room.exits)
         inbound = sorted(ObjectDB.objects.filter(db_destination=room.id).values_list("pk", flat=True))

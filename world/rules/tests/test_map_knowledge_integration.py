@@ -19,6 +19,7 @@ from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom, InstanceRoom, Room, TerrainRoom
 from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.maps import wilderness_provider
+from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.maps.static_references import settlement_node_xyz
 from world.rules.clock import get_world_clock
 from world.rules.map_knowledge import (
@@ -272,7 +273,8 @@ class MapKnowledgePruneTests(EvenniaTest):
         affected.attributes.add(
             "map_knowledge",
             {
-                "schema_version": 1,
+                "schema_version": 2,
+                "wilderness": {},
                 "visited": {
                     f"room:{room.id}": {"first_seen_tick": 10, "last_seen_tick": 20},
                     f"room:{self.room1.id}": {"first_seen_tick": 30, "last_seen_tick": 30},
@@ -282,7 +284,8 @@ class MapKnowledgePruneTests(EvenniaTest):
         unaffected.attributes.add(
             "map_knowledge",
             {
-                "schema_version": 1,
+                "schema_version": 2,
+                "wilderness": {},
                 "visited": {
                     f"room:{self.room1.id}": {"first_seen_tick": 30, "last_seen_tick": 30}
                 },
@@ -292,6 +295,38 @@ class MapKnowledgePruneTests(EvenniaTest):
         self.assertNotIn(f"room:{room.id}", _node_ids(affected))
         self.assertIn(f"room:{self.room1.id}", _node_ids(affected))
         self.assertIn(f"room:{self.room1.id}", _node_ids(unaffected))
+
+    def test_prune_reclaimed_room_preserves_wilderness_chunks(self):
+        room = create_object(InstanceRoom, key="prune_with_wild")
+        self.char1.attributes.add(
+            "map_knowledge",
+            {
+                "schema_version": 2,
+                "visited": {
+                    f"room:{room.id}": {"first_seen_tick": 10, "last_seen_tick": 20},
+                    f"room:{self.room1.id}": {"first_seen_tick": 30, "last_seen_tick": 30},
+                },
+                "wilderness": {
+                    WILDERNESS_NAME: {
+                        "0:0": {"65": {"first_seen_tick": 5, "last_seen_tick": 8, "sight": 4}}
+                    }
+                },
+            },
+        )
+        prune_reclaimed_room(room.id)
+        stored = self.char1.attributes.get("map_knowledge")
+        self.assertEqual(
+            stored,
+            {
+                "schema_version": 2,
+                "visited": {f"room:{self.room1.id}": {"first_seen_tick": 30, "last_seen_tick": 30}},
+                "wilderness": {
+                    WILDERNESS_NAME: {
+                        "0:0": {"65": {"first_seen_tick": 5, "last_seen_tick": 8, "sight": 4}}
+                    }
+                },
+            },
+        )
 
     def test_player_without_attribute_gets_none_by_pruning(self):
         room = create_object(InstanceRoom, key="never_visited")
@@ -319,17 +354,19 @@ class MapKnowledgePruneTests(EvenniaTest):
     def test_prune_write_failure_restores_snapshots(self):
         room = create_object(InstanceRoom, key="failure_room")
         before = {
-            "schema_version": 1,
+            "schema_version": 2,
             "visited": {
                 f"room:{room.id}": {"first_seen_tick": 10, "last_seen_tick": 20},
                 f"room:{self.room1.id}": {"first_seen_tick": 30, "last_seen_tick": 30},
             },
+            "wilderness": {},
         }
         self.char1.attributes.add("map_knowledge", before)
         self.char2.attributes.add(
             "map_knowledge",
             {
-                "schema_version": 1,
+                "schema_version": 2,
+                "wilderness": {},
                 "visited": {f"room:{room.id}": {"first_seen_tick": 5, "last_seen_tick": 5}},
             },
         )
@@ -358,7 +395,8 @@ class MapKnowledgePruneTests(EvenniaTest):
         self.assertEqual(
             self.char2.attributes.get("map_knowledge"),
             {
-                "schema_version": 1,
+                "schema_version": 2,
+                "wilderness": {},
                 "visited": {f"room:{room.id}": {"first_seen_tick": 5, "last_seen_tick": 5}},
             },
         )
@@ -371,7 +409,8 @@ class MapKnowledgePruneTests(EvenniaTest):
         self.char1.attributes.add(
             "map_knowledge",
             {
-                "schema_version": 1,
+                "schema_version": 2,
+                "wilderness": {},
                 "visited": {f"room:{room.id}": {"first_seen_tick": 10, "last_seen_tick": 20}},
             },
         )

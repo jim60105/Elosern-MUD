@@ -1210,7 +1210,7 @@ class MetricCutoverTests(EvenniaTest):
         native.attributes.add(
             "map_knowledge",
             {
-                "schema_version": 1,
+                "schema_version": 2,
                 "visited": {
                     "grid:capital_altoria:3:3": {
                         "first_seen_tick": 5,
@@ -1221,6 +1221,7 @@ class MetricCutoverTests(EvenniaTest):
                         "last_seen_tick": 11,
                     },
                 },
+                "wilderness": {},
             },
         )
 
@@ -1287,13 +1288,14 @@ class MetricCutoverTests(EvenniaTest):
         old_xyz = south.xyz
 
         snapshot = {
-            "schema_version": 1,
+            "schema_version": 2,
             "visited": {
                 "grid:capital_altoria:3:0": {
                     "first_seen_tick": 1,
                     "last_seen_tick": 2,
                 }
             },
+            "wilderness": {},
         }
         first = create_object(PlayerCharacter, key="測試甲", location=south)
         second = create_object(PlayerCharacter, key="測試乙", location=south)
@@ -1338,7 +1340,7 @@ class MetricCutoverTests(EvenniaTest):
             location=self._object(ids["capital_altoria"]["south_gate"]),
         )
         original = {
-            "schema_version": 1,
+            "schema_version": 2,
             "visited": {
                 "grid:capital_altoria:3:3": {
                     "first_seen_tick": 3,
@@ -1349,6 +1351,7 @@ class MetricCutoverTests(EvenniaTest):
                     "last_seen_tick": 9,
                 },
             },
+            "wilderness": {},
         }
         observer.attributes.add(KNOWLEDGE_ATTR, original)
 
@@ -1423,13 +1426,14 @@ class MetricCutoverTests(EvenniaTest):
         observer.attributes.add(
             KNOWLEDGE_ATTR,
             {
-                "schema_version": 1,
+                "schema_version": 2,
                 "visited": {
                     "grid:capital_altoria:3:3": {
                         "first_seen_tick": 4,
                         "last_seen_tick": 8,
                     }
                 },
+                "wilderness": {},
             },
         )
 
