@@ -32,6 +32,13 @@ Use synthetic documents, policies and parties with independent expected results.
 
 Requirement IDs must come from tools.spec_traceability list on the equivalent merged spec tree, never hand-composed. Before sync associate only the nearest current canonical requirement and report the temporary mapping per docs/development/spec-test-traceability.md. Sync remounts to the generated IDs with no uncovered requirements or waiver. Modified requirements retain identity except an explicit RENAMED window title. Mechanism tests must exist before that sync.
 
+Requirement traceability mapping for this change (task 2.2), using IDs from `uv run --locked python -m tools.spec_traceability list`, never hand-composed:
+
+- ADDED requirement: `wilderness-elevation-generation::elevation-generation-is-deterministic-and-physically-constrained` (the delta spec in this change).
+- Pre-sync canonical mount: `wilderness-elevation-authoring::elevation-shapes-reject-invalid-candidates` (nearest current canonical requirement; the ordered shape declarations and their rejection boundary are the shared authored surface). Annotations live in `tests/test_elevation_contract.py`, whose subprocess probes execute the real generator with every game namespace blocked and prove the runtime surface imports without NumPy/SciPy or the generator.
+- Mechanism evidence: `packages/map-core/tests/test_elevation.py` covers repeat-byte determinism, sea/ridge/river/shape-order/canopy/no-prominence physics, ring thresholds, minimum-area component suppression and directional residual autocorrelation on synthetic frames.
+- Post-sync planned target: `wilderness-elevation-generation::elevation-generation-is-deterministic-and-physically-constrained`; sync remounts the annotation with no uncovered requirement and no waiver.
+
 ## Risks / Trade-offs
 
 [Read side effects] -> Pure projections and object/Attribute/clock snapshots in integration tests. [Shared files] -> Serialize shard-manifest, schema and documentation changes even when roots are independent. [Data echo tests] -> Assert mechanics on synthetic fixtures and treat visual review separately. No new permanent lighting or walking state is allowed.
