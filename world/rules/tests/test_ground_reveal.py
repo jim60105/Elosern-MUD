@@ -330,6 +330,88 @@ class GroundRevealProjectionTests(unittest.TestCase):
             self.assertTrue(has_visited(character, _wild_node(60, 60)))
 
 
+def _reference_reveal(record, bounds, landmarks, owners):
+    """The pre-snapshot reveal algorithm, kept as an independent oracle.
+
+    It walks every visit's whole disc with ``in_ground_disc`` and then the lit
+    district ownership of every remaining cell, with no early exit or offset
+    table, so the optimized projection is compared against plain arithmetic.
+    """
+    from world.rules.sight import in_ground_disc
+
+    x0, y0, x1, y1 = bounds
+    x0, y0 = max(0, x0), max(0, y0)
+    x1 = min(wilderness_provider.WILDERNESS_MAX_X, x1)
+    y1 = min(wilderness_provider.WILDERNESS_MAX_Y, y1)
+    if x0 > x1 or y0 > y1:
+        return frozenset()
+    chunks = record["wilderness"][wilderness_provider.WILDERNESS_NAME]
+    stored = {}
+    for key, entries in chunks.items():
+        cx, cy = (int(part) for part in key.split(":"))
+        for offset, entry in entries.items():
+            offset = int(offset)
+            stored[(cx * CHUNK_CELLS + offset % CHUNK_CELLS, cy * CHUNK_CELLS + offset // CHUNK_CELLS)] = entry["sight"]
+    lit = {key for key, node_id in landmarks.items() if node_id in {_wild_node(*cell) for cell in stored}}
+    revealed = set()
+    for (ox, oy), radius in stored.items():
+        if not (x0 - 8 <= ox <= x1 + 8 and y0 - 8 <= oy <= y1 + 8):
+            continue
+        for y in range(max(y0, oy - radius), min(y1, oy + radius) + 1):
+            for x in range(max(x0, ox - radius), min(x1, ox + radius) + 1):
+                if in_ground_disc((ox, oy), (x, y), radius):
+                    revealed.add((x, y))
+    for y in range(y0, y1 + 1):
+        for x in range(x0, x1 + 1):
+            if owners.get((x, y)) in lit:
+                revealed.add((x, y))
+    return frozenset(revealed)
+
+
+class RevealDifferentialTests(unittest.TestCase):
+    """The snapshot projection equals the plain reference on random records."""
+
+    _reveal = GroundRevealProjectionTests._reveal
+
+    @covers_requirement(
+        "wilderness-ground-reveal::permanent-reveal-is-a-bounded-read-projection"
+    )
+    def test_snapshot_reveal_matches_the_reference_union(self):
+        import random
+
+        rng = random.Random(20261031)
+        for case in range(40):
+            # Some cases hug the frame's west/south edge, some are dense.
+            base = (rng.choice([0, 3, 70, 130]), rng.choice([0, 5, 70, 128]))
+            chunks = {}
+            for _ in range(rng.choice([1, 8, 60])):
+                cell = (base[0] + rng.randrange(0, 40), base[1] + rng.randrange(0, 40))
+                chunks.setdefault(_chunk_key(*cell), {})[str(_offset(*cell))] = {
+                    "first_seen_tick": 1,
+                    "last_seen_tick": 2,
+                    "sight": rng.randrange(0, 9),
+                }
+            record = _record(chunks)
+            landmark_cell = next(
+                (int(key) % CHUNK_CELLS + int(chunk.split(":")[0]) * CHUNK_CELLS,
+                 int(key) // CHUNK_CELLS + int(chunk.split(":")[1]) * CHUNK_CELLS)
+                for chunk, entries in chunks.items()
+                for key in entries
+            )
+            landmarks = {"t_lit": _wild_node(*landmark_cell), "t_dark": _wild_node(2600, 2600)}
+            owners = {
+                (base[0] + dx, base[1] + dy): ("t_lit" if case % 3 == 0 else "t_dark")
+                for dx in range(10, 20)
+                for dy in range(5, 15)
+            }
+            bounds = (base[0] - 5, base[1] - 5, base[0] + 35, base[1] + 35)
+            with self.subTest(case=case):
+                self.assertEqual(
+                    self._reveal(record, bounds, landmarks=landmarks, owners=owners),
+                    _reference_reveal(record, bounds, landmarks, owners),
+                )
+
+
 class GroundObservationWriterTests(EvenniaTest):
     @covers_requirement(
         "map-knowledge::map-knowledge-py-is-the-sole-writer-of-a-versioned-visited-node-record"
