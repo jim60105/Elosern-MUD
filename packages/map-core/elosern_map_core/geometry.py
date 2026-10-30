@@ -16,7 +16,8 @@ position that sits on the wilderness anchor cell's centre. A settlement's
 transform returns horizontal metres only.
 
 Polygon helpers take the mainland boundary as an explicit closed-ring vertex
-tuple in absolute kilometres; boundary points count as land.
+tuple in absolute kilometres; boundary points count as land. Elevation polygon
+helpers take unclosed cell-coordinate vertices with implicit closure.
 
 Every function is pure and deterministic: no game, database, clock or random
 input, and no cache outside the arguments it is given.
@@ -180,12 +181,12 @@ def segments_intersect(p1: Point, p2: Point, p3: Point, p4: Point) -> bool:
     return False
 
 
-def is_simple_polygon(vertices: tuple[Point, ...]) -> tuple[bool, str]:
+def is_simple_polygon(vertices: tuple[Point, ...]) -> tuple[bool, str, str]:
     """Verify polygon simplicity: at least 3 distinct unclosed vertices, no self-intersections or degeneracy."""
     if len(vertices) < 3:
-        return False, "polygon requires at least 3 vertices"
+        return False, "degenerate_polygon", "polygon requires at least 3 vertices"
     if len(set(vertices)) != len(vertices):
-        return False, "polygon contains duplicate vertices"
+        return False, "degenerate_polygon", "polygon contains duplicate vertices"
 
     # Shoelace doubled area must be non-zero (not all collinear)
     doubled = sum(
@@ -194,7 +195,7 @@ def is_simple_polygon(vertices: tuple[Point, ...]) -> tuple[bool, str]:
         for i in range(len(vertices))
     )
     if doubled == 0:
-        return False, "polygon has zero area (degenerate/collinear)"
+        return False, "degenerate_polygon", "polygon has zero area (degenerate/collinear)"
 
     n = len(vertices)
     edges = [(vertices[i], vertices[(i + 1) % n]) for i in range(n)]
@@ -211,9 +212,9 @@ def is_simple_polygon(vertices: tuple[Point, ...]) -> tuple[bool, str]:
                 other1 = e1_p1 if j == i + 1 else e1_p2
                 other2 = e2_p2 if j == i + 1 else e2_p1
                 if _point_on_segment(other1, shared, other2) or _point_on_segment(other2, shared, other1):
-                    return False, f"adjacent edges {i} and {j} overlap or backtrack"
+                    return False, "degenerate_polygon", f"adjacent edges {i} and {j} overlap or backtrack"
             else:
                 if segments_intersect(e1_p1, e1_p2, e2_p1, e2_p2):
-                    return False, f"non-adjacent edges {i} and {j} intersect"
+                    return False, "self_intersecting_polygon", f"non-adjacent edges {i} and {j} intersect"
 
-    return True, ""
+    return True, "", ""

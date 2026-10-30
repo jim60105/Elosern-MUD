@@ -165,29 +165,23 @@ def diagnose_elevation_shapes(continent: ContinentDocument) -> list[Diagnostic]:
                         field_path=f"{field_prefix}.centre",
                     )
                 )
-            # Footprint including feather must be within frame
-            min_x, max_x = cx - r - feather, cx + r + feather
-            min_y, max_y = cy - r - feather, cy + r + feather
-            if min_x < 0 or max_x >= frame or min_y < 0 or max_y >= frame:
-                diagnostics.append(
-                    _diagnostic(
-                        "elevation_shape_outside_frame",
-                        STRUCTURE,
-                        f"elevation shape {idx} footprint ([{min_x}, {max_x}], [{min_y}, {max_y}]) exceeds frame [0, {frame})",
-                        document=continent,
-                        field_path=field_prefix,
+            else:
+                min_x, max_x = cx - r - feather, cx + r + feather
+                min_y, max_y = cy - r - feather, cy + r + feather
+                if min_x < 0 or max_x >= frame or min_y < 0 or max_y >= frame:
+                    diagnostics.append(
+                        _diagnostic(
+                            "elevation_shape_outside_frame",
+                            STRUCTURE,
+                            f"elevation shape {idx} footprint ([{min_x}, {max_x}], [{min_y}, {max_y}]) exceeds frame [0, {frame})",
+                            document=continent,
+                            field_path=field_prefix,
+                        )
                     )
-                )
         elif shape_decl.shape == "polygon":
             vertices = shape_decl.vertices
-            # Check polygon simplicity
-            ok, reason = is_simple_polygon(vertices)
+            ok, code, reason = is_simple_polygon(vertices)
             if not ok:
-                code = (
-                    "degenerate_polygon"
-                    if ("degenerate" in reason or "duplicate" in reason or "vertices" in reason)
-                    else "self_intersecting_polygon"
-                )
                 diagnostics.append(
                     _diagnostic(
                         code,

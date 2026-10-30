@@ -390,22 +390,41 @@ def test_continent_elevation_shapes_ordered_round_trip():
             "centre": {"cell_x": 500, "cell_y": 500},
             "radius": 30,
         },
+        {
+            "shape": "circle",
+            "op": "lower",
+            "centre": {"cell_x": 600, "cell_y": 600},
+            "radius": 15,
+            "amount": 3,
+            "feather": 4,
+        },
     ]
     text = fixtures.yaml_text(data)
     parsed = parse_document("content/maps/continent.yaml", text)
-    assert len(parsed.document.elevation_shapes) == 3
+    assert len(parsed.document.elevation_shapes) == 4
     assert parsed.document.elevation_shapes[0].shape == "circle"
     assert parsed.document.elevation_shapes[0].amount == 7
     assert parsed.document.elevation_shapes[1].shape == "polygon"
     assert parsed.document.elevation_shapes[1].target_band == 4
     assert parsed.document.elevation_shapes[2].op == "no_prominence"
+    assert parsed.document.elevation_shapes[3].op == "lower"
+    assert parsed.document.elevation_shapes[3].amount == 3
 
     emitted = serialize_document(parsed.document, parsed.round_trip)
     reparsed = parse_document("content/maps/continent.yaml", emitted)
-    assert len(reparsed.document.elevation_shapes) == 3
+    assert len(reparsed.document.elevation_shapes) == 4
     assert reparsed.document.elevation_shapes[0].centre == (100, 150)
     assert reparsed.document.elevation_shapes[1].vertices == ((300, 300), (400, 300), (350, 400))
     assert reparsed.document.elevation_shapes[2].feather is None
+    assert reparsed.document.elevation_shapes[3].amount == 3
+
+    # Test edited elevation_shapes re-emits correctly
+    edited_data = fixtures.plain_data(reparsed.document.data)
+    edited_data["elevation_shapes"][0]["amount"] = 12
+    edited_doc = document_from_data("content/maps/continent.yaml", edited_data)
+    re_emitted = serialize_document(edited_doc, reparsed.round_trip)
+    re_reparsed = parse_document("content/maps/continent.yaml", re_emitted)
+    assert re_reparsed.document.elevation_shapes[0].amount == 12
 
 
 def test_continent_elevation_shapes_omission_stays_omitted():
@@ -424,8 +443,16 @@ def test_continent_elevation_shapes_omission_stays_omitted():
         lambda d: d["elevation_shapes"][0].__setitem__("amount", 16),
         lambda d: d["elevation_shapes"][0].__setitem__("amount", 0),
         lambda d: d["elevation_shapes"][0].__setitem__("amount", True),
+        lambda d: d["elevation_shapes"][0].__setitem__("radius", 0),
         lambda d: d["elevation_shapes"][0].__setitem__("feather", 0),
         lambda d: d["elevation_shapes"][0].__setitem__("target_band", 5),  # forbidden for raise
+        lambda d: d["elevation_shapes"][0].__setitem__("op", "unknown_op"),
+        lambda d: d["elevation_shapes"][0].__setitem__("shape", "unknown_shape"),
+        lambda d: d["elevation_shapes"][0].update({"op": "no_prominence", "feather": 5}),  # forbidden feather
+        lambda d: d["elevation_shapes"][0].update({"shape": "polygon", "vertices": [{"cell_x": 1, "cell_y": 1}, {"cell_x": 2, "cell_y": 2}]}),  # min_items 3
+        lambda d: d["elevation_shapes"][0].update({"shape": "polygon", "vertices": [{"cell_x": 1, "cell_y": 1}, {"cell_x": 2, "cell_y": 2}, {"cell_x": 3, "cell_y": 3}], "centre": {"cell_x": 1, "cell_y": 1}}),  # forbidden centre on polygon
+        lambda d: d["elevation_shapes"][0].update({"shape": "polygon", "vertices": [{"cell_x": 1, "cell_y": 1}, {"cell_x": 2, "cell_y": 2}, {"cell_x": 3, "cell_y": 3}], "radius": 5}),  # forbidden radius on polygon
+        lambda d: d["elevation_shapes"][0].update({"op": "flatten", "target_band": 16}),  # max 15
         lambda d: d["elevation_shapes"][0].__setitem__("vertices", [{"cell_x": 1, "cell_y": 1}]),  # forbidden for circle
         lambda d: d["elevation_shapes"][0].__delitem__("centre"),  # required for circle
         lambda d: d["elevation_shapes"][0].__setitem__("unknown_prop", 123),

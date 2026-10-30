@@ -10,6 +10,7 @@ import pytest
 from elosern_map_core.geometry import (
     cell_center_m,
     is_on_mainland,
+    is_simple_polygon,
     is_within_frame,
     local_to_world_m,
     polygon_area_km2,
@@ -87,6 +88,23 @@ class TestMetricTransforms:
         with pytest.raises(ValueError):
             polygon_area_km2(((0, 0), (1, 1)))
 
+    def test_polygon_simplicity_checks(self):
+        # Valid triangle
+        assert is_simple_polygon(((0, 0), (10, 0), (0, 10))) == (True, "", "")
+        # Clockwise square
+        assert is_simple_polygon(((0, 0), (10, 0), (10, 10), (0, 10))) == (True, "", "")
+        # Too few vertices
+        assert is_simple_polygon(((0, 0), (10, 0)))[0] is False
+        # Duplicate vertices (self-touching)
+        assert is_simple_polygon(((0, 0), (10, 0), (5, 5), (0, 0))) == (False, "degenerate_polygon", "polygon contains duplicate vertices")
+        # Collinear (zero area)
+        assert is_simple_polygon(((0, 0), (5, 5), (10, 10))) == (False, "degenerate_polygon", "polygon has zero area (degenerate/collinear)")
+        # Adjacent backtrack / 180 turn
+        assert is_simple_polygon(((0, 0), (10, 0), (5, 0), (0, 10))) == (False, "degenerate_polygon", "adjacent edges 0 and 1 overlap or backtrack")
+        # Non-adjacent intersection (hourglass)
+        ok, code, _ = is_simple_polygon(((0, 0), (10, 10), (10, 5), (0, 10)))
+        assert ok is False
+        assert code == "self_intersecting_polygon"
 
 class TestDirectedRoutes:
     def _bent_graph(self) -> SparseSettlementGraph:
