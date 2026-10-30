@@ -10,18 +10,19 @@ The format is a custom JSON-compatible domain schema, not JSON Schema:
 
 * ``document_kinds`` maps a kind to its source location, identity rule,
   ``fields`` tree and ``rules`` list.
-* A field spec has ``type`` (``str``, ``int``, ``bool``, ``enum``, ``mapping``,
-  ``list``), ``required`` (default true), ``nullable``, and type-specific keys
-  (``values``, ``min``, ``max``, ``pattern``, ``fields``, ``items``,
-  ``key_pattern``, ``min_items``, ``max_items``, ``constant``, ``reference``).
+* A field spec has ``type`` (``str``, ``int``, ``number``, ``bool``, ``enum``,
+  ``mapping``, ``list``), ``required`` (default true), ``nullable``, and
+  type-specific keys (``values``, ``min``, ``max``, ``pattern``, ``min_length``,
+  ``max_length``, ``non_blank``, ``fields``, ``items``, ``key_pattern``,
+  ``min_items``, ``max_items``, ``constant``, ``reference``).
 * A list spec may carry ``identity``: the field names that identify one object
   of the list across edits (used by the round-trip serializer to retain that
   object's comments).
 * A mapping spec may carry ``unique_values``: sibling field names whose value
   tuple must be unique across the mapping's object values.
 * ``rules`` entries are: ``required_when_equals``, ``forbidden_when_equals``,
-  ``required_when_in``, ``forbidden_when_in``, ``unique_sequence``,
-  ``unique_outgoing`` and ``mask``.
+  ``required_when_in``, ``forbidden_when_in``, ``required_when_positive``,
+  ``unique_sequence``, ``unique_outgoing`` and ``mask``.
 
 ``schema()`` returns a deep copy, so a consumer can never mutate the core's
 description.
@@ -29,6 +30,7 @@ description.
 
 from __future__ import annotations
 
+import math
 from copy import deepcopy
 from typing import Any, Mapping
 
@@ -66,6 +68,22 @@ def _int(*, required: bool = True, min_value: int | None = None, **extra: Any) -
     if "max_value" in extra:
         spec["max"] = extra.pop("max_value")
     spec.update(extra)
+    return spec
+
+
+def _number(
+    *,
+    required: bool = True,
+    min_value: float | None = None,
+    max_value: float | None = None,
+) -> dict:
+    """One finite number: an integer or a float, never a boolean."""
+
+    spec: dict[str, Any] = {"type": "number", "required": required}
+    if min_value is not None:
+        spec["min"] = min_value
+    if max_value is not None:
+        spec["max"] = max_value
     return spec
 
 
@@ -401,6 +419,15 @@ _DISTRICT = _mapping(
         "landmark": deepcopy(_QUALIFIED_REF),
         "kind": _enum(DISTRICT_KINDS),
         "region_key": _nullable(_str(reference="continent_regions")),
+        # Optional distant-sighting facts. A district may author a daytime
+        # range, a night (light) range, and the silhouette a distant viewer
+        # sees; a positive range without that silhouette is rejected below.
+        "vantage": _bool(required=False),
+        "sight_km": _number(required=False, min_value=0),
+        "light_km": _number(required=False, min_value=0),
+        "silhouette_zh": _str(
+            required=False, max_length=256, non_blank=True
+        ),
     },
     rules=[
         {
@@ -414,6 +441,11 @@ _DISTRICT = _mapping(
             "field": "region_key",
             "other": "kind",
             "value": "voronoi",
+        },
+        {
+            "rule": "required_when_positive",
+            "field": "silhouette_zh",
+            "others": ["sight_km", "light_km"],
         },
     ],
 )
@@ -722,6 +754,26 @@ def _is_int(value: Any) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
 
 
+def _is_positive_number(value: Any) -> bool:
+    """Whether a cross-field rule sees an authored positive number."""
+
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        number = float(value)
+    except (OverflowError, ValueError):
+        # An unrepresentable integer is already reported by the scalar check;
+        # the rule only asks whether an authored positive range exists.
+        return True
+    return math.isfinite(number) and number > 0
+
+
+def _non_blank_text(value: Any) -> bool:
+    """Whether a cross-field rule sees authored, non-whitespace text."""
+
+    return isinstance(value, str) and bool(value.strip())
+
+
 def _hashable_identity(values) -> tuple | None:
     """The identity tuple, or ``None`` when a value cannot key a uniqueness check.
 
@@ -756,6 +808,10 @@ def _check_scalar(
         valid = isinstance(value, str)
         if valid and "min_length" in spec:
             valid = len(value) >= spec["min_length"]
+        if valid and "max_length" in spec:
+            valid = len(value) <= spec["max_length"]
+        if valid and spec.get("non_blank"):
+            valid = bool(value.strip())
     elif kind == "int":
         valid = _is_int(value)
         if valid and "min" in spec:
@@ -764,6 +820,22 @@ def _check_scalar(
             valid = value <= spec["max"]
         if valid and "constant" in spec:
             valid = value == spec["constant"]
+    elif kind == "number":
+        # A boolean is an integer in Python and never a range in kilometres;
+        # an infinity or a NaN is not an authored value either.
+        valid = not isinstance(value, bool) and isinstance(value, (int, float))
+        if valid:
+            try:
+                number = float(value)
+            except (OverflowError, ValueError):
+                # A decimal integer beyond the float range is a structural
+                # diagnostic, never an exception out of validation.
+                number = math.inf
+            valid = math.isfinite(number)
+            if valid and "min" in spec:
+                valid = number >= spec["min"]
+            if valid and "max" in spec:
+                valid = number <= spec["max"]
     elif kind == "bool":
         valid = isinstance(value, bool)
     elif kind == "enum":
@@ -863,6 +935,25 @@ def _apply_rules(
                     "invalid_field_value",
                     f"{_join(path, field)} is not allowed when "
                     f"{rule['other']} is {other!r}",
+                    relative_path=relative_path,
+                    field_path=_join(path, field),
+                    provenance=provenance,
+                )
+        elif name == "required_when_positive":
+            # One field becomes mandatory as soon as any named sibling declares a
+            # positive number: an authored sighting range is never anonymous.
+            field = rule["field"]
+            positive = [
+                other
+                for other in rule["others"]
+                if _is_positive_number(value.get(other))
+            ]
+            if positive and not _non_blank_text(value.get(field)):
+                _problem(
+                    diagnostics,
+                    "missing_field",
+                    f"{_join(path, field)} is required when "
+                    f"{' or '.join(positive)} is positive",
                     relative_path=relative_path,
                     field_path=_join(path, field),
                     provenance=provenance,
@@ -1025,7 +1116,7 @@ def _validate_value(
         )
         return
     kind = spec["type"]
-    if kind in ("str", "int", "bool", "enum"):
+    if kind in ("str", "int", "number", "bool", "enum"):
         _check_scalar(
             spec,
             value,

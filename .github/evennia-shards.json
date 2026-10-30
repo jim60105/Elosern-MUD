@@ -210,6 +210,7 @@
       "index": 3,
       "name": "rules-c",
       "labels": [
+        "world.rules.tests.test_sight",
         "world.rules.tests.test_cross_lineage_unlock",
         "world.rules.tests.test_item_holdings",
         "world.rules.tests.test_npc_persona",

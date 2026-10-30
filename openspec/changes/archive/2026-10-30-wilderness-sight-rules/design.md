@@ -10,7 +10,7 @@ Calculate ground sight and transient distant sightings from validated policy. Ke
 
 ## Decisions
 
-Pure functions light_phase(calendar), ground_radius(cell,calendar,inputs), in_ground_disc(observer,target,radius), distant_markers(observer,calendar,sources,lit_districts) use immutable inputs. sight.yaml owns hours/radii/factors, separate from clock.yaml anchor hours. Initial policy is detailed design §3: day07-17, dusk17-19, night19-05, dawn05-07, boundaries inclusive at phase start. Terrain rows day/twilight/night: open/coast4/3/1, hills3/2/1, mountain2/2/1, woodland/deep forest1/1/0. Tier bonuses0=0/0/0,1=1/0/0,2=2/1/0,3=3/2/0; vantage8/5/2. Validate coverage, finite nonnegative factors and radius<=8; tests inject a policy rather than pin shipped values.
+Pure functions light_phase(calendar), ground_radius(calendar, inputs), in_ground_disc(observer, target, radius) and distant_markers(observer, calendar, sources, lit_districts, *, inputs, cell_size_km, district_names=None) use immutable inputs; `inputs` is the observer's GroundSightInputs (terrain row, elevation tier, vantage holding) and `cell_size_km` is the provider's declared cell span, because both the canopy rule and the distance scale need them. sight.yaml owns hours/radii/factors, separate from clock.yaml anchor hours. Initial policy is detailed design §3: day07-17, dusk17-19, night19-05, dawn05-07, boundaries inclusive at phase start. Terrain rows day/twilight/night: open/coast4/3/1, hills3/2/1, mountain2/2/1, woodland/deep forest1/1/0. Tier bonuses0=0/0/0,1=1/0/0,2=2/1/0,3=3/2/0; vantage8/5/2. Validate coverage, finite nonnegative factors and radius<=8; tests inject a policy rather than pin shipped values.
 
 Radius=max(terrain+prominence,vantage or0); canopy forces tier0 before addition but vantage remains eligible. Disc uses dx²+dy²<=(r+0.5)², radius0 only origin; no occlusion or mountain-pass logic. Bands are rendering only. Add optional district fields vantage:boolean(default false), sight_km/light_km:finite nonnegative numbers and silhouette_zh:nonblank<=256 codepoints. Positive sight/light requires silhouette. Preserve optional fields through parser/frozen published district/editor save, without adding shipped values. No distant marker for a landmark with no authored range.
 
@@ -21,6 +21,23 @@ Internal source_key is comparison-only. Wire marker is exactly {bearing,distance
 ## Dependency contracts
 
 N2 is adopted through the validated settlement-kind silhouette policy above. Add test_unlit_settlement_uses_kind_silhouette_not_identity to test_sight.py, plus missing-kind/blank/over-bound policy rejection cases. The evidence mapping is this design section: current map-districts/map-geographic-sources requirements support source derivation before sync; equivalent-tree IDs for both new sight requirements replace those temporary associations afterward.
+
+### N2 disposition (apply record)
+
+Applied as specified. `world/rules/rulebook/sight.yaml` owns `settlement_silhouettes`,
+keyed by every supported non-hidden settlement kind (`SUPPORTED_SETTLEMENT_KINDS`,
+the anchor vocabulary minus the hidden kinds), with non-blank day and night strings
+bounded at 256 code points. `load_policy` rejects a missing, unknown, blank or
+over-bound row, so a settlement kind the policy cannot describe is a load-time
+error, never an invented silhouette. `world/rules/sight.py::settlement_sources`
+selects the silhouette by kind and light column (day for the day and twilight
+columns, night for the night column) and never reads a location name, a
+description, a registry key or a district landmark name.
+`test_unlit_settlement_uses_kind_silhouette_not_identity` proves that an unlit
+settlement whose identifying anchor key is a sentinel produces exactly the four
+wire keys, the policy silhouette, a null name and no trace of the identity.
+Missing-kind, blank, over-bound, non-text and duplicate-phase rejections are
+covered by `PolicyValidationTests`. No shipped district value was added.
 
 - [wilderness-elevation-runtime](../wilderness-elevation-runtime/design.md) must land first.
 
@@ -36,10 +53,36 @@ Use synthetic documents, policies and parties with independent expected results.
 
 Requirement IDs must come from tools.spec_traceability list on the equivalent merged spec tree, never hand-composed. Before sync associate only the nearest current canonical requirement and report the temporary mapping per docs/development/spec-test-traceability.md. Sync remounts to the generated IDs with no uncovered requirements or waiver. Modified requirements retain identity except an explicit RENAMED window title. Mechanism tests must exist before that sync.
 
+### Recorded requirement mapping (apply handoff)
+
+Both delta requirements and every scenario are new. `tools.spec_traceability list`
+(2645 canonical requirements at apply time) contains no `wilderness-sight`
+requirement yet, so no `covers_requirement` annotation may be attached to this
+delta: the IDs below do not exist until sync. The nearest current canonical
+requirement is recorded per new requirement as the temporary association, and
+the remount replaces it after sync:
+
+| Delta requirement | Nearest current canonical requirement (temporary) | Evidence test |
+| --- | --- | --- |
+| Ground sight derives from phase and observer inputs | `wilderness-map-provider::get-location-name-and-at-prepare-room-delegate-to-the-deterministic-terrain-model` | `world.rules.tests.test_sight` — `LightPhaseTests`, `GroundRadiusTests`, `GroundDiscTests`, `PolicyValidationTests` |
+| Distant sightings disclose approximate current observations | `map-districts::district-lighting-is-derived-from-visited-landmark-identity` | `world.rules.tests.test_sight` — `DistantMarkerTests`, `BearingAndDistanceTests` |
+
+Remount target after the archive sync (generated by the tool from the delta
+requirement titles; the post-sync `tools.spec_traceability list` is the
+authority and must confirm them before any annotation is added):
+
+- `wilderness-sight::ground-sight-derives-from-phase-and-observer-inputs`
+- `wilderness-sight::distant-sightings-disclose-approximate-current-observations`
+
+No requirement is waived or left uncovered: each has a discoverable mechanism
+test named from its mechanism, covering both the raising and non-raising cases
+of every delta scenario. Sync itself attaches the annotations; this change
+stops before sync, as the proposal requires.
+
 ## Risks / Trade-offs
 
 [Read side effects] -> Pure projections and object/Attribute/clock snapshots in integration tests. [Shared files] -> Serialize shard-manifest, schema and documentation changes even when roots are independent. [Data echo tests] -> Assert mechanics on synthetic fixtures and treat visual review separately. No new permanent lighting or walking state is allowed.
 
 ## Rollout / Rollback
 
-Apply only after dependencies land. Development database reset is needed for the schema2 cutover; never automate deleting the user's database. No migration or dual decoder is added. Rollback is source reversal and a deliberate development reset where applicable. This proposal task does not start apply, sync or archive.
+Apply only after dependencies land. This change writes no persistent state, so no database reset is needed here; the map-knowledge schema-2 cutover and its deliberate development reset belong to the later ground-reveal change. No migration or dual decoder is added. Rollback is source reversal for the policy, the module and the optional district fields. This proposal task does not start apply, sync or archive.

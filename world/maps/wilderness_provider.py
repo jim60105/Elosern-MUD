@@ -174,6 +174,19 @@ def region_for_coordinates(x: int, y: int) -> str:
     return core_terrain.region_for_coordinates(terrain_definition(), x, y)
 
 
+def sight_terrain_class(coordinates: tuple[int, int]) -> str:
+    """The sight rulebook's terrain row for the region at ``coordinates``.
+
+    Sight classifies terrain for visibility, which is not the travel-cost
+    terrain class; the policy owns the join and here the provider merely
+    delegates one published region key to it.
+    """
+
+    from world.rules.sight import sight_terrain_class as _row_for_region
+
+    return _row_for_region(region_for_coordinates(*coordinates))
+
+
 def nominal_nation_for_coordinates(x: int, y: int) -> str:
     """Return the one nation that nominally claims ``(x, y)``."""
     return core_terrain.nominal_nation_for_coordinates(terrain_definition(), x, y)

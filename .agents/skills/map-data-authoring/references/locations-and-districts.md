@@ -93,6 +93,39 @@ node reference with the node's current cell.
   and it must be **≥ 100 km** from every other Voronoi landmark. The target
   district size is about 200 km.
 
+### Optional distant-sighting fields
+
+A district may also author how it is seen from far away. All four fields are
+optional and absent fields stay absent; the editor never invents a value.
+
+```yaml
+  march_watch_hills:
+    # ...name, landmark, kind and region_key as above...
+    vantage: true            # this landmark's cell widens ground sight
+    sight_km: 30             # daytime sighting range in km
+    light_km: 12             # night (light) range in km; omit for a dark place
+    silhouette_zh: 一座燃著燈火的石塔哨所   # what a distant viewer sees
+```
+
+- `vantage` is a boolean and defaults to false. Only `true` makes the
+  landmark's wilderness cell a widened-viewpoint cell.
+- `sight_km` and `light_km` are finite non-negative numbers. `light_km`
+  describes a light source such as a lighthouse beacon, so a place with no
+  night light omits it. Twilight reads `sight_km` scaled by the sight
+  rulebook's twilight factor.
+- `silhouette_zh` is non-blank text of at most 256 code points. A **positive**
+  `sight_km` or `light_km` requires it: an authored range is never anonymous.
+- `silhouette_zh` is authored prose, in the fantasy idiom of the world and
+  never naming a command, mechanic or UI element. It is human-reviewed, like
+  other authored wording, not a value a test pins.
+- The sight rules themselves (light phases, radius rows, factors and the
+  anonymous settlement silhouettes) belong to
+  `world/rules/rulebook/sight.yaml`; see
+  [距離制旅行與地形耗時](../../../../docs/development/distance-based-travel.md).
+  A wild cell landmark with a range is a distant-sighting source; a landmark
+  that references a settlement merges with that settlement's automatic
+  source instead of producing a second marker.
+
 ### Diagnostics
 
 Structure errors block loading:

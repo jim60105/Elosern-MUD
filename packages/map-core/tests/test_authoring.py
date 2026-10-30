@@ -17,7 +17,7 @@ from elosern_map_core.authoring import (
     gate_approach_cell,
     load_authoring_world,
 )
-from elosern_map_core.codec import document_from_data, serialize_document
+from elosern_map_core.codec import document_from_data, parse_document, serialize_document
 from elosern_map_core.diagnostics import (
     AuthoringError,
     RuntimeRejection,
@@ -352,6 +352,98 @@ def test_region_declarations_reject_incomplete_or_duplicate_authoring(mutator, c
     with pytest.raises(AuthoringError) as captured:
         load_authoring_world(fixtures.custom_sources(continent=continent))
     assert code in _codes(captured.value)
+
+
+def _district_with_sight(**fields):
+    """The synthetic district fixture with optional sight fields applied."""
+
+    districts = fixtures.districts_data()
+    districts["districts"]["demo_district"].update(fields)
+    return districts
+
+
+def test_district_sight_fields_survive_parse_and_serialization():
+    world = load_authoring_world(
+        fixtures.custom_sources(
+            settlement=fixtures.settlement_data(),
+            districts=_district_with_sight(
+                vantage=True, sight_km=12, light_km=4.5, silhouette_zh="合成側影"
+            ),
+        )
+    )
+    assert world.diagnostics == ()
+    district = world.districts.districts["demo_district"]
+    assert district.vantage is True
+    assert district.sight_km == 12.0
+    assert district.light_km == 4.5
+    assert district.silhouette_zh == "合成側影"
+
+    # The authored numbers are preserved through one serialize/reparse cycle.
+    source_row = world.districts.data["districts"]["demo_district"]
+    assert source_row["sight_km"] == 12
+    assert source_row["light_km"] == 4.5
+    reparsed = parse_document(
+        fixtures.DISTRICTS_PATH, serialize_document(world.districts)
+    ).document
+    reparsed_row = reparsed.districts["demo_district"]
+    assert reparsed_row.vantage is True
+    assert reparsed_row.sight_km == 12.0
+    assert reparsed_row.light_km == 4.5
+    assert reparsed_row.silhouette_zh == "合成側影"
+
+    # An unauthored district keeps every optional field absent; no value is
+    # invented for it.
+    plain = load_authoring_world(
+        fixtures.custom_sources(settlement=fixtures.settlement_data())
+    ).districts.districts["demo_district"]
+    assert plain.vantage is False
+    assert plain.sight_km is None
+    assert plain.light_km is None
+    assert plain.silhouette_zh is None
+
+
+@pytest.mark.parametrize(
+    ("fields", "expected_code"),
+    [
+        # A positive daytime range without a silhouette is anonymous.
+        ({"sight_km": 8}, "missing_field"),
+        # A positive night range alone is just as anonymous.
+        ({"light_km": 3}, "missing_field"),
+        # A whitespace-only silhouette is not authored text.
+        ({"sight_km": 8, "silhouette_zh": "   "}, "invalid_field_value"),
+        # The silhouette bound is counted in code points.
+        ({"sight_km": 8, "silhouette_zh": "字" * 257}, "invalid_field_value"),
+        # Ranges are finite non-negative numbers, never strings or booleans.
+        ({"sight_km": -1, "silhouette_zh": "合成側影"}, "invalid_field_value"),
+        ({"sight_km": "8", "silhouette_zh": "合成側影"}, "invalid_field_value"),
+        ({"light_km": True, "silhouette_zh": "合成側影"}, "invalid_field_value"),
+        # A decimal integer beyond the float range is a diagnostic, not a crash.
+        ({"sight_km": 10**400, "silhouette_zh": "合成側影"}, "invalid_field_value"),
+        # Vantage is a boolean.
+        ({"vantage": "yes"}, "invalid_field_value"),
+    ],
+)
+def test_district_sight_fields_reject_invalid_authoring(fields, expected_code):
+    with pytest.raises(AuthoringError) as captured:
+        load_authoring_world(
+            fixtures.custom_sources(
+                settlement=fixtures.settlement_data(),
+                districts=_district_with_sight(**fields),
+            )
+        )
+    assert expected_code in _codes(captured.value)
+
+
+def test_a_zero_range_or_bound_is_legal_without_a_silhouette():
+    world = load_authoring_world(
+        fixtures.custom_sources(
+            settlement=fixtures.settlement_data(),
+            districts=_district_with_sight(sight_km=0, light_km=0),
+        )
+    )
+    assert world.diagnostics == ()
+    district = world.districts.districts["demo_district"]
+    assert (district.sight_km, district.light_km, district.silhouette_zh) == (0.0, 0.0, None)
 
 
 def test_elevation_shapes_valid_candidate_loads_and_preserves_order():

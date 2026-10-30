@@ -304,6 +304,7 @@ def _validate_game_joins(
     from world.lore.monster_species import MONSTER_SPECIES_REGISTRY
     from world.lore.nations import NATION_REGISTRY
     from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
+    from world.rules.sight import validate_sight_region_coverage
     from world.rules.travel_cost import validate_wilderness_region_coverage
 
     problems: list[str] = []
@@ -350,6 +351,10 @@ def _validate_game_joins(
             )
     try:
         validate_wilderness_region_coverage(regions)
+    except ValueError as error:
+        problems.append(str(error))
+    try:
+        validate_sight_region_coverage(regions)
     except ValueError as error:
         problems.append(str(error))
     return problems

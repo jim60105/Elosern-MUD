@@ -556,6 +556,12 @@ def _project(world, layouts: Mapping[str, dict[str, Any]]) -> dict[str, Any]:
                 "landmark": thaw(world.districts.data["districts"][district_id]["landmark"]),
                 "kind": district.kind,
                 "region_key": district.region_key,
+                # Optional distant-sighting authoring; absent values stay
+                # absent so the editor never invents a range or a silhouette.
+                "vantage": district.vantage,
+                "sight_km": district.sight_km,
+                "light_km": district.light_km,
+                "silhouette_zh": district.silhouette_zh,
             }
             for district_id, district in world.districts.districts.items()
         ],

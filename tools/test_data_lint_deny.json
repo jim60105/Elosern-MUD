@@ -61,6 +61,12 @@
       "token": "bandit"
     },
     {
+      "evidence": "world/rules/rulebook/sight.yaml top-level schema fields (catalog payload field names)",
+      "reason": "sight.yaml schema field name; the loader tests must build policy dicts under this key",
+      "rule": "schema-structural",
+      "token": "canopy_terrain"
+    },
+    {
       "evidence": "world/rules/rulebook/clock.yaml top-level schema fields (catalog payload field names)",
       "reason": "clock.yaml schema field name (also named in design D1)",
       "rule": "schema-structural",
@@ -235,16 +241,34 @@
       "token": "options"
     },
     {
+      "evidence": "world/quests/scene_package.py:198",
+      "reason": "proven present in non-test production corpus outside catalog modules (world/quests/scene_package.py:198, world/ai/scenario_director/packages.py:373); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "phases"
+    },
+    {
       "evidence": "web/webclient-app/stories/fixtures/party_panels.js:487",
       "reason": "proven present in non-test production corpus outside catalog modules (web/webclient-app/stories/fixtures/party_panels.js:487); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "potion"
     },
     {
+      "evidence": "world/rules/rulebook/sight.yaml top-level schema fields (catalog payload field names)",
+      "reason": "sight.yaml schema field name; the loader tests must build policy dicts under this key",
+      "rule": "schema-structural",
+      "token": "prominence_bonus"
+    },
+    {
       "evidence": "world/rules/rulebook/defeat_aftermath.yaml section key 'recovery'",
       "reason": "structural schema key of defeat aftermath rulebook colliding with generic recovery rate profile keyword",
       "rule": "schema-structural",
       "token": "recovery"
+    },
+    {
+      "evidence": "world/rules/rulebook/sight.yaml top-level schema fields (catalog payload field names)",
+      "reason": "sight.yaml schema field name; the loader tests must build policy dicts under this key",
+      "rule": "schema-structural",
+      "token": "region_terrain"
     },
     {
       "evidence": "web/static/webclient/js/elosern/protocol/panels/status.js:135",
@@ -289,6 +313,18 @@
       "evidence": "world/rules/combat/healing.py:169"
     },
     {
+      "evidence": "world/rules/rulebook/sight.yaml top-level schema fields (catalog payload field names)",
+      "reason": "sight.yaml schema field name; the loader tests must build policy dicts under this key",
+      "rule": "schema-structural",
+      "token": "settlement_footprint_factor"
+    },
+    {
+      "evidence": "world/rules/rulebook/sight.yaml top-level schema fields (catalog payload field names)",
+      "reason": "sight.yaml schema field name; the loader tests must build policy dicts under this key",
+      "rule": "schema-structural",
+      "token": "settlement_silhouettes"
+    },
+    {
       "evidence": "world/rules/guild_config/_shops.py:30",
       "reason": "proven present in non-test production corpus outside catalog modules (world/rules/guild_config/_shops.py:30); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
@@ -307,10 +343,28 @@
       "token": "sw"
     },
     {
+      "evidence": "world/rules/rulebook/sight.yaml top-level schema fields (catalog payload field names)",
+      "reason": "sight.yaml schema field name; the loader tests must build policy dicts under this key",
+      "rule": "schema-structural",
+      "token": "terrain_radius"
+    },
+    {
       "evidence": "tools/verify_coverage_roots.py:16",
       "reason": "proven present in non-test production corpus outside catalog modules (tools/verify_coverage_roots.py:16); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "tool"
+    },
+    {
+      "evidence": "world/rules/rulebook/sight.yaml top-level schema fields (catalog payload field names)",
+      "reason": "sight.yaml schema field name; the loader tests must build policy dicts under this key",
+      "rule": "schema-structural",
+      "token": "twilight_factor"
+    },
+    {
+      "evidence": "world/rules/rulebook/sight.yaml top-level schema fields (catalog payload field names)",
+      "reason": "sight.yaml schema field name; the loader tests must build policy dicts under this key",
+      "rule": "schema-structural",
+      "token": "vantage_radius"
     },
     {
       "evidence": "commands/skip.py:124",
