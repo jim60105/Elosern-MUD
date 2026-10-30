@@ -8,7 +8,7 @@ Read design.md contracts before starting each group. Paths without a web/ prefix
 
 ## 2. One decoder and real overlays
 
-- [ ] 2.1 Extract the prerequisite decoder to lib/wilderness-grid.js and migrate both AreaMapView and TravelMap; delete the temporary node adapter and obsolete tests. Add tests/travel/window.test.js for run sums, origin axes, sparse nodes, unknown rejection, stale map and phase/radius passthrough; wire PlaceCard/chips from display facts. Acceptance: pnpm test -- web/webclient-app/tests/travel/window.test.js exits0; changing supplied radius/phase changes presentation without a client rule lookup.
+- [ ] 2.1 Extract the prerequisite decoder to lib/wilderness-grid.js and migrate both AreaMapView and TravelMap; delete the temporary node adapter and obsolete tests. Add tests/travel/window.test.js for run sums, origin axes, sparse nodes, unknown rejection, stale map and phase/radius passthrough; wire PlaceCard/chips from display facts. Acceptance: pnpm test -- web/webclient-app/tests/travel/window.test.js exits0; changing supplied radius/phase changes presentation without a client rule lookup. Preserve the base refreshing versus unavailable/invalid/retired lifecycle; cover normal queued continuation after refresh and one same-position sync recovery request without recursive map refresh.
 
 ## 3. Canonical event enrichment
 
