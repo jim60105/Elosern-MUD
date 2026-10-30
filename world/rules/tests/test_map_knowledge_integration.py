@@ -296,6 +296,9 @@ class MapKnowledgePruneTests(EvenniaTest):
         self.assertIn(f"room:{self.room1.id}", _node_ids(affected))
         self.assertIn(f"room:{self.room1.id}", _node_ids(unaffected))
 
+    @covers_requirement(
+        "wilderness-knowledge-chunks::wilderness-observations-are-chunk-addressed"
+    )
     def test_prune_reclaimed_room_preserves_wilderness_chunks(self):
         room = create_object(InstanceRoom, key="prune_with_wild")
         self.char1.attributes.add(

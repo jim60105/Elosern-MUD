@@ -167,7 +167,10 @@ class KnowledgeParseTests(_RegisteredVocabularyTests):
             ],
         )
 
-    @covers_requirement("map-knowledge::parse-knowledge-isolates-corrupt-records-without-resetting-them")
+    @covers_requirement(
+        "map-knowledge::parse-knowledge-isolates-corrupt-records-without-resetting-them",
+        "wilderness-knowledge-chunks::wilderness-observations-are-chunk-addressed",
+    )
     def test_corrupt_records_raise_and_are_not_reset(self):
         corrupt = [
             None,
@@ -252,7 +255,10 @@ class KnowledgeParseTests(_RegisteredVocabularyTests):
                     parse_knowledge(character)
                 self.assertEqual(character.attributes.get("map_knowledge"), record)
 
-    @covers_requirement("map-knowledge::map-knowledge-py-is-the-sole-writer-of-a-versioned-visited-node-record")
+    @covers_requirement(
+        "map-knowledge::map-knowledge-py-is-the-sole-writer-of-a-versioned-visited-node-record",
+        "wilderness-knowledge-chunks::wilderness-observations-are-chunk-addressed",
+    )
     def test_has_visited_and_visits_in_bounds(self):
         # Build record with 2 distant chunks: chunk 0:0 and chunk 10:10
         # In chunk 0:0, cell (1, 2) -> offset = 2 * 64 + 1 = 129
@@ -318,7 +324,10 @@ class KnowledgeParseTests(_RegisteredVocabularyTests):
         # Non-intersecting query returns empty
         self.assertEqual(visits_in_bounds(char, (200, 200, 210, 210)), [])
 
-    @covers_requirement("map-knowledge::map-knowledge-py-is-the-sole-writer-of-a-versioned-visited-node-record")
+    @covers_requirement(
+        "map-knowledge::map-knowledge-py-is-the-sole-writer-of-a-versioned-visited-node-record",
+        "wilderness-knowledge-chunks::wilderness-observations-are-chunk-addressed",
+    )
     def test_bounded_query_ignores_distant_corrupt_chunk_entries(self):
         # Distant chunk 10:10 has a corrupt entry (sight=99), but chunk 0:0 is valid.
         # visits_in_bounds for chunk 0:0 must succeed without inspecting chunk 10:10's entries.
@@ -351,7 +360,10 @@ class KnowledgeParseTests(_RegisteredVocabularyTests):
         with self.assertRaises(KnowledgeError):
             parse_knowledge(char)
 
-    @covers_requirement("map-knowledge::map-knowledge-py-is-the-sole-writer-of-a-versioned-visited-node-record")
+    @covers_requirement(
+        "map-knowledge::map-knowledge-py-is-the-sole-writer-of-a-versioned-visited-node-record",
+        "wilderness-knowledge-chunks::wilderness-observations-are-chunk-addressed",
+    )
     def test_edge_padding_and_frame_boundary_validation(self):
         max_x = wilderness_provider.WILDERNESS_MAX_X
         max_y = wilderness_provider.WILDERNESS_MAX_Y
