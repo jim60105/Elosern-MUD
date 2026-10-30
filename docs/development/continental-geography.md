@@ -296,6 +296,47 @@ SHA-256 fingerprint of the algorithm version, districts and input rasters.
 Lookup checks the mainland polygon first, then the exception tile, then the
 tile run.
 
+## Offline elevation generation
+
+`packages/map-core/elosern_map_core/elevation.py` owns the deterministic
+physical relief of the wilderness frame. `generate_elevation(terrain, shapes,
+config)` returns two `uint8` rasters indexed `[y, x]` over the explicit
+`TerrainDefinition`: elevation bands `0..15` and prominence tiers `0..3`.
+Generation is offline and offline-only: the module needs the core package's
+optional `generation` extra (NumPy and SciPy), the package `__init__` never
+imports it, and no runtime, codec, startup loader or production artifact in
+this slice reads it.
+
+Stages run in one fixed order:
+
+1. Land from `mainland_row_intervals`, inland water from `waterway_cells`, a
+   linear capped coastal rise from the Euclidean distance to sea, the
+   ridge-centre mountain rise across the authored corridor and river carving;
+   land is never negative.
+2. Domain-warped multi-octave value noise. The lattice hash is an integer
+   avalanche mix (xor shifts 16/15/16 with the MurmurHash3 finalizer
+   multipliers `0x7FEB352D`/`0x846CA68B` and explicit `uint32` overflow), never
+   a coordinate-linear congruential hash. Region amplitudes keep
+   `hills > open > coast`; the two forest regions are canopy.
+3. The ordered authored shapes apply strictly in declaration order. `raise` and
+   `lower` add or subtract `amount * weight`, `flatten` blends towards
+   `target_band`, and `no_prominence` records the final override mask. The
+   feather weight is 1 inside a shape (a lattice cell on an edge is interior)
+   and decreases linearly to 0 over `feather` cells outside it.
+4. Fixed-configuration quantization to bands `0..15`. Sea returns to band 0 and
+   every river cell is clamped to its immediate land banks (four-connected
+   first, eight-connected fallback; a mouth with no land bank stays sea).
+5. Ring-mean prominence becomes tiers `0..3` through the configured thresholds.
+   Sea, canopy and `no_prominence` cells are always tier 0, and four-connected
+   components smaller than `min_cluster_area` are cleared.
+
+Every seed, octave, wavelength, amplitude, ring radius, threshold and cluster
+minimum lives in the one immutable versioned `ElevationConfig`
+(`DEFAULT_ELEVATION_CONFIG` is the authored default). Synthetic small-frame
+tests inject known configs; they never pin shipped geography or raster
+snapshots. The published artifact and its runtime handoff are explicitly out of
+this slice.
+
 ## Declarations
 
 | Owner | Declaration | Contract |

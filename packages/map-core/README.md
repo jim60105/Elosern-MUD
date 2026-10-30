@@ -179,6 +179,26 @@ uv run --locked --extra generation python -m pytest tests
 - `compute_partition`, `compute_outlines`, `encode`, `serialize`, `fingerprint`
   — the individual stages, for focused assertions.
 
+### `elosern_map_core.elevation` (the `generation` extra)
+
+The offline deterministic elevation and prominence generator. It needs NumPy
+and SciPy; the runtime surface above never imports it:
+
+- `ElevationConfig` — the one immutable versioned record for every seed,
+  octave, wavelength, amplitude, ring radius, prominence threshold and cluster
+  minimum; `DEFAULT_ELEVATION_CONFIG`, `ELEVATION_CONFIG_VERSION`.
+- `generate_elevation(terrain, shapes, config)` — `ElevationRasters(bands,
+  tiers)`, both `[y, x]` `uint8` arrays over the explicit `TerrainDefinition`.
+  Sea is band 0, river cells never exceed their immediate land banks, sea /
+  canopy / `no_prominence` cells are tier 0, and repeat calls return identical
+  bytes.
+- `fractal_noise(width, height, config)` — the domain-warped multi-octave value
+  noise field, for the residual-autocorrelation assertion.
+- `region_amplitudes(terrain, config)` — the per-cell region noise amplitude.
+- `shape_weight(shape, width, height)` — the linear feather weight of one
+  authored shape.
+- `ELEVATION_BAND_MAX`, `PROMINENCE_TIER_MAX`, `CANOPY_REGIONS`.
+
 ## Cache ownership
 
 Derived tables belong to the definition instance that produced them:
@@ -195,7 +215,7 @@ Graph objects cache only their own derived adjacency and coordinate index.
 uv run --locked python -m pytest          # inside this directory
 ```
 
-The partition generator tests need the extra (CI uses this form):
+The partition and elevation generator tests need the extra (CI uses this form):
 `uv run --locked --extra generation python -m pytest tests`.
 
 The game project consumes this package through its own `uv.lock`; the package
