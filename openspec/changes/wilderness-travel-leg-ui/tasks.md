@@ -4,7 +4,7 @@ Read design.md contracts before starting each group. Paths without a web/ prefix
 
 ## 1. Capacity read model and status cutover
 
-- [ ] 1.1 Implement build_travel_status and capacity_by_stage using detached canonical traversal/prediction, exact status6 fields and Python/JS validators. Extend existing status tests and add world/rules/tests/test_travel_capacity.py with independent sequential assertions, no-create snapshots, possession, flight and refusal; register one evennia shard. Update protocol/status documentation. Acceptance: focused Evennia capacity/status tests and mirrored Node status tests exit0; current terrain capacity performs no neighbour discovery or game writes.
+- [ ] 1.1 Implement build_travel_status and capacity_by_stage using detached canonical traversal/prediction, exact status6 fields and Python/JS validators. Extend existing status tests and add world/rules/tests/test_travel_capacity.py with independent sequential assertions, no-create snapshots, possession, flight and refusal; register one evennia shard. Update protocol/status documentation. Acceptance: focused Evennia capacity/status tests and mirrored Node status tests exit0; current terrain capacity performs no neighbour discovery or game writes. Require seconds:null for every shared-projection-withheld destination while keeping its opaque move executable; compare complete pre-move publications with differing hidden target terrains and require indistinguishable quotes. Count an admitted terminal forced_sleep arrival in severe capacity before ending prediction, with independent exact-zero counts/duration assertions.
 
 ## 2. Preference contract
 
@@ -12,7 +12,7 @@ Read design.md contracts before starting each group. Paths without a web/ prefix
 
 ## 3. Leg surface and actions
 
-- [ ] 3.1 Implement leg-model.js/LegPanel.vue and mount it in AppClient, preserving Stop/aim behavior; migrate and delete TravelWalkControls. Wire real guarded look and existing sleep card through openTravelCamp; do not add camping rules. Add tests/travel/leg.test.js for every intent state, independent capacity ticks, disabled actions and non-colour stage cues; update controls HelpOverlay. Acceptance: pnpm test -- web/webclient-app/tests/travel/leg.test.js exits0; absent plan disables Depart and a look sends exactly explore.look {room:true}.
+- [ ] 3.1 Implement leg-model.js/LegPanel.vue and mount it in AppClient, preserving Stop/aim behavior; migrate and delete TravelWalkControls. Wire real guarded look and existing sleep card through openTravelCamp; do not add camping rules. Add tests/travel/leg.test.js for every intent state, independent capacity ticks, disabled actions and non-colour stage cues; update controls HelpOverlay. Acceptance: pnpm test -- web/webclient-app/tests/travel/leg.test.js exits0; absent plan disables Depart and a look sends exactly explore.look {room:true}. Use one shared terminal-stage display mapping: preserve forced_sleep data but show a severe-height/rust-ring tick plus crescent and sleep accessible label. Keep Stop usable during refresh and test exact-zero plans.
 
 ## 4. Accessible production evidence
 

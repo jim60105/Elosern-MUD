@@ -48,4 +48,4 @@ Status SHALL use exact schema6 with canonical resources, actor, conditions, fati
 
 #### Scenario: Capacity shape is bounded and opaque
 - **WHEN** wilderness capacity and neighbour duration quotes serialize, or the actor leaves wilderness
-- **THEN** exact bounded stage counts, advisory pace state and exit_ref/seconds quotes expose no hidden target facts, and travel_capacity is null outside wilderness
+- **THEN** exact bounded stage counts, advisory pace state and exit_ref/seconds quotes expose no hidden target facts, withheld destination quotes are null, terminal admitted forced_sleep counts in severe, and travel_capacity is null outside wilderness

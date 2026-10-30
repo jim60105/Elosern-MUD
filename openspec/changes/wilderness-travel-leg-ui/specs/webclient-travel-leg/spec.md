@@ -17,6 +17,14 @@ Wilderness status SHALL supply read-only per-stage foot-capacity counts and curr
 - **WHEN** non-wilderness, corrupt capacity inputs and malformed wire counts/quotes are supplied
 - **THEN** non-wilderness or unreadable capacity is null, malformed wire facts reject and no hidden destination metadata serializes
 
+#### Scenario: Opaque directions hide cost information
+- **WHEN** undisclosed neighbours differ only in hidden terrain or duration
+- **THEN** every pre-move quote remains null and indistinguishable while the existing opaque control remains executable
+
+#### Scenario: Exact-zero admitted arrival remains counted
+- **WHEN** the final legal foot step reaches zero reserve and its canonical after-stage is forced_sleep
+- **THEN** the capacity counts that step in the severe display bucket before ending, preserving its real admitted duration and canonical sleep result
+
 ### Requirement: Leg panel projects supplied state and persisted preferences
 The leg panel SHALL present aim, capacity, plan, walking and error states from supplied facts with non-colour ticks and persisted pace/night preferences that remain fixed while walking.
 
