@@ -9,7 +9,7 @@
 
 The AVG stage (`HudFrame.vue`) is built for one place, a few people, and one conversation. It assumes that scene changes are rare and that each one deserves a performance. Wilderness travel inverts every assumption:
 
-- The decision data for travel is spatial: terrain, distance, fords, passes, and how far the party can still walk. The stage gives most of the screen to one backdrop that does not change for hundreds of kilometres, and squeezes the map into a corner minimap and a drawer.
+- The decision data for travel is spatial: terrain, distance, fords, and how far the party can still walk. The stage gives most of the screen to one backdrop that does not change for hundreds of kilometres, and squeezes the map into a corner minimap and a drawer.
 - Every 1 km step costs 20 to 40 minutes of game time and produces a paragraph of narration. Players either read every paragraph or learn to ignore the message band.
 - The stage polish proposed earlier (step parallax, day-night filters, marching bob) animates a surface that players should not be looking at during travel.
 
@@ -93,7 +93,7 @@ The map tint has four phases: dawn, day, dusk, and night. At night, revealed cel
 
 In scope:
 
-- Ground sight radius by terrain and time of day, enlarged at vantage points such as hilltops, passes, and watch-tower landmarks. Ground sight reveals terrain, passability, fords, roads, and monsters.
+- Ground sight radius by terrain and time of day, enlarged by elevation prominence and by authored vantage landmarks. Ground sight reveals terrain, passability, fords, roads, and monsters.
 - Permanent reveal: every cell that has entered ground sight stays revealed and can be a destination. This replaces the current visited-cells-only memory.
 - Distant-sighting markers: tall landmarks, mountains, and light sources beyond ground sight produce a bearing and an approximate distance without revealing cells. At night only light sources remain.
 - No change to the anti-peek rule: unrevealed cells are never sent to the browser.
@@ -101,7 +101,7 @@ In scope:
 
 Questions for its spec: the sight radius per terrain and time of day, and the sighting distances; who owns the reveal record (character, account, or party); its storage format and size bound; how to enlarge the `area_map` window and packet limit; whether sighting a landmark lights its district; and how to migrate existing visit records.
 
-Working figures for the spec to confirm (cells, daytime): open ground and coast 4; hills and valleys 3; mountain trail 2; woodland and deep forest 1; vantage points 6 to 8. Reference: the geometric horizon for a 1.7 m eye is about 4.7 km, and a 30 m tower top is visible from about 24 km.
+The detailed design is in [Wilderness Sight and Fog Reveal](2026-10-30-wilderness-sight-and-fog-reveal-design.md).
 
 ### 7.2 Sub-project 2: travel-mode interface
 
