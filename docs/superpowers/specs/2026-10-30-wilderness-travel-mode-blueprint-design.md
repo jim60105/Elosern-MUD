@@ -105,12 +105,16 @@ The detailed design is in [Wilderness Sight and Fog Reveal](2026-10-30-wildernes
 
 ### 7.2 Sub-project 2: travel-mode interface
 
+The detailed design is in [Wilderness Travel-Mode Interface](2026-10-30-wilderness-travel-interface-design.md).
+
 In scope: the layout in section 4, both inputs and the pace setting in section 5, the map tint, the travel log, the leg panel, event cards, and the settlement transitions. The layout and step-by-step movement can ship before sub-project 1; the destination input waits for `travel.plan`.
 
 ### 7.3 Sub-project 3: lightweight camping
 
+The detailed design is in [Lightweight Wilderness Camping](2026-10-30-wilderness-camping-design.md).
+
 - 紮營 opens one camp card with one main choice: 睡到天亮 (default after nightfall) or 睡到精力全滿 (default in daytime). Camping from dusk to dawn takes about 12 hours, which covers a full refill.
-- The dream-collaboration question becomes a remembered checkbox on the card instead of a separate prompt after falling asleep.
+- The dream-collaboration question becomes a checkbox on the card, unchecked every time; ticking it is that sleep's explicit opt-in, replacing the separate prompt after falling asleep.
 - One confirmation puts the whole party to sleep.
 - The camp event card shows a campfire scene illustration with anonymous seated silhouettes painted into the art. The party appears as the same round medallions used in travel, in an arc along the card's lower edge; each reserve bar fills from its pre-sleep to its post-sleep value, and sleepers carry a moon mark. Standing portraits are not reused, because the `data-fallen="down"` deformation does not read as sitting. After about 1.5 seconds the result line appears (for example 「夜裡無事。全隊精力恢復至 100%，第 13 日 05:50」) and the map returns. The card is skippable; at motion level `off` the result shows directly.
 - When a member is forced asleep while walking, the existing handoff menu stays, with 全員紮營 as its first option leading to the camp card.
