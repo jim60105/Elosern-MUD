@@ -6,14 +6,19 @@ import math
 import unittest
 from unittest import mock
 
+from tools.spec_traceability import covers_requirement
 from elosern_map_core.elevation_codec import (
     DEFAULT_CONFIG_DIGEST,
     ELEVATION_ALGORITHM_VERSION,
     ELEVATION_FORMAT_VERSION,
+    ELEVATION_TILE_CELLS,
     ElevationBoundsError,
     ElevationDocumentError,
     ElevationMetadata,
     ElevationTileCorruptionError,
+    compute_data_sha256,
+    elevation_fingerprint,
+    elevation_source_signature,
     encode_tile,
 )
 from world.maps import elevation, runtime
@@ -129,6 +134,45 @@ class ElevationRuntimeLogicTests(unittest.TestCase):
         self.assertNotIn((different_fp, 0, 0), cache)
         self.assertIsNone(cache.get((different_fp, 0, 0)))
 
+    def test_runtime_lookups_match_packed_bytes_on_partial_frame(self):
+        """Lookups must match packed bytes, including partial edge tiles ending inside the frame."""
+        frame = 70  # ceil(70/64) = 2, so 2x2 = 4 tiles total
+        bands = [[(x + y * 2) % 16 for x in range(frame)] for y in range(frame)]
+        tiers = [[(x * 3 + y) % 4 for x in range(frame)] for y in range(frame)]
+
+        num_tiles = math.ceil(frame / ELEVATION_TILE_CELLS)
+        tiles_map = {}
+        tiles_list = []
+        for ty in range(num_tiles):
+            for tx in range(num_tiles):
+                b64 = encode_tile(bands, tiers, tx, ty, frame_cells=frame)
+                tiles_map[(tx, ty)] = b64
+                tiles_list.append({"x": tx, "y": ty, "data": b64})
+
+        sig = elevation_source_signature("test_fp", DEFAULT_CONFIG_DIGEST, ELEVATION_ALGORITHM_VERSION)
+        fp = elevation_fingerprint(sig)
+        data_hash = compute_data_sha256(tiles_list, frame_cells=frame)
+        metadata = ElevationMetadata(
+            format_version=ELEVATION_FORMAT_VERSION,
+            algorithm_version=ELEVATION_ALGORITHM_VERSION,
+            source_signature=sig,
+            fingerprint=fp,
+            frame_cells=frame,
+            tile_cells=ELEVATION_TILE_CELLS,
+            data_sha256=data_hash,
+        )
+        synth_runtime = elevation.ElevationRuntime(metadata, tiles_map)
+
+        # Test corner and boundary cells
+        sample_cells = [(0, 0), (10, 20), (63, 63), (64, 64), (69, 69)]
+        for x, y in sample_cells:
+            expected_band = bands[y][x]
+            expected_tier = tiers[y][x]
+            self.assertEqual(synth_runtime.cell_elevation(x, y), (expected_band, expected_tier))
+            self.assertEqual(synth_runtime.band(x, y), expected_band)
+            self.assertEqual(synth_runtime.prominence_tier(x, y), expected_tier)
+
+    @covers_requirement("map-runtime-adoption::runtime-adoption-publishes-one-complete-validated-world")
     def test_admission_rejection_on_missing_or_corrupt_elevation_retains_prior_bundle(self):
         """If elevation is missing or corrupt, load_candidate fails and prior bundle survives."""
         publish_shipped_map_world()

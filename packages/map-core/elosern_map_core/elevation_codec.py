@@ -217,6 +217,8 @@ def _document(source: Mapping | str) -> Mapping:
 def read_elevation_metadata(source: Mapping | str) -> ElevationMetadata:
     """Read the artifact's metadata and signatures without expanding any raster."""
     doc = _document(source)
+    if not isinstance(doc, Mapping):
+        raise ElevationDocumentError("elevation artifact root must be a mapping")
     version = doc.get("version")
     if isinstance(version, bool) or version != ELEVATION_FORMAT_VERSION:
         raise ElevationDocumentError(f"unsupported elevation version {version!r}")
@@ -237,8 +239,8 @@ def read_elevation_metadata(source: Mapping | str) -> ElevationMetadata:
     if not isinstance(source_sig, list) or not source_sig:
         raise ElevationDocumentError("source_signature must be a non-empty list")
     for item in source_sig:
-        if not isinstance(item, dict) or "identity" not in item or "digest" not in item:
-            raise ElevationDocumentError("source_signature items must have identity and digest")
+        if not isinstance(item, Mapping) or not isinstance(item.get("identity"), str) or not isinstance(item.get("digest"), str):
+            raise ElevationDocumentError("source_signature items must have string identity and digest")
 
     fingerprint = doc.get("fingerprint")
     if not isinstance(fingerprint, str) or not fingerprint:
@@ -282,6 +284,9 @@ def verify_elevation_data_integrity(
     tiles = doc.get("tiles")
     if not isinstance(tiles, list):
         raise ElevationDocumentError("tiles must be a list")
+    for idx, tile in enumerate(tiles):
+        if not isinstance(tile, Mapping):
+            raise ElevationCorruptionError(f"tile {idx} must be a mapping")
 
     computed_sha256 = compute_data_sha256(
         tiles,
@@ -363,6 +368,10 @@ def encode_tile(
             if x < frame_cells and y < frame_cells:
                 b = int(bands[y, x] if has_shape else bands[y][x])
                 t = int(tiers[y, x] if has_shape else tiers[y][x])
+                if not (0 <= b <= 15):
+                    raise ElevationDocumentError(f"band {b} at cell ({x}, {y}) out of bounds 0..15")
+                if not (0 <= t <= 3):
+                    raise ElevationDocumentError(f"prominence tier {t} at cell ({x}, {y}) out of bounds 0..3")
                 byte_val = (b << 4) | (t & 0x03)
             else:
                 byte_val = 0
@@ -390,15 +399,14 @@ def decode_tile(
     target_len = tile_cells * tile_cells
     try:
         decompressor = zlib.decompressobj()
-        decoded = decompressor.decompress(compressed, max_length=target_len)
+        decoded = decompressor.decompress(compressed, max_length=target_len + 1)
+        if len(decoded) > target_len:
+            raise ElevationTileCorruptionError(
+                f"tile ({tx}, {ty}) exceeded {target_len}-byte output ceiling"
+            )
         if len(decoded) != target_len:
             raise ElevationTileCorruptionError(
                 f"tile ({tx}, {ty}) decompressed to {len(decoded)} bytes, expected {target_len}"
-            )
-        extra = decompressor.decompress(b"", max_length=1)
-        if extra or decompressor.unconsumed_tail:
-            raise ElevationTileCorruptionError(
-                f"tile ({tx}, {ty}) exceeded {target_len}-byte output ceiling"
             )
         if decompressor.unused_data:
             raise ElevationTileCorruptionError(

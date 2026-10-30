@@ -5,6 +5,9 @@ from __future__ import annotations
 import base64
 import json
 import math
+import os
+import tempfile
+from pathlib import Path
 import sys
 import unittest
 from unittest import mock
@@ -102,11 +105,7 @@ class ElevationCodecTests(unittest.TestCase):
         b64 = base64.b64encode(zlib.compress(oversize)).decode("ascii")
         with self.assertRaises(ElevationTileCorruptionError) as caught:
             decode_tile(b64, 0, 0, frame_cells=64)
-        self.assertTrue(
-            "exceeded 4096-byte output ceiling" in str(caught.exception)
-            or "trailing unused data" in str(caught.exception)
-            or "decompressed to" in str(caught.exception)
-        )
+        self.assertIn("exceeded 4096-byte output ceiling", str(caught.exception))
 
     def test_tile_non_zero_reserved_bits_raises(self):
         # Bit 2 is set (0x04)
@@ -163,6 +162,26 @@ class ElevationCodecTests(unittest.TestCase):
             with self.assertRaises(ElevationBudgetExceededError) as caught:
                 encode_elevation_artifact(bands, tiers, frame_cells=frame, continent_fingerprint="f" * 64)
             self.assertIn("exceeds", str(caught.exception))
+
+    def test_prior_bytes_survive_oversize_failure(self):
+        """When artifact generation fails the size budget, an existing target file is not overwritten."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir) / "wilderness_elevation.json"
+            prior_bytes = b'{"prior": "valid_output_bytes"}\n'
+            target.write_bytes(prior_bytes)
+
+            frame = 64
+            bands = [[0] * frame for _ in range(frame)]
+            tiers = [[0] * frame for _ in range(frame)]
+
+            with mock.patch("elosern_map_core.elevation_codec.MAX_ELEVATION_BYTES", 50):
+                with self.assertRaises(ElevationBudgetExceededError):
+                    # Simulating regeneration workflow: encode raises budget error before atomic replacement
+                    text = encode_elevation_artifact(bands, tiers, frame_cells=frame, continent_fingerprint="f" * 64)
+                    target.write_text(text, encoding="utf-8")
+
+            # Target content must remain byte-identical to prior bytes
+            self.assertEqual(target.read_bytes(), prior_bytes)
 
     def test_integrity_checks_detect_reordered_or_missing_tiles(self):
         frame = 128

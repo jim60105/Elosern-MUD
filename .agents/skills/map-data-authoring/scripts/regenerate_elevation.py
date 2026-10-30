@@ -16,9 +16,11 @@ byte-identical to a fresh run.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import sys
 import tempfile
+from dataclasses import asdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -41,6 +43,7 @@ from elosern_map_core.elevation_codec import (  # noqa: E402
     ELEVATION_ALGORITHM_VERSION,
     ELEVATION_TILE_CELLS,
     ElevationBudgetExceededError,
+    canonical_json,
     encode_elevation_artifact,
     verify_elevation_data_integrity,
 )
@@ -50,6 +53,20 @@ ELEVATION_PATH = "content/maps/wilderness_elevation.json"
 
 def _load(root: Path):
     return load_authoring_world(discover_source_documents(root))
+
+
+def _write_atomic(target: Path, text: str) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    handle, temporary = tempfile.mkstemp(prefix=".wilderness_elevation.", dir=target.parent)
+    try:
+        with os.fdopen(handle, "w", encoding="utf-8") as stream:
+            stream.write(text)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, target)
+    except BaseException:
+        Path(temporary).unlink(missing_ok=True)
+        raise
 
 
 def main(argv: list[str]) -> int:
@@ -88,6 +105,10 @@ def main(argv: list[str]) -> int:
     terrain = terrain_definition(world.continent)
     shapes = world.continent.elevation_shapes
     config = DEFAULT_ELEVATION_CONFIG
+    config_dict = asdict(config)
+    if isinstance(config_dict.get("prominence_thresholds"), tuple):
+        config_dict["prominence_thresholds"] = list(config_dict["prominence_thresholds"])
+    config_digest = hashlib.sha256(canonical_json(config_dict).encode("utf-8")).hexdigest()
 
     print(f"generating elevation for {terrain.frame_cells}x{terrain.frame_cells} frame...")
     rasters = generate_elevation(terrain, config=config, shapes=shapes)
@@ -98,7 +119,7 @@ def main(argv: list[str]) -> int:
             tiers=rasters.tiers,
             frame_cells=terrain.frame_cells,
             continent_fingerprint=continent_fp,
-            config_digest=DEFAULT_CONFIG_DIGEST,
+            config_digest=config_digest,
             algorithm_version=ELEVATION_ALGORITHM_VERSION,
             tile_cells=ELEVATION_TILE_CELLS,
         )
@@ -132,17 +153,7 @@ def main(argv: list[str]) -> int:
         print("continent source changed during generation; nothing written, run again")
         return 1
 
-    target.parent.mkdir(parents=True, exist_ok=True)
-    handle, temporary = tempfile.mkstemp(prefix=".wilderness_elevation.", dir=target.parent)
-    try:
-        with os.fdopen(handle, "w", encoding="utf-8") as stream:
-            stream.write(text)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary, target)
-    except BaseException:
-        Path(temporary).unlink(missing_ok=True)
-        raise
+    _write_atomic(target, text)
 
     print(f"wrote {ELEVATION_PATH} ({len(text.encode('utf-8'))} bytes)")
     return 0

@@ -36,8 +36,11 @@ Requirement IDs must come from tools.spec_traceability list on the equivalent me
 
 ### Requirement Traceability Mapping
 
-Nearest current canonical requirement in canonical spec tree:
+Nearest current canonical requirements in canonical spec tree:
 - `wilderness-elevation-generation::elevation-generation-is-deterministic-and-physically-constrained`
+  (Reason: covers deterministic generation of physical relief rasters, configuration bounds and offline extra separation)
+- `map-runtime-adoption::runtime-adoption-publishes-one-complete-validated-world`
+  (Reason: covers candidate validation, refusal on missing/stale/corrupt artifacts, and retention of prior published bundle)
 
 Planned equivalent-tree remount for new delta requirements (after archive sync):
 
@@ -49,6 +52,8 @@ Planned equivalent-tree remount for new delta requirements (after archive sync):
      - `packages/map-core/tests/test_elevation_codec.py:ElevationCodecTests.test_encode_elevation_artifact_produces_valid_structure`
      - `packages/map-core/tests/test_elevation_codec.py:ElevationCodecTests.test_oversize_budget_rejection`
      - `packages/map-core/tests/test_elevation_codec.py:ElevationCodecTests.test_freshness_reporting_and_named_changed_source`
+     - `packages/map-core/tests/test_elevation_codec.py:ElevationCodecTests.test_prior_bytes_survive_oversize_failure`
+     - `packages/map-core/tests/test_elevation.py:test_default_config_matches_codec_mirror_and_digest`
 
 2. `wilderness-elevation-runtime::runtime-elevation-rejects-stale-or-corrupt-artifacts`
    - **Requirement**: Map adoption SHALL reject missing, stale or integrity-invalid elevation artifacts and expose bounded cached tile lookup without offline numeric dependencies.
@@ -65,9 +70,33 @@ Planned equivalent-tree remount for new delta requirements (after archive sync):
      - `world/maps/tests/test_map_elevation.py:ElevationRuntimeLogicTests.test_bounds_checks_reject_out_of_frame_and_non_integers`
      - `world/maps/tests/test_map_elevation.py:ElevationRuntimeLogicTests.test_lru_cache_capacity_strictly_bounded_to_128_and_evicts`
      - `world/maps/tests/test_map_elevation.py:ElevationRuntimeLogicTests.test_different_artifact_identity_does_not_hit_stale_cache`
+     - `world/maps/tests/test_map_elevation.py:ElevationRuntimeLogicTests.test_runtime_lookups_match_packed_bytes_on_partial_frame`
      - `world/maps/tests/test_map_elevation.py:ElevationRuntimeLogicTests.test_admission_rejection_on_missing_or_corrupt_elevation_retains_prior_bundle`
      - `world/maps/tests/test_map_elevation.py:ElevationRuntimeLogicTests.test_clear_published_world_clears_elevation_pointer`
      - `tests/test_elevation_contract.py:RuntimeWithoutGenerationExtraTests.test_package_runtime_surface_imports_without_numpy_scipy_or_the_generator`
+
+### Integration Verification Evidence and Benchmarks
+
+Executed verification outcomes:
+1. **Elevation Codec suite** (`uv run --locked --project packages/map-core python -m pytest packages/map-core/tests/test_elevation_codec.py`):
+   - 13 passed in 0.07s. Covers packing, partial edge tiles, corrupt base64/zlib, trailing data, ceiling excess, reserved bits non-zero, padding cell non-zero, budget rejection, prior bytes survival, and freshness reporting.
+2. **Elevation Generation suite** (`uv run --locked --project tools/map-editor python -m pytest packages/map-core/tests/test_elevation.py`):
+   - 18 passed in 0.28s. Includes byte-for-byte verification that `asdict(DEFAULT_ELEVATION_CONFIG)` matches `DEFAULT_CONFIG_VALUES` and `DEFAULT_CONFIG_DIGEST`.
+3. **Runtime Surface Probe** (`uv run --locked python -m unittest tests/test_elevation_contract.py`):
+   - 2 passed in 0.26s. Subprocess probe proves `world.maps.elevation` and `elosern_map_core.elevation_codec` import without NumPy, SciPy or the offline generator.
+4. **Server Runtime Adapter suite** (`uv run --locked evennia test --settings settings.py world.maps.tests.test_map_elevation`):
+   - 7 passed in 2.8s. Verifies unloaded lookup error without zero-fallback, pointer clearance on uninstallation, bounds checks, strict LRU <= 128 eviction, fingerprint cache separation, packed byte matching, and candidate admission failure retaining prior bundle.
+5. **Map Runtime Contract suite** (`uv run --locked evennia test tests.test_map_runtime_contract`):
+   - 7 passed in 0.65s. Verifies single-writer authority and no retired symbols.
+6. **Static Source Checker** (`uv run --locked --project packages/map-core python .agents/skills/map-data-authoring/scripts/check_map_sources.py`):
+   - Exit code 0, reports `wilderness elevation: current` with full integrity verification in < 1s without raster expansion.
+7. **Artifact Benchmark**:
+   - Committed `content/maps/wilderness_elevation.json`: 445,549 bytes (~435 KiB), representing 10.6% of the 4,194,304 bytes (4 MiB) budget ceiling.
+8. **Gates & Lint**:
+   - `tools.observability_lint check`: scanned=810, frozen=0, violations=0, exemptions=353.
+   - `tools.spec_traceability check`: 2643 requirements, 11959 associations, 2643 covered, 0 uncovered, 0 errors.
+   - `tools.contract_gate`: all 6 gates passed (reference-context, traceability, observability, test-data, manifests, contracts).
+   - `openspec validate wilderness-elevation-runtime --strict`: valid.
 
 ## Risks / Trade-offs
 

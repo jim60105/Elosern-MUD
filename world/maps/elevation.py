@@ -199,12 +199,14 @@ def load_elevation(
         )
 
     text = path.read_text(encoding="utf-8")
-    doc = json.loads(text)
-    metadata = verify_elevation_data_integrity(doc, expected_frame_cells=expected_frame_cells)
-
-    tiles_map: dict[tuple[int, int], str] = {}
-    for tile in doc.get("tiles", ()):
-        tiles_map[(tile["x"], tile["y"])] = tile["data"]
+    try:
+        doc = json.loads(text)
+        metadata = verify_elevation_data_integrity(doc, expected_frame_cells=expected_frame_cells)
+        tiles_map: dict[tuple[int, int], str] = {}
+        for tile in doc.get("tiles", ()):
+            tiles_map[(tile["x"], tile["y"])] = tile["data"]
+    except (json.JSONDecodeError, TypeError, AttributeError, KeyError) as error:
+        raise ElevationCorruptionError(f"malformed elevation artifact structure: {error}") from error
 
     return ElevationRuntime(
         metadata=metadata,

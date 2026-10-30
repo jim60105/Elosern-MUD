@@ -21,7 +21,7 @@ Discovery is deterministic (lexicographic canonical relative paths):
 
 `content/map-editor-layouts/<interior_id>.yaml` is a typed `layout` document
 for the codec but is never a world snapshot input. Generated artifacts (the
-district partition, the reference context) and any other path are never
+district partition, the wilderness elevation tiles, the reference context) and any other path are never
 scanned as sources. Every document declares `version: 1` and a `kind`; the
 kind, version and fixed id or file-stem identity must agree. Unknown document
 kinds, unsupported versions, duplicate identities and missing singleton

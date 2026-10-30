@@ -9,6 +9,9 @@ itself, excluding coastline and ridge trends by construction.
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError, replace
+from dataclasses import asdict
+import hashlib
+import json
 
 import numpy as np
 import pytest
@@ -24,6 +27,11 @@ from elosern_map_core.elevation import (
     generate_elevation,
     region_amplitudes,
     shape_weight,
+)
+from elosern_map_core.elevation_codec import (
+    DEFAULT_CONFIG_DIGEST,
+    DEFAULT_CONFIG_VALUES,
+    canonical_json,
 )
 from elosern_map_core.terrain import (
     REGION_KEYS,
@@ -486,3 +494,13 @@ def test_river_clamp_with_diagonal_only_banks():
         if banks:
             min_bank = min(result.bands[by, bx] for bx, by in banks)
             assert result.bands[y, x] <= min_bank
+
+
+def test_default_config_matches_codec_mirror_and_digest():
+    raw = asdict(DEFAULT_ELEVATION_CONFIG)
+    if isinstance(raw.get("prominence_thresholds"), tuple):
+        raw["prominence_thresholds"] = list(raw["prominence_thresholds"])
+    sorted_raw = {k: raw[k] for k in sorted(raw)}
+    assert sorted_raw == DEFAULT_CONFIG_VALUES
+    computed_digest = hashlib.sha256(canonical_json(sorted_raw).encode("utf-8")).hexdigest()
+    assert computed_digest == DEFAULT_CONFIG_DIGEST
