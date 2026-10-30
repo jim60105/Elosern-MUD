@@ -215,7 +215,7 @@ Graph objects cache only their own derived adjacency and coordinate index.
 uv run --locked python -m pytest          # inside this directory
 ```
 
-The partition generator tests need the extra (CI uses this form):
+The partition and elevation generator tests need the extra (CI uses this form):
 `uv run --locked --extra generation python -m pytest tests`.
 
 The game project consumes this package through its own `uv.lock`; the package

@@ -50,6 +50,7 @@ import numpy as np
 from scipy import ndimage
 
 from .documents import ElevationShapeDeclaration
+from .schema import ELEVATION_OPS, ELEVATION_SHAPES
 from .terrain import (
     TerrainDefinition,
     border_river_row,
@@ -71,8 +72,8 @@ PROMINENCE_TIER_MAX = 3
 #: The two forest regions whose land is canopy: it never carries a tier.
 CANOPY_REGIONS = frozenset({"north_deep_forest", "northwest_highland_forest"})
 
-_SHAPE_KINDS = ("circle", "polygon")
-_SHAPE_OPS = ("raise", "lower", "flatten", "no_prominence")
+_SHAPE_KINDS = ELEVATION_SHAPES
+_SHAPE_OPS = ELEVATION_OPS
 _MISSING_BANK = 0x7FFF
 
 
@@ -424,22 +425,7 @@ def region_amplitudes(
 
 
 def _canopy_mask(terrain: TerrainDefinition, land: np.ndarray) -> np.ndarray:
-    frame = terrain.frame_cells
-    ys, xs = np.mgrid[0:frame, 0:frame]
-    forest_rows = _column_rows(forest_edge_row, terrain)
-    river_rows = _column_rows(border_river_row, terrain)
-    centres = _row_centres(terrain)
-    north_deep_forest = ys >= forest_rows
-    mountains = ~north_deep_forest & (
-        np.abs(xs - centres) <= terrain.mountain_corridor_half_width
-    )
-    northwest = (
-        ~north_deep_forest
-        & ~mountains
-        & (xs < centres)
-        & (ys > terrain.coastal_y_max)
-        & (ys > river_rows)
-    )
+    north_deep_forest, northwest, *_ = _region_masks(terrain)
     return land & (north_deep_forest | northwest)
 
 

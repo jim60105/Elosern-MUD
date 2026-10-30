@@ -39,6 +39,14 @@ Requirement traceability mapping for this change (task 2.2), using IDs from `uv 
 - Mechanism evidence: `packages/map-core/tests/test_elevation.py` covers repeat-byte determinism, sea/ridge/river/shape-order/canopy/no-prominence physics, ring thresholds, minimum-area component suppression and directional residual autocorrelation on synthetic frames.
 - Post-sync planned target: `wilderness-elevation-generation::elevation-generation-is-deterministic-and-physically-constrained`; sync remounts the annotation with no uncovered requirement and no waiver.
 
+### Verified outcomes (task 2.3)
+
+- `packages/map-core` pytest suite with generation extra: 255 passed in 2.8s (`tests/test_elevation.py` 16 passed in 0.3s).
+- Contract test `tests.test_elevation_contract`: 2 passed in 0.3s (subprocess probes verifying game-free generator and extra-free runtime).
+- Repository contract gate (`tools.contract_gate`): all 6 gates passed (reference-context, traceability, observability, test-data, manifests, contracts).
+- Node DOM-independent test suite: 710 passed in 4.1s.
+- Strict OpenSpec validation (`openspec validate --all --strict`): 423 items passed, 0 failed.
+
 ## Risks / Trade-offs
 
 [Read side effects] -> Pure projections and object/Attribute/clock snapshots in integration tests. [Shared files] -> Serialize shard-manifest, schema and documentation changes even when roots are independent. [Data echo tests] -> Assert mechanics on synthetic fixtures and treat visual review separately. No new permanent lighting or walking state is allowed.

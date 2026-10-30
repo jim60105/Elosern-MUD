@@ -238,12 +238,13 @@ def test_river_never_exceeds_immediate_land_banks():
 def test_canopy_and_no_prominence_cells_never_carry_a_tier():
     terrain = synthetic_terrain()
     canopy_bump = _circle("flatten", 10, 44, 2, target_band=12)
+    northwest_bump = _circle("flatten", 10, 35, 2, target_band=12)
     plain_bump = _circle("flatten", 40, 12, 2, target_band=12)
     no_prominence = _circle("no_prominence", 40, 12, 2)
     control = _circle("flatten", 58, 12, 2, target_band=12)
     result = generate_elevation(
         terrain,
-        [_background(terrain), canopy_bump, plain_bump, no_prominence, control],
+        [_background(terrain), canopy_bump, northwest_bump, plain_bump, no_prominence, control],
     )
 
     canopy = np.zeros((_FRAME, _FRAME), dtype=bool)
@@ -253,6 +254,7 @@ def test_canopy_and_no_prominence_cells_never_carry_a_tier():
 
     assert np.all(result.tiers[canopy] == 0)
     assert np.all(result.tiers[_disc_mask(40, 12, 2, _FRAME)] == 0)
+    assert np.all(result.tiers[_disc_mask(10, 35, 2, _FRAME)] == 0)
     assert result.tiers[44, 10] == 0
     assert result.tiers[12, 40] == 0
     # The same raised disc outside canopy and no_prominence stays prominent.
@@ -441,3 +443,46 @@ def test_config_is_immutable_versioned_and_validated():
     ):
         with pytest.raises(ValueError):
             replace(config, **overrides)
+
+
+def test_shape_validation_rejects_malformed_shapes():
+    terrain = synthetic_terrain()
+
+    with pytest.raises(TypeError, match="ElevationShapeDeclaration"):
+        generate_elevation(terrain, [object()])  # type: ignore[list-item]
+
+    invalid_cases = (
+        ElevationShapeDeclaration(shape="triangle", op="raise", amount=1, feather=1),
+        ElevationShapeDeclaration(shape="circle", op="explode", centre=(5, 5), radius=2, feather=1),
+        ElevationShapeDeclaration(shape="circle", op="raise", centre=None, radius=2, amount=1, feather=1),
+        ElevationShapeDeclaration(shape="circle", op="raise", centre=(5, 5), radius=None, amount=1, feather=1),
+        ElevationShapeDeclaration(shape="circle", op="raise", centre=(5, 5), radius=0, amount=1, feather=1),
+        ElevationShapeDeclaration(shape="polygon", op="flatten", vertices=((0, 0), (1, 1)), target_band=5, feather=1),
+        ElevationShapeDeclaration(shape="circle", op="raise", centre=(5, 5), radius=2, amount=None, feather=1),
+        ElevationShapeDeclaration(shape="circle", op="flatten", centre=(5, 5), radius=2, target_band=None, feather=1),
+        ElevationShapeDeclaration(shape="circle", op="no_prominence", centre=(5, 5), radius=2, feather=2),
+    )
+    for bad_shape in invalid_cases:
+        with pytest.raises(ValueError):
+            generate_elevation(terrain, [bad_shape])
+
+
+def test_river_clamp_with_diagonal_only_banks():
+    terrain = synthetic_terrain(16)
+    river_shape = _circle("raise", 2, 2, 1, amount=10, feather=1)
+    result = generate_elevation(terrain, [_background(terrain), river_shape])
+    river_cells = set(terrain.waterway_cells)
+    cardinal = ((1, 0), (-1, 0), (0, 1), (0, -1))
+    diagonal = ((1, 1), (1, -1), (-1, 1), (-1, -1))
+
+    for x, y in river_cells:
+        banks = [
+            (x + dx, y + dy) for dx, dy in cardinal
+            if (x + dx, y + dy) not in river_cells and is_land_cell(terrain, (x + dx, y + dy))
+        ] or [
+            (x + dx, y + dy) for dx, dy in diagonal
+            if (x + dx, y + dy) not in river_cells and is_land_cell(terrain, (x + dx, y + dy))
+        ]
+        if banks:
+            min_bank = min(result.bands[by, bx] for bx, by in banks)
+            assert result.bands[y, x] <= min_bank
