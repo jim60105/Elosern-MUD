@@ -5,9 +5,8 @@ namespace blocked, proves repeat-byte determinism and the sea/band/tier
 postconditions on a synthetic frame, and proves that importing the package's
 runtime surface never pulls the generator or NumPy/SciPy.
 
-The requirement annotation uses the nearest current canonical requirement
-before the equivalent tree is synced; the change's design.md records the
-temporary mapping and the planned remount.
+The requirement annotation targets the canonical requirement synced from the
+wilderness-elevation-generation delta spec.
 """
 
 from __future__ import annotations
@@ -162,8 +161,8 @@ def _run_probe(source: str) -> subprocess.CompletedProcess:
 
 class GenerationIsGameFreeTests(unittest.TestCase):
     @covers_requirement(
-        "wilderness-elevation-authoring::"
-        "elevation-shapes-reject-invalid-candidates"
+        "wilderness-elevation-generation::"
+        "elevation-generation-is-deterministic-and-physically-constrained"
     )
     def test_generation_is_deterministic_and_physically_constrained_without_game_code(
         self,
