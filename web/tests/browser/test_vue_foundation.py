@@ -679,7 +679,7 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
                 # panel with no traversal exits — the root resolves to the
                 # empty exploration root (exploration-room-actions).
                 "exploration": {
-                    "schema_version": 5,
+                    "schema_version": 6,
                     "available": True,
                     "kind": "exploration",
                     "move": [],

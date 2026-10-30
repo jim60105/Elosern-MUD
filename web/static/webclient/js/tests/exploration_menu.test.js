@@ -48,7 +48,7 @@ function withServices(target) {
 function validPanel(overrides) {
   const panel = Object.assign(
     {
-      schema_version: 5,
+      schema_version: 6,
       available: true,
       kind: "exploration",
       move: [
@@ -169,6 +169,35 @@ test("a locked exit chip is disabled, never submits, and keeps its plain label",
   assert.equal(moveItem.description, "此出口目前無法通行。");
   // The shared chip renderer owns the disabled marker: no per-frame suffix.
   assert.equal(moveItem.label, "東");
+});
+
+test("a withheld wilderness target keeps the direction, the payload and its submit", () => {
+  // Schema 6: a legal direction whose cell is unrevealed carries a null
+  // destination. The compass and the dialogue exits list still submit it by
+  // its opaque exit_ref, and the word label still names the bearing.
+  const panel = validPanel({
+    move: [
+      {
+        exit_ref: "9",
+        label: "northeast",
+        destination: null,
+        enabled: true,
+        disabled_reason: null,
+      },
+    ],
+  });
+  const [item] = ExplorationMenu.moveItems(panel, "wild:elosern:5:5");
+  assert.equal(item.destination, null);
+  assert.equal(item.direction, "northeast");
+  assert.equal(item.enabled, true);
+  assert.equal(item.actionId, "explore.move");
+  assert.deepEqual(item.payload, { exit_ref: "9", current_node: "wild:elosern:5:5" });
+  // The dialogue screen's `↦ 移動…` list reads these rows: the withheld
+  // direction stays a submittable row with the same payload.
+  const [dialogueRow] = ExplorationMenu.exitTargets(panel, {
+    currentNode: "wild:elosern:5:5",
+  });
+  assert.deepEqual(dialogueRow, item);
 });
 
 test("move rows disable without the local-map current_node, and an empty exit list yields no placeholder", () => {

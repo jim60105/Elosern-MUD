@@ -8,7 +8,7 @@ const Protocol = require("../elosern/protocol.js");
 test("exploration accepts npc_persona navigation surface", () => {
   assert.ok(Protocol.EXPLORATION_SURFACES.includes("npc_persona"));
   const panel = {
-    schema_version: 5,
+    schema_version: 6,
     available: true,
     kind: "exploration",
     move: [],

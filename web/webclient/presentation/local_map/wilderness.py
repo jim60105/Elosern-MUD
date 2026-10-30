@@ -4,6 +4,12 @@ Builds the eight-neighbour wilderness payload from provider bounds, terrain
 labels, and the resolver-truth node identity: a step resolving to a registered
 gateway IS the resolved grid node, and in-view gate approach cells are named
 for their far side.
+
+Every wilderness fact is filtered through the shared disclosure policy
+(wilderness-map-disclosure D1/D2) before a node, edge, label or gateway
+metadata is built: an unrevealed neighbour publishes nothing, and a hidden
+entry's gateway identity requires an actual visit. The current cell always
+stays current.
 """
 
 from typing import Any
@@ -31,8 +37,10 @@ from world.rules.map_knowledge import (
     KnowledgeError,
     NodeVisit,
     decode_node,
+    encode_grid,
     encode_wild,
 )
+from world.rules.wilderness_disclosure import WildernessDisclosure
 
 
 def _wilderness_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilder) -> str:
@@ -56,6 +64,7 @@ def _wilderness_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilde
     from typeclasses.rooms import AnchorRoom, GridRoom, TerrainRoom
     from world.lore.wilderness_regions import regions
     from world.maps.wilderness_destination import (
+        find_gateway,
         normalize_wilderness_direction,
         DIRECTION_DELTAS,
         wilderness_neighbor,
@@ -78,6 +87,7 @@ def _wilderness_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilde
         raise PanelUnavailableError
     visited = _visited_map(visits)
     current_id = encode_wild(WILDERNESS_NAME, x, y)
+    disclosure = WildernessDisclosure.around(actor, (x, y), visits)
 
     builder.add_node(
         current_id,
@@ -101,28 +111,40 @@ def _wilderness_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilde
         if direction is not None:
             exits_by_direction.setdefault(direction, exit_obj)
 
-    # Eight legal adjacent cells are visible (visited or unvisited).
+    # Eight legal adjacent cells are drawn only once they are revealed; the
+    # destination's own disclosure decision is the single filter (a ``wild:``
+    # step follows permanent reveal, a ``grid:`` step follows the gateway
+    # rule), so no terrain, region label, identity or gateway fact is built
+    # for a withheld direction.
     for direction in WILD_DIRECTIONS:
         neighbor = wilderness_neighbor(x, y, direction)
         destination = resolve_wilderness_destination(location, direction)
+        if destination is None:
+            continue
         exit_obj = exits_by_direction.get(direction)
         action = None
-        if (
-            destination is not None
-            and exit_obj is not None
-            and _traversable(exit_obj, actor)
-        ):
+        if exit_obj is not None and _traversable(exit_obj, actor):
             action = {
                 "kind": "move",
                 "exit_ref": _exit_ref(exit_obj),
                 "destination": destination,
             }
-        if destination is not None and destination.startswith("grid:"):
+        if destination.startswith("grid:"):
             # Registered gateway: the node is the resolved grid room itself.
             try:
                 decoded = decode_node(destination)
             except KnowledgeError:
                 raise PanelUnavailableError
+            gateway_hit = find_gateway((x, y), direction)
+            gateway_anchor = (
+                gateway_hit[0].anchor_key if gateway_hit is not None else None
+            )
+            if not disclosure.gateway_disclosed(gateway_anchor, destination):
+                # A hidden entry's identity stays unpublished until visited:
+                # no node, edge, label or gateway metadata. Its opaque
+                # directional control survives on the exploration move rows.
+                action = None
+                continue
             room = GridRoom.objects.filter_xyz(
                 xyz=(decoded["x"], decoded["y"], decoded["z_map_key"])
             ).first()
@@ -176,6 +198,11 @@ def _wilderness_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilde
             continue
         if neighbor is None:
             continue
+        if not disclosure.reveals(neighbor):
+            # Wilderness adjacency alone grants no knowledge: an unrevealed
+            # cell publishes no terrain, region label, identity or action.
+            action = None
+            continue
         nx, ny = neighbor
         node_id = encode_wild(WILDERNESS_NAME, nx, ny)
         visibility = (
@@ -193,8 +220,16 @@ def _wilderness_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilde
         # changes.
         neighbor_gateway = _wilderness_gateway_at(nx, ny)
         if neighbor_gateway is not None:
-            _, _, neighbor_anchor_key = neighbor_gateway
-            label = _gateway_far_side_label("wilderness", (nx, ny), neighbor_anchor_key)
+            _, (grid_xy, z_map_key), neighbor_anchor_key = neighbor_gateway
+            gate_node = encode_grid(z_map_key, *grid_xy)
+            if disclosure.gateway_disclosed(neighbor_anchor_key, gate_node):
+                label = _gateway_far_side_label(
+                    "wilderness", (nx, ny), neighbor_anchor_key
+                )
+            else:
+                # A hidden entry keeps its identity until visited; the revealed
+                # cell still carries its ordinary region name.
+                label = regions()[region_for_coordinates(nx, ny)].display_name_zh
         else:
             label = regions()[region_for_coordinates(nx, ny)].display_name_zh
         builder.add_node(
@@ -224,6 +259,10 @@ def _wilderness_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilde
         if gateway is None:
             continue
         _, (grid_xy, z_map_key), anchor_key = gateway
+        gate_node = encode_grid(z_map_key, *grid_xy)
+        if not disclosure.gateway_disclosed(anchor_key, gate_node):
+            # An unvisited hidden entry's boundary publishes no identity.
+            continue
         far_label = _gateway_far_side_label("wilderness", (decoded["x"], decoded["y"]), anchor_key)
         boundary_name = _grid_room_label(grid_xy, z_map_key)
         gateway_candidates.append((visit.node_id, decoded["x"], decoded["y"], far_label, boundary_name))

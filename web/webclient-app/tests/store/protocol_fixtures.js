@@ -110,7 +110,7 @@ export function explorationActions(overrides = undefined) {
 export function explorationPanel(overrides = undefined) {
   const panel = deepMerge(
     {
-      schema_version: 5,
+      schema_version: 6,
       available: true,
       kind: "exploration",
       move: [

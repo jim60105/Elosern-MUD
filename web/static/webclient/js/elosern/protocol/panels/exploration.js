@@ -432,7 +432,12 @@ function validateExplorationMoveRow(value) {
   if (!label.trim()) {
     throw new Error("exit label must be non-empty");
   }
-  requireNodeId(value.destination, "destination");
+  // Nullable since schema 6 (wilderness-map-disclosure): a directional
+  // wilderness row whose target is withheld publishes no identity; every
+  // other row keeps the canonical non-null destination.
+  if (value.destination !== null) {
+    requireNodeId(value.destination, "destination");
+  }
   var enabled = requireBool(value.enabled, "enabled");
   var disabledReason = validateExplorationDisabledReason(value.disabled_reason);
   if (disabledReason === null) {
@@ -445,7 +450,7 @@ function validateExplorationMoveRow(value) {
   return value;
 }
 
-// Exact available exploration panel v5 schema (design D10).
+// Exact available exploration panel v6 schema (design D10).
 function validateExplorationPanel(payload) {
   requireExactFields(
     payload,
@@ -464,7 +469,7 @@ function validateExplorationPanel(payload) {
     []
   );
   requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-  if (payload.schema_version !== 5) {
+  if (payload.schema_version !== 6) {
     throw new Error("unsupported exploration schema_version");
   }
   if (payload.available !== true || payload.kind !== "exploration") {
@@ -495,7 +500,7 @@ function validateExplorationPanel(payload) {
   validateExplorationAvailability(payload.inventory, "inventory");
 
   var result = {
-    schema_version: 5,
+    schema_version: 6,
     available: true,
     kind: "exploration",
     move: payload.move,

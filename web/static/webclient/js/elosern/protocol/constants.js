@@ -547,7 +547,7 @@ var PANEL_ALLOWLIST = {
   objectives: 1,
   services: SERVICES_SCHEMA_VERSION,
   creation: 6,
-  exploration: 5,
+  exploration: 6,
   character: 9,
   lineage: 2,
   dialogue: DIALOGUE_SCHEMA_VERSION,

@@ -27,6 +27,11 @@ from world.rules.map_knowledge import (
     record_ground_observation,
     revealed_in_bounds,
 )
+from world.rules.wilderness_disclosure import (
+    WildernessDisclosure,
+    anchor_is_hidden,
+    generic_direction_label,
+)
 from world.rules.skip_safety import SkipRejectReason
 from world.rules.sleep_receipt import read_sleep_receipt
 from world.tests.raw_attributes import raw_attribute_value
@@ -569,6 +574,104 @@ class SkipObservationTests(EvenniaTest):
             "map_knowledge_record_ground_observation_write_failed",
             [call.args[0] for call in log_warn.call_args_list],
         )
+
+
+class WildernessDisclosurePolicyTests(unittest.TestCase):
+    """One read-only policy decides which wilderness facts a publisher may emit.
+
+    Synthetic records and registry stubs keep every expectation independent of
+    shipped geography: the reveal disc alone discloses an ordinary neighbour,
+    and a hidden entry's identity additionally needs the exact gate room's
+    visit.
+    """
+
+    CENTRE = (40, 40)
+    HIDDEN_GATE = _wild_node(41, 40)
+    GATE_ROOM = "grid:t_map:7:8"
+
+    def _disclosure(self, record, anchor_kind="capital"):
+        from types import SimpleNamespace
+
+        anchor = SimpleNamespace(kind=anchor_kind)
+        # Both patches stay active for the whole test: the policy reads the
+        # anchor registry lazily on each decision, and the synthetic settlement
+        # frame is registered here instead of naming a shipped map identity.
+        self.enterContext(
+            patch("world.lore.anchors.anchors", return_value={"t_place": anchor})
+        )
+        self.enterContext(
+            patch(
+                "world.rules.map_knowledge._registered_grid_bounds",
+                return_value=(10_000_000, 10_000_000),
+            )
+        )
+        return WildernessDisclosure.around(_Character(record), self.CENTRE)
+
+    def _record_with_sight(self, radius, visited=None):
+        return _record(
+            {
+                "0:0": {
+                    str(_offset(*self.CENTRE)): {
+                        "first_seen_tick": 1,
+                        "last_seen_tick": 1,
+                        "sight": radius,
+                    }
+                }
+            },
+            visited=visited,
+        )
+
+    def test_an_ordinary_neighbour_needs_its_revealed_cell(self):
+        radius_one = self._disclosure(self._record_with_sight(1))
+        self.assertTrue(radius_one.reveals((41, 40)))
+        self.assertTrue(radius_one.destination_disclosed(_wild_node(41, 40)))
+        self.assertFalse(radius_one.reveals((42, 40)))
+        self.assertFalse(radius_one.destination_disclosed(_wild_node(42, 40)))
+
+    def test_a_zero_radius_cell_discloses_no_neighbour_but_its_own_cell(self):
+        night_forest = self._disclosure(self._record_with_sight(0))
+        self.assertTrue(night_forest.reveals(self.CENTRE))
+        for cell in ((41, 40), (40, 41), (39, 39), (41, 41)):
+            with self.subTest(cell=cell):
+                self.assertFalse(night_forest.reveals(cell))
+                self.assertFalse(night_forest.destination_disclosed(_wild_node(*cell)))
+
+    def test_a_hidden_gateway_stays_withheld_until_its_gate_room_is_visited(self):
+        # Even a fully revealed neighbourhood does not disclose a dungeon's
+        # gateway identity: only the gate room's own visit does.
+        unrevealed_hidden = self._disclosure(
+            self._record_with_sight(8), anchor_kind="dungeon"
+        )
+        self.assertFalse(
+            unrevealed_hidden.destination_disclosed(self.GATE_ROOM, "t_place")
+        )
+        visited_hidden = self._disclosure(
+            self._record_with_sight(
+                8, visited={self.GATE_ROOM: {"first_seen_tick": 2, "last_seen_tick": 2}}
+            ),
+            anchor_kind="elven_village",
+        )
+        self.assertTrue(visited_hidden.destination_disclosed(self.GATE_ROOM, "t_place"))
+
+    def test_a_non_hidden_settlement_gateway_needs_no_visit(self):
+        capital = self._disclosure(self._record_with_sight(0), anchor_kind="capital")
+        self.assertTrue(capital.destination_disclosed(self.GATE_ROOM, "t_place"))
+        # A gateway whose anchor cannot be identified withholds instead.
+        self.assertFalse(capital.destination_disclosed(self.GATE_ROOM))
+
+    def test_an_unknown_anchor_fails_closed(self):
+        with patch("world.lore.anchors.anchors", return_value={}):
+            self.assertTrue(anchor_is_hidden("t_unpublished"))
+            self.assertTrue(anchor_is_hidden(None))
+
+    def test_generic_labels_are_direction_words_only(self):
+        self.assertEqual(
+            [generic_direction_label(d) for d in ("n", "ne", "e", "se", "s", "sw", "w", "nw")],
+            ["north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"],
+        )
+        for value in ("", "room", "up", "荒野", None):
+            with self.subTest(value=value):
+                self.assertIsNone(generic_direction_label(value))
 
 
 if __name__ == "__main__":

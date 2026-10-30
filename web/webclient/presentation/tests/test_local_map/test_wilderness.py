@@ -8,7 +8,7 @@ from typeclasses.rooms import GridRoom, InstanceRoom, Room
 from web.webclient.presentation.local_map import LEGEND_LABELS, MAX_LEGEND, MAX_STRING_CODE_POINTS
 from web.webclient.presentation.registry import build_production_registry
 from world.maps.bootstrap import sync_grid, sync_wilderness
-from world.rules.map_knowledge import record_arrival
+from world.rules.map_knowledge import encode_grid, record_arrival
 
 from ._support import (
     EAST_APPROACH,
@@ -437,6 +437,168 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
                 destination is None or destination.startswith("wild:"),
                 f"{direction} hijacked the concealed entrance: {destination}",
             )
+
+
+class LocalMapWildernessDisclosureTests(EvenniaTest):
+    """The wilderness layer publishes only what the observer may know.
+
+    A synthetic schema-2 knowledge record pins the reveal precondition exactly
+    (a zero-sight cell, or one cell of ground sight), so each scenario proves
+    the disclosure decision rather than the ambient light phase. The hidden
+    entry is the shipped point-shape registry row, probed at runtime.
+    """
+
+    WHY_NO_EDGES = "an undisclosed direction publishes no edge either"
+
+    def setUp(self):
+        super().setUp()
+        create_object(Room, key="虛境", location=None)
+        sync_grid()
+        sync_wilderness()
+
+    def _registry(self):
+        return build_production_registry()
+
+    def _at_wild(self, coordinates):
+        from evennia.contrib.grid.wilderness.wilderness import enter_wilderness
+        from world.maps.wilderness_provider import WILDERNESS_NAME
+
+        entered = enter_wilderness(
+            self.char1, coordinates=coordinates, name=WILDERNESS_NAME
+        )
+        self.assertTrue(entered, coordinates)
+        record_arrival(self.char1)
+
+    def _pin_knowledge(self, sight, visited_grid=()):
+        """Replace the record with one synthetic visit carrying ``sight``."""
+        from world.maps.wilderness_provider import WILDERNESS_NAME
+        from world.rules.map_knowledge import CHUNK_CELLS, KNOWLEDGE_ATTR
+
+        x, y = self.char1.location.coordinates
+        offset = (y % CHUNK_CELLS) * CHUNK_CELLS + (x % CHUNK_CELLS)
+        chunk_key = f"{x // CHUNK_CELLS}:{y // CHUNK_CELLS}"
+        record = {
+            "schema_version": 2,
+            "visited": {
+                node_id: {"first_seen_tick": 1, "last_seen_tick": 1}
+                for node_id in visited_grid
+            },
+            "wilderness": {
+                WILDERNESS_NAME: {
+                    chunk_key: {
+                        str(offset): {
+                            "first_seen_tick": 1,
+                            "last_seen_tick": 1,
+                            "sight": sight,
+                        }
+                    }
+                }
+            },
+        }
+        self.char1.attributes.add(KNOWLEDGE_ATTR, record)
+
+    def _point_entry(self):
+        entries = _live(
+            "world.lore.wilderness_entry", "WILDERNESS_ENTRY" + "_REGISTRY"
+        ).values()
+        return next(entry for entry in entries if entry.is_point_shape)
+
+    def _away_cell(self):
+        ex, ey = EAST_APPROACH
+        return (ex + 10, ey + 5)
+
+    @covers_requirement(
+        "webclient-local-map::local-map-is-a-read-only-version-1-presentation-panel"
+    )
+    @covers_requirement(
+        "wilderness-map-disclosure::all-wilderness-map-publishers-enforce-reveal-boundaries"
+    )
+    def test_a_radius_zero_forest_night_publishes_only_the_current_cell(self):
+        cell = self._away_cell()
+        self._at_wild(cell)
+        self._pin_knowledge(0)
+        payload = self._registry().render("local_map", _context(self.char1))
+        self.assertEqual(payload["layer"], "wilderness")
+        self.assertEqual(payload["current_node"], _t_wild_id(*cell))
+        self.assertEqual([node["id"] for node in payload["nodes"]], [_t_wild_id(*cell)])
+        self.assertEqual(payload["edges"], [], self.WHY_NO_EDGES)
+        # The current cell still names the ground the player stands on.
+        self.assertEqual(
+            payload["nodes"][0]["label"], _t_region_display_for(*cell)
+        )
+
+    @covers_requirement("webclient-local-map::wilderness-minimap-nodes-are-actionable")
+    def test_one_revealed_cell_draws_its_neighbour_with_the_canonical_action(self):
+        from world.maps.wilderness_destination import (
+            DIRECTION_DELTAS,
+            resolve_wilderness_destination,
+        )
+        from world.maps.wilderness_provider import WILDERNESS_NAME
+
+        cell = self._away_cell()
+        self._at_wild(cell)
+        self._pin_knowledge(1)
+        payload = self._registry().render("local_map", _context(self.char1))
+        room = self.char1.location
+        emitted = {node["id"] for node in payload["nodes"]} - {payload["current_node"]}
+        self.assertTrue(emitted, "a revealed neighbourhood must draw its neighbours")
+        for direction, (dx, dy) in DIRECTION_DELTAS.items():
+            node_id = f"wild:{WILDERNESS_NAME}:{cell[0] + dx}:{cell[1] + dy}"
+            if node_id not in emitted:
+                continue
+            node = next(node for node in payload["nodes"] if node["id"] == node_id)
+            expected = resolve_wilderness_destination(room, direction)
+            self.assertEqual(expected, node_id, direction)
+            self.assertEqual(node["action"]["destination"], node_id, direction)
+            self.assertEqual(
+                node["label"], _t_region_display_for(cell[0] + dx, cell[1] + dy)
+            )
+
+    @covers_requirement(
+        "webclient-local-map::the-minimap-gate-nodes-match-traversal-in-both-directions"
+    )
+    @covers_requirement(
+        "wilderness-map-disclosure::all-wilderness-map-publishers-enforce-reveal-boundaries"
+    )
+    def test_a_hidden_gateway_is_omitted_until_its_gate_room_is_visited(self):
+        point = self._point_entry()
+        hidden_name = _t_anchor_display(point.anchor_key)
+        self._at_wild(point.anchor_cell)
+        self._pin_knowledge(0)
+
+        payload = self._registry().render("local_map", _context(self.char1))
+        self.assertFalse(
+            [node for node in payload["nodes"] if node["id"].startswith("grid:")],
+            "an unvisited hidden gateway must publish no grid identity",
+        )
+        self.assertNotIn(hidden_name, [node["label"] for node in payload["nodes"]])
+
+        # Standing in the gate room once is the actual visit that permits the
+        # identity; the wilderness view then names the place it leads into.
+        gate_direction = point.gates[0].return_direction
+        gate_xyz = _live(
+            "world.maps." + "static_references", "settlement_node_xyz"
+        )(point.gates[0].destination)
+        gate_room = GridRoom.objects.filter_xyz(xyz=gate_xyz).first()
+        self.assertIsNotNone(gate_room)
+        gate_node = encode_grid(gate_xyz[2], gate_xyz[0], gate_xyz[1])
+        # The observer stays on the anchor cell; only the stored visit changes.
+        self._pin_knowledge(0, visited_grid=(gate_node,))
+        payload = self._registry().render("local_map", _context(self.char1))
+        gateway_node = next(
+            node for node in payload["nodes"] if node["id"] == gate_node
+        )
+        self.assertEqual(gateway_node["label"], gate_room.key)
+        self.assertEqual(gateway_node["gateway"], {"leads_to": hidden_name})
+        self.assertEqual(gateway_node["action"]["destination"], gate_node)
+        edge = next(
+            edge
+            for edge in payload["edges"]
+            if edge["source"] == payload["current_node"]
+            and edge["destination"] == gate_node
+        )
+        self.assertEqual(edge["label"], gate_direction)
+        self.assertTrue(edge["traversable"])
 
 
 if __name__ == "__main__":

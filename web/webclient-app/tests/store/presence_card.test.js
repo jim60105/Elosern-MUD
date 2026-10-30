@@ -517,7 +517,7 @@ describe("the presence slice (exploration-presence-rail)", () => {
     it("unreadable presence retires the card quietly, not as a departure", () => {
       open();
       store.activatePresence("target-7");
-      const result = commit({ schema_version: 5, available: false, reason: { code: "scene_lost", message: "暫時不可用。" } });
+      const result = commit({ schema_version: 6, available: false, reason: { code: "scene_lost", message: "暫時不可用。" } });
       expect(result.accepted).toBe(true);
       // The committed presentation can no longer establish the target, so the
       // card and its mapping go; nobody is reported as departed.
@@ -535,7 +535,7 @@ describe("the presence slice (exploration-presence-rail)", () => {
       store.activatePresence("target-7");
       store.activatePresenceVerb("service-guild");
       expect(store.view.hudDrawer).toBe("quest");
-      commit({ schema_version: 5, available: false, reason: { code: "scene_lost", message: "暫時不可用。" } });
+      commit({ schema_version: 6, available: false, reason: { code: "scene_lost", message: "暫時不可用。" } });
       expect(store.view.presenceCard).toBe(null);
       expect(store.view.hudDrawer).toBe(null);
       expect(store.view.presenceNotice).toBe(null);

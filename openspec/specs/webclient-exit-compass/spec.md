@@ -6,30 +6,30 @@ The exit compass is the exploration screen's movement control: it encodes each e
 ## Requirements
 
 ### Requirement: Each exploration exit resolves to exactly one angled or portal target
-The exit compass SHALL resolve every `move` row of the committed exploration panel to exactly one target, in payload order, as either **angled** (a bearing in degrees clockwise from north) or a **portal**. The rules apply in this order: a map bearing, then a direction word, then portal. `interior` and `instance` coordinates SHALL NOT be used for bearings.
+Every committed exploration move row SHALL resolve in payload order by map bearing, direction word then portal; a withheld wilderness destination SHALL resolve from its generic direction and opaque exit reference without inferred map identity.
 
 #### Scenario: A wilderness exit takes its map bearing
-- **WHEN** the layer is `wilderness`, the current node is at (0, 0), and an exit leads to a node at (1, 1)
+- **WHEN** the layer is `wilderness`, the current node is at (0, 0), and an exit leads to a node at (1, 1); any asserted wilderness destination facts are revealed and location-identity permitted
 - **THEN** the exit is an angled target at 45° and the same exit's remote-direction marker on the minimap points the same way
 
 #### Scenario: An irregular city bearing is preserved
-- **WHEN** the layer is `grid` and an exit leads to a node at (3, 4) from (0, 0)
+- **WHEN** the layer is `grid` and an exit leads to a node at (3, 4) from (0, 0); any asserted wilderness destination facts are revealed and location-identity permitted
 - **THEN** the exit is an angled target at about 36.9° and is not rounded to a cardinal direction
 
 #### Scenario: The map bearing needs both coordinates and a difference
-- **WHEN** the destination is absent from the committed local map, or either node lacks coordinates, or the two coordinates are equal
+- **WHEN** the destination is absent from the committed local map, or either node lacks coordinates, or the two coordinates are equal; any asserted wilderness destination facts are revealed and location-identity permitted
 - **THEN** the map-bearing rule does not apply and the next rule is tried
 
 #### Scenario: A direction word is the fallback
-- **WHEN** an exit label is `northeast` and its destination is absent from the committed local map
+- **WHEN** an exit label is `northeast` and its destination is absent from the committed local map; any asserted wilderness destination facts are revealed and location-identity permitted
 - **THEN** the exit is an angled target at 45°
 
 #### Scenario: Interior doors are portals
-- **WHEN** the layer is `interior` and an exit is labelled 公會大廳 with coordinates present on both nodes
+- **WHEN** the layer is `interior` and an exit is labelled 公會大廳 with coordinates present on both nodes; any asserted wilderness destination facts are revealed and location-identity permitted
 - **THEN** the exit is a portal and its coordinates are not used to place it
 
 #### Scenario: Same-coordinate stairs are portals
-- **WHEN** an exit labelled up leads to a node with the same coordinates as the current node
+- **WHEN** an exit labelled up leads to a node with the same coordinates as the current node; any asserted wilderness destination facts are revealed and location-identity permitted
 - **THEN** the exit is a portal pinned to the up position
 
 ### Requirement: Portals occupy deterministic slots on an outer track
@@ -192,14 +192,14 @@ The exploration command panel SHALL render a single readout (`aria-live="polite"
 - **THEN** the readout text is the exit's own label
 
 ### Requirement: The aimed destination lights on the minimap and motion respects the motion level
-The minimap SHALL highlight the node of the aimed exit and clear the highlight when the aim clears. At the `off` effective motion level every compass transition SHALL resolve in the commit frame and the shake SHALL become a static seal-red flash of the readout.
+A disclosed aimed destination SHALL highlight its existing minimap node; a withheld destination SHALL produce no fabricated highlight, while effective off motion resolves transitions in the commit frame.
 
 #### Scenario: The aimed node lights on the minimap
-- **WHEN** the compass aims an exit whose destination is a committed minimap node
+- **WHEN** the compass aims an exit whose destination is a committed minimap node; any asserted wilderness destination facts are revealed and location-identity permitted
 - **THEN** that node is highlighted on the minimap and the highlight clears when the aim clears
 
 #### Scenario: Motion off removes the shake
-- **WHEN** the effective motion level is `off` and a click has no target
+- **WHEN** the effective motion level is `off` and a click has no target; any asserted wilderness destination facts are revealed and location-identity permitted
 - **THEN** the pad does not animate and the readout shows a static warn-tone flash
 
 ### Requirement: The compass never loosens the server's gate
@@ -214,18 +214,18 @@ The compass SHALL render only committed payload fields and SHALL NOT enable an a
 - **THEN** no `explore.move` is submitted
 
 ### Requirement: The compass degrades honestly
-When no local map is committed, exits SHALL resolve by direction word only and the rest SHALL become portals, each disabled with the server's `地圖資料尚未同步。` reason. A room with no exits SHALL render an empty pad with no portal track, and when the exploration panel is unavailable the compass SHALL NOT render.
+Without a committed local map, compass degradation SHALL retain its existing disabled fallback; with a valid wilderness map, an enabled opaque directional row SHALL remain usable even when its destination node is withheld.
 
 #### Scenario: No local map
-- **WHEN** the local map is not committed and the room has a `north` exit and a named door
+- **WHEN** the local map is not committed and the room has a `north` exit and a named door; any asserted wilderness destination facts are revealed and location-identity permitted
 - **THEN** the exit labelled north is an angled target at 0°, the door is a portal, both are disabled, and aiming either shows `地圖資料尚未同步。`
 
 #### Scenario: No exits
-- **WHEN** the room has no exits
+- **WHEN** the room has no exits; any asserted wilderness destination facts are revealed and location-identity permitted
 - **THEN** the pad renders with no pips and no portal track, a click shakes, and the readout idles at `出口 0 · 在場 M`
 
 #### Scenario: Exploration panel unavailable
-- **WHEN** the exploration panel is unavailable
+- **WHEN** the exploration panel is unavailable; any asserted wilderness destination facts are revealed and location-identity permitted
 - **THEN** no compass is rendered and the dock keeps its degraded root
 
 ### Requirement: The controls reference documents the compass and the exploration panel shows no key hints
@@ -251,15 +251,19 @@ The compass SHALL be verified by `agent-browser` in the live client at 1451×790
 - **THEN** each behaves as the pad, click, and walk requirements state
 
 ### Requirement: The dialogue screen's exits list stays independent of the exploration root
-The dialogue screen's `↦ 移動…` list SHALL keep presenting the room's exits with their direction glyphs, destinations, and disabled reasons, sourced independently of the exploration router root, and activating an exit SHALL submit the unchanged `explore.move` payload.
+The dialogue exits list SHALL remain independent of the exploration router and apply the same destination-disclosure policy; withheld wilderness targets retain generic direction, opaque action and safe disabled reason without target facts.
 
 #### Scenario: The dialogue exits list is populated
-- **WHEN** a conversation is open in a room with two exits and the player opens `↦ 移動…`
+- **WHEN** a conversation is open in a room with two exits and the player opens `↦ 移動…`; any asserted wilderness destination facts are revealed and location-identity permitted
 - **THEN** the list shows both exits and activating an enabled one submits exactly the former `explore.move` payload
 
 #### Scenario: A disabled exit keeps its reason
-- **WHEN** the room has a locked exit
+- **WHEN** the room has a locked exit; any asserted wilderness destination facts are revealed and location-identity permitted
 - **THEN** the dialogue exits list shows it disabled with its server-authored reason
+
+#### Scenario: Undisclosed directional target
+- **WHEN** a synthetic unvisited wilderness neighbour remains outside reveal
+- **THEN** it has no local-map node or identifying exit metadata, while its enabled opaque direction can still submit exit_ref/current_node without a fabricated minimap highlight
 
 ### Requirement: A press produces one discrete move or one walk, never both
 A discrete move SHALL be sent on pointer release, or on the release of Enter or Space, only when the press was shorter than 400 ms, and a held press or key SHALL NOT also send a discrete move. Opening a card or drawer, a suppressed step, a result without a panel change, and Escape SHALL stop a walk.

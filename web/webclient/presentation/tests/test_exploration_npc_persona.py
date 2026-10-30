@@ -12,6 +12,7 @@ from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.exploration import (
+    EXPLORATION_SCHEMA_VERSION,
     MAX_AFFORDANCES,
     MAX_INTERACT_TARGETS,
     SURFACES,
@@ -126,7 +127,7 @@ class ExplorationNpcPersonaAffordanceTest(EvenniaTest):
 
         payload = exploration_presenter(self._context())
         validated = validate_exploration(payload)
-        self.assertEqual(validated["schema_version"], 5)
+        self.assertEqual(validated["schema_version"], EXPLORATION_SCHEMA_VERSION)
 
         # Extra field on navigate affordance rejects
         bad_payload = dict(payload)
@@ -167,7 +168,7 @@ class ExplorationNpcPersonaAffordanceTest(EvenniaTest):
             })
 
         max_payload = {
-            "schema_version": 5,
+            "schema_version": 6,
             "available": True,
             "kind": "exploration",
             "move": [],

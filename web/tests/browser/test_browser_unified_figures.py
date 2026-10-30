@@ -146,7 +146,7 @@ def _art_panel(*, with_candidate: bool = True) -> dict:
 
 def _exploration_panel() -> dict:
     return {
-        "schema_version": 5,
+        "schema_version": 6,
         "available": True,
         "kind": "exploration",
         "move": [],

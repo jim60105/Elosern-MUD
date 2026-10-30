@@ -34,6 +34,56 @@ Use synthetic documents, policies and parties with independent expected results.
 
 Requirement IDs must come from tools.spec_traceability list on the equivalent merged spec tree, never hand-composed. Before sync associate only the nearest current canonical requirement and report the temporary mapping per docs/development/spec-test-traceability.md. Sync remounts to the generated IDs with no uncovered requirements or waiver. Modified requirements retain identity except an explicit RENAMED window title. Mechanism tests must exist before that sync.
 
+### Current canonical association and planned remount
+
+`tools.spec_traceability list` on the main tree at `master` `aab865ac` reports no
+`wilderness-map-disclosure::` requirements, because the capability exists only
+as a delta; the archive-time sync generates that capability's IDs. Until then
+the mechanism tests carry the nearest modified requirement only:
+
+| Delta requirement | Current canonical association | Tests |
+| --- | --- | --- |
+| All wilderness map publishers enforce reveal boundaries | `webclient-local-map::local-map-is-a-read-only-version-1-presentation-panel`; `webclient-exploration-menu::exploration-move-rows-advertise-canonical-destinations` | `world.rules.tests.test_ground_reveal.WildernessDisclosurePolicyTests`; `test_local_map.test_wilderness.LocalMapWildernessDisclosureTests`; `test_exploration_panel.test_wilderness_and_npc_titles.WildernessExplorationPresenterTests` |
+| Opaque directional controls remain executable | `webclient-exploration-menu::explore-move-traverses-a-re-resolved-exit-through-the-shared-movement-path`; `webclient-exit-compass::each-exploration-exit-resolves-to-exactly-one-angled-or-portal-target` | `test_wilderness_and_npc_titles.WildernessExplorationPresenterTests.test_a_withheld_direction_executes_through_the_production_move_seam`; `web/webclient-app/tests/action/compass_model.test.js` |
+| local_map is a read-only version-1 panel | `webclient-local-map::local-map-is-a-read-only-version-1-presentation-panel` (retained) | `test_local_map.test_wilderness`, `test_local_map.test_schema` |
+| Visibility states | `webclient-local-map::visibility-states-are-current-visible-unvisited-visible-visited-and-remembered` (retained) | `test_local_map.test_wilderness` |
+| Place names only where informative | `webclient-local-map::the-map-surfaces-state-a-place-name-only-where-it-adds-information` (retained) | `test_local_map.test_wilderness`, `test_local_map.test_grid_gateways` |
+| Wilderness minimap nodes are actionable | `webclient-local-map::wilderness-minimap-nodes-are-actionable` (retained) | `test_local_map.test_wilderness` |
+| Minimap gate nodes match traversal | `webclient-local-map::the-minimap-gate-nodes-match-traversal-in-both-directions` (retained) | `test_local_map.test_gateway_resolution`, `test_local_map.test_per_gate_footprint`, `test_local_map.test_wilderness` |
+| Exploration panel schema 6 | `webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-4-presentation-panel` (retained) | `test_exploration_panel.test_schema`, `web/static/webclient/js/tests/protocol_exploration_a.test.js` |
+| Move rows advertise canonical destinations | `webclient-exploration-menu::exploration-move-rows-advertise-canonical-destinations` (retained; a disclosed row keeps the resolver's arrival node, a withheld row publishes null) | `test_wilderness_and_npc_titles.WildernessExplorationPresenterTests.test_a_withheld_direction_keeps_an_opaque_enabled_row`, `…test_a_locked_withheld_direction_keeps_its_server_reason`, `…test_a_withheld_direction_executes_through_the_production_move_seam`, `protocol_exploration_a.test.js` |
+| Aimed highlight, compass degradation, dialogue exits list | `webclient-exit-compass::the-aimed-destination-lights-on-the-minimap-and-motion-respects-the-motion-level`; `webclient-exit-compass::the-compass-degrades-honestly`; `webclient-exit-compass::the-dialogue-screen-s-exits-list-stays-independent-of-the-exploration-root` (retained) | `web/webclient-app/tests/action/compass_model.test.js`, `web/static/webclient/js/tests/exploration_menu.test.js` |
+
+No coverage waiver is claimed and no delta requirement ID is hand-attached;
+those annotations are remounted by the sync that follows archive, once
+`tools.spec_traceability list` reports the new identifiers.
+
+### Remount after sync
+
+The sync generated the two identifiers above, and the mechanism tests were
+remounted onto them in the same archive commit. Every remount was made
+individually against what the test's inputs, actions and assertions actually
+establish; no identifier below was hand-composed or substituted globally, and
+the retained modified-requirement annotations stay in place because those
+tests still establish them.
+
+| Canonical identifier (from the tool) | Remounted tests | Why that test establishes it |
+| --- | --- | --- |
+| `wilderness-map-disclosure::all-wilderness-map-publishers-enforce-reveal-boundaries` | `test_local_map.test_wilderness.LocalMapWildernessDisclosureTests.test_a_radius_zero_forest_night_publishes_only_the_current_cell` | The local-map publisher branch: a synthetic radius-0 record leaves exactly the current cell, no neighbour node and no edge. |
+| `wilderness-map-disclosure::all-wilderness-map-publishers-enforce-reveal-boundaries` | `...test_a_hidden_gateway_is_omitted_until_its_gate_room_is_visited` | The visit-gated branch: no `grid:` identity or hidden name before the gate room's own visit, and permitted metadata after it. |
+| `wilderness-map-disclosure::all-wilderness-map-publishers-enforce-reveal-boundaries` | `test_exploration_panel.test_wilderness_and_npc_titles.WildernessExplorationPresenterTests.test_a_withheld_direction_keeps_an_opaque_enabled_row` | The exit publisher branch: the withheld rows publish a null destination and only a generic direction word, with the disclosed gateway row still canonical. |
+| `wilderness-map-disclosure::opaque-directional-controls-remain-executable` | `...test_a_withheld_direction_executes_through_the_production_move_seam` | A withheld row submits exactly `{exit_ref, current_node}` through the production `explore.move` adapter and the arrival records the canonical cell. |
+
+### Scope note: on-demand area output
+
+This change owns the shared disclosure policy and the eager publications named
+in Impact: the `local_map` wilderness layer, the exploration `move` rows and the
+dialogue exit rows that reuse them. The on-demand `area_map` wilderness window
+keeps its current contract here; `wilderness-area-map-reveal` (blueprint change
+9) owns its unknown-run rewrite and consumes `WildernessDisclosure.reveals`
+directly, so the same predicate governs it without a second decision. Task 1.4's
+inspection therefore covers every publication this change owns.
+
 ## Risks / Trade-offs
 
 [Read side effects] -> Pure projections and object/Attribute/clock snapshots in integration tests. [Shared files] -> Serialize shard-manifest, schema and documentation changes even when roots are independent. [Data echo tests] -> Assert mechanics on synthetic fixtures and treat visual review separately. No new permanent lighting or walking state is allowed.
