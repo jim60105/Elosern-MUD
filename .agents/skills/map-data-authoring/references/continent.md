@@ -53,6 +53,19 @@ terrain:
       route: [{cell_x, cell_y}, ...]   # ≥ 2 points
       fords: [{cell_x, cell_y}, ...]   # optional; crossing cells on the route
   border_river_key: border_river       # must name a waterway, never removed
+elevation_shapes:                      # optional ordered list of elevation shapes
+  - shape: circle                      # circle | polygon
+    op: raise                          # raise | lower | flatten | no_prominence
+    centre: {cell_x: 100, cell_y: 100} # required for circle
+    radius: 20                         # required for circle, integer ≥ 1
+    amount: 5                          # 1..15, required for raise/lower
+    feather: 5                         # integer ≥ 1, required for raise/lower/flatten
+    note: Optional descriptive note    # optional string
+  - shape: polygon
+    op: flatten
+    vertices: [{cell_x: 200, cell_y: 200}, {cell_x: 250, cell_y: 200}, {cell_x: 220, cell_y: 250}] # ≥ 3 distinct
+    target_band: 8                     # 0..15, required for flatten
+    feather: 10
 ```
 
 Region keys (required, fixed): `central_mountains`, `eastern_plains`,

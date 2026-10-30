@@ -354,6 +354,113 @@ def test_region_declarations_reject_incomplete_or_duplicate_authoring(mutator, c
     assert code in _codes(captured.value)
 
 
+def test_elevation_shapes_valid_candidate_loads_and_preserves_order():
+    continent = fixtures.continent_data()
+    continent["elevation_shapes"] = [
+        {
+            "shape": "circle",
+            "op": "raise",
+            "centre": {"cell_x": 10, "cell_y": 10},
+            "radius": 4,
+            "amount": 5,
+            "feather": 2,
+        },
+        {
+            "shape": "polygon",
+            "op": "flatten",
+            # Clockwise polygon (acceptance test per review)
+            "vertices": [
+                {"cell_x": 20, "cell_y": 20},
+                {"cell_x": 30, "cell_y": 20},
+                {"cell_x": 30, "cell_y": 10},
+                {"cell_x": 20, "cell_y": 10},
+            ],
+            "target_band": 4,
+            "feather": 2,
+        },
+        {
+            "shape": "circle",
+            "op": "no_prominence",
+            "centre": {"cell_x": 25, "cell_y": 25},
+            "radius": 3,
+        },
+    ]
+    world = load_authoring_world(fixtures.custom_sources(continent=continent, settlement=fixtures.settlement_data()))
+    assert len(world.continent.elevation_shapes) == 3
+    assert world.continent.elevation_shapes[0].shape == "circle"
+    assert world.continent.elevation_shapes[1].shape == "polygon"
+    assert world.continent.elevation_shapes[2].shape == "circle"
+    assert world.diagnostics == ()
+
+
+@pytest.mark.parametrize(
+    ("mutator", "expected_code"),
+    [
+        # Circle outside frame (centre)
+        (
+            lambda c: c["elevation_shapes"].append(
+                {"shape": "circle", "op": "no_prominence", "centre": {"cell_x": 2700, "cell_y": 100}, "radius": 10}
+            ),
+            "elevation_shape_outside_frame",
+        ),
+        # Circle footprint + feather outside frame
+        (
+            lambda c: c["elevation_shapes"].append(
+                {"shape": "circle", "op": "raise", "centre": {"cell_x": 10, "cell_y": 10}, "radius": 8, "amount": 2, "feather": 5}
+            ),
+            "elevation_shape_outside_frame",
+        ),
+        # Polygon vertex outside frame
+        (
+            lambda c: c["elevation_shapes"].append(
+                {"shape": "polygon", "op": "no_prominence", "vertices": [{"cell_x": 0, "cell_y": 0}, {"cell_x": 2700, "cell_y": 0}, {"cell_x": 10, "cell_y": 10}]}
+            ),
+            "elevation_shape_outside_frame",
+        ),
+        # Polygon footprint + feather outside frame
+        (
+            lambda c: c["elevation_shapes"].append(
+                {"shape": "polygon", "op": "raise", "vertices": [{"cell_x": 2, "cell_y": 2}, {"cell_x": 20, "cell_y": 2}, {"cell_x": 10, "cell_y": 20}], "amount": 3, "feather": 5}
+            ),
+            "elevation_shape_outside_frame",
+        ),
+        # Self-intersecting polygon (hourglass)
+        (
+            lambda c: c["elevation_shapes"].append(
+                {
+                    "shape": "polygon",
+                    "op": "no_prominence",
+                    # vertices: (5,5)->(20,20)->(20,5)->(5,20); edges (5,5)-(20,20) and (20,5)-(5,20) cross.
+                    "vertices": [{"cell_x": 5, "cell_y": 5}, {"cell_x": 20, "cell_y": 20}, {"cell_x": 20, "cell_y": 10}, {"cell_x": 5, "cell_y": 20}],
+                }
+            ),
+            "self_intersecting_polygon",
+        ),
+        # Degenerate polygon (collinear / zero area)
+        (
+            lambda c: c["elevation_shapes"].append(
+                {"shape": "polygon", "op": "no_prominence", "vertices": [{"cell_x": 5, "cell_y": 5}, {"cell_x": 10, "cell_y": 10}, {"cell_x": 15, "cell_y": 15}]}
+            ),
+            "degenerate_polygon",
+        ),
+        # Degenerate polygon (repeated non-consecutive vertex / self-touching)
+        (
+            lambda c: c["elevation_shapes"].append(
+                {"shape": "polygon", "op": "no_prominence", "vertices": [{"cell_x": 5, "cell_y": 5}, {"cell_x": 15, "cell_y": 15}, {"cell_x": 15, "cell_y": 5}, {"cell_x": 5, "cell_y": 5}]}
+            ),
+            "degenerate_polygon",
+        ),
+    ],
+)
+def test_elevation_shapes_geometry_rejections(mutator, expected_code):
+    continent = fixtures.continent_data()
+    continent["elevation_shapes"] = []
+    mutator(continent)
+    with pytest.raises(AuthoringError) as captured:
+        load_authoring_world(fixtures.custom_sources(continent=continent, settlement=fixtures.settlement_data()))
+    assert expected_code in _codes(captured.value)
+
+
 def test_duplicate_outgoing_direction_is_structural():
     data = fixtures.settlement_data()
     data["nodes"]["market"] = {

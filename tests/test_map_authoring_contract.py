@@ -316,6 +316,26 @@ class AuthoringRequirementTests(unittest.TestCase):
         )
 
     @covers_requirement(
+        "wilderness-elevation-authoring::"
+        "elevation-shapes-reject-invalid-candidates"
+    )
+    def test_continent_elevation_shapes_schema_rejection(self):
+        invalid_continent = fixtures.continent_data()
+        invalid_continent["elevation_shapes"] = [
+            {
+                "shape": "circle",
+                "op": "raise",
+                "centre": {"cell_x": 10, "cell_y": 10},
+                "radius": 5,
+                "amount": 16,  # max is 15
+                "feather": 2,
+            }
+        ]
+        with self.assertRaises(AuthoringError) as captured:
+            load_authoring_world(fixtures.custom_sources(continent=invalid_continent, settlement=fixtures.settlement_data()))
+        self.assertIn("invalid_field_value", {item.code for item in captured.exception.diagnostics})
+
+    @covers_requirement(
         "map-authoring-documents::"
         "restricted-yaml-preserves-supported-authored-information"
     )
@@ -396,6 +416,72 @@ class AuthoringRequirementTests(unittest.TestCase):
             "external_reference_unavailable",
             {item.code for item in captured.exception.diagnostics},
         )
+
+    @covers_requirement(
+        "wilderness-elevation-authoring::"
+        "elevation-shapes-reject-invalid-candidates"
+    )
+    def test_continent_elevation_shapes_round_trip_and_omission_preservation(self):
+        # 1. Omission stays omitted
+        base_data = fixtures.continent_data()
+        self.assertNotIn("elevation_shapes", base_data)
+        parsed_omitted = parse_document("content/maps/continent.yaml", fixtures.yaml_text(base_data))
+        self.assertEqual(parsed_omitted.document.elevation_shapes, ())
+        emitted_omitted = serialize_document(parsed_omitted.document, parsed_omitted.round_trip)
+        self.assertNotIn("elevation_shapes", emitted_omitted)
+
+        # 2. Ordered preservation
+        with_shapes = fixtures.continent_data()
+        with_shapes["elevation_shapes"] = [
+            {
+                "shape": "circle",
+                "op": "raise",
+                "centre": {"cell_x": 10, "cell_y": 10},
+                "radius": 4,
+                "amount": 5,
+                "feather": 2,
+                "note": "Hilltop dome",
+            },
+            {
+                "shape": "polygon",
+                "op": "flatten",
+                "vertices": [
+                    {"cell_x": 20, "cell_y": 20},
+                    {"cell_x": 30, "cell_y": 20},
+                    {"cell_x": 30, "cell_y": 10},
+                    {"cell_x": 20, "cell_y": 10},
+                ],
+                "target_band": 4,
+                "feather": 2,
+            },
+        ]
+        parsed = parse_document("content/maps/continent.yaml", fixtures.yaml_text(with_shapes))
+        self.assertEqual(len(parsed.document.elevation_shapes), 2)
+        emitted = serialize_document(parsed.document, parsed.round_trip)
+        reparsed = parse_document("content/maps/continent.yaml", emitted)
+        self.assertEqual(reparsed.document.data["elevation_shapes"], parsed.document.data["elevation_shapes"])
+
+    @covers_requirement(
+        "wilderness-elevation-authoring::"
+        "elevation-shapes-reject-invalid-candidates"
+    )
+    def test_continent_elevation_shapes_structural_geometry_rejection_and_atomicity(self):
+        valid_continent = fixtures.continent_data()
+        valid_world = load_authoring_world(fixtures.custom_sources(continent=valid_continent, settlement=fixtures.settlement_data()))
+        self.assertEqual(valid_world.diagnostics, ())
+
+        bad_continent = fixtures.continent_data()
+        bad_continent["elevation_shapes"] = [
+            {
+                "shape": "circle",
+                "op": "no_prominence",
+                "centre": {"cell_x": 50, "cell_y": 50},  # outside frame 40
+                "radius": 5,
+            }
+        ]
+        with self.assertRaises(AuthoringError) as captured:
+            load_authoring_world(fixtures.custom_sources(continent=bad_continent, settlement=fixtures.settlement_data()))
+        self.assertIn("elevation_shape_outside_frame", {item.code for item in captured.exception.diagnostics})
 
         duplicate = fixtures.settlement_data()
         duplicate["nodes"]["market"] = {

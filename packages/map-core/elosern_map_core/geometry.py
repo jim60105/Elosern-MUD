@@ -16,7 +16,8 @@ position that sits on the wilderness anchor cell's centre. A settlement's
 transform returns horizontal metres only.
 
 Polygon helpers take the mainland boundary as an explicit closed-ring vertex
-tuple in absolute kilometres; boundary points count as land.
+tuple in absolute kilometres; boundary points count as land. Elevation polygon
+helpers take unclosed cell-coordinate vertices with implicit closure.
 
 Every function is pure and deterministic: no game, database, clock or random
 input, and no cache outside the arguments it is given.
@@ -147,3 +148,73 @@ def is_on_mainland(
         if east_km < crossing_east:
             inside = not inside
     return inside
+
+
+def _point_on_segment(p: Point, a: Point, b: Point) -> bool:
+    px, py = p
+    ax, ay = a
+    bx, by = b
+    cross = (bx - ax) * (py - ay) - (by - ay) * (px - ax)
+    if cross != 0:
+        return False
+    return min(ax, bx) <= px <= max(ax, bx) and min(ay, by) <= py <= max(ay, by)
+
+
+def segments_intersect(p1: Point, p2: Point, p3: Point, p4: Point) -> bool:
+    """Whether two segments (p1-p2 and p3-p4) intersect anywhere, including endpoints."""
+    d1 = (p2[0] - p1[0]) * (p3[1] - p1[1]) - (p2[1] - p1[1]) * (p3[0] - p1[0])
+    d2 = (p2[0] - p1[0]) * (p4[1] - p1[1]) - (p2[1] - p1[1]) * (p4[0] - p1[0])
+    d3 = (p4[0] - p3[0]) * (p1[1] - p3[1]) - (p4[1] - p3[1]) * (p1[0] - p3[0])
+    d4 = (p4[0] - p3[0]) * (p2[1] - p3[1]) - (p4[1] - p3[1]) * (p2[0] - p3[0])
+
+    if ((d1 > 0 and d2 < 0) or (d1 < 0 and d2 > 0)) and ((d3 > 0 and d4 < 0) or (d3 < 0 and d4 > 0)):
+        return True
+
+    if _point_on_segment(p3, p1, p2):
+        return True
+    if _point_on_segment(p4, p1, p2):
+        return True
+    if _point_on_segment(p1, p3, p4):
+        return True
+    if _point_on_segment(p2, p3, p4):
+        return True
+    return False
+
+
+def is_simple_polygon(vertices: tuple[Point, ...]) -> tuple[bool, str, str]:
+    """Verify polygon simplicity: at least 3 distinct unclosed vertices, no self-intersections or degeneracy."""
+    if len(vertices) < 3:
+        return False, "degenerate_polygon", "polygon requires at least 3 vertices"
+    if len(set(vertices)) != len(vertices):
+        return False, "degenerate_polygon", "polygon contains duplicate vertices"
+
+    # Shoelace doubled area must be non-zero (not all collinear)
+    doubled = sum(
+        vertices[i][0] * vertices[(i + 1) % len(vertices)][1]
+        - vertices[(i + 1) % len(vertices)][0] * vertices[i][1]
+        for i in range(len(vertices))
+    )
+    if doubled == 0:
+        return False, "degenerate_polygon", "polygon has zero area (degenerate/collinear)"
+
+    n = len(vertices)
+    edges = [(vertices[i], vertices[(i + 1) % n]) for i in range(n)]
+
+    for i in range(n):
+        e1_p1, e1_p2 = edges[i]
+        for j in range(i + 1, n):
+            e2_p1, e2_p2 = edges[j]
+            is_adjacent = (j == i + 1) or (i == 0 and j == n - 1)
+            if is_adjacent:
+                # Adjacent edges share exactly one vertex: e1_p2 == e2_p1 (or e2_p2 == e1_p1 for the wrap)
+                # Check for 180-degree backtrack or collinear overlap along the shared vertex
+                shared = e1_p2 if j == i + 1 else e1_p1
+                other1 = e1_p1 if j == i + 1 else e1_p2
+                other2 = e2_p2 if j == i + 1 else e2_p1
+                if _point_on_segment(other1, shared, other2) or _point_on_segment(other2, shared, other1):
+                    return False, "degenerate_polygon", f"adjacent edges {i} and {j} overlap or backtrack"
+            else:
+                if segments_intersect(e1_p1, e1_p2, e2_p1, e2_p2):
+                    return False, "self_intersecting_polygon", f"non-adjacent edges {i} and {j} intersect"
+
+    return True, "", ""

@@ -28,6 +28,11 @@ Implementation will be performed by gpt-luna-level workers. Follow the named own
 
 Use synthetic documents, policies and parties with independent expected results. Do not pin shipped data, text, markup or counts. Appearance/wording judgments are human-reviewed against the approved detailed design, outside SHALL requirements. For each requirement implement a discoverable test named from its mechanism, covering every delta scenario and both raising/non-raising cases. Test paths are named in Context. New package-local server tests join exactly one shard in .github/evennia-shards.json; avoid new modules when an existing test file is sufficient.
 
+Requirement traceability mapping:
+- `map-authoring-documents::map-documents-are-discovered-and-schema-checked-as-a-complete-candidate` (nearest canonical): covers schema check, exact field constraints (shape, op unions, ranges, forbidden fields), and candidate discovery. Planned equivalent-tree remount: `wilderness-elevation-authoring::elevation-shapes-reject-invalid-candidates`.
+- `map-authoring-documents::restricted-yaml-preserves-supported-authored-information` (nearest canonical): covers ordered round-trip, absent preservation, and comment preservation. Planned equivalent-tree remount: `wilderness-elevation-authoring::elevation-shapes-reject-invalid-candidates`.
+- `map-authoring-documents::authoring-diagnostics-and-runtime-acceptance-have-distinct-gates` (nearest canonical): covers structural geometry rejection (out-of-frame, self-intersecting, degenerate polygons) and atomic candidate rejection leaving prior valid document unchanged. Planned equivalent-tree remount: `wilderness-elevation-authoring::elevation-shapes-reject-invalid-candidates`.
+
 Requirement IDs must come from tools.spec_traceability list on the equivalent merged spec tree, never hand-composed. Before sync associate only the nearest current canonical requirement and report the temporary mapping per docs/development/spec-test-traceability.md. Sync remounts to the generated IDs with no uncovered requirements or waiver. Modified requirements retain identity except an explicit RENAMED window title. Mechanism tests must exist before that sync.
 
 ## Risks / Trade-offs
