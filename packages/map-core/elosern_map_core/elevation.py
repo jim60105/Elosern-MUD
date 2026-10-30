@@ -21,11 +21,15 @@ Stages, in order:
    coordinate-linear congruential stripes appear. Octaves combine with the
    configured lacunarity and persistence; every cell is scaled by its region
    amplitude (hills > open > coast).
-3. The authored shapes apply strictly in declaration order. ``raise``/``lower``
-   add or subtract ``amount * weight``, ``flatten`` blends towards
-   ``target_band``, and ``no_prominence`` records a final override mask. The
-   feather weight is 1 inside the shape and decreases linearly to 0 over
-   ``feather`` cells outside it.
+3. The authored shapes apply strictly in declaration order. Their
+   ``amount``/``target_band`` are authored in bands, so ``raise``/``lower``
+   add or subtract ``amount`` bands weighted by the feather and ``flatten``
+   blends towards ``target_band``; the band quantities are divided by the
+   configuration's ``quantization_scale`` because quantization multiplies the
+   raster by it, which keeps one authored band worth exactly one band at any
+   scale. ``no_prominence`` records a final override mask. The feather weight
+   is 1 inside the shape and decreases linearly to 0 over ``feather`` cells
+   outside it.
 4. Fixed-configuration quantization to bands ``0..15``; sea returns to band 0
    and every river cell is clamped to its immediate land banks.
 5. Ring-mean prominence becomes tiers ``0..3`` through the configured
@@ -591,7 +595,16 @@ def _apply_shape(
     elevation: np.ndarray,
     no_prominence_mask: np.ndarray,
     shape: ElevationShapeDeclaration,
+    quantization_scale: float,
 ) -> None:
+    """Apply one authored shape, whose ``amount``/``target_band`` are in bands.
+
+    The raster holds unquantized elevation units, which quantization later
+    multiplies by ``quantization_scale`` to obtain bands; dividing the authored
+    band quantities by that scale keeps one authored band worth exactly one
+    band at every configured scale.
+    """
+
     height, width = elevation.shape
     assets = _shape_assets(shape, width, height)
     if assets is None:
@@ -599,15 +612,16 @@ def _apply_shape(
     left, top, right, bottom, inside, weight = assets
     region = elevation[top : bottom + 1, left : right + 1]
     if shape.op == "raise":
-        region += shape.amount * weight  # type: ignore[operator]
+        region += (shape.amount or 0) / quantization_scale * weight
     elif shape.op == "lower":
         np.maximum(
-            region - shape.amount * weight, 0.0, out=region  # type: ignore[operator]
+            region - (shape.amount or 0) / quantization_scale * weight,
+            0.0,
+            out=region,
         )
     elif shape.op == "flatten":
-        region[:] = (1.0 - weight) * region + weight * float(  # type: ignore[arg-type]
-            shape.target_band
-        )
+        target = (shape.target_band or 0) / quantization_scale
+        region[:] = (1.0 - weight) * region + weight * target
     elif shape.op == "no_prominence":
         no_prominence_mask[top : bottom + 1, left : right + 1] |= inside
     else:  # pragma: no cover - _validate_shape already rejected it
@@ -763,7 +777,7 @@ def generate_elevation(
 
     no_prominence = np.zeros((frame, frame), dtype=bool)
     for shape in shape_list:
-        _apply_shape(elevation, no_prominence, shape)
+        _apply_shape(elevation, no_prominence, shape, config.quantization_scale)
     elevation[~land] = 0.0
 
     bands = _quantize(elevation, land, config)
