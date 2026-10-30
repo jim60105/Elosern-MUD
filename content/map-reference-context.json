@@ -176,7 +176,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "fbfa29d3746ce8a94205f6a9e5dc6505c7025b072b226d394a25aa25a4bac226",
+  "fingerprint": "21ba34dc406633e30ae0927e1d3aff1bb032988c696900efbaf38f26564ea228",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -1266,7 +1266,7 @@
     "world/rules/status_text.py": "293518f7c908dd79946ed08e8af1c65a4871c4deaae3fd656553bccc2c19417b",
     "world/rules/stored_sexual_reads.py": "6ce57e7c3a8d1166476efaf8ea21cd4c0408d9c05270beef08e737be54378fd5",
     "world/rules/story_effects.py": "571c1dd4c381be9925b75ba15ad3b3e862e5b9f754d5a3fc558f5590cfe480c5",
-    "world/rules/surfaces.py": "2f680085abfebc53919d1146da29308ef39b2a0eb334fcd7a8f241e112ff5cf9",
+    "world/rules/surfaces.py": "ab43996e91df6657f8e627456906d5173f947aa92ff2546dd0bf8eefbbe8e429",
     "world/rules/target_facts.py": "18c850571b194d6fbaddf6d2ce329a2b6763e920e3050da97d3db1d3df04855b",
     "world/rules/targeting.py": "2eec94487a48b86133833dcbb9ac86477b381caa7fa8b095dd67b71640bc1a97",
     "world/rules/time_skip.py": "6c98b765b50cbcda606047643c0672187372675aea46e0c34f7f7b9c0780e3bd",

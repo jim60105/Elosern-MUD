@@ -56,6 +56,7 @@ from world.observability import log_info, log_warn
 from world.rules.clock import ScheduledEvent, SurfaceSnapshot, register_event_source
 from world.rules.monster_individual import construct_species_individual
 from world.rules.surfaces import attribute_snapshot
+from world.rules.surfaces import persisted_hp as _persisted_hp
 
 # The registered world-clock stage kind this module's settlement owns.
 SITE_STAGE_KIND = "monster_site_lifecycle"
@@ -157,30 +158,6 @@ def _members(wilderness: Any, site: MonsterSite) -> tuple[Monster, ...]:
         obj
         for obj in wilderness.get_objs_at_coordinates(site.coordinates)
         if isinstance(obj, Monster) and obj.db.site_key == site.key
-    )
-
-
-def _persisted_hp(member: Monster) -> float:
-    """The individual's persisted HP, read without materializing its Trait.
-
-    ``world.maps.wilderness_population::_stored_hp`` reads ``member.traits.hp``,
-    which constructs the ``Trait``; Evennia's ``TraitHandler.get`` builds it from
-    the persisted ``_SaverDict`` and the constructor's validation calls
-    ``trait_data.update(...)``, and ``_SaverDict.update`` saves the attribute on
-    every call. Both this module's settlement and the binding-source read below
-    must leave storage alone, so they read the persisted trait record directly
-    (the ``world/rules/status_query`` no-create read) and apply the same stored
-    gauge rule, failing closed to "not living" on anything unreadable instead of
-    raising.
-    """
-    traits = member.attributes.get("traits", category="traits")
-    record = None if not isinstance(traits, Mapping) else traits.get("hp")
-    if not isinstance(record, Mapping):
-        return 0.0
-    if "current" in record:
-        return float(record["current"])
-    return float(record.get("base", 0) + record.get("mod", 0)) * float(
-        record.get("mult", 1)
     )
 
 

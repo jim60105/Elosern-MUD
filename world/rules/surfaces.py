@@ -99,6 +99,37 @@ def write_counter_trait(obj: Any, key: str, value: int) -> None:
     obj.traits[key].current = int(value)
 
 
+def persisted_hp(entity: Any) -> float:
+    """Read entity's persisted HP record directly without materializing TraitHandler.
+
+    Evennia's ``TraitHandler.get`` constructs a ``Trait`` from persisted ``_SaverDict``
+    and constructor validation calls ``trait_data.update(...)``, which saves the
+    Attribute on read. To ensure pure, side-effect-free reads that never modify
+    Attribute records or trigger saves, read the persisted trait mapping directly.
+    Fails closed to 0.0 on missing or unreadable records.
+    """
+    attributes = getattr(entity, "attributes", None)
+    if attributes is None:
+        return 0.0
+    traits = attributes.get("traits", category="traits")
+    if not isinstance(traits, Mapping):
+        return 0.0
+    record = traits.get("hp")
+    if not isinstance(record, Mapping):
+        return 0.0
+    if "current" in record:
+        try:
+            return float(record["current"])
+        except (ValueError, TypeError):  # observability: ignore R2: malformed persisted numeric record fails closed to 0.0
+            return 0.0
+    try:
+        return float(record.get("base", 0) + record.get("mod", 0)) * float(
+            record.get("mult", 1)
+        )
+    except (ValueError, TypeError):  # observability: ignore R2: unparseable gauge expression fails closed to 0.0
+        return 0.0
+
+
 def restore_component_state(
     obj: Any, snapshots: Mapping[str, tuple[bool, Any]]
 ) -> None:
