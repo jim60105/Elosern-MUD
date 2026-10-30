@@ -51,6 +51,7 @@ from world.maps.wilderness_population import (
     _population_key,
     _spawn_species_individual,
     _stored_hp,
+    ambient_slots_in_use,
     species_rule_for_coordinates,
 )
 from world.maps.wilderness_provider import (
@@ -396,9 +397,21 @@ def ensure_hunt_targets(
     remaining = deficit
     for cell, headroom in reserved:
         take = min(headroom, remaining)
+        # Each supplementary individual needs its own slot: a slot is an
+        # observation identity, so reusing another individual's would erase the
+        # difference between two distinct monsters.
+        used_slots = ambient_slots_in_use(world, cell)
         for _ in range(take):
+            slot = 0
+            while slot in used_slots:
+                slot += 1
+            used_slots.add(slot)
             individual = _spawn_species_individual(
-                world, cell, creatable[cursor % len(creatable)], _population_key(*cell)
+                world,
+                cell,
+                creatable[cursor % len(creatable)],
+                _population_key(*cell),
+                slot=slot,
             )
             created.append(individual.pk)
             cursor += 1

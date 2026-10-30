@@ -166,6 +166,25 @@ def _population_key(x: int, y: int) -> str:
     return f"wilderness:{x}:{y}"
 
 
+def ambient_slots_in_use(wilderness, coordinates: tuple[int, int]) -> set[int]:
+    """The population slots the ambient individuals at ``coordinates`` claim.
+
+    A slot is an individual's observation identity, stamped once at
+    construction and never reassigned, so any second creator at the same
+    coordinate must pick a free slot from this set -- otherwise two living
+    individuals would share one identity.
+    """
+    marker = _population_key(*coordinates)
+    slots: set[int] = set()
+    for obj in wilderness.get_objs_at_coordinates(coordinates):
+        if not isinstance(obj, Monster) or obj.db.population_key != marker:
+            continue
+        slot = obj.db.population_slot
+        if isinstance(slot, int) and not isinstance(slot, bool):
+            slots.add(slot)
+    return slots
+
+
 def _emit_ambient(event: str, context: Mapping[str, object]) -> None:
     """Schedule one ambient decision event on the enclosing durable commit.
 
@@ -332,26 +351,41 @@ def ambient_population_decision(
             else:
                 stale.append(m)
 
-        # Sort living deterministically by pk so slot assignment is stable
+        # Sort living deterministically by pk so a repeated slot stays stable
         living.sort(key=lambda obj: int(getattr(obj, "pk", 0) or 0))
 
-        # Assign living monsters to expected slots by variant_key
-        unassigned_slots = list(expected_slots)
-        assigned_pairs: list[tuple[ExpectedSlot, Monster | None]] = []
-        assigned_monsters: set[int] = set()
+        # The persisted slot is the individual's observation identity, assigned
+        # once at construction. Matching survivors by variant would hand a dead
+        # individual's identity to whoever survives it, corrupting every
+        # before/after sight comparison; the slot is validated here and never
+        # reassigned. Members outside the expected slots (supplementary
+        # provisioning, legacy reads) keep their own object identity and stay
+        # living, but occupy no slot.
+        expected_by_slot = {entry.slot: entry for entry in expected_slots}
+        occupied: dict[int, Monster] = {}
+        for m in living:
+            slot = m.db.population_slot
+            if (
+                isinstance(slot, int)
+                and not isinstance(slot, bool)
+                and slot in expected_by_slot
+                and slot not in occupied
+            ):
+                occupied[slot] = m
 
-        for slot_entry in expected_slots:
-            matched_monster = None
-            for m in living:
-                if m.pk not in assigned_monsters and m.variant_key == slot_entry.variant_key:
-                    assigned_monsters.add(m.pk)
-                    unassigned_slots.remove(slot_entry)
-                    matched_monster = m
-                    break
-            assigned_pairs.append((slot_entry, matched_monster))
-
+        assigned_pairs = tuple(
+            (slot_entry, occupied.get(slot_entry.slot))
+            for slot_entry in expected_slots
+        )
+        vacant_slots = tuple(
+            slot_entry
+            for slot_entry in expected_slots
+            if slot_entry.slot not in occupied
+        )
+        # Spawn only into genuinely vacant slots, and never beyond the authored
+        # quantity, so a surplus living member can never be doubled.
         budget = max(0, target - len(living))
-        spawns_needed = () if is_protected else tuple(unassigned_slots[:budget])
+        spawns_needed = () if is_protected else vacant_slots[:budget]
 
         return PopulationDecision(
             coordinates=coordinates,
@@ -540,7 +574,8 @@ def _spawn_species_individual(
     coordinates: tuple[int, int],
     variant_key: str,
     population_key: str,
-    slot: int = 0,
+    *,
+    slot: int,
 ) -> Monster:
     """Create one species-bearing ambient individual through the construction owner.
 
@@ -551,6 +586,11 @@ def _spawn_species_individual(
     same ambient ownership marker as the tier-example population and is
     registered in the wilderness bookkeeping like every other wilderness
     monster.
+
+    ``slot`` is required: it is the individual's permanent observation
+    identity, so a caller creating into a coordinate that already holds
+    individuals must pass a free slot from :func:`ambient_slots_in_use`
+    rather than silently reusing another individual's identity.
     """
     individual = construct_species_individual(
         variant_species_key(variant_key), variant_key
