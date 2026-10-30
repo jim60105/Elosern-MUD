@@ -30,5 +30,6 @@ Sub-projects2/3, authored geography/content, new roads, client travel presentati
 ## Batch:
 depends-on: wilderness-ground-reveal
 depends-on: wilderness-population-view
+depends-on: wilderness-map-disclosure
 
-Code-conflict notes: shared schema.py/documents.py edits order shapes before sight; knowledge-chunks before ground-reveal; population before area/interrupts; area then planner then interrupts serialize protocol/docs/action changes. All server slices may conflict in .github/evennia-shards.json; one integration owner serializes that manifest. Follow the dependency matrix in design.md.
+Code-conflict notes: shared schema.py/documents.py edits order shapes before sight; knowledge-chunks before ground-reveal; population before area/interrupts; area then planner then interrupts serialize protocol/docs/action changes. wilderness-map-disclosure lands before this map stops assuming an unchanged ExitCompass for unknown neighbours; both touch frozen map/protocol audits. All server slices may conflict in .github/evennia-shards.json; one integration owner serializes that manifest. Follow the dependency matrix in design.md.

@@ -31,4 +31,4 @@ Sub-projects2/3, authored geography/content, new roads, client travel presentati
 ## Batch:
 depends-on: wilderness-ground-reveal
 
-Code-conflict notes: shared schema.py/documents.py edits order shapes before sight; knowledge-chunks before ground-reveal; population before area/interrupts; area then planner then interrupts serialize protocol/docs/action changes. All server slices may conflict in .github/evennia-shards.json; one integration owner serializes that manifest. Follow the dependency matrix in design.md.
+Code-conflict notes: shared schema.py/documents.py edits order shapes before sight; knowledge-chunks before ground-reveal; population before area/interrupts; area then planner then interrupts serialize protocol/docs/action changes. This change also lands before wilderness-travel-interrupts: both modify webclient-exploration-menu and the exploration move-row payload, so the schema5->6 nullable-destination cutover is integrated first and the optional walk field is added on top of it. All server slices may conflict in .github/evennia-shards.json; one integration owner serializes that manifest. Follow the dependency matrix in design.md.

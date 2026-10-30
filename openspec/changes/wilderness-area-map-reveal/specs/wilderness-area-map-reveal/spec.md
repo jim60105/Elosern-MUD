@@ -13,6 +13,10 @@ Wilderness area maps SHALL encode a centred41-cell square as validated RLE, expo
 - **WHEN** a synthetic window has unknown, remembered, live and hidden cells
 - **THEN** unknown runs have only length/kind, remembered cells contain no entities and hidden identity requires visits
 
+#### Scenario: Remembered cells distinguish visits from reveal
+- **WHEN** two synthetic in-window cells share identical revealed terrain and only one has an actual visit record
+- **THEN** the visited cell carries its own node entry with visited true, the reveal-only cell carries none, and no terrain or unknown run states a visit
+
 #### Scenario: Rows and edge limits
 - **WHEN** rows cross the frame boundary or carry wrong totals, extra unknown metadata or invalid band/tier
 - **THEN** Python and JS agree on rejection; valid frame padding remains unknown
