@@ -316,8 +316,8 @@ class AuthoringRequirementTests(unittest.TestCase):
         )
 
     @covers_requirement(
-        "map-authoring-documents::"
-        "map-documents-are-discovered-and-schema-checked-as-a-complete-candidate"
+        "wilderness-elevation-authoring::"
+        "elevation-shapes-reject-invalid-candidates"
     )
     def test_continent_elevation_shapes_schema_rejection(self):
         invalid_continent = fixtures.continent_data()
@@ -418,8 +418,8 @@ class AuthoringRequirementTests(unittest.TestCase):
         )
 
     @covers_requirement(
-        "map-authoring-documents::"
-        "restricted-yaml-preserves-supported-authored-information"
+        "wilderness-elevation-authoring::"
+        "elevation-shapes-reject-invalid-candidates"
     )
     def test_continent_elevation_shapes_round_trip_and_omission_preservation(self):
         # 1. Omission stays omitted
@@ -462,8 +462,8 @@ class AuthoringRequirementTests(unittest.TestCase):
         self.assertEqual(reparsed.document.data["elevation_shapes"], parsed.document.data["elevation_shapes"])
 
     @covers_requirement(
-        "map-authoring-documents::"
-        "authoring-diagnostics-and-runtime-acceptance-have-distinct-gates"
+        "wilderness-elevation-authoring::"
+        "elevation-shapes-reject-invalid-candidates"
     )
     def test_continent_elevation_shapes_structural_geometry_rejection_and_atomicity(self):
         valid_continent = fixtures.continent_data()
