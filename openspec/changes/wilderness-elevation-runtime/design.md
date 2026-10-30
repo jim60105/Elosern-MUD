@@ -34,6 +34,41 @@ Use synthetic documents, policies and parties with independent expected results.
 
 Requirement IDs must come from tools.spec_traceability list on the equivalent merged spec tree, never hand-composed. Before sync associate only the nearest current canonical requirement and report the temporary mapping per docs/development/spec-test-traceability.md. Sync remounts to the generated IDs with no uncovered requirements or waiver. Modified requirements retain identity except an explicit RENAMED window title. Mechanism tests must exist before that sync.
 
+### Requirement Traceability Mapping
+
+Nearest current canonical requirement in canonical spec tree:
+- `wilderness-elevation-generation::elevation-generation-is-deterministic-and-physically-constrained`
+
+Planned equivalent-tree remount for new delta requirements (after archive sync):
+
+1. `wilderness-elevation-runtime::elevation-artifacts-are-bounded-and-source-identified`
+   - **Requirement**: Generation SHALL atomically publish deterministic elevation tiles within 4MiB, with fingerprints covering geographic, configuration and algorithm inputs.
+   - **Scenarios**: Budget and freshness; Partial edge tiles.
+   - **Test evidence**:
+     - `packages/map-core/tests/test_elevation_codec.py:ElevationCodecTests.test_round_trip_synthetic_frame_with_partial_edge_tiles`
+     - `packages/map-core/tests/test_elevation_codec.py:ElevationCodecTests.test_encode_elevation_artifact_produces_valid_structure`
+     - `packages/map-core/tests/test_elevation_codec.py:ElevationCodecTests.test_oversize_budget_rejection`
+     - `packages/map-core/tests/test_elevation_codec.py:ElevationCodecTests.test_freshness_reporting_and_named_changed_source`
+
+2. `wilderness-elevation-runtime::runtime-elevation-rejects-stale-or-corrupt-artifacts`
+   - **Requirement**: Map adoption SHALL reject missing, stale or integrity-invalid elevation artifacts and expose bounded cached tile lookup without offline numeric dependencies.
+   - **Scenarios**: Admission and lookup.
+   - **Test evidence**:
+     - `packages/map-core/tests/test_elevation_codec.py:ElevationCodecTests.test_tile_corrupt_base64_raises`
+     - `packages/map-core/tests/test_elevation_codec.py:ElevationCodecTests.test_tile_corrupt_zlib_stream_raises`
+     - `packages/map-core/tests/test_elevation_codec.py:ElevationCodecTests.test_tile_trailing_data_raises`
+     - `packages/map-core/tests/test_elevation_codec.py:ElevationCodecTests.test_tile_exceeded_ceiling_raises`
+     - `packages/map-core/tests/test_elevation_codec.py:ElevationCodecTests.test_tile_non_zero_reserved_bits_raises`
+     - `packages/map-core/tests/test_elevation_codec.py:ElevationCodecTests.test_tile_non_zero_padding_cell_raises`
+     - `packages/map-core/tests/test_elevation_codec.py:ElevationCodecTests.test_integrity_checks_detect_reordered_or_missing_tiles`
+     - `world/maps/tests/test_map_elevation.py:ElevationRuntimeLogicTests.test_unloaded_lookup_raises_without_zero_fallback`
+     - `world/maps/tests/test_map_elevation.py:ElevationRuntimeLogicTests.test_bounds_checks_reject_out_of_frame_and_non_integers`
+     - `world/maps/tests/test_map_elevation.py:ElevationRuntimeLogicTests.test_lru_cache_capacity_strictly_bounded_to_128_and_evicts`
+     - `world/maps/tests/test_map_elevation.py:ElevationRuntimeLogicTests.test_different_artifact_identity_does_not_hit_stale_cache`
+     - `world/maps/tests/test_map_elevation.py:ElevationRuntimeLogicTests.test_admission_rejection_on_missing_or_corrupt_elevation_retains_prior_bundle`
+     - `world/maps/tests/test_map_elevation.py:ElevationRuntimeLogicTests.test_clear_published_world_clears_elevation_pointer`
+     - `tests/test_elevation_contract.py:RuntimeWithoutGenerationExtraTests.test_package_runtime_surface_imports_without_numpy_scipy_or_the_generator`
+
 ## Risks / Trade-offs
 
 [Read side effects] -> Pure projections and object/Attribute/clock snapshots in integration tests. [Shared files] -> Serialize shard-manifest, schema and documentation changes even when roots are independent. [Data echo tests] -> Assert mechanics on synthetic fixtures and treat visual review separately. No new permanent lighting or walking state is allowed.
