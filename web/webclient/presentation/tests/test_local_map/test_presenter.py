@@ -154,11 +154,12 @@ class LocalMapPresenterTests(EvenniaTestCase):
         interior = create_object(Room, key="倉庫")
         self.char1.location = interior
         record = {
-            "schema_version": 1,
+            "schema_version": 2,
             "visited": {
                 f"room:{interior.id}": {"first_seen_tick": 1, "last_seen_tick": 1},
                 "room:99999999": {"first_seen_tick": 2, "last_seen_tick": 2},
             },
+            "wilderness": {},
         }
         self.char1.attributes.add("map_knowledge", record)
         payload = self._registry().render("local_map", _context(self.char1))

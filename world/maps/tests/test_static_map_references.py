@@ -257,10 +257,11 @@ class SyncPreservationTests(EvenniaTest):
         observer.attributes.add(
             KNOWLEDGE_ATTR,
             {
-                "schema_version": 1,
+                "schema_version": 2,
                 "visited": {
                     encode_grid(MAP, 10, 10): {"first_seen_tick": 2, "last_seen_tick": 7}
                 },
+                "wilderness": {},
             },
         )
         # A moved identity may not land on an unbound room: the plan refuses
@@ -292,10 +293,11 @@ class SyncPreservationTests(EvenniaTest):
         traveller.attributes.add(
             KNOWLEDGE_ATTR,
             {
-                "schema_version": 1,
+                "schema_version": 2,
                 "visited": {
                     encode_grid(MAP, 10, 10): {"first_seen_tick": 3, "last_seen_tick": 9}
                 },
+                "wilderness": {},
             },
         )
 
@@ -477,8 +479,9 @@ class IntegratedMovedNodeTests(EvenniaTest):
         traveller.attributes.add(
             KNOWLEDGE_ATTR,
             {
-                "schema_version": 1,
+                "schema_version": 2,
                 "visited": {encode_grid(MAP, 10, 10): {"first_seen_tick": 1, "last_seen_tick": 2}},
+                "wilderness": {},
             },
         )
 

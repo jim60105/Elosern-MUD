@@ -13,8 +13,17 @@ from elosern_map_core.documents import DistrictDeclaration
 from elosern_map_core.references import wilderness_cell_ref
 from world.lore.map_districts import landmark_node_ids
 from world.rules.map_district_lighting import lit_district_keys, lit_district_keys_from_visits
-from world.rules.map_knowledge import KNOWLEDGE_ATTR, KnowledgeError, NodeVisit
+from world.rules.map_knowledge import (
+    CHUNK_CELLS,
+    KNOWLEDGE_ATTR,
+    KnowledgeError,
+    NodeVisit,
+    decode_node,
+)
+from world.maps.wilderness_provider import WILDERNESS_NAME
+from world.tests.geography_fixture import publish_shipped_geography
 
+publish_shipped_geography()
 
 def _district(key, name, landmark_name, cell, kind="voronoi", region_key=None):
     return DistrictDeclaration(
@@ -56,11 +65,26 @@ class _Character:
     def __init__(self, visited):
         record = None
         if visited is not None:
+            visited_map = {}
+            wild_chunks = {}
+            for node in visited:
+                decoded = decode_node(node)
+                if decoded["prefix"] in ("grid", "room"):
+                    visited_map[node] = {"first_seen_tick": 3, "last_seen_tick": 9}
+                elif decoded["prefix"] == "wild":
+                    x, y = decoded["x"], decoded["y"]
+                    cx, cy = x // CHUNK_CELLS, y // CHUNK_CELLS
+                    chunk_key = f"{cx}:{cy}"
+                    offset = str((y % CHUNK_CELLS) * CHUNK_CELLS + (x % CHUNK_CELLS))
+                    wild_chunks.setdefault(chunk_key, {})[offset] = {
+                        "first_seen_tick": 3,
+                        "last_seen_tick": 9,
+                        "sight": 0,
+                    }
             record = {
-                "schema_version": 1,
-                "visited": {
-                    node: {"first_seen_tick": 3, "last_seen_tick": 9} for node in visited
-                },
+                "schema_version": 2,
+                "visited": visited_map,
+                "wilderness": {WILDERNESS_NAME: wild_chunks} if wild_chunks else {},
             }
         self.attributes = _SpyAttributes({} if record is None else {KNOWLEDGE_ATTR: record})
 
@@ -105,7 +129,7 @@ class DistrictLightingTests(unittest.TestCase):
         self.assertEqual(character.attributes.stored, before)
         # No discovery attribute or district data is attached to the record.
         self.assertEqual(set(before), {KNOWLEDGE_ATTR})
-        self.assertEqual(set(before[KNOWLEDGE_ATTR]), {"schema_version", "visited"})
+        self.assertEqual(set(before[KNOWLEDGE_ATTR]), {"schema_version", "visited", "wilderness"})
 
     @covers_requirement("map-districts::district-lighting-is-derived-from-visited-landmark-identity")
     def test_missing_record_lights_nothing_and_corrupt_record_raises(self):
@@ -114,7 +138,7 @@ class DistrictLightingTests(unittest.TestCase):
         self.assertEqual(fresh.attributes.writes, [])
 
         corrupt = _Character([])
-        corrupt.attributes.stored[KNOWLEDGE_ATTR] = {"schema_version": 99, "visited": {}}
+        corrupt.attributes.stored[KNOWLEDGE_ATTR] = {"schema_version": 99, "visited": {}, "wilderness": {}}
         before = copy.deepcopy(corrupt.attributes.stored)
         with self.assertRaises(KnowledgeError):
             lit_district_keys(corrupt, _DISTRICTS)

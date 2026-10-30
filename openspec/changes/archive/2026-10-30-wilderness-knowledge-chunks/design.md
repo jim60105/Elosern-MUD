@@ -32,6 +32,11 @@ Use synthetic documents, policies and parties with independent expected results.
 
 Requirement IDs must come from tools.spec_traceability list on the equivalent merged spec tree, never hand-composed. Before sync associate only the nearest current canonical requirement and report the temporary mapping per docs/development/spec-test-traceability.md. Sync remounts to the generated IDs with no uncovered requirements or waiver. Modified requirements retain identity except an explicit RENAMED window title. Mechanism tests must exist before that sync.
 
+### Temporary spec traceability mapping
+- MODIFIED `map-knowledge::map-knowledge-py-is-the-sole-writer-of-a-versioned-visited-node-record`: Covered by `test_map_knowledge.py`, `test_map_knowledge_integration.py`.
+- MODIFIED `map-knowledge::parse-knowledge-isolates-corrupt-records-without-resetting-them`: Covered by `test_map_knowledge.py`.
+- ADDED `wilderness-observations-are-chunk-addressed`: Associated with nearest canonical requirement `map-knowledge::map-knowledge-py-is-the-sole-writer-of-a-versioned-visited-node-record` before sync. Planned equivalent-tree remount: `wilderness-knowledge-chunks::wilderness-observations-are-chunk-addressed`.
+
 ## Risks / Trade-offs
 
 [Read side effects] -> Pure projections and object/Attribute/clock snapshots in integration tests. [Shared files] -> Serialize shard-manifest, schema and documentation changes even when roots are independent. [Data echo tests] -> Assert mechanics on synthetic fixtures and treat visual review separately. No new permanent lighting or walking state is allowed.

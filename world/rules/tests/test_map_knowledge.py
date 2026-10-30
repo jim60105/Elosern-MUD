@@ -15,6 +15,8 @@ from world.rules.map_knowledge import (
     encode_room,
     encode_wild,
     parse_knowledge,
+    has_visited,
+    visits_in_bounds,
     validate_node,
 )
 
@@ -133,15 +135,22 @@ class KnowledgeParseTests(_RegisteredVocabularyTests):
         return _FakeCharacter(record)
 
     def test_valid_record_parses_in_deterministic_order(self):
+        # x=1, y=1 -> chunk 0:0, offset = (1%64)*64 + 1%64 = 65
         record = {
-            "schema_version": 1,
+            "schema_version": 2,
             "visited": {
                 "room:99": {"first_seen_tick": 40, "last_seen_tick": 80},
                 f"grid:{self.map}:2:0": {
                     "first_seen_tick": 10,
                     "last_seen_tick": 10,
                 },
-                f"wild:{self.wild}:1:1": {"first_seen_tick": 20, "last_seen_tick": 60},
+            },
+            "wilderness": {
+                self.wild: {
+                    "0:0": {
+                        "65": {"first_seen_tick": 20, "last_seen_tick": 60, "sight": 3}
+                    }
+                }
             },
         }
         with patch(
@@ -154,32 +163,89 @@ class KnowledgeParseTests(_RegisteredVocabularyTests):
             [
                 NodeVisit(f"grid:{self.map}:2:0", 10, 10),
                 NodeVisit("room:99", 40, 80),
-                NodeVisit(f"wild:{self.wild}:1:1", 20, 60),
+                NodeVisit(f"wild:{self.wild}:1:1", 20, 60, sight=3),
             ],
         )
 
-    @covers_requirement("map-knowledge::parse-knowledge-isolates-corrupt-records-without-resetting-them")
+    @covers_requirement(
+        "map-knowledge::parse-knowledge-isolates-corrupt-records-without-resetting-them",
+        "wilderness-knowledge-chunks::wilderness-observations-are-chunk-addressed",
+    )
     def test_corrupt_records_raise_and_are_not_reset(self):
         corrupt = [
             None,
-            {"schema_version": 2, "visited": {}},
+            # Schema 1 rejection
             {"schema_version": 1},
             {"schema_version": 1, "visited": []},
+            {"schema_version": 1, "visited": {}, "wilderness": {}},
+            {"schema_version": 1, "visited": {}},
+            # Schema 2 missing wilderness
+            {"schema_version": 2, "visited": {}},
+            # Schema 2 extra key
+            {"schema_version": 2, "visited": {}, "wilderness": {}, "extra": True},
+            # wild: prefix in visited mapping is rejected
             {
-                "schema_version": 1,
+                "schema_version": 2,
+                "visited": {f"wild:{self.wild}:1:1": {"first_seen_tick": 1, "last_seen_tick": 1}},
+                "wilderness": {},
+            },
+            # Non-integer tick in visited
+            {
+                "schema_version": 2,
                 "visited": {f"grid:{self.map}:2:0": {"first_seen_tick": "x", "last_seen_tick": 1}},
+                "wilderness": {},
             },
+            # Boolean tick in visited
             {
-                "schema_version": 1,
-                "visited": {"unknown:1": {"first_seen_tick": 1, "last_seen_tick": 1}},
+                "schema_version": 2,
+                "visited": {f"grid:{self.map}:2:0": {"first_seen_tick": True, "last_seen_tick": 1}},
+                "wilderness": {},
             },
+            # first_seen > last_seen
             {
-                "schema_version": 1,
-                "visited": {"room:5": {"first_seen_tick": -1, "last_seen_tick": 1}},
+                "schema_version": 2,
+                "visited": {"room:5": {"first_seen_tick": 10, "last_seen_tick": 5}},
+                "wilderness": {},
             },
+            # unknown wilderness name
+            {"schema_version": 2, "visited": {}, "wilderness": {"unknown": {}}},
+            # empty chunk
+            {"schema_version": 2, "visited": {}, "wilderness": {self.wild: {"0:0": {}}}},
+            # invalid chunk key format
             {
-                "schema_version": 1,
-                "visited": {"room:5": {"first_seen_tick": 1}},
+                "schema_version": 2,
+                "visited": {},
+                "wilderness": {self.wild: {"0:0:0": {"0": {"first_seen_tick": 1, "last_seen_tick": 1, "sight": 0}}}},
+            },
+            # non-canonical decimal in chunk key (e.g. 00:1)
+            {
+                "schema_version": 2,
+                "visited": {},
+                "wilderness": {self.wild: {"00:1": {"0": {"first_seen_tick": 1, "last_seen_tick": 1, "sight": 0}}}},
+            },
+            # invalid sight (> 8)
+            {
+                "schema_version": 2,
+                "visited": {},
+                "wilderness": {self.wild: {"0:0": {"0": {"first_seen_tick": 1, "last_seen_tick": 1, "sight": 9}}}},
+            },
+            # boolean sight
+            {
+                "schema_version": 2,
+                "visited": {},
+                "wilderness": {self.wild: {"0:0": {"0": {"first_seen_tick": 1, "last_seen_tick": 1, "sight": True}}}},
+            },
+            # offset out of bounds
+            {
+                "schema_version": 2,
+                "visited": {},
+                "wilderness": {self.wild: {"0:0": {"4096": {"first_seen_tick": 1, "last_seen_tick": 1, "sight": 0}}}},
+            },
+            # excessively long non-canonical integer key (> 10 digits)
+            {
+                "schema_version": 2,
+                "visited": {},
+                "wilderness": {self.wild: {"1" * 5000 + ":0": {"0": {"first_seen_tick": 1, "last_seen_tick": 1, "sight": 0}}}},
             },
         ]
         for record in corrupt:
@@ -188,6 +254,148 @@ class KnowledgeParseTests(_RegisteredVocabularyTests):
                 with self.assertRaises(KnowledgeError):
                     parse_knowledge(character)
                 self.assertEqual(character.attributes.get("map_knowledge"), record)
+
+    @covers_requirement(
+        "map-knowledge::map-knowledge-py-is-the-sole-writer-of-a-versioned-visited-node-record",
+        "wilderness-knowledge-chunks::wilderness-observations-are-chunk-addressed",
+    )
+    def test_has_visited_and_visits_in_bounds(self):
+        # Build record with 2 distant chunks: chunk 0:0 and chunk 10:10
+        # In chunk 0:0, cell (1, 2) -> offset = 2 * 64 + 1 = 129
+        # In chunk 10:10, cell (641, 642) -> cx=10, cy=10, local_x=1, local_y=2, offset=129
+        record = {
+            "schema_version": 2,
+            "visited": {
+                "room:10": {"first_seen_tick": 5, "last_seen_tick": 5},
+            },
+            "wilderness": {
+                self.wild: {
+                    "0:0": {
+                        "129": {"first_seen_tick": 10, "last_seen_tick": 15, "sight": 2}
+                    },
+                    "10:10": {
+                        "129": {"first_seen_tick": 30, "last_seen_tick": 40, "sight": 5}
+                    },
+                }
+            },
+        }
+        char = self._character(record)
+        self.assertTrue(has_visited(char, "room:10"))
+        self.assertFalse(has_visited(char, "room:20"))
+        self.assertTrue(has_visited(char, f"wild:{self.wild}:1:2"))
+        self.assertFalse(has_visited(char, f"wild:{self.wild}:1:3"))
+        self.assertTrue(has_visited(char, f"wild:{self.wild}:641:642"))
+
+        # Bounded query around chunk 0:0 (bounds 0, 0, 10, 10)
+        visits = visits_in_bounds(char, (0, 0, 10, 10))
+        self.assertEqual(len(visits), 1)
+        self.assertEqual(visits[0].node_id, f"wild:{self.wild}:1:2")
+        self.assertEqual(visits[0].sight, 2)
+
+        # Bounded query around chunk 10:10
+        visits_far = visits_in_bounds(char, (640, 640, 650, 650))
+        self.assertEqual(len(visits_far), 1)
+        self.assertEqual(visits_far[0].node_id, f"wild:{self.wild}:641:642")
+        self.assertEqual(visits_far[0].sight, 5)
+
+        # Bounded query with padding: bounds=(633, 634, 633, 634) with padding=8 covers (641, 642)
+        visits_padded = visits_in_bounds(char, (633, 634, 633, 634), padding=8)
+        self.assertEqual(len(visits_padded), 1)
+        self.assertEqual(visits_padded[0].node_id, f"wild:{self.wild}:641:642")
+
+        # Multi-chunk query covering both chunk 0:0 and chunk 1:1
+        # Add cell (65, 65) -> cx=1, cy=1, offset=(1*64)+1 = 65
+        record_multi = {
+            "schema_version": 2,
+            "visited": {},
+            "wilderness": {
+                self.wild: {
+                    "0:0": {"65": {"first_seen_tick": 1, "last_seen_tick": 1, "sight": 0}},
+                    "1:1": {"65": {"first_seen_tick": 2, "last_seen_tick": 2, "sight": 1}},
+                }
+            },
+        }
+        char_multi = self._character(record_multi)
+        multi_visits = visits_in_bounds(char_multi, (0, 0, 70, 70))
+        self.assertEqual(len(multi_visits), 2)
+        self.assertEqual(multi_visits[0].node_id, f"wild:{self.wild}:1:1")
+        self.assertEqual(multi_visits[1].node_id, f"wild:{self.wild}:65:65")
+
+        # Non-intersecting query returns empty
+        self.assertEqual(visits_in_bounds(char, (200, 200, 210, 210)), [])
+
+    @covers_requirement(
+        "map-knowledge::map-knowledge-py-is-the-sole-writer-of-a-versioned-visited-node-record",
+        "wilderness-knowledge-chunks::wilderness-observations-are-chunk-addressed",
+    )
+    def test_bounded_query_ignores_distant_corrupt_chunk_entries(self):
+        # Distant chunk 10:10 has a corrupt entry (sight=99), but chunk 0:0 is valid.
+        # visits_in_bounds for chunk 0:0 must succeed without inspecting chunk 10:10's entries.
+        # parse_knowledge must fail because it decodes all chunks.
+        record = {
+            "schema_version": 2,
+            "visited": {},
+            "wilderness": {
+                self.wild: {
+                    "0:0": {
+                        "65": {"first_seen_tick": 1, "last_seen_tick": 1, "sight": 1}
+                    },
+                    "10:10": {
+                        "129": {"first_seen_tick": 1, "last_seen_tick": 1, "sight": 99}
+                    },
+                }
+            },
+        }
+        char = self._character(record)
+        # Query intersecting only chunk 0:0
+        results = visits_in_bounds(char, (0, 0, 5, 5))
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].node_id, f"wild:{self.wild}:1:1")
+
+        # Query intersecting chunk 10:10 raises KnowledgeError
+        with self.assertRaises(KnowledgeError):
+            visits_in_bounds(char, (640, 640, 650, 650))
+
+        # parse_knowledge raises KnowledgeError
+        with self.assertRaises(KnowledgeError):
+            parse_knowledge(char)
+
+    @covers_requirement(
+        "map-knowledge::map-knowledge-py-is-the-sole-writer-of-a-versioned-visited-node-record",
+        "wilderness-knowledge-chunks::wilderness-observations-are-chunk-addressed",
+    )
+    def test_edge_padding_and_frame_boundary_validation(self):
+        max_x = wilderness_provider.WILDERNESS_MAX_X
+        max_y = wilderness_provider.WILDERNESS_MAX_Y
+        cx = max_x // 64
+        cy = max_y // 64
+        out_of_bounds_local_x = (max_x % 64) + 1
+        if out_of_bounds_local_x < 64:
+            bad_offset = out_of_bounds_local_x
+            record = {
+                "schema_version": 2,
+                "visited": {},
+                "wilderness": {
+                    self.wild: {
+                        f"{cx}:{cy}": {
+                            str(bad_offset): {"first_seen_tick": 1, "last_seen_tick": 1, "sight": 0}
+                        }
+                    }
+                },
+            }
+            char = self._character(record)
+            with self.assertRaises(KnowledgeError):
+                parse_knowledge(char)
+
+    @covers_requirement("map-knowledge::map-knowledge-py-is-the-sole-writer-of-a-versioned-visited-node-record")
+    def test_node_visit_backwards_compatibility(self):
+        visit = NodeVisit("room:1", 10, 20)
+        self.assertEqual(visit.node_id, "room:1")
+        self.assertEqual(visit.first_seen_tick, 10)
+        self.assertEqual(visit.last_seen_tick, 20)
+        self.assertEqual(visit.sight, 0)
+        visit_with_sight = NodeVisit("wild:elosern:1:1", 10, 20, sight=5)
+        self.assertEqual(visit_with_sight.sight, 5)
 
 
 class _FakeCharacter:

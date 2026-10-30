@@ -73,7 +73,9 @@ closure that does not resolve before startup synchronization writes anything.
    destination, both coordinate tag sets, key/aliases, prototype).
 3. Each moved node contributes an old→new binding. The knowledge owner rewrites
    every affected player's `grid:` ids, preserving first/last-seen ticks and
-   merging collapsed ids; it never records a new arrival.
+   merging collapsed ids; it never records a new arrival. Wilderness chunk knowledge
+   is preserved untouched. Map knowledge uses schema 2 with chunk-addressed wilderness
+   observations and development database reset cutover (no migration shim).
 4. A second startup performs no managed write and logs no prune event.
 5. A failure rolls back the whole transaction, reloads every touched room/exit
    and resets the attribute caches of every journalled knowledge record.

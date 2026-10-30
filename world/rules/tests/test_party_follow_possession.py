@@ -34,7 +34,10 @@ from world.rules.fatigue import (
     read_fatigue_state,
     write_fatigue_state,
 )
-from world.rules.map_knowledge import parse_knowledge, record_arrival
+from world.tests.geography_fixture import publish_shipped_settlements
+
+publish_shipped_settlements()
+from world.rules.map_knowledge import has_visited, parse_knowledge, record_arrival
 from world.rules.party import (
     FOLLOW_LOST_MESSAGE,
     follow_companions,
@@ -341,8 +344,7 @@ class PossessedWildernessFollowTests(PossessedFollowTestCase):
         self.assertEqual(self.other.location.coordinates, ENTRY_XY)
         self.assertEqual(self._tick(), before + EAST_GATE_SECONDS)
         self.assertEqual(self._script().itemcoordinates.get(self.char1), ENTRY_XY)
-        visited = self.char1.attributes.get("map_knowledge")["visited"]
-        self.assertIn(f"wild:{WILDERNESS_NAME}:{ENTRY_XY[0]}:{ENTRY_XY[1]}", visited)
+        self.assertTrue(has_visited(self.char1, f"wild:{WILDERNESS_NAME}:{ENTRY_XY[0]}:{ENTRY_XY[1]}"))
 
     @covers_requirement(
         "party-system::companions-follow-the-player-through-every-exit-traversal"
@@ -461,7 +463,7 @@ class PossessedWildernessFollowTests(PossessedFollowTestCase):
         write_fatigue_state(self.other, 0, SleepPosture.FORCED)
         before = self._tick()
         coordinates = self.npc.location.coordinates
-        visited = set(self.char1.attributes.get("map_knowledge")["visited"])
+        visited = {v.node_id for v in parse_knowledge(self.char1)}
 
         result = self._exit("west").at_traverse(self.npc, self.npc.location)
 
@@ -474,7 +476,7 @@ class PossessedWildernessFollowTests(PossessedFollowTestCase):
         self.assertEqual(self._script().itemcoordinates[self.npc], coordinates)
         self.assertEqual(self._tick(), before)
         self.assertEqual(
-            set(self.char1.attributes.get("map_knowledge")["visited"]), visited
+            {v.node_id for v in parse_knowledge(self.char1)}, visited
         )
 
 

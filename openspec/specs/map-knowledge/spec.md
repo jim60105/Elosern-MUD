@@ -8,10 +8,7 @@ instance-reclamation transaction, and the deterministic read parser presenters c
 ## Requirements
 
 ### Requirement: map_knowledge.py is the sole writer of a versioned visited-node record
-`world/rules/map_knowledge.py` SHALL be the only module that writes the player's map-knowledge
-attribute. The record SHALL be a JSON-safe dict of exactly `{"schema_version": 1, "visited": {...}}`,
-where `visited` maps canonical node IDs to `{"first_seen_tick": int, "last_seen_tick": int}` with
-non-negative integer ticks.
+world/rules/map_knowledge.py SHALL exclusively write schema2 map knowledge, with grid/room tick pairs and bounded chunk-addressed wilderness tick/radius observations, preserving corrupt records without conversion.
 
 #### Scenario: record_arrival creates a first observation
 - **WHEN** `record_arrival(character)` is called for a character at a canonical node at world tick 30
@@ -38,8 +35,7 @@ non-negative integer ticks.
 
 #### Scenario: The record stores no duplicate geometry or room names
 - **WHEN** the knowledge record is inspected after several arrivals
-- **THEN** it contains only node IDs and observation ticks, with no room names, descriptions, glyphs,
-  exit keys, or coordinates as independent fields
+- **THEN** it contains only canonical identities/chunk addresses, observation ticks and wilderness sight, with no room names, descriptions, glyphs, exit keys or duplicate independent geometry
 
 #### Scenario: The module exposes the full knowledge API
 - **WHEN** the public surface of `world/rules/map_knowledge.py` is inspected
@@ -203,11 +199,7 @@ contain the target node, never creating the attribute for a character that does 
   `reclaim_due_instances`
 
 ### Requirement: parse_knowledge isolates corrupt records without resetting them
-`world/rules/map_knowledge.py::parse_knowledge(character)` SHALL return a normalized, deterministically
-ordered view of the character's knowledge for presentation, and SHALL raise a dedicated error (not
-return a reset record) when the stored value is missing, malformed, has an unknown `schema_version`,
-contains an invalid node ID, or has non-integer ticks. A presenter receiving that error SHALL make the
-minimap unavailable without clearing or overwriting the player's history during a read.
+parse_knowledge SHALL return deterministic schema2 visit projections and reject missing, malformed or unknown records without resetting them; non-wilderness presenters SHALL retain unavailable behavior, while wilderness reveal readers use only independently valid lit membership on observation failure.
 
 #### Scenario: A valid record parses in deterministic order
 - **WHEN** `parse_knowledge()` is called on a valid record with several nodes

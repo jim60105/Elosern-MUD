@@ -314,11 +314,12 @@ class ReclaimKnowledgePruneTests(EvenniaTest):
         self.char1.attributes.add(
             "map_knowledge",
             {
-                "schema_version": 1,
+                "schema_version": 2,
                 "visited": {
                     f"room:{room.id}": {"first_seen_tick": 10, "last_seen_tick": 20},
                     f"room:{self.room1.id}": {"first_seen_tick": 30, "last_seen_tick": 30},
                 },
+                "wilderness": {},
             },
         )
         events = reclaim_due_instances(0, 100)
@@ -335,10 +336,11 @@ class ReclaimKnowledgePruneTests(EvenniaTest):
         self.char1.attributes.add(
             "map_knowledge",
             {
-                "schema_version": 1,
+                "schema_version": 2,
                 "visited": {
                     f"room:{self.room1.id}": {"first_seen_tick": 30, "last_seen_tick": 30}
                 },
+                "wilderness": {},
             },
         )
         reclaim_due_instances(0, 100)
@@ -359,10 +361,11 @@ class ReclaimKnowledgePruneTests(EvenniaTest):
         self.char1.attributes.add(
             "map_knowledge",
             {
-                "schema_version": 1,
+                "schema_version": 2,
                 "visited": {
                     f"room:{room.id}": {"first_seen_tick": 10, "last_seen_tick": 20}
                 },
+                "wilderness": {},
             },
         )
         events = reclaim_due_instances(0, 100)
@@ -383,8 +386,9 @@ class ReclaimKnowledgePruneTests(EvenniaTest):
         self.char1.attributes.add(
             "map_knowledge",
             {
-                "schema_version": 1,
+                "schema_version": 2,
                 "visited": {f"room:{room.id}": {"first_seen_tick": 10, "last_seen_tick": 20}},
+                "wilderness": {},
             },
         )
         from world.rules import map_knowledge as map_knowledge_module
@@ -456,11 +460,12 @@ class ReclaimKnowledgePruneTests(EvenniaTest):
         # from the rolled-back database (design D4).
         room = self._due_room("prune_real_failure")
         before = {
-            "schema_version": 1,
+            "schema_version": 2,
             "visited": {
                 f"room:{room.id}": {"first_seen_tick": 10, "last_seen_tick": 20},
                 f"room:{self.room1.id}": {"first_seen_tick": 30, "last_seen_tick": 30},
             },
+            "wilderness": {},
         }
         self.char1.attributes.add("map_knowledge", before)
         from evennia.typeclasses.attributes import Attribute
@@ -526,11 +531,12 @@ class ReclaimRollbackCacheTests(EvenniaTest):
         npc = create_object(NPC, key="relocated_on_rollback")
         npc.move_to(room, quiet=True)
         before_knowledge = {
-            "schema_version": 1,
+            "schema_version": 2,
             "visited": {
                 f"room:{room_id}": {"first_seen_tick": 10, "last_seen_tick": 20},
                 f"room:{self.room1.id}": {"first_seen_tick": 30, "last_seen_tick": 30},
             },
+            "wilderness": {},
         }
         self.char1.attributes.add("map_knowledge", before_knowledge)
         before_surfaces = {
