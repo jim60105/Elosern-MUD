@@ -165,6 +165,7 @@ class WildernessExplorationPresenterTests(EvenniaTestCase):
         "wilderness-map-disclosure::opaque-directional-controls-remain-executable"
     )
     def test_a_withheld_direction_executes_through_the_production_move_seam(self):
+        from twisted.internet.defer import Deferred
         from world.maps.wilderness_destination import resolve_wilderness_destination
         from world.rules.map_knowledge import parse_knowledge
         from web.webclient.actions.exploration_actions import _move_adapter
@@ -176,13 +177,23 @@ class WildernessExplorationPresenterTests(EvenniaTestCase):
         expected = resolve_wilderness_destination(room, "north")
         self.assertIsNotNone(expected)
         # The compass submits only the opaque reference plus the current node.
-        result = _move_adapter(
-            self.char1,
-            {
-                "exit_ref": row["exit_ref"],
-                "current_node": node_id_for_location(room),
-            },
-        )
+        # A wilderness step releases its success through ``on_commit``, because
+        # production only publishes once ``settle_movement`` commits. The test
+        # transaction never commits, so the capture block runs the registered
+        # callback the way production's own commit would.
+        with self.captureOnCommitCallbacks(execute=True):
+            result = _move_adapter(
+                self.char1,
+                {
+                    "exit_ref": row["exit_ref"],
+                    "current_node": node_id_for_location(room),
+                },
+            )
+        if isinstance(result, Deferred):
+            self.assertTrue(
+                result.called, "the committed step must release its result"
+            )
+            result = result.result
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(node_id_for_location(self.char1.location), expected)
         visited = {visit.node_id for visit in parse_knowledge(self.char1)}
