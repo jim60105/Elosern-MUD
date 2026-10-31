@@ -90,6 +90,35 @@ does not repaint; several adoptions inside one animation frame paint once.
 Camera moves, zoom, UI scale, aim, hover, walking, the plan and the refresh
 status never repaint: they change a CSS transform or the SVG/HTML overlays.
 
+### Travel walking queue
+
+The travel stage's held walk (wilderness-travel-walking-ui) is owned by the
+store (`web/webclient-app/stores/elosern/travel.js`): the 400 ms hold timer,
+the one pending `explore.move` and the dwell live there, and components only
+emit intents. Each step re-resolves the held direction against the committed
+exit rows and leaves through the ordinary guarded `activateExit` with its
+unchanged `{exit_ref, current_node}` payload. A step counts once, and only
+when all of these hold:
+
+- its own `ui_action_result` (same request id and epoch) succeeded;
+- the committed revision reached the revision that result declared, in the
+  same epoch (result and publication may arrive in either order; a result
+  that names a revision not yet committed starts the ordinary repair and the
+  queue waits for it);
+- the canonical current node (`local_map.current_node`) differs from the node
+  the step was sent from. A wilderness room object can be pooled across
+  coordinates, so the room identity is never the signal.
+
+`lastActionResult` alone, a foreign result, an unrelated revision or a free
+dispatch gate never advances the queue. After a counted step the queue waits
+`STEP_DWELL_MS` (350 ms, 0 at motion `off`) and for a current map: the
+refresh owner's `ready` status for the window whose `current_node` is the
+committed node. `refreshing` is ordinary waiting; `unavailable`, `invalid`,
+`retired`, a refusal, a disconnect, a generation or epoch change, a failed
+recovery, leaving the layout or exploration, and an opened drawer, overlay or
+card stop the walk and never resume it. A stop sends nothing and never resends
+a step already sent; that step's late commit only updates committed state.
+
 ### General publication parts
 
 An eager `ui_snapshot`/`ui_update` whose canonical document does not fit its

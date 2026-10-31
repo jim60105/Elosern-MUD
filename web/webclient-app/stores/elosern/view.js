@@ -258,7 +258,8 @@ export function applyView(ctx) {
       maps: rs.maps || {},
       mapPublications: rs.mapPublications || {},
       // The wilderness travel presentation (wilderness-travel-interface):
-      // `{ mode, layout, room, map, mapReady, mapStatus, area }`.
+      // `{ mode, layout, room, map, mapReady, mapStatus, area, aim,
+      // aimTarget, walking, holding, notice }`.
       travel: ctx.travelView(rs),
       mutationsLocked: rs.mutationsLocked,
       protocolError: rs.protocolError,
@@ -583,6 +584,11 @@ export function applyView(ctx) {
     // The bag tab's held cross-member item (webclient-party-bag-retire) opens
     // its frame last, after the publication, once its actor switch committed.
     ctx.followCombatItem(ctx.reducer.getCommittedState());
+    // The travel walking queue (wilderness-travel-walking-ui) settles last:
+    // its cancellations, the pending step's commit match and the next send
+    // read the freshly released gate, and a send's own nested publication
+    // never re-enters it.
+    ctx.settleTravel();
   };
 
   const partyAvailable = computed(() => !!ctx.view.value.partyAvailable);

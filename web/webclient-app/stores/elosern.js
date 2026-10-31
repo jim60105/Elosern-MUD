@@ -241,6 +241,14 @@ export const useElosernStore = defineStore("elosern", () => {
     // their one user.
     setTravelMap: ctx.setTravelMap,
     travelRecovery: ctx.travelRecovery,
+    // The travel walking queue (wilderness-travel-walking-ui): the persistent
+    // neighbour aim, one guarded step, the 400 ms held walk and its stops.
+    // composables/use-travel-input.js is their one caller.
+    aimTravel: ctx.aimTravel,
+    stepTravel: ctx.stepTravel,
+    holdTravel: ctx.holdTravel,
+    releaseTravel: ctx.releaseTravel,
+    stopTravel: ctx.stopTravel,
     requestCreationReset: ctx.requestCreationReset,
     focusPress: ctx.focusPress,
     focusConfirm: ctx.focusConfirm,
