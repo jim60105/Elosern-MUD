@@ -176,7 +176,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "629bd5cf8980ada34ac3584f3dd568ceb41281810081c01c6804cafde0ab1b96",
+  "fingerprint": "b80cb81971b53be1a31d59122e3b4bb419ccbb69fd2c537a21ec64f35161396c",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -1190,7 +1190,7 @@
     "world/rules/progression/_constants.py": "2996c37a60e0f5a120ad7338062513bc7c995e67e9a7cc7169709396c7b058e3",
     "world/rules/progression/_gates.py": "2d9b87b2a1b0bcfcb10dd404d65751b52d4771cfe18ee0cf04760f7daa2d31a8",
     "world/rules/progression/_lineage.py": "e77668e8ea4738ae9115d13480925185cc6711319ff7905693f294256bd205ec",
-    "world/rules/progression/_practice.py": "5592d305ed5ec0b49ee7db3f9ad426332eeee91844593d23c65bf16793b4faa9",
+    "world/rules/progression/_practice.py": "d5170cb7951b13e3f868c00528651333267c24a13afdd5dab4e56063eb9edf85",
     "world/rules/progression/_scales.py": "e3fe413762fc31c10ed69e3cfdb2f85ec4ead48047d510e84163a9e0c617edae",
     "world/rules/progression/_scaling.py": "4f487e807f7e294a0185cb79ca599d6b51455c028711df7607644e159555a28b",
     "world/rules/protection_demo.py": "fd92b8d359cb02500ad091e7509dbf2d4b0dd7028fe0bb220e7f1c0d668eeb44",

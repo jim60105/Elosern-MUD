@@ -8,8 +8,14 @@ here; both practice entry points (in the package ``__init__``) scale through
 from math import isfinite
 from typing import Any
 
-from world.skills.effects import DamageEffect, GrowthRateEffect
-from world.skills.registry import SKILL_REGISTRY, SkillDef
+from world.lore.elements import ELEMENT_REGISTRY
+from world.skills.effects import GrowthRateEffect
+from world.skills.registry import (
+    SKILL_REGISTRY,
+    SkillCategory,
+    SkillDef,
+    SkillKind,
+)
 
 from ._constants import SKILL_PRACTICE_XP_PER_USE
 from ._gates import _race_learning_multiplier
@@ -17,22 +23,24 @@ from ._scaling import element_affinity_multiplier
 
 
 def _is_elemental_magic(skill: SkillDef) -> bool:
-    """Return whether element affinity may ever scale this skill's practice.
+    """Return whether the elemental factors may scale this skill's practice.
 
-    ``shadow_slash`` carries ``element == dark`` with a PHYSICAL damage
-    school, so the element field alone cannot decide affinity eligibility:
-    only a skill whose parsed effects include a magic-school damage of its own
-    element is elemental magic. Physical and non-elemental skills take the
-    neutral ``1.0`` (design §8: the accrual formula reads no school bias, but
-    affinity is a magic-affinity concept by definition).
+    A skill qualifies when the catalog says it is an ACTIVE elemental spell
+    whose declared element names a registered :data:`ELEMENT_REGISTRY` entry.
+    The catalog identity -- kind, category and element -- decides a spell's
+    learning domain, never its parsed effects, so damage-free elemental
+    healing, buff, control, cleansing and mixed-effect spells learn at the
+    same affinity and owned scoped-growth rates as elemental damage (design
+    D1). ``shadow_slash`` and the other element-tagged PHYSICAL martial rows
+    stay at the neutral ``1.0``, as do PASSIVE enhancements, elementless
+    actions and every other category: the accrual formula reads no school
+    bias, but affinity is an elemental-magic concept by definition.
     """
-    if skill.element is None:
-        return False
-    return any(
-        isinstance(effect, DamageEffect)
-        and effect.school == "magic"
-        and effect.element == skill.element.key
-        for effect in skill.parsed_effects
+    return (
+        skill.kind is SkillKind.ACTIVE
+        and skill.category is SkillCategory.ELEMENTAL_MAGIC
+        and skill.element is not None
+        and skill.element.key in ELEMENT_REGISTRY
     )
 
 
@@ -86,8 +94,8 @@ def _owned_growth_factor(entity: Any, skill: SkillDef) -> float:
 def _practice_growth_factors(entity: Any, skill: SkillDef) -> float:
     """Return the shared growth-factor composite for one skill's practice.
 
-    Race ``learning_multiplier`` x element-affinity multiplier (``1.0`` for a
-    physical or non-elemental skill) x ``growth_rate_multiplier(entity)``
+    Race ``learning_multiplier`` x element-affinity multiplier (``1.0`` for
+    any skill outside ACTIVE elemental magic) x ``growth_rate_multiplier(entity)``
     (the conferred-buff pull path) x the owned-skill growth factor
     (:func:`_owned_growth_factor`, the scoped ``growth_rate`` effects of the
     skills the entity owns). One formula, two entry points: the per-use grant

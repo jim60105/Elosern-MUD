@@ -167,11 +167,20 @@ class StaticBand:
 ```
 practice_xp += SKILL_PRACTICE_XP_PER_USE
              × RACE_REGISTRY[race].learning_multiplier          (elf ×10)
-             × ELEMENT_AFFINITY_MULT if skill.element in entity.affinity_elements
-               (affinity 1.1 / non-affinity 0.9; physical or non-elemental
+             × ELEMENT_AFFINITY_MULT for ACTIVE ELEMENTAL_MAGIC skills whose
+               registered element is in entity.affinity_elements
+               (affinity 1.1 / non-affinity 0.9; the catalog category decides,
+                so damage-free healing, buff, control, cleansing and mixed
+                elemental spells learn at the same rate as elemental damage,
+                while element-tagged physical martial, PASSIVE and elementless
                 skills: 1.0)
              × growth_rate_multiplier(entity)                   (conferred buff, pull-read)
 ```
+
+- 屬性親和與持有的範圍成長加成，對象是**元素魔法目錄裡的主動法術**：只要技能
+  的 kind 是 ACTIVE、分類是 `ELEMENTAL_MAGIC`，且宣告的 `element` 已登錄於
+  `ELEMENT_REGISTRY`，就適用，不論其效果是否包含傷害。這些學習倍率只縮放練習
+  XP，不改變威力、治療量、MP 消耗或任何與生俱來的基礎數值。
 
 - 儲存結構維持現形：`db.skill_proficiency[skill_key]` 存 float XP；
   `skill_proficiency_level() = floor(xp / 50)` 不變；等級在未觸及 D6 上限前一樣無上
