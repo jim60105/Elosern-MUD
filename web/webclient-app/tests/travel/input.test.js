@@ -80,7 +80,7 @@ describe("aim, step and cancel", () => {
     await s.lift("ArrowUp");
     await s.lift("ArrowRight");
     expect(s.store.view.travel.aim).toBe("northeast");
-    expect(s.w.get('[data-testid="travel-walk-title"]').text()).toContain("東北");
+    expect(s.store.view.travel.aimTarget).toMatchObject({ direction: "northeast", enabled: true });
     expect(s.moves()).toHaveLength(0);
   });
 

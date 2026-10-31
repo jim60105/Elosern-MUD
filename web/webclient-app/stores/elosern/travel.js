@@ -107,6 +107,12 @@ export function applyTravel(ctx) {
     return typeof node === "string" && node ? node : null;
   }
 
+  // The canonical current node: the local map's, else the exploration
+  // resolver's own fallback. Sent and committed nodes compare like with like.
+  function canonicalNode(rs) {
+    return localMapNode(rs) ?? ctx.frameResolver.explorationExits().currentNode ?? null;
+  }
+
   function layoutShown(rs) {
     return travelSelection({ mode: rs.mode, panels: rs.panels || {}, creation: ctx.creation != null }).layout;
   }
@@ -239,7 +245,7 @@ export function applyTravel(ctx) {
     if (!target.enabled) {
       return stop("blocked", { kind: "blocked", message: target.reason || disabledRowReason(target.item) || DEAD_END_LINE });
     }
-    const sentNode = localMapNode(rs) ?? ctx.frameResolver.explorationExits().currentNode;
+    const sentNode = canonicalNode(rs);
     // The dispatch publishes synchronously; the step is marked as being sent
     // first, so that nested settle neither sends again nor mistakes the
     // missing request id for an absent step.
@@ -248,6 +254,11 @@ export function applyTravel(ctx) {
     let outcome;
     try {
       outcome = ctx.activateExit(target.exitRef);
+    } catch (error) {
+      // A failed send never leaves a half-marked step behind.
+      walk.pending = null;
+      stop("refused");
+      return true;
     } finally {
       pumping = false;
     }
@@ -279,10 +290,14 @@ export function applyTravel(ctx) {
     }
     if (!pending.ok || rs.activeEpoch !== pending.epoch) return false;
     if (pending.declared !== null && (rs.revision === null || rs.revision < pending.declared)) return false;
-    const now = localMapNode(rs);
+    const now = canonicalNode(rs);
     if (now === null || now === pending.sentNode) {
-      // The step's own publication committed and the party did not move.
-      return stop("unchanged", { kind: "blocked", message: DEAD_END_LINE });
+      // Without a declared revision nothing says the step's publication has
+      // committed yet: keep waiting for the node.
+      if (pending.declared === null) return false;
+      // The step's own publication committed and the party did not move: the
+      // walk ends quietly (the step was accepted; there is no reason to show).
+      return stop("unchanged");
     }
     walk.progress += 1;
     walk.pending = null;
@@ -323,6 +338,9 @@ export function applyTravel(ctx) {
       ) {
         ctx.travelAim = null;
         changed = true;
+      }
+      if (ctx.travelSingle && (!rs.connected || ctx.travelSingle.epoch !== rs.activeEpoch)) {
+        ctx.travelSingle = null;
       }
       changed = settleSingle(rs) || changed;
       changed = settlePending(rs) || changed;

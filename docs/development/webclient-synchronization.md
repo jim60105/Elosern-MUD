@@ -110,7 +110,10 @@ when all of these hold:
   coordinates, so the room identity is never the signal.
 
 `lastActionResult` alone, a foreign result, an unrelated revision or a free
-dispatch gate never advances the queue. After a counted step the queue waits
+dispatch gate never advances the queue. A step whose own publication commits
+without a changed node ends the walk quietly. A pending repair (`mutationsLocked`
+while a result names a publication not yet adopted) is a wait, not a stop.
+After a counted step the queue waits
 `STEP_DWELL_MS` (350 ms, 0 at motion `off`) and for a current map: the
 refresh owner's `ready` status for the window whose `current_node` is the
 committed node. `refreshing` is ordinary waiting; `unavailable`, `invalid`,
