@@ -39,11 +39,36 @@ export const CAPACITY_STOP_TEXT = "依節制紮營";
 export const MAX_GAUGE_TICKS = 60;
 
 const STALE_MAP = new Set(["unavailable", "invalid", "retired"]);
-const BUSY_REASON = "上一個行動尚未完成，請稍候。";
+/** Each disabled state's code and the reason it is told as. */
+const REASONS = Object.freeze({
+  walking: "行進中無法變更",
+  moving: "行進中",
+  stale: "地圖尚未更新",
+  no_plan: "尚未鎖定路線",
+  capacity_pending: "正在估算腳程",
+  capacity_unavailable: "無法估算腳程",
+  busy: "上一個行動尚未完成，請稍候。",
+});
 const SLEEP_TICK_LABEL = "力竭倒下";
 
 function pad(n) {
   return String(n).padStart(2, "0");
+}
+
+/** The structured quote of one neighbour step: instant, minutes or unknown. */
+export function stepQuote(seconds) {
+  if (seconds === 0) return Object.freeze({ kind: "instant", minutes: 0 });
+  if (Number.isInteger(seconds) && seconds > 0) return Object.freeze({ kind: "minutes", minutes: Math.max(1, Math.round(seconds / 60)) });
+  return Object.freeze({ kind: "unknown", minutes: null });
+}
+
+/** The stop clock `seconds` after the committed time: `{hour, minute, dayOffset}` or null. */
+export function stopClock(serverTime, seconds) {
+  if (!serverTime || !Number.isInteger(serverTime.hour) || !Number.isInteger(serverTime.minute)) return null;
+  const start = serverTime.hour * 3600 + serverTime.minute * 60 + (Number.isInteger(serverTime.second) ? serverTime.second : 0);
+  const at = start + Math.max(0, seconds);
+  const inDay = at % 86400;
+  return Object.freeze({ hour: Math.floor(inDay / 3600), minute: Math.floor((inDay % 3600) / 60), dayOffset: Math.floor(at / 86400) });
 }
 
 /** "N 小時 M 分" (minutes rounded up) for a positive duration in seconds. */
@@ -61,19 +86,16 @@ export function formatDuration(seconds) {
  * when it falls on a later day). Display only: no time is advanced.
  */
 export function clockAfter(serverTime, seconds) {
-  if (!serverTime || !Number.isInteger(serverTime.hour) || !Number.isInteger(serverTime.minute)) return null;
-  const start = serverTime.hour * 3600 + serverTime.minute * 60 + (Number.isInteger(serverTime.second) ? serverTime.second : 0);
-  const at = start + Math.max(0, seconds);
-  const day = Math.floor(at / 86400);
-  const inDay = at % 86400;
-  const text = `${pad(Math.floor(inDay / 3600))}:${pad(Math.floor((inDay % 3600) / 60))}`;
-  return day > 0 ? `隔天 ${text}` : text;
+  const clock = stopClock(serverTime, seconds);
+  if (!clock) return null;
+  const text = `${pad(clock.hour)}:${pad(clock.minute)}`;
+  return clock.dayOffset > 0 ? `隔天 ${text}` : text;
 }
 
-/** A neighbour step's quote as words: minutes, instant, or unknown. */
-export function quoteText(seconds) {
-  if (seconds === 0) return "轉眼即至";
-  if (Number.isInteger(seconds) && seconds > 0) return `約 ${Math.max(1, Math.round(seconds / 60))} 分鐘`;
+/** A neighbour step's quote as words. */
+export function quoteText(quote) {
+  if (quote.kind === "instant") return "轉眼即至";
+  if (quote.kind === "minutes") return `約 ${quote.minutes} 分鐘`;
   return "所需時間未明";
 }
 
@@ -152,7 +174,8 @@ function intentFor(s) {
   }
   if (s.aim) {
     if (s.aim.enabled) {
-      return { kind: "aim", title: `瞄準${s.aim.word}・一步`, detail: `${quoteText(quoteFor(s.capacity, s.aim.exitRef))}・Enter 前進` };
+      const quote = stepQuote(quoteFor(s.capacity, s.aim.exitRef));
+      return { kind: "aim", title: `瞄準${s.aim.word}・一步`, detail: `${quoteText(quote)}・Enter 前進`, quote };
     }
     return { kind: "blocked", title: `瞄準${s.aim.word}`, detail: s.aim.reason || "無法通行" };
   }
@@ -161,7 +184,21 @@ function intentFor(s) {
     const clock = clockAfter(s.serverTime, s.plan.total_seconds);
     const parts = [`${steps} 步`, formatDuration(s.plan.total_seconds)];
     if (clock) parts.push(`${clock} 停`);
-    return { kind: "plan", title: `前往${s.plan.label || "目的地"}`, detail: parts.join("・") };
+    return {
+      kind: "plan",
+      title: `前往${s.plan.label || "目的地"}`,
+      detail: parts.join("・"),
+      leg: Object.freeze({
+        steps,
+        minutes: Math.ceil(Math.max(0, s.plan.total_seconds) / 60),
+        stop: stopClock(s.serverTime, s.plan.total_seconds),
+      }),
+    };
+  }
+  // A sleeper zeroes the capacity because nobody may walk, not because the
+  // party is spent; a possessing owner's sleeping body alone does not.
+  if (s.asleep && s.capacityState === "ready" && capacityTotal(s.capacity) === 0) {
+    return { kind: "asleep", title: "有同伴正在沉睡", detail: "等待甦醒，或紮營休息" };
   }
   if (s.capacityState === "ready" && s.capacity.at_pace?.[s.pace] === true) {
     return { kind: "advice", title: "已到今天的節制門檻", detail: "建議紮營" };
@@ -170,13 +207,14 @@ function intentFor(s) {
     return { kind: "night", title: "夜裡只看得見身邊", detail: "建議紮營到天亮" };
   }
   let detail = "方向鍵瞄準・Enter 前進一步";
+  let total = null;
   if (s.capacityState === "ready") {
-    const total = capacityTotal(s.capacity);
+    total = capacityTotal(s.capacity);
     detail = total > 0 ? `腳程還夠走約 ${total} 格・方向鍵瞄準` : "精力已不足以再走";
   } else if (s.capacityState === "pending") {
     detail = "正在估算腳程…";
   }
-  return { kind: "idle", title: "選擇相鄰的一格", detail };
+  return { kind: "idle", title: "選擇相鄰的一格", detail, capacity: total };
 }
 
 /**
@@ -194,6 +232,9 @@ function intentFor(s) {
  * - `mapStatus`: the stage map's status; a failed read disables the panel
  *   but never 停步. `busy`: the dispatch gate is closed.
  * - `labels`: optional supplied stage labels (`forced_sleep`).
+ * - `asleep`: a committed status fatigue row is asleep; with a zero
+ *   capacity the intent then says a companion sleeps instead of reading the
+ *   zero as exhaustion.
  */
 export function legView({
   aim = null,
@@ -210,12 +251,13 @@ export function legView({
   mapStatus = "ready",
   busy = false,
   labels = {},
+  asleep = false,
 } = {}) {
   const pace = TRAVEL_PACES.includes(preferences?.pace) ? preferences.pace : DEFAULT_TRAVEL_PREFERENCES.pace;
   const stopAtNight = typeof preferences?.stopAtNight === "boolean" ? preferences.stopAtNight : DEFAULT_TRAVEL_PREFERENCES.stopAtNight;
   const usablePlan = validPlan(plan) ? plan : null;
   const state = {
-    aim, plan: usablePlan, walking, holding, capacity, pace, stopAtNight, phase, error, serverTime,
+    aim, plan: usablePlan, walking, holding, capacity, pace, stopAtNight, phase, error, serverTime, asleep: !!asleep,
     stale: STALE_MAP.has(mapStatus),
     capacityState: capacityState(capacity),
   };
@@ -235,6 +277,7 @@ export function legView({
       caption: "今日行程",
       entries: STAGE_BUCKETS.filter((b) => counts[b] > 0).map((b) => ({ bucket: b, label: BUCKET_LABELS[b], count: counts[b] })),
       stop: STOP_TEXT[usablePlan.stop_reason] ?? null,
+      stopReason: usablePlan.stop_reason ?? null,
     };
   } else if (state.capacityState === "ready") {
     const { ticks, stopAt } = capacityTicks(capacity, pace);
@@ -244,10 +287,11 @@ export function legView({
       entries: STAGE_BUCKETS.filter((b) => capacity.capacity[b] > 0).map((b) => ({ bucket: b, label: BUCKET_LABELS[b], count: capacity.capacity[b] })),
       // The capacity gauge marks where the chosen pace would camp.
       stop: stopAt >= 0 ? CAPACITY_STOP_TEXT : null,
+      stopReason: stopAt >= 0 ? "pace_threshold" : null,
     };
   } else {
     gauge = { source: state.capacityState, ticks: [], hidden: 0 };
-    legend = { caption: "腳程估計", entries: [], stop: null };
+    legend = { caption: "腳程估計", entries: [], stop: null, stopReason: null };
   }
   const total = legend.entries.reduce((sum, e) => sum + e.count, 0);
   let summary;
@@ -259,27 +303,29 @@ export function legView({
   }
   gauge = Object.freeze({ ...gauge, summary });
 
-  // ── controls ──
-  const controlsReason = moving ? "行進中無法變更" : state.stale ? "地圖尚未更新" : null;
-  const controls = Object.freeze({ pace, stopAtNight, enabled: controlsReason === null, reason: controlsReason });
+  const controlsCode = moving ? "walking" : state.stale ? "stale" : null;
+  const controls = Object.freeze({
+    pace, stopAtNight, enabled: controlsCode === null, code: controlsCode, reason: REASONS[controlsCode] ?? null,
+  });
 
   // ── actions ──
   let primary;
   if (moving) {
-    primary = { kind: "stop", label: "停步", hint: "任意鍵", enabled: true, reason: null };
+    primary = { kind: "stop", label: "停步", hint: "任意鍵", enabled: true, code: null, reason: null };
   } else {
-    let reason = null;
-    if (state.stale) reason = "地圖尚未更新";
-    else if (!usablePlan || !locked) reason = "尚未鎖定路線";
-    else if (state.capacityState !== "ready") reason = state.capacityState === "pending" ? "正在估算腳程" : "無法估算腳程";
-    else if (busy) reason = BUSY_REASON;
-    primary = { kind: "depart", label: "出發", hint: "Enter", enabled: reason === null, reason };
+    let code = null;
+    if (state.stale) code = "stale";
+    else if (!usablePlan || !locked) code = "no_plan";
+    else if (state.capacityState !== "ready") code = `capacity_${state.capacityState}`;
+    else if (busy) code = "busy";
+    primary = { kind: "depart", label: "出發", hint: "Enter", enabled: code === null, code, reason: REASONS[code] ?? null };
   }
-  const sideReason = moving ? "行進中" : state.stale ? "地圖尚未更新" : busy ? BUSY_REASON : null;
+  const sideCode = moving ? "moving" : state.stale ? "stale" : busy ? "busy" : null;
+  const side = Object.freeze({ enabled: sideCode === null, code: sideCode, reason: REASONS[sideCode] ?? null });
   const actions = Object.freeze({
     primary: Object.freeze(primary),
-    camp: Object.freeze({ enabled: sideReason === null, reason: sideReason }),
-    look: Object.freeze({ enabled: sideReason === null, reason: sideReason }),
+    camp: side,
+    look: side,
   });
 
   return Object.freeze({

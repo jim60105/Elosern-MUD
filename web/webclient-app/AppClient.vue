@@ -201,6 +201,7 @@ const travelLeg = computed(() => {
     serverTime: store.view.serverTime,
     mapStatus: travel.mapStatus,
     busy: !store.view.connected || store.view.dispatch.inFlight !== null,
+    asleep: (store.view.panels?.status?.fatigue ?? []).some((row) => row?.asleep === true),
   });
 });
 function onTravelLook() {

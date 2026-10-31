@@ -243,9 +243,10 @@ def build_travel_status(
 ) -> dict[str, Any] | None:
     """The exact ``travel_capacity`` status object, or ``None``.
 
-    ``rows`` are the committed exploration move rows of this same
-    publication (the presenter passes them so both panels quote one row
-    set); without them the exploration presenter's own row builder is read.
+    ``rows`` are exploration move rows to quote; without them the
+    exploration presenter's own row builder is read again (the status
+    presenter does this, so the quotes follow the same disclosure and
+    enabled rules as the exploration panel built in the same publication).
     Raises the canonical readers' errors (``FatigueStateError``) for corrupt
     physiology; the presenter degrades that to ``null``.
     """

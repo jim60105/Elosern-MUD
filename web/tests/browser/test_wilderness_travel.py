@@ -975,8 +975,10 @@ class TravelLegTests(_TravelStage):
         # The aimed row's quote reaches the intent line.
         page.locator('[data-testid="travel-map"]').focus()
         page.keyboard.press("ArrowRight")
+        # The aimed row's 1200 s quote reaches the intent line as 20 minutes.
         page.wait_for_function(
-            "() => document.querySelector('[data-testid=\"leg-intent-detail\"]').textContent.startsWith('約 20 分鐘')",
+            "() => { const el = document.querySelector('[data-testid=\"leg-intent\"]');"
+            " return el.dataset.quote === 'minutes' && el.dataset.minutes === '20'; }",
             timeout=15000,
         )
         self._shoot(page, "travel-leg-1451x790.png")
@@ -1008,6 +1010,8 @@ class TravelLegTests(_TravelStage):
         page.keyboard.press("Escape")
         page.keyboard.press("Escape")
         page.wait_for_selector('[data-testid="sleep-card"]', state="detached", timeout=15000)
+        self.assertEqual(_moves(page), [])
+        self.assertEqual(page.evaluate("() => window.__travelLooks.length"), 0)
 
         # Walking: the preferences freeze and 停步 is live.
         page.locator('[data-testid="travel-map"]').focus()
@@ -1033,8 +1037,10 @@ class TravelLegTests(_TravelStage):
         # 環顧: exactly the existing guarded room look.
         page.locator('[data-testid="leg-look"]').click()
         page.wait_for_function("() => window.__travelLooks.length >= 1", timeout=15000)
-        page.wait_for_timeout(300)
+        # The look holds the single-flight gate, so no second send can follow.
+        self.assertEqual(page.evaluate("() => window.__elosernBridge.store.view.dispatch.inFlight !== null"), True)
         self.assertEqual(page.evaluate("() => window.__travelLooks.map((e) => e.payload)"), [{"room": True}])
+        self.assertEqual(page.locator('[data-testid="leg-look"]').get_attribute("aria-disabled"), "true")
         page.close()
 
         # The wide acceptance size keeps the floor at its own scale.

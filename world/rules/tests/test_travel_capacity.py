@@ -23,6 +23,7 @@ from world.rules.travel_capacity import (
     CapacitySnapshot,
     build_travel_status,
     capacity_by_stage,
+    neighbour_quotes,
     pace_state,
 )
 from world.rules.travel_plan import TravellerState
@@ -111,6 +112,25 @@ class CapacityByStageTests(unittest.TestCase):
         for travellers, expected in cases:
             with self.subTest(expected=expected):
                 self.assertEqual(pace_state(CapacitySnapshot(travellers=travellers)), expected)
+
+
+class NeighbourQuoteBoundTests(unittest.TestCase):
+    def test_quotes_dedupe_and_stop_at_the_wire_bound(self):
+        # Disabled and withheld rows quote null without any preflight, so the
+        # bound and the dedupe are observable on their own.
+        rows = [{"exit_ref": "r0", "destination": None, "enabled": True}]
+        rows += [{"exit_ref": "r0", "destination": None, "enabled": True}]
+        rows += [
+            {"exit_ref": f"r{i}", "destination": f"wild:elosern:{i}:0", "enabled": False}
+            for i in range(1, 14)
+        ]
+        with mock.patch(
+            "world.rules.travel_capacity.flight_waives_wilderness_charge", return_value=False
+        ):
+            quotes = neighbour_quotes(object(), None, (0, 0), (), rows)
+        self.assertEqual(len(quotes), MAX_NEIGHBOUR_QUOTES)
+        self.assertEqual([q["exit_ref"] for q in quotes], [f"r{i}" for i in range(12)])
+        self.assertTrue(all(q["seconds"] is None for q in quotes))
 
 
 def _stored(entity):

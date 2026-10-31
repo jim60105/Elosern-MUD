@@ -47,6 +47,8 @@ function onPaceKey(event, index) {
   if (!delta) return;
   event.preventDefault();
   event.stopPropagation();
+  // A frozen group keeps focus (and its ring) on the checked radio.
+  if (!controls.value.enabled) return;
   const next = (index + delta + PACE_OPTIONS.length) % PACE_OPTIONS.length;
   radios.value[next]?.focus();
   onPace(PACE_OPTIONS[next].key);
@@ -86,7 +88,15 @@ function tickStyle(index) {
     aria-label="行程"
   >
     <header class="leg-panel__head">
-      <div class="leg-panel__intent" role="status" aria-live="polite" data-testid="leg-intent">
+      <div
+        class="leg-panel__intent"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        data-testid="leg-intent"
+        :data-quote="intent.quote?.kind ?? null"
+        :data-minutes="intent.quote?.minutes ?? null"
+      >
         <p class="leg-panel__title" data-testid="leg-intent-title">{{ intent.title }}</p>
         <p class="leg-panel__detail" data-testid="leg-intent-detail">{{ intent.detail }}</p>
       </div>
@@ -150,7 +160,7 @@ function tickStyle(index) {
           class="leg-seg__opt"
           :aria-checked="controls.pace === p.key ? 'true' : 'false'"
           :aria-disabled="controls.enabled ? null : 'true'"
-          :aria-describedby="`${uid}-pace-${p.key}`"
+          :aria-describedby="controls.enabled ? `${uid}-pace-${p.key}` : `${uid}-pace-${p.key} ${uid}-controls`"
           :tabindex="controls.pace === p.key ? 0 : -1"
           :title="controls.enabled ? p.hint : controls.reason"
           :data-testid="`leg-pace-${p.key}`"
@@ -158,8 +168,9 @@ function tickStyle(index) {
           @keydown="onPaceKey($event, i)"
           @keydown.enter.stop
           @keydown.space.stop
-        >{{ p.label }}<span :id="`${uid}-pace-${p.key}`" class="leg-sr">{{ p.hint }}</span></button>
+        >{{ p.label }}</button>
       </div>
+      <span v-for="p in PACE_OPTIONS" :id="`${uid}-pace-${p.key}`" :key="`hint-${p.key}`" class="leg-sr">{{ p.hint }}</span>
       <button
         type="button"
         class="leg-switch"

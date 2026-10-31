@@ -69,7 +69,7 @@ describe("the intent line follows the documented precedence", () => {
 
   it("the night advisory needs the supplied night phase and the nightfall stop", () => {
     const base = { capacity: CAPACITY, phase: "night" };
-    expect(legView({ ...base, preferences: { pace: "standard", stopAtNight: true } }).intent.title).toBe("夜裡只看得見身邊");
+    expect(legView({ ...base, preferences: { pace: "standard", stopAtNight: true } }).intent.kind).toBe("night");
     expect(legView({ ...base, preferences: { pace: "standard", stopAtNight: false } }).intent.kind).toBe("idle");
     expect(legView({ ...base, phase: null }).intent.kind).toBe("idle");
   });
@@ -82,27 +82,29 @@ describe("the intent line follows the documented precedence", () => {
   });
 
   it("an aim quotes its own row's supplied minutes, or none", () => {
-    const quote = (exitRef) => legView({ aim: { ...AIM, exitRef }, capacity: CAPACITY }).intent.detail;
-    expect(legView({ aim: AIM, capacity: CAPACITY }).intent.title).toBe("瞄準東方・一步");
-    expect(quote("e_east")).toMatch(/^約 20 分鐘/);
-    expect(quote("e_fly")).toMatch(/^轉眼即至/);
+    const quote = (exitRef) => legView({ aim: { ...AIM, exitRef }, capacity: CAPACITY }).intent.quote;
+    // 1200 s is 20 minutes; a waived (0 s) step is instant.
+    expect(quote("e_east")).toEqual({ kind: "minutes", minutes: 20 });
+    expect(quote("e_fly")).toEqual({ kind: "instant", minutes: 0 });
     // A withheld destination (null) and a row without a quote are unknown,
     // never zero minutes.
-    expect(quote("e_hidden")).toMatch(/^所需時間未明/);
-    expect(quote("e_other")).toMatch(/^所需時間未明/);
-    expect(legView({ aim: AIM, capacity: null }).intent.detail).toMatch(/^所需時間未明/);
+    expect(quote("e_hidden")).toEqual({ kind: "unknown", minutes: null });
+    expect(quote("e_other")).toEqual({ kind: "unknown", minutes: null });
+    expect(legView({ aim: AIM, capacity: null }).intent.quote.kind).toBe("unknown");
+    // A disabled row states the server's own reason (fixture pass-through).
     const blocked = legView({ aim: { ...AIM, enabled: false, reason: "斷崖擋住了去路。" } }).intent;
-    expect([blocked.kind, blocked.detail]).toEqual(["blocked", "斷崖擋住了去路。"]);
-    expect(legView({ aim: { ...AIM, enabled: false, reason: null } }).intent.detail).toBe("無法通行");
+    expect([blocked.kind, blocked.detail, blocked.quote]).toEqual(["blocked", "斷崖擋住了去路。", undefined]);
   });
 
   it("a plan states its steps, total duration and stop clock from committed time", () => {
     const intent = legView({ plan: PLAN, serverTime: NOON }).intent;
-    expect(intent.title).toBe("前往灰石崗");
-    // stop_index 4 → 5 steps; 7800 s = 2 h 10 min after 12:00.
-    expect(intent.detail).toBe("5 步・2 小時 10 分・14:10 停");
+    // stop_index 4 → 5 steps; 7800 s = 130 min, stopping at 14:10.
+    expect(intent.leg).toEqual({ steps: 5, minutes: 130, stop: { hour: 14, minute: 10, dayOffset: 0 } });
+    // The plan's supplied destination label is named (fixture pass-through).
+    expect(intent.title).toContain("灰石崗");
     const late = legView({ plan: PLAN, serverTime: { hour: 22, minute: 30, second: 0 } }).intent;
-    expect(late.detail).toBe("5 步・2 小時 10 分・隔天 00:40 停");
+    expect(late.leg.stop).toEqual({ hour: 0, minute: 40, dayOffset: 1 });
+    expect(legView({ plan: PLAN, serverTime: null }).intent.leg.stop).toBeNull();
   });
 });
 
@@ -115,23 +117,30 @@ describe("the gauge", () => {
     expect(view.gauge.ticks.map((t) => t.camp)).toEqual([false, false, false, true, false]);
     expect(view.gauge.ticks.map((t) => t.beyond)).toEqual([false, false, false, false, true]);
     expect(view.legend.entries.map((e) => [e.bucket, e.count])).toEqual([["normal", 2], ["light", 1], ["moderate", 1], ["severe", 1]]);
-    expect(view.legend.stop).toBe("依節制紮營");
+    expect(view.legend.stopReason).toBe("pace_threshold");
 
     const cautious = legView({ capacity: CAPACITY, preferences: { pace: "cautious", stopAtNight: true } });
     expect(cautious.gauge.ticks.findIndex((t) => t.camp)).toBe(2);
     const forced = legView({ capacity: CAPACITY, preferences: { pace: "forced", stopAtNight: true } });
     expect(forced.gauge.ticks.some((t) => t.camp || t.beyond)).toBe(false);
-    expect(forced.legend.stop).toBeNull();
+    expect(forced.legend.stopReason).toBeNull();
   });
 
   it("states pending and unavailable capacity explicitly", () => {
     const pending = legView({});
-    expect([pending.gauge.source, pending.gauge.ticks.length, pending.gauge.summary]).toEqual(["pending", 0, "正在估算腳程"]);
+    expect([pending.gauge.source, pending.gauge.ticks.length]).toEqual(["pending", 0]);
     const none = legView({ capacity: null });
-    expect([none.gauge.source, none.gauge.summary]).toEqual(["unavailable", "無法估算腳程"]);
-    const spent = legView({ capacity: { ...CAPACITY, capacity: { normal: 0, light: 0, moderate: 0, severe: 0 } } });
+    expect([none.gauge.source, none.gauge.ticks.length]).toEqual(["unavailable", 0]);
+    const zero = { ...CAPACITY, capacity: { normal: 0, light: 0, moderate: 0, severe: 0 } };
+    const spent = legView({ capacity: zero });
     expect(spent.gauge.ticks).toEqual([]);
-    expect(spent.intent.detail).toBe("精力已不足以再走");
+    expect([spent.intent.kind, spent.intent.capacity]).toEqual(["idle", 0]);
+    expect(legView({ capacity: CAPACITY }).intent.capacity).toBe(5);
+    // A sleeper zeroes the capacity because nobody may walk: the intent says
+    // a companion sleeps. A sleeper beside a nonzero capacity (a possessing
+    // owner's resting body) changes nothing.
+    expect(legView({ capacity: zero, asleep: true }).intent.kind).toBe("asleep");
+    expect(legView({ capacity: CAPACITY, asleep: true }).intent.kind).toBe("idle");
   });
 
   it("follows a supplied plan's stages with spent, night, moon and camp ticks", () => {
@@ -144,10 +153,10 @@ describe("the gauge", () => {
     expect(ticks.map((t) => t.night)).toEqual([false, false, true, true, true]);
     // The canonical forced_sleep step keeps its enum, is drawn in the severe
     // bucket with the crescent and carries the sleep label.
-    expect([ticks[4].bucket, ticks[4].sleep, ticks[4].label, ticks[4].camp]).toEqual(["severe", true, "力竭倒下", true]);
+    expect([ticks[4].bucket, ticks[4].sleep, ticks[4].camp]).toEqual(["severe", true, true]);
     expect(legView({ plan: PLAN, labels: { forced_sleep: "倒地昏睡" } }).gauge.ticks[4].label).toBe("倒地昏睡");
     expect(view.legend.entries.map((e) => [e.bucket, e.count])).toEqual([["normal", 1], ["light", 1], ["moderate", 1], ["severe", 2]]);
-    expect(view.legend.stop).toBe("精力不足以再走");
+    expect(view.legend.stopReason).toBe("member_asleep");
   });
 
   it("an exact-zero plan is one severe sleep tick; an arrival has no camp line", () => {
@@ -157,7 +166,7 @@ describe("the gauge", () => {
     expect(zero.gauge.ticks.map((t) => [t.stage, t.bucket, t.sleep, t.camp])).toEqual([["forced_sleep", "severe", true, true]]);
     const arrival = legView({ plan: { ...PLAN, stop_reason: "destination_reached" } });
     expect(arrival.gauge.ticks.some((t) => t.camp)).toBe(false);
-    expect(arrival.legend.stop).toBe("抵達目的地");
+    expect(arrival.legend.stopReason).toBe("destination_reached");
     // Steps past the stop are drawn beyond it and left out of the counts.
     const short = legView({ plan: { ...PLAN, stop_index: 1, stop_reason: "pace_threshold" } });
     expect(short.gauge.ticks.map((t) => t.beyond)).toEqual([false, false, true, true, true]);
@@ -188,15 +197,21 @@ describe("the gauge", () => {
 describe("controls and actions", () => {
   it("出發 needs a current locked plan, a supplied capacity and a live map", () => {
     const depart = (input) => legView(input).actions.primary;
-    expect(depart({ capacity: CAPACITY })).toMatchObject({ kind: "depart", enabled: false, reason: "尚未鎖定路線" });
-    expect(depart({ capacity: CAPACITY, plan: PLAN, locked: false }).enabled).toBe(false);
-    expect(depart({ capacity: CAPACITY, plan: PLAN, locked: true }).enabled).toBe(true);
-    expect(depart({ plan: PLAN, locked: true }).reason).toBe("正在估算腳程");
-    expect(depart({ capacity: null, plan: PLAN, locked: true }).reason).toBe("無法估算腳程");
-    expect(depart({ capacity: CAPACITY, plan: PLAN, locked: true, busy: true }).enabled).toBe(false);
-    expect(depart({ capacity: CAPACITY, plan: PLAN, locked: true, mapStatus: "invalid" }).reason).toBe("地圖尚未更新");
+    expect(depart({ capacity: CAPACITY })).toMatchObject({ kind: "depart", enabled: false, code: "no_plan" });
+    expect(depart({ capacity: CAPACITY, plan: PLAN, locked: false }).code).toBe("no_plan");
+    expect(depart({ capacity: CAPACITY, plan: PLAN, locked: true })).toMatchObject({ enabled: true, code: null, reason: null });
+    expect(depart({ plan: PLAN, locked: true }).code).toBe("capacity_pending");
+    expect(depart({ capacity: null, plan: PLAN, locked: true }).code).toBe("capacity_unavailable");
+    expect(depart({ capacity: CAPACITY, plan: PLAN, locked: true, busy: true }).code).toBe("busy");
+    expect(depart({ capacity: CAPACITY, plan: PLAN, locked: true, mapStatus: "invalid" }).code).toBe("stale");
     // A malformed plan is the working no-plan state.
-    expect(depart({ capacity: CAPACITY, plan: { steps: [] }, locked: true }).reason).toBe("尚未鎖定路線");
+    expect(depart({ capacity: CAPACITY, plan: { steps: [] }, locked: true }).code).toBe("no_plan");
+    // Every disabled state carries a stated reason.
+    for (const input of [{}, { plan: PLAN, locked: true }, { capacity: null, plan: PLAN, locked: true }, { mapStatus: "retired" }]) {
+      const action = depart(input);
+      expect(action.enabled).toBe(false);
+      expect(action.reason).toBeTruthy();
+    }
   });
 
   it("a walk turns 出發 into an always-usable 停步 and freezes the preferences", () => {
@@ -213,7 +228,8 @@ describe("controls and actions", () => {
   it("a stale map disables everything but 停步; a refresh disables nothing", () => {
     const stale = legView({ capacity: CAPACITY, mapStatus: "retired" });
     expect([stale.controls.enabled, stale.actions.camp.enabled, stale.actions.look.enabled]).toEqual([false, false, false]);
-    expect(stale.controls.reason).toBe("地圖尚未更新");
+    expect([stale.controls.code, stale.actions.look.code]).toEqual(["stale", "stale"]);
+    expect(stale.controls.reason).toBeTruthy();
     const refreshing = legView({ capacity: CAPACITY, mapStatus: "refreshing" });
     expect([refreshing.controls.enabled, refreshing.actions.camp.enabled, refreshing.actions.look.enabled]).toEqual([true, true, true]);
   });
@@ -252,10 +268,14 @@ describe("the mounted leg panel", () => {
     const ticks = s.w.findAll('[data-testid="leg-tick"]');
     expect(ticks.map((t) => t.attributes("data-bucket"))).toEqual(["normal", "normal", "normal", "light", "light", "moderate", "severe"]);
     expect(s.w.findAll('[data-testid="leg-camp-mark"]')).toHaveLength(1);
-    expect(s.w.get('[data-testid="leg-gauge"]').attributes("aria-label")).toContain("中度 1 格");
+    // The gauge is one labelled image (its ticks are decorative).
+    expect(s.w.get('[data-testid="leg-gauge"]').attributes("role")).toBe("img");
+    expect(s.w.get('[data-testid="leg-gauge"]').attributes("aria-label")).toBeTruthy();
+    expect(ticks.every((t) => t.attributes("aria-hidden") === "true")).toBe(true);
     s.store.aimTravel("east");
     await tick();
-    expect(s.w.get('[data-testid="leg-intent-detail"]').text()).toMatch(/^約 25 分鐘/);
+    const intent = s.w.get('[data-testid="leg-intent"]');
+    expect([intent.attributes("data-quote"), intent.attributes("data-minutes")]).toEqual(["minutes", "25"]);
   });
 
   it("the pace radio and nightfall switch persist through the store", async () => {
@@ -310,6 +330,37 @@ describe("the mounted leg panel", () => {
     expect(document.activeElement).toBe(s.w.get('[data-testid="leg-camp"]').element);
   });
 
+  it("紮營 on an already open rest entry switches it to the sleep form", async () => {
+    const s = await stage();
+    expect(s.store.openRoomCard("wait")).toBe(true);
+    await tick();
+    expect(s.w.find('[data-testid="sleep-card"]').exists()).toBe(false);
+    await s.w.get('[data-testid="leg-camp"]').trigger("click");
+    await tick();
+    expect(s.w.find('[data-testid="sleep-card"]').exists()).toBe(true);
+    // The next ordinary opening starts on the tiles again.
+    s.store.closeRoomCard();
+    await tick();
+    expect(s.store.openRoomCard("wait")).toBe(true);
+    await tick();
+    expect(s.w.find('[data-testid="sleep-card"]').exists()).toBe(false);
+  });
+
+  it("a failed map read freezes the radio: its reason is named and arrows do nothing", async () => {
+    const s = await stage();
+    s.store.setTravelMap({ status: "unavailable", area: s.store.view.travel.area });
+    await tick();
+    const checked = s.w.get('[data-testid="leg-pace-standard"]');
+    expect(checked.attributes("aria-disabled")).toBe("true");
+    const described = checked.attributes("aria-describedby").split(" ");
+    expect(described).toHaveLength(2);
+    expect(document.getElementById(described[1]).textContent).toBeTruthy();
+    checked.element.focus();
+    await checked.trigger("keydown", { key: "ArrowRight" });
+    expect(document.activeElement).toBe(checked.element);
+    expect(s.store.view.travel.preferences.pace).toBe("standard");
+  });
+
   it("while walking the preferences stay fixed and 停步 stays usable through a refresh", async () => {
     vi.useFakeTimers();
     const s = await stage();
@@ -320,6 +371,7 @@ describe("the mounted leg panel", () => {
     expect(s.store.view.travel.walking).not.toBeNull();
     const radio = s.w.get('[data-testid="leg-pace-standard"]');
     expect(radio.attributes("aria-disabled")).toBe("true");
+
     await radio.trigger("click");
     await s.w.get('[data-testid="leg-night"]').trigger("click");
     expect(s.store.view.travel.preferences).toEqual({ pace: "cautious", stopAtNight: true });
