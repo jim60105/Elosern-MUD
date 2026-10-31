@@ -628,8 +628,12 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
             result = _look_adapter(self.player, {"target_id": int(target.pk)})
         self.assertEqual(result["outcome"], "success")
         self.assertIn("攻擊：60", str(msg.call_args[0][0]))
+        from web.webclient.actions.dispatcher import PUBLICATION_GROUP_FIELD
+
+        # The private causal-group slot (wilderness-travel-log-ui) is stripped
+        # by the dispatcher and never reaches the wire.
         self.assertEqual(
-            set(result),
+            set(result) - {PUBLICATION_GROUP_FIELD},
             {"outcome", "code", "message", "affected_panels"},
             "the look result must publish no panel payload",
         )

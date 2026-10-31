@@ -82,6 +82,7 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "art_sync_all",
     "connect_art_push",
     "connect_alignment_observer",
+    "connect_travel_log_observer",
     "narrative_projection_init",
     "narrative_correspondence_projection_init",
     "start_dream_dispatch_pump",
@@ -680,6 +681,14 @@ def at_server_start():
         "connect_alignment_observer",
         lambda: _late(
             "web.webclient.presentation.alignment", "connect_alignment_observer"
+        ),
+    )
+    # Committed travel notices reach every watcher coordinator's causal group
+    # through the one registered observer (wilderness-travel-log-ui).
+    _startup_step(
+        "connect_travel_log_observer",
+        lambda: _late(
+            "web.webclient.presentation.travel_log_push", "connect_travel_log_observer"
         ),
     )
     _startup_step(

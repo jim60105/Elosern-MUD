@@ -49,7 +49,7 @@ mutation helper: calendar data comes only from the read-only
 
 import secrets
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Callable, Mapping
 
 from twisted.internet.defer import Deferred, succeed
@@ -105,6 +105,9 @@ UPDATE_MESSAGE = "ui_update"
 # whose recomputed mode is dialogue renders it as a candidate, so the committed
 # mode and the committed dialogue panel can never diverge on the wire.
 DIALOGUE_PANEL = "dialogue"
+
+# The eager travel notice panel (wilderness-travel-log-ui).
+TRAVEL_LOG_PANEL = "travel_log"
 
 # Bound on queued publication groups and on the waiting callers of one live
 # sequence (64 each, result-only answers exempt). Reaching it is a defect (a
@@ -183,6 +186,9 @@ class _Intent:
     expected_epoch: str | None
     completion: PublicationCompletion | None
     deferred: Deferred
+    #: The already-identified travel notices this request attaches to its
+    #: group (wilderness-travel-log-ui); empty for every other publisher.
+    travel_events: tuple[Any, ...] = ()
 
 
 @dataclass(eq=False)
@@ -211,11 +217,25 @@ class _PendingGroup:
     completion: PublicationCompletion | None
     waiters: list[Deferred]
     completion_factory: bool
+    #: This group's own immutable travel notices, in source order. A duplicate
+    #: id is inert; another group's notices never join this list.
+    travel_events: list[Any] | None = None
+
+    def add_travel_events(self, events: tuple[Any, ...]) -> None:
+        if not events:
+            return
+        held = self.travel_events if self.travel_events is not None else []
+        known = {event.id for event in held}
+        for event in events:
+            if event.id not in known:
+                known.add(event.id)
+                held.append(event)
+        self.travel_events = held
 
     @classmethod
     def from_intent(cls, intent: "_Intent") -> "_PendingGroup":
         candidates = dict(intent.candidates) if intent.candidates is not None else None
-        return cls(
+        entry = cls(
             group_id=intent.group_id,
             context_factory=intent.context_factory,
             candidates=candidates,
@@ -230,6 +250,8 @@ class _PendingGroup:
             waiters=[intent.deferred],
             completion_factory=intent.completion is not None,
         )
+        entry.add_travel_events(intent.travel_events)
+        return entry
 
     def merge(self, intent: "_Intent") -> None:
         """Merge one validated request into this entry.
@@ -274,6 +296,7 @@ class _PendingGroup:
                 )
         if self.expected_epoch is None:
             self.expected_epoch = intent.expected_epoch
+        self.add_travel_events(intent.travel_events)
         self.waiters.append(intent.deferred)
 
 
@@ -360,6 +383,9 @@ class PresentationCoordinator:
         self._pending_groups: dict[str, _PendingGroup] = {}
         self._drain_scheduled = False
         self._draining = False
+        # The latest *published* travel batch, ``(actor_id, events)``: the
+        # one replay source for a snapshot that carries no new travel group.
+        self._latest_travel: tuple[Any, tuple[Any, ...]] | None = None
 
     @property
     def epoch(self) -> str:
@@ -417,6 +443,7 @@ class PresentationCoordinator:
 
         retire_gallery_selection(self.session)
         self._retire_pending()
+        self._latest_travel = None
         self._epoch = new_presentation_epoch()
         self._revision = 0
         self._baseline = None
@@ -472,6 +499,7 @@ class PresentationCoordinator:
         result_only: bool = False,
         group_id: str | None = None,
         independent: bool = False,
+        travel_events: tuple[Any, ...] = (),
     ) -> Deferred:
         """Queue one publication and return its always-present Deferred.
 
@@ -512,6 +540,7 @@ class PresentationCoordinator:
                 group_id=group_id,
                 independent=independent,
                 deferred=deferred,
+                travel_events=tuple(travel_events),
             )
         except Exception as error:  # observability: ignore R2: a rejected declaration is reported to its caller through the returned Deferred's errback; the receipt consumer owns the diagnosis and its own log event
             deferred.errback(error)
@@ -546,6 +575,54 @@ class PresentationCoordinator:
         # order, and no later operation can overtake an earlier committed one.
         self._schedule_deferred_drain()
         return deferred
+
+    def record_travel_events(
+        self,
+        fact: Any,
+        context_factory: Callable[[], PresentationContext],
+        *,
+        expected_epoch: str | None = None,
+    ) -> Deferred:
+        """Attach one committed fact's notices to its causal pending group.
+
+        The notices were identified once at the source; nothing here allocates
+        an id. They join exactly ``fact.group_id``'s entry (created when the
+        group has not queued yet) together with a ``travel_log`` declaration,
+        so the group's own publication carries them. A notice the latest
+        published batch already carried is inert.
+        """
+        # Only the latest published batch is checked here: an older id that
+        # comes back is still inert in the browser, which dedupes by id, and
+        # the replay batch is never another actor's (``_travel_context``).
+        published = (
+            {event.id for event in self._latest_travel[1]}
+            if self._latest_travel is not None
+            else set()
+        )
+        events = tuple(event for event in fact.events if event.id not in published)
+        if not events:
+            return succeed(None)
+        return self.enqueue_publication(
+            context_factory,
+            affected_panels=(TRAVEL_LOG_PANEL,),
+            expected_epoch=expected_epoch,
+            group_id=fact.group_id,
+            travel_events=events,
+        )
+
+    def _travel_context(
+        self, context: PresentationContext, entry: _PendingGroup
+    ) -> PresentationContext:
+        """The context carrying this group's notices, or the replay batch."""
+        if not isinstance(context, PresentationContext):
+            return context
+        if entry.travel_events:
+            events = tuple(entry.travel_events)
+        else:
+            latest = self._latest_travel
+            actor_id = getattr(context.actor, "pk", None)
+            events = latest[1] if latest is not None and latest[0] == actor_id else ()
+        return replace(context, travel_events=events)
 
     def full_snapshot(self, context: PresentationContext) -> Deferred:
         """Publish the complete eager snapshot at one fresh revision."""
@@ -596,6 +673,7 @@ class PresentationCoordinator:
         group_id: str | None,
         independent: bool,
         deferred: Deferred,
+        travel_events: tuple[Any, ...] = (),
     ) -> _Intent:
         """Validate one raw declaration and isolate its supplied candidates.
 
@@ -667,6 +745,7 @@ class PresentationCoordinator:
             expected_epoch=expected_epoch,
             completion=completion,
             deferred=deferred,
+            travel_events=travel_events,
         )
 
     def _declared_scope(self, affected_panels: Any) -> frozenset[str] | None:
@@ -821,7 +900,7 @@ class PresentationCoordinator:
             if envelope is not None:
                 self._send_result(envelope)
             return PublicationReceipt(self._epoch, revision, "unchanged", False)
-        context = entry.context_factory()
+        context = self._travel_context(entry.context_factory(), entry)
         mode = self._mode_provider(context)
         server_time = copy_json_value(self.server_time())
         baseline = self._baseline
@@ -840,6 +919,13 @@ class PresentationCoordinator:
         target = plans[-1].revision if plans else self.published_revision
         result_envelope = self._completion_envelope(entry, target)
         self._send_plans(plans)
+        if entry.travel_events:
+            # Only a published group becomes the replay batch; pending or
+            # failed notices never leak into a later snapshot.
+            self._latest_travel = (
+                getattr(context.actor, "pk", None),
+                tuple(entry.travel_events),
+            )
         if result_envelope is not None:
             self._send_result(result_envelope)
         if self._epoch != entry.epoch:

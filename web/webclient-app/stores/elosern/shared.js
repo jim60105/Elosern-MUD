@@ -48,6 +48,7 @@ export const PANEL_ALLOWLIST = [
   "dream",
   "skill_use",
   "sleep_handoff",
+  "travel_log",
 ];
 
 // D5 (webclient-minimap-04-island-single-affordance): the place card's locationLabel

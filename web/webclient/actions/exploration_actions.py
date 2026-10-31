@@ -743,13 +743,24 @@ def _look_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> d
         target = _present_by_id(actor, payload["target_id"])
         if target is None:
             return _rejected("no_target", "這裡沒有這個對象。")
-    try:
-        appearance = actor.at_look(target)
-    except Exception as exc:
-        log_warn("look_failed", context={"char": actor.pk, "target": target.pk}, exc=exc)
-        return _rejected("look_failed", "無法查看。")
-    actor.msg(appearance)
-    return _success("looked", "你仔細打量了一番。", AFFECTED_FULL)
+    # The look result and its travel notice share one causal publication
+    # group, so the notice publishes with the result (wilderness-travel-log-ui).
+    with publication_group() as captured:
+        try:
+            appearance = actor.at_look(target)
+        except Exception as exc:
+            log_warn("look_failed", context={"char": actor.pk, "target": target.pk}, exc=exc)
+            return _rejected("look_failed", "無法查看。")
+        actor.msg(appearance)
+        if "room" in payload:
+            from world.rules.travel_events import record_room_look
+
+            record_room_look(actor, appearance)
+        from web.webclient.actions.dispatcher import PUBLICATION_GROUP_FIELD
+
+        result = _success("looked", "你仔細打量了一番。", AFFECTED_FULL)
+        result[PUBLICATION_GROUP_FIELD] = captured.id
+        return result
 
 
 def _talk_scripted_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:

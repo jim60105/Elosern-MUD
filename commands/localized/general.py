@@ -207,6 +207,12 @@ class CmdLook(_CmdLook):
         desc = caller.at_look(target)
         # 與上游相同：以 type=look 的 outputfunc 輸出，方便客戶端區分。
         self.msg(text=(desc, {"type": "look"}), options=None)
+        if not self.args:
+            # The shared room-look seam of the travel log
+            # (wilderness-travel-log-ui); explore.look never runs this command.
+            from world.rules.travel_events import record_room_look
+
+            record_room_look(caller, desc)
         self._msg_services(target)
 
     def _msg_services(self, target) -> None:

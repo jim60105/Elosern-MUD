@@ -122,6 +122,76 @@ recovery, leaving the layout or exploration, and an opened drawer, overlay or
 card stop the walk and never resume it. A stop sends nothing and never resends
 a step already sent; that step's late commit only updates committed state.
 
+### Travel log notices
+
+The travel band's log (wilderness-travel-log-ui) reads structured notices,
+never room prose. A deterministic owner captures the immutable before facts
+of the position it changes, compares them with the committed after facts
+(`world/rules/travel_events.py`) and records one `TravelLogFact`. Its event
+ids (`<group_id>:<fact token>.<index>`, ASCII, at most 80 characters) are
+allocated once at the source, and the fact is delivered through
+`on_publication_commit` inside the owning transaction: a refusal, a rollback
+or a compensated step delivers nothing, and every watcher coordinator gets
+the same ids.
+
+| Source | Owner seam | Notices |
+|---|---|---|
+| Settled wilderness step (exit traversal or gate entry) | `movement_settlement.settle_movement` | `region_entered` (region identity changed), `woodland_entered` (woodland entered from outside it), `ford_crossed` (the reached cell is a ford), `landmark_reached` (the reached cell is a district's exact landmark; `lit_district` only when this arrival lit it; prose is the reached room's ordinary appearance, art its scene descriptor), `hostile_sighted` (current-cell hostiles not present before), `fatigue_stage` |
+| Positive explicit wait/rest and each sleep interval | `time_skip.advance_wait`, `time_skip.continue_sleep` | `hostile_sighted`, `fatigue_stage` |
+| Successful wilderness room look | `explore.look {room}` adapter and the bare `看` command | `look` (one-line summary; the full appearance in `prose` and in the ordinary narration) |
+| No producer in this slice | window-ui, camping | `landmark_sighted`, `dusk`, `nightfall`, `camp_result` (consumer contract only) |
+
+`web/webclient/presentation/travel_log_push.py` hands the fact to every live
+watcher coordinator (`watchers_for`, the movement audience policy), and
+`PresentationCoordinator.record_travel_events` attaches the notices to
+exactly the fact's pending causal group. Each pending group owns its own
+ordered batch; a duplicate id is inert, and two groups queued before one
+drain never share notices. The group's publication renders the eager
+`travel_log` panel from that batch through `PresentationContext.travel_events`.
+The coordinator keeps only the latest *published* batch for replay: a
+snapshot or delta without a travel group renders it again (the browser
+dedupes by id), pending notices never ride another group, and a reset (new
+epoch or puppet) or another actor replays nothing. Earlier batches are not
+replayed; that loss is deliberate.
+
+`travel_log` v1 is exactly `{schema_version: 1, available: true, entries}`
+with at most 64 entries and at most 65,536 canonical UTF-8 bytes, checked
+independently of the field bounds. Each entry is exactly
+`{id, kind, tick, day, time, text, params}`: `tick` and `day` (the absolute
+1-based game day) are non-negative safe integers, `time` is server-rendered
+`HH:MM` (non-blank, at most 32 code points) and `text` is the server-rendered
+zh-TW line (non-blank, at most 1,024). The closed union:
+
+| `kind` | Exact `params` |
+|---|---|
+| `region_entered`, `woodland_entered`, `ford_crossed` | `{name}` |
+| `hostile_sighted` | `{name, count, threat}` |
+| `landmark_sighted` | `{name, bearing, distance_km}` |
+| `landmark_reached` | `{arrival_node, name, lit_district, prose, artwork}` |
+| `fatigue_stage` | `{member_id, name, stage, label}` |
+| `dusk`, `nightfall` | `{}` |
+| `camp_result` | `{summary}` |
+| `look` | `{prose}` |
+
+Names, labels, bearing and summary are at most 256 code points; `name` is
+nullable only for `landmark_sighted`, `threat` and `lit_district` are
+nullable. `count` is a positive and `distance_km` a non-negative safe integer;
+`member_id` is opaque ASCII (at most 64), `stage` a canonical fatigue stage,
+`prose` at most 2,048 code points (the protocol's global string bound),
+`artwork` the validated descriptor or `null`, and `arrival_node` a canonical
+node id (at most 128). Both validators reject extra kind-specific fields; a
+malformed batch renders the ordinary unavailable form and is never trimmed
+into validity. Off the wilderness the panel's batch is empty.
+
+The browser (`web/webclient-app/stores/elosern/travel_log.js`) appends each
+newly seen notice in order and writes its `text` once to the full log through
+the ordinary narrative append. It retains at most 128 entries per generation
+and epoch; the retained list retires with the epoch, while the seen-id set
+lives as long as the full log, so a replay after a reconnect may list a
+notice again but never writes it to the full log twice. A recognized non-success `explore.move`
+result during travel adds one local refusal entry (`refusal:<request id>`,
+committed server time, server message) and never a second full-log line.
+
 ### General publication parts
 
 An eager `ui_snapshot`/`ui_update` whose canonical document does not fit its

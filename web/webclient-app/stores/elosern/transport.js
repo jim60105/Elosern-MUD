@@ -120,6 +120,18 @@ export function applyTransport(ctx) {
           : ACTION_RESULT_FALLBACK_MESSAGE;
       ctx.appendText("err", message);
     }
+    // The travel band's refusal entry (wilderness-travel-log-ui): this
+    // recognized-result branch is its one producer, for a discrete step, the
+    // compass and every queued walk step alike. It writes the travel entry
+    // only; the line above stays the single full-log refusal line.
+    if (NON_SUCCESS_OUTCOMES.indexOf(result.outcome) !== -1 && ctx.inFlight.actionId === "explore.move") {
+      ctx.appendTravelRefusal(
+        result.requestId,
+        typeof result.message === "string" && result.message.trim() !== ""
+          ? result.message
+          : ACTION_RESULT_FALLBACK_MESSAGE,
+      );
+    }
     // The action-feedback crit toast (webclient-action-feedback D3): a
     // recognized non-success `creation.concept` result ALSO speaks exactly
     // once, above the overlay. This branch shares the narrative line's

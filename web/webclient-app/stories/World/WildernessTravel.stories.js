@@ -6,6 +6,8 @@ import StatusPanel from "../../components/StatusPanel.vue";
 import TravelMap from "../../components/travel/TravelMap.vue";
 import PartyMedallions from "../../components/travel/PartyMedallions.vue";
 import TravelWalkControls from "../../components/travel/TravelWalkControls.vue";
+import TravelLog from "../../components/travel/TravelLog.vue";
+import { travelJourney, travelLogPanel } from "../fixtures/travel_log.js";
 import { useElosernStore } from "../../stores/elosern.js";
 import * as fx from "../../tests/store/protocol_fixtures.js";
 import { walkArea, walkPanels } from "../fixtures/travel_walk.js";
@@ -149,7 +151,7 @@ const renderStage = (args) =>
           h(PartyMedallions, { members: members(args.fatigue) }),
         ],
         map: () => h(PlaceCard, { locationLabel: args.place, timeLabel: args.time, motionLevel: args.motionLevel }),
-        "band-message": () => quiet("訊息視窗（旅行紀錄由後續變更取代）"),
+        "band-message": () => h(TravelLog, { entries: args.log ?? [] }),
         "band-command": () => quiet("移動控制（行程面板由後續變更取代）"),
       }),
     ),
@@ -169,6 +171,12 @@ export default {
 // so it paints flat, with no relief, flags or light.
 const ADAPTED = decodeTravelGrid(wildernessArea());
 
+// The travel band log (wilderness-travel-log-ui): one leg's committed
+// notices under their day headings — region, woodland, ford, hostiles, a
+// look with its full prose behind 全文, fatigue, a landmark arrival, dusk,
+// night and the next morning's camp result.
+const JOURNEY = travelJourney();
+
 const MORNING = {
   grid: MORNING_GRID,
   aim: "east",
@@ -178,6 +186,7 @@ const MORNING = {
   place: "灰鬃荒原東麓・曠野",
   time: "春 3 日 ‧ 07:20・白晝",
   motionLevel: "full",
+  log: JOURNEY.slice(0, 4),
 };
 
 // Morning on the road: the painted window at full strength with relief,
@@ -240,6 +249,12 @@ function walkingStage(args) {
       const { x, y } = MORNING_GRID.party;
       const panels = walkPanels(x, y, args.walk?.panels ?? {});
       store.receive(store.view.generation, "ui_snapshot", [fx.snapshot({ panels })], {});
+      // The travel band log through the store's own adoption (and the real
+      // travel_log validator), exactly as a committed batch arrives.
+      if (args.log?.length) {
+        const v = store.view;
+        store.receive(v.generation, "ui_update", [fx.update({ revision: v.revision + 1, panels: { travel_log: travelLogPanel(args.log) } })], {});
+      }
       store.setTravelMap({ status: "ready", area: walkArea(x, y) });
       onMounted(() => {
         if (args.walk?.aim) store.aimTravel(args.walk.aim);
@@ -278,7 +293,7 @@ function walkingStage(args) {
               h(PartyMedallions, { members: members(args.fatigue) }),
             ],
             map: () => h(PlaceCard, { locationLabel: args.place, timeLabel: args.time, motionLevel: args.motionLevel }),
-            "band-message": () => quiet("訊息視窗（旅行紀錄由後續變更取代）"),
+            "band-message": () => h(TravelLog, { entries: travel.entries }),
             "band-command": () =>
               h(
                 "div",
@@ -319,3 +334,13 @@ export const StepRefused = {
   args: { ...MORNING, aim: null, walk: { step: "east", refuse: "前方的河水太深，無法涉過。" } },
   render: walkingStage,
 };
+
+// The travel band log across one whole leg: every notice kind the server
+// emits, newest at the bottom, the full log one control away.
+export const TravelLogLeg = {
+  name: "Travel Log",
+  args: { ...MORNING, aim: null, grid: DUSK_GRID, log: JOURNEY, time: "春 4 日 ‧ 06:00・黎明" },
+};
+
+// An empty band on first entry: the log's one quiet line.
+export const TravelLogEmpty = { name: "Travel Log Empty", args: { ...MORNING, log: [] } };

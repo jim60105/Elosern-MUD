@@ -52,6 +52,7 @@ import ConnectOverlay from "./ConnectOverlay.vue";
 import CommandLine from "./CommandLine.vue";
 import HudFrame from "./HudFrame.vue";
 import MessageWindow from "./MessageWindow.vue";
+import TravelLog from "./travel/TravelLog.vue";
 import PlaceCard from "./PlaceCard.vue";
 import TopBar from "./TopBar.vue";
 import { retireReplacedFallback } from "../fallback.js";
@@ -114,6 +115,10 @@ const props = defineProps({
   // The wilderness travel presentation (wilderness-travel-interface),
   // forwarded to HudFrame's presentation hook.
   travel: { type: Boolean, default: false },
+  // The travel band log's entries (wilderness-travel-log-ui): while the
+  // travel layout is shown the message region renders TravelLog instead of
+  // the paged message window; the 日誌 and ⌨ controls stay.
+  travelLog: { type: Array, default: null },
   // The person in focus, named as the speaker line of the message window
   // while the verb card is open (null otherwise).
   speaker: { type: String, default: null },
@@ -552,7 +557,9 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMe
         <slot name="presence" />
       </template>
       <template #band-message>
+        <TravelLog v-if="travel && travelLog" :entries="travelLog" />
         <MessageWindow
+          v-else
           ref="messageWindow"
           :lines="props.narrative"
           :marks="props.responseMarks"

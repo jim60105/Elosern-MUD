@@ -498,6 +498,8 @@ export function applyTravel(ctx) {
       walking: walkingView(),
       holding: ctx.travelHold !== null,
       notice: ctx.travelNotice ? Object.freeze({ ...ctx.travelNotice }) : null,
+      // The typed travel band log (wilderness-travel-log-ui).
+      entries: ctx.travelLogEntries(),
     });
   };
 }

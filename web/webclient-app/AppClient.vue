@@ -889,6 +889,7 @@ const rootStyle = computed(() => {
         :person-focus="personFocus"
         :formation="!!formation"
         :travel="travelLayout"
+        :travel-log="travelLayout ? store.view.travel.entries : null"
         :speaker="speaker"
         :mode-hydrating="modeHydrating"
         :connection-status="store.view.connectionStatus"

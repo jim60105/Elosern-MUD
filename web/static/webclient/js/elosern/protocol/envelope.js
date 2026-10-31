@@ -75,6 +75,7 @@ var combatBeats = require("./panels/combat_beats.js");
 var dream = require("./panels/dream.js");
 var skillUse = require("./panels/skill_use.js");
 var sleepHandoff = require("./panels/sleep_handoff.js");
+var travelLog = require("./panels/travel_log.js");
 var mapPanels = require("./panels/map_panels.js");
 var mapParts = require("./map_parts.js");
 var MAP_PANEL_SCHEMAS = mapPanels.MAP_PANEL_SCHEMAS;
@@ -106,6 +107,7 @@ var PANEL_VALIDATORS = {
   dream: dream.validateDreamPanel,
   skill_use: skillUse.validateSkillUsePanel,
   sleep_handoff: sleepHandoff.validateSleepHandoffPanel,
+  travel_log: travelLog.validateTravelLogPanel,
 };
 
 

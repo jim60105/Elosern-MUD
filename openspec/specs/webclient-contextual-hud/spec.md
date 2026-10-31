@@ -356,7 +356,7 @@ The backdrop SHALL consume canonical scene load state and same-scene retention, 
   centred between them (±1.5px), with no foe painted over any of its parts
 
 ### Requirement: The message window presents the current response one page at a time in the band's message region
-The narrative SHALL render as a message window filling the bottom band's message region — the left two thirds of the band, or the whole band in dialogue mode, at the band's fixed height — drawn with the reference's caption panel treatment. The window SHALL never grow into the stage or change size with its content, SHALL present exactly one page of the current response at a time in every mode, and SHALL NOT present earlier responses.
+Outside travel presentation, the narrative SHALL retain its bounded current-response message window and paging behavior; active travel presentation SHALL use a typed travel log in that region while preserving every ordinary narration line in the full log.
 
 #### Scenario: The window wears the reference caption panel chrome
 - **WHEN** the message window renders
@@ -364,7 +364,7 @@ The narrative SHALL render as a message window filling the bottom band's message
 
 #### Scenario: Paging follows the narrative and combat contracts
 - **WHEN** the window presents the current response, including while that response carries a combat round the client presents
-- **THEN** pages follow `webclient-input-narrative` and are revealed as its typing requirement defines — or, for a presented combat round, as that round's beat pages followed by the response's remaining lines, as `webclient-combat-menu` "A combat round plays beat by beat" defines — and earlier responses are not presented: they remain readable in the full-log surface
+- **THEN** pages follow `webclient-input-narrative` and are revealed as its typing requirement defines , or, for a presented combat round, as that round's beat pages followed by the response's remaining lines, as `webclient-combat-menu` "A combat round plays beat by beat" defines , and earlier responses are not presented: they remain readable in the full-log surface
 
 #### Scenario: The clear layer is the one paging exception
 - **WHEN** a new response replaces the previous one
@@ -372,7 +372,7 @@ The narrative SHALL render as a message window filling the bottom band's message
 
 #### Scenario: Page typography is bounded at the reference size
 - **WHEN** page text renders at the 1451x790 reference size and the default prose scale
-- **THEN** it is set in the bundled monospace reading face — the same Jim Mono TC family the monospace type role ships — at 18px, scales once with the desktop chrome factor and with the client's prose scale, and holds at most 42 CJK characters per line in every mode, including the whole-band width of dialogue mode
+- **THEN** it is set in the bundled monospace reading face , the same Jim Mono TC family the monospace type role ships , at 18px, scales once with the desktop chrome factor and with the client's prose scale, and holds at most 42 CJK characters per line in every mode, including the whole-band width of dialogue mode
 
 #### Scenario: The control strip carries the marker and the log control
 - **WHEN** any page renders
@@ -404,8 +404,8 @@ The narrative SHALL render as a message window filling the bottom band's message
 
 #### Scenario: The window keeps the message region's box
 - **WHEN** the current response holds more text than one page and new lines keep arriving
-- **THEN** the window keeps the message region's box — the band's height and two thirds of its
-  width, or the whole band in dialogue mode — and never expands into the stage
+- **THEN** the window keeps the message region's box , the band's height and two thirds of its
+  width, or the whole band in dialogue mode , and never expands into the stage
 
 #### Scenario: One page of the current response is shown
 - **WHEN** the log holds three responses and the latest one fills two pages
@@ -413,7 +413,7 @@ The narrative SHALL render as a message window filling the bottom band's message
   has finished no line of the two earlier responses is rendered in the window
 
 #### Scenario: The page measure is bounded at the reference size
-- **WHEN** the stage renders at 1451x790 with the default prose scale and a long prose response, in exploration mode and in dialogue mode with the panel transiently unavailable
+- **WHEN** the stage renders at 1451x790 with the default prose scale and a long prose response, in ordinary non-travel exploration mode and in dialogue mode with the panel transiently unavailable
 - **THEN** the page text's computed font size is 18px (±0.5px) in the bundled monospace reading face and no rendered text line holds more
   than 42 CJK characters in either mode
 
@@ -457,6 +457,10 @@ The narrative SHALL render as a message window filling the bottom band's message
 #### Scenario: Narration and actor plate change with text
 - **WHEN** an actor speech begins after a host line and then narration begins
 - **THEN** text/name/portrait transition synchronously to actor and then to no speaker, with no host plate retained for narration
+
+#### Scenario: Travel band replaces paging without losing prose
+- **WHEN** wilderness exploration enters travel and ordinary room narration arrives
+- **THEN** only typed events enter the travel band, the full log retains raw prose and leaving travel restores the existing message reader
 
 ### Requirement: An open drawer or overlay dims the stage behind it
 When a drawer or a full-screen overlay is open, the shell SHALL mark the stage so the surfaces behind

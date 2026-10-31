@@ -706,3 +706,165 @@ class TravelWalkingTests(_TravelStage):
         self.assertEqual(len(_moves(page)), 1)
         self.assertTrue(_map_focused(page))
         page.close()
+
+
+# The travel log journey's live hooks: every explore.move envelope is recorded
+# (and still sent) so the test can resend a step from a node it has left.
+_RECORD_MOVES = """() => {
+  const store = window.__elosernBridge.store;
+  if (window.__logMoves) return;
+  const sender = store.getSender();
+  const original = sender.sendAction.bind(sender);
+  window.__logMoves = [];
+  sender.sendAction = (env) => {
+    if (env && env.action_id === 'explore.move') window.__logMoves.push(env);
+    return original(env);
+  };
+}"""
+
+_LOG_STATE = """() => {
+  const store = window.__elosernBridge.store;
+  return JSON.parse(JSON.stringify({
+    entries: store.view.travel.entries,
+    narrative: store.narrative.map((l) => ({ kind: l.kind, text: l.text })),
+    result: store.view.lastActionResult,
+    layout: store.view.travel.layout,
+  }));
+}"""
+
+
+class TravelLogTests(BrowserAcceptanceTest):
+    """The committed travel band log over the real producers
+    (wilderness-travel-log-ui): a look, a step and a refused step."""
+
+    def _send(self, page, text: str) -> None:
+        page.evaluate("(text) => window.__elosernBridge.store.sendText(text)", text)
+
+    def _fixture(self, page, call: str) -> list[str]:
+        from .browser_helpers import narrative_log_text
+
+        seen = narrative_log_text(page).count("TRAVEL_LOG_FIXTURE")
+        self._send(page, f"@py __import__('web.tests.browser.travel_log_fixture', fromlist=['run']).{call}")
+        wait_for_store_state(
+            page, lambda _s: narrative_log_text(page).count("TRAVEL_LOG_FIXTURE") > seen, timeout=60000,
+        )
+        lines = [line for line in narrative_log_text(page).splitlines() if "TRAVEL_LOG_FIXTURE" in line]
+        return lines[-1].split()
+
+    def _state(self, page) -> dict:
+        return page.evaluate(_LOG_STATE)
+
+    def _dispatch(self, page, action: str, payload: dict) -> str:
+        page.wait_for_function(
+            "() => { const v = window.__elosernBridge.store.view; return v.dispatch.inFlight === null && !v.mutationsLocked; }",
+            timeout=30000,
+        )
+        request = page.evaluate(
+            "([a, p]) => window.__elosernBridge.store.dispatchAction(a, p)", [action, payload]
+        )
+        self.assertTrue(request)
+        page.wait_for_function(
+            "(id) => { const r = window.__elosernBridge.store.view.lastActionResult; return r && r.requestId === id; }",
+            arg=request, timeout=30000,
+        )
+        return request
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-message-window-presents-the-current-response-one-page-at-a-time-in-the-band-s-message-region",
+        "webclient-travel-log::travel-log-retains-typed-chronological-entries",
+    )
+    def test_committed_log_and_full_prose(self):
+        """A real look, step and refused step: typed notices reach the band
+        log once, the step's ordinary narration and the look's full prose stay
+        in the full log only, and a refusal is one travel entry plus exactly
+        one full-log line."""
+        page = self.logged_in_page((1451, 790), "off")
+        page.evaluate(_RECORD_MOVES)
+        placed = self._fixture(page, "run(me)")
+        self.assertEqual(placed[1], "ok", placed)
+        origin = placed[-1]
+        # The shared browser account leaves the wilderness again, even when an
+        # assertion fails half way.
+        self.addCleanup(lambda: page.is_closed() or self._fixture(page, f"restore(me, {origin})"))
+        page.wait_for_function("() => !!window.__elosernBridge.store.view.travel.layout", timeout=30000)
+        log = page.locator('[data-testid="travel-log"]')
+        log.wait_for(timeout=15000)
+        self.assertEqual(page.locator('[data-testid="message-page"]').count(), 0)
+        region = page.locator('[data-testid="travel-log__scroll"]')
+        self.assertEqual(region.get_attribute("role"), "log")
+        self.assertEqual(region.get_attribute("aria-live"), "polite")
+
+        # 1. An explicit look: one typed summary, its full prose in the full log.
+        self._dispatch(page, "explore.look", {"room": True})
+        page.wait_for_function(
+            "() => window.__elosernBridge.store.view.travel.entries.some((e) => e.kind === 'look')", timeout=30000,
+        )
+        state = self._state(page)
+        looks = [e for e in state["entries"] if e["kind"] == "look"]
+        self.assertEqual(len(looks), 1)
+        summary = looks[0]["text"]
+        self.assertNotIn("\n", summary)
+        self.assertEqual([l["text"] for l in state["narrative"] if l["kind"] == "sys"].count(summary), 1)
+        # The full appearance stays ordinary narration: the summary's own
+        # opening words appear in a raw narrative line, not only as the notice.
+        head = summary.split("：", 1)[-1].rstrip("…")[:6]
+        self.assertTrue(head)
+        self.assertTrue(any(head in l["text"] for l in state["narrative"] if l["kind"] == "out"))
+        shown = page.locator(f'[data-entry-id="{looks[0]["id"]}"] [data-testid="travel-log__text"]')
+        self.assertEqual(shown.text_content(), summary)
+
+        # 2. A committed step: its ordinary narration is full-log only.
+        before_ids = {e["id"] for e in state["entries"]}
+        page.wait_for_function(
+            "() => { const v = window.__elosernBridge.store.view; return v.dispatch.inFlight === null && !v.mutationsLocked; }",
+            timeout=30000,
+        )
+        # One committed neighbour step through the guarded exit activation.
+        sent = page.evaluate(
+            """() => {
+              const store = window.__elosernBridge.store;
+              const map = store.view.panels.local_map || {};
+              const node = (map.nodes || []).find((n) => n.action && n.action.destination && n.id !== map.current_node);
+              if (!node) return { sent: false, reason: "no-node" };
+              return store.activateExit(node.action.exit_ref);
+            }"""
+        )
+        self.assertTrue(sent.get("sent"), sent)
+        page.wait_for_function("() => window.__logMoves.length >= 1", timeout=30000)
+        step = page.evaluate("() => window.__logMoves[0]")
+        page.wait_for_function(
+            "(id) => { const r = window.__elosernBridge.store.view.lastActionResult; return r && r.requestId === id; }",
+            arg=step["request_id"], timeout=30000,
+        )
+        self.assertEqual(self._state(page)["result"]["outcome"], "success")
+        page.wait_for_timeout(500)
+        state = self._state(page)
+        moved_lines = [l["text"] for l in state["narrative"] if l["kind"] == "out" and "移動到了" in l["text"]]
+        self.assertTrue(moved_lines)
+        self.assertFalse(any("移動到了" in e["text"] for e in state["entries"]))
+        for entry in state["entries"]:
+            if entry["id"] not in before_ids:
+                self.assertNotEqual(entry["kind"], "refusal")
+
+        # 3. A refused step: the same step resent from the node it left.
+        errors_before = [l for l in state["narrative"] if l["kind"] == "err"]
+        refused = self._dispatch(page, "explore.move", step["payload"])
+        state = self._state(page)
+        self.assertNotEqual(state["result"]["outcome"], "success")
+        message = state["result"]["message"]
+        refusals = [e for e in state["entries"] if e["kind"] == "refusal"]
+        self.assertEqual(len(refusals), 1)
+        self.assertEqual(refusals[0]["text"], message)
+        self.assertIn(refused, refusals[0]["id"])
+        errors = [l for l in state["narrative"] if l["kind"] == "err"][len(errors_before):]
+        self.assertEqual([l["text"] for l in errors], [message])
+
+        # The full log stays one action away and holds the look's summary.
+        page.locator('[data-testid="message-log-open"]').click()
+        page.wait_for_selector('[data-testid="fulllog-overlay"]', timeout=15000)
+        self.assertIn(summary, page.locator('[data-testid="fulllog-overlay"]').inner_text())
+        page.keyboard.press("Escape")
+        os.makedirs(SHOTS, exist_ok=True)
+        page.screenshot(path=os.path.join(SHOTS, "travel-log-1451x790.png"))
+        self.assertEqual(self._fixture(page, f"restore(me, {origin})")[1], "restored")
+        page.close()

@@ -440,6 +440,20 @@ def settle_movement(
             window_seconds=window_seconds,
         )
         observation = _observation_for(traversing_object)
+        travel_before = None
+        travel_lineage = (
+            wilderness_coordinates is not None or wilderness_source_coordinates is not None
+        )
+        if travel_lineage:
+            from world.rules.travel_events import capture_travel_facts
+
+            # The travel log's before facts, copied with the interrupt facts:
+            # before the traversal and before any pooled-room mutation.
+            travel_before = capture_travel_facts(
+                traversing_object,
+                location=source_location,
+                knowledge_owner=snapshot.commander or traversing_object,
+            )
         if observation is not None:
             # Frozen immediately before the traversal and before any pooled-room
             # mutation: the source cell and the party's before physiology can
@@ -516,6 +530,18 @@ def settle_movement(
                 # collector's empty-flag disposition.
                 observation.capture_after(
                     traversing_object,
+                    knowledge_owner=snapshot.commander or traversing_object,
+                )
+            if travel_lineage and result:
+                from world.rules.travel_events import record_position_change
+
+                # Registered like the checkpoint above: an outer rollback
+                # discards it, and a refused or compensated step never
+                # reaches here.
+                record_position_change(
+                    traversing_object,
+                    travel_before,
+                    "move",
                     knowledge_owner=snapshot.commander or traversing_object,
                 )
         if narrate_traversal and not (wilderness_lineage and not result):

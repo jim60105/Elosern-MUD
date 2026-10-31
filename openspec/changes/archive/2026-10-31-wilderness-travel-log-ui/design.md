@@ -96,6 +96,18 @@ All commands run from repository root. Focused frontend command is `pnpm test --
 
 B1/B4/B6 adopted. Event batches belong to pending causal publication groups with source-assigned stable IDs; replay uses latest published data only. Recognized-result handling owns discrete and queued move refusal delivery without duplicate full-log lines. Landmark notices carry canonical arrival_node. N1 names ordinary reached-room appearance as the prose source; N2 gives concrete reuse and hours. All six blocking findings were addressed across the batch; no requirement was replaced with human-judged copy/appearance evidence. This records remediation, not an unperformed second review.
 
+## Implementation notes (apply)
+
+These record where the applied slice settled a detail the decisions above left open or could not meet as written; none changes a delta requirement.
+
+- Event ids are `<group_id>:<fact token>.<index>`: a 4-byte token drawn once per recorded fact plus the event's index inside it, instead of a group-local ordinal held on the publication binding. Ids stay allocated once at the source, identical across watcher coordinators and at most 44 ASCII characters; a group's batch keeps source (arrival) order. This avoids a shared mutable state on `presentation_events`' bindings.
+- `prose` is bounded at 2,048 code points, not 8,192: the protocol's global JSON-safety table rejects any string over 2,048 anywhere in a publication. The source holds prose to that bound (the complete appearance stays in the ordinary full-log narration); the validators enforce 2,048.
+- `landmark_sighted` has no producer in this slice. Approximating "a newly visible disclosed landmark in the local view" without the sight/disclosure inputs risked false sightings; window-ui owns the sight-based producer (as it already does for `dusk`/`nightfall`). `hostile_sighted` is produced for current-cell hostiles not present before.
+- Producers run only when the actor ends on a wilderness cell, so the non-travel full log is unchanged; the look summary quotes the first scenery line after the appearance's name line.
+- `explore.look` now binds its own publication group and names it on the result, so the look notice publishes with the look result.
+- The browser keeps the seen-id set for the life of the full log (the store) and retires only the retained list with the epoch, so a replay after a reconnect may list a notice again but never appends it twice. A local refusal joins the day of the newest retained notice: the client has no calendar arithmetic to derive an absolute day from `server_time`.
+- The travel_log panel renders an empty batch off the wilderness, so a replayed batch never rides a town snapshot.
+
 ## Migration Plan
 
 Pre-release clean cutover. No database migration, compatibility aliases or alternative wire schemas. The requested temporary node-grid adapter exists only until window-ui replaces it with the shared validated RLE decoder. Rollback is source reversal of the slice and its dependent slices together. Do not apply, sync or archive in the proposal workflow. Update existing developer guidance and control reference during implementation; these proposal artifacts are the requested documentation deliverable now.
