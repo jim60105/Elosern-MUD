@@ -2039,11 +2039,11 @@ While the committed mode is `dialogue`, the bottom band's command region SHALL b
 - **THEN** the move dispatches exactly as in exploration mode, the movement settlement clears the session through the existing seam, the committed mode returns to `exploration`, and the command region renders the new room's exploration root
 
 ### Requirement: Stage actors present the player and the dialogue host with a speaking state
-Each standing portrait on the stage SHALL be rendered by one stage-actor component. The controlled figure and companions in `actor-left` SHALL follow the companion-lineup rule. The dialogue host SHALL render once: when its committed identity joins to a committed party slot or controlled lineup figure, its existing lineup StageActor is the host and no duplicate renders in `actor-right`.
+Outside active travel presentation, standing portraits SHALL retain their current actor, companion-lineup and single dialogue-host speaking behavior; travel presentation SHALL keep both actor anchors empty and represent present members through medallions.
 
 #### Scenario: The host actor presents its catalog entry truthfully
 - **WHEN** a non-party host's stage actor renders in `actor-right`
-- **THEN** it presents the committed `art` panel's `portrait_catalog` entry named by `dialogue.host.portrait_ref` — the complete image bottom-aligned with contain fit, and a grounded silhouette with host identity and authoritative availability when the entry is a placeholder; when `portrait_ref` is null or names no catalog entry it renders the truthful placeholder: the display name's initial and display name, never a stock or guessed image; and the client constructs no catalog key from host identity or any other field
+- **THEN** it presents the committed `art` panel's `portrait_catalog` entry named by `dialogue.host.portrait_ref` , the complete image bottom-aligned with contain fit, and a grounded silhouette with host identity and authoritative availability when the entry is a placeholder; when `portrait_ref` is null or names no catalog entry it renders the truthful placeholder: the display name's initial and display name, never a stock or guessed image; and the client constructs no catalog key from host identity or any other field
 
 #### Scenario: Foes follow the same presentation rule
 - **WHEN** a foe's stage actor renders
@@ -2063,7 +2063,7 @@ Each standing portrait on the stage SHALL be rendered by one stage-actor compone
 
 #### Scenario: The speaking cue is never colour-only or disruptive
 - **WHEN** a speaking state is active
-- **THEN** the dim is not the only speaking cue — the name plate names the current explicit speaker (none for narration) and each actor exposes its speaking data attribute; actors remain decorative, with no focusable element; motion owns transitions; and no other dialogue behavior changes: the name plate, pagination, choices, focus, keyboard paths and non-party host mode-transition motion retain their contracts
+- **THEN** the dim is not the only speaking cue , the name plate names the current explicit speaker (none for narration) and each actor exposes its speaking data attribute; actors remain decorative, with no focusable element; motion owns transitions; and no other dialogue behavior changes: the name plate, pagination, choices, focus, keyboard paths and non-party host mode-transition motion retain their contracts
 
 #### Scenario: The host portrait comes from the art catalog
 - **WHEN** a non-party host's dialogue panel names ref `"41"` and its catalog entry carries an image and face rectangle
@@ -2086,7 +2086,7 @@ Each standing portrait on the stage SHALL be rendered by one stage-actor compone
 - **THEN** rejection handling restores the host's light and the player's dim
 
 #### Scenario: Nothing is dimmed outside dialogue
-- **WHEN** mode is exploration and later combat with two active foes
+- **WHEN** ordinary non-travel exploration is followed by combat with two active foes
 - **THEN** the controlled figure is lit in both and both foes are lit in combat; companions retain their listener dim, and actor-right carries no exploration actor
 
 #### Scenario: A companion host is not duplicated on the opposite anchor
@@ -2096,6 +2096,10 @@ Each standing portrait on the stage SHALL be rendered by one stage-actor compone
 #### Scenario: Consecutive actor and host lines
 - **WHEN** a complete scene has actor speech followed by two host lines and narration
 - **THEN** speaker emphasis changes with each line, both host lines remain separately advanceable and narration removes emphasis
+
+#### Scenario: Travel and ordinary layout switch
+- **WHEN** a committed wilderness exploration presentation enters or leaves travel
+- **THEN** travel uses medallions with empty actor anchors and vitals above them; ordinary dialogue/combat/settlement composition restores without duplicated figures
 
 ### Requirement: Dialogue choices appear centred over the stage after the line is fully read
 While the committed mode is `dialogue` and the committed `dialogue` panel is available, the client SHALL present the conversation's choices as one choice list in the stage's `choices` anchor, and nowhere else. The list SHALL render only while the message window reports that a native response last page is fully shown or an authored scene has received its explicit final-page finish activation, with no pending action mark, and while no action the player dispatched is in flight.
@@ -2801,7 +2805,7 @@ The client-owned help reference (including its party guidance), the combat detai
 - **THEN** it reads 未知目標類型 or 未知屬性 and shows no raw identifier
 
 ### Requirement: The vitals dock stands at the stage's lower-left above the band
-The stage SHALL render the vitals surfaces — the condition icon row and the vitals bars — as one bottom-anchored dock in the `vitals` anchor: a left-gutter column standing on the bottom band's upper edge, inset from the stage's left edge by the stage gutter, a quarter of the viewport's width wide, and at whatever compact height its content takes. The dock SHALL be bounded above the band and SHALL scroll internally rather than grow past the band's edge.
+The vitals dock SHALL retain its bounded lower-left placement above the band and existing conditional visibility; during travel it SHALL occupy the same column above party medallions, with their combined content bounded away from other interactive anchors.
 
 #### Scenario: The dock's width stays viewport-relative
 - **WHEN** the dock's width resolves at any viewport
@@ -2828,7 +2832,7 @@ The stage SHALL render the vitals surfaces — the condition icon row and the vi
 - **THEN** the quickbar island stands in the `vitals` anchor between the dock and the band
 
 #### Scenario: The dock stands on the band's edge
-- **WHEN** the shell renders in exploration mode with the vitals dock visible at 1451x790
+- **WHEN** the shell renders in ordinary non-travel exploration mode with the vitals dock visible at 1451x790
 - **THEN** the `vitals` anchor's bottom edge coincides with the bottom band's top edge (the dock's own bottom edge does too whenever no interim party quickbar stands below it), the dock's left edge sits at the stage's left gutter and its width is a quarter of the viewport's width (±1.5px), its rendered height is the compact height of the icon row, the readout, and the three lines, and the stage's upper-left corner holds no vitals surface
 
 #### Scenario: The dock covers only the portraits' lowest strip
@@ -2839,8 +2843,12 @@ The stage SHALL render the vitals surfaces — the condition icon row and the vi
 - **WHEN** the shell renders at 1451x790 with the dock visible and conditions overflowing the row
 - **THEN** the dock's box stays inside the left gutter between the top band and the band's top edge, its content scrolls within that bound, and it intersects no other interactive anchor's content
 
+#### Scenario: Travel and ordinary layout switch
+- **WHEN** a committed wilderness exploration presentation enters or leaves travel
+- **THEN** travel uses medallions with empty actor anchors and vitals above them; ordinary dialogue/combat/settlement composition restores without duplicated figures
+
 ### Requirement: Companion standing portraits line up behind the controlled character in the actor-left anchor
-The `actor-left` anchor SHALL render the currently controlled character's standing portrait as the group's rightmost figure with highest baseline z, and SHALL render each companion in committed `party.slots` order to its left, forming an overlapping horizontal row outside combat; in combat they stand at the formation's boxes. Each figure SHALL reuse StageActor rendering and stay non-interactive decorative art: no focusable element, and no pointer events except the stage target step's hit areas.
+Outside active travel presentation, the party SHALL retain its existing controlled-front standing lineup, committed companion order and combat formation; active travel presentation SHALL replace that lineup with present-member medallions below the existing vitals island.
 
 #### Scenario: Portraits resolve through the catalog
 - **WHEN** a companion portrait renders
@@ -2851,12 +2859,12 @@ The `actor-left` anchor SHALL render the currently controlled character's standi
 - **THEN** every figure, including the controlled character, has the same full anchor size and ground line; no progressively smaller scale, lift ramp or depth dimming
 
 #### Scenario: The row compresses to stay in the left half
-- **WHEN** the row renders at 1451x790, 1741x948 and 2560x1440, in exploration and dialogue
+- **WHEN** the row renders at 1451x790, 1741x948 and 2560x1440, in ordinary exploration and dialogue
 - **THEN** horizontal overlap compresses as necessary to keep the row inside the stage's left half, preserving a scaled left gutter; a multi-figure group MAY shift horizontally within that half; in dialogue the group compresses overlap to clear the choice list without resizing figures; zero companions render the existing solo portrait at its standard anchor position; the anchor has `overflow: visible`; and the vitals dock MAY cover the lowest strip of feet, never face or torso
 
 #### Scenario: Visibility follows the mode
 - **WHEN** the committed mode is exploration, combat, dialogue, or creation
-- **THEN** the lineup is visible in exploration, combat and dialogue, and hidden in creation
+- **THEN** the lineup is visible in ordinary exploration, combat and dialogue, hidden in creation and active travel; medallions replace it only in travel
 
 #### Scenario: A speaking companion rises in z only
 - **WHEN** a non-controlled rendered companion is the active host speaker in dialogue mode or the selected surviving exploration verb-card target, and when that speaking/focus changes or ends
@@ -2867,7 +2875,7 @@ The `actor-left` anchor SHALL render the currently controlled character's standi
 - **THEN** no figure box enters the dead-centre gap of "Combat figures stand in a shared-scale formation", and both sides are drawn at the same scale
 
 #### Scenario: A two-companion party renders a three-figure group
-- **WHEN** the committed `party` panel carries two resolved-portrait slots at 1451x790 in exploration mode
+- **WHEN** the committed `party` panel carries two resolved-portrait slots at 1451x790 in ordinary non-travel exploration mode
 - **THEN** three equally sized figures share a ground line, the player is rightmost with highest baseline z, the companions overlap leftward in party order, no box crosses the horizontal centre and no figure is focusable
 
 #### Scenario: A zero-companion party renders only the player
@@ -2905,6 +2913,10 @@ The `actor-left` anchor SHALL render the currently controlled character's standi
 #### Scenario: The party takes the listener dim during the stage target step
 - **WHEN** the stage target step is active for a skill whose candidates include the controlled figure and one companion, with the focus on that companion
 - **THEN** that companion's stage actor is lit (`data-speaking="true"`) and every other party figure, the controlled figure included, carries the listener dim; no figure moves, lifts, resizes or changes z for the step, and when the step ends every figure returns to the state it had before the step (in combat the controlled figure undimmed and the companions in their existing listener dim)
+
+#### Scenario: Travel and ordinary layout switch
+- **WHEN** a committed wilderness exploration presentation enters or leaves travel
+- **THEN** travel uses medallions with empty actor anchors and vitals above them; ordinary dialogue/combat/settlement composition restores without duplicated figures
 
 ### Requirement: Possession moves the possessed companion to the group's front
 While the possession banner is available, the possessed companion SHALL occupy the rightmost slot and A SHALL occupy exactly that companion's former slot, without moving the remaining companions. Release SHALL restore both original positions.

@@ -12,6 +12,8 @@ from __future__ import annotations
 import os
 import tempfile
 
+from tools.spec_traceability import covers_requirement
+
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     inject_snapshot,
@@ -189,6 +191,7 @@ class TravelLayoutTests(BrowserAcceptanceTest):
         os.makedirs(SHOTS, exist_ok=True)
         page.screenshot(path=os.path.join(SHOTS, name))
 
+    @covers_requirement("webclient-travel-layout::wilderness-presentation-follows-committed-room-identity")
     def test_settlement_gate_layout(self):
         """A committed wilderness identity selects travel and a settlement
         identity restores the ordinary stage, at both acceptance viewports."""
@@ -225,6 +228,7 @@ class TravelLayoutTests(BrowserAcceptanceTest):
             self.assertFalse(_travel(page)["layout"])
             page.close()
 
+    @covers_requirement("webclient-travel-layout::travel-area-refresh-follows-committed-state")
     def test_refresh_adoption(self):
         """Only the current request's own result and body make the stage
         ready, in either order; a same-position snapshot recovers once."""
@@ -250,6 +254,7 @@ class TravelLayoutTests(BrowserAcceptanceTest):
         state = store_state(page)
         self.assertIsNone((state.get("dispatch") or {}).get("inFlight"))
 
+    @covers_requirement("webclient-travel-layout::medallions-identify-committed-physiological-subjects")
     def test_medallion_subjects(self):
         """Each present member joins its own body-keyed reserve and posture;
         a member with no committed row is not with the party."""

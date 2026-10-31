@@ -6,7 +6,7 @@ Provide the production area/world map drawer with on-demand refresh, keyboard na
 ## Requirements
 
 ### Requirement: The map drawer opens the appropriate scope and preserves session views
-MapDrawer SHALL replace MapOverlay inside the existing OverlayHost shell. It SHALL expose ARIA 區域/世界 tabs with 1/2 shortcuts, a place caption and close control. Opening SHALL choose area in settlement/dungeon/interior and world in wilderness. Each tab SHALL retain its view for the session. New area views SHALL centre on current and fit adjacent nodes; new world views SHALL start at country centred on the player and fit a tracked commission within 800 km.
+MapDrawer SHALL retain its modal area/world navigation and session view memory, offer only world scope in active travel presentation, and restore ordinary per-layer scope selection outside travel.
 
 #### Scenario: Opening and returning to a tab
 - **WHEN** the player opens in a settlement, switches tabs, pans and switches back
@@ -16,8 +16,12 @@ MapDrawer SHALL replace MapOverlay inside the existing OverlayHost shell. It SHA
 - **WHEN** the client reconnects or changes puppet
 - **THEN** old map payloads, view memory and pending responses cannot appear for the new epoch
 
+#### Scenario: Travel hides the area tab
+- **WHEN** travel opens or begins while the drawer area tab is selected
+- **THEN** world is selected, no hidden area tab or shortcut is actionable and existing world readiness/view memory remains intact
+
 ### Requirement: Map requests follow explicit scope and committed moves only while open
-Opening or switching active scope SHALL request map.view for that scope; committed moves SHALL refresh it once while open. Closed maps SHALL request nothing. Adoption SHALL obey dispatcher ordering and epoch/revision rules. Each opening's world discovery baseline SHALL use its first fresh world response, never a retained cached body or a response from an earlier opening. Freshness SHALL remain independent of per-tab viewport memory.
+The drawer SHALL request and adopt maps through its existing opening, active-scope and committed-move lifecycle only while open; the active travel stage independently requests area scope while visible, with both owners sharing existing dispatch and epoch/revision admission.
 
 #### Scenario: Open movement refreshes only the active map
 - **WHEN** a movement commits with world selected
@@ -46,6 +50,10 @@ Opening or switching active scope SHALL request map.view for that scope; committ
 #### Scenario: A committed move is observed while opening readiness is pending
 - **WHEN** a movement commits before opening readiness and its active-scope refresh follows the opening response in either supported action-result/body order
 - **THEN** the opening response establishes a silent baseline; an unlit baseline followed by the movement refresh's eligible newly lit district reveals once without remounting, while a discovery already included in the first fresh baseline remains silent; normal dispatcher admission and single-refresh behavior remain unchanged
+
+#### Scenario: Closed drawer with visible travel map
+- **WHEN** travel is visible while its drawer is closed
+- **THEN** the drawer sends nothing while the travel stage requests its own correlated area refresh; the world baseline remains drawer-owned
 
 ### Requirement: Floating map chrome avoids selected details
 The map SHALL fill the drawer with a floating minus/stop/plus/recentre/full-map/legend pill, top-left quest dropdown and bottom-left scale bar. Selection SHALL open an approximately 360 px right detail drawer; pill and HTML edge pointers SHALL move left of it. Offscreen quest pointers SHALL be keyboard reachable, stack by distance and collapse beyond three into ＋n. Quest list and detail SHALL mirror permitted map facts as text.
