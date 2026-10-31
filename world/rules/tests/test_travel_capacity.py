@@ -15,6 +15,7 @@ from __future__ import annotations
 import unittest
 from unittest import mock
 
+from tools.spec_traceability import covers_requirement
 from world.rules import travel_cost
 from world.rules.fatigue import SleepPosture
 from world.rules.tests.test_travel_plan import WildernessPlanTestCase
@@ -53,6 +54,7 @@ def _counts(normal=0, light=0, moderate=0, severe=0):
 
 
 class CapacityByStageTests(unittest.TestCase):
+    @covers_requirement("webclient-travel-leg::travel-status-supplies-bounded-foot-capacity-and-quotes")
     def test_exact_zero_arrival_is_counted_severe_and_ends(self):
         # 19200 units at the severe half speed: 1000 m at 1500 m/h is 2400 s,
         # which consumes exactly 19200 units. The admitted step arrives at
@@ -66,6 +68,7 @@ class CapacityByStageTests(unittest.TestCase):
         # A body that cannot even finish the first step has no capacity.
         self.assertEqual(_capacity(_awake(19199)), _counts())
 
+    @covers_requirement("webclient-travel-leg::travel-status-supplies-bounded-foot-capacity-and-quotes")
     def test_the_slowest_present_traveller_sets_every_step(self):
         # A fresh body walks 1000 m in 1200 s, but it travels with a severe
         # body at 38400 units: each step takes the slow 2400 s, so the slow
@@ -115,6 +118,7 @@ class CapacityByStageTests(unittest.TestCase):
 
 
 class NeighbourQuoteBoundTests(unittest.TestCase):
+    @covers_requirement("webclient-travel-leg::travel-status-supplies-bounded-foot-capacity-and-quotes")
     def test_quotes_dedupe_and_stop_at_the_wire_bound(self):
         # Disabled and withheld rows quote null without any preflight, so the
         # bound and the dedupe are observable on their own.
@@ -148,6 +152,7 @@ class TravelStatusWorldTests(WildernessPlanTestCase):
     def _wild_rows(self, rows):
         return [row for row in rows if (row["destination"] or "").startswith("wild:")]
 
+    @covers_requirement("webclient-travel-leg::travel-status-supplies-bounded-foot-capacity-and-quotes")
     def test_status_quotes_the_committed_rows_and_writes_nothing(self):
         from world.rules.clock import get_world_clock
         from world.rules.travel_cost import wilderness_cell_size_m
@@ -194,6 +199,7 @@ class TravelStatusWorldTests(WildernessPlanTestCase):
         self.assertEqual(after, before)
         self.assertFalse(bare.attributes.has("mental_reserve_units"))
 
+    @covers_requirement("webclient-travel-leg::travel-status-supplies-bounded-foot-capacity-and-quotes")
     def test_withheld_destinations_quote_null_whatever_lies_there(self):
         self.set_reserve(self.char1, 360000)
         # Only the party's own cell is known: every wilderness neighbour is
@@ -279,6 +285,7 @@ class TravelStatusWorldTests(WildernessPlanTestCase):
         self.assertEqual(sum(expected["capacity"].values()), expected["capacity"]["severe"])
         self.assertLessEqual(expected["capacity"]["severe"], 1)
 
+    @covers_requirement("webclient-travel-leg::travel-status-supplies-bounded-foot-capacity-and-quotes")
     def test_outside_exploration_there_is_no_travel_status(self):
         with mock.patch(
             "web.webclient.presentation.affordances.in_exploration_mode", return_value=False

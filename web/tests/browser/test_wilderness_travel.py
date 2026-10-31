@@ -947,6 +947,7 @@ class TravelLegTests(_TravelStage):
         page.wait_for_selector('[data-testid="leg-panel"][data-gauge="capacity"]', timeout=15000)
         return page
 
+    @covers_requirement("webclient-travel-leg::leg-panel-projects-supplied-state-and-persisted-preferences")
     def test_gauge_preferences_and_actions(self):
         """The supplied capacity draws one tick per counted step with the
         pace's camp line; every text run keeps the 16px x scale floor and
