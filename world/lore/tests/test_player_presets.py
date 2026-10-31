@@ -234,7 +234,7 @@ class PlayerPresetTests(unittest.TestCase):
             (make(active_skills=("not_a_skill",)), "unknown skill"),
             (make(active_skills=("body_enhancement_basic",)), "classifies it as"),
             (make(active_skills=("dual_wield_style",)), "classifies it as"),
-            (make(passive_skills=("light_sword_style",)), "classifies it as"),
+            (make(passive_skills=("basic_swordplay",)), "classifies it as"),
             (make(passive_skills=("divine_sexual_mastery",)), "identity-ineligible"),
         )
         for preset, message in cases:

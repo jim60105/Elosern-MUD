@@ -90,7 +90,7 @@ existing bundle-merge behavior.
 
 ### 3.3 Weapon styles split by shape
 
-- `light_sword_style` (an attack: `SINGLE` target, deals damage) stays a cast-time skill in
+- `shadow_slash` (an attack: `SINGLE` target, deals damage) stays a cast-time skill in
   `action.py`, unchanged in kind.
 - `dual_wield_style` (a stance: `SELF` target, no direct effect except enabling a different combat
   posture) reclassifies to the `skill_owned` rule-table path — owning it while equipped with two
@@ -408,8 +408,8 @@ placeholder for "someone forgot to wire this up" (D1's registry-load validation 
 | 雙刀流（悠花，"宗師級"） | `dual_wield_style` 保留為初階架式（見 §3.3，改走 `skill_owned` 規則表）；新增 `dual_blade_mastery`（宗師級雙刀連擊，`SINGLE`，SP 30）作為 Cast 型攻擊技 |
 | 水/土/雷/冰屬性精通 | 新增 `water_mastery`／`earth_mastery`／`lightning_mastery`／`ice_mastery`，補齊八屬性（見 §4.4） |
 
-**SP cost tiers for non-magic weapon/stance skills** (calibrated against existing `light_sword_style`
-6 / `dual_wield_style` 8 / `flash_step` 12 / `shadow_slash` 18): 基礎架式/移動 6–12 SP，中階連段技
+**SP cost tiers for non-magic weapon/stance skills** (calibrated against existing `dual_wield_style`
+8 / `flash_step` 12 / `shadow_slash` 18): 基礎架式/移動 6–12 SP，中階連段技
 15–25 SP，宗師級奧義 25–40 SP.
 
 ---

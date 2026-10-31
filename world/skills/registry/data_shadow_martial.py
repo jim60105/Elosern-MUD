@@ -40,19 +40,6 @@ ROWS: tuple[SkillDef, ...] = (
             effects=["weapon_style:dual_wield"],
             category=SkillCategory.MARTIAL_ARTS,
         ),
-        _skill(
-            "light_sword_style",
-            "光劍架式",
-            "以光之劍的架式對單一目標造成物理傷害。",
-            SkillKind.ACTIVE,
-            TargetSpec.SINGLE,
-            usable_out_of_combat=True,
-            cost={"sp": 6},
-            element="light",
-            faction_constraint=FactionConstraint.ANY,
-            effects=["damage:light:physical"],
-            category=SkillCategory.MARTIAL_ARTS,
-        ),
         # 影流刀術 — 根（martial-arts-catalog D1/D3：outsiders 從此節起步，不設架式門檻）
         _skill(
             "shadow_slash",
