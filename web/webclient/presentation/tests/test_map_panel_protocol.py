@@ -135,6 +135,12 @@ class MapSchemaParityTests(unittest.TestCase):
             ("visited flag on run", "area_map", variant(wild, lambda v: next(r for r in v["rows"][20] if r["kind"] == "terrain").update(visited=True))),
             ("off-centre window", "area_map", variant(wild, lambda v: v["window"].update(min_y=v["window"]["min_y"] + 1))),
             ("node on unknown", "area_map", variant(wild, lambda v: v["nodes"][1].update(id="wild:elosern:100:100", x=100.5, y=100.5))),
+            ("gateway on unknown", "area_map", variant(wild, lambda v: (
+                v["rows"].__setitem__(21, [{"length": 41, "kind": "unknown"}]),
+                v.update(nodes=[n for n in v["nodes"] if int(n["y"]) != 121], edges=[], entities=[]),
+                v["nodes"].append({"id": "grid:t_map:3:3", "label": "門", "x": 121.5, "y": 121.5,
+                                   "visibility": "seen", "visited": False, "gateway": {"leads_to": "鎮"}, "action": None}),
+            ))),
             ("entity beyond sight", "area_map", variant(wild, lambda v: v["entities"][0]["cell"].update(x=125))),
             ("semantic entity id", "area_map", variant(wild, lambda v: v["entities"][0].update(id="object:9"))),
             ("sighting cell", "area_map", variant(wild, lambda v: v["sightings"][0].update(cell=[1, 2]))),

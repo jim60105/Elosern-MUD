@@ -797,6 +797,17 @@ class WildernessAreaTests(EvenniaTest):
             if node["id"].startswith("wild:"):
                 self.assertIsNone(node["gateway"])
         self.assertTrue(_js_accepts(payload))
+        # A woodland-night radius 0 leaves the gate cell unrevealed: no gate
+        # room, label or far side is published; the step stays an opaque
+        # directional control on the exploration rows.
+        self._pin({EAST_APPROACH: 0})
+        payload = _render(self.char1)
+        self.assertEqual([node["id"] for node in payload["nodes"]], [payload["current_node"]])
+        # (The current cell itself is revealed; its own approach name is its
+        # location metadata, not the unrevealed gate's.)
+        self.assertTrue(all(node["gateway"] is None for node in payload["nodes"]))
+        self.assertEqual(payload["edges"], [])
+        self.assertTrue(_js_accepts(payload))
 
     @covers_requirement(
         "webclient-area-map::wilderness-area-maps-cover-a-fifteen-cell-neighbourhood"

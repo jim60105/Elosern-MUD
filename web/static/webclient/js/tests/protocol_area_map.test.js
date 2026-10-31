@@ -222,6 +222,13 @@ test("wilderness rows are exact, merged and frame-bounded", () => {
     "node on unknown": (a) => a.nodes.push(F.wildNode(F.WILD_MIN, F.WILD_MIN)),
     "node off its cell": (a) => (a.nodes[1].x += 1),
     "far gateway": (a) => a.nodes.push(F.wildNode(F.WILD_C + 2, F.WILD_C, { id: "grid:t_map:2:2", gateway: { leads_to: "合成鎮" } })),
+    "gateway on unknown": (a) => {
+      a.rows[21] = [{ length: 41, kind: "unknown" }];
+      a.entities = [];
+      a.nodes = a.nodes.filter((n) => Math.floor(n.y) !== F.WILD_C + 1);
+      a.edges = a.edges.filter((e) => a.nodes.some((n) => n.id === e.destination));
+      a.nodes.push(F.wildNode(F.WILD_C + 1, F.WILD_C + 1, { id: "grid:t_map:3:3", gateway: { leads_to: "合成鎮" } }));
+    },
     "entity outside sight": (a) => (a.entities[0].cell = { x: F.WILD_C + 5, y: F.WILD_C }),
     "entity on unknown": (a) => (a.entities[0].cell = { x: F.WILD_MIN, y: F.WILD_MIN }),
     "semantic entity id": (a) => (a.entities[0].id = "object:12"),
@@ -240,6 +247,12 @@ test("wilderness rows are exact, merged and frame-bounded", () => {
     mutate(area);
     assert.equal(accepts(area), false, name);
   }
+  // The same adjacent gateway on a revealed cell is accepted.
+  const gated = clone(F.wildernessArea());
+  gated.nodes = gated.nodes.filter((n) => n.id !== `wild:elosern:${F.WILD_C + 1}:${F.WILD_C + 1}`);
+  gated.edges = gated.edges.filter((e) => e.destination !== `wild:elosern:${F.WILD_C + 1}:${F.WILD_C + 1}`);
+  gated.nodes.push(F.wildNode(F.WILD_C + 1, F.WILD_C + 1, { id: "grid:t_map:3:3", gateway: { leads_to: "合成鎮" } }));
+  assert.equal(accepts(gated), true);
   // A window hanging over the frame's west edge keeps negative origins and
   // unknown padding.
   const shift = 110;

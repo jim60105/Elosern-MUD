@@ -517,6 +517,8 @@ function wildernessBody(payload, nodes, current) {
       }
     } else if (Math.max(Math.abs(col - cx), Math.abs(row - cy)) !== 1) {
       fail("a gateway node must be one step from the current cell");
+    } else if (!decoded.revealed.has(ox + "," + oy)) {
+      fail("a gateway node must lie on a revealed cell");
     }
   });
   var radius = int(payload.ground_radius, "ground_radius", 0, WILDERNESS_MAX_GROUND_RADIUS);

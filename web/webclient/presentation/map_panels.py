@@ -523,6 +523,8 @@ def _wilderness_body(payload: dict[str, Any], nodes: list[dict[str, Any]], curre
                 raise MapPanelError("a wild node must lie on a revealed cell")
         elif max(abs(col - cx), abs(row - cy)) != 1:
             raise MapPanelError("a gateway node must be one step from the current cell")
+        elif offset not in revealed:
+            raise MapPanelError("a gateway node must lie on a revealed cell")
     radius = _int(payload["ground_radius"], "ground_radius", 0, WILDERNESS_MAX_GROUND_RADIUS)
     if payload["light_phase"] not in AREA_LIGHT_PHASES:
         raise MapPanelError("light_phase is not a stable value")

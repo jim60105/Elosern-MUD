@@ -419,12 +419,18 @@ class _TerrainOracle:
                 self._footprints[tuple(cell)] = hidden
         # Facts are a pure function of the published terrain, elevation and
         # footprint registry; one bounded cache serves repeated windows.
-        key = (
-            id(definition),
-            elevation.current().fingerprint,
-            frozenset(self._footprints.items()),
-        )
-        if _TerrainOracle._cache_key != key:
+        # The terrain definition and sight policy are compared by identity and
+        # kept alive by the cache, so a republished world never reuses a freed
+        # object's id.
+        owners = (definition, sight.POLICY)
+        key = (elevation.current().fingerprint, frozenset(self._footprints.items()))
+        cached_owners = _TerrainOracle._cache_definition
+        if (
+            cached_owners is None
+            or any(a is not b for a, b in zip(cached_owners, owners))
+            or _TerrainOracle._cache_key != key
+        ):
+            _TerrainOracle._cache_definition = owners
             _TerrainOracle._cache_key = key
             _TerrainOracle._cache = {}
         self._cache = _TerrainOracle._cache
@@ -436,6 +442,7 @@ class _TerrainOracle:
             raise PanelUnavailableError
         return row
 
+    _cache_definition: Any = None
     _cache_key: Any = None
     _cache: dict[tuple[int, int], dict[str, Any]] = {}
     _CACHE_CELLS = 65_536
@@ -649,8 +656,11 @@ def _wilderness_area(actor: Any, location: Any) -> dict[str, Any]:
         if exit_obj is not None and _traversable(exit_obj, actor):
             action = {"kind": "move", "exit_ref": _exit_ref(exit_obj), "destination": destination}
         if destination.startswith("grid:"):
-            # True gateway replacement on a step from the (always revealed)
-            # current cell; a hidden entry needs its gate room's visit.
+            # True gateway replacement on a revealed step only: an unrevealed
+            # gate cell stays an opaque directional control, and a hidden
+            # entry also needs its gate room's visit.
+            if cell not in revealed:
+                continue
             decoded = decode_node(destination)
             grid_gateway = _grid_gateway_at(decoded["x"], decoded["y"], decoded["z_map_key"])
             if grid_gateway is None:

@@ -984,11 +984,13 @@ def read_snapshot(character: Any) -> KnowledgeSnapshot | None:
 
     Reads the stored Attribute's persisted value directly instead of the
     per-read deep conversion of ``attributes.get``, so a long wilderness
-    history costs one envelope validation per request. Raises
-    :class:`KnowledgeError` for a corrupt envelope; never writes.
+    history costs one envelope validation per request. The persisted value
+    is the cached Attribute's own object, so the snapshot is strictly
+    read-only and never hands it out. Raises :class:`KnowledgeError` for a
+    corrupt envelope; never writes.
     """
     attribute = character.attributes.get(KNOWLEDGE_ATTR, return_obj=True)
-    if attribute is None:
+    if attribute is None or attribute.db_value is None:
         return None
     return KnowledgeSnapshot.from_record(attribute.db_value)
 
