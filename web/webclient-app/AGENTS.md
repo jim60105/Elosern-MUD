@@ -107,7 +107,16 @@ prototypes; the real app differs too much for a prototype to be useful).
   which its footprints, spreading, label clearance, stub start and aim ring
   follow); `WorldMapGlyph`, `WorldHatchPattern` and `world-map-ink.css` for
   the world map. Both map-drawer legend tabs draw the maps' own glyphs;
-  never redraw, copy or approximate a glyph in a host.
+  never redraw, copy or approximate a glyph in a host. The travel stage
+  extends the set with named travel states (wilderness-travel-map-ui):
+  `MapNodeGlyph` state `party` is the party seal, and
+  `components/travel/TravelGlyph.vue` is the one source of the landmark
+  ornament (the HUD band ornament's diamond), the neighbour targets
+  (`open`/`aimed`/`blocked`/`unknown`), the live hostile seal and the route
+  step marks (`normal`/`light`/`moderate`/`severe`), all with base geometry
+  in `lib/map_glyphs.js` (`PARTY_GLYPH`, `TRAVEL_GLYPHS`) and drawn at
+  `cellPx / TRAVEL_GLYPH_CELL`. Each state differs by shape as well as
+  colour; the existing drawer and minimap states are unchanged.
 - Island motion is scale-aware (`lib/map_pan.js` `islandMotion`): an
   unchanged projection mode and level pans the drawing with its
   world-anchored dot field; a changed one never pans. It dissolves an inert
@@ -161,7 +170,28 @@ dream or creation surface owns the stage. There is no server travel mode.
   the area.
 - `lib/travel-grid.js` `decodeTravelGrid` is the temporary adapter over the
   schema-2 window (through `decodeWindow`, never a second decoder); it
-  leaves band/tier/flags/phase/sight empty until window-ui.
+  leaves band/tier/flags/phase/sight empty until window-ui. It also carries
+  the body's `title` and `cellKm` (the scale bar).
+- `TravelMap` paints that grid (wilderness-travel-map-ui; design §4.2–4.4):
+  `lib/travel-paint.js` `paintTravelMap` draws onto a canvas of exactly
+  `width × 12` by `height × 12` pixels (terrain field, brushed reveal mask
+  with unknown ground transparent over the one hatched fog, ink strokes
+  clipped to the mask, then source-atop light), and a CSS transform scales
+  it. A missing fact suppresses its decoration (no band: flat; no radius:
+  no ring, dim or grid; no phase: no wash); rivers follow the canonical
+  `water` terrain, roads/fords their flags, districts and walls the
+  `display` facts. Texture hashes world coordinates, never a fact.
+  Repaint keys: only `paintSignature(grid)` (map, origin, size, party,
+  phase, radius and every cell's painted facts) repaints, once per
+  animation frame; camera, zoom, UI scale, aim, hover, walking, plan and
+  status move transforms or overlays only. `lib/travel-camera.js` follows
+  the party between the measured header and band, fits a locked plan
+  between the measured side columns (minimum 14 px × scale), steps zoom
+  18..46 by 4 × scale (wheel, `+`/`-` on the focused map) and projects
+  bearing-only sighting cards onto the safe rectangle's inset edge. The map
+  emits pointer `hover`/`pick` and `zoom`; keyboard aim and walking are the
+  walking slice's. `window.__elosernBridge.travelPaint` exposes the painter
+  and its call record for the managed repaint-budget test.
 - `PartyMedallions` shows the controlled body once, then each member whose
   own `status.fatigue` row is committed (status v5 emits one per
   source-present traveller), with its supplied reserve, stage label and

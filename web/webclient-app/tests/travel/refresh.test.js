@@ -71,7 +71,9 @@ describe("the travel stage requests its own area map", () => {
     expect(travel(h.store)).toMatchObject({ mapStatus: "ready", mapReady: true });
     expect(travel(h.store).map.party).toEqual({ x: 100, y: 200 });
     expect(h.w.get('[data-testid="travel-map"]').attributes("data-map-shown")).toBe("true");
-    expect(h.w.find('[data-testid="travel-map"] [data-testid="area-map"]').exists()).toBe(true);
+    // The adopted grid is drawn by the travel painter's own canvas and seal.
+    expect(h.w.find('[data-testid="travel-map"] [data-testid="travel-map__canvas"]').exists()).toBe(true);
+    expect(h.w.find('[data-testid="travel-map"] [data-testid="travel-map__party"]').exists()).toBe(true);
     // A result for another request id leaves the adopted state alone.
     expect(() => h.result({ request_id: "session:999" }, h.store.view.revision)).not.toThrow();
     await tick();

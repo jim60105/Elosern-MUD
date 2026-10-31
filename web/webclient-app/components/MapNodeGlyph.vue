@@ -27,11 +27,13 @@ import {
   HALO_R,
   gatePath,
 } from "@elosern/map-view";
+import { PARTY_GLYPH } from "../lib/map_glyphs.js";
 
 defineOptions({ inheritAttrs: false });
 
 defineProps({
-  // "current", "visited" or "seen".
+  // "current", "visited" or "seen"; "party" is the travel stage's party
+  // seal (wilderness-travel-map-ui), drawn by no other surface.
   state: { type: String, required: true },
   gate: { type: Boolean, default: false },
   travel: { type: Boolean, default: false },
@@ -46,7 +48,19 @@ defineProps({
 <template>
   <g class="map-glyph" :transform="size === 1 ? null : `scale(${size})`">
     <circle v-if="travel" class="map-glyph__halo" :class="haloClass" :data-testid="testIds.halo" :r="HALO_R" aria-hidden="true" />
-    <template v-if="state === 'current'">
+    <template v-if="state === 'party'">
+      <circle class="map-glyph__party-halo" :r="PARTY_GLYPH.haloR" aria-hidden="true" />
+      <circle
+        class="map-glyph__party-body"
+        :class="markerClass"
+        :data-testid="testIds.marker"
+        :r="PARTY_GLYPH.bodyR"
+        :stroke-width="PARTY_GLYPH.rim"
+        aria-hidden="true"
+      />
+      <circle class="map-glyph__party-core" :r="PARTY_GLYPH.coreR" aria-hidden="true" />
+    </template>
+    <template v-else-if="state === 'current'">
       <circle class="map-glyph__here-glow" :r="HERE_GLOW_R" aria-hidden="true" />
       <circle class="map-glyph__here-ring" :class="markerClass" :data-testid="testIds.marker" :r="HERE_RING_R" aria-hidden="true" />
       <circle class="map-glyph__here-dot" :r="HERE_DOT_R" aria-hidden="true" />
@@ -91,6 +105,24 @@ defineProps({
 @media (prefers-reduced-motion: reduce) {
   .map-glyph__here-glow { animation: none; }
 }
+/* The travel party seal: its halo breathes on the shared pulse token, which
+   is 0ms at reduced and off, so the ring then holds still. */
+.map-glyph__party-halo {
+  fill: none;
+  stroke: rgba(207, 68, 68, 0.38);
+  stroke-width: 4;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: map-glyph-party-breathe var(--motion-pulse) ease-in-out infinite;
+}
+@keyframes map-glyph-party-breathe {
+  50% { stroke-opacity: 0.12; transform: scale(1.14); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .map-glyph__party-halo { animation: none; }
+}
+.map-glyph__party-body { fill: var(--seal-500); stroke: var(--gold-300); }
+.map-glyph__party-core { fill: var(--gold-300); }
 .map-glyph__here-ring { fill: none; stroke: var(--map-view-paper, var(--paper-50)); stroke-width: 2; }
 .map-glyph__here-dot { fill: var(--map-view-current, var(--seal-deep)); stroke: #fff2e6; stroke-width: 1.5; }
 .map-glyph__dot { fill: var(--map-view-node, var(--paper-200)); stroke: #15130f; stroke-width: 2; }

@@ -70,7 +70,10 @@ export function decodeTravelGrid(area) {
   }
   return Object.freeze({
     mapId: area.map_id,
+    title: area.title,
     frame: area.frame,
+    // Kilometres per cell (the stage's scale bar; wilderness-travel-map-ui).
+    cellKm: area.cell_km,
     currentNode: area.current_node,
     origin: Object.freeze({ x: minX, y: minY }),
     width,

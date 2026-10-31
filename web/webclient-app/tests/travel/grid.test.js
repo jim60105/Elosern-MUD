@@ -97,6 +97,10 @@ describe("decodeTravelGrid", () => {
     expect(grid.party).toEqual({ x: CX, y: CY });
     expect(grid.currentNode).toBe(wild(CX, CY));
     expect([grid.mapId, grid.frame]).toEqual(["elosern", { key: "elosern", unit: "km" }]);
+    // The body's own title and cell size ride along for the stage's
+    // announcement and scale bar.
+    const area = validateAreaMapPanel(body());
+    expect([grid.title, grid.cellKm]).toEqual([area.title, area.cell_km]);
   });
 
   it("keeps unknown cells unknown and guesses no fact", () => {
