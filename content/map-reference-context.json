@@ -176,7 +176,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "2b96835f4b659b3e133f7b6eb963ab23c0c614c2c7afc6d38a22e291e63aa46b",
+  "fingerprint": "02bf748533bda411f1986ee8c8857c53c2a7da7cdb8763b40bca19ad389ee78c",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -1163,7 +1163,7 @@
     "world/rules/monster_ai/utility.py": "0ae217655d0e4e1c2e8a7b1ade154f73cdb24d72072efa901c856b8dd065fbe4",
     "world/rules/monster_behaviour.py": "bad5390fc03d977bc79d2d162a12f873eb8248a0db2f555d0dfac4893130730a",
     "world/rules/monster_individual.py": "aebffc963389222d028d121c9ee9d9bd7b13f88e3ffcc6a42f7939e0eeed0591",
-    "world/rules/movement.py": "eb354e5159dffc76ff0694846616454fe617b262ccc2fb14e3b6881bacf02c2e",
+    "world/rules/movement.py": "cd3d72c72bd4c9cf89b210413b8871056b38caa4969554f4ad5770bb19fe436a",
     "world/rules/movement_settlement.py": "43e22fa2e32e3b3e9a2087013d2bcc8917ec17af11fed86e447b37dbbfb2aaa3",
     "world/rules/mp_flow.py": "cf7f26056b7845b1df943068fe21fc5cfb2b5ab5d837c20a660418d6804179a4",
     "world/rules/namegen.py": "f22a06725ebb3ce1553cf5b568f13ffcedcef3e63b97089dc9c72c9f05b26c71",
@@ -1282,7 +1282,8 @@
     "world/rules/titles/removal.py": "ceed0f1a4c117c1aac1c9a68c4e38d052fa645e20104f09ce2ae3338325e2c9e",
     "world/rules/titles/state.py": "7efdc1e5a9a745f0ba980106f133f031856f21f7bfacb83beaef54f7a3097247",
     "world/rules/traits.py": "fb483c81ecbdfaf57f973fb984867c119bf2615451415980ef82e4de61ae7237",
-    "world/rules/travel_cost.py": "8bfd5fb2e7298542deaebcfb369481338abc919fd4239bfeba2418cceaf4813f",
+    "world/rules/travel_cost.py": "bfb2a1eb87cbd9ccb25410de6026462b9c3acfaa22adc63f42ba39171bb0a5ae",
+    "world/rules/travel_plan.py": "10ce62a44c4bbc7c6add81e14c9fe3f023610214b12078441dc4e0fb94f23737",
     "world/rules/unlock_notices.py": "c3402f1db1a73348f5667761e9fe7722c11a692b2a1371593528b70ac9e452f1",
     "world/rules/upkeep.py": "2e400d2dfa0434bc0e49a5a509dba51a82ebaa2e972b6d842639dd12fbf3128d",
     "world/rules/wallet.py": "db5b03079ce2f905a411c1fe553a5ecedaa9eedb9dc4ef9cd961c8facb6e9c9a",

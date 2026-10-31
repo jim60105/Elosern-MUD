@@ -126,6 +126,7 @@ class RegistryTests(unittest.TestCase):
                     "dream.awaken",
                     "party.view_member",
                     "map.view",
+                    "travel.plan",
                 }
             ),
         )
