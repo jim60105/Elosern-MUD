@@ -89,7 +89,7 @@ def _knowledge(visits):
 
 class TravelPlanPayloadTests(unittest.TestCase):
     @covers_requirement(
-        "webclient-action-dispatch::action-registries-are-allowlisted-and-duplicate-safe"
+        "wilderness-travel-planning::travel-queries-route-within-revealed-wilderness"
     )
     def test_the_exact_payload_is_normalized_and_every_deviation_is_rejected(self):
         valid = {
@@ -144,7 +144,7 @@ class TravelPlanPayloadTests(unittest.TestCase):
                     validate_travel_plan_payload(bad)
 
     @covers_requirement(
-        "webclient-action-dispatch::action-registries-are-allowlisted-and-duplicate-safe"
+        "wilderness-travel-planning::travel-queries-route-within-revealed-wilderness"
     )
     def test_the_production_registry_binds_the_travel_plan_spec(self):
         registry = build_production_action_registry()
@@ -203,7 +203,7 @@ class TravelPlanWildernessTests(EvenniaTest):
         return None
 
     @covers_requirement(
-        "webclient-area-map::map-view-requests-publish-the-requested-area-without-changing-gameplay"
+        "wilderness-travel-planning::travel-queries-route-within-revealed-wilderness"
     )
     def test_success_is_a_result_only_plan_and_a_mode_refusal_keeps_its_code(self):
         result = travel_plan_adapter(self.char1, self._payload())
@@ -246,7 +246,7 @@ class TravelPlanWildernessTests(EvenniaTest):
         self.assertNotIn("data", refused)
 
     @covers_requirement(
-        "webclient-area-map::map-view-requests-publish-the-requested-area-without-changing-gameplay"
+        "wilderness-travel-planning::travel-queries-route-within-revealed-wilderness"
     )
     def test_every_domain_refusal_maps_to_its_stable_code_and_message(self):
         x, y = self.origin
@@ -277,7 +277,7 @@ class TravelPlanWildernessTests(EvenniaTest):
         self.assertEqual(refused["message"], PLAN_MESSAGES[PLAN_PARTY_CANNOT_TRAVEL])
 
     @covers_requirement(
-        "webclient-area-map::map-view-requests-publish-the-requested-area-without-changing-gameplay"
+        "wilderness-travel-planning::travel-queries-route-within-revealed-wilderness"
     )
     def test_an_unexpected_failure_is_logged_and_answers_plan_unreachable(self):
         with mock.patch(
@@ -294,7 +294,7 @@ class TravelPlanWildernessTests(EvenniaTest):
         self.assertEqual(log_error.call_args[1]["context"]["char"], str(self.char1.pk))
 
     @covers_requirement(
-        "webclient-area-map::map-view-requests-publish-the-requested-area-without-changing-gameplay"
+        "wilderness-travel-planning::travel-queries-route-within-revealed-wilderness"
     )
     def test_a_mode_read_failure_is_result_only_and_never_re_snapshots(self):
         session = FakeSession()
@@ -345,7 +345,7 @@ class TravelPlanWildernessTests(EvenniaTest):
         self.assertEqual(log_error.call_args[0][0], "travel_plan_failed")
 
     @covers_requirement(
-        "webclient-area-map::map-view-requests-publish-the-requested-area-without-changing-gameplay"
+        "wilderness-travel-planning::travel-queries-route-within-revealed-wilderness"
     )
     def test_dispatch_publishes_only_the_correlated_result_and_writes_nothing(self):
         neighbour = self._revealed_neighbour()
@@ -407,7 +407,7 @@ class TravelPlanWildernessTests(EvenniaTest):
         self.assertIs(self.char1.location, location)
 
     @covers_requirement(
-        "webclient-area-map::map-view-requests-publish-the-requested-area-without-changing-gameplay"
+        "wilderness-travel-planning::travel-queries-route-within-revealed-wilderness"
     )
     def test_a_domain_refusal_publishes_no_presentation_and_keeps_state(self):
         session = FakeSession()

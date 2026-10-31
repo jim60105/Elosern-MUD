@@ -95,6 +95,18 @@ first-legal-step decision with the identical departure's real committed
 after-step stage and the shared threshold table that slice must reuse; it does
 not claim the flag surface exists here.
 
+### Remount completed at archive
+
+The archive sync created both canonical IDs above. Every mapping row's test now
+annotates its remount target instead of the pre-sync neighbour, and
+`tools.spec_traceability check` reports 2655 requirements, 2655 covered, 0
+uncovered, 0 errors on the synced tree. `test_warmed_plan_with_twenty_thousand_visits_is_within_one_hundred_ms`
+kept its pre-sync `wilderness-ground-reveal::permanent-reveal-is-a-bounded-read-projection`
+association rather than gaining a remounted one, because it is skipped unless
+`MUD_TRAVEL_PLAN_BENCHMARK=1` and would not establish coverage on its own; the
+requirement's bounded-read clause is carried by the non-skipped routing and
+publication tests above.
+
 ### Post-implementation review dispositions
 
 The final review raised two blocking items; both are addressed on the branch.

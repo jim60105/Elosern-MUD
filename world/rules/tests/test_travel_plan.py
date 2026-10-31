@@ -260,7 +260,7 @@ class PlannerTestCase(unittest.TestCase):
 
 class PlannerRoutingTests(PlannerTestCase):
     @covers_requirement(
-        "movement-cost-charging::terrain-and-the-slowest-eligible-traveller-determine-speed"
+        "wilderness-travel-planning::travel-queries-route-within-revealed-wilderness"
     )
     def test_route_goes_around_water_and_prefers_the_lower_canonical_duration(self):
         self.fill(_box(4, 3, 9, 7))
@@ -286,7 +286,7 @@ class PlannerRoutingTests(PlannerTestCase):
         self.assertEqual(plan.total_seconds, sum(seconds))
 
     @covers_requirement(
-        "movement-cost-charging::terrain-and-the-slowest-eligible-traveller-determine-speed"
+        "wilderness-travel-planning::travel-queries-route-within-revealed-wilderness"
     )
     def test_a_diagonal_needs_both_crossed_orthogonals_passable_and_revealed(self):
         self.fill(_box(4, 4, 7, 7))
@@ -319,7 +319,7 @@ class PlannerRoutingTests(PlannerTestCase):
         self.assertEqual([step.cell for step in plan.steps], [(6, 6)])
 
     @covers_requirement(
-        "wilderness-gateway::wildernessreturnexit-routes-every-registered-approach-cell-and-direction-pair-back-to-the-grid"
+        "wilderness-travel-planning::travel-queries-route-within-revealed-wilderness"
     )
     def test_a_registered_gateway_direction_is_never_an_ordinary_route(self):
         self.fill([(5, 5), (6, 5)])
@@ -333,7 +333,7 @@ class PlannerRoutingTests(PlannerTestCase):
         self.assertEqual([step.cell for step in plan.steps], [(6, 5)])
 
     @covers_requirement(
-        "movement-cost-charging::terrain-and-the-slowest-eligible-traveller-determine-speed"
+        "wilderness-travel-planning::travel-queries-route-within-revealed-wilderness"
     )
     def test_each_domain_error_keeps_its_stable_code(self):
         self.fill(_box(0, 0, 61, 2))
@@ -365,7 +365,7 @@ class PlannerRoutingTests(PlannerTestCase):
         self.assertEqual(caught.exception.code, PLAN_UNREACHABLE)
 
     @covers_requirement(
-        "movement-cost-charging::sparse-edge-admission-refuses-pre-destination-depletion"
+        "wilderness-travel-planning::travel-queries-route-within-revealed-wilderness"
     )
     def test_same_cell_destination_is_an_empty_arrival_but_sleepers_refuse(self):
         self.fill(_box(4, 4, 6, 6))
@@ -389,7 +389,7 @@ class PlannerRoutingTests(PlannerTestCase):
                 self.assertEqual(caught.exception.code, PLAN_PARTY_CANNOT_TRAVEL)
 
     @covers_requirement(
-        "movement-cost-charging::terrain-and-the-slowest-eligible-traveller-determine-speed"
+        "wilderness-travel-planning::travel-prediction-matches-sequential-admitted-steps"
     )
     def test_an_absent_physiology_traveller_is_admitted_at_base_speed(self):
         self.fill([(5, 5), (6, 5)])
@@ -413,7 +413,7 @@ class PlannerReplayTests(PlannerTestCase):
         return cells
 
     @covers_requirement(
-        "movement-cost-charging::sparse-edge-admission-refuses-pre-destination-depletion"
+        "wilderness-travel-planning::travel-prediction-matches-sequential-admitted-steps"
     )
     def test_first_refusal_is_party_cannot_travel_and_a_later_one_keeps_the_prefix(self):
         cells = self.corridor(2)
@@ -443,7 +443,7 @@ class PlannerReplayTests(PlannerTestCase):
         self.assertEqual(plan.total_seconds, plan.steps[0].seconds)
 
     @covers_requirement(
-        "movement-cost-charging::sparse-edge-admission-refuses-pre-destination-depletion"
+        "wilderness-travel-planning::travel-prediction-matches-sequential-admitted-steps"
     )
     def test_exact_zero_arrival_is_admitted_and_ends_with_member_asleep(self):
         cells = self.corridor(2)
@@ -465,7 +465,7 @@ class PlannerReplayTests(PlannerTestCase):
         self.assertEqual(plan.stop_reason, "member_asleep")
 
     @covers_requirement(
-        "movement-cost-charging::traversal-integrates-fatigue-over-remaining-distance"
+        "wilderness-travel-planning::travel-prediction-matches-sequential-admitted-steps"
     )
     def test_preview_steps_continue_past_a_voluntary_stop(self):
         cells = self.corridor(4)
@@ -493,7 +493,7 @@ class PlannerReplayTests(PlannerTestCase):
         self.assertEqual([step.fatigue_stage for step in plan.steps], stages)
 
     @covers_requirement(
-        "movement-cost-charging::terrain-and-the-slowest-eligible-traveller-determine-speed"
+        "wilderness-travel-planning::travel-prediction-matches-sequential-admitted-steps"
     )
     def test_each_pace_stops_at_the_first_step_at_or_beyond_its_threshold(self):
         cells = self.corridor(3)
@@ -546,7 +546,7 @@ class PlannerReplayTests(PlannerTestCase):
                 self.assertEqual(plan.stop_reason, "destination_reached")
 
     @covers_requirement(
-        "movement-cost-charging::terrain-and-the-slowest-eligible-traveller-determine-speed"
+        "wilderness-travel-planning::travel-prediction-matches-sequential-admitted-steps"
     )
     def test_heterogeneous_party_pays_the_slowest_member_and_reports_the_worst_stage(self):
         cells = self.corridor(2)
@@ -561,7 +561,7 @@ class PlannerReplayTests(PlannerTestCase):
         self.assertEqual(plan.steps[0].fatigue_stage, FatigueStage.SEVERE)
 
     @covers_requirement(
-        "movement-cost-charging::charge-movement-is-the-single-shared-movement-cost-charging-function"
+        "wilderness-travel-planning::travel-prediction-matches-sequential-admitted-steps"
     )
     def test_a_waived_plan_charges_zero_and_keeps_every_reserve_and_the_calendar(self):
         cells = self.corridor(3)
@@ -583,7 +583,7 @@ class PlannerReplayTests(PlannerTestCase):
         self.assertEqual(plan.stop_reason, "destination_reached")
 
     @covers_requirement(
-        "movement-cost-charging::traversal-integrates-fatigue-over-remaining-distance"
+        "wilderness-travel-planning::travel-prediction-matches-sequential-admitted-steps"
     )
     def test_nightfall_index_uses_absolute_calendar_boundaries(self):
         cells = self.corridor(2)
@@ -619,7 +619,7 @@ class PlannerReplayTests(PlannerTestCase):
         self.assertEqual(plan.stop_reason, "destination_reached")
 
     @covers_requirement(
-        "movement-cost-charging::traversal-integrates-fatigue-over-remaining-distance"
+        "wilderness-travel-planning::travel-prediction-matches-sequential-admitted-steps"
     )
     def test_night_entry_transitions_cover_starts_ends_and_later_nights(self):
         from world.rules.travel_plan import _night_entry_offset
@@ -632,7 +632,7 @@ class PlannerReplayTests(PlannerTestCase):
         self.assertEqual(_night_entry_offset(night, 24 * 3600), 24 * 3600)
 
     @covers_requirement(
-        "movement-cost-charging::terrain-and-the-slowest-eligible-traveller-determine-speed"
+        "wilderness-travel-planning::travel-prediction-matches-sequential-admitted-steps"
     )
     def test_the_earlier_stop_wins_and_a_tie_uses_the_design_priority(self):
         cells = self.corridor(3)
@@ -676,7 +676,7 @@ class PlannerReplayTests(PlannerTestCase):
         self.assertEqual(plan.stop_index, 0)
 
     @covers_requirement(
-        "movement-cost-charging::traversal-integrates-fatigue-over-remaining-distance"
+        "wilderness-travel-planning::travel-prediction-matches-sequential-admitted-steps"
     )
     def test_frozen_route_choice_is_separate_from_sequential_replay(self):
         # Two complete legal routes to (14, 10):
@@ -973,10 +973,7 @@ class WildernessPlanTestCase(EvenniaTest):
 
 class TravelSnapshotTests(WildernessPlanTestCase):
     @covers_requirement(
-        "wilderness-ground-reveal::permanent-reveal-is-a-bounded-read-projection"
-    )
-    @covers_requirement(
-        "webclient-area-map::map-view-requests-publish-the-requested-area-without-changing-gameplay"
+        "wilderness-travel-planning::travel-queries-route-within-revealed-wilderness"
     )
     def test_the_snapshot_matches_its_canonical_owners_and_writes_nothing(self):
         from world.rules.clock import get_world_clock
@@ -1028,7 +1025,7 @@ class TravelSnapshotTests(WildernessPlanTestCase):
         self.assertIn(KNOWLEDGE_ATTR, attributes)
 
     @covers_requirement(
-        "webclient-area-map::map-view-requests-publish-the-requested-area-without-changing-gameplay"
+        "wilderness-travel-planning::travel-queries-route-within-revealed-wilderness"
     )
     def test_an_absent_clock_is_read_as_zero_and_is_never_created(self):
         from world.rules import travel_plan as module
@@ -1043,7 +1040,7 @@ class TravelSnapshotTests(WildernessPlanTestCase):
         self.assertEqual(snapshot.tick, 0)
 
     @covers_requirement(
-        "movement-cost-charging::sparse-edge-admission-refuses-pre-destination-depletion"
+        "wilderness-travel-planning::travel-prediction-matches-sequential-admitted-steps"
     )
     def test_malformed_physiology_is_party_cannot_travel_not_an_internal_error(self):
         from world.rules.fatigue import POSTURE_ATTRIBUTE, RESERVE_ATTRIBUTE
@@ -1058,7 +1055,7 @@ class TravelSnapshotTests(WildernessPlanTestCase):
 
 class CommittedEquivalenceTests(WildernessPlanTestCase):
     @covers_requirement(
-        "movement-cost-charging::traversal-integrates-fatigue-over-remaining-distance"
+        "wilderness-travel-planning::travel-prediction-matches-sequential-admitted-steps"
     )
     def test_predicted_prefix_matches_real_transactional_steps(self):
         from world.rules.travel_plan import read_travel_snapshot
@@ -1077,7 +1074,7 @@ class CommittedEquivalenceTests(WildernessPlanTestCase):
         self.assertEqual(self.char1.location.coordinates, destination)
 
     @covers_requirement(
-        "movement-cost-charging::charge-movement-is-the-single-shared-movement-cost-charging-function"
+        "wilderness-travel-planning::travel-prediction-matches-sequential-admitted-steps"
     )
     def test_allowed_flight_has_zero_charge_and_matches_real_steps(self):
         from world.rules.clock import get_world_clock
@@ -1122,7 +1119,7 @@ class CommittedEquivalenceTests(WildernessPlanTestCase):
         return get_world_clock().tick - before
 
     @covers_requirement(
-        "movement-cost-charging::charge-movement-is-the-single-shared-movement-cost-charging-function"
+        "wilderness-travel-planning::travel-prediction-matches-sequential-admitted-steps"
     )
     def test_restricted_flight_and_flash_step_use_foot_cost(self):
         from dataclasses import replace
@@ -1183,10 +1180,7 @@ class CommittedEquivalenceTests(WildernessPlanTestCase):
         self.assertEqual(self._charge_one_step(snapshot, plan), plan.steps[0].seconds)
 
     @covers_requirement(
-        "movement-cost-charging::charge-movement-is-the-single-shared-movement-cost-charging-function"
-    )
-    @covers_requirement(
-        "movement-cost-charging::sparse-edge-admission-refuses-pre-destination-depletion"
+        "wilderness-travel-planning::travel-prediction-matches-sequential-admitted-steps"
     )
     def test_flight_does_not_bypass_sleep_or_depletion(self):
         from world.rules.clock import get_world_clock
@@ -1241,7 +1235,7 @@ class CommittedEquivalenceTests(WildernessPlanTestCase):
         self.assertEqual(caught.exception.code, PLAN_PARTY_CANNOT_TRAVEL)
 
     @covers_requirement(
-        "movement-cost-charging::traversal-integrates-fatigue-over-remaining-distance"
+        "wilderness-travel-planning::travel-prediction-matches-sequential-admitted-steps"
     )
     def test_initial_pace_state_matches_the_committed_first_step(self):
         from world.rules.fatigue import read_optional_fatigue_state
