@@ -482,6 +482,92 @@ function validateCombatResultData(code, hasData, data) {
   }
 }
 
+// The read-only route preview (wilderness-travel-planning-ui): a successful
+// `travel.plan` result carries exactly the planner's bounded data slot,
+// mirror of world.rules.travel_plan.TravelPlan.as_data. Indices are
+// zero-based and nullable; a same-cell query has no steps, no indices and
+// the destination_reached reason. The stop and nightfall indices are
+// independent (a pace stop may precede nightfall), and the durations are the
+// server's own (their sum is never re-derived here). Every other code keeps
+// the generic slot rules only.
+var TRAVEL_PLAN_CODE = "travel.plan";
+var TRAVEL_PLAN_FIELDS = [
+  "origin",
+  "destination",
+  "steps",
+  "total_seconds",
+  "nightfall_index",
+  "stop_index",
+  "stop_reason",
+];
+var TRAVEL_PLAN_MAX_STEPS = 60;
+var TRAVEL_PLAN_STOP_REASONS = [
+  "member_asleep",
+  "preflight_refused",
+  "pace_threshold",
+  "nightfall",
+  "destination_reached",
+];
+
+function requireTravelCell(value, field) {
+  requireExactFields(value, field, ["x", "y"], []);
+  requireInt(value.x, field + ".x", -MAX_SAFE_INTEGER, MAX_SAFE_INTEGER);
+  requireInt(value.y, field + ".y", -MAX_SAFE_INTEGER, MAX_SAFE_INTEGER);
+  return value;
+}
+
+function requireTravelIndex(value, field, length) {
+  if (value === null) {
+    return null;
+  }
+  return requireInt(value, field, 0, length - 1);
+}
+
+function validateTravelPlanData(value) {
+  requireExactFields(value, "travel.plan data", TRAVEL_PLAN_FIELDS, []);
+  requireTravelCell(value.origin, "travel.plan origin");
+  requireTravelCell(value.destination, "travel.plan destination");
+  var steps = value.steps;
+  if (!Array.isArray(steps) || steps.length > TRAVEL_PLAN_MAX_STEPS) {
+    throw new Error("travel.plan steps must be an array of at most " + TRAVEL_PLAN_MAX_STEPS);
+  }
+  for (var i = 0; i < steps.length; i++) {
+    var step = steps[i];
+    requireExactFields(step, "travel.plan step", ["cell", "seconds", "fatigue_stage"], []);
+    requireTravelCell(step.cell, "travel.plan step cell");
+    requireInt(step.seconds, "travel.plan step seconds", 0, MAX_SAFE_INTEGER);
+    if (C.STATUS_FATIGUE_STAGES.indexOf(step.fatigue_stage) === -1) {
+      throw new Error("travel.plan step fatigue_stage is not a canonical stage");
+    }
+  }
+  requireInt(value.total_seconds, "travel.plan total_seconds", 0, MAX_SAFE_INTEGER);
+  if (TRAVEL_PLAN_STOP_REASONS.indexOf(value.stop_reason) === -1) {
+    throw new Error("travel.plan stop_reason is not a stable reason");
+  }
+  if (steps.length === 0) {
+    if (value.nightfall_index !== null || value.stop_index !== null || value.stop_reason !== "destination_reached") {
+      throw new Error("an empty travel.plan has no indices and only reaches its destination");
+    }
+    return value;
+  }
+  requireTravelIndex(value.nightfall_index, "travel.plan nightfall_index", steps.length);
+  if (value.stop_index === null) {
+    throw new Error("a travel.plan with steps names its stop_index");
+  }
+  requireTravelIndex(value.stop_index, "travel.plan stop_index", steps.length);
+  return value;
+}
+
+function validateTravelResultData(code, outcome, hasData, data) {
+  if (code !== TRAVEL_PLAN_CODE || outcome !== "success") {
+    return;
+  }
+  if (!hasData) {
+    throw new Error("a travel.plan success requires its exact data slot");
+  }
+  validateTravelPlanData(data);
+}
+
 function validateServerTime(value) {
   requireExactFields(
     value,
@@ -567,6 +653,8 @@ module.exports = {
   requireExactFields: requireExactFields,
   validateCombatResultData: validateCombatResultData,
   validatePartyExitPromptData: validatePartyExitPromptData,
+  validateTravelResultData: validateTravelResultData,
+  validateTravelPlanData: validateTravelPlanData,
   requireInt: requireInt,
   requireBool: requireBool,
   requireString: requireString,
