@@ -1,10 +1,11 @@
 """Wilderness travel stage acceptance (wilderness-travel-interface, task 4.1;
-wilderness-travel-map-ui, task 3.1; wilderness-travel-walking-ui, task 3.1).
+wilderness-travel-map-ui, task 3.1; wilderness-travel-walking-ui, task 3.1;
+wilderness-travel-window-ui, task 4.1).
 
 The journeys run in the live client against injected committed state: the
 room's panels arrive through the store's own ``receive`` seam, and a
 responder on the live sender holds every ``map.view`` the travel stage sends
-so the test answers it with its action result and a synthetic schema-2
+so the test answers it with its action result and a synthetic schema-3
 wilderness ``area_map`` in either order. The walking journeys hold every
 ``explore.move`` the same way and answer it with its result and the next
 cell's panels. Nothing here names shipped content.
@@ -45,22 +46,35 @@ def _art(subject: str) -> dict:
     }
 
 
+def _display(terrain: str, district: str | None = "t_east", ford: bool = False) -> dict:
+    """A synthetic schema-3 display annotation (``district`` None: undisclosed)."""
+    return {
+        "terrain_label": "合成" + terrain, "district_key": district,
+        "district_name": None if district is None else "合成%s區" % district,
+        "settlement": terrain == "settlement", "ford_label": "合成渡口" if ford else None,
+    }
+
+
 def _run(terrain: str) -> dict:
     return {
         "length": 1, "kind": "terrain", "terrain": terrain, "passable": terrain != "water",
-        "band": 3, "tier": 0, "road": False, "ford": False,
+        "band": 3, "tier": 0, "road": False, "ford": False, "display": _display(terrain),
     }
 
 
 def _rows(known) -> list:
-    """Schema-2 rows (south to north) from ``known(col, row)``, which returns a
-    terrain class or None for an unknown cell; equal neighbours merge."""
+    """Schema-3 rows (south to north) from ``known(col, row)``, which returns a
+    terrain class (or a full run dict) or None for an unknown cell; equal
+    neighbours merge."""
     rows = []
     for row in range(WINDOW):
         runs: list = []
         for col in range(WINDOW):
             terrain = known(col, row)
-            run = _run(terrain) if terrain else {"length": 1, "kind": "unknown"}
+            if isinstance(terrain, dict):
+                run = {"length": 1, **terrain}
+            else:
+                run = _run(terrain) if terrain else {"length": 1, "kind": "unknown"}
             last = runs[-1] if runs else None
             if last and {**last, "length": 0} == {**run, "length": 0}:
                 last["length"] += 1
@@ -88,7 +102,7 @@ def _fact_area(cx: int = CX, cy: int = CY) -> dict:
 
 
 def _area(cx: int = CX, cy: int = CY) -> dict:
-    """A schema-2 wilderness window centred on ``(cx, cy)``: a 3 x 3 revealed
+    """A schema-3 wilderness window centred on ``(cx, cy)``: a 3 x 3 revealed
     open-ground block around the party, everything else unknown."""
     rows = []
     for row in range(WINDOW):
@@ -99,7 +113,7 @@ def _area(cx: int = CX, cy: int = CY) -> dict:
                     {"length": 19, "kind": "unknown"},
                     {
                         "length": 3, "kind": "terrain", "terrain": "open_ground", "passable": True,
-                        "band": 3, "tier": 0, "road": False, "ford": False,
+                        "band": 3, "tier": 0, "road": False, "ford": False, "display": _display("open_ground"),
                     },
                     {"length": 19, "kind": "unknown"},
                 ]
@@ -108,7 +122,7 @@ def _area(cx: int = CX, cy: int = CY) -> dict:
             rows.append([{"length": WINDOW, "kind": "unknown"}])
     current = "wild:elosern:%d:%d" % (cx, cy)
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "available": True,
         "layer": "wilderness",
         "map_id": "elosern",
@@ -118,7 +132,7 @@ def _area(cx: int = CX, cy: int = CY) -> dict:
         "nodes": [
             {
                 "id": current, "label": "合成荒原", "x": cx + 0.5, "y": cy + 0.5,
-                "visibility": "current", "visited": True, "gateway": None, "action": None,
+                "visibility": "current", "visited": True, "gateway": None, "action": None, "landmark": None,
             }
         ],
         "edges": [],
@@ -362,46 +376,59 @@ _DIGEST = """() => {
 
 _PAINTS = "() => window.__elosernBridge.travelPaint.stats().count"
 
-# The repaint benchmark: the real painter on a rich synthetic 41 x 41 grid
+# The repaint benchmark: the real painter on the real decoder's output
+# (wilderness-travel-window-ui) for rich synthetic 41 x 41 schema-3 bodies
 # (bands, tiers, roads, a river with a ford, woods, two districts, a
 # settlement footprint, phase and radius), 5 warm-up paints, then 20 timed
-# state changes (party, reveal, phase, radius and flags all move).
+# state changes (party, reveal, phase, radius and flags all move). The canvas
+# size comes from the decoded window, never a constant.
 _BENCH = """() => {
   const S = 12, N = 41, phases = ['day', 'dusk', 'night', 'dawn'];
-  const grid = (k) => {
+  const labels = { open_ground: '曠', hills: '丘', woodland: '林', water: '河', settlement: '聚' };
+  const body = (k) => {
     const ox = 1000 + k, oy = 2000 + (k % 3);
     const party = { x: ox + 20, y: oy + 20 };
-    const cells = [];
+    const rows = [];
     for (let row = 0; row < N; row += 1) {
+      const runs = [];
       for (let col = 0; col < N; col += 1) {
         const x = ox + col, y = oy + row;
-        const known = (x - party.x) ** 2 + (y - party.y) ** 2 < (14 + (k % 5)) ** 2 || (col + row * 3 + k) % 11 === 0;
-        const river = Math.abs(y - (2012 + 3 * Math.sin(x * 0.2))) < 0.6;
-        const road = y === 2020 + Math.round((x - 1020) * 0.4);
-        const wood = Math.sin(x * 0.37) * Math.cos(y * 0.29) > 0.45;
-        const terrain = river ? 'water' : x < ox + 5 && y < oy + 5 ? 'settlement' : wood ? 'woodland' : (x + y) % 7 === 0 ? 'hills' : 'open_ground';
-        const band = Math.max(0, Math.min(15, Math.round(6 + 4 * Math.sin(x * 0.15) + 3 * Math.cos(y * 0.11))));
-        cells.push({
-          x, y, known,
-          terrain: known ? terrain : null,
-          band: known ? band : null,
-          tier: known ? (band > 9 ? (band % 3) + 1 : 0) : null,
-          road: known && road, ford: known && road && river,
-          node: null,
-          display: known ? { terrain_label: 't', district_key: x < 1020 ? 'w' : 'e', district_name: 'd', settlement: terrain === 'settlement', ford_label: null } : null,
-        });
+        const known = (x - party.x) ** 2 + (y - party.y) ** 2 < (14 + (k % 5)) ** 2 || (col + row * 3 + k) % 11 === 0 || (x === party.x && y === party.y);
+        let run = { length: 1, kind: 'unknown' };
+        if (known) {
+          const river = Math.abs(y - (2012 + 3 * Math.sin(x * 0.2))) < 0.6;
+          const road = y === 2020 + Math.round((x - 1020) * 0.4);
+          const wood = Math.sin(x * 0.37) * Math.cos(y * 0.29) > 0.45;
+          const terrain = river ? 'water' : x < ox + 5 && y < oy + 5 ? 'settlement' : wood ? 'woodland' : (x + y) % 7 === 0 ? 'hills' : 'open_ground';
+          const band = Math.max(0, Math.min(15, Math.round(6 + 4 * Math.sin(x * 0.15) + 3 * Math.cos(y * 0.11))));
+          const ford = road && river;
+          run = { length: 1, kind: 'terrain', terrain, passable: terrain !== 'water' && terrain !== 'settlement',
+            band, tier: band > 9 ? (band % 3) + 1 : 0, road, ford,
+            display: { terrain_label: labels[terrain], district_key: x < 1020 ? 'w' : 'e', district_name: x < 1020 ? '西' : '東',
+              settlement: terrain === 'settlement', ford_label: ford ? '渡' : null } };
+        }
+        const last = runs[runs.length - 1];
+        if (last && JSON.stringify({ ...last, length: 0 }) === JSON.stringify({ ...run, length: 0 })) last.length += 1;
+        else runs.push(run);
       }
+      rows.push(runs);
     }
-    return { mapId: 'bench', origin: { x: ox, y: oy }, width: N, height: N, cells, party,
-      lightPhase: phases[k % 4], groundRadius: 1 + (k % 6), entities: [], sightings: [] };
+    const current = 'wild:elosern:' + party.x + ':' + party.y;
+    return { schema_version: 3, available: true, layer: 'wilderness', map_id: 'elosern', frame: { key: 'elosern', unit: 'km' },
+      current_node: current, title: '合成', nodes: [{ id: current, label: '合成', x: party.x + 0.5, y: party.y + 0.5,
+        visibility: 'current', visited: true, gateway: null, action: null, landmark: null }],
+      edges: [], quest_markers: [], district_name: '合成', cell_km: 1,
+      window: { min_x: ox, min_y: oy, width: N, height: N }, rows,
+      light_phase: phases[k % 4], ground_radius: 1 + (k % 6), entities: [], sightings: [] };
   };
-  const { paintTravelMap } = window.__elosernBridge.travelPaint;
+  const { paintTravelMap, decode } = window.__elosernBridge.travelPaint;
+  const grids = Array.from({ length: 25 }, (_, k) => decode(body(k)));
+  if (grids.some((g) => !g)) return { error: 'the decoder refused a bench body' };
   const canvas = document.createElement('canvas');
-  canvas.width = N * S;
-  canvas.height = N * S;
+  canvas.width = grids[0].width * S;
+  canvas.height = grids[0].height * S;
   const ctx = canvas.getContext('2d');
   const cache = {};
-  const grids = Array.from({ length: 25 }, (_, k) => grid(k));
   for (let k = 0; k < 5; k += 1) paintTravelMap(ctx, grids[k], { cache });
   const samples = [];
   for (let k = 5; k < 25; k += 1) {
@@ -410,7 +437,8 @@ _BENCH = """() => {
     ctx.getImageData(0, 0, 1, 1);
     samples.push(performance.now() - started);
   }
-  return { samples, ua: navigator.userAgent, dpr: window.devicePixelRatio, size: [canvas.width, canvas.height] };
+  return { samples, ua: navigator.userAgent, dpr: window.devicePixelRatio, size: [canvas.width, canvas.height],
+    known: grids[0].cells.filter((c) => c.known).length };
 }"""
 
 
@@ -496,6 +524,9 @@ class TravelMapTests(_TravelStage):
         for viewport in ((1451, 790), (2560, 1440)):
             page = self._open(viewport)
             result = page.evaluate(_BENCH)
+            self.assertNotIn("error", result)
+            self.assertEqual(result["size"], [41 * 12, 41 * 12])
+            self.assertGreater(result["known"], 0)
             samples = result["samples"]
             lines.append(
                 "%dx%d dpr=%s canvas=%s ua=%s samples_ms=%s"
@@ -515,6 +546,146 @@ class TravelMapTests(_TravelStage):
         with open(os.path.join(SHOTS, "travel-repaint-budget.txt"), "w", encoding="utf-8") as handle:
             handle.write("\n".join(lines) + "\n")
         print("\n".join(lines))
+
+
+# ── the live window (wilderness-travel-window-ui) ───────────────────────
+
+
+def _window_area(phase: str = "dusk", radius: int = 3) -> dict:
+    """A schema-3 window whose west half (columns 0..20) is revealed: open
+    ground in a disclosed district, a ford crossing in an undisclosed one, a
+    lit landmark on a visited cell, two hostiles in live sight (one without a
+    supplied threat), one remembered hostile-free cell and three distant
+    sightings."""
+    cx, cy = CX, CY
+
+    def known(col, row):
+        if col > 20:
+            return None
+        if row == 18 and col == 17:
+            return {"kind": "terrain", "terrain": "water", "passable": True, "band": 1, "tier": 0, "road": False,
+                    "ford": True, "display": _display("water", None, ford=True)}
+        if row == 18:
+            return {"kind": "terrain", "terrain": "water", "passable": False, "band": 1, "tier": 0, "road": False,
+                    "ford": False, "display": _display("water", None)}
+        return "woodland" if row > 26 else "open_ground"
+
+    area = _area(cx, cy)
+    area["rows"] = _rows(known)
+    area["light_phase"] = phase
+    area["ground_radius"] = radius
+    area["nodes"].append({
+        "id": _node(cx - 3, cy + 2), "label": "合成荒原", "x": cx - 2.5, "y": cy + 2.5, "visibility": "visited",
+        "visited": True, "gateway": None, "action": None, "landmark": {"name": "合成石標"},
+    })
+    area["nodes"].sort(key=lambda node: (node["y"], node["x"]))
+    area["entities"] = [
+        {"id": "0123456789abcdef", "cell": {"x": cx - 1, "y": cy + 1}, "kind": "hostile", "hostile": True,
+         "label": "合成狼", "count": 1, "threat": "合成中階"},
+        {"id": "fedcba9876543210", "cell": {"x": cx - 2, "y": cy - 1}, "kind": "hostile", "hostile": True,
+         "label": "合成豬", "count": 1, "threat": None},
+    ]
+    reach = (radius + 0.5) ** 2
+    area["entities"] = [
+        e for e in area["entities"] if (e["cell"]["x"] - cx) ** 2 + (e["cell"]["y"] - cy) ** 2 <= reach
+    ]
+    area["sightings"] = [
+        {"bearing": "北", "distance_km": 25, "silhouette_zh": "合成塔影", "name": None},
+        {"bearing": "東南", "distance_km": 40, "silhouette_zh": "合成城牆", "name": "合成城"},
+        {"bearing": "西南西", "distance_km": 15, "silhouette_zh": "合成望台", "name": None},
+    ]
+    return area
+
+
+# The screen boxes of the protected controls and every chip/card.
+_BOXES = """() => {
+  const box = (el) => { const r = el.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom]; };
+  const all = (sel) => [...document.querySelectorAll(sel)].map(box);
+  return {
+    protected: [
+      ...all('[data-testid="stage-band"]'),
+      ...all('[data-testid="place-card"]'),
+      ...all('[data-testid="party-medallions"]'),
+      ...all('[data-testid="anchor-vitals"] .status-panel'),
+    ],
+    cards: all('[data-testid="travel-map__sighting"]'),
+    chips: all('.travel-map__chips .tm-chip'),
+  };
+}"""
+
+
+def _overlaps(a, b) -> bool:
+    return a[0] < b[2] - 1 and b[0] < a[2] - 1 and a[1] < b[3] - 1 and b[1] < a[3] - 1
+
+
+class TravelWindowTests(_TravelStage):
+    """The live window on the stage: live hostiles and the lit landmark,
+    remembered ground, distant cards, the supplied phase and the place card
+    (wilderness-travel-window-ui)."""
+
+    @covers_requirement("webclient-travel-map::travel-painting-uses-disclosed-cell-facts")
+    @covers_requirement("webclient-travel-window::travel-consumes-the-shared-current-wilderness-window")
+    def test_live_memory_and_distant_cards(self):
+        """Only the supplied annotations draw; a hostile without a threat says
+        so; distant cards stay clear of the protected controls; the supplied
+        phase alone retints the map and the place card states it."""
+        for viewport in ((1451, 790), (2560, 1440)):
+            page = self.logged_in_page(viewport)
+            self._enter(page, {"status": valid_status_panel("合成主角", "42"), "art": _art(WILD)})
+            self._wait_views(page, 1)
+            before = page.evaluate(_PAINTS)
+            self._answer(page, 0, area=_window_area())
+            self._wait_ready(page)
+            page.wait_for_function("(n) => window.__elosernBridge.travelPaint.stats().count > n", arg=before, timeout=15000)
+            page.wait_for_timeout(300)
+
+            # Live hostiles: one seal and chip each, the threat or its absence.
+            self.assertEqual(page.locator('[data-testid="travel-map__hostile"]').count(), 2)
+            chips = page.locator('[data-testid="travel-map__hostile-chip"]').all_text_contents()
+            self.assertEqual(len(chips), 2)
+            self.assertIn("合成中階", chips[0])
+            self.assertEqual(page.locator('[data-testid="travel-map__hostile-chip"] .tm-chip__unknown').count(), 1)
+            # The lit landmark carries its ornament and name; the ford its label.
+            self.assertEqual(page.locator('[data-testid="travel-map__landmark"]').count(), 1)
+            chip_text = " ".join(page.locator(".travel-map__chips .tm-chip").all_text_contents())
+            self.assertIn("合成石標", chip_text)
+            self.assertIn("合成渡口", chip_text)
+            # The place card: the party cell's disclosed district and terrain,
+            # and the supplied phase on the time line.
+            grid = _travel(page)["map"]
+            here = next(c for c in grid["cells"] if c["x"] == CX and c["y"] == CY)["display"]
+            self.assertEqual(
+                page.locator('[data-testid="place-card__location"]').text_content().strip(),
+                "%s・%s" % (here["district_name"], here["terrain_label"]),
+            )
+            self.assertIn("黃昏", page.locator('[data-testid="place-card"]').text_content())
+            # Distant cards: one per sighting, none under a protected control,
+            # and no chip beneath one either.
+            boxes = page.evaluate(_BOXES)
+            self.assertEqual(len(boxes["cards"]), 3)
+            for card in boxes["cards"]:
+                for guard in boxes["protected"]:
+                    self.assertFalse(_overlaps(card, guard), (card, guard))
+            for chip in boxes["chips"]:
+                for guard in boxes["protected"]:
+                    self.assertFalse(_overlaps(chip, guard), (chip, guard))
+            self._shoot(page, "travel-window-dusk-%dx%d.png" % viewport)
+
+            # The supplied phase alone: night retints the stage and the card.
+            paints = page.evaluate(_PAINTS)
+            inject_snapshot(page, {"status": valid_status_panel("合成主角", "42"), "art": _art(WILD)})
+            self._wait_views(page, 2)
+            self._answer(page, 1, area=_window_area(phase="night", radius=1))
+            self._wait_ready(page)
+            page.wait_for_function("(n) => window.__elosernBridge.travelPaint.stats().count > n", arg=paints, timeout=15000)
+            page.wait_for_timeout(300)
+            self.assertIn("is-night", page.locator('[data-testid="travel-map"]').get_attribute("class"))
+            self.assertIn("夜晚", page.locator('[data-testid="place-card"]').text_content())
+            radius = page.locator('[data-testid="travel-map__sight"]').get_attribute("r")
+            cell_px = float(page.locator('[data-testid="travel-map"]').get_attribute("data-cell-px"))
+            self.assertAlmostEqual(float(radius), 1.5 * cell_px, places=2)
+            self._shoot(page, "travel-window-night-%dx%d.png" % viewport)
+            page.close()
 
 
 # ── walking (wilderness-travel-walking-ui) ──────────────────────────────
@@ -581,6 +752,7 @@ def _walk_area(cx: int, cy: int) -> dict:
         area["nodes"].append({
             "id": node, "label": "合成荒原", "x": cx + dx + 0.5, "y": cy + dy + 0.5, "visibility": "seen",
             "visited": False, "gateway": None, "action": {"kind": "move", "exit_ref": "e_wild_" + key, "destination": node},
+            "landmark": None,
         })
         area["edges"].append({"source": _node(cx, cy), "destination": node})
     return area

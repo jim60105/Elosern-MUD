@@ -62,7 +62,6 @@ import {
   stepZoom,
 } from "../../lib/travel-camera.js";
 import { travelCellAt } from "../../lib/travel-grid.js";
-import { TERRAIN_NAMES } from "../../lib/area_map_view.js";
 import { TRAVEL_GLYPH_CELL } from "../../lib/map_glyphs.js";
 import { ARROW_KEYS, directionForKeys } from "./travel-walk-model.js";
 
@@ -321,9 +320,14 @@ const party = computed(() => props.grid?.party ?? null);
 const partyInWindow = computed(() => !!party.value && !!travelCellAt(props.grid, party.value.x, party.value.y));
 const radius = computed(() => (typeof props.grid?.groundRadius === "number" ? props.grid.groundRadius : null));
 
+// The server's permitted label only (schema 3 `display.terrain_label`): the
+// stage never maps a terrain class to a name itself.
 function terrainLabel(cell) {
-  return cell.display?.terrain_label ?? TERRAIN_NAMES[cell.terrain] ?? cell.terrain;
+  return cell.display?.terrain_label ?? "";
 }
+
+// A hostile whose canonical threat is unavailable says so; no grade is guessed.
+const UNKNOWN_THREAT = "威脅不明";
 
 const neighbours = computed(() => {
   const grid = props.grid;
@@ -371,10 +375,90 @@ const hostiles = computed(() =>
       x: e.cell.x,
       y: e.cell.y,
       label: e.label,
-      count: Number.isSafeInteger(e.count) && e.count > 1 ? e.count : null,
+      count: Number.isSafeInteger(e.count) && e.count > 0 ? e.count : 1,
       threat: typeof e.threat === "string" && e.threat ? e.threat : null,
     })),
 );
+
+// One chip per pack: hostiles with the same supplied label and threat within
+// two cells of each other share one label with their summed count. Every
+// token is still drawn on its own cell; only the text is shared, so packs
+// never stack chips over each other's seals.
+const hostilePacks = computed(() => {
+  const packs = [];
+  for (const h of hostiles.value) {
+    const pack = packs.find(
+      (p) => p.label === h.label && p.threat === h.threat && p.members.some((m) => Math.max(Math.abs(m.x - h.x), Math.abs(m.y - h.y)) <= 2),
+    );
+    if (pack) pack.members.push(h);
+    else packs.push({ label: h.label, threat: h.threat, members: [h] });
+  }
+  return packs.map((p) => {
+    const count = p.members.reduce((sum, m) => sum + m.count, 0);
+    const x = p.members.reduce((sum, m) => sum + m.x, 0) / p.members.length;
+    const meanY = p.members.reduce((sum, m) => sum + m.y, 0) / p.members.length;
+    // The chip sits on the far side of the pack from the party, so a pack
+    // beside the party never hides its seal.
+    const above = !!party.value && meanY > party.value.y;
+    const ys = p.members.map((m) => m.y);
+    return {
+      key: p.members[0].id,
+      label: p.label,
+      count: count > 1 ? count : null,
+      threat: p.threat,
+      x,
+      y: above ? Math.max(...ys) : Math.min(...ys),
+      above,
+    };
+  });
+});
+
+// Static chips with a light collision pass: each chip's box is estimated
+// from its text at the chip font (16 px × UI scale), and a chip that would
+// cover an earlier chip or the party seal steps away from its anchor
+// (upward for a chip above its mark, downward otherwise).
+function textUnits(text) {
+  let units = 0;
+  for (const ch of text) units += ch.codePointAt(0) > 0x2e7f ? 1 : 0.58;
+  return units;
+}
+const placedChips = computed(() => {
+  if (!props.grid) return [];
+  const s = uiScaleNow.value;
+  const font = 16 * s;
+  const h = font * 1.35 + 4 * s + 2;
+  const boxes = [];
+  if (partyInWindow.value) {
+    const r = c.value * 0.5;
+    boxes.push([lx(party.value.x) - r, ly(party.value.y) - r, lx(party.value.x) + r, ly(party.value.y) + r]);
+  }
+  const hits = (b) => boxes.some((o) => b[0] < o[2] && o[0] < b[2] && b[1] < o[3] && o[1] < b[3]);
+  const place = (chip) => {
+    const w = textUnits(chip.text) * font * 1.04 + 20 * s;
+    for (let step = 0; step < 4; step += 1) {
+      const top = chip.above ? chip.top - step * h : chip.top + step * h;
+      const box = chip.above ? [chip.left - w / 2, top - h, chip.left + w / 2, top] : [chip.left - w / 2, top, chip.left + w / 2, top + h];
+      if (!hits(box) || step === 3) {
+        boxes.push(box);
+        return { ...chip, top };
+      }
+    }
+    return chip;
+  };
+  const out = [];
+  for (const l of landmarks.value) {
+    out.push(place({ key: `chip-${l.key}`, kind: "landmark", text: l.name, name: l.name, left: lx(l.x), top: ly(l.y) - c.value * 0.55, above: true }));
+  }
+  for (const p of hostilePacks.value) {
+    const text = `${p.label}${p.count ? ` ×${p.count}` : ""}・${p.threat ?? UNKNOWN_THREAT}`;
+    const top = p.above ? ly(p.y) - c.value * 0.52 : ly(p.y) + c.value * 0.48;
+    out.push(place({ key: `chip-${p.key}`, kind: "hostile", text, pack: p, left: lx(p.x), top, above: p.above }));
+  }
+  for (const f of fords.value) {
+    out.push(place({ key: `ford-${f.key}`, kind: "ford", text: f.label, label: f.label, left: lx(f.x), top: ly(f.y) + c.value * 0.5, above: false }));
+  }
+  return out;
+});
 
 const hoverCell = ref(null);
 const hoverInfo = computed(() => {
@@ -671,25 +755,26 @@ defineExpose({ focusInside, focus: () => root.value?.focus({ preventScroll: true
           </g>
         </svg>
         <div class="travel-map__chips" :style="layerStyle" aria-hidden="true">
-          <div
-            v-for="l in landmarks"
-            :key="`chip-${l.key}`"
-            class="tm-chip tm-chip--gold"
-            data-side="above"
-            :style="{ left: `${lx(l.x)}px`, top: `${ly(l.y) - c * 0.55}px` }"
-          >{{ l.name }}</div>
-          <div
-            v-for="h in hostiles"
-            :key="`chip-${h.id}`"
-            class="tm-chip tm-chip--seal"
-            :style="{ left: `${lx(h.x)}px`, top: `${ly(h.y) + c * 0.48}px` }"
-          >{{ h.label }}<template v-if="h.count"> ×{{ h.count }}</template><template v-if="h.threat">・<b>{{ h.threat }}</b></template></div>
-          <div
-            v-for="f in fords"
-            :key="`ford-${f.key}`"
-            class="tm-chip tm-chip--quiet"
-            :style="{ left: `${lx(f.x)}px`, top: `${ly(f.y) + c * 0.5}px` }"
-          >{{ f.label }}</div>
+          <template v-for="chip in placedChips" :key="chip.key">
+            <div
+              v-if="chip.kind === 'landmark'"
+              class="tm-chip tm-chip--gold"
+              data-side="above"
+              :style="{ left: `${chip.left}px`, top: `${chip.top}px` }"
+            >{{ chip.name }}</div>
+            <div
+              v-else-if="chip.kind === 'hostile'"
+              class="tm-chip tm-chip--seal"
+              :data-side="chip.above ? 'above' : null"
+              :style="{ left: `${chip.left}px`, top: `${chip.top}px` }"
+              data-testid="travel-map__hostile-chip"
+            >{{ chip.pack.label }}<template v-if="chip.pack.count"> ×{{ chip.pack.count }}</template>・<b v-if="chip.pack.threat">{{ chip.pack.threat }}</b><i v-else class="tm-chip__unknown">{{ UNKNOWN_THREAT }}</i></div>
+            <div
+              v-else
+              class="tm-chip tm-chip--quiet"
+              :style="{ left: `${chip.left}px`, top: `${chip.top}px` }"
+            >{{ chip.label }}</div>
+          </template>
           <div
             v-if="aimed"
             class="tm-chip tm-chip--aim"
@@ -894,6 +979,13 @@ defineExpose({ focusInside, focus: () => root.value?.focus({ preventScroll: true
 .tm-chip--seal b {
   font-weight: 600;
   color: #ffb4a6;
+}
+/* An unavailable threat reads as a quieter, dotted aside: a distinct shape,
+   not just a paler colour, so it never passes for a grade. */
+.tm-chip__unknown {
+  font-style: normal;
+  color: rgba(242, 214, 208, 0.72);
+  border-bottom: 1px dotted rgba(242, 214, 208, 0.55);
 }
 .tm-chip--quiet {
   color: var(--paper-400);

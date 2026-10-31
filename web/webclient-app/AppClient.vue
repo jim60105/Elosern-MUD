@@ -66,7 +66,7 @@ import TravelMap from "./components/travel/TravelMap.vue";
 import LegPanel from "./components/travel/LegPanel.vue";
 import { legView } from "./components/travel/leg-model.js";
 import PartyMedallions from "./components/travel/PartyMedallions.vue";
-import { medallionMembers } from "./components/travel/travel-model.js";
+import { medallionMembers, travelPlace } from "./components/travel/travel-model.js";
 import { useTravelMap } from "./composables/use-travel-map.js";
 import { useTravelInput } from "./composables/use-travel-input.js";
 import { inertWhileLeaving } from "./lib/transition_hooks.js";
@@ -170,6 +170,14 @@ watch(
 // the medallions under the vitals dock and both portrait anchors are empty.
 const travelLayout = computed(() => !!store.view.travel?.layout);
 const travelMapStatus = computed(() => store.view.travel?.mapStatus ?? "refreshing");
+// The place card while travelling (wilderness-travel-window-ui): the party
+// cell's disclosed `<district>・<terrain>` and the server's time line with
+// the supplied light phase; the ordinary labels everywhere else.
+const travelPlaceLabels = computed(() =>
+  travelLayout.value ? travelPlace(store.view.travel?.map ?? null, store.view.statusSlice.timeLabel) : null,
+);
+const placeLocationLabel = computed(() => travelPlaceLabels.value?.location ?? store.view.statusSlice.locationLabel);
+const placeTimeLabel = computed(() => travelPlaceLabels.value?.time ?? store.view.statusSlice.timeLabel);
 const { retryTravelMap } = useTravelMap(store);
 // The travel stage's movement (wilderness-travel-walking-ui): the map's
 // intents and the band's 停步 reach the store's walking queue, which waits
@@ -893,8 +901,8 @@ const rootStyle = computed(() => {
         ref="shellRef"
         :mode="store.view.mode || 'exploration'"
         :connected="store.view.connected"
-        :location-label="store.view.statusSlice.locationLabel"
-        :time-label="store.view.statusSlice.timeLabel"
+        :location-label="placeLocationLabel"
+        :time-label="placeTimeLabel"
         :narrative="store.narrative"
         :response-marks="store.responseMarks"
         :dialogue="dialogueVM"

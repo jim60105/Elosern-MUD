@@ -12,7 +12,7 @@ import { travelJourney, travelLogPanel } from "../fixtures/travel_log.js";
 import { useElosernStore } from "../../stores/elosern.js";
 import * as fx from "../../tests/store/protocol_fixtures.js";
 import { walkArea, walkCapacity, walkPanels } from "../fixtures/travel_walk.js";
-import { medallionMembers } from "../../components/travel/travel-model.js";
+import { medallionMembers, travelPlace } from "../../components/travel/travel-model.js";
 import { companionFigures } from "../../components/companion-lineup.js";
 import { portraitFor } from "../../components/party-helpers.js";
 import { artworkDescriptor, artworkEntry, artworkResource, fixtureDigest } from "../fixtures/art_panels.js";
@@ -24,11 +24,12 @@ import { STATUS_PANEL_SAMPLE } from "../fixtures/status_panels.js";
 // The wilderness travel stage (OpenSpec change wilderness-travel-interface;
 // design docs/superpowers/specs/2026-10-30-wilderness-travel-interface-design.md
 // §3/§8; approved prototype Design/WildernessTravel): the real HudFrame with
-// its travel hook, TravelMap painting a decoded travel grid (the full-fact
-// synthetic grids of stories/fixtures/travel_grid.js for the painted states,
-// the real adapter over a schema-valid area_map window for the refresh ones),
-// the vitals dock above the party medallions, and the place card alone in the
-// map column. Every body is a synthetic protocol fixture; the medallions join
+// its travel hook, TravelMap painting a decoded travel grid (exact schema-3
+// area_map bodies of stories/fixtures/travel_grid.js, validated by the real
+// wire validator and decoded by the real lib/travel-grid.js decoder; the
+// drawer's own fixture window for the refresh ones), the vitals dock above
+// the party medallions, and the place card alone in the map column, its
+// lines projected by the real `travelPlace`. Every body is a synthetic protocol fixture; the medallions join
 // each member to its own status fatigue row. The band's message region is
 // the travel log and its command region the leg panel (wilderness-travel-
 // leg-ui), projected by the real `legView` from a status v6 travel capacity
@@ -183,9 +184,14 @@ export default {
   },
 };
 
-// The real adapter's output over a schema-2 window: terrain and reveal only,
-// so it paints flat, with no relief, flags or light.
+// The drawer's own schema-3 fixture window through the real decoder.
 const ADAPTED = decodeTravelGrid(wildernessArea());
+
+// The place card's lines for one grid at one server time line.
+const placeOf = (grid, time) => {
+  const labels = travelPlace(grid, time);
+  return { place: labels.location, time: labels.time };
+};
 
 // The travel band log (wilderness-travel-log-ui): one leg's committed
 // notices under their day headings — region, woodland, ford, hostiles, a
@@ -201,8 +207,7 @@ const MORNING = {
   status: "ready",
   fatigue: FATIGUE.morning,
   vitalsVisible: false,
-  place: "灰鬃荒原東麓・曠野",
-  time: "春 3 日 ‧ 07:20・白晝",
+  ...placeOf(MORNING_GRID, "春 3 日 ‧ 07:20"),
   motionLevel: "full",
   log: JOURNEY.slice(0, 4),
 };
@@ -239,13 +244,13 @@ export const Unavailable = { args: { ...MORNING, grid: ADAPTED, aim: null, statu
 
 // Dusk: the amber wash and a narrower live sight.
 export const Dusk = {
-  args: { ...MORNING, grid: DUSK_GRID, aim: null, fatigue: FATIGUE.weary, vitalsVisible: true, time: "春 3 日 ‧ 17:40・黃昏" },
+  args: { ...MORNING, grid: DUSK_GRID, aim: null, fatigue: FATIGUE.weary, vitalsVisible: true, ...placeOf(DUSK_GRID, "春 3 日 ‧ 17:40") },
 };
 
 // Night: the deep blue wash, the moonlit disc and only the lights that carry.
 export const Night = {
   args: {
-    ...MORNING, grid: NIGHT_GRID, aim: null, fatigue: FATIGUE.weary, vitalsVisible: true, time: "春 3 日 ‧ 22:10・夜晚",
+    ...MORNING, grid: NIGHT_GRID, aim: null, fatigue: FATIGUE.weary, vitalsVisible: true, ...placeOf(NIGHT_GRID, "春 3 日 ‧ 22:10"),
     phase: "night", capacity: walkCapacity({ normal: 0, light: 7, moderate: 6, severe: 3 }),
   },
 };
@@ -281,7 +286,7 @@ export const CapacityUnavailable = {
 
 // Woodland: under the canopy, one cell of sight and no horizon.
 export const Woodland = {
-  args: { ...MORNING, grid: WOODLAND_GRID, aim: "north", place: "合成東麓・林地", time: "春 3 日 ‧ 11:05・白晝" },
+  args: { ...MORNING, grid: WOODLAND_GRID, aim: "north", ...placeOf(WOODLAND_GRID, "春 3 日 ‧ 11:05") },
 };
 
 // Motion off: every state lands at once, with no glide, crossfade or breath.

@@ -8,11 +8,11 @@
 // this game's map: which layers exist, the server's fog and current node, the
 // quest markers, the travel descriptors and the Traditional Chinese reading.
 //
-// Input is a validated `area_map` v2 body (protocol/panels/map_panels.js
+// Input is a validated `area_map` v3 body (protocol/panels/map_panels.js
 // validateAreaMapPanel). Nothing here invents a node, an edge, a coordinate
 // or a travel action: every drawn fact comes from the payload. The wilderness
-// window's run-length rows decode into ephemeral display cells
-// (`decodeWindow`); sight, eligibility, routes and the clock stay the
+// window's run-length rows decode through the shared decoder
+// (lib/wilderness-grid.js) into ephemeral display cells (`decodeWindow`); sight, eligibility, routes and the clock stay the
 // server's, so nothing here derives them.
 //
 // Units per layer
@@ -45,6 +45,7 @@ import {
   spanLimits,
 } from "@elosern/map-view";
 import { MIN_NEARBY_SPAN_M, settlementStops, wildernessStops } from "./map_stops.js";
+import { decodeWildernessGrid } from "./wilderness-grid.js";
 
 /** Minimum on-screen gap between scale-true dots (CSS px at ui-scale 1). */
 export const DOT_MIN_GAP_PX = 30;
@@ -256,16 +257,23 @@ const windowCache = new WeakMap();
 
 /**
  * The revealed cells of a wilderness window as ephemeral display cells, in
- * row order: `{ key, x, y, terrain, passable, band, tier, road, ford, state }`
- * with cell-unit `x`/`y` (the cell spans [x, x+1)). Unknown runs yield no
+ * row order: `{ key, x, y, terrain, passable, band, tier, road, ford,
+ * display, state }` with cell-unit `x`/`y` (the cell spans [x, x+1)), read
+ * through the shared decoder (lib/wilderness-grid.js). Unknown runs yield no
  * cell. `state` is "current", "visited" (the cell carries a visited node:
  * the server's actual visit record) or "remembered" (revealed without a
- * visit). Empty for other layers.
+ * visit). Empty for other layers and for a window the decoder refuses.
  */
 export function decodeWindow(area) {
   if (area?.layer !== "wilderness" || !area.window) return Object.freeze([]);
   const cached = windowCache.get(area);
   if (cached) return cached;
+  const grid = decodeWildernessGrid(area);
+  if (!grid) {
+    const none = Object.freeze([]);
+    windowCache.set(area, none);
+    return none;
+  }
   const visited = new Set();
   let current = null;
   for (const node of area.nodes) {
@@ -275,33 +283,17 @@ export function decodeWindow(area) {
     else if (node.visited) visited.add(key);
   }
   const cells = [];
-  area.rows.forEach((runs, row) => {
-    let column = 0;
-    for (const run of runs) {
-      if (run.kind === "terrain") {
-        for (let offset = 0; offset < run.length; offset += 1) {
-          const x = area.window.min_x + column + offset;
-          const y = area.window.min_y + row;
-          const key = `${x}:${y}`;
-          cells.push(
-            Object.freeze({
-              key,
-              x,
-              y,
-              terrain: run.terrain,
-              passable: run.passable,
-              band: run.band,
-              tier: run.tier,
-              road: run.road,
-              ford: run.ford,
-              state: key === current ? "current" : visited.has(key) ? "visited" : "remembered",
-            }),
-          );
-        }
-      }
-      column += run.length;
-    }
-  });
+  for (const cell of grid.cells) {
+    if (!cell) continue;
+    const key = `${cell.x}:${cell.y}`;
+    cells.push(
+      Object.freeze({
+        key,
+        ...cell,
+        state: key === current ? "current" : visited.has(key) ? "visited" : "remembered",
+      }),
+    );
+  }
   const out = Object.freeze(cells);
   windowCache.set(area, out);
   return out;

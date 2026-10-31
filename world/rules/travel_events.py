@@ -5,13 +5,20 @@ and a successful room look are the only places a travel notice may be produced.
 This module is their narrow, read-only helper:
 
 - :func:`capture_travel_facts` copies the primitive facts of one position
-  (region, woodland, ford, landmarks, lit districts, present hostiles and the
-  travelling party's fatigue rows) into an immutable :class:`TravelCapture`.
+  (region, woodland, ford, landmarks, lit districts, the live-sight hostile
+  observations, the visible distant sources and the travelling party's
+  fatigue rows) into an immutable :class:`TravelCapture`. Sightings are read
+  from the same canonical sight and population functions the area map and
+  the interrupts consume (wilderness-travel-window-ui); their internal
+  observation and source identities stay inside the capture.
   Every read failure is reported and yields ``None``, so a broken read can
   never fail the operation it observes.
 - :func:`build_travel_events` is a pure comparison of two captures. It returns
   immutable :class:`TravelEvent` drafts whose zh-TW text the server template
-  renders; the browser never infers importance from prose.
+  renders; the browser never infers importance from prose. A sighting notice
+  fires for an observation identity present after and absent before (no
+  permanent sighting memory), and dusk/nightfall for every light-phase entry
+  inside the committed charged interval.
 - :func:`record_travel_fact` allocates the stable identities once, at the
   source, and registers the delivery with ``on_publication_commit`` inside the
   owning transaction, under the operation's causal publication group. A
@@ -140,8 +147,11 @@ class TravelCapture:
 
     ``cell`` is ``None`` off the wilderness. ``landmarks`` pairs each district
     key whose exact landmark node is this cell with its display name;
-    ``hostiles`` pairs each present hostile's stable observation key with its
-    label; ``travellers`` are the source-present party's fatigue rows.
+    ``hostiles`` holds ``(observation key, label, threat)`` for each hostile in
+    live sight on revealed ground; ``distant`` holds ``(source key, bearing,
+    distance_km, name)`` for each visible distant source (``name`` only for a
+    lit district); ``travellers`` are the source-present party's fatigue rows.
+    The keys are comparison identities only and never leave the capture.
     """
 
     cell: tuple[int, int] | None
@@ -152,7 +162,8 @@ class TravelCapture:
     ford: bool = False
     landmarks: tuple[tuple[str, str], ...] = ()
     lit_districts: frozenset[str] = frozenset()
-    hostiles: tuple[tuple[str, str], ...] = ()
+    hostiles: tuple[tuple[str, str, str | None], ...] = ()
+    distant: tuple[tuple[str, str, int, str | None], ...] = ()
     travellers: tuple[TravellerRow, ...] = ()
 
 
@@ -312,17 +323,36 @@ def build_travel_events(
             )
     if cause not in ("move", "skip") or before is None:
         return tuple(drafts)
-    seen_hostiles = {key for key, _label in before.hostiles} if before.cell == after.cell else set()
-    counts: dict[str, int] = {}
-    for key, label in after.hostiles:
+    # Light-phase entries happened inside the interval, before the arrival
+    # and the sightings it ends with: they lead the batch, so ticks never
+    # decrease within it.
+    drafts[:0] = _phase_drafts(before.tick, tick)
+    seen_hostiles = {key for key, _label, _threat in before.hostiles}
+    counts: dict[tuple[str, str | None], int] = {}
+    for key, label, threat in after.hostiles:
         if key in seen_hostiles:
             continue
-        counts[label] = counts.get(label, 0) + 1
-    for label, count in counts.items():
+        counts[(label, threat)] = counts.get((label, threat), 0) + 1
+    for (label, threat), count in counts.items():
         drafts.append(
             _draft(
                 "hostile_sighted",
-                {"name": _bounded_name(label), "count": count, "threat": None},
+                {"name": _bounded_name(label), "count": count, "threat": None if threat is None else _bounded_name(threat)},
+                tick,
+            )
+        )
+    seen_sources = {key for key, *_rest in before.distant}
+    for key, bearing, distance_km, name in after.distant:
+        if key in seen_sources:
+            continue
+        drafts.append(
+            _draft(
+                "landmark_sighted",
+                {
+                    "name": None if name is None else _bounded_name(name),
+                    "bearing": _bounded_name(bearing),
+                    "distance_km": int(distance_km),
+                },
                 tick,
             )
         )
@@ -344,6 +374,40 @@ def build_travel_events(
             )
         )
     return tuple(drafts)
+
+
+_SECONDS_PER_HOUR = 3600
+_PHASE_EVENTS = {"dusk": "dusk", "night": "nightfall"}
+
+
+def _phase_drafts(start: int, end: int) -> list[_Draft]:
+    """Dusk and nightfall drafts for each phase entry inside ``(start, end]``.
+
+    The sight rulebook's phases begin on whole hours, so the comparison is
+    made at every absolute hour boundary of the committed charged interval
+    (the planner's own scan): same-phase endpoints that span a boundary still
+    report it, several entries keep their chronological order, and a
+    zero-charge interval reports nothing. Each draft carries its boundary's
+    tick. The scan is bounded by the owners' own interval caps (a step's
+    charge, ``time_skip.MAX_SKIP_SECONDS`` for a skip), so it stays a few
+    dozen hour boundaries and well inside the fact's event bound.
+    """
+    if end <= start:
+        return []
+    from world.rules import sight
+    from world.rules.clock import WorldDateTime
+
+    drafts: list[_Draft] = []
+    current = sight.light_phase(WorldDateTime.from_tick(start))
+    boundary = (start // _SECONDS_PER_HOUR + 1) * _SECONDS_PER_HOUR
+    while boundary <= end:
+        phase = sight.light_phase(WorldDateTime.from_tick(boundary))
+        kind = _PHASE_EVENTS.get(phase)
+        if kind is not None and phase != current:
+            drafts.append(_draft(kind, {}, boundary))
+        current = phase
+        boundary += _SECONDS_PER_HOUR
+    return drafts
 
 
 # -- read-only capture -------------------------------------------------------
@@ -371,17 +435,64 @@ def _traveller_rows(members: Iterable[Any]) -> tuple[TravellerRow, ...]:
     return tuple(rows)
 
 
-def _hostiles_at(location: Any, cell: tuple[int, int]) -> tuple[tuple[str, str], ...]:
-    from world.maps.wilderness_population import population_view
+def _hostiles_in_sight(
+    location: Any, cell: tuple[int, int], calendar: Any, owner: Any
+) -> tuple[tuple[str, str, str | None], ...]:
+    """The live-sight hostile observations on revealed ground around ``cell``.
 
-    wilderness = getattr(location, "wilderness", None)
-    if wilderness is None:
+    The canonical live disc and population view (shared with the
+    interrupts), restricted to the knowledge owner's revealed cells exactly as
+    the area map publishes its entities, so a notice never names a hostile
+    the map does not draw.
+    """
+    from world.maps.wilderness_population import threat_label
+    from world.rules.map_knowledge import revealed_in_bounds
+    from world.rules.travel_interrupts import live_hostile_facts, live_sight_disc
+
+    disc = live_sight_disc(cell, calendar)
+    if not disc:
         return ()
+    xs = [x for x, _y in disc]
+    ys = [y for _x, y in disc]
+    revealed = set(revealed_in_bounds(owner, (min(xs), min(ys), max(xs), max(ys)))) | {tuple(cell)}
     return tuple(
-        (fact.observation_key, fact.label)
-        for fact in population_view(wilderness, [cell])
-        if fact.hostile and fact.kind == "monster"
+        (fact.observation_key, fact.label, threat_label(fact.threat_tier, fact.danger_grade))
+        for fact in live_hostile_facts(location, [c for c in disc if c in revealed])
     )
+
+
+def _distant_in_sight(
+    cell: tuple[int, int], calendar: Any, lit: frozenset[str]
+) -> tuple[tuple[str, str, int, str | None], ...]:
+    """The visible distant sources around ``cell`` with their wire facts.
+
+    The single visibility decision behind the area map's markers and the
+    interrupts' comparison; the name follows the markers' rule (a lit
+    district's landmark name, else anonymous).
+    """
+    from world.lore.map_districts import current as districts_current
+    from world.maps.wilderness_provider import WILDERNESS_KM_PER_CELL
+    from world.rules import sight
+
+    names = {key: row.landmark_name_zh for key, row in districts_current().districts.items()}
+    out = []
+    for source, _silhouette, distance_km in sight.visible_distant_sources(
+        cell,
+        calendar,
+        sight.published_distant_sources(),
+        inputs=sight.published_ground_inputs(cell),
+        cell_size_km=WILDERNESS_KM_PER_CELL,
+    ):
+        name = names.get(source.district_key) if source.district_key in lit else None
+        out.append(
+            (
+                source.source_key,
+                sight.bearing_label(cell, source.cell),
+                sight.rounded_distance_km(distance_km),
+                name,
+            )
+        )
+    return tuple(sorted(out))
 
 
 def _landmarks_at(cell: tuple[int, int]) -> tuple[tuple[str, str], ...]:
@@ -449,6 +560,8 @@ def _capture(actor, location, knowledge_owner, members, read_world_clock):
     region = regions().get(region_key)
     fords = wilderness_provider.terrain_definition().waterway_fords
     owner = knowledge_owner if knowledge_owner is not None else actor
+    lit = frozenset(lit_district_keys(owner))
+    calendar = None if clock is None else clock.calendar
     return TravelCapture(
         cell=cell,
         tick=tick,
@@ -457,8 +570,9 @@ def _capture(actor, location, knowledge_owner, members, read_world_clock):
         woodland=wilderness_provider.sight_terrain_class(cell) == "woodland",
         ford=any(tuple(cell) in {tuple(c) for c in cells} for cells in fords.values()),
         landmarks=_landmarks_at(cell),
-        lit_districts=frozenset(lit_district_keys(owner)),
-        hostiles=_hostiles_at(location, cell),
+        lit_districts=lit,
+        hostiles=() if calendar is None else _hostiles_in_sight(location, cell, calendar, owner),
+        distant=() if calendar is None else _distant_in_sight(cell, calendar, lit),
         travellers=travellers,
     )
 

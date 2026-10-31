@@ -136,10 +136,28 @@ the same ids.
 
 | Source | Owner seam | Notices |
 |---|---|---|
-| Settled wilderness step (exit traversal or gate entry) | `movement_settlement.settle_movement` | `region_entered` (region identity changed), `woodland_entered` (woodland entered from outside it), `ford_crossed` (the reached cell is a ford), `landmark_reached` (the reached cell is a district's exact landmark; `lit_district` only when this arrival lit it; prose is the reached room's ordinary appearance, art its scene descriptor), `hostile_sighted` (current-cell hostiles not present before), `fatigue_stage` |
-| Positive explicit wait/rest and each sleep interval | `time_skip.advance_wait`, `time_skip.continue_sleep` | `hostile_sighted`, `fatigue_stage` |
+| Settled wilderness step (exit traversal or gate entry) | `movement_settlement.settle_movement` | `region_entered` (region identity changed), `woodland_entered` (woodland entered from outside it), `ford_crossed` (the reached cell is a ford), `landmark_reached` (the reached cell is a district's exact landmark; `lit_district` only when this arrival lit it; prose is the reached room's ordinary appearance, art its scene descriptor), `dusk` / `nightfall` (each phase entry inside the charged step), `hostile_sighted`, `landmark_sighted`, `fatigue_stage` |
+| Positive explicit wait/rest and each sleep interval | `time_skip.advance_wait`, `time_skip.continue_sleep` | `dusk` / `nightfall`, `hostile_sighted`, `landmark_sighted`, `fatigue_stage` |
 | Successful wilderness room look | `explore.look {room}` adapter and the bare `看` command | `look` (one-line summary; the full appearance in `prose` and in the ordinary narration) |
-| No producer in this slice | window-ui, camping | `landmark_sighted`, `dusk`, `nightfall`, `camp_result` (consumer contract only) |
+| No producer yet | camping | `camp_result` (consumer contract only) |
+
+Sightings and light (wilderness-travel-window-ui) come from the same canonical
+functions the `area_map` window and the travel interrupts read: the capture
+copies the live ground disc's hostile observations on the knowledge owner's
+revealed ground (`travel_interrupts.live_sight_disc` / `live_hostile_facts`,
+each with `wilderness_population.threat_label`) and the visible distant
+sources (`sight.visible_distant_sources`). `hostile_sighted` reports the
+observation keys present after and absent before, grouped by label and
+threat; `landmark_sighted` the new distant source keys, named only for a lit
+district. A prospective slot and the monster that materializes in it share
+one observation key, so arrival never resights it; there is no permanent
+sighting memory, so leaving and re-entering sight is a new sighting. The raw
+observation and source keys stay inside the immutable capture and never reach
+a notice, the wire or the browser. `dusk` and `nightfall` scan every whole-hour
+boundary of the committed charged interval with `sight.light_phase` (the
+rulebook's phases start on whole hours), so same-phase endpoints spanning an
+entry still report it, several entries keep their order and lead the batch at
+their own boundary ticks, and a zero-charge step or a read reports none.
 
 `web/webclient/presentation/travel_log_push.py` hands the fact to every live
 watcher coordinator (`watchers_for`, the movement audience policy), and

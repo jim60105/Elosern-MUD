@@ -176,7 +176,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "0903d6024422c26ba7b287e6f3235a6a354a537fb42c6d219542482869078666",
+  "fingerprint": "b4cfb3f85d8e910d700a51db500009c374105d0e77293069ba205a8420ebc6f3",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -1284,8 +1284,8 @@
     "world/rules/traits.py": "fb483c81ecbdfaf57f973fb984867c119bf2615451415980ef82e4de61ae7237",
     "world/rules/travel_capacity.py": "13f544331f38dd691e826325ef668edfb082bed1104b8c2c0b97599acd4e45af",
     "world/rules/travel_cost.py": "bfb2a1eb87cbd9ccb25410de6026462b9c3acfaa22adc63f42ba39171bb0a5ae",
-    "world/rules/travel_events.py": "d94bda5a1abb63797785df5a93a5a54a788ef0a28d4612b99eaf83369014a8c9",
-    "world/rules/travel_interrupts.py": "7f85db1c6ab8d3d8a5264428e98900f4ec6fd2eee4198c13aed74c20efdabcce",
+    "world/rules/travel_events.py": "b3044bfac2109e3739a1eb80d8a55f39060ba75602b456f910abc35e71b4407f",
+    "world/rules/travel_interrupts.py": "af9c2b2122278c7055a518ce1dda11b4f4e0999135f75a75a088a17b00badc75",
     "world/rules/travel_plan.py": "10ce62a44c4bbc7c6add81e14c9fe3f023610214b12078441dc4e0fb94f23737",
     "world/rules/unlock_notices.py": "c3402f1db1a73348f5667761e9fe7722c11a692b2a1371593528b70ac9e452f1",
     "world/rules/upkeep.py": "2e400d2dfa0434bc0e49a5a509dba51a82ebaa2e972b6d842639dd12fbf3128d",

@@ -92,16 +92,72 @@ class BuildTravelEventsTests(unittest.TestCase):
         self.assertEqual(_kinds(repeat), ["landmark_reached"])
         self.assertIsNone(repeat[0].params["lit_district"])
 
-    def test_new_hostiles_group_by_label_and_count(self):
-        after = _capture(cell=(11, 10), hostiles=(("k1", "灰狼"), ("k2", "灰狼"), ("k3", "野豬")))
-        drafts = build_travel_events(_capture(hostiles=(("k1", "灰狼"),)), after, "move")
+    def test_new_hostiles_group_by_label_threat_and_count(self):
+        after = _capture(
+            cell=(11, 10),
+            hostiles=(("k1", "灰狼", "甲"), ("k2", "灰狼", "甲"), ("k5", "灰狼", "甲"), ("k3", "野豬", None)),
+        )
+        drafts = build_travel_events(_capture(hostiles=(("k1", "灰狼", "甲"),)), after, "move")
         self.assertEqual(
             [dict(d.params) for d in drafts],
-            [{"name": "灰狼", "count": 2, "threat": None}, {"name": "野豬", "count": 1, "threat": None}],
+            [{"name": "灰狼", "count": 2, "threat": "甲"}, {"name": "野豬", "count": 1, "threat": None}],
         )
         # The same cell after a skip: only the newly present one is reported.
-        same = build_travel_events(_capture(hostiles=(("k1", "灰狼"),)), _capture(hostiles=(("k1", "灰狼"), ("k4", "野豬"))), "skip")
+        same = build_travel_events(
+            _capture(hostiles=(("k1", "灰狼", None),)), _capture(hostiles=(("k1", "灰狼", None), ("k4", "野豬", None))), "skip"
+        )
         self.assertEqual([dict(d.params)["count"] for d in same], [1])
+
+    @covers_requirement("webclient-travel-window::travel-observations-follow-canonical-sight-and-phase-facts")
+    def test_sightings_compare_observation_identities_across_moves(self):
+        """An observation still in sight after a step is never resighted,
+        whatever cell the party stands on, and leaving and re-entering sight
+        is a new sighting (no permanent sighting memory)."""
+        wolf = ("ambient:t:1", "灰狼", "甲")
+        first = _capture(cell=(10, 10), hostiles=(wolf,))
+        second = _capture(cell=(11, 10), hostiles=(wolf,))
+        self.assertEqual(build_travel_events(first, second, "move"), ())
+        gone = _capture(cell=(12, 10))
+        self.assertEqual(build_travel_events(second, gone, "move"), ())
+        back = _capture(cell=(11, 10), hostiles=(wolf,))
+        self.assertEqual(_kinds(build_travel_events(gone, back, "move")), ["hostile_sighted"])
+
+    @covers_requirement("webclient-travel-window::travel-observations-follow-canonical-sight-and-phase-facts")
+    def test_a_prospective_slot_that_materializes_is_not_resighted(self):
+        """A prospective ambient slot and the monster that materializes in it
+        share the slot's observation key: the arrival brings no extra notice,
+        even when the materialized label or threat reads differently."""
+        prospective = _capture(hostiles=(("ambient:t:7", "灰狼", "甲"),))
+        materialized = _capture(cell=(11, 10), hostiles=(("ambient:t:7", "灰狼王", "乙"),))
+        self.assertEqual(build_travel_events(prospective, materialized, "move"), ())
+
+    def test_an_unchanged_read_emits_nothing(self):
+        view = _capture(
+            hostiles=(("k1", "灰狼", "甲"),),
+            distant=(("settlement:t", "北", 15, None),),
+        )
+        self.assertEqual(build_travel_events(view, view, "skip"), ())
+        self.assertEqual(build_travel_events(view, view, "move"), ())
+
+    @covers_requirement("webclient-travel-window::travel-observations-follow-canonical-sight-and-phase-facts")
+    def test_new_distant_sources_are_sighted_once_with_their_permitted_name(self):
+        before = _capture(distant=(("settlement:a", "北", 15, None),))
+        after = _capture(
+            cell=(11, 10),
+            distant=(("settlement:a", "北北東", 15, None), ("landmark:b", "西", 20, "合成塔"), ("landmark:c", "東", 25, None)),
+        )
+        drafts = build_travel_events(before, after, "move")
+        self.assertEqual(
+            [dict(d.params) for d in drafts],
+            [
+                {"name": "合成塔", "bearing": "西", "distance_km": 20},
+                {"name": None, "bearing": "東", "distance_km": 25},
+            ],
+        )
+        # The internal source keys never reach a notice.
+        for draft in drafts:
+            self.assertNotIn("landmark:", repr(dict(draft.params)) + draft.text)
+        self.assertIn("地標", drafts[1].text)
 
     def test_fatigue_stage_change_per_member(self):
         before = _capture(travellers=(TravellerRow("7", "伊蓮", "normal", "精神充沛"), TravellerRow("8", "莉亞", "light", "微倦")))
@@ -116,7 +172,9 @@ class BuildTravelEventsTests(unittest.TestCase):
         "webclient-travel-log::travel-notices-are-committed-structured-events"
     )
     def test_unreadable_before_never_invents_a_change(self):
-        drafts = build_travel_events(None, _capture(region_key="r_b", woodland=True, hostiles=(("k", "狼"),)), "move")
+        drafts = build_travel_events(
+            None, _capture(region_key="r_b", woodland=True, hostiles=(("k", "狼", None),), tick=3600 * 20), "move"
+        )
         self.assertEqual(drafts, ())
 
     def test_look_summary_is_one_line(self):
@@ -134,6 +192,81 @@ class BuildTravelEventsTests(unittest.TestCase):
     def test_long_prose_stays_within_the_wire_string_bound(self):
         drafts = build_travel_events(None, _capture(), "look", look_prose="字" * 5000)
         self.assertEqual(len(drafts[0].params["prose"]), travel_events.MAX_PROSE_CODE_POINTS)
+
+
+HOUR = 3600
+
+
+class PhaseIntervalTests(unittest.TestCase):
+    """Dusk and nightfall from the rulebook's phases over the committed
+    charged interval; expected entries come from the sight policy itself."""
+
+    def _entries(self, start_hour, end_hour, tick_offset=0):
+        before = _capture(tick=int(start_hour * HOUR) + tick_offset)
+        after = _capture(tick=int(end_hour * HOUR) + tick_offset)
+        return [
+            (draft.kind, draft.tick) for draft in build_travel_events(before, after, "skip") if draft.kind in ("dusk", "nightfall")
+        ]
+
+    def _start(self, name):
+        from world.rules import sight
+
+        return next(start for phase, start, _column in sight.POLICY.phases if phase == name)
+
+    @covers_requirement("webclient-travel-window::travel-observations-follow-canonical-sight-and-phase-facts")
+    def test_crossing_an_entry_inside_the_interval_reports_it(self):
+        dusk, night = self._start("dusk"), self._start("night")
+        # Endpoints on either side of the dusk entry.
+        self.assertEqual(self._entries(dusk - 0.5, dusk + 0.5), [("dusk", dusk * HOUR)])
+        # Both endpoints in the same (day) phase a whole cycle apart still
+        # cross dusk and nightfall, in order.
+        self.assertEqual(
+            self._entries(dusk - 1, dusk - 1 + 24),
+            [("dusk", dusk * HOUR), ("nightfall", night * HOUR)],
+        )
+
+    def test_several_entries_keep_chronological_order_and_lead_the_batch(self):
+        dusk, night = self._start("dusk"), self._start("night")
+        before = _capture(tick=(dusk - 1) * HOUR)
+        after = _capture(tick=(dusk - 1 + 48) * HOUR, hostiles=(("k9", "灰狼", None),))
+        drafts = build_travel_events(before, after, "skip")
+        self.assertEqual(
+            [(d.kind, d.tick) for d in drafts],
+            [
+                ("dusk", dusk * HOUR),
+                ("nightfall", night * HOUR),
+                ("dusk", (dusk + 24) * HOUR),
+                ("nightfall", (night + 24) * HOUR),
+                ("hostile_sighted", after.tick),
+            ],
+        )
+        ticks = [d.tick for d in drafts]
+        self.assertEqual(ticks, sorted(ticks))
+
+    @covers_requirement("webclient-travel-window::travel-observations-follow-canonical-sight-and-phase-facts")
+    def test_no_entry_inside_the_interval_reports_nothing(self):
+        dusk, night = self._start("dusk"), self._start("night")
+        # Starting at dusk and stopping before night enters nothing new.
+        self.assertEqual(self._entries(dusk, night - 0.5), [])
+        # A zero-charge step reports nothing even exactly on a boundary.
+        self.assertEqual(self._entries(dusk, dusk), [])
+        before = _capture(tick=dusk * HOUR - 1)
+        self.assertEqual(build_travel_events(before, before, "move"), ())
+
+    @covers_requirement("webclient-travel-window::travel-observations-follow-canonical-sight-and-phase-facts")
+    def test_a_move_reports_its_crossing_before_its_arrival(self):
+        dusk = self._start("dusk")
+        before = _capture(tick=dusk * HOUR - 600)
+        after = _capture(tick=dusk * HOUR + 600, region_key="r_b", region_name="乙谷")
+        self.assertEqual(_kinds(build_travel_events(before, after, "move")), ["dusk", "region_entered"])
+
+    def test_phase_starts_are_whole_hours(self):
+        """The hour-boundary scan is exact only because every phase starts on
+        a whole hour; the policy's integer start hours are that guarantee."""
+        from world.rules import sight
+
+        for _phase, start, _column in sight.POLICY.phases:
+            self.assertIsInstance(start, int)
 
 
 class RecordTravelFactTests(TestCase):
@@ -176,6 +309,21 @@ class RecordTravelFactTests(TestCase):
                 record_travel_fact(self.actor, self._drafts())
                 transaction.set_rollback(True)
         self.assertEqual(self.delivered, [])
+
+    def test_a_rolled_back_skip_delivers_no_phase_notice(self):
+        from world.rules import sight
+
+        dusk = next(start for phase, start, _column in sight.POLICY.phases if phase == "dusk")
+        drafts = build_travel_events(_capture(tick=(dusk - 1) * HOUR), _capture(tick=(dusk + 1) * HOUR), "skip")
+        self.assertEqual(_kinds(drafts), ["dusk"])
+        with self.captureOnCommitCallbacks(execute=True):
+            with transaction.atomic():
+                record_travel_fact(self.actor, drafts)
+                transaction.set_rollback(True)
+        self.assertEqual(self.delivered, [])
+        with self.captureOnCommitCallbacks(execute=True):
+            fact = record_travel_fact(self.actor, drafts)
+        self.assertEqual(self.delivered, [fact])
 
     def test_overflow_keeps_the_earlier_events(self):
         draft = build_travel_events(None, _capture(), "look", look_prose="字" * 2000)[0]
@@ -284,6 +432,30 @@ class ProducerHookTests(TestCase):
                     ObjectDB.objects.count()
         self.assertIsInstance(warn.call_args.kwargs["exc"], DatabaseError)
         self.assertEqual(self.delivered, [])
+
+    def test_capture_reads_live_sight_on_revealed_ground_only(self):
+        """The capture asks the canonical disc for hostiles, keeps only the
+        knowledge owner's revealed cells and states each canonical threat."""
+        from world.maps.wilderness_population import PopulationFact
+
+        location = SimpleNamespace(wilderness=object())
+        seen = []
+        disc = [(10, 10), (11, 10), (12, 10)]
+
+        def view(_location, cells):
+            seen.extend(cells)
+            return tuple(
+                PopulationFact(f"ambient:{x}", (x, y), "monster", True, "灰狼", threat_tier=None) for x, y in cells
+            )
+
+        owner = object()
+        with mock.patch("world.rules.travel_interrupts.live_sight_disc", return_value=disc), \
+                mock.patch("world.rules.travel_interrupts.live_hostile_facts", side_effect=view), \
+                mock.patch("world.rules.map_knowledge.revealed_in_bounds", return_value=frozenset({(11, 10)})) as revealed:
+            hostiles = travel_events._hostiles_in_sight(location, (10, 10), object(), owner)
+        self.assertEqual(sorted(seen), [(10, 10), (11, 10)])
+        self.assertEqual(revealed.call_args.args, (owner, (10, 10, 12, 10)))
+        self.assertEqual(hostiles, (("ambient:10", "灰狼", None), ("ambient:11", "灰狼", None)))
 
     def test_capture_failure_is_reported_not_raised(self):
         actor = SimpleNamespace(pk=5, location=object())

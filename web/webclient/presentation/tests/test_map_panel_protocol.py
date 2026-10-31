@@ -117,6 +117,7 @@ class MapSchemaParityTests(unittest.TestCase):
         # reads them as integers, so the server normalizes and accepts too.
         for spelling in ("3.0", "-0.0", "1e2", "1E1"):
             accept.append((f"integral spelling {spelling}", "area_map", text(grid).replace('"x":10,', f'"x":{spelling},', 1)))
+        accept.append(("wild lit landmark", "area_map", variant(wild, lambda v: v["nodes"][0].update(landmark={"name": "合成石標"}))))
         reject = [
             ("grid extra node field", "area_map", variant(grid, lambda v: v["nodes"][1].update(secret=1))),
             ("grid km frame", "area_map", variant(grid, lambda v: v["frame"].update(unit="km"))),
@@ -141,6 +142,20 @@ class MapSchemaParityTests(unittest.TestCase):
                 v["nodes"].append({"id": "grid:t_map:3:3", "label": "門", "x": 121.5, "y": 121.5,
                                    "visibility": "seen", "visited": False, "gateway": {"leads_to": "鎮"}, "action": None}),
             ))),
+            # Schema 3 display annotations (wilderness-travel-window-ui).
+            ("wild schema 2", "area_map", variant(wild, lambda v: v.update(schema_version=2))),
+            ("unknown run display", "area_map", variant(wild, lambda v: v["rows"][0][0].update(display=None))),
+            ("run without display", "area_map", variant(wild, lambda v: next(r for r in v["rows"][20] if r["kind"] == "terrain").pop("display"))),
+            ("display private key", "area_map", variant(wild, lambda v: next(r for r in v["rows"][20] if r["kind"] == "terrain")["display"].update(source_key="s"))),
+            ("district key without name", "area_map", variant(wild, lambda v: next(r for r in v["rows"][20] if r["kind"] == "terrain")["display"].update(district_name=None))),
+            ("district name without key", "area_map", variant(wild, lambda v: next(r for r in v["rows"][20] if r["kind"] == "terrain")["display"].update(district_key=None))),
+            ("settlement off a settlement run", "area_map", variant(wild, lambda v: next(r for r in v["rows"][20] if r["kind"] == "terrain" and r["terrain"] == "open_ground")["display"].update(settlement=True))),
+            ("ford label off a ford", "area_map", variant(wild, lambda v: next(r for r in v["rows"][20] if r["kind"] == "terrain" and not r["ford"])["display"].update(ford_label="淺灘"))),
+            ("wild node without landmark", "area_map", variant(wild, lambda v: v["nodes"][0].pop("landmark"))),
+            ("blank landmark", "area_map", variant(wild, lambda v: v["nodes"][0].update(landmark={"name": " "}))),
+            ("entity count 0", "area_map", variant(wild, lambda v: v["entities"][0].update(count=0))),
+            ("entity threat too long", "area_map", variant(wild, lambda v: v["entities"][0].update(threat="危" * 129))),
+            ("entity without threat", "area_map", variant(wild, lambda v: v["entities"][0].pop("threat"))),
             ("entity beyond sight", "area_map", variant(wild, lambda v: v["entities"][0]["cell"].update(x=125))),
             ("semantic entity id", "area_map", variant(wild, lambda v: v["entities"][0].update(id="object:9"))),
             ("sighting cell", "area_map", variant(wild, lambda v: v["sightings"][0].update(cell=[1, 2]))),
@@ -159,7 +174,7 @@ class MapSchemaParityTests(unittest.TestCase):
         # Guard: each spelling really reached the wire text.
         self.assertIn('"x":650.0,', accept[4][2])
         self.assertIn('"band":3.0,', accept[5][2])
-        for (_, _, payload_text), spelling in zip(accept[6:], ("3.0", "-0.0", "1e2", "1E1"), strict=True):
+        for (_, _, payload_text), spelling in zip(accept[6:10], ("3.0", "-0.0", "1e2", "1E1"), strict=True):
             self.assertIn(f'"x":{spelling},', payload_text)
         cases = [(name, panel, body, True) for name, panel, body in accept] + [
             (name, panel, body, False) for name, panel, body in reject

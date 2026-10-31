@@ -6,7 +6,7 @@ Define the exact on-demand area/world panel wire models and bounded atomic deliv
 ## Requirements
 
 ### Requirement: Map panels use exact layer and precision discriminators
-Map panels SHALL use exact versioned layer schemas; wilderness area schema2 carries bounded RLE terrain, current sight and approximate sightings, while metric/coordinate-free graph layers and world-map precision retain their existing contracts.
+Map panels SHALL retain exact versioned layer schemas and existing precision/disclosure rules; wilderness area schema3 SHALL extend schema2 terrain, nodes and entities with bounded display annotations while unknown runs remain minimal.
 
 #### Scenario: Coordinate frames are not interchangeable
 - **WHEN** a player crosses from settlement to wilderness or enters another interior
@@ -15,6 +15,10 @@ Map panels SHALL use exact versioned layer schemas; wilderness area schema2 carr
 #### Scenario: Malformed or secretly enriched records are rejected
 - **WHEN** a node, unlit district or approximate marker has extra fields or wrong discriminator types
 - **THEN** both validators reject it rather than preserving unknown metadata
+
+#### Scenario: Display additions cannot enrich unknowns
+- **WHEN** schema3 includes district/terrain/ford labels, settlement flags, landmark names and hostile count/threat
+- **THEN** fields validate only in their exact disclosed record variants, old wilderness schemas reject, unknown records gain no metadata and existing logical byte limits remain
 
 ### Requirement: Map delivery replaces only complete epoch-safe logical panels
 On-demand maps SHALL remain separate from eager snapshots, survive same-epoch eager refreshes unchanged and clear on epoch retirement. Large map parts SHALL have finite byte/count limits and replace map state only after complete validated assembly.

@@ -240,7 +240,7 @@ autocreating `origin_room` descriptor during a read-only request.
 | --- | --- | --- |
 | `grid` | The settlement's declared sparse graph (the live XYMap for a builder map), never rooms spawned on demand. Roads count in both directions. `x`/`y` are the node's integer metres. | The authored street name, also for seen nodes (the minimap also names them). A registered gate room carries `{leads_to: <wilderness region>}`. Wilderness gate exits are not grid nodes. |
 | `instance`, `interior` | The connected rooms of the current family (`InstanceRoom`, or a plain `Room`), walked through exits in both directions. `map_id` is `instance:<lowest dbref>` or `room:<lowest dbref>`, which does not depend on where the player stands or what they know. The walk stops at 4,096 rooms. | A seen room is `未探索` and never shows its name or its exits. An exit from a visited room into another family is one gateway node, `room:<dbref>` with `{leads_to: <room name>}`, and is never traversed further. |
-| `wilderness` | Schema 2 (wilderness-area-map-reveal): the 41 × 41 window centred on the player (`window.min_x/min_y` = current − 20, negative near the frame edge). Terrain is published as run-length rows only for revealed cells (permanent reveal, an actual visit, or the current cell); everything else, including out-of-frame positions, is an exact unknown run. Nodes are sparse: the current cell, every actually visited cell (`visited: true`), and revealed cells that carry a legal step or disclosed location metadata. `x`/`y` are cell-centre kilometres. | The region name, or the settlement name for a disclosed gate's approach cell (gateway `null`, as on the minimap). A revealed neighbour step that resolves to a disclosed grid gate room replaces that cell with the room, carrying `{leads_to: <settlement>}`; a hidden entry needs its gate room's visit. `district_name` comes from the frozen district partition. |
+| `wilderness` | Schema 2 (wilderness-area-map-reveal; display annotations in schema 3, wilderness-travel-window-ui): the 41 × 41 window centred on the player (`window.min_x/min_y` = current − 20, negative near the frame edge). Terrain is published as run-length rows only for revealed cells (permanent reveal, an actual visit, or the current cell); everything else, including out-of-frame positions, is an exact unknown run. Nodes are sparse: the current cell, every actually visited cell (`visited: true`), and revealed cells that carry a legal step or disclosed location metadata. `x`/`y` are cell-centre kilometres. | The region name, or the settlement name for a disclosed gate's approach cell (gateway `null`, as on the minimap). A revealed neighbour step that resolves to a disclosed grid gate room replaces that cell with the room, carrying `{leads_to: <settlement>}`; a hidden entry needs its gate room's visit. `district_name` comes from the frozen district partition. |
 
 Quest markers come from `map_quest_destinations`, with tracking flags taken
 from the same quest-log read. A marker carries the node identity when the
@@ -299,7 +299,7 @@ node, entity or sighting caps, or a schema-valid body above the logical byte
 ceiling, becomes the `map_unavailable` panel. The publisher logs
 `area_map_over_bound` and never truncates the graph.
 
-## Logical wire forms (`area_map` schema version 2, `world_map` schema version 1)
+## Logical wire forms (`area_map` schema version 3, `world_map` schema version 1)
 
 Every object below is exact: unknown keys, wrong types, booleans in number
 fields and non-finite numbers are rejected. Integer fields accept any JSON
@@ -325,7 +325,7 @@ duplicated. `gateway` is `null` or `{leads_to}`. `action` is `null` or
 | --- | --- | --- |
 | `grid` | the z-map key; `{key: map_id, unit: "m"}` | `{id, label, x, y, visibility, gateway, action}`, integer metres; every node is `grid:<map_id>:…` |
 | `instance`, `interior` | the stable instance identity or the enclosing interior root identity; `{key: map_id, unit: "none"}` | `{id, label, visibility, gateway, action}`, no coordinates; every node is `room:…` |
-| `wilderness` | `"elosern"`; `{key: "elosern", unit: "km"}` | `{id, label, x, y, visibility, visited, gateway, action}`, cell-centre kilometres; at most 1,681 nodes (41 × 41); a `wild:` node's position is its own cell and lies on a revealed cell inside the window; a non-`wild:` node must be a gateway on a revealed cell one step from the current cell; the current node must be visited |
+| `wilderness` | `"elosern"`; `{key: "elosern", unit: "km"}` | `{id, label, x, y, visibility, visited, gateway, action, landmark}`, cell-centre kilometres; at most 1,681 nodes (41 × 41); `landmark` is `null` or exactly `{name}` and only a `wild:` node may carry one; a `wild:` node's position is its own cell and lies on a revealed cell inside the window; a non-`wild:` node must be a gateway on a revealed cell one step from the current cell; the current node must be visited |
 
 `visibility` is `current`, `visited` or `seen`. A wilderness payload adds
 `district_name`, `cell_km` (positive, at most 1000) and:
@@ -336,19 +336,37 @@ duplicated. `gateway` is `null` or `{leads_to}`. `action` is `null` or
   east whose positive integer lengths sum to 41, and two adjacent runs with
   equal facts are always merged. An unknown run is exactly
   `{length, kind: "unknown"}`. A revealed run is exactly
-  `{length, kind: "terrain", terrain, passable, band, tier, road, ford}`:
+  `{length, kind: "terrain", terrain, passable, band, tier, road, ford, display}`:
   `terrain` is one of `open_ground`, `hills`, `mountain`, `woodland` (the
   sight rulebook rows), `water`, `ridge`, `sea`, `settlement`; `band` is
   0..15, `tier` 0..3, and the three flags are booleans. Blocked, water and
   footprint terrain stays present with `passable: false`; a hidden anchor's
   footprint keeps its underlying terrain class. `road` is always `false`
   (no wilderness road exists in the published geography or pricing).
+  `display` (schema 3, wilderness-travel-window-ui) is exactly
+  `{terrain_label, district_key, district_name, settlement, ford_label}` and
+  takes part in run merging: `terrain_label` is the server's label for the
+  class (`area_map.WILDERNESS_TERRAIN_LABELS`; the browser never maps a
+  class itself); `district_key` (printable ASCII, at most 128) and
+  `district_name` are both `null` or both set, and are set only for the
+  current cell's district or a lit district; `settlement` may be `true` only
+  on a `settlement` run (a disclosed, non-hidden footprint); `ford_label` may
+  be set only on a ford run and is the generic `淺灘` (no waterway declares a
+  name).
 - `light_phase` (`day`, `dusk`, `night`, `dawn`) and `ground_radius` (0..8).
-- `entities`: at most 4,096 exact `{id, cell: {x, y}, kind, hostile, label}`
+- `entities`: at most 4,096 exact `{id, cell: {x, y}, kind, hostile, label, count, threat}`
   with a 16-hex-digit keyed, non-semantic `id`, `kind` `hostile`, `npc` or
   `character`, standing on a revealed cell inside the current ground disc
   (`dx² + dy² ≤ (r + 0.5)²`). Only the current disc is published; remembered
-  ground carries no entity.
+  ground carries no entity. `count` is a positive safe integer (the
+  presenter publishes each observation as one entity with `count: 1` and never
+  groups them); `threat` is `null` or at most 128 code points, the monster
+  tier's registered name plus its guild danger grade
+  (`wilderness_population.threat_label`): a prospective ambient slot reads its
+  expected variant, a materialized monster its resolved tier and grade.
+- Wilderness nodes: every node carries `landmark`; a lit district's landmark
+  names its own `wild:` node (`{name: landmark_name_zh}`), every other node
+  carries `null`.
 - `sightings`: at most 256 exact `{bearing, distance_km, silhouette_zh,
   name}`: one of the sixteen Traditional Chinese compass words, a distance
   rounded to a multiple of 5 km, the silhouette, and the landmark name only
@@ -611,9 +629,11 @@ the measurements here.
 - Shipped settlement membership and road counts follow their authored modules.
   Payload size depends on that data and the player's explored set; it is not
   a fixed settlement contract.
-- The wilderness window (schema 2) is 41 × 41 cells. Its edge list is at
+- The wilderness window (schema 3) is 41 × 41 cells. Its edge list is at
   most the eight neighbour steps. Its RLE rows hold at most 1,681 runs, and
-  a dense window with every cell visited stays well under the byte ceiling;
+  a dense window with every cell visited stays well under the byte ceiling
+  (fully revealed schema-3 windows at spread positions measure about 30–41 KB;
+  `test_area_map.WildernessAreaTests.test_dense_real_windows_stay_inside_the_byte_ceiling`);
   larger bodies travel as bounded parts like any map.
 - Wilderness benchmark (wilderness-area-map-reveal): a synthetic record of
   20,000 wilderness visits (a dense block around the window plus a frame-wide

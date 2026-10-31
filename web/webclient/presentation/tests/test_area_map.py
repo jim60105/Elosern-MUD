@@ -712,7 +712,7 @@ class WildernessAreaTests(EvenniaTest):
         self._at_wild(start)
         self._pin({start: 3, (start[0] - 1, start[1]): 0})
         payload = _render(self.char1)
-        self.assertEqual(payload["schema_version"], 2)
+        self.assertEqual(payload["schema_version"], 3)
         self.assertEqual(payload["layer"], "wilderness")
         self.assertEqual(payload["frame"]["unit"], "km")
         half = WILDERNESS_WINDOW // 2
@@ -868,7 +868,7 @@ class WildernessAreaTests(EvenniaTest):
         for runs in payload["rows"]:
             for run in runs:
                 expected = {"length", "kind"} if run["kind"] == "unknown" else {
-                    "length", "kind", "terrain", "passable", "band", "tier", "road", "ford"
+                    "length", "kind", "terrain", "passable", "band", "tier", "road", "ford", "display"
                 }
                 self.assertEqual(set(run), expected)
         # Entities are only read and published inside live sight on revealed
@@ -939,7 +939,10 @@ class WildernessAreaTests(EvenniaTest):
         start = self._away()
         self._at_wild(start)
         self._pin({start: 8})
-        fact = SimpleNamespace(observation_key="population:t", cell=start, kind="monster", hostile=True, label="狼")
+        fact = SimpleNamespace(
+            observation_key="population:t", cell=start, kind="monster", hostile=True, label="狼",
+            threat_tier=None, danger_grade=None,
+        )
         facts = [SimpleNamespace(**{**vars(fact), "observation_key": f"population:t:{i}"}) for i in range(4097)]
         with mock.patch("world.maps.wilderness_population.population_view", return_value=facts), \
                 mock.patch.object(area_map_module, "log_warn") as warn:
@@ -953,6 +956,127 @@ class WildernessAreaTests(EvenniaTest):
             with self.assertRaises(PanelUnavailableError):
                 _render(self.char1)
         self.assertEqual(warn.call_args[1]["context"]["sightings"], 257)
+
+    # -- schema 3 display annotations (wilderness-travel-window-ui) ----------
+
+    def test_every_wire_terrain_class_has_a_server_label(self):
+        from web.webclient.presentation.map_panels import AREA_TERRAIN_CLASSES
+
+        self.assertEqual(set(area_map_module.WILDERNESS_TERRAIN_LABELS), set(AREA_TERRAIN_CLASSES))
+        self.assertTrue(all(label.strip() for label in area_map_module.WILDERNESS_TERRAIN_LABELS.values()))
+
+    @covers_requirement("webclient-travel-window::travel-consumes-the-shared-current-wilderness-window")
+    def test_display_annotations_ride_only_revealed_runs_and_disclosed_districts(self):
+        start = self._away()
+        self._at_wild(start)
+        self._pin({start: 6})
+        district_at = _live("world.maps.district_partition", "district_at")
+        here = district_at(start)
+        with mock.patch.object(area_map_module, "_lit_landmarks", return_value={}):
+            payload = _render(self.char1)
+        cells = _decode_rows(payload)
+        labels = area_map_module.WILDERNESS_TERRAIN_LABELS
+        seen_keys = set()
+        for runs in payload["rows"]:
+            for run in runs:
+                if run["kind"] == "unknown":
+                    self.assertEqual(set(run), {"length", "kind"})
+                    continue
+                display = run["display"]
+                self.assertEqual(display["terrain_label"], labels[run["terrain"]])
+                self.assertEqual(display["settlement"], run["terrain"] == "settlement")
+                self.assertEqual(display["ford_label"] is not None, run["ford"])
+                self.assertEqual(display["district_key"] is None, display["district_name"] is None)
+                seen_keys.add(display["district_key"])
+        # With nothing lit only the current cell's own district is disclosed.
+        self.assertLessEqual(seen_keys - {None}, {here})
+        for cell, facts in cells.items():
+            if facts is not None and district_at(cell) != here:
+                self.assertIsNone(facts["display"]["district_key"], cell)
+        self.assertEqual(cells[start]["display"]["district_key"], here)
+        # Lighting another district (by its exact landmark) discloses it too.
+        others = {district_at(cell) for cell, facts in cells.items() if facts is not None} - {here, None}
+        if others:
+            other = sorted(others)[0]
+            with mock.patch.object(area_map_module, "_lit_landmarks", return_value={other: "grid:t_none:0:0"}):
+                lit_cells = _decode_rows(_render(self.char1))
+            disclosed = {facts["display"]["district_key"] for facts in lit_cells.values() if facts is not None}
+            self.assertIn(other, disclosed)
+        self.assertTrue(_js_accepts(payload))
+
+    @covers_requirement("webclient-travel-window::travel-consumes-the-shared-current-wilderness-window")
+    def test_only_a_lit_landmark_names_its_own_wild_node(self):
+        start = self._away()
+        self._at_wild(start)
+        self._pin({start: 2})
+        current = _t_wild_id(*start)
+        rows = dict(area_map_module._district_rows())
+        rows["t_lit"] = SimpleNamespace(district_name_zh="合成區", landmark_name_zh="合成石標")
+        with mock.patch.object(area_map_module, "_district_rows", return_value=rows), \
+                mock.patch.object(area_map_module, "_lit_landmarks", return_value={"t_lit": current}):
+            payload = _render(self.char1)
+        nodes = _by_id(payload)
+        self.assertEqual(nodes[current]["landmark"], {"name": "合成石標"})
+        self.assertTrue(all(node["landmark"] is None for node in payload["nodes"] if node["id"] != current))
+        with mock.patch.object(area_map_module, "_lit_landmarks", return_value={}):
+            plain = _render(self.char1)
+        self.assertTrue(all(node["landmark"] is None for node in plain["nodes"]))
+        self.assertTrue(_js_accepts(payload))
+
+    def test_entities_carry_one_count_and_their_canonical_threat(self):
+        from world.maps.wilderness_population import PopulationFact, threat_label
+
+        start = self._away()
+        self._at_wild(start)
+        self._pin({start: 4})
+        tier = sorted(_live("world.lore.monsters", "MONSTER_TIER_REGISTRY"))[0]
+        facts = (
+            PopulationFact("population:a", start, "monster", True, "合成狼", threat_tier=tier, danger_grade="D"),
+            PopulationFact("population:b", start, "monster", True, "合成狼", threat_tier=None),
+            PopulationFact("object:9", start, "npc", False, "合成旅人", threat_tier=tier),
+        )
+        with mock.patch("world.maps.wilderness_population.population_view", return_value=facts):
+            payload = _render(self.char1)
+        self.assertEqual(
+            [(e["label"], e["count"], e["threat"]) for e in payload["entities"]],
+            [("合成狼", 1, threat_label(tier, "D")), ("合成狼", 1, None), ("合成旅人", 1, None)],
+        )
+        self.assertIsNotNone(threat_label(tier, "D"))
+        self.assertNotEqual(threat_label(tier, "D"), threat_label(tier, None))
+        self.assertIsNone(threat_label("t_unknown_tier", "D"))
+        self.assertTrue(_js_accepts(payload))
+
+    def test_a_slot_and_its_materialized_monster_state_one_threat(self):
+        from world.maps import wilderness_population as population
+        from world.rules.monster_individual import construct_species_individual
+
+        variants = _live("world.lore.monster_species", "MONSTER_VARIANT_REGISTRY")
+        key, variant = next((key, row) for key, row in sorted(variants.items()) if row.danger_grade is not None)
+        slot = population.ExpectedSlot(
+            slot=0, observation_key="t", name_zh="t", tier=variant.threat_tier,
+            species_key=variant.species_key, variant_key=key,
+        )
+        monster = construct_species_individual(variant.species_key, key)
+        self.assertEqual(population._slot_threat(slot), population._monster_threat(monster))
+
+    def test_dense_real_windows_stay_inside_the_byte_ceiling(self):
+        """Measured, not pinned: fully revealed windows at spread positions
+        publish (or degrade to unavailable) within the unchanged cap."""
+        start = self._away()
+        sizes = []
+        for dx, dy in ((0, 0), (40, 0), (0, 40), (-40, -20)):
+            cell = (start[0] + dx, start[1] + dy)
+            try:
+                self._at_wild(cell)
+            except AssertionError:
+                continue
+            self._pin({cell: 8, (cell[0] + 12, cell[1]): 8, (cell[0] - 12, cell[1]): 8,
+                       (cell[0], cell[1] + 12): 8, (cell[0], cell[1] - 12): 8})
+            payload = _render(self.char1)
+            sizes.append(json_byte_size(payload))
+        print(f"area_map schema-3 dense window bytes: {sizes}")
+        self.assertTrue(sizes)
+        self.assertLessEqual(max(sizes), AREA_MAX_BYTES)
 
     @covers_requirement(
         "webclient-area-map::map-view-requests-publish-the-requested-area-without-changing-gameplay"
@@ -1085,7 +1209,7 @@ class MapViewDispatchTests(EvenniaTestCase):
         self.registry = PresentationRegistry("test")
         self.registry.register(_status_spec())
         self.registry.register(
-            PresenterSpec("area_map", 2, ("map_unavailable", "區域地圖目前無法顯示"), spy, on_demand=True)
+            PresenterSpec("area_map", 3, ("map_unavailable", "區域地圖目前無法顯示"), spy, on_demand=True)
         )
         self.session = _Session(self.char)
         self.coordinator = PresentationCoordinator(
@@ -1302,7 +1426,7 @@ def _largest_grid_body(labels: int = 16) -> dict:
         for i in range(AREA_MAX_QUEST_MARKERS)
     ]
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "available": True,
         "layer": "grid",
         "map_id": map_key,
