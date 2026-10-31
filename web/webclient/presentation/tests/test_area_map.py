@@ -1045,13 +1045,11 @@ class WildernessAreaTests(EvenniaTest):
         self.assertTrue(_js_accepts(payload))
 
     def test_a_slot_and_its_materialized_monster_state_one_threat(self):
-        from world.lore.monster_species import MONSTER_VARIANT_REGISTRY
         from world.maps import wilderness_population as population
         from world.rules.monster_individual import construct_species_individual
 
-        key, variant = next(
-            (key, row) for key, row in sorted(MONSTER_VARIANT_REGISTRY.items()) if row.danger_grade is not None
-        )
+        variants = _live("world.lore.monster_species", "MONSTER_VARIANT_REGISTRY")
+        key, variant = next((key, row) for key, row in sorted(variants.items()) if row.danger_grade is not None)
         slot = population.ExpectedSlot(
             slot=0, observation_key="t", name_zh="t", tier=variant.threat_tier,
             species_key=variant.species_key, variant_key=key,
