@@ -536,6 +536,10 @@ export function applyView(ctx) {
     // caller (a local-only UI change) reads the current committed record.
     let rs = current || ctx.reducer.getCommittedState();
     ctx.handleTransportLifecycle(prev, rs);
+    // The travel log adopts this publication's notices first, so a result
+    // carried by the same publication lands after them (wilderness-travel-
+    // log-ui).
+    ctx.syncTravelLog(rs);
     // A matching result may record the one recovery episode (a revision this
     // client never adopted) and publish it synchronously; the committed state
     // is therefore re-read so this projection can never overwrite the nested

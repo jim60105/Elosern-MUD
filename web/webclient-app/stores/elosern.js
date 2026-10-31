@@ -49,6 +49,7 @@ import { applyBeats } from "./elosern/beats.js";
 import { applyView } from "./elosern/view.js";
 import { applySkillUse } from "./elosern/skill_use.js";
 import { applyTravel } from "./elosern/travel.js";
+import { applyTravelLog } from "./elosern/travel_log.js";
 
 export { resolveLocationLabel };
 
@@ -172,6 +173,7 @@ export const useElosernStore = defineStore("elosern", () => {
   // The wilderness travel presentation (wilderness-travel-interface): the
   // committed selection, the active stage's map state and the recovery
   // signal the transport seam raises.
+  applyTravelLog(ctx);
   applyTravel(ctx);
   applyView(ctx);
 
