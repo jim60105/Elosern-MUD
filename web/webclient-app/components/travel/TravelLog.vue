@@ -68,15 +68,16 @@ ProseLines.props = ["prose"];
 
 const scroller = ref(null);
 const SLACK = 4;
-let atBottom = true;
-function onScroll() {
+// The watcher runs before the DOM update, so "was at the bottom" is measured
+// on the list as the reader last saw it (a resize included).
+function atBottom() {
   const el = scroller.value;
-  if (el) atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= SLACK;
+  return !el || el.scrollHeight - el.scrollTop - el.clientHeight <= SLACK;
 }
 watch(
   () => newestId.value,
   async () => {
-    const follow = atBottom;
+    const follow = atBottom();
     await nextTick();
     const el = scroller.value;
     if (el && follow) el.scrollTop = el.scrollHeight;
@@ -101,7 +102,6 @@ watch(
       aria-relevant="additions"
       aria-labelledby="travel-log-title"
       tabindex="0"
-      @scroll.passive="onScroll"
     >
       <p v-if="!entries.length" class="travel-log__empty" data-testid="travel-log__empty">
         旅途中的見聞會記在這裡。
