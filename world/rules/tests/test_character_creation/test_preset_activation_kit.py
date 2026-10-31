@@ -419,7 +419,10 @@ class PresetActivationCommittedReloadTests(TransactionTestCase):
         control.race = _race_key()
         control.apply_race_baseline()
         control_before = {
-            "skills": control.db.skills,
+            # A detached snapshot: the live attribute value could be mutated
+            # in place by a later write, which would silently rewrite the
+            # "before" side of the comparison.
+            "skills": deepcopy(control.db.skills),
             "proficiency": dict(control.db.skill_proficiency or {}),
             "traits": {axis: control.traits[axis].base for axis in ALLOCATABLE_AXES},
         }
@@ -447,11 +450,18 @@ class PresetActivationCommittedReloadTests(TransactionTestCase):
         self.assertTrue(can_use_skill(fresh, mastery))
         self.assertTrue(freeform_ladder_for(fresh, bloom))
 
-        self.assertEqual(control.db.skills, control_before["skills"])
+        # The control character is re-read from storage too, so "untouched"
+        # is observed on committed state rather than on the writer's own
+        # handler caches.
+        fresh_control = self._reread(control)
+        self.assertEqual(fresh_control.db.skills, control_before["skills"])
         self.assertEqual(
-            dict(control.db.skill_proficiency or {}), control_before["proficiency"]
+            dict(fresh_control.db.skill_proficiency or {}),
+            control_before["proficiency"],
         )
         for axis in ALLOCATABLE_AXES:
             self.assertEqual(
-                control.traits[axis].base, control_before["traits"][axis], msg=axis
+                fresh_control.traits[axis].base,
+                control_before["traits"][axis],
+                msg=axis,
             )
