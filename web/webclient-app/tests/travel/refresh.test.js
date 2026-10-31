@@ -288,22 +288,22 @@ describe("correlation edges", () => {
 });
 
 describe("movement waits for the current map", () => {
-  it("suspends the compass while refreshing and stops it on a failed read", async () => {
+  // The compass is not mounted in travel (wilderness-travel-walking-ui); the
+  // store's walking queue reads the same status (tests/travel/walking.test.js).
+  it("a refreshing or failed map refuses a step in the travel layout", async () => {
     const h = liveTravel({ wrappers });
     await tick();
-    const compass = () => h.w.findComponent({ name: "ExitCompass" });
-    const props = () => (compass().exists() ? compass().props() : null);
-    expect(compass().exists()).toBe(true);
-    expect(props().busy).toBe(true);
+    expect(h.w.findComponent({ name: "ExitCompass" }).exists()).toBe(false);
+    expect(h.store.stepTravel("east")).toMatchObject({ sent: false, reason: "waiting" });
     await h.answerMap(wildernessArea());
     await tick();
-    expect(props().busy).toBe(false);
-    expect(props().active).toBe(true);
     h.publish({ local_map: LOCAL_MAP_WILDERNESS_RETURN_SAMPLE });
     await tick();
-    expect(props().busy).toBe(true);
+    expect(travel(h.store).mapStatus).toBe("refreshing");
+    expect(h.store.stepTravel("east")).toMatchObject({ sent: false, reason: "waiting" });
     await h.answerMap(unavailableArea());
     await tick();
-    expect(props().active).toBe(false);
+    expect(h.store.stepTravel("east")).toMatchObject({ sent: false, reason: "waiting" });
+    expect(h.sender.sent.actions.filter((a) => a.action_id === "explore.move")).toHaveLength(0);
   });
 });

@@ -1,9 +1,14 @@
 import { h, onBeforeUnmount, onMounted } from "vue";
+import { createPinia, disposePinia } from "pinia";
 import HudFrame from "../../components/HudFrame.vue";
 import PlaceCard from "../../components/PlaceCard.vue";
 import StatusPanel from "../../components/StatusPanel.vue";
 import TravelMap from "../../components/travel/TravelMap.vue";
 import PartyMedallions from "../../components/travel/PartyMedallions.vue";
+import TravelWalkControls from "../../components/travel/TravelWalkControls.vue";
+import { useElosernStore } from "../../stores/elosern.js";
+import * as fx from "../../tests/store/protocol_fixtures.js";
+import { walkArea, walkPanels } from "../fixtures/travel_walk.js";
 import { medallionMembers } from "../../components/travel/travel-model.js";
 import { companionFigures } from "../../components/companion-lineup.js";
 import { portraitFor } from "../../components/party-helpers.js";
@@ -213,3 +218,104 @@ export const Woodland = {
 
 // Motion off: every state lands at once, with no glide, crossfade or breath.
 export const MotionOff = { name: "Motion Off", args: { ...MORNING, motionLevel: "off" } };
+
+// ── walking (wilderness-travel-walking-ui) ──────────────────────────────
+
+// The aimed and held states come from the real composed store, never from a
+// second movement model: each story establishes a synthetic wilderness cell
+// through the store's own `receive`, adopts that cell's window through
+// `setTravelMap` exactly as the refresh owner does, then calls the store's
+// walking actions. A recording sender keeps every step on the page. The
+// painted map is the full-fact morning grid; the band's movement column is
+// the temporary TravelWalkControls reading `view.travel`.
+function walkingStage(args) {
+  return {
+    setup() {
+      const pinia = createPinia();
+      const store = useElosernStore(pinia);
+      const sender = fx.createFakeSender();
+      store.setSender(sender);
+      store.beginTransport(1);
+      store.setConnected(true);
+      const { x, y } = MORNING_GRID.party;
+      const panels = walkPanels(x, y, args.walk?.panels ?? {});
+      store.receive(store.view.generation, "ui_snapshot", [fx.snapshot({ panels })], {});
+      store.setTravelMap({ status: "ready", area: walkArea(x, y) });
+      onMounted(() => {
+        if (args.walk?.aim) store.aimTravel(args.walk.aim);
+        // The store's own 400 ms hold timer sends the first step.
+        if (args.walk?.hold) store.holdTravel(args.walk.hold);
+        if (args.walk?.step) {
+          const sent = store.stepTravel(args.walk.step);
+          if (sent.sent && args.walk.refuse) {
+            const v = store.view;
+            store.receive(v.generation, "ui_action_result", [fx.actionResult({
+              request_id: sent.requestId, presentation_revision: v.revision, outcome: "rejected",
+              code: "blocked", message: args.walk.refuse,
+            })], {});
+          }
+        }
+      });
+      onBeforeUnmount(() => {
+        store.stopTravel("story");
+        disposePinia(pinia);
+      });
+      const render = () => {
+        const travel = store.view.travel;
+        return h(
+          "div",
+          { style: "position:relative;height:calc(100vh - var(--header-h));" },
+          h(HudFrame, { mode: "exploration", travel: true }, {
+            backdrop: () =>
+              h(TravelMap, { grid: args.grid, status: args.status, aim: travel.aim, aimBlocked: !!travel.aimTarget && !travel.aimTarget.enabled, aimReason: travel.aimTarget?.reason ?? null, walking: travel.walking, motionLevel: args.motionLevel }),
+            vitals: () => [
+              h(StatusPanel, {
+                status: { ...STATUS_PANEL_SAMPLE, fatigue: args.fatigue },
+                visible: args.vitalsVisible,
+                motionLevel: args.motionLevel,
+                showFatigue: false,
+              }),
+              h(PartyMedallions, { members: members(args.fatigue) }),
+            ],
+            map: () => h(PlaceCard, { locationLabel: args.place, timeLabel: args.time, motionLevel: args.motionLevel }),
+            "band-message": () => quiet("訊息視窗（旅行紀錄由後續變更取代）"),
+            "band-command": () =>
+              h(
+                "div",
+                { style: "box-sizing:border-box;height:100%;display:flex;padding:calc(12px * var(--ui-scale));" },
+                h("div", { style: "display:flex;width:calc(250px * var(--ui-scale));" }, h(TravelWalkControls, {
+                  travel,
+                  motionLevel: args.motionLevel,
+                  onStop: () => store.stopTravel("stop"),
+                })),
+              ),
+          }),
+        );
+      };
+      return withMotion(args.motionLevel, render).setup();
+    },
+  };
+}
+
+// Aimed: the eastern neighbour aimed by the store; the intent line names it
+// and offers the step.
+export const Aimed = { args: { ...MORNING, aim: null, walk: { aim: "east" } }, render: walkingStage };
+
+// A blocked aim: the northern row is committed disabled with its reason, which
+// the intent line states instead of offering a step.
+export const AimBlocked = {
+  name: "Aim Blocked",
+  args: { ...MORNING, aim: null, walk: { aim: "north", panels: { disabled: { north: "斷崖擋住了去路。" } } } },
+  render: walkingStage,
+};
+
+// Held walk: the store's 400 ms hold fired and its first step waits for the
+// commit; neighbours and hover are hidden and 停步 is live.
+export const HeldWalk = { name: "Held Walk", args: { ...MORNING, aim: null, walk: { hold: "east" } }, render: walkingStage };
+
+// A refused step: the server's message stands in the intent line.
+export const StepRefused = {
+  name: "Step Refused",
+  args: { ...MORNING, aim: null, walk: { step: "east", refuse: "前方的河水太深，無法涉過。" } },
+  render: walkingStage,
+};

@@ -1,11 +1,13 @@
 """Wilderness travel stage acceptance (wilderness-travel-interface, task 4.1;
-wilderness-travel-map-ui, task 3.1).
+wilderness-travel-map-ui, task 3.1; wilderness-travel-walking-ui, task 3.1).
 
 The journeys run in the live client against injected committed state: the
 room's panels arrive through the store's own ``receive`` seam, and a
 responder on the live sender holds every ``map.view`` the travel stage sends
 so the test answers it with its action result and a synthetic schema-2
-wilderness ``area_map`` in either order. Nothing here names shipped content.
+wilderness ``area_map`` in either order. The walking journeys hold every
+``explore.move`` the same way and answer it with its result and the next
+cell's panels. Nothing here names shipped content.
 """
 
 from __future__ import annotations
@@ -513,3 +515,194 @@ class TravelMapTests(_TravelStage):
         with open(os.path.join(SHOTS, "travel-repaint-budget.txt"), "w", encoding="utf-8") as handle:
             handle.write("\n".join(lines) + "\n")
         print("\n".join(lines))
+
+
+# ── walking (wilderness-travel-walking-ui) ──────────────────────────────
+
+_STEPS = (
+    ("north", "n", 0, 1), ("northeast", "ne", 1, 1), ("east", "e", 1, 0), ("southeast", "se", 1, -1),
+    ("south", "s", 0, -1), ("southwest", "sw", -1, -1), ("west", "w", -1, 0), ("northwest", "nw", -1, 1),
+)
+
+
+def _node(x: int, y: int) -> str:
+    return "wild:elosern:%d:%d" % (x, y)
+
+
+def _walk_panels(cx: int, cy: int) -> dict:
+    """The eager panels of synthetic cell ``(cx, cy)``: the local map names it
+    as the canonical current node and the exploration panel carries one
+    direction row per step."""
+    current = _node(cx, cy)
+    neighbours = [
+        {
+            "id": _node(cx + dx, cy + dy), "label": "合成荒原", "x": cx + dx, "y": cy + dy,
+            "visibility": "visible_unvisited", "current": False, "anchor": False, "landmark": False,
+            "gateway": None, "action": {"kind": "move", "exit_ref": "e_wild_" + key, "destination": _node(cx + dx, cy + dy)},
+        }
+        for _, key, dx, dy in _STEPS
+    ]
+    return {
+        "status": valid_status_panel("合成主角", "42"),
+        "art": _art("wilderness:合成荒原:%d,%d" % (cx, cy)),
+        "local_map": {
+            "schema_version": 1, "available": True, "layer": "wilderness", "current_node": current,
+            "title": "合成荒原",
+            "nodes": [
+                {
+                    "id": current, "label": "合成荒原", "x": cx, "y": cy, "visibility": "current",
+                    "current": True, "anchor": False, "landmark": False, "gateway": None, "action": None,
+                },
+                *neighbours,
+            ],
+            "edges": [], "legend": ["每格約一公里"],
+        },
+        "exploration": {
+            "schema_version": 6, "available": True, "kind": "exploration",
+            "move": [
+                {
+                    "exit_ref": "e_wild_" + key, "label": word, "destination": _node(cx + dx, cy + dy),
+                    "enabled": True, "disabled_reason": None,
+                }
+                for word, key, dx, dy in _STEPS
+            ],
+            "look": {"room": {"identity": 900, "display_name": "合成荒原", "room": True}, "entities": [], "objects": []},
+            "interact": [],
+            "character": {"available": True}, "quests": {"available": True}, "inventory": {"available": True},
+        },
+    }
+
+
+def _walk_area(cx: int, cy: int) -> dict:
+    """``_area`` with the eight neighbours as move nodes."""
+    area = _area(cx, cy)
+    for _, key, dx, dy in _STEPS:
+        node = _node(cx + dx, cy + dy)
+        area["nodes"].append({
+            "id": node, "label": "合成荒原", "x": cx + dx + 0.5, "y": cy + dy + 0.5, "visibility": "seen",
+            "visited": False, "gateway": None, "action": {"kind": "move", "exit_ref": "e_wild_" + key, "destination": node},
+        })
+        area["edges"].append({"source": _node(cx, cy), "destination": node})
+    return area
+
+
+# Holds every explore.move as well (recorded, never forwarded).
+_HOLD_MOVES = """() => {
+  const store = window.__elosernBridge.store;
+  if (window.__travelMoves) return;
+  const sender = store.getSender();
+  const original = sender.sendAction.bind(sender);
+  window.__travelMoves = [];
+  sender.sendAction = (env) => {
+    if (env && env.action_id === 'explore.move') {
+      window.__travelMoves.push(env);
+      return undefined;
+    }
+    return original(env);
+  };
+}"""
+
+# Commits held move `index`: its successful result, then the next cell's
+# panels at the revision the result declared (the publication may follow
+# its result; the queue accepts both orders).
+_COMMIT_MOVE = """([index, panels]) => {
+  const store = window.__elosernBridge.store;
+  const env = window.__travelMoves[index];
+  const v = store.view;
+  const revision = v.revision + 1;
+  const body = store.receive(v.generation, 'ui_update', [{
+    protocol_version: 1, presentation_epoch: v.epoch, base_revision: revision - 1, revision,
+    mode: v.mode, panels, removed_panels: [], layout_version: v.layoutVersion, server_time: v.serverTime,
+  }], {});
+  const result = store.receive(v.generation, 'ui_action_result', [{
+    protocol_version: 1, presentation_epoch: v.epoch, request_id: env.request_id,
+    outcome: 'success', code: 'moved', message: '你向前走去。', presentation_revision: revision,
+  }], {});
+  return [!!body.accepted, !!result.accepted];
+}"""
+
+
+def _moves(page) -> list:
+    return page.evaluate("() => window.__travelMoves.map((e) => e.payload)")
+
+
+def _map_focused(page) -> bool:
+    return page.evaluate("() => document.activeElement && document.activeElement.matches('[data-testid=\"travel-map\"]')")
+
+
+class TravelWalkingTests(_TravelStage):
+    """Keyboard-only neighbour stepping and the commit-paced held walk
+    (wilderness-travel-walking-ui)."""
+
+    def _walk_stage(self, motion_level: str = "off"):
+        page = self.logged_in_page((1451, 790), motion_level)
+        page.evaluate(_HOLD_MOVES)
+        self._enter(page, _walk_panels(CX, CY))
+        self._wait_views(page, 1)
+        self._answer(page, 0, area=_walk_area(CX, CY))
+        self._wait_ready(page)
+        return page
+
+    @covers_requirement("webclient-travel-walking::travel-aim-maps-to-guarded-neighbour-movement")
+    def test_keyboard_only_step(self):
+        """Entering travel focuses the map; a tapped arrow only aims and the
+        aim persists; Enter sends exactly one existing move payload."""
+        page = self._walk_stage()
+        page.wait_for_function("() => document.activeElement && document.activeElement.matches('[data-testid=\"travel-map\"]')", timeout=15000)
+        self.assertEqual(page.locator('[data-testid="exit-compass"]').count(), 0)
+        page.keyboard.press("ArrowRight")
+        page.wait_for_timeout(600)
+        self.assertEqual(_moves(page), [])
+        self.assertEqual(_travel(page)["aim"], "east")
+        self.assertEqual(page.locator('[data-testid="travel-map__neighbour"][data-state="aimed"]').count(), 1)
+        page.keyboard.press("Enter")
+        page.wait_for_function("() => window.__travelMoves.length >= 1", timeout=15000)
+        page.keyboard.press("Enter")
+        page.wait_for_timeout(300)
+        self.assertEqual(_moves(page), [{"exit_ref": "e_wild_e", "current_node": _node(CX, CY)}])
+
+        # The step commits: the stage asks for the new cell's map and the aim stays.
+        self.assertEqual(page.evaluate(_COMMIT_MOVE, [0, _walk_panels(CX + 1, CY)]), [True, True])
+        self._wait_views(page, 2)
+        self._answer(page, 1, area=_walk_area(CX + 1, CY))
+        page.wait_for_function(
+            "(n) => window.__elosernBridge.store.view.travel.map && window.__elosernBridge.store.view.travel.map.currentNode === n",
+            arg=_node(CX + 1, CY), timeout=15000,
+        )
+        self._wait_ready(page)
+        self.assertEqual(_travel(page)["aim"], "east")
+        self.assertIsNone(_travel(page)["walking"])
+        self.assertEqual(len(_moves(page)), 1)
+        self.assertTrue(_map_focused(page))
+        self._shoot(page, "travel-walk-aim-1451x790.png")
+        page.close()
+
+    @covers_requirement("webclient-travel-walking::held-walking-waits-for-committed-steps-and-dwell")
+    def test_held_walk_release(self):
+        """A 400 ms hold sends one step and nothing more until it commits;
+        releasing during the post-step wait sends no next step and leaves
+        focus on the map."""
+        page = self._walk_stage("full")
+        page.locator('[data-testid="travel-map"]').focus()
+        page.keyboard.down("ArrowRight")
+        page.wait_for_timeout(250)
+        self.assertEqual(_moves(page), [])
+        page.wait_for_function("() => window.__travelMoves.length >= 1", timeout=15000)
+        page.wait_for_timeout(500)
+        self.assertEqual(len(_moves(page)), 1)
+        self.assertEqual(_travel(page)["walking"]["direction"], "east")
+        self.assertEqual(page.locator('[data-testid="travel-walk-stop"]').get_attribute("aria-disabled"), None)
+
+        self.assertEqual(page.evaluate(_COMMIT_MOVE, [0, _walk_panels(CX + 1, CY)]), [True, True])
+        page.wait_for_function("() => (window.__elosernBridge.store.view.travel.walking || {}).progress === 1", timeout=15000)
+        self._shoot(page, "travel-walk-held-1451x790.png")
+        # Release while the walk dwells and waits for the new cell's map.
+        page.keyboard.up("ArrowRight")
+        page.wait_for_function("() => window.__elosernBridge.store.view.travel.walking === null", timeout=15000)
+        self._wait_views(page, 2)
+        self._answer(page, 1, area=_walk_area(CX + 1, CY))
+        self._wait_ready(page)
+        page.wait_for_timeout(1000)
+        self.assertEqual(len(_moves(page)), 1)
+        self.assertTrue(_map_focused(page))
+        page.close()

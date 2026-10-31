@@ -94,3 +94,7 @@ export function liveTravel({ subject = WILD_SUBJECT, panels = null, mounted = tr
   };
   return { store, sender, w, accept, publish, result, answerMap, mapViews, next };
 }
+
+// The walking slice's synthetic wilderness cells (wilderness-travel-walking-ui)
+// live with the stories that render them.
+export { WALK_STEPS, walkArea, walkNode, walkPanels } from "../../stories/fixtures/travel_walk.js";
