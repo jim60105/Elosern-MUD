@@ -1,7 +1,7 @@
 """explore.move traversal/charging and explore.look adapter tests."""
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 from world.rules.clock import CLOCK_YAML, WorldClock, get_world_clock
-from evennia.utils.test_resources import EvenniaTestCase
+from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 from world.rules.map_knowledge import (
     KnowledgeError,
     encode_grid,
@@ -124,6 +124,25 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
     def _move(self, payload):
         return _move_adapter(self.player, payload)
 
+    def _settled(self, payload):
+        """Run one move and execute the commit callbacks its success waits for.
+
+        A wilderness step releases its result only when the movement-owning
+        transaction commits. The test harness queues that callback until the
+        capture block exits, exactly as production commits inside
+        ``settle_movement`` before the adapter returns.
+        """
+        from twisted.internet.defer import Deferred
+
+        with self.captureOnCommitCallbacks(execute=True):
+            result = self._move(payload)
+        if isinstance(result, Deferred):
+            self.assertTrue(
+                result.called, "the committed step must release its result"
+            )
+            return result.result
+        return result
+
 
 
     # ------------------------------------------------------------------
@@ -162,11 +181,16 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
             side_effect=lambda: tuple(coordinates),
         ), patch.object(self.exit_obj, "at_traverse", traverse):
             source = _current_node(self.player)
-            result = self._move(
+            result = self._settled(
                 {"exit_ref": str(int(self.exit_obj.id)), "current_node": source}
             )
             self.assertEqual(result["outcome"], "success")
             self.assertEqual(result["code"], "moved")
+            # The canonical-coordinate success is a wilderness step, so the
+            # result carries its interrupt slot; this patched traversal never
+            # runs the settlement, so there is nothing to compare and the
+            # legal empty list rides along.
+            self.assertEqual(result["data"], {"interrupts": []})
             self.assertNotEqual(_current_node(self.player), source)
             self.assertIs(self.player.location, room)
 
@@ -337,6 +361,142 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIsNone(_current_node(self.player))
 
 
+    @covers_requirement("webclient-exploration-menu::explore-move-traverses-a-re-resolved-exit-through-the-shared-movement-path")
+    def test_move_payload_admits_only_the_exact_optional_walk_union(self):
+        base = {"exit_ref": "42", "current_node": "wild:elosern:5:5"}
+        self.assertEqual(validate_move_payload(base), base)
+        self.assertEqual(
+            validate_move_payload(
+                {**base, "walk": {"pace": "cautious", "stop_at_night": True}}
+            ),
+            {**base, "walk": {"pace": "cautious", "stop_at_night": True}},
+        )
+        rejected = (
+            # extra / missing keys at either level
+            {**base, "direction": "n"},
+            {**base, "walk": {"pace": "cautious"}},
+            {**base, "walk": {"pace": "cautious", "stop_at_night": True, "x": 1}},
+            {**base, "walk": None},
+            {**base, "walk": ["cautious", True]},
+            # an unknown pace and non-boolean switches
+            {**base, "walk": {"pace": "sprint", "stop_at_night": True}},
+            {**base, "walk": {"pace": "forced", "stop_at_night": 1}},
+            {**base, "walk": {"pace": "forced", "stop_at_night": "yes"}},
+            # the walk pace must be a string, never a boolean
+            {**base, "walk": {"pace": True, "stop_at_night": True}},
+            # a class instance is not the exact object form
+            {**base, "walk": type("Walk", (), {"pace": "forced", "stop_at_night": True})()},
+        )
+        for payload in rejected:
+            with self.subTest(payload=payload):
+                with self.assertRaises(ExplorationActionError):
+                    validate_move_payload(payload)
+
+
+    @covers_requirement("webclient-exploration-menu::explore-move-traverses-a-re-resolved-exit-through-the-shared-movement-path")
+    def test_an_unchanged_canonical_node_rejects_whatever_the_room_identity(self):
+        # A traversal that swapped the pooled room object while keeping the
+        # canonical cell is not a step: the result must be move_failed.
+        source_room = create_object(TerrainRoom, key="荒野甲")
+        target_room = create_object(TerrainRoom, key="荒野乙")
+        self.player.location = source_room
+        self.exit_obj.location = source_room
+        self.exit_obj.destination = target_room
+
+        def traverse(actor, destination):
+            actor.location = destination
+
+        with patch.object(
+            TerrainRoom,
+            "coordinates",
+            new_callable=PropertyMock,
+            return_value=(4, 9),
+        ), patch.object(self.exit_obj, "at_traverse", traverse):
+            result = self._move(
+                {
+                    "exit_ref": str(int(self.exit_obj.id)),
+                    "current_node": encode_wild(WILDERNESS_NAME, 4, 9),
+                }
+            )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "move_failed")
+        self.assertNotIn("data", result)
+
+
+    def test_a_refused_step_carries_no_interrupt_data(self):
+        before = get_world_clock().tick
+        result = self._move(
+            {"exit_ref": str(int(self.exit_obj.id)), "current_node": "room:9999"}
+        )
+        self.assertEqual(result["code"], "stale_location")
+        self.assertNotIn("data", result)
+        self.assertEqual(get_world_clock().tick, before)
+
+
+    def test_a_movement_owned_failure_restores_knowledge_and_carries_no_interrupts(self):
+        import world.rules.map_knowledge as map_knowledge
+
+        real_record = map_knowledge.record_arrival
+
+        def failing_record(character):
+            # Fail after the arrival write, still inside the movement-owned
+            # transaction, so the settlement's own compensation must restore
+            # the durable and cached observation state.
+            real_record(character)
+            raise RuntimeError("synthetic post-knowledge failure")
+
+        before = get_world_clock().tick
+        with patch.object(map_knowledge, "record_arrival", failing_record):
+            result = self._move(
+                {
+                    "exit_ref": str(int(self.exit_obj.id)),
+                    "current_node": f"room:{int(self.room1.pk)}",
+                }
+            )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "move_failed")
+        self.assertNotIn("data", result)
+        self.assertIs(self.player.location, self.room1)
+        self.assertEqual(get_world_clock().tick, before)
+        with self.assertRaises(KnowledgeError):
+            parse_knowledge(self.player)
+
+
+    def test_a_caller_rollback_discards_the_commit_qualified_result(self):
+        from django.db import transaction
+        from twisted.internet.defer import Deferred
+
+        room = create_object(TerrainRoom, key="測試荒野房間")
+        self.player.location = room
+        self.exit_obj.location = room
+        self.exit_obj.destination = room
+        coordinates = [1, 1]
+
+        def traverse(actor, destination):
+            coordinates[1] += 1
+
+        with patch.object(
+            TerrainRoom,
+            "coordinates",
+            new_callable=PropertyMock,
+            side_effect=lambda: tuple(coordinates),
+        ), patch.object(self.exit_obj, "at_traverse", traverse):
+            source = _current_node(self.player)
+            with transaction.atomic():
+                result = self._move(
+                    {
+                        "exit_ref": str(int(self.exit_obj.id)),
+                        "current_node": source,
+                    }
+                )
+                self.assertIsInstance(result, Deferred)
+                transaction.set_rollback(True)
+        self.assertFalse(
+            result.called,
+            "a rolled-back caller transaction must never publish the step",
+        )
+
+
     def test_actor_without_a_location_rejects_every_present_identity(self):
         self.player.location = None
         self.assertIsNone(_present_by_id(self.player, 1))
@@ -464,6 +624,307 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
             {"outcome", "code", "message", "affected_panels"},
             "the look result must publish no panel payload",
         )
+
+
+class WildernessMoveInterruptTests(BattlefieldIsolation, EvenniaTest):
+    """A real wilderness world: committed steps carry committed interrupts.
+
+    The fixture enters the wilderness through the production east gate and
+    pins a revealed window around the landing cell, so the paired planner
+    prediction and the committed adapter step describe the same cell.
+    """
+
+    def setUp(self):
+        super().setUp()
+        from typeclasses.exits import WildernessGateExit
+        from typeclasses.rooms import GridRoom, Room
+        from world.maps.bootstrap import sync_grid, sync_wilderness
+        from world.tests.geography_fixture import publish_shipped_map_world
+
+        publish_shipped_map_world()
+        self.room1.key = "Room1"
+        self.room1.save()
+        create_object(Room, key="虛境", location=None)
+        sync_grid()
+        sync_wilderness()
+        self.east_gate = GridRoom.objects.filter_xyz(xyz=_east_gate_xyz()).first()
+        self.gate = next(
+            exit_obj
+            for exit_obj in self.east_gate.exits
+            if isinstance(exit_obj, WildernessGateExit)
+        )
+        self.char1.race = "human"
+        self.char1.apply_race_baseline()
+        self.char1.location = self.east_gate
+        self.pinned: set[tuple[int, int]] = set()
+
+    # -- fixture helpers -------------------------------------------------
+    def _move(self, payload):
+        from twisted.internet.defer import Deferred
+
+        with self.captureOnCommitCallbacks(execute=True):
+            result = _move_adapter(self.char1, payload)
+        if isinstance(result, Deferred):
+            self.assertTrue(
+                result.called, "the committed step must release its result"
+            )
+            return result.result
+        return result
+
+    def pin_knowledge(self, visits):
+        from world.maps.wilderness_provider import WILDERNESS_NAME
+        from world.rules.map_knowledge import CHUNK_CELLS, KNOWLEDGE_ATTR, SCHEMA_VERSION
+
+        chunks: dict[str, dict[str, dict[str, int]]] = {}
+        for (x, y), sight in visits.items():
+            chunk = chunks.setdefault(f"{x // CHUNK_CELLS}:{y // CHUNK_CELLS}", {})
+            chunk[str((y % CHUNK_CELLS) * CHUNK_CELLS + (x % CHUNK_CELLS))] = {
+                "first_seen_tick": 1,
+                "last_seen_tick": 1,
+                "sight": sight,
+            }
+        self.char1.attributes.add(
+            KNOWLEDGE_ATTR,
+            {
+                "schema_version": SCHEMA_VERSION,
+                "visited": {},
+                "wilderness": {WILDERNESS_NAME: chunks},
+            },
+        )
+        self.pinned.update(tuple(cell) for cell in visits)
+
+    def _enter(self):
+        """Enter the wilderness through the real gate and pin its window."""
+        result = self._move(
+            {
+                "exit_ref": str(int(self.gate.id)),
+                "current_node": _current_node(self.char1),
+            }
+        )
+        self.assertEqual(result["outcome"], "success")
+        self.origin = tuple(self.char1.location.coordinates)
+        self.pin_knowledge(
+            {
+                (self.origin[0] + dx, self.origin[1] + dy): 8
+                for dx in range(-2, 3)
+                for dy in range(-2, 3)
+            }
+        )
+        return result
+
+    def _step(self):
+        """The first revealed, gateway-free neighbour's exit and cell."""
+        from world.maps import wilderness_destination
+        from world.maps.wilderness_destination import (
+            DIRECTION_DELTAS,
+            normalize_wilderness_direction,
+        )
+        from world.rules.travel_plan import DIRECTION_ORDER
+
+        origin = tuple(self.char1.location.coordinates)
+        for direction in DIRECTION_ORDER:
+            dx, dy = DIRECTION_DELTAS[direction]
+            if wilderness_destination.find_gateway(origin, direction) is not None:
+                continue
+            target = wilderness_destination.wilderness_neighbor(
+                origin[0], origin[1], direction
+            )
+            if target is None or target not in self.pinned:
+                continue
+            exit_obj = next(
+                (
+                    exit_obj
+                    for exit_obj in self.char1.location.exits
+                    if normalize_wilderness_direction(exit_obj.key) == direction
+                ),
+                None,
+            )
+            if exit_obj is not None:
+                return exit_obj, target
+        self.fail("no revealed wilderness step is available")
+
+    def _step_payload(self, exit_obj, *, walk=None):
+        payload = {
+            "exit_ref": str(int(exit_obj.id)),
+            "current_node": _current_node(self.char1),
+        }
+        if walk is not None:
+            payload["walk"] = walk
+        return payload
+
+    def _set_reserve(self, reserve):
+        from world.rules.fatigue import (
+            SleepPosture,
+            initialize_fatigue_state,
+            read_optional_fatigue_state,
+            write_fatigue_state,
+        )
+
+        if read_optional_fatigue_state(self.char1) is None:
+            initialize_fatigue_state(self.char1)
+        write_fatigue_state(self.char1, reserve, SleepPosture.AWAKE)
+
+    def _advance_to(self, tick: int) -> None:
+        """Advance the canonical world clock to ``tick`` through its own API."""
+        from world.rules.clock import AdvanceSource
+
+        clock = get_world_clock()
+        clock.advance(tick - clock.tick, AdvanceSource.COMMAND, [self.char1])
+        self.assertEqual(get_world_clock().tick, tick)
+
+    # -- evidence --------------------------------------------------------
+    def test_a_gate_entry_carries_committed_interrupts_without_a_capture_failure(self):
+        from world.rules.travel_interrupts import FLAG_ORDER
+
+        result = self._enter()
+        interrupts = result["data"]["interrupts"]
+        self.assertIsInstance(interrupts, list)
+        self.assertEqual(len(interrupts), len(set(interrupts)))
+        self.assertTrue(set(interrupts) <= set(FLAG_ORDER))
+        # Without a walk context the pace/night flags never raise.
+        self.assertNotIn("pace_threshold", interrupts)
+        self.assertNotIn("nightfall", interrupts)
+
+    def test_the_natural_arrival_flag_reports_the_landmark_cell(self):
+        from world.rules.travel_interrupts import landmark_keys_at
+
+        result = self._enter()
+        origin = tuple(self.char1.location.coordinates)
+        expected = bool(landmark_keys_at(origin))
+        self.assertEqual(
+            "landmark_reached" in result["data"]["interrupts"], expected
+        )
+
+    def test_capturing_the_committed_facts_writes_nothing(self):
+        from world.rules.surfaces import attribute_snapshot
+        from world.rules.travel_interrupts import read_movement_facts
+
+        self._enter()
+        clock = get_world_clock()
+        tick = clock.tick
+        knowledge = attribute_snapshot(self.char1, "map_knowledge")
+        facts = read_movement_facts(self.char1, self.char1.location)
+        self.assertEqual(facts.cell, tuple(self.char1.location.coordinates))
+        self.assertEqual(len(facts.travellers), 1)
+        self.assertEqual(clock.tick, tick)
+        self.assertEqual(attribute_snapshot(self.char1, "map_knowledge"), knowledge)
+
+    def test_pooled_room_facts_follow_coordinates_not_object_identity(self):
+        from world.rules.travel_interrupts import read_movement_facts
+
+        self._enter()
+        room = self.char1.location
+        first = self.origin
+        second = (first[0] + 1, first[1])
+        with patch.object(
+            TerrainRoom,
+            "coordinates",
+            new_callable=PropertyMock,
+            return_value=first,
+        ):
+            before = read_movement_facts(self.char1, room)
+        with patch.object(
+            TerrainRoom,
+            "coordinates",
+            new_callable=PropertyMock,
+            return_value=second,
+        ):
+            after = read_movement_facts(self.char1, room)
+        self.assertEqual(before.cell, first)
+        self.assertEqual(after.cell, second)
+
+    def test_initial_pace_state_matches_move_interrupt(self):
+        from world.rules.fatigue import FatigueStage, get_policy
+        from world.rules.tests.test_travel_plan import _STAGE_RESERVES
+        from world.rules.travel_plan import plan_travel, read_travel_snapshot
+
+        self._enter()
+        for initial in (
+            FatigueStage.LIGHT,
+            FatigueStage.MODERATE,
+            FatigueStage.SEVERE,
+        ):
+            for pace in ("cautious", "standard", "forced"):
+                with self.subTest(initial=initial, pace=pace):
+                    self._set_reserve(_STAGE_RESERVES[initial])
+                    exit_obj, target = self._step()
+                    plan = plan_travel(
+                        read_travel_snapshot(self.char1), target, pace, False
+                    )
+                    result = self._move(
+                        self._step_payload(
+                            exit_obj,
+                            walk={"pace": pace, "stop_at_night": False},
+                        )
+                    )
+                    self.assertEqual(result["outcome"], "success")
+                    planner_stops = plan.stop_reason == "pace_threshold"
+                    self.assertEqual(
+                        "pace_threshold" in result["data"]["interrupts"],
+                        planner_stops,
+                        "the move must stop on the same threshold as travel.plan",
+                    )
+
+    def test_nightfall_raises_only_for_a_charged_crossing(self):
+        self._enter()
+        self._advance_to(_night_start_tick() - 1)
+        exit_obj, _cell = self._step()
+        result = self._move(
+            self._step_payload(
+                exit_obj, walk={"pace": "forced", "stop_at_night": True}
+            )
+        )
+        self.assertEqual(result["outcome"], "success")
+        self.assertGreater(get_world_clock().tick, _night_start_tick() - 1)
+        self.assertIn("nightfall", result["data"]["interrupts"])
+
+    def test_a_flight_waived_zero_charge_step_cannot_cross_into_night(self):
+        from world.rules.fatigue import get_policy
+
+        self._enter()
+        self.char1.db.skills = {"active": [], "passive": ["flight"]}
+        self._set_reserve(get_policy().max_units)
+        self._advance_to(_night_start_tick() - 1)
+        exit_obj, _cell = self._step()
+        result = self._move(
+            self._step_payload(
+                exit_obj, walk={"pace": "forced", "stop_at_night": True}
+            )
+        )
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(get_world_clock().tick, _night_start_tick() - 1)
+        self.assertNotIn("nightfall", result["data"]["interrupts"])
+
+
+def _east_gate_xyz():
+    """The production east-gate grid coordinate, probed from the registry."""
+    import importlib
+
+    registry = getattr(
+        importlib.import_module("world.lore.wilderness_entry"),
+        "WILDERNESS_ENTRY" + "_REGISTRY",
+    )
+    entries = [
+        entry
+        for entry in registry.values()
+        if entry.gate_for("w") is not None and entry.gate_for("n") is not None
+    ]
+    if len(entries) != 1:
+        raise AssertionError(entries)
+    from world.maps.static_references import settlement_node_xyz
+
+    return settlement_node_xyz(entries[0].gate_for("w").destination)
+
+
+def _night_start_tick() -> int:
+    """One tick at the first second of the shipped night phase."""
+    from world.rules import sight
+
+    start_hour = next(
+        entry[1] for entry in sight.POLICY.phases if entry[0] == "night"
+    )
+    return start_hour * 3600
+
 
 if __name__ == "__main__":
     unittest.main()

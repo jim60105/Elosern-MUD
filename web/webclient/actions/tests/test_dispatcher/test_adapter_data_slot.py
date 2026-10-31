@@ -14,6 +14,7 @@ from web.webclient.actions.dispatcher import (
     retire_sequence,
 )
 import unittest
+from django.test import TestCase as DjangoTestCase
 from web.webclient.presentation.protocol import (
     ProtocolValidationError,
     new_presentation_epoch,
@@ -193,6 +194,99 @@ class AdapterDataSlotTests(unittest.TestCase):
         self.assertEqual(second["data"], first["data"])
         self.assertEqual(second["data"]["display_name"], "加斯帕")
         self.assertEqual(second["data"]["nested"]["tags"], ["甲"])
+
+
+class CommitQualifiedResultTests(DjangoTestCase):
+    """A commit-qualified adapter result publishes only after the commit."""
+
+    def _session(self):
+        session = FakeSession()
+        _coordinator(session)
+        session.puppet = FakeActor()
+        coordinator = session.ndb.elosern_coordinator
+        coordinator.full_snapshot(
+            SimpleNamespace(actor=session.puppet, protocol_version=1)
+        )
+        return session
+
+    def _results(self, session):
+        return [
+            call["ui_action_result"][0][0]
+            for call in session.sent
+            if "ui_action_result" in call
+        ]
+
+    def _envelope(self, coordinator, *, request_id):
+        return {
+            "protocol_version": 1,
+            "presentation_epoch": coordinator.epoch,
+            "request_id": request_id,
+            "base_revision": coordinator.revision,
+            "action_id": "proof.move",
+            "payload": {},
+        }
+
+    @covers_requirement(
+        "webclient-oob-protocol::result-and-protocol-error-envelopes-are-exact-and-non-overlapping"
+    )
+    def test_a_commit_qualified_result_waits_for_the_commit_then_replays(self):
+        from django.db import transaction
+
+        from world.rules.presentation_events import on_publication_commit
+
+        calls = []
+        held: Deferred = Deferred()
+
+        def adapter(actor, payload, session=None):
+            calls.append(payload)
+            result = {
+                "outcome": "success",
+                "code": "moved",
+                "message": "移動",
+                "affected_panels": (),
+                "data": {"interrupts": ["landmark_reached"]},
+            }
+            on_publication_commit(lambda: held.callback(result))
+            return held
+
+        session = self._session()
+        coordinator = session.ndb.elosern_coordinator
+        registry = ActionRegistry("test")
+        registry.register(
+            ActionSpec(
+                action_id="proof.move",
+                validate_payload=lambda payload: payload,
+                adapter=adapter,
+            )
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            handle_ui_action(
+                session,
+                session.puppet,
+                self._envelope(coordinator, request_id="r1"),
+                registry,
+                _presenter_registry(),
+            )
+            self.assertEqual(
+                self._results(session),
+                [],
+                "a commit-qualified result must never publish before the commit",
+            )
+        published = self._results(session)
+        self.assertEqual(len(published), 1)
+        self.assertEqual(published[0]["data"], {"interrupts": ["landmark_reached"]})
+        # The completion released the in-flight marker, so the same request ID
+        # replays the cached result without executing the adapter again.
+        handle_ui_action(
+            session,
+            session.puppet,
+            self._envelope(coordinator, request_id="r1"),
+            registry,
+            _presenter_registry(),
+        )
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(self._results(session)[-1]["data"], published[0]["data"])
+
 
 if __name__ == "__main__":
     unittest.main()
