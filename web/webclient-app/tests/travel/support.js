@@ -97,4 +97,4 @@ export function liveTravel({ subject = WILD_SUBJECT, panels = null, mounted = tr
 
 // The walking slice's synthetic wilderness cells (wilderness-travel-walking-ui)
 // live with the stories that render them.
-export { WALK_STEPS, walkArea, walkNode, walkPanels } from "../../stories/fixtures/travel_walk.js";
+export { WALK_STEPS, walkArea, walkCapacity, walkNode, walkPanels } from "../../stories/fixtures/travel_walk.js";

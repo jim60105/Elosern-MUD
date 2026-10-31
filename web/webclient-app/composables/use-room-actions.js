@@ -120,6 +120,8 @@ const CHAIN_SELECTORS = Object.freeze({
   rail: '[data-anchor="presence"] [data-testid="presence-rail"]',
   look: '[data-anchor="map"] [data-testid="place-card-look"]',
   wait: '[data-anchor="map"] [data-testid="place-card-wait"]',
+  // The travel leg panel's 紮營 (not a Tab-chain member; focus return only).
+  camp: '#action-dock [data-testid="leg-camp"]',
   pill: '#action-dock [data-testid="suggestions-pill"]',
 });
 const CHAIN_ORDER = Object.freeze(["compass", "rail", "look", "wait", "pill"]);
@@ -135,7 +137,7 @@ export function useRoomActions(
   const lastTile = ref("wait");
   // The tiles are shown again after a step back: no replayed entrance.
   const returning = ref(false);
-  // Which control opened the open card: "wait" | "pill" | null.
+  // Which control opened the open card: "wait" | "pill" | "camp" | null.
   const opener = ref(null);
 
   const roomCard = computed(() => (store.view.mode === "exploration" ? store.view.roomCard : null));
@@ -209,6 +211,33 @@ export function useRoomActions(
     if (store.openRoomCard("wait")) {
       opener.value = "wait";
     }
+  }
+
+  // The travel band's 紮營 (wilderness-travel-leg-ui): the single client
+  // camp entry. Before the camp card exists (wilderness-camping replaces this
+  // destination) it opens the existing rest entry straight on its sleep form;
+  // no new request, rule or placeholder. An entry already open switches to
+  // that layer. Closing it returns focus to 紮營.
+  async function openTravelCamp() {
+    if (skipDisabled.value) {
+      return false;
+    }
+    if (roomCard.value?.kind !== "wait") {
+      if (!store.openRoomCard("wait")) {
+        return false;
+      }
+      // The kind watcher resets the layers when the entry opens; select the
+      // sleep layer after it ran.
+      await nextTick();
+      if (roomCard.value?.kind !== "wait") {
+        return false;
+      }
+    }
+    opener.value = "camp";
+    lastTile.value = "sleep";
+    returning.value = false;
+    waitStep.value = "sleep";
+    return true;
   }
 
   function onPill() {
@@ -345,7 +374,7 @@ export function useRoomActions(
       if (!focusLost(document.activeElement)) {
         return;
       }
-      if (from && focusMember(from === "pill" ? "pill" : "wait")) {
+      if (from && focusMember(from === "pill" || from === "camp" ? from : "wait")) {
         return;
       }
       if (compassRef.value) {
@@ -475,6 +504,7 @@ export function useRoomActions(
     pillLabel,
     onPlaceLook,
     onPlaceWait,
+    openTravelCamp,
     onPill,
     onRoomCardPick,
     onRoomCardBack,

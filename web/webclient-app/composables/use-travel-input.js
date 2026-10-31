@@ -125,7 +125,7 @@ export function useTravelInput(store, { mapRef, fullLogOpen = () => false }) {
     if (!layout.value || store.view.mode !== "exploration" || surfaceOwnsFocus()) return;
     const el = document.activeElement;
     const mapEl = mapRef.value?.el?.() ?? null;
-    const inControls = !!el?.closest?.('[data-testid="travel-walk-controls"]');
+    const inControls = !!el?.closest?.('[data-testid="leg-panel"]');
     if (lost(el) || el === mapEl || inControls) focusMap();
   });
 

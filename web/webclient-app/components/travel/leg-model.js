@@ -32,6 +32,9 @@ export const STOP_TEXT = Object.freeze({
   destination_reached: "抵達目的地",
 });
 
+/** The capacity legend's pace stop (the camp line on the estimate). */
+export const CAPACITY_STOP_TEXT = "依節制紮營";
+
 /** At most this many ticks are drawn; the legend keeps the exact counts. */
 export const MAX_GAUGE_TICKS = 60;
 
@@ -239,7 +242,8 @@ export function legView({
     legend = {
       caption: "腳程估計",
       entries: STAGE_BUCKETS.filter((b) => capacity.capacity[b] > 0).map((b) => ({ bucket: b, label: BUCKET_LABELS[b], count: capacity.capacity[b] })),
-      stop: stopAt >= 0 ? STOP_TEXT.pace_threshold : null,
+      // The capacity gauge marks where the chosen pace would camp.
+      stop: stopAt >= 0 ? CAPACITY_STOP_TEXT : null,
     };
   } else {
     gauge = { source: state.capacityState, ticks: [], hidden: 0 };

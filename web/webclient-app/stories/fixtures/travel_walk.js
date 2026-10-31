@@ -32,9 +32,10 @@ export const walkNode = (x, y) => `wild:elosern:${x}:${y}`;
  * carries one direction row per step. `disabled` maps a word to a reason;
  * `withheld` lists words whose destination is not disclosed (schema 6:
  * a null destination and the generic direction label); `missing` drops a
- * word's row; `room` is the look room identity (pooled rooms reuse one).
+ * word's row; `room` is the look room identity (pooled rooms reuse one);
+ * `capacity` is the status v6 `travel_capacity` (null: none supplied).
  */
-export function walkPanels(cx, cy, { disabled = {}, withheld = [], missing = [], room = 900, subject = null } = {}) {
+export function walkPanels(cx, cy, { disabled = {}, withheld = [], missing = [], room = 900, subject = null, capacity = null } = {}) {
   const steps = WALK_STEPS.filter(([word]) => !missing.includes(word));
   const current = walkNode(cx, cy);
   const localMap = {
@@ -75,11 +76,29 @@ export function walkPanels(cx, cy, { disabled = {}, withheld = [], missing = [],
     interact: [],
   });
   return {
-    status: fx.statusPanel(),
+    status: { ...fx.statusPanel(), travel_capacity: capacity },
     context_actions: fx.explorationActions(),
     exploration,
     local_map: localMap,
     art: artFor(subject ?? `wilderness:合成荒原:${cx},${cy}`),
+  };
+}
+
+/**
+ * A synthetic status v6 `travel_capacity`: per-stage foot counts, one quote
+ * per walk step's opaque exit reference (`quotes` maps a word to seconds or
+ * null; unlisted words quote `seconds`), and the advisory pace state.
+ */
+export function walkCapacity({
+  normal = 14, light = 9, moderate = 6, severe = 3, seconds = 1200, quotes = {}, cautious = false, standard = false,
+} = {}) {
+  return {
+    capacity: { normal, light, moderate, severe },
+    neighbours: WALK_STEPS.map(([word, dir]) => ({
+      exit_ref: `e_wild_${dir}`,
+      seconds: word in quotes ? quotes[word] : seconds,
+    })),
+    at_pace: { cautious, standard },
   };
 }
 

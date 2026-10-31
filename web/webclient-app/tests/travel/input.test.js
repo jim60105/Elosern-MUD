@@ -43,7 +43,7 @@ describe("the map owns movement in the travel layout", () => {
   it("focuses the map on entry and mounts no compass", async () => {
     const s = await stage();
     expect(s.w.findComponent({ name: "ExitCompass" }).exists()).toBe(false);
-    expect(s.w.find('[data-testid="travel-walk-controls"]').exists()).toBe(true);
+    expect(s.w.find('[data-testid="leg-panel"]').exists()).toBe(true);
     expect(document.activeElement).toBe(s.map().element);
     expect(s.map().attributes("role")).toBe("application");
   });
@@ -52,7 +52,7 @@ describe("the map owns movement in the travel layout", () => {
     const h = liveTravel({ wrappers, subject: "grid:t_synth_map:2,0" });
     await tick();
     expect(h.w.findComponent({ name: "ExitCompass" }).exists()).toBe(true);
-    expect(h.w.find('[data-testid="travel-walk-controls"]').exists()).toBe(false);
+    expect(h.w.find('[data-testid="leg-panel"]').exists()).toBe(false);
   });
 });
 
@@ -192,14 +192,16 @@ describe("the held walk", () => {
 
   it("停步 stops it and returns focus to the map", async () => {
     const s = await walking();
-    const stop = s.w.get('[data-testid="travel-walk-stop"]');
+    const stop = s.w.get('[data-testid="leg-stop"]');
     expect(stop.attributes("aria-disabled")).toBeUndefined();
     stop.element.focus();
     await stop.trigger("click");
     await tick();
     expect(s.store.view.travel.walking).toBeNull();
     expect(document.activeElement).toBe(s.map().element);
-    expect(stop.attributes("aria-disabled")).toBe("true");
+    // 停步 turns back into 出發, disabled without a locked route.
+    expect(s.w.find('[data-testid="leg-stop"]').exists()).toBe(false);
+    expect(s.w.get('[data-testid="leg-depart"]').attributes("aria-disabled")).toBe("true");
   });
 
   it("blur and a window blur stop it", async () => {
