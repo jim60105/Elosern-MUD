@@ -122,6 +122,51 @@ recovery, leaving the layout or exploration, and an opened drawer, overlay or
 card stop the walk and never resume it. A stop sends nothing and never resends
 a step already sent; that step's late commit only updates committed state.
 
+### Travel route queries
+
+The route preview (wilderness-travel-planning-ui) sends the read-only
+`travel.plan` through the same single-flight `dispatchAction`; the store
+(`web/webclient-app/stores/elosern/travel.js`) owns the hovered cell, the
+locked destination, the one outstanding token, the adopted plan and the
+current error. The request lifecycle is:
+
+1. **Intent.** Hovering a disclosed cell of the current window beyond the
+   eight neighbours waits 150 ms (`PLAN_DEBOUNCE_MS`); a click or Enter on a
+   destination cursor locks a disclosed non-party cell and asks at once. A
+   newer intent forgets the older one immediately: its token is dropped, the
+   old preview and error clear, and only the latest desired request is kept.
+2. **Send.** The desired request leaves only when the gate is free, no walk
+   or hold is active, no drawer, overlay or card owns the stage, and the
+   adopted map is current for planning: the refresh owner's `ready` window of
+   the committed node, adopted at the committed world time (a time change
+   waits for the map the refresh owner fetches for it). A busy gate keeps the
+   request waiting; nothing superseded is ever replayed.
+3. **Token.** The sent request records `{generation, epoch, revision, node,
+   origin, map, time, members, pace, stop_at_night, destination, serial,
+   requestId}`. `map` counts content changes of the adopted window (an
+   identical re-adoption keeps it); `members` is each fatigue row's stage,
+   reserve and posture plus the supplied capacity counts. The revision is
+   diagnostic only: an unrelated publication keeps the preview.
+4. **Adoption.** Only the token's own `ui_action_result` (request id and
+   epoch) is adopted, and a success only when its `origin` and `destination`
+   are the asked ones. The data slot is validated exactly at the result
+   envelope (`protocol/core.js` `validateTravelPlanData`). A success has no
+   presentation revision to wait for. A refusal becomes the intent line's
+   error: the five planner codes read as stable client words, any other
+   refusal keeps the server's message, and no narrative error line is
+   written for `travel.plan`. There is no automatic retry.
+5. **Invalidation.** A change of any token fact (session, node, party cell,
+   window content, clock, member facts, pace, nightfall stop) or a
+   disconnect forgets the token, the plan and the error. A surviving lock
+   asks once from the new facts; an unlocked hover is dropped (the pointer
+   must move again). A lock survives pointer leave, an aim and a committed
+   stop; a session or layout exit, Esc, a window that no longer discloses it
+   and the party standing on it clear it. An aim supersedes an unlocked
+   hover preview but not a lock, and keeps Enter's single step.
+
+Departure is not inferred from any of this: 出發 stays disabled with its
+pending reason until route-ui installs the route action.
+
 ### Travel log notices
 
 The travel band's log (wilderness-travel-log-ui) reads structured notices,
