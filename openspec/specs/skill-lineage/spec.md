@@ -210,7 +210,7 @@ snapshot/restore face and the same transaction as the skill's own effects: `SKIL
 #### Scenario: The affinity factor is magic-damage-scoped
 - **WHEN** the affinity factor is evaluated for a skill
 - **THEN** it applies only to a skill whose parsed effects include a magic-school damage of its own
-  element — a physical skill carrying an element (e.g. `light_sword_style`) multiplies by `1.0`,
+  element — a physical skill carrying an element (e.g. `shadow_slash`) multiplies by `1.0`,
   and so does a physical skill declaring no element at all
 
 #### Scenario: Storage and derivation are unchanged
