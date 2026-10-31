@@ -125,6 +125,17 @@ describe("keyboard destination cursor", () => {
     expect(s.plans()).toHaveLength(1);
   });
 
+  it("Enter on a neighbour cursor locks it and asks at once, without a step", async () => {
+    const s = await stage();
+    await s.press("ArrowRight", { shiftKey: true });
+    // A neighbour is never hover-previewed; Enter asks for it directly.
+    expect(s.plans()).toHaveLength(0);
+    await s.press("Enter");
+    expect(s.travel().lockedDestination).toEqual({ x: CX + 1, y: CY });
+    expect(s.plans().map((r) => r.payload.destination)).toEqual([{ x: CX + 1, y: CY }]);
+    expect(s.moves()).toHaveLength(0);
+  });
+
   it("an unknown or party cursor cell is only inspected", async () => {
     const s = await stage();
     // Toward the party's own cell: one step out and back.

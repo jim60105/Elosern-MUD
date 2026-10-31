@@ -234,8 +234,15 @@ function intentFor(s) {
     const parts = [`${steps} 步`, formatDuration(s.plan.total_seconds)];
     if (clock) parts.push(`${clock} 停`);
     if (!s.locked) parts.push("點擊鎖定");
+    // The polite intent line also tells screen readers the nightfall and
+    // terminal sleep steps the map draws (visually the gauge shows them).
+    const notes = [];
+    if (Number.isInteger(s.plan.nightfall_index)) notes.push(`第 ${s.plan.nightfall_index + 1} 步入夜`);
+    const sleep = sleepIndex(s.plan);
+    if (sleep >= 0) notes.push(`第 ${sleep + 1} 步${s.sleepLabel || SLEEP_TICK_LABEL}`);
     return {
       kind: "plan",
+      note: notes.join("，"),
       title: `前往${s.plan.label || "目的地"}`,
       detail: parts.join("・"),
       leg: Object.freeze({
@@ -320,7 +327,7 @@ export function legView({
   const usablePlan = validPlan(plan) ? plan : null;
   const state = {
     aim, plan: usablePlan, walking, holding, capacity, pace, stopAtNight, phase, error, serverTime, asleep: !!asleep,
-    locked: !!locked, pending: !!pending, planError, cursor, target,
+    locked: !!locked, pending: !!pending, planError, cursor, target, sleepLabel: labels.forced_sleep ?? null,
     stale: STALE_MAP.has(mapStatus),
     capacityState: capacityState(capacity),
   };

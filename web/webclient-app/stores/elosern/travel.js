@@ -519,8 +519,11 @@ export function applyTravel(ctx) {
     mapTime = timeKey(committed().serverTime);
   }
 
+  // The clock to the minute: a publication stamped seconds later is the
+  // same planning moment (nightfall falls on an hour boundary, and every
+  // duration is whole seconds from the server anyway).
   function timeKey(t) {
-    return t ? `${t.year}|${t.season_index}|${t.day_in_season}|${t.hour}|${t.minute}|${t.second}` : "";
+    return t ? `${t.year}|${t.season_index}|${t.day_in_season}|${t.hour}|${t.minute}` : "";
   }
 
   // The committed member facts a prediction reads: each traveller's stage,
@@ -656,8 +659,10 @@ export function applyTravel(ctx) {
       const data = result.data ?? null;
       // Only the answer for the asked origin and destination is this one.
       const own = !!data && sameCell(data.origin, token.origin) && sameCell(data.destination, token.destination);
+      // An answer for another origin or destination is no plan: say so
+      // instead of leaving the intent line empty (no automatic retry).
       route.plan = own ? Object.freeze(data) : null;
-      route.error = null;
+      route.error = own ? null : Object.freeze({ code: "plan_mismatch", message: PLAN_FALLBACK_ERROR });
     } else {
       route.plan = null;
       const stable = PLAN_ERROR_TEXT[result.code];
@@ -671,7 +676,7 @@ export function applyTravel(ctx) {
 
   // Send the latest desired request once everything admits it.
   function flushPlan(rs) {
-    if (!desired || !desired.armed || route.pendingToken || planning) return false;
+    if (!desired || !desired.armed || desired.refusedAt || route.pendingToken || planning) return false;
     if (ctx.travelWalk || ctx.travelHold) return false;
     if (rs.mode !== "exploration" || !layoutShown(rs) || !planningMapCurrent(rs) || !gateFree(rs) || surfaceOpen()) return false;
     const destination = desired.destination;
@@ -690,7 +695,16 @@ export function applyTravel(ctx) {
     } finally {
       planning = false;
     }
-    if (!requestId) return false;
+    if (!requestId) {
+      // A refused send (a gate this flush did not foresee) is not retried on
+      // every publication: a hover is dropped, a lock waits for new facts.
+      if (route.lockedDestination && sameCell(route.lockedDestination, destination)) desired.refusedAt = factsKey(facts);
+      else {
+        desired = null;
+        route.hover = null;
+      }
+      return true;
+    }
     route.pendingToken = Object.freeze({
       ...facts,
       revision: rs.revision,
@@ -716,11 +730,13 @@ export function applyTravel(ctx) {
     }
     let changed = false;
     if (!rs.connected) {
-      // A reconnect is a new session, which clears the lock as well.
+      // A reconnect is a new session, which clears the lock as well; a
+      // connection that returns in the same session asks again for a lock
+      // left without an answer (below).
       if (route.pendingToken || route.plan || route.error) changed = true;
       dropPreview();
       changed = dropHover() || changed;
-      if (route.lockedDestination) desired = { destination: route.lockedDestination, armed: true, basis: null };
+      desired = null;
       return changed;
     }
     if ((ctx.travelWalk || ctx.travelHold) && !route.lockedDestination) changed = dropHover() || changed;
@@ -731,6 +747,12 @@ export function applyTravel(ctx) {
       changed = dropHover() || true;
     }
     const key = factsKey(planFacts(rs));
+    // A lock with nothing asked, flying or answered asks once.
+    if (route.lockedDestination && !desired && !route.pendingToken && planBasis === null) {
+      want(route.lockedDestination, true);
+      changed = true;
+    }
+    if (desired?.refusedAt && desired.refusedAt !== key) delete desired.refusedAt;
     if (planBasis !== null && planBasis !== key) {
       dropPreview();
       changed = true;
@@ -899,7 +921,9 @@ export function applyTravel(ctx) {
       lockedDestination: route.lockedDestination,
       planTarget: selection.layout ? planTargetView() : null,
       plan: route.plan,
-      planPending: route.pendingToken !== null || desired !== null,
+      // Only an armed or flying query is pending: a hover still inside its
+      // debounce has asked nothing yet.
+      planPending: route.pendingToken !== null || desired?.armed === true,
       planError: route.error,
     });
   };

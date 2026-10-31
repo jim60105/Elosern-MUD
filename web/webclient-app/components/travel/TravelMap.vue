@@ -1,3 +1,9 @@
+<script>
+// Module scope: one serial across every mounted map, so each instance's
+// route description id is unique and stable (a leaving copy included).
+let routeTextSerial = 0;
+</script>
+
 <script setup>
 // TravelMap (OpenSpec changes wilderness-travel-interface and
 // wilderness-travel-map-ui; interface design §4): the travel stage's
@@ -577,7 +583,7 @@ const cursorPath = computed(() => {
 // stays legible over busy terrain at every zoom.
 const routeScale = computed(() => glyphScale.value * TRAVEL_GLYPHS.route.scale);
 const routeText = computed(() => routeSummary(props.plan, { label: props.target?.label ?? null, sleepLabel: props.sleepLabel }));
-const routeTextId = `travel-route-${Math.random().toString(36).slice(2, 8)}`;
+const routeTextId = `travel-route-${++routeTextSerial}`;
 
 const hoverCell = ref(null);
 const hoverInfo = computed(() => {

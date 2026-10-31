@@ -144,12 +144,14 @@ current error. The request lifecycle is:
 3. **Token.** The sent request records `{generation, epoch, revision, node,
    origin, map, time, members, pace, stop_at_night, destination, serial,
    requestId}`. `map` counts content changes of the adopted window (an
-   identical re-adoption keeps it); `members` is each fatigue row's stage,
+   identical re-adoption keeps it); `time` is the clock to the minute (a
+   publication stamped seconds later keeps the preview); `members` is each fatigue row's stage,
    reserve and posture plus the supplied capacity counts. The revision is
    diagnostic only: an unrelated publication keeps the preview.
 4. **Adoption.** Only the token's own `ui_action_result` (request id and
    epoch) is adopted, and a success only when its `origin` and `destination`
-   are the asked ones. The data slot is validated exactly at the result
+   are the asked ones (an answer for another origin or destination reads
+   as an error, never as an empty preview). The data slot is validated exactly at the result
    envelope (`protocol/core.js` `validateTravelPlanData`). A success has no
    presentation revision to wait for. A refusal becomes the intent line's
    error: the five planner codes read as stable client words, any other
@@ -157,7 +159,9 @@ current error. The request lifecycle is:
    written for `travel.plan`. There is no automatic retry.
 5. **Invalidation.** A change of any token fact (session, node, party cell,
    window content, clock, member facts, pace, nightfall stop) or a
-   disconnect forgets the token, the plan and the error. A surviving lock
+   disconnect forgets the token, the plan and the error. A hover is pending
+   only once its debounce elapsed; a send the gate refuses unexpectedly
+   drops a hover and leaves a lock waiting for new facts. A surviving lock
    asks once from the new facts; an unlocked hover is dropped (the pointer
    must move again). A lock survives pointer leave, an aim and a committed
    stop; a session or layout exit, Esc, a window that no longer discloses it

@@ -93,6 +93,8 @@ describe("hover queries are debounced", () => {
     expect(p.travel().hover).toEqual(FAR);
     vi.advanceTimersByTime(PLAN_DEBOUNCE_MS - 1);
     expect(p.plans()).toHaveLength(0);
+    // Nothing is asked inside the debounce, so nothing is pending yet.
+    expect(p.travel().planPending).toBe(false);
     vi.advanceTimersByTime(1);
     expect(p.plans().map((r) => r.payload)).toEqual([{ destination: FAR, pace: "standard", stop_at_night: true }]);
     expect(p.travel().planPending).toBe(true);
@@ -165,14 +167,17 @@ describe("supersession through the single-flight gate", () => {
     expect(p.plans().map((r) => r.payload.destination)).toEqual([FAR]);
   });
 
-  it("an answer for another origin or destination is dropped", () => {
+  it("an answer for another origin or destination is no plan and is not retried", () => {
     const p = planner();
     p.store.lockTravelDestination(FAR);
     p.answer(p.plans()[0], "success", { data: planData({ x: CX - 1, y: CY }, FAR) });
     expect(p.travel().plan).toBeNull();
+    expect(p.travel().planError?.code).toBe("plan_mismatch");
     p.store.lockTravelDestination(OTHER);
     p.answer(p.plans()[1], "success", { data: planData({ x: CX, y: CY }, FAR) });
     expect(p.travel().plan).toBeNull();
+    p.publish();
+    expect(p.plans()).toHaveLength(2);
   });
 });
 
@@ -254,6 +259,9 @@ describe("currentness", () => {
   it("an unrelated publication or an identical window keeps the plan", () => {
     const p = locked();
     p.publish();
+    // A publication stamped seconds later is the same planning moment.
+    const t = p.store.view.serverTime;
+    p.publish({ server_time: { ...t, second: (t.second + 30) % 60 } });
     p.store.setTravelMap({ status: "refreshing", area: p.store.view.travel.area });
     p.adopt();
     expect(p.travel().plan).not.toBeNull();
@@ -308,6 +316,18 @@ describe("currentness", () => {
     expect(p.plans()).toHaveLength(2);
     p.answer(p.plans()[1]);
     expect(p.travel().plan.origin).toEqual({ x: CX + 1, y: CY });
+  });
+
+  it("an unrelated later-second publication keeps a hover preview", () => {
+    const p = planner();
+    p.store.hoverTravelCell(FAR);
+    vi.advanceTimersByTime(150);
+    p.answer(p.plans()[0]);
+    const t = p.store.view.serverTime;
+    p.publish({ server_time: { ...t, second: (t.second + 30) % 60 } });
+    expect(p.travel().plan?.destination).toEqual(FAR);
+    expect(p.travel().hover).toEqual(FAR);
+    expect(p.plans()).toHaveLength(1);
   });
 
   it("an unlocked hover is dropped when the party moves", () => {

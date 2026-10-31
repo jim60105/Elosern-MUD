@@ -100,6 +100,7 @@ function tickStyle(index) {
       >
         <p class="leg-panel__title" data-testid="leg-intent-title">{{ intent.title }}</p>
         <p class="leg-panel__detail" data-testid="leg-intent-detail">{{ intent.detail }}</p>
+        <span v-if="intent.note" class="leg-sr">{{ intent.note }}</span>
       </div>
       <div v-if="$slots.aside" class="leg-panel__aside"><slot name="aside" /></div>
     </header>
