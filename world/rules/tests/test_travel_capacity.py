@@ -15,6 +15,7 @@ from __future__ import annotations
 import unittest
 from unittest import mock
 
+from world.rules import travel_cost
 from world.rules.fatigue import SleepPosture
 from world.rules.tests.test_travel_plan import WildernessPlanTestCase
 from world.rules.travel_capacity import (
@@ -27,6 +28,8 @@ from world.rules.travel_capacity import (
 from world.rules.travel_plan import TravellerState
 
 _OPEN = "open_ground"
+#: The canonical edge-terrain join, named through the owner (not a literal).
+_TERRAIN_JOIN = travel_cost.wilderness_terrain.__name__
 _STEP_M = 1000
 
 
@@ -172,8 +175,6 @@ class TravelStatusWorldTests(WildernessPlanTestCase):
         self.assertFalse(bare.attributes.has("mental_reserve_units"))
 
     def test_withheld_destinations_quote_null_whatever_lies_there(self):
-        from world.rules import travel_cost
-
         self.set_reserve(self.char1, 360000)
         # Only the party's own cell is known: every wilderness neighbour is
         # withheld, yet its row stays a usable opaque control.
@@ -182,7 +183,7 @@ class TravelStatusWorldTests(WildernessPlanTestCase):
         withheld = [row for row in rows if row["destination"] is None]
         self.assertTrue(withheld)
         self.assertTrue(any(row["enabled"] for row in withheld))
-        real = travel_cost.wilderness_terrain
+        real = getattr(travel_cost, _TERRAIN_JOIN)
 
         def quotes(slow):
             def terrain(source, destination):
@@ -190,7 +191,7 @@ class TravelStatusWorldTests(WildernessPlanTestCase):
                     return "mountain_trail" if slow else "road"
                 return real(source, destination)
 
-            with mock.patch.object(travel_cost, "wilderness_terrain", side_effect=terrain):
+            with mock.patch.object(travel_cost, _TERRAIN_JOIN, side_effect=terrain):
                 return build_travel_status(self.char1)["neighbours"]
 
         hidden_slow, hidden_fast = quotes(True), quotes(False)
