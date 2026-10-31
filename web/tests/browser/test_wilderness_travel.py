@@ -691,7 +691,7 @@ class TravelWalkingTests(_TravelStage):
         page.wait_for_timeout(500)
         self.assertEqual(len(_moves(page)), 1)
         self.assertEqual(_travel(page)["walking"]["direction"], "east")
-        self.assertEqual(page.locator('[data-testid="travel-walk-stop"]').get_attribute("aria-disabled"), None)
+        self.assertEqual(page.locator('[data-testid="leg-stop"]').get_attribute("aria-disabled"), None)
 
         self.assertEqual(page.evaluate(_COMMIT_MOVE, [0, _walk_panels(CX + 1, CY)]), [True, True])
         page.wait_for_function("() => (window.__elosernBridge.store.view.travel.walking || {}).progress === 1", timeout=15000)
@@ -868,3 +868,179 @@ class TravelLogTests(BrowserAcceptanceTest):
         page.screenshot(path=os.path.join(SHOTS, "travel-log-1451x790.png"))
         self.assertEqual(self._fixture(page, f"restore(me, {origin})")[1], "restored")
         page.close()
+
+
+# ── the leg panel (wilderness-travel-leg-ui) ────────────────────────────
+
+_CAPACITY = {"normal": 5, "light": 4, "moderate": 3, "severe": 2}
+
+
+def _leg_panels(cx: int, cy: int) -> dict:
+    """``_walk_panels`` whose status v6 carries a synthetic travel capacity:
+    per-stage foot counts, one 1200 s quote per step row and no pace
+    threshold reached."""
+    panels = _walk_panels(cx, cy)
+    panels["status"] = {
+        **panels["status"],
+        "travel_capacity": {
+            "capacity": dict(_CAPACITY),
+            "neighbours": [{"exit_ref": "e_wild_" + key, "seconds": 1200} for _, key, _, _ in _STEPS],
+            "at_pace": {"cautious": False, "standard": False},
+        },
+    }
+    return panels
+
+
+# Holds every explore.look as well (recorded, never forwarded).
+_HOLD_LOOKS = """() => {
+  const store = window.__elosernBridge.store;
+  if (window.__travelLooks) return;
+  const sender = store.getSender();
+  const original = sender.sendAction.bind(sender);
+  window.__travelLooks = [];
+  sender.sendAction = (env) => {
+    if (env && env.action_id === 'explore.look') {
+      window.__travelLooks.push(env);
+      return undefined;
+    }
+    return original(env);
+  };
+}"""
+
+# Every rendered text run of the panel (screen-reader-only reasons aside)
+# with its computed font size.
+_LEG_TEXT = """() => {
+  const panel = document.querySelector('[data-testid="leg-panel"]');
+  const out = [];
+  const walker = document.createTreeWalker(panel, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const text = node.textContent.trim();
+    const el = node.parentElement;
+    if (!text || el.closest('.leg-sr')) continue;
+    out.push([text, parseFloat(getComputedStyle(el).fontSize)]);
+  }
+  return out;
+}"""
+
+_FOCUS_RING = """() => {
+  const el = document.activeElement;
+  const style = getComputedStyle(el);
+  return {
+    testid: el.getAttribute('data-testid'),
+    ring: style.boxShadow !== 'none' || (style.outlineStyle !== 'none' && parseFloat(style.outlineWidth) > 0),
+  };
+}"""
+
+
+class TravelLegTests(_TravelStage):
+    """The leg panel's gauge, persisted preferences and guarded actions
+    (wilderness-travel-leg-ui)."""
+
+    def _leg_stage(self, viewport=(1451, 790), motion_level: str = "off"):
+        page = self.logged_in_page(viewport, motion_level)
+        page.evaluate(_HOLD_MOVES)
+        page.evaluate(_HOLD_LOOKS)
+        self._enter(page, _leg_panels(CX, CY))
+        self._wait_views(page, 1)
+        self._answer(page, 0, area=_walk_area(CX, CY))
+        self._wait_ready(page)
+        page.wait_for_selector('[data-testid="leg-panel"][data-gauge="capacity"]', timeout=15000)
+        return page
+
+    def test_gauge_preferences_and_actions(self):
+        """The supplied capacity draws one tick per counted step with the
+        pace's camp line; every text run keeps the 16px x scale floor and
+        every control shows a focus ring; the pace radio and the nightfall
+        switch persist through the layout wrapper and freeze while walking,
+        when 停步 stays live; 環顧 sends exactly the room look and 紮營 opens
+        the existing sleep form."""
+        page = self._leg_stage()
+        scale = ui_scale((1451, 790))
+        ticks = page.locator('[data-testid="leg-tick"]')
+        self.assertEqual(ticks.count(), sum(_CAPACITY.values()))
+        buckets = [ticks.nth(i).get_attribute("data-bucket") for i in range(ticks.count())]
+        self.assertEqual(
+            buckets, ["normal"] * 5 + ["light"] * 4 + ["moderate"] * 3 + ["severe"] * 2
+        )
+        # Standard camps on the first moderate step (index 9).
+        camp = page.locator('[data-testid="leg-tick"]:has([data-testid="leg-camp-mark"])')
+        self.assertEqual(camp.count(), 1)
+        self.assertEqual(camp.get_attribute("data-bucket"), "moderate")
+        sizes = page.evaluate(_LEG_TEXT)
+        self.assertTrue(sizes)
+        for text, size in sizes:
+            self.assertGreaterEqual(size + 0.01, 16 * scale, text)
+        self.assertEqual(page.locator('[data-testid="leg-depart"]').get_attribute("aria-disabled"), "true")
+
+        # The aimed row's quote reaches the intent line.
+        page.locator('[data-testid="travel-map"]').focus()
+        page.keyboard.press("ArrowRight")
+        page.wait_for_function(
+            "() => document.querySelector('[data-testid=\"leg-intent-detail\"]').textContent.startsWith('約 20 分鐘')",
+            timeout=15000,
+        )
+        self._shoot(page, "travel-leg-1451x790.png")
+
+        # Keyboard: the radio group is one stop; arrows choose; Tab walks on
+        # through the switch and the three actions, each with a focus ring.
+        page.locator('[data-testid="leg-pace-standard"]').focus()
+        page.keyboard.press("ArrowRight")
+        page.wait_for_function(
+            "() => window.__elosernBridge.store.view.travel.preferences.pace === 'forced'", timeout=15000
+        )
+        self.assertEqual(page.evaluate(_FOCUS_RING), {"testid": "leg-pace-forced", "ring": True})
+        for expected in ("leg-night", "leg-depart", "leg-camp", "leg-look"):
+            page.keyboard.press("Tab")
+            self.assertEqual(page.evaluate(_FOCUS_RING), {"testid": expected, "ring": True})
+        self.assertEqual(page.locator('[data-testid="leg-night"]').get_attribute("role"), "switch")
+        self.assertEqual(page.locator('[data-testid="leg-pace"]').get_attribute("role"), "radiogroup")
+        page.locator('[data-testid="leg-night"]').click()
+        page.wait_for_function(
+            "() => window.__elosernBridge.store.view.travel.preferences.stopAtNight === false", timeout=15000
+        )
+        stored = page.evaluate("() => JSON.parse(localStorage.getItem('elosern.layout')).preferences")
+        self.assertEqual((stored["travelPace"], stored["travelStopAtNight"]), ("forced", False))
+
+        # 紮營: the existing sleep form, with no request of its own.
+        page.locator('[data-testid="leg-camp"]').click()
+        page.wait_for_selector('[data-testid="sleep-card"]', timeout=15000)
+        self.assertEqual(_moves(page), [])
+        page.keyboard.press("Escape")
+        page.keyboard.press("Escape")
+        page.wait_for_selector('[data-testid="sleep-card"]', state="detached", timeout=15000)
+
+        # Walking: the preferences freeze and 停步 is live.
+        page.locator('[data-testid="travel-map"]').focus()
+        page.keyboard.down("ArrowRight")
+        page.wait_for_function("() => window.__travelMoves.length >= 1", timeout=15000)
+        self.assertEqual(page.locator('[data-testid="leg-pace-cautious"]').get_attribute("aria-disabled"), "true")
+        self.assertEqual(page.locator('[data-testid="leg-night"]').get_attribute("aria-disabled"), "true")
+        self.assertIsNone(page.locator('[data-testid="leg-stop"]').get_attribute("aria-disabled"))
+        frozen = page.evaluate(
+            "() => [window.__elosernBridge.store.setTravelPace('cautious'),"
+            " window.__elosernBridge.store.view.travel.preferences.pace]"
+        )
+        self.assertEqual(frozen, [False, "forced"])
+        self._shoot(page, "travel-leg-walking-1451x790.png")
+        page.keyboard.up("ArrowRight")
+        page.wait_for_function("() => window.__elosernBridge.store.view.travel.walking === null", timeout=15000)
+        # The step commits on the next cell, whose map the stage adopts.
+        self.assertEqual(page.evaluate(_COMMIT_MOVE, [0, _leg_panels(CX + 1, CY)]), [True, True])
+        self._wait_views(page, 2)
+        self._answer(page, 1, area=_walk_area(CX + 1, CY))
+        self._wait_ready(page)
+        page.wait_for_function("() => window.__elosernBridge.store.view.dispatch.inFlight === null", timeout=15000)
+        # 環顧: exactly the existing guarded room look.
+        page.locator('[data-testid="leg-look"]').click()
+        page.wait_for_function("() => window.__travelLooks.length >= 1", timeout=15000)
+        page.wait_for_timeout(300)
+        self.assertEqual(page.evaluate("() => window.__travelLooks.map((e) => e.payload)"), [{"room": True}])
+        page.close()
+
+        # The wide acceptance size keeps the floor at its own scale.
+        wide = self._leg_stage((2560, 1440))
+        wide_scale = ui_scale((2560, 1440))
+        for text, size in wide.evaluate(_LEG_TEXT):
+            self.assertGreaterEqual(size + 0.01, 16 * wide_scale, text)
+        self._shoot(wide, "travel-leg-2560x1440.png")
+        wide.close()
