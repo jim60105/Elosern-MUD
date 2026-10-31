@@ -89,6 +89,11 @@ number. Dropping authored baseline roots to fit the old bound would let the guar
 the bound follows the roster, never the reverse. `passives` stays 32, the payload shape and the
 canonical JSON envelope are unchanged, and the worst-case actives payload still fits.
 
+The delta keeps the current spec's scenario identifier verbatim (its historical "96 rows ...
+rejects 97" wording) while its body states the bound in force, because the validator refuses a
+MODIFIED block that renames or drops an existing scenario. Renaming that identifier is left to the
+archive sync, which owns rewriting the main spec.
+
 ## Acceptance and automated evidence
 
 Use existing `world.lore.tests.test_player_presets` generic integrity checks for kinds, references, eligibility, duplicate/finite XP and budget constraints. Extend an existing representative activation/companion test only when a generic consumer boundary needs coverage: construct from an actual chosen preset, compare stored literal bases with the resolver's selected source, observe closure and usable existing mastery, reload, and check an untouched recipient. No tests approving exact roster identities, initial XP tables, prose, labels or counts.
