@@ -123,8 +123,8 @@ Within the all-or-nothing import transaction, missing prerequisite proficiency S
 - **WHEN** preset activation seeds proficiency
 - **THEN** it composes ownership closure and proficiency seed directly over declared keys, not the import-record wrapper
 
-#### Scenario: Construction paths share the algorithms
-- **WHEN** a production constructor closes and seeds a declared skill kit
+#### Scenario: Exactly three production callers
+- **WHEN** the originally covered preset, import and scene construction paths close and seed a declared skill kit
 - **THEN** it uses the shared closure/seed algorithms without a copied implementation or a fixed caller-count assertion
 
 #### Scenario: Mastery closure includes every declared branch

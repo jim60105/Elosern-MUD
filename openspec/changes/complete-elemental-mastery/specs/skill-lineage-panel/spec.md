@@ -25,7 +25,7 @@
 - **WHEN** a graph view is built
 - **THEN** `nodes` SHALL be in topological order, each node appears exactly once even when it merges two parents, and `depth` is its longest prerequisite path from a root
 
-#### Scenario: Consumed means every node complete
+#### Scenario: Consumed means every node capped
 - **WHEN** a graph view is built
 - **THEN** `consumed` is true exactly when every ACTIVE node is owned, usable and XP-capped, and every PASSIVE node is owned and usable without needing passive XP
 

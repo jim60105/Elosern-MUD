@@ -70,6 +70,8 @@ Modify existing requirements without losing unrelated scenarios. Remove the four
 
 Explicitly amend `docs/superpowers/specs/2026-08-30-use-driven-progression-design.md` §9.1 (currently lines 235-238), §9.2 bare-key entitlement and §12 completion. Amend `docs/lore/skill-trees/index.md` §1 outside-tree statement, `docs/lore/magic-system.md` and all eight elemental tree pages' mastery placement. Preserve flight's independent position. The stale `element-mastery` main Purpose is a known pre-existing description; during future spec sync update it to lawful learned mastery, without touching it during proposal creation.
 
+Retain existing MODIFIED scenario headings as OpenSpec merge identities, including the historical `Exactly three production callers` and `Consumed means every node capped`. Their updated WHEN/THEN clauses define shared construction without a fixed caller count and completion with usable passive ownership; the old headings add no separate count or passive-XP rule.
+
 ## Evidence and acceptance map
 
 Extend existing modules only; add no new shard or browser test files. Use fixed synthetic registries and independently known expected results. Every ADDED/MODIFIED requirement has a discoverable test target below.
