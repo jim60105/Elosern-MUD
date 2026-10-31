@@ -643,10 +643,7 @@ class TravelWalkingTests(_TravelStage):
         self._wait_ready(page)
         return page
 
-    # Temporary association (no canonical ID before the archive sync): the
-    # nearest existing requirement, the MODIFIED keyboard composite whose
-    # travel scenario hands movement focus to the map.
-    @covers_requirement("webclient-exit-compass::the-compass-is-one-keyboard-composite")
+    @covers_requirement("webclient-travel-walking::travel-aim-maps-to-guarded-neighbour-movement")
     def test_keyboard_only_step(self):
         """Entering travel focuses the map; a tapped arrow only aims and the
         aim persists; Enter sends exactly one existing move payload."""
@@ -680,9 +677,7 @@ class TravelWalkingTests(_TravelStage):
         self._shoot(page, "travel-walk-aim-1451x790.png")
         page.close()
 
-    # Temporary association: the nearest existing commit-driven continuous
-    # movement requirement until the archive sync mints the walking IDs.
-    @covers_requirement("webclient-exit-compass::continuous-movement-is-commit-driven")
+    @covers_requirement("webclient-travel-walking::held-walking-waits-for-committed-steps-and-dwell")
     def test_held_walk_release(self):
         """A 400 ms hold sends one step and nothing more until it commits;
         releasing during the post-step wait sends no next step and leaves

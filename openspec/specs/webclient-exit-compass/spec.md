@@ -101,7 +101,7 @@ A press held for 400 ms on an angled target SHALL start continuous movement. Cur
 - **THEN** the walk stops and no further `explore.move` is sent
 
 ### Requirement: The compass is one keyboard composite
-The compass SHALL be a single tab stop with `role="application"` and `aria-label="出口羅盤"`, and entering exploration SHALL focus it. Arrow keys SHALL set an eight-way aim that snaps like the pointer, and a tap SHALL only aim. Enter and Space SHALL move to the aimed target and key repeat SHALL be ignored.
+Outside active travel presentation the compass SHALL retain its single application focus stop, arrow aim, Enter/Space movement and repeat handling; entering active travel SHALL instead focus the map application and use its travel input contract.
 
 #### Scenario: Arrows aim without moving
 - **WHEN** the compass has focus and the player taps ArrowUp
@@ -116,8 +116,12 @@ The compass SHALL be a single tab stop with `role="application"` and `aria-label
 - **THEN** exactly one `explore.move` is submitted
 
 #### Scenario: Entering exploration focuses the compass
-- **WHEN** the client enters exploration mode
+- **WHEN** the client enters ordinary non-travel exploration mode
 - **THEN** the compass holds keyboard focus
+
+#### Scenario: Wilderness travel owns movement focus
+- **WHEN** committed wilderness exploration selects the travel layout
+- **THEN** the map application receives focus and no hidden compass also consumes arrows, Enter or held-walk input
 
 ### Requirement: Bracket keys cycle every target and holding a key walks
 The `[` and `]` keys SHALL cycle every target, angled exits by ascending angle and then portals by ascending slot, so an exit crowded out of every arrow sector stays reachable. Holding an arrow or Enter for 400 ms SHALL start continuous movement, and releasing every arrow and Enter, or blur, SHALL stop it.
