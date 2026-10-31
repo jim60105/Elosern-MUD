@@ -160,6 +160,9 @@
     // `services.open` is a pure read of one selected provider's snapshot; it
     // is a private correlated result and never a typed command.
     "services.open",
+    // `travel.plan` is a pure read-only route/preview query answered through
+    // the private result slot: no typed command produces or echoes it.
+    "travel.plan",
   ];
 
   function isSilentPresentationControl(actionId) {

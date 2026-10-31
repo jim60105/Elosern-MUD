@@ -72,7 +72,8 @@
     "title.accept",
     "title.decline",
     "title.equip",
-    "title.remove"
+    "title.remove",
+    "travel.plan"
   ],
   "silentPresentationControlIds": [
     "account.character.create",
@@ -102,6 +103,7 @@
     "party.transfer",
     "party.view_member",
     "map.view",
-    "services.open"
+    "services.open",
+    "travel.plan"
   ]
 }

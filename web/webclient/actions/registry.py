@@ -96,10 +96,10 @@ def build_production_action_registry() -> ActionRegistry:
     account adapters (``account.character.switch``, ``account.character.create``), the two
     NPC author-editor adapters (``npc.persona.read``, ``npc.persona.update``), the
     two party adapters (``party.transfer``, ``party.view_member``), the
-    ``options.dismiss`` action, and the read-only ``map.view`` and
-    ``services.open`` requests. Each action binds one exact payload validator
-    and one narrow deterministic adapter; no action routes through the text
-    parser.
+    ``options.dismiss`` action, the read-only ``map.view`` and
+    ``services.open`` requests, and the read-only ``travel.plan`` preview.
+    Each action binds one exact payload validator and one narrow deterministic
+    adapter; no action routes through the text parser.
     """
     from web.webclient.actions.combat_actions import (
         _actor_choices_adapter,
@@ -859,6 +859,23 @@ def build_production_action_registry() -> ActionRegistry:
             validate_payload=validate_map_view_payload,
             adapter=map_view_adapter,
             affected_panels=MAP_VIEW_PANELS,
+        )
+    )
+    from web.webclient.actions.travel_actions import (
+        travel_plan_adapter,
+        validate_travel_plan_payload,
+    )
+
+    # The read-only travel preview (wilderness-travel-planning): the adapter's
+    # result carries the plan through the private ``data`` slot with the
+    # dispatcher's result-only completion, so no panel is republished. The
+    # empty affected-panel tuple only names the contract ("no panels owned").
+    registry.register(
+        ActionSpec(
+            action_id="travel.plan",
+            validate_payload=validate_travel_plan_payload,
+            adapter=travel_plan_adapter,
+            affected_panels=(),
         )
     )
     return registry

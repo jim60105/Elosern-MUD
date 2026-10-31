@@ -749,6 +749,7 @@ const REGISTERED_MUTATION_ACTIONS = {
   "shop.buy": { payload: { item_key: SYNTH_ITEM.id, quantity: 2, recipient_id: 7, npc_id: 62 }, display: { itemLabel: SYNTH_ITEM.display } },
   "shop.sell": { payload: { item_key: SYNTH_ITEM.id, quantity: 1, seller_id: 7, npc_id: 62 }, display: { itemLabel: SYNTH_ITEM.display } },
   "services.open": null,
+  "travel.plan": null,
   "title.accept": { payload: { index: 2 }, display: {} },
   "title.decline": { payload: {}, display: {} },
   "title.equip": { payload: { kind: "fixed", identifier: SYNTH_TITLE.id }, display: {} },

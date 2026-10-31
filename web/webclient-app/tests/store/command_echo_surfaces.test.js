@@ -235,6 +235,21 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       },
     },
     {
+      // travel.plan is the read-only route preview: the exact payload travels
+      // as a private correlated result and no typed command echoes it.
+      id: "EXPECTED SILENCE: travel.plan read-only route preview",
+      ids: ["travel.plan"],
+      silence: true,
+      prepare() {
+        openExploration();
+        store.dispatchAction("travel.plan", {
+          destination: { x: 12, y: 9 },
+          pace: "standard",
+          stop_at_night: true,
+        });
+      },
+    },
+    {
       id: "EXPECTED SILENCE: party.transfer item hand-over",
       ids: ["party.transfer"],
       silence: true,
