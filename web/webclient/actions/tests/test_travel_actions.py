@@ -265,12 +265,13 @@ class TravelPlanWildernessTests(EvenniaTest):
         # A sleeping party refuses even the same-cell preview.
         from world.rules.fatigue import (
             SleepPosture,
+            get_policy,
             initialize_fatigue_state,
             write_fatigue_state,
         )
 
         initialize_fatigue_state(self.char1)
-        write_fatigue_state(self.char1, 360000, SleepPosture.VOLUNTARY)
+        write_fatigue_state(self.char1, get_policy().max_units, SleepPosture.VOLUNTARY)
         refused = travel_plan_adapter(self.char1, self._payload())
         self.assertEqual(refused["code"], PLAN_PARTY_CANNOT_TRAVEL)
         self.assertEqual(refused["message"], PLAN_MESSAGES[PLAN_PARTY_CANNOT_TRAVEL])
@@ -295,6 +296,57 @@ class TravelPlanWildernessTests(EvenniaTest):
     @covers_requirement(
         "webclient-area-map::map-view-requests-publish-the-requested-area-without-changing-gameplay"
     )
+    def test_a_mode_read_failure_is_result_only_and_never_re_snapshots(self):
+        session = FakeSession()
+        _coordinator(session)
+        session.puppet = self.char1
+        coordinator = session.ndb.elosern_coordinator
+        coordinator.full_snapshot(SimpleNamespace(actor=self.char1, protocol_version=1))
+        session.sent.clear()  # the establishing baseline is setup, not the action
+        registry = ActionRegistry("test")
+        registry.register(
+            ActionSpec(
+                action_id="travel.plan",
+                validate_payload=validate_travel_plan_payload,
+                adapter=travel_plan_adapter,
+                affected_panels=(),
+            )
+        )
+        revision = coordinator.revision
+        envelope = {
+            "protocol_version": 1,
+            "presentation_epoch": coordinator.epoch,
+            "request_id": "plan-mode-failure",
+            "base_revision": revision,
+            "action_id": "travel.plan",
+            "payload": self._payload(),
+        }
+        with mock.patch(
+            "web.webclient.presentation.affordances.in_exploration_mode",
+            side_effect=RuntimeError("boom"),
+        ), mock.patch(
+            "web.webclient.actions.travel_actions.log_error"
+        ) as log_error:
+            handle_ui_action(
+                session, self.char1, envelope, registry, _presenter_registry()
+            )
+        names = [name for call in session.sent for name in call]
+        self.assertNotIn("ui_update", names)
+        self.assertNotIn("ui_snapshot", names)
+        result = [
+            call["ui_action_result"][0][0]
+            for call in session.sent
+            if "ui_action_result" in call
+        ][-1]
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], PLAN_UNREACHABLE)
+        self.assertNotIn("data", result)
+        self.assertEqual(coordinator.revision, revision)
+        self.assertEqual(log_error.call_args[0][0], "travel_plan_failed")
+
+    @covers_requirement(
+        "webclient-area-map::map-view-requests-publish-the-requested-area-without-changing-gameplay"
+    )
     def test_dispatch_publishes_only_the_correlated_result_and_writes_nothing(self):
         neighbour = self._revealed_neighbour()
         self.assertIsNotNone(neighbour)
@@ -313,8 +365,10 @@ class TravelPlanWildernessTests(EvenniaTest):
                 affected_panels=(),
             )
         )
-        knowledge = self.char1.attributes.get(KNOWLEDGE_ATTR)
-        attribute_count = len(self.char1.attributes.all())
+        attributes = {
+            attribute.key: attribute.value
+            for attribute in self.char1.attributes.all()
+        }
         tick = get_world_clock().tick
         location = self.char1.location
         revision = coordinator.revision
@@ -342,8 +396,13 @@ class TravelPlanWildernessTests(EvenniaTest):
         self.assertEqual(result["code"], CODE_SUCCESS)
         self.assertEqual(result["data"]["origin"], {"x": self.origin[0], "y": self.origin[1]})
         self.assertEqual(coordinator.revision, revision)
-        self.assertEqual(self.char1.attributes.get(KNOWLEDGE_ATTR), knowledge)
-        self.assertEqual(len(self.char1.attributes.all()), attribute_count)
+        self.assertEqual(
+            {
+                attribute.key: attribute.value
+                for attribute in self.char1.attributes.all()
+            },
+            attributes,
+        )
         self.assertEqual(get_world_clock().tick, tick)
         self.assertIs(self.char1.location, location)
 
@@ -366,6 +425,13 @@ class TravelPlanWildernessTests(EvenniaTest):
                 affected_panels=(),
             )
         )
+        attributes = {
+            attribute.key: attribute.value
+            for attribute in self.char1.attributes.all()
+        }
+        tick = get_world_clock().tick
+        location = self.char1.location
+        revision = coordinator.revision
         envelope = {
             "protocol_version": 1,
             "presentation_epoch": coordinator.epoch,
@@ -388,3 +454,13 @@ class TravelPlanWildernessTests(EvenniaTest):
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], PLAN_OUTSIDE_WINDOW)
         self.assertNotIn("data", result)
+        self.assertEqual(coordinator.revision, revision)
+        self.assertEqual(
+            {
+                attribute.key: attribute.value
+                for attribute in self.char1.attributes.all()
+            },
+            attributes,
+        )
+        self.assertEqual(get_world_clock().tick, tick)
+        self.assertIs(self.char1.location, location)

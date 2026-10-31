@@ -69,13 +69,17 @@ never hand-composed:
 | `test_heterogeneous_party_pays_the_slowest_member_and_reports_the_worst_stage` | Committed equivalence | `movement-cost-charging::terrain-and-the-slowest-eligible-traveller-determine-speed` | travel-prediction… |
 | `test_a_waived_plan_charges_zero_and_keeps_every_reserve_and_the_calendar` | Flight charge follows execution | `movement-cost-charging::charge-movement-is-the-single-shared-movement-cost-charging-function` | travel-prediction… |
 | `test_nightfall_index_uses_absolute_calendar_boundaries` | Stops and refusal | `movement-cost-charging::traversal-integrates-fatigue-over-remaining-distance` | travel-prediction… |
+| `test_night_entry_transitions_cover_starts_ends_and_later_nights` | Stops and refusal | `movement-cost-charging::traversal-integrates-fatigue-over-remaining-distance` | travel-prediction… |
+| `test_the_earlier_stop_wins_and_a_tie_uses_the_design_priority` | Stops and refusal | `movement-cost-charging::terrain-and-the-slowest-eligible-traveller-determine-speed` | travel-prediction… |
 | `test_frozen_route_choice_is_separate_from_sequential_replay` | Frozen route selection is distinct from replay | `movement-cost-charging::traversal-integrates-fatigue-over-remaining-distance` | travel-prediction… |
 | `test_warmed_plan_with_twenty_thousand_visits_is_within_one_hundred_ms` | Read isolation and publication (bound) | `wilderness-ground-reveal::permanent-reveal-is-a-bounded-read-projection` | travel-queries… |
+| `test_an_absent_clock_is_read_as_zero_and_is_never_created` (`test_travel_plan.py`) | Read isolation and publication | `webclient-area-map::map-view-requests-publish-the-requested-area-without-changing-gameplay` | travel-queries… |
 | `test_the_exact_payload_is_normalized_and_every_deviation_is_rejected` (`web/webclient/actions/tests/test_travel_actions.py`) | Read isolation and publication | `webclient-action-dispatch::action-registries-are-allowlisted-and-duplicate-safe` | travel-queries… |
 | `test_the_production_registry_binds_the_travel_plan_spec` (`test_travel_actions.py`) | Read isolation and publication | same | travel-queries… |
 | `test_success_is_a_result_only_plan_and_a_mode_refusal_keeps_its_code` (`test_travel_actions.py`) | Read isolation and publication | `webclient-area-map::map-view-requests-publish-the-requested-area-without-changing-gameplay` | travel-queries… |
 | `test_every_domain_refusal_maps_to_its_stable_code_and_message` (`test_travel_actions.py`) | Routing and errors | same | travel-queries… |
 | `test_an_unexpected_failure_is_logged_and_answers_plan_unreachable` (`test_travel_actions.py`) | Read isolation and publication | same | travel-queries… |
+| `test_a_mode_read_failure_is_result_only_and_never_re_snapshots` (`test_travel_actions.py`) | Read isolation and publication | same | travel-queries… |
 | `test_dispatch_publishes_only_the_correlated_result_and_writes_nothing` (`test_travel_actions.py`) | Read isolation and publication | same | travel-queries… |
 | `test_a_domain_refusal_publishes_no_presentation_and_keeps_state` (`test_travel_actions.py`) | Read isolation and publication | same | travel-queries… |
 
@@ -90,6 +94,49 @@ not implemented in this tree), so
 first-legal-step decision with the identical departure's real committed
 after-step stage and the shared threshold table that slice must reuse; it does
 not claim the flag surface exists here.
+
+### Post-implementation review dispositions
+
+The final review raised two blocking items; both are addressed on the branch.
+
+1. *Mode admission escaped the failure boundary.* `travel_plan_adapter` now
+   reads `actor.location` and `in_exploration_mode` inside its guarded
+   operation, so an unexpected stored-mode read failure logs
+   `travel_plan_failed` and answers `plan_unreachable` through the same
+   result-only path; `test_a_mode_read_failure_is_result_only_and_never_re_snapshots`
+   proves no update/snapshot, no revision change and the logged event. Ordinary
+   mode refusals keep the existing `not_exploring` code.
+2. *The frozen-route test did not compare complete routes.* It now plans
+   between two complete legal routes to the same destination, asserts the
+   frozen-weight ordering selects the frozen-cheaper route, asserts the
+   selected route's committed replay sum differs from that frozen sum, asserts
+   the single-edge alternative's frozen and replay sums agree, and checks every
+   returned step against an independent canonical cost/prediction replay (a
+   local probe, not the planner's traveller type). A strict pairwise rank
+   inversion (frozen A<B while replay A>B) is **not constructible** with the
+   bounded wilderness cell set and the approved one-arc band calibration inside
+   the 60-step window: the per-route frozen/replay gap is bounded by the
+   post-crossing edge count times at most one band step, while the only
+   same-destination alternatives differ by whole authored edges. The test
+   therefore establishes exactly what the planner promises — selection uses the
+   frozen weights, replay is the committed prediction, and the two sums differ
+   — and records this limitation here rather than asserting an impossible
+   inversion.
+
+Non-blocking review items were also closed: night-entry detection now tracks
+phase transitions across the whole interval (start, exact end boundary,
+night→day→night), a night-start interval no longer suppresses a later entry;
+the committed-equivalence test now compares every emitted `fatigue_stage` with
+the canonical worst stage of the committed members; the exact-zero test walks a
+route with a further unperformed edge; stop-priority and earlier-stop ties have
+direct tests; the read-isolation tests compare persisted attribute values, the
+clock tick, location and revision (success and refusal) and pin the
+non-creating clock accessor with an absent-clock case; and all fatigue fixtures
+derive their reserves and per-step seconds from the live policy/rulebook rather
+than calibration literals. The shipped-gateway probe keeps the repository's
+established live-registry idiom (unique-match assertion) used by the existing
+movement-settlement tests, because the wilderness contrib identity is a
+production fixture there.
 
 - [wilderness-area-map-reveal](../wilderness-area-map-reveal/design.md) must land first.
 

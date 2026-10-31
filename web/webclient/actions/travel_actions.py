@@ -99,16 +99,20 @@ def travel_plan_adapter(
     from typeclasses.rooms import TerrainRoom
     from web.webclient.presentation.affordances import in_exploration_mode
 
-    location = getattr(actor, "location", None)
-    if not in_exploration_mode(actor) or not isinstance(location, TerrainRoom):
-        return {
-            "outcome": "rejected",
-            "code": NOT_EXPLORING_CODE,
-            "message": NOT_EXPLORING_MESSAGE,
-            "no_presentation": True,
-        }
     destination = (payload["destination"]["x"], payload["destination"]["y"])
     try:
+        # Admission reads are inside the same boundary: a stored combat-session
+        # or creation read that fails unexpectedly must answer through the
+        # bounded result-only refusal, never escape into the dispatcher's
+        # recovery-snapshot path.
+        location = getattr(actor, "location", None)
+        if not in_exploration_mode(actor) or not isinstance(location, TerrainRoom):
+            return {
+                "outcome": "rejected",
+                "code": NOT_EXPLORING_CODE,
+                "message": NOT_EXPLORING_MESSAGE,
+                "no_presentation": True,
+            }
         snapshot = read_travel_snapshot(actor)
         plan = plan_travel(
             snapshot, destination, payload["pace"], payload["stop_at_night"]

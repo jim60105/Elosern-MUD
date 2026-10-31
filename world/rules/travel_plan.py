@@ -568,19 +568,21 @@ def _night_entry_offset(tick: int, seconds: int) -> int | None:
 
     The comparison is made at absolute calendar hour boundaries, so a step
     whose start and end phases are both daylight but which crosses a night
-    boundary is still an entry, and a step that starts in the night never
-    reports a new entry in that same night.
+    boundary is still an entry, a step that starts in the night never reports
+    that same night, and a long interval that leaves the night and re-enters a
+    later one reports that later entry.
     """
 
     if seconds <= 0:
         return None
-    if sight.light_phase(WorldDateTime.from_tick(tick)) == "night":
-        return None
+    current = sight.light_phase(WorldDateTime.from_tick(tick))
     end = tick + seconds
     boundary = (tick // _SECONDS_PER_HOUR + 1) * _SECONDS_PER_HOUR
     while boundary <= end:
-        if sight.light_phase(WorldDateTime.from_tick(boundary)) == "night":
+        phase = sight.light_phase(WorldDateTime.from_tick(boundary))
+        if phase == "night" and current != "night":
             return boundary - tick
+        current = phase
         boundary += _SECONDS_PER_HOUR
     return None
 
