@@ -226,7 +226,10 @@ def _strip_markup(text: str) -> str:
 def look_summary(prose: str) -> str:
     """The one-line server summary of a look's full appearance."""
     lines = [" ".join(line.split()) for line in _strip_markup(str(prose)).splitlines()]
-    first = next((line for line in lines if line), "")
+    lines = [line for line in lines if line]
+    # An appearance opens with the place's name line; the scenery that
+    # follows it is what the summary quotes.
+    first = lines[1] if len(lines) > 1 else (lines[0] if lines else "")
     if len(first) > _SUMMARY_CODE_POINTS:
         first = first[: _SUMMARY_CODE_POINTS - 1] + "…"
     return f"環顧四周：{first}" if first else "環顧四周。"

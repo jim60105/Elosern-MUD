@@ -122,6 +122,9 @@ class BuildTravelEventsTests(unittest.TestCase):
         self.assertEqual(drafts[0].params["prose"], prose)
         self.assertNotIn("\n", drafts[0].text)
         self.assertNotIn("|c", drafts[0].text)
+        # The place's name line is skipped for the scenery after it.
+        self.assertEqual(drafts[0].text, "環顧四周：遠處有一座塔。")
+        self.assertEqual(look_summary("|c北風|n"), "環顧四周：北風")
         self.assertEqual(look_summary(""), "環顧四周。")
 
     def test_long_prose_stays_within_the_wire_string_bound(self):
