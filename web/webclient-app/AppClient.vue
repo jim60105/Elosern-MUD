@@ -955,8 +955,9 @@ const rootStyle = computed(() => {
           <Transition name="travel-stage" :css="travelStageCss" v-bind="inertWhileLeaving">
             <TravelMap
               v-if="travelLayout"
-              :area="store.view.travel.area"
+              :grid="store.view.travel.map"
               :status="travelMapStatus"
+              :motion-level="store.view.motionLevel"
               @retry="retryTravelMap"
             />
           </Transition>

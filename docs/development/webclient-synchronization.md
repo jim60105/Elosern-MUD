@@ -78,6 +78,18 @@ unchanged, while its own `map.view` completions (updates) never do.
 | `status` | 5 | Each `fatigue` row is `{identity, name, reserve_percent, stage, label, severity, restriction, asleep}`; `asleep` is the canonical posture (voluntary and forced sleep) and agrees with the sleeping stages. Rows are the status source, the controlled body, then each further source-present traveller with readable physiology, at most 8. Version 4 is rejected; there is no compatibility form. |
 | `area_map` | 2 | Unchanged. The travel stage decodes the wilderness window through `lib/travel-grid.js` until window-ui's schema cutover. |
 
+### Travel map repaint keys
+
+The travel stage paints the adopted grid once per content change
+(`web/webclient-app/lib/travel-paint.js`, wilderness-travel-map-ui). The
+repaint key is `paintSignature(grid)`: the map id, the window origin and
+size, the party cell, the light phase, the ground radius and every cell's
+painted facts (known, terrain, band, tier, road, ford, display). A new
+publication of the same window is a new grid object with the same key and
+does not repaint; several adoptions inside one animation frame paint once.
+Camera moves, zoom, UI scale, aim, hover, walking, the plan and the refresh
+status never repaint: they change a CSS transform or the SVG/HTML overlays.
+
 ### General publication parts
 
 An eager `ui_snapshot`/`ui_update` whose canonical document does not fit its

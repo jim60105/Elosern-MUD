@@ -10,6 +10,7 @@ import "./styles/tokens.css";
 import "./styles/fonts.css";
 import "./styles/fonts-mono.css";
 import "./styles/app-shell.css";
+import { paintTravelMap, travelPaintStats } from "./lib/travel-paint.js";
 
 // C3 (webclient-vue-09-wire-transport-mount): the store-bound live renderers
 // (design D3). The Vue app mounts AppClient — the store-driven root that
@@ -90,6 +91,11 @@ window.__elosernBridge = {
   // is dev-only in Vue's production build, so the registration approach
   // works in every build.
   backdrop: null,
+  // Test hook (wilderness-travel-map-ui): the travel painter itself and its
+  // own call record ({ count, lastMs }), so the managed repaint-budget check
+  // times the real painter and counts that camera, zoom and hover never
+  // repaint. Nothing is reported anywhere.
+  travelPaint: { paintTravelMap, stats: travelPaintStats },
 };
 
 app.mount(resolveMountPoint());
