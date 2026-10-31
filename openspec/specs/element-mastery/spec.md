@@ -10,9 +10,7 @@ itself is written by the progression rules under their own transaction.
 ## Requirements
 
 ### Requirement: Mastery ownership entitles freeform scaling of the element's eligible spells
-Elemental freeform entitlement SHALL require direct mastery ownership, identity and effect
-eligibility, and a lawful directly owned prerequisite closure meeting every declared proficiency
-threshold; the query SHALL validate the element first and remain side-effect-free.
+Elemental freeform entitlement SHALL require direct mastery ownership, identity and effect eligibility, and a lawful directly owned prerequisite closure meeting every declared proficiency threshold; the query SHALL validate the element first and remain side-effect-free.
 
 #### Scenario: A mastery holder's scale set follows the cast skill's proficiency ladder
 - **WHEN** an actor lawfully owns a synthetic element's mastery and a synthetic ladder assigns successive scales to proficiency levels
