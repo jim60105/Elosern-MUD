@@ -65,7 +65,7 @@ Successful ACTIVE resolution SHALL award practice XP atomically from the configu
   pull path) are both in play
 - **THEN** the two factors are independent; they multiply, and neither reads the other
 
-#### Scenario: Elemental learning follows the catalog domain
+#### Scenario: The affinity factor is magic-damage-scoped
 - **WHEN** affinity and owned scoped growth are evaluated for a synthetic ACTIVE elemental-magic skill with a registered element
 - **THEN** both use that element regardless of damage, healing, buff, control, cleanse or mixed effects; elemental-tagged physical martial skills and other learning domains use neutral elemental factors
 
@@ -78,7 +78,7 @@ Successful ACTIVE resolution SHALL award practice XP atomically from the configu
   `event_context["simulated"]`)
 - **THEN** it accrues nothing
 
-#### Scenario: Accrual ignores actor school and innate stats
+#### Scenario: Accrual ignores school and stats
 - **WHEN** any accrual is computed
 - **THEN** it reads neither the actor's school nor any magic stat
 

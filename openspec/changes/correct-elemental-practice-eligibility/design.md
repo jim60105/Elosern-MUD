@@ -41,6 +41,8 @@ All tests stay in existing modules, with synthetic fixture support in `_support.
 
 Modify the existing `skill-lineage` requirement `Successful ACTIVE resolution accruses lineage practice XP`, preserving unrelated scenarios. Replace its damage-only scenario with catalog-domain eligibility and add damage-free/use-study examples without copying production constants or skill keys. Its current canonical ID remains unchanged; retrieve it with `uv run --locked python -m tools.spec_traceability list` and use the existing discoverable behavior tests.
 
+Keep existing scenario headings as OpenSpec merge identities, including the historical `The affinity factor is magic-damage-scoped`. Its updated WHEN/THEN explicitly defines catalog-domain eligibility for damage-free spells; the retained heading adds no damage requirement.
+
 Amend §8 of `docs/superpowers/specs/2026-08-30-use-driven-progression-design.md`, the learning explanation in `docs/lore/skill-trees/index.md`, and `docs/lore/magic-system.md` only where needed to state elemental learning eligibility. Mastery changes own the separate mastery paragraphs in those documents.
 
 ## Risks / Trade-offs
