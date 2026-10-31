@@ -142,19 +142,16 @@ nodes (PASSIVE skills are never consumed by edges and never accrue).
 - **THEN** it remains a display-only data label
 
 ### Requirement: Successful ACTIVE resolution accruses lineage practice XP
-Every successful ACTIVE skill resolution SHALL accrue to the actor, inside the existing action
-snapshot/restore face and the same transaction as the skill's own effects: `SKILL_PRACTICE_XP_PER_USE
-× RACE_REGISTRY[race].learning_multiplier × element_affinity_multiplier(entity, skill.element)
-× growth_rate_multiplier(entity) × the owned-skill growth factor`. PASSIVE skills SHALL NOT accrue.
+Successful ACTIVE resolution SHALL award practice XP atomically from the configured base and independent race, affinity, conferred-growth and owned scoped-growth factors; affinity and owned elemental growth SHALL apply to registered elemental-magic learning, including damage-free spells, while other domains remain neutral and PASSIVE skills earn no XP.
 
 #### Scenario: A physical skill accrues like a spell
-- **WHEN** an ACTIVE sword skill resolves successfully for an elf (learning x10) with no affinity and no growth buff
-- **THEN** `db.skill_proficiency[skill_key]` increases by exactly `SKILL_PRACTICE_XP_PER_USE × 10.0`
+- **WHEN** an ACTIVE sword skill resolves successfully for a fixed synthetic race (learning x2) with no affinity and no growth buff
+- **THEN** `db.skill_proficiency[skill_key]` increases by exactly `SKILL_PRACTICE_XP_PER_USE × 2.0`
 
 #### Scenario: The affinity multiplier participates
-- **WHEN** an entity with `affinity_elements == ["fire"]` successfully casts a magic fire spell
-- **THEN** the accrued XP carries the `1.1` factor; a non-favored element carries `0.9`, and a
-  physical skill carrying `element == fire` carries `1.0`
+- **WHEN** an entity with `affinity_elements == ["t_element"]` successfully casts a fixed synthetic elemental-magic spell
+- **THEN** the accrued XP carries a synthetic configured `1.25` factor; a non-favored element carries the synthetic configured `0.75` factor, and a
+  physical skill carrying `element == t_element` carries `1.0`
 
 #### Scenario: An elementless skill carries the neutral factor
 - **WHEN** an entity with declared affinities successfully resolves a physical skill that declares no
@@ -197,25 +194,23 @@ snapshot/restore face and the same transaction as the skill's own effects: `SKIL
 
 #### Scenario: The owned-skill growth factor is defined
 - **WHEN** the owned-skill growth factor is computed for a practised skill
-- **THEN** it is the product of the multipliers of every scoped `growth_rate` effect carried by a
+- **THEN** it is the product of the multipliers of every eligible owned scoped `growth_rate` effect carried by a
   skill the actor OWNS whose declared scope equals the element of the skill being practised, and
-  `1.0` for a skill of any other element and for a skill declaring no element, so an unscoped
+  `1.0` for a skill of any other element, a skill outside elemental magic and a skill declaring no element, so an unscoped
   acceleration is not expressible
 
 #### Scenario: Neither growth factor reads the other
 - **WHEN** the owned-skill growth factor and `growth_rate_multiplier(entity)` (the conferred-buff
   pull path) are both in play
-- **THEN** the two factors are independent — they multiply, and neither reads the other
+- **THEN** the two factors are independent; they multiply, and neither reads the other
 
 #### Scenario: The affinity factor is magic-damage-scoped
-- **WHEN** the affinity factor is evaluated for a skill
-- **THEN** it applies only to a skill whose parsed effects include a magic-school damage of its own
-  element — a physical skill carrying an element (e.g. `shadow_slash`) multiplies by `1.0`,
-  and so does a physical skill declaring no element at all
+- **WHEN** affinity and owned scoped growth are evaluated for a synthetic ACTIVE elemental-magic skill with a registered element
+- **THEN** both use that element regardless of damage, healing, buff, control, cleanse or mixed effects; elemental-tagged physical martial skills and other learning domains use neutral elemental factors
 
 #### Scenario: Storage and derivation are unchanged
 - **WHEN** practice XP accrues
-- **THEN** it lands in `db.skill_proficiency[skill_key]` as float XP with `level = floor(xp / 50)`
+- **THEN** it lands in `db.skill_proficiency[skill_key]` as float XP with `level = floor(xp / configured_xp_per_level)`
 
 #### Scenario: A simulated resolution accrues nothing
 - **WHEN** a resolution carries the simulated marker (a guild examination's
@@ -227,10 +222,22 @@ snapshot/restore face and the same transaction as the skill's own effects: `SKIL
 - **THEN** it reads neither the actor's school nor any magic stat
 
 #### Scenario: The one divine cadence exception
-- **WHEN** an ACTIVE skill in `SkillCategory.DIVINE_MYSTERY` resolves successfully — the exactly one
+- **WHEN** an ACTIVE skill in `SkillCategory.DIVINE_MYSTERY` resolves successfully; the exactly one
   category-scoped exception that additionally passes a per-world-calendar-day claim before accruing
 - **THEN** that rule and its scenarios are owned by the `divine-mystery` capability and SHALL NOT be
   restated here; no other category carries a cadence of any kind
+
+#### Scenario: Damage-free magic shares both award paths
+- **WHEN** synthetic elemental healing, self-buff and control skills are practised through successful use and booked study
+- **THEN** both paths apply the same affinity and owned scoped-growth eligibility, retaining their independently configured base amounts and caps
+
+#### Scenario: Learning modifiers change XP alone
+- **WHEN** the same synthetic eligible spell is resolved with different elemental affinity or owned scoped-growth factors
+- **THEN** XP changes by those factors while innate bases, resolved damage/heal output and MP charge remain unchanged
+
+#### Scenario: No declared affinity remains neutral
+- **WHEN** a synthetic learner has no declared elemental affinity
+- **THEN** the affinity factor is neutral for each eligible elemental skill, with owned scoped growth evaluated independently
 
 ### Requirement: Practice saturates at the derived tip cap
 For skill S, cap(S) SHALL be the maximum minimum proficiency of all edges consuming S, or the authored progression tip cap when no edge consumes S. Once proficiency reaches that cap, further practice SHALL NOT accrue. Synthetic numeric fixtures SHALL NOT approve shipped edge/tip values.
