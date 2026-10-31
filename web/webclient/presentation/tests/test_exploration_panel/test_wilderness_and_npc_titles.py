@@ -248,10 +248,16 @@ class NPCPanelRowsTests(BattlefieldIsolation, EvenniaTestCase):
             register_catalog_offers,
         )
         from world.rules.guild_offers import GUILD_OFFER_REGISTRY
+        from world.tests.geography_fixture import publish_shipped_map_world
 
         self._registry_items = list(QUEST_DEFINITION_REGISTRY.items())
         self._catalog = CATALOG
         self._offers = list(GUILD_OFFER_REGISTRY.items())
+        # The catalog validates its hunt selectors against the published anchor
+        # placements, so this class publishes the shipped world in its own
+        # setup: it must not depend on an earlier module in the same worker
+        # having published one.
+        publish_shipped_map_world()
         register_catalog()
         catalog = load_catalog_into_cache()
         register_catalog_offers(catalog)
