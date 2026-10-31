@@ -165,9 +165,9 @@ dream or creation surface owns the stage. There is no server travel mode.
   sent through `dispatchAction`, paused while a drawer or overlay is open;
   adoption follows the drawer's result/body correlation. It publishes
   `mapStatus` (`ready`, `refreshing`, `unavailable`, `invalid`, `retired`)
-  through `store.setTravelMap`; the compass waits while refreshing and stops
-  on a failed read. In travel the drawer offers only 世界 and never asks for
-  the area.
+  through `store.setTravelMap`; the walking queue waits while refreshing and
+  stops on a failed read. In travel the drawer offers only 世界 and never asks
+  for the area.
 - `lib/travel-grid.js` `decodeTravelGrid` is the temporary adapter over the
   schema-2 window (through `decodeWindow`, never a second decoder); it
   leaves band/tier/flags/phase/sight empty until window-ui. It also carries
@@ -189,9 +189,27 @@ dream or creation surface owns the stage. There is no server travel mode.
   between the measured side columns (minimum 14 px × scale), steps zoom
   18..46 by 4 × scale (wheel, `+`/`-` on the focused map) and projects
   bearing-only sighting cards onto the safe rectangle's inset edge. The map
-  emits pointer `hover`/`pick` and `zoom`; keyboard aim and walking are the
-  walking slice's. `window.__elosernBridge.travelPaint` exposes the painter
-  and its call record for the managed repaint-budget test.
+  emits pointer `hover`/`pick` and `zoom`, and its keyboard intents.
+  `window.__elosernBridge.travelPaint` exposes the painter and its call
+  record for the managed repaint-budget test.
+- Walking (wilderness-travel-walking-ui): the store owns the aim, the 400 ms
+  hold, the one pending step and the dwell (`stores/elosern/travel.js`,
+  `aimTravel`/`stepTravel`/`holdTravel`/`releaseTravel`/`stopTravel`,
+  published as `view.travel.aim`/`aimTarget`/`walking`/`holding`/`notice`).
+  A direction resolves through the compass model against the committed exit
+  rows (`components/travel/travel-walk-model.js`) and every step is the
+  unchanged `activateExit` payload. A step counts only after its own success,
+  its declared revision and a changed `local_map.current_node`; the next one
+  waits 350 ms (0 at `off`) and the committed cell's `ready` map. The map is
+  one `role="application"` stop: arrows aim (two give a diagonal, kept after
+  release), Enter steps, a 400 ms arrow hold walks, Esc clears the aim; a
+  known neighbour hovers to aim and clicks to step. `composables/
+  use-travel-input.js` wires those intents and holds one document capture
+  `keydown` listener that stops a walk on any key but the held arrows'
+  repeat, without consuming the event; the stopping event neither aims nor
+  steps. Entering travel focuses the map and the compass is not mounted
+  there; the band's movement column is the temporary `TravelWalkControls`
+  (intent line and 停步) until the leg panel replaces it.
 - `PartyMedallions` shows the controlled body once, then each member whose
   own `status.fatigue` row is committed (status v5 emits one per
   source-present traveller), with its supplied reserve, stage label and

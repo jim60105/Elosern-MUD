@@ -162,6 +162,53 @@ export const CONTROLS_REFERENCE = [
     ],
   },
   {
+    // The wilderness travel map (wilderness-travel-walking-ui): one focus
+    // stop on the stage, focused on entering the wilderness, in place of the
+    // exit compass; the band's movement column shows the intent line and 停步.
+    id: "travel",
+    title: "荒野旅行",
+    entries: [
+      {
+        id: "travel-aim",
+        keys: ["↑", "↓", "←", "→"],
+        label: "瞄準相鄰的格子",
+        detail:
+          "旅行地圖有焦點時按方向鍵瞄準，同時按住兩個方向鍵即為斜向；放開後瞄準仍會保留。滑鼠移到相鄰的已探明格子上也會瞄準。",
+      },
+      {
+        id: "travel-step",
+        keys: ["Enter"],
+        label: "前進一步",
+        detail: "朝瞄準的方向走一步；點擊相鄰的已探明格子也一樣。無法通行時不會移動，指令面板顯示原因。",
+      },
+      {
+        id: "travel-hold",
+        keys: ["↑", "↓", "←", "→"],
+        label: "按住連續前進",
+        detail:
+          "按住方向鍵約 0.4 秒，就會朝該方向一步一步前進，每一步都等到抵達並看清新的地圖後才走下一步。",
+      },
+      {
+        id: "travel-stop",
+        keys: ["停步"],
+        label: "停下腳步",
+        detail: "放開方向鍵、按下任何其他按鍵、點擊地圖或「停步」按鈕都會停下；已送出的那一步不會撤回。",
+      },
+      {
+        id: "travel-escape",
+        keys: ["Esc"],
+        label: "取消瞄準",
+        detail: "清除地圖上的瞄準；沒有瞄準時，Esc 照常返回指令面板的上一層。",
+      },
+      {
+        id: "travel-zoom",
+        keys: ["＋", "－"],
+        label: "縮放地圖",
+        detail: "在預設的比例之間切換；滾輪也能縮放。",
+      },
+    ],
+  },
+  {
     // The presence rail and its centred cards (exploration-presence-rail):
     // one tab stop on the stage floor after the compass, and the verb or
     // overflow card it opens.

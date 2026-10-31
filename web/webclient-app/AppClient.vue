@@ -63,9 +63,11 @@ import ChoiceCard from "./components/ChoiceCard.vue";
 import QuestionCard from "./components/QuestionCard.vue";
 import PresenceRail from "./components/PresenceRail.vue";
 import TravelMap from "./components/travel/TravelMap.vue";
+import TravelWalkControls from "./components/travel/TravelWalkControls.vue";
 import PartyMedallions from "./components/travel/PartyMedallions.vue";
 import { medallionMembers } from "./components/travel/travel-model.js";
 import { useTravelMap } from "./composables/use-travel-map.js";
+import { useTravelInput } from "./composables/use-travel-input.js";
 import { inertWhileLeaving } from "./lib/transition_hooks.js";
 
 const store = useElosernStore();
@@ -168,13 +170,14 @@ watch(
 const travelLayout = computed(() => !!store.view.travel?.layout);
 const travelMapStatus = computed(() => store.view.travel?.mapStatus ?? "refreshing");
 const { retryTravelMap } = useTravelMap(store);
-// Movement waits for the current map (design: a committed step or refresh
-// suspends new movement, a failed read stops a walk); the compass's own
-// release of a held key still stops at once.
-const travelMoveSuspended = computed(() => travelLayout.value && travelMapStatus.value === "refreshing");
-const travelMoveStopped = computed(
-  () => travelLayout.value && travelMapStatus.value !== "ready" && travelMapStatus.value !== "refreshing",
-);
+// The travel stage's movement (wilderness-travel-walking-ui): the map's
+// intents and the band's 停步 reach the store's walking queue, which waits
+// for the current map itself. The compass is not mounted in travel.
+const travelMapRef = ref(null);
+const {
+  onTravelAim, onTravelHold, onTravelRelease, onTravelStep, onTravelCancel,
+  onTravelHover, onTravelPick, onTravelStop,
+} = useTravelInput(store, { mapRef: travelMapRef, fullLogOpen: () => fullLogOpen.value });
 const travelStageCss = computed(() => store.view.motionLevel !== "off");
 // Leaving travel removes the map; focus that was on it returns to the
 // shell's focus home instead of falling to the document.
@@ -955,9 +958,19 @@ const rootStyle = computed(() => {
           <Transition name="travel-stage" :css="travelStageCss" v-bind="inertWhileLeaving">
             <TravelMap
               v-if="travelLayout"
+              ref="travelMapRef"
               :grid="store.view.travel.map"
               :status="travelMapStatus"
+              :aim="store.view.travel.aim"
+              :walking="store.view.travel.walking"
               :motion-level="store.view.motionLevel"
+              @aim="onTravelAim"
+              @hold="onTravelHold"
+              @release="onTravelRelease"
+              @step="onTravelStep"
+              @cancel="onTravelCancel"
+              @hover="onTravelHover"
+              @pick="onTravelPick"
               @retry="retryTravelMap"
             />
           </Transition>
@@ -1476,13 +1489,23 @@ const rootStyle = computed(() => {
               class="exploration-root"
               data-testid="exploration-root"
             >
-              <div class="exploration-root__compass" @keydown="onCompassTab">
+              <!-- In travel the band's movement column is the temporary
+                   TravelWalkControls (wilderness-travel-walking-ui); the
+                   compass stays the ordinary exploration control. -->
+              <div v-if="travelLayout" class="exploration-root__travel">
+                <TravelWalkControls
+                  :travel="store.view.travel"
+                  :motion-level="store.view.motionLevel"
+                  @stop="onTravelStop"
+                />
+              </div>
+              <div v-else class="exploration-root__compass" @keydown="onCompassTab">
                 <ExitCompass
                   ref="compassRef"
                   :targets="compassTargets"
-                  :busy="compassBusy || travelMoveSuspended"
+                  :busy="compassBusy"
                   :arrival-key="compassArrivalKey"
-                  :active="compassActive && !travelMoveStopped"
+                  :active="compassActive"
                   :motion-level="store.view.motionLevel"
                   @aim="onCompassAim"
                   @blocked="onCompassBlocked"
@@ -2080,6 +2103,14 @@ const rootStyle = computed(() => {
   height: 100%;
   min-height: 0;
   aspect-ratio: 1 / 1;
+}
+/* The travel movement column: wider than the compass square, so the intent
+   line reads on one line beside the rose. */
+.exploration-root__travel {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  width: calc(300px * var(--ui-scale));
 }
 .exploration-root__side {
   display: flex;

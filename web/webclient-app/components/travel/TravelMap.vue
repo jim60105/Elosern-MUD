@@ -34,9 +34,16 @@
 // away: it moves to the stage section itself. One mounted live region
 // speaks the state.
 //
-// This slice emits pointer `hover`/`pick` and `zoom` intents; keyboard aim,
-// stepping and held walking belong to the walking slice, which owns the
-// remaining declared intents.
+// Intents (wilderness-travel-walking-ui, design §5): the map is one
+// `role="application"` focus stop. It emits pointer `hover`/`pick` and
+// `zoom`, and on its own focused root: `aim(direction)` and `hold(direction)`
+// for each newly pressed arrow (two arrows combine into a diagonal through
+// the compass key model), `release` when a held arrow is released or the map
+// blurs, `step` for Enter and `cancel` for Escape while an aim or a walk
+// stands (a bare Escape bubbles). Each keyboard intent carries its event, so
+// the walking owner can tell an event that already stopped a walk. Native
+// key repeat emits nothing; modified and composing keys are ignored. The
+// store (stores/elosern/travel.js) owns the aim, the hold and the queue.
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import WorldHatchPattern from "../WorldHatchPattern.vue";
 import MapNodeGlyph from "../MapNodeGlyph.vue";
@@ -57,6 +64,7 @@ import {
 import { travelCellAt } from "../../lib/travel-grid.js";
 import { TERRAIN_NAMES } from "../../lib/area_map_view.js";
 import { TRAVEL_GLYPH_CELL } from "../../lib/map_glyphs.js";
+import { ARROW_KEYS, directionForKeys } from "./travel-walk-model.js";
 
 const props = defineProps({
   // The decoded travel grid (lib/travel-grid.js), or null before adoption.
@@ -75,6 +83,9 @@ const props = defineProps({
   uiScale: { type: Number, default: null },
 });
 const emit = defineEmits(["aim", "hover", "pick", "step", "confirm", "cancel", "hold", "release", "zoom", "retry"]);
+
+// The accessible name states the controls (design §5).
+const CONTROLS_LABEL = "旅行地圖：方向鍵瞄準相鄰的格子，同時按兩個方向鍵為斜向；Enter 前進一步；按住方向鍵連續前進，放開或按任意鍵停步；Esc 取消瞄準；＋／－ 縮放。";
 
 const DIRECTIONS = Object.freeze([
   { key: "north", dx: 0, dy: 1, word: "北" },
@@ -484,8 +495,42 @@ function onWheel(event) {
     wheelTravel -= Math.sign(wheelTravel) * WHEEL_STEP;
   }
 }
+// The arrows held on the focused map, in press order.
+const pressed = new Set();
+function modified(event) {
+  return event.ctrlKey || event.altKey || event.metaKey || event.isComposing || event.keyCode === 229;
+}
+function consume(event) {
+  event.preventDefault();
+  event.stopPropagation();
+}
 function onKeyDown(event) {
-  if (event.target !== root.value) return;
+  if (event.target !== root.value || modified(event)) return;
+  if (ARROW_KEYS.includes(event.key)) {
+    if (event.shiftKey) return;
+    consume(event);
+    // Native repeat of a held arrow is no new input: the walk owner reads
+    // it as the hold's continuation.
+    if (event.repeat || pressed.has(event.key)) return;
+    pressed.add(event.key);
+    const direction = directionForKeys(pressed);
+    if (direction) {
+      emit("aim", direction, event);
+      emit("hold", direction, event);
+    }
+    return;
+  }
+  if (event.key === "Enter") {
+    consume(event);
+    if (!event.repeat) emit("step", event);
+    return;
+  }
+  if (event.key === "Escape") {
+    if (!props.aim && !props.walking) return;
+    consume(event);
+    emit("cancel", event);
+    return;
+  }
   if (event.key === "+" || event.key === "=") {
     event.preventDefault();
     event.stopPropagation();
@@ -495,6 +540,18 @@ function onKeyDown(event) {
     event.stopPropagation();
     zoomBy(-1);
   }
+}
+
+function onKeyUp(event) {
+  if (pressed.delete(event.key)) {
+    event.stopPropagation();
+    emit("release", event);
+  }
+}
+function onBlur() {
+  const held = pressed.size > 0;
+  pressed.clear();
+  if (held || props.walking) emit("release", null);
 }
 
 // ── lifecycle ────────────────────────────────────────────────────────────
@@ -522,7 +579,7 @@ onBeforeUnmount(() => {
   paintFrame = 0;
 });
 
-defineExpose({ focusInside, focus: () => root.value?.focus({ preventScroll: true }) });
+defineExpose({ focusInside, focus: () => root.value?.focus({ preventScroll: true }), el: () => root.value });
 </script>
 
 <template>
@@ -535,7 +592,8 @@ defineExpose({ focusInside, focus: () => root.value?.focus({ preventScroll: true
     :data-motion="motionLevel"
     :data-zoom="zoom"
     :data-cell-px="c"
-    aria-label="旅行地圖"
+    role="application"
+    :aria-label="CONTROLS_LABEL"
     tabindex="0"
     ref="root"
     @pointermove="onPointerMove"
@@ -543,6 +601,8 @@ defineExpose({ focusInside, focus: () => root.value?.focus({ preventScroll: true
     @click="onClick"
     @wheel="onWheel"
     @keydown="onKeyDown"
+    @keyup="onKeyUp"
+    @blur="onBlur"
   >
     <svg class="travel-map__fog" aria-hidden="true" focusable="false">
       <defs><WorldHatchPattern id="travel-map-fog" /></defs>
