@@ -7,12 +7,15 @@
 // `area_map_view.decodeWindow` and the travel stage's
 // `travel-grid.decodeTravelGrid`, so they share coordinates and rejection.
 //
-// The store validates every body against the exact wire schema before it is
-// committed (protocol/panels/map_panels.js). The decoder still refuses any
-// body whose rows it cannot lay out exactly — a non-wilderness or older
-// schema (node-form wilderness included), a row count or run total other
-// than the window's, an unknown run with any extra key, a revealed run
-// without its exact fields — and returns null rather than guessing.
+// The decoder trusts a validated body: the store validates every body
+// against the exact wire schema before it is committed
+// (protocol/panels/map_panels.js), and that validator alone owns value
+// bounds and cross-field rules. The decoder only refuses a body whose rows
+// it cannot lay out exactly — a non-wilderness or older schema (node-form
+// wilderness included), a row count or run total other than the window's,
+// an unknown run with any extra key, a revealed run without its exact keys —
+// and returns null rather than guessing. Bodies are immutable once
+// committed, so the per-body cache never goes stale.
 //
 // `cells` is row-major and south-to-north: index `row * width + col` is the
 // cell at `(origin.x + col, origin.y + row)`; row 0 is the window's southern

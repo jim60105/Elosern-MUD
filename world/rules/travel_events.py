@@ -388,7 +388,9 @@ def _phase_drafts(start: int, end: int) -> list[_Draft]:
     (the planner's own scan): same-phase endpoints that span a boundary still
     report it, several entries keep their chronological order, and a
     zero-charge interval reports nothing. Each draft carries its boundary's
-    tick.
+    tick. The scan is bounded by the owners' own interval caps (a step's
+    charge, ``time_skip.MAX_SKIP_SECONDS`` for a skip), so it stays a few
+    dozen hour boundaries and well inside the fact's event bound.
     """
     if end <= start:
         return []
