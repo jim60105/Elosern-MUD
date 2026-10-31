@@ -82,9 +82,11 @@ class FakeSession:
 
 
 def _spec(name, presenter, *, on_demand=False):
+    from web.webclient.presentation.map_panels import MAP_PANEL_SCHEMAS
+
     return PresenterSpec(
         name=name,
-        schema_version=1,
+        schema_version=MAP_PANEL_SCHEMAS.get(name, 1),
         unavailable_reason=("missing_data", "無法讀取"),
         presenter=presenter,
         on_demand=on_demand,

@@ -730,7 +730,7 @@ class CheckpointCompletenessTests(EvenniaTest):
         registry.register(
             PresenterSpec(
                 name="area_map",
-                schema_version=1,
+                schema_version=2,
                 unavailable_reason=("missing_data", "無法讀取"),
                 presenter=self._unopened_map,
                 on_demand=True,

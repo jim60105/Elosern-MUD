@@ -761,7 +761,7 @@ def _register_area_map(registry):
     registry.register(
         PresenterSpec(
             name="area_map",
-            schema_version=1,
+            schema_version=2,
             unavailable_reason=("map_unavailable", "地圖目前無法顯示"),
             # An available body violating the map schema degrades to the
             # unavailable map form.
