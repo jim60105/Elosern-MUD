@@ -5,8 +5,9 @@ isolated browser-test runtime: it initializes the temporary SQLite database,
 seeds the deterministic account/character, boots Evennia through the
 ``evennia --settings browser_settings start`` launcher, polls the allocated
 WebClient URL until ready, waits for the server process's ordered startup
-steps to finish (the world bootstrap, not just the portal), and always stops
-only its own processes (via the
+steps to finish (the world bootstrap, not just the portal), waits for the
+Django login form to render (the page every journey opens first), and always
+stops only its own processes (via the
 launcher's AMP shutdown with a direct kill fallback) before removing temporary
 state -- on success, failure, or timeout.
 
@@ -278,6 +279,19 @@ class ManagedServer:
             raise HarnessError(
                 "the server's world bootstrap never finished\n"
                 + self._diagnostics()
+            )
+        # A booted world is not a rendering website: a fresh runtime can answer
+        # the webclient template while Django pages still return an empty 200
+        # during the first-boot restart the login helper documents, and every
+        # journey opens /auth/login/ before anything else. One shard's per-test
+        # server never rendered that form inside the login helper's retry
+        # budget, so the handover is gated on the form itself.
+        self.web_ready = fixtures.web_server_settled(
+            self.runtime, timeout=self.ready_timeout
+        )
+        if not self.web_ready:
+            raise HarnessError(
+                "the Django auth page never rendered\n" + self._diagnostics()
             )
         self.started = True
 

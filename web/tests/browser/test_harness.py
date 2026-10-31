@@ -80,7 +80,11 @@ class ManagedServerFastTests(unittest.TestCase):
             "web.tests.browser.harness.fixtures.world_bootstrapped",
             return_value=True,
         )
-        for patcher in (migrate, seed, poll, booted):
+        settled = mock.patch(
+            "web.tests.browser.harness.fixtures.web_server_settled",
+            return_value=True,
+        )
+        for patcher in (migrate, seed, poll, booted, settled):
             patcher.start()
             self.addCleanup(patcher.stop)
 
@@ -156,7 +160,11 @@ class ManagedServerFastTests(unittest.TestCase):
             "web.tests.browser.harness.fixtures.world_bootstrapped",
             return_value=True,
         )
-        for patcher in (migrate, seed, poll, booted):
+        settled = mock.patch(
+            "web.tests.browser.harness.fixtures.web_server_settled",
+            return_value=True,
+        )
+        for patcher in (migrate, seed, poll, booted, settled):
             patcher.start()
             self.addCleanup(patcher.stop)
 
@@ -257,6 +265,43 @@ class ManagedServerFastTests(unittest.TestCase):
         self.assertIn("world bootstrap never finished", str(caught.exception))
         self.assertFalse(self.server.started)
         self.assertFalse(self.server.world_ready)
+        self.assertFalse(self.runtime.root_dir.exists())
+
+    def test_a_server_without_the_django_login_page_is_not_ready(self):
+        """A booted world is not a rendering website.
+
+        A fresh runtime can answer the webclient template while Django pages
+        still return an empty 200, and every journey logs in through
+        ``/auth/login/`` before anything else. The harness must refuse such a
+        server instead of handing it to a journey that then times out waiting
+        for the login form.
+        """
+        for target, result in (
+            ("run_migrate", _ok_result("migrate")),
+            ("run_seed", _ok_result("seed")),
+        ):
+            patcher = mock.patch(
+                f"web.tests.browser.harness.fixtures.{target}",
+                return_value=result,
+            )
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        for target, value in (
+            ("webclient_ready", True),
+            ("world_bootstrapped", True),
+            ("web_server_settled", False),
+        ):
+            patcher = mock.patch(
+                f"web.tests.browser.harness.fixtures.{target}",
+                return_value=value,
+            )
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        with self.assertRaises(HarnessError) as caught:
+            self.server.start()
+        self.assertIn("auth page never rendered", str(caught.exception))
+        self.assertFalse(self.server.started)
+        self.assertFalse(self.server.web_ready)
         self.assertFalse(self.runtime.root_dir.exists())
 
     def test_boot_failure_raised(self):
@@ -477,6 +522,7 @@ class StartupSerializationTests(unittest.TestCase):
         for target, value in (
             ("webclient_ready", True),
             ("world_bootstrapped", True),
+            ("web_server_settled", True),
         ):
             patcher = mock.patch(
                 f"web.tests.browser.harness.fixtures.{target}",
@@ -567,6 +613,10 @@ class StartupSerializationTests(unittest.TestCase):
             "web.tests.browser.harness.fixtures.world_bootstrapped",
             return_value=True,
         )
+        settled = mock.patch(
+            "web.tests.browser.harness.fixtures.web_server_settled",
+            return_value=True,
+        )
         migrate = mock.patch(
             "web.tests.browser.harness.fixtures.run_migrate",
             return_value=_ok_result("migrate"),
@@ -579,7 +629,7 @@ class StartupSerializationTests(unittest.TestCase):
             "web.tests.browser.harness._startup_lock",
             side_effect=lambda: _RecordingLock(),
         )
-        for patcher in (migrate, seed, poll, booted, lock):
+        for patcher in (migrate, seed, poll, booted, settled, lock):
             patcher.start()
             self.addCleanup(patcher.stop)
 
