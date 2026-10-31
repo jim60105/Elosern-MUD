@@ -591,6 +591,9 @@ class PresentationCoordinator:
         so the group's own publication carries them. A notice the latest
         published batch already carried is inert.
         """
+        # Only the latest published batch is checked here: an older id that
+        # comes back is still inert in the browser, which dedupes by id, and
+        # the replay batch is never another actor's (``_travel_context``).
         published = (
             {event.id for event in self._latest_travel[1]}
             if self._latest_travel is not None

@@ -248,6 +248,12 @@ class DeliveryTests(unittest.TestCase):
             [("ui_update", [f"{GROUP_A}:aaaa0001.0"]), ("ui_snapshot", []), ("ui_snapshot", [])],
         )
 
+    def test_a_result_only_answer_of_the_same_group_keeps_the_notices(self):
+        self.coordinator.enqueue_publication(self._context, result_only=True, group_id=GROUP_A)
+        self._record(_fact(GROUP_A, "aaaa0001"))
+        self.scheduler.run()
+        self.assertEqual(self.session.travel_ids(), [("ui_update", [f"{GROUP_A}:aaaa0001.0"])])
+
     def test_retired_pending_notices_never_publish(self):
         self._record(_fact(GROUP_A, "aaaa0001"))
         self.coordinator.reset()
