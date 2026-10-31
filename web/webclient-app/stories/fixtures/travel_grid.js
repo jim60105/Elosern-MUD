@@ -244,6 +244,8 @@ const DAY_SIGHTINGS = [
 
 /** Morning on the road: wide day sight, a wolf pack in view, three sightings. */
 export const MORNING_GRID = travelGridFixture({ entities: WOLVES, sightings: DAY_SIGHTINGS });
+/** The morning window's exact schema-3 body, for stories that adopt it through the store. */
+export const MORNING_AREA = travelAreaFixture({ entities: WOLVES, sightings: DAY_SIGHTINGS });
 /** Dusk: the amber wash, a narrower sight. */
 export const DUSK_GRID = travelGridFixture({
   lightPhase: "dusk",

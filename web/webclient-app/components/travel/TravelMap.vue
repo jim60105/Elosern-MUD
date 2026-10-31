@@ -44,6 +44,21 @@
 // the walking owner can tell an event that already stopped a walk. Native
 // key repeat emits nothing; modified and composing keys are ignored. The
 // store (stores/elosern/travel.js) owns the aim, the hold and the queue.
+//
+// Route preview (wilderness-travel-planning-ui, design §4.3/§5): Shift with
+// an arrow emits `cursor(dx, dy)` (native repeat moves on), Enter is `step`
+// whatever the cursor (the input owner decides between the aim's step and
+// the cursor's lock) and Escape is `cancel` while an aim, a walk, a cursor
+// or a destination stands. The SVG draws the supplied `travel.plan` result
+// exactly as sent: one stage mark per step (TravelGlyph `route`, the shared
+// stage-display mapping, forced_sleep keeping its severe ring plus the
+// crescent), faint outlines beyond `stop_index`, dimmed steps from
+// `nightfall_index`, the moon on the nightfall step, the camp mark on the
+// stop step and the destination outline (a double frame when locked, a
+// dashed one while only previewed). The keyboard cursor is drawn as corner
+// brackets, distinct from the aim's filled cell and the lock's frame. An
+// empty plan draws no route. The overlay never repaints the canvas, and a
+// screen-reader summary of the route describes the map.
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import WorldHatchPattern from "../WorldHatchPattern.vue";
 import MapNodeGlyph from "../MapNodeGlyph.vue";
@@ -62,8 +77,14 @@ import {
   stepZoom,
 } from "../../lib/travel-camera.js";
 import { travelCellAt } from "../../lib/travel-grid.js";
-import { TRAVEL_GLYPH_CELL } from "../../lib/map_glyphs.js";
+import { TRAVEL_GLYPH_CELL, TRAVEL_GLYPHS } from "../../lib/map_glyphs.js";
+
+const G_DEST = TRAVEL_GLYPHS.destination;
+const G_CURSOR = TRAVEL_GLYPHS.cursor;
+const G_MOON = TRAVEL_GLYPHS.moon;
 import { ARROW_KEYS, directionForKeys } from "./travel-walk-model.js";
+import { stageDisplay } from "./stage-display.js";
+import { routeSummary } from "./leg-model.js";
 
 const props = defineProps({
   // The decoded travel grid (lib/travel-grid.js), or null before adoption.
@@ -79,17 +100,28 @@ const props = defineProps({
   aimReason: { type: String, default: null },
   // The walking state, or null while standing.
   walking: { type: Object, default: null },
-  // The current travel.plan result ({ steps: [{x, y}], destination }), or null.
+  // The current travel.plan result exactly as the server sent it
+  // ({origin, destination, steps: [{cell, seconds, fatigue_stage}], ...}).
   plan: { type: Object, default: null },
   locked: { type: Boolean, default: false },
+  // The previewed or locked destination (`view.travel.planTarget`:
+  // {x, y, label, locked}), or null.
+  target: { type: Object, default: null },
+  // The keyboard destination cursor ({x, y, known, party, label}), or null.
+  cursor: { type: Object, default: null },
+  // The supplied label of the terminal sleep stage, when known.
+  sleepLabel: { type: String, default: null },
   motionLevel: { type: String, default: "full" },
   // The UI scale; null reads the stage's own `--ui-scale`.
   uiScale: { type: Number, default: null },
 });
-const emit = defineEmits(["aim", "hover", "pick", "step", "confirm", "cancel", "hold", "release", "zoom", "retry"]);
+const emit = defineEmits(["aim", "hover", "pick", "step", "cancel", "hold", "release", "zoom", "retry", "cursor"]);
 
 // The accessible name states the controls (design §5).
-const CONTROLS_LABEL = "旅行地圖：方向鍵瞄準相鄰的格子，同時按兩個方向鍵為斜向；Enter 前進一步；按住方向鍵連續前進，放開或按任意鍵停步；Esc 取消瞄準；＋／－ 縮放。";
+const CONTROLS_LABEL =
+  "旅行地圖：方向鍵瞄準相鄰的格子，同時按兩個方向鍵為斜向；Enter 前進一步；按住方向鍵連續前進，放開或按任意鍵停步；" +
+  "Shift＋方向鍵移動目的地游標，Enter 鎖定游標所在的已探明格子並規劃路線；Esc 依序取消瞄準、游標與路線；＋／－ 縮放。";
+const SHIFT_STEPS = Object.freeze({ ArrowUp: [0, 1], ArrowDown: [0, -1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] });
 
 const DIRECTIONS = Object.freeze([
   { key: "north", dx: 0, dy: 1, word: "北" },
@@ -218,7 +250,7 @@ const camera = computed(() => {
   if (!grid) return { tx: 0, ty: 0, cellPx: baseCell.value };
   const plan = props.plan;
   if (plan && props.locked && !props.walking) {
-    const points = [grid.party, ...(Array.isArray(plan.steps) ? plan.steps : []), plan.destination].filter(Boolean);
+    const points = [grid.party, ...(Array.isArray(plan.steps) ? plan.steps.map((s) => s.cell) : []), plan.destination].filter(Boolean);
     return fitRouteCamera({ points, cellPx: baseCell.value, minCellPx: 14 * uiScaleNow.value, safe: measured.value.safe });
   }
   return followCamera({ party: grid.party, cellPx: baseCell.value, stage: measured.value.stage });
@@ -460,6 +492,86 @@ const placedChips = computed(() => {
   return out;
 });
 
+// ── route preview (wilderness-travel-planning-ui) ──────────────────────
+
+// One mark per supplied step, by the shared stage mapping; nothing derived.
+const routeSteps = computed(() => {
+  const plan = props.plan;
+  if (!props.grid || !plan || !Array.isArray(plan.steps) || plan.steps.length === 0) return [];
+  const stop = Number.isInteger(plan.stop_index) ? plan.stop_index : null;
+  const night = Number.isInteger(plan.nightfall_index) ? plan.nightfall_index : null;
+  return plan.steps.map((step, index) => {
+    const display = stageDisplay(step.fatigue_stage) ?? { bucket: "normal", sleep: false };
+    return {
+      index,
+      x: step.cell.x,
+      y: step.cell.y,
+      stage: step.fatigue_stage,
+      bucket: display.bucket,
+      sleep: display.sleep,
+      beyond: stop !== null && index > stop,
+      night: night !== null && index >= night,
+    };
+  });
+});
+const routeMarks = computed(() => {
+  const plan = props.plan;
+  const steps = routeSteps.value;
+  if (!steps.length) return { moon: null, camp: null };
+  const at = (i) => (Number.isInteger(i) && steps[i] ? steps[i] : null);
+  return {
+    moon: at(plan.nightfall_index),
+    camp: plan.stop_reason !== "destination_reached" ? at(plan.stop_index) : null,
+  };
+});
+// The line through the steps: solid to the stop, dashed beyond it.
+const routeLines = computed(() => {
+  const steps = routeSteps.value;
+  if (!steps.length || !party.value) return { walked: "", beyond: "" };
+  const point = (p) => `${lx(p.x)} ${ly(p.y)}`;
+  const kept = steps.filter((s) => !s.beyond);
+  const walked = [party.value, ...kept].map((p, i) => `${i ? "L" : "M"}${point(p)}`).join(" ");
+  const rest = steps.filter((s) => s.beyond);
+  const last = kept.length ? kept[kept.length - 1] : party.value;
+  const beyond = rest.length ? [last, ...rest].map((p, i) => `${i ? "L" : "M"}${point(p)}`).join(" ") : "";
+  return { walked, beyond };
+});
+const destination = computed(() => {
+  const t = props.target;
+  if (!props.grid || !t) return null;
+  const inset = c.value * G_DEST.inset;
+  const inner = c.value * G_DEST.inner;
+  return {
+    x: t.x,
+    y: t.y,
+    locked: !!t.locked,
+    outer: cellBox(t.x, t.y, inset),
+    inner: cellBox(t.x, t.y, inner),
+    radius: c.value * G_DEST.radius,
+  };
+});
+// The destination chip: its supplied name and the plan's step count.
+const destinationChip = computed(() => {
+  const d = destination.value;
+  if (!d) return null;
+  const plan = props.plan;
+  const steps = plan && Array.isArray(plan.steps) && plan.steps.length && Number.isInteger(plan.stop_index) ? plan.stop_index + 1 : null;
+  const label = props.target.label || "目的地";
+  return { left: lx(d.x), top: ly(d.y) - c.value * 0.62, label, steps, locked: d.locked };
+});
+const cursorPath = computed(() => {
+  const k = props.cursor;
+  if (!props.grid || !k) return null;
+  const half = c.value / 2 - c.value * G_CURSOR.inset;
+  const arm = c.value * G_CURSOR.arm;
+  const cx = lx(k.x);
+  const cy = ly(k.y);
+  const corner = (sx, sy) => `M${cx + sx * half} ${cy + sy * (half - arm)} L${cx + sx * half} ${cy + sy * half} L${cx + sx * (half - arm)} ${cy + sy * half}`;
+  return { d: [corner(-1, -1), corner(1, -1), corner(1, 1), corner(-1, 1)].join(" "), known: !!k.known };
+});
+const routeText = computed(() => routeSummary(props.plan, { label: props.target?.label ?? null, sleepLabel: props.sleepLabel }));
+const routeTextId = `travel-route-${Math.random().toString(36).slice(2, 8)}`;
+
 const hoverCell = ref(null);
 const hoverInfo = computed(() => {
   const h = hoverCell.value;
@@ -598,7 +710,13 @@ function consume(event) {
 function onKeyDown(event) {
   if (event.target !== root.value || modified(event)) return;
   if (ARROW_KEYS.includes(event.key)) {
-    if (event.shiftKey) return;
+    if (event.shiftKey) {
+      // The destination cursor: one cell per press, native repeat included.
+      consume(event);
+      const [dx, dy] = SHIFT_STEPS[event.key];
+      emit("cursor", dx, dy, event);
+      return;
+    }
     consume(event);
     // Native repeat of a held arrow is no new input: the walk owner reads
     // it as the hold's continuation.
@@ -617,7 +735,7 @@ function onKeyDown(event) {
     return;
   }
   if (event.key === "Escape") {
-    if (!props.aim && !props.walking) return;
+    if (!props.aim && !props.walking && !props.cursor && !props.target) return;
     consume(event);
     emit("cancel", event);
     return;
@@ -685,6 +803,7 @@ defineExpose({ focusInside, focus: () => root.value?.focus({ preventScroll: true
     :data-cell-px="c"
     role="application"
     :aria-label="CONTROLS_LABEL"
+    :aria-describedby="routeText ? routeTextId : null"
     tabindex="0"
     ref="root"
     @pointermove="onPointerMove"
@@ -741,6 +860,59 @@ defineExpose({ focusInside, focus: () => root.value?.focus({ preventScroll: true
             v-bind="cellBox(aimed.cell.x, aimed.cell.y, 1)"
             rx="3"
           />
+          <g v-if="routeSteps.length" class="travel-map__route" data-testid="travel-map__route">
+            <path v-if="routeLines.walked" class="travel-map__route-line" :d="routeLines.walked" />
+            <path v-if="routeLines.beyond" class="travel-map__route-line is-beyond" :d="routeLines.beyond" />
+            <g
+              v-for="step in routeSteps"
+              :key="`route-${step.index}`"
+              class="travel-map__route-step"
+              :class="{ 'is-beyond': step.beyond, 'is-night': step.night }"
+              :transform="`translate(${lx(step.x)} ${ly(step.y)})`"
+              data-testid="travel-map__route-step"
+              :data-index="step.index"
+              :data-stage="step.stage"
+              :data-bucket="step.bucket"
+              :data-sleep="step.sleep ? 'true' : null"
+              :data-beyond="step.beyond ? 'true' : null"
+              :data-night="step.night ? 'true' : null"
+            >
+              <TravelGlyph kind="route" :state="step.bucket" :sleep="step.sleep" :faint="step.beyond" :size="glyphScale" />
+            </g>
+            <g
+              v-if="routeMarks.moon"
+              :transform="`translate(${lx(routeMarks.moon.x) - c * G_MOON.lift} ${ly(routeMarks.moon.y) - c * G_MOON.lift})`"
+              data-testid="travel-map__route-moon"
+              :data-index="routeMarks.moon.index"
+            >
+              <TravelGlyph kind="moon" :size="glyphScale" />
+            </g>
+            <g
+              v-if="routeMarks.camp"
+              :transform="`translate(${lx(routeMarks.camp.x) + c * G_MOON.lift} ${ly(routeMarks.camp.y) - c * G_MOON.lift})`"
+              data-testid="travel-map__route-camp"
+              :data-index="routeMarks.camp.index"
+            >
+              <TravelGlyph kind="camp" :size="glyphScale" />
+            </g>
+          </g>
+          <g
+            v-if="destination"
+            class="travel-map__destination"
+            :class="{ 'is-locked': destination.locked }"
+            data-testid="travel-map__destination"
+            :data-locked="destination.locked ? 'true' : 'false'"
+          >
+            <rect class="travel-map__destination-outer" v-bind="destination.outer" :rx="destination.radius" />
+            <rect v-if="destination.locked" class="travel-map__destination-inner" v-bind="destination.inner" :rx="destination.radius * 0.6" />
+          </g>
+          <path
+            v-if="cursorPath"
+            class="travel-map__cursor"
+            :class="{ 'is-fog': !cursorPath.known }"
+            :d="cursorPath.d"
+            data-testid="travel-map__cursor"
+          />
           <g v-for="l in landmarks" :key="l.key" :transform="`translate(${lx(l.x)} ${ly(l.y)})`">
             <TravelGlyph kind="landmark" :size="glyphScale * 2.2" test-id="travel-map__landmark" />
           </g>
@@ -784,7 +956,15 @@ defineExpose({ focusInside, focus: () => root.value?.focus({ preventScroll: true
             :style="{ left: `${lx(aimed.cell.x) + (aimed.dx >= 0 ? c * 0.7 : -c * 0.7)}px`, top: `${ly(aimed.cell.y)}px` }"
           >{{ aimText }}</div>
           <div
-            v-else-if="hoverInfo"
+            v-if="destinationChip"
+            class="tm-chip tm-chip--route"
+            :class="{ 'is-locked': destinationChip.locked }"
+            data-side="above"
+            data-testid="travel-map__destination-chip"
+            :style="{ left: `${destinationChip.left}px`, top: `${destinationChip.top}px` }"
+          ><span class="tm-chip__flag" aria-hidden="true">{{ destinationChip.locked ? "◆" : "◇" }}</span>{{ destinationChip.label }}<template v-if="destinationChip.steps">・{{ destinationChip.steps }} 步</template></div>
+          <div
+            v-if="!aimed && hoverInfo && !(destination && destination.x === hoverInfo.x && destination.y === hoverInfo.y)"
             class="tm-chip"
             :class="hoverInfo.known ? 'tm-chip--paper' : 'tm-chip--quiet'"
             data-side="above"
@@ -820,6 +1000,7 @@ defineExpose({ focusInside, focus: () => root.value?.focus({ preventScroll: true
       </div>
     </template>
     <p class="travel-map__live" role="status" data-testid="travel-map__live">{{ announcement }}</p>
+    <p v-if="routeText" :id="routeTextId" class="travel-map__live" data-testid="travel-map__route-text">{{ routeText }}</p>
     <div v-if="failed" class="travel-map__state" data-testid="travel-map__state">
       <span class="travel-map__state-text">{{ stateText }}</span>
       <button
@@ -945,6 +1126,59 @@ defineExpose({ focusInside, focus: () => root.value?.focus({ preventScroll: true
   stroke-width: 1.2;
 }
 
+/* The route preview (wilderness-travel-planning-ui): a faint gold thread
+   through the steps (dashed past the stop), the stage marks above it,
+   dimmed from nightfall; the destination frame and the keyboard cursor. */
+.travel-map__route-line {
+  fill: none;
+  stroke: rgba(228, 200, 142, 0.34);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.travel-map__route-line.is-beyond {
+  stroke: rgba(186, 181, 174, 0.3);
+  stroke-width: 1.4;
+  stroke-dasharray: 2 5;
+}
+.travel-map__route-step.is-night {
+  opacity: 0.6;
+}
+.travel-map__route-step.is-beyond {
+  opacity: 0.55;
+}
+.travel-map.is-walking .travel-map__route {
+  opacity: 0.8;
+}
+.travel-map__destination-outer {
+  fill: rgba(228, 200, 142, 0.08);
+  stroke: var(--gold-400);
+  stroke-width: 1.4;
+  stroke-dasharray: 4 3;
+}
+.travel-map__destination.is-locked .travel-map__destination-outer {
+  fill: rgba(228, 200, 142, 0.14);
+  stroke-width: 1.8;
+  stroke-dasharray: none;
+  filter: drop-shadow(0 0 4px rgba(228, 200, 142, 0.35));
+}
+.travel-map__destination-inner {
+  fill: none;
+  stroke: rgba(242, 222, 170, 0.7);
+  stroke-width: 1;
+}
+.travel-map__cursor {
+  fill: none;
+  stroke: var(--paper-50);
+  stroke-width: 2;
+  stroke-linecap: square;
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.9));
+}
+.travel-map__cursor.is-fog {
+  stroke: var(--paper-400);
+  stroke-dasharray: 2 2;
+}
+
 .tm-chip {
   position: absolute;
   transform: translate(-50%, 0);
@@ -1001,6 +1235,22 @@ defineExpose({ focusInside, focus: () => root.value?.focus({ preventScroll: true
   color: var(--gold-300);
   background: rgba(15, 17, 21, 0.9);
   border: 1px solid var(--gold-600);
+}
+/* The destination chip: dashed while only previewed, a gold plate once
+   locked; the flag differs by shape (open or filled diamond). */
+.tm-chip--route {
+  color: var(--gold-300);
+  background: rgba(15, 17, 21, 0.86);
+  border: 1px dashed rgba(185, 154, 96, 0.7);
+  font-family: var(--f-serif);
+}
+.tm-chip--route.is-locked {
+  background: linear-gradient(180deg, rgba(36, 30, 20, 0.94), rgba(15, 17, 21, 0.94));
+  border: 1px solid var(--gold-500);
+}
+.tm-chip__flag {
+  margin-right: calc(6px * var(--ui-scale));
+  color: var(--gold-400);
 }
 .tm-chip--aim.is-blocked {
   color: var(--paper-400);

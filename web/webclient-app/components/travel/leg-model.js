@@ -48,6 +48,9 @@ const REASONS = Object.freeze({
   capacity_pending: "正在估算腳程",
   capacity_unavailable: "無法估算腳程",
   busy: "上一個行動尚未完成，請稍候。",
+  // A locked plan with nothing else missing: the route walk itself is
+  // route-ui's (wilderness-travel-planning-ui ships no departure).
+  route_pending: "路線行進尚未開放",
 });
 const SLEEP_TICK_LABEL = "力竭倒下";
 
@@ -111,6 +114,38 @@ function capacityTotal(capacity) {
 
 function validPlan(plan) {
   return !!plan && Array.isArray(plan.steps) && plan.steps.length > 0 && Number.isInteger(plan.stop_index);
+}
+
+/** The terminal sleep step of a usable plan up to its stop, or -1. */
+function sleepIndex(plan) {
+  return plan.steps.findIndex((step, i) => i <= plan.stop_index && stageDisplay(step.fatigue_stage)?.sleep === true);
+}
+
+/**
+ * The route preview's accessible text: steps by stage up to the stop, the
+ * nightfall step, the stop and its reason, a terminal sleep step with its
+ * duration, and the planned steps beyond the stop. Display only; every
+ * number is the supplied plan's. Empty for an unusable plan.
+ */
+export function routeSummary(plan, { label = null, sleepLabel = null } = {}) {
+  if (!validPlan(plan)) return "";
+  const counts = Object.fromEntries(STAGE_BUCKETS.map((b) => [b, 0]));
+  plan.steps.forEach((step, i) => {
+    const display = stageDisplay(step.fatigue_stage);
+    if (i <= plan.stop_index && display) counts[display.bucket] += 1;
+  });
+  const stages = STAGE_BUCKETS.filter((b) => counts[b] > 0).map((b) => `${BUCKET_LABELS[b]} ${counts[b]} 步`);
+  const parts = [`路線預覽：前往${label || "目的地"}，走 ${plan.stop_index + 1} 步，約 ${formatDuration(plan.total_seconds)}（${stages.join("、")}）`];
+  if (Number.isInteger(plan.nightfall_index)) parts.push(`第 ${plan.nightfall_index + 1} 步入夜`);
+  const sleep = sleepIndex(plan);
+  if (sleep >= 0) {
+    parts.push(`第 ${sleep + 1} 步${sleepLabel || SLEEP_TICK_LABEL}（這一步約 ${formatDuration(plan.steps[sleep].seconds)}）`);
+  }
+  const stop = STOP_TEXT[plan.stop_reason];
+  if (stop) parts.push(`第 ${plan.stop_index + 1} 步${stop}`);
+  const beyond = plan.steps.length - plan.stop_index - 1;
+  if (beyond > 0) parts.push(`之後還有 ${beyond} 步僅供參考`);
+  return `${parts.join("；")}。`;
 }
 
 function quoteFor(capacity, exitRef) {
@@ -179,11 +214,26 @@ function intentFor(s) {
     }
     return { kind: "blocked", title: `瞄準${s.aim.word}`, detail: s.aim.reason || "無法通行" };
   }
+  if (s.cursor) {
+    const c = s.cursor;
+    if (c.party) return { kind: "cursor", title: "選擇目的地・隊伍所在", detail: "Shift＋方向鍵移動游標・Esc 結束" };
+    if (!c.known) return { kind: "cursor", title: "選擇目的地・未探明", detail: "未探明的格子無法規劃路線" };
+    if (!s.plan && !s.planError) {
+      return { kind: "cursor", title: `選擇目的地・${c.label || "已探明"}`, detail: s.pending ? "正在規劃路線…・Enter 鎖定" : "Enter 鎖定路線・Esc 結束" };
+    }
+  }
+  if (s.planError) {
+    return { kind: "plan-error", title: "無法規劃路線", detail: s.planError.message || "無法規劃這段路線" };
+  }
+  if (!s.plan && s.pending) {
+    return { kind: "plan-pending", title: `前往${s.target?.label || "目的地"}`, detail: "正在規劃路線…" };
+  }
   if (s.plan) {
     const steps = s.plan.stop_index + 1;
     const clock = clockAfter(s.serverTime, s.plan.total_seconds);
     const parts = [`${steps} 步`, formatDuration(s.plan.total_seconds)];
     if (clock) parts.push(`${clock} 停`);
+    if (!s.locked) parts.push("點擊鎖定");
     return {
       kind: "plan",
       title: `前往${s.plan.label || "目的地"}`,
@@ -235,6 +285,13 @@ function intentFor(s) {
  * - `asleep`: a committed status fatigue row is asleep; with a zero
  *   capacity the intent then says a companion sleeps instead of reading the
  *   zero as exhaustion.
+ * - Route preview (wilderness-travel-planning-ui): `pending` (a query waits
+ *   or flies), `planError` (`{code, message}` of the current query),
+ *   `cursor` (the keyboard destination cursor `{known, party, label}`),
+ *   `target` (`{label}` of the previewed destination) and `routeReady`
+ *   (route-ui installed the route walk; until then a departable locked plan
+ *   reads `route_pending`). Intent priority after the aim: the cursor, the
+ *   plan error, the pending query, then the plan.
  */
 export function legView({
   aim = null,
@@ -252,12 +309,18 @@ export function legView({
   busy = false,
   labels = {},
   asleep = false,
+  pending = false,
+  planError = null,
+  cursor = null,
+  target = null,
+  routeReady = true,
 } = {}) {
   const pace = TRAVEL_PACES.includes(preferences?.pace) ? preferences.pace : DEFAULT_TRAVEL_PREFERENCES.pace;
   const stopAtNight = typeof preferences?.stopAtNight === "boolean" ? preferences.stopAtNight : DEFAULT_TRAVEL_PREFERENCES.stopAtNight;
   const usablePlan = validPlan(plan) ? plan : null;
   const state = {
     aim, plan: usablePlan, walking, holding, capacity, pace, stopAtNight, phase, error, serverTime, asleep: !!asleep,
+    locked: !!locked, pending: !!pending, planError, cursor, target,
     stale: STALE_MAP.has(mapStatus),
     capacityState: capacityState(capacity),
   };
@@ -300,6 +363,9 @@ export function legView({
   else {
     const parts = legend.entries.map((e) => `${e.label} ${e.count} 格`);
     summary = `${legend.caption}：${total > 0 ? parts.join("、") : "已無法再走"}${legend.stop ? `，${legend.stop}` : ""}`;
+    // The terminal sleep step is named with its place in the leg.
+    const sleep = usablePlan ? sleepIndex(usablePlan) : -1;
+    if (sleep >= 0) summary += `，第 ${sleep + 1} 步${labels.forced_sleep ?? SLEEP_TICK_LABEL}`;
   }
   gauge = Object.freeze({ ...gauge, summary });
 
@@ -318,6 +384,7 @@ export function legView({
     else if (!usablePlan || !locked) code = "no_plan";
     else if (state.capacityState !== "ready") code = `capacity_${state.capacityState}`;
     else if (busy) code = "busy";
+    else if (!routeReady) code = "route_pending";
     primary = { kind: "depart", label: "出發", hint: "Enter", enabled: code === null, code, reason: REASONS[code] ?? null };
   }
   const sideCode = moving ? "moving" : state.stale ? "stale" : busy ? "busy" : null;
