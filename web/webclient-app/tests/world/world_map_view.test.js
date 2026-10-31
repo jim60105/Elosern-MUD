@@ -45,6 +45,13 @@ const { validateWorldMapPanel } = MapPanels;
 const SIGNATURE = "world|elosern|km";
 const FRAME = { width: 960, height: 600 }; // the component's provisional frame in jsdom
 
+// This suite mounts the whole world map and drives real commits, so an
+// individual test can exceed Vitest's default budget on a shared runner (the
+// evennia evidence job runs this file inside a worker alongside four parallel
+// suites): the file carries the same explicit headroom the project's other
+// mount-heavy suites use.
+vi.setConfig({ testTimeout: 20000 });
+
 let wrappers = [];
 afterEach(() => {
   for (const w of wrappers) w.unmount();
