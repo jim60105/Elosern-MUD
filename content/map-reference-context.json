@@ -176,7 +176,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "8c5172a6eccef57e179d5071412273a7fad617a2a0c80172c635546b12619d26",
+  "fingerprint": "d597827d83b71d965d3b1b2f7dd859f87f587e5ec458cb0a8b74bab5d86dc050",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -956,7 +956,7 @@
     "world/lore/player_presets/__init__.py": "7640ad1e9fcdee37be50038eb956441baf7ed9f347b4ffc0f748b695c887fee0",
     "world/lore/player_presets/assembly.py": "f285d3efdca8bb76276f5a5c6696f0a3a43c775516affaa8443ab89239cc30a4",
     "world/lore/player_presets/data_pack_cards.py": "146e1580652003ac15a4c22e396d400da608a4309b4c6f33f76fb931010c17f9",
-    "world/lore/player_presets/data_story_cards.py": "2f776d09a2017bd4f0da8e966d212a9d5301ea3065c86b98f99341327d82b735",
+    "world/lore/player_presets/data_story_cards.py": "1063276947f4cd14f8196a0dfea55b3bfc9654f0aa924f1b42e7731a50362489",
     "world/lore/player_presets/validation.py": "084c3ff9755e870076bf84f4a0b617968fe5967285519e988eccd120edb3bca9",
     "world/lore/player_presets/vocab.py": "a9563a1af1e464e4f018de4a1b1158cae7aeed2573ca42a13244893d2f1bfc71",
     "world/lore/races.py": "d1d3672182c64eae1dfb17f1fe16962c9db5f51fb5a0b7404e70d88b20887ae4",
