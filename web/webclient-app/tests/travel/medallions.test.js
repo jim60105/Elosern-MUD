@@ -102,7 +102,7 @@ describe("the medallion strip", () => {
     expect(items[1].get(".party-medallion__stage").text()).toBe("合成力竭");
     // Sleep is a shape, not a colour: only the sleeper wears the crescent.
     expect(items.map((item) => item.find('[data-testid="party-medallion__moon"]').exists())).toEqual([false, false, true]);
-    expect(items[2].attributes("aria-label")).toBe("合成乙：精力 50%（合成睡眠）");
+    expect(items[2].get('[data-testid="party-medallion__sr"]').text()).toBe("合成乙：精力 50%（合成睡眠）");
     // The 70 / 40 / 20 % notches.
     expect(items[0].findAll(".party-medallion__notch").map((n) => n.attributes("style"))).toEqual(
       ["left: 20%;", "left: 40%;", "left: 70%;"],
@@ -132,5 +132,27 @@ describe("the medallion strip", () => {
     // The dock does not repeat the fatigue rows the medallions show.
     expect(vitals.find('[data-testid="status-panel__fatigue"]').exists()).toBe(false);
     expect(vitals.findAll('[data-testid="party-medallion"]')).toHaveLength(1);
+  });
+
+  it("never reveals the dock outside travel for a further traveller's row alone", async () => {
+    const h = liveTravel({
+      wrappers,
+      subject: "grid:t_synth_map:2,0",
+      panels: panelsAt("grid:t_synth_map:2,0", {
+        status: fx.statusPanel({
+          resources: { hp: { current: 100, maximum: 100 }, mp: { current: 50, maximum: 50 }, sp: { current: 40, maximum: 40 } },
+          fatigue: [row("42", "影行者"), row("7", "合成甲", { reserve_percent: 3, stage: "severe", label: "合成力竭", severity: "harmful" })],
+        }),
+      }),
+    });
+    await tick();
+    expect(h.store.view.vitals.visible).toBe(false);
+    // The source's own adverse row still reveals it.
+    h.publish({ status: fx.statusPanel({
+      resources: { hp: { current: 100, maximum: 100 }, mp: { current: 50, maximum: 50 }, sp: { current: 40, maximum: 40 } },
+      fatigue: [row("42", "影行者", { reserve_percent: 3, stage: "severe", label: "合成力竭", severity: "harmful" })],
+    }) });
+    await tick();
+    expect(h.store.view.vitals.visible).toBe(true);
   });
 });

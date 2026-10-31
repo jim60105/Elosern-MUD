@@ -20,6 +20,7 @@ from world.rules.fatigue import (
     read_optional_fatigue_state,
     reserve_percent,
 )
+from world.observability import log_debug
 from world.rules.status_display import display_for
 
 from .models import FatigueSubjectView, StatusQueryError
@@ -106,6 +107,13 @@ def present_fatigue_subjects(
             if read_optional_fatigue_state(member) is None:
                 continue
             rows.append(build_fatigue_subject(member))
-        except (FatigueStateError, StatusQueryError):  # observability: ignore R2: an unreadable companion simply has no row; the required owner/controlled rows still fail closed
+        except (FatigueStateError, StatusQueryError) as error:
+            # An unreadable companion simply has no row; the required
+            # owner/controlled rows still fail closed.
+            log_debug(
+                "status_fatigue_row_skipped",
+                context={"char": identity, "traveller": str(getattr(traveller, "pk", ""))},
+                exc=error,
+            )
             continue
     return tuple(rows)

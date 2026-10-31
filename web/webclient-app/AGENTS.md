@@ -165,7 +165,13 @@ dream or creation surface owns the stage. There is no server travel mode.
 - `PartyMedallions` shows the controlled body once, then each member whose
   own `status.fatigue` row is committed (status v5 emits one per
   source-present traveller), with its supplied reserve, stage label and
-  `asleep` crescent; a missing row reads unavailable, never full.
+  `asleep` crescent; a missing row reads unavailable, never full. Only the
+  status source's and the controlled body's rows can reveal the vitals dock;
+  a further traveller's row never surfaces it by itself.
+- Focus never falls to the document from the stage: a remounted view or the
+  retry control's removal moves it to the `TravelMap` section, and leaving
+  travel returns it to the shell's focus home. One mounted `role="status"`
+  line speaks the map state.
 
 ## Styling pitfall
 

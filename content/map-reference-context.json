@@ -176,7 +176,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "e85bc754230b371205c7019c129f5e3f2632911d2c90d1cfaddc14ef3c3b5c43",
+  "fingerprint": "f1a9a86f4bce87d927149b79580410a39dd6260dd58ae97b08adce21443eeab3",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -1261,7 +1261,7 @@
     "world/rules/status_query/character.py": "cbf8a06c06b98105bcacde85bcdf280bb0cf07fb10d295d91519315e2aa36707",
     "world/rules/status_query/conditions.py": "fbd38c4ed1a07442e6c4a7530c28153f0d21ba91d8346f7f2ec73d3078ac84d3",
     "world/rules/status_query/context.py": "51417f8da2aab4d23963edc1c7f5a0dee3b91352f6efbd926bb1b3f96238e14e",
-    "world/rules/status_query/fatigue.py": "a51d700de15a703f07acc354cfed3e74e32759813147261cfa689aabf49edf00",
+    "world/rules/status_query/fatigue.py": "fcdcc96444a7d8895905aaad0c422b278cfbf33f26f0331f6836afbd7527e4c5",
     "world/rules/status_query/models.py": "ad2e80794526936ed86f69070562866563ad020504a9694ee00313ee3692e4de",
     "world/rules/status_query/provenance.py": "a3288f8c9c47b45fbb9a93e0f9a37bad0cbecc5f0cdaf68717c2270503dfa4e3",
     "world/rules/status_query/readers.py": "dd8a659d5226379f648cd23dca384d6ad108ef0270e4e3ea9b5483f3554ebbcc",

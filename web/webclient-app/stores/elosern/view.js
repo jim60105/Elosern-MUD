@@ -178,7 +178,14 @@ export function applyView(ctx) {
           mode: rs.mode,
           resources: statusPanel.resources,
           conditions: statusPanel.conditions,
-          fatigue: statusPanel.fatigue,
+          // Only the status source and the controlled body reveal the dock;
+          // a further present traveller's row (status v5) is the travel
+          // medallions' and the dock's own list's, never a reason to
+          // surface the dock by itself.
+          fatigue: Array.isArray(statusPanel.fatigue)
+            ? statusPanel.fatigue.filter((row, index) =>
+                index === 0 || String(row?.identity) === String(statusPanel.actor?.identity))
+            : statusPanel.fatigue,
           lowHp,
         }),
       };

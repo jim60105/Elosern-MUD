@@ -216,6 +216,75 @@ describe("failed reads and recovery", () => {
   });
 });
 
+describe("correlation edges", () => {
+  it("adopts a newer area body that replaced its own before it settled", async () => {
+    const h = liveTravel({ wrappers });
+    await tick();
+    const request = h.mapViews().at(-1);
+    const revision = h.next();
+    h.result(request, revision);
+    h.publish({ area_map: wildernessArea() });
+    // A later publication replaces the map before the owner compares.
+    h.publish({ area_map: wildernessArea() });
+    await tick();
+    expect(travel(h.store).mapStatus).toBe("ready");
+  });
+
+  it("keeps refreshing, not failed, when a cause already waits", async () => {
+    const h = liveTravel({ wrappers });
+    await ready(h);
+    h.publish({ local_map: LOCAL_MAP_WILDERNESS_RETURN_SAMPLE });
+    await tick();
+    const request = h.mapViews().at(-1);
+    h.publish({}, { server_time: fx.serverTime({ minute: 30 }) });
+    await tick();
+    h.result(request, h.store.view.revision, "rejected", "busy");
+    await tick();
+    expect(travel(h.store).mapStatus).toBe("refreshing");
+    expect(h.w.find('[data-testid="travel-map__state"]').exists()).toBe(false);
+    expect(h.mapViews()).toHaveLength(3);
+  });
+
+  it("asks exactly once after a disconnect and a reconnect", async () => {
+    const h = liveTravel({ wrappers });
+    await ready(h);
+    h.publish({ local_map: LOCAL_MAP_WILDERNESS_RETURN_SAMPLE });
+    await tick();
+    expect(h.mapViews()).toHaveLength(2);
+    h.store.setConnected(false);
+    await tick();
+    h.store.beginTransport(2);
+    h.store.setConnected(true);
+    await tick();
+    h.accept("ui_snapshot", fx.snapshot({ presentation_epoch: fx.EPOCH_B, revision: 1, panels: panelsAt(WILD_SUBJECT) }));
+    await tick();
+    await tick();
+    expect(h.mapViews()).toHaveLength(3);
+    expect(h.mapViews().at(-1).presentation_epoch).toBe(fx.EPOCH_B);
+  });
+
+  it("publishes nothing for an unchanged map state", async () => {
+    const h = liveTravel({ wrappers });
+    await ready(h);
+    const view = h.store.view;
+    h.store.setTravelMap({ status: "ready", area: view.travel.area });
+    expect(h.store.view).toBe(view);
+  });
+
+  it("keeps focus in the stage when the retry control goes away", async () => {
+    const h = liveTravel({ wrappers });
+    await tick();
+    await h.answerMap(unavailableArea());
+    const retry = h.w.get('[data-testid="travel-map__retry"]');
+    retry.element.focus();
+    await retry.trigger("click");
+    await tick();
+    expect(h.w.find('[data-testid="travel-map__retry"]').exists()).toBe(false);
+    expect(document.activeElement).toBe(h.w.get('[data-testid="travel-map"]').element);
+    expect(h.w.get('[data-testid="travel-map__live"]').text()).toBe("正在展開這一帶的地圖。");
+  });
+});
+
 describe("movement waits for the current map", () => {
   it("suspends the compass while refreshing and stops it on a failed read", async () => {
     const h = liveTravel({ wrappers });

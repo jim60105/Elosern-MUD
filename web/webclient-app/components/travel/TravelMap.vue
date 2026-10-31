@@ -15,8 +15,14 @@
 //     status line and a 重新整理 control that asks the owner for one more
 //     read. That control is the player's own input, never a timer.
 // Each adopted body remounts the view keyed by its current node, so the
-// opening fit always frames the party's own cell.
-import { computed } from "vue";
+// opening fit always frames the party's own cell (a pan or zoom is the
+// player's look around one place, not kept across a step). Focus inside the
+// view, or on the retry control, never falls to the document when that
+// element goes away: it moves to the stage section itself.
+//
+// The section's name is constant; the status is spoken by one live region
+// that stays mounted and only changes its text.
+import { computed, nextTick, ref, watch } from "vue";
 import AreaMapView from "../AreaMapView.vue";
 import WorldHatchPattern from "../WorldHatchPattern.vue";
 
@@ -33,12 +39,38 @@ const showMap = computed(() => !!props.area && props.status !== "retired");
 const stateText = computed(() =>
   props.status === "invalid" ? "無法讀取這一帶的地圖。" : "這一帶的地圖暫時無法更新。",
 );
-const label = computed(() => {
-  if (!showMap.value) return "旅行地圖：正在展開這一帶的地圖";
-  if (props.status === "ready") return `旅行地圖：${props.area.title}`;
-  return `旅行地圖：${props.area.title}（尚未更新）`;
+const announcement = computed(() => {
+  if (failed.value) return stateText.value;
+  if (!showMap.value) return "正在展開這一帶的地圖。";
+  return props.status === "ready" ? `${props.area.title}的地圖已更新。` : "";
 });
 const viewKey = computed(() => (props.area ? `${props.area.map_id}|${props.area.current_node}` : "none"));
+
+const root = ref(null);
+function focusInside() {
+  const active = typeof document === "undefined" ? null : document.activeElement;
+  return !!(root.value && active && active !== root.value && root.value.contains(active));
+}
+function keepFocus() {
+  nextTick(() => {
+    const active = document.activeElement;
+    if (!active || active === document.body || !root.value?.contains(active)) root.value?.focus({ preventScroll: true });
+  });
+}
+// A remount of the view or the retry control's removal: rescue focus that
+// was inside before the patch.
+watch(
+  () => [viewKey.value, failed.value, showMap.value],
+  () => {
+    if (focusInside()) keepFocus();
+  },
+  { flush: "pre" },
+);
+function onRetry() {
+  emit("retry");
+  keepFocus();
+}
+defineExpose({ focusInside });
 </script>
 
 <template>
@@ -47,7 +79,9 @@ const viewKey = computed(() => (props.area ? `${props.area.map_id}|${props.area.
     data-testid="travel-map"
     :data-map-status="status"
     :data-map-shown="showMap ? 'true' : 'false'"
-    :aria-label="label"
+    aria-label="旅行地圖"
+    tabindex="-1"
+    ref="root"
   >
     <svg class="travel-map__fog" aria-hidden="true" focusable="false">
       <defs><WorldHatchPattern id="travel-map-fog" /></defs>
@@ -56,13 +90,14 @@ const viewKey = computed(() => (props.area ? `${props.area.map_id}|${props.area.
     <div v-if="showMap" class="travel-map__view" data-testid="travel-map__view">
       <AreaMapView :key="viewKey" :area="area" :show-detail="false" />
     </div>
-    <div v-if="failed" class="travel-map__state" role="status" data-testid="travel-map__state">
+    <p class="travel-map__live" role="status" data-testid="travel-map__live">{{ announcement }}</p>
+    <div v-if="failed" class="travel-map__state" data-testid="travel-map__state">
       <span class="travel-map__state-text">{{ stateText }}</span>
       <button
         type="button"
         class="travel-map__retry"
         data-testid="travel-map__retry"
-        @click="emit('retry')"
+        @click="onRetry"
         @keydown.enter.stop
         @keydown.space.stop
       >重新整理</button>
@@ -80,6 +115,20 @@ const viewKey = computed(() => (props.area ? `${props.area.map_id}|${props.area.
   overflow: hidden;
   background:
     radial-gradient(90% 80% at 42% 38%, #221f1a 0%, #161411 52%, var(--ink-950) 100%);
+}
+.travel-map:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--gold-400);
+}
+.travel-map__live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 .travel-map__fog {
   position: absolute;

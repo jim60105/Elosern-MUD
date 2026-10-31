@@ -270,7 +270,10 @@ class TravelLayoutTests(BrowserAcceptanceTest):
             " el.querySelector('[data-testid=\"party-medallion__bar\"]').dataset.reserve])"
         )
         self.assertEqual(facts, [["true", "false", "73"], ["false", "true", "2"], ["false", "false", "38"]])
-        self.assertEqual(medallions.nth(2).get_attribute("aria-label"), "合成乙：精力 38%（合成疲勞）")
+        self.assertEqual(
+            medallions.nth(2).locator('[data-testid="party-medallion__sr"]').text_content(),
+            "合成乙：精力 38%（合成疲勞）",
+        )
         self.assertEqual(page.locator('[data-testid="party-medallion__moon"]').count(), 1)
         # The dock never repeats the medallions' fatigue lines.
         self.assertEqual(page.locator('[data-testid="status-panel__fatigue"]').count(), 0)

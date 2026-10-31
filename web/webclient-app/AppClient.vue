@@ -176,6 +176,15 @@ const travelMoveStopped = computed(
   () => travelLayout.value && travelMapStatus.value !== "ready" && travelMapStatus.value !== "refreshing",
 );
 const travelStageCss = computed(() => store.view.motionLevel !== "off");
+// Leaving travel removes the map; focus that was on it returns to the
+// shell's focus home instead of falling to the document.
+watch(travelLayout, async (shown, was) => {
+  if (shown || !was) return;
+  await nextTick();
+  await nextTick();
+  const active = typeof document === "undefined" ? null : document.activeElement;
+  if (!active || active === document.body) shellRef.value?.restoreFocusHome?.();
+});
 // The map drawer (redesign-map-drawer): the area/world tab, the per-tab
 // session memory and the on-demand `map.view` requests; its 前往 goes
 // through the same `explore.move` seam as the minimap.

@@ -58,6 +58,12 @@ export function useTravelMap(store) {
     publish();
   }
 
+  // A failed read while another cause already waits is not the stage's
+  // state: the queued request is about to ask again.
+  function fail(next) {
+    setStatus(pending ? "refreshing" : next);
+  }
+
   // Every cause one publication raises (entry, a changed node or time, a
   // recovery snapshot) runs in the same watcher pass; the send waits for the
   // pass to end, so they all leave as one request.
@@ -104,9 +110,9 @@ export function useTravelMap(store) {
 
   function adopt(body) {
     if (!body || body.available === false) {
-      setStatus("unavailable");
+      fail("unavailable");
     } else if (decodeTravelGrid(body) === null) {
-      setStatus("invalid");
+      fail("invalid");
     } else {
       adopted = body;
       // A cause that arrived meanwhile still owes a fresher map.
@@ -124,15 +130,18 @@ export function useTravelMap(store) {
         awaiting.revision = result.presentationRevision;
       } else {
         awaiting = null;
-        setStatus("unavailable");
+        fail("unavailable");
       }
     }
     if (awaiting && awaiting.revision !== null && v.revision !== null && v.revision >= awaiting.revision) {
+      // The request's own body, or a newer one published after it (a later
+      // publication may already have replaced it), counts; one published
+      // before the request was sent never does.
       const publication = v.mapPublications?.area_map;
-      const own = publication === awaiting.revision && publication > awaiting.mark;
+      const own = publication !== undefined && publication >= awaiting.revision && publication > awaiting.mark;
       awaiting = null;
       if (own) adopt(v.maps?.area_map ?? null);
-      else setStatus("unavailable");
+      else fail("unavailable");
     }
     // A completed room look owes the stage a fresh map.
     if (lookRequest && result && result.requestId === lookRequest.requestId && result.epoch === lookRequest.epoch) {
@@ -171,6 +180,9 @@ export function useTravelMap(store) {
     { immediate: true },
   );
 
+  // The owner's own area publication never changes the canonical node or
+  // time, so it cannot re-arm itself here; `sentKey` keeps a late watcher
+  // pass for an already-requested change from asking twice.
   watch(placeKey, (now, before) => {
     if (before !== undefined && now !== before && now !== sentKey) want();
   });

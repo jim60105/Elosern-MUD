@@ -48,8 +48,10 @@ const rows = computed(() =>
       :data-stage="m.stage"
       :data-asleep="m.asleep ? 'true' : 'false'"
       :data-controlled="m.controlled ? 'true' : 'false'"
-      :aria-label="m.accessibleName"
     >
+      <!-- The member's reading as real text (a plain list item's own label is
+           not reliably exposed); everything painted below is decorative. -->
+      <span class="party-medallion__sr" data-testid="party-medallion__sr">{{ m.accessibleName }}</span>
       <span class="party-medallion__ring" aria-hidden="true">
         <span class="party-medallion__face">
           <AvatarArtwork
@@ -102,6 +104,19 @@ const rows = computed(() =>
   gap: calc(4px * var(--ui-scale));
   width: calc(64px * var(--ui-scale));
 }
+.party-medallion__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.party-medallion {
+  position: relative;
+}
 .party-medallion__ring {
   position: relative;
   display: block;
@@ -114,7 +129,20 @@ const rows = computed(() =>
   box-sizing: border-box;
 }
 /* The controlled body: a brighter rim and a second, outer hairline. */
-.party-medallion.is-controlled .party-medallion__ring {
+.party-medallion.is-controlled .party-medallion__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.party-medallion {
+  position: relative;
+}
+.party-medallion__ring {
   background: linear-gradient(160deg, var(--paper-50), var(--gold-300) 45%, var(--gold-500));
   box-shadow:
     0 0 0 calc(2px * var(--ui-scale)) var(--ink-950),

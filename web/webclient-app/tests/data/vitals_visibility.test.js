@@ -151,9 +151,11 @@ describe("isVitalsVisible (webclient-retire-redundant-hud, design D2)", () => {
     store.beginTransport(1);
     store.setConnected(true);
     store.setLoggedIn(true);
-    const message = (revision, fatigue) => fx.snapshot({
+    // Under possession the status actor names the controlled body (status
+    // presenter), so its own row is one of the two that reveal the dock.
+    const message = (revision, fatigue, actor = "42") => fx.snapshot({
       revision, presentation_epoch: fx.EPOCH_A, mode: "exploration",
-      panels: { status: fx.statusPanel({ resources: fullResources, fatigue }) },
+      panels: { status: fx.statusPanel({ resources: fullResources, fatigue, actor: { identity: actor } }) },
     });
     expect(store.receive(1, "ui_snapshot", [message(1, [{
       identity: "42", name: "影行者", reserve_percent: 80, stage: "normal",
@@ -169,7 +171,7 @@ describe("isVitalsVisible (webclient-retire-redundant-hud, design D2)", () => {
         identity: "77", name: "同伴", reserve_percent: 2, stage: "forced_sleep",
         label: "強制睡眠", severity: "critical", restriction: "沉睡中，無法行動", asleep: true,
       },
-    ]), base_revision: 1, removed_panels: [] }], {}).accepted).toBe(true);
+    ], "77"), base_revision: 1, removed_panels: [] }], {}).accepted).toBe(true);
     expect(store.view.vitals.visible).toBe(true);
   });
 
