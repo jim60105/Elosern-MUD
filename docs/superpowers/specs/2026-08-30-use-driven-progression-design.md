@@ -242,9 +242,10 @@ prerequisites: tuple[SkillPrerequisite, ...] = ()
 | 不滅鳳凰焰（`phoenix_eternal_flame`） | (`dragon_flame`, 8) | 10（樹冠） |
 
 其餘火系姊妹法術（業火纏繞 `infernal_wrap`、煉獄業火 `hellfire`、焚世終焰
-`world_ending_blaze`）由同一輪內容工作補上各自的邊。五個元素精通被動（火焰精通
-`fire_mastery` 等）是 PASSIVE，因此不是樹節點。沒有東西會使用它們，它們由匯入或
-授予取得，剩下的唯一機械角色是下方 freeform 資格的 key-presence 檢查。
+`world_ending_blaze`）由同一輪內容工作補上各自的邊。元素精通被動（火焰精通
+`fire_mastery` 等）是 PASSIVE，因此不是樹的「節點」，卻是**整棵樹的獎勵**：每個精通
+宣告其屬性所有一般分支的最低階節點為前置，所以持有它代表整條系譜都已依法練滿，並可
+透過一般練習自動取得。它的機械角色是下方 freeform 資格的合法閉包檢查，不是 key-presence。
 
 ### 9.2 門檻
 
@@ -269,8 +270,9 @@ def can_use_skill(entity, skill) -> bool:
   的熟練度見下方 auto-seed。
 - 五個 `cost_tiers` 階層保留為選單與稱號 registry 階層謂詞用的資料標籤，不再承載門
   檻值。
-- **Freeform 規模階梯改錨**（progression.yaml 常數）：資格仍需該元素精通（對已持有
-  的 `<element>_mastery` 做 key 檢查，例如火焰精通 `fire_mastery`）；之後允許的
+- **Freeform 規模階梯改錨**（progression.yaml 常數）：資格仍需該元素精通依法持有
+  （`<element>_mastery` 必須是登錄在冊的精通列，且其完整前置閉包直接持有並達標；例如
+  火焰精通 `fire_mastery`）；之後允許的
   scale 讀該技能自身熟練度：0.25 無條件、0.5 ≥1、1.0 ≥3、2.0 ≥6、4.0 ≥10。與 D6
   上限的交互是刻意的：衍生 cap 小於 10 的中段技能會停在 cap 允許的最高規模（例如
   cap 5 對應最大 scale 2.0）；scale 4.0 只有樹冠技能（衍生 cap 為預設 10）能觸
@@ -351,7 +353,7 @@ class LineageChainView:
     root_skill_key: str
     element_or_style_zh: str
     nodes: tuple[LineageNodeView, ...]   # topological order
-    consumed: bool                        # every node capped
+    consumed: bool                        # ACTIVE: owned+usable+capped / PASSIVE: owned+usable
     meter: float                          # 0..1 shallowest-uncapped progress
 @dataclass(frozen=True)
 class LineageView:

@@ -12,12 +12,12 @@ Define the pure skill-lineage read model and its user surfaces: the bounded vers
 - **THEN** `LineageNodeView` carries `skill_key`, `display_name_zh`, `owned`, `usable`, `ready`, `level`, `xp_into_level`, `xp_to_next_level`, `capped`, `prereq_text_zh`, `depth`; `LineageEdgeView` carries `from_key`, `to_key`, `min_level`; `LineageGraphView` carries `graph_id`, `group_label_zh`, `root_keys`, `nodes`, `edges`, `owned_count`, `total_count`, `consumed`; and `LineageView` carries `graphs`, `completed_count`, `total_count`
 
 #### Scenario: A capped mid-tree node reports saturation
-- **WHEN** the view is built for an entity whose `fire_arrow` practice has saturated at its derived cap
+- **WHEN** the view is built for a fixed synthetic entity whose `t_root` practice has saturated at its derived cap
 - **THEN** the node carries `capped == True`, `xp_to_next_level == 0`, and `usable` agrees with `can_use_skill`
 
 #### Scenario: A locked node names its missing edge
-- **WHEN** the view is built for an entity owning `firestorm` with `scorching_wave` level 2
-- **THEN** the `firestorm` node carries `usable == False` and `prereq_text_zh` naming 灼熱波動 at Lv.3
+- **WHEN** the view is built for a fixed synthetic entity owning `t_child` with `t_parent` level 2
+- **THEN** the `t_child` node carries `usable == False` and `prereq_text_zh` naming the synthetic parent at Lv.3
 
 #### Scenario: The view is byte-identical across builds and writes nothing
 - **WHEN** the view is built twice for one entity with no state change in between
@@ -48,8 +48,8 @@ Define the pure skill-lineage read model and its user surfaces: the bounded vers
 - **THEN** it SHALL NOT create, mutate, or persist any entity or world state
 
 #### Scenario: Edges carry their minimum level
-- **WHEN** 冰槍 requires 冰錐術 Lv 3
-- **THEN** the ice graph carries exactly one edge from 冰錐術 to 冰槍 with `min_level == 3`, and a two-parent merge node carries one edge per parent
+- **WHEN** a synthetic child requires its synthetic parent at Lv.3
+- **THEN** the synthetic graph carries exactly one edge from parent to child with `min_level == 3`, and a two-parent merge node carries one edge per parent
 
 #### Scenario: Ready marks an unowned node whose prerequisites are met
 - **WHEN** an identity/effect-eligible node is unowned and its directly owned prerequisites meet every edge, including the full lawful closure for an elemental mastery

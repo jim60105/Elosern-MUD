@@ -3,8 +3,9 @@
 Element mastery is the learned whole-tree reward of one element: the mastery
 passive follows every ordinary branch of its element's catalog, so holding it
 means having practised the whole lineage, and holding it lawfully is what
-entitles freeform scaling of that element's eligible spells. Everything here is
-a pure, side-effect-free query; nothing in this capability writes game state.
+entitles freeform scaling of that element's eligible spells. The entitlement
+and scale-derivation queries are pure and write no state; the acquisition
+itself is written by the progression rules under their own transaction.
 
 ## Requirements
 
@@ -14,56 +15,44 @@ eligibility, and a lawful directly owned prerequisite closure meeting every decl
 threshold; the query SHALL validate the element first and remain side-effect-free.
 
 #### Scenario: A mastery holder's scale set follows the cast skill's proficiency ladder
-- **WHEN** `freeform_scales_for(entity, skill)` is called for a fire skill on an entity whose
-  `owned_keys()` contains `"fire_mastery"` and whose proficiency in THAT skill reaches 10
-- **THEN** it returns `(0.25, 0.5, 1.0, 2.0, 4.0)` in ascending order; at level 0 it returns
-  `(0.25,)`, at level 1 `(0.25, 0.5)`, at level 3 `(0.25, 0.5, 1.0)`, at level 6
-  `(0.25, 0.5, 1.0, 2.0)`
+- **WHEN** an actor lawfully owns a synthetic element's mastery and a synthetic ladder assigns successive scales to proficiency levels
+- **THEN** the returned ascending scale set contains exactly the rungs reached by the cast skill's own proficiency and derived cap
 
 #### Scenario: A sibling skill's proficiency never raises the set
-- **WHEN** the entity holds level-10 proficiency in one fire skill and level 0 in another
-- **THEN** `freeform_scales_for` returns `(0.25,)` for the level-0 skill regardless of the sibling
+- **WHEN** a lawful mastery owner has greater proficiency in one synthetic spell than another spell of the same element
+- **THEN** the second spell's scale set remains limited to its own proficiency
 
 #### Scenario: An entity without mastery receives an empty set
-- **WHEN** `freeform_scales_for(entity, skill)` is called on an entity without the element's
-  mastery, including one with a high magic level and one holding only a `ConferredSkillGrant`
-  referencing `<element>_mastery`
-- **THEN** it returns `()` in both cases
+- **WHEN** an actor lacks direct mastery ownership or holds only a conferred mastery
+- **THEN** the freeform scale set is empty regardless of innate magic or other proficiency
 
 #### Scenario: An unknown element fails closed
-- **WHEN** `freeform_mastery_entitled(entity, "not_an_element")` is called on an entity owning
-  `"not_an_element_mastery"`
-- **THEN** it raises `ValueError` and writes no state
+- **WHEN** entitlement is queried for an unregistered element, even with a fabricated matching mastery key
+- **THEN** the query raises a validation error before ownership can grant entitlement and writes nothing
 
 #### Scenario: freeform_scales_for is the single ladder authority
-- **WHEN** `world/rules/progression.py`'s `freeform_scales_for(entity, skill) -> tuple[float, ...]`
-  is called
-- **THEN** it returns `()` for a skill with no element or an entity that is not
-  `freeform_mastery_entitled` for that skill's element, and otherwise the ascending rungs of the
-  `progression.yaml` `freeform_scale_ladder` whose `min_level` the entity's OWN
-  `skill_proficiency_level` for THAT SKILL reaches — 0.25 unconditionally for an entitled actor,
-  0.5 at level >= 1, 1.0 at >= 3, 2.0 at >= 6, 4.0 at >= 10
+- **WHEN** any consumer requests scales for a skill
+- **THEN** one shared derivation returns an empty tuple for absent element or unlawful mastery, otherwise the authored ascending proficiency rungs bounded by that skill's cap
 
 #### Scenario: Entitlement grants no scale by itself
-- **WHEN** `freeform_mastery_entitled` returns `True`
-- **THEN** it SHALL grant no scale by itself
+- **WHEN** the entitlement query returns true
+- **THEN** the cast skill's own proficiency and the authored scale ladder still determine the allowed scales
 
 #### Scenario: A low derived tip cap excludes the top rung
-- **WHEN** a skill's derived tip cap is below 10
-- **THEN** the returned set can never include 4.0
+- **WHEN** a synthetic skill's derived cap falls below a ladder rung's minimum level
+- **THEN** that rung remains unavailable
 
 #### Scenario: Skill anchoring protects consumers from rejected rungs
-- **WHEN** proficiency is anchored to the cast skill
-- **THEN** proficiency in a sibling skill of the same element SHALL NOT raise the returned set, so
-  no consumer can advertise a rung the resolver would reject
+- **WHEN** preview, resolver or presentation asks for an eligible skill's scales
+- **THEN** all receive the same skill-anchored set, independent of sibling proficiency
 
 #### Scenario: Neither function writes entity state
-- **WHEN** either function is called
-- **THEN** neither SHALL write any entity state
+- **WHEN** entitlement or scale derivation is queried repeatedly
+- **THEN** entity and world state remain unchanged
 
 #### Scenario: The empty tuple gates non-default scales
-- **WHEN** the freeform-casting gate consumes the returned tuple and it is empty
-- **THEN** every non-`1.0` scale for that skill is forbidden
+- **WHEN** an actor's allowed scale tuple is empty
+- **THEN** every non-default scale is forbidden for that skill
 
 #### Scenario: Bare ownership cannot shortcut an unfinished branch
 - **WHEN** a directly owned synthetic mastery has satisfied terminal XP but a missing prerequisite owner or an internal edge below its threshold
