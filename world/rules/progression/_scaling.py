@@ -15,14 +15,14 @@ from typing import Any
 
 from world.lore.elements import ELEMENT_REGISTRY
 from world.skills.cost_tiers import is_freeform_eligible
-from world.skills.registry import SkillDef
+from world.skills.registry import SKILL_REGISTRY, SkillDef
 from world.rules.combat_modifiers import apply_cost_modifier, evaluate_combat_modifiers_no_create
 
 from ._constants import (
     AFFINITY_ELEMENT_MULTIPLIER,
     NON_AFFINITY_ELEMENT_MULTIPLIER,
 )
-from ._gates import proficiency_cap, skill_proficiency_level
+from ._gates import can_use_skill, proficiency_cap, skill_proficiency_level
 from ._scales import FREEFORM_CAST_SCALES, FREEFORM_SCALE_LADDER
 
 
@@ -136,20 +136,25 @@ def freeform_mastery_entitled(
     *,
     owned_keys: Any = None,
 ) -> bool:
-    """Return whether the entity directly owns the element's mastery passive.
+    """Return whether the entity lawfully holds the element's mastery passive.
 
     Pure side-effect-free entitlement query: ``element`` is validated against
     ``ELEMENT_REGISTRY`` first (an unrecognized element raises ``ValueError``
-    even when the entity owns a fabricated ``<element>_mastery``), then
-    ``True`` when ``f"{element}_mastery"`` appears in
-    ``entity.skills.owned_keys()`` (direct ownership only, never
-    ``conferred_grants()``). It grants NO scale by itself; the unlocked set is
-    the skill-anchored :func:`freeform_scales_for`. Never writes entity state.
+    even when the entity owns a fabricated ``<element>_mastery``), then the
+    element's registered mastery is resolved and handed to the ONE use gate.
+    Entitlement is therefore direct ownership AND the full lawful prerequisite
+    closure — a bare injected key, a conferred mastery, a conferred
+    prerequisite, a restricted ancestor and a low internal ancestor all deny.
+    A registry without that element's mastery denies too. It grants NO scale by
+    itself; the unlocked set is the skill-anchored
+    :func:`freeform_scales_for`. Never writes entity state.
     """
     if element not in ELEMENT_REGISTRY:
         raise ValueError(f"unknown element {element!r}")
-    owned = entity.skills.owned_keys() if owned_keys is None else owned_keys
-    return f"{element}_mastery" in owned
+    mastery = SKILL_REGISTRY.get(f"{element}_mastery")
+    if mastery is None:
+        return False
+    return can_use_skill(entity, mastery, owned_keys=owned_keys)
 
 
 def freeform_scales_for(

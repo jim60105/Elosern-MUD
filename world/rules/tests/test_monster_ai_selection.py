@@ -102,9 +102,15 @@ from world.rules.monster_behaviour import (
     monster_behaviour_policy,
 )
 from world.rules.monster_individual import construct_species_individual
-from world.rules.progression import FREEFORM_SCALE_VALUES
+from world.rules.progression import (
+    FREEFORM_SCALE_VALUES,
+    SKILL_PROFICIENCY_XP_PER_LEVEL,
+    scaled_mp_cost,
+)
+from world.skills.cost_tiers import is_freeform_eligible
 from world.skills.effects import EffectAudience, EffectPolicy
-from world.skills.registry import SKILL_REGISTRY, TargetSpec
+from world.skills.registry import TargetSpec
+from world.rules.tests._combat_session_helpers import live_skill_registry
 from world.tests.synthetic_data import (
     make_monster_species,
     make_monster_tier,
@@ -1305,7 +1311,18 @@ class UtilityAdapterTests(SyntheticTuningMixin, EvenniaTestCase):
         freeform = replace(
             AREA, key="t_sel_free_scale", element=_scoped_element(SYNTH_GLOW_ELEMENT)
         )
-        self.monster.db.skills = {"active": [freeform.key], "passive": [MASTERY]}
+        # The mastery is lawful only through its declared closure, seeded here
+        # at exactly each edge's threshold (read from the live row).
+        closure = {
+            edge.skill_key: float(edge.min_proficiency)
+            * SKILL_PROFICIENCY_XP_PER_LEVEL
+            for edge in live_skill_registry()[MASTERY].prerequisites
+        }
+        self.monster.db.skills = {
+            "active": [freeform.key, *closure],
+            "passive": [MASTERY],
+        }
+        self.monster.db.skill_proficiency = closure
         with patch.dict("world.skills.registry.SKILL_REGISTRY", {freeform.key: freeform}):
             request = _enemy_policy(
                 self.monster,
@@ -1316,7 +1333,12 @@ class UtilityAdapterTests(SyntheticTuningMixin, EvenniaTestCase):
             self.assertIsNotNone(request)
             self.assertEqual(request.scale, SCALE)
             self.assertEqual(request.targets, "all-enemies")
-            allowed = round(4 * SCALE)
+            # The scale is applied to whichever eligible skill the policy
+            # selected, so the expected deduction is the shared cost authority
+            # over that skill's own declared cost — never a pinned number.
+            selected = live_skill_registry()[request.skill_key]
+            self.assertTrue(is_freeform_eligible(selected))
+            allowed = scaled_mp_cost(int(selected.cost["mp"]), SCALE)
             with patch(
                 "world.rules.combat.damage.roll_d100", return_value=95
             ), combat_provenance(_selection_provenance()):

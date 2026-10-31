@@ -58,6 +58,8 @@ def _t_context_skill(base_key: str, key: str, label: str, effects):
 def _presenter_scope_extra():
     """One skills overlay: innates plus this file's probe rows."""
     skills = dict(synth_innate_overlay()["skills"])
+    entitlement = _entitlement_mastery_row()
+    skills[entitlement.key] = entitlement
     for row in _rite_rows():
         skills[row.key] = row
     disguise = _t_context_skill(
@@ -73,6 +75,30 @@ def _presenter_scope_extra():
         {disguise.key: disguise, confer.key: confer, martial.key: martial}
     )
     return {"skills": skills}
+
+
+def _entitlement_mastery_row():
+    """The mastery row the freeform entitlement actually resolves.
+
+    Entitlement resolves ``<element>_mastery`` from the LIVE registry and now
+    requires the row's whole declared closure, so the fixture registers the
+    row under the derived key with one same-element ordinary branch. The
+    branch consumes nothing the burst's derived cap observes, so the panel's
+    advertised rung set stays clamped by the kit's own comet edge alone.
+    """
+    from world.skills.registry import SkillCategory, SkillKind, SkillPrerequisite
+
+    return replace(
+        SYNTH_SKILLS["t_steady_stride"],
+        key=f"{SYNTH_SKILLS['t_ember_burst'].element.key}_mastery",
+        label="合成元素精通",
+        description="對該元素達到最高造詣的合成被動。",
+        kind=SkillKind.PASSIVE,
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        prerequisites=(
+            SkillPrerequisite(SYNTH_SKILLS["t_hush_mend"].key, 1),
+        ),
+    )
 
 
 # File-local holy-rite twins for the holy_rite grouping contract: the kit

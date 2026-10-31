@@ -27,15 +27,19 @@ from world.rules.combat_view import CATEGORY_LABELS
 from world.rules.progression import (
     SKILL_PROFICIENCY_XP_PER_LEVEL,
     can_use_skill,
+    is_elemental_mastery,
+    mastery_prerequisites_met,
     missing_prerequisite,
     proficiency_cap,
 )
 from world.skills.registry import (
     SKILL_REGISTRY,
+    SkillKind,
     declared_prerequisites,
     prerequisite_consumers,
 )
 from world.skills.eligibility import skill_identity_eligible
+from world.skills.restrictions import skill_effect_allowed
 
 # Wire bound for every rendered lineage text (design DD1): mirrors the panel
 # contract's MAX_TEXT_CODE_POINTS in web/webclient/presentation/lineage.py.
@@ -335,7 +339,18 @@ def _node_view(
     xp: dict[str, float],
     depth: int,
 ) -> LineageNodeView:
-    """One node with its live state, unlock gate, readiness and graph depth."""
+    """One node with its live state, unlock gate, readiness and graph depth.
+
+    Completion is per kind. An ACTIVE node is complete when it is owned, usable
+    and practised to its derived cap. A PASSIVE node is complete on ownership
+    plus lawful usability: nothing ever practises a passive, so its XP band can
+    never be the completion test, and a complete passive reports
+    ``xp_to_next_level == 0`` while keeping its genuine level and in-band XP.
+    Readiness is derived from the same gate: an unowned, identity/effect
+    eligible node whose DIRECTLY OWNED prerequisites meet every edge, and for
+    an elemental mastery additionally the whole lawful closure — an imported
+    ancestral XP without the ownership behind it is not a ready node.
+    """
     skill = SKILL_REGISTRY[skill_key]
     progress = _progress_from_stored(xp.get(skill_key, 0.0), skill_key)
     prereq = missing_prerequisite(entity, skill, owned_keys=owned)
@@ -344,24 +359,54 @@ def _node_view(
         prereq_skill = SKILL_REGISTRY[prereq.skill_key]
         prereq_text = _fit_wire_text(prereq_skill.label, prereq.min_proficiency)
     is_owned = skill_key in owned
-    ready = not is_owned and all(
-        int(xp.get(edge.skill_key, 0.0) // SKILL_PROFICIENCY_XP_PER_LEVEL)
-        >= edge.min_proficiency
-        for edge in skill.prerequisites
+    usable = can_use_skill(entity, skill, owned_keys=owned)
+    eligible = skill_identity_eligible(entity, skill) and skill_effect_allowed(
+        entity, skill.key
     )
+    if skill.kind is SkillKind.PASSIVE:
+        capped = is_owned and usable
+        xp_to_next_level = 0.0 if capped else progress.xp_to_next_level
+    else:
+        capped = progress.capped
+        xp_to_next_level = progress.xp_to_next_level
+    if is_elemental_mastery(skill) and skill.prerequisites:
+        ready = not is_owned and eligible and mastery_prerequisites_met(
+            entity, skill, owned_keys=owned
+        )
+    else:
+        ready = not is_owned and eligible and all(
+            edge.skill_key in owned
+            and int(xp.get(edge.skill_key, 0.0) // SKILL_PROFICIENCY_XP_PER_LEVEL)
+            >= edge.min_proficiency
+            for edge in skill.prerequisites
+        )
     return LineageNodeView(
         skill_key=skill_key,
         display_name_zh=skill.label,
         owned=is_owned,
-        usable=can_use_skill(entity, skill, owned_keys=owned),
+        usable=usable,
         ready=ready,
         level=progress.level,
         xp_into_level=progress.xp_into_level,
-        xp_to_next_level=progress.xp_to_next_level,
-        capped=progress.capped,
+        xp_to_next_level=xp_to_next_level,
+        capped=capped,
         prereq_text_zh=prereq_text,
         depth=depth,
     )
+
+
+def _node_completed(node: LineageNodeView) -> bool:
+    """Whether one node satisfies the graph-completion contract.
+
+    Every node must be owned and usable; an ACTIVE node additionally has to be
+    practised to its XP cap, while a PASSIVE node is complete on that usability
+    alone (see :func:`_node_view`).
+    """
+    if not node.owned or not node.usable:
+        return False
+    if SKILL_REGISTRY[node.skill_key].kind is SkillKind.PASSIVE:
+        return True
+    return node.capped
 
 
 def build_lineage_view(entity: Any) -> LineageView:
@@ -427,7 +472,7 @@ def build_lineage_view(entity: Any) -> LineageView:
             for edge in SKILL_REGISTRY[key].prerequisites
             if edge.skill_key in component
         )
-        consumed = all(node.capped for node in nodes)
+        consumed = all(_node_completed(node) for node in nodes)
         graphs.append(
             LineageGraphView(
                 graph_id=roots[0],

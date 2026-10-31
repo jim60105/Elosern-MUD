@@ -42,7 +42,7 @@ from world.skills.effects.polarity import (
     POLARITY_CLASSES,
     skill_target_polarity,
 )
-from world.skills.registry import SkillKind, TargetSpec
+from world.skills.registry import SkillKind, SkillPrerequisite, TargetSpec
 from world.tests.synthetic_data import SYNTH_SKILLS, make_skill
 
 from ._combat_session_helpers import (
@@ -91,7 +91,22 @@ def _mastery_row():
         effects=["passive_trait:element_mastery"],
         category=SkillCategory.ELEMENTAL_MAGIC,
         group=_T_ELEMENT,
+        # A mastery is lawful only through its whole declared closure: one
+        # unconsumed same-element branch at the proficiency tip cap, so the
+        # branch's own derived cap is unchanged by the new edge.
+        prerequisites=(SkillPrerequisite(_T_SEAL.key, 10),),
     )
+
+
+# The mastery's ordinary terminal: a same-element ACTIVE branch nobody else
+# consumes, never a cast subject of its own (a ladder subject must stay at its
+# own practised level).
+_T_SEAL = replace(
+    _T_CAST,
+    key="t_ember_seal",
+    label="燼印",
+    description="在目標身上烙下餘燼印記的合成法術。",
+)
 
 
 # A shape-eligible spell on the kit's synthetic element — the second element
@@ -127,6 +142,7 @@ def _open_scope(test):
                 **synth_innate_overlay()["skills"],
                 _T_AREA.key: _T_AREA,
                 _mastery_row().key: _mastery_row(),
+                _T_SEAL.key: _T_SEAL,
                 _T_STORM.key: _T_STORM,
                 _T_FOCUS.key: _T_FOCUS,
                 _T_GLOW.key: _T_GLOW,
@@ -320,8 +336,9 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         )
         self.assertEqual(focus.freeform_scales, ())
 
-        # Element mastery never advertises scales for another element's spells.
-        self.player.db.skills = _owned(_T_GLOW, _mastery_row())
+        # Element mastery never advertises scales for another element's spells,
+        # even when the mastery itself is lawfully held.
+        grant_lineage(self.player, [_T_GLOW.key], [_mastery_key()])
         view = build_combat_view(self.player)
         light = next(
             skill for skill in _flat_skills(view) if skill.key == _T_GLOW.key

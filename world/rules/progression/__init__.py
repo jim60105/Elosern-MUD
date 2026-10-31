@@ -40,6 +40,8 @@ from world.rules.progression._gates import (  # noqa: F401
     _race_learning_multiplier,
     award_practice_xp,
     can_use_skill,
+    is_elemental_mastery,
+    mastery_prerequisites_met,
     missing_prerequisite,
     proficiency_cap,
     skill_proficiency_level,
@@ -321,16 +323,118 @@ def _usable_snapshot(entity: Any, skill_key: str) -> dict[str, bool]:
     }
 
 
+def _affected_masteries(changed_key: str) -> tuple[SkillDef, ...]:
+    """Every elemental mastery one ``changed_key`` award can affect, sorted.
+
+    Walks the load-time reverse-edge cache transitively: a mastery is affected
+    by ANY of its ancestors, so repairing a deep internal edge — not only a
+    direct mastery parent — must be able to qualify it. The traversal is
+    bounded by a local visited set, and the candidate keys are sorted so the
+    grant order and the notices are deterministic.
+    """
+    seen: set[str] = set()
+    found: set[str] = set()
+    frontier = [changed_key]
+    while frontier:
+        for consumer_key, _ in prerequisite_consumers(frontier.pop(0)):
+            if consumer_key in seen:
+                continue
+            seen.add(consumer_key)
+            skill = SKILL_REGISTRY.get(consumer_key)
+            if skill is None:
+                continue
+            if is_elemental_mastery(skill):
+                found.add(consumer_key)
+            frontier.append(consumer_key)
+    return tuple(SKILL_REGISTRY[key] for key in sorted(found))
+
+
+def _mastery_usable_snapshot(entity: Any, changed_key: str) -> dict[str, bool]:
+    """The pre-award ``can_use_skill`` verdict of every affected mastery.
+
+    Read before the award so a mastery that was ALREADY owned and flips
+    unusable-to-usable through a repaired internal edge still produces exactly
+    one transition notice.
+    """
+    return {
+        candidate.key: can_use_skill(entity, candidate)
+        for candidate in _affected_masteries(changed_key)
+    }
+
+
+def _grant_ready_masteries(entity: Any, changed_key: str) -> list[str]:
+    """Grant every affected mastery whose declared closure is now lawful.
+
+    The acquisition path of design D3: reachable candidates come from the
+    reverse-edge traversal, qualification comes from the shared closure query,
+    and the write goes through the existing ownership writer
+    (``cross_lineage_unlock.grant_owned_skill``) so append-if-absent
+    idempotence, the stored active/passive split, the committed dialogue
+    refresh and the caller's transaction all stay exactly as they are. No
+    proficiency is written and no passive XP is awarded. Returns the newly
+    granted keys in candidate order.
+    """
+    granted: list[str] = []
+    for candidate in _affected_masteries(changed_key):
+        if candidate.key in entity.skills.owned_keys():
+            continue
+        if not mastery_prerequisites_met(entity, candidate):
+            continue
+        import world.rules.cross_lineage_unlock as _cross_lineage
+
+        if _cross_lineage.grant_owned_skill(entity, candidate.key, SKILL_REGISTRY):
+            granted.append(candidate.key)
+    return granted
+
+
+def _append_mastery_notices(
+    entity: Any,
+    changed_key: str,
+    usable_before: Mapping[str, bool],
+    noticed: set[str],
+    unlocks_out: list[UnlockNotice] | None,
+) -> None:
+    """Acquire ready masteries and append one line per new transition.
+
+    The grant itself never depends on the sink. Each newly granted mastery and
+    each already-owned mastery that just became usable gets exactly ONE
+    learner-specific notice, deduplicated by key against everything already
+    announced for this award (``noticed`` carries the immediate-consumer flips
+    and the cross-lineage grants).
+    """
+    granted = _grant_ready_masteries(entity, changed_key)
+    if unlocks_out is None:
+        return
+    for key in granted:
+        if key in noticed:
+            continue
+        unlocks_out.append(_unlock_notice(entity, SKILL_REGISTRY[key]))
+        noticed.add(key)
+    for key, was_usable in usable_before.items():
+        if was_usable or key in noticed:
+            continue
+        if can_use_skill(entity, SKILL_REGISTRY[key]):
+            unlocks_out.append(_unlock_notice(entity, SKILL_REGISTRY[key]))
+            noticed.add(key)
+
+
 def _append_unlock_flips(
     entity: Any,
     skill_key: str,
     was_usable: Mapping[str, bool],
     unlocks_out: list[UnlockNotice],
-) -> None:
-    """Append one notice per consumer the award just made usable."""
+) -> set[str]:
+    """Append one notice per consumer the award just made usable.
+
+    Returns the keys it announced, so the mastery pass of the same award can
+    deduplicate against them.
+    """
+    noticed: set[str] = set()
     for candidate in unlock_candidates_for(skill_key):
         if not was_usable[candidate.key] and can_use_skill(entity, candidate):
             unlocks_out.append(_unlock_notice(entity, candidate))
+            noticed.add(candidate.key)
+    return noticed
 
 
 def grant_skill_practice_xp(
@@ -373,6 +477,12 @@ def grant_skill_practice_xp(
     became satisfiable grants its keys immediately, and one announcement line
     per newly granted skill is appended to the same caller-owned sink. The
     grant itself is unconditional — it lands whether or not a sink exists.
+
+    Finally the affected elemental masteries are evaluated against their
+    declared closure and granted through the same ownership writer; each new
+    grant and each already-owned mastery the award makes usable contributes
+    exactly one notice, deduplicated by key for this award. That pass also runs
+    without a sink, and it writes no proficiency.
     """
     if nonlethal:
         return False
@@ -390,10 +500,17 @@ def grant_skill_practice_xp(
     if skill.category is SkillCategory.DIVINE_MYSTERY:
         _mark_practice_day(entity, skill_key, day)
     was_usable = _usable_snapshot(entity, skill_key) if unlocks_out is not None else {}
+    mastery_before = (
+        _mastery_usable_snapshot(entity, skill_key) if unlocks_out is not None else {}
+    )
     award_practice_xp(entity, skill_key, amount)
+    noticed: set[str] = set()
     if unlocks_out is not None:
-        _append_unlock_flips(entity, skill_key, was_usable, unlocks_out)
-    _run_cross_lineage_eval(entity, skill_key, unlocks_out)
+        noticed = _append_unlock_flips(entity, skill_key, was_usable, unlocks_out)
+    noticed |= _run_cross_lineage_eval(entity, skill_key, unlocks_out)
+    _append_mastery_notices(
+        entity, skill_key, mastery_before, noticed, unlocks_out
+    )
     return True
 
 
@@ -419,7 +536,8 @@ def grant_study_practice_xp(
     grant boundary. ``unlocks_out`` is the same optional notice sink the
     per-use path carries: the clock settlement owns it and turns each notice
     into a post-commit ``practice_unlock`` event. The grant itself is
-    unconditional.
+    unconditional. The mastery-acquisition pass runs identically on both
+    paths, after the cross-lineage evaluation, with or without a sink.
     """
     if isinstance(hours, bool) or not isinstance(hours, int):
         raise ValueError(f"study hours must be an int, got {hours!r}")
@@ -434,16 +552,23 @@ def grant_study_practice_xp(
     if not isfinite(amount) or amount < 0:
         raise ValueError(f"study XP formula produced an invalid {amount!r}")
     was_usable = _usable_snapshot(entity, skill_key) if unlocks_out is not None else {}
+    mastery_before = (
+        _mastery_usable_snapshot(entity, skill_key) if unlocks_out is not None else {}
+    )
     award_practice_xp(entity, skill_key, amount)
+    noticed: set[str] = set()
     if unlocks_out is not None:
-        _append_unlock_flips(entity, skill_key, was_usable, unlocks_out)
-    _run_cross_lineage_eval(entity, skill_key, unlocks_out)
+        noticed = _append_unlock_flips(entity, skill_key, was_usable, unlocks_out)
+    noticed |= _run_cross_lineage_eval(entity, skill_key, unlocks_out)
+    _append_mastery_notices(
+        entity, skill_key, mastery_before, noticed, unlocks_out
+    )
     return True
 
 
 def _run_cross_lineage_eval(
     entity: Any, skill_key: str, unlocks_out: list[UnlockNotice] | None
-) -> None:
+) -> set[str]:
     """Evaluate the cross-lineage rulebook after one practice award (D3).
 
     Called immediately after :func:`award_practice_xp` on BOTH practice entry
@@ -452,7 +577,8 @@ def _run_cross_lineage_eval(
     granted keys are appended to the entity's stored owned set; when the
     caller supplied the same sink that carries newly-usable-skill notices, one
     notice per grant is appended there too (the caller owns delivery after its
-    transaction commits).
+    transaction commits). Returns the granted keys, so the mastery pass that
+    runs next can deduplicate its own notices against them.
 
     Imported lazily so importing ``world.rules.progression`` never pulls in
     the rulebook module: cross_lineage_unlock imports progression at its top,
@@ -468,3 +594,4 @@ def _run_cross_lineage_eval(
     if unlocks_out is not None:
         for grant_key in newly_granted:
             unlocks_out.append(_unlock_notice(entity, rulebook.registry[grant_key]))
+    return set(newly_granted)

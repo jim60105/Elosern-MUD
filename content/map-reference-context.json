@@ -176,7 +176,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "b80cb81971b53be1a31d59122e3b4bb419ccbb69fd2c537a21ec64f35161396c",
+  "fingerprint": "0f22ce04b5c23cef13cdc3a1e2c8dc52fb28a5858193baebbc4b57716e61dfb4",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -1042,7 +1042,7 @@
     "world/rules/action/effects/gauge_transfer.py": "d787fa0ffec0068261ef1330d5d24a89aff32b2304f68147396938ef28b011b6",
     "world/rules/action/effects/sexual.py": "4c7415458058507fe7e29a31ec49b50a0c02d411bd928990919b4b245cb1fdad",
     "world/rules/action/event_log.py": "d0f743700e87a39f92d244d74f3d8a36b5290924c45b58dd4942a9c8aa8364af",
-    "world/rules/action/gates.py": "8aa6a8fde61eef4915fc3b335a19c1e06d5c3d705991b1d1c021a5c462d3c42f",
+    "world/rules/action/gates.py": "b8571f02ce1b19cfc6b87596ef34187b1757e2cdf8c2638b199dd6bede4406e0",
     "world/rules/action/resolver.py": "037e3dfbafa66456dcc204bed4b5a6a06ad2c81793f67bcce062b1cfd361546f",
     "world/rules/action/routing.py": "ce168b2c5cbc9737c069d3299ba2dc15e6a95d6179347311a0c46d804807004e",
     "world/rules/action/transaction.py": "3ff3bb309c2a21eb45fa0253bb4d8453053686e7a9550ad3b039db8f97f2765d",
@@ -1143,7 +1143,7 @@
     "world/rules/items/planning.py": "c779fdeccbac8146d965bcba74dabc48c12d56423724000ff807e7123a519348",
     "world/rules/items/reads.py": "7dc93f3d671b2966f16f0c10a508ad221b03f71cea5d400f9ccf2c7d908d95a1",
     "world/rules/items/settlement.py": "cdedc385a958dee57e6fe696d0366d8edd2ce5c8266202d2cf6c319cac2398a3",
-    "world/rules/lineage_query.py": "f0cd5051d652b8abb52c42ce4ba9080c493e2a2c4cadb1d470ff7dec740cb9e2",
+    "world/rules/lineage_query.py": "b9aaca47b1582b2d1556227a90e0ee21c5a6bf96a6ef945ce9424f0302de93ce",
     "world/rules/lore_knowledge.py": "04ee8bf163fc3b9ad5d0a428576650637204e37c8893b0e8fd5116a589ad0a02",
     "world/rules/map_discovery.py": "a97c3216776f3db32397c9a72050203922c7b6a6e51c006104208d1f245f10b3",
     "world/rules/map_district_lighting.py": "45e346cefbff57dc213b7b0110b1d8bf34ec284bff85e8cbc06fbae616648a36",
@@ -1186,13 +1186,13 @@
     "world/rules/pleasure.py": "09d5fdf11f720c6d0be2349542684b532d61f4a2a52cce84b81d6ab2204c02ab",
     "world/rules/possession.py": "bcf4f398e8195424bc0c950f49270bf0e70f0b71dd83df3a2a899432cbe7db8c",
     "world/rules/presentation_events.py": "b784ea1e940767300a6abe4ec723e81802664ace5176244b2af88b4dc9d9ae89",
-    "world/rules/progression/__init__.py": "19d55ffc66db25ec195b1b77b19478a6dc3e007d07f0fa7a99b7fd4391f6877a",
+    "world/rules/progression/__init__.py": "268a84e2b4cd3a9f4a8bc2d4df724fe863f6b1a59dabaab88d6babd0fbe9f886",
     "world/rules/progression/_constants.py": "2996c37a60e0f5a120ad7338062513bc7c995e67e9a7cc7169709396c7b058e3",
-    "world/rules/progression/_gates.py": "2d9b87b2a1b0bcfcb10dd404d65751b52d4771cfe18ee0cf04760f7daa2d31a8",
+    "world/rules/progression/_gates.py": "7fb01e3def546107c9a8e2c8a7a749a63b2ec42cdb368ebd4ee2264ca17b825c",
     "world/rules/progression/_lineage.py": "e77668e8ea4738ae9115d13480925185cc6711319ff7905693f294256bd205ec",
     "world/rules/progression/_practice.py": "d5170cb7951b13e3f868c00528651333267c24a13afdd5dab4e56063eb9edf85",
     "world/rules/progression/_scales.py": "e3fe413762fc31c10ed69e3cfdb2f85ec4ead48047d510e84163a9e0c617edae",
-    "world/rules/progression/_scaling.py": "4f487e807f7e294a0185cb79ca599d6b51455c028711df7607644e159555a28b",
+    "world/rules/progression/_scaling.py": "12475551f94cbfc72f034be48919161d6b35c03854ea8f4ac587575c233a74f5",
     "world/rules/protection_demo.py": "fd92b8d359cb02500ad091e7509dbf2d4b0dd7028fe0bb220e7f1c0d668eeb44",
     "world/rules/quantum.py": "7b66627e72d94a78da1d05f6d8ca65d189b72baf7062f07190b810914d826e59",
     "world/rules/quest_delivery.py": "4061a01e49fb95dacb75fb10e803798e7aef2267a191235fd8a30f108d9b61fa",

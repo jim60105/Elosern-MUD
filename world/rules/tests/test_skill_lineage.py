@@ -31,6 +31,7 @@ from world.rules.progression import (
     freeform_scale_entries_for,
     freeform_scales_for,
     lineage_ownership_closure,
+    mastery_prerequisites_met,
     missing_prerequisite,
     normalize_lineage_record,
     practice_claim_key,
@@ -82,6 +83,28 @@ _MASTERY_ROW = replace(
     effects=["passive_trait:element_mastery"],
     category=SkillCategory.ELEMENTAL_MAGIC,
     group=_TREE_ELEMENT,
+    # A mastery is lawful only through a declared closure: this fixture's is
+    # the tree root at its own derived cap, so the edge never raises a cap.
+    prerequisites=(SkillPrerequisite("t_tree_root", 3),),
+)
+
+# The whole-tree mastery: every TERMINAL of the synthetic tree (the chain's
+# end plus the two disconnected sister leaves) at the global tip cap. The
+# key is deliberately not the runtime-derived ``<element>_mastery`` key — that
+# one is the freeform entitlement vocabulary and cannot be shared.
+_TREE_MASTERY = replace(
+    SYNTH_SKILLS["t_steady_stride"],
+    key="t_tree_whole_mastery",
+    label="合成全樹精通",
+    description="遍歷整棵合成系譜後方能領會的合成精通。",
+    effects=["passive_trait:element_mastery"],
+    category=SkillCategory.ELEMENTAL_MAGIC,
+    group=_TREE_ELEMENT,
+    prerequisites=(
+        SkillPrerequisite("t_tree_crownfire", PROFICIENCY_TIP_CAP),
+        SkillPrerequisite("t_tree_mossback", PROFICIENCY_TIP_CAP),
+        SkillPrerequisite("t_tree_fallen", PROFICIENCY_TIP_CAP),
+    ),
 )
 
 # Elemental-magic damage row on the tree's element: the affinity-factor
@@ -104,6 +127,7 @@ _ALL_ROWS = {
     **TREE,
     **MAGIC_TREE,
     _MASTERY_KEY: _MASTERY_ROW,
+    _TREE_MASTERY.key: _TREE_MASTERY,
     _MAGIC_SPELL.key: _MAGIC_SPELL,
 }
 
@@ -408,6 +432,17 @@ def _xp_for_level(level: int) -> float:
     return float(level * SKILL_PROFICIENCY_XP_PER_LEVEL)
 
 
+def _mastery_closure(row: SkillDef) -> tuple[tuple[str, ...], dict[str, float]]:
+    """The owned keys and exact-minimum XP that make ``row`` lawful."""
+    return (
+        tuple(edge.skill_key for edge in row.prerequisites),
+        {
+            edge.skill_key: _xp_for_level(edge.min_proficiency)
+            for edge in row.prerequisites
+        },
+    )
+
+
 class FreeformLadderTests(_Scoped):
     """Skill-anchored ladder over the cast skill's own proficiency."""
 
@@ -416,8 +451,10 @@ class FreeformLadderTests(_Scoped):
     CANOPY = "t_tree_crownfire"
 
     def _master(self, level_xp: float):
+        owned, xp = _mastery_closure(_MASTERY_ROW)
         return _entity(
-            (self.CANOPY, _MASTERY_KEY), {self.CANOPY: level_xp}
+            (self.CANOPY, _MASTERY_KEY, *owned),
+            {self.CANOPY: level_xp, **xp},
         )
 
     @covers_requirement("skill-lineage::the-freeform-scale-ladder-is-anchored-to-proficiency")
@@ -463,9 +500,10 @@ class FreeformLadderTests(_Scoped):
     def test_ladder_is_skill_anchored_not_element_max(self):
         # High proficiency in a SIBLING node must not raise the canopy's own
         # rung set: the ladder reads the CAST skill's level only.
+        owned, xp = _mastery_closure(_MASTERY_ROW)
         entity = _entity(
-            (self.CANOPY, _MASTERY_KEY, "t_tree_heartwood"),
-            {self.CANOPY: 0.0, "t_tree_heartwood": 500.0},
+            (self.CANOPY, _MASTERY_KEY, "t_tree_heartwood", *owned),
+            {self.CANOPY: 0.0, "t_tree_heartwood": 500.0, **xp},
         )
         with patch(
             "world.rules.progression._scaling.FREEFORM_SCALE_LADDER",
@@ -499,9 +537,10 @@ class FreeformLadderTests(_Scoped):
     def test_scale_entries_follow_the_ladder_with_scaled_costs(self):
         # Entries need an mp-cost spell shape: cast the tree-element spell,
         # whose ladder anchors on its OWN proficiency.
+        owned, xp = _mastery_closure(_MASTERY_ROW)
         entity = _entity(
-            (_MAGIC_SPELL.key, _MASTERY_KEY),
-            {_MAGIC_SPELL.key: _xp_for_level(4)},
+            (_MAGIC_SPELL.key, _MASTERY_KEY, *owned),
+            {_MAGIC_SPELL.key: _xp_for_level(4), **xp},
         )
         with patch(
             "world.rules.progression._scaling.FREEFORM_SCALE_LADDER",
@@ -758,6 +797,146 @@ class LineageSeedTests(_Scoped):
         normalized = normalize_lineage_record(record)
         self.assertEqual(normalized["skills"], ["not_a_skill"])
         self.assertNotIn("skill_proficiency", normalized)
+
+
+class MasteryWholeTreeTests(_Scoped):
+    """The whole-tree mastery closure: every branch, exact seed, lawful repair.
+
+    The synthetic mastery declares the tree's three terminals — the chain end
+    plus two disconnected sister leaves — so one fixture proves disconnected
+    components, a side branch and ordinary cap preservation without naming
+    shipped content.
+    """
+
+    TERMINALS = ("t_tree_crownfire", "t_tree_mossback", "t_tree_fallen")
+
+    @covers_requirement(
+        "element-mastery::elemental-mastery-prerequisites-cover-every-ordinary-branch"
+    )
+    def test_every_declared_terminal_is_required_with_and_semantics(self):
+        ancestors, _ = lineage_ownership_closure([_TREE_MASTERY.key])
+        self.assertEqual(
+            {edge.skill_key for edge in _TREE_MASTERY.prerequisites},
+            set(self.TERMINALS),
+        )
+        # The transitive closure: every terminal plus every ancestor behind
+        # it, at exactly the seeded minimum each edge requires.
+        owned = (_TREE_MASTERY.key, *ancestors)
+        xp = seed_lineage_proficiency(list(owned), None)
+        for missing in self.TERMINALS:
+            entity = _entity(
+                tuple(key for key in owned if key != missing),
+                xp,
+            )
+            with self.subTest(missing=missing):
+                self.assertFalse(can_use_skill(entity, _TREE_MASTERY))
+        lawful = _entity(owned, xp)
+        self.assertTrue(can_use_skill(lawful, _TREE_MASTERY))
+
+    @covers_requirement(
+        "element-mastery::elemental-mastery-prerequisites-cover-every-ordinary-branch"
+    )
+    def test_each_terminal_keeps_its_own_derived_cap(self):
+        for edge in _TREE_MASTERY.prerequisites:
+            with self.subTest(terminal=edge.skill_key):
+                self.assertEqual(
+                    proficiency_cap(edge.skill_key), PROFICIENCY_TIP_CAP
+                )
+                self.assertLessEqual(edge.min_proficiency, PROFICIENCY_TIP_CAP)
+
+    @covers_requirement(
+        "element-mastery::elemental-mastery-prerequisites-cover-every-ordinary-branch"
+    )
+    def test_no_passive_is_ever_a_mastery_prerequisite(self):
+        registry = live_skill_registry()
+        for row in (_MASTERY_ROW, _TREE_MASTERY):
+            for edge in row.prerequisites:
+                with self.subTest(mastery=row.key, branch=edge.skill_key):
+                    self.assertIs(
+                        registry[edge.skill_key].kind, SkillKind.ACTIVE
+                    )
+
+    @covers_requirement(
+        "skill-lineage::import-and-scene-build-auto-seed-prerequisite-proficiency-exactly"
+    )
+    def test_declaring_the_mastery_closes_and_seeds_every_branch(self):
+        active, passive = lineage_ownership_closure([_TREE_MASTERY.key])
+        self.assertEqual(passive, [])
+        self.assertTrue(set(self.TERMINALS) <= set(active))
+        seeded = seed_lineage_proficiency([_TREE_MASTERY.key, *active], None)
+        for key in self.TERMINALS:
+            with self.subTest(terminal=key):
+                self.assertEqual(
+                    seeded[key],
+                    _xp_for_level(PROFICIENCY_TIP_CAP),
+                )
+        self.assertEqual(
+            seed_lineage_proficiency([_TREE_MASTERY.key, *active], seeded),
+            seeded,
+        )
+
+    def _internal_mastery(self) -> SkillDef:
+        """A file-local mastery over a mid-tree node, so its closure has edges."""
+        row = replace(
+            _TREE_MASTERY,
+            key="t_tree_internal_mastery",
+            prerequisites=(SkillPrerequisite("t_tree_bloom", 5),),
+        )
+        live_skill_registry()[row.key] = row
+        validate_prerequisite_graph(live_skill_registry())
+        return row
+
+    @covers_requirement(
+        "element-mastery::elemental-mastery-prerequisites-cover-every-ordinary-branch"
+    )
+    def test_an_explicit_low_internal_edge_is_preserved_and_denies_until_repaired(
+        self,
+    ):
+        row = self._internal_mastery()
+        owned = (
+            row.key,
+            "t_tree_bloom",
+            "t_tree_branch",
+            "t_tree_sprout",
+            "t_tree_root",
+        )
+        explicit = {
+            "t_tree_bloom": _xp_for_level(5),
+            "t_tree_branch": _xp_for_level(5),
+            "t_tree_sprout": _xp_for_level(3),
+            # Explicit and BELOW the internal root edge: the author wins.
+            "t_tree_root": _xp_for_level(2),
+        }
+        entity = _entity(owned, explicit)
+        self.assertFalse(can_use_skill(entity, row))
+        unmet = missing_prerequisite(entity, row)
+        self.assertEqual(unmet.skill_key, "t_tree_root")
+        self.assertEqual(unmet.min_proficiency, 3)
+        self.assertEqual(
+            entity.db.skill_proficiency["t_tree_root"], _xp_for_level(2)
+        )
+        # Lawful repair: practice raises the internal ancestor to its edge.
+        repaired = dict(entity.db.skill_proficiency)
+        repaired["t_tree_root"] = _xp_for_level(3)
+        entity.db.skill_proficiency = repaired
+        self.assertTrue(can_use_skill(entity, row))
+
+    @covers_requirement(
+        "element-mastery::elemental-mastery-prerequisites-cover-every-ordinary-branch"
+    )
+    def test_a_noncanonical_target_definition_is_denied(self):
+        # A mastery-shaped row that borrows a registered prerequisite-free
+        # key: the query must validate the LIVE registered row, so the copy
+        # can never inherit an empty traversal and return true.
+        impostor = replace(
+            _TREE_MASTERY,
+            key="t_tree_root",
+            prerequisites=(SkillPrerequisite("t_tree_root", 1),),
+        )
+        closure, xp = _mastery_closure(_TREE_MASTERY)
+        entity = _entity(("t_tree_root", *closure), xp)
+        self.assertFalse(mastery_prerequisites_met(entity, impostor))
+        self.assertFalse(can_use_skill(entity, impostor))
 
 
 class ProficiencyCapTableTests(_Scoped):

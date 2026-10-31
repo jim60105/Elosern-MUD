@@ -26,7 +26,13 @@ from world.rules.action_gates import damage_requires_battlefield
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.skill_effects import mundane_veil_values
 from world.rules.targeting import RoomActionContext
-from world.skills.registry import SkillCategory, SkillDef, SkillKind, TargetSpec
+from world.skills.registry import (
+    SkillCategory,
+    SkillDef,
+    SkillKind,
+    SkillPrerequisite,
+    TargetSpec,
+)
 
 from ._combat_session_helpers import (
     open_synthetic_scope,
@@ -96,6 +102,29 @@ _SP10_ROW = replace(_DISGUISE_ROW, key="t_action_sp10", cost={"sp": 10})
 _UNFLAGGED_PROBE = replace(_DAMAGE_PROBE, key="gate_probe_unflagged", usable_out_of_combat=False)
 _ZERO_COST_ROW = replace(_DAMAGE_PROBE, key="gate_probe_zero_cost", cost={})
 
+# A mastery-family passive and its single declared branch: the shape whose
+# boolean gate can fail with NO unmet numeric edge (when only an ancestor is
+# effect-restricted), which is exactly the case the old rejection order
+# dereferenced as a missing edge.
+_MASTERY_BRANCH = replace(
+    _DAMAGE_PROBE,
+    key="t_action_mastery_branch",
+    label="試探精通分支",
+    description="測試用的精通前置分支。",
+    category=SkillCategory.ELEMENTAL_MAGIC,
+    group="fire",
+)
+_MASTERY_PROBE = replace(
+    _PASSIVE_PROBE,
+    key="t_action_mastery",
+    label="試探精通",
+    description="測試用的合成精通被動。",
+    category=SkillCategory.ELEMENTAL_MAGIC,
+    group="fire",
+    element="fire",
+    prerequisites=(SkillPrerequisite(_MASTERY_BRANCH.key, 3),),
+)
+
 
 def _scope_extra() -> dict[str, dict[str, object]]:
     """Innate rows + local probes merged into every class's skills scope."""
@@ -105,6 +134,7 @@ def _scope_extra() -> dict[str, dict[str, object]]:
             _DAMAGE_PROBE, _DRAIN_PROBE, _DISGUISE_ROW, _PASSIVE_PROBE,
             _DISGUISE_PASSIVE_ROW, _EXPENSIVE_ROW, _MP10_ROW, _MPSP10_ROW,
             _SP10_ROW, _UNFLAGGED_PROBE, _ZERO_COST_ROW,
+            _MASTERY_BRANCH, _MASTERY_PROBE,
         )}
     )
     return extra
@@ -293,6 +323,44 @@ class ActionPipelineRejectionTests(EvenniaTestCase):
             self.resolve(_PASSIVE_PROBE.key).reason,
             RejectReason.SKILL_NOT_ACTIVE,
         )
+
+    @covers_requirement(
+        "skill-lineage::can-use-skill-is-the-single-shared-use-eligibility-predicate"
+    )
+    def test_a_restricted_ancestor_rejects_a_passive_without_dereferencing_an_edge(
+        self,
+    ):
+        """The boolean gate can fail with NO unmet numeric edge.
+
+        The actor directly owns a mastery-family passive and its declared
+        branch at the branch's threshold, but the branch is effect-restricted
+        for this examination, so the closure is unlawful while no numeric edge
+        is unmet. The rejection must be the non-ACTIVE reason, with no dice, no
+        state change and no ``None`` edge dereference.
+        """
+        from world.rules.progression import can_use_skill, missing_prerequisite
+
+        self.actor.db.skills = {
+            "active": [_MASTERY_BRANCH.key],
+            "passive": [_MASTERY_PROBE.key],
+        }
+        self.actor.db.skill_proficiency = {_MASTERY_BRANCH.key: 150.0}
+        self.actor.db.guild_exam_restriction = {
+            "host_id": self.actor.pk,
+            "exam_id": "t_action_exam",
+            "allowed_skills": [_MASTERY_PROBE.key, _DISGUISE_ROW.key],
+            "neutral_ceilings": {},
+        }
+        # Precondition: the gate denies through eligibility alone, so the
+        # named-edge query really has nothing to report.
+        self.assertFalse(can_use_skill(self.actor, _MASTERY_PROBE))
+        self.assertIsNone(
+            missing_prerequisite(self.actor, _MASTERY_PROBE)
+        )
+        before = deepcopy(dict(self.actor.traits.trait_data))
+        result = self.resolve(_MASTERY_PROBE.key)
+        self.assertIs(result.reason, RejectReason.SKILL_NOT_ACTIVE)
+        self.assertEqual(dict(self.actor.traits.trait_data), before)
 
     def test_unknown_effect(self):
         # An unregistered handler for the skill's own (non-damaging) effect:

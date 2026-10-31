@@ -60,6 +60,8 @@ from .._combat_session_helpers import (
 from world.skills.registry import (
     SkillCategory,
     SkillKind,
+    SkillPrerequisite,
+    rebuild_prerequisite_caches,
     validate_prerequisite_graph,
 )
 # Cross-lineage wiring: importing the rulebook module at collection time also
@@ -77,6 +79,22 @@ from ._support import (
 )
 
 
+# A parity mastery: PASSIVE of the elemental-magic category whose single
+# declared branch is the magic tree's mid node, so declaring the mastery must
+# close the chain and seed the branch plus its ancestors identically on the
+# preset and the import path.
+_T_PARITY_BRANCH = "magic_t_tree_sprout"
+_T_PARITY_MASTERY = replace(
+    SYNTH_SKILLS["t_steady_stride"],
+    key="t_parity_mastery",
+    label="合成全樹精通",
+    description="合成系譜的整樹精通。",
+    kind=SkillKind.PASSIVE,
+    category=SkillCategory.ELEMENTAL_MAGIC,
+    prerequisites=(SkillPrerequisite(_T_PARITY_BRANCH, 3),),
+)
+
+
 class PresetLineageParityTests(unittest.TestCase):
     """Preset activation is the third caller of the SAME two seed helpers.
 
@@ -88,6 +106,8 @@ class PresetLineageParityTests(unittest.TestCase):
 
     def setUp(self):
         _scoped_setup(self)
+        live_skill_registry()[_T_PARITY_MASTERY.key] = _T_PARITY_MASTERY
+        rebuild_prerequisite_caches(live_skill_registry())
 
     @covers_requirement("skill-lineage::import-and-scene-build-auto-seed-prerequisite-proficiency-exactly")
     def test_preset_path_and_import_path_seed_the_same_values(self):
@@ -108,6 +128,18 @@ class PresetLineageParityTests(unittest.TestCase):
                 ("magic_t_tree_crownfire",),
                 (),
                 {"magic_t_tree_bloom": 120.0},
+            ),
+            (
+                "mastery kit",
+                (_T_PARITY_BRANCH,),
+                (_T_PARITY_MASTERY.key,),
+                {},
+            ),
+            (
+                "mastery with explicit low ancestor",
+                (_T_PARITY_BRANCH,),
+                (_T_PARITY_MASTERY.key,),
+                {"magic_t_tree_root": 40.0},
             ),
         )
         for label, active, passive, explicit in cases:

@@ -458,7 +458,7 @@
     },
     {
       "path": "world/skills/tests/test_spell_catalogs.py",
-      "reason": "spell catalog content contract"
+      "reason": "closed spell-parser vocabulary plus generic lineage-graph and mastery-coverage relationships"
     },
     {
       "path": "world/maps/tests/test_settlement_sources.py",

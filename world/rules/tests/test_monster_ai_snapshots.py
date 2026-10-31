@@ -265,6 +265,11 @@ class _ProbeParticipant:
         self.db = SimpleNamespace(
             skills={"active": list(skills), "passive": []},
             skill_grants=[],
+            # The shared use gate reads stored practice XP for every
+            # prerequisite edge, and the real attribute store always carries
+            # this mapping; the double carries it too so a mastery closure can
+            # be seeded here instead of tripping an attribute error.
+            skill_proficiency={},
             equipment=None,
             disguised_stats=None,
         )

@@ -1,11 +1,11 @@
-"""Data-contract test: spell catalog content contract
+"""Data-contract test: closed spell-parser vocabulary plus generic lineage-graph and mastery-coverage relationships
 Elemental spell-catalog tests and their pinned catalog constants."""
 
 from tools.spec_traceability import covers_requirement
 
 import unittest
 
-from world.lore.elements import ELEMENT_REGISTRY
+from world.rules.progression import PROFICIENCY_TIP_CAP, proficiency_cap
 from world.skills.effects import (
     BuffApplyEffect,
     CleanseEffect,
@@ -21,6 +21,8 @@ from world.skills.effects import (
 from world.skills.registry import (
     FactionConstraint,
     SKILL_REGISTRY,
+    SkillCategory,
+    SkillEligibility,
     SkillKind,
     TargetSpec,
     declared_prerequisites,
@@ -99,254 +101,218 @@ class ClosedVocabularyParseTests(unittest.TestCase):
                     parse_effect(effect)
 
 
-class LightningLineageTreeCatalogTests(unittest.TestCase):
-    """The shipped branching lightning lineage tree with a two-parent canopy is catalog data.
+def _is_unrestricted(skill) -> bool:
+    """Whether the row is open to every actor kind, race, subrace and species."""
+    return skill.eligibility == SkillEligibility()
 
-    The edge topology is the shipped content the requirement names, so it
-    lives in this registered data-contract file; each edge threshold is
-    authored tuning data, so only its positive-integer shape is asserted.
+
+def _is_mastery_row(skill) -> bool:
+    """The mastery family as authored: a PASSIVE of the elemental-magic category."""
+    return (
+        skill.kind is SkillKind.PASSIVE
+        and skill.category is SkillCategory.ELEMENTAL_MAGIC
+    )
+
+
+def _mastery_rows() -> dict[str, object]:
+    """Every elemental-mastery row of the live catalog, by key."""
+    return {
+        key: skill
+        for key, skill in SKILL_REGISTRY.items()
+        if _is_mastery_row(skill)
+    }
+
+
+def _ordinary_universe(skill) -> set[str]:
+    """One mastery's ordinary ACTIVE elemental catalog: element, group, unrestricted.
+
+    Derived from the registry's own classification, never from a copied
+    roster, so a re-authored node joins or leaves the universe by content
+    alone. Element-tagged martial skills (another category) and
+    identity-restricted monster rows are outside it by construction.
+    """
+    return {
+        key
+        for key, row in SKILL_REGISTRY.items()
+        if row.kind is SkillKind.ACTIVE
+        and row.category is SkillCategory.ELEMENTAL_MAGIC
+        and row.element is not None
+        and skill.element is not None
+        and row.element.key == skill.element.key
+        and row.group == skill.group
+        and _is_unrestricted(row)
+    }
+
+
+def _ordinary_terminals(universe: set[str]) -> set[str]:
+    """Universe members no OTHER universe member consumes."""
+    consumed = {
+        edge.skill_key
+        for key in universe
+        for edge in SKILL_REGISTRY[key].prerequisites
+        if edge.skill_key in universe
+    }
+    return universe - consumed
+
+
+def _ordinary_cap(skill_key: str) -> int:
+    """The derived tip cap of one row with every mastery consumer excluded.
+
+    The mastery consumers are subtracted so the comparison cannot become
+    circular: it answers "what would this row's cap be without the masteries",
+    which is the pre-mastery derived cap the contract preserves.
+    """
+    ordinary = [
+        level
+        for consumer, level in prerequisite_consumers(skill_key)
+        if consumer not in SKILL_REGISTRY
+        or not _is_mastery_row(SKILL_REGISTRY[consumer])
+    ]
+    return max(ordinary) if ordinary else PROFICIENCY_TIP_CAP
+
+
+class LineageGraphContractTests(unittest.TestCase):
+    """Generic registry-graph relationships over the live skill catalog.
+
+    Mechanism, never authored topology: every relationship below is derived
+    from the registry itself, so a re-authored node, edge or threshold stays a
+    content decision while a dangling reference, a non-positive threshold, a
+    reversed or missing reverse-cache entry or a cyclic graph is still
+    detected. No assertion approves a node roster, a display label or a
+    balance magnitude.
     """
 
     @covers_requirement(
-        "skill-lineage::the-lightning-lineage-ships-as-the-authored-two-root-branching-tree-with-a-two-parent-canopy"
+        "skill-lineage::skillprerequisite-declares-registry-edges-and-load-validation-fails-closed"
     )
-    def test_lightning_tree_edges_are_as_designed(self):
-        expected_edges = {
-            "lightning_flicker": ("static_ward",),
-            "thunder_combo": ("lightning_flicker",),
-            "thunder_gods_haste": ("thunder_combo",),
-            "thunder_shatter_strike": ("thunder_combo",),
-            "judgement_thunder": ("thunder_gods_haste",),
-            "chain_lightning": ("spark_shock",),
-            "paralyzing_bolt": ("spark_shock",),
-            "lightning_strike": ("chain_lightning",),
-            "thunder_prison": ("paralyzing_bolt",),
-            "heavens_thunder": ("lightning_strike",),
-            "divine_lightning_slaughter": ("heavens_thunder",),
-            "thunder_apotheosis": (
-                "judgement_thunder",
-                "divine_lightning_slaughter",
-            ),
-        }
-        for key, parent_keys in expected_edges.items():
-            with self.subTest(spell=key):
-                declared = declared_prerequisites(key)
+    def test_every_declared_edge_references_a_registered_row_at_a_positive_level(self):
+        for key, skill in SKILL_REGISTRY.items():
+            with self.subTest(skill=key):
                 self.assertEqual(
-                    tuple(prereq.skill_key for prereq in declared),
-                    parent_keys,
+                    declared_prerequisites(key), tuple(skill.prerequisites)
                 )
-                for prereq in declared:
-                    self.assertIs(type(prereq.min_proficiency), int)
-                    self.assertGreaterEqual(prereq.min_proficiency, 1)
-        for root in ("static_ward", "spark_shock"):
-            self.assertEqual(declared_prerequisites(root), ())
-        # Topological canopy: thunder_apotheosis is consumed by nothing.
-        self.assertEqual(prerequisite_consumers("thunder_apotheosis"), ())
-        # Both canopy parents are consumed only by the canopy edge.
-        for parent in ("judgement_thunder", "divine_lightning_slaughter"):
-            self.assertEqual(
-                tuple(consumer for consumer, _ in prerequisite_consumers(parent)),
-                ("thunder_apotheosis",),
-            )
-        # Branch points feed exactly their authored children.
-        self.assertEqual(
-            {consumer for consumer, _ in prerequisite_consumers("spark_shock")},
-            {"chain_lightning", "paralyzing_bolt"},
-        )
-        self.assertEqual(
-            {consumer for consumer, _ in prerequisite_consumers("thunder_combo")},
-            {"thunder_gods_haste", "thunder_shatter_strike"},
-        )
-        # Terminal leaves have empty consumers.
-        self.assertEqual(prerequisite_consumers("thunder_shatter_strike"), ())
-        self.assertEqual(prerequisite_consumers("thunder_prison"), ())
+                for edge in skill.prerequisites:
+                    self.assertIn(edge.skill_key, SKILL_REGISTRY)
+                    self.assertIs(type(edge.min_proficiency), int)
+                    self.assertGreaterEqual(edge.min_proficiency, 1)
 
-    def test_lightning_passives_stay_out_of_the_graph(self):
-        self.assertEqual(prerequisite_consumers("lightning_mastery"), ())
-        self.assertEqual(declared_prerequisites("lightning_mastery"), ())
+    @covers_requirement(
+        "skill-lineage::skillprerequisite-declares-registry-edges-and-load-validation-fails-closed"
+    )
+    def test_reverse_cache_matches_the_declared_edges_exactly(self):
+        expected: dict[str, list[tuple[str, int]]] = {}
+        for key, skill in SKILL_REGISTRY.items():
+            for edge in skill.prerequisites:
+                expected.setdefault(edge.skill_key, []).append(
+                    (key, edge.min_proficiency)
+                )
+        for prereq_key, edges in expected.items():
+            with self.subTest(prerequisite=prereq_key):
+                self.assertEqual(
+                    prerequisite_consumers(prereq_key),
+                    tuple(sorted(edges, key=lambda edge: (edge[1], edge[0]))),
+                )
+        for key in SKILL_REGISTRY:
+            if key in expected:
+                continue
+            with self.subTest(canopy=key):
+                self.assertEqual(prerequisite_consumers(key), ())
+
+    @covers_requirement(
+        "skill-lineage::skillprerequisite-declares-registry-edges-and-load-validation-fails-closed"
+    )
+    def test_prerequisite_graph_is_acyclic_and_drains_completely(self):
+        indegree = {
+            key: len(skill.prerequisites)
+            for key, skill in SKILL_REGISTRY.items()
+        }
+        queue = [key for key, degree in indegree.items() if degree == 0]
+        visited = 0
+        while queue:
+            current = queue.pop()
+            visited += 1
+            for consumer_key, _ in prerequisite_consumers(current):
+                indegree[consumer_key] -= 1
+                if indegree[consumer_key] == 0:
+                    queue.append(consumer_key)
+        leftover = sorted(key for key, degree in indegree.items() if degree > 0)
+        self.assertEqual(visited, len(SKILL_REGISTRY), leftover)
 
 
-class IceLineageTreeCatalogTests(unittest.TestCase):
-    """The shipped branching ice lineage tree with a two-parent canopy is catalog data.
+class ElementalMasteryCoverageContractTests(unittest.TestCase):
+    """Whole-tree mastery coverage as a generic registry relationship.
 
-    The edge topology is the shipped content the requirement names, so it
-    lives in this registered data-contract file; each edge threshold is
-    authored tuning data, so only its positive-integer shape is asserted.
+    The assertions derive each element's ordinary terminals instead of naming
+    them, so re-authoring a branch stays a content decision while an omitted
+    terminal, a foreign prerequisite, a restricted prerequisite or a mastery
+    edge that would raise an ordinary cap is still caught.
     """
 
     @covers_requirement(
-        "skill-lineage::the-ice-lineage-ships-as-the-authored-two-root-branching-tree-with-a-two-parent-canopy"
+        "element-mastery::elemental-mastery-prerequisites-cover-every-ordinary-branch"
     )
-    def test_ice_tree_edges_are_as_designed(self):
-        expected_edges = {
-            "ice_wall": ("frost_breath",),
-            "frost_mire": ("ice_wall",),
-            "permafrost_domain": ("ice_wall",),
-            "absolute_tundra": ("permafrost_domain",),
-            "eternal_ice_field": ("absolute_tundra",),
-            "frost_arrow_rain": ("ice_shard",),
-            "ice_prison": ("frost_arrow_rain",),
-            "blizzard": ("ice_prison",),
-            "crystal_shatter": ("ice_prison",),
-            "absolute_zero": ("blizzard",),
-            "eternal_frost_apotheosis": ("eternal_ice_field", "absolute_zero"),
-        }
-        for key, parent_keys in expected_edges.items():
-            with self.subTest(spell=key):
-                declared = declared_prerequisites(key)
+    def test_each_mastery_declares_exactly_its_elements_ordinary_terminals(self):
+        masteries = _mastery_rows()
+        self.assertTrue(masteries)
+        for key, mastery in masteries.items():
+            universe = _ordinary_universe(mastery)
+            terminals = _ordinary_terminals(universe)
+            with self.subTest(mastery=key):
+                self.assertTrue(universe)
+                self.assertTrue(terminals)
                 self.assertEqual(
-                    tuple(prereq.skill_key for prereq in declared),
-                    parent_keys,
+                    {edge.skill_key for edge in mastery.prerequisites},
+                    terminals,
                 )
-                for prereq in declared:
-                    self.assertIs(type(prereq.min_proficiency), int)
-                    self.assertGreaterEqual(prereq.min_proficiency, 1)
-        self.assertEqual(declared_prerequisites("frost_breath"), ())
-        self.assertEqual(declared_prerequisites("ice_shard"), ())
-        # Topological canopy: eternal_frost_apotheosis is consumed by nothing.
-        self.assertEqual(prerequisite_consumers("eternal_frost_apotheosis"), ())
-        # Both canopy parents are consumed only by the canopy edge.
-        for parent in ("eternal_ice_field", "absolute_zero"):
-            self.assertEqual(
-                tuple(consumer for consumer, _ in prerequisite_consumers(parent)),
-                ("eternal_frost_apotheosis",),
-            )
-        # Branch points feed exactly their two authored children.
-        self.assertEqual(
-            {consumer for consumer, _ in prerequisite_consumers("ice_wall")},
-            {"frost_mire", "permafrost_domain"},
-        )
-        self.assertEqual(
-            {consumer for consumer, _ in prerequisite_consumers("ice_prison")},
-            {"blizzard", "crystal_shatter"},
-        )
-        # Terminal leaves have empty consumers.
-        self.assertEqual(prerequisite_consumers("frost_mire"), ())
-        self.assertEqual(prerequisite_consumers("crystal_shatter"), ())
 
     @covers_requirement(
-        "skill-lineage::the-ice-lineage-ships-as-the-authored-two-root-branching-tree-with-a-two-parent-canopy"
+        "element-mastery::elemental-mastery-prerequisites-cover-every-ordinary-branch"
     )
-    def test_mastery_passives_stay_out_of_the_graph(self):
-        for element_key in ELEMENT_REGISTRY:
-            mastery_key = f"{element_key}_mastery"
-            with self.subTest(mastery_key=mastery_key):
-                self.assertEqual(prerequisite_consumers(mastery_key), ())
-                self.assertEqual(declared_prerequisites(mastery_key), ())
-
-class FireLineageTreeCatalogTests(unittest.TestCase):
-    """The shipped branching fire lineage tree with a two-parent canopy is catalog data.
-
-    Relocated from the migrated (now synthetic) rules lineage suite: the
-    edge topology is the shipped content the requirement names, so it lives in
-    this registered data-contract file; each edge threshold is authored
-    tuning data, so only its positive-integer shape is asserted.
-    """
-
-    @covers_requirement("skill-lineage::the-fire-lineage-ships-as-the-authored-branching-tree-with-a-two-parent-canopy")
-    def test_fire_tree_edges_are_as_designed(self):
-        expected_edges = {
-            "fire_ball": ("fire_arrow",),
-            "scorching_wave": ("fire_ball",),
-            "firestorm": ("scorching_wave",),
-            "flame_shroud": ("scorching_wave",),
-            "scorching_armor": ("scorching_wave",),
-            "lava_burst": ("firestorm",),
-            "hellfire": ("firestorm",),
-            "dragon_flame": ("lava_burst",),
-            "final_blaze": ("hellfire",),
-            "sacrificial_flame": ("dragon_flame",),
-            "crimson_apotheosis": ("sacrificial_flame", "final_blaze"),
-        }
-        for key, parent_keys in expected_edges.items():
-            with self.subTest(key=key):
-                declared = declared_prerequisites(key)
-                self.assertEqual(
-                    tuple(prereq.skill_key for prereq in declared),
-                    parent_keys,
+    def test_restricted_and_unrelated_rows_are_never_mastery_prerequisites(self):
+        for key, mastery in _mastery_rows().items():
+            element_key = mastery.element.key
+            restricted = {
+                row_key
+                for row_key, row in SKILL_REGISTRY.items()
+                if row.element is not None
+                and row.element.key == element_key
+                and not _is_unrestricted(row)
+            }
+            with self.subTest(mastery=key):
+                self.assertFalse(
+                    {edge.skill_key for edge in mastery.prerequisites} & restricted
                 )
-                for prereq in declared:
-                    self.assertIs(type(prereq.min_proficiency), int)
-                    self.assertGreaterEqual(prereq.min_proficiency, 1)
-        self.assertEqual(declared_prerequisites("fire_arrow"), ())
-        # Topological canopy: crimson_apotheosis is the strict last node.
-        self.assertEqual(prerequisite_consumers("crimson_apotheosis"), ())
-        # sacrificial_flame is consumed only by crimson_apotheosis.
-        self.assertEqual(
-            tuple(
-                consumer
-                for consumer, _ in prerequisite_consumers("sacrificial_flame")
-            ),
-            ("crimson_apotheosis",),
-        )
-
-    @covers_requirement("skill-lineage::the-fire-lineage-ships-as-the-authored-branching-tree-with-a-two-parent-canopy")
-    def test_mastery_passives_stay_out_of_the_graph(self):
-        for element_key in ELEMENT_REGISTRY:
-            mastery_key = f"{element_key}_mastery"
-            with self.subTest(mastery_key=mastery_key):
-                self.assertEqual(prerequisite_consumers(mastery_key), ())
-                self.assertEqual(declared_prerequisites(mastery_key), ())
-
-
-class WindLineageTreeCatalogTests(unittest.TestCase):
-    """The shipped branching wind lineage tree with a two-parent canopy is catalog data.
-
-    The edge topology is the shipped content the requirement names, so it
-    lives in this registered data-contract file; each edge threshold is
-    authored tuning data, so only its positive-integer shape is asserted.
-    """
+                for edge in mastery.prerequisites:
+                    row = SKILL_REGISTRY[edge.skill_key]
+                    self.assertIs(row.kind, SkillKind.ACTIVE)
+                    self.assertIs(row.category, SkillCategory.ELEMENTAL_MAGIC)
+                    self.assertIsNotNone(row.element)
+                    self.assertEqual(row.element.key, element_key)
+                    self.assertEqual(row.group, mastery.group)
+                    self.assertTrue(_is_unrestricted(row))
 
     @covers_requirement(
-        "skill-lineage::the-wind-lineage-ships-as-the-authored-two-root-branching-tree-with-a-two-parent-canopy"
+        "element-mastery::elemental-mastery-prerequisites-cover-every-ordinary-branch"
     )
-    def test_wind_tree_edges_are_as_designed(self):
-        expected_edges = {
-            "gale_chain_step": ("gale_step",),
-            "afterimage_step": ("gale_chain_step",),
-            "haste_domain": ("afterimage_step",),
-            "tornado_blade": ("wind_blade",),
-            "storm_domain": ("tornado_blade",),
-            "gale_dance_strike": ("tornado_blade",),
-            "heavens_wrath_storm": ("storm_domain",),
-            "sky_rending_slash": ("gale_dance_strike",),
-            "sky_tempest": ("heavens_wrath_storm",),
-            "vacuum_severance": ("sky_rending_slash",),
-            "sky_apotheosis": ("sky_tempest", "vacuum_severance"),
-        }
-        for key, parent_keys in expected_edges.items():
-            with self.subTest(key=key):
-                declared = declared_prerequisites(key)
-                self.assertEqual(
-                    tuple(prereq.skill_key for prereq in declared),
-                    parent_keys,
-                )
-                for prereq in declared:
-                    self.assertIs(type(prereq.min_proficiency), int)
-                    self.assertGreaterEqual(prereq.min_proficiency, 1)
-        self.assertEqual(declared_prerequisites("gale_step"), ())
-        self.assertEqual(declared_prerequisites("wind_blade"), ())
-        # Topological canopy: sky_apotheosis is consumed by nothing.
-        self.assertEqual(prerequisite_consumers("sky_apotheosis"), ())
-        # Both canopy parents are consumed only by the canopy edge.
-        for parent in ("sky_tempest", "vacuum_severance"):
-            self.assertEqual(
-                tuple(consumer for consumer, _ in prerequisite_consumers(parent)),
-                ("sky_apotheosis",),
-            )
-        # Branch point: tornado_blade feeds exactly its two authored children.
-        self.assertEqual(
-            {consumer for consumer, _ in prerequisite_consumers("tornado_blade")},
-            {"storm_domain", "gale_dance_strike"},
-        )
-        # Mobility leaf: haste_domain is consumed by nothing.
-        self.assertEqual(prerequisite_consumers("haste_domain"), ())
+    def test_mastery_edges_leave_every_ordinary_terminal_cap_unchanged(self):
+        for key, mastery in _mastery_rows().items():
+            for edge in mastery.prerequisites:
+                with self.subTest(mastery=key, terminal=edge.skill_key):
+                    baseline = _ordinary_cap(edge.skill_key)
+                    self.assertLessEqual(edge.min_proficiency, baseline)
+                    self.assertEqual(proficiency_cap(edge.skill_key), baseline)
 
     @covers_requirement(
-        "skill-lineage::the-wind-lineage-ships-as-the-authored-two-root-branching-tree-with-a-two-parent-canopy"
+        "element-mastery::elemental-mastery-prerequisites-cover-every-ordinary-branch"
     )
-    def test_wind_passives_stay_out_of_the_graph(self):
-        for passive_key in ("wind_mastery", "flight"):
-            with self.subTest(passive_key=passive_key):
-                self.assertEqual(prerequisite_consumers(passive_key), ())
-                self.assertEqual(declared_prerequisites(passive_key), ())
+    def test_independent_passives_are_never_prerequisites(self):
+        independent = {
+            key
+            for key, skill in SKILL_REGISTRY.items()
+            if skill.kind is SkillKind.PASSIVE
+            and skill.category is SkillCategory.ENHANCEMENT
+        }
+        self.assertTrue(independent)
+        for key in independent:
+            with self.subTest(passive=key):
+                self.assertEqual(prerequisite_consumers(key), ())
