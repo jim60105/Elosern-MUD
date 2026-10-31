@@ -8,13 +8,17 @@ import { medallionMembers } from "../../components/travel/travel-model.js";
 import { companionFigures } from "../../components/companion-lineup.js";
 import { portraitFor } from "../../components/party-helpers.js";
 import { artworkDescriptor, artworkEntry, artworkResource, fixtureDigest } from "../fixtures/art_panels.js";
-import { wildernessArea, wildernessNightArea } from "../fixtures/area_map.js";
+import { wildernessArea } from "../fixtures/area_map.js";
+import { DUSK_GRID, MORNING_GRID, NIGHT_GRID, WOODLAND_GRID } from "../fixtures/travel_grid.js";
+import { decodeTravelGrid } from "../../lib/travel-grid.js";
 import { STATUS_PANEL_SAMPLE } from "../fixtures/status_panels.js";
 
 // The wilderness travel stage (OpenSpec change wilderness-travel-interface;
 // design docs/superpowers/specs/2026-10-30-wilderness-travel-interface-design.md
 // §3/§8; approved prototype Design/WildernessTravel): the real HudFrame with
-// its travel hook, TravelMap over a schema-valid wilderness area_map window,
+// its travel hook, TravelMap painting a decoded travel grid (the full-fact
+// synthetic grids of stories/fixtures/travel_grid.js for the painted states,
+// the real adapter over a schema-valid area_map window for the refresh ones),
 // the vitals dock above the party medallions, and the place card alone in the
 // map column. Every body is a synthetic protocol fixture; the medallions join
 // each member to its own status v5 fatigue row. The band keeps the ordinary
@@ -128,7 +132,8 @@ const renderStage = (args) =>
       "div",
       { style: "position:relative;height:calc(100vh - var(--header-h));" },
       h(HudFrame, { mode: "exploration", travel: true }, {
-        backdrop: () => h(TravelMap, { area: args.area, status: args.status }),
+        backdrop: () =>
+          h(TravelMap, { grid: args.grid, status: args.status, aim: args.aim, motionLevel: args.motionLevel }),
         vitals: () => [
           h(StatusPanel, {
             status: { ...STATUS_PANEL_SAMPLE, fatigue: args.fatigue },
@@ -155,8 +160,13 @@ export default {
   },
 };
 
+// The real adapter's output over a schema-2 window: terrain and reveal only,
+// so it paints flat, with no relief, flags or light.
+const ADAPTED = decodeTravelGrid(wildernessArea());
+
 const MORNING = {
-  area: wildernessArea(),
+  grid: MORNING_GRID,
+  aim: "east",
   status: "ready",
   fatigue: FATIGUE.morning,
   vitalsVisible: false,
@@ -165,30 +175,41 @@ const MORNING = {
   motionLevel: "full",
 };
 
-// Morning on the open ground: the current window at full strength, the whole
-// party fresh, the vitals dock hidden at full.
+// Morning on the road: the painted window at full strength with relief,
+// river, road and ford, a wolf pack in live sight, three distant sightings
+// and the eastern neighbour aimed; the whole party fresh.
 export const Morning = { args: MORNING };
 
 // The day wears on: stages lower each face's colour and carry their label,
 // the sleeper wears the crescent, and the dock shows the damaged gauges.
 export const WearyParty = {
   name: "Weary Party",
-  args: { ...MORNING, fatigue: FATIGUE.weary, vitalsVisible: true, time: "春 3 日 ‧ 17:40・黃昏" },
+  args: { ...MORNING, fatigue: FATIGUE.weary, vitalsVisible: true, time: "春 3 日 ‧ 14:20・白晝" },
 };
 
 // A committed step: the last map stays, dimmed, while the next one settles.
-export const Refreshing = { args: { ...MORNING, status: "refreshing" } };
+export const Refreshing = { args: { ...MORNING, grid: ADAPTED, aim: null, status: "refreshing" } };
 
 // The first entry: no map adopted yet, only the hatched fog.
-export const FirstLoad = { name: "First Load", args: { ...MORNING, area: null, status: "refreshing" } };
+export const FirstLoad = { name: "First Load", args: { ...MORNING, grid: null, aim: null, status: "refreshing" } };
 
 // A failed read: the last map dimmed, one status line and the explicit retry.
-export const Unavailable = { args: { ...MORNING, status: "unavailable" } };
+export const Unavailable = { args: { ...MORNING, grid: ADAPTED, aim: null, status: "unavailable" } };
 
-// Night: the window the server sends after dark.
-export const Night = {
-  args: { ...MORNING, area: wildernessNightArea(), fatigue: FATIGUE.weary, vitalsVisible: true, time: "春 3 日 ‧ 22:10・夜晚" },
+// Dusk: the amber wash and a narrower live sight.
+export const Dusk = {
+  args: { ...MORNING, grid: DUSK_GRID, aim: null, fatigue: FATIGUE.weary, vitalsVisible: true, time: "春 3 日 ‧ 17:40・黃昏" },
 };
 
-// Motion off: every state lands at once, with no crossfade or bar glide.
+// Night: the deep blue wash, the moonlit disc and only the lights that carry.
+export const Night = {
+  args: { ...MORNING, grid: NIGHT_GRID, aim: null, fatigue: FATIGUE.weary, vitalsVisible: true, time: "春 3 日 ‧ 22:10・夜晚" },
+};
+
+// Woodland: under the canopy, one cell of sight and no horizon.
+export const Woodland = {
+  args: { ...MORNING, grid: WOODLAND_GRID, aim: "north", place: "合成東麓・林地", time: "春 3 日 ‧ 11:05・白晝" },
+};
+
+// Motion off: every state lands at once, with no glide, crossfade or breath.
 export const MotionOff = { name: "Motion Off", args: { ...MORNING, motionLevel: "off" } };
