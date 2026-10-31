@@ -102,21 +102,24 @@ export function walkCapacity({
   };
 }
 
-/** A schema-3 wilderness window centred on `(cx, cy)`: a revealed 3 x 3 block. */
-export function walkArea(cx, cy) {
+/**
+ * A schema-3 wilderness window centred on `(cx, cy)`: a revealed square block
+ * of `reveal` cells around the party (default 1: the 3 x 3 neighbourhood).
+ */
+export function walkArea(cx, cy, { reveal = 1 } = {}) {
   const width = 41;
   const rows = [];
   for (let row = 0; row < width; row += 1) {
     const y = cy - 20 + row;
     rows.push(
-      Math.abs(y - cy) <= 1
+      Math.abs(y - cy) <= reveal
         ? [
-            { length: 19, kind: "unknown" },
+            { length: 20 - reveal, kind: "unknown" },
             {
-              length: 3, kind: "terrain", terrain: "open_ground", passable: true, band: 3, tier: 0, road: false, ford: false,
+              length: 2 * reveal + 1, kind: "terrain", terrain: "open_ground", passable: true, band: 3, tier: 0, road: false, ford: false,
               display: { terrain_label: "曠野", district_key: "synthetic_east", district_name: "合成東麓", settlement: false, ford_label: null },
             },
-            { length: 19, kind: "unknown" },
+            { length: 20 - reveal, kind: "unknown" },
           ]
         : [{ length: width, kind: "unknown" }],
     );

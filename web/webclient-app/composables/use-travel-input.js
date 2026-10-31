@@ -7,9 +7,19 @@
 // - Keyboard intents come from the focused map only (TravelMap ignores
 //   modified and composing keys and native repeat), so text entries, open
 //   dialogs and drawers keep their own input.
-// - Pointer: hovering a known neighbour aims it; clicking one steps once.
-//   The party's own cell, unknown cells and cells further away do nothing
-//   here (the route slices own those).
+// - Pointer: hovering a known neighbour aims it; clicking one steps once
+//   (neighbour single-step precedence, gateway and withheld-destination rows
+//   included). Hovering a disclosed cell further away previews its route
+//   (the store debounces it); clicking one locks it. The party's own cell
+//   and unknown cells do nothing beyond the hover outline; a second click on
+//   the locked cell is route-ui's departure and does nothing here.
+// - Destination cursor (wilderness-travel-planning-ui): Shift+arrows move a
+//   visible cursor one cell inside the current window, clear the neighbour
+//   aim and preview a disclosed far cell like a hover. Enter with an aim
+//   still steps; otherwise Enter on the cursor locks a disclosed non-party
+//   cell (a neighbour too) and leaves cursor mode, while an unknown or party
+//   cell is only inspected. Esc clears, in order: a walk or the aim, the
+//   cursor, then the lock and preview.
 // - One document keydown listener in the CAPTURE phase stops an active walk
 //   before any other handler runs. The held arrows' native repeat is the
 //   walk's continuation, not a new key. The stopping event is recorded, so
@@ -21,7 +31,7 @@
 //   (a drawer, an overlay, a card, the full log, a text entry) holds it.
 // - Entering the travel layout focuses the map: the compass is not mounted
 //   there, so no hidden control consumes the movement keys.
-import { computed, nextTick, onBeforeUnmount, onMounted, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { ARROW_KEYS, directionForCell } from "../components/travel/travel-walk-model.js";
 import { travelCellAt } from "../lib/travel-grid.js";
 import { isTextEntry } from "./use-window-hotkeys.js";
@@ -35,6 +45,8 @@ export function useTravelInput(store, { mapRef, fullLogOpen = () => false }) {
   const active = computed(() => walking.value || !!travel.value?.holding);
   // Events that already stopped a walk in the capture phase.
   const stopping = new WeakSet();
+  // The keyboard destination cursor: a window cell, or null outside cursor mode.
+  const cursor = ref(null);
 
   function onCapture(event) {
     if (!walking.value) return;
@@ -49,7 +61,9 @@ export function useTravelInput(store, { mapRef, fullLogOpen = () => false }) {
   }
 
   function onAim(direction, event) {
-    if (!swallowed(event)) store.aimTravel(direction);
+    if (swallowed(event)) return;
+    leaveCursor();
+    store.aimTravel(direction);
   }
   function onHold(direction, event) {
     if (!swallowed(event)) store.holdTravel(direction);
@@ -58,13 +72,60 @@ export function useTravelInput(store, { mapRef, fullLogOpen = () => false }) {
     store.releaseTravel();
   }
   function onStep(event) {
-    if (!swallowed(event)) store.stepTravel();
+    if (swallowed(event)) return;
+    // An ordinary aim keeps its single step.
+    if (!travel.value?.aim && cursor.value) {
+      if (store.lockTravelDestination(cursor.value)) cursor.value = null;
+      return;
+    }
+    store.stepTravel();
   }
   function onCancel(event) {
     if (swallowed(event)) return;
-    store.stopTravel("cancel");
-    store.aimTravel(null);
+    if (active.value || travel.value?.aim) {
+      store.stopTravel("cancel");
+      store.aimTravel(null);
+      return;
+    }
+    if (cursor.value) {
+      leaveCursor();
+      return;
+    }
+    store.clearTravelTarget();
   }
+
+  function leaveCursor() {
+    if (!cursor.value) return;
+    cursor.value = null;
+    // The cursor's own preview goes with it; a lock stays.
+    store.hoverTravelCell(null);
+  }
+
+  /** Move the destination cursor by one cell, inside the current window. */
+  function onCursor(dx, dy, event) {
+    if (swallowed(event) || active.value) return;
+    const grid = travel.value?.map ?? null;
+    if (!grid || !travel.value?.mapReady) return;
+    const from = cursor.value ?? travel.value.lockedDestination ?? grid.party;
+    if (!from) return;
+    const clamp = (v, lo, size) => Math.min(lo + size - 1, Math.max(lo, v));
+    cursor.value = Object.freeze({ x: clamp(from.x + dx, grid.origin.x, grid.width), y: clamp(from.y + dy, grid.origin.y, grid.height) });
+    if (travel.value.aim) store.aimTravel(null);
+    // The store previews only a disclosed cell beyond the neighbours.
+    store.hoverTravelCell(cursor.value);
+  }
+
+  // What the cursor stands on, for the map outline and the intent line.
+  const cursorView = computed(() => {
+    const c = cursor.value;
+    const grid = travel.value?.map ?? null;
+    if (!c || !grid) return null;
+    const cell = travelCellAt(grid, c.x, c.y);
+    const party = !!grid.party && grid.party.x === c.x && grid.party.y === c.y;
+    const known = !!cell?.known;
+    const label = known ? cell.node?.landmark?.name || cell.display?.terrain_label || null : null;
+    return Object.freeze({ x: c.x, y: c.y, known, party, label, lockable: known && !party });
+  });
 
   function neighbour(cell) {
     const grid = travel.value?.map ?? null;
@@ -76,8 +137,19 @@ export function useTravelInput(store, { mapRef, fullLogOpen = () => false }) {
 
   function onHover(cell) {
     if (active.value) return;
+    if (cell) cursor.value = null;
     const direction = neighbour(cell);
-    if (direction && direction !== travel.value?.aim) store.aimTravel(direction);
+    if (direction) {
+      store.hoverTravelCell(null);
+      if (direction !== travel.value?.aim) store.aimTravel(direction);
+      return;
+    }
+    // The store previews a disclosed far cell; anything else clears.
+    store.hoverTravelCell(cell);
+  }
+
+  function sameCell(a, b) {
+    return !!a && !!b && a.x === b.x && a.y === b.y;
   }
 
   function onPick(cell) {
@@ -85,9 +157,26 @@ export function useTravelInput(store, { mapRef, fullLogOpen = () => false }) {
       store.stopTravel("pointer");
       return;
     }
+    cursor.value = null;
     const direction = neighbour(cell);
-    if (direction) store.stepTravel(direction);
+    if (direction) {
+      store.stepTravel(direction);
+      return;
+    }
+    // A second click on the locked cell is the departure route-ui installs.
+    if (!cell || sameCell(cell, travel.value?.lockedDestination)) return;
+    store.lockTravelDestination(cell);
   }
+
+  // The cursor leaves with the layout, a walk, or a window that no longer holds it.
+  watch(
+    () => [layout.value, active.value, travel.value?.map ?? null],
+    ([shown, moving, grid]) => {
+      const c = cursor.value;
+      if (!c) return;
+      if (!shown || moving || !grid || !travelCellAt(grid, c.x, c.y)) cursor.value = null;
+    },
+  );
 
   function onStop() {
     store.stopTravel("stop");
@@ -165,5 +254,7 @@ export function useTravelInput(store, { mapRef, fullLogOpen = () => false }) {
     onTravelHover: onHover,
     onTravelPick: onPick,
     onTravelStop: onStop,
+    onTravelCursor: onCursor,
+    travelCursor: cursorView,
   };
 }

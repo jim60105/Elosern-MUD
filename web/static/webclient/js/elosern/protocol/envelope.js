@@ -14,6 +14,7 @@ var validateRequestId = core.validateRequestId;
 var validateMessage = core.validateMessage;
 var validateCorrelationId = core.validateCorrelationId;
 var validateCombatResultData = core.validateCombatResultData;
+var validateTravelResultData = core.validateTravelResultData;
 var validateResultData = core.validateResultData;
 var validateServerTime = core.validateServerTime;
 
@@ -357,6 +358,8 @@ function validateActionResult(payload) {
   // Adapter-specific combat result contract: the exit prompt's exact bounded
   // slot, and no data at all on the other combat codes.
   validateCombatResultData(payload.code, hasData, result.data);
+  // The read-only route preview's exact planner slot (travel.plan success).
+  validateTravelResultData(payload.code, payload.outcome, hasData, result.data);
   return result;
 }
 

@@ -17,7 +17,7 @@ import { companionFigures } from "../../components/companion-lineup.js";
 import { portraitFor } from "../../components/party-helpers.js";
 import { artworkDescriptor, artworkEntry, artworkResource, fixtureDigest } from "../fixtures/art_panels.js";
 import { wildernessArea } from "../fixtures/area_map.js";
-import { DUSK_GRID, MORNING_GRID, NIGHT_GRID, WOODLAND_GRID } from "../fixtures/travel_grid.js";
+import { DUSK_GRID, MORNING_AREA, MORNING_GRID, NIGHT_GRID, WOODLAND_GRID } from "../fixtures/travel_grid.js";
 import { decodeTravelGrid } from "../../lib/travel-grid.js";
 import { STATUS_PANEL_SAMPLE } from "../fixtures/status_panels.js";
 
@@ -33,8 +33,11 @@ import { STATUS_PANEL_SAMPLE } from "../fixtures/status_panels.js";
 // each member to its own status fatigue row. The band's message region is
 // the travel log and its command region the leg panel (wilderness-travel-
 // leg-ui), projected by the real `legView` from a status v6 travel capacity
-// fixture, an aimed committed row, a supplied light phase and, for the route
-// preview, a `travel.plan`-shaped result.
+// fixture, an aimed committed row and a supplied light phase. The route
+// preview stories (wilderness-travel-planning-ui) drive the real store: a
+// destination locked (or hovered) through its own actions, the window adopted
+// through `setTravelMap`, and the `travel.plan` answer delivered through the
+// real result validator.
 
 // The committed portrait catalog: the bundled default figures as each
 // member's own descriptor (no URL is built by the components).
@@ -120,8 +123,6 @@ const EAST = { direction: "east", word: "東方", exists: true, enabled: true, r
 function staticLeg(args) {
   return legView({
     aim: args.legAim === undefined ? (args.aim === "east" ? EAST : null) : args.legAim,
-    plan: args.plan ?? null,
-    locked: !!args.plan,
     progress: args.progress ?? 0,
     walking: args.legWalking ?? null,
     capacity: args.capacity,
@@ -253,28 +254,6 @@ export const Night = {
     ...MORNING, grid: NIGHT_GRID, aim: null, fatigue: FATIGUE.weary, vitalsVisible: true, ...placeOf(NIGHT_GRID, "春 3 日 ‧ 22:10"),
     phase: "night", capacity: walkCapacity({ normal: 0, light: 7, moderate: 6, severe: 3 }),
   },
-};
-
-// The leg gauge over a supplied route preview (the travel.plan result shape
-// planning-ui will lock): stages per step, the moon at nightfall, the camp
-// line at the stop and the steps beyond it.
-const ROUTE = {
-  origin: { x: 60, y: 80 },
-  destination: { x: 74, y: 84 },
-  steps: [
-    ...Array.from({ length: 6 }, (_, i) => ({ cell: { x: 61 + i, y: 80 }, seconds: 1200, fatigue_stage: "normal" })),
-    ...Array.from({ length: 4 }, (_, i) => ({ cell: { x: 67 + i, y: 81 }, seconds: 1334, fatigue_stage: "light" })),
-    ...Array.from({ length: 4 }, (_, i) => ({ cell: { x: 71 + i, y: 82 }, seconds: 1600, fatigue_stage: "moderate" })),
-  ],
-  total_seconds: 6 * 1200 + 4 * 1334 + 1600,
-  nightfall_index: 8,
-  stop_index: 10,
-  stop_reason: "pace_threshold",
-  label: "灰石崗",
-};
-export const RoutePreview = {
-  name: "Route Preview",
-  args: { ...MORNING, aim: null, plan: ROUTE, serverTime: { ...NOON, hour: 14, minute: 20 }, time: "春 3 日 ‧ 14:20・白晝" },
 };
 
 // The capacity read failed (or the party has no physiology): the gauge says
@@ -419,3 +398,166 @@ export const TravelLogLeg = {
 
 // An empty band on first entry: the log's one quiet line.
 export const TravelLogEmpty = { name: "Travel Log Empty", args: { ...MORNING, log: [] } };
+
+// ── route preview (wilderness-travel-planning-ui) ──────────────────────
+
+// The morning party's road east to the lit stone marker: three fresh steps,
+// two light, two moderate (the standard pace camps on the first) and one
+// severe; nightfall would fall on the step after the camp.
+const ORIGIN = { x: 100, y: 200 };
+const MARKER = { x: 108, y: 207 };
+const ROAD = [[101, 201], [102, 201], [103, 202], [104, 203], [105, 204], [106, 205], [107, 206], [108, 207]];
+const routeSteps = (stages, seconds) => ROAD.slice(0, stages.length).map(([x, y], i) => ({ cell: { x, y }, seconds: seconds[i], fatigue_stage: stages[i] }));
+const ROUTE_STEPS = routeSteps(
+  ["normal", "normal", "normal", "light", "light", "moderate", "moderate", "severe"],
+  [1260, 1200, 1320, 1400, 1460, 1580, 1640, 1720],
+);
+const ROUTE_PLAN = {
+  origin: ORIGIN,
+  destination: MARKER,
+  steps: ROUTE_STEPS,
+  total_seconds: ROUTE_STEPS.slice(0, 6).reduce((sum, step) => sum + step.seconds, 0),
+  nightfall_index: 6,
+  stop_index: 5,
+  stop_reason: "pace_threshold",
+};
+// A forced march that ends in an admitted exact-zero arrival.
+const SLEEP_STEPS = routeSteps(["light", "moderate", "severe", "severe", "forced_sleep"], [1400, 1580, 1720, 1760, 1810]);
+const SLEEP_PLAN = {
+  origin: ORIGIN,
+  destination: { x: 105, y: 204 },
+  steps: SLEEP_STEPS,
+  total_seconds: SLEEP_STEPS.reduce((sum, step) => sum + step.seconds, 0),
+  nightfall_index: null,
+  stop_index: 4,
+  stop_reason: "member_asleep",
+};
+
+function planningStage(args) {
+  return {
+    setup() {
+      const pinia = createPinia();
+      const store = useElosernStore(pinia);
+      const sender = fx.createFakeSender();
+      store.setSender(sender);
+      store.beginTransport(1);
+      store.setConnected(true);
+      const panels = walkPanels(ORIGIN.x, ORIGIN.y, { capacity: args.capacity });
+      store.receive(store.view.generation, "ui_snapshot", [fx.snapshot({ panels })], {});
+      store.setTravelMap({ status: "ready", area: MORNING_AREA });
+      onMounted(() => {
+        const { lock, hover, answer } = args.route;
+        if (lock) store.lockTravelDestination(lock);
+        if (hover) store.hoverTravelCell(hover);
+        const request = () => sender.sent.actions.filter((a) => a.action_id === "travel.plan").at(-1);
+        const reply = () => {
+          const env = request();
+          if (!env || !answer) return;
+          const v = store.view;
+          const body = answer.refuse
+            ? { outcome: "rejected", code: answer.refuse, message: "目前無法找到通往該處的路線。" }
+            : { outcome: "success", code: "travel.plan", message: "已規劃行程。", data: answer.plan };
+          store.receive(v.generation, "ui_action_result", [fx.actionResult({ request_id: env.request_id, presentation_revision: v.revision, ...body })], {});
+        };
+        // A hovered cell is asked for after its debounce.
+        if (hover) setTimeout(reply, 200);
+        else reply();
+      });
+      onBeforeUnmount(() => {
+        store.clearTravelTarget();
+        disposePinia(pinia);
+      });
+      const render = () => {
+        const travel = store.view.travel;
+        const plan = travel.plan ? { ...travel.plan, label: travel.planTarget?.label ?? null } : null;
+        return h(
+          "div",
+          { style: "position:relative;height:calc(100vh - var(--header-h));" },
+          h(HudFrame, { mode: "exploration", travel: true }, {
+            backdrop: () =>
+              h(TravelMap, {
+                grid: travel.map,
+                status: travel.mapStatus,
+                aim: travel.aim,
+                walking: travel.walking,
+                plan: travel.plan,
+                locked: !!travel.lockedDestination,
+                target: travel.planTarget,
+                motionLevel: args.motionLevel,
+              }),
+            vitals: () => [
+              h(StatusPanel, { status: { ...STATUS_PANEL_SAMPLE, fatigue: args.fatigue }, visible: args.vitalsVisible, motionLevel: args.motionLevel, showFatigue: false }),
+              h(PartyMedallions, { members: members(args.fatigue) }),
+            ],
+            map: () => h(PlaceCard, { locationLabel: args.place, timeLabel: args.time, motionLevel: args.motionLevel }),
+            "band-message": () => h(TravelLog, { entries: travel.entries }),
+            "band-command": () =>
+              commandPane(h(LegPanel, {
+                view: legView({
+                  aim: travel.aimTarget,
+                  plan,
+                  locked: !!travel.lockedDestination && !!travel.planTarget?.locked,
+                  pending: travel.planPending,
+                  planError: travel.planError,
+                  target: travel.planTarget,
+                  routeReady: false,
+                  capacity: travel.capacity,
+                  preferences: travel.preferences,
+                  phase: args.phase ?? null,
+                  serverTime: { ...NOON, hour: 9, minute: 40 },
+                  mapStatus: travel.mapStatus,
+                  busy: store.view.dispatch.inFlight !== null,
+                }),
+                motionLevel: args.motionLevel,
+              })),
+          }),
+        );
+      };
+      return withMotion(args.motionLevel, render).setup();
+    },
+  };
+}
+
+const ROUTE_ARGS = { ...MORNING, aim: null, time: "春 3 日 ‧ 09:40・白晝" };
+
+// Route Preview: the stone marker locked; the server's plan draws one stage
+// mark per step, the camp at the pace stop, the moon on the nightfall step
+// beyond it and the faint planned steps past the camp, and the camera frames
+// the whole leg. 出發 waits for the route walk.
+export const RoutePreview = {
+  name: "Route Preview",
+  args: { ...ROUTE_ARGS, route: { lock: MARKER, answer: { plan: ROUTE_PLAN } } },
+  render: planningStage,
+};
+
+// Hovering the marker: the same plan as an unlocked preview (dashed frame);
+// the camera keeps following the party.
+export const RouteHover = {
+  name: "Route Hover",
+  args: { ...ROUTE_ARGS, route: { hover: MARKER, answer: { plan: ROUTE_PLAN } } },
+  render: planningStage,
+};
+
+// A locked destination whose answer has not arrived: the intent line waits.
+export const RoutePending = {
+  name: "Route Pending",
+  args: { ...ROUTE_ARGS, route: { lock: MARKER, answer: null } },
+  render: planningStage,
+};
+
+// The planner refuses: its stable reason stands in the intent line and no
+// route is drawn.
+export const RouteRefused = {
+  name: "Route Refused",
+  args: { ...ROUTE_ARGS, route: { lock: MARKER, answer: { refuse: "plan_unreachable" } } },
+  render: planningStage,
+};
+
+// A forced march to collapse: the terminal forced_sleep step keeps its stage
+// and is drawn as the severe ring with the sleep crescent, on the map and in
+// the gauge.
+export const RouteTerminalSleep = {
+  name: "Route Terminal Sleep",
+  args: { ...ROUTE_ARGS, fatigue: FATIGUE.weary, vitalsVisible: true, route: { lock: { x: 105, y: 204 }, answer: { plan: SLEEP_PLAN } } },
+  render: planningStage,
+};

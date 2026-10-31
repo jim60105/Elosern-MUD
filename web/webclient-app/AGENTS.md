@@ -238,13 +238,33 @@ dream or creation surface owns the stage. There is no server travel mode.
   `travelStopAtNight` in the layout wrapper; `store.setTravelPace` /
   `setTravelStopAtNight`, frozen while walking or holding) and only saved
   intent until route-ui sends them. 出發 needs a locked current plan, a
-  supplied capacity and a live map (no plan exists before planning-ui); 停步
+  supplied capacity and a live map (the route walk itself arrives with route-ui); 停步
   is always usable while walking; a failed map read disables the rest.
   環顧 is `store.activateRoomLook()` (the guarded `explore.look
   {room:true}`); 紮營 is `openTravelCamp()` (use-room-actions.js), which
   opens the existing rest entry on its sleep form until the camp card
   replaces that destination. In travel the dock's side column keeps only
   the 建議 pill; the intent line is the travel readout.
+- Route preview (wilderness-travel-planning-ui; design §4.3/§5/§12): the
+  store owns the destination (`hoverTravelCell` / `lockTravelDestination` /
+  `clearTravelTarget`, published as `view.travel.hover`, `lockedDestination`,
+  `planTarget`, `plan`, `planPending`, `planError`) and sends the read-only
+  `travel.plan` through `dispatchAction` only: a hovered disclosed far cell
+  after 150 ms, a lock at once, the latest intent only, adopted only for
+  the token's own request and committed facts (lifecycle in
+  `docs/development/webclient-synchronization.md` "Travel route
+  queries"). `travel.plan` refusals never write a narrative line; the five
+  planner codes read as the store's `PLAN_ERROR_TEXT`. Input: neighbours
+  keep aim/step precedence; a far disclosed click locks; Shift+arrows move
+  the keyboard cursor (composable-owned, inside the window), Enter locks
+  it unless an aim stands; Esc clears aim, cursor, then lock. TravelMap
+  draws the exact plan (TravelGlyph `route` per step on an ink seat with
+  the shared stage-display mapping, `moon`, `camp`, the destination frame
+  double when locked and dashed while previewed, cursor corner brackets
+  outside the cell) on a paper-gold thread with an ink casing, so it never
+  reads as the painted road; a hover never moves the camera, a lock fits
+  the route. The overlay never repaints the canvas. 出發 stays disabled
+  (`route_pending`) until route-ui installs `store.departTravel`.
 - `PartyMedallions` shows the controlled body once, then each member whose
   own `status.fatigue` row is committed (status v5+ emits one per
   source-present traveller), with its supplied reserve, stage label and

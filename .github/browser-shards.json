@@ -339,6 +339,8 @@
         "web.tests.browser.test_wilderness_travel.TravelWalkingTests.test_keyboard_only_step",
         "web.tests.browser.test_wilderness_travel.TravelWalkingTests.test_held_walk_release",
         "web.tests.browser.test_wilderness_travel.TravelLegTests.test_gauge_preferences_and_actions",
+        "web.tests.browser.test_wilderness_travel.TravelPlanningTests.test_destination_preview_keyboard_and_pointer",
+        "web.tests.browser.test_wilderness_travel.TravelPlanningTests.test_destination_query_supersession",
         "web.tests.browser.test_wilderness_travel.TravelLogTests.test_committed_log_and_full_prose"
       ],
       "files_b": [

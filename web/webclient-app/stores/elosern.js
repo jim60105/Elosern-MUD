@@ -251,6 +251,11 @@ export const useElosernStore = defineStore("elosern", () => {
     holdTravel: ctx.holdTravel,
     releaseTravel: ctx.releaseTravel,
     stopTravel: ctx.stopTravel,
+    // The route preview (wilderness-travel-planning-ui): the hovered cell's
+    // debounced query, a locked destination and Esc's clear.
+    hoverTravelCell: ctx.hoverTravelCell,
+    lockTravelDestination: ctx.lockTravelDestination,
+    clearTravelTarget: ctx.clearTravelTarget,
     requestCreationReset: ctx.requestCreationReset,
     focusPress: ctx.focusPress,
     focusConfirm: ctx.focusConfirm,

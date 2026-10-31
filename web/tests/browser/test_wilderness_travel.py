@@ -1223,3 +1223,254 @@ class TravelLegTests(_TravelStage):
             self.assertGreaterEqual(size + 0.01, 16 * wide_scale, text)
         self._shoot(wide, "travel-leg-2560x1440.png")
         wide.close()
+
+
+# ── the route preview (wilderness-travel-planning-ui) ───────────────────
+
+# Holds every travel.plan (recorded, never forwarded), so the journey answers
+# each query itself, late or never.
+_HOLD_PLANS = """() => {
+  const store = window.__elosernBridge.store;
+  if (window.__travelPlans) return;
+  const sender = store.getSender();
+  const original = sender.sendAction.bind(sender);
+  window.__travelPlans = [];
+  sender.sendAction = (env) => {
+    if (env && env.action_id === 'travel.plan') {
+      window.__travelPlans.push(env);
+      return undefined;
+    }
+    return original(env);
+  };
+}"""
+
+# Answers held query `index` through the real result validator: a success
+# carrying `data`, or a refusal with `code` (no presentation: the current
+# revision).
+_ANSWER_PLAN = """([index, data, code]) => {
+  const store = window.__elosernBridge.store;
+  const env = window.__travelPlans[index];
+  const v = store.view;
+  const body = data
+    ? { outcome: 'success', code: 'travel.plan', message: '已規劃行程。', data }
+    : { outcome: 'rejected', code, message: '伺服器的原文訊息。' };
+  return !!store.receive(v.generation, 'ui_action_result', [{
+    protocol_version: 1, presentation_epoch: v.epoch, request_id: env.request_id,
+    presentation_revision: v.revision, ...body,
+  }], {}).accepted;
+}"""
+
+# The on-screen centre of map cell (x, y), from the world layer's live origin.
+_CELL_POINT = """([x, y]) => {
+  const map = document.querySelector('[data-testid="travel-map"]');
+  const c = Number(map.dataset.cellPx);
+  const origin = document.querySelector('[data-testid="travel-map__world"]').getBoundingClientRect();
+  return [origin.left + (x + 0.5) * c, origin.top - (y + 0.5) * c];
+}"""
+
+_PLAN_REVEAL = 4
+
+
+def _plan_area(cx: int, cy: int) -> dict:
+    """``_walk_area`` whose revealed block reaches four cells around the party."""
+    area = _walk_area(cx, cy)
+    centre = WINDOW // 2
+    area["rows"] = _rows(
+        lambda col, row: "open_ground"
+        if abs(col - centre) <= _PLAN_REVEAL and abs(row - centre) <= _PLAN_REVEAL
+        else None
+    )
+    return area
+
+
+def _plan(cx: int, cy: int, destination: tuple[int, int]) -> dict:
+    """A synthetic plan east then north to ``destination``: every awake stage,
+    nightfall on the third step and the pace stop on the fourth."""
+    dx, dy = destination[0] - cx, destination[1] - cy
+    cells = [(cx + i, cy) for i in range(1, dx + 1)] + [(cx + dx, cy + j) for j in range(1, dy + 1)]
+    stages = ["normal", "light", "moderate", "severe", "severe", "severe", "severe"]
+    steps = [
+        {"cell": {"x": x, "y": y}, "seconds": 1200, "fatigue_stage": stages[min(i, len(stages) - 1)]}
+        for i, (x, y) in enumerate(cells)
+    ]
+    stop = min(3, len(steps) - 1)
+    return {
+        "origin": {"x": cx, "y": cy}, "destination": {"x": destination[0], "y": destination[1]},
+        "steps": steps, "total_seconds": 1200 * (stop + 1),
+        "nightfall_index": min(2, len(steps) - 1), "stop_index": stop, "stop_reason": "pace_threshold",
+    }
+
+
+def _plans(page) -> list:
+    return page.evaluate("() => window.__travelPlans.map((e) => e.payload)")
+
+
+def _intent(page) -> str:
+    return page.locator('[data-testid="leg-panel"]').get_attribute("data-intent")
+
+
+class TravelPlanningTests(_TravelStage):
+    """Destination input and the debounced current-only route preview
+    (wilderness-travel-planning-ui): pointer and keyboard reach the same
+    lock, neighbours keep their single step, only the current query's result
+    or error controls the preview, and no route walk is claimed."""
+
+    FAR = (CX + 3, CY + 1)
+    OTHER = (CX - 2, CY + 3)
+
+    def _plan_stage(self, viewport=(1451, 790)):
+        page = self.logged_in_page(viewport)
+        page.evaluate(_HOLD_MOVES)
+        page.evaluate(_HOLD_PLANS)
+        self._enter(page, _leg_panels(CX, CY))
+        self._wait_views(page, 1)
+        self._answer(page, 0, area=_plan_area(CX, CY))
+        self._wait_ready(page)
+        page.wait_for_selector('[data-testid="leg-panel"][data-gauge="capacity"]', timeout=15000)
+        return page
+
+    def _hover(self, page, cell) -> None:
+        x, y = page.evaluate(_CELL_POINT, list(cell))
+        page.mouse.move(x, y)
+
+    def _click(self, page, cell) -> None:
+        x, y = page.evaluate(_CELL_POINT, list(cell))
+        page.mouse.click(x, y)
+
+    def _wait_plans(self, page, count: int) -> None:
+        page.wait_for_function("(n) => window.__travelPlans.length >= n", arg=count, timeout=15000)
+
+    def _answer_plan(self, page, index: int, data: dict | None = None, code: str | None = None) -> None:
+        self.assertTrue(page.evaluate(_ANSWER_PLAN, [index, data, code]))
+
+    @covers_requirement("webclient-travel-route-preview::travel-destinations-and-previews-remain-disclosed-and-accessible")
+    def test_destination_preview_keyboard_and_pointer(self):
+        """A hovered far cell previews after its debounce and a click locks it
+        without a second query; the Shift-arrow cursor plus Enter locks the
+        same cell; a current planner error clears the drawn route; a
+        neighbour still aims and steps; 出發 stays disabled."""
+        for viewport in ((1451, 790), (2560, 1440)):
+            page = self._plan_stage(viewport)
+            size = "%dx%d" % viewport
+            far = {"x": self.FAR[0], "y": self.FAR[1]}
+
+            # Pointer: the hover waits, asks once, and the route is drawn.
+            self._hover(page, self.FAR)
+            page.wait_for_selector('[data-testid="leg-panel"][data-intent="plan-pending"]', timeout=15000)
+            self._wait_plans(page, 1)
+            self.assertEqual(_plans(page), [{"destination": far, "pace": "standard", "stop_at_night": True}])
+            self._shoot(page, "travel-plan-pending-%s.png" % size)
+            self._answer_plan(page, 0, _plan(CX, CY, self.FAR))
+            page.wait_for_selector('[data-testid="travel-map__route-step"]', timeout=15000)
+            steps = page.locator('[data-testid="travel-map__route-step"]')
+            self.assertEqual(steps.count(), 4)
+            self.assertEqual(
+                [steps.nth(i).get_attribute("data-bucket") for i in range(4)],
+                ["normal", "light", "moderate", "severe"],
+            )
+            self.assertEqual(page.locator('[data-testid="travel-map__route-camp"]').get_attribute("data-index"), "3")
+            self.assertEqual(page.locator('[data-testid="travel-map__destination"]').get_attribute("data-locked"), "false")
+
+            # The click locks the previewed cell with no second query, and the
+            # camera frames the route clear of the band and the side columns.
+            self._click(page, self.FAR)
+            page.wait_for_selector('[data-testid="travel-map__destination"][data-locked="true"]', timeout=15000)
+            page.wait_for_timeout(400)
+            self.assertEqual(len(_plans(page)), 1)
+            self.assertEqual(_moves(page), [])
+            band = page.locator('[data-testid="stage-band"]').bounding_box()
+            dest = page.locator('[data-testid="travel-map__destination"]').bounding_box()
+            self.assertLessEqual(dest["y"] + dest["height"], band["y"])
+            self.assertEqual(_intent(page), "plan")
+            intent = page.locator('[data-testid="leg-intent"]')
+            self.assertEqual(intent.get_attribute("role"), "status")
+            self.assertTrue(intent.inner_text().strip())
+            described = page.locator('[data-testid="travel-map"]').get_attribute("aria-describedby")
+            self.assertTrue(described)
+            self.assertTrue(page.evaluate("(id) => document.getElementById(id).textContent.trim()", described))
+            # No route walk exists yet: 出發 stays disabled with its reason.
+            depart = page.locator('[data-testid="leg-depart"]')
+            self.assertEqual(depart.get_attribute("aria-disabled"), "true")
+            self._click(page, self.FAR)
+            page.wait_for_timeout(300)
+            self.assertEqual(_moves(page), [])
+            self._shoot(page, "travel-route-preview-%s.png" % size)
+
+            # Escape clears the lock; the keyboard cursor reaches the same cell.
+            page.locator('[data-testid="travel-map"]').focus()
+            page.keyboard.press("Escape")
+            page.wait_for_function("() => window.__elosernBridge.store.view.travel.lockedDestination === null", timeout=15000)
+            self.assertEqual(page.locator('[data-testid="travel-map__route-step"]').count(), 0)
+            for key in ("ArrowRight", "ArrowRight", "ArrowRight", "ArrowUp"):
+                page.keyboard.press("Shift+" + key)
+            page.wait_for_selector('[data-testid="travel-map__cursor"]', timeout=15000)
+            self.assertIsNone(_travel(page)["aim"])
+            self._shoot(page, "travel-plan-cursor-%s.png" % size)
+            page.keyboard.press("Enter")
+            self._wait_plans(page, 2)
+            self.assertEqual(_plans(page)[1]["destination"], far)
+            self.assertEqual(_travel(page)["lockedDestination"], far)
+            self.assertEqual(_moves(page), [])
+
+            # The current planner error clears the drawn route.
+            self._answer_plan(page, 1, code="plan_unreachable")
+            page.wait_for_selector('[data-testid="leg-panel"][data-intent="plan-error"]', timeout=15000)
+            self.assertEqual(page.locator('[data-testid="travel-map__route-step"]').count(), 0)
+            self.assertIsNone(_travel(page)["plan"])
+            self._shoot(page, "travel-plan-error-%s.png" % size)
+
+            # A neighbour still aims on hover and steps on click.
+            self._hover(page, (CX + 1, CY))
+            page.wait_for_function("() => window.__elosernBridge.store.view.travel.aim === 'east'", timeout=15000)
+            self._click(page, (CX + 1, CY))
+            page.wait_for_function("() => window.__travelMoves.length >= 1", timeout=15000)
+            self.assertEqual(_moves(page), [{"exit_ref": "e_wild_e", "current_node": _node(CX, CY)}])
+            self.assertEqual(len(_plans(page)), 2)
+            page.close()
+
+    @covers_requirement("webclient-travel-route-preview::travel-route-queries-are-debounced-and-current-only")
+    def test_destination_query_supersession(self):
+        """A newer hover waits behind the one in-flight query and is the only
+        one sent when the gate frees; the superseded result never draws; a
+        preference change forgets the plan and the lock asks once more; a
+        current error is not retried."""
+        page = self._plan_stage()
+        self._hover(page, self.FAR)
+        self._wait_plans(page, 1)
+        # Two newer cells inside the gate's hold: only the last one is kept.
+        self._hover(page, (CX + 3, CY - 2))
+        page.wait_for_timeout(60)
+        self._hover(page, self.OTHER)
+        page.wait_for_timeout(500)
+        self.assertEqual(len(_plans(page)), 1)
+        self.assertEqual(_intent(page), "plan-pending")
+
+        # The superseded answer arrives late: nothing draws and the latest
+        # request leaves at once.
+        self._answer_plan(page, 0, _plan(CX, CY, self.FAR))
+        self._wait_plans(page, 2)
+        self.assertEqual(_plans(page)[1]["destination"], {"x": self.OTHER[0], "y": self.OTHER[1]})
+        self.assertEqual(page.locator('[data-testid="travel-map__route-step"]').count(), 0)
+        # A duplicate of the superseded answer changes nothing either.
+        self._answer_plan(page, 0, _plan(CX, CY, self.FAR))
+        page.wait_for_timeout(200)
+        self.assertIsNone(_travel(page)["plan"])
+        self._answer_plan(page, 1, _plan(CX, CY, self.OTHER))
+        page.wait_for_selector('[data-testid="travel-map__route-step"]', timeout=15000)
+        self.assertEqual(_travel(page)["plan"]["destination"], {"x": self.OTHER[0], "y": self.OTHER[1]})
+
+        # Lock it; a pace change forgets the plan and asks once with the new pace.
+        self._click(page, self.OTHER)
+        page.wait_for_selector('[data-testid="travel-map__destination"][data-locked="true"]', timeout=15000)
+        self.assertEqual(len(_plans(page)), 2)
+        page.locator('[data-testid="leg-pace-cautious"]').click()
+        self._wait_plans(page, 3)
+        self.assertEqual(_plans(page)[2]["pace"], "cautious")
+        self.assertEqual(page.locator('[data-testid="travel-map__route-step"]').count(), 0)
+        self._answer_plan(page, 2, code="plan_too_long")
+        page.wait_for_selector('[data-testid="leg-panel"][data-intent="plan-error"]', timeout=15000)
+        page.wait_for_timeout(800)
+        self.assertEqual(len(_plans(page)), 3)
+        self.assertEqual(_moves(page), [])
+        self._shoot(page, "travel-plan-supersession-1451x790.png")
+        page.close()

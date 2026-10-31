@@ -40,13 +40,36 @@
 // - A stop never sends and never resends: a step already sent is left to the
 //   transport's single-flight gate, and its late commit only updates the
 //   committed state.
+//
+// Route planning (wilderness-travel-planning-ui, interface design §5/§12).
+// The store is the one owner of the destination preview: the hovered cell,
+// the locked destination, the current `travel.plan` result, the one
+// outstanding query token and the current query's error.
+//
+// - A hovered disclosed cell beyond the neighbours waits PLAN_DEBOUNCE_MS;
+//   a lock asks at once. A newer intent forgets the older request at once
+//   (its late result matches nothing) and only the latest desired request
+//   is kept; it leaves through `dispatchAction`, the one single-flight
+//   sender, when the gate, the layout and a map adopted at the committed
+//   node and time admit it. Nothing superseded is ever replayed.
+// - A token records the committed facts it was asked for (session, node,
+//   party cell, window content, clock, member fatigue and capacity, pace
+//   and nightfall stop). A change of any of them forgets the token, the
+//   plan and the error; a surviving lock asks once from the new facts, a
+//   hovered cell waits for the pointer. Only the token's own result (request
+//   id, epoch, asked origin and destination) is adopted, success or error.
+//   There is no retry after an error.
+// - A lock survives pointer leave, an aim and a stop; it clears on Esc, on a
+//   session or layout exit, when the current window no longer discloses it
+//   or when the party stands on it. Departure is not inferred from anything
+//   here (route-ui owns it).
 
 import { getCurrentScope, onScopeDispose, ref } from "vue";
 import { travelSelection } from "../../components/travel/travel-model.js";
 import { directionOf, travelTarget } from "../../components/travel/travel-walk-model.js";
 import { HOLD_MS, STEP_DWELL_MS } from "../../components/compass-model.js";
 import { disabledRowReason } from "../../components/dock-exits.js";
-import { decodeTravelGrid } from "../../lib/travel-grid.js";
+import { decodeTravelGrid, travelCellAt } from "../../lib/travel-grid.js";
 import LocalMap from "../../lib/local_map.js";
 import { NON_SUCCESS_OUTCOMES } from "./shared.js";
 
@@ -57,6 +80,22 @@ export const TRAVEL_MAP_STATUSES = Object.freeze(["ready", "refreshing", "unavai
 export const DEAD_END_LINE = "這個方向沒有路了，停下腳步。";
 
 const FAILED_MAP = new Set(["unavailable", "invalid", "retired"]);
+
+/** A hovered destination waits this long before its route is asked for. */
+export const PLAN_DEBOUNCE_MS = 150;
+
+/**
+ * The intent line's stable words for the five planner refusals; every other
+ * refusal keeps the server's own message. Nothing is parsed from prose.
+ */
+export const PLAN_ERROR_TEXT = Object.freeze({
+  plan_destination_outside_window: "目的地不在視野範圍內",
+  plan_destination_unrevealed: "目的地尚未探明",
+  plan_unreachable: "無法抵達那裡",
+  plan_too_long: "路線超過 60 步",
+  plan_party_cannot_travel: "隊伍目前無法出發",
+});
+const PLAN_FALLBACK_ERROR = "無法規劃這段路線";
 
 export function applyTravel(ctx) {
   ctx.travelMap = { status: "refreshing", area: null, grid: null };
@@ -78,6 +117,7 @@ export function applyTravel(ctx) {
     if (ctx.travelMap.status === status && ctx.travelMap.area === body) return;
     // The grid is decoded once per adopted body, not once per publication.
     const grid = body === ctx.travelMap.area ? ctx.travelMap.grid : decodeTravelGrid(body);
+    if (body !== ctx.travelMap.area && grid) notePlanningMap(body);
     ctx.travelMap = { status, area: body, grid };
     ctx.publishView();
   };
@@ -192,7 +232,13 @@ export function applyTravel(ctx) {
     clearDwell();
   }
 
-  if (getCurrentScope()) onScopeDispose(clearTimers);
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      clearTimers();
+      clearTimeout(planTimer);
+      planTimer = null;
+    });
+  }
 
   // ── the queue ──────────────────────────────────────────────────────────
 
@@ -350,6 +396,8 @@ export function applyTravel(ctx) {
         // transport) was skipped by the nested pass; match it now.
         settlePending(committed());
       }
+      // The route preview settles after the walk: a walk owns the gate first.
+      changed = settlePlan(committed()) || changed;
       return changed;
     } finally {
       settling = false;
@@ -374,6 +422,9 @@ export function applyTravel(ctx) {
     const next = direction === null || direction === undefined ? null : directionOf(direction)?.key ?? null;
     if (direction != null && next === null) return false;
     setAim(next);
+    // A newer aim supersedes an unlocked hover preview; a lock survives it
+    // (the aim keeps the intent line and Enter's single step).
+    if (next !== null) dropHover();
     ctx.travelNotice = null;
     ctx.publishView();
     return true;
@@ -449,6 +500,354 @@ export function applyTravel(ctx) {
     if (stop(reason)) ctx.publishView();
   };
 
+  // ── route planning (wilderness-travel-planning-ui) ─────────────────────
+
+  // The adopted map's identity for planning: a counter that moves only when
+  // the window's content (its current node, bounds and runs) changes, so an
+  // identical re-adoption (a look, a recovery snapshot) keeps a preview, and
+  // the committed time it was adopted at, so a query waits for the map the
+  // refresh owner fetches after a time change instead of racing it.
+  let mapSerial = 0;
+  let mapDigest = null;
+  let mapTime = null;
+  function notePlanningMap(body) {
+    const digest = JSON.stringify([body.current_node, body.window, body.rows]);
+    if (digest !== mapDigest) {
+      mapDigest = digest;
+      mapSerial += 1;
+    }
+    mapTime = timeKey(committed().serverTime);
+  }
+
+  // The clock to the minute: a publication stamped seconds later is the
+  // same planning moment (nightfall falls on an hour boundary, and every
+  // duration is whole seconds from the server anyway).
+  function timeKey(t) {
+    return t ? `${t.year}|${t.season_index}|${t.day_in_season}|${t.hour}|${t.minute}` : "";
+  }
+
+  // The committed member facts a prediction reads: each traveller's stage,
+  // reserve and posture, and the supplied foot capacity.
+  function membersKey(status) {
+    if (!status || status.available === false) return "";
+    const rows = (status.fatigue ?? []).map((r) => `${r.identity}:${r.stage}:${r.reserve_percent}:${r.asleep}`);
+    const cap = status.travel_capacity?.capacity;
+    const counts = cap ? `${cap.normal},${cap.light},${cap.moderate},${cap.severe}` : "-";
+    return `${rows.join(",")}/${counts}`;
+  }
+
+  /**
+   * The committed facts one query is answered for. Every planner input maps
+   * to one field: the session (generation, epoch), the party's position
+   * (canonical node and the window's party cell), the revealed window
+   * (content serial), the world clock (nightfall), the travellers' fatigue
+   * and capacity, and the two preferences. The revision is recorded in the
+   * token for diagnostics only: an unrelated publication changes none of
+   * these and keeps the preview.
+   */
+  function planFacts(rs) {
+    const party = ctx.travelMap.grid?.party ?? null;
+    return {
+      generation: rs.generation,
+      epoch: rs.activeEpoch,
+      node: canonicalNode(rs),
+      origin: party ? { x: party.x, y: party.y } : null,
+      map: mapSerial,
+      time: timeKey(rs.serverTime),
+      members: membersKey(rs.panels?.status),
+      pace: ctx.prefs.travelPace,
+      stopAtNight: ctx.prefs.travelStopAtNight,
+    };
+  }
+
+  function factsKey(f) {
+    const origin = f.origin ? `${f.origin.x},${f.origin.y}` : "";
+    return [f.generation, f.epoch, f.node, origin, f.map, f.time, f.members, f.pace, f.stopAtNight].join("|");
+  }
+
+  ctx.travelRoute = { hover: null, lockedDestination: null, plan: null, pendingToken: null, error: null };
+  const route = ctx.travelRoute;
+  // The one latest desired request: `armed` once its debounce elapsed (a
+  // lock is armed at once). `basis` is the facts key it was asked at.
+  let desired = null;
+  let planTimer = null;
+  let planSerial = 0;
+  // The facts key the current token, plan or error belongs to.
+  let planBasis = null;
+  // The destination the current token, plan or error answers.
+  let planDestination = null;
+  let planSession = null;
+  let planning = false;
+
+  function sameCell(a, b) {
+    return a === b || (!!a && !!b && a.x === b.x && a.y === b.y);
+  }
+
+  function clearPlanTimer() {
+    clearTimeout(planTimer);
+    planTimer = null;
+  }
+
+  // A cell of the current window that the window discloses (revealed).
+  function disclosed(cell) {
+    const found = cell ? travelCellAt(ctx.travelMap.grid, cell.x, cell.y) : null;
+    return !!found && found.known;
+  }
+
+  // A destination: disclosed and not the party's own cell.
+  function lockable(cell) {
+    if (!disclosed(cell)) return false;
+    const party = ctx.travelMap.grid.party;
+    return !sameCell(party, cell);
+  }
+
+  // A pointer preview: a lockable cell beyond the eight neighbours.
+  function previewable(cell) {
+    if (!lockable(cell)) return false;
+    const party = ctx.travelMap.grid.party;
+    return !party || Math.max(Math.abs(cell.x - party.x), Math.abs(cell.y - party.y)) > 1;
+  }
+
+  // Forget the current token, plan and error: a late result of the
+  // forgotten request no longer matches anything.
+  function dropPreview() {
+    planSerial += 1;
+    route.pendingToken = null;
+    route.plan = null;
+    route.error = null;
+    planBasis = null;
+    planDestination = null;
+  }
+
+  function resetPlanning() {
+    clearPlanTimer();
+    dropPreview();
+    desired = null;
+    route.hover = null;
+    route.lockedDestination = null;
+    planSession = null;
+  }
+
+  // Drop an unlocked pointer preview (an aim, a walk or a moved party
+  // supersedes it; the pointer must move again).
+  function dropHover() {
+    if (route.lockedDestination) return false;
+    const had = route.hover !== null || desired !== null || route.pendingToken !== null || route.plan !== null || route.error !== null;
+    clearPlanTimer();
+    desired = null;
+    route.hover = null;
+    dropPreview();
+    return had;
+  }
+
+  function want(destination, armed) {
+    desired = { destination: { x: destination.x, y: destination.y }, armed, basis: factsKey(planFacts(committed())) };
+    planSession = sessionKey(committed());
+  }
+
+  function planningMapCurrent(rs) {
+    return mapCurrent(rs) && mapTime === timeKey(rs.serverTime);
+  }
+
+  // Match the outstanding token's own result; true on a change.
+  function settlePlanResult(rs) {
+    const token = route.pendingToken;
+    const result = rs.lastActionResult;
+    if (!token || !result || result.requestId !== token.requestId || result.epoch !== token.epoch) return false;
+    route.pendingToken = null;
+    if (result.outcome === "success") {
+      const data = result.data ?? null;
+      // Only the answer for the asked origin and destination is this one.
+      const own = !!data && sameCell(data.origin, token.origin) && sameCell(data.destination, token.destination);
+      // An answer for another origin or destination is no plan: say so
+      // instead of leaving the intent line empty (no automatic retry).
+      route.plan = own ? Object.freeze(data) : null;
+      route.error = own ? null : Object.freeze({ code: "plan_mismatch", message: PLAN_FALLBACK_ERROR });
+    } else {
+      route.plan = null;
+      const stable = PLAN_ERROR_TEXT[result.code];
+      route.error = Object.freeze({
+        code: result.code,
+        message: stable ?? (typeof result.message === "string" && result.message.trim() ? result.message : PLAN_FALLBACK_ERROR),
+      });
+    }
+    return true;
+  }
+
+  // Send the latest desired request once everything admits it.
+  function flushPlan(rs) {
+    if (!desired || !desired.armed || desired.refusedAt || route.pendingToken || planning) return false;
+    if (ctx.travelWalk || ctx.travelHold) return false;
+    if (rs.mode !== "exploration" || !layoutShown(rs) || !planningMapCurrent(rs) || !gateFree(rs) || surfaceOpen()) return false;
+    const destination = desired.destination;
+    if (!lockable(destination)) {
+      desired = null;
+      if (sameCell(route.lockedDestination, destination)) route.lockedDestination = null;
+      route.hover = null;
+      return true;
+    }
+    const facts = planFacts(rs);
+    const payload = { destination: { x: destination.x, y: destination.y }, pace: facts.pace, stop_at_night: facts.stopAtNight };
+    planning = true;
+    let requestId = null;
+    try {
+      requestId = ctx.dispatchAction("travel.plan", payload, null);
+    } finally {
+      planning = false;
+    }
+    if (!requestId) {
+      // A refused send (a gate this flush did not foresee) is not retried on
+      // every publication: a hover is dropped, a lock waits for new facts.
+      if (route.lockedDestination && sameCell(route.lockedDestination, destination)) desired.refusedAt = factsKey(facts);
+      else {
+        desired = null;
+        route.hover = null;
+      }
+      return true;
+    }
+    route.pendingToken = Object.freeze({
+      ...facts,
+      revision: rs.revision,
+      destination: Object.freeze({ ...destination }),
+      serial: planSerial,
+      requestId,
+    });
+    planBasis = factsKey(facts);
+    planDestination = destination;
+    desired = null;
+    // A result delivered inside the send (a synchronous transport).
+    settlePlanResult(committed());
+    return true;
+  }
+
+  // Run inside settle(): invalidate, match, then send. True on a change.
+  function settlePlan(rs) {
+    const anything = route.hover || route.lockedDestination || desired || route.pendingToken || route.plan || route.error;
+    if (!anything) return false;
+    if (rs.mode !== "exploration" || !layoutShown(rs) || (planSession !== null && planSession !== sessionKey(rs))) {
+      resetPlanning();
+      return true;
+    }
+    let changed = false;
+    if (!rs.connected) {
+      // A reconnect is a new session, which clears the lock as well; a
+      // connection that returns in the same session asks again for a lock
+      // left without an answer (below).
+      if (route.pendingToken || route.plan || route.error) changed = true;
+      dropPreview();
+      changed = dropHover() || changed;
+      desired = null;
+      return changed;
+    }
+    if ((ctx.travelWalk || ctx.travelHold) && !route.lockedDestination) changed = dropHover() || changed;
+    // A lock leaves when the current window no longer discloses it (or the
+    // party stands on it); the stale window of a refresh decides nothing.
+    if (route.lockedDestination && mapCurrent(rs) && !lockable(route.lockedDestination)) {
+      route.lockedDestination = null;
+      changed = dropHover() || true;
+    }
+    const key = factsKey(planFacts(rs));
+    // A lock with nothing asked, flying or answered asks once.
+    if (route.lockedDestination && !desired && !route.pendingToken && planBasis === null) {
+      want(route.lockedDestination, true);
+      changed = true;
+    }
+    if (desired?.refusedAt && desired.refusedAt !== key) delete desired.refusedAt;
+    if (planBasis !== null && planBasis !== key) {
+      dropPreview();
+      changed = true;
+      if (route.lockedDestination) want(route.lockedDestination, true);
+      else changed = dropHover() || changed;
+    } else if (desired && desired.basis !== null && desired.basis !== key) {
+      // The facts moved while a request waited: a lock asks from the new
+      // origin; a hovered cell is no longer under the pointer.
+      if (route.lockedDestination) want(route.lockedDestination, true);
+      else changed = dropHover() || changed;
+    }
+    changed = settlePlanResult(rs) || changed;
+    changed = flushPlan(rs) || changed;
+    return changed;
+  }
+
+  function publishPlanning() {
+    ctx.publishView();
+  }
+
+  /**
+   * Preview the route to a hovered cell (null: the pointer left). Only a
+   * disclosed cell beyond the neighbours is previewed, after
+   * PLAN_DEBOUNCE_MS; a newer cell supersedes the older one at once. While a
+   * destination is locked, the lock owns the preview.
+   */
+  ctx.hoverTravelCell = function hoverTravelCell(cell) {
+    if (ctx.travelWalk || ctx.travelHold) return false;
+    const next = cell && ctx.travelMap.grid && previewable(cell) ? Object.freeze({ x: cell.x, y: cell.y }) : null;
+    if (sameCell(next, route.hover)) return false;
+    if (route.lockedDestination) {
+      route.hover = next;
+      publishPlanning();
+      return true;
+    }
+    clearPlanTimer();
+    dropPreview();
+    desired = null;
+    route.hover = next;
+    if (next) {
+      // A newer target supersedes the neighbour aim.
+      if (ctx.travelAim !== null) setAim(null);
+      want(next, false);
+      const wanted = desired;
+      planTimer = setTimeout(() => {
+        planTimer = null;
+        if (desired !== wanted) return;
+        wanted.armed = true;
+        publishPlanning();
+      }, PLAN_DEBOUNCE_MS);
+    }
+    publishPlanning();
+    return true;
+  };
+
+  /** Lock a disclosed destination and ask for its plan at once. */
+  ctx.lockTravelDestination = function lockTravelDestination(cell) {
+    if (ctx.travelWalk || ctx.travelHold) return false;
+    if (!cell || !ctx.travelMap.grid || !lockable(cell)) return false;
+    const destination = Object.freeze({ x: cell.x, y: cell.y });
+    route.lockedDestination = destination;
+    route.hover = null;
+    clearPlanTimer();
+    if (ctx.travelAim !== null) setAim(null);
+    const answered = sameCell(planDestination, destination) && (route.pendingToken || route.plan || route.error);
+    if (answered) {
+      // The preview already answers this destination: keep it.
+      desired = null;
+    } else if (desired && sameCell(desired.destination, destination)) {
+      desired.armed = true;
+    } else {
+      dropPreview();
+      want(destination, true);
+    }
+    planSession = sessionKey(committed());
+    publishPlanning();
+    return true;
+  };
+
+  /** Clear the hover, the lock and the preview (Esc). */
+  ctx.clearTravelTarget = function clearTravelTarget() {
+    const had = route.hover || route.lockedDestination || desired || route.pendingToken || route.plan || route.error;
+    resetPlanning();
+    if (had) publishPlanning();
+    return !!had;
+  };
+
+  function planTargetView() {
+    const cell = route.lockedDestination ?? desired?.destination ?? planDestination ?? route.hover;
+    if (!cell) return null;
+    const found = travelCellAt(ctx.travelMap.grid, cell.x, cell.y);
+    const label = found?.known ? found.node?.landmark?.name || found.display?.terrain_label || null : null;
+    return Object.freeze({ x: cell.x, y: cell.y, label, locked: sameCell(route.lockedDestination, cell) });
+  }
+
   // ── projection ─────────────────────────────────────────────────────────
 
   function aimTargetView(rs) {
@@ -515,6 +914,17 @@ export function applyTravel(ctx) {
       // undefined while no status is committed.
       preferences: Object.freeze({ pace: ctx.prefs.travelPace, stopAtNight: ctx.prefs.travelStopAtNight }),
       capacity: travelCapacity(rs.panels?.status),
+      // The route preview (wilderness-travel-planning-ui): the hovered and
+      // locked destinations, the current plan exactly as the server sent
+      // it, whether a query waits or flies, and the current query's error.
+      hover: route.hover,
+      lockedDestination: route.lockedDestination,
+      planTarget: selection.layout ? planTargetView() : null,
+      plan: route.plan,
+      // Only an armed or flying query is pending: a hover still inside its
+      // debounce has asked nothing yet.
+      planPending: route.pendingToken !== null || desired?.armed === true,
+      planError: route.error,
     });
   };
 }

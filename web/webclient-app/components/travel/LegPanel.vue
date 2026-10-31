@@ -15,6 +15,7 @@
 import { computed, ref } from "vue";
 import { PACE_OPTIONS } from "./leg-model.js";
 import { glyphPath } from "../dock-icons.js";
+import { SLEEP_CRESCENT_PATH } from "../../lib/map_glyphs.js";
 
 const CAMP_GLYPH = glyphPath("camp");
 const LOOK_GLYPH = glyphPath("look");
@@ -99,6 +100,7 @@ function tickStyle(index) {
       >
         <p class="leg-panel__title" data-testid="leg-intent-title">{{ intent.title }}</p>
         <p class="leg-panel__detail" data-testid="leg-intent-detail">{{ intent.detail }}</p>
+        <span v-if="intent.note" class="leg-sr">{{ intent.note }}</span>
       </div>
       <div v-if="$slots.aside" class="leg-panel__aside"><slot name="aside" /></div>
     </header>
@@ -123,7 +125,7 @@ function tickStyle(index) {
           aria-hidden="true"
         >
           <span class="leg-tick__bar" />
-          <svg v-if="t.moon || t.sleep" class="leg-tick__moon" viewBox="0 0 10 10" focusable="false"><path d="M6.6 1.2a4 4 0 1 0 2.2 6.6A3.3 3.3 0 0 1 6.6 1.2z" /></svg>
+          <svg v-if="t.moon || t.sleep" class="leg-tick__moon" viewBox="0 0 10 10" focusable="false"><path :d="SLEEP_CRESCENT_PATH" /></svg>
           <span v-if="t.camp" class="leg-tick__camp" data-testid="leg-camp-mark" />
         </span>
         <span v-if="!gauge.ticks.length" class="leg-gauge__empty" aria-hidden="true">
