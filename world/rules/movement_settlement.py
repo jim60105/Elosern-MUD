@@ -296,7 +296,7 @@ class MovementObservation:
                 knowledge_owner=knowledge_owner,
                 members=self._members,
             )
-        except Exception as error:
+        except Exception as error:  # observability: ignore R2: the failure IS reported by _failed's travel_interrupts_failed event below; an interrupt read must never fail a committed move
             self._failed(error, "before")
             return
         self.before = facts
@@ -327,7 +327,7 @@ class MovementObservation:
             self.flags = travel_interrupts.movement_flags(
                 self.before, after, walk=self.walk
             )
-        except Exception as error:
+        except Exception as error:  # observability: ignore R2: the failure IS reported by _failed's travel_interrupts_failed event below; an interrupt comparison must never fail a committed move
             self._failed(error, "after")
 
     def _failed(self, error: Exception, step: str) -> None:
