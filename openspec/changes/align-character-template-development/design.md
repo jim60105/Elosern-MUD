@@ -78,6 +78,17 @@ Explicitly amend `docs/superpowers/specs/2026-07-29-ai-mud-engine-design.md` §1
 
 `light_sword_style` was retired in commit `40c254d233f85b8d880e0a5dc90ca2866a0d7e72`. The approved search found no live production/main-spec residue; the lone current source reference is ignored `tmp/story_settings/character/LidziaRosenthal.md:40`, with historical log/archive mentions. In the tracked review document record its correction as common sword training plus `flowing_strikes`. Do not restore the key, add an alias, rewrite archives/logs, commit ignored personal files, or promise an ignored-file edit as shipped acceptance. The owner may separately update that personal reference; no runtime task depends on it.
 
+### D5. The presentation actives bound follows the widened roster
+
+The character panel's flattened `actives` bound (`MAX_ACTIVE_ROWS`, mirrored by the JS wire validator
+and parity-guarded) is a fail-closed guard that must sit above every legitimately assembled active
+row set. The completed elf baseline lifts the largest shipped card from 86 to 102 active rows (2
+declared, 25 fire/dark mastery-closure actives, the 16 authored roots, `basic_attack`, and 58
+unlocked act-catalogue acts), so the bound moves 96 -> 128 and the delta spec carries that one
+number. Dropping authored baseline roots to fit the old bound would let the guard shape content:
+the bound follows the roster, never the reverse. `passives` stays 32, the payload shape and the
+canonical JSON envelope are unchanged, and the worst-case actives payload still fits.
+
 ## Acceptance and automated evidence
 
 Use existing `world.lore.tests.test_player_presets` generic integrity checks for kinds, references, eligibility, duplicate/finite XP and budget constraints. Extend an existing representative activation/companion test only when a generic consumer boundary needs coverage: construct from an actual chosen preset, compare stored literal bases with the resolver's selected source, observe closure and usable existing mastery, reload, and check an untouched recipient. No tests approving exact roster identities, initial XP tables, prose, labels or counts.
