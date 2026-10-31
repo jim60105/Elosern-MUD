@@ -249,8 +249,11 @@ class PlayerPreset:
     """A complete player-owned identity, raw stat allocation, and skill kit.
 
     ``allocations`` covers all seven allocatable axes (the three gauges and the
-    four statics); the ``magic_power`` entry fixes the preset's starting magic
-    power as a literal (growth-redesign D-A5 deleted the magic sampler).
+    four statics). Each entry is an increment over that axis's racial floor,
+    never the final value: activation adds the floor back (and the subrace's
+    static modifiers on the physical axes), so the ``magic_power`` entry is an
+    authored literal increment and no sampler exists to average it
+    (growth-redesign D-A5 deleted the sampler).
     """
 
     key: str

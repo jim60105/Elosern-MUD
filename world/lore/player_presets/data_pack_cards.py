@@ -25,7 +25,7 @@ ROWS: dict[str, PlayerPreset] = {
         "elysa_snow", "艾莉莎", 24, 24, "human", "human_plains",
         (("hp", 50), ("mp", 50), ("sp", 50), ("atk_phys", 10),
          ("agility", 10), ("defense", 11), ("magic_power", 43)),
-        "生命力與魔力均衡的開局配點",
+        "十年抄寫磨出來的劍術與基礎強化、身心均衡的新人冒險者",
         active_skills=("basic_swordplay",),
         passive_skills=("body_enhancement_basic",),
         starting_items=(("plain_sword", 1), ("leather_armor", 1),
@@ -83,7 +83,7 @@ ROWS: dict[str, PlayerPreset] = {
             background=(
                 "南境出身的公會新人冒險者，測繪局抄寫員出身。母親六年前走入地圖上一片無名空白後失蹤，"
                 "官方記錄隨後被人抹去。她帶著十年抄本與一把磨亮的長劍出發，要用自己的腳補上那張缺了一角的地圖；"
-                "均衡的劍術與基礎強化，是她敢獨自上路的底氣。"
+                "這十年裡練出來的劍術與基礎強化，是她敢獨自上路的底氣。"
             ),
             speech_style=(
                 "親切開朗、善於拉近距離的南方旅人口吻，三句話內就能帶動氣氛；"
@@ -105,7 +105,7 @@ ROWS: dict[str, PlayerPreset] = {
         "nazka_bloodfang", "娜茲卡", 22, 22, "beastfolk", "foxkin",
         (("hp", 25), ("mp", 10), ("sp", 25), ("atk_phys", 15),
          ("agility", 15), ("defense", 15), ("magic_power", 14)),
-        "敏捷與近身作戰優先的斥候配點",
+        "敏捷與遠程斥候優先的信使配點",
         active_skills=("gale_step",),
         passive_skills=("flash_step",),
         affinity_elements=("wind",),
@@ -187,9 +187,43 @@ ROWS: dict[str, PlayerPreset] = {
         "sylwen_stillwater", "希爾溫", 180, 24, "elf", "fionnen",
         (("hp", 0), ("mp", 0), ("sp", 0), ("atk_phys", 12),
          ("agility", 12), ("defense", 13), ("magic_power", 400)),
-        "防禦與均衡戰技優先的守護者配點",
-        active_skills=("hardened_skin",),
-        passive_skills=("defense_instinct", "elf_longevity"),
+        "劍盾守護為本、元素與療癒皆為後天所學的護衛",
+        # The ordinary elf baseline (align-character-template-development
+        # D1): every currently implemented, identity-eligible elemental,
+        # common sword, common shadow and common divine root, each owned and
+        # initially developed. Sylwen holds no elemental mastery, so every
+        # root carries its literal XP here; the sword progression, earth
+        # guard and light healing are her own learned depth.
+        active_skills=(
+            "hardened_skin",
+            "fire_arrow",
+            "tide_pull", "water_bolt",
+            "gale_step", "wind_blade",
+            "stone_shard",
+            "static_ward", "spark_shock",
+            "frost_breath", "ice_shard",
+            "heal", "light_arrow",
+            "weaken", "shadow_bolt",
+            "basic_swordplay", "shadow_slash",
+            "dominion_art", "mentors_covenant", "status_disguise",
+            "flowing_strikes",
+        ),
+        passive_skills=("defense_instinct", "elf_longevity", "body_enhancement"),
+        skill_proficiency=(
+            ("hardened_skin", 150.0),
+            ("fire_arrow", 50.0),
+            ("tide_pull", 50.0), ("water_bolt", 50.0),
+            ("gale_step", 50.0), ("wind_blade", 50.0),
+            ("stone_shard", 50.0),
+            ("static_ward", 50.0), ("spark_shock", 50.0),
+            ("frost_breath", 50.0), ("ice_shard", 50.0),
+            ("heal", 150.0), ("light_arrow", 50.0),
+            ("weaken", 50.0), ("shadow_bolt", 50.0),
+            ("basic_swordplay", 150.0), ("shadow_slash", 50.0),
+            ("dominion_art", 50.0), ("mentors_covenant", 50.0),
+            ("status_disguise", 50.0),
+            ("flowing_strikes", 50.0),
+        ),
         starting_items=(("knight_blade", 1), ("iron_shield", 1),
                         ("chainmail", 1), ("pilgrim_medallion", 1),
                         ("healing_potion", 1)),
@@ -238,7 +272,8 @@ ROWS: dict[str, PlayerPreset] = {
             ),
             background=(
                 "斐歐恩森林出身的精靈族護衛，用一百八十年的歲月實踐世代一次的守護誓約。"
-                "硬化肌膚與防禦直覺讓她成為隊伍最可靠的盾；她守護人族，正因為日子短，"
+                "硬化肌膚、基礎劍術、土屬性防護與光系療癒都是後天一點一點練出來的，"
+                "防禦直覺則讓她成為隊伍最可靠的盾；她守護人族，正因為日子短，"
                 "每一天才都值得守。"
             ),
             speech_style=(
@@ -266,9 +301,14 @@ ROWS: dict[str, PlayerPreset] = {
         "violet_altoria", "薇歐蕾特", 16, 16, "human", "human_royal",
         (("hp", 50), ("mp", 60), ("sp", 50), ("atk_phys", 4),
          ("agility", 5), ("defense", 4), ("magic_power", 51)),
-        "體力與生命力紮實、魔力突出的術師配點",
-        active_skills=("fire_ball", "wind_blade"),
+        "天生高魔力、風系操控全靠後天練成的王女術師",
+        active_skills=("fire_ball", "wind_blade", "fire_arrow"),
         passive_skills=("magic_circle_comprehension", "precise_mana_control", "flight"),
+        # No elemental mastery: the three direct spells carry their own
+        # literal practice XP, each Lv.3 (150.0), inside their derived caps.
+        skill_proficiency=(
+            ("fire_ball", 150.0), ("wind_blade", 150.0), ("fire_arrow", 150.0),
+        ),
         affinity_elements=("fire", "wind"),
         starting_items=(("royal_traveling_robe", 1), ("royal_signet_ring", 1),
                         ("royal_heirloom_pendant", 1)),

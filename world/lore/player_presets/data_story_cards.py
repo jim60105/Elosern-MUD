@@ -29,10 +29,16 @@ ROWS: dict[str, PlayerPreset] = {
         (("hp", 80), ("mp", 0), ("sp", 100), ("atk_phys", 6),
          ("agility", 8), ("defense", 7), ("magic_power", 23)),
         "體力最強、劍技敏於防禦的近侍配點",
-        active_skills=("basic_swordplay",),
+        active_skills=("basic_swordplay", "flowing_strikes"),
         passive_skills=(
             "body_enhancement_basic", "retainer_martial_training",
             "guardian_instinct",
+        ),
+        # The sword technique the story names is tracked common sword
+        # training plus this second technique; the retired 光劍架式 key is
+        # not restored (see docs/lore/character-template-alignment.md).
+        skill_proficiency=(
+            ("basic_swordplay", 150.0), ("flowing_strikes", 50.0),
         ),
         starting_items=(("rose_crest_rapier", 1), ("black_maid_dress", 1),
                         ("silver_feather_earring", 1)),
@@ -111,21 +117,52 @@ ROWS: dict[str, PlayerPreset] = {
     ),
     "yuka_darknight": PlayerPreset(
         # Pre-departure Yuka: still living in Shadow Valley Village, the
-        # village's youngest blade prodigy, Yuna at her side. Reconverted
-        # from tmp/story_settings/character/YukaDarknight.md: age
-        # 16; base statics 88/92/90 exact (the x1000 body enhancement is the
-        # skill, not the allocation); the remaining budget inflates magic
-        # power above the story's 250 because the elf gauge floors consume no
-        # budget and the budget must be spent in full.
+        # village's youngest blade prodigy, Yuna at her side. Age 16; final
+        # innate statics 88/92/90 and magic power 477. The allocation above
+        # the ciaran floors is an increment over those floors, never the
+        # final value, and the x1000 body enhancement is the skill, not the
+        # allocation. Every approved source fact is recorded in
+        # docs/lore/character-template-alignment.md.
         "yuka_darknight", "悠花", 16, 16, "elf", "ciaran",
         (("hp", 0), ("mp", 0), ("sp", 0), ("atk_phys", 18),
          ("agility", 22), ("defense", 20), ("magic_power", 377)),
         "攻擊與防禦逼近精靈上限的雙刀配點",
-        active_skills=("dual_blade_waltz", "shadow_slash", "status_disguise"),
+        # Fire and dark are mastered, so their ordinary trees arrive through
+        # the shared prerequisite closure and must carry NO literal XP here
+        # (an explicit Lv.1 would win over the seed and invalidate the
+        # mastery). Every other ordinary baseline root is authored.
+        active_skills=(
+            "dual_blade_waltz", "shadow_slash", "status_disguise",
+            "tide_pull", "water_bolt",
+            "gale_step", "wind_blade",
+            "stone_shard", "hardened_skin",
+            "static_ward", "spark_shock",
+            "frost_breath", "ice_shard",
+            "heal", "light_arrow",
+            "basic_swordplay",
+            "dominion_art", "mentors_covenant",
+        ),
         passive_skills=(
             "fire_mastery", "dark_mastery", "body_enhancement_extreme",
             "flash_step", "flight", "dual_wield_style", "blade_art_mastery",
             "extreme_endurance", "defense_instinct", "reincarnation_boon_yuka",
+            "elf_longevity",
+        ),
+        # Lv.8 on the retained dual-blade art; shadow_slash sits exactly at
+        # its Lv.3 cap so the closure-supplied phantom_dance gets its Lv.5
+        # edge from the seed.
+        skill_proficiency=(
+            ("dual_blade_waltz", 400.0),
+            ("shadow_slash", 150.0),
+            ("status_disguise", 50.0),
+            ("tide_pull", 50.0), ("water_bolt", 50.0),
+            ("gale_step", 50.0), ("wind_blade", 50.0),
+            ("stone_shard", 50.0), ("hardened_skin", 50.0),
+            ("static_ward", 50.0), ("spark_shock", 50.0),
+            ("frost_breath", 50.0), ("ice_shard", 50.0),
+            ("heal", 50.0), ("light_arrow", 50.0),
+            ("basic_swordplay", 50.0),
+            ("dominion_art", 50.0), ("mentors_covenant", 50.0),
         ),
         starting_items=(("shadow_blade", 1), ("shadow_blade_echo", 1),
                         ("dark_elf_ninja_garb", 1)),
@@ -205,20 +242,43 @@ ROWS: dict[str, PlayerPreset] = {
     ),
     "yuna_darknight": PlayerPreset(
         # Pre-departure Yuna: the village's acknowledged sex-magic prodigy,
-        # still in Shadow Valley Village. Reconverted from
-        # tmp/story_settings/character/YunaDarknight.md: age
-        # 16; story defense 92 exact, the story's 65/65 physical floor sits
-        # under the elf minimum, and the remaining budget inflates magic
-        # power above the story's 350 (the budget must be spent in full).
+        # still in Shadow Valley Village. Age 16; final innate statics
+        # 70/70/92 and magic power 515. The allocation above the ciaran
+        # floors is an increment over those floors, never the final value.
+        # Every approved source fact is recorded in
+        # docs/lore/character-template-alignment.md.
         "yuna_darknight", "悠奈", 16, 16, "elf", "ciaran",
         (("hp", 0), ("mp", 0), ("sp", 0), ("atk_phys", 0),
          ("agility", 0), ("defense", 22), ("magic_power", 415)),
         "防禦特化的魔力體質配點",
-        active_skills=("divine_sexual_arts", "status_disguise"),
+        # Fire and dark stay mastery-supplied (no literal XP); the rest of
+        # the ordinary baseline is authored like her twin's.
+        active_skills=(
+            "divine_sexual_arts", "status_disguise",
+            "tide_pull", "water_bolt",
+            "gale_step", "wind_blade",
+            "stone_shard", "hardened_skin",
+            "static_ward", "spark_shock",
+            "frost_breath", "ice_shard",
+            "heal", "light_arrow",
+            "basic_swordplay", "shadow_slash",
+            "dominion_art", "mentors_covenant",
+        ),
         passive_skills=(
             "fire_mastery", "dark_mastery", "divine_sexual_mastery",
             "reincarnation_boon_yuna", "body_enhancement", "flight",
-            "defense_instinct",
+            "defense_instinct", "elf_longevity",
+        ),
+        skill_proficiency=(
+            ("status_disguise", 50.0),
+            ("tide_pull", 50.0), ("water_bolt", 50.0),
+            ("gale_step", 50.0), ("wind_blade", 50.0),
+            ("stone_shard", 50.0), ("hardened_skin", 50.0),
+            ("static_ward", 50.0), ("spark_shock", 50.0),
+            ("frost_breath", 50.0), ("ice_shard", 50.0),
+            ("heal", 50.0), ("light_arrow", 50.0),
+            ("basic_swordplay", 50.0), ("shadow_slash", 50.0),
+            ("dominion_art", 50.0), ("mentors_covenant", 50.0),
         ),
         starting_items=(("dark_elf_kimono", 1),),
         sex="female",
@@ -296,21 +356,45 @@ ROWS: dict[str, PlayerPreset] = {
     "elosia_shadowmoon": PlayerPreset(
         # Pre-meeting Elosia: the phantasm elf who just left the village and
         # walked into the human world ALONE -- not yet registered at the guild,
-        # Violet not yet met, no disciple, no party name. Reconverted from
-        # tmp/story_settings/character/ElosiaShadowmoon.md:
-        # species is 伊歐拉斯族 (eolas, Phantasm Elf), age 10/apparent 10 (she
-        # CLAIMS 222; the persona prose carries the lie). Story statics
-        # 70/70/95 exact; the story's 873 magic exceeds the creation ceiling,
-        # so the full remaining budget lands at the 512 maximum the budget
-        # allows.
+        # Violet not yet met, no disciple, no party name. Species is 伊歐拉斯族
+        # (eolas, Phantasm Elf), age 10/apparent 10 (she CLAIMS 222; the
+        # persona prose carries the lie). Final innate statics 70/70/95 and
+        # magic power 512; the allocation above the eolas floor is an
+        # increment over that floor, never the final value. Every approved
+        # source fact is recorded in docs/lore/character-template-alignment.md.
         "elosia_shadowmoon", "伊洛希雅", 10, 10, "elf", "eolas",
         (("hp", 0), ("mp", 0), ("sp", 0), ("atk_phys", 0),
          ("agility", 0), ("defense", 25), ("magic_power", 412)),
         "防禦滿值、魔力極高的魔導師配點",
-        active_skills=("dominion_art", "status_disguise"),
+        # Wind and light are mastered, so their ordinary trees come from the
+        # shared closure with no literal XP; the other ordinary roots are
+        # authored.
+        active_skills=(
+            "dominion_art", "status_disguise",
+            "fire_arrow",
+            "tide_pull", "water_bolt",
+            "stone_shard", "hardened_skin",
+            "static_ward", "spark_shock",
+            "frost_breath", "ice_shard",
+            "weaken", "shadow_bolt",
+            "basic_swordplay", "shadow_slash",
+            "mentors_covenant",
+        ),
         passive_skills=(
             "wind_mastery", "light_mastery", "body_enhancement",
             "defense_instinct", "flight", "reincarnation_boon_elosia",
+            "elf_longevity",
+        ),
+        skill_proficiency=(
+            ("dominion_art", 50.0), ("status_disguise", 50.0),
+            ("fire_arrow", 50.0),
+            ("tide_pull", 50.0), ("water_bolt", 50.0),
+            ("stone_shard", 50.0), ("hardened_skin", 50.0),
+            ("static_ward", 50.0), ("spark_shock", 50.0),
+            ("frost_breath", 50.0), ("ice_shard", 50.0),
+            ("weaken", 50.0), ("shadow_bolt", 50.0),
+            ("basic_swordplay", 50.0), ("shadow_slash", 50.0),
+            ("mentors_covenant", 50.0),
         ),
         starting_items=(("elven_traditional_robe", 1), ("crescent_earring", 1)),
         sex="female",
@@ -333,8 +417,9 @@ ROWS: dict[str, PlayerPreset] = {
                 "0 歲誕生時保留前世全部記憶，對精靈村落「裸露即日常」的文化既困惑又"
                 "興奮。8 歲起固定參與村中群交活動；10 歲身體發育完成，以「尋找命定之"
                 "人」為由離開幽月谷村，謊稱 222 歲，由於人族看不出幻童精靈的年齡而被"
-                "相信。轉生特典讓她的魔法成長是伊歐拉斯族平均的百倍，打發時間學的魔法"
-                "已達 873 級。剛離村不到一個月，獨自走進人類城鎮，發現人族對精靈的"
+                "相信。轉生特典讓她的魔力天生就是伊歐拉斯族平均的百倍，而這十年打發"
+                "時間練出來的，是各系術法實際施展的熟練度，不是什麼等級。剛離村不到"
+                "一個月，獨自走進人類城鎮，發現人族對精靈的"
                 "尊敬讓她得以名正言順地暴露，於是盤算著隱藏實力、先當個普通魔法師"
                 "遊玩一陣。"
             ),
