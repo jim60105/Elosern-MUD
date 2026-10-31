@@ -15,6 +15,9 @@
 
 模板是 `PLAYER_PRESET_REGISTRY` 字典中的 frozen dataclass `PlayerPreset`，共二十一個欄位，分屬十個資料域。卡寫進 registry 之後，Telnet 建立精靈、WebClient 建立面板與 NPC 夥伴建構器都讀同一張卡，沒有第二份作者副本。
 
+現行八張卡的技能組、精通選擇、天生數值與角色描述用語的核准內容與來源決策，記在
+[角色模板對齊審查紀錄](/lore/character-template-alignment)；本指南只說明機制與流程。
+
 | 資料域 | 欄位 | 內容 |
 |---|---|---|
 | 身份 | `key`、`display_name`、`age`、`apparent_age`、`race`、`subrace`、`sex` | registry 鍵、顯示名、實際與外表年齡、種族亞種、性別 |
@@ -47,7 +50,7 @@
 ## 2. 事前決定：寫卡之前要回答的四個問題
 
 1. 種族與亞種選哪個？`race` 必須在 `RACE_REGISTRY`、`subrace` 必須在 `SUBRACE_REGISTRY` 且屬於該種族，每張模板卡都必須帶亞種（沒有「無亞種」卡）。先用 `resolve_starting_profile()` 看清這個配對的預算與邊界。
-2. 配點怎麼分？預算由設定檔決定（人類設定檔目前是 224），七軸各在 0～跨度內取，總和不許差一。`allocations` 的 `magic_power` 項目就是該卡的開局魔力字面值（成長重設計 D-A5 已刪除種族平均取樣器），模板的魔力全部由作者手寫決定。
+2. 配點怎麼分？預算由設定檔決定（人類設定檔目前是 224），七軸各在 0～跨度內取，總和不許差一。`allocations` 記的是**對該軸下限的增量，不是最終值**：啟動時最終值 = 該軸下界 + 配點，物理三軸（`atk_phys`／`agility`／`defense`）再乘上亞種的靜態修正，`magic_power` 可配但無修正（成長重設計 D-A5 已刪除種族平均取樣器，因此魔力仍完全由作者手寫決定）。作者不要把配點當成絕對值：精靈卡寫 `("magic_power", 377)`，開局實際魔力是 477。
 3. 技能組牽涉哪些血脈前置？宣告的 kit 在啟動時由 `lineage_ownership_closure()` 補齊前置鏈、再由 `seed_lineage_proficiency()` 把未滿足的前置邊播到恰好達標。作者只需宣告核心技能，前置交給閉包；要改變某條邊的練習值，才需要 `skill_proficiency`。技能若宣告必要種族能力 `can_use_divine_arts`，種族設定檔就必須提供該能力，否則載入時拒絕。
 4. 這張卡需不需要隱藏身分層與夥伴？`persona` 的 `identity` 有公開／隱秘兩層，隱秘層供 PersonaStore 渲染；`starting_companions` 的每筆指向夥伴**自己**的 registry 卡，所以夥伴得先作為一張可選卡存在（雙胞胎互宣告就是這個形）。
 
