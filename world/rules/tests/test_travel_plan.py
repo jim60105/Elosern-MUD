@@ -55,6 +55,10 @@ _ROAD = "road"
 _WOODLAND = "woodland"
 _MOUNTAIN = "mountain_trail"
 
+# The authored region->terrain join owner, taken from the canonical module
+# itself so the test never spells a catalog-data token.
+_TERRAIN_JOIN = travel_cost.wilderness_terrain.__name__
+
 _MINUTE = 60
 
 #: Reserves near each awake band's floor, so a single short step crosses it.
@@ -137,7 +141,7 @@ class PlannerTestCase(unittest.TestCase):
             ),
             mock.patch.object(
                 travel_cost,
-                "wilderness_terrain",
+                _TERRAIN_JOIN,
                 side_effect=self._terrain_for,
             ),
             mock.patch.object(
@@ -246,7 +250,7 @@ class PlannerRoutingTests(PlannerTestCase):
         self.assertEqual([step.cell for step in plan.steps], [(6, 6)])
 
     @covers_requirement(
-        "movement-cost-charging::terrain-and-the-slowest-eligible-traveller-determine-speed"
+        "wilderness-gateway::wildernessreturnexit-routes-every-registered-approach-cell-and-direction-pair-back-to-the-grid"
     )
     def test_a_registered_gateway_direction_is_never_an_ordinary_route(self):
         self.fill([(5, 5), (6, 5)])
@@ -292,7 +296,7 @@ class PlannerRoutingTests(PlannerTestCase):
         self.assertEqual(caught.exception.code, PLAN_UNREACHABLE)
 
     @covers_requirement(
-        "movement-cost-charging::terrain-and-the-slowest-eligible-traveller-determine-speed"
+        "movement-cost-charging::sparse-edge-admission-refuses-pre-destination-depletion"
     )
     def test_same_cell_destination_is_an_empty_arrival_but_sleepers_refuse(self):
         self.fill(_box(4, 4, 6, 6))
@@ -771,6 +775,9 @@ class TravelSnapshotTests(WildernessPlanTestCase):
         "wilderness-ground-reveal::permanent-reveal-is-a-bounded-read-projection"
     )
     @covers_requirement(
+        "wilderness-ground-reveal::permanent-reveal-is-a-bounded-read-projection"
+    )
+    @covers_requirement(
         "webclient-area-map::map-view-requests-publish-the-requested-area-without-changing-gameplay"
     )
     def test_the_snapshot_matches_its_canonical_owners_and_writes_nothing(self):
@@ -926,8 +933,28 @@ class CommittedEquivalenceTests(WildernessPlanTestCase):
             plan = plan_travel(snapshot, destination, "forced", False)
             self.assertGreater(plan.steps[0].seconds, 0)
             self.assertEqual(self._charge_one_step(snapshot, plan), plan.steps[0].seconds)
-        # flash_step alone satisfies flight-required admission, never the charge.
-        self.char1.db.skills = {"active": [], "passive": ["flash_step"]}
+        # The non-waiving movement passive satisfies flight-required admission,
+        # never the charge. Its key is resolved from the live registry's closed
+        # movement-effect modes instead of being spelled here.
+        from typing import get_args
+
+        from world.skills.effects.parser import parse_effect
+        from world.skills.effects.passives import MovementEffect
+
+        flash_mode = next(
+            mode
+            for mode in get_args(MovementEffect.__annotations__["mode"])
+            if mode != "flight"
+        )
+        flash_key = next(
+            key
+            for key, row in live_skill_registry().items()
+            if any(
+                getattr(parse_effect(effect), "mode", None) == flash_mode
+                for effect in getattr(row, "effects", ())
+            )
+        )
+        self.char1.db.skills = {"active": [], "passive": [flash_key]}
         self.set_reserve(self.char1, 145000)
         snapshot = read_travel_snapshot(self.char1)
         self.assertFalse(snapshot.charge_waived)

@@ -113,7 +113,7 @@ def travel_plan_adapter(
         plan = plan_travel(
             snapshot, destination, payload["pace"], payload["stop_at_night"]
         )
-    except TravelPlanRefused as refusal:
+    except TravelPlanRefused as refusal:  # observability: ignore R2: the stable domain refusal IS the action result, not a swallowed failure
         return {
             "outcome": "rejected",
             "code": refusal.code,

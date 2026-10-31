@@ -642,7 +642,7 @@ def wilderness_step_weight(
         return wilderness_step_cost(
             source_xy, destination_xy, members, cell_size_m=cell_size_m
         ).seconds
-    except MovementPreflightRefused:
+    except MovementPreflightRefused:  # observability: ignore R2: the refused edge is replaced by its documented routing-only distance/terrain weight; the sequential replay reports any real refusal to the caller
         terrain = wilderness_terrain(source_xy, destination_xy)
         distance = Fraction(
             wilderness_distance_m(source_xy, destination_xy, cell_size_m=cell_size_m)

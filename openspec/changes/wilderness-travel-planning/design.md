@@ -34,6 +34,63 @@ The frozen-weight suggestion is adopted. Add test_frozen_route_choice_is_separat
 
 The requirement-to-test mapping belongs in this design's evidence section. Existing canonical targets are movement-cost-charging requirements for admission/waiver and webclient-area-map for read-only query state. Obtain their exact IDs with the tool; remount to the two new capability requirements on the equivalent merged tree. Do not hand-compose IDs.
 
+### Requirement-to-test mapping (pre-sync)
+
+The delta's ADDED requirements have no canonical ID before archive sync, so
+each mechanism test currently annotates the nearest current canonical
+requirement exactly as `docs/development/spec-test-traceability.md` requires.
+The planned remount targets were produced by running
+`tools.spec_traceability list --repo-root <equivalent merged spec tree>`
+(the delta merged as the capability's `openspec/specs/wilderness-travel-planning/spec.md`),
+never hand-composed:
+
+- `wilderness-travel-planning::travel-queries-route-within-revealed-wilderness`
+- `wilderness-travel-planning::travel-prediction-matches-sequential-admitted-steps`
+
+| Test (`world/rules/tests/test_travel_plan.py` unless noted) | Scenario it establishes | Current canonical annotation | Remount target |
+| --- | --- | --- | --- |
+| `test_route_goes_around_water_and_prefers_the_lower_canonical_duration` | Routing and errors | `movement-cost-charging::terrain-and-the-slowest-eligible-traveller-determine-speed` | travel-queries… |
+| `test_a_diagonal_needs_both_crossed_orthogonals_passable_and_revealed` | Routing and errors | same | travel-queries… |
+| `test_a_registered_gateway_direction_is_never_an_ordinary_route` | Routing and errors | `wilderness-gateway::wildernessreturnexit-routes-every-registered-approach-cell-and-direction-pair-back-to-the-grid` | travel-queries… |
+| `test_each_domain_error_keeps_its_stable_code` | Routing and errors | `movement-cost-charging::terrain-and-the-slowest-eligible-traveller-determine-speed` | travel-queries… |
+| `test_same_cell_destination_is_an_empty_arrival_but_sleepers_refuse` | Stops and refusal | `movement-cost-charging::sparse-edge-admission-refuses-pre-destination-depletion` | travel-queries… |
+| `test_an_absent_physiology_traveller_is_admitted_at_base_speed` | Committed equivalence | `movement-cost-charging::terrain-and-the-slowest-eligible-traveller-determine-speed` | travel-prediction… |
+| `test_the_snapshot_matches_its_canonical_owners_and_writes_nothing` | Read isolation and publication | `wilderness-ground-reveal::permanent-reveal-is-a-bounded-read-projection` + `webclient-area-map::map-view-requests-publish-the-requested-area-without-changing-gameplay` | travel-queries… |
+| `test_malformed_physiology_is_party_cannot_travel_not_an_internal_error` | Stops and refusal | `movement-cost-charging::sparse-edge-admission-refuses-pre-destination-depletion` | travel-prediction… |
+| `test_predicted_prefix_matches_real_transactional_steps` | Committed equivalence | `movement-cost-charging::traversal-integrates-fatigue-over-remaining-distance` | travel-prediction… |
+| `test_allowed_flight_has_zero_charge_and_matches_real_steps` | Flight charge follows execution | `movement-cost-charging::charge-movement-is-the-single-shared-movement-cost-charging-function` | travel-prediction… |
+| `test_restricted_flight_and_flash_step_use_foot_cost` | Flight charge follows execution | same | travel-prediction… |
+| `test_flight_does_not_bypass_sleep_or_depletion` | Flight charge follows execution | `movement-cost-charging::charge-movement-is-the-single-shared-movement-cost-charging-function` + `movement-cost-charging::sparse-edge-admission-refuses-pre-destination-depletion` | travel-prediction… |
+| `test_initial_pace_state_matches_the_committed_first_step` | Initial pace state agrees with move interruption | `movement-cost-charging::traversal-integrates-fatigue-over-remaining-distance` | travel-prediction… |
+| `test_first_refusal_is_party_cannot_travel_and_a_later_one_keeps_the_prefix` | Stops and refusal | `movement-cost-charging::sparse-edge-admission-refuses-pre-destination-depletion` | travel-prediction… |
+| `test_exact_zero_arrival_is_admitted_and_ends_with_member_asleep` | Committed equivalence / Stops and refusal | `movement-cost-charging::sparse-edge-admission-refuses-pre-destination-depletion` | travel-prediction… |
+| `test_preview_steps_continue_past_a_voluntary_stop` | Stops and refusal | `movement-cost-charging::traversal-integrates-fatigue-over-remaining-distance` | travel-prediction… |
+| `test_each_pace_stops_at_the_first_step_at_or_beyond_its_threshold` | Stops and refusal | `movement-cost-charging::terrain-and-the-slowest-eligible-traveller-determine-speed` | travel-prediction… |
+| `test_heterogeneous_party_pays_the_slowest_member_and_reports_the_worst_stage` | Committed equivalence | `movement-cost-charging::terrain-and-the-slowest-eligible-traveller-determine-speed` | travel-prediction… |
+| `test_a_waived_plan_charges_zero_and_keeps_every_reserve_and_the_calendar` | Flight charge follows execution | `movement-cost-charging::charge-movement-is-the-single-shared-movement-cost-charging-function` | travel-prediction… |
+| `test_nightfall_index_uses_absolute_calendar_boundaries` | Stops and refusal | `movement-cost-charging::traversal-integrates-fatigue-over-remaining-distance` | travel-prediction… |
+| `test_frozen_route_choice_is_separate_from_sequential_replay` | Frozen route selection is distinct from replay | `movement-cost-charging::traversal-integrates-fatigue-over-remaining-distance` | travel-prediction… |
+| `test_warmed_plan_with_twenty_thousand_visits_is_within_one_hundred_ms` | Read isolation and publication (bound) | `wilderness-ground-reveal::permanent-reveal-is-a-bounded-read-projection` | travel-queries… |
+| `test_the_exact_payload_is_normalized_and_every_deviation_is_rejected` (`web/webclient/actions/tests/test_travel_actions.py`) | Read isolation and publication | `webclient-action-dispatch::action-registries-are-allowlisted-and-duplicate-safe` | travel-queries… |
+| `test_the_production_registry_binds_the_travel_plan_spec` (`test_travel_actions.py`) | Read isolation and publication | same | travel-queries… |
+| `test_success_is_a_result_only_plan_and_a_mode_refusal_keeps_its_code` (`test_travel_actions.py`) | Read isolation and publication | `webclient-area-map::map-view-requests-publish-the-requested-area-without-changing-gameplay` | travel-queries… |
+| `test_every_domain_refusal_maps_to_its_stable_code_and_message` (`test_travel_actions.py`) | Routing and errors | same | travel-queries… |
+| `test_an_unexpected_failure_is_logged_and_answers_plan_unreachable` (`test_travel_actions.py`) | Read isolation and publication | same | travel-queries… |
+| `test_dispatch_publishes_only_the_correlated_result_and_writes_nothing` (`test_travel_actions.py`) | Read isolation and publication | same | travel-queries… |
+| `test_a_domain_refusal_publishes_no_presentation_and_keeps_state` (`test_travel_actions.py`) | Read isolation and publication | same | travel-queries… |
+
+No waiver test is attached to
+`movement-cost-charging::flight-required-exits-pass-only-for-flight-flash-step-owners`:
+that requirement governs exit admission, not the wilderness charge waiver; the
+charge tests attach to the charge/admission requirements instead. The
+cross-slice "move interruption" half of the initial-pace scenario is owned by
+the later `wilderness-travel-interrupts` change (its `pace_threshold` flag is
+not implemented in this tree), so
+`test_initial_pace_state_matches_the_committed_first_step` compares the query's
+first-legal-step decision with the identical departure's real committed
+after-step stage and the shared threshold table that slice must reuse; it does
+not claim the flag surface exists here.
+
 - [wilderness-area-map-reveal](../wilderness-area-map-reveal/design.md) must land first.
 
 ## Planning and implementation boundaries

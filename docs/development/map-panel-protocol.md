@@ -41,6 +41,77 @@ always adds in dialogue mode, through the delivery rules below. The command
 echo declares it a silent presentation control. Nothing pushes a map after a
 move: the drawer re-requests its active scope.
 
+## The `travel.plan` query
+
+`travel.plan` is the browser's bounded route preview
+(`web/webclient/actions/travel_actions.py`, owner
+`world/rules/travel_plan.py`). It is a read-only action, not a panel: the
+adapter returns one private correlated result (`no_presentation`) and never
+re-publishes a map, a status panel or the narrative. Only the current
+wilderness exploration actor is admitted; any other location keeps the
+existing `not_exploring` refusal.
+
+The payload is exactly
+`{"destination": {"x": int, "y": int}, "pace": "cautious" | "standard" | "forced", "stop_at_night": boolean}`.
+Any other key, a boolean or non-integer coordinate outside the safe-integer
+range, an unknown pace and a non-boolean switch are `malformed_payload`
+rejections and the adapter never runs.
+
+Success `data` is exactly:
+
+```json
+{
+  "origin": {"x": 0, "y": 0},
+  "destination": {"x": 0, "y": 0},
+  "steps": [{"cell": {"x": 0, "y": 0}, "seconds": 0, "fatigue_stage": "normal"}],
+  "total_seconds": 0,
+  "nightfall_index": null,
+  "stop_index": null,
+  "stop_reason": "destination_reached"
+}
+```
+
+- `steps` holds at most 60 admitted steps; `seconds` is the non-negative
+  integer the step would charge (zero for a flight-waived step) and
+  `fatigue_stage` is the worst canonical stage among present travellers after
+  the step.
+- `nightfall_index`, `stop_index` and `stop_reason` are zero-based and
+  nullable on an empty plan; `total_seconds` sums the steps through
+  `stop_index`. `stop_reason` is one of `member_asleep`, `preflight_refused`,
+  `pace_threshold`, `nightfall`, `destination_reached`.
+
+Domain refusals are exactly `plan_destination_outside_window`,
+`plan_destination_unrevealed`, `plan_unreachable`, `plan_too_long` and
+`plan_party_cannot_travel`. An unexpected read or planning failure is logged
+(`travel_plan_failed`) and answered as `plan_unreachable`; nothing raises to
+the client. The query writes no location, clock, knowledge, reserve, quest or
+party state and never creates the world clock.
+
+Routing is deterministic: A* with a zero heuristic (Dijkstra) over the
+revealed cells of the inclusive current±20 window clipped to the frame, eight
+neighbours in `n, ne, e, se, s, sw, w, nw` order through the canonical
+`wilderness_neighbor` rule (both crossed orthogonals passable *and* revealed),
+registered gateway directions excluded (execution diverts them into their grid
+room first) and `(cost, steps, y, x)` heap ties. Candidate edges use
+`travel_cost.wilderness_step_weight`: the canonical `wilderness_step_cost`
+duration with the snapshot's reserves frozen, or -- only when that initial
+preflight refuses -- the pure distance/terrain seconds at the frozen party
+speed. That weight is never authorization: the sequential replay re-runs the
+canonical preflight per step, carries the predicted reserves/postures through
+the pure fatigue prediction over each step's rounded charged seconds, and stops
+at the design's pace, nightfall, refusal and exact-zero-sleep boundaries.
+The whole route is never rounded as one interval.
+
+Travel-plan benchmark (wilderness-travel-planning): a synthetic knowledge
+record of 20,000 wilderness visits, one warmed snapshot+plan call excluded
+from the samples, then 20 timed snapshot+plan samples: median 85 ms on the
+development machine (Intel Core i7-13700, 24 threads, Linux 7.2 / Fedora 44,
+Python 3.13.14, SQLite test database), within the 100 ms budget. Run it with
+`MUD_TRAVEL_PLAN_BENCHMARK=1` on
+`world.rules.tests.test_travel_plan.TravelPlanBenchmarkTests.test_warmed_plan_with_twenty_thousand_visits_is_within_one_hundred_ms`;
+the default module run skips only the timing and still covers the same
+snapshot, routing and prediction mechanisms.
+
 ## The `area_map` publisher
 
 `web/webclient/presentation/area_map.py` builds the panel from canonical data
