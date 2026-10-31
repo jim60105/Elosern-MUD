@@ -32,6 +32,21 @@ export const STOP_TEXT = Object.freeze({
   destination_reached: "抵達目的地",
 });
 
+/**
+ * The words a walk stopped by committed interrupt flags reads as
+ * (wilderness-travel-route-ui). The flags are the server's; the client only
+ * names them, in the server's stable order, and decides nothing from them.
+ */
+export const INTERRUPT_TEXT = Object.freeze({
+  landmark_reached: "抵達地標",
+  district_lit: "探明新的地區",
+  landmark_sighted: "望見遠方的地標",
+  hostile_in_sight: "發現敵蹤",
+  pace_threshold: "已到節制門檻",
+  nightfall: "入夜了",
+  member_asleep: "有同伴睡著了",
+});
+
 /** The capacity legend's pace stop (the camp line on the estimate). */
 export const CAPACITY_STOP_TEXT = "依節制紮營";
 
@@ -48,9 +63,6 @@ const REASONS = Object.freeze({
   capacity_pending: "正在估算腳程",
   capacity_unavailable: "無法估算腳程",
   busy: "上一個行動尚未完成，請稍候。",
-  // A locked plan with nothing else missing: the route walk itself is
-  // route-ui's (wilderness-travel-planning-ui ships no departure).
-  route_pending: "路線行進尚未開放",
 });
 const SLEEP_TICK_LABEL = "力竭倒下";
 
@@ -191,6 +203,11 @@ function intentFor(s) {
   if (s.stale) {
     return { kind: "stale", title: "地圖尚未更新", detail: "等待下一份地圖，行程暫停" };
   }
+  if (s.error?.kind === "interrupted") {
+    const words = (Array.isArray(s.error.flags) ? s.error.flags : []).map((f) => INTERRUPT_TEXT[f]).filter(Boolean);
+    const resume = s.plan && s.locked ? "・Enter 繼續出發" : "";
+    return { kind: "interrupted", title: "停下腳步", detail: `${words.join("・") || "途中有事發生"}${resume}`, flags: s.error.flags ?? [] };
+  }
   if (s.error?.message || s.error?.kind) {
     return {
       kind: s.error.kind === "refused" ? "refused" : "blocked",
@@ -204,7 +221,11 @@ function intentFor(s) {
     const title = route
       ? `前往${s.plan.label || "目的地"}`
       : `朝${walk?.word || s.aim?.word || ""}前進`;
-    const progress = walk && walk.progress > 0 ? `・已走 ${walk.progress} 步` : "";
+    const progress = walk && walk.progress > 0
+      ? route && Number.isInteger(walk.stopIndex)
+        ? `・已走 ${walk.progress}／${walk.stopIndex + 1} 步`
+        : `・已走 ${walk.progress} 步`
+      : "";
     return { kind: "walking", title, detail: `行進中・任意鍵停步${progress}` };
   }
   if (s.aim) {
@@ -295,9 +316,8 @@ function intentFor(s) {
  * - Route preview (wilderness-travel-planning-ui): `pending` (a query waits
  *   or flies), `planError` (`{code, message}` of the current query),
  *   `cursor` (the keyboard destination cursor `{known, party, label}`),
- *   `target` (`{label}` of the previewed destination) and `routeReady`
- *   (route-ui installed the route walk; until then a departable locked plan
- *   reads `route_pending`). Intent priority after the aim: the cursor, the
+ *   `target` (`{label}` of the previewed destination). A locked current plan
+ *   departs (wilderness-travel-route-ui). Intent priority after the aim: the cursor, the
  *   plan error, the pending query, then the plan.
  */
 export function legView({
@@ -320,7 +340,6 @@ export function legView({
   planError = null,
   cursor = null,
   target = null,
-  routeReady = true,
 } = {}) {
   const pace = TRAVEL_PACES.includes(preferences?.pace) ? preferences.pace : DEFAULT_TRAVEL_PREFERENCES.pace;
   const stopAtNight = typeof preferences?.stopAtNight === "boolean" ? preferences.stopAtNight : DEFAULT_TRAVEL_PREFERENCES.stopAtNight;
@@ -391,7 +410,6 @@ export function legView({
     else if (!usablePlan || !locked) code = "no_plan";
     else if (state.capacityState !== "ready") code = `capacity_${state.capacityState}`;
     else if (busy) code = "busy";
-    else if (!routeReady) code = "route_pending";
     primary = { kind: "depart", label: "出發", hint: "Enter", enabled: code === null, code, reason: REASONS[code] ?? null };
   }
   const sideCode = moving ? "moving" : state.stale ? "stale" : busy ? "busy" : null;

@@ -12,6 +12,17 @@ import { ARROW_KEYS, arrowTarget } from "./stage_targets.js";
 // (webclient-party-bag-retire).
 const FRAMELESS_DRAWER_NAMES = new Set(["inventory", "quest", "shop"]);
 
+// The exact walk context `explore.move` admits (wilderness-travel-interrupts).
+const WALK_PACES = new Set(["cautious", "standard", "forced"]);
+function validWalk(walk) {
+  return (
+    !!walk &&
+    typeof walk === "object" &&
+    WALK_PACES.has(walk.pace) &&
+    typeof walk.stop_at_night === "boolean"
+  );
+}
+
 export function applyInteraction(ctx) {
   // The free-dialogue borrow (the dialogue choice list's `⌨ 自由對話` row,
   // webclient-dialogue-choices-overlay): set the guarded freeform target to the committed host identity
@@ -285,7 +296,16 @@ export function applyInteraction(ctx) {
   // every exploration row outside the router shares (`activateExplorationRow`,
   // exploration-presence-rail design D2), so the payload, the command echo,
   // and the connection lock inside `dispatchAction` are the old exit chip's.
-  ctx.activateExit = function activateExit(exitRef) {
+  //
+  // `walk` (wilderness-travel-route-ui) is the optional walk context of a
+  // walking queue step: `{pace, stop_at_night}`, added as the payload's exact
+  // `walk` field. Omitted (null), the payload is the ordinary two-field one,
+  // so every other caller is unchanged; either way the row passes the same
+  // admission below.
+  ctx.activateExit = function activateExit(exitRef, walk = null) {
+    if (walk !== null && !validWalk(walk)) {
+      return { sent: false, reason: "refused" };
+    }
     const rs = ctx.reducer.getCommittedState();
     if (!ctx.dockOnExplorationForm(rs)) {
       return { sent: false, reason: "mode" };
@@ -300,7 +320,11 @@ export function applyInteraction(ctx) {
     if (!item) {
       return { sent: false, reason: "missing" };
     }
-    const outcome = ctx.activateExplorationRow(item);
+    const row =
+      walk === null || !item.payload
+        ? item
+        : { ...item, payload: { ...item.payload, walk: { pace: walk.pace, stop_at_night: walk.stop_at_night } } };
+    const outcome = ctx.activateExplorationRow(row);
     if (outcome.sent) {
       return { sent: true, requestId: outcome.requestId };
     }

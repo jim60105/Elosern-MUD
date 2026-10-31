@@ -17,6 +17,8 @@
 //   local refusal entry keyed by its request id (`appendTravelRefusal`), with
 //   the committed server time and the server's message. The recognized-result
 //   handler stays the single full-log owner of that line.
+// - A never-seen `landmark_reached` notice is handed to the travel store's
+//   arrival slot (`noteTravelArrival`, wilderness-travel-route-ui).
 
 import { travelSelection } from "../../components/travel/travel-model.js";
 
@@ -85,8 +87,12 @@ export function applyTravelLog(ctx) {
       if (listed(raw.id)) continue;
       const fresh = !seen.has(raw.id);
       remember(raw.id);
-      push(freezeEntry(raw));
+      const entry = freezeEntry(raw);
+      push(entry);
       if (fresh) ctx.appendText("sys", raw.text);
+      // A landmark arrival seen for the first time ever is the arrival
+      // card's one opener (wilderness-travel-route-ui); a replay never is.
+      if (fresh && entry.kind === "landmark_reached") ctx.noteTravelArrival?.(entry, rs);
     }
   };
 

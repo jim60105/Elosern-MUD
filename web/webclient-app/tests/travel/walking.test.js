@@ -11,6 +11,9 @@ import { fx, walkArea, walkNode, walkPanels } from "./support.js";
 
 const CX = 60;
 const CY = 80;
+// A held walk's steps carry the frozen default preferences as their walk
+// context (wilderness-travel-route-ui).
+const WALK = { pace: "standard", stop_at_night: true };
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -92,7 +95,7 @@ describe("the held walk waits for its committed step", () => {
     expect(w.moves()).toHaveLength(0);
     expect(w.store.view.travel).toMatchObject({ aim: "east", holding: true, walking: null });
     vi.advanceTimersByTime(1);
-    expect(w.moves().map((m) => m.payload)).toEqual([{ exit_ref: "e_wild_e", current_node: walkNode(CX, CY) }]);
+    expect(w.moves().map((m) => m.payload)).toEqual([{ exit_ref: "e_wild_e", current_node: walkNode(CX, CY), walk: WALK }]);
     expect(w.store.view.travel.walking).toMatchObject({ kind: "direction", direction: "east", progress: 0, waiting: "commit" });
   });
 
@@ -107,7 +110,7 @@ describe("the held walk waits for its committed step", () => {
     expect(w.moves()).toHaveLength(1);
     vi.advanceTimersByTime(1);
     expect(w.moves()).toHaveLength(2);
-    expect(w.moves()[1].payload).toEqual({ exit_ref: "e_wild_e", current_node: walkNode(CX + 1, CY) });
+    expect(w.moves()[1].payload).toEqual({ exit_ref: "e_wild_e", current_node: walkNode(CX + 1, CY), walk: WALK });
     expect(w.store.view.travel.walking.progress).toBe(1);
   });
 
@@ -313,7 +316,7 @@ describe("the cancellation table", () => {
   it("walks a withheld direction through its committed row", () => {
     const w = walker({ panels: walkPanels(CX, CY, { withheld: ["east"] }) });
     holdPast(w);
-    expect(w.moves().map((m) => m.payload)).toEqual([{ exit_ref: "e_wild_e", current_node: walkNode(CX, CY) }]);
+    expect(w.moves().map((m) => m.payload)).toEqual([{ exit_ref: "e_wild_e", current_node: walkNode(CX, CY), walk: WALK }]);
   });
 });
 

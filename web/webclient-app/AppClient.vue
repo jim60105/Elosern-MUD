@@ -64,6 +64,7 @@ import QuestionCard from "./components/QuestionCard.vue";
 import PresenceRail from "./components/PresenceRail.vue";
 import TravelMap from "./components/travel/TravelMap.vue";
 import LegPanel from "./components/travel/LegPanel.vue";
+import LandmarkCard from "./components/travel/LandmarkCard.vue";
 import { legView } from "./components/travel/leg-model.js";
 import PartyMedallions from "./components/travel/PartyMedallions.vue";
 import { medallionMembers, travelPlace } from "./components/travel/travel-model.js";
@@ -185,18 +186,44 @@ const { retryTravelMap } = useTravelMap(store);
 const travelMapRef = ref(null);
 const {
   onTravelAim, onTravelHold, onTravelRelease, onTravelStep, onTravelCancel,
-  onTravelHover, onTravelPick, onTravelStop, onTravelCursor, travelCursor,
+  onTravelHover, onTravelPick, onTravelStop, onTravelCursor, onTravelDepart, travelCursor,
 } = useTravelInput(store, { mapRef: travelMapRef, fullLogOpen: () => fullLogOpen.value });
 const travelStageCss = computed(() => store.view.motionLevel !== "off");
 // The leg panel (wilderness-travel-leg-ui): the pure projection of the
 // committed travel facts. The plan is the store's current `travel.plan`
 // result (wilderness-travel-planning-ui) with its destination's supplied
-// label; 出發 waits for route-ui's route walk (`store.departTravel`).
+// label; during a route walk (wilderness-travel-route-ui) it is the departed
+// plan exactly as captured, with its committed progress.
 const travelPlan = computed(() => {
   const travel = store.view.travel;
-  if (!travel?.plan) return null;
-  return { ...travel.plan, label: travel.planTarget?.label ?? null };
+  const plan = travel?.departedPlan ?? travel?.plan ?? null;
+  if (!plan) return null;
+  return { ...plan, label: travel.planTarget?.label ?? null };
 });
+// The landmark arrival card (wilderness-travel-route-ui): the store's one
+// committed arrival bound to the current node. The sleep-handoff cards and
+// the dream own the choices anchor first; dialogue and combat leave the
+// travel layout, so the arrival waits there and opens only if its cell is
+// still current when they close.
+const landmarkArrival = computed(() => (travelLayout.value ? store.view.travel?.arrival ?? null : null));
+const landmarkCardOpen = computed(
+  () =>
+    !!landmarkArrival.value &&
+    !panel("dream")?.state?.open &&
+    !sleepHandoffSelectionOpen.value &&
+    !sleepHandoffQuestionOpen.value &&
+    !sleepHandoffContinuationOpen.value,
+);
+async function onLandmarkContinue(id) {
+  if (!store.dismissTravelArrival(id)) return;
+  await nextTick();
+  if (!travelLayout.value || store.view.travel?.arrival) return;
+  const active = typeof document === "undefined" ? null : document.activeElement;
+  // Focus returns to the map unless another surface already took it.
+  if (!active || active === document.body || !active.isConnected || active.closest?.(".landmark-card")) {
+    travelMapRef.value?.focus?.();
+  }
+}
 const travelLeg = computed(() => {
   const travel = store.view.travel;
   if (!travel?.layout) return null;
@@ -209,7 +236,6 @@ const travelLeg = computed(() => {
     planError: travel.planError,
     cursor: travelCursor.value,
     target: travel.planTarget,
-    routeReady: typeof store.departTravel === "function",
     walking,
     holding: travel.holding,
     progress: walking?.progress ?? 0,
@@ -931,7 +957,8 @@ const rootStyle = computed(() => {
           roomCardOpen ||
           sleepHandoffSelectionOpen ||
           sleepHandoffQuestionOpen ||
-          sleepHandoffContinuationOpen
+          sleepHandoffContinuationOpen ||
+          landmarkCardOpen
         "
         :person-focus="personFocus"
         :formation="!!formation"
@@ -1013,7 +1040,8 @@ const rootStyle = computed(() => {
               :aim-blocked="!!store.view.travel.aimTarget && !store.view.travel.aimTarget.enabled"
               :aim-reason="store.view.travel.aimTarget?.reason ?? null"
               :walking="store.view.travel.walking"
-              :plan="store.view.travel.plan"
+              :plan="store.view.travel.departedPlan ?? store.view.travel.plan"
+              :route-progress="store.view.travel.walking?.kind === 'route' ? store.view.travel.walking.progress : 0"
               :locked="!!store.view.travel.lockedDestination"
               :target="store.view.travel.planTarget"
               :cursor="travelCursor"
@@ -1233,6 +1261,18 @@ const rootStyle = computed(() => {
             autofocus
             @pick="onSleepContinuationPick"
             @back="onSleepContinuationPick('back')"
+          />
+          <!-- The landmark arrival (wilderness-travel-route-ui): one
+               committed typed arrival bound to the current node, after the
+               sleep-handoff cards and before every exploration card. It
+               traps focus and returns it to the map when it closes. -->
+          <LandmarkCard
+            v-else-if="landmarkCardOpen"
+            :key="landmarkArrival.id"
+            :arrival="landmarkArrival"
+            :art-panel="panel('art')"
+            :entrance="!modeHydrating && store.view.motionLevel !== 'off'"
+            @continue="onLandmarkContinue(landmarkArrival.id)"
           />
           <!-- The room cards (exploration-room-actions design D1/D4/D5;
                redesign-rest-entry design D6): the rest entry the place card's
@@ -1547,8 +1587,8 @@ const rootStyle = computed(() => {
               <!-- In travel the band's movement column is the leg panel
                    (wilderness-travel-leg-ui): intent line, leg gauge and
                    legend, pace and nightfall preferences, and 出發/停步,
-                   紮營 and 環顧. 出發 stays disabled (route_pending) over
-                   a locked plan until route-ui wires its departure.
+                   紮營 and 環顧. 出發 departs on the locked current plan
+                   (wilderness-travel-route-ui).
                    The compass stays the ordinary exploration control. -->
               <div v-if="travelLayout && travelLeg" class="exploration-root__travel">
                 <LegPanel
@@ -1557,6 +1597,7 @@ const rootStyle = computed(() => {
                   @pace="store.setTravelPace"
                   @night="store.setTravelStopAtNight"
                   @stop="onTravelStop"
+                  @depart="onTravelDepart"
                   @look="onTravelLook"
                   @camp="openTravelCamp"
                 />

@@ -168,8 +168,62 @@ current error. The request lifecycle is:
    and the party standing on it clear it. An aim supersedes an unlocked
    hover preview but not a lock, and keeps Enter's single step.
 
-Departure is not inferred from any of this: 出發 stays disabled with its
-pending reason until route-ui installs the route action.
+Departure is never inferred from any of this; it is the route walk below.
+
+### Travel route walking
+
+The route walk (wilderness-travel-route-ui) is the walking queue's second
+kind. `store.departTravel()` departs only when the travel layout shows, the
+map is current, the gate is free, no card or surface owns the stage, no aim
+stands, no plan query waits or flies, and the locked destination has the
+current token's own plan from the party's cell with an executable prefix (a
+non-empty `steps` and an integer `stop_index` inside it). 出發, Enter on the
+map with neither an aim nor a cursor, and a second click on the locked cell
+all call it; the button and the click clear a hovered aim first. The walk
+captures the plan as `departedPlan` (published as `view.travel.departedPlan`
+and drawn with its walked steps removed) and never replaces it with a later
+preview.
+
+1. **Prefix.** Indices `0..stop_index` inclusive send; `stop_index` is an
+   index, never a count. The steps beyond it stay drawn as the planned future.
+2. **Descriptor.** Before each send the next supplied step is compared with
+   the current window's party cell (the previous step's cell, or the plan's
+   origin), its direction derived from the two cells and the CURRENT committed
+   move row for that direction resolved through the compass model. The row's
+   disclosed destination must be the window's own node on that cell (never a
+   settlement gateway); otherwise the walk stops with its reason and the lock
+   waits for a fresh plan. Nothing is built from a route coordinate.
+3. **Walk context.** Every queued step (route and held direction walks)
+   leaves through `activateExit(exitRef, walk)` with the exact
+   `walk: {pace, stop_at_night}` frozen when the walk started; a discrete
+   neighbour step keeps the two-field payload. The same admission (stale row,
+   epoch, mutation lock, `current_node`) applies to both.
+4. **Commit and interrupts.** A step counts exactly as a walking-ui step
+   (correlated result, declared revision, canonical node change). The step's
+   own `result.data.interrupts` is read when its result matches; once the
+   step counts, any non-empty list (each of the seven flags, alone or
+   combined) stops the walk at once, without waiting out the dwell, and the
+   intent line names the flags. An empty list continues after the 350 ms
+   dwell (0 at motion off) and a current map; a route step whose result has
+   no flag list stops. The server owns what each flag means.
+5. **Stops.** A refusal (the log-ui handler stays the only refusal
+   appender), a disconnect, an epoch or generation change, any new key (Enter
+   included), 停步, a blur or layout exit, a card (a landmark arrival
+   included) and the spent prefix all stop the walk, and nothing restarts it:
+   a stopped walk's late result or timer matches nothing. The key that
+   stopped a walk never also departs, until it is released.
+6. **Replanning.** A short stop keeps the lock, drops the old token and asks
+   once for a fresh `travel.plan` from the committed position once the map is
+   current and no card owns the stage; the answer is never departed by
+   itself. Reaching the destination clears the lock.
+
+Landmark arrivals: a never-seen `landmark_reached` notice of the committed
+`travel_log` panel is handed to the travel store's one arrival slot, bound to
+`{generation, epoch, arrival_node, id}`. It is published as
+`view.travel.arrival` only while the canonical current node is its
+`arrival_node` and the travel layout shows; a later move, a session change or
+a layout exit forgets it, so a delayed notice never opens a card even with a
+matching name or art. The interrupt flag alone opens nothing.
 
 ### Travel log notices
 

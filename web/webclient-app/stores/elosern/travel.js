@@ -66,7 +66,8 @@
 
 import { getCurrentScope, onScopeDispose, ref } from "vue";
 import { travelSelection } from "../../components/travel/travel-model.js";
-import { directionOf, travelTarget } from "../../components/travel/travel-walk-model.js";
+import { directionForCell, directionOf, travelTarget } from "../../components/travel/travel-walk-model.js";
+import { DEFAULT_TRAVEL_PREFERENCES, TRAVEL_PACES } from "../../components/travel/leg-model.js";
 import { HOLD_MS, STEP_DWELL_MS } from "../../components/compass-model.js";
 import { disabledRowReason } from "../../components/dock-exits.js";
 import { decodeTravelGrid, travelCellAt } from "../../lib/travel-grid.js";
@@ -78,6 +79,10 @@ export const TRAVEL_MAP_STATUSES = Object.freeze(["ready", "refreshing", "unavai
 // A walk's closing line when the held bearing has no exit (the compass's
 // dead-end wording).
 export const DEAD_END_LINE = "這個方向沒有路了，停下腳步。";
+
+// A route walk's closing line when the next supplied step no longer matches
+// a current move row (the window or the exits changed under the plan).
+export const ROUTE_CHANGED_LINE = "路線已經改變，停下腳步。";
 
 const FAILED_MAP = new Set(["unavailable", "invalid", "retired"]);
 
@@ -105,7 +110,9 @@ export function applyTravel(ctx) {
   ctx.travelHold = null; // { direction, timer, generation, epoch }
   ctx.travelWalk = null; // see `startWalk`
   ctx.travelSingle = null; // { requestId, epoch } of a discrete step
-  ctx.travelNotice = null; // { kind, message }
+  ctx.travelNotice = null; // { kind, message } | { kind: "interrupted", flags }
+  // The one pending landmark arrival (see "landmark arrivals" below).
+  ctx.travelArrival = null;
   let dwellTimer = null;
   let aimSession = null;
   let pumping = false;
@@ -197,7 +204,8 @@ export function applyTravel(ctx) {
       ctx.presenceCard != null ||
       ctx.centredCardOpen?.() === true ||
       ctx.partyExitPrompt != null ||
-      ctx.crossSideConfirm != null
+      ctx.crossSideConfirm != null ||
+      ctx.travelArrival !== null
     );
   }
 
@@ -250,18 +258,60 @@ export function applyTravel(ctx) {
     return had || notice !== null;
   }
 
-  function startWalk(direction, rs) {
+  // The walk context every queued step carries: the persisted preferences
+  // frozen when the walk starts (they cannot change while it walks anyway).
+  // An unreadable preference reads as its default rather than refusing a
+  // step the player already asked for.
+  function frozenPreferences() {
+    const pace = TRAVEL_PACES.includes(ctx.prefs.travelPace) ? ctx.prefs.travelPace : DEFAULT_TRAVEL_PREFERENCES.pace;
+    const night = typeof ctx.prefs.travelStopAtNight === "boolean" ? ctx.prefs.travelStopAtNight : DEFAULT_TRAVEL_PREFERENCES.stopAtNight;
+    return Object.freeze({ pace, stop_at_night: night });
+  }
+
+  function startWalk(direction, rs, departedPlan = null) {
     ctx.travelWalk = {
-      kind: "direction",
+      kind: departedPlan ? "route" : "direction",
       direction,
-      departedPlan: null,
+      departedPlan,
       progress: 0,
-      pending: null, // { requestId, sentNode, epoch, declared, ok }
+      pending: null, // { requestId, sentNode, epoch, declared, ok, interrupts }
       commitSeen: false,
       dwellUntil: null,
       generation: rs.generation,
       epoch: rs.activeEpoch,
+      walk: frozenPreferences(),
     };
+  }
+
+  // The next route step's current descriptor (wilderness-travel-route-ui):
+  // `{target}` to send, `{done}` when the departed prefix is spent, or
+  // `{stop}` with the notice to stop on. The supplied step is compared with
+  // the party cell of the current window, its direction derived from the two
+  // cells, and the CURRENT committed move row for that direction resolved
+  // through the compass model; its disclosed destination must be the window's
+  // own node on the step's cell. Nothing is inferred from the coordinate: a
+  // step without such a row stops and the lock waits for a fresh plan.
+  function routeTarget(walk, rs) {
+    const plan = walk.departedPlan;
+    const index = walk.progress;
+    if (index > plan.stop_index || index >= plan.steps.length) return { done: true };
+    const grid = ctx.travelMap.grid;
+    const party = grid?.party ?? null;
+    const from = index === 0 ? plan.origin : plan.steps[index - 1].cell;
+    const step = plan.steps[index].cell;
+    const offRoute = { stop: { kind: "blocked", message: ROUTE_CHANGED_LINE } };
+    if (!party || !sameCell(party, from)) return offRoute;
+    const direction = directionForCell(party, step);
+    if (!direction) return offRoute;
+    const node = travelCellAt(grid, step.x, step.y)?.node ?? null;
+    const target = targetFor(direction, rs);
+    if (!target) return { stop: { kind: "blocked", message: DEAD_END_LINE } };
+    // A settlement gateway is ordinary neighbour movement, never a route node.
+    if (!node || node.gateway || target.destination === null || target.destination !== node.id) return offRoute;
+    if (!target.enabled) {
+      return { stop: { kind: "blocked", message: target.reason || disabledRowReason(target.item) || DEAD_END_LINE } };
+    }
+    return { target };
   }
 
   function dwellMs() {
@@ -286,20 +336,28 @@ export function applyTravel(ctx) {
     }
     const rs = committed();
     if (!ready(rs)) return false;
-    const target = targetFor(walk.direction, rs);
-    if (!target) return stop("blocked", { kind: "blocked", message: DEAD_END_LINE });
-    if (!target.enabled) {
-      return stop("blocked", { kind: "blocked", message: target.reason || disabledRowReason(target.item) || DEAD_END_LINE });
+    let target;
+    if (walk.kind === "route") {
+      const next = routeTarget(walk, rs);
+      if (next.done) return stop("depleted");
+      if (next.stop) return stop("blocked", next.stop);
+      target = next.target;
+    } else {
+      target = targetFor(walk.direction, rs);
+      if (!target) return stop("blocked", { kind: "blocked", message: DEAD_END_LINE });
+      if (!target.enabled) {
+        return stop("blocked", { kind: "blocked", message: target.reason || disabledRowReason(target.item) || DEAD_END_LINE });
+      }
     }
     const sentNode = canonicalNode(rs);
     // The dispatch publishes synchronously; the step is marked as being sent
     // first, so that nested settle neither sends again nor mistakes the
     // missing request id for an absent step.
-    walk.pending = { requestId: null, sentNode, epoch: rs.activeEpoch, declared: null, ok: false };
+    walk.pending = { requestId: null, sentNode, epoch: rs.activeEpoch, declared: null, ok: false, interrupts: null };
     pumping = true;
     let outcome;
     try {
-      outcome = ctx.activateExit(target.exitRef);
+      outcome = ctx.activateExit(target.exitRef, walk.walk);
     } catch (error) {
       // A failed send never leaves a half-marked step behind.
       walk.pending = null;
@@ -332,6 +390,11 @@ export function applyTravel(ctx) {
       if (result.outcome === "success") {
         pending.ok = true;
         pending.declared = typeof result.presentationRevision === "number" ? result.presentationRevision : null;
+        // The step's own committed interrupt flags, read now: the result
+        // slot is overwritten by the next result. Absent (a non-wilderness
+        // success) is null.
+        const flags = result.data?.interrupts;
+        pending.interrupts = Array.isArray(flags) ? Object.freeze(flags.slice()) : null;
       }
     }
     if (!pending.ok || rs.activeEpoch !== pending.epoch) return false;
@@ -348,6 +411,17 @@ export function applyTravel(ctx) {
     walk.progress += 1;
     walk.pending = null;
     walk.commitSeen = true;
+    // Every supplied interrupt flag (alone or combined) stops the walk at
+    // once, never waiting out the dwell; an empty list continues. A route
+    // step whose result names no flag list at all also stops: its commit is
+    // not one the route can vouch for. The server owns what each flag means.
+    if (pending.interrupts && pending.interrupts.length > 0) {
+      return stop("interrupt", { kind: "interrupted", flags: pending.interrupts });
+    }
+    if (walk.kind === "route" && pending.interrupts === null) return stop("unqualified");
+    // The departed prefix is spent: the walk ends here (a short stop keeps
+    // the lock, which asks once for a fresh plan from the new position).
+    if (walk.kind === "route" && walk.progress > walk.departedPlan.stop_index) return stop("depleted");
     walk.dwellUntil = Date.now() + dwellMs();
     return true;
   }
@@ -372,7 +446,7 @@ export function applyTravel(ctx) {
     settling = true;
     try {
       const rs = committed();
-      let changed = false;
+      let changed = settleArrival(rs);
       const session = ctx.travelWalk ?? ctx.travelHold;
       if (session) {
         const reason = cancelReason(rs, session);
@@ -495,10 +569,107 @@ export function applyTravel(ctx) {
     if (stop("release")) ctx.publishView();
   };
 
-  /** Stop the walk (停步, a key, blur, an opened surface). */
+  /** Stop the walk (停步, a key, blur, an opened surface). True when one stopped. */
   ctx.stopTravel = function stopTravel(reason = "stop") {
-    if (stop(reason)) ctx.publishView();
+    const stopped = stop(reason);
+    if (stopped) ctx.publishView();
+    return stopped;
   };
+
+  // ── route walking (wilderness-travel-route-ui) ─────────────────────────
+
+  // Why the locked plan cannot depart now, or null. The plan must be the
+  // current token's own answer for the locked destination from the party's
+  // cell, with an executable prefix: indices 0..stop_index inclusive.
+  function departBlock(rs) {
+    if (ctx.travelWalk || ctx.travelHold) return "walking";
+    if (!ready(rs)) return "waiting";
+    if (surfaceOpen()) return "surface";
+    if (ctx.travelAim !== null) return "aim";
+    const plan = route.plan;
+    if (!route.lockedDestination || !plan) return "no_plan";
+    if (route.pendingToken !== null || desired?.armed === true) return "pending";
+    if (planBasis !== factsKey(planFacts(rs)) || !sameCell(planDestination, route.lockedDestination)) return "stale";
+    const party = ctx.travelMap.grid?.party ?? null;
+    if (!party || !sameCell(plan.origin, party)) return "stale";
+    const steps = Array.isArray(plan.steps) ? plan.steps : [];
+    if (steps.length === 0 || !Number.isInteger(plan.stop_index) || plan.stop_index < 0 || plan.stop_index >= steps.length) {
+      return "no_plan";
+    }
+    return null;
+  }
+
+  /**
+   * Depart on the locked current plan: its prefix 0..stop_index walks
+   * through the same queue, one committed step at a time. The plan is
+   * captured as it is; no later preview replaces it during the walk.
+   */
+  ctx.departTravel = function departTravel() {
+    const rs = committed();
+    const reason = departBlock(rs);
+    if (reason) return { departed: false, reason };
+    ctx.travelNotice = null;
+    startWalk(null, rs, route.plan);
+    after();
+    return { departed: true };
+  };
+
+  // ── landmark arrivals (wilderness-travel-route-ui) ─────────────────────
+  //
+  // A committed typed `landmark_reached` notice (never the interrupt flag,
+  // never prose) is the only opener. The travel log hands over each notice
+  // the first time its id is ever seen, so a replay never reopens one. One
+  // arrival is kept, bound to `{generation, epoch, arrivalNode, id}`: it is
+  // published only while the canonical current node IS its arrival node and
+  // the travel layout shows, and it is forgotten once the session or the node
+  // moves on (a delayed arrival after another move never opens). While a
+  // higher-priority flow owns the stage (dialogue, combat) it waits. While it
+  // is held the walk stops and a replan waits (`surfaceOpen`).
+
+  ctx.noteTravelArrival = function noteTravelArrival(entry, rs) {
+    const node = entry?.params?.arrival_node;
+    if (typeof node !== "string" || !node) return;
+    ctx.travelArrival = Object.freeze({
+      id: entry.id,
+      generation: rs.generation,
+      epoch: rs.activeEpoch,
+      arrivalNode: node,
+      params: entry.params,
+    });
+  };
+
+  function settleArrival(rs) {
+    const arrival = ctx.travelArrival;
+    if (!arrival) return false;
+    const gone =
+      rs.generation !== arrival.generation ||
+      rs.activeEpoch !== arrival.epoch ||
+      (rs.mode === "exploration" && (!layoutShown(rs) || canonicalNode(rs) !== arrival.arrivalNode));
+    if (!gone) return false;
+    ctx.travelArrival = null;
+    return true;
+  }
+
+  /** Close the arrival card `id` (Continue, Enter, Esc); a second close does nothing. */
+  ctx.dismissTravelArrival = function dismissTravelArrival(id) {
+    if (!ctx.travelArrival || ctx.travelArrival.id !== id) return false;
+    ctx.travelArrival = null;
+    ctx.publishView();
+    return true;
+  };
+
+  function arrivalView(rs, layout) {
+    const arrival = ctx.travelArrival;
+    if (!arrival || !layout || rs.mode !== "exploration" || canonicalNode(rs) !== arrival.arrivalNode) return null;
+    const p = arrival.params;
+    return Object.freeze({
+      id: arrival.id,
+      name: p.name,
+      litDistrict: p.lit_district ?? null,
+      prose: p.prose,
+      artwork: p.artwork ?? null,
+    });
+  }
 
   // ── route planning (wilderness-travel-planning-ui) ─────────────────────
 
@@ -877,8 +1048,10 @@ export function applyTravel(ctx) {
     return Object.freeze({
       kind: walk.kind,
       direction: walk.direction,
-      word: directionOf(walk.direction)?.word ?? "",
+      word: walk.direction ? directionOf(walk.direction)?.word ?? "" : "",
       progress: walk.progress,
+      // A route walk's executable prefix ends at this supplied index.
+      stopIndex: walk.kind === "route" ? walk.departedPlan.stop_index : null,
       waiting,
     });
   }
@@ -906,6 +1079,11 @@ export function applyTravel(ctx) {
       walking: walkingView(),
       holding: ctx.travelHold !== null,
       notice: ctx.travelNotice ? Object.freeze({ ...ctx.travelNotice }) : null,
+      // The route walk (wilderness-travel-route-ui): the departed plan as
+      // it was captured, and the one committed landmark arrival the card
+      // shows (bound to the current node).
+      departedPlan: ctx.travelWalk?.kind === "route" ? ctx.travelWalk.departedPlan : null,
+      arrival: arrivalView(rs, selection.layout),
       // The typed travel band log (wilderness-travel-log-ui).
       entries: ctx.travelLogEntries(),
       // The leg panel (wilderness-travel-leg-ui): the persisted travel
