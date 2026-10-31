@@ -1,6 +1,6 @@
 "use strict";
 
-// Exact area_map (schema 2) / world_map (schema 1) logical schemas (OpenSpec change
+// Exact area_map (schema 3) / world_map (schema 1) logical schemas (OpenSpec change
 // define-map-panel-protocol). Mirror of web/webclient/presentation/map_panels.py:
 // every constant, vocabulary and rule below must stay equal to the server
 // validator; a bidirectional Python/Node parity test pins them.
@@ -23,7 +23,7 @@ var MAX_DEPTH = 12;
 var MAX_FIELDS = 64;
 var MAX_STRING_CODE_POINTS = 2048;
 
-var AREA_MAP_SCHEMA_VERSION = 2;
+var AREA_MAP_SCHEMA_VERSION = 3;
 var WORLD_MAP_SCHEMA_VERSION = 1;
 var MAP_PANEL_SCHEMAS = { area_map: AREA_MAP_SCHEMA_VERSION, world_map: WORLD_MAP_SCHEMA_VERSION };
 
@@ -46,7 +46,10 @@ var AREA_MAX_CELL_KM = 1000;
 
 // Wilderness schema 2 (wilderness-area-map-reveal): a centred 41 x 41 window
 // of run-length-encoded rows, sparse nodes, live-sight entities and distant
-// sightings.
+// sightings. Schema 3 (wilderness-travel-window-ui) adds display-only
+// annotations to the disclosed records: a terrain run's `display`, a wild
+// node's `landmark` and an entity's `count`/`threat`. Unknown runs stay
+// exactly {length, kind}.
 var WILDERNESS_WINDOW = 41;
 var WILDERNESS_HALF_WINDOW = Math.floor(WILDERNESS_WINDOW / 2);
 var WILDERNESS_MAX_NODES = WILDERNESS_WINDOW * WILDERNESS_WINDOW;
@@ -55,6 +58,8 @@ var WILDERNESS_MAX_SIGHTINGS = 256;
 var WILDERNESS_MAX_BAND = 15;
 var WILDERNESS_MAX_TIER = 3;
 var WILDERNESS_MAX_GROUND_RADIUS = 8;
+var WILDERNESS_MAX_DISTRICT_KEY = 128;
+var WILDERNESS_MAX_THREAT = 128;
 var SIGHTING_DISTANCE_STEP_KM = 5;
 var AREA_TERRAIN_CLASSES = ["open_ground", "hills", "mountain", "woodland", "water", "ridge", "sea", "settlement"];
 var AREA_LIGHT_PHASES = ["day", "dusk", "night", "dawn"];
@@ -99,6 +104,7 @@ var MAP_ID_RE = /^[a-z0-9._]{1,64}$/;
 // eslint-disable-next-line no-control-regex
 var EXIT_REF_RE = /^[\x00-\x7f]{1,64}$/;
 var ENTITY_ID_RE = /^[0-9a-f]{16}$/;
+var DISTRICT_KEY_RE = /^[\x21-\x7e]{1,128}$/;
 
 function fail(message) {
   throw new Error(message);
@@ -267,7 +273,8 @@ var AREA_WILDERNESS_FIELDS = AREA_COMMON_FIELDS.concat([
   "sightings",
 ]);
 var UNKNOWN_RUN_FIELDS = ["length", "kind"];
-var TERRAIN_RUN_FIELDS = ["length", "kind", "terrain", "passable", "band", "tier", "road", "ford"];
+var TERRAIN_RUN_FIELDS = ["length", "kind", "terrain", "passable", "band", "tier", "road", "ford", "display"];
+var RUN_DISPLAY_FIELDS = ["terrain_label", "district_key", "district_name", "settlement", "ford_label"];
 
 function areaGateway(value) {
   if (value === null) {
@@ -295,12 +302,23 @@ function areaAction(value) {
   };
 }
 
+function areaLandmark(value, id) {
+  if (value === null) {
+    return null;
+  }
+  exact(value, "landmark", ["name"]);
+  if (id.indexOf("wild:") !== 0) {
+    fail("only a wild node may carry a landmark");
+  }
+  return { name: text(value.name, "landmark.name", MAP_MAX_LABEL) };
+}
+
 function areaNode(value, layer) {
   var fields;
   if (layer === "grid") {
     fields = ["id", "label", "x", "y", "visibility", "gateway", "action"];
   } else if (layer === "wilderness") {
-    fields = ["id", "label", "x", "y", "visibility", "visited", "gateway", "action"];
+    fields = ["id", "label", "x", "y", "visibility", "visited", "gateway", "action", "landmark"];
   } else {
     fields = ["id", "label", "visibility", "gateway", "action"];
   }
@@ -325,6 +343,9 @@ function areaNode(value, layer) {
   }
   node.gateway = areaGateway(value.gateway);
   node.action = areaAction(value.action);
+  if (layer === "wilderness") {
+    node.landmark = areaLandmark(value.landmark, node.id);
+  }
   return node;
 }
 
@@ -398,7 +419,44 @@ function wildRun(value) {
     tier: int(value.tier, "run.tier", 0, WILDERNESS_MAX_TIER),
     road: bool(value.road, "run.road"),
     ford: bool(value.ford, "run.ford"),
+    display: runDisplay(value.display, value.terrain, value.ford),
   };
+}
+
+// A revealed run's display-only annotation (schema 3). The key and the name
+// of a district are disclosed together or not at all; only a settlement
+// footprint is drawn as one, and only a ford carries a ford label.
+function runDisplay(value, terrain, ford) {
+  exact(value, "run.display", RUN_DISPLAY_FIELDS);
+  var key = value.district_key;
+  if (key !== null && (typeof key !== "string" || !DISTRICT_KEY_RE.test(key))) {
+    fail("run.display.district_key must be null or 1.." + WILDERNESS_MAX_DISTRICT_KEY + " printable ASCII characters");
+  }
+  var name = value.district_name === null ? null : text(value.district_name, "run.display.district_name", MAP_MAX_LABEL);
+  if ((key === null) !== (name === null)) {
+    fail("run.display district key and name must be disclosed together");
+  }
+  var settlement = bool(value.settlement, "run.display.settlement");
+  if (settlement && terrain !== "settlement") {
+    fail("only a settlement run may be a settlement footprint");
+  }
+  var fordLabel = value.ford_label === null ? null : text(value.ford_label, "run.display.ford_label", MAP_MAX_LABEL);
+  if (fordLabel !== null && !ford) {
+    fail("only a ford run may carry a ford label");
+  }
+  return {
+    terrain_label: text(value.terrain_label, "run.display.terrain_label", MAP_MAX_LABEL),
+    district_key: key,
+    district_name: name,
+    settlement: settlement,
+    ford_label: fordLabel,
+  };
+}
+
+function sameDisplay(a, b) {
+  return RUN_DISPLAY_FIELDS.every(function (field) {
+    return a[field] === b[field];
+  });
 }
 
 function sameRun(a, b) {
@@ -411,7 +469,8 @@ function sameRun(a, b) {
     a.band === b.band &&
     a.tier === b.tier &&
     a.road === b.road &&
-    a.ford === b.ford
+    a.ford === b.ford &&
+    sameDisplay(a.display, b.display)
   );
 }
 
@@ -446,7 +505,7 @@ function inGroundDisc(dx, dy, radius) {
 }
 
 function wildEntity(value) {
-  exact(value, "entity", ["id", "cell", "kind", "hostile", "label"]);
+  exact(value, "entity", ["id", "cell", "kind", "hostile", "label", "count", "threat"]);
   if (typeof value.id !== "string" || !ENTITY_ID_RE.test(value.id)) {
     fail("entity.id must be a 16-character lowercase hex token");
   }
@@ -463,6 +522,8 @@ function wildEntity(value) {
     kind: value.kind,
     hostile: bool(value.hostile, "entity.hostile"),
     label: text(value.label, "entity.label", MAP_MAX_LABEL),
+    count: int(value.count, "entity.count", 1, MAX_SAFE_INTEGER),
+    threat: value.threat === null ? null : text(value.threat, "entity.threat", WILDERNESS_MAX_THREAT),
   };
 }
 
@@ -483,7 +544,7 @@ function wildSighting(value) {
   };
 }
 
-// The schema-2 wilderness fields, checked against the already-valid nodes.
+// The schema-3 wilderness fields, checked against the already-valid nodes.
 function wildernessBody(payload, nodes, current) {
   var cellKm = number(payload.cell_km, "cell_km", 0, AREA_MAX_CELL_KM);
   if (cellKm <= 0) {
@@ -1020,6 +1081,8 @@ module.exports = {
     WILDERNESS_MAX_BAND: WILDERNESS_MAX_BAND,
     WILDERNESS_MAX_TIER: WILDERNESS_MAX_TIER,
     WILDERNESS_MAX_GROUND_RADIUS: WILDERNESS_MAX_GROUND_RADIUS,
+    WILDERNESS_MAX_DISTRICT_KEY: WILDERNESS_MAX_DISTRICT_KEY,
+    WILDERNESS_MAX_THREAT: WILDERNESS_MAX_THREAT,
     SIGHTING_DISTANCE_STEP_KM: SIGHTING_DISTANCE_STEP_KM,
     AREA_TERRAIN_CLASSES: AREA_TERRAIN_CLASSES,
     AREA_LIGHT_PHASES: AREA_LIGHT_PHASES,

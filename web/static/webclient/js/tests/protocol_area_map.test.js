@@ -196,10 +196,10 @@ test("the wilderness node, entity and sighting caps are exact", () => {
   entities.entities = [];
   for (let i = 0; i < C.WILDERNESS_MAX_ENTITIES; i++) {
     const [dx, dy] = cells[i % cells.length];
-    entities.entities.push({ id: i.toString(16).padStart(16, "0"), cell: { x: F.WILD_C + dx, y: F.WILD_C + dy }, kind: "hostile", hostile: true, label: "狼" });
+    entities.entities.push({ id: i.toString(16).padStart(16, "0"), cell: { x: F.WILD_C + dx, y: F.WILD_C + dy }, kind: "hostile", hostile: true, label: "狼", count: 1, threat: null });
   }
   assert.equal(accepts(entities), true);
-  entities.entities.push({ id: "ffffffffffffffff", cell: { x: F.WILD_C, y: F.WILD_C }, kind: "npc", hostile: false, label: "人" });
+  entities.entities.push({ id: "ffffffffffffffff", cell: { x: F.WILD_C, y: F.WILD_C }, kind: "npc", hostile: false, label: "人", count: 1, threat: null });
   assert.equal(accepts(entities), false);
 });
 
@@ -241,6 +241,31 @@ test("wilderness rows are exact, merged and frame-bounded", () => {
     "radius 9": (a) => (a.ground_radius = 9),
     "phase noon": (a) => (a.light_phase = "noon"),
     "schema 1": (a) => (a.schema_version = 1),
+    "schema 2": (a) => (a.schema_version = 2),
+    // Schema 3 display annotations (wilderness-travel-window-ui).
+    "terrain run without display": (a) => delete a.rows[20].find((r) => r.kind === "terrain").display,
+    "unknown with display": (a) => (a.rows[0] = [{ length: 41, kind: "unknown", display: null }]),
+    "display extra field": (a) => (a.rows[20].find((r) => r.kind === "terrain").display.source_key = "x"),
+    "display missing field": (a) => delete a.rows[20].find((r) => r.kind === "terrain").display.ford_label,
+    "blank terrain label": (a) => (a.rows[20].find((r) => r.kind === "terrain").display.terrain_label = " "),
+    "district key without name": (a) => (a.rows[20].find((r) => r.kind === "terrain").display.district_name = null),
+    "district name without key": (a) => (a.rows[20].find((r) => r.kind === "terrain").display.district_key = null),
+    "non-ascii district key": (a) => (a.rows[20].find((r) => r.kind === "terrain").display.district_key = "東區"),
+    "settlement flag on open ground": (a) => (a.rows[20].find((r) => r.kind === "terrain" && r.terrain === "open_ground").display.settlement = true),
+    "ford label off a ford": (a) => (a.rows[20].find((r) => r.kind === "terrain" && !r.ford).display.ford_label = "淺灘"),
+    "wild node without landmark": (a) => delete a.nodes[0].landmark,
+    "blank landmark": (a) => (a.nodes[0].landmark = { name: "" }),
+    "landmark extra field": (a) => (a.nodes[0].landmark = { name: "塔", x: 1 }),
+    "landmark on a gateway": (a) => {
+      a.nodes = a.nodes.filter((n) => n.id !== `wild:elosern:${F.WILD_C + 1}:${F.WILD_C + 1}`);
+      a.edges = a.edges.filter((e) => e.destination !== `wild:elosern:${F.WILD_C + 1}:${F.WILD_C + 1}`);
+      a.nodes.push(F.wildNode(F.WILD_C + 1, F.WILD_C + 1, { id: "grid:t_map:3:3", gateway: { leads_to: "合成鎮" }, landmark: { name: "塔" } }));
+    },
+    "entity without count": (a) => delete a.entities[0].count,
+    "entity count 0": (a) => (a.entities[0].count = 0),
+    "entity count fraction": (a) => (a.entities[0].count = 1.5),
+    "entity threat too long": (a) => (a.entities[0].threat = "危".repeat(C.WILDERNESS_MAX_THREAT + 1)),
+    "entity without threat": (a) => delete a.entities[0].threat,
   };
   for (const [name, mutate] of Object.entries(cases)) {
     const area = clone(F.wildernessArea());
@@ -253,6 +278,19 @@ test("wilderness rows are exact, merged and frame-bounded", () => {
   gated.edges = gated.edges.filter((e) => e.destination !== `wild:elosern:${F.WILD_C + 1}:${F.WILD_C + 1}`);
   gated.nodes.push(F.wildNode(F.WILD_C + 1, F.WILD_C + 1, { id: "grid:t_map:3:3", gateway: { leads_to: "合成鎮" } }));
   assert.equal(accepts(gated), true);
+  // Undisclosed districts, a lit landmark name and a long threat at its
+  // bound are accepted.
+  const annotated = clone(F.wildernessArea());
+  annotated.rows = F.wildRowsFor((x, y) => {
+    const facts = F.wildTerrainAt(x, y);
+    if (!facts) return null;
+    const display = { terrain_label: "合成地表", district_key: null, district_name: null, settlement: false, ford_label: null };
+    return Object.assign({}, facts, { display });
+  });
+  annotated.nodes[0].landmark = { name: "合成石標" };
+  annotated.entities[0].threat = "危".repeat(C.WILDERNESS_MAX_THREAT);
+  annotated.entities[0].count = 3;
+  assert.equal(accepts(annotated), true);
   // A window hanging over the frame's west edge keeps negative origins and
   // unknown padding.
   const shift = 110;

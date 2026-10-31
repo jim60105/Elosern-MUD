@@ -233,13 +233,56 @@ def _stored_hp(monster: Monster) -> float:
 
 @dataclass(frozen=True, slots=True)
 class PopulationFact:
-    """One entity visible in the wilderness population view."""
+    """One entity visible in the wilderness population view.
+
+    ``threat_tier`` and ``danger_grade`` are the canonical threat facts of a
+    monster observation (wilderness-travel-window-ui): a prospective ambient
+    slot carries its expected variant's tier and grade, a materialized monster
+    its resolved ones; every other observation carries ``None``.
+    """
 
     observation_key: str
     cell: tuple[int, int]
     kind: str
     hostile: bool
     label: str
+    threat_tier: str | None = None
+    danger_grade: str | None = None
+
+
+def threat_label(tier: str | None, grade: str | None) -> str | None:
+    """The display threat of one observation's canonical tier and grade.
+
+    The tier's registered display name, followed by the guild danger grade
+    when one is declared; ``None`` when the tier is unknown, so a consumer
+    states an unknown threat instead of guessing one.
+    """
+    row = MONSTER_TIER_REGISTRY.get(tier) if isinstance(tier, str) else None
+    if row is None:
+        return None
+    return f"{row.display_name_zh} {grade} 級" if isinstance(grade, str) and grade else row.display_name_zh
+
+
+def _slot_threat(slot: "ExpectedSlot") -> dict[str, str | None]:
+    """A prospective slot's expected tier and its variant's danger grade."""
+    grade = None
+    if slot.variant_key is not None:
+        from world.lore.monster_species import MONSTER_VARIANT_REGISTRY
+
+        variant = MONSTER_VARIANT_REGISTRY.get(slot.variant_key)
+        grade = None if variant is None else variant.danger_grade
+    return {"threat_tier": slot.tier, "danger_grade": grade}
+
+
+def _monster_threat(monster: Any) -> dict[str, str | None]:
+    """A materialized monster's resolved tier and danger grade (never raises)."""
+    from world.rules.monster_individual import individual_danger_grade
+
+    tier = getattr(monster, "threat_tier", None)
+    return {
+        "threat_tier": tier if isinstance(tier, str) else None,
+        "danger_grade": individual_danger_grade(monster),
+    }
 
 
 @dataclass(frozen=True, slots=True)
@@ -820,6 +863,7 @@ def population_view(
                         kind="monster",
                         hostile=True,
                         label=monster.key,
+                        **_monster_threat(monster),
                     )
                 )
             elif slot_entry in decision.spawns_needed:
@@ -831,6 +875,7 @@ def population_view(
                         kind="monster",
                         hostile=True,
                         label=slot_entry.name_zh,
+                        **_slot_threat(slot_entry),
                     )
                 )
 
@@ -845,6 +890,7 @@ def population_view(
                         kind="monster",
                         hostile=True,
                         label=m.key,
+                        **_monster_threat(m),
                     )
                 )
 
@@ -873,6 +919,7 @@ def population_view(
                                 kind="monster",
                                 hostile=True,
                                 label=obj.key,
+                                **_monster_threat(obj),
                             )
                         )
                     continue
@@ -886,6 +933,7 @@ def population_view(
                             kind="monster",
                             hostile=True,
                             label=obj.key,
+                            **_monster_threat(obj),
                         )
                     )
             elif isinstance(obj, PlayerCharacter):

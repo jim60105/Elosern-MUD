@@ -1,4 +1,4 @@
-"""Exact ``area_map`` (schema 2) / ``world_map`` (schema 1) wire schemas and bounds.
+"""Exact ``area_map`` (schema 3) / ``world_map`` (schema 1) wire schemas and bounds.
 
 The on-demand map panels (world-map drawer design §5.2/§5.3, OpenSpec change
 define-map-panel-protocol) share one fixed wire contract between the server
@@ -37,7 +37,7 @@ from web.webclient.presentation.protocol import (
 
 AREA_MAP_PANEL = "area_map"
 WORLD_MAP_PANEL = "world_map"
-AREA_MAP_SCHEMA_VERSION = 2
+AREA_MAP_SCHEMA_VERSION = 3
 WORLD_MAP_SCHEMA_VERSION = 1
 
 #: The on-demand map panels and their registered schema versions. Only these
@@ -93,6 +93,8 @@ WILDERNESS_MAX_SIGHTINGS = 256
 WILDERNESS_MAX_BAND = 15
 WILDERNESS_MAX_TIER = 3
 WILDERNESS_MAX_GROUND_RADIUS = 8
+WILDERNESS_MAX_DISTRICT_KEY = 128
+WILDERNESS_MAX_THREAT = 128
 SIGHTING_DISTANCE_STEP_KM = 5
 #: Terrain classes of a revealed run: the sight rulebook's terrain rows plus
 #: the structural classes (blocked or non-walkable ground).
@@ -312,7 +314,9 @@ _AREA_WILDERNESS_FIELDS = _AREA_COMMON_FIELDS + (
     "sightings",
 )
 _UNKNOWN_RUN_FIELDS = ("length", "kind")
-_TERRAIN_RUN_FIELDS = ("length", "kind", "terrain", "passable", "band", "tier", "road", "ford")
+_TERRAIN_RUN_FIELDS = ("length", "kind", "terrain", "passable", "band", "tier", "road", "ford", "display")
+_RUN_DISPLAY_FIELDS = ("terrain_label", "district_key", "district_name", "settlement", "ford_label")
+_DISTRICT_KEY_RE = re.compile(r"[\x21-\x7e]{1,128}")
 
 
 def _area_gateway(value: Any) -> dict[str, str] | None:
@@ -338,11 +342,20 @@ def _area_action(value: Any) -> dict[str, str] | None:
     }
 
 
+def _area_landmark(value: Any, node_id: str) -> dict[str, str] | None:
+    if value is None:
+        return None
+    _exact(value, "landmark", ("name",))
+    if not node_id.startswith("wild:"):
+        raise MapPanelError("only a wild node may carry a landmark")
+    return {"name": _text(value["name"], "landmark.name", MAP_MAX_LABEL)}
+
+
 def _area_node(value: Any, layer: str) -> dict[str, Any]:
     if layer == "grid":
         fields = ("id", "label", "x", "y", "visibility", "gateway", "action")
     elif layer == "wilderness":
-        fields = ("id", "label", "x", "y", "visibility", "visited", "gateway", "action")
+        fields = ("id", "label", "x", "y", "visibility", "visited", "gateway", "action", "landmark")
     else:
         fields = ("id", "label", "visibility", "gateway", "action")
     _exact(value, "node", fields)
@@ -365,6 +378,8 @@ def _area_node(value: Any, layer: str) -> dict[str, Any]:
             raise MapPanelError("the current wilderness node must be visited")
     node["gateway"] = _area_gateway(value["gateway"])
     node["action"] = _area_action(value["action"])
+    if layer == "wilderness":
+        node["landmark"] = _area_landmark(value["landmark"], node["id"])
     return node
 
 
@@ -430,6 +445,40 @@ def _wild_run(value: Any) -> dict[str, Any]:
         "tier": _int(value["tier"], "run.tier", 0, WILDERNESS_MAX_TIER),
         "road": _bool(value["road"], "run.road"),
         "ford": _bool(value["ford"], "run.ford"),
+        "display": _run_display(value["display"], value["terrain"], value["ford"]),
+    }
+
+
+def _run_display(value: Any, terrain: str, ford: Any) -> dict[str, Any]:
+    """A revealed run's display-only annotation (schema 3).
+
+    A district's key and name are disclosed together or not at all; only a
+    settlement run may be drawn as a footprint, and only a ford run carries a
+    ford label.
+    """
+    _exact(value, "run.display", _RUN_DISPLAY_FIELDS)
+    key = value["district_key"]
+    if key is not None and (not isinstance(key, str) or not _DISTRICT_KEY_RE.fullmatch(key)):
+        raise MapPanelError(
+            f"run.display.district_key must be null or 1..{WILDERNESS_MAX_DISTRICT_KEY} printable ASCII characters"
+        )
+    name = value["district_name"]
+    name = None if name is None else _text(name, "run.display.district_name", MAP_MAX_LABEL)
+    if (key is None) != (name is None):
+        raise MapPanelError("run.display district key and name must be disclosed together")
+    settlement = _bool(value["settlement"], "run.display.settlement")
+    if settlement and terrain != "settlement":
+        raise MapPanelError("only a settlement run may be a settlement footprint")
+    ford_label = value["ford_label"]
+    ford_label = None if ford_label is None else _text(ford_label, "run.display.ford_label", MAP_MAX_LABEL)
+    if ford_label is not None and ford is not True:
+        raise MapPanelError("only a ford run may carry a ford label")
+    return {
+        "terrain_label": _text(value["terrain_label"], "run.display.terrain_label", MAP_MAX_LABEL),
+        "district_key": key,
+        "district_name": name,
+        "settlement": settlement,
+        "ford_label": ford_label,
     }
 
 
@@ -463,7 +512,7 @@ def _in_ground_disc(dx: int, dy: int, radius: int) -> bool:
 
 
 def _wild_entity(value: Any) -> dict[str, Any]:
-    _exact(value, "entity", ("id", "cell", "kind", "hostile", "label"))
+    _exact(value, "entity", ("id", "cell", "kind", "hostile", "label", "count", "threat"))
     entity_id = value["id"]
     if not isinstance(entity_id, str) or not ENTITY_ID_RE.fullmatch(entity_id):
         raise MapPanelError("entity.id must be a 16-character lowercase hex token")
@@ -479,6 +528,8 @@ def _wild_entity(value: Any) -> dict[str, Any]:
         "kind": value["kind"],
         "hostile": _bool(value["hostile"], "entity.hostile"),
         "label": _text(value["label"], "entity.label", MAP_MAX_LABEL),
+        "count": _int(value["count"], "entity.count", 1, MAX_SAFE_INTEGER),
+        "threat": None if value["threat"] is None else _text(value["threat"], "entity.threat", WILDERNESS_MAX_THREAT),
     }
 
 
@@ -499,7 +550,7 @@ def _wild_sighting(value: Any) -> dict[str, Any]:
 
 
 def _wilderness_body(payload: dict[str, Any], nodes: list[dict[str, Any]], current: str) -> dict[str, Any]:
-    """Validate the schema-2 wilderness fields against the already-valid nodes."""
+    """Validate the schema-3 wilderness fields against the already-valid nodes."""
     cell_km = _number(payload["cell_km"], "cell_km", 0, AREA_MAX_CELL_KM)
     if cell_km <= 0:
         raise MapPanelError("cell_km must be positive")

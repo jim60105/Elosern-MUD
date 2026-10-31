@@ -17,7 +17,10 @@ The panel is a whole-area fog-of-war view of the map the player stands on:
   for revealed cells, sparse nodes (current, actually visited, and revealed
   cells with a legal step or disclosed location), true gateway replacement on
   the eight neighbour steps, live-sight entities, distant sightings and the
-  current district name.
+  current district name. Schema 3 (wilderness-travel-window-ui) adds
+  display-only annotations read after the reveal filter: each revealed run's
+  terrain label, disclosed district, settlement footprint and ford label, a
+  lit landmark's name on its node, and each entity's count and threat.
 
 For every graph (non-wilderness) layer, known = visited ∪ adjacent(visited); a road is emitted
 only when both ends are known and at least one is visited. Move actions are
@@ -60,6 +63,7 @@ from web.webclient.presentation.map_panels import (
     WILDERNESS_MAX_ENTITIES,
     WILDERNESS_MAX_NODES,
     WILDERNESS_MAX_SIGHTINGS,
+    WILDERNESS_MAX_THREAT,
     WILDERNESS_WINDOW,
     validate_area_map,
 )
@@ -78,6 +82,22 @@ from world.rules.map_knowledge import KnowledgeError, encode_grid, encode_room, 
 UNEXPLORED_LABEL = "未探索"
 
 _HALF_WINDOW = WILDERNESS_WINDOW // 2
+
+#: Server-owned display labels of the closed wire terrain classes (schema 3
+#: ``display.terrain_label``). The browser never maps a class to a label.
+WILDERNESS_TERRAIN_LABELS: Mapping[str, str] = {
+    "open_ground": "曠野",
+    "hills": "丘陵",
+    "mountain": "山地",
+    "woodland": "林地",
+    "water": "河川",
+    "ridge": "山脊",
+    "sea": "海域",
+    "settlement": "聚落",
+}
+
+#: The generic label of a ford cell: no waterway declares an authored name.
+WILDERNESS_FORD_LABEL = "淺灘"
 
 
 # ---------------------------------------------------------------------------
@@ -367,6 +387,28 @@ def _district_name(cell: tuple[int, int]) -> str:
     return district.district_name_zh
 
 
+def _district_key(cell: tuple[int, int]) -> str | None:
+    from world.maps.district_partition import district_at
+
+    return district_at(cell)
+
+
+def _district_rows() -> Mapping[str, Any]:
+    from world.lore.map_districts import current
+
+    return current().districts
+
+
+def _landmark_names(lit_nodes: Mapping[str, str]) -> dict[str, str]:
+    """``{wild landmark node id: landmark name}`` of the lit districts."""
+    rows = _district_rows()
+    return {
+        node_id: rows[key].landmark_name_zh
+        for key, node_id in lit_nodes.items()
+        if node_id.startswith("wild:") and key in rows
+    }
+
+
 def _wilderness_over_bound(**context: Any) -> None:
     log_warn("area_map_over_bound", context={"layer": "wilderness", "map": WILDERNESS_MAP_ID, **context})
     raise _OverBound
@@ -502,10 +544,8 @@ def encode_rows(
     return rows
 
 
-def _distant_markers(
-    actor: Any, cell: tuple[int, int], calendar: Any, visited: Callable[[str], bool]
-) -> tuple[dict[str, Any], ...]:
-    """Distant sightings with lighting read by exact landmark membership.
+def _lit_landmarks(visited: Callable[[str], bool]) -> dict[str, str]:
+    """The lit districts' landmark node ids, read by exact landmark membership.
 
     ``sight.visible_distant_markers`` derives the lit set from the whole
     knowledge record; the window instead asks only for each district
@@ -513,11 +553,20 @@ def _distant_markers(
     decodes every chunk.
     """
     from world.lore.map_districts import current as districts_current, landmark_node_ids
+
+    registry = districts_current().districts
+    return {key: node_id for key, node_id in landmark_node_ids(registry).items() if visited(node_id)}
+
+
+def _distant_markers(
+    cell: tuple[int, int], calendar: Any, lit: frozenset[str]
+) -> tuple[dict[str, Any], ...]:
+    """Distant sightings, named only for the lit districts."""
+    from world.lore.map_districts import current as districts_current
     from world.maps.wilderness_provider import WILDERNESS_KM_PER_CELL
     from world.rules import sight
 
     registry = districts_current().districts
-    lit = frozenset(key for key, node_id in landmark_node_ids(registry).items() if visited(node_id))
     return sight.distant_markers(
         cell,
         calendar,
@@ -530,7 +579,7 @@ def _distant_markers(
 
 
 def _wilderness_area(actor: Any, location: Any) -> dict[str, Any]:
-    """The schema-2 wilderness window (wilderness-area-map-reveal).
+    """The schema-3 wilderness window (wilderness-area-map-reveal, -travel-window-ui).
 
     Reads only the knowledge chunks the window (plus the reveal reach) needs,
     never the whole record. A cell is published as terrain only when it is
@@ -547,7 +596,7 @@ def _wilderness_area(actor: Any, location: Any) -> dict[str, Any]:
         normalize_wilderness_direction,
         resolve_wilderness_destination,
     )
-    from world.maps.wilderness_population import population_view
+    from world.maps.wilderness_population import population_view, threat_label
     from world.rules import sight
     from world.rules.clock import get_world_clock
     from world.rules.map_knowledge import decode_node, read_snapshot
@@ -598,6 +647,13 @@ def _wilderness_area(actor: Any, location: Any) -> dict[str, Any]:
                 gate_visits[gate_node] = False
         return gate_visits[gate_node]
 
+    try:
+        lit_nodes = _lit_landmarks(gate_visited)
+    except Exception as error:
+        log_warn("area_map_lighting_failed", exc=error, context={"layer": "wilderness", "cell": f"{cx},{cy}"})
+        raise PanelUnavailableError from error
+    lit = frozenset(lit_nodes)
+
     def disclosure_for(gate_node: str) -> WildernessDisclosure:
         visited = frozenset({gate_node}) if gate_visited(gate_node) else frozenset()
         return WildernessDisclosure(frozenset(revealed), visited)
@@ -623,6 +679,7 @@ def _wilderness_area(actor: Any, location: Any) -> dict[str, Any]:
             "visited": visited,
             "gateway": None,
             "action": action,
+            "landmark": None,
         }
 
     # Sparse nodes keyed by cell: current, visits, then disclosed locations.
@@ -684,6 +741,7 @@ def _wilderness_area(actor: Any, location: Any) -> dict[str, Any]:
                     "leads_to": _gateway_far_side_label("wilderness", grid_gateway[0], grid_gateway[2])
                 },
                 "action": action,
+                "landmark": None,
             }
         else:
             if cell not in revealed:
@@ -698,6 +756,14 @@ def _wilderness_area(actor: Any, location: Any) -> dict[str, Any]:
             node["action"] = action
         steps.append(destination)
 
+    # A lit district's landmark names its own wild node (a lit landmark was
+    # visited, so its node is already present when it lies in the window).
+    landmark_names = _landmark_names(lit_nodes)
+    for node in cells.values():
+        name = landmark_names.get(node["id"])
+        if name is not None:
+            node["landmark"] = {"name": name[:MAP_MAX_LABEL]}
+
     nodes = [cells[key] for key in sorted(cells, key=lambda cell: (cell[1], cell[0]))]
     presented = {node["id"] for node in nodes}
     edges = [
@@ -709,11 +775,27 @@ def _wilderness_area(actor: Any, location: Any) -> dict[str, Any]:
         _wilderness_over_bound(nodes=len(nodes), edges=len(edges))
 
     oracle = _TerrainOracle()
+    current_district = _district_key((cx, cy))
+    district_rows = _district_rows()
 
     def facts_at(cell: tuple[int, int]) -> dict[str, Any] | None:
         if cell not in revealed:
             return None
-        return oracle.facts(cell)
+        facts = oracle.facts(cell)
+        # Display metadata is read only for a revealed cell, per request: the
+        # disclosed districts depend on the character's lit set and position.
+        key = _district_key(cell)
+        district = district_rows.get(key) if key is not None and (key in lit or key == current_district) else None
+        return {
+            **facts,
+            "display": {
+                "terrain_label": WILDERNESS_TERRAIN_LABELS[facts["terrain"]],
+                "district_key": key if district is not None else None,
+                "district_name": district.district_name_zh[:MAP_MAX_LABEL] if district is not None else None,
+                "settlement": facts["terrain"] == "settlement",
+                "ford_label": WILDERNESS_FORD_LABEL if facts["ford"] else None,
+            },
+        }
 
     rows = encode_rows(min_x, min_y, facts_at)
 
@@ -721,7 +803,7 @@ def _wilderness_area(actor: Any, location: Any) -> dict[str, Any]:
         calendar = get_world_clock().calendar
         phase = sight.light_phase(calendar)
         radius = sight.ground_radius_at((cx, cy), calendar)
-        sightings = [dict(marker) for marker in _distant_markers(actor, (cx, cy), calendar, gate_visited)]
+        sightings = [dict(marker) for marker in _distant_markers((cx, cy), calendar, lit)]
     except Exception as error:
         log_warn("area_map_sight_failed", exc=error, context={"layer": "wilderness", "cell": f"{cx},{cy}"})
         raise PanelUnavailableError from error
@@ -741,6 +823,7 @@ def _wilderness_area(actor: Any, location: Any) -> dict[str, Any]:
     for fact in population_view(location.wilderness, disc):
         if fact.observation_key == own:
             continue
+        threat = threat_label(fact.threat_tier, fact.danger_grade) if fact.kind == "monster" else None
         entities.append(
             {
                 "id": entity_token(fact.observation_key),
@@ -748,6 +831,9 @@ def _wilderness_area(actor: Any, location: Any) -> dict[str, Any]:
                 "kind": "hostile" if fact.kind == "monster" else fact.kind,
                 "hostile": bool(fact.hostile),
                 "label": fact.label[:MAP_MAX_LABEL],
+                # One observation is one entity: never grouped here.
+                "count": 1,
+                "threat": None if threat is None else threat[:WILDERNESS_MAX_THREAT],
             }
         )
     if len(entities) > WILDERNESS_MAX_ENTITIES:
@@ -911,6 +997,8 @@ def area_map_presenter(context: PresentationContext) -> dict[str, Any]:
 __all__ = [
     "ROOM_GRAPH_MAX_ROOMS",
     "UNEXPLORED_LABEL",
+    "WILDERNESS_FORD_LABEL",
+    "WILDERNESS_TERRAIN_LABELS",
     "area_map_presenter",
     "bearing_and_distance",
     "encode_rows",

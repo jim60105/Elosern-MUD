@@ -1522,7 +1522,7 @@ def valid_area_map_panel(**overrides) -> dict:
     """
     map_id = "synth_harbour"
     panel = {
-        "schema_version": 2,
+        "schema_version": 3,
         "available": True,
         "layer": "grid",
         "map_id": map_id,

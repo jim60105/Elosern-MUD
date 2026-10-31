@@ -32,7 +32,7 @@ function gridNode(x, y, overrides) {
 function gridArea(overrides) {
   return Object.assign(
     {
-      schema_version: 2,
+      schema_version: 3,
       available: true,
       layer: "grid",
       map_id: MAP,
@@ -73,7 +73,7 @@ function gridArea(overrides) {
 function interiorArea(overrides) {
   return Object.assign(
     {
-      schema_version: 2,
+      schema_version: 3,
       available: true,
       layer: "interior",
       map_id: "room:40",
@@ -91,7 +91,8 @@ function interiorArea(overrides) {
   );
 }
 
-// A schema-2 wilderness window (41 x 41, wilderness-area-map-reveal) around
+// A schema-3 wilderness window (41 x 41, wilderness-area-map-reveal and
+// wilderness-travel-window-ui) around
 // cell (120, 120): a revealed disc of radius 6 drawn as merged terrain runs
 // (a west ridge, a river with a ford, woodland in the north), unknown runs
 // everywhere else, a short visited trail with one node per visit, the eight
@@ -110,13 +111,32 @@ function wildTerrainAt(x, y) {
   if (dy >= 3) return { terrain: "woodland", passable: true, band: 4, tier: 0, road: false, ford: false };
   return { terrain: "open_ground", passable: true, band: 3 + (dx > 0 ? 1 : 0), tier: 0, road: false, ford: false };
 }
+// The synthetic display annotation of one revealed cell's facts: a label per
+// class, two disclosed districts split at x = WILD_C, and a ford label on the
+// ford. Fixture data only.
+const WILD_LABELS = {
+  open_ground: "合成曠野", hills: "合成丘陵", mountain: "合成山地", woodland: "合成林地",
+  water: "合成河川", ridge: "合成山脊", sea: "合成海域", settlement: "合成聚落",
+};
+function wildDisplay(x, facts) {
+  const east = x >= WILD_C;
+  return {
+    terrain_label: WILD_LABELS[facts.terrain],
+    district_key: east ? "t_east" : "t_west",
+    district_name: east ? "合成東區" : "合成西區",
+    settlement: facts.terrain === "settlement",
+    ford_label: facts.ford ? "合成淺灘" : null,
+  };
+}
 function wildRowsFor(terrainAt) {
   const rows = [];
   for (let row = 0; row < 41; row++) {
     const runs = [];
     for (let col = 0; col < 41; col++) {
-      const facts = terrainAt(WILD_MIN + col, WILD_MIN + row);
-      const run = facts ? Object.assign({ length: 1, kind: "terrain" }, facts) : { length: 1, kind: "unknown" };
+      const x = WILD_MIN + col;
+      const facts = terrainAt(x, WILD_MIN + row);
+      const withDisplay = facts && !("display" in facts) ? Object.assign({}, facts, { display: wildDisplay(x, facts) }) : facts;
+      const run = withDisplay ? Object.assign({ length: 1, kind: "terrain" }, withDisplay) : { length: 1, kind: "unknown" };
       const last = runs[runs.length - 1];
       const same = last && JSON.stringify(Object.assign({}, last, { length: 0 })) === JSON.stringify(Object.assign({}, run, { length: 0 }));
       if (same) last.length += 1;
@@ -137,6 +157,7 @@ function wildNode(x, y, overrides) {
       visited: false,
       gateway: null,
       action: null,
+      landmark: null,
     },
     overrides || {}
   );
@@ -158,7 +179,7 @@ function wildernessArea(overrides) {
   edges.push({ source: current, destination: sw.id });
   return Object.assign(
     {
-      schema_version: 2,
+      schema_version: 3,
       available: true,
       layer: "wilderness",
       map_id: "elosern",
@@ -175,8 +196,8 @@ function wildernessArea(overrides) {
       light_phase: "day",
       ground_radius: 4,
       entities: [
-        { id: "0123456789abcdef", cell: { x: 122, y: 121 }, kind: "hostile", hostile: true, label: "合成野狼" },
-        { id: "fedcba9876543210", cell: { x: 118, y: 122 }, kind: "npc", hostile: false, label: "合成旅人" },
+        { id: "0123456789abcdef", cell: { x: 122, y: 121 }, kind: "hostile", hostile: true, label: "合成野狼", count: 1, threat: "合成低階" },
+        { id: "fedcba9876543210", cell: { x: 118, y: 122 }, kind: "npc", hostile: false, label: "合成旅人", count: 1, threat: null },
       ],
       sightings: [{ bearing: "北北東", distance_km: 25, silhouette_zh: "一座合成石塔", name: null }],
     },
@@ -322,6 +343,7 @@ module.exports = {
   wildernessArea,
   wildNode,
   wildRowsFor,
+  wildTerrainAt,
   WILD_C,
   WILD_MIN,
   worldMap,
