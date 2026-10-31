@@ -97,7 +97,7 @@ class StatusPanelPresenterTests(EvenniaTest):
         before = (_stored_physiology(owner), _stored_physiology(controlled))
 
         payload = status_presenter(self._context(controlled))
-        self.assertEqual(payload["schema_version"], 5)
+        self.assertEqual(payload["schema_version"], 6)
         # Resources stay owner-keyed; the actor identity names the controlled
         # body, so no owner gauge can be relabelled as the companion's truth.
         self.assertEqual(payload["actor"]["identity"], str(controlled.pk))
@@ -123,6 +123,37 @@ class StatusPanelPresenterTests(EvenniaTest):
         self.assertEqual(
             (_stored_physiology(owner), _stored_physiology(controlled)), before
         )
+
+
+class StatusPanelTravelCapacityTests(EvenniaTest):
+    """Version 6: the required travel_capacity field and its failure path."""
+
+    def setUp(self):
+        super().setUp()
+        self.char1.location = self.room1
+        self.char1.race = "human"
+        self.char1.apply_race_baseline()
+        write_fatigue_state(self.char1, 288000, SleepPosture.AWAKE)
+
+    def test_travel_capacity_is_null_outside_the_wilderness(self):
+        payload = status_presenter(PresentationContext(self.char1, 1))
+        self.assertEqual(payload["schema_version"], 6)
+        self.assertIn("travel_capacity", payload)
+        self.assertIsNone(payload["travel_capacity"])
+
+    def test_capacity_failure_degrades_to_null_and_keeps_the_panel(self):
+        error = RuntimeError("synthetic capacity failure")
+        with patch(
+            "world.rules.travel_capacity.build_travel_status", side_effect=error
+        ), patch("web.webclient.presentation.status.log_warn") as warn:
+            payload = status_presenter(PresentationContext(self.char1, 1))
+        self.assertTrue(payload["available"])
+        self.assertIsNone(payload["travel_capacity"])
+        # The ordinary status facts are untouched by the failed capacity read.
+        self.assertEqual(payload["fatigue"][0]["reserve_percent"], 80)
+        warn.assert_called_once()
+        self.assertEqual(warn.call_args.args[0], "status_travel_capacity_unavailable")
+        self.assertIs(warn.call_args.kwargs["exc"], error)
 
 
 class StatusPanelPresentTravellerTests(EvenniaTest):

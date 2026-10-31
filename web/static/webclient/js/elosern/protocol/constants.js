@@ -48,6 +48,12 @@ var MAX_MODIFIER_KEYS = 16;
 // model): at most the present party's bodies, one bounded restriction line per
 // row, and the closed stage vocabulary the exact stored units select.
 var STATUS_FATIGUE_MAX_SUBJECTS = 8;
+// Status v6 travel capacity (wilderness-travel-leg-ui): at most twelve
+// neighbour duration quotes, each keyed by an opaque exit reference.
+var STATUS_TRAVEL_MAX_NEIGHBOURS = 12;
+var STATUS_TRAVEL_MAX_EXIT_REF = 64;
+var STATUS_TRAVEL_BUCKETS = ["normal", "light", "moderate", "severe"];
+var STATUS_TRAVEL_PACES = ["cautious", "standard"];
 var STATUS_FATIGUE_MAX_RESTRICTION = 64;
 var STATUS_FATIGUE_STAGES = [
   "normal",
@@ -552,7 +558,7 @@ var TRAVEL_LOG_MAX_NODE_ID = 128;
 var PANEL_ALLOWLIST = {
   gallery: 3,
   art: ART_SCHEMA_VERSION,
-  status: 5,
+  status: 6,
   context_actions: CONTEXT_ACTIONS_SCHEMA_VERSION,
   local_map: 1,
   party: PARTY_SCHEMA_VERSION,
@@ -617,6 +623,10 @@ module.exports = {
   MAX_CONDITION_LABEL: MAX_CONDITION_LABEL,
   MAX_MODIFIER_KEYS: MAX_MODIFIER_KEYS,
   STATUS_FATIGUE_MAX_SUBJECTS: STATUS_FATIGUE_MAX_SUBJECTS,
+  STATUS_TRAVEL_MAX_NEIGHBOURS: STATUS_TRAVEL_MAX_NEIGHBOURS,
+  STATUS_TRAVEL_MAX_EXIT_REF: STATUS_TRAVEL_MAX_EXIT_REF,
+  STATUS_TRAVEL_BUCKETS: STATUS_TRAVEL_BUCKETS,
+  STATUS_TRAVEL_PACES: STATUS_TRAVEL_PACES,
   STATUS_FATIGUE_MAX_RESTRICTION: STATUS_FATIGUE_MAX_RESTRICTION,
   STATUS_FATIGUE_STAGES: STATUS_FATIGUE_STAGES,
   RESULT_DATA_STANDARD_RESERVE: RESULT_DATA_STANDARD_RESERVE,

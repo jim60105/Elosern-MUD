@@ -71,7 +71,7 @@ describe("medallion membership", () => {
     expect(front).toMatchObject({ key: "1", controlled: true, available: false, reserve: null, stage: null });
     expect(medallionLabel(front)).toBe("合成主角：精力資料無法取得");
     expect(rest.map((m) => m.key)).toEqual(["7"]);
-    const unavailable = medallionMembers(figures(), { schema_version: 5, available: false, reason: { code: "x", message: "y" } });
+    const unavailable = medallionMembers(figures(), { schema_version: 6, available: false, reason: { code: "x", message: "y" } });
     expect(unavailable.map((m) => [m.key, m.available])).toEqual([["1", false]]);
   });
 

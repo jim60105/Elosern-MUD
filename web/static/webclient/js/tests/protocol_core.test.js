@@ -139,9 +139,9 @@ test("validates the status panel available/unavailable discriminator exactly", (
     Protocol.validatePanel(
       "status",
       Protocol.PANEL_ALLOWLIST.status,
-      unavailableStatusPanel({ schema_version: 5 })
+      unavailableStatusPanel({ schema_version: 6 })
     ),
-    unavailableStatusPanel({ schema_version: 5 })
+    unavailableStatusPanel({ schema_version: 6 })
   );
   const badReason = unavailableStatusPanel();
   badReason.reason = { code: "x" };
@@ -152,18 +152,18 @@ test("validates the status panel available/unavailable discriminator exactly", (
     Protocol.validatePanel(
       "status",
       Protocol.PANEL_ALLOWLIST.status,
-      unavailableStatusPanel({ schema_version: 4 })
+      unavailableStatusPanel({ schema_version: 5 })
     )
   );
-  // The available form cuts over with it: version 4 is no compatibility form.
-  assert.throws(() => Protocol.validateStatusPanel(validStatusPanel({ schema_version: 4 })));
+  // The available form cuts over with it: version 5 is no compatibility form.
+  assert.throws(() => Protocol.validateStatusPanel(validStatusPanel({ schema_version: 5 })));
   // An internal reason carries a bounded correlation ID.
   assert.doesNotThrow(() =>
     Protocol.validatePanel(
       "status",
       Protocol.PANEL_ALLOWLIST.status,
       unavailableStatusPanel({
-        schema_version: 5,
+        schema_version: 6,
         reason: {
           code: "internal_presenter_error",
           message: "此介面暫時無法使用",
@@ -457,6 +457,58 @@ test("status v5 fatigue rows identify each body and reject untruthful forms", ()
   assert.throws(() =>
     Protocol.validateStatusPanel(validStatusPanel({ fatigue: tooMany }))
   );
+});
+
+test("status v6 travel capacity is null or the exact bounded opaque object", () => {
+  const capacity = (overrides = {}) => ({
+    capacity: { normal: 12, light: 9, moderate: 7, severe: 3 },
+    neighbours: [
+      { exit_ref: "e_wild_n", seconds: 1200 },
+      { exit_ref: "e_wild_e", seconds: null },
+      { exit_ref: "e_wild_s", seconds: 0 },
+    ],
+    at_pace: { cautious: false, standard: false },
+    ...overrides,
+  });
+  // Null outside the wilderness, the exact object inside it.
+  assert.doesNotThrow(() => Protocol.validateStatusPanel(validStatusPanel({ travel_capacity: null })));
+  assert.doesNotThrow(() => Protocol.validateStatusPanel(validStatusPanel({ travel_capacity: capacity() })));
+  // The field is required: an absent capacity is not a v6 form.
+  const missing = validStatusPanel();
+  delete missing.travel_capacity;
+  assert.throws(() => Protocol.validateStatusPanel(missing));
+  const twelve = [];
+  for (let i = 0; i < Protocol.STATUS_TRAVEL_MAX_NEIGHBOURS; i++) twelve.push({ exit_ref: `x${i}`, seconds: i });
+  assert.doesNotThrow(() =>
+    Protocol.validateStatusPanel(validStatusPanel({ travel_capacity: capacity({ neighbours: twelve }) }))
+  );
+  const bad = [
+    capacity({ extra: 1 }),
+    capacity({ capacity: { normal: 1, light: 1, moderate: 1 } }),
+    capacity({ capacity: { normal: 1, light: 1, moderate: 1, severe: 1, forced_sleep: 0 } }),
+    capacity({ capacity: { normal: -1, light: 0, moderate: 0, severe: 0 } }),
+    capacity({ capacity: { normal: 1.5, light: 0, moderate: 0, severe: 0 } }),
+    capacity({ capacity: { normal: Number.MAX_SAFE_INTEGER + 1, light: 0, moderate: 0, severe: 0 } }),
+    capacity({ neighbours: [...twelve, { exit_ref: "x99", seconds: 1 }] }),
+    capacity({ neighbours: [{ exit_ref: "", seconds: 1 }] }),
+    capacity({ neighbours: [{ exit_ref: "東門", seconds: 1 }] }),
+    capacity({ neighbours: [{ exit_ref: "a b", seconds: 1 }] }),
+    capacity({ neighbours: [{ exit_ref: "x".repeat(65), seconds: 1 }] }),
+    capacity({ neighbours: [{ exit_ref: "x", seconds: 1 }, { exit_ref: "x", seconds: 2 }] }),
+    capacity({ neighbours: [{ exit_ref: "x", seconds: -1 }] }),
+    capacity({ neighbours: [{ exit_ref: "x", seconds: "60" }] }),
+    // A quote carries no destination facts of its own.
+    capacity({ neighbours: [{ exit_ref: "x", seconds: 1, destination: "wild:elosern:1:2" }] }),
+    capacity({ neighbours: [{ exit_ref: "x" }] }),
+    capacity({ at_pace: { cautious: false } }),
+    capacity({ at_pace: { cautious: false, standard: 0 } }),
+    capacity({ at_pace: { cautious: false, standard: false, forced: false } }),
+    [],
+    "none",
+  ];
+  bad.forEach((value) => {
+    assert.throws(() => Protocol.validateStatusPanel(validStatusPanel({ travel_capacity: value })));
+  });
 });
 
 test("validates exact ui_action_result envelopes", () => {

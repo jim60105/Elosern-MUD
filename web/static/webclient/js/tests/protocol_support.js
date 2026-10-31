@@ -100,7 +100,7 @@ function serverTime(overrides) {
 function validStatusPanel(overrides) {
   return deepMerge(
     {
-      schema_version: 5,
+      schema_version: 6,
       available: true,
       actor: {
         name: "影行者",
@@ -120,6 +120,7 @@ function validStatusPanel(overrides) {
       ],
       disguise_active: false,
       combat: null,
+      travel_capacity: null,
     },
     overrides
   );
@@ -128,7 +129,7 @@ function validStatusPanel(overrides) {
 function unavailableStatusPanel(overrides) {
   return deepMerge(
     {
-      schema_version: 5,
+      schema_version: 6,
       available: false,
       reason: { code: "presentation_unavailable", message: "目前無法顯示此介面" },
     },
