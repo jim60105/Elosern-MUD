@@ -1145,9 +1145,12 @@ describe("every map surface draws a shared map concept from its one glyph source
     const area = validateAreaMapPanel(wildernessWithCornerQuest());
     const host = document.createElement("div");
     document.body.appendChild(host);
-    // The widest zoom the map allows: the 周邊 stop's span at the zoom-out
-    // limit, on the 960 × 600 fallback frame.
-    const span = spanLimits(wildernessStops({ width: 960, height: 600 })).max;
+    // The glyph-in-cell contract holds up to the 周邊 stop zoomed out to its
+    // own limit on the 960 × 600 fallback frame; the 全區 overview of the
+    // 41-cell window intentionally lets the here-seal read larger than a
+    // cell (it marks the player on an overview).
+    const surroundings = wildernessStops({ width: 960, height: 600 }).filter((stop) => stop.key !== "window");
+    const span = spanLimits(surroundings).max;
     const here = area.nodes.find((n) => n.id === area.current_node);
     const view = { signature: viewSignature(area), cx: here.x / area.cell_km, cy: here.y / area.cell_km, span };
     const w = mount(AreaMapView, { props: { area, view }, attachTo: host });

@@ -18,12 +18,16 @@ import {
   DUNGEON_IDS,
   TOWN_IDS,
   WILD_GATE_ID,
+  WILD_QUEST_CELL,
+  WILD_REMEMBERED_CELL,
+  WILD_TRAIL_CELL,
   crowdedTownArea,
   dungeonArea,
   interiorArea,
   townArea,
   townFromEastArea,
   wildernessArea,
+  wildernessNightArea,
 } from "../../stories/fixtures/area_map.js";
 
 const { validateAreaMapPanel } = MapPanels;
@@ -61,7 +65,7 @@ async function select(w, id) {
 
 describe("area rendering uses truthful geometry and server fog", () => {
   it("every story fixture is a schema-valid area_map body", () => {
-    for (const body of [townArea(), crowdedTownArea(), townFromEastArea(), dungeonArea(), interiorArea(), wildernessArea(), wildernessArea({ cellKm: 2 })]) {
+    for (const body of [townArea(), crowdedTownArea(), townFromEastArea(), dungeonArea(), interiorArea(), wildernessArea(), wildernessArea({ cellKm: 2 }), wildernessNightArea()]) {
       expect(() => validateAreaMapPanel(body)).not.toThrow();
     }
   });
@@ -130,20 +134,71 @@ describe("area rendering uses truthful geometry and server fog", () => {
     expect(300 - 360 * k).toBeGreaterThanOrEqual(0);
   });
 
-  it("renders the 15 x 15 wilderness window in cells with the district", () => {
+  it("renders the revealed wilderness window over fog with the district and sight", async () => {
     const area = wildernessArea();
     const w = mountMap(area);
-    const nodes = w.findAll('[data-testid="area-map__node"]');
-    expect(nodes.length).toBe(area.nodes.length);
-    expect(area.nodes.length).toBe(225 - 5); // the pond is invalid ground
-    expect(w.findAll(".area-map__cell").length).toBe(area.nodes.length);
+    // The whole window (全區) puts every revealed cell on screen.
+    w.vm.showWhole();
+    await w.vm.$nextTick();
+    // Sparse nodes only: never one control per window cell.
+    expect(w.findAll('[data-testid="area-map__node"]').length).toBe(area.nodes.length);
+    // One terrain cell per revealed cell decoded from the runs; unknown
+    // runs draw nothing over the fog wash.
+    const revealed = area.rows.flat().filter((run) => run.kind === "terrain").reduce((sum, run) => sum + run.length, 0);
+    expect(w.findAll('[data-testid="area-map__terrain"]').length).toBe(revealed);
+    expect(revealed).toBeLessThan(41 * 41);
+    expect(w.find('[data-testid="area-map__window"]').exists()).toBe(true);
+    // The pond cell west of the player is revealed water.
+    const pond = w.findAll('[data-testid="area-map__terrain"]').find((c) => c.attributes("data-cell") === "96:200");
+    expect(pond.attributes("data-terrain")).toBe("water");
+    expect(pond.classes()).toContain("is-blocked");
+    // A cell outside every sight disc is never drawn.
+    expect(w.findAll('[data-testid="area-map__terrain"]').some((c) => c.attributes("data-cell") === "115:215")).toBe(false);
     expect(w.find('[data-testid="area-map__district"]').text()).toBe("灰鬃荒原東麓");
-    // Visited trail cells carry their own state.
-    expect(nodeEl(w, "wild:elosern:98:198").classes()).toContain("is-visited");
-    expect(nodeEl(w, "wild:elosern:105:205").classes()).toContain("is-seen");
+    expect(w.find('[data-testid="area-map__sight"]').text()).toContain("白晝 · 視野 4 格");
+    expect(w.find('[data-testid="area-map__threat"]').text()).toContain("視野內敵蹤 2");
+    expect(w.find('[data-testid="area-map__sight-ring"]').exists()).toBe(true);
     // The gate room replacing the north-east step names its far side.
     const gate = w.findAll('[data-testid="area-map__label"]').find((l) => l.attributes("data-label-for") === WILD_GATE_ID);
     expect(gate.text().replace(/\s+/g, "")).toBe("河岸碼頭通往灰岩鎮");
+  });
+
+  it("keeps a visited cell's visit styling and dims an identical reveal-only cell", () => {
+    // Two cells of identical revealed terrain; only one carries a visited node.
+    const area = wildernessArea();
+    const w = mountMap(area);
+    const cellEl = (x, y) => w.findAll('[data-testid="area-map__terrain"]').find((c) => c.attributes("data-cell") === `${x}:${y}`);
+    const trail = cellEl(WILD_TRAIL_CELL.x, WILD_TRAIL_CELL.y);
+    const remembered = cellEl(WILD_REMEMBERED_CELL.x, WILD_REMEMBERED_CELL.y);
+    expect(trail.attributes("data-terrain")).toBe(remembered.attributes("data-terrain"));
+    expect(trail.classes()).toContain("is-visited");
+    expect(remembered.classes()).toContain("is-remembered");
+    expect(Number(remembered.attributes("fill-opacity"))).toBeLessThan(Number(trail.attributes("fill-opacity")));
+    // The visited cell is its own node with the walked state; the reveal-only
+    // cell has no node at all.
+    expect(nodeEl(w, `wild:elosern:${WILD_TRAIL_CELL.x}:${WILD_TRAIL_CELL.y}`).classes()).toContain("is-visited");
+    expect(nodeEl(w, `wild:elosern:${WILD_REMEMBERED_CELL.x}:${WILD_REMEMBERED_CELL.y}`)).toBeUndefined();
+  });
+
+  it("draws only the server's live-sight entities and rim sightings", () => {
+    const day = mountMap(wildernessArea());
+    const kinds = day.findAll('[data-testid="area-map__entity"]').map((e) => e.attributes("data-kind"));
+    expect(kinds).toEqual(["hostile", "hostile", "npc"]);
+    const sightings = day.findAll('[data-testid="area-map__sighting"]');
+    expect(sightings.map((s) => s.attributes("data-bearing"))).toEqual(["北北東", "西", "東南"]);
+    expect(sightings[1].text()).toContain("孤立的瞭望台（風鳴丘）");
+    // North-north-east sits above the player, west to its left.
+    const here = nodePos(day, "wild:elosern:100:200");
+    const pos = (el) => {
+      const match = /translate\(([-\d.e]+) ([-\d.e]+)\)/.exec(el.find("g").attributes("transform"));
+      return { x: Number(match[1]), y: Number(match[2]) };
+    };
+    expect(pos(sightings[0]).y).toBeLessThan(here.y);
+    expect(pos(sightings[1]).x).toBeLessThan(here.x);
+    const night = mountMap(wildernessNightArea());
+    expect(night.findAll('[data-testid="area-map__entity"]')).toHaveLength(0);
+    expect(night.find('[data-testid="area-map__threat"]').exists()).toBe(false);
+    expect(night.find('[data-testid="area-map__sight"]').text()).toContain("夜晚 · 視野 1 格");
   });
 
   it("follows the panel's cell scale for wilderness distances", () => {
@@ -387,7 +442,8 @@ describe("area selection offers travel only for an authoritative adjacent exit",
     expect(wild.find('[data-testid="area-map-detail"]').text()).toContain("通往 灰岩鎮");
     await wild.find('[data-testid="area-map-detail__go"]').trigger("click");
     expect(wild.emitted("move")).toEqual([[{ exit_ref: "e_wild_ne", destination: WILD_GATE_ID, current_node: "wild:elosern:100:200" }]]);
-    await select(wild, "wild:elosern:104:204");
+    await select(wild, `wild:elosern:${WILD_QUEST_CELL.x}:${WILD_QUEST_CELL.y}`);
+    expect(wild.find('[data-testid="area-map-detail"]').text()).toContain("地形：丘陵");
     expect(wild.find('[data-testid="area-map-detail__go"]').exists()).toBe(false);
   });
 

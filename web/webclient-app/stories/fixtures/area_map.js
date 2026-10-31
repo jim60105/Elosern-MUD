@@ -43,7 +43,7 @@ const townNode = (id, label, x, y, visibility, extra = {}) => ({
 export function townArea(overrides = {}) {
   const T = TOWN_IDS;
   return {
-    schema_version: 1,
+    schema_version: 2,
     available: true,
     layer: "grid",
     map_id: TOWN,
@@ -149,7 +149,7 @@ const room = (id, label, visibility, extra = {}) => ({ id, label, visibility, ga
 export function dungeonArea(overrides = {}) {
   const D = DUNGEON_IDS;
   return {
-    schema_version: 1,
+    schema_version: 2,
     available: true,
     layer: "instance",
     map_id: "instance:41",
@@ -187,7 +187,7 @@ export function dungeonArea(overrides = {}) {
 
 export function interiorArea() {
   return {
-    schema_version: 1,
+    schema_version: 2,
     available: true,
     layer: "interior",
     map_id: "room:120",
@@ -215,20 +215,40 @@ export function interiorArea() {
 }
 
 // ---------------------------------------------------------------------------
-// Wilderness (cell-centre kilometres): the 15 x 15 window around cell
-// (100, 200). A pond west of the player is invalid ground (no cells), the
-// north-east step is the town's south gate room, two approach cells name the
-// town, and a short trail of visited cells leads in from the south-west.
+// Wilderness (schema 2, cell-centre kilometres): the 41 x 41 window around
+// cell (100, 200) in daylight with ground sight 4. The revealed ground is the
+// union of the sight discs along a short trail in from the south-west, one
+// lone old camp to the north-west and the current cell; everything else is
+// unknown. A river with one ford runs north of the player, a pond lies west,
+// a ridge wall and its mountain flank close the far west, woodland fills the
+// north-west, hills rise to the south-east, and the town's footprint stands
+// north-east. The north-east step is the town's south gate room; one approach
+// cell names the town. Two wolves and a traveller stand in live sight, and
+// three distant sightings sit beyond it.
 // ---------------------------------------------------------------------------
 
 export const WILD_CENTRE = { x: 100, y: 200 };
-const POND = new Set(["96:199", "96:200", "97:200", "96:201", "95:200"]);
-const TRAIL = new Set(["99:199", "98:198", "97:197", "97:196", "96:195", "95:195"]);
-const APPROACH = new Set(["102:202", "103:203"]);
 export const WILD_GATE_ID = gridId(TOWN, 400, 60);
-
-const wildId = (x, y) => `wild:elosern:${x}:${y}`;
-const DIRS = [
+export const WILD_QUEST_CELL = { x: 104, y: 197 };
+/** A revealed cell no node stands on (seen, never visited). */
+export const WILD_REMEMBERED_CELL = { x: 101, y: 196 };
+/** A visited trail cell with no step from the current cell. */
+export const WILD_TRAIL_CELL = { x: 97, y: 197 };
+const POND = new Set(["96:199", "96:200", "97:200", "96:201", "95:200"]);
+const FOOTPRINT = (x, y) => x >= 103 && x <= 105 && y >= 203 && y <= 205;
+const APPROACH = { x: 102, y: 202 };
+const WILD_VISITS = [
+  [100, 200, 4],
+  [99, 199, 4],
+  [98, 198, 4],
+  [97, 197, 3],
+  [97, 196, 3],
+  [96, 195, 2],
+  [95, 195, 2],
+  [104, 197, 2],
+  [89, 208, 3],
+];
+const WILD_STEPS = [
   ["n", 0, 1],
   ["ne", 1, 1],
   ["e", 1, 0],
@@ -239,38 +259,103 @@ const DIRS = [
   ["nw", -1, 1],
 ];
 
+const wildId = (x, y) => `wild:elosern:${x}:${y}`;
+
+function riverRow(x) {
+  return 203 + Math.round((x - 100) * 0.5);
+}
+
+/** The synthetic terrain facts of one cell (independent of reveal). */
+function wildTerrain(x, y) {
+  const noise = (x * 7 + y * 13) % 3;
+  let terrain = "open_ground";
+  let band = 2 + noise;
+  let tier = 0;
+  let ford = false;
+  if (x >= 108 && y <= 194) {
+    terrain = "sea";
+    band = 0;
+  } else if (FOOTPRINT(x, y)) {
+    terrain = "settlement";
+    band = 3;
+  } else if (x === 93 && y >= 194 && y <= 207) {
+    terrain = "ridge";
+    band = 12;
+  } else if (x <= 92) {
+    terrain = "mountain";
+    band = 9 + noise;
+    tier = noise === 2 ? 3 : 1;
+  } else if (POND.has(`${x}:${y}`) || (y === riverRow(x) && x !== 99)) {
+    terrain = "water";
+    band = 1;
+  } else if (y === riverRow(x) && x === 99) {
+    ford = true;
+    band = 1;
+  } else if (x <= 95 && y >= 197) {
+    terrain = "woodland";
+    band = 3 + (noise > 0 ? 1 : 0);
+  } else if (x >= 103 && y <= 198) {
+    terrain = "hills";
+    band = 5 + noise;
+    tier = (x + y) % 5 === 0 ? 2 : 1;
+  }
+  const passable = !["water", "ridge", "sea", "settlement"].includes(terrain);
+  return { terrain, passable, band, tier, road: false, ford };
+}
+
+function revealedAt(x, y) {
+  return WILD_VISITS.some(([vx, vy, r]) => (x - vx) ** 2 + (y - vy) ** 2 <= (r + 0.5) ** 2);
+}
+
+function wildRows(minX, minY) {
+  const rows = [];
+  for (let row = 0; row < 41; row += 1) {
+    const runs = [];
+    for (let col = 0; col < 41; col += 1) {
+      const x = minX + col;
+      const y = minY + row;
+      const run = revealedAt(x, y) ? { length: 1, kind: "terrain", ...wildTerrain(x, y) } : { length: 1, kind: "unknown" };
+      const last = runs[runs.length - 1];
+      const same = last && JSON.stringify({ ...last, length: 0 }) === JSON.stringify({ ...run, length: 0 });
+      if (same) last.length += 1;
+      else runs.push(run);
+    }
+    rows.push(runs);
+  }
+  return rows;
+}
+
 export function wildernessArea({ cellKm = 1 } = {}) {
   const { x: cx, y: cy } = WILD_CENTRE;
   const centre = (value) => (value + 0.5) * cellKm;
   const current = wildId(cx, cy);
   const cells = new Map();
-  for (let y = cy - 7; y <= cy + 7; y += 1) {
-    for (let x = cx - 7; x <= cx + 7; x += 1) {
-      const key = `${x}:${y}`;
-      if (POND.has(key)) continue;
-      const isCurrent = x === cx && y === cy;
-      const visited = isCurrent || TRAIL.has(key);
-      cells.set(key, {
-        id: wildId(x, y),
-        label: APPROACH.has(key) ? "灰岩鎮" : "灰鬃荒原",
-        x: centre(x),
-        y: centre(y),
-        visibility: isCurrent ? "current" : visited ? "visited" : "seen",
-        visited,
-        gateway: null,
-        action: null,
-      });
-    }
+  const node = (x, y, fields) => ({
+    id: wildId(x, y),
+    label: "灰鬃荒原",
+    x: centre(x),
+    y: centre(y),
+    visibility: "seen",
+    visited: false,
+    gateway: null,
+    action: null,
+    ...fields,
+  });
+  for (const [x, y] of WILD_VISITS) {
+    const isCurrent = x === cx && y === cy;
+    cells.set(`${x}:${y}`, node(x, y, { visibility: isCurrent ? "current" : "visited", visited: true }));
   }
+  cells.set(`${APPROACH.x}:${APPROACH.y}`, node(APPROACH.x, APPROACH.y, { label: "灰岩鎮" }));
   const edges = [];
-  for (const [dir, dx, dy] of DIRS) {
-    const key = `${cx + dx}:${cy + dy}`;
+  for (const [dir, dx, dy] of WILD_STEPS) {
+    const x = cx + dx;
+    const y = cy + dy;
     if (dir === "ne") {
-      cells.set(key, {
+      cells.set(`${x}:${y}`, {
         id: WILD_GATE_ID,
         label: "河岸碼頭",
-        x: centre(cx + dx),
-        y: centre(cy + dy),
+        x: centre(x),
+        y: centre(y),
         visibility: "seen",
         visited: false,
         gateway: { leads_to: "灰岩鎮" },
@@ -279,10 +364,11 @@ export function wildernessArea({ cellKm = 1 } = {}) {
       edges.push({ source: current, destination: WILD_GATE_ID });
       continue;
     }
-    const cell = cells.get(key);
-    if (!cell) continue;
-    cell.action = move(`e_wild_${dir}`, cell.id);
-    edges.push({ source: current, destination: cell.id });
+    if (!wildTerrain(x, y).passable) continue;
+    const existing = cells.get(`${x}:${y}`) ?? node(x, y, {});
+    existing.action = move(`e_wild_${dir}`, existing.id);
+    cells.set(`${x}:${y}`, existing);
+    edges.push({ source: current, destination: existing.id });
   }
   const nodes = [...cells.entries()]
     .sort(([a], [b]) => {
@@ -290,9 +376,11 @@ export function wildernessArea({ cellKm = 1 } = {}) {
       const [bx, by] = b.split(":").map(Number);
       return ay - by || ax - bx;
     })
-    .map(([, node]) => node);
+    .map(([, value]) => value);
+  const minX = cx - 20;
+  const minY = cy - 20;
   return {
-    schema_version: 1,
+    schema_version: 2,
     available: true,
     layer: "wilderness",
     map_id: "elosern",
@@ -302,9 +390,35 @@ export function wildernessArea({ cellKm = 1 } = {}) {
     nodes,
     edges,
     quest_markers: [
-      { id: "q_story_wolves", title: "驅離荒原狼群", tracked: true, destination: { kind: "node", node_id: wildId(cx + 4, cy - 3) } },
+      { id: "q_story_wolves", title: "驅離荒原狼群", tracked: true, destination: { kind: "node", node_id: wildId(WILD_QUEST_CELL.x, WILD_QUEST_CELL.y) } },
     ],
     district_name: "灰鬃荒原東麓",
     cell_km: cellKm,
+    window: { min_x: minX, min_y: minY, width: 41, height: 41 },
+    rows: wildRows(minX, minY),
+    light_phase: "day",
+    ground_radius: 4,
+    entities: [
+      { id: "a1b2c3d4e5f60718", cell: { x: 102, y: 198 }, kind: "hostile", hostile: true, label: "荒原狼" },
+      { id: "b2c3d4e5f6071829", cell: { x: 103, y: 199 }, kind: "hostile", hostile: true, label: "荒原狼" },
+      { id: "c3d4e5f60718293a", cell: { x: 101, y: 197 }, kind: "npc", hostile: false, label: "行腳商人" },
+    ],
+    sightings: [
+      { bearing: "北北東", distance_km: 25, silhouette_zh: "一座石塔", name: null },
+      { bearing: "西", distance_km: 15, silhouette_zh: "孤立的瞭望台", name: "風鳴丘" },
+      { bearing: "東南", distance_km: 40, silhouette_zh: "地平線上的城牆與高塔", name: null },
+    ],
+  };
+}
+
+/** The same window at night: ground sight shrinks and only lights carry. */
+export function wildernessNightArea() {
+  const area = wildernessArea();
+  return {
+    ...area,
+    light_phase: "night",
+    ground_radius: 1,
+    entities: area.entities.filter((e) => (e.cell.x - 100) ** 2 + (e.cell.y - 200) ** 2 <= 1.5 ** 2),
+    sightings: [{ bearing: "東南", distance_km: 40, silhouette_zh: "地平線上連成一片的城鎮燈火", name: null }],
   };
 }

@@ -13,8 +13,10 @@ import { DEFAULT_MARGIN_PX, createStop, fitBounds, orderedStops } from "@elosern
 export const WORLD_COUNTRY_SPAN_KM = 800;
 export const WORLD_DISTRICT_SPAN_KM = 200;
 export const WORLD_NEARBY_SPAN_KM = 40;
-/** Wilderness surroundings stop: the provider's 15 x 15 cell window. */
-export const WILDERNESS_WINDOW_CELLS = 15;
+/** Wilderness whole stop: the published 41 x 41 cell window. */
+export const WILDERNESS_WINDOW_CELLS = 41;
+/** Wilderness surroundings stop: a 15-cell neighbourhood. */
+export const WILDERNESS_SURROUNDINGS_CELLS = 15;
 /** Wilderness nearby stop: the eight neighbours plus one ring of context. */
 export const WILDERNESS_NEARBY_CELLS = 5;
 /** Floor for the settlement nearby stop so a lone node never zooms forever. */
@@ -57,10 +59,11 @@ function cellWindow(cells) {
   return { minX: -half, minY: -half, maxX: half, maxY: half };
 }
 
-/** Wilderness stops in cell units: 周邊 (the 15-cell window) and 近處. */
+/** Wilderness stops in cell units: 全區 (the 41-cell window), 周邊 and 近處. */
 export function wildernessStops(frame, { marginPx = DEFAULT_MARGIN_PX } = {}) {
   return orderedStops([
-    createStop("surroundings", "周邊", fitBounds(cellWindow(WILDERNESS_WINDOW_CELLS), frame, { marginPx }).span),
+    createStop("window", "全區", fitBounds(cellWindow(WILDERNESS_WINDOW_CELLS), frame, { marginPx }).span),
+    createStop("surroundings", "周邊", fitBounds(cellWindow(WILDERNESS_SURROUNDINGS_CELLS), frame, { marginPx }).span),
     createStop("nearby", "近處", fitBounds(cellWindow(WILDERNESS_NEARBY_CELLS), frame, { marginPx }).span),
   ]);
 }

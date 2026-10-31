@@ -8,9 +8,12 @@
 // this game's map: which layers exist, the server's fog and current node, the
 // quest markers, the travel descriptors and the Traditional Chinese reading.
 //
-// Input is a validated `area_map` v1 body (protocol/panels/map_panels.js
+// Input is a validated `area_map` v2 body (protocol/panels/map_panels.js
 // validateAreaMapPanel). Nothing here invents a node, an edge, a coordinate
-// or a travel action: every drawn fact comes from the payload.
+// or a travel action: every drawn fact comes from the payload. The wilderness
+// window's run-length rows decode into ephemeral display cells
+// (`decodeWindow`); sight, eligibility, routes and the clock stay the
+// server's, so nothing here derives them.
 //
 // Units per layer
 //   grid        map units are the payload's integer metres (UNITS.m)
@@ -163,6 +166,11 @@ export function openingView(area, placed, frame, stops = areaStops(area, placed,
   const here = currentPlaced(area, placed);
   const nearest = stops[stops.length - 1].span;
   let floor = area.layer === "grid" ? Math.min(nearest, MIN_NEARBY_SPAN_M) : nearest;
+  if (area.layer === "wilderness") {
+    // The revealed neighbourhood is the point of the wilderness view: open
+    // on the 周邊 stop rather than the eight-neighbour close-up.
+    floor = stops.find((stop) => stop.key === "surroundings")?.span ?? nearest;
+  }
   if (isRadialLayer(area)) {
     // Radial units carry no distance, so zooming in past the room graph buys
     // no detail: the opening still centres on the current room and fits its
@@ -177,13 +185,18 @@ export function openingView(area, placed, frame, stops = areaStops(area, placed,
   return Object.freeze({ signature: viewSignature(area), cx: view.cx, cy: view.cy, span: view.span });
 }
 
-/** The whole known area at one uniform scale. */
+/** The cell-unit bounds of the wilderness window. */
+export function windowBounds(area) {
+  const { min_x: x, min_y: y, width, height } = area.window;
+  return { minX: x, minY: y, maxX: x + width, maxY: y + height };
+}
+
+/** The whole known area at one uniform scale (the full window in the wilderness). */
 export function wholeView(area, placed, frame, rect = null) {
   const stops = areaStops(area, placed, frame);
-  const bounds = boundsOfPoints(placed);
-  const pad = area.layer === "wilderness" ? 0.5 : 0;
+  const bounds = area.layer === "wilderness" ? windowBounds(area) : boundsOfPoints(placed);
   const fitted = fitBounds(
-    { minX: bounds.minX - pad, minY: bounds.minY - pad, maxX: bounds.maxX + pad, maxY: bounds.maxY + pad },
+    bounds,
     frame,
     { rect, marginPx: OPENING_MARGIN_PX, minSpan: stops[stops.length - 1].span },
   );
@@ -215,6 +228,138 @@ export function compassWord(dx, dy) {
 }
 
 const STATE_TEXT = { current: "你在這裡", visited: "到過", seen: "看過，尚未到訪" };
+
+/** Traditional Chinese names of the wire terrain classes. */
+export const TERRAIN_NAMES = Object.freeze({
+  open_ground: "曠野",
+  hills: "丘陵",
+  mountain: "山地",
+  woodland: "林地",
+  water: "河川",
+  ridge: "山脊",
+  sea: "海域",
+  settlement: "聚落",
+});
+
+/** Traditional Chinese names of the light phases. */
+export const LIGHT_PHASE_NAMES = Object.freeze({ day: "白晝", dusk: "黃昏", night: "夜晚", dawn: "黎明" });
+
+/** The sixteen sighting compass words, north first and clockwise. */
+export const SIGHTING_BEARINGS = Object.freeze([
+  "北", "北北東", "東北", "東北東", "東", "東南東", "東南", "南南東",
+  "南", "南南西", "西南", "西南西", "西", "西北西", "西北", "北北西",
+]);
+
+// ── the wilderness window ───────────────────────────────────────────────
+
+const windowCache = new WeakMap();
+
+/**
+ * The revealed cells of a wilderness window as ephemeral display cells, in
+ * row order: `{ key, x, y, terrain, passable, band, tier, road, ford, state }`
+ * with cell-unit `x`/`y` (the cell spans [x, x+1)). Unknown runs yield no
+ * cell. `state` is "current", "visited" (the cell carries a visited node:
+ * the server's actual visit record) or "remembered" (revealed without a
+ * visit). Empty for other layers.
+ */
+export function decodeWindow(area) {
+  if (area?.layer !== "wilderness" || !area.window) return Object.freeze([]);
+  const cached = windowCache.get(area);
+  if (cached) return cached;
+  const visited = new Set();
+  let current = null;
+  for (const node of area.nodes) {
+    if (!node.id.startsWith("wild:")) continue;
+    const key = `${Math.floor(node.x / area.cell_km)}:${Math.floor(node.y / area.cell_km)}`;
+    if (node.id === area.current_node) current = key;
+    else if (node.visited) visited.add(key);
+  }
+  const cells = [];
+  area.rows.forEach((runs, row) => {
+    let column = 0;
+    for (const run of runs) {
+      if (run.kind === "terrain") {
+        for (let offset = 0; offset < run.length; offset += 1) {
+          const x = area.window.min_x + column + offset;
+          const y = area.window.min_y + row;
+          const key = `${x}:${y}`;
+          cells.push(
+            Object.freeze({
+              key,
+              x,
+              y,
+              terrain: run.terrain,
+              passable: run.passable,
+              band: run.band,
+              tier: run.tier,
+              road: run.road,
+              ford: run.ford,
+              state: key === current ? "current" : visited.has(key) ? "visited" : "remembered",
+            }),
+          );
+        }
+      }
+      column += run.length;
+    }
+  });
+  const out = Object.freeze(cells);
+  windowCache.set(area, out);
+  return out;
+}
+
+/** The display cell under one placed node, or null. */
+export function cellUnder(area, entry) {
+  const key = `${Math.floor(entry.x)}:${Math.floor(entry.y)}`;
+  return decodeWindow(area).find((cell) => cell.key === key) ?? null;
+}
+
+/** Live-sight entities at their cell centres, in payload order. */
+export function entityMarks(area) {
+  if (area?.layer !== "wilderness") return [];
+  return area.entities.map((entity) => ({
+    id: entity.id,
+    x: entity.cell.x + 0.5,
+    y: entity.cell.y + 0.5,
+    kind: entity.kind,
+    hostile: entity.hostile,
+    label: entity.label,
+  }));
+}
+
+/**
+ * Distant sightings with the screen bearing of their compass word: `angle`
+ * is radians clockwise from north (the word's sector centre). The text is
+ * the server's: bearing word, rounded distance, silhouette and an optional
+ * district landmark name.
+ */
+export function sightingMarks(area) {
+  if (area?.layer !== "wilderness") return [];
+  return area.sightings.map((sighting, index) => {
+    const sector = SIGHTING_BEARINGS.indexOf(sighting.bearing);
+    return {
+      key: `${index}:${sighting.bearing}`,
+      angle: (sector * 22.5 * Math.PI) / 180,
+      bearing: sighting.bearing,
+      head: `${sighting.bearing} · 約 ${sighting.distance_km} km`,
+      body: sighting.name ? `${sighting.silhouette_zh}（${sighting.name}）` : sighting.silhouette_zh,
+    };
+  });
+}
+
+/** The legend line for the window's light and sight: e.g. `白晝 · 視野 4 格`. */
+export function sightCaption(area) {
+  if (area?.layer !== "wilderness") return "";
+  return `${LIGHT_PHASE_NAMES[area.light_phase] ?? area.light_phase} · 視野 ${area.ground_radius} 格`;
+}
+
+/** The terrain reading of one display cell. */
+export function terrainLine(cell) {
+  const parts = [TERRAIN_NAMES[cell.terrain] ?? cell.terrain];
+  if (cell.ford) parts.push("淺灘");
+  parts.push(`海拔第 ${cell.band} 階`);
+  if (!cell.passable) parts.push("無法通行");
+  return `地形：${parts.join(" · ")}`;
+}
 
 export function leadsToOf(node) {
   const value = node?.gateway?.leads_to;
@@ -257,8 +402,13 @@ export function nodeDetail(area, placed, nodeId) {
     const rounded = metres >= 1000 ? Math.round(metres / 100) * 100 : Math.max(10, Math.round(metres / 10) * 10);
     lines.push(`${compassWord(dx, dy)}方 · 直線約 ${formatDistance(rounded)}`);
   }
-  if (area.layer === "wilderness" && node.id === area.current_node) {
-    lines.push(`所在分區：${area.district_name}`);
+  if (area.layer === "wilderness") {
+    const cell = node.id.startsWith("wild:") ? cellUnder(area, entry) : null;
+    if (cell) lines.push(terrainLine(cell));
+    if (node.id === area.current_node) {
+      lines.push(`所在分區：${area.district_name}`);
+      lines.push(sightCaption(area));
+    }
   }
   const quests = area.quest_markers
     .filter((marker) => marker.destination.kind === "node" && marker.destination.node_id === node.id)

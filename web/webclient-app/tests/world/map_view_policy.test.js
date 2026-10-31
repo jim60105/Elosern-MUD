@@ -335,19 +335,21 @@ describe("map zoom stops and fit follow scope and aspect ratio", () => {
     expect(tiny).toEqual([{ key: "whole", label: "全城", span: MIN_NEARBY_SPAN_M }]);
   });
 
-  it("uses the 15-cell window and a nearby stop for the wilderness", () => {
+  it("uses the 41-cell window, a 15-cell surroundings and a nearby stop for the wilderness", () => {
     const stops = wildernessStops(FRAME);
-    expect(stops.map((s) => s.label)).toEqual(["周邊", "近處"]);
-    // Height-limited: 15 cells into 552 px -> span 1000 * 15 / 552 cells.
-    close(stops[0].span, 1000 * 15 / 552);
-    close(stops[1].span, 1000 * 5 / 552);
-    // The whole 15 x 15 window is visible around the player's cell centre.
+    expect(stops.map((s) => s.label)).toEqual(["全區", "周邊", "近處"]);
+    // Height-limited: n cells into 552 px -> span 1000 * n / 552 cells.
+    close(stops[0].span, 1000 * 41 / 552);
+    close(stops[1].span, 1000 * 15 / 552);
+    close(stops[2].span, 1000 * 5 / 552);
+    // The whole 41 x 41 window is visible around the player's cell centre.
     const view = { cx: 100.5, cy: 200.5, span: stops[0].span };
-    const top = cellRect(view, FRAME, 100 + 7, 200 + 7);
-    const bottom = cellRect(view, FRAME, 100 - 7, 200 - 7);
+    const top = cellRect(view, FRAME, 100 + 20, 200 + 20);
+    const bottom = cellRect(view, FRAME, 100 - 20, 200 - 20);
     expect(top.top).toBeGreaterThanOrEqual(24 - EPS);
     expect(bottom.bottom).toBeLessThanOrEqual(576 + EPS);
   });
+
 
   it("jumps between stops with plus/minus and caps the continuous wheel", () => {
     const stops = worldStops(CONTINENT, { width: 1600, height: 600 });

@@ -9,11 +9,12 @@ import {
   interiorArea,
   townArea,
   wildernessArea,
+  wildernessNightArea,
 } from "../fixtures/area_map.js";
 import { atFullHd, atReference, windowViewportParameters } from "../window-viewports.js";
 
 // AreaMapView (render-area-map-view): the real area-tab renderer over
-// synthetic, schema-valid `area_map` v1 bodies (the Vitest suite validates
+// synthetic, schema-valid `area_map` v2 bodies (the Vitest suite validates
 // every fixture with the wire validator). The frame stands in for the map
 // drawer's body at the 1451x790 reference; the drawer header, pill, quest
 // dropdown and edge pointers belong to the later MapDrawer change. Each
@@ -239,17 +240,23 @@ export const CrowdedNames = {
   },
 };
 
-// The wilderness neighbourhood: the 15 x 15 window in cells (a pond is
-// invalid ground), the trail of visited cells, the eight steps outlined, the
-// town gate replacing the north-east step, and the current district.
+// The wilderness neighbourhood (schema 2): the revealed ground of a short
+// trail and a lone old camp decoded from the run-length rows over the fog of
+// the 41 x 41 window, walked cells brighter than remembered ones, the
+// daylight sight ring with two wolves and a traveller inside it, distant
+// sightings on the frame rim, the town gate replacing the north-east step,
+// and the district with its light and sight caption.
 export const Wilderness = {
   render,
   args: { area: wildernessArea() },
   ...atReference,
   play: async ({ canvasElement }) => {
     await frames(3);
-    const cells = canvasElement.querySelectorAll(".area-map__cell").length;
-    if (cells !== 220) fail("Wilderness", `expected 220 cells, got ${cells}`);
+    const nodes = canvasElement.querySelectorAll('[data-testid="area-map__node"]').length;
+    if (nodes !== wildernessArea().nodes.length) fail("Wilderness", `expected sparse nodes, got ${nodes}`);
+    if (!canvasElement.querySelector('[data-testid="area-map__terrain"].is-remembered')) fail("Wilderness", "remembered ground must be drawn");
+    if (canvasElement.querySelectorAll('[data-testid="area-map__entity"]').length !== 3) fail("Wilderness", "three live-sight entities");
+    if (canvasElement.querySelectorAll('[data-testid="area-map__sighting"]').length !== 3) fail("Wilderness", "three distant sightings");
     if (canvasElement.querySelector('[data-testid="area-map__district"]')?.textContent !== "灰鬃荒原東麓") {
       fail("Wilderness", "the current district must be shown");
     }
@@ -257,6 +264,33 @@ export const Wilderness = {
     assertLabelsLegible(canvasElement, "Wilderness");
     await clickNode(canvasElement, WILD_GATE_ID);
     if (!canvasElement.querySelector('[data-testid="area-map-detail__go"]')) fail("Wilderness", "the gate step must offer 前往");
+  },
+};
+
+// The same window at 1920 x 1080: the 16px label floor and the rim
+// sightings hold at the wide reference.
+export const WildernessWide = {
+  render,
+  args: { area: wildernessArea() },
+  ...atFullHd,
+  play: async ({ canvasElement }) => {
+    await frames(3);
+    assertLabelsLegible(canvasElement, "WildernessWide");
+  },
+};
+
+// Night: ground sight shrinks to one cell, no entity stands in it and only a
+// town's lights carry over the horizon; the revealed ground stays revealed.
+export const WildernessNight = {
+  render,
+  args: { area: wildernessNightArea() },
+  ...atReference,
+  play: async ({ canvasElement }) => {
+    await frames(3);
+    if (canvasElement.querySelector('[data-testid="area-map__entity"]')) fail("WildernessNight", "no entity stands in night sight");
+    if (!canvasElement.querySelector('[data-testid="area-map__sight"]')?.textContent.includes("夜晚 · 視野 1 格")) {
+      fail("WildernessNight", "the caption states the night sight");
+    }
   },
 };
 
