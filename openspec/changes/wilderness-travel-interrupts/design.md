@@ -62,6 +62,27 @@ Sync is expected to generate the two new IDs with no uncovered requirement and
 no waiver; the matching-table membership of the listed tests is the reviewed
 per-requirement mapping.
 
+### Post-implementation review dispositions
+
+One blocking post-implementation critique ran over the final diff, tests and
+docs. Its blocking finding and both non-blocking findings were adopted:
+
+- Blocking: the destination cell/location resolution in `capture_after` sat
+  outside the collector's guard, so a coordinate-read failure could escape a
+  committed move into `move_failed`. The setup now runs inside the guarded
+  capture, and `test_an_after_capture_setup_failure_never_fails_the_committed_move`
+  proves the committed relocation, charge, empty interrupt list and
+  `travel_interrupts_failed` event survive it.
+- Non-blocking: `distant_markers` consumed the lighting iterable before the
+  canopy short circuit and sight-input validation. The markers now answer
+  before consuming lighting when nothing is visible, restoring the previous
+  order; `test_marker_validation_and_the_canopy_short_circuit_precede_lighting`
+  pins both orders.
+- Non-blocking: a before-capture failure logged tick zero. The collector now
+  records the correlation tick before the rest of the read;
+  `test_a_before_capture_failure_reports_the_current_tick` asserts the real
+  world tick.
+
 ## Risks / Trade-offs
 
 [Read side effects] -> Pure projections and object/Attribute/clock snapshots in integration tests. [Shared files] -> Serialize shard-manifest, schema and documentation changes even when roots are independent. [Data echo tests] -> Assert mechanics on synthetic fixtures and treat visual review separately. No new permanent lighting or walking state is allowed.

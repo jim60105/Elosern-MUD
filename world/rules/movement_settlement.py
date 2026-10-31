@@ -284,8 +284,13 @@ class MovementObservation:
     ) -> None:
         """Freeze the facts of the position being left, before any write."""
         from world.rules import travel_interrupts
+        from world.rules.clock import read_world_clock
 
         try:
+            # Record the correlation tick before the rest of the read, so a
+            # later capture failure still reports the real world time.
+            clock = read_world_clock()
+            self._tick = 0 if clock is None else int(clock.tick)
             self._members = travel_interrupts._source_present_members(
                 actor, source_location, wilderness_source_coordinates
             )
@@ -306,15 +311,17 @@ class MovementObservation:
         """Compare the committed destination facts with the frozen source facts."""
         from world.rules import travel_interrupts
 
-        location = getattr(actor, "location", None)
-        cell = travel_interrupts.wilderness_cell(location)
-        if cell is None:
-            return
-        self.wilderness = True
-        if self.before is None:
-            # The source capture already reported its failure.
-            return
         try:
+            # The setup is part of the capture: a destination-coordinate read
+            # failure must never escape a committed move.
+            location = getattr(actor, "location", None)
+            cell = travel_interrupts.wilderness_cell(location)
+            if cell is None:
+                return
+            self.wilderness = True
+            if self.before is None:
+                # The source capture already reported its failure.
+                return
             after = travel_interrupts.read_movement_facts(
                 actor,
                 location,

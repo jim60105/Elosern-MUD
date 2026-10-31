@@ -827,17 +827,22 @@ def distant_markers(
     stored or lit by reading.
     """
 
-    lit = frozenset(lit_districts)
-    names = {} if district_names is None else district_names
-    markers: list[tuple[tuple[int, int], str, dict[str, Any]]] = []
-    for source, silhouette, distance_km in visible_distant_sources(
+    visible = visible_distant_sources(
         observer,
         calendar,
         sources,
         inputs=inputs,
         cell_size_km=cell_size_km,
         policy=policy,
-    ):
+    )
+    if not visible:
+        # The canopy short circuit (and an observation with no visible source)
+        # answers before the caller's lighting iterable is consumed.
+        return ()
+    lit = frozenset(lit_districts)
+    names = {} if district_names is None else district_names
+    markers: list[tuple[tuple[int, int], str, dict[str, Any]]] = []
+    for source, silhouette, distance_km in visible:
         name = None
         if source.district_key is not None and source.district_key in lit:
             name = names.get(source.district_key)

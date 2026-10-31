@@ -833,6 +833,48 @@ class WildernessMoveInterruptTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(before.cell, first)
         self.assertEqual(after.cell, second)
 
+    def test_an_after_capture_setup_failure_never_fails_the_committed_move(self):
+        import world.rules.movement_settlement as settlement
+
+        self._enter()
+        exit_obj, _cell = self._step()
+        before = get_world_clock().tick
+        with patch(
+            "world.rules.travel_interrupts.wilderness_cell",
+            side_effect=RuntimeError("synthetic destination-cell failure"),
+        ), patch.object(settlement, "log_warn") as log_warn:
+            result = self._move(self._step_payload(exit_obj))
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(result["data"], {"interrupts": []})
+        self.assertGreater(
+            get_world_clock().tick,
+            before,
+            "the committed step must keep its charge",
+        )
+        events = [call.args[0] for call in log_warn.call_args_list]
+        self.assertIn("travel_interrupts_failed", events)
+
+    def test_a_before_capture_failure_reports_the_current_tick(self):
+        import world.rules.movement_settlement as settlement
+
+        self._enter()
+        exit_obj, _cell = self._step()
+        tick_before = get_world_clock().tick
+        with patch(
+            "world.rules.travel_interrupts.read_movement_facts",
+            side_effect=RuntimeError("synthetic source capture failure"),
+        ), patch.object(settlement, "log_warn") as log_warn:
+            result = self._move(self._step_payload(exit_obj))
+        self.assertEqual(result["outcome"], "success")
+        failures = [
+            call.kwargs["context"]
+            for call in log_warn.call_args_list
+            if call.args and call.args[0] == "travel_interrupts_failed"
+        ]
+        self.assertTrue(failures)
+        self.assertEqual(failures[0]["tick"], tick_before)
+        self.assertEqual(failures[0]["step"], "before")
+
     def test_initial_pace_state_matches_move_interrupt(self):
         from world.rules.fatigue import FatigueStage, get_policy
         from world.rules.tests.test_travel_plan import _STAGE_RESERVES
