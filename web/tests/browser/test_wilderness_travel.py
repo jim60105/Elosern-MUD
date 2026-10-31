@@ -1388,7 +1388,7 @@ class TravelPlanningTests(_TravelStage):
             self.assertTrue(intent.inner_text().strip())
             described = page.locator('[data-testid="travel-map"]').get_attribute("aria-describedby")
             self.assertTrue(described)
-            self.assertTrue(page.locator("#" + described).inner_text().strip())
+            self.assertTrue(page.evaluate("(id) => document.getElementById(id).textContent.trim()", described))
             # No route walk exists yet: 出發 stays disabled with its reason.
             depart = page.locator('[data-testid="leg-depart"]')
             self.assertEqual(depart.get_attribute("aria-disabled"), "true")
