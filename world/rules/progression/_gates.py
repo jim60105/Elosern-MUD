@@ -13,6 +13,7 @@ from world.skills.registry import (
     SKILL_REGISTRY,
     SkillCategory,
     SkillDef,
+    SkillKind,
     SkillPrerequisite,
     prerequisite_consumers,
 )
@@ -58,6 +59,102 @@ def _race_learning_multiplier(entity: Any) -> float:
     return float(race.learning_multiplier) if race is not None else 1.0
 
 
+def is_elemental_mastery(skill: SkillDef) -> bool:
+    """Return whether ``skill`` belongs to the elemental-mastery family.
+
+    The family is the taxonomy itself — a PASSIVE of
+    ``SkillCategory.ELEMENTAL_MAGIC`` — not a key suffix, an effect marker or
+    a declared element. Every shipped mastery is one (all eight carry the
+    category), and synthetic fixtures build mastery rows from an elementless
+    enhancement template, so a key- or element-based test would silently fail
+    open for them. A future non-mastery PASSIVE cannot join the category
+    without receiving the whole-tree gate, which is the intended contract.
+    """
+    return (
+        skill.kind is SkillKind.PASSIVE
+        and skill.category is SkillCategory.ELEMENTAL_MAGIC
+    )
+
+
+def mastery_prerequisites_met(
+    entity: Any,
+    skill: SkillDef,
+    *,
+    owned_keys: Any = None,
+) -> bool:
+    """Return whether ``skill``'s whole declared closure is lawfully held.
+
+    The ONE closure query shared by the use gate and by acquisition (design
+    D2). Pure and side-effect free: it never repairs ownership or practice XP
+    and never substitutes a conferred grant for a direct one. The target must
+    be the live registered elemental-mastery definition, declare a nonempty
+    prerequisite list, and pass identity/effect eligibility itself — ownership
+    of the target is deliberately NOT required, because acquisition asks this
+    before granting it.
+
+    Every ancestor reached through the declared edges must be registered,
+    identity/effect eligible, directly owned, and at or above the edge's
+    declared proficiency level. A local visited set keeps a shared ancestor
+    from being re-traversed, and an unknown key fails closed.
+    """
+    if not is_elemental_mastery(skill) or not skill.prerequisites:
+        return False
+    registered = SKILL_REGISTRY.get(skill.key)
+    if registered is None:
+        return False
+    if not skill_identity_eligible(entity, skill) or not skill_effect_allowed(
+        entity, skill.key
+    ):
+        return False
+    owned = entity.skills.owned_keys() if owned_keys is None else owned_keys
+    visited: set[str] = set()
+    stack = [registered]
+    while stack:
+        for edge in stack.pop().prerequisites:
+            ancestor = SKILL_REGISTRY.get(edge.skill_key)
+            if ancestor is None:
+                return False
+            if not skill_identity_eligible(
+                entity, ancestor
+            ) or not skill_effect_allowed(entity, ancestor.key):
+                return False
+            if edge.skill_key not in owned:
+                return False
+            if skill_proficiency_level(entity, edge.skill_key) < edge.min_proficiency:
+                return False
+            if edge.skill_key not in visited:
+                visited.add(edge.skill_key)
+                stack.append(ancestor)
+    return True
+
+
+def _missing_closure_edge(
+    entity: Any, skill: SkillDef, owned: Any
+) -> SkillPrerequisite | None:
+    """First unmet ownership/XP edge of a mastery's closure, or ``None``.
+
+    Declared-edge breadth-first order, so the reported edge is deterministic
+    and a low INTERNAL ancestor (not only a direct mastery parent) can be
+    named. Eligibility-only failures have no numeric edge to report and yield
+    ``None``; the callers that render a reason own that distinction.
+    """
+    visited: set[str] = set()
+    queue = [skill]
+    while queue:
+        for edge in queue.pop(0).prerequisites:
+            if edge.skill_key not in owned:
+                return edge
+            if skill_proficiency_level(entity, edge.skill_key) < edge.min_proficiency:
+                return edge
+            if edge.skill_key in visited:
+                continue
+            visited.add(edge.skill_key)
+            ancestor = SKILL_REGISTRY.get(edge.skill_key)
+            if ancestor is not None:
+                queue.append(ancestor)
+    return None
+
+
 def can_use_skill(
     entity: Any,
     skill: SkillDef,
@@ -73,6 +170,13 @@ def can_use_skill(
     is simply every edge on the path into that node (AND semantics). MP
     affordability and every other check stay in the resolver; this answers
     lineage eligibility only.
+
+    An elemental-mastery passive additionally requires its COMPLETE closure
+    (``mastery_prerequisites_met``). Its declared edges name ordinary
+    terminals, so the immediate-edge loop above cannot see an internal edge
+    left unmet by explicit imported XP; the recursive query is what denies a
+    bare key, a restricted ancestor and a low internal ancestor. Ordinary
+    skills keep exactly their previous behaviour.
     """
     owned = entity.skills.owned_keys() if owned_keys is None else owned_keys
     if (
@@ -86,6 +190,10 @@ def can_use_skill(
             return False
         if skill_proficiency_level(entity, prereq.skill_key) < prereq.min_proficiency:
             return False
+    if is_elemental_mastery(skill) and not mastery_prerequisites_met(
+        entity, skill, owned_keys=owned
+    ):
+        return False
     return True
 
 
@@ -100,8 +208,15 @@ def missing_prerequisite(
     Reports in declared edge order so rejection text is deterministic. The
     caller owns the ownership check for the skill itself; this only walks the
     prerequisite list (an already-usable skill yields ``None``).
+
+    An elemental-mastery passive walks its whole declared closure instead, so
+    a low internal ancestor can be named rather than only a direct parent;
+    ``None`` therefore means "no numeric edge is unmet", which is not the same
+    as "usable" (an ineligible or sealed ancestor also yields ``None``).
     """
     owned = entity.skills.owned_keys() if owned_keys is None else owned_keys
+    if is_elemental_mastery(skill) and skill.prerequisites:
+        return _missing_closure_edge(entity, skill, owned)
     for prereq in skill.prerequisites:
         if prereq.skill_key not in owned:
             return prereq

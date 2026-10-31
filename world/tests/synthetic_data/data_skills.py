@@ -125,6 +125,12 @@ SYNTH_SKILLS: dict[str, SkillDef] = {
         effects=[],
         category=SkillCategory.ELEMENTAL_MAGIC,
         group=SYNTH_GLOWMIRE_ELEMENT.key,
+        # The whole-tree closure the production masteries declare, in kit
+        # form: every ordinary ACTIVE row of the element at the proficiency
+        # tip cap. `t_glowmire_bloom` is that element's only ordinary
+        # branch, and adding the Lv.10 consumer leaves its derived cap at the
+        # global tip cap (it had no consumer before).
+        prerequisites=(SkillPrerequisite("t_glowmire_bloom", 10),),
     ),
     "t_glowmire_bloom": SkillDef(
         key="t_glowmire_bloom",

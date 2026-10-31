@@ -29,7 +29,7 @@ Define the pure skill-lineage read model and its user surfaces: the bounded vers
 
 #### Scenario: Consumed means every node capped
 - **WHEN** a graph view is built
-- **THEN** `consumed` SHALL be true exactly when every node of that graph is capped
+- **THEN** `consumed` is true exactly when every ACTIVE node is owned, usable and XP-capped, and every PASSIVE node is owned and usable without needing passive XP
 
 #### Scenario: Meter is shallowest-uncapped progress
 - **WHEN** a graph view is built
@@ -52,7 +52,7 @@ Define the pure skill-lineage read model and its user surfaces: the bounded vers
 - **THEN** the ice graph carries exactly one edge from 冰錐術 to 冰槍 with `min_level == 3`, and a two-parent merge node carries one edge per parent
 
 #### Scenario: Ready marks an unowned node whose prerequisites are met
-- **WHEN** a node is not owned and every prerequisite edge's minimum level is met
+- **WHEN** an identity/effect-eligible node is unowned and its directly owned prerequisites meet every edge, including the full lawful closure for an elemental mastery
 - **THEN** the node carries `ready == True`, and no owned node is ever ready
 
 #### Scenario: Valid synthetic installed and grafted lineage reaches both consumers
@@ -62,6 +62,14 @@ Define the pure skill-lineage read model and its user surfaces: the bounded vers
 #### Scenario: Valid merge graphs are distinguished from malformed cycles
 - **WHEN** lineage consumers read a valid branching graph with a two-parent merge, and separately encounter malformed or cyclic source data
 - **THEN** the valid graph remains readable with consistent prerequisite edges and counts, while invalid sources retain safe refusal or unavailable responses without fabricated nodes or query-time repair
+
+#### Scenario: A usable passive completes without passive practice
+- **WHEN** a synthetic mastery is directly owned and usable at its genuine unpractised level
+- **THEN** its node is complete with zero XP-to-next-level, and its graph can be consumed without any passive XP
+
+#### Scenario: An unusable passive prevents completion
+- **WHEN** a passive is unowned or its lawful closure fails while all ACTIVE nodes are XP-capped
+- **THEN** the graph is incomplete and does not increase the completed count
 
 ### Requirement: The lineage panel ships as one bounded versioned OOB contract
 The presentation registry SHALL register panel name `lineage` at schema version 2

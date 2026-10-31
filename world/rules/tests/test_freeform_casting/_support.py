@@ -73,7 +73,12 @@ from world.skills.cost_tiers import is_freeform_eligible
 from world.skills.handler import ConferredSkillGrant
 
 
-from world.skills.registry import SkillCategory, SkillKind, TargetSpec
+from world.skills.registry import (
+    SkillCategory,
+    SkillKind,
+    SkillPrerequisite,
+    TargetSpec,
+)
 
 
 from world.tests.synthetic_data import SYNTH_SKILLS
@@ -116,6 +121,19 @@ def _mastery_key() -> str:
     return f"{_T_ELEMENT}_mastery"
 
 
+# The mastery's ordinary terminal: one same-element ACTIVE branch nobody else
+# consumes, so its derived tip cap stays at the global cap and its Lv.10 edge
+# leaves that cap unchanged. It is never a cast subject here — a fixture row
+# that IS the ladder subject must stay at its own practised level.
+_T_SEAL = replace(
+    _T_CAST,
+    key="t_ember_seal",
+    label="燼印",
+    description="在目標身上烙下餘燼印記的合成法術。",
+    cost={"mp": 12},
+)
+
+
 def _mastery_row():
     return replace(
         SYNTH_SKILLS["t_steady_stride"],
@@ -125,6 +143,10 @@ def _mastery_row():
         effects=["passive_trait:element_mastery"],
         category=SkillCategory.ELEMENTAL_MAGIC,
         group=_T_ELEMENT,
+        # A mastery is lawful only through its whole declared closure, so the
+        # fixture carries the same shape the shipped rows do: one ordinary
+        # terminal at the proficiency tip cap.
+        prerequisites=(SkillPrerequisite(_T_SEAL.key, 10),),
     )
 
 
@@ -249,6 +271,7 @@ _T_GLOW = replace(
 
 _EXTRA_SKILLS = {
     _T_CAST.key: _T_CAST,
+    _T_SEAL.key: _T_SEAL,
     _T_STORM.key: _T_STORM,
     _T_TYRANT.key: _T_TYRANT,
     _T_TIDE.key: _T_TIDE,

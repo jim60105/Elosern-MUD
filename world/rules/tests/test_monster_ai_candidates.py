@@ -55,7 +55,7 @@ from world.rules.monster_ai import (
     stable_identity,
 )
 from world.rules.monster_ai.candidates import MANDATORY_RESTRICTION, SEAL_BUFF_KEY
-from world.rules.progression import FREEFORM_SCALE_VALUES
+from world.rules.progression import FREEFORM_SCALE_VALUES, SKILL_PROFICIENCY_XP_PER_LEVEL
 from world.skills.cast_conditions import CastCondition, CastConditionSubject
 from world.skills.effects import EffectAudience, EffectPolicy, InteractionPolicy
 from world.skills.registry import SKILL_REGISTRY, TargetSpec
@@ -612,16 +612,45 @@ class CandidateShapeTests(unittest.TestCase):
             key="t_cand_freeform",
             element=_scoped_element(SYNTH_GLOW_ELEMENT),
         )
-        self.actor.db.skills = {"active": [freeform.key], "passive": [MASTERY]}
+        # The mastery is lawful only through its declared closure, seeded here
+        # at exactly each edge's threshold (read from the live row, never a
+        # copied level).
+        closure = {
+            edge.skill_key: float(edge.min_proficiency)
+            * SKILL_PROFICIENCY_XP_PER_LEVEL
+            for edge in SKILL_REGISTRY[MASTERY].prerequisites
+        }
+        self.actor.db.skills = {
+            "active": [freeform.key, *closure],
+            "passive": [MASTERY],
+        }
+        self.actor.db.skill_proficiency = closure
         with patch.dict(
             "world.skills.registry.SKILL_REGISTRY", {freeform.key: freeform}
         ):
             result = _enumerate(self.actor, (self.enemy,), scale=SCALE)
-        self.assertEqual(len(result.plans), 1)
-        plan = result.plans[0]
+        # Every lawful candidate keeps the authored scale; the plan under test
+        # is the freeform row itself, located by key rather than by position so
+        # a sibling candidate cannot mask it.
+        plans = [
+            plan for plan in result.plans if plan.skill_key == freeform.key
+        ]
+        self.assertEqual(len(plans), 1)
+        plan = plans[0]
         self.assertEqual(plan.scale, SCALE)
         self.assertEqual(plan.shorthand, "all-enemies")
-        self.assertEqual(result.candidates[0].identity.scale, SCALE)
+        freeform_candidates = [
+            candidate
+            for candidate in result.candidates
+            if candidate.identity.skill_key == freeform.key
+        ]
+        self.assertTrue(freeform_candidates)
+        self.assertTrue(
+            all(
+                candidate.identity.scale == SCALE
+                for candidate in freeform_candidates
+            )
+        )
 
     @covers_requirement("monster-ai-legal-candidates::canonical-deduplication-preserves-executable-representation")
     def test_one_shorthand_and_one_explicit_roster_share_one_identity(self):

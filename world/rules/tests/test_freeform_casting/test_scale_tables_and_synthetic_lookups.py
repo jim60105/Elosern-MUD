@@ -49,6 +49,7 @@ from ..combat_fixtures import BattlefieldIsolation, grant_lineage
 
 from ._support import (
     _T_CAST,
+    _T_ELEMENT,
     _T_FOCUS_MP,
     _T_MIXED,
     _T_PHOENIX,
@@ -56,6 +57,7 @@ from ._support import (
     _T_STORM,
     _T_TIDE,
     _T_VEIL,
+    _T_SEAL,
     _granted_mastery_only,
     _mastery_key,
     _mastery_row,
@@ -232,7 +234,11 @@ class FreeformScalesForTests(EvenniaTestCase):
             (6, (0.25, 0.5, 1.0, 2.0)),
         ):
             with self.subTest(level=level):
-                self.entity.db.skill_proficiency = {_T_CAST.key: float(level) * 50.0}
+                # Mutate the stored map instead of replacing it: the mastery's
+                # prerequisite closure keeps its seeded XP.
+                stored = dict(self.entity.db.skill_proficiency)
+                stored[_T_CAST.key] = float(level) * 50.0
+                self.entity.db.skill_proficiency = stored
                 self.assertEqual(
                     freeform_scales_for(self.entity, _T_CAST),
                     tuple(
@@ -244,8 +250,10 @@ class FreeformScalesForTests(EvenniaTestCase):
 
     @covers_requirement("element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells")
     def test_sibling_proficiency_never_raises_the_set(self):
-        self.entity.db.skills = _owned(_T_CAST, _T_STORM, _mastery_row())
-        self.entity.db.skill_proficiency = {_T_CAST.key: 500.0}
+        grant_lineage(self.entity, [_T_CAST.key, _T_STORM.key], [_mastery_key()])
+        stored = dict(self.entity.db.skill_proficiency)
+        stored[_T_CAST.key] = 500.0
+        self.entity.db.skill_proficiency = stored
         self.assertEqual(freeform_scales_for(self.entity, _T_STORM), (0.25,))
 
     @covers_requirement("element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells")
@@ -309,8 +317,14 @@ class FreeformScaleEntriesForTests(EvenniaTestCase):
         "element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells"
     )
     def test_entry_mp_costs_match_the_shared_rounding_helper(self):
-        self.entity.db.skills = _owned(_T_CAST, _mastery_row())
+        grant_lineage(
+            self.entity,
+            [_T_CAST.key],
+            [_mastery_key()],
+            rungs={_T_CAST.key: len(FREEFORM_SCALE_VALUES) * 2},
+        )
         entries = freeform_scale_entries_for(self.entity, _T_CAST)
+        self.assertEqual(len(entries), len(FREEFORM_CAST_SCALES))
         base_mp = int(_T_CAST.cost["mp"])
         self.assertEqual(
             [c for _, _, c in entries],
@@ -462,3 +476,127 @@ class FreeformLadderForTests(EvenniaTestCase):
                 else:
                     self.assertIsNone(rung.mp_cost)
                     self.assertEqual(rung.unlock_level, levels[rung.scale])
+
+
+class FreeformMasteryClosureTests(EvenniaTestCase):
+    """Entitlement is lawful only through the mastery's whole closure (D2).
+
+    Every case runs on the file-local synthetic mastery whose single declared
+    prerequisite is the unscaled ``t_ember_seal`` branch, so the closure
+    contract is exercised without naming shipped content and without any
+    ladder subject's own proficiency interfering. The positive control proves
+    the same fixture grants when the closure really is lawful.
+    """
+
+    def setUp(self):
+        # Cleanup order is LIFO: register the revalidation BEFORE opening the
+        # scope so it runs after the scope restores the kit registry.
+        self.addCleanup(_revalidate_live)
+        _open_scope(self)
+        super().setUp()
+        self.entity = _player()
+        self.entity.db.skills = {"active": [], "passive": []}
+
+    def _swap_seal(self, **overrides):
+        """Replace the closure ancestor in the live registry for one case."""
+        live_skill_registry()[_T_SEAL.key] = replace(_T_SEAL, **overrides)
+        _revalidate_live()
+
+    def _own_mastery_and_seal(self, *, seal_level: int = 10):
+        """Directly own the mastery and its ancestor at a chosen level."""
+        grant_lineage(self.entity, [_T_CAST.key], [_mastery_key()])
+        stored = dict(self.entity.db.skill_proficiency)
+        stored[_T_SEAL.key] = float(seal_level) * 50.0
+        self.entity.db.skill_proficiency = stored
+
+    @covers_requirement(
+        "element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells"
+    )
+    def test_the_lawful_direct_closure_grants_entitlement(self):
+        self._own_mastery_and_seal()
+        self.assertTrue(freeform_mastery_entitled(self.entity, _T_ELEMENT))
+        self.assertEqual(freeform_scales_for(self.entity, _T_CAST), (0.25,))
+
+    @covers_requirement(
+        "element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells"
+    )
+    def test_a_bare_mastery_key_with_an_unowned_branch_denies(self):
+        # Direct ownership of the mastery, nothing below it.
+        self.entity.db.skills = _owned(_T_CAST, _mastery_row())
+        self.assertFalse(freeform_mastery_entitled(self.entity, _T_ELEMENT))
+        self.assertEqual(freeform_scales_for(self.entity, _T_CAST), ())
+
+    @covers_requirement(
+        "element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells"
+    )
+    def test_a_low_internal_branch_denies_until_repaired(self):
+        self._own_mastery_and_seal(seal_level=9)
+        self.assertFalse(freeform_mastery_entitled(self.entity, _T_ELEMENT))
+        self.assertEqual(freeform_scales_for(self.entity, _T_CAST), ())
+        self._own_mastery_and_seal(seal_level=10)
+        self.assertTrue(freeform_mastery_entitled(self.entity, _T_ELEMENT))
+
+    @covers_requirement(
+        "element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells"
+    )
+    def test_a_conferred_branch_denies(self):
+        self._own_mastery_and_seal()
+        pledged = dict(self.entity.db.skill_proficiency)
+        pledged.pop(_T_SEAL.key, None)
+        self.entity.db.skill_proficiency = pledged
+        owned = self.entity.db.skills
+        self.entity.db.skills = {
+            "active": [key for key in owned["active"] if key != _T_SEAL.key],
+            "passive": list(owned["passive"]),
+        }
+        self.entity.db.skill_grants = [
+            ConferredSkillGrant("source", _T_SEAL.key, 1.0)
+        ]
+        self.assertFalse(freeform_mastery_entitled(self.entity, _T_ELEMENT))
+        self.assertEqual(freeform_scales_for(self.entity, _T_CAST), ())
+
+    @covers_requirement(
+        "element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells"
+    )
+    def test_an_identity_ineligible_branch_denies(self):
+        from world.skills.registry import SkillEligibility
+
+        self._swap_seal(
+            eligibility=SkillEligibility(allowed_actor_kinds=("monster",))
+        )
+        self._own_mastery_and_seal()
+        self.assertFalse(freeform_mastery_entitled(self.entity, _T_ELEMENT))
+        self.assertEqual(freeform_scales_for(self.entity, _T_CAST), ())
+
+    @covers_requirement(
+        "element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells"
+    )
+    def test_an_effect_restricted_branch_denies(self):
+        self._own_mastery_and_seal()
+        self.entity.db.guild_exam_restriction = {
+            "host_id": self.entity.pk,
+            "exam_id": "t_freeform_exam",
+            "allowed_skills": [_T_CAST.key, _mastery_key()],
+            "neutral_ceilings": {},
+        }
+        self.assertFalse(freeform_mastery_entitled(self.entity, _T_ELEMENT))
+        self.assertEqual(freeform_scales_for(self.entity, _T_CAST), ())
+
+    @covers_requirement(
+        "element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells"
+    )
+    def test_the_entitlement_query_writes_nothing(self):
+        self._own_mastery_and_seal()
+        skills_before = {
+            name: list(keys) for name, keys in self.entity.db.skills.items()
+        }
+        proficiency_before = dict(self.entity.db.skill_proficiency)
+        for _ in range(3):
+            self.assertTrue(freeform_mastery_entitled(self.entity, _T_ELEMENT))
+            freeform_scales_for(self.entity, _T_CAST)
+            freeform_scale_entries_for(self.entity, _T_CAST)
+        self.assertEqual(
+            {name: list(keys) for name, keys in self.entity.db.skills.items()},
+            skills_before,
+        )
+        self.assertEqual(dict(self.entity.db.skill_proficiency), proficiency_before)

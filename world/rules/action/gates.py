@@ -148,6 +148,13 @@ def ownership_failure(
     reconstructs the named edge for the detail), active kind, the two
     sanctioned combat-state gates and the freeform-casting entitlement.
     ``readings`` may pre-supply registry resolution and the owned-key set.
+
+    Kind is decided BEFORE the lineage detail is rendered. A registered,
+    owned PASSIVE can now fail the boolean gate through an ancestor
+    restriction while no numeric edge is unmet, and ``missing_prerequisite``
+    answers ``None`` for exactly that case — the old ordering would then
+    dereference a missing edge. Passives cannot be submitted as actions, and
+    the ACTIVE rejection text and its order stay exactly as they were.
     """
     skill = (
         SKILL_REGISTRY.get(skill_key)
@@ -165,6 +172,8 @@ def ownership_failure(
         return RejectReason.IDENTITY_INELIGIBLE, skill.key
     if not skill_effect_allowed(actor, skill.key):
         return RejectReason.EXAM_SKILL_SEALED, skill.key
+    if skill.kind is not SkillKind.ACTIVE:
+        return RejectReason.SKILL_NOT_ACTIVE, skill_key
     if not can_use_skill(actor, skill, owned_keys=owned):
         unmet = missing_prerequisite(actor, skill, owned_keys=owned)
         required = SKILL_REGISTRY.get(unmet.skill_key)
@@ -173,8 +182,6 @@ def ownership_failure(
             RejectReason.UNKNOWN_SKILL,
             f"{skill.key}:需先精通「{name}」至 Lv.{unmet.min_proficiency}",
         )
-    if skill.kind is not SkillKind.ACTIVE:
-        return RejectReason.SKILL_NOT_ACTIVE, skill_key
     # Sanctioned combat-state gate 1 of 2 (usable_out_of_combat): the flagged
     # out-of-combat gate — see design.md D-3. Both sanctioned gates read the
     # context's battlefield, never a combat-state token.
