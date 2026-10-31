@@ -35,6 +35,7 @@ from world.rules.progression import (
     skill_proficiency_level,
 )
 from world.rules.targeting import RoomActionContext
+from world.lore.elements import Element
 import world.rules.progression as progression
 from world.tests.synthetic_data import (
     SYNTH_GLOWMIRE_ELEMENT,
@@ -322,10 +323,16 @@ _MIXED = "t_elig_mixed"
 _MARTIAL = "t_elig_martial"
 _PLAIN = "t_elig_plain"
 _PASSIVE = "t_elig_passive"
+_ELEMENTLESS_SPELL = "t_elig_elementless_spell"
+_UNREGISTERED_SPELL = "t_elig_unregistered_spell"
 _GROWTH = "t_elig_growth"
 _GROWTH_OTHER = "t_elig_growth_other"
 _PAIR_DAMAGE = "t_elig_pair_damage"
 _PAIR_MEND = "t_elig_pair_mend"
+
+# An Element instance the scoped registry does not carry: the classifier's
+# registered-element guard, not the element-presence guard.
+_UNREGISTERED_ELEMENT = Element("t_elig_unknown", "未登錄", "synthetic element")
 
 
 def _growth_row(key: str, label: str, multiplier: int, scope: str):
@@ -389,6 +396,24 @@ def _practice_rows() -> dict:
             effects=(),
             kind=SkillKind.PASSIVE,
             category=SkillCategory.ENHANCEMENT,
+        ),
+        replace(
+            synth_damage_skill(
+                _ELEMENTLESS_SPELL,
+                "無屬癒合",
+                effects=("heal:single",),
+                category=SkillCategory.ELEMENTAL_MAGIC,
+            ),
+            element=None,
+        ),
+        replace(
+            synth_damage_skill(
+                _UNREGISTERED_SPELL,
+                "幻元素癒合",
+                effects=("heal:single",),
+                category=SkillCategory.ELEMENTAL_MAGIC,
+            ),
+            element=_UNREGISTERED_ELEMENT,
         ),
         _growth_row(_GROWTH, "燼成長", 3, _ELEMENT),
         _growth_row(_GROWTH_OTHER, "異成長", 7, _OTHER_ELEMENT),
@@ -513,7 +538,10 @@ class ElementalLearningEligibilityTests(EvenniaTestCase):
     @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
     def test_elemental_physical_and_elementless_stay_neutral(self):
         self._patch_formula()
-        for key in (_MARTIAL, _PLAIN):
+        # The last two are ACTIVE ELEMENTAL_MAGIC rows that still fail the
+        # catalog predicate: one declares no element, one a key the registry
+        # does not carry.
+        for key in (_MARTIAL, _PLAIN, _ELEMENTLESS_SPELL, _UNREGISTERED_SPELL):
             learner = self._learner(
                 f"neutral {key}",
                 affinity=(_ELEMENT,),
@@ -643,6 +671,10 @@ class ElementalLearningEligibilityTests(EvenniaTestCase):
             wolf.traits.hp.current = 500
             ally = self._patient(ally_key, room)
             battlefield = self._battlefield((caster, ally, bystander), (wolf,))
+            bases_before = (
+                caster.traits.magic_power.base,
+                caster.traits.atk_phys.base,
+            )
             mp_before = caster.traits.mp.current
             wolf_before = wolf.traits.hp.current
             ally_before = ally.traits.hp.current
@@ -650,6 +682,11 @@ class ElementalLearningEligibilityTests(EvenniaTestCase):
             self.assertEqual(damage.outcome, "success")
             mend = self._resolve(caster, _PAIR_MEND, ally, battlefield)
             self.assertEqual(mend.outcome, "success")
+            # The raw innate bases are untouched by either resolution.
+            self.assertEqual(
+                (caster.traits.magic_power.base, caster.traits.atk_phys.base),
+                bases_before,
+            )
             results.append(
                 (
                     mp_before - caster.traits.mp.current,
