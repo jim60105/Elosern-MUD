@@ -249,13 +249,16 @@ class ProducerHookTests(TestCase):
 
     def test_a_failed_record_never_breaks_the_owner_transaction(self):
         """A database error inside the notice record rolls back its own
-        savepoint only: the owner's later writes still commit."""
-        from django.db import DatabaseError
+        savepoint only: the owner's enclosing atomic stays usable."""
+        from django.db import DatabaseError, connection
         from evennia.objects.models import ObjectDB
 
         actor = SimpleNamespace(pk=5, location=object())
 
         def broken(*_args, **_kwargs):
+            # A statement error that terminates the current transaction:
+            # Django marks it for rollback, then the database rejects the read.
+            transaction.set_rollback(True)
             ObjectDB.objects.raw("SELECT * FROM no_such_table")[0]
 
         with self.captureOnCommitCallbacks(execute=True), \
@@ -264,8 +267,11 @@ class ProducerHookTests(TestCase):
                 mock.patch.object(travel_events, "log_warn") as warn:
             with transaction.atomic():
                 self.assertIsNone(travel_events.record_position_change(actor, None, "skip"))
-                # The owner's next query still runs in the unbroken transaction.
-                ObjectDB.objects.count()
+                # The owner's transaction survived: it is not marked for
+                # rollback and it still accepts a nested atomic block.
+                self.assertFalse(connection.needs_rollback)
+                with transaction.atomic():
+                    ObjectDB.objects.count()
         self.assertIsInstance(warn.call_args.kwargs["exc"], DatabaseError)
         self.assertEqual(self.delivered, [])
 
