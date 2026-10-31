@@ -598,6 +598,34 @@ carries its own group, so both paths produce one final complete snapshot for
 every watcher and the ordinary text refresh afterwards finds nothing left to
 compare.
 
+### Commit-qualified move results
+
+`world/rules/movement_settlement.py::capture_movement_observation` binds one
+ephemeral collector around `_move_adapter`'s `at_traverse` call only. It holds
+immutable before/after interrupt facts and the frozen traversing cohort, and it
+is actor-scoped, so a nested settlement for another actor cannot replace the
+step. `settle_movement` captures the source facts immediately before the
+traversal and the destination facts only inside its settled-relocation branch,
+after the canonical change and after the movement checkpoint is registered.
+
+A successful wilderness step therefore has one result that is qualified by the
+commit: `_move_adapter` builds the usual success dictionary, composes
+`data.interrupts`, and returns a Twisted `Deferred` resolved by
+`on_publication_commit` inside the group it already captured. When the
+settlement owns the transaction (every production UI request), that callback
+runs immediately because the transaction has already committed; when a caller
+owns an enclosing transaction, the callback is discarded if that transaction
+rolls back and no result publishes — that external owner keeps its own
+compensation and failure completion. The dispatcher's existing `Deferred`
+adapter path attaches the completion to the private `publication_group_id`, so
+the checkpoint and the result coalesce into one publication and the completed
+request cache replays the committed value. Refusals and non-wilderness
+successes stay synchronous dictionaries with today's exact shape.
+
+A capture or comparison failure logs `travel_interrupts_failed` (`char`,
+`tick`, `step`) and leaves the empty-flag disposition; it never fails the
+movement and never swallows a traversal, preflight or settlement failure.
+
 ### Outcomes and bounds
 
 Every public queueing entry returns `Deferred[PublicationReceipt | None]`. All

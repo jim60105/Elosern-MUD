@@ -344,6 +344,41 @@ test("a result data slot keeping an own __proto__ key survives adoption", () => 
   assert.deepEqual(store.getState().lastActionResult.data, data);
 });
 
+test("an explore.move interrupt slot is adopted and detached from the envelope", () => {
+  const store = connectedStore(VALID_EPOCH, 1);
+  // The server publishes the committed step's flags as one ordered string
+  // list in the success data slot; the reducer owns a frozen copy so no
+  // later transport mutation can rewrite what the walk queue reads.
+  const data = {
+    interrupts: ["landmark_reached", "district_lit", "member_asleep"],
+  };
+  const payload = actionResult({
+    presentation_revision: 2,
+    code: "moved",
+    message: "你移動到了荒野。",
+    data: data,
+  });
+  assert.equal(
+    store.receive(1, "ui_action_result", [payload], {}).accepted,
+    true
+  );
+  const adopted = store.getCommittedState().lastActionResult.data;
+  assert.deepEqual(adopted.interrupts, data.interrupts);
+  assert.equal(Object.isFrozen(adopted.interrupts), true);
+  payload.data.interrupts.push("nightfall");
+  data.interrupts[0] = "nightfall";
+  assert.deepEqual(store.getCommittedState().lastActionResult.data.interrupts, [
+    "landmark_reached",
+    "district_lit",
+    "member_asleep",
+  ]);
+  assert.deepEqual(store.getState().lastActionResult.data.interrupts, [
+    "landmark_reached",
+    "district_lit",
+    "member_asleep",
+  ]);
+});
+
 test("a retained old committed record stays stable across replacement and removal", () => {
   const store = storeWithPanels(panelPanels());
   const first = store.getCommittedState();

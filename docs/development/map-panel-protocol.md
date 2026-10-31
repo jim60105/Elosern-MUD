@@ -112,6 +112,62 @@ Python 3.13.14, SQLite test database), within the 100 ms budget. Run it with
 the default module run skips only the timing and still covers the same
 snapshot, routing and prediction mechanisms.
 
+## The `explore.move` walk context and interrupt result
+
+`explore.move` admits exactly two request shapes: the original
+`{exit_ref, current_node}` and that plus
+`walk: {"pace": "cautious" | "standard" | "forced", "stop_at_night": boolean}`
+(`web/webclient/actions/exploration_actions.py::validate_move_payload`). Any
+other key at either level, an unknown pace, a non-boolean switch, a non-object
+walk or a missing nested field is `malformed_payload`; the exit/current-node
+admission, the stale-location guard, the traversal and the charge are identical
+in both forms. The server stores no walking state between requests: the walk
+context qualifies exactly the one step it accompanies.
+
+Success is a canonical-coordinate change. A traversal whose canonical location
+node is unchanged rejects `move_failed` whatever the room object's identity,
+while a pooled wilderness `TerrainRoom` reused at another cell succeeds because
+its coordinate node moved.
+
+A successful **wilderness** step (`wild:` destination node) carries one extra
+success `data` field:
+
+```json
+{"interrupts": ["landmark_reached", "district_lit", "landmark_sighted"]}
+```
+
+The list is ordered and duplicate-free: `landmark_reached`, `district_lit`,
+`landmark_sighted`, `hostile_in_sight`, `pace_threshold`, `nightfall`,
+`member_asleep`. An empty list is legal. The flags compare immutable facts of
+the committed step (`world/rules/travel_interrupts.py`):
+
+- `landmark_reached` -- the party stands on a district's exact canonical
+  landmark cell (a repeat visit still raises it).
+- `district_lit` -- the lit-district set grew across the step.
+- `landmark_sighted` -- a distant sight source's internal key is visible after
+  the step and was not visible before it.
+- `hostile_in_sight` -- a live hostile population-view observation key entered
+  the ground disc (the stable prospective/materialized slot key never raises a
+  false change).
+- `pace_threshold` (walk only) -- a traveller is at or beyond the cautious or
+  standard threshold after the step, mirroring `travel.plan`'s first-legal-step
+  stop; `forced` has no threshold.
+- `nightfall` (`walk.stop_at_night` only) -- a positive charged interval
+  crossed a non-night -> night hour boundary; a flight-waived zero-charge step
+  cannot cross one.
+- `member_asleep` -- a traveller observed awake before became voluntarily or
+  forced asleep during the step.
+
+Without `walk` the natural flags still apply and the pace/night flags never
+raise. A refused, stale, failed or rolled-back step carries no `data` slot and
+keeps its existing code and message, and a non-wilderness success keeps its
+exact previous shape. The interrupt result is released through
+`on_publication_commit` under the step's captured publication group, so a
+caller-owned transaction that rolls back publishes nothing. A capture or
+comparison failure logs `travel_interrupts_failed` (`char`, `tick`, `step`) and
+answers an otherwise successful step with an empty list; it never fails the
+movement.
+
 ## The `area_map` publisher
 
 `web/webclient/presentation/area_map.py` builds the panel from canonical data
