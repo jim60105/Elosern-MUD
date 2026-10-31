@@ -43,6 +43,21 @@ describe("the travel stage requests its own area map", () => {
     expect(h.mapViews()).toHaveLength(1);
   });
 
+  it("sends one request for every cause one publication raises", async () => {
+    const h = liveTravel({ wrappers, subject: TOWN_SUBJECT });
+    await tick();
+    expect(h.mapViews()).toHaveLength(0);
+    // Entry, a new current node and a recovery snapshot at once.
+    h.accept("ui_snapshot", fx.snapshot({
+      revision: h.next(),
+      panels: panelsAt(WILD_SUBJECT, { local_map: LOCAL_MAP_WILDERNESS_RETURN_SAMPLE }),
+    }));
+    await tick();
+    expect(h.mapViews()).toHaveLength(1);
+    await h.answerMap(wildernessArea());
+    expect([travel(h.store).mapStatus, h.mapViews().length, h.store.view.dispatch.inFlight]).toEqual(["ready", 1, null]);
+  });
+
   it.each(["body-first", "result-first"])("adopts only its own complete body (%s)", async (order) => {
     const h = liveTravel({ wrappers });
     await tick();

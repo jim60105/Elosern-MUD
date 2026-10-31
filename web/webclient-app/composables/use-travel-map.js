@@ -58,11 +58,31 @@ export function useTravelMap(store) {
     publish();
   }
 
+  // Every cause one publication raises (entry, a changed node or time, a
+  // recovery snapshot) runs in the same watcher pass; the send waits for the
+  // pass to end, so they all leave as one request.
+  let flushQueued = false;
+  // The canonical place and time a request was sent at, and the recovery
+  // publications it already covers: a cause observed later for the same
+  // publication is answered by that request and asks nothing more.
+  let sentKey = null;
+  function placeKey() {
+    return `${store.view.panels?.local_map?.current_node ?? ""}|${JSON.stringify(store.view.serverTime ?? null)}`;
+  }
+  function recoveryKey(signal) {
+    return signal ? `${signal.generation}|${signal.epoch}|${signal.revision}` : null;
+  }
+
   function want() {
     if (!layout.value) return;
     pending = true;
     if (status !== "refreshing") setStatus("refreshing");
-    flush();
+    if (flushQueued) return;
+    flushQueued = true;
+    Promise.resolve().then(() => {
+      flushQueued = false;
+      flush();
+    });
   }
 
   function admitted() {
@@ -77,6 +97,9 @@ export function useTravelMap(store) {
     if (!requestId) return;
     pending = false;
     awaiting = { requestId, session: session.value, mark, revision: null };
+    sentKey = placeKey();
+    const covered = recoveryKey(store.travelRecovery);
+    if (covered) seenRecovery.add(covered);
   }
 
   function adopt(body) {
@@ -148,12 +171,9 @@ export function useTravelMap(store) {
     { immediate: true },
   );
 
-  watch(
-    () => [store.view.panels?.local_map?.current_node ?? null, JSON.stringify(store.view.serverTime ?? null)],
-    (now, before) => {
-      if (before && (now[0] !== before[0] || now[1] !== before[1])) want();
-    },
-  );
+  watch(placeKey, (now, before) => {
+    if (before !== undefined && now !== before && now !== sentKey) want();
+  });
 
   // A room look: remember the request while it is the one in flight.
   watch(
@@ -169,8 +189,8 @@ export function useTravelMap(store) {
     // Pinia unwraps the store's ref, so this reads the signal itself.
     () => store.travelRecovery ?? null,
     (signal) => {
-      if (!signal) return;
-      const identity = `${signal.generation}|${signal.epoch}|${signal.revision}`;
+      const identity = recoveryKey(signal);
+      if (!identity) return;
       if (seenRecovery.has(identity)) return;
       seenRecovery.add(identity);
       want();
