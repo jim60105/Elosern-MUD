@@ -114,6 +114,19 @@ describe("aim, step and cancel", () => {
     expect(s.store.view.travel.aim).toBeNull();
   });
 
+  it("an aim the committed row refuses is drawn blocked with its reason", async () => {
+    const s = await stage({ panels: walkPanels(CX, CY, { disabled: { north: "斷崖擋住了去路。" } }) });
+    const states = () => s.w.findAll('[data-testid="travel-map__neighbour"]').map((n) => n.attributes("data-state"));
+    await s.press("ArrowUp");
+    await s.lift("ArrowUp");
+    expect(states()).toContain("blocked");
+    expect(states()).not.toContain("aimed");
+    expect(s.w.get('[data-testid="travel-map__aim-chip"]').text()).toContain("斷崖擋住了去路。");
+    await s.press("ArrowRight");
+    await s.lift("ArrowRight");
+    expect(states()).toContain("aimed");
+  });
+
   it("a neighbour click steps once; the party cell and far cells do nothing", async () => {
     const s = await stage();
     const map = s.w.findComponent(TravelMap);

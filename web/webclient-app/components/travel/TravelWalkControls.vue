@@ -35,11 +35,11 @@ const intent = computed(() => {
     };
   }
   if (notice.value?.message) {
-    return { kind: notice.value.kind === "refused" ? "refused" : "blocked", title: "已停步", detail: notice.value.message };
+    return { kind: notice.value.kind === "refused" ? "refused" : "blocked", title: "無法前進", detail: notice.value.message };
   }
   const aim = target.value;
   if (aim) {
-    if (aim.enabled) return { kind: "aim", title: `瞄準${aim.word}・一步`, detail: "Enter 前進・按住連續前進" };
+    if (aim.enabled) return { kind: "aim", title: `瞄準${aim.word}・一步`, detail: "Enter 前進一步" };
     return { kind: "blocked", title: `瞄準${aim.word}`, detail: aim.reason || "無法通行" };
   }
   return { kind: "none", title: "選擇相鄰的一格", detail: "方向鍵瞄準・點選鄰格前進" };

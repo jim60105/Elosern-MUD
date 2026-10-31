@@ -73,6 +73,11 @@ const props = defineProps({
   status: { type: String, default: "refreshing" },
   // The aimed neighbour as a canonical direction word ("north", ...), or null.
   aim: { type: String, default: null },
+  // The committed exit row for the aim refuses it (disabled, or no exit):
+  // the aimed node is drawn blocked whatever the window's node says.
+  aimBlocked: { type: Boolean, default: false },
+  // The committed reason a blocked aim shows in its chip (`方位・阻擋原因`).
+  aimReason: { type: String, default: null },
   // The walking state, or null while standing.
   walking: { type: Object, default: null },
   // The current travel.plan result ({ steps: [{x, y}], destination }), or null.
@@ -328,7 +333,8 @@ const neighbours = computed(() => {
     const cell = travelCellAt(grid, grid.party.x + d.dx, grid.party.y + d.dy);
     if (!cell) continue;
     const state = !cell.known ? "unknown" : cell.node?.action ? "open" : "blocked";
-    out.push({ ...d, cell, state: props.aim === d.key && state === "open" ? "aimed" : state });
+    const aimedHere = props.aim === d.key && state === "open";
+    out.push({ ...d, cell, state: aimedHere ? (props.aimBlocked ? "blocked" : "aimed") : state });
   }
   return out;
 });
@@ -336,6 +342,7 @@ const aimed = computed(() => neighbours.value.find((n) => n.key === props.aim) ?
 const aimText = computed(() => {
   const n = aimed.value;
   if (!n) return "";
+  if (n.state === "blocked" && props.aimReason) return `${n.word}・${props.aimReason}`;
   return `${n.word}・${n.cell.known ? terrainLabel(n.cell) : "未探明"}`;
 });
 

@@ -962,6 +962,8 @@ const rootStyle = computed(() => {
               :grid="store.view.travel.map"
               :status="travelMapStatus"
               :aim="store.view.travel.aim"
+              :aim-blocked="!!store.view.travel.aimTarget && !store.view.travel.aimTarget.enabled"
+              :aim-reason="store.view.travel.aimTarget?.reason ?? null"
               :walking="store.view.travel.walking"
               :motion-level="store.view.motionLevel"
               @aim="onTravelAim"
