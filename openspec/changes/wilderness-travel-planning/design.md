@@ -28,7 +28,7 @@ Return standard action outcome/code/message and bounded data slot, with internal
 
 B1 is adopted. Add test_allowed_flight_has_zero_charge_and_matches_real_steps, test_restricted_flight_and_flash_step_use_foot_cost and test_flight_does_not_bypass_sleep_or_depletion in test_travel_plan.py and the existing movement suite. Route selection still uses physical predicted weights; charge waivers affect sequential replay and stops only. These tests use synthetic ownership/restriction facts and compare real settlement.
 
-B3 uses the shared first-legal-step stop when already fatigued. Add test_initial_pace_state_matches_move_interrupt for light/moderate/severe states under all paces; it compares this query with the interrupt result from the identical departure.
+B3 uses the shared first-legal-step stop when already fatigued. Add test_initial_pace_state_matches_the_committed_first_step for light/moderate/severe states under all paces; it compares this query's first-legal-step decision with the identical departure's real committed after-step stage against the same threshold table (the move-interrupt flag itself is owned by the later slice — see the initial-pace note under the requirement-to-test mapping).
 
 The frozen-weight suggestion is adopted. Add test_frozen_route_choice_is_separate_from_sequential_replay with two synthetic paths whose initially cheaper edge-weight sum differs from the sum after fatigue replay; assert the selected frozen-weight path and then independently assert its committed per-step predictions.
 
