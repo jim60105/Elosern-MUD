@@ -279,7 +279,7 @@ class ReconnectTest(BrowserAcceptanceTest):
               const store = window.__elosernBridge.store;
               const before = store.view;
               const status = {
-                schema_version: 4, available: true,
+                schema_version: 5, available: true,
                 actor: { name: 'X', identity: 'y', location: null },
                 resources: { hp: {current: 10, maximum: 10},
                              mp: {current: 10, maximum: 10},
@@ -287,7 +287,7 @@ class ReconnectTest(BrowserAcceptanceTest):
                 conditions: [],
                 fatigue: [{ identity: 'y', name: 'X', reserve_percent: 100,
                             stage: 'normal', label: '精神充沛',
-                            severity: 'informational', restriction: null }],
+                            severity: 'informational', restriction: null, asleep: false }],
                 disguise_active: false, combat: null,
               };
               const env = (epoch, revision) => ({
@@ -329,7 +329,7 @@ class ReconnectTest(BrowserAcceptanceTest):
         result = page.evaluate(
             """() => {
               const status = {
-                schema_version: 4, available: true,
+                schema_version: 5, available: true,
                 actor: { name: 'X', identity: 'y', location: null },
                 resources: { hp: {current: 10, maximum: 10},
                              mp: {current: 10, maximum: 10},
@@ -337,7 +337,7 @@ class ReconnectTest(BrowserAcceptanceTest):
                 conditions: [],
                 fatigue: [{ identity: 'y', name: 'X', reserve_percent: 100,
                             stage: 'normal', label: '精神充沛',
-                            severity: 'informational', restriction: null }],
+                            severity: 'informational', restriction: null, asleep: false }],
                 disguise_active: false, combat: null,
               };
               function env(epoch, revision) {

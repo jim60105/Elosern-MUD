@@ -162,6 +162,7 @@ describe("StatusPanel (H2 island-stack root)", () => {
             label: "測試充沛",
             severity: "informational",
             restriction: null,
+            asleep: false,
           },
           {
             identity: "char-77",
@@ -171,6 +172,7 @@ describe("StatusPanel (H2 island-stack root)", () => {
             label: "測試強制睡眠",
             severity: "critical",
             restriction: "測試無法行動",
+            asleep: true,
           },
         ],
       },

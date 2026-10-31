@@ -1,4 +1,4 @@
-"""Version-4 read-only ``status`` panel presenter.
+"""Version-5 read-only ``status`` panel presenter.
 
 The presenter serializes the frozen status read model built by
 ``world.rules.status_query``. It never reads raw persistent records itself, never
@@ -7,6 +7,9 @@ condition provenance and preserves the optional composed ``actor.full_title``.
 Version 4 adds the ``fatigue`` subject rows: the status source's own row, plus
 the controlled body's distinct row under possession, so each physiological
 subject is identified while the owner-keyed resources stay unchanged.
+Version 5 adds the canonical ``asleep`` posture to every row and one row per
+further source-present traveller (the canonical traversal cohort), so the
+travel medallions read each body's own facts.
 """
 
 from typing import Any
@@ -17,9 +20,12 @@ from world.rules.status_query import (
     StatusQueryError,
     build_fatigue_subject,
     build_status_read_model,
+    present_fatigue_subjects,
 )
 
-STATUS_SCHEMA_VERSION = 4
+STATUS_SCHEMA_VERSION = 5
+#: Mirror of the client's ``STATUS_FATIGUE_MAX_SUBJECTS`` exact bound.
+STATUS_FATIGUE_MAX_SUBJECTS = 8
 
 
 def _fatigue_entry(row) -> dict[str, Any]:
@@ -31,6 +37,7 @@ def _fatigue_entry(row) -> dict[str, Any]:
         "label": row.label,
         "severity": row.severity,
         "restriction": row.restriction,
+        "asleep": row.asleep,
     }
 
 
@@ -85,6 +92,13 @@ def status_presenter(context: PresentationContext) -> dict[str, Any]:
         except StatusQueryError:
             raise PanelUnavailableError
         fatigue.append(_fatigue_entry(controlled))
+    # Every further source-present traveller has its own row after the two
+    # required ones; the bound only ever trims that optional tail.
+    known = frozenset(row["identity"] for row in fatigue)
+    for row in present_fatigue_subjects(actor, known):
+        if len(fatigue) >= STATUS_FATIGUE_MAX_SUBJECTS:
+            break
+        fatigue.append(_fatigue_entry(row))
     actor_field: dict[str, Any] = {
         "name": model.actor_name,
         # Resources remain owner-keyed under possession; identity addresses

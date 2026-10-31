@@ -81,7 +81,7 @@ describe("isVitalsVisible (webclient-retire-redundant-hud, design D2)", () => {
     expect(store.view.vitals.visible).toBe(false);
     const unavailable = fx.update({ revision: 2, base_revision: 1, presentation_epoch: fx.EPOCH_B, mode: "combat" });
     unavailable.panels.status = {
-      schema_version: 4, available: false, reason: { code: "status_unavailable", message: "暫無資料" },
+      schema_version: 5, available: false, reason: { code: "status_unavailable", message: "暫無資料" },
     };
     expect(store.receive(2, "ui_update", [unavailable], {}).accepted).toBe(true);
     expect(store.view.vitals.visible).toBe(false);
@@ -119,11 +119,11 @@ describe("isVitalsVisible (webclient-retire-redundant-hud, design D2)", () => {
   it("an adverse controlled-body fatigue row reveals the dock at full owner vitals", () => {
     const ownerRow = {
       identity: "1", name: "主人", reserve_percent: 80, stage: "normal",
-      label: "精神充沛", severity: "informational", restriction: null,
+      label: "精神充沛", severity: "informational", restriction: null, asleep: false,
     };
     const companionRow = {
       identity: "2", name: "同伴", reserve_percent: 2, stage: "forced_sleep",
-      label: "強制睡眠", severity: "critical", restriction: "沉睡中，無法行動",
+      label: "強制睡眠", severity: "critical", restriction: "沉睡中，無法行動", asleep: true,
     };
     expect(
       isVitalsVisible({
@@ -157,17 +157,17 @@ describe("isVitalsVisible (webclient-retire-redundant-hud, design D2)", () => {
     });
     expect(store.receive(1, "ui_snapshot", [message(1, [{
       identity: "42", name: "影行者", reserve_percent: 80, stage: "normal",
-      label: "精神充沛", severity: "informational", restriction: null,
+      label: "精神充沛", severity: "informational", restriction: null, asleep: false,
     }])], {}).accepted).toBe(true);
     expect(store.view.vitals.visible).toBe(false);
     expect(store.receive(1, "ui_update", [{ ...message(2, [
       {
         identity: "42", name: "影行者", reserve_percent: 80, stage: "normal",
-        label: "精神充沛", severity: "informational", restriction: null,
+        label: "精神充沛", severity: "informational", restriction: null, asleep: false,
       },
       {
         identity: "77", name: "同伴", reserve_percent: 2, stage: "forced_sleep",
-        label: "強制睡眠", severity: "critical", restriction: "沉睡中，無法行動",
+        label: "強制睡眠", severity: "critical", restriction: "沉睡中，無法行動", asleep: true,
       },
     ]), base_revision: 1, removed_panels: [] }], {}).accepted).toBe(true);
     expect(store.view.vitals.visible).toBe(true);
@@ -339,7 +339,7 @@ describe("isVitalsVisible (webclient-retire-redundant-hud, design D2)", () => {
       mode: "exploration",
       panels: {
         status: {
-          schema_version: 4,
+          schema_version: 5,
           available: false,
           reason: { code: "status_unavailable", message: "無法顯示" },
         },

@@ -356,7 +356,7 @@ const snap = {
   layout_version: frame.layout_version,
   server_time: frame.server_time,
 };
-const first = store.receive(1, 'ui_snapshot', [Object.assign({}, snap, {panels: {status: {schema_version: 4, available: false, reason: {code: 'x', message: 'x'}}}})], {});
+const first = store.receive(1, 'ui_snapshot', [Object.assign({}, snap, {panels: {status: {schema_version: 5, available: false, reason: {code: 'x', message: 'x'}}}})], {});
 const results = frames.map((f) => store.receive(1, 'ui_update', [f], {}));
 process.stdout.write(JSON.stringify({first, results, state: store.getState()}));
 """

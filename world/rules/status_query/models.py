@@ -203,7 +203,8 @@ class FatigueSubjectView:
     possession owner by implication; ``stage`` is the exact threshold stage
     from stored units and ``reserve_percent`` is display-only rounding.
     ``restriction`` is the fixed action-unavailability line, or ``None`` when
-    the body may act.
+    the body may act. ``asleep`` is the canonical posture: true for voluntary
+    and forced sleep alike.
     """
 
     identity: str
@@ -213,6 +214,7 @@ class FatigueSubjectView:
     label: str
     severity: str
     restriction: str | None
+    asleep: bool
 
 
 @dataclass(frozen=True)

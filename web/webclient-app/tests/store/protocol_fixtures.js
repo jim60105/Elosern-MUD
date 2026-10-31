@@ -43,7 +43,7 @@ export function serverTime(overrides = undefined) {
 export function statusPanel(overrides = undefined) {
   return deepMerge(
     {
-      schema_version: 4,
+      schema_version: 5,
       available: true,
       actor: {
         name: "影行者",
@@ -65,6 +65,7 @@ export function statusPanel(overrides = undefined) {
           label: "精神充沛",
           severity: "informational",
           restriction: null,
+          asleep: false,
         },
       ],
       disguise_active: false,

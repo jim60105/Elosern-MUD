@@ -54,6 +54,7 @@ from world.rules.status_query.conditions import (  # noqa: F401
 from world.rules.status_query.fatigue import (  # noqa: F401
     SLEEP_RESTRICTION_MESSAGE,
     build_fatigue_subject,
+    present_fatigue_subjects,
 )
 from world.rules.status_query.models import (  # noqa: F401
     _COUNTER_KEYS,
