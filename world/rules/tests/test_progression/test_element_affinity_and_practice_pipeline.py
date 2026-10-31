@@ -31,6 +31,7 @@ from world.rules.progression import (
     SKILL_PROFICIENCY_XP_PER_LEVEL,
     element_affinity_multiplier,
     grant_skill_practice_xp,
+    grant_study_practice_xp,
     skill_proficiency_level,
 )
 from world.rules.targeting import RoomActionContext
@@ -61,8 +62,10 @@ from .._combat_session_helpers import (
 from world.skills.registry import (
     SkillCategory,
     SkillKind,
+    TargetSpec,
     validate_prerequisite_graph,
 )
+from world.skills.handler import ConferredSkillGrant
 # Cross-lineage wiring: importing the rulebook module at collection time also
 # forces its shipped-table load against the LIVE registry, before any
 # synthetic scope clears it (the shared helpers' eager import is the same
@@ -72,6 +75,8 @@ import world.rules.cross_lineage_unlock as cross_lineage
 
 from ._support import (
     _MAGIC_CASTER,
+    _character,
+    _monster,
     _scoped_setup,
 )
 
@@ -294,4 +299,392 @@ class PracticePipelineIntegrationTests(EvenniaTestCase):
         self.assertEqual(
             self.actor.db.skill_proficiency[_MAGIC_CASTER],
             SKILL_PRACTICE_XP_PER_USE,
+        )
+
+
+# --- Elemental learning eligibility (design D1/D2/D3) -----------------------
+#
+# File-local synthetic rows, built inside the synthetic scope: ACTIVE
+# elemental spells of every effect shape (damage, heal, self-buff, control,
+# mixed) plus an element-tagged PHYSICAL martial row, a PASSIVE enhancement,
+# an elementless action, and two PASSIVE scoped ``growth_rate`` rows (one
+# matching the practised element, one not). Every fixture key is a ``t_``
+# token; no shipped identifier is named.
+
+_ELEMENT = SYNTH_SKILLS["t_ember_burst"].element.key
+_OTHER_ELEMENT = SYNTH_GLOW_ELEMENT
+
+_DAMAGE = "t_elig_damage"
+_MEND = "t_elig_mend"
+_VEIL = "t_elig_veil"
+_DAZE = "t_elig_daze"
+_MIXED = "t_elig_mixed"
+_MARTIAL = "t_elig_martial"
+_PLAIN = "t_elig_plain"
+_PASSIVE = "t_elig_passive"
+_GROWTH = "t_elig_growth"
+_GROWTH_OTHER = "t_elig_growth_other"
+_PAIR_DAMAGE = "t_elig_pair_damage"
+_PAIR_MEND = "t_elig_pair_mend"
+
+
+def _growth_row(key: str, label: str, multiplier: int, scope: str):
+    """One synthetic PASSIVE scoped ``growth_rate`` row (no element)."""
+    return replace(
+        synth_damage_skill(
+            key,
+            label,
+            effects=(f"growth_rate:practice:{multiplier}:{scope}",),
+            kind=SkillKind.PASSIVE,
+            category=SkillCategory.ENHANCEMENT,
+        ),
+        element=None,
+    )
+
+
+def _practice_rows() -> dict:
+    """The synthetic rows the eligibility cases register in one scope."""
+    rows = (
+        synth_damage_skill(
+            _DAMAGE,
+            "灼燼擊",
+            effects=(f"damage:{_ELEMENT}:magic",),
+            category=SkillCategory.ELEMENTAL_MAGIC,
+        ),
+        synth_damage_skill(
+            _MEND,
+            "燼息癒合",
+            effects=("heal:single",),
+            category=SkillCategory.ELEMENTAL_MAGIC,
+        ),
+        synth_damage_skill(
+            _VEIL,
+            "燼幕",
+            effects=("self_buff_apply:t_elig_veil_buff",),
+            category=SkillCategory.ELEMENTAL_MAGIC,
+            target_spec=TargetSpec.SELF,
+        ),
+        synth_damage_skill(
+            _DAZE,
+            "燼惑",
+            effects=("buff_apply:t_elig_daze_buff",),
+            category=SkillCategory.ELEMENTAL_MAGIC,
+        ),
+        synth_damage_skill(
+            _MIXED,
+            "灼光癒合",
+            effects=(f"damage:{_ELEMENT}:magic", "heal:single"),
+            category=SkillCategory.ELEMENTAL_MAGIC,
+        ),
+        synth_damage_skill(
+            _MARTIAL,
+            "燼刃",
+            effects=(f"damage:{_ELEMENT}:physical",),
+            category=SkillCategory.MARTIAL_ARTS,
+        ),
+        make_skill(_PLAIN),
+        synth_damage_skill(
+            _PASSIVE,
+            "燼之韻",
+            effects=(),
+            kind=SkillKind.PASSIVE,
+            category=SkillCategory.ENHANCEMENT,
+        ),
+        _growth_row(_GROWTH, "燼成長", 3, _ELEMENT),
+        _growth_row(_GROWTH_OTHER, "異成長", 7, _OTHER_ELEMENT),
+        synth_damage_skill(
+            _PAIR_DAMAGE,
+            "對照灼擊",
+            effects=(f"damage:{_ELEMENT}:magic",),
+            cost={"mp": 10},
+            category=SkillCategory.ELEMENTAL_MAGIC,
+        ),
+        synth_damage_skill(
+            _PAIR_MEND,
+            "對照癒合",
+            effects=("heal:single",),
+            cost={"mp": 10},
+            category=SkillCategory.ELEMENTAL_MAGIC,
+        ),
+    )
+    return {row.key: row for row in rows}
+
+
+class ElementalLearningEligibilityTests(EvenniaTestCase):
+    """skill-lineage: elemental learning eligibility on both award paths.
+
+    Formula inputs are pinned to fixed synthetic values, so every expected XP
+    total below is derived by hand from base x race x affinity x conferred x
+    owned -- never by calling the calculator under test.
+    """
+
+    def setUp(self):
+        _scoped_setup(self)
+        super().setUp()
+        progression.reset_practice_dedupe()
+        scope = patch.dict(live_skill_registry(), _practice_rows(), clear=False)
+        scope.start()
+        self.addCleanup(scope.stop)
+
+    def _patch_formula(self):
+        """Pin base XP 2, study-hour XP 7, race 2, affinity 1.25 / 0.75."""
+        for target, value in (
+            ("world.rules.progression._practice.SKILL_PRACTICE_XP_PER_USE", 2.0),
+            ("world.rules.progression.PRACTICE_XP_PER_STUDY_HOUR", 7.0),
+            (
+                "world.rules.progression._scaling.AFFINITY_ELEMENT_MULTIPLIER",
+                1.25,
+            ),
+            (
+                "world.rules.progression._scaling.NON_AFFINITY_ELEMENT_MULTIPLIER",
+                0.75,
+            ),
+        ):
+            patcher = patch(target, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        race = patch(
+            "world.rules.progression._practice._race_learning_multiplier",
+            lambda entity: 2.0,
+        )
+        race.start()
+        self.addCleanup(race.stop)
+
+    def _learner(
+        self,
+        key: str,
+        *,
+        affinity=(),
+        owned=(),
+        passives=(),
+        conferred=None,
+        skill_grants=(),
+    ) -> PlayerCharacter:
+        """One synthetic learner owning ``owned`` and ``passives``."""
+        entity = _character(self, key)
+        entity.db.skills = {"active": list(owned), "passive": list(passives)}
+        entity.db.skill_proficiency = {}
+        if affinity:
+            entity.db.affinity_elements = list(affinity)
+        if conferred is not None:
+            grant_conferred_growth_rate(entity, "t_practice_source", conferred)
+        if skill_grants:
+            entity.db.skill_grants = list(skill_grants)
+        return entity
+
+    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
+    def test_damage_free_shapes_share_both_award_paths(self):
+        self._patch_formula()
+        for key in (_DAMAGE, _MEND, _VEIL, _DAZE, _MIXED):
+            learner = self._learner(
+                f"shape {key}",
+                affinity=(_ELEMENT,),
+                owned=(key,),
+                passives=(_GROWTH,),
+                conferred=1.5,
+            )
+            self.assertTrue(grant_skill_practice_xp(learner, key))
+            # 2 base x 2 race x 1.25 favored x 1.5 conferred x 3 owned.
+            self.assertEqual(learner.db.skill_proficiency[key], 22.5)
+            self.assertTrue(grant_study_practice_xp(learner, key, 1))
+            # One booked hour: 7 x (2 x 1.25 x 1.5 x 3), on top of the use.
+            self.assertEqual(learner.db.skill_proficiency[key], 22.5 + 78.75)
+
+    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
+    def test_use_and_study_award_the_fixed_affinity_numbers(self):
+        self._patch_formula()
+        for affinity, use, study in (
+            ((_ELEMENT,), 22.5, 78.75),
+            ((_OTHER_ELEMENT,), 13.5, 47.25),
+            ((), 18.0, 63.0),
+        ):
+            learner = self._learner(
+                f"affinity {affinity!r}",
+                affinity=affinity,
+                owned=(_MEND,),
+                passives=(_GROWTH,),
+                conferred=1.5,
+            )
+            self.assertTrue(grant_skill_practice_xp(learner, _MEND))
+            self.assertEqual(learner.db.skill_proficiency[_MEND], use)
+            self.assertTrue(grant_study_practice_xp(learner, _MEND, 1))
+            self.assertEqual(learner.db.skill_proficiency[_MEND], use + study)
+
+    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
+    def test_elemental_physical_and_elementless_stay_neutral(self):
+        self._patch_formula()
+        for key in (_MARTIAL, _PLAIN):
+            learner = self._learner(
+                f"neutral {key}",
+                affinity=(_ELEMENT,),
+                owned=(key,),
+                passives=(_GROWTH,),
+                conferred=1.5,
+            )
+            # Neutral affinity and a neutral owned factor: 2 x 2 x 1 x 1.5.
+            self.assertTrue(grant_skill_practice_xp(learner, key))
+            self.assertEqual(learner.db.skill_proficiency[key], 6.0)
+            self.assertTrue(grant_study_practice_xp(learner, key, 1))
+            self.assertEqual(learner.db.skill_proficiency[key], 6.0 + 21.0)
+
+    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
+    def test_owned_scope_and_ownership_controls(self):
+        self._patch_formula()
+        mismatch = self._learner(
+            "mismatched scope",
+            affinity=(_ELEMENT,),
+            owned=(_MEND,),
+            passives=(_GROWTH_OTHER,),
+            conferred=1.5,
+        )
+        granted = self._learner(
+            "conferred ownership",
+            affinity=(_ELEMENT,),
+            owned=(_MEND,),
+            conferred=1.5,
+            skill_grants=(
+                ConferredSkillGrant("t_practice_source", _GROWTH, 1.0),
+            ),
+        )
+        bare = self._learner(
+            "no growth source",
+            affinity=(_ELEMENT,),
+            owned=(_MEND,),
+        )
+        for learner, use, study in (
+            (mismatch, 7.5, 26.25),
+            (granted, 7.5, 26.25),
+            (bare, 5.0, 17.5),
+        ):
+            self.assertTrue(grant_skill_practice_xp(learner, _MEND))
+            self.assertEqual(learner.db.skill_proficiency[_MEND], use)
+            self.assertTrue(grant_study_practice_xp(learner, _MEND, 1))
+            self.assertEqual(learner.db.skill_proficiency[_MEND], use + study)
+
+    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
+    def test_passive_requests_write_nothing(self):
+        self._patch_formula()
+        learner = self._learner(
+            "passive owner",
+            owned=(_MEND,),
+            passives=(_PASSIVE, _GROWTH),
+            conferred=1.5,
+        )
+        self.assertFalse(grant_skill_practice_xp(learner, _PASSIVE))
+        self.assertFalse(grant_study_practice_xp(learner, _PASSIVE, 1))
+        self.assertEqual(dict(learner.db.skill_proficiency), {})
+
+    def _caster(self, key: str, room, *, affinity=(), mp: int = 100):
+        """One combat caster owning the paired damage/heal fixtures."""
+        entity = create_object(PlayerCharacter, key=key)
+        entity.location = room
+        entity.race = _race_key()
+        entity.apply_race_baseline()
+        entity.traits.magic_power.base = 30
+        entity.traits.hp.base = 300
+        entity.traits.hp.current = 300
+        entity.traits.mp.base = mp
+        entity.traits.mp.current = mp
+        entity.db.skills = {"active": [_PAIR_DAMAGE, _PAIR_MEND], "passive": []}
+        entity.db.skill_proficiency = {}
+        if affinity:
+            entity.db.affinity_elements = list(affinity)
+        return entity
+
+    def _patient(self, key: str, room):
+        """One unskilled party recipient at a partially depleted HP pool."""
+        entity = create_object(PlayerCharacter, key=key)
+        entity.location = room
+        entity.race = _race_key()
+        entity.apply_race_baseline()
+        entity.traits.hp.base = 300
+        entity.traits.hp.current = 100
+        entity.db.skills = {"active": [], "passive": []}
+        entity.db.skill_proficiency = {}
+        return entity
+
+    def _battlefield(self, party, foes):
+        entities = {str(entity.key): entity for entity in (*party, *foes)}
+        return Battlefield(
+            {
+                "party": frozenset(str(entity.key) for entity in party),
+                "foes": frozenset(str(entity.key) for entity in foes),
+            },
+            entities,
+        )
+
+    def _resolve(self, caster, skill_key, target, battlefield):
+        request = ActionRequest(
+            caster, skill_key, [target], BattlefieldActionContext(battlefield)
+        )
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
+            return resolve_combat_action(request)
+
+    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
+    def test_learning_factors_change_practice_xp_alone(self):
+        room = create_object(Room, key="eligibility arena")
+        favored = self._caster("eligibility favored", room, affinity=(_ELEMENT,))
+        unfavored = self._caster(
+            "eligibility unfavored", room, affinity=(_OTHER_ELEMENT,)
+        )
+        bystander = self._patient("eligibility bystander", room)
+        bystander_state = (
+            bystander.traits.hp.current,
+            bystander.traits.mp.current,
+            dict(bystander.db.skill_proficiency),
+        )
+        results = []
+        for caster, wolf_key, ally_key in (
+            (favored, "favored wolf", "favored ally"),
+            (unfavored, "unfavored wolf", "unfavored ally"),
+        ):
+            wolf = _monster(self, wolf_key)
+            wolf.traits.hp.base = 500
+            wolf.traits.hp.current = 500
+            ally = self._patient(ally_key, room)
+            battlefield = self._battlefield((caster, ally, bystander), (wolf,))
+            mp_before = caster.traits.mp.current
+            wolf_before = wolf.traits.hp.current
+            ally_before = ally.traits.hp.current
+            damage = self._resolve(caster, _PAIR_DAMAGE, wolf, battlefield)
+            self.assertEqual(damage.outcome, "success")
+            mend = self._resolve(caster, _PAIR_MEND, ally, battlefield)
+            self.assertEqual(mend.outcome, "success")
+            results.append(
+                (
+                    mp_before - caster.traits.mp.current,
+                    wolf_before - wolf.traits.hp.current,
+                    ally.traits.hp.current - ally_before,
+                    caster.traits.magic_power.base,
+                    caster.traits.atk_phys.base,
+                    caster.db.skill_proficiency[_PAIR_DAMAGE],
+                    caster.db.skill_proficiency[_PAIR_MEND],
+                )
+            )
+        favored_run, unfavored_run = results
+        # Identical stats, resources and outputs across the learning variants.
+        self.assertGreater(favored_run[1], 0)
+        self.assertGreater(favored_run[2], 0)
+        self.assertEqual(favored_run[0], 20)
+        self.assertEqual(favored_run[0], unfavored_run[0])
+        self.assertEqual(favored_run[1], unfavored_run[1])
+        self.assertEqual(favored_run[2], unfavored_run[2])
+        self.assertEqual(favored_run[3], unfavored_run[3])
+        self.assertEqual(favored_run[4], unfavored_run[4])
+        # Only the learner's practice XP differs, by the elemental factor.
+        for index in (5, 6):
+            self.assertGreater(favored_run[index], 0)
+            self.assertGreater(unfavored_run[index], 0)
+            self.assertAlmostEqual(
+                favored_run[index] / unfavored_run[index],
+                AFFINITY_ELEMENT_MULTIPLIER / NON_AFFINITY_ELEMENT_MULTIPLIER,
+            )
+        # The untouched party member is byte-identical after both rounds.
+        self.assertEqual(
+            (
+                bystander.traits.hp.current,
+                bystander.traits.mp.current,
+                dict(bystander.db.skill_proficiency),
+            ),
+            bystander_state,
         )
