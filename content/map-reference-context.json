@@ -176,7 +176,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "f303c5dc7e41ba078af9cc3084b68ed0fac286f5b8994d1a891d16aab33e5c4c",
+  "fingerprint": "e85bc754230b371205c7019c129f5e3f2632911d2c90d1cfaddc14ef3c3b5c43",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -1255,14 +1255,14 @@
     "world/rules/state_derived_roll.py": "a2750faa8d5e9eeeddcd20a7c711e4d76be0b13a7f8dae6413f84f0c3ecfce99",
     "world/rules/state_reactions.py": "7a9b6c952722bfa13db3e219bcba63578cec8ccd9c4dd635211eaa5693e3c0de",
     "world/rules/status_display.py": "615ef85f36c071cc2e44b776f621820dbdfd780460ef40e536559c2b956ab2ea",
-    "world/rules/status_query/__init__.py": "2ced83665d18ee4788a248549138c9a15cdbabdfef00d16efc8c0f1a4e48e678",
+    "world/rules/status_query/__init__.py": "1a450ed9dc1d8ea6bc424c4b8d6070e6ab160d951dad130bc8bf36a29c2de377",
     "world/rules/status_query/assembly.py": "addb46139de0811cc2a390f37824890a758b7781ec0abe5041fdbcb0342612f8",
     "world/rules/status_query/breakdown.py": "514a9e6dfd273c442a18cad32e76d0025a1896525b9a5037e4896279534eddd2",
     "world/rules/status_query/character.py": "cbf8a06c06b98105bcacde85bcdf280bb0cf07fb10d295d91519315e2aa36707",
     "world/rules/status_query/conditions.py": "fbd38c4ed1a07442e6c4a7530c28153f0d21ba91d8346f7f2ec73d3078ac84d3",
     "world/rules/status_query/context.py": "51417f8da2aab4d23963edc1c7f5a0dee3b91352f6efbd926bb1b3f96238e14e",
-    "world/rules/status_query/fatigue.py": "7b6969faecb8b0cb549187a16135e57c408d68262ac5956f2fadebd13bc0216e",
-    "world/rules/status_query/models.py": "aa0f3fd37cb62eac2722953071bda9e28dfd8e10e25155921ac2c44feabdeaff",
+    "world/rules/status_query/fatigue.py": "a51d700de15a703f07acc354cfed3e74e32759813147261cfa689aabf49edf00",
+    "world/rules/status_query/models.py": "ad2e80794526936ed86f69070562866563ad020504a9694ee00313ee3692e4de",
     "world/rules/status_query/provenance.py": "a3288f8c9c47b45fbb9a93e0f9a37bad0cbecc5f0cdaf68717c2270503dfa4e3",
     "world/rules/status_query/readers.py": "dd8a659d5226379f648cd23dca384d6ad108ef0270e4e3ea9b5483f3554ebbcc",
     "world/rules/status_query/sexual.py": "829f841791b3cc0515171fd423306e8a1fcbddb2900f4771d53f0f3c47bc684f",
