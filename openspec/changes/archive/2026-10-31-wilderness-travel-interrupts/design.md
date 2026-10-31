@@ -44,6 +44,45 @@ Use synthetic documents, policies and parties with independent expected results.
 
 Requirement IDs must come from tools.spec_traceability list on the equivalent merged spec tree, never hand-composed. Before sync associate only the nearest current canonical requirement and report the temporary mapping per docs/development/spec-test-traceability.md. Sync remounts to the generated IDs with no uncovered requirements or waiver. Modified requirements retain identity except an explicit RENAMED window title. Mechanism tests must exist before that sync.
 
+### Requirement association record (task 2.2)
+
+`uv run --locked python -m tools.spec_traceability list` on the merged main
+tree reports no canonical requirement for the new capability; its two
+requirements exist only after the archive sync, so no `covers_requirement`
+annotation names them and no ID is hand-composed. The modified requirement
+keeps its current canonical identity.
+
+| Delta requirement | Current canonical association | Evidence (mechanism tests) |
+| --- | --- | --- |
+| `wilderness-travel-interrupts` ADDED: Wilderness steps report stateless committed interrupts | none yet (planned sync mount: `openspec/specs/wilderness-travel-interrupts/spec.md`) | `world.rules.tests.test_travel_interrupts.TransitionTableTests`, `CollectorDispositionTests`, `world.rules.tests.test_travel_interrupts.PaceThresholdTests`, `NightfallTests`, `MemberAsleepTests`; committed-step capture in `WildernessMoveInterruptTests` (`test_a_gate_entry_carries_committed_interrupts_without_a_capture_failure`, `test_the_natural_arrival_flag_reports_the_landmark_cell`, `test_pooled_room_facts_follow_coordinates_not_object_identity`, `test_capturing_the_committed_facts_writes_nothing`) |
+| `wilderness-travel-interrupts` ADDED: Interrupt results respect movement failure boundaries | none yet (planned sync mount: `openspec/specs/wilderness-travel-interrupts/spec.md`) | `CollectorDispositionTests` (capture and comparison failure), `test_a_refused_step_carries_no_interrupt_data`, `test_a_movement_owned_failure_restores_knowledge_and_carries_no_interrupts`, `test_a_caller_rollback_discards_the_commit_qualified_result`, `test_initial_pace_state_matches_move_interrupt`, `test_nightfall_raises_only_for_a_charged_crossing`, `test_a_flight_waived_zero_charge_step_cannot_cross_into_night`; dispatcher `CommitQualifiedResultTests` |
+| `webclient-exploration-menu` MODIFIED: `explore.move` traverses a re-resolved Exit through the shared movement path | `webclient-exploration-menu::explore-move-traverses-a-re-resolved-exit-through-the-shared-movement-path` (retained identity) | existing scenarios keep their tests; the added scenarios are `test_move_payload_admits_only_the_exact_optional_walk_union` and `test_an_unchanged_canonical_node_rejects_whatever_the_room_identity` (both annotated with the canonical ID), plus every pre-existing move test |
+
+Sync is expected to generate the two new IDs with no uncovered requirement and
+no waiver; the matching-table membership of the listed tests is the reviewed
+per-requirement mapping.
+
+### Post-implementation review dispositions
+
+One blocking post-implementation critique ran over the final diff, tests and
+docs. Its blocking finding and both non-blocking findings were adopted:
+
+- Blocking: the destination cell/location resolution in `capture_after` sat
+  outside the collector's guard, so a coordinate-read failure could escape a
+  committed move into `move_failed`. The setup now runs inside the guarded
+  capture, and `test_an_after_capture_setup_failure_never_fails_the_committed_move`
+  proves the committed relocation, charge, empty interrupt list and
+  `travel_interrupts_failed` event survive it.
+- Non-blocking: `distant_markers` consumed the lighting iterable before the
+  canopy short circuit and sight-input validation. The markers now answer
+  before consuming lighting when nothing is visible, restoring the previous
+  order; `test_marker_validation_and_the_canopy_short_circuit_precede_lighting`
+  pins both orders.
+- Non-blocking: a before-capture failure logged tick zero. The collector now
+  records the correlation tick before the rest of the read;
+  `test_a_before_capture_failure_reports_the_current_tick` asserts the real
+  world tick.
+
 ## Risks / Trade-offs
 
 [Read side effects] -> Pure projections and object/Attribute/clock snapshots in integration tests. [Shared files] -> Serialize shard-manifest, schema and documentation changes even when roots are independent. [Data echo tests] -> Assert mechanics on synthetic fixtures and treat visual review separately. No new permanent lighting or walking state is allowed.

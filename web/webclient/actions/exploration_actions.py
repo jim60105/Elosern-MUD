@@ -29,7 +29,8 @@ from web.webclient.presentation.protocol import MAX_SAFE_INTEGER
 from world.observability import log_error, log_warn
 from world.rules.clock import DaypartError, get_world_clock, seconds_until_daypart
 from world.rules.combat_session import CombatSessionError, SessionReason, engage
-from world.rules.presentation_events import publication_group
+from world.rules.presentation_events import on_publication_commit, publication_group
+from world.rules.travel_plan import PACES
 from world.rules.dialogue import (
     DuplicateSelectionError,
     StaleContextError,
@@ -151,17 +152,45 @@ def _require_non_empty_string(value: Any, field: str, maximum: int) -> str:
 
 
 def validate_move_payload(payload: Any) -> dict[str, Any]:
-    """Validate the exact ``explore.move`` payload (exit_ref + current_node)."""
+    """Validate the exact ``explore.move`` payload, with an optional walk context.
+
+    The admitted union is exactly ``{exit_ref, current_node}`` or that plus
+    ``walk: {pace, stop_at_night}``. The movement contract itself never
+    changes: the exit/current-node admission and the stale-location guard are
+    the same for both forms. The walk context is request-scoped only; nothing
+    about it is stored between requests.
+    """
     if not isinstance(payload, dict):
         raise ExplorationActionError("explore.move payload must be an object")
-    if set(payload) != {"exit_ref", "current_node"}:
-        raise ExplorationActionError("explore.move requires exactly exit_ref and current_node")
-    return {
+    keys = set(payload)
+    if keys not in (
+        {"exit_ref", "current_node"},
+        {"exit_ref", "current_node", "walk"},
+    ):
+        raise ExplorationActionError(
+            "explore.move requires exactly exit_ref and current_node, "
+            "optionally with walk"
+        )
+    normalized = {
         "exit_ref": _require_ascii_identifier(
             payload["exit_ref"], "exit_ref", MAX_EXIT_REF_CHARS
         ),
         "current_node": _require_node_id(payload["current_node"], "current_node"),
     }
+    if "walk" in keys:
+        walk = payload["walk"]
+        if not isinstance(walk, dict) or set(walk) != {"pace", "stop_at_night"}:
+            raise ExplorationActionError(
+                "explore.move walk requires exactly pace and stop_at_night"
+            )
+        pace = walk["pace"]
+        if not isinstance(pace, str) or pace not in PACES:
+            raise ExplorationActionError("pace is not an admitted value")
+        stop_at_night = walk["stop_at_night"]
+        if not isinstance(stop_at_night, bool):
+            raise ExplorationActionError("stop_at_night must be a boolean")
+        normalized["walk"] = {"pace": pace, "stop_at_night": stop_at_night}
+    return normalized
 
 
 def validate_look_payload(payload: Any) -> dict[str, Any]:
@@ -610,15 +639,34 @@ def _resolve_monster(actor: Any, monster_id: int) -> Any | None:
 # ---------------------------------------------------------------------------
 
 
-def _move_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
+def _move_adapter(
+    actor: Any, payload: dict[str, Any], session: Any = None
+) -> dict[str, Any] | Deferred:
     """Re-resolve the Exit and traverse through its own method (design D3).
 
     The Exit's own ``at_traverse`` flows through ``MovementCostMixin`` so the
     shared 30-second move charge and the destination-node record fire exactly
     as the typed command produces them, and the ``at_pre_move`` combat veto
     still runs inside the traversal.
+
+    Success is a canonical-coordinate change: a traversal whose canonical
+    location node is unchanged rejects ``move_failed`` whatever the room
+    object's identity, while a pooled wilderness room reused at another cell
+    succeeds because its coordinate node moved.
+
+    A successful wilderness step carries its committed interrupt flags in the
+    result ``data`` slot. That result is released only when the move's own
+    transaction commits: the adapter returns a ``Deferred`` resolved through
+    ``on_publication_commit`` under the group it already captured. Production
+    commits inside ``settle_movement``, so the callback runs immediately; a
+    caller-owned enclosing transaction that rolls back discards it, and the
+    completion therefore never publishes (the external owner keeps its own
+    compensation and failure completion). Every refusal and every
+    non-wilderness success keeps today's synchronous dictionary shape.
     """
     del session
+    from world.rules.movement_settlement import capture_movement_observation
+
     current_node = _current_node(actor)
     if current_node is None or current_node != payload["current_node"]:
         return _rejected("stale_location", "你的位置已經改變，請重新操作。")
@@ -634,25 +682,22 @@ def _move_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> d
     except Exception as exc:
         log_warn("exit_access_failed", context={"char": actor.pk, "exit": exit_obj.pk}, exc=exc)
         return _rejected("locked", "此出口目前無法通行。")
-    source_location = actor.location
     # The traversal, its committed settlement and this result share one causal
     # publication group. The group bound here is the dispatcher's invocation
     # group (a nested scope reuses it); the private slot below makes the
     # attachment explicit, so a completion enqueued before the reactor drain
     # always names the group the movement checkpoint joined and the two
     # coalesce into one publication.
-    with publication_group() as captured:
+    with publication_group() as captured, capture_movement_observation(
+        actor, walk=payload.get("walk")
+    ) as observation:
         try:
             exit_obj.at_traverse(actor, destination)
         except Exception as exc:
             log_error("exit_traverse_failed", context={"char": actor.pk, "exit": exit_obj.pk}, exc=exc)
             return _rejected("move_failed", "移動失敗。")
-        if actor.location is source_location and _current_node(actor) in (None, current_node):
-            # ``at_traverse`` returns None on both branches (the movement cost
-            # and knowledge hooks live in ``at_post_traverse``), so success is
-            # detected by the actor actually relocating. Wilderness rooms may
-            # be reused: their canonical coordinate node changes without object
-            # replacement.
+        after_node = _current_node(actor)
+        if after_node is None or after_node == current_node:
             from world.rules.combat_session import is_in_active_session
 
             if is_in_active_session(actor):
@@ -663,10 +708,28 @@ def _move_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> d
         # narrative, including first-landmark discovery, once for every
         # traversal lineage.
         result = _success("moved", message, AFFECTED_FULL)
-    from web.webclient.actions.dispatcher import PUBLICATION_GROUP_FIELD
+        wilderness_step = after_node.startswith("wild:")
+        if wilderness_step:
+            data = result.get("data")
+            result["data"] = {
+                **(data if isinstance(data, dict) else {}),
+                "interrupts": list(observation.flags),
+            }
+        from web.webclient.actions.dispatcher import PUBLICATION_GROUP_FIELD
 
-    result[PUBLICATION_GROUP_FIELD] = captured.id
-    return result
+        result[PUBLICATION_GROUP_FIELD] = captured.id
+        if not wilderness_step:
+            return result
+        # The wilderness success result is commit-qualified: it exists only when
+        # the move's transaction really committed, and it joins the captured
+        # causal group through the private slot above.
+        released = Deferred()
+
+        def _release() -> None:
+            released.callback(result)
+
+        on_publication_commit(_release)
+        return released
 
 
 def _look_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:

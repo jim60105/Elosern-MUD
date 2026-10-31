@@ -239,6 +239,141 @@ def note_direct_move_end(actor: Any) -> None:
         return
 
 
+# ---------------------------------------------------------------------------
+# Ephemeral interrupt observations (wilderness-travel-interrupts).
+#
+# The adapter binds one collector around its exit traversal only. The
+# settlement captures the immutable before facts before the traversal and the
+# after facts only once a settled relocation is known, so a refused, failed or
+# compensated step can never publish an interrupt result. The collector holds
+# values and a ContextVar binding, never game state, and the adapter reads the
+# frozen flag tuple after `at_traverse` returns.
+# ---------------------------------------------------------------------------
+
+
+class MovementObservation:
+    """One move's ephemeral before/after interrupt facts.
+
+    The collector is actor-scoped: a nested settlement for another actor (an
+    NPC moved inside the same synchronous chain) resolves no collector and
+    therefore can neither replace this actor's step nor publish its facts.
+    Every capture or comparison failure is reported as
+    ``travel_interrupts_failed`` and leaves the empty-flag disposition, so a
+    broken read never fails an otherwise successful movement.
+    """
+
+    __slots__ = ("actor_id", "walk", "before", "after", "flags", "wilderness", "_members", "_tick")
+
+    def __init__(self, actor: Any, walk: Any = None) -> None:
+        self.actor_id = int(actor.pk)
+        self.walk = walk
+        self.before: Any = None
+        self.after: Any = None
+        self.flags: tuple[str, ...] = ()
+        self.wilderness = False
+        self._members: tuple[Any, ...] = ()
+        self._tick = 0
+
+    def capture_before(
+        self,
+        actor: Any,
+        source_location: Any,
+        *,
+        wilderness_source_coordinates: tuple[int, int] | None,
+        knowledge_owner: Any,
+    ) -> None:
+        """Freeze the facts of the position being left, before any write."""
+        from world.rules import travel_interrupts
+        from world.rules.clock import read_world_clock
+
+        try:
+            # Record the correlation tick before the rest of the read, so a
+            # later capture failure still reports the real world time.
+            clock = read_world_clock()
+            self._tick = 0 if clock is None else int(clock.tick)
+            self._members = travel_interrupts._source_present_members(
+                actor, source_location, wilderness_source_coordinates
+            )
+            facts = travel_interrupts.read_movement_facts(
+                actor,
+                source_location,
+                cell=wilderness_source_coordinates,
+                knowledge_owner=knowledge_owner,
+                members=self._members,
+            )
+        except Exception as error:  # observability: ignore R2: the failure IS reported by _failed's travel_interrupts_failed event below; an interrupt read must never fail a committed move
+            self._failed(error, "before")
+            return
+        self.before = facts
+        self._tick = facts.tick
+
+    def capture_after(self, actor: Any, *, knowledge_owner: Any) -> None:
+        """Compare the committed destination facts with the frozen source facts."""
+        from world.rules import travel_interrupts
+
+        try:
+            # The setup is part of the capture: a destination-coordinate read
+            # failure must never escape a committed move.
+            location = getattr(actor, "location", None)
+            cell = travel_interrupts.wilderness_cell(location)
+            if cell is None:
+                return
+            self.wilderness = True
+            if self.before is None:
+                # The source capture already reported its failure.
+                return
+            after = travel_interrupts.read_movement_facts(
+                actor,
+                location,
+                cell=cell,
+                knowledge_owner=knowledge_owner,
+                members=self._members,
+            )
+            self.after = after
+            self._tick = after.tick
+            self.flags = travel_interrupts.movement_flags(
+                self.before, after, walk=self.walk
+            )
+        except Exception as error:  # observability: ignore R2: the failure IS reported by _failed's travel_interrupts_failed event below; an interrupt comparison must never fail a committed move
+            self._failed(error, "after")
+
+    def _failed(self, error: Exception, step: str) -> None:
+        self.flags = ()
+        log_warn(
+            "travel_interrupts_failed",
+            context={"char": self.actor_id, "tick": self._tick, "step": step},
+            exc=error,
+        )
+
+
+_movement_observation: contextvars.ContextVar[MovementObservation | None] = (
+    contextvars.ContextVar("elosern_movement_observation", default=None)
+)
+
+
+@contextmanager
+def capture_movement_observation(
+    actor: Any, *, walk: Any = None
+) -> Iterator[MovementObservation]:
+    """Bind one ephemeral interrupt collector around one move's traversal."""
+    observation = MovementObservation(actor, walk)
+    token = _movement_observation.set(observation)
+    try:
+        yield observation
+    finally:
+        _movement_observation.reset(token)
+
+
+def _observation_for(actor: Any) -> MovementObservation | None:
+    """The collector bound for exactly ``actor``'s step, or ``None``."""
+    observation = _movement_observation.get()
+    if observation is None:
+        return None
+    if observation.actor_id != int(actor.pk):
+        return None
+    return observation
+
+
 def settle_movement(
     traversing_object: Any,
     source_location: Any,
@@ -304,6 +439,17 @@ def settle_movement(
             wilderness_source_coordinates=wilderness_source_coordinates,
             window_seconds=window_seconds,
         )
+        observation = _observation_for(traversing_object)
+        if observation is not None:
+            # Frozen immediately before the traversal and before any pooled-room
+            # mutation: the source cell and the party's before physiology can
+            # never be rewritten by the step they describe.
+            observation.capture_before(
+                traversing_object,
+                source_location,
+                wilderness_source_coordinates=wilderness_source_coordinates,
+                knowledge_owner=snapshot.commander or traversing_object,
+            )
         try:
             from world.quests.escort_events import escort_event_boundary
 
@@ -364,6 +510,14 @@ def settle_movement(
                 source_identity,
                 read_alignment_identity(traversing_object),
             )
+            if observation is not None:
+                # Only a settled relocation has an after state to compare: a
+                # refusal, a rollback or a compensated falsy return keeps the
+                # collector's empty-flag disposition.
+                observation.capture_after(
+                    traversing_object,
+                    knowledge_owner=snapshot.commander or traversing_object,
+                )
         if narrate_traversal and not (wilderness_lineage and not result):
             from world.rules.map_discovery import publish_traversal_narrative
 

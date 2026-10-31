@@ -725,6 +725,86 @@ def merge_sources(sources: Iterable[SightSource]) -> tuple[SightSource, ...]:
     return tuple(sorted(merged, key=lambda source: (source.cell, source.source_key)))
 
 
+def visible_distant_sources(
+    observer: tuple[int, int],
+    calendar: Any,
+    sources: Iterable[SightSource],
+    *,
+    inputs: GroundSightInputs,
+    cell_size_km: float,
+    policy: SightPolicy | None = None,
+) -> tuple[tuple[SightSource, str, float], ...]:
+    """The merged distant sources visible from ``observer`` right now.
+
+    This is the single visibility decision behind both the wire markers and
+    the travel interrupts' ``landmark_sighted`` comparison: a source is
+    visible only while the current phase can see it, only when it lies outside
+    live ground sight, and never under a canopy. Each entry carries the merged
+    source, its phase silhouette and its distance in kilometres; nothing is
+    stored, lit or named here.
+    """
+
+    resolved = _policy(policy)
+    if not isinstance(inputs, GroundSightInputs):
+        raise TypeError("distant sources need GroundSightInputs")
+    if inputs.terrain in resolved.canopy_terrain:
+        return ()
+    if isinstance(cell_size_km, bool) or not isinstance(cell_size_km, (int, float)):
+        raise TypeError("cell size must be a number of kilometres")
+    if not math.isfinite(float(cell_size_km)) or cell_size_km <= 0:
+        raise ValueError(f"cell size must be positive, got {cell_size_km!r}")
+
+    column = resolved.phase_for_hour(_hour(calendar))[1]
+    radius = ground_radius(calendar, inputs, policy=resolved)
+    visible: list[tuple[SightSource, str, float]] = []
+    for source in merge_sources(sources):
+        if in_ground_disc(observer, source.cell, radius):
+            continue
+        if column == "night":
+            visibility = source.light_km
+            silhouette = source.silhouette_night
+        elif column == "twilight":
+            visibility = source.sight_km * resolved.twilight_factor
+            silhouette = source.silhouette_day
+        else:
+            visibility = source.sight_km
+            silhouette = source.silhouette_day
+        distance_cells = math.dist(observer, source.cell)
+        distance_km = distance_cells * float(cell_size_km)
+        if visibility <= 0 or distance_km > visibility:
+            continue
+        visible.append((source, silhouette, distance_km))
+    return tuple(visible)
+
+
+def visible_distant_source_keys(
+    observer: tuple[int, int],
+    calendar: Any,
+    sources: Iterable[SightSource],
+    *,
+    inputs: GroundSightInputs,
+    cell_size_km: float,
+    policy: SightPolicy | None = None,
+) -> frozenset[str]:
+    """The internal source keys visible from ``observer`` right now.
+
+    The comparison identity behind ``landmark_sighted``: callers diff two
+    committed positions' key sets instead of comparing localized wire markers.
+    """
+
+    return frozenset(
+        source.source_key
+        for source, _silhouette, _distance_km in visible_distant_sources(
+            observer,
+            calendar,
+            sources,
+            inputs=inputs,
+            cell_size_km=cell_size_km,
+            policy=policy,
+        )
+    )
+
+
 def distant_markers(
     observer: tuple[int, int],
     calendar: Any,
@@ -747,37 +827,22 @@ def distant_markers(
     stored or lit by reading.
     """
 
-    resolved = _policy(policy)
-    if not isinstance(inputs, GroundSightInputs):
-        raise TypeError("distant markers need GroundSightInputs")
-    if inputs.terrain in resolved.canopy_terrain:
+    visible = visible_distant_sources(
+        observer,
+        calendar,
+        sources,
+        inputs=inputs,
+        cell_size_km=cell_size_km,
+        policy=policy,
+    )
+    if not visible:
+        # The canopy short circuit (and an observation with no visible source)
+        # answers before the caller's lighting iterable is consumed.
         return ()
-    if isinstance(cell_size_km, bool) or not isinstance(cell_size_km, (int, float)):
-        raise TypeError("cell size must be a number of kilometres")
-    if not math.isfinite(float(cell_size_km)) or cell_size_km <= 0:
-        raise ValueError(f"cell size must be positive, got {cell_size_km!r}")
-
-    column = resolved.phase_for_hour(_hour(calendar))[1]
-    radius = ground_radius(calendar, inputs, policy=resolved)
     lit = frozenset(lit_districts)
     names = {} if district_names is None else district_names
     markers: list[tuple[tuple[int, int], str, dict[str, Any]]] = []
-    for source in merge_sources(sources):
-        if in_ground_disc(observer, source.cell, radius):
-            continue
-        if column == "night":
-            visibility = source.light_km
-            silhouette = source.silhouette_night
-        elif column == "twilight":
-            visibility = source.sight_km * resolved.twilight_factor
-            silhouette = source.silhouette_day
-        else:
-            visibility = source.sight_km
-            silhouette = source.silhouette_day
-        distance_cells = math.dist(observer, source.cell)
-        distance_km = distance_cells * float(cell_size_km)
-        if visibility <= 0 or distance_km > visibility:
-            continue
+    for source, silhouette, distance_km in visible:
         name = None
         if source.district_key is not None and source.district_key in lit:
             name = names.get(source.district_key)
@@ -1114,5 +1179,7 @@ __all__ = [
     "settlement_sources",
     "sight_terrain_class",
     "validate_sight_region_coverage",
+    "visible_distant_source_keys",
+    "visible_distant_sources",
     "visible_distant_markers",
 ]

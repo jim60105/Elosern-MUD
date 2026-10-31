@@ -176,7 +176,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "02bf748533bda411f1986ee8c8857c53c2a7da7cdb8763b40bca19ad389ee78c",
+  "fingerprint": "f303c5dc7e41ba078af9cc3084b68ed0fac286f5b8994d1a891d16aab33e5c4c",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -1164,7 +1164,7 @@
     "world/rules/monster_behaviour.py": "bad5390fc03d977bc79d2d162a12f873eb8248a0db2f555d0dfac4893130730a",
     "world/rules/monster_individual.py": "aebffc963389222d028d121c9ee9d9bd7b13f88e3ffcc6a42f7939e0eeed0591",
     "world/rules/movement.py": "cd3d72c72bd4c9cf89b210413b8871056b38caa4969554f4ad5770bb19fe436a",
-    "world/rules/movement_settlement.py": "43e22fa2e32e3b3e9a2087013d2bcc8917ec17af11fed86e447b37dbbfb2aaa3",
+    "world/rules/movement_settlement.py": "1b080e26cc2bc7a099cee1938ad39ae11e71a099fb9e87f68e34e374a5620370",
     "world/rules/mp_flow.py": "cf7f26056b7845b1df943068fe21fc5cfb2b5ab5d837c20a660418d6804179a4",
     "world/rules/namegen.py": "f22a06725ebb3ce1553cf5b568f13ffcedcef3e63b97089dc9c72c9f05b26c71",
     "world/rules/npc_capabilities.py": "46b02af1f99742ee7ed081dbc720f676d9b5f23ee41671f38aa9e5bcfc7022e8",
@@ -1243,7 +1243,7 @@
     "world/rules/sexual_state/traits.py": "eb0b8495f68f47fb8b51654821200f22bfe7f008f1241ebc84e284833bf14f91",
     "world/rules/sexual_transitions.py": "69cf32779cfd749d35a7c6ffa62f1067698f3f30df04821b2efcccb98de67c87",
     "world/rules/shop_hours.py": "676d1dd1353d6758068c0b1c9d40e2f3db986cd97d1507a025982d124e04b366",
-    "world/rules/sight.py": "5af03573084d0cab14dadf36f8464a8e65a8b0f011de67a4437a3c3933246b87",
+    "world/rules/sight.py": "c9d76d662df6f247a9b5a4c47b5d1c97e9b66a45c00e198eefe749402d7fa0d9",
     "world/rules/skill_effects.py": "6fdffeed7109222c2d762b7784cb513631db43d5e1d8d8b7383a29d8e18a0856",
     "world/rules/skill_ownership.py": "a028bd224eb349c98ee829986dcdc9bdc518470ccf86ef719aba4ef8f0087205",
     "world/rules/skip_safety.py": "72088a1fd2bb12f9bf777805740ada42da4c5689c30e7cbfa94bd752fd4ff255",
@@ -1283,6 +1283,7 @@
     "world/rules/titles/state.py": "7efdc1e5a9a745f0ba980106f133f031856f21f7bfacb83beaef54f7a3097247",
     "world/rules/traits.py": "fb483c81ecbdfaf57f973fb984867c119bf2615451415980ef82e4de61ae7237",
     "world/rules/travel_cost.py": "bfb2a1eb87cbd9ccb25410de6026462b9c3acfaa22adc63f42ba39171bb0a5ae",
+    "world/rules/travel_interrupts.py": "7f85db1c6ab8d3d8a5264428e98900f4ec6fd2eee4198c13aed74c20efdabcce",
     "world/rules/travel_plan.py": "10ce62a44c4bbc7c6add81e14c9fe3f023610214b12078441dc4e0fb94f23737",
     "world/rules/unlock_notices.py": "c3402f1db1a73348f5667761e9fe7722c11a692b2a1371593528b70ac9e452f1",
     "world/rules/upkeep.py": "2e400d2dfa0434bc0e49a5a509dba51a82ebaa2e972b6d842639dd12fbf3128d",

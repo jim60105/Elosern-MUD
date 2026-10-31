@@ -397,6 +397,41 @@ class DistantMarkerTests(unittest.TestCase):
     @covers_requirement(
         "wilderness-sight::distant-sightings-disclose-approximate-current-observations"
     )
+    def test_marker_validation_and_the_canopy_short_circuit_precede_lighting(self):
+        policy = _synthetic_policy()
+        source = _marker_source(cell=(3, 0), sight_km=10.0)
+        consumed: list[bool] = []
+
+        def lighting():
+            consumed.append(True)
+            yield "t_district"
+
+        # A canopy observation answers before the caller's lighting iterable
+        # is consumed, exactly as the pre-extraction implementation did.
+        self.assertEqual(
+            _markers(policy, [source], hour=12, terrain="canopy", lit=lighting()),
+            (),
+        )
+        self.assertEqual(consumed, [])
+        # A malformed sight input is rejected before lighting is consumed too.
+        with self.assertRaises(TypeError):
+            distant_markers(
+                (0, 0),
+                _hour(12),
+                [source],
+                lighting(),
+                inputs=None,
+                cell_size_km=1.0,
+                policy=policy,
+            )
+        self.assertEqual(consumed, [])
+        # A valid observation does consume it.
+        self.assertEqual(len(_markers(policy, [source], hour=12, lit=lighting())), 1)
+        self.assertEqual(consumed, [True])
+
+    @covers_requirement(
+        "wilderness-sight::distant-sightings-disclose-approximate-current-observations"
+    )
     def test_a_hidden_place_is_never_a_source_in_any_phase(self):
         policy = _synthetic_policy()
         for kind in sorted(HIDDEN_ANCHOR_KINDS):

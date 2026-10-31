@@ -468,12 +468,7 @@ SHALL NEVER drop, clip, or reorder rows to fit a bound.
 - **THEN** the flattened row bounds apply to flattened totals, not to that count, which is separately bounded by the number of `SkillCategory` members plus exactly one — the extra slot carrying the presentation-only synthetic fallback group (category `"unknown"`) for keys absent from `SKILL_REGISTRY`, so an entity owning skills in every real category plus one unregistered key still renders
 
 ### Requirement: explore.move traverses a re-resolved Exit through the shared movement path
-
-The production action registry SHALL register `explore.move`, whose payload SHALL accept exactly `exit_ref`
-(1..64 ASCII characters) and `current_node` (a canonical node ID). The adapter SHALL verify the actor's
-current node, re-resolve the Exit by the opaque `exit_ref`, re-check its location, destination, and `traverse`
-lock, and invoke its own traversal method. Relocation SHALL be decided by the canonical node, never by the
-room object.
+explore.move SHALL accept exactly exit_ref/current_node, optionally plus exact walk:{pace,stop_at_night}; it SHALL re-resolve and re-authorize the Exit and canonical current node through the shared traversal path, preserving authenticated actor ownership and canonical-coordinate success detection.
 
 #### Scenario: Keyboard movement charges the same 30 seconds as the command path
 - **WHEN** an actor submits `explore.move` with a valid `exit_ref` and matching `current_node` for a traversable exit
@@ -513,6 +508,10 @@ room object.
 - **WHEN** traversal changes the actor's canonical wilderness coordinates while retaining the same room object
 - **THEN** the adapter reports `success` / `moved`, publishes the committed destination, and does not return `move_failed` solely because room identity is unchanged
 - **AND** a traversal whose canonical location node is unchanged still rejects `move_failed`, whatever the room object's identity
+
+#### Scenario: Exact optional walk union
+- **WHEN** omitted, valid, extra-key, invalid-enum or non-boolean walk payloads are submitted
+- **THEN** only the original two-field request and the exact valid three-field request are admitted, with unchanged traversal and stale-location guards
 
 ### Requirement: explore.look reuses the command appearance path
 The production action registry SHALL register `explore.look`, whose payload SHALL accept exactly one of `room` (the exact boolean true) or `target_id` (a positive integer). The adapter SHALL obtain the actor from the authenticated session, re-resolve `target_id` against the actor's current location's present contents when given, re-verify presence and ordinary display/access rules, and route the look through the same appearance path the `look` command uses.
