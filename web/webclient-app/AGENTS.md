@@ -126,7 +126,52 @@ prototypes; the real app differs too much for a prototype to be useful).
   keeps per-tab view／selection memory per generation｜epoch (the area half
   also per `map_id|frame.key|frame.unit`), and sends `map.view` on open, on a
   tab switch and once per committed move while open — never on input or
-  while closed. Keep the drawer data-free: it requests nothing itself.
+  while closed. That closed-map rule is the drawer's own: the travel stage
+  below requests its area independently. Keep the drawer data-free: it
+  requests nothing itself.
+
+## Wilderness travel stage
+
+The travel presentation (wilderness-travel-interface; design
+`docs/superpowers/specs/2026-10-30-wilderness-travel-interface-design.md`)
+is selected from committed facts only: `view.travel` (`stores/elosern/
+travel.js`, pure rules in `components/travel/travel-model.js`) is `mode`
+while the committed mode is exploration and the `art` scene descriptor's
+`subject_id` starts with `wilderness:`, and `layout` while no dialogue,
+dream or creation surface owns the stage. There is no server travel mode.
+
+- `HudFrame`'s `travel` prop is a presentation hook (`data-travel`), never a
+  mode: the vignette lightens and both portrait anchors stay empty. AppClient
+  fills the slots: `TravelMap` over the still-mounted `SceneBackdrop`
+  (crossfade over `--motion-scene`, none at `off`, the leaving copy inert),
+  `StatusPanel` (without its fatigue lines) above `PartyMedallions` in
+  `vitals`, the place card alone in `map` (no minimap); the choices,
+  presence, message and command regions are unchanged.
+- `composables/use-travel-map.js` is the one area `map.view` owner while
+  the layout is shown: on entry, a committed current-node or world-time
+  change, a completed `explore.look`, each accepted full snapshot (the
+  transport seam's recovery signal, `store.travelRecovery`) and the
+  player's own 重新整理 after a failed read; never on aim, hover, resize,
+  render or a failed move, and never on a timer. One coalesced pending slot,
+  sent through `dispatchAction`, paused while a drawer or overlay is open;
+  adoption follows the drawer's result/body correlation. It publishes
+  `mapStatus` (`ready`, `refreshing`, `unavailable`, `invalid`, `retired`)
+  through `store.setTravelMap`; the compass waits while refreshing and stops
+  on a failed read. In travel the drawer offers only 世界 and never asks for
+  the area.
+- `lib/travel-grid.js` `decodeTravelGrid` is the temporary adapter over the
+  schema-2 window (through `decodeWindow`, never a second decoder); it
+  leaves band/tier/flags/phase/sight empty until window-ui.
+- `PartyMedallions` shows the controlled body once, then each member whose
+  own `status.fatigue` row is committed (status v5 emits one per
+  source-present traveller), with its supplied reserve, stage label and
+  `asleep` crescent; a missing row reads unavailable, never full. Only the
+  status source's and the controlled body's rows can reveal the vitals dock;
+  a further traveller's row never surfaces it by itself.
+- Focus never falls to the document from the stage: a remounted view or the
+  retry control's removal moves it to the `TravelMap` section, and leaving
+  travel returns it to the shell's focus home. One mounted `role="status"`
+  line speaks the map state.
 
 ## Styling pitfall
 

@@ -266,6 +266,7 @@ describe("AppClient room actions (exploration-room-actions)", () => {
           label: "中度疲勞",
           severity: "warning",
           restriction: null,
+          asleep: false,
         },
       ];
       await mountWith({ status });

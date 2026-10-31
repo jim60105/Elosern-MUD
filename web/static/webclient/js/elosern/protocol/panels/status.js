@@ -1,4 +1,4 @@
-// Status v4 presenter wire contract, including read-model provenance and the
+// Status v5 presenter wire contract, including read-model provenance and the
 // physiological fatigue subject rows.
 // Split from the combat panel module.
 
@@ -93,12 +93,13 @@ function validateStatusCondition(value) {
 }
 
 // One physiological subject row: the member's own identity, display-rounded
-// reserve percent, the exact-units stage, and the fixed restriction line.
+// reserve percent, the exact-units stage, the fixed restriction line, and
+// (v5) the canonical sleep posture.
 function validateFatigueSubject(value) {
   requireExactFields(
     value,
     "fatigue subject",
-    ["identity", "name", "reserve_percent", "stage", "label", "severity", "restriction"],
+    ["identity", "name", "reserve_percent", "stage", "label", "severity", "restriction", "asleep"],
     []
   );
   requireString(value.identity, "fatigue subject.identity", MAX_ACTOR_IDENTITY);
@@ -126,6 +127,10 @@ function validateFatigueSubject(value) {
   if (sleepingStage !== (value.restriction !== null)) {
     throw new Error("fatigue subject.restriction disagrees with its stage");
   }
+  requireBool(value.asleep, "fatigue subject.asleep");
+  if (value.asleep !== sleepingStage) {
+    throw new Error("fatigue subject.asleep disagrees with its stage");
+  }
   if (value.restriction !== null) {
     requireString(
       value.restriction,
@@ -139,7 +144,7 @@ function validateFatigueSubject(value) {
   return value;
 }
 
-// Exact available status panel v4 schema (composed full title optional).
+// Exact available status panel v5 schema (composed full title optional).
 function validateStatusPanel(payload) {
   requireExactFields(
     payload,
@@ -157,7 +162,7 @@ function validateStatusPanel(payload) {
     []
   );
   requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-  if (payload.schema_version !== 4) {
+  if (payload.schema_version !== 5) {
     throw new Error("unsupported status panel schema_version");
   }
 

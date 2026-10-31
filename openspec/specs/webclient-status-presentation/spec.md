@@ -5,7 +5,7 @@ Read-only compact character status derived from canonical resources, active cond
 ## Requirements
 
 ### Requirement: Compact status reports canonical true resources
-The available version-3 status panel SHALL contain exactly `schema_version: 3`, `available: true`, `actor`, `resources`, `conditions`, `disguise_active`, and `combat`. `resources` SHALL contain exactly `hp`, `mp`, `sp`, each with non-negative safe-integer `current` and non-negative safe-integer `maximum` not below current. Resource values SHALL come directly from canonical traits and SHALL never call `get_display_value` or substitute `disguised_stats`.
+Status SHALL use exact schema5 with canonical true resources, actor, conditions, fatigue subjects, disguise and combat facts; each fatigue subject SHALL include canonical asleep state without changing resource ownership under possession.
 
 #### Scenario: Active disguise does not alter resources
 - **WHEN** an actor has true HP 80/100, MP 40/60, SP 30/50 and display-only disguised values for any traits
@@ -13,7 +13,7 @@ The available version-3 status panel SHALL contain exactly `schema_version: 3`, 
 
 #### Scenario: Missing gauge fails closed
 - **WHEN** the active puppet lacks a valid required HP, MP, or SP gauge
-- **THEN** the status panel is unavailable at schema version 3 and does not report zero for the missing resource
+- **THEN** the status panel is unavailable at schema version 5 and does not report zero for the missing resource
 
 #### Scenario: A zero-maximum gauge is reported verbatim
 - **WHEN** the active puppet's canonical storage carries a required gauge whose computed maximum is zero with stored current zero, as sanctioned zero-MP/SP monster data produces
@@ -21,19 +21,19 @@ The available version-3 status panel SHALL contain exactly `schema_version: 3`, 
 
 #### Scenario: A negative computed maximum fails closed
 - **WHEN** a required gauge's stored base/mod/mult compute to a negative maximum, or its stored current is nonzero while its maximum computes to zero
-- **THEN** the status panel is unavailable at schema version 3 rather than reporting the corrupt gauge
+- **THEN** the status panel is unavailable at schema version 5 rather than reporting the corrupt gauge
 
 #### Scenario: Status version cutover is exact
-- **WHEN** equivalent available and unavailable status payloads are checked at versions 2 and 3
-- **THEN** the registered version-3 forms are accepted and version-2 forms are rejected without replacing committed presentation
+- **WHEN** equivalent available and unavailable status payloads are checked at versions 4 and 5
+- **THEN** the registered version-5 forms are accepted and version-4 forms are rejected without replacing committed presentation
 
 #### Scenario: Actor envelope fields are bounded
-- **WHEN** an available version-3 status payload is validated
+- **WHEN** an available version-5 status payload is validated
 - **THEN** `actor` contains display `name` of 1..256 Unicode code points, opaque correlation `identity` of 1..64 ASCII characters, and nullable `location`, with the existing optional composed `full_title` contract unchanged
 - **AND** a present location contains exactly a 1..256-code-point display `label` and 1..64-character opaque `identity`
 
 #### Scenario: Condition and remaining envelope bounds
-- **WHEN** an available version-3 status payload is validated
+- **WHEN** an available version-5 status payload is validated
 - **THEN** `conditions` contains at most 32 entries
 - **AND** `disguise_active` is boolean and `combat` is null or the exact combat object
 
@@ -43,8 +43,12 @@ The available version-3 status panel SHALL contain exactly `schema_version: 3`, 
 
 #### Scenario: Both status forms share registered version 3
 - **WHEN** available and unavailable status forms are checked
-- **THEN** both use the same registered version 3
-- **AND** envelope protocol version and unrelated panel versions remain unchanged and status version 2 is not accepted as a compatibility form
+- **THEN** both use the same registered version 5
+- **AND** envelope protocol version and unrelated panel versions remain unchanged and status version 4 is not accepted as a compatibility form
+
+#### Scenario: Required fatigue sleep facts
+- **WHEN** current owner and present travellers include awake, voluntary and forced sleepers
+- **THEN** each physiological identity has its own bounded fatigue row and asleep boolean, missing facts remain unavailable and reads materialize nothing
 
 ### Requirement: Status conditions use deterministic matched modifiers
 The deterministic combat-modifier module SHALL expose a read-only query of each currently matched rule ID and its exact adjustment bundle without changing existing merged evaluation. The status presenter SHALL combine that query with active rulebook buff instances and immutable display metadata.
@@ -311,7 +315,7 @@ Condition provenance SHALL be computed read-only from the same canonical snapsho
 - **THEN** it follows the same canonical subject that owns the status resources and conditions, without borrowing sources from the controlled host
 
 ### Requirement: Fatigue presentation identifies its physiological subject
-Existing read-only status/debuff surfaces SHALL show member identity, rounded reserve percent and text action-unavailability with registry severity. Exact thresholds SHALL use stored units. Controlled-body and party-member fatigue SHALL be identifiable without changing the existing owner-keyed possession hybrid for unrelated status resources.
+Read-only fatigue presentation SHALL identify each present physiological subject by its own committed identity, reserve percent, exact stage, canonical asleep boolean and restriction while preserving unrelated owner-keyed possession resources.
 
 #### Scenario: Possessed body differs from owner
 - **WHEN** the owner is awake at 80% and the controlled companion is forced asleep at 2%
@@ -320,3 +324,7 @@ Existing read-only status/debuff surfaces SHALL show member identity, rounded re
 #### Scenario: No independent countdown
 - **WHEN** a forced sleeper is displayed twice without accepted time
 - **THEN** reserve and posture stay unchanged and no fabricated expiry or wake is promised
+
+#### Scenario: Present party rows stay body-keyed
+- **WHEN** the controlled body changes through possession while present companions differ in posture
+- **THEN** each body retains its own fatigue/sleep row and no owner gauge becomes controlled-body physiology

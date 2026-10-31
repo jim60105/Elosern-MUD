@@ -116,6 +116,12 @@ const props = defineProps({
   // and while a round that ended the fight still plays. The portrait anchors
   // then span the stage and the `plates` layer shows.
   formation: { type: Boolean, default: false },
+  // The wilderness travel presentation (wilderness-travel-interface): a
+  // presentation hook beside the committed mode, never a mode of its own.
+  // The stage keeps its slots; the travel host fills them (the map in
+  // `backdrop`, the medallions under the vitals dock) and both portrait
+  // anchors stay empty. Only the vignette and the left column change here.
+  travel: { type: Boolean, default: false },
 });
 
 // The open-surface registry drives the `menu-open` mark (design D9): the
@@ -199,6 +205,7 @@ defineExpose({ menuOpen });
     :data-card-open="cardOpen ? 'true' : null"
     :data-person-focus="personFocus ? 'true' : null"
     :data-formation="formation ? 'true' : null"
+    :data-travel="travel ? 'true' : null"
   >
     <!-- The stage metrics probe (webclient-combat-formation D1): boxes whose
          heights resolve the shell's length tokens, which their computed
@@ -406,6 +413,19 @@ defineExpose({ menuOpen });
 }
 .elosern-stage[data-mode-change$="-combat"] .stage-flash {
   animation: elosern-stage-flash var(--motion-flash) linear 1;
+}
+
+/* Travel (wilderness-travel-interface): the full-bleed map needs its edges,
+   so the vignette lightens to a soft rim; the portrait anchors stand empty
+   and leave the layout; the vitals column holds the dock above the party's
+   medallions and stays the dock's own width, so the command line still
+   starts past it. */
+.elosern-stage[data-travel="true"] .stage-vignette {
+  box-shadow: inset 0 0 calc(160px * var(--ui-scale)) calc(20px * var(--ui-scale)) rgba(0, 0, 0, 0.55);
+}
+.elosern-stage[data-travel="true"] [data-anchor="actor-left"],
+.elosern-stage[data-travel="true"] [data-anchor="actor-right"] {
+  display: none;
 }
 
 /* Named anchors (design D1/D10): absolutely positioned, bounded. */

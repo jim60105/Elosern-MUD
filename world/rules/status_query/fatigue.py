@@ -13,11 +13,14 @@ from typing import Any
 from world.rules.fatigue import (
     PROJECTION_BUFF_KEYS,
     FatigueStateError,
+    SleepPosture,
     actions_allowed,
     fatigue_stage,
     read_fatigue_state,
+    read_optional_fatigue_state,
     reserve_percent,
 )
+from world.observability import log_debug
 from world.rules.status_display import display_for
 
 from .models import FatigueSubjectView, StatusQueryError
@@ -59,4 +62,58 @@ def build_fatigue_subject(entity: Any) -> FatigueSubjectView:
         label=label,
         severity=severity,
         restriction=None if actions_allowed(state) else SLEEP_RESTRICTION_MESSAGE,
+        asleep=state.posture is not SleepPosture.AWAKE,
     )
+
+
+def _source_coordinates(location: Any) -> tuple[int, int] | None:
+    coordinates = getattr(location, "coordinates", None)
+    if (
+        isinstance(coordinates, tuple)
+        and len(coordinates) == 2
+        and all(isinstance(value, int) and not isinstance(value, bool) for value in coordinates)
+    ):
+        return (coordinates[0], coordinates[1])
+    return None
+
+
+def present_fatigue_subjects(
+    traveller: Any,
+    known_identities: frozenset[str] = frozenset(),
+) -> tuple[FatigueSubjectView, ...]:
+    """Rows for the traveller's source-present party members, in scope order.
+
+    Membership is the canonical traversal cohort
+    (``travel_cost.source_present_members``), so presentation and movement
+    can never disagree about who travels together. Identities already
+    presented are skipped, and so is a member whose physiology was never
+    constructed or does not read: only the status source and the controlled
+    body are required, so one unreadable companion never blanks the panel.
+    Nothing is written; reads use the strict non-creating reader.
+    """
+    from world.rules.travel_cost import source_present_members
+
+    location = getattr(traveller, "location", None)
+    if location is None:
+        return ()
+    seen = set(known_identities)
+    rows: list[FatigueSubjectView] = []
+    for member in source_present_members(traveller, location, _source_coordinates(location)):
+        identity = str(getattr(member, "pk", ""))
+        if not identity or identity in seen:
+            continue
+        seen.add(identity)
+        try:
+            if read_optional_fatigue_state(member) is None:
+                continue
+            rows.append(build_fatigue_subject(member))
+        except (FatigueStateError, StatusQueryError) as error:
+            # An unreadable companion simply has no row; the required
+            # owner/controlled rows still fail closed.
+            log_debug(
+                "status_fatigue_row_skipped",
+                context={"char": identity, "traveller": str(getattr(traveller, "pk", ""))},
+                exc=error,
+            )
+            continue
+    return tuple(rows)

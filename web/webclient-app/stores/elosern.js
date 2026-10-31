@@ -48,6 +48,7 @@ import { applyDialogueReading } from "./elosern/dialogue_reading.js";
 import { applyBeats } from "./elosern/beats.js";
 import { applyView } from "./elosern/view.js";
 import { applySkillUse } from "./elosern/skill_use.js";
+import { applyTravel } from "./elosern/travel.js";
 
 export { resolveLocationLabel };
 
@@ -168,6 +169,10 @@ export const useElosernStore = defineStore("elosern", () => {
   // between the transport (whose dispatch guard and lifecycle call its
   // entries) and the view (which publishes its projected slice).
   applyBeats(ctx);
+  // The wilderness travel presentation (wilderness-travel-interface): the
+  // committed selection, the active stage's map state and the recovery
+  // signal the transport seam raises.
+  applyTravel(ctx);
   applyView(ctx);
 
   // The initial committed view (the original `initialView()`): built before
@@ -231,6 +236,11 @@ export const useElosernStore = defineStore("elosern", () => {
     clearFreeformTarget: ctx.clearFreeformTarget,
     borrowDialogueCommand: ctx.borrowDialogueCommand,
     dispatchAction: ctx.dispatchAction,
+    // The travel stage's map state writer and the accepted-snapshot recovery
+    // signal (wilderness-travel-interface); composables/use-travel-map.js is
+    // their one user.
+    setTravelMap: ctx.setTravelMap,
+    travelRecovery: ctx.travelRecovery,
     requestCreationReset: ctx.requestCreationReset,
     focusPress: ctx.focusPress,
     focusConfirm: ctx.focusConfirm,

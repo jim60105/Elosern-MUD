@@ -537,7 +537,7 @@ var SLEEP_HANDOFF_MAX_SLEEP_ID = 64;
 var PANEL_ALLOWLIST = {
   gallery: 3,
   art: ART_SCHEMA_VERSION,
-  status: 4,
+  status: 5,
   context_actions: CONTEXT_ACTIONS_SCHEMA_VERSION,
   local_map: 1,
   party: PARTY_SCHEMA_VERSION,

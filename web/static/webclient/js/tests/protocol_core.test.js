@@ -139,9 +139,9 @@ test("validates the status panel available/unavailable discriminator exactly", (
     Protocol.validatePanel(
       "status",
       Protocol.PANEL_ALLOWLIST.status,
-      unavailableStatusPanel({ schema_version: 4 })
+      unavailableStatusPanel({ schema_version: 5 })
     ),
-    unavailableStatusPanel({ schema_version: 4 })
+    unavailableStatusPanel({ schema_version: 5 })
   );
   const badReason = unavailableStatusPanel();
   badReason.reason = { code: "x" };
@@ -152,16 +152,18 @@ test("validates the status panel available/unavailable discriminator exactly", (
     Protocol.validatePanel(
       "status",
       Protocol.PANEL_ALLOWLIST.status,
-      unavailableStatusPanel({ schema_version: 3 })
+      unavailableStatusPanel({ schema_version: 4 })
     )
   );
+  // The available form cuts over with it: version 4 is no compatibility form.
+  assert.throws(() => Protocol.validateStatusPanel(validStatusPanel({ schema_version: 4 })));
   // An internal reason carries a bounded correlation ID.
   assert.doesNotThrow(() =>
     Protocol.validatePanel(
       "status",
       Protocol.PANEL_ALLOWLIST.status,
       unavailableStatusPanel({
-        schema_version: 4,
+        schema_version: 5,
         reason: {
           code: "internal_presenter_error",
           message: "此介面暫時無法使用",
@@ -347,7 +349,7 @@ test("enforces status field-specific bounds", () => {
   );
 });
 
-test("status v4 fatigue rows identify each body and reject untruthful forms", () => {
+test("status v5 fatigue rows identify each body and reject untruthful forms", () => {
   const row = (overrides) => Object.assign(
     {
       identity: "42",
@@ -357,6 +359,7 @@ test("status v4 fatigue rows identify each body and reject untruthful forms", ()
       label: "合成充沛",
       severity: "informational",
       restriction: null,
+      asleep: false,
     },
     overrides
   );
@@ -367,8 +370,29 @@ test("status v4 fatigue rows identify each body and reject untruthful forms", ()
       validStatusPanel({
         fatigue: [
           row({}),
-          row({ identity: "77", name: "艾拉", reserve_percent: 2, stage: "forced_sleep", restriction: "沉睡中，無法行動" }),
+          row({ identity: "77", name: "艾拉", reserve_percent: 2, stage: "forced_sleep", restriction: "沉睡中，無法行動", asleep: true }),
+          row({ identity: "78", name: "蕾娜", stage: "sleeping", restriction: "沉睡中，無法行動", asleep: true }),
         ],
+      })
+    )
+  );
+  // The posture is a required boolean that agrees with the sleeping stage:
+  // a forced or voluntary sleeper is asleep, an awake stage never is.
+  assert.throws(() =>
+    Protocol.validateStatusPanel(
+      validStatusPanel({ fatigue: [row({ asleep: undefined })] })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateStatusPanel(validStatusPanel({ fatigue: [row({ asleep: "false" })] }))
+  );
+  assert.throws(() =>
+    Protocol.validateStatusPanel(validStatusPanel({ fatigue: [row({ asleep: true })] }))
+  );
+  assert.throws(() =>
+    Protocol.validateStatusPanel(
+      validStatusPanel({
+        fatigue: [row({ stage: "forced_sleep", restriction: "沉睡中，無法行動", asleep: false })],
       })
     )
   );

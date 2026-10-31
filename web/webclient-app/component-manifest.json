@@ -82,7 +82,8 @@
     "Core/ActionBar",
     "Data/HoldingsStrip",
     "World/AreaMapView",
-    "World/WorldMapView"
+    "World/WorldMapView",
+    "World/WildernessTravel"
   ],
   "frozen": true
 }

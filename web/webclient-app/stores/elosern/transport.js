@@ -232,6 +232,13 @@ export function applyTransport(ctx) {
     if (messageName === "ui_snapshot" || messageName === "ui_update") {
       if (result && result.accepted) {
         ctx.lastPanelRejection.value = null;
+        // An accepted full snapshot is a recovery publication for the travel
+        // stage (an external snapshot or an explicit sync's completion), even
+        // when it changed neither position nor time. Maps never ride one.
+        if (messageName === "ui_snapshot") {
+          const committed = ctx.reducer.getCommittedState();
+          ctx.noteRecoveryPublication(messageGeneration, committed.activeEpoch, committed.revision);
+        }
       } else if (
         result &&
         !result.accepted &&

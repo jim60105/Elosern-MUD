@@ -62,6 +62,10 @@ import DialogueChoices from "./components/DialogueChoices.vue";
 import ChoiceCard from "./components/ChoiceCard.vue";
 import QuestionCard from "./components/QuestionCard.vue";
 import PresenceRail from "./components/PresenceRail.vue";
+import TravelMap from "./components/travel/TravelMap.vue";
+import PartyMedallions from "./components/travel/PartyMedallions.vue";
+import { medallionMembers } from "./components/travel/travel-model.js";
+import { useTravelMap } from "./composables/use-travel-map.js";
 import { inertWhileLeaving } from "./lib/transition_hooks.js";
 
 const store = useElosernStore();
@@ -157,12 +161,36 @@ watch(
         (mode !== "dialogue" || host !== previous[1])) retireDialogueFocus();
   },
 );
+// The wilderness travel presentation (wilderness-travel-interface): the
+// committed selection the store publishes, and the stage's one area refresh
+// owner. While the layout is shown the stage is the travel map, the party is
+// the medallions under the vitals dock and both portrait anchors are empty.
+const travelLayout = computed(() => !!store.view.travel?.layout);
+const travelMapStatus = computed(() => store.view.travel?.mapStatus ?? "refreshing");
+const { retryTravelMap } = useTravelMap(store);
+// Movement waits for the current map (design: a committed step or refresh
+// suspends new movement, a failed read stops a walk); the compass's own
+// release of a held key still stops at once.
+const travelMoveSuspended = computed(() => travelLayout.value && travelMapStatus.value === "refreshing");
+const travelMoveStopped = computed(
+  () => travelLayout.value && travelMapStatus.value !== "ready" && travelMapStatus.value !== "refreshing",
+);
+const travelStageCss = computed(() => store.view.motionLevel !== "off");
+// Leaving travel removes the map; focus that was on it returns to the
+// shell's focus home instead of falling to the document.
+watch(travelLayout, async (shown, was) => {
+  if (shown || !was) return;
+  await nextTick();
+  await nextTick();
+  const active = typeof document === "undefined" ? null : document.activeElement;
+  if (!active || active === document.body) shellRef.value?.restoreFocusHome?.();
+});
 // The map drawer (redesign-map-drawer): the area/world tab, the per-tab
 // session memory and the on-demand `map.view` requests; its 前往 goes
 // through the same `explore.move` seam as the minimap.
 const {
   mapTab, mapMemory, mapEpoch, mapBusy, mapOpening, mapWorldReady, onMapDrawerMove,
-} = useMapDrawer(store, { onMapMove });
+} = useMapDrawer(store, { onMapMove, travelMode: () => travelLayout.value });
 // The two provider drawers (npc-targeted-service-flows): each opened drawer
 // reads its selected provider once through `services.open` and renders that
 // correlated snapshot. A drawer that is not targeted (no NPC to name) keeps
@@ -383,7 +411,12 @@ const actorRightFigure = computed(() => {
   }
   return explorationFocusFigure.value;
 });
-const standee = computed(() => (actorRightFigure.value ? null : actorRightTarget.value));
+const standee = computed(() => (actorRightFigure.value || travelLayout.value ? null : actorRightTarget.value));
+// The travel medallions: the controlled body once, then each present member
+// in party order, each joined to its own committed fatigue row.
+const partyMedallions = computed(() =>
+  medallionMembers(companionLineupSlots.value, panel("status"), panel("status")?.actor?.identity ?? null),
+);
 // The representation transfer must not leave a right-side copy behind (D1):
 // when the standee disappears because its identity is now drawn in the
 // actor-left lineup, that leave phase is skipped. Every other entrance and
@@ -852,6 +885,7 @@ const rootStyle = computed(() => {
         "
         :person-focus="personFocus"
         :formation="!!formation"
+        :travel="travelLayout"
         :speaker="speaker"
         :mode-hydrating="modeHydrating"
         :connection-status="store.view.connectionStatus"
@@ -913,6 +947,19 @@ const rootStyle = computed(() => {
             :mode="stageMode"
             :motion-level="store.view.motionLevel"
           />
+          <!-- The travel map over the scene (wilderness-travel-interface):
+               it crossfades in and out over --motion-scene on a live change,
+               lands in the commit's frame at off, and a leaving copy is
+               inert. The scene stays mounted beneath it, so dialogue and
+               combat in the wilderness keep their region art. -->
+          <Transition name="travel-stage" :css="travelStageCss" v-bind="inertWhileLeaving">
+            <TravelMap
+              v-if="travelLayout"
+              :area="store.view.travel.area"
+              :status="travelMapStatus"
+              @retry="retryTravelMap"
+            />
+          </Transition>
         </template>
         <!-- The player's standing portrait (webclient-avg-stage-shell D4):
              the current roster character's portrait stands on the bottom
@@ -920,7 +967,7 @@ const rootStyle = computed(() => {
              dimmed while the dialogue host speaks. -->
         <template #actor-left>
           <CompanionLineup
-            v-if="store.view.mode !== 'creation'"
+            v-if="store.view.mode !== 'creation' && !travelLayout"
             :slots="companionLineupSlots"
             :compact="inDialogue"
             :speaking-identity="companionSpeakingIdentity"
@@ -1353,7 +1400,9 @@ const rootStyle = computed(() => {
           :revision="store.view.revision"
           :epoch="store.view.epoch"
           :display-hp="playerDisplayHp"
+          :show-fatigue="!travelLayout"
         />
+        <PartyMedallions v-if="travelLayout" :members="partyMedallions" />
       </template>
       <!-- The `map` anchor (webclient-avg-stage-hud-anchors design D1/D4),
            at the stage's top-right, in this order: the minimap island, the
@@ -1365,7 +1414,7 @@ const rootStyle = computed(() => {
         <!-- The minimap island (H2, design D9); hidden in combat. The
              `@move` wiring and `explore.move` submission are untouched. -->
         <LocalMap
-          v-if="store.view.localMapModel"
+          v-if="store.view.localMapModel && !travelLayout"
           :local-map="store.view.localMapModel"
           :aimed-node="aimedNode"
           :motion-level="store.view.motionLevel"
@@ -1430,9 +1479,9 @@ const rootStyle = computed(() => {
                 <ExitCompass
                   ref="compassRef"
                   :targets="compassTargets"
-                  :busy="compassBusy"
+                  :busy="compassBusy || travelMoveSuspended"
                   :arrival-key="compassArrivalKey"
-                  :active="compassActive"
+                  :active="compassActive && !travelMoveStopped"
                   :motion-level="store.view.motionLevel"
                   @aim="onCompassAim"
                   @blocked="onCompassBlocked"
@@ -1632,6 +1681,7 @@ const rootStyle = computed(() => {
           :world-baseline-ready="mapWorldReady"
           :location-label="store.view.statusSlice.locationLabel"
           :busy="mapBusy"
+          :travel-mode="travelLayout"
           @move="onMapDrawerMove"
           @close="closeOverlayHost"
         />
@@ -1709,6 +1759,17 @@ const rootStyle = computed(() => {
 </template>
 
 <style>
+/* The travel stage's crossfade (wilderness-travel-interface): the map fades
+   over the scene on entering and away on leaving, over the scene token; at
+   `off` the Transition has no CSS phase at all. */
+.travel-stage-enter-active,
+.travel-stage-leave-active {
+  transition: opacity var(--motion-scene) var(--ease-standard);
+}
+.travel-stage-enter-from,
+.travel-stage-leave-to {
+  opacity: 0;
+}
 /* The dialogue host's entrance (webclient-mode-transitions D3; AVG stage
    design §9.3): the figure walks in from the right edge of the stage. It
    starts a beat after the command panel begins to leave, so the eye reads

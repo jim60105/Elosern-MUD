@@ -65,6 +65,19 @@ Consecutive logical map publications have consecutive baselines; an eager delta
 before a map uses its own revision and the next map builds on that revision.
 A general part frame never embeds a specialized map-body part.
 
+Because maps never ride a `ui_snapshot`, an accepted snapshot is the one
+recovery signal the travel stage reads (`stores/elosern/travel.js`): every
+accepted full snapshot, an external one or an explicit sync's completion,
+lets the stage ask for its area once even when position and time are
+unchanged, while its own `map.view` completions (updates) never do.
+
+### Registered panel versions touched by travel
+
+| Panel | Version | Shape note |
+|---|---|---|
+| `status` | 5 | Each `fatigue` row is `{identity, name, reserve_percent, stage, label, severity, restriction, asleep}`; `asleep` is the canonical posture (voluntary and forced sleep) and agrees with the sleeping stages. Rows are the status source, the controlled body, then each further source-present traveller with readable physiology, at most 8. Version 4 is rejected; there is no compatibility form. |
+| `area_map` | 2 | Unchanged. The travel stage decodes the wilderness window through `lib/travel-grid.js` until window-ui's schema cutover. |
+
 ### General publication parts
 
 An eager `ui_snapshot`/`ui_update` whose canonical document does not fit its

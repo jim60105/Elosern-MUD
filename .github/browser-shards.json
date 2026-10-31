@@ -328,7 +328,10 @@
         "web.tests.browser.test_browser_exploration_actions.ExplorationBrowserTest.test_rest_entry_tile_form_dispatch_path",
         "web.tests.browser.test_browser_exploration_actions.ExplorationBrowserTest.test_stale_and_tampered_submissions_do_nothing",
         "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_a_stale_multi_selection_copies_every_source_without_secrets_or_actions",
-        "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_supported_viewports_keep_status_and_operations_reachable"
+        "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_supported_viewports_keep_status_and_operations_reachable",
+        "web.tests.browser.test_wilderness_travel.TravelLayoutTests.test_settlement_gate_layout",
+        "web.tests.browser.test_wilderness_travel.TravelLayoutTests.test_refresh_adoption",
+        "web.tests.browser.test_wilderness_travel.TravelLayoutTests.test_medallion_subjects"
       ],
       "files_b": [
         "web.tests.browser.test_browser_combat_rejection.CombatReconnectBrowserTest.test_confirmed_action_disconnect_shows_no_uncertain_notice",
