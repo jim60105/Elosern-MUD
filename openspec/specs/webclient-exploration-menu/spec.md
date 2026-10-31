@@ -402,20 +402,20 @@ SHALL NEVER drop, clip, or reorder rows to fit a bound.
 #### Scenario: The flattened row-count bound rejects a payload whose total exceeds the limit even when its category-group count is small
 - **WHEN** a hand-constructed `passives` (or `actives`) payload has few top-level category-group
   entries but a flattened total row count across all of their sub-groups exceeding that array's
-  bound — more than 32 for `passives`, more than 96 for `actives`
+  bound — more than 32 for `passives`, more than 128 for `actives`
 - **THEN** validation rejects the payload, because the bound applies to the flattened total, not to
   the count of top-level category-group entries
 
 #### Scenario: The actives flattened bound admits exactly 96 rows and rejects 97
-- **WHEN** a hand-constructed `actives` payload carries exactly 96 flattened skill rows across its
-  sub-groups, and a second payload carries 97
-- **THEN** the 96-row payload passes validation and the 97-row payload is rejected, while an
+- **WHEN** a hand-constructed `actives` payload carries exactly the flattened actives bound's rows
+  across its sub-groups — 128 rows at this revision — and a second payload carries one more (129)
+- **THEN** the at-bound payload passes validation and the one-over payload is rejected, while an
   equally-shaped `passives` payload of 33 rows is still rejected under its independent 32 bound
 
 #### Scenario: A progressed character's full active roster renders the available panel
 - **WHEN** the character panel is built for an actor whose read model legitimately assembles more
   than 32 active skill rows — stored keys, innate grants, and unlocked act-catalogue skills
-  together exceeding 32 (e.g. 61 rows) — yet staying within the 96 bound
+  together exceeding 32 (e.g. 102 rows) — yet staying within the 128 bound
 - **THEN** the `character` panel reports `available` true with every active row present in the
   grouped shape, with no row dropped, clipped, or reordered to fit the bound
 
@@ -460,8 +460,8 @@ SHALL NEVER drop, clip, or reorder rows to fit a bound.
 
 #### Scenario: Flattened row-count bounds are independent fail-closed guards
 - **WHEN** a panel's flattened skill-row totals are validated
-- **THEN** the total count of skill rows across every category and sub-group, flattened, does not exceed 32 for `passives` and does not exceed 96 for `actives`, tracked as independent bounds
-- **AND** the 96-row actives bound is sized above every registry-authorizable active row an actor can hold plus headroom, so a legitimately progressed character never trips it — the bound remains a fail-closed wire guard, not a truncation mechanism, and the panel never drops, clips, or reorders rows to fit it
+- **THEN** the total count of skill rows across every category and sub-group, flattened, does not exceed 32 for `passives` and does not exceed 128 for `actives`, tracked as independent bounds
+- **AND** the 128-row actives bound is sized above every registry-authorizable active row an actor can hold plus headroom, so a legitimately progressed character never trips it — the bound remains a fail-closed wire guard, not a truncation mechanism, and the panel never drops, clips, or reorders rows to fit it
 
 #### Scenario: Category-group entry count is separately bounded with one fallback slot
 - **WHEN** the count of top-level category-group entries in either array is bounded
