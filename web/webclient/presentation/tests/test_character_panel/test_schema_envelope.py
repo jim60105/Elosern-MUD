@@ -345,7 +345,7 @@ class CharacterSchemaTests(unittest.TestCase):
 
 
     @covers_requirement("webclient-exploration-menu::character-panel-skills-are-grouped-by-category-with-the-same-ordering-rule-as-the-combat-panel")
-    def test_actives_boundary_admits_96_rows_and_rejects_97(self):
+    def test_actives_boundary_admits_the_bound_and_rejects_one_more(self):
         # The flattened actives bound admits exactly MAX_ACTIVE_ROWS rows
         # spread across the eight category groups and rejects one more, while
         # an equally-shaped over-bound passives payload still fails under its
