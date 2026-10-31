@@ -4,7 +4,7 @@ Read design.md contracts before starting each group. Paths without a web/ prefix
 
 ## 1. Current-only query owner
 
-- [ ] 1.1 Implement token state and150ms debounce/latest-intent flush in the travel store, sharing dispatchAction without changing single-flight policy. Add tests/travel/planning.test.js for all result orders, token-input invalidations, dispatcher/domain refusals and response-only success; document exact request lifecycle in synchronization guidance. Acceptance: pnpm test -- web/webclient-app/tests/travel/planning.test.js exits0; no hover query sends at149ms and superseded errors cannot replace a newer plan.
+- [x] 1.1 Implement token state and150ms debounce/latest-intent flush in the travel store, sharing dispatchAction without changing single-flight policy. Add tests/travel/planning.test.js for all result orders, token-input invalidations, dispatcher/domain refusals and response-only success; document exact request lifecycle in synchronization guidance. Acceptance: pnpm test -- web/webclient-app/tests/travel/planning.test.js exits0; no hover query sends at149ms and superseded errors cannot replace a newer plan.
 
 ## 2. Destination input
 

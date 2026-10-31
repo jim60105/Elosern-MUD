@@ -191,6 +191,20 @@ export const CONTROLS_REFERENCE = [
           "按住方向鍵約 0.4 秒，就會朝該方向一步一步前進，每一步都等到抵達並看清新的地圖後才走下一步。",
       },
       {
+        id: "travel-route",
+        keys: [],
+        label: "預覽與鎖定路線",
+        detail:
+          "滑鼠移到不相鄰的已探明格子上，稍候即顯示伺服器規劃的路線與每一步的疲勞；點擊該格鎖定路線，地圖會框住整段行程。未探明的格子與隊伍所在的格子不會規劃路線。",
+      },
+      {
+        id: "travel-cursor",
+        keys: ["Shift", "↑", "↓", "←", "→"],
+        label: "以鍵盤選擇目的地",
+        detail:
+          "按住 Shift 再按方向鍵，目的地游標會在目前的地圖範圍內一格一格移動並預覽路線；按 Enter 鎖定游標所在的已探明格子。已瞄準相鄰格子時，Enter 仍是前進一步。",
+      },
+      {
         id: "travel-stop",
         keys: ["停步"],
         label: "停下腳步",
@@ -230,8 +244,8 @@ export const CONTROLS_REFERENCE = [
       {
         id: "travel-escape",
         keys: ["Esc"],
-        label: "取消瞄準",
-        detail: "清除地圖上的瞄準；沒有瞄準時，Esc 照常返回指令面板的上一層。",
+        label: "取消瞄準與路線",
+        detail: "依序清除地圖上的瞄準、目的地游標，再清除鎖定的路線與預覽；都沒有時，Esc 照常返回指令面板的上一層。",
       },
       {
         id: "travel-zoom",

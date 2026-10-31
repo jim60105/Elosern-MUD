@@ -185,20 +185,31 @@ const { retryTravelMap } = useTravelMap(store);
 const travelMapRef = ref(null);
 const {
   onTravelAim, onTravelHold, onTravelRelease, onTravelStep, onTravelCancel,
-  onTravelHover, onTravelPick, onTravelStop,
+  onTravelHover, onTravelPick, onTravelStop, onTravelCursor, travelCursor,
 } = useTravelInput(store, { mapRef: travelMapRef, fullLogOpen: () => fullLogOpen.value });
 const travelStageCss = computed(() => store.view.motionLevel !== "off");
 // The leg panel (wilderness-travel-leg-ui): the pure projection of the
-// committed travel facts. No plan exists until planning-ui supplies one, and
-// the light phase only once the window carries it (window-ui).
+// committed travel facts. The plan is the store's current `travel.plan`
+// result (wilderness-travel-planning-ui) with its destination's supplied
+// label; 出發 waits for route-ui's route walk (`store.departTravel`).
+const travelPlan = computed(() => {
+  const travel = store.view.travel;
+  if (!travel?.plan) return null;
+  return { ...travel.plan, label: travel.planTarget?.label ?? null };
+});
 const travelLeg = computed(() => {
   const travel = store.view.travel;
   if (!travel?.layout) return null;
   const walking = travel.walking;
   return legView({
     aim: travel.aimTarget,
-    plan: null,
-    locked: false,
+    plan: travelPlan.value,
+    locked: !!travel.lockedDestination && !!travel.planTarget?.locked,
+    pending: travel.planPending,
+    planError: travel.planError,
+    cursor: travelCursor.value,
+    target: travel.planTarget,
+    routeReady: typeof store.departTravel === "function",
     walking,
     holding: travel.holding,
     progress: walking?.progress ?? 0,
@@ -1002,6 +1013,10 @@ const rootStyle = computed(() => {
               :aim-blocked="!!store.view.travel.aimTarget && !store.view.travel.aimTarget.enabled"
               :aim-reason="store.view.travel.aimTarget?.reason ?? null"
               :walking="store.view.travel.walking"
+              :plan="store.view.travel.plan"
+              :locked="!!store.view.travel.lockedDestination"
+              :target="store.view.travel.planTarget"
+              :cursor="travelCursor"
               :motion-level="store.view.motionLevel"
               @aim="onTravelAim"
               @hold="onTravelHold"
@@ -1010,6 +1025,7 @@ const rootStyle = computed(() => {
               @cancel="onTravelCancel"
               @hover="onTravelHover"
               @pick="onTravelPick"
+              @cursor="onTravelCursor"
               @retry="retryTravelMap"
             />
           </Transition>
