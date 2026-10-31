@@ -390,5 +390,7 @@ export const useElosernStore = defineStore("elosern", () => {
     // C7: the reading preferences (text speed, auto-advance).
     setTextSpeed: ctx.setTextSpeed,
     setAutoAdvance: ctx.setAutoAdvance,
+    setTravelPace: ctx.setTravelPace,
+    setTravelStopAtNight: ctx.setTravelStopAtNight,
   };
 });
