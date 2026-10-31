@@ -335,6 +335,7 @@
         "web.tests.browser.test_wilderness_travel.TravelMapTests.test_map_fact_layers",
         "web.tests.browser.test_wilderness_travel.TravelMapTests.test_map_viewports",
         "web.tests.browser.test_wilderness_travel.TravelMapTests.test_repaint_budget",
+        "web.tests.browser.test_wilderness_travel.TravelWindowTests.test_live_memory_and_distant_cards",
         "web.tests.browser.test_wilderness_travel.TravelWalkingTests.test_keyboard_only_step",
         "web.tests.browser.test_wilderness_travel.TravelWalkingTests.test_held_walk_release",
         "web.tests.browser.test_wilderness_travel.TravelLegTests.test_gauge_preferences_and_actions",

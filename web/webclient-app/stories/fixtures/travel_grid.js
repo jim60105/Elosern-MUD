@@ -9,7 +9,7 @@
 // of world coordinates; nothing here is shipped geography or a production
 // rule (reveal is a fixed list of synthetic visit discs).
 
-import MapPanels from "../../../static/webclient/js/elosern/protocol/panels/map_panels.js";
+import Protocol from "../../lib/protocol.js";
 import { decodeTravelGrid } from "../../lib/travel-grid.js";
 
 const SIZE = 41;
@@ -227,7 +227,7 @@ export function travelAreaFixture({
 
 /** The validated, decoded travel grid of one {@link travelAreaFixture} body. */
 export function travelGridFixture(options = {}) {
-  return decodeTravelGrid(MapPanels.validateAreaMapPanel(travelAreaFixture(options)));
+  return decodeTravelGrid(Protocol.validateAreaMapPanel(travelAreaFixture(options)));
 }
 
 // Two wolves of a pack and a boar whose threat the server could not state.

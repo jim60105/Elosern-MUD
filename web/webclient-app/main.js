@@ -11,6 +11,7 @@ import "./styles/fonts.css";
 import "./styles/fonts-mono.css";
 import "./styles/app-shell.css";
 import { paintTravelMap, travelPaintStats } from "./lib/travel-paint.js";
+import { decodeTravelGrid } from "./lib/travel-grid.js";
 
 // C3 (webclient-vue-09-wire-transport-mount): the store-bound live renderers
 // (design D3). The Vue app mounts AppClient — the store-driven root that
@@ -95,7 +96,9 @@ window.__elosernBridge = {
   // own call record ({ count, lastMs }), so the managed repaint-budget check
   // times the real painter and counts that camera, zoom and hover never
   // repaint. Nothing is reported anywhere.
-  travelPaint: { paintTravelMap, stats: travelPaintStats },
+  // `decode` is the real travel decoder, so the benchmark paints real
+  // decoded schema-3 windows (wilderness-travel-window-ui).
+  travelPaint: { paintTravelMap, decode: decodeTravelGrid, stats: travelPaintStats },
 };
 
 app.mount(resolveMountPoint());
