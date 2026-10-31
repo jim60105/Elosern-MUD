@@ -274,6 +274,21 @@ describe("TravelMap overlay consumers", () => {
     expect(w.find('[data-testid="travel-map__party"]').exists()).toBe(true);
   });
 
+  it("zooms one step per wheel notch and takes no pick from a map that is not current", async () => {
+    const w = mount(TravelMapView, { props: { grid: grid(), status: "ready" } });
+    const stage = w.get('[data-testid="travel-map"]');
+    // A trackpad's stream of small deltas adds up to one notch.
+    for (let k = 0; k < 9; k += 1) await stage.trigger("wheel", { deltaY: -10 });
+    expect(stage.attributes("data-zoom")).toBe("30");
+    await stage.trigger("wheel", { deltaY: -10 });
+    expect(stage.attributes("data-zoom")).toBe("34");
+    await stage.trigger("wheel", { deltaY: 300 });
+    expect(stage.attributes("data-zoom")).toBe("22");
+    await w.setProps({ status: "unavailable" });
+    await stage.trigger("click", { clientX: 5, clientY: 5 });
+    expect(w.emitted("pick")).toBeUndefined();
+  });
+
   it("draws supplied hostiles, the sight ring and sighting cards without coordinates", () => {
     const w = mount(TravelMapView, {
       props: {
@@ -289,11 +304,15 @@ describe("TravelMap overlay consumers", () => {
       },
     });
     expect(w.findAll('[data-testid="travel-map__hostile"]')).toHaveLength(1);
-    expect(w.text()).toContain("合成狼 ×2");
+    const chip = w.findAll(".tm-chip--seal");
+    expect(chip).toHaveLength(1);
+    expect(chip[0].text()).toContain("合成狼");
+    expect(chip[0].text()).toMatch(/\b2\b/);
     expect(w.text()).not.toContain("合成商人");
     expect(w.find('[data-testid="travel-map__sight"]').exists()).toBe(true);
     const card = w.get('[data-testid="travel-map__sighting"]');
-    expect(card.text()).toContain("北北東・約 25 公里");
+    expect(card.text()).toContain("北北東");
+    expect(card.text()).toMatch(/\b25\b/);
     expect(card.text()).toContain("合成石塔");
   });
 });

@@ -94,10 +94,15 @@ const showMap = computed(() => !!props.grid && props.status !== "retired");
 const stateText = computed(() =>
   props.status === "invalid" ? "無法讀取這一帶的地圖。" : "這一帶的地圖暫時無法更新。",
 );
+// A step's ready -> refreshing -> ready cycle keeps the same line, so a
+// screen reader hears "updated" when the map first arrives, recovers or
+// changes title, not on every step.
+let readyLine = "";
 const announcement = computed(() => {
   if (failed.value) return stateText.value;
   if (!showMap.value) return "正在展開這一帶的地圖。";
-  return props.status === "ready" ? `${props.grid.title ?? ""}的地圖已更新。` : "";
+  if (props.status === "ready") readyLine = `${props.grid.title ?? ""}的地圖已更新。`;
+  return readyLine;
 });
 
 const root = ref(null);
@@ -294,7 +299,8 @@ function ly(y) {
 function cellBox(x, y, inset = 1) {
   return { x: lx(x) - c.value / 2 + inset, y: ly(y) - c.value / 2 + inset, width: c.value - inset * 2, height: c.value - inset * 2 };
 }
-const glyphScale = computed(() => c.value / TRAVEL_GLYPH_CELL);
+// Never below 0.75, so the smallest target stays perceivable at minimum zoom.
+const glyphScale = computed(() => Math.max(0.75, c.value / TRAVEL_GLYPH_CELL));
 const party = computed(() => props.grid?.party ?? null);
 const partyInWindow = computed(() => !!party.value && !!travelCellAt(props.grid, party.value.x, party.value.y));
 const radius = computed(() => (typeof props.grid?.groundRadius === "number" ? props.grid.groundRadius : null));
@@ -414,12 +420,15 @@ const scaleBar = computed(() => {
 
 // ── pointer and zoom ─────────────────────────────────────────────────────
 
+// The world layer's live on-screen origin, so a pointer mid-glide resolves
+// against what is drawn, not where the camera is heading.
+const world = ref(null);
 function cellFromEvent(event) {
   const grid = props.grid;
-  if (!grid || !root.value) return null;
-  const rect = root.value.getBoundingClientRect();
-  const wx = event.clientX - rect.left - camera.value.tx;
-  const wy = event.clientY - rect.top - camera.value.ty;
+  if (!grid || !world.value) return null;
+  const origin = world.value.getBoundingClientRect();
+  const wx = event.clientX - origin.left;
+  const wy = event.clientY - origin.top;
   const x = Math.floor(wx / c.value);
   const y = Math.ceil(-wy / c.value) - 1;
   return travelCellAt(grid, x, y) ? { x, y } : null;
@@ -427,21 +436,30 @@ function cellFromEvent(event) {
 function sameCell(a, b) {
   return a === b || (!!a && !!b && a.x === b.x && a.y === b.y);
 }
+const interactive = computed(() => showMap.value && props.status === "ready");
+function clearHover() {
+  if (hoverCell.value === null) return;
+  hoverCell.value = null;
+  emit("hover", null);
+}
+// A map that stops being the current one drops its hover.
+watch(interactive, (now) => {
+  if (!now) clearHover();
+});
 function onPointerMove(event) {
-  if (props.walking || !showMap.value) return;
+  if (props.walking || !interactive.value) return;
   const cell = cellFromEvent(event);
   if (sameCell(cell, hoverCell.value)) return;
   hoverCell.value = cell;
   emit("hover", cell);
 }
 function onPointerLeave() {
-  if (hoverCell.value === null) return;
-  hoverCell.value = null;
-  emit("hover", null);
+  clearHover();
 }
 function onClick(event) {
   if (event.target?.closest?.(".travel-map__state")) return;
   root.value?.focus({ preventScroll: true });
+  if (!interactive.value) return;
   const cell = cellFromEvent(event);
   if (cell) emit("pick", cell);
 }
@@ -451,10 +469,20 @@ function zoomBy(direction) {
   zoom.value = next;
   emit("zoom", next);
 }
+// Wheel travel accumulates to one zoom step per notch (100 px of delta), so
+// a trackpad's stream of small deltas does not slam the zoom to a clamp.
+const WHEEL_STEP = 100;
+let wheelTravel = 0;
 function onWheel(event) {
   if (!showMap.value || event.deltaY === 0) return;
   event.preventDefault();
-  zoomBy(event.deltaY < 0 ? 1 : -1);
+  const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 800 : 1;
+  if (Math.sign(event.deltaY) !== Math.sign(wheelTravel)) wheelTravel = 0;
+  wheelTravel += event.deltaY * unit;
+  while (Math.abs(wheelTravel) >= WHEEL_STEP) {
+    zoomBy(wheelTravel < 0 ? 1 : -1);
+    wheelTravel -= Math.sign(wheelTravel) * WHEEL_STEP;
+  }
 }
 function onKeyDown(event) {
   if (event.target !== root.value) return;
@@ -522,6 +550,7 @@ defineExpose({ focusInside, focus: () => root.value?.focus({ preventScroll: true
     </svg>
     <div
       v-show="showMap"
+      ref="world"
       class="travel-map__world"
       :class="{ 'is-snap': snapping }"
       :style="worldStyle"
