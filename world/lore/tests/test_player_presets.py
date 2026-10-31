@@ -12,8 +12,41 @@ from world.lore.player_presets import (
     StartingCompanion,
 )
 from world.lore.races import RACE_REGISTRY
-from world.rules.character_creation import resolve_starting_profile
-from world.skills.registry import SKILL_REGISTRY, SkillKind
+from world.rules.character_creation import (
+    _preset_lineage_state,
+    resolve_starting_profile,
+)
+from world.rules.progression import SKILL_PROFICIENCY_XP_PER_LEVEL
+from world.skills.eligibility import record_identity_eligible
+from world.skills.handler import INNATE_SKILL_KEYS
+from world.skills.registry import SKILL_REGISTRY, SkillCategory, SkillKind
+
+
+# The ordinary learning domains (align-character-template-development D1):
+# the catalog's own root rows -- ACTIVE kind, no prerequisites -- in these
+# categories, minus the innate general actions every entity already owns.
+# Identity eligibility is resolved for the preset's own authored race and
+# subrace through the shared predicate the load-time kit validator uses.
+_ORDINARY_ROOT_CATEGORIES = (
+    SkillCategory.ELEMENTAL_MAGIC,
+    SkillCategory.MARTIAL_ARTS,
+    SkillCategory.DIVINE_MYSTERY,
+)
+
+
+def _ordinary_roots(preset: PlayerPreset) -> tuple[str, ...]:
+    """Every identity-eligible ordinary root the preset's own race may own."""
+    return tuple(
+        key
+        for key, skill in SKILL_REGISTRY.items()
+        if skill.kind is SkillKind.ACTIVE
+        and skill.category in _ORDINARY_ROOT_CATEGORIES
+        and not skill.prerequisites
+        and key not in INNATE_SKILL_KEYS
+        and record_identity_eligible(
+            skill.eligibility, "player", race=preset.race, subrace=preset.subrace
+        )
+    )
 
 
 class PlayerPresetTests(unittest.TestCase):
@@ -62,6 +95,52 @@ class PlayerPresetTests(unittest.TestCase):
                 for key in (*preset.active_skills, *preset.passive_skills):
                     if ("can_use_divine_arts" in SKILL_REGISTRY[key].eligibility.required_capabilities):
                         self.assertTrue(race.can_use_divine_arts)
+
+    def test_elf_presets_own_every_eligible_ordinary_root_with_positive_xp(self):
+        # Derived, never copied: the expected set is the catalog's own root
+        # rows filtered by the shared identity predicate over the closure the
+        # activation itself builds, so an omitted root, an unowned closure
+        # addition or a zero-development root fails while valid retuning and
+        # prose edits cannot.
+        elf_presets = [
+            preset
+            for preset in PLAYER_PRESET_REGISTRY.values()
+            if preset.race == "elf"
+        ]
+        self.assertTrue(elf_presets)
+        for preset in elf_presets:
+            with self.subTest(preset=preset.key):
+                skills, proficiency = _preset_lineage_state(preset)
+                owned = {*skills["active"], *skills["passive"]}
+                roots = _ordinary_roots(preset)
+                self.assertTrue(roots)
+                self.assertEqual(
+                    sorted(key for key in roots if key not in owned), []
+                )
+                self.assertEqual(
+                    sorted(
+                        key
+                        for key in roots
+                        if proficiency.get(key, 0.0) <= 0.0
+                    ),
+                    [],
+                )
+
+    def test_no_owned_prerequisite_edge_is_left_unmet(self):
+        # A declared proficiency entry beats the shared seed, so a literal
+        # below a consuming edge is the failure this catches: it would leave
+        # an owned descendant -- a mastery whose terminal levels the seed
+        # would otherwise supply above all -- unusable at activation.
+        for preset in PLAYER_PRESET_REGISTRY.values():
+            with self.subTest(preset=preset.key):
+                skills, proficiency = _preset_lineage_state(preset)
+                for key in (*skills["active"], *skills["passive"]):
+                    for edge in SKILL_REGISTRY[key].prerequisites:
+                        self.assertGreaterEqual(
+                            proficiency.get(edge.skill_key, 0.0),
+                            edge.min_proficiency * SKILL_PROFICIENCY_XP_PER_LEVEL,
+                            msg=f"{preset.key}: {key} requires {edge.skill_key}",
+                        )
 
     @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-starting-inventory")
     def test_starting_item_validation_rejects_unknown_duplicate_and_bad_quantity(self):
@@ -189,6 +268,10 @@ class PlayerPresetTests(unittest.TestCase):
             _validate_preset_starting_equipment({"x": preset})
 
     def test_skill_lists_returns_the_storage_shape_in_declared_order(self):
+        # Storage keeps the authored order verbatim under the two storage
+        # keys; the roster itself is authored content, so no literal key list
+        # is pinned here (the closure/seed order is covered by the activation
+        # consumer tests).
         preset = PLAYER_PRESET_REGISTRY["yuna_darknight"]
         self.assertEqual(
             preset.skill_lists(),
@@ -196,10 +279,6 @@ class PlayerPresetTests(unittest.TestCase):
                 "active": list(preset.active_skills),
                 "passive": list(preset.passive_skills),
             },
-        )
-        self.assertEqual(
-            preset.skill_lists()["active"],
-            ["divine_sexual_arts", "status_disguise"],
         )
 
     def test_yunas_catalog_installed_signature_act_passes_the_divine_gate(self):

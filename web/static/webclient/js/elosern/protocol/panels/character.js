@@ -33,8 +33,10 @@ var FREEFORM_LABELS_ALLOWED = C.FREEFORM_LABELS_ALLOWED;
 var CHARACTER_MAX_TRAIT_ROWS = 32;
 // Actives absorb the act-catalogue unlock flood; passives do not, so the
 // two flattened-row bounds are deliberately asymmetric (mirror of the
-// server's MAX_ACTIVE_ROWS/MAX_PASSIVE_ROWS).
-var CHARACTER_MAX_ACTIVE_ROWS = 96;
+// server's MAX_ACTIVE_ROWS/MAX_PASSIVE_ROWS). The actives bound sits above
+// every legitimately assembled active-row set (the largest authored card
+// assembles 102 rows).
+var CHARACTER_MAX_ACTIVE_ROWS = 128;
 var CHARACTER_MAX_PASSIVE_ROWS = 32;
 var CHARACTER_MAX_EQUIPMENT_ROWS = 32;
 var CHARACTER_MAX_DISPLAYED_ROWS = 32;

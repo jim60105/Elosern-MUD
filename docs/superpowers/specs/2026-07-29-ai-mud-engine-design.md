@@ -22,6 +22,13 @@ regression test asserts that an out-of-range record fails import. This is a code
 not a documentation convention. The sample cards currently in `tmp/story_settings/` (gitignored,
 never committed) are not authoritative and cannot be used as seed data.
 
+> **Amended 2026-10-31, character-template alignment.** The ignored reference tree stays
+> non-authoritative and is never loaded at runtime. An approved non-sexual fact taken from such a
+> reference becomes seed authority only after it is re-authored into a tracked registry or lore
+> document (`world/lore/…`, `docs/lore/…`); the tracked copy is the authority and the ignored file
+> is provenance only, never a deployment dependency. The authored outcome of that re-authoring for
+> the eight shipped player templates is recorded in `docs/lore/character-template-alignment.md`.
+
 **Developer background.** Python primary. Existing SillyTavern-style world and character data.
 No art capability; Stable Diffusion via external service. Runs on a single machine with a local
 GPU serving Ollama and sd-webui.

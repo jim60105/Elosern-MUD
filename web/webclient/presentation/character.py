@@ -40,9 +40,9 @@ uses, the session ``fresh`` mark, and the member's standing practice
 ``booked`` flag), drops the per-row ``freeform_scales``, and adds the required
 ``selected_skill`` section: the one skill selected through ``party.view_member``
 carries its lineage position and — for a mastery owner — the full freeform
-ladder, so the 96-row payload stays inside the OOB bound. Version 9 is the only
-accepted schema version: the validator accepts v9 exactly and rejects every
-other version.
+ladder, so the maximal actives payload stays inside the OOB bound. Version 9 is
+the only accepted schema version: the validator accepts v9 exactly and rejects
+every other version.
 
 The payload shape and the exact shared bounds (design D10) are mirrored by the
 client validator in ``web/static/webclient/js/elosern/protocol.js`` and guarded
@@ -105,9 +105,12 @@ MAX_LAYERS_PER_STAT = 16
 # absorb the act-catalogue unlock flood (stored keys, innate grants, and
 # every unlocked catalogue act), so the old 32 failed closed on well-formed
 # progressed characters. Passives never receive those rows, so 32 stays.
+# Raised again from 96 when the elf preset baseline (align-character-
+# template-development) took the largest authored card to 102 active rows;
+# the bound stays above every legitimately assembled active-row set.
 # The flattened-row check remains a fail-closed wire guard, never a
 # truncation mechanism; the byte envelope is the true payload ceiling.
-MAX_ACTIVE_ROWS = 96
+MAX_ACTIVE_ROWS = 128
 MAX_PASSIVE_ROWS = 32
 # The category-group count bound equals the number of SkillCategory members
 # plus one: the extra slot is the presentation-only synthetic fallback group
@@ -867,7 +870,7 @@ def _selected_skill(
     it names an ACTIVE skill the viewed member owns (the read model's own
     active keys). The lineage position and — for a mastery owner of the
     skill's element — the full freeform ladder ride here, so no per-row detail
-    is needed for 96 rows.
+    is needed for the maximal actives payload.
     """
     key = selected_skill_key_for(context, member)
     if key is None or key not in model.active_keys:
