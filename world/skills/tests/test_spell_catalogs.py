@@ -1,4 +1,4 @@
-"""Data-contract test: spell catalog content contract
+"""Data-contract test: closed spell-parser vocabulary plus generic lineage-graph and mastery-coverage relationships
 Elemental spell-catalog tests and their pinned catalog constants."""
 
 from tools.spec_traceability import covers_requirement

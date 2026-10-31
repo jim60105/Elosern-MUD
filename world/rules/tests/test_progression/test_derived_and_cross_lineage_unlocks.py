@@ -60,6 +60,7 @@ from .._combat_session_helpers import (
 from world.skills.registry import (
     SkillCategory,
     SkillKind,
+    SkillPrerequisite,
     validate_prerequisite_graph,
 )
 # Cross-lineage wiring: importing the rulebook module at collection time also
@@ -391,3 +392,194 @@ class CrossLineageUnlockWiringTests(EvenniaTestCase):
         self.assertEqual(actor.db.skills, before_skills)
         self.assertEqual(actor.db.skill_proficiency, before_proficiency)
         self.assertNotIn(_T_GRANTED.key, actor.skills.owned_keys())
+
+
+class MasteryAcquisitionTests(EvenniaTestCase):
+    """Practice acquires a newly qualified elemental mastery atomically (D3).
+
+    One file-local mastery passive whose single declared branch is the magic
+    tree's mid node: owning the root and the mid node one award short of the
+    declared threshold leaves exactly one edge unmet, so one use or one booked
+    hour must flip the closure, grant the passive through the ownership writer
+    and stage exactly one learner-specific notice — with no passive XP.
+    """
+
+    BRANCH = _MAGIC_CASTER
+    ROOT = "magic_t_tree_root"
+
+    def setUp(self):
+        _scoped_setup(self)
+        super().setUp()
+        progression.reset_practice_dedupe()
+        self.branch_row = live_skill_registry()[self.BRANCH]
+        self.mastery = replace(
+            SYNTH_SKILLS["t_steady_stride"],
+            key="t_derived_mastery",
+            label="合成精通",
+            description="合成系譜的整樹精通。",
+            kind=SkillKind.PASSIVE,
+            category=SkillCategory.ELEMENTAL_MAGIC,
+            element=self.branch_row.element,
+            group=self.branch_row.element.key,
+            prerequisites=(SkillPrerequisite(self.BRANCH, 3),),
+        )
+        live_skill_registry()[self.mastery.key] = self.mastery
+        validate_prerequisite_graph(live_skill_registry())
+
+    def _learner(self, key: str) -> PlayerCharacter:
+        """Owner of the root plus the branch one award short of its edge."""
+        actor = _character(self, key)
+        grant_lineage(actor, [self.BRANCH])
+        actor.db.skill_proficiency[self.BRANCH] = (
+            3 * SKILL_PROFICIENCY_XP_PER_LEVEL - SKILL_PRACTICE_XP_PER_USE
+        )
+        self.assertNotIn(self.mastery.key, actor.skills.owned_keys())
+        self.assertFalse(
+            progression.can_use_skill(actor, self.mastery)
+        )
+        return actor
+
+    def _notices_for(self, sink, key: str) -> list[UnlockNotice]:
+        return [notice for notice in sink if notice.skill_key == key]
+
+    @covers_requirement(
+        "element-mastery::practice-acquires-a-newly-qualified-elemental-mastery-atomically"
+    )
+    def test_the_last_required_use_award_acquires_the_mastery_once(self):
+        actor = self._learner("mastery-use")
+        sink: list[UnlockNotice] = []
+        self.assertTrue(
+            grant_skill_practice_xp(actor, self.BRANCH, unlocks_out=sink)
+        )
+        self.assertIn(self.mastery.key, actor.skills.owned_keys())
+        self.assertTrue(progression.can_use_skill(actor, self.mastery))
+        notices = self._notices_for(sink, self.mastery.key)
+        self.assertEqual(len(notices), 1)
+        self.assertEqual(notices[0].learner_name, actor.key)
+        self.assertEqual(notices[0].line, progression.unlock_line(self.mastery))
+        # No passive practice is invented for the obtained mastery.
+        self.assertEqual(
+            float(actor.db.skill_proficiency.get(self.mastery.key, 0.0)), 0.0
+        )
+
+    @covers_requirement(
+        "element-mastery::practice-acquires-a-newly-qualified-elemental-mastery-atomically"
+    )
+    def test_booked_study_acquires_the_same_mastery(self):
+        actor = self._learner("mastery-study")
+        sink: list[UnlockNotice] = []
+        self.assertTrue(
+            progression.grant_study_practice_xp(
+                actor, self.BRANCH, 1, unlocks_out=sink
+            )
+        )
+        self.assertIn(self.mastery.key, actor.skills.owned_keys())
+        self.assertEqual(len(self._notices_for(sink, self.mastery.key)), 1)
+
+    @covers_requirement(
+        "element-mastery::practice-acquires-a-newly-qualified-elemental-mastery-atomically"
+    )
+    def test_the_sink_is_optional_and_repeats_are_idempotent(self):
+        actor = self._learner("mastery-no-sink")
+        self.assertTrue(grant_skill_practice_xp(actor, self.BRANCH))
+        self.assertIn(self.mastery.key, actor.skills.owned_keys())
+        # A second award (a later tick) must not duplicate ownership...
+        progression.reset_practice_dedupe()
+        sink: list[UnlockNotice] = []
+        self.assertTrue(
+            grant_skill_practice_xp(actor, self.BRANCH, unlocks_out=sink)
+        )
+        owned = actor.db.skills["passive"]
+        self.assertEqual(owned.count(self.mastery.key), 1)
+        # ...nor announce the already-owned passive again.
+        self.assertEqual(self._notices_for(sink, self.mastery.key), [])
+
+    @covers_requirement(
+        "element-mastery::practice-acquires-a-newly-qualified-elemental-mastery-atomically"
+    )
+    def test_no_grant_when_a_branch_is_unowned(self):
+        actor = _character(self, "mastery-unowned")
+        grant_lineage(actor, [self.BRANCH])
+        actor.db.skill_proficiency[self.BRANCH] = (
+            3 * SKILL_PROFICIENCY_XP_PER_LEVEL - SKILL_PRACTICE_XP_PER_USE
+        )
+        # Drop the root from the owned set: the closure can never qualify.
+        owned = actor.db.skills
+        actor.db.skills = {
+            "active": [key for key in owned["active"] if key != self.ROOT],
+            "passive": list(owned["passive"]),
+        }
+        sink: list[UnlockNotice] = []
+        grant_skill_practice_xp(actor, self.BRANCH, unlocks_out=sink)
+        self.assertNotIn(self.mastery.key, actor.skills.owned_keys())
+        self.assertEqual(self._notices_for(sink, self.mastery.key), [])
+
+    @covers_requirement(
+        "element-mastery::practice-acquires-a-newly-qualified-elemental-mastery-atomically"
+    )
+    def test_repairing_an_internal_edge_stages_exactly_one_notice(self):
+        actor = _character(self, "mastery-repair")
+        grant_lineage(actor, [self.BRANCH])
+        # Owned but unlawful: the mastery and the root are held, and the
+        # ROOT sits below its declared internal edge.
+        owned = actor.db.skills
+        actor.db.skills = {
+            "active": list(owned["active"]),
+            "passive": [*owned["passive"], self.mastery.key],
+        }
+        proficiency = dict(actor.db.skill_proficiency)
+        proficiency[self.BRANCH] = 3 * SKILL_PROFICIENCY_XP_PER_LEVEL
+        # One award short of the root's Lv.3 internal edge.
+        proficiency[self.ROOT] = (
+            3 * SKILL_PROFICIENCY_XP_PER_LEVEL - SKILL_PRACTICE_XP_PER_USE
+        )
+        actor.db.skill_proficiency = proficiency
+        self.assertFalse(progression.can_use_skill(actor, self.mastery))
+        sink: list[UnlockNotice] = []
+        self.assertTrue(
+            grant_skill_practice_xp(actor, self.ROOT, unlocks_out=sink)
+        )
+        self.assertTrue(progression.can_use_skill(actor, self.mastery))
+        self.assertEqual(len(self._notices_for(sink, self.mastery.key)), 1)
+
+    @covers_requirement(
+        "element-mastery::practice-acquires-a-newly-qualified-elemental-mastery-atomically"
+    )
+    def test_a_pre_owned_direct_consumer_flip_is_announced_once(self):
+        # The mastery directly consumes the awarded key AND is already owned
+        # but unusable: the ordinary flip pass and the mastery pass both see
+        # the same false-to-true transition, and the per-award dedupe must
+        # collapse them to exactly one line.
+        actor = self._learner("mastery-direct-flip")
+        owned = actor.db.skills
+        actor.db.skills = {
+            "active": list(owned["active"]),
+            "passive": [*owned["passive"], self.mastery.key],
+        }
+        self.assertFalse(progression.can_use_skill(actor, self.mastery))
+        sink: list[UnlockNotice] = []
+        self.assertTrue(
+            grant_skill_practice_xp(actor, self.BRANCH, unlocks_out=sink)
+        )
+        self.assertTrue(progression.can_use_skill(actor, self.mastery))
+        notices = self._notices_for(sink, self.mastery.key)
+        self.assertEqual(len(notices), 1)
+        self.assertEqual(notices[0].learner_name, actor.key)
+
+    @covers_requirement(
+        "element-mastery::practice-acquires-a-newly-qualified-elemental-mastery-atomically"
+    )
+    def test_a_simulated_award_and_passive_practice_grant_nothing(self):
+        actor = self._learner("mastery-simulated")
+        sink: list[UnlockNotice] = []
+        self.assertFalse(
+            grant_skill_practice_xp(actor, self.BRANCH, nonlethal=True, unlocks_out=sink)
+        )
+        self.assertNotIn(self.mastery.key, actor.skills.owned_keys())
+        self.assertEqual(self._notices_for(sink, self.mastery.key), [])
+        # Practising the passive itself awards no XP and no ownership.
+        progression.reset_practice_dedupe()
+        self.assertFalse(grant_skill_practice_xp(actor, self.mastery.key))
+        self.assertEqual(
+            float(actor.db.skill_proficiency.get(self.mastery.key, 0.0)), 0.0
+        )

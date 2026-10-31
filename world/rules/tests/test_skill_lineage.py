@@ -31,6 +31,7 @@ from world.rules.progression import (
     freeform_scale_entries_for,
     freeform_scales_for,
     lineage_ownership_closure,
+    mastery_prerequisites_met,
     missing_prerequisite,
     normalize_lineage_record,
     practice_claim_key,
@@ -42,7 +43,6 @@ from world.rules.progression import (
     skill_proficiency_level,
 )
 from world.skills.registry import (
-    SKILL_REGISTRY,
     SkillCategory,
     SkillDef,
     SkillKind,
@@ -848,11 +848,12 @@ class MasteryWholeTreeTests(_Scoped):
         "element-mastery::elemental-mastery-prerequisites-cover-every-ordinary-branch"
     )
     def test_no_passive_is_ever_a_mastery_prerequisite(self):
+        registry = live_skill_registry()
         for row in (_MASTERY_ROW, _TREE_MASTERY):
             for edge in row.prerequisites:
                 with self.subTest(mastery=row.key, branch=edge.skill_key):
                     self.assertIs(
-                        SKILL_REGISTRY[edge.skill_key].kind, SkillKind.ACTIVE
+                        registry[edge.skill_key].kind, SkillKind.ACTIVE
                     )
 
     @covers_requirement(
@@ -919,6 +920,23 @@ class MasteryWholeTreeTests(_Scoped):
         repaired["t_tree_root"] = _xp_for_level(3)
         entity.db.skill_proficiency = repaired
         self.assertTrue(can_use_skill(entity, row))
+
+    @covers_requirement(
+        "element-mastery::elemental-mastery-prerequisites-cover-every-ordinary-branch"
+    )
+    def test_a_noncanonical_target_definition_is_denied(self):
+        # A mastery-shaped row that borrows a registered prerequisite-free
+        # key: the query must validate the LIVE registered row, so the copy
+        # can never inherit an empty traversal and return true.
+        impostor = replace(
+            _TREE_MASTERY,
+            key="t_tree_root",
+            prerequisites=(SkillPrerequisite("t_tree_root", 1),),
+        )
+        closure, xp = _mastery_closure(_TREE_MASTERY)
+        entity = _entity(("t_tree_root", *closure), xp)
+        self.assertFalse(mastery_prerequisites_met(entity, impostor))
+        self.assertFalse(can_use_skill(entity, impostor))
 
 
 class ProficiencyCapTableTests(_Scoped):

@@ -109,7 +109,8 @@ from world.rules.progression import (
 )
 from world.skills.cost_tiers import is_freeform_eligible
 from world.skills.effects import EffectAudience, EffectPolicy
-from world.skills.registry import SKILL_REGISTRY, TargetSpec
+from world.skills.registry import TargetSpec
+from world.rules.tests._combat_session_helpers import live_skill_registry
 from world.tests.synthetic_data import (
     make_monster_species,
     make_monster_tier,
@@ -1315,7 +1316,7 @@ class UtilityAdapterTests(SyntheticTuningMixin, EvenniaTestCase):
         closure = {
             edge.skill_key: float(edge.min_proficiency)
             * SKILL_PROFICIENCY_XP_PER_LEVEL
-            for edge in SKILL_REGISTRY[MASTERY].prerequisites
+            for edge in live_skill_registry()[MASTERY].prerequisites
         }
         self.monster.db.skills = {
             "active": [freeform.key, *closure],
@@ -1335,7 +1336,7 @@ class UtilityAdapterTests(SyntheticTuningMixin, EvenniaTestCase):
             # The scale is applied to whichever eligible skill the policy
             # selected, so the expected deduction is the shared cost authority
             # over that skill's own declared cost — never a pinned number.
-            selected = SKILL_REGISTRY[request.skill_key]
+            selected = live_skill_registry()[request.skill_key]
             self.assertTrue(is_freeform_eligible(selected))
             allowed = scaled_mp_cost(int(selected.cost["mp"]), SCALE)
             with patch(

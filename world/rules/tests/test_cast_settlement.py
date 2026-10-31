@@ -31,15 +31,25 @@ from world.rules.clock import (
 )
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.party_scope import present_party_scope
-from world.rules.progression import SKILL_PRACTICE_XP_PER_USE, reset_practice_dedupe
+from world.rules.progression import (
+    SKILL_PRACTICE_XP_PER_USE,
+    SKILL_PROFICIENCY_XP_PER_LEVEL,
+    reset_practice_dedupe,
+)
 from world.rules.skill_effects import mundane_veil_values
 from world.rules.surfaces import attribute_snapshot
 from world.rules.targeting import RoomActionContext
-from world.skills.registry import SkillCategory, SkillKind, TargetSpec
+from world.skills.registry import (
+    SkillCategory,
+    SkillKind,
+    SkillPrerequisite,
+    TargetSpec,
+    rebuild_prerequisite_caches,
+)
 from world.tests.raw_attributes import raw_attribute_value
 from world.tests.synthetic_data import make_skill
 
-from ._combat_session_helpers import open_synthetic_scope
+from ._combat_session_helpers import live_skill_registry, open_synthetic_scope
 
 
 def _learning_multiplier(race_key: str) -> float:
@@ -90,6 +100,27 @@ _T_GRANTABLE = make_skill(
     element=None,
     effects=["stat_multiply:defense:2.0"],
     category=SkillCategory.ENHANCEMENT,
+)
+
+# The acquisition pair: an ordinary out-of-combat castable branch and the
+# mastery passive that declares it at one threshold. Casting the branch one
+# award short of that edge makes the settlement itself the qualifying award.
+_T_MASTERY_BRANCH = make_skill(
+    "t_settle_branch",
+    label="試探精通分支",
+    description="測試用的精通前置分支。",
+    target_spec=TargetSpec.SELF,
+    cost={},
+)
+_T_MASTERY = make_skill(
+    "t_settle_mastery",
+    label="試探精通",
+    description="測試用的合成精通被動。",
+    kind=SkillKind.PASSIVE,
+    target_spec=TargetSpec.NONE,
+    cost={},
+    category=SkillCategory.ELEMENTAL_MAGIC,
+    prerequisites=(SkillPrerequisite(_T_MASTERY_BRANCH.key, 3),),
 )
 
 
@@ -688,6 +719,102 @@ class DigestionCadenceSettlementRollbackTests(_CastSettlementTestCase):
             self.char1.db.skill_proficiency, {_T_PRAYER.key: 0.0}
         )
         self.assertEqual(self.char1.db.skill_practice_day, {_T_PRAYER.key: 2})
+
+
+class MasteryGrantSettlementTests(_CastSettlementTestCase):
+    """The mastery grant rides the settlement transaction, forward and back.
+
+    Design D3: the qualifying award happens inside the settlement's outer
+    transaction, so a committed cast owns the passive and announces it once,
+    while a failed settlement restores the raw and cached ownership and XP,
+    releases its retry claim and publishes nothing.
+    """
+
+    def setUp(self):
+        super().setUp()
+        registry = live_skill_registry()
+        registry[_T_MASTERY_BRANCH.key] = _T_MASTERY_BRANCH
+        registry[_T_MASTERY.key] = _T_MASTERY
+        # The scope's own rows already include synthetic content that only the
+        # structural cache rebuild accepts (the sibling suites' convention).
+        rebuild_prerequisite_caches(registry)
+
+    def _award(self) -> float:
+        """One use award for this actor, from the runtime learning multiplier."""
+        return SKILL_PRACTICE_XP_PER_USE * _learning_multiplier("human")
+
+    def _seed_caster(self) -> float:
+        """Own the branch exactly one award short of the mastery's edge."""
+        seeded = 3 * SKILL_PROFICIENCY_XP_PER_LEVEL - self._award()
+        self.char1.db.skills = {
+            "active": [_T_MASTERY_BRANCH.key],
+            "passive": [],
+        }
+        self.char1.db.skill_proficiency = {_T_MASTERY_BRANCH.key: seeded}
+        return seeded
+
+    def _mastery_notices(self, settlement) -> list:
+        return [
+            notice
+            for notice in settlement.unlock_notices
+            if notice.skill_key == _T_MASTERY.key
+        ]
+
+    @covers_requirement(
+        "element-mastery::practice-acquires-a-newly-qualified-elemental-mastery-atomically"
+        )
+    def test_a_committed_cast_acquires_and_announces_the_mastery_once(self):
+        self._seed_caster()
+        settlement = settle_out_of_combat_cast(
+            self._request(_T_MASTERY_BRANCH.key), clock=WorldClock()
+        )
+        self.assertEqual(settlement.result.outcome, "success")
+        self.assertIn(_T_MASTERY.key, self.char1.skills.owned_keys())
+        stored = self._raw_attribute(self.char1, "skills")
+        self.assertIn(_T_MASTERY.key, stored["passive"])
+        notices = self._mastery_notices(settlement)
+        self.assertEqual(len(notices), 1)
+        self.assertEqual(notices[0].learner_name, self.char1.key)
+        self.assertIn(notices[0].line, settlement.notifications)
+        # No passive practice is invented for the obtained mastery.
+        self.assertNotIn(
+            _T_MASTERY.key, self.char1.db.skill_proficiency
+        )
+
+    @covers_requirement(
+        "element-mastery::practice-acquires-a-newly-qualified-elemental-mastery-atomically"
+        )
+    def test_a_failed_settlement_rolls_back_the_grant_and_the_retry_qualifies(self):
+        seeded = self._seed_caster()
+        clock = WorldClock()
+        clock._persist = lambda tick: (_ for _ in ()).throw(
+            RuntimeError("simulated persist failure")
+        )
+        with self.assertRaises(RuntimeError):
+            settle_out_of_combat_cast(
+                self._request(_T_MASTERY_BRANCH.key), clock=clock
+        )
+        # Raw rows and the in-process cache both come back byte-equal...
+        self.assertNotIn(_T_MASTERY.key, self.char1.skills.owned_keys())
+        self.assertEqual(
+            self._raw_attribute(self.char1, "skills"),
+            {"active": [_T_MASTERY_BRANCH.key], "passive": []},
+        )
+        self.assertEqual(
+            self._raw_attribute(self.char1, "skill_proficiency"),
+            {_T_MASTERY_BRANCH.key: seeded},
+        )
+        self.assertEqual(
+            self.char1.db.skill_proficiency, {_T_MASTERY_BRANCH.key: seeded}
+        )
+        # ...and the retry claim was released, so the next cast still qualifies
+        # and publishes exactly one line for the newly acquired passive.
+        retry = settle_out_of_combat_cast(
+            self._request(_T_MASTERY_BRANCH.key), clock=WorldClock()
+        )
+        self.assertEqual(retry.result.outcome, "success")
+        self.assertIn(_T_MASTERY.key, self.char1.skills.owned_keys())
+        self.assertEqual(len(self._mastery_notices(retry)), 1)
 
 
 if __name__ == "__main__":

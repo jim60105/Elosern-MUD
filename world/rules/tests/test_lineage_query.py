@@ -51,6 +51,25 @@ from ._combat_session_helpers import (
 TREE = synth_lineage_tree()
 TREE_EXTRA = {"skills": TREE}
 
+# The whole-tree mastery the passive-completion cases use: a PASSIVE of the
+# elemental-magic category whose single declared branch is the tree root at
+# the root's own derived cap, so it joins the tree's component without
+# changing any ordinary cap.
+TREE_MASTERY = dataclasses.replace(
+    TREE["t_tree_root"],
+    key="t_tree_mastery",
+    label="合成全樹精通",
+    description="遍歷整棵合成系譜後方能領會的合成精通。",
+    kind=SkillKind.PASSIVE,
+    target_spec=TargetSpec.NONE,
+    cost={},
+    effects=[],
+    category=SkillCategory.ELEMENTAL_MAGIC,
+    group=TREE["t_tree_root"].element.key,
+    prerequisites=(SkillPrerequisite("t_tree_root", 3),),
+)
+TREE_MASTERY_EXTRA = {"skills": {**TREE, TREE_MASTERY.key: TREE_MASTERY}}
+
 TREE_CHAIN = (
     "t_tree_root",
     "t_tree_sprout",
@@ -302,15 +321,108 @@ class ReadyAndConsumedTests(_TreeScopeMixin, unittest.TestCase):
             self.assertTrue(node.owned)
             self.assertFalse(node.ready)
 
-    def test_consumed_requires_every_node_capped(self):
+    def test_consumed_requires_every_node_owned_usable_and_capped(self):
         partial = self._fire({"t_tree_root": _level_xp(3)})
         self.assertFalse(partial.consumed)
-        full = self._fire({key: _level_xp(10) for key in TREE_CLOSURE})
+        # Inflated XP on unowned nodes is not completion: the unowned ACTIVE
+        # sisters carry a capped band but no ownership and no usability.
+        capped_but_unowned = self._fire(
+            {key: _level_xp(10) for key in TREE_CLOSURE}, owned=TREE_CHAIN
+        )
+        self.assertFalse(capped_but_unowned.consumed)
+        full = self._fire(
+            {key: _level_xp(10) for key in TREE_CLOSURE}, owned=TREE_CLOSURE
+        )
         self.assertTrue(full.consumed)
         view = build_lineage_view(
             _entity(TREE_CLOSURE, {key: _level_xp(10) for key in TREE_CLOSURE})
         )
         self.assertEqual(view.completed_count, 1)
+
+
+class PassiveCompletionTests(unittest.TestCase):
+    """A usable passive completes on ownership alone; an unusable one never.
+
+    Runs on the tree plus one whole-tree mastery row, so the graph-completion
+    contract of design D4 is exercised over a real component: an ACTIVE node
+    needs ownership, usability and its XP cap, while a PASSIVE node needs only
+    ownership plus lawful usability and never any passive practice XP.
+    """
+
+    OWNED = TREE_CLOSURE + (TREE_MASTERY.key,)
+    MAXED = {key: _level_xp(10) for key in TREE_CLOSURE}
+
+    def setUp(self):
+        self.addCleanup(_revalidate_live)
+        open_synthetic_scope(self, "skills", extra=TREE_MASTERY_EXTRA)
+        _revalidate_live()
+
+    def _fire(self, proficiency, owned=OWNED):
+        view = build_lineage_view(_entity(owned, proficiency))
+        return next(g for g in view.graphs if g.graph_id == "t_tree_root")
+
+    def _node(self, graph, key):
+        return next(node for node in graph.nodes if node.skill_key == key)
+
+    def test_a_usable_passive_completes_without_passive_practice(self):
+        graph = self._fire(self.MAXED)
+        mastery = self._node(graph, TREE_MASTERY.key)
+        self.assertTrue(mastery.owned)
+        self.assertTrue(mastery.usable)
+        self.assertTrue(mastery.capped)
+        self.assertEqual(mastery.level, 0)
+        self.assertEqual(mastery.xp_into_level, 0.0)
+        self.assertEqual(mastery.xp_to_next_level, 0.0)
+        self.assertTrue(graph.consumed)
+
+    def test_an_unowned_passive_prevents_completion(self):
+        graph = self._fire(self.MAXED, owned=TREE_CLOSURE)
+        mastery = self._node(graph, TREE_MASTERY.key)
+        self.assertFalse(mastery.owned)
+        self.assertFalse(mastery.usable)
+        self.assertFalse(mastery.capped)
+        # The closure is lawful, so the unowned passive is ready — ready is
+        # not completion.
+        self.assertTrue(mastery.ready)
+        self.assertFalse(graph.consumed)
+
+    def test_an_unlawful_passive_prevents_completion(self):
+        proficiency = dict(self.MAXED)
+        proficiency["t_tree_root"] = _level_xp(2)
+        graph = self._fire(proficiency)
+        mastery = self._node(graph, TREE_MASTERY.key)
+        self.assertTrue(mastery.owned)
+        self.assertFalse(mastery.usable)
+        self.assertFalse(mastery.capped)
+        self.assertFalse(mastery.ready)
+        self.assertIn(TREE["t_tree_root"].label, mastery.prereq_text_zh)
+        self.assertFalse(graph.consumed)
+
+    def test_an_unowned_capped_active_does_not_complete(self):
+        owned = tuple(key for key in self.OWNED if key != "t_tree_mossback")
+        graph = self._fire(self.MAXED, owned=owned)
+        sister = self._node(graph, "t_tree_mossback")
+        self.assertFalse(sister.owned)
+        self.assertTrue(sister.capped)
+        self.assertFalse(sister.usable)
+        self.assertFalse(graph.consumed)
+
+    def test_passive_xp_facts_stay_genuine_while_completion_differs(self):
+        graph = self._fire(self.MAXED)
+        mastery = self._node(graph, TREE_MASTERY.key)
+        # The lineage node reports completion without inventing XP...
+        self.assertEqual(mastery.level, 0)
+        self.assertEqual(mastery.xp_to_next_level, 0.0)
+        # ...while the panel's growth facts keep the honest derived band for
+        # the same key (nothing practises a passive, so its band is empty).
+        progress = proficiency_progress_for_keys(
+            _entity(self.OWNED, self.MAXED), [TREE_MASTERY.key]
+        )[TREE_MASTERY.key]
+        self.assertEqual(progress.level, 0)
+        self.assertFalse(progress.capped)
+        self.assertEqual(
+            progress.xp_to_next_level, SKILL_PROFICIENCY_XP_PER_LEVEL
+        )
 
 
 class PurityTests(_TreeScopeMixin, unittest.TestCase):

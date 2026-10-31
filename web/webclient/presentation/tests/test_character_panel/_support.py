@@ -105,6 +105,8 @@ def _scope_extra():
     skills = dict(overlay["skills"])
     mastery = _mastery_row()
     skills[mastery.key] = mastery
+    entitlement = _entitlement_mastery_row()
+    skills[entitlement.key] = entitlement
     for row in _rite_rows():
         skills[row.key] = row
     return {**overlay, "skills": skills}
@@ -143,6 +145,28 @@ def _element_mastery_key():
     the ladder test owns it by its derived key rather than a literal.
     """
     return f"{SYNTH_SKILLS['t_ember_burst'].element.key}_mastery"
+
+
+def _entitlement_mastery_row():
+    """The mastery row the freeform entitlement actually resolves.
+
+    Entitlement resolves ``<element>_mastery`` from the LIVE registry and now
+    requires the row's whole declared closure, so the fixture registers the
+    row under the derived key. Its single branch is a same-element ordinary
+    active that consumes nothing the burst's lineage assertions observe, so
+    the burst's derived cap and consumer list stay exactly as they were.
+    """
+    from world.skills.registry import SkillCategory, SkillKind, SkillPrerequisite
+    from world.rules.tests._combat_session_helpers import synth_damage_skill
+
+    return synth_damage_skill(
+        _element_mastery_key(),
+        "合成元素精通",
+        effects=(),
+        kind=SkillKind.PASSIVE,
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        prerequisites=(SkillPrerequisite(SYNTH_SKILLS["t_hush_mend"].key, 1),),
+    )
 
 
 # Display/identity for the composed-title tests, derived from the kit rows

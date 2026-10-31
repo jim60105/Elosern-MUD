@@ -87,10 +87,11 @@ def mastery_prerequisites_met(
     The ONE closure query shared by the use gate and by acquisition (design
     D2). Pure and side-effect free: it never repairs ownership or practice XP
     and never substitutes a conferred grant for a direct one. The target must
-    be the live registered elemental-mastery definition, declare a nonempty
-    prerequisite list, and pass identity/effect eligibility itself — ownership
-    of the target is deliberately NOT required, because acquisition asks this
-    before granting it.
+    be the live registered elemental-mastery definition — the supplied object
+    must BE that row, so a stale or hand-built copy can never borrow another
+    registered key's closure — declare a nonempty prerequisite list, and pass
+    identity/effect eligibility itself — ownership of the target is
+    deliberately NOT required, because acquisition asks this before granting it.
 
     Every ancestor reached through the declared edges must be registered,
     identity/effect eligible, directly owned, and at or above the edge's
@@ -100,7 +101,7 @@ def mastery_prerequisites_met(
     if not is_elemental_mastery(skill) or not skill.prerequisites:
         return False
     registered = SKILL_REGISTRY.get(skill.key)
-    if registered is None:
+    if registered is None or registered is not skill:
         return False
     if not skill_identity_eligible(entity, skill) or not skill_effect_allowed(
         entity, skill.key
