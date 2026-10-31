@@ -176,7 +176,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "13ee3206d368c99292faa2624ee470a17161e6fc9f161daf04be1dd42227a1b7",
+  "fingerprint": "629bd5cf8980ada34ac3584f3dd568ceb41281810081c01c6804cafde0ab1b96",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -1273,7 +1273,7 @@
     "world/rules/surfaces.py": "ab43996e91df6657f8e627456906d5173f947aa92ff2546dd0bf8eefbbe8e429",
     "world/rules/target_facts.py": "18c850571b194d6fbaddf6d2ce329a2b6763e920e3050da97d3db1d3df04855b",
     "world/rules/targeting.py": "2eec94487a48b86133833dcbb9ac86477b381caa7fa8b095dd67b71640bc1a97",
-    "world/rules/time_skip.py": "fbf69d91fbd2d518a8b63b084ec4210067256fe19a0300d613c6d4e73afa7802",
+    "world/rules/time_skip.py": "af76c38ea6c78bdae6a6cc734e8e68fcfe123062fae37106bfde6a17a008f806",
     "world/rules/title_view.py": "16fea08f0dcd76d16f1e76db98feefd6c53ca329cff2a29ca7cbdd28167b518e",
     "world/rules/titles/__init__.py": "762b43d83b88d7ec146ee013dafc60ee9c79bd0fa3ed737f8e4063c6dde41543",
     "world/rules/titles/awards.py": "afd05d152bffdda198e80a42d5226d54db93af6dd818dd6d797c9775178b9f2e",
@@ -1283,7 +1283,7 @@
     "world/rules/titles/state.py": "7efdc1e5a9a745f0ba980106f133f031856f21f7bfacb83beaef54f7a3097247",
     "world/rules/traits.py": "fb483c81ecbdfaf57f973fb984867c119bf2615451415980ef82e4de61ae7237",
     "world/rules/travel_cost.py": "bfb2a1eb87cbd9ccb25410de6026462b9c3acfaa22adc63f42ba39171bb0a5ae",
-    "world/rules/travel_events.py": "b3318bd2152afd5b73e3ebf46d0a9b70593ee4ec4ed79976f35db95cff9c7b9a",
+    "world/rules/travel_events.py": "d94bda5a1abb63797785df5a93a5a54a788ef0a28d4612b99eaf83369014a8c9",
     "world/rules/travel_interrupts.py": "7f85db1c6ab8d3d8a5264428e98900f4ec6fd2eee4198c13aed74c20efdabcce",
     "world/rules/travel_plan.py": "10ce62a44c4bbc7c6add81e14c9fe3f023610214b12078441dc4e0fb94f23737",
     "world/rules/unlock_notices.py": "c3402f1db1a73348f5667761e9fe7722c11a692b2a1371593528b70ac9e452f1",

@@ -470,9 +470,10 @@ def advance_wait(
     entities = present_party_scope(actor)
     clock = get_world_clock()
     elapsed = planned_seconds(entities, limit, tick=clock.tick)
-    from world.rules.travel_events import capture_travel_facts, record_position_change
+    from world.rules.travel_events import capture_travel_facts, on_wilderness, record_position_change
 
-    travel_before = capture_travel_facts(actor, members=entities) if elapsed > 0 else None
+    travel_scope = elapsed > 0 and on_wilderness(actor)
+    travel_before = capture_travel_facts(actor, members=entities) if travel_scope else None
     commits: list[Any] = []
     mental = replace(plan_for(entities), record=commits)
     observation = _ground_observation_target(actor)
@@ -504,7 +505,7 @@ def advance_wait(
     )
     _record(result)
     publish_awake_skip(actor, result)
-    if elapsed > 0:
+    if travel_scope:
         record_position_change(actor, travel_before, "skip", members=entities)
     return result
 
@@ -890,12 +891,16 @@ def continue_sleep(
     tick_snapshot = _snapshot_clock_tick(clock)
     elapsed = 0
     events: list[ScheduledEvent] = []
-    from world.rules.travel_events import capture_travel_facts, record_position_change
+    from world.rules.travel_events import capture_travel_facts, on_wilderness, record_position_change
 
-    travel_before = capture_travel_facts(actor, members=entities)
+    travel_scope = on_wilderness(actor)
+    travel_before = None
     try:
         with transaction.atomic():
             _lock_members(entities)
+            if travel_scope:
+                # Read under the member locks the interval settles with.
+                travel_before = capture_travel_facts(actor, members=entities)
             state = read_optional_fatigue_state(member)
             if state is None:
                 raise SleepRefused(
@@ -959,7 +964,7 @@ def continue_sleep(
             }
             if updated is not None:
                 write_sleep_receipt(member, updated.with_result(result_payload))
-            if elapsed > 0:
+            if travel_scope and elapsed > 0:
                 # Inside the interval's transaction: a rollback discards it.
                 record_position_change(actor, travel_before, "skip", members=entities)
             if continuation is not None:

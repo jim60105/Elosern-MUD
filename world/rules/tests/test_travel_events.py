@@ -247,6 +247,28 @@ class ProducerHookTests(TestCase):
         self.assertEqual([fact.group_id for fact in self.delivered], [result[PUBLICATION_GROUP_FIELD]])
         self.assertEqual([e.kind for e in self.delivered[0].events], ["look"])
 
+    def test_a_failed_record_never_breaks_the_owner_transaction(self):
+        """A database error inside the notice record rolls back its own
+        savepoint only: the owner's later writes still commit."""
+        from django.db import DatabaseError
+        from evennia.objects.models import ObjectDB
+
+        actor = SimpleNamespace(pk=5, location=object())
+
+        def broken(*_args, **_kwargs):
+            ObjectDB.objects.raw("SELECT * FROM no_such_table")[0]
+
+        with self.captureOnCommitCallbacks(execute=True), \
+                mock.patch.object(travel_events, "_wilderness_cell", return_value=(1, 1)), \
+                mock.patch.object(travel_events, "capture_travel_facts", side_effect=broken), \
+                mock.patch.object(travel_events, "log_warn") as warn:
+            with transaction.atomic():
+                self.assertIsNone(travel_events.record_position_change(actor, None, "skip"))
+                # The owner's next query still runs in the unbroken transaction.
+                ObjectDB.objects.count()
+        self.assertIsInstance(warn.call_args.kwargs["exc"], DatabaseError)
+        self.assertEqual(self.delivered, [])
+
     def test_capture_failure_is_reported_not_raised(self):
         actor = SimpleNamespace(pk=5, location=object())
         with mock.patch.object(travel_events, "_wilderness_cell", side_effect=RuntimeError("bad")), \

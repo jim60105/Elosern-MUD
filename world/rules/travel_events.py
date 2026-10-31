@@ -31,6 +31,8 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, Callable, Iterable, Mapping
 
+from django.db import transaction
+
 from world.observability import log_warn
 from world.rules.presentation_events import (
     current_publication_group,
@@ -405,37 +407,10 @@ def capture_travel_facts(
     from world.rules.clock import read_world_clock
 
     try:
-        location = location if location is not None else getattr(actor, "location", None)
-        clock = read_world_clock()
-        tick = 0 if clock is None else int(clock.tick)
-        cell = _wilderness_cell(location)
-        if members is None:
-            from world.rules.travel_cost import source_present_members
-
-            members = () if location is None else source_present_members(actor, location, cell)
-        travellers = _traveller_rows(members)
-        if cell is None:
-            return TravelCapture(cell=None, tick=tick, travellers=travellers)
-        from world.maps import wilderness_provider
-        from world.lore.wilderness_regions import regions
-        from world.rules.map_district_lighting import lit_district_keys
-
-        region_key = wilderness_provider.region_for_coordinates(*cell)
-        region = regions().get(region_key)
-        fords = wilderness_provider.terrain_definition().waterway_fords
-        owner = knowledge_owner if knowledge_owner is not None else actor
-        return TravelCapture(
-            cell=cell,
-            tick=tick,
-            region_key=region_key,
-            region_name=region.display_name_zh if region is not None else region_key,
-            woodland=wilderness_provider.sight_terrain_class(cell) == "woodland",
-            ford=any(tuple(cell) in {tuple(c) for c in cells} for cells in fords.values()),
-            landmarks=_landmarks_at(cell),
-            lit_districts=frozenset(lit_district_keys(owner)),
-            hostiles=_hostiles_at(location, cell),
-            travellers=travellers,
-        )
+        # A savepoint keeps a failed read from breaking an owner's enclosing
+        # transaction (a sleep interval reads these inside its own atomic).
+        with transaction.atomic():
+            return _capture(actor, location, knowledge_owner, members, read_world_clock)
     except Exception as error:  # observability: R2 reported here; a travel notice read never fails the observed operation
         log_warn(
             "travel_events_capture_failed",
@@ -443,6 +418,49 @@ def capture_travel_facts(
             exc=error,
         )
         return None
+
+
+def on_wilderness(actor: Any) -> bool:
+    """Whether ``actor`` stands on a wilderness cell (the only notice scope)."""
+    try:
+        return _wilderness_cell(getattr(actor, "location", None)) is not None
+    except Exception as error:  # observability: R2 reported here; an unreadable position records nothing
+        log_warn("travel_events_capture_failed", context={"char": str(getattr(actor, "pk", "?"))}, exc=error)
+        return False
+
+
+def _capture(actor, location, knowledge_owner, members, read_world_clock):
+    location = location if location is not None else getattr(actor, "location", None)
+    clock = read_world_clock()
+    tick = 0 if clock is None else int(clock.tick)
+    cell = _wilderness_cell(location)
+    if members is None:
+        from world.rules.travel_cost import source_present_members
+
+        members = () if location is None else source_present_members(actor, location, cell)
+    travellers = _traveller_rows(members)
+    if cell is None:
+        return TravelCapture(cell=None, tick=tick, travellers=travellers)
+    from world.maps import wilderness_provider
+    from world.lore.wilderness_regions import regions
+    from world.rules.map_district_lighting import lit_district_keys
+
+    region_key = wilderness_provider.region_for_coordinates(*cell)
+    region = regions().get(region_key)
+    fords = wilderness_provider.terrain_definition().waterway_fords
+    owner = knowledge_owner if knowledge_owner is not None else actor
+    return TravelCapture(
+        cell=cell,
+        tick=tick,
+        region_key=region_key,
+        region_name=region.display_name_zh if region is not None else region_key,
+        woodland=wilderness_provider.sight_terrain_class(cell) == "woodland",
+        ford=any(tuple(cell) in {tuple(c) for c in cells} for cells in fords.values()),
+        landmarks=_landmarks_at(cell),
+        lit_districts=frozenset(lit_district_keys(owner)),
+        hostiles=_hostiles_at(location, cell),
+        travellers=travellers,
+    )
 
 
 # -- delivery ----------------------------------------------------------------
@@ -569,37 +587,10 @@ def record_position_change(
     reported instead of raised.
     """
     try:
-        location = getattr(actor, "location", None)
-        cell = _wilderness_cell(location)
-        if cell is None:
-            return None
-        after = capture_travel_facts(
-            actor, location=location, knowledge_owner=knowledge_owner, members=members
-        )
-        if after is None:
-            return None
-        prose = artwork = node = None
-        if cause == "move" and after.landmarks:
-            from world.maps.wilderness_provider import WILDERNESS_NAME
-            from world.rules.map_knowledge import encode_wild
-
-            node = encode_wild(WILDERNESS_NAME, cell[0], cell[1])
-            # The reached room's ordinary appearance through the read-only
-            # look seam: current-cell scenery, no authored landmark prose, no
-            # LLM and no look charge.
-            prose = actor.at_look(location)
-            artwork = _scene_artwork(location)
-        return record_travel_fact(
-            actor,
-            build_travel_events(
-                before,
-                after,
-                cause,
-                landmark_prose=prose,
-                landmark_artwork=artwork,
-                arrival_node=node,
-            ),
-        )
+        # A savepoint: a failed read or record rolls back only itself (and the
+        # delivery it registered), never the owner's enclosing transaction.
+        with transaction.atomic():
+            return _record_position_change(actor, before, cause, knowledge_owner, members)
     except Exception as error:  # observability: R2 reported here; a notice never fails a committed operation
         log_warn(
             "travel_events_record_failed",
@@ -607,6 +598,40 @@ def record_position_change(
             exc=error,
         )
         return None
+
+
+def _record_position_change(actor, before, cause, knowledge_owner, members):
+    location = getattr(actor, "location", None)
+    cell = _wilderness_cell(location)
+    if cell is None:
+        return None
+    after = capture_travel_facts(
+        actor, location=location, knowledge_owner=knowledge_owner, members=members
+    )
+    if after is None:
+        return None
+    prose = artwork = node = None
+    if cause == "move" and after.landmarks:
+        from world.maps.wilderness_provider import WILDERNESS_NAME
+        from world.rules.map_knowledge import encode_wild
+
+        node = encode_wild(WILDERNESS_NAME, cell[0], cell[1])
+        # The reached room's ordinary appearance through the read-only
+        # look seam: current-cell scenery, no authored landmark prose, no
+        # LLM and no look charge.
+        prose = actor.at_look(location)
+        artwork = _scene_artwork(location)
+    return record_travel_fact(
+        actor,
+        build_travel_events(
+            before,
+            after,
+            cause,
+            landmark_prose=prose,
+            landmark_artwork=artwork,
+            arrival_node=node,
+        ),
+    )
 
 
 def _scene_artwork(location: Any) -> Mapping[str, Any] | None:
