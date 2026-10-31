@@ -439,6 +439,113 @@ class CollectorDispositionTests(unittest.TestCase):
             self.assertIs(_observation_for(self.actor), observation)
             self.assertIsNone(_observation_for(other))
 
+    def test_the_collector_takes_one_travel_capture_per_side(self):
+        """A travel lineage's collector reads each position once for the
+        travel log, beside the interrupt facts, and keeps both values."""
+        from world.rules.movement_settlement import capture_movement_observation
+
+        before_capture, after_capture = object(), object()
+        arrived = SimpleNamespace(pk=22)
+        self.actor.location = arrived
+        with mock.patch(
+            "world.rules.travel_interrupts._source_present_members",
+            return_value=(),
+        ), mock.patch(
+            "world.rules.travel_interrupts.read_movement_facts",
+            side_effect=[_facts(cell=(5, 5)), _facts(cell=(5, 6), hostiles=("h1",))],
+        ) as interrupt_read, mock.patch(
+            "world.rules.travel_interrupts.wilderness_cell",
+            return_value=(5, 6),
+        ), mock.patch(
+            "world.rules.travel_events.capture_travel_facts",
+            side_effect=[before_capture, after_capture],
+        ) as travel_read:
+            with capture_movement_observation(self.actor) as observation:
+                observation.capture_before(
+                    self.actor,
+                    self.location,
+                    wilderness_source_coordinates=(5, 5),
+                    knowledge_owner=self.actor,
+                    travel=True,
+                )
+                observation.capture_after(self.actor, knowledge_owner=self.actor)
+        self.assertEqual(interrupt_read.call_count, 2)
+        self.assertEqual(
+            [call.kwargs["location"] for call in travel_read.call_args_list],
+            [self.location, arrived],
+        )
+        self.assertIs(observation.travel_before, before_capture)
+        self.assertIs(observation.travel_after, after_capture)
+        self.assertEqual(observation.flags, ("hostile_in_sight",))
+
+    def test_an_interrupt_read_failure_keeps_the_travel_capture(self):
+        from world.rules.movement_settlement import capture_movement_observation
+
+        capture = object()
+        with mock.patch(
+            "world.rules.travel_interrupts._source_present_members",
+            return_value=(),
+        ), mock.patch(
+            "world.rules.travel_interrupts.read_movement_facts",
+            side_effect=RuntimeError("synthetic capture failure"),
+        ), mock.patch(
+            "world.rules.travel_events.capture_travel_facts",
+            return_value=capture,
+        ), mock.patch("world.rules.movement_settlement.log_warn"):
+            with capture_movement_observation(self.actor) as observation:
+                observation.capture_before(
+                    self.actor,
+                    self.location,
+                    wilderness_source_coordinates=(5, 5),
+                    knowledge_owner=self.actor,
+                    travel=True,
+                )
+        self.assertIs(observation.travel_before, capture)
+        self.assertEqual(observation.flags, ())
+
+    def test_a_failed_travel_capture_keeps_the_flags(self):
+        from world.rules.movement_settlement import capture_movement_observation
+
+        self.actor.location = SimpleNamespace(pk=22)
+        with mock.patch(
+            "world.rules.travel_interrupts._source_present_members",
+            return_value=(),
+        ), mock.patch(
+            "world.rules.travel_interrupts.read_movement_facts",
+            side_effect=[_facts(cell=(5, 5)), _facts(cell=(5, 6), landmarks=("d",))],
+        ), mock.patch(
+            "world.rules.travel_interrupts.wilderness_cell",
+            return_value=(5, 6),
+        ), mock.patch(
+            "world.rules.travel_events.capture_travel_facts",
+            return_value=None,
+        ):
+            with capture_movement_observation(self.actor) as observation:
+                observation.capture_before(
+                    self.actor,
+                    self.location,
+                    wilderness_source_coordinates=(5, 5),
+                    knowledge_owner=self.actor,
+                    travel=True,
+                )
+                observation.capture_after(self.actor, knowledge_owner=self.actor)
+        self.assertIsNone(observation.travel_after)
+        self.assertEqual(observation.flags, ("landmark_reached",))
+
+    def test_a_nested_other_actor_never_reaches_the_travel_capture(self):
+        from world.rules.movement_settlement import (
+            _observation_for,
+            capture_movement_observation,
+        )
+
+        other = SimpleNamespace(pk=18)
+        with mock.patch("world.rules.travel_events.capture_travel_facts") as travel_read:
+            with capture_movement_observation(self.actor) as observation:
+                self.assertIsNone(_observation_for(other))
+        travel_read.assert_not_called()
+        self.assertIsNone(observation.travel_before)
+        self.assertIsNone(observation.travel_after)
+
     def test_a_non_wilderness_destination_yields_no_wilderness_disposition(self):
         from world.rules.movement_settlement import capture_movement_observation
 

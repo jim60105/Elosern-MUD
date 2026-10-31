@@ -874,6 +874,25 @@ A capture or comparison failure logs `travel_interrupts_failed` (`char`,
 `tick`, `step`) and leaves the empty-flag disposition; it never fails the
 movement and never swallows a traversal, preflight or settlement failure.
 
+The bound collector is also the one observation owner of the step's travel
+log capture (wilderness-travel-route-ui). On a wilderness lineage
+`capture_before(..., travel=True)` reads the source position once for each
+consumer and `capture_after` reads the reached position once for each:
+`MovementFacts` feed `travel_interrupts.movement_flags` and the
+`TravelCapture` values (`observation.travel_before` / `travel_after`) feed
+`travel_events.build_travel_events` through
+`record_position_change(..., after=observation.travel_after)`, which never
+reads that position again. The two reads keep their own failure boundaries
+and their own party scopes, so a failed interrupt read never hides a notice
+and a failed notice read (`travel_events_capture_failed`, recording nothing)
+never clears a flag. Both deliveries stay commit-qualified under the step's
+one captured group: the notice through `record_travel_fact`'s
+`on_publication_commit` and the result through the adapter's `Deferred`, so
+one committed step yields its structured notice and its `data.interrupts`
+together and a rolled-back step yields neither. The result's other `data`
+keys are kept. Without a collector (a text command, an NPC move, an
+explicit skip) the travel owner reads both positions itself as before.
+
 ### Outcomes and bounds
 
 Every public queueing entry returns `Deferred[PublicationReceipt | None]`. All

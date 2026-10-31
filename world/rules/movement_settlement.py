@@ -248,6 +248,12 @@ def note_direct_move_end(actor: Any) -> None:
 # compensated step can never publish an interrupt result. The collector holds
 # values and a ContextVar binding, never game state, and the adapter reads the
 # frozen flag tuple after `at_traverse` returns.
+#
+# The collector is also the one observation owner of its traversal's travel
+# log capture (wilderness-travel-route-ui): each side's position is read once
+# for the interrupt comparison and once, in its own failure boundary, for the
+# travel notice comparison, and the settlement hands those immutable values
+# to their two existing pure comparisons instead of reading again.
 # ---------------------------------------------------------------------------
 
 
@@ -262,7 +268,19 @@ class MovementObservation:
     broken read never fails an otherwise successful movement.
     """
 
-    __slots__ = ("actor_id", "walk", "before", "after", "flags", "wilderness", "_members", "_tick")
+    __slots__ = (
+        "actor_id",
+        "walk",
+        "before",
+        "after",
+        "flags",
+        "wilderness",
+        "travel_before",
+        "travel_after",
+        "_travel",
+        "_members",
+        "_tick",
+    )
 
     def __init__(self, actor: Any, walk: Any = None) -> None:
         self.actor_id = int(actor.pk)
@@ -271,6 +289,12 @@ class MovementObservation:
         self.after: Any = None
         self.flags: tuple[str, ...] = ()
         self.wilderness = False
+        # The travel log's immutable captures of the same two positions
+        # (``world.rules.travel_events.TravelCapture`` or ``None`` when that
+        # read failed and reported itself).
+        self.travel_before: Any = None
+        self.travel_after: Any = None
+        self._travel = False
         self._members: tuple[Any, ...] = ()
         self._tick = 0
 
@@ -281,8 +305,40 @@ class MovementObservation:
         *,
         wilderness_source_coordinates: tuple[int, int] | None,
         knowledge_owner: Any,
+        travel: bool = False,
     ) -> None:
-        """Freeze the facts of the position being left, before any write."""
+        """Freeze the facts of the position being left, before any write.
+
+        ``travel`` also takes the travel log's capture of the same position
+        (a wilderness lineage). It is read in its own failure boundary, with
+        the travel log's own party scope, so a failed interrupt read never
+        hides a notice and a failed notice read never clears a flag.
+        """
+        if travel:
+            self._travel = True
+            self.travel_before = self._travel_capture(actor, source_location, knowledge_owner)
+        self._capture_interrupt_before(
+            actor,
+            source_location,
+            wilderness_source_coordinates=wilderness_source_coordinates,
+            knowledge_owner=knowledge_owner,
+        )
+
+    @staticmethod
+    def _travel_capture(actor: Any, location: Any, knowledge_owner: Any) -> Any:
+        from world.rules.travel_events import capture_travel_facts
+
+        # capture_travel_facts reports its own failure and answers None.
+        return capture_travel_facts(actor, location=location, knowledge_owner=knowledge_owner)
+
+    def _capture_interrupt_before(
+        self,
+        actor: Any,
+        source_location: Any,
+        *,
+        wilderness_source_coordinates: tuple[int, int] | None,
+        knowledge_owner: Any,
+    ) -> None:
         from world.rules import travel_interrupts
         from world.rules.clock import read_world_clock
 
@@ -308,7 +364,17 @@ class MovementObservation:
         self._tick = facts.tick
 
     def capture_after(self, actor: Any, *, knowledge_owner: Any) -> None:
-        """Compare the committed destination facts with the frozen source facts."""
+        """Compare the committed destination facts with the frozen source facts.
+
+        A travel lineage also takes the travel log's capture of the reached
+        position once, independently of the interrupt comparison's outcome.
+        """
+        self._capture_interrupt_after(actor, knowledge_owner=knowledge_owner)
+        if self._travel:
+            location = getattr(actor, "location", None)
+            self.travel_after = self._travel_capture(actor, location, knowledge_owner)
+
+    def _capture_interrupt_after(self, actor: Any, *, knowledge_owner: Any) -> None:
         from world.rules import travel_interrupts
 
         try:
@@ -444,24 +510,27 @@ def settle_movement(
         travel_lineage = (
             wilderness_coordinates is not None or wilderness_source_coordinates is not None
         )
-        if travel_lineage:
-            from world.rules.travel_events import capture_travel_facts
-
-            # The travel log's before facts, copied with the interrupt facts:
-            # before the traversal and before any pooled-room mutation.
-            travel_before = capture_travel_facts(
-                traversing_object,
-                location=source_location,
-                knowledge_owner=snapshot.commander or traversing_object,
-            )
         if observation is not None:
             # Frozen immediately before the traversal and before any pooled-room
             # mutation: the source cell and the party's before physiology can
-            # never be rewritten by the step they describe.
+            # never be rewritten by the step they describe. The bound collector
+            # owns this traversal's one travel log capture of the source too.
             observation.capture_before(
                 traversing_object,
                 source_location,
                 wilderness_source_coordinates=wilderness_source_coordinates,
+                knowledge_owner=snapshot.commander or traversing_object,
+                travel=travel_lineage,
+            )
+            travel_before = observation.travel_before
+        elif travel_lineage:
+            from world.rules.travel_events import capture_travel_facts
+
+            # No collector (a text command, an NPC): the travel log's before
+            # facts, before the traversal and before any pooled-room mutation.
+            travel_before = capture_travel_facts(
+                traversing_object,
+                location=source_location,
                 knowledge_owner=snapshot.commander or traversing_object,
             )
         try:
@@ -538,12 +607,23 @@ def settle_movement(
                 # Registered like the checkpoint above: an outer rollback
                 # discards it, and a refused or compensated step never
                 # reaches here.
-                record_position_change(
-                    traversing_object,
-                    travel_before,
-                    "move",
-                    knowledge_owner=snapshot.commander or traversing_object,
-                )
+                if observation is not None:
+                    # The collector already read the reached position once:
+                    # its immutable capture feeds the notice comparison.
+                    record_position_change(
+                        traversing_object,
+                        travel_before,
+                        "move",
+                        knowledge_owner=snapshot.commander or traversing_object,
+                        after=observation.travel_after,
+                    )
+                else:
+                    record_position_change(
+                        traversing_object,
+                        travel_before,
+                        "move",
+                        knowledge_owner=snapshot.commander or traversing_object,
+                    )
         if narrate_traversal and not (wilderness_lineage and not result):
             from world.rules.map_discovery import publish_traversal_narrative
 

@@ -381,6 +381,60 @@ class ProducerHookTests(TestCase):
         self.assertEqual(reached.params["arrival_node"], NODE)
         self.assertEqual(reached.params["lit_district"], "合成塔")
 
+    def _landmark_step(self):
+        actor = mock.Mock(pk=5, location=object())
+        actor.at_look.return_value = "塔前石階。"
+        after = _capture(cell=(12, 34), landmarks=(("d_tower", "合成塔"),))
+        return actor, after
+
+    def test_a_supplied_after_capture_is_never_read_again(self):
+        actor, after = self._landmark_step()
+        with self.captureOnCommitCallbacks(execute=True), \
+                mock.patch.object(travel_events, "_wilderness_cell", return_value=(12, 34)), \
+                mock.patch.object(travel_events, "capture_travel_facts") as read, \
+                mock.patch.object(travel_events, "_scene_artwork", return_value=None), \
+                mock.patch("world.rules.map_knowledge.encode_wild", return_value=NODE):
+            fact = travel_events.record_position_change(actor, _capture(), "move", after=after)
+            self.assertIsNone(travel_events.record_position_change(actor, _capture(), "move", after=None))
+        read.assert_not_called()
+        self.assertEqual([e.kind for e in fact.events], ["landmark_reached"])
+        self.assertEqual(self.delivered, [fact])
+
+    def _step_with_release(self, actor, after, released):
+        """One committed step's two commit-qualified deliveries: its travel
+        notice and an adapter-style result release, under one group."""
+        from world.rules.presentation_events import on_publication_commit
+
+        with publication_group() as group:
+            fact = travel_events.record_position_change(actor, _capture(), "move", after=after)
+            on_publication_commit(lambda: released.append({"interrupts": ["landmark_reached"], "group": group.id}))
+        return fact, group
+
+    def test_one_committed_step_publishes_its_event_and_its_flags(self):
+        actor, after = self._landmark_step()
+        released = []
+        with self.captureOnCommitCallbacks(execute=True), \
+                mock.patch.object(travel_events, "_wilderness_cell", return_value=(12, 34)), \
+                mock.patch.object(travel_events, "_scene_artwork", return_value=None), \
+                mock.patch("world.rules.map_knowledge.encode_wild", return_value=NODE):
+            fact, group = self._step_with_release(actor, after, released)
+        self.assertEqual(self.delivered, [fact])
+        self.assertEqual(fact.group_id, group.id)
+        self.assertEqual(released, [{"interrupts": ["landmark_reached"], "group": group.id}])
+
+    def test_a_rolled_back_step_publishes_neither_event_nor_flags(self):
+        actor, after = self._landmark_step()
+        released = []
+        with self.captureOnCommitCallbacks(execute=True), \
+                mock.patch.object(travel_events, "_wilderness_cell", return_value=(12, 34)), \
+                mock.patch.object(travel_events, "_scene_artwork", return_value=None), \
+                mock.patch("world.rules.map_knowledge.encode_wild", return_value=NODE):
+            with transaction.atomic():
+                self._step_with_release(actor, after, released)
+                transaction.set_rollback(True)
+        self.assertEqual(self.delivered, [])
+        self.assertEqual(released, [])
+
     def test_failed_look_adapter_records_nothing(self):
         from web.webclient.actions.exploration_actions import _look_adapter
 

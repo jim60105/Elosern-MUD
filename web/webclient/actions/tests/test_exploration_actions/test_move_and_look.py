@@ -831,6 +831,49 @@ class WildernessMoveInterruptTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(clock.tick, tick)
         self.assertEqual(attribute_snapshot(self.char1, "map_knowledge"), knowledge)
 
+    def test_a_committed_step_publishes_its_travel_notice_with_its_flags(self):
+        """One committed step reads each position once for the travel log
+        and yields both its structured notice and its interrupt data under
+        the step's one causal group."""
+        from web.webclient.actions.dispatcher import PUBLICATION_GROUP_FIELD
+        from world.rules import travel_events
+
+        self._enter()
+        exit_obj, target = self._step()
+        delivered = []
+        travel_events.clear_travel_observers()
+        travel_events.register_travel_observer(delivered.append)
+        self.addCleanup(travel_events.clear_travel_observers)
+        build = travel_events.build_travel_events
+
+        def comparison(before, after, cause, **kwargs):
+            # The real comparison of the two captures, plus one synthetic
+            # notice so the step always records a fact.
+            drafts = build(before, after, cause, **kwargs)
+            return (*drafts, travel_events._draft("region_entered", {"name": "合成原野"}, after.tick))
+
+        with patch.object(
+            travel_events, "build_travel_events", side_effect=comparison
+        ) as compared, patch.object(
+            travel_events,
+            "capture_travel_facts",
+            wraps=travel_events.capture_travel_facts,
+        ) as read:
+            result = self._move(
+                self._step_payload(exit_obj, walk={"pace": "forced", "stop_at_night": False})
+            )
+        self.assertEqual(result["outcome"], "success")
+        self.assertIsInstance(result["data"]["interrupts"], list)
+        self.assertEqual(read.call_count, 2)
+        # The comparison received the collector's two immutable captures.
+        before_capture, after_capture = compared.call_args.args[:2]
+        self.assertIsNotNone(before_capture)
+        self.assertEqual(after_capture.cell, tuple(target))
+        self.assertEqual(len(delivered), 1)
+        self.assertEqual(delivered[0].group_id, result[PUBLICATION_GROUP_FIELD])
+        self.assertIn("region_entered", [event.kind for event in delivered[0].events])
+        self.assertEqual(tuple(self.char1.location.coordinates), tuple(target))
+
     @covers_requirement(
         "wilderness-travel-interrupts::wilderness-steps-report-stateless-committed-interrupts"
     )
