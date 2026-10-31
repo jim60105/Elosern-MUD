@@ -61,6 +61,7 @@ const chevron = (c) => `M${-c} ${c * 0.78} L0 ${-c} L${c} ${c * 0.78}`;
       <path class="travel-glyph__chevron" :d="chevron(G.hostile.chevron)" />
     </template>
     <template v-else-if="kind === 'route'">
+      <circle class="travel-glyph__halo-ink" :r="G.route.haloR" />
       <circle v-if="state === 'normal'" class="travel-glyph__step" :r="G.route.dotR" />
       <path v-else-if="state === 'light'" class="travel-glyph__step" :d="diamond(G.route.diamond)" />
       <template v-else>
@@ -93,6 +94,9 @@ const chevron = (c) => `M${-c} ${c * 0.78} L0 ${-c} L${c} ${c * 0.78}`;
 .travel-glyph__seal { fill: #2a1416; stroke: var(--seal-500); stroke-width: 1.8; }
 .travel-glyph__chevron { fill: none; stroke: var(--seal-light); stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
 
+/* An ink seat under each route mark keeps it legible over painted terrain. */
+.travel-glyph__halo-ink { fill: rgba(11, 13, 16, 0.62); stroke: rgba(242, 222, 170, 0.22); stroke-width: 0.6; }
+.travel-glyph--route.is-faint .travel-glyph__halo-ink { fill: rgba(11, 13, 16, 0.38); stroke: none; }
 .travel-glyph--route.is-normal .travel-glyph__step { fill: var(--gold-400); }
 .travel-glyph--route.is-light .travel-glyph__step { fill: var(--warn); }
 .travel-glyph__ring { fill: none; stroke: #d0705a; stroke-width: 2; }

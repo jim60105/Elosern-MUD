@@ -557,7 +557,11 @@ const destinationChip = computed(() => {
   const plan = props.plan;
   const steps = plan && Array.isArray(plan.steps) && plan.steps.length && Number.isInteger(plan.stop_index) ? plan.stop_index + 1 : null;
   const label = props.target.label || "目的地";
-  return { left: lx(d.x), top: ly(d.y) - c.value * 0.62, label, steps, locked: d.locked };
+  // A moon or camp mark on the destination sits above its cell: the chip
+  // rises over it instead of covering it.
+  const marks = routeMarks.value;
+  const marked = [marks.moon, marks.camp].some((m) => m && m.x === d.x && m.y === d.y);
+  return { left: lx(d.x), top: ly(d.y) - c.value * (marked ? 1.05 : 0.62), label, steps, locked: d.locked };
 });
 const cursorPath = computed(() => {
   const k = props.cursor;
@@ -569,6 +573,9 @@ const cursorPath = computed(() => {
   const corner = (sx, sy) => `M${cx + sx * half} ${cy + sy * (half - arm)} L${cx + sx * half} ${cy + sy * half} L${cx + sx * (half - arm)} ${cy + sy * half}`;
   return { d: [corner(-1, -1), corner(1, -1), corner(1, 1), corner(-1, 1)].join(" "), known: !!k.known };
 });
+// Route marks read a little larger than the neighbour targets, so a stage
+// stays legible over busy terrain at every zoom.
+const routeScale = computed(() => glyphScale.value * TRAVEL_GLYPHS.route.scale);
 const routeText = computed(() => routeSummary(props.plan, { label: props.target?.label ?? null, sleepLabel: props.sleepLabel }));
 const routeTextId = `travel-route-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -860,7 +867,18 @@ defineExpose({ focusInside, focus: () => root.value?.focus({ preventScroll: true
             v-bind="cellBox(aimed.cell.x, aimed.cell.y, 1)"
             rx="3"
           />
+          <g
+            v-if="destination"
+            class="travel-map__destination"
+            :class="{ 'is-locked': destination.locked }"
+            data-testid="travel-map__destination"
+            :data-locked="destination.locked ? 'true' : 'false'"
+          >
+            <rect class="travel-map__destination-outer" v-bind="destination.outer" :rx="destination.radius" />
+            <rect v-if="destination.locked" class="travel-map__destination-inner" v-bind="destination.inner" :rx="destination.radius * 0.6" />
+          </g>
           <g v-if="routeSteps.length" class="travel-map__route" data-testid="travel-map__route">
+            <path v-if="routeLines.walked" class="travel-map__route-casing" :d="routeLines.walked" />
             <path v-if="routeLines.walked" class="travel-map__route-line" :d="routeLines.walked" />
             <path v-if="routeLines.beyond" class="travel-map__route-line is-beyond" :d="routeLines.beyond" />
             <g
@@ -877,7 +895,7 @@ defineExpose({ focusInside, focus: () => root.value?.focus({ preventScroll: true
               :data-beyond="step.beyond ? 'true' : null"
               :data-night="step.night ? 'true' : null"
             >
-              <TravelGlyph kind="route" :state="step.bucket" :sleep="step.sleep" :faint="step.beyond" :size="glyphScale" />
+              <TravelGlyph kind="route" :state="step.bucket" :sleep="step.sleep" :faint="step.beyond" :size="routeScale" />
             </g>
             <g
               v-if="routeMarks.moon"
@@ -885,7 +903,7 @@ defineExpose({ focusInside, focus: () => root.value?.focus({ preventScroll: true
               data-testid="travel-map__route-moon"
               :data-index="routeMarks.moon.index"
             >
-              <TravelGlyph kind="moon" :size="glyphScale" />
+              <TravelGlyph kind="moon" :size="routeScale" />
             </g>
             <g
               v-if="routeMarks.camp"
@@ -893,18 +911,8 @@ defineExpose({ focusInside, focus: () => root.value?.focus({ preventScroll: true
               data-testid="travel-map__route-camp"
               :data-index="routeMarks.camp.index"
             >
-              <TravelGlyph kind="camp" :size="glyphScale" />
+              <TravelGlyph kind="camp" :size="routeScale" />
             </g>
-          </g>
-          <g
-            v-if="destination"
-            class="travel-map__destination"
-            :class="{ 'is-locked': destination.locked }"
-            data-testid="travel-map__destination"
-            :data-locked="destination.locked ? 'true' : 'false'"
-          >
-            <rect class="travel-map__destination-outer" v-bind="destination.outer" :rx="destination.radius" />
-            <rect v-if="destination.locked" class="travel-map__destination-inner" v-bind="destination.inner" :rx="destination.radius * 0.6" />
           </g>
           <path
             v-if="cursorPath"
@@ -1129,10 +1137,19 @@ defineExpose({ focusInside, focus: () => root.value?.focus({ preventScroll: true
 /* The route preview (wilderness-travel-planning-ui): a faint gold thread
    through the steps (dashed past the stop), the stage marks above it,
    dimmed from nightfall; the destination frame and the keyboard cursor. */
+/* The thread is paper-gold on an ink casing, so it never reads as the
+   painted road's gold dash beneath it. */
+.travel-map__route-casing {
+  fill: none;
+  stroke: rgba(11, 13, 16, 0.55);
+  stroke-width: 4.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 .travel-map__route-line {
   fill: none;
-  stroke: rgba(228, 200, 142, 0.34);
-  stroke-width: 2;
+  stroke: rgba(242, 222, 170, 0.78);
+  stroke-width: 1.6;
   stroke-linecap: round;
   stroke-linejoin: round;
 }

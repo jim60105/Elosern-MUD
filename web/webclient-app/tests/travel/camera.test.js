@@ -208,7 +208,9 @@ describe("shared travel glyph states", () => {
     expect(new Set(routes).size).toBe(4);
     expect(routes[0]).toMatch(/<circle/);
     expect(routes[1]).toMatch(/<path/);
-    expect((routes[3].match(/<circle/g) || []).length).toBe(2);
+    // Severe is the ring with its core (each mark also sits on one ink seat).
+    expect((routes[3].match(/travel-glyph__(ring|core)/g) || []).length).toBe(2);
+    expect(routes.every((html) => (html.match(/travel-glyph__halo-ink/g) || []).length === 1)).toBe(true);
   });
 
   it("draws the landmark as the band ornament's diamond", () => {

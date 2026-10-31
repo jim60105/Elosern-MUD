@@ -1547,8 +1547,8 @@ const rootStyle = computed(() => {
               <!-- In travel the band's movement column is the leg panel
                    (wilderness-travel-leg-ui): intent line, leg gauge and
                    legend, pace and nightfall preferences, and 出發/停步,
-                   紮營 and 環顧. 出發 stays disabled until planning-ui
-                   supplies a locked plan (route-ui wires its departure).
+                   紮營 and 環顧. 出發 stays disabled (route_pending) over
+                   a locked plan until route-ui wires its departure.
                    The compass stays the ordinary exploration control. -->
               <div v-if="travelLayout && travelLeg" class="exploration-root__travel">
                 <LegPanel

@@ -57,17 +57,18 @@ export function paintedMarkerFootprint(node, size = 1) {
  *   moonlit rim above the step;
  * - `destination` is the outlined destination cell (as a fraction of the
  *   cell, so it follows the cell size, not the glyph scale) and `cursor` the
- *   keyboard destination cursor's corner brackets (fraction of the cell).
+ *   keyboard destination cursor's corner brackets (fraction of the cell; a
+ *   negative inset sets them just outside the cell, around the destination frame).
  */
 export const TRAVEL_GLYPHS = Object.freeze({
   landmark: Object.freeze({ half: 4.7, dotR: 1.3, stroke: 1 }),
   neighbour: Object.freeze({ openR: 3.2, aimedR: 4.6, blockedR: 3.2, unknownR: 2.4 }),
   hostile: Object.freeze({ haloR: 12, sealR: 8.4, chevron: 3.9 }),
-  route: Object.freeze({ dotR: 3.3, diamond: 3.2, ringR: 3.1, innerR: 1.3, sleepR: 2.4, sleepAt: 4.2 }),
+  route: Object.freeze({ dotR: 3.3, diamond: 3.2, ringR: 3.1, innerR: 1.3, sleepR: 2.4, sleepAt: 4.2, haloR: 5.6, scale: 1.25 }),
   moon: Object.freeze({ discR: 6.2, crescentR: 4, biteR: 3.3, lift: 0.6 }),
   camp: Object.freeze({ discR: 6.6, half: 3.8, rise: 3.6, lift: 0.6 }),
   destination: Object.freeze({ inset: 0.08, inner: 0.2, radius: 0.14 }),
-  cursor: Object.freeze({ inset: 0.04, arm: 0.3 }),
+  cursor: Object.freeze({ inset: -0.1, arm: 0.32 }),
 });
 
 /**
