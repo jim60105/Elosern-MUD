@@ -108,6 +108,7 @@ class BuildTravelEventsTests(unittest.TestCase):
         )
         self.assertEqual([dict(d.params)["count"] for d in same], [1])
 
+    @covers_requirement("webclient-travel-window::travel-observations-follow-canonical-sight-and-phase-facts")
     def test_sightings_compare_observation_identities_across_moves(self):
         """An observation still in sight after a step is never resighted,
         whatever cell the party stands on, and leaving and re-entering sight
@@ -121,6 +122,7 @@ class BuildTravelEventsTests(unittest.TestCase):
         back = _capture(cell=(11, 10), hostiles=(wolf,))
         self.assertEqual(_kinds(build_travel_events(gone, back, "move")), ["hostile_sighted"])
 
+    @covers_requirement("webclient-travel-window::travel-observations-follow-canonical-sight-and-phase-facts")
     def test_a_prospective_slot_that_materializes_is_not_resighted(self):
         """A prospective ambient slot and the monster that materializes in it
         share the slot's observation key: the arrival brings no extra notice,
@@ -137,6 +139,7 @@ class BuildTravelEventsTests(unittest.TestCase):
         self.assertEqual(build_travel_events(view, view, "skip"), ())
         self.assertEqual(build_travel_events(view, view, "move"), ())
 
+    @covers_requirement("webclient-travel-window::travel-observations-follow-canonical-sight-and-phase-facts")
     def test_new_distant_sources_are_sighted_once_with_their_permitted_name(self):
         before = _capture(distant=(("settlement:a", "北", 15, None),))
         after = _capture(
@@ -210,6 +213,7 @@ class PhaseIntervalTests(unittest.TestCase):
 
         return next(start for phase, start, _column in sight.POLICY.phases if phase == name)
 
+    @covers_requirement("webclient-travel-window::travel-observations-follow-canonical-sight-and-phase-facts")
     def test_crossing_an_entry_inside_the_interval_reports_it(self):
         dusk, night = self._start("dusk"), self._start("night")
         # Endpoints on either side of the dusk entry.
@@ -239,6 +243,7 @@ class PhaseIntervalTests(unittest.TestCase):
         ticks = [d.tick for d in drafts]
         self.assertEqual(ticks, sorted(ticks))
 
+    @covers_requirement("webclient-travel-window::travel-observations-follow-canonical-sight-and-phase-facts")
     def test_no_entry_inside_the_interval_reports_nothing(self):
         dusk, night = self._start("dusk"), self._start("night")
         # Starting at dusk and stopping before night enters nothing new.
@@ -248,6 +253,7 @@ class PhaseIntervalTests(unittest.TestCase):
         before = _capture(tick=dusk * HOUR - 1)
         self.assertEqual(build_travel_events(before, before, "move"), ())
 
+    @covers_requirement("webclient-travel-window::travel-observations-follow-canonical-sight-and-phase-facts")
     def test_a_move_reports_its_crossing_before_its_arrival(self):
         dusk = self._start("dusk")
         before = _capture(tick=dusk * HOUR - 600)

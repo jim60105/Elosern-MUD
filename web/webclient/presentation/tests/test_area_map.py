@@ -965,6 +965,7 @@ class WildernessAreaTests(EvenniaTest):
         self.assertEqual(set(area_map_module.WILDERNESS_TERRAIN_LABELS), set(AREA_TERRAIN_CLASSES))
         self.assertTrue(all(label.strip() for label in area_map_module.WILDERNESS_TERRAIN_LABELS.values()))
 
+    @covers_requirement("webclient-travel-window::travel-consumes-the-shared-current-wilderness-window")
     def test_display_annotations_ride_only_revealed_runs_and_disclosed_districts(self):
         start = self._away()
         self._at_wild(start)
@@ -1003,6 +1004,7 @@ class WildernessAreaTests(EvenniaTest):
             self.assertIn(other, disclosed)
         self.assertTrue(_js_accepts(payload))
 
+    @covers_requirement("webclient-travel-window::travel-consumes-the-shared-current-wilderness-window")
     def test_only_a_lit_landmark_names_its_own_wild_node(self):
         start = self._away()
         self._at_wild(start)

@@ -624,6 +624,7 @@ class TravelWindowTests(_TravelStage):
     (wilderness-travel-window-ui)."""
 
     @covers_requirement("webclient-travel-map::travel-painting-uses-disclosed-cell-facts")
+    @covers_requirement("webclient-travel-window::travel-consumes-the-shared-current-wilderness-window")
     def test_live_memory_and_distant_cards(self):
         """Only the supplied annotations draw; a hostile without a threat says
         so; distant cards stay clear of the protected controls; the supplied
