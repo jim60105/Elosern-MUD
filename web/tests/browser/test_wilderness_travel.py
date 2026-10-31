@@ -427,8 +427,7 @@ class TravelMapTests(_TravelStage):
         page.wait_for_timeout(200)
         return page
 
-    # Temporary association until the archive sync mounts webclient-travel-map.
-    @covers_requirement("webclient-map-drawer::every-map-surface-draws-a-shared-map-concept-from-its-one-glyph-source")
+    @covers_requirement("webclient-travel-map::travel-painting-uses-disclosed-cell-facts")
     def test_map_fact_layers(self):
         """Unknown ground is transparent on the real canvas, known ground is
         painted, and no ink reaches past the revealed edge."""
@@ -443,8 +442,7 @@ class TravelMapTests(_TravelStage):
         self.assertEqual(layers["east"], 0)
         page.close()
 
-    # Temporary association until the archive sync mounts webclient-travel-map.
-    @covers_requirement("webclient-map-drawer::map-keyboard-and-pointer-interaction-remains-modal-and-accessible")
+    @covers_requirement("webclient-travel-map::travel-camera-preserves-the-open-stage")
     def test_map_viewports(self):
         """At both viewports the party is centred in the open stage, zoom
         steps and clamps at the scaled cell sizes, and neither zoom, hover nor
@@ -487,8 +485,7 @@ class TravelMapTests(_TravelStage):
             self.assertEqual(page.evaluate(_DIGEST), digest)
             page.close()
 
-    # Temporary association until the archive sync mounts webclient-travel-map.
-    @covers_requirement("webclient-map-drawer::every-map-surface-draws-a-shared-map-concept-from-its-one-glyph-source")
+    @covers_requirement("webclient-travel-map::travel-painting-uses-disclosed-cell-facts")
     def test_repaint_budget(self):
         """Every warmed repaint of a full-fact window takes at most 50 ms at
         both viewports, and camera-only input paints nothing."""

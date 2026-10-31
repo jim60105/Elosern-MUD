@@ -99,7 +99,7 @@ The area drawer SHALL keep one concentric, decorative current-location glyph, th
 - **THEN** both draw one glow, one ring and one seal dot with the shared here-seal's base radii. The island's glyph group carries its uniform island scale, and neither surface draws a second current shape.
 
 ### Requirement: Every map surface draws a shared map concept from its one glyph source
-All map surfaces (island, area map including wilderness cells, world map, both legend tabs) SHALL share one icon set. Each shared concept SHALL have exactly one definition owning its shapes, paint, stroke and dash styling, and states. Every surface, including a new one, SHALL render it from that definition, with no private redraw, copy or approximation. A surface MAY set its own uniform scale applied to the whole glyph, and SHALL NOT differ otherwise.
+Every map surface SHALL render each shared concept and named state from its single glyph definition with uniform whole-glyph scaling; travel party, neighbour, hostile and route states SHALL extend shared definitions without changing existing drawer/minimap states or copying their geometry.
 
 #### Scenario: The shared concepts are enumerated
 - **WHEN** the shared icon set is listed
@@ -139,6 +139,10 @@ All map surfaces (island, area map including wilderness cells, world map, both l
 #### Scenario: A changed glyph changes every surface at once
 - **WHEN** the single definition of a shared concept changes, for example the gate arch path or the road core colour
 - **THEN** every map and legend that shows that concept renders the change with no second edit
+
+#### Scenario: Travel adds named shared states
+- **WHEN** travel draws its party seal, landmark ornament or neighbour/hostile/route states
+- **THEN** each concept/state has one shared definition, repeated consumers differ only by uniform scale and the existing non-travel states retain their original shapes
 
 ### Requirement: Map legend samples are drawn by the map they explain
 Each map-drawer legend tab SHALL draw every sample with the same shared definitions as the map it explains, at the map's base glyph size multiplied by the UI scale, beside its existing text label. CSS boxes, borders, gradients, clip-paths or copied paint values that imitate a glyph SHALL NOT be used.
