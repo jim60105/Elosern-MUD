@@ -42,6 +42,7 @@ var exotic = require("./protocol/panels/exotic.js");
 var combat_beats = require("./protocol/panels/combat_beats.js");
 var skill_use = require("./protocol/panels/skill_use.js");
 var sleep_handoff = require("./protocol/panels/sleep_handoff.js");
+var travel_log = require("./protocol/panels/travel_log.js");
 var map_panels = require("./protocol/panels/map_panels.js");
 var map_parts = require("./protocol/map_parts.js");
 var publication_parts = require("./protocol/publication_parts.js");
@@ -328,6 +329,9 @@ var publication_parts = require("./protocol/publication_parts.js");
     validateSleepHandoffPanel: sleep_handoff.validateSleepHandoffPanel,
     SLEEP_HANDOFF_SCHEMA_VERSION: sleep_handoff.SLEEP_HANDOFF_SCHEMA_VERSION,
     SLEEP_HANDOFF_MAX_ROWS: sleep_handoff.SLEEP_HANDOFF_MAX_ROWS,
+    validateTravelLogPanel: travel_log.validateTravelLogPanel,
+    TRAVEL_LOG_SCHEMA_VERSION: travel_log.TRAVEL_LOG_SCHEMA_VERSION,
+    TRAVEL_LOG_MAX_ENTRIES: travel_log.TRAVEL_LOG_MAX_ENTRIES,
     validatePanel: env.validatePanel,
     // On-demand map panels (define-map-panel-protocol).
     AREA_MAP_SCHEMA_VERSION: map_panels.AREA_MAP_SCHEMA_VERSION,

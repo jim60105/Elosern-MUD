@@ -567,6 +567,19 @@ def build_production_registry() -> PresentationRegistry:
         unavailable_reason=("not_sleeping", "目前沒有需要交接的睡眠"),
         presenter=sleep_handoff_presenter,
     ))
+    from web.webclient.presentation.travel_log import (
+        TRAVEL_LOG_SCHEMA_VERSION,
+        travel_log_presenter,
+    )
+
+    # The commit-qualified travel notices of the group being published
+    # (wilderness-travel-log-ui); the coordinator supplies them.
+    registry.register(PresenterSpec(
+        name="travel_log",
+        schema_version=TRAVEL_LOG_SCHEMA_VERSION,
+        unavailable_reason=UNAVAILABLE_REASON,
+        presenter=travel_log_presenter,
+    ))
     _attach_production_validators(registry)
     return registry
 
@@ -605,6 +618,7 @@ def _attach_production_validators(registry: PresentationRegistry) -> None:
     from web.webclient.presentation.sleep_handoff import validate_sleep_handoff
     from web.webclient.presentation.title_ballot import validate_title_ballot
     from web.webclient.presentation.title_codex import validate_title_codex
+    from web.webclient.presentation.travel_log import validate_travel_log
 
     validators = {
         "art": validate_art,
@@ -631,6 +645,7 @@ def _attach_production_validators(registry: PresentationRegistry) -> None:
         "sleep_handoff": validate_sleep_handoff,
         "title_ballot": validate_title_ballot,
         "title_codex": validate_title_codex,
+        "travel_log": validate_travel_log,
     }
     for name, validator in validators.items():
         registry.attach_validator(name, validator)

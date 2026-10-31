@@ -154,6 +154,11 @@ class PresentationContext:
             Session-scoped and non-persistent; it survives a possession
             transition because it is bound to the commander, and it never
             authorizes anything.
+        travel_events: The immutable travel notices
+            (``world.rules.travel_events.TravelEvent``) of the causal group
+            being published, or of the latest published batch on a replay.
+            Only the coordinator supplies it, at its publication boundary;
+            only the ``travel_log`` presenter reads it.
     """
 
     actor: Any
@@ -168,6 +173,7 @@ class PresentationContext:
     party_actor: int | None = field(default=None)
     unlocks: Mapping[int, MemberUnlocks] = field(default=_EMPTY_UNLOCKS)
     party_view: Any = field(default=None)
+    travel_events: tuple[Any, ...] = field(default=())
 
 
 __all__ = [

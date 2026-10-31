@@ -231,6 +231,19 @@ class ProducerHookTests(TestCase):
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(self.delivered, [])
 
+    def test_look_result_names_the_group_its_notice_joined(self):
+        from web.webclient.actions.dispatcher import PUBLICATION_GROUP_FIELD
+        from web.webclient.actions.exploration_actions import _look_adapter
+
+        actor = mock.Mock(pk=5, location=mock.Mock(pk=9))
+        actor.at_look.return_value = "草原。"
+        with self.captureOnCommitCallbacks(execute=True), \
+                mock.patch.object(travel_events, "_wilderness_cell", return_value=(1, 1)):
+            result = _look_adapter(actor, {"room": True})
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual([fact.group_id for fact in self.delivered], [result[PUBLICATION_GROUP_FIELD]])
+        self.assertEqual([e.kind for e in self.delivered[0].events], ["look"])
+
     def test_capture_failure_is_reported_not_raised(self):
         actor = SimpleNamespace(pk=5, location=object())
         with mock.patch.object(travel_events, "_wilderness_cell", side_effect=RuntimeError("bad")), \
