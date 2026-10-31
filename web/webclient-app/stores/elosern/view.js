@@ -250,6 +250,9 @@ export function applyView(ctx) {
       // the map drawer reads them (redesign-map-drawer).
       maps: rs.maps || {},
       mapPublications: rs.mapPublications || {},
+      // The wilderness travel presentation (wilderness-travel-interface):
+      // `{ mode, layout, room, map, mapReady, mapStatus, area }`.
+      travel: ctx.travelView(rs),
       mutationsLocked: rs.mutationsLocked,
       protocolError: rs.protocolError,
       // The bounded complete recovery state (webclient-sync-recovery): the
