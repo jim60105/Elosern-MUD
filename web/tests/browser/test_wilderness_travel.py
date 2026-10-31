@@ -1343,8 +1343,7 @@ class TravelPlanningTests(_TravelStage):
     def _answer_plan(self, page, index: int, data: dict | None = None, code: str | None = None) -> None:
         self.assertTrue(page.evaluate(_ANSWER_PLAN, [index, data, code]))
 
-    @covers_requirement("webclient-travel-walking::travel-aim-maps-to-guarded-neighbour-movement")
-    @covers_requirement("webclient-travel-map::travel-camera-preserves-the-open-stage")
+    @covers_requirement("webclient-travel-route-preview::travel-destinations-and-previews-remain-disclosed-and-accessible")
     def test_destination_preview_keyboard_and_pointer(self):
         """A hovered far cell previews after its debounce and a click locks it
         without a second query; the Shift-arrow cursor plus Enter locks the
@@ -1429,7 +1428,7 @@ class TravelPlanningTests(_TravelStage):
             self.assertEqual(len(_plans(page)), 2)
             page.close()
 
-    @covers_requirement("webclient-action-dispatch::each-session-admits-only-one-mutation-in-flight")
+    @covers_requirement("webclient-travel-route-preview::travel-route-queries-are-debounced-and-current-only")
     def test_destination_query_supersession(self):
         """A newer hover waits behind the one in-flight query and is the only
         one sent when the gate frees; the superseded result never draws; a
