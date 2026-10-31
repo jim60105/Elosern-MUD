@@ -164,6 +164,35 @@ def _traveller_facts(members: Iterable[Any]) -> tuple[TravellerFact, ...]:
     return tuple(facts)
 
 
+def live_sight_disc(cell: tuple[int, int], calendar: Any) -> list[tuple[int, int]]:
+    """The valid wilderness cells of ``cell``'s current live ground disc.
+
+    The canonical live-sight geometry (``in_ground_disc`` over the committed
+    radius), shared by the interrupt comparison and the travel log's
+    sighting capture.
+    """
+    radius = sight.ground_radius_at(cell, calendar)
+    return [
+        (cell[0] + dx, cell[1] + dy)
+        for dy in range(-radius, radius + 1)
+        for dx in range(-radius, radius + 1)
+        if sight.in_ground_disc(cell, (cell[0] + dx, cell[1] + dy), radius)
+        and is_valid_wilderness_cell((cell[0] + dx, cell[1] + dy))
+    ]
+
+
+def live_hostile_facts(location: Any, cells: Iterable[tuple[int, int]]) -> tuple[Any, ...]:
+    """The population view's live hostile monster facts on ``cells`` (read only)."""
+    from world.maps.wilderness_population import population_view
+
+    wilderness = getattr(location, "wilderness", None)
+    if wilderness is None:
+        return ()
+    return tuple(
+        fact for fact in population_view(wilderness, list(cells)) if fact.hostile and fact.kind == "monster"
+    )
+
+
 def _hostile_keys(location: Any, cell: tuple[int, int], calendar: Any) -> frozenset[str]:
     """The population view's live hostile observation keys in the ground disc.
 
@@ -173,23 +202,8 @@ def _hostile_keys(location: Any, cell: tuple[int, int], calendar: Any) -> frozen
     sight, not what the map has drawn. The view only reads: it never
     materializes a prospective slot.
     """
-    from world.maps.wilderness_population import population_view
-
-    wilderness = getattr(location, "wilderness", None)
-    if wilderness is None:
-        return frozenset()
-    radius = sight.ground_radius_at(cell, calendar)
-    disc = [
-        (cell[0] + dx, cell[1] + dy)
-        for dy in range(-radius, radius + 1)
-        for dx in range(-radius, radius + 1)
-        if sight.in_ground_disc(cell, (cell[0] + dx, cell[1] + dy), radius)
-        and is_valid_wilderness_cell((cell[0] + dx, cell[1] + dy))
-    ]
     return frozenset(
-        fact.observation_key
-        for fact in population_view(wilderness, disc)
-        if fact.hostile and fact.kind == "monster"
+        fact.observation_key for fact in live_hostile_facts(location, live_sight_disc(cell, calendar))
     )
 
 
@@ -336,6 +350,8 @@ __all__ = [
     "MovementFacts",
     "TravellerFact",
     "landmark_keys_at",
+    "live_hostile_facts",
+    "live_sight_disc",
     "member_fell_asleep",
     "movement_flags",
     "nightfall_crossed",
