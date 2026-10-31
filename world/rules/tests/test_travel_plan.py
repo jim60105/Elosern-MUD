@@ -550,7 +550,7 @@ class PlannerReplayTests(PlannerTestCase):
     )
     def test_heterogeneous_party_pays_the_slowest_member_and_reports_the_worst_stage(self):
         cells = self.corridor(2)
-        slow = _traveller(30000)  # severe band: half the base foot speed
+        slow = _traveller(_STAGE_RESERVES[FatigueStage.SEVERE])  # severe band: half the base foot speed
         absent = _traveller(None)
         plan = plan_travel(
             _snapshot((5, 5), cells, [absent, slow]), cells[-1], "forced", False
@@ -679,51 +679,76 @@ class PlannerReplayTests(PlannerTestCase):
         "movement-cost-charging::traversal-integrates-fatigue-over-remaining-distance"
     )
     def test_frozen_route_choice_is_separate_from_sequential_replay(self):
-        # Two complete legal routes to the same diagonal destination (11, 11):
-        #   A: road east (10,10)->(11,10), then mountain north ->(11,11)
-        #   B: one mountain diagonal (10,10)->(11,11)
-        # Frozen weights rank A (3,200 s) below B (3,394 s), so A is selected.
-        # After the first 800 s A drops into the light band, making its second
-        # edge 2,667 s: A's fatigue-aware replay (3,467 s) is dearer than B's
-        # unchanged single edge (3,394 s). Selection therefore follows the
-        # frozen weights while every returned step still predicts its real
-        # sequential charge.
-        self.fill([(10, 10), (11, 10)], _ROAD)
-        self.fill([(10, 11), (11, 11)], _MOUNTAIN)
-        revealed = [(10, 10), (11, 10), (10, 11), (11, 11)]
-        reserve = _BANDS[FatigueStage.NORMAL].minimum_units + 2000
-        traveller = _traveller(reserve)
-        snapshot = _snapshot((10, 10), revealed, [traveller])
+        # Two complete legal routes to (14, 10):
+        #   A: nine road edges (three diagonal) plus one mountain edge
+        #   B: four mountain edges
+        # The initial reserve puts the normal->light boundary exactly at the
+        # end of A's first 800 s road edge. Frozen weights price every edge from
+        # that same initial state, so A's frozen sum (five road cardinals, three
+        # road diagonals, one mountain) is below B's four mountain cardinals.
+        # Cumulative replay charges A's later edges at the light band and
+        # reverses the ranking: replay A is dearer than replay B. Selection
+        # therefore follows the frozen weights while every returned step still
+        # predicts its real sequential charge.
+        route_a = [
+            (9, 10),
+            (9, 9),
+            (10, 8),
+            (11, 7),
+            (12, 8),
+            (13, 8),
+            (14, 8),
+            (14, 9),
+            (14, 10),
+        ]
+        route_b = [(11, 10), (12, 10), (13, 10), (14, 10)]
+        self.fill([(10, 10), (9, 10), (9, 9), (12, 8), (13, 8), (14, 8), (14, 9)], _ROAD)
+        self.fill([(14, 10)], _MOUNTAIN)
+        self.fill([(10, 8), (11, 7)], _ROAD)
+        self.fill(route_b, _MOUNTAIN)
+        # Diagonal support cells (both crossed orthogonals) stay passable and
+        # revealed but priced as rough ground, so they never form a shortcut.
+        support = [(10, 9), (9, 8), (11, 8), (10, 7), (12, 7)]
+        self.fill(support, _MOUNTAIN)
+        revealed = [(10, 10), *route_a, *route_b, *support]
+        # The south-west gateway blocks the cheap diagonal shortcut out of the
+        # origin, so the chosen route really starts west along A.
+        self.gateways.add(((10, 10), "sw"))
+        drain = abs(get_policy().rates[FatigueActivity.FOOT_TRAVEL])
+        normal = _BANDS[FatigueStage.NORMAL].minimum_units
+        first_step = self.step_seconds((10, 10), (9, 10), [_traveller(normal)])
+        reserve = normal + first_step * drain
         probes = [_Probe(reserve, SleepPosture.AWAKE)]
-        frozen_a = (
-            travel_cost.wilderness_step_weight((10, 10), (11, 10), probes)
-            + travel_cost.wilderness_step_weight((11, 10), (11, 11), probes)
-        )
-        frozen_b = travel_cost.wilderness_step_weight((10, 10), (11, 11), probes)
+
+        def frozen(route):
+            previous = (10, 10)
+            total = 0
+            for cell in route:
+                total += travel_cost.wilderness_step_weight(previous, cell, probes)
+                previous = cell
+            return total
+
+        frozen_a, frozen_b = frozen(route_a), frozen(route_b)
         self.assertLess(frozen_a, frozen_b)
-        plan = plan_travel(snapshot, (11, 11), "forced", False)
-        self.assertEqual([step.cell for step in plan.steps], [(11, 10), (11, 11)])
-        seconds, stages = self.replay(
-            (10, 10),
-            [step.cell for step in plan.steps],
-            [(reserve, SleepPosture.AWAKE)],
+        replay_a, _ = self.replay(
+            (10, 10), route_a, [(reserve, SleepPosture.AWAKE)]
         )
-        self.assertEqual([step.seconds for step in plan.steps], seconds)
-        self.assertEqual([step.fatigue_stage for step in plan.steps], stages)
-        self.assertEqual(plan.total_seconds, sum(seconds))
         replay_b, _ = self.replay(
-            (10, 10), [(11, 11)], [(reserve, SleepPosture.AWAKE)]
+            (10, 10), route_b, [(reserve, SleepPosture.AWAKE)]
         )
-        # Selection used the frozen weights, and the selected route's committed
-        # replay differs from that frozen sum (the second edge is charged at the
-        # degraded band). The bounded wilderness edge/band set cannot construct
-        # a strict pairwise rank inversion between the two metrics; this asserts
-        # the separation the planner actually makes, and the independent
-        # per-step predictions above prove replay is not the selector.
-        self.assertLess(frozen_a, frozen_b)
-        self.assertNotEqual(sum(seconds), frozen_a)
-        # The alternative is one edge, so its frozen and replay sums agree.
-        self.assertEqual(sum(replay_b), frozen_b)
+        self.assertGreater(sum(replay_a), sum(replay_b))
+        plan = plan_travel(
+            _snapshot((10, 10), revealed, [_traveller(reserve)]),
+            (14, 10),
+            "forced",
+            False,
+        )
+        self.assertEqual([step.cell for step in plan.steps], route_a)
+        self.assertEqual([step.seconds for step in plan.steps], replay_a)
+        self.assertEqual(plan.total_seconds, sum(replay_a))
+        # Selection used the frozen sum of the selected route, not its replay.
+        self.assertLess(frozen_a, sum(replay_a))
+
 
 
 # ---------------------------------------------------------------------------

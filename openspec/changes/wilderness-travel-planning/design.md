@@ -106,22 +106,18 @@ The final review raised two blocking items; both are addressed on the branch.
    result-only path; `test_a_mode_read_failure_is_result_only_and_never_re_snapshots`
    proves no update/snapshot, no revision change and the logged event. Ordinary
    mode refusals keep the existing `not_exploring` code.
-2. *The frozen-route test did not compare complete routes.* It now plans
-   between two complete legal routes to the same destination, asserts the
-   frozen-weight ordering selects the frozen-cheaper route, asserts the
-   selected route's committed replay sum differs from that frozen sum, asserts
-   the single-edge alternative's frozen and replay sums agree, and checks every
-   returned step against an independent canonical cost/prediction replay (a
-   local probe, not the planner's traveller type). A strict pairwise rank
-   inversion (frozen A<B while replay A>B) is **not constructible** with the
-   bounded wilderness cell set and the approved one-arc band calibration inside
-   the 60-step window: the per-route frozen/replay gap is bounded by the
-   post-crossing edge count times at most one band step, while the only
-   same-destination alternatives differ by whole authored edges. The test
-   therefore establishes exactly what the planner promises — selection uses the
-   frozen weights, replay is the committed prediction, and the two sums differ
-   — and records this limitation here rather than asserting an impossible
-   inversion.
+2. *The frozen-route test did not compare complete routes.* It now compares two
+   complete legal routes to the same destination (14, 10): route A is nine road
+   edges (three diagonal) plus one mountain edge, route B is four mountain
+   edges, and the initial reserve puts the normal→light boundary exactly at the
+   end of A's first 800 s road edge. The test asserts the strict inversion the
+   delta names: frozen sum A < frozen sum B, while cumulative replay A > replay
+   B; the planner selects A (the frozen winner); and every returned step equals
+   an independent canonical cost/prediction replay built from a local probe,
+   not the planner's traveller type. The initial reserve and the first step's
+   price are derived from the live policy and the canonical cost owner, and a
+   registered gateway direction blocks the diagonal shortcut that would
+   otherwise bypass the intended route.
 
 Non-blocking review items were also closed: night-entry detection now tracks
 phase transitions across the whole interval (start, exact end boundary,
