@@ -127,12 +127,13 @@ function mapViews(store) {
   return store.sent.filter((entry) => entry.actionId === "map.view").map((entry) => entry.payload.scope);
 }
 
-function withDrawer(store) {
+function withDrawer(store, travel = null) {
   const moves = [];
   let api = null;
   const Host = defineComponent({
     setup() {
       api = useMapDrawer(store, {
+        travelMode: () => !!travel?.value,
         onMapMove: (payload) => {
           moves.push(payload);
           return store.dispatchAction("explore.move", { exit_ref: payload.exit_ref, current_node: payload.current_node });
@@ -162,7 +163,7 @@ function mountDrawer(props = {}) {
   host.style.cssText = "position:relative;width:1200px;height:700px";
   document.body.appendChild(host);
   const memory = props.memory ?? blankMemory();
-  const state = reactive({ tab: props.tab ?? "area" });
+  const state = reactive({ tab: props.tab ?? "area", travelMode: props.travelMode ?? false });
   const emitted = { move: [], close: 0 };
   const w = mount(
     defineComponent({
@@ -176,6 +177,7 @@ function mountDrawer(props = {}) {
             epoch: props.epoch ?? "1|epoch-a",
             locationLabel: "灰岩鎮",
             busy: props.busy ?? false,
+            travelMode: state.travelMode,
             "onUpdate:tab": (tab) => {
               state.tab = tab;
             },
@@ -227,6 +229,50 @@ describe("the map drawer opens the appropriate scope and preserves session views
     await tick();
     expect(api().mapTab.value).toBe("area");
     expect(mapViews(store)).toEqual(["world", "area"]);
+  });
+
+  it("offers only the world scope while the travel stage is shown", async () => {
+    const { w, state } = mountDrawer({ travelMode: true });
+    await tick();
+    // An area tab standing open turns to world; the area tab is not offered.
+    expect(state.tab).toBe("world");
+    expect(w.find('[data-testid="map-drawer-tab--area"]').exists()).toBe(false);
+    expect(w.get('[data-testid="map-drawer-tab--world"]').attributes("aria-selected")).toBe("true");
+    // Its shortcut selects nothing.
+    await key(w.get('[data-testid="map-drawer"]'), "1");
+    await tick();
+    expect(state.tab).toBe("world");
+    // Leaving travel brings the ordinary tabs back.
+    state.travelMode = false;
+    await tick();
+    expect(w.find('[data-testid="map-drawer-tab--area"]').exists()).toBe(true);
+    await key(w.get('[data-testid="map-drawer"]'), "1");
+    await tick();
+    expect(state.tab).toBe("area");
+  });
+
+  it("turns an open area tab to world when travel begins and keeps the area memory", async () => {
+    const store = fakeStore({ layer: "grid" });
+    const travel = ref(false);
+    const { api } = withDrawer(store, travel);
+    store.view.hudOverlay = "map";
+    await tick();
+    expect(api().mapTab.value).toBe("area");
+    store.answer();
+    api().mapMemory.area.view = { signature: "grid|story_town|m", cx: 1, cy: 2, span: 300 };
+    travel.value = true;
+    await tick();
+    expect(api().mapTab.value).toBe("world");
+    expect(mapViews(store)).toEqual(["area", "world"]);
+    expect(api().mapMemory.area.view).toEqual({ signature: "grid|story_town|m", cx: 1, cy: 2, span: 300 });
+    // The next opening outside travel chooses by layer again.
+    store.answer();
+    store.view.hudOverlay = null;
+    travel.value = false;
+    await tick();
+    store.view.hudOverlay = "map";
+    await tick();
+    expect(api().mapTab.value).toBe("area");
   });
 
   it("keeps each tab's pan, zoom and selection for the session and across reopening", async () => {
@@ -589,6 +635,26 @@ describe("map requests follow explicit scope and committed moves only while open
     store.answer();
     await tick();
     expect(mapViews(store)).toEqual(["area", "world", "world"]);
+  });
+
+  it("never asks for the area while the travel stage owns it", async () => {
+    const store = fakeStore({ layer: "grid" });
+    const travel = ref(true);
+    const { api } = withDrawer(store, travel);
+    store.view.hudOverlay = "map";
+    await tick();
+    // The opening is world even on a settlement layer, and a committed move
+    // refreshes world only.
+    expect(api().mapTab.value).toBe("world");
+    store.answer();
+    await tick();
+    api().mapTab.value = "area";
+    await tick();
+    expect(mapViews(store)).toEqual(["world"]);
+    // A closed drawer in travel sends nothing at all.
+    store.view.hudOverlay = null;
+    await tick();
+    expect(mapViews(store)).toEqual(["world"]);
   });
 
   it("does not refresh for a rejected move, an earlier move or a closed drawer", async () => {

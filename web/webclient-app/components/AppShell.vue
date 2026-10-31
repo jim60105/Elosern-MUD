@@ -111,6 +111,9 @@ const props = defineProps({
   // The combat formation stands (webclient-combat-formation D1), forwarded
   // to HudFrame.
   formation: { type: Boolean, default: false },
+  // The wilderness travel presentation (wilderness-travel-interface),
+  // forwarded to HudFrame's presentation hook.
+  travel: { type: Boolean, default: false },
   // The person in focus, named as the speaker line of the message window
   // while the verb card is open (null otherwise).
   speaker: { type: String, default: null },
@@ -509,6 +512,7 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMe
       :card-open="cardOpen"
       :person-focus="personFocus"
       :formation="formation"
+      :travel="travel"
       :open-surfaces="frameOpenSurfaces"
       :lowhp="lowHp"
       :command-line-expanded="commandLineExpanded"

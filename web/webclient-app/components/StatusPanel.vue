@@ -41,6 +41,10 @@ const props = defineProps({
   // The hit points a playing combat round displays (webclient-combat-beat-
   // queue D7), forwarded to the vitals island; null when nothing plays.
   displayHp: { type: Number, default: null },
+  // Whether the dock lists the fatigue subject rows. The travel stage turns
+  // it off: the party medallions under the dock are that readout there, so
+  // the same facts never stand twice in one column.
+  showFatigue: { type: Boolean, default: true },
 });
 
 const transitionCss = computed(() => props.motionLevel !== "off");
@@ -65,7 +69,7 @@ const fatigueRows = computed(() =>
         :display-hp="displayHp"
       />
       <div
-        v-if="fatigueRows.length > 0"
+        v-if="showFatigue && fatigueRows.length > 0"
         class="fatigue"
         data-testid="status-panel__fatigue"
       >

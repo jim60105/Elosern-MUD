@@ -66,6 +66,11 @@ const props = defineProps({
   locationLabel: { type: String, default: "" },
   // The host is settling a request or a move: 前往 waits.
   busy: { type: Boolean, default: false },
+  // The travel stage is shown (wilderness-travel-interface): its own map is
+  // the area view, so the drawer offers only the world scope. An area tab
+  // already open turns to world, its shortcut does nothing, and leaving
+  // travel brings the ordinary tabs back with their memory untouched.
+  travelMode: { type: Boolean, default: false },
 });
 const emit = defineEmits(["update:tab", "move", "close"]);
 
@@ -74,6 +79,7 @@ const TABS = Object.freeze([
   Object.freeze({ key: "area", label: "區域", shortcut: "1" }),
   Object.freeze({ key: "world", label: "世界", shortcut: "2" }),
 ]);
+const tabs = computed(() => (props.travelMode ? TABS.filter((tab) => tab.key === "world") : TABS));
 const tabId = (key) => `${uid}-tab-${key}`;
 const panelId = `${uid}-panel`;
 const questListId = `${uid}-quests`;
@@ -157,7 +163,7 @@ function readUiScale() {
 // ── tabs ────────────────────────────────────────────────────────────────
 
 function selectTab(key, { focus = false } = {}) {
-  if (!TABS.some((tab) => tab.key === key)) return;
+  if (!tabs.value.some((tab) => tab.key === key)) return;
   closePopovers();
   if (key !== props.tab) emit("update:tab", key);
   // A tab switch unmounts the old panel; keep focus inside the dialog.
@@ -166,17 +172,27 @@ function selectTab(key, { focus = false } = {}) {
 
 function onTabKeydown(event, key) {
   if (event.altKey || event.ctrlKey || event.metaKey) return;
-  const index = TABS.findIndex((tab) => tab.key === key);
+  const list = tabs.value;
+  const index = list.findIndex((tab) => tab.key === key);
   let next = null;
-  if (event.key === "ArrowRight") next = TABS[(index + 1) % TABS.length].key;
-  else if (event.key === "ArrowLeft") next = TABS[(index - 1 + TABS.length) % TABS.length].key;
-  else if (event.key === "Home") next = TABS[0].key;
-  else if (event.key === "End") next = TABS[TABS.length - 1].key;
+  if (event.key === "ArrowRight") next = list[(index + 1) % list.length].key;
+  else if (event.key === "ArrowLeft") next = list[(index - 1 + list.length) % list.length].key;
+  else if (event.key === "Home") next = list[0].key;
+  else if (event.key === "End") next = list[list.length - 1].key;
   if (next === null) return;
   event.preventDefault();
   event.stopPropagation();
   selectTab(next, { focus: true });
 }
+
+// Travel hides the area scope: a drawer standing on it turns to world.
+watch(
+  () => props.travelMode,
+  (travel) => {
+    if (travel && props.tab === "area") emit("update:tab", "world");
+  },
+  { immediate: true },
+);
 
 // ── popovers ────────────────────────────────────────────────────────────
 
@@ -440,7 +456,7 @@ defineExpose({ viewRef });
     >
       <div class="map-drawer__tabs" role="tablist" aria-label="地圖範圍" data-testid="map-drawer-tabs">
         <button
-          v-for="entry in TABS"
+          v-for="entry in tabs"
           :id="tabId(entry.key)"
           :key="entry.key"
           :ref="(el) => setTabButton(entry.key, el)"

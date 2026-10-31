@@ -14,6 +14,12 @@
 //   drawer opens or switches tab, and one after each committed move while it
 //   is open — never on input, on a rejected move or while closed.
 //
+// While the travel stage is shown (wilderness-travel-interface,
+// `travelMode`), the stage itself owns the area map
+// (composables/use-travel-map.js): the drawer opens on world, never asks for
+// the area and turns an open area tab to world. Leaving travel keeps the
+// frame-scoped area memory, and the next opening chooses by layer again.
+//
 // A request rides the store's single in-flight lock and its admission
 // rules. No queue exists: one coalesced pending scope is sent when the lock
 // frees, and it is dropped on close or when the session scope changes.
@@ -40,7 +46,8 @@ function blankMemory() {
   };
 }
 
-export function useMapDrawer(store, { onMapMove }) {
+export function useMapDrawer(store, { onMapMove, travelMode = () => false }) {
+  const travel = computed(() => !!travelMode());
   const open = computed(() => store.view.hudOverlay === "map");
   const sessionScope = computed(() => `${store.view.generation}|${store.view.epoch}`);
   const tab = ref("area");
@@ -89,6 +96,8 @@ export function useMapDrawer(store, { onMapMove }) {
   }
 
   function request(scope) {
+    // The travel stage owns the area map; the drawer never asks for it there.
+    if (scope === "area" && travel.value) return;
     // The scope already on its way needs no second request.
     if (pendingScope.value === null && awaiting.value?.scope === scope) return;
     pendingScope.value = scope;
@@ -109,7 +118,7 @@ export function useMapDrawer(store, { onMapMove }) {
         baselineResultId = resultOf()?.requestId ?? null;
         trackedMove.value = null;
         awaiting.value = null;
-        tab.value = scopeForLayer(store.view.localMapModel?.layer ?? null);
+        tab.value = travel.value ? "world" : scopeForLayer(store.view.localMapModel?.layer ?? null);
         request(tab.value);
       } else {
         worldReady.value = false;
@@ -127,6 +136,12 @@ export function useMapDrawer(store, { onMapMove }) {
 
   watch(tab, (scope) => {
     if (open.value) request(scope);
+  });
+
+  // Travel beginning while the drawer stands on its area tab turns it to
+  // world (which requests world once); the area memory is left as it is.
+  watch(travel, (shown) => {
+    if (shown && tab.value === "area") tab.value = "world";
   });
 
   // A new transport generation or presentation epoch retires every view,
@@ -211,7 +226,7 @@ export function useMapDrawer(store, { onMapMove }) {
         }
       }
       if (observedMove.value && lockFree() && store.view.revision >= observedMove.value.revision) {
-        pendingScope.value = tab.value;
+        pendingScope.value = tab.value === "area" && travel.value ? null : tab.value;
         observedMove.value = null;
       }
       flush();
