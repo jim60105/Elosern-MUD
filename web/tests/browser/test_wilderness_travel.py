@@ -770,7 +770,8 @@ class TravelLogTests(BrowserAcceptanceTest):
         return request
 
     @covers_requirement(
-        "webclient-contextual-hud::the-message-window-presents-the-current-response-one-page-at-a-time-in-the-band-s-message-region"
+        "webclient-contextual-hud::the-message-window-presents-the-current-response-one-page-at-a-time-in-the-band-s-message-region",
+        "webclient-travel-log::travel-log-retains-typed-chronological-entries",
     )
     def test_committed_log_and_full_prose(self):
         """A real look, step and refused step: typed notices reach the band

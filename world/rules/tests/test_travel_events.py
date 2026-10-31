@@ -13,6 +13,7 @@ import unittest
 from django.db import transaction
 from django.test import TestCase
 
+from tools.spec_traceability import covers_requirement
 from world.rules import travel_events
 from world.rules.presentation_events import publication_group
 from world.rules.travel_events import (
@@ -111,6 +112,9 @@ class BuildTravelEventsTests(unittest.TestCase):
             [{"member_id": "7", "name": "伊蓮", "stage": "light", "label": "微倦"}],
         )
 
+    @covers_requirement(
+        "webclient-travel-log::travel-notices-are-committed-structured-events"
+    )
     def test_unreadable_before_never_invents_a_change(self):
         drafts = build_travel_events(None, _capture(region_key="r_b", woodland=True, hostiles=(("k", "狼"),)), "move")
         self.assertEqual(drafts, ())
@@ -145,6 +149,9 @@ class RecordTravelFactTests(TestCase):
         drafts = build_travel_events(_capture(), after, "move")
         return drafts[:count]
 
+    @covers_requirement(
+        "webclient-travel-log::travel-notices-are-committed-structured-events"
+    )
     def test_committed_fact_is_identified_once_under_its_group(self):
         with self.captureOnCommitCallbacks(execute=True):
             with publication_group() as group:
@@ -160,6 +167,9 @@ class RecordTravelFactTests(TestCase):
         # Day and clock text come from the event's own tick (day 2, 06:05).
         self.assertEqual((first.events[0].day, first.events[0].time), (2, "06:05"))
 
+    @covers_requirement(
+        "webclient-travel-log::travel-notices-are-committed-structured-events"
+    )
     def test_rollback_delivers_nothing(self):
         with self.captureOnCommitCallbacks(execute=True):
             with transaction.atomic():

@@ -11,6 +11,7 @@ import unittest
 from types import MappingProxyType, SimpleNamespace
 from unittest import mock
 
+from tools.spec_traceability import covers_requirement
 from web.webclient.presentation import travel_log_push
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.coordinator import PresentationCoordinator
@@ -56,11 +57,17 @@ class ValidatorTests(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
+    @covers_requirement(
+        "webclient-travel-log::travel-notices-are-committed-structured-events"
+    )
     def test_every_kind_adopts_its_exact_params(self):
         for kind, params in VALID.items():
             with self.subTest(kind=kind):
                 validate_travel_log(_panel(_entry(kind, copy.deepcopy(params))))
 
+    @covers_requirement(
+        "webclient-travel-log::travel-notices-are-committed-structured-events"
+    )
     def test_extra_or_missing_kind_specific_fields_reject(self):
         for kind, params in VALID.items():
             with self.subTest(kind=kind, case="extra"):
@@ -192,6 +199,9 @@ class DeliveryTests(unittest.TestCase):
         target = coordinator or self.coordinator
         return target.record_travel_events(fact, self._context, expected_epoch=target.epoch)
 
+    @covers_requirement(
+        "webclient-travel-log::travel-notices-are-committed-structured-events"
+    )
     def test_groups_recorded_before_one_drain_publish_only_their_own_notices(self):
         self._record(_fact(GROUP_A, "aaaa0001", 2))
         self._record(_fact(GROUP_B, "bbbb0001"))
@@ -205,6 +215,9 @@ class DeliveryTests(unittest.TestCase):
             ],
         )
 
+    @covers_requirement(
+        "webclient-travel-log::travel-notices-are-committed-structured-events"
+    )
     def test_duplicate_fact_delivery_is_inert(self):
         fact = _fact(GROUP_A, "aaaa0001", 2)
         self._record(fact)
@@ -215,6 +228,9 @@ class DeliveryTests(unittest.TestCase):
         self.scheduler.run()
         self.assertEqual(len(self.session.travel_ids()), 1)
 
+    @covers_requirement(
+        "webclient-travel-log::travel-notices-are-committed-structured-events"
+    )
     def test_snapshot_replays_only_the_latest_published_batch(self):
         self._record(_fact(GROUP_A, "aaaa0001"))
         self.scheduler.run()
