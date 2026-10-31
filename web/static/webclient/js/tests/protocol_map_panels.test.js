@@ -71,7 +71,7 @@ test("each area layer validates its exact frame and coordinate form", () => {
   assert.deepEqual(Protocol.validateAreaMapPanel(F.gridArea()), F.gridArea());
   assert.deepEqual(Protocol.validateAreaMapPanel(F.interiorArea()), F.interiorArea());
   const wild = F.wildernessArea();
-  assert.equal(Protocol.validateAreaMapPanel(wild).nodes.length, 225);
+  assert.deepEqual(Protocol.validateAreaMapPanel(wild), wild);
 });
 
 test("coordinate frames are not interchangeable between layers", () => {

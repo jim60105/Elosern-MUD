@@ -12,8 +12,11 @@ graphs and the pure fog function use synthetic fixtures.
 
 from collections import deque
 import json
+import os
 from pathlib import Path
+import statistics
 import subprocess
+import time
 from types import SimpleNamespace
 import unittest
 from unittest import mock
@@ -641,6 +644,40 @@ class RoomGraphAreaTests(EvenniaTestCase):
 # ---------------------------------------------------------------------------
 
 
+def _decode_rows(payload):
+    """Window offset -> run facts (``None`` for unknown) from the RLE rows."""
+    window = payload["window"]
+    cells = {}
+    for row_index, runs in enumerate(payload["rows"]):
+        column = 0
+        for run in runs:
+            facts = None if run["kind"] == "unknown" else {k: v for k, v in run.items() if k != "length"}
+            for offset in range(run["length"]):
+                cells[(window["min_x"] + column + offset, window["min_y"] + row_index)] = facts
+            column += run["length"]
+    return cells
+
+
+def _knowledge(visits, visited_grid=()):
+    """A synthetic schema-2 record: ``visits`` maps a wild cell to its sight."""
+    from world.rules.map_knowledge import CHUNK_CELLS, SCHEMA_VERSION
+
+    name = _live("world.maps.wilderness_provider", "WILDERNESS_NAME")
+    chunks = {}
+    for (x, y), sight in visits.items():
+        chunk = chunks.setdefault(f"{x // CHUNK_CELLS}:{y // CHUNK_CELLS}", {})
+        chunk[str((y % CHUNK_CELLS) * CHUNK_CELLS + (x % CHUNK_CELLS))] = {
+            "first_seen_tick": 1,
+            "last_seen_tick": 1,
+            "sight": sight,
+        }
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "visited": {node_id: {"first_seen_tick": 1, "last_seen_tick": 1} for node_id in visited_grid},
+        "wilderness": {name: chunks},
+    }
+
+
 class WildernessAreaTests(EvenniaTest):
     """``EvenniaTest``: ``enter_wilderness`` teleports need the full fixture."""
 
@@ -658,63 +695,91 @@ class WildernessAreaTests(EvenniaTest):
         self.assertTrue(enter_wilderness(self.char1, coordinates=coordinates, name=name))
         record_arrival(self.char1)
 
-    @covers_requirement(
-        "webclient-area-map::wilderness-area-maps-cover-a-fifteen-cell-neighbourhood"
-    )
-    def test_window_is_bounded_clipped_and_flags_visits(self):
+    def _pin(self, visits, visited_grid=()):
+        from world.rules.map_knowledge import KNOWLEDGE_ATTR
+
+        self.char1.attributes.add(KNOWLEDGE_ATTR, _knowledge(visits, visited_grid))
+
+    def _away(self):
         ex, ey = EAST_APPROACH
-        start = (ex + 9, ey)
-        self._at_wild((start[0] - 1, start[1]))
+        return (ex + 10, ey + 5)
+
+    @covers_requirement(
+        "webclient-area-map::wilderness-area-maps-cover-a-revealed-forty-one-cell-neighbourhood"
+    )
+    def test_window_is_centred_run_length_encoded_and_flags_visits(self):
+        start = self._away()
         self._at_wild(start)
+        self._pin({start: 3, (start[0] - 1, start[1]): 0})
         payload = _render(self.char1)
+        self.assertEqual(payload["schema_version"], 2)
         self.assertEqual(payload["layer"], "wilderness")
         self.assertEqual(payload["frame"]["unit"], "km")
-        self.assertLessEqual(len(payload["nodes"]), WILDERNESS_WINDOW * WILDERNESS_WINDOW)
-        is_valid = _live("world.maps.wilderness_destination", "is_provider_valid_coordinates")
-        km = _live("world.maps.wilderness_provider", "WILDERNESS_KM_PER_CELL")
         half = WILDERNESS_WINDOW // 2
-        expected = {
-            _t_wild_id(x, y)
-            for x in range(start[0] - half, start[0] + half + 1)
-            for y in range(start[1] - half, start[1] + half + 1)
-            if is_valid((x, y))
-        }
-        wild = {node["id"] for node in payload["nodes"] if node["id"].startswith("wild:")}
-        self.assertEqual(wild, expected)
+        self.assertEqual(WILDERNESS_WINDOW, 41)
+        self.assertEqual(
+            payload["window"],
+            {"min_x": start[0] - half, "min_y": start[1] - half, "width": 41, "height": 41},
+        )
+        self.assertEqual(len(payload["rows"]), 41)
+        for runs in payload["rows"]:
+            self.assertEqual(sum(run["length"] for run in runs), 41)
+        cells = _decode_rows(payload)
+        in_disc = _live("world.rules.sight", "in_ground_disc")
+        for cell, facts in cells.items():
+            expected = in_disc(start, cell, 3) or cell == (start[0] - 1, start[1])
+            self.assertEqual(facts is not None, expected, cell)
+        km = _live("world.maps.wilderness_provider", "WILDERNESS_KM_PER_CELL")
         nodes = _by_id(payload)
         current = nodes[_t_wild_id(*start)]
         self.assertEqual((current["visibility"], current["visited"]), ("current", True))
         self.assertEqual((current["x"], current["y"]), ((start[0] + 0.5) * km, (start[1] + 0.5) * km))
         west = nodes[_t_wild_id(start[0] - 1, start[1])]
         self.assertEqual((west["visibility"], west["visited"]), ("visited", True))
-        far = nodes[_t_wild_id(start[0] + half, start[1])]
-        self.assertEqual((far["visibility"], far["visited"], far["action"]), ("seen", False, None))
+        # Every node sits on a revealed cell; nothing outside the window.
+        for node in payload["nodes"]:
+            if node["id"].startswith("wild:"):
+                parts = node["id"].split(":")
+                self.assertIsNotNone(cells[(int(parts[2]), int(parts[3]))], node["id"])
         district_at = _live("world.maps.district_partition", "district_at")
         districts = _live("world.lore.map_districts", "current")().districts
         self.assertEqual(payload["district_name"], districts[district_at(start)].district_name_zh)
         self.assertEqual(payload["title"], _t_region_display_for(*start))
         self.assertEqual(payload["cell_km"], km)
+        self.assertIn(payload["light_phase"], ("day", "dusk", "night", "dawn"))
         self.assertTrue(_js_accepts(payload))
 
     @covers_requirement(
-        "webclient-area-map::wilderness-area-maps-cover-a-fifteen-cell-neighbourhood"
+        "webclient-area-map::wilderness-area-maps-cover-a-revealed-forty-one-cell-neighbourhood"
     )
-    def test_only_legal_immediate_steps_are_actionable(self):
-        ex, ey = EAST_APPROACH
-        start = (ex + 9, ey)
+    def test_only_legal_revealed_immediate_steps_are_actionable(self):
+        start = self._away()
         self._at_wild(start)
-        payload = _render(self.char1)
         neighbor = _live("world.maps.wilderness_destination", "wilderness_neighbor")
         directions = _live("world.maps.wilderness_destination", "DIRECTION_DELTAS")
         legal = {_t_wild_id(*cell) for cell in (neighbor(*start, d) for d in directions) if cell is not None}
+        self.assertTrue(legal)
+        # Radius 1 reveals all eight neighbours: every legal step acts.
+        self._pin({start: 1})
+        payload = _render(self.char1)
         actionable = {node["id"] for node in payload["nodes"] if node["action"] is not None}
         self.assertEqual(actionable, legal)
+        for node in payload["nodes"]:
+            if node["action"] is not None:
+                self.assertEqual(node["action"]["destination"], node["id"])
         self.assertEqual(
             _edge_set(payload), {frozenset((_t_wild_id(*start), node_id)) for node_id in legal}
         )
+        # Radius 0 reveals only the current cell: no neighbour is a node and
+        # unknown steps stay opaque directional controls elsewhere.
+        self._pin({start: 0})
+        payload = _render(self.char1)
+        self.assertEqual([node["id"] for node in payload["nodes"]], [_t_wild_id(*start)])
+        self.assertEqual(payload["edges"], [])
+        self.assertTrue(_js_accepts(payload))
 
     @covers_requirement(
-        "webclient-area-map::wilderness-area-maps-cover-a-fifteen-cell-neighbourhood"
+        "webclient-area-map::wilderness-area-maps-cover-a-revealed-forty-one-cell-neighbourhood"
     )
     @covers_requirement(
         "webclient-area-map::area-maps-reveal-visited-nodes-and-one-step-frontier-across-all-layers"
@@ -732,6 +797,249 @@ class WildernessAreaTests(EvenniaTest):
             if node["id"].startswith("wild:"):
                 self.assertIsNone(node["gateway"])
         self.assertTrue(_js_accepts(payload))
+        # A woodland-night radius 0 leaves the gate cell unrevealed: no gate
+        # room, label or far side is published; the step stays an opaque
+        # directional control on the exploration rows.
+        self._pin({EAST_APPROACH: 0})
+        payload = _render(self.char1)
+        self.assertEqual([node["id"] for node in payload["nodes"]], [payload["current_node"]])
+        # (The current cell itself is revealed; its own approach name is its
+        # location metadata, not the unrevealed gate's.)
+        self.assertTrue(all(node["gateway"] is None for node in payload["nodes"]))
+        self.assertEqual(payload["edges"], [])
+        self.assertTrue(_js_accepts(payload))
+
+    @covers_requirement(
+        "wilderness-area-map-reveal::wilderness-runs-disclose-only-revealed-terrain"
+    )
+    def test_visited_cell_has_its_own_node_and_reveal_only_cell_has_none(self):
+        start = self._away()
+        self._at_wild(start)
+        self._pin({start: 4})
+        cells = _decode_rows(_render(self.char1))
+        # Two cells of identical revealed terrain: one becomes a visit.
+        facts = {}
+        pair = None
+        for cell, value in sorted(cells.items()):
+            if value is None or cell == start or max(abs(cell[0] - start[0]), abs(cell[1] - start[1])) < 2:
+                continue
+            key = json.dumps(value, sort_keys=True)
+            if key in facts:
+                pair = (facts[key], cell)
+                break
+            facts[key] = cell
+        self.assertIsNotNone(pair, "the synthetic disc holds two identical cells")
+        visited, reveal_only = pair
+        self._pin({start: 4, visited: 0})
+        payload = _render(self.char1)
+        cells = _decode_rows(payload)
+        self.assertEqual(cells[visited], cells[reveal_only])
+        nodes = _by_id(payload)
+        node = nodes[_t_wild_id(*visited)]
+        self.assertEqual((node["visited"], node["visibility"]), (True, "visited"))
+        self.assertNotIn(_t_wild_id(*reveal_only), nodes)
+        for runs in payload["rows"]:
+            for run in runs:
+                self.assertNotIn("visited", run)
+        self.assertTrue(_js_accepts(payload))
+
+    @covers_requirement(
+        "wilderness-area-map-reveal::wilderness-runs-disclose-only-revealed-terrain"
+    )
+    def test_anti_peek_across_every_payload_branch(self):
+        start = self._away()
+        self._at_wild(start)
+        remembered = (start[0] + 9, start[1])
+        self._pin({start: 2, remembered: 3})
+        seen_cells = []
+        real_view = _live("world.maps.wilderness_population", "population_view")
+
+        def spy(wilderness, cells):
+            cells = list(cells)
+            seen_cells.extend(cells)
+            return real_view(wilderness, cells)
+
+        with mock.patch("world.maps.wilderness_population.population_view", spy):
+            payload = _render(self.char1)
+        cells = _decode_rows(payload)
+        in_disc = _live("world.rules.sight", "in_ground_disc")
+        radius = payload["ground_radius"]
+        # Unknown runs carry exactly two keys and no metadata.
+        for runs in payload["rows"]:
+            for run in runs:
+                expected = {"length", "kind"} if run["kind"] == "unknown" else {
+                    "length", "kind", "terrain", "passable", "band", "tier", "road", "ford"
+                }
+                self.assertEqual(set(run), expected)
+        # Entities are only read and published inside live sight on revealed
+        # cells; the remembered disc far away carries none.
+        for cell in seen_cells:
+            self.assertTrue(in_disc(start, cell, radius))
+            self.assertIsNotNone(cells[cell])
+        for entity in payload["entities"]:
+            cell = (entity["cell"]["x"], entity["cell"]["y"])
+            self.assertTrue(in_disc(start, cell, radius))
+            self.assertNotIn(":", entity["id"])
+            self.assertFalse(in_disc(remembered, cell, 3) and not in_disc(start, cell, radius))
+        self.assertIsNotNone(cells[remembered])
+        # Sightings carry the four approximate fields only.
+        for sighting in payload["sightings"]:
+            self.assertEqual(set(sighting), {"bearing", "distance_km", "silhouette_zh", "name"})
+        # A quest destination on an unrevealed cell adds no node or cell
+        # detail: it is a bearing marker only.
+        unknown = next(cell for cell, facts in sorted(cells.items()) if facts is None and cell[0] >= 0 and cell[1] >= 0)
+        destination = QuestDestination(
+            quest_id="q_far", definition_key="t_def", family=list(DestinationFamily)[0],
+            world_cell=unknown, map_key=None, node_id=_t_wild_id(*unknown),
+        )
+        definition = SimpleNamespace(display_name="合成委託")
+        with mock.patch(
+            "web.webclient.presentation.map_quest_destinations.accepted_destinations_with_tracking",
+            return_value=([destination], set()),
+        ), mock.patch.dict("world.quests.definitions.QUEST_DEFINITION_REGISTRY", {"t_def": definition}):
+            quest_payload = _render(self.char1)
+        self.assertEqual(quest_payload["rows"], payload["rows"])
+        self.assertEqual(quest_payload["nodes"], payload["nodes"])
+        self.assertEqual(quest_payload["quest_markers"][0]["destination"]["kind"], "bearing")
+        self.assertTrue(_js_accepts(payload))
+
+    @covers_requirement(
+        "wilderness-map-disclosure::all-wilderness-map-publishers-enforce-reveal-boundaries"
+    )
+    @covers_requirement(
+        "wilderness-area-map-reveal::wilderness-runs-disclose-only-revealed-terrain"
+    )
+    def test_hidden_entry_identity_requires_an_actual_visit(self):
+        from world.maps.static_references import settlement_node_xyz
+
+        entries = _live("world.lore.wilderness_entry", "WILDERNESS_ENTRY_REGISTRY").values()
+        hidden = _live("world.rules.wilderness_disclosure", "anchor_is_hidden")
+        point = next(entry for entry in entries if entry.is_point_shape and hidden(entry.anchor_key))
+        hidden_name = _t_anchor_display(point.anchor_key)
+        self._at_wild(point.anchor_cell)
+        # Maximal reveal around the entry: terrain only, never its identity.
+        self._pin({point.anchor_cell: 8})
+        payload = _render(self.char1)
+        self.assertFalse([node for node in payload["nodes"] if node["id"].startswith("grid:")])
+        self.assertNotIn(hidden_name, json.dumps(payload, ensure_ascii=False))
+        self.assertTrue(_js_accepts(payload))
+        gate_xyz = settlement_node_xyz(point.gates[0].destination)
+        gate_node = encode_grid(gate_xyz[2], gate_xyz[0], gate_xyz[1])
+        self._pin({point.anchor_cell: 8}, visited_grid=(gate_node,))
+        payload = _render(self.char1)
+        node = _by_id(payload)[gate_node]
+        self.assertEqual(node["gateway"], {"leads_to": hidden_name})
+        self.assertEqual(node["action"]["destination"], gate_node)
+        self.assertTrue(_js_accepts(payload))
+
+    @covers_requirement(
+        "wilderness-area-map-reveal::existing-maps-consume-bounded-atomic-reveal-payloads"
+    )
+    def test_oversized_collections_become_unavailable_without_truncation(self):
+        start = self._away()
+        self._at_wild(start)
+        self._pin({start: 8})
+        fact = SimpleNamespace(observation_key="population:t", cell=start, kind="monster", hostile=True, label="狼")
+        facts = [SimpleNamespace(**{**vars(fact), "observation_key": f"population:t:{i}"}) for i in range(4097)]
+        with mock.patch("world.maps.wilderness_population.population_view", return_value=facts), \
+                mock.patch.object(area_map_module, "log_warn") as warn:
+            with self.assertRaises(PanelUnavailableError):
+                _render(self.char1)
+        self.assertEqual(warn.call_args[0][0], "area_map_over_bound")
+        self.assertEqual(warn.call_args[1]["context"]["entities"], 4097)
+        markers = [{"bearing": "北", "distance_km": 5, "silhouette_zh": "塔", "name": None}] * 257
+        with mock.patch.object(area_map_module, "_distant_markers", return_value=markers), \
+                mock.patch.object(area_map_module, "log_warn") as warn:
+            with self.assertRaises(PanelUnavailableError):
+                _render(self.char1)
+        self.assertEqual(warn.call_args[1]["context"]["sightings"], 257)
+
+    @covers_requirement(
+        "webclient-area-map::map-view-requests-publish-the-requested-area-without-changing-gameplay"
+    )
+    @covers_requirement(
+        "wilderness-area-map-reveal::existing-maps-consume-bounded-atomic-reveal-payloads"
+    )
+    def test_the_window_reads_only_its_own_chunks_and_writes_nothing(self):
+        from world.rules import map_knowledge
+        from world.rules.map_knowledge import CHUNK_CELLS, KNOWLEDGE_ATTR
+
+        start = self._away()
+        self._at_wild(start)
+        visits = _synthetic_visits(start, 20_000)
+        self._pin(visits)
+        from evennia.utils.dbserialize import deserialize
+
+        def stored():
+            return json.dumps(deserialize(self.char1.attributes.get(KNOWLEDGE_ATTR)), sort_keys=True)
+
+        before = stored()
+        decoded = []
+        real = map_knowledge._decode_chunk_entries
+
+        def spy(chunk_key, chunk_data):
+            decoded.append(chunk_key)
+            return real(chunk_key, chunk_data)
+
+        with mock.patch.object(map_knowledge, "_decode_chunk_entries", spy):
+            payload = _render(self.char1)
+        reach = WILDERNESS_WINDOW // 2 + map_knowledge.MAX_SIGHT
+        allowed = {
+            f"{x // CHUNK_CELLS}:{y // CHUNK_CELLS}"
+            for x in range(start[0] - reach, start[0] + reach + 1)
+            for y in range(start[1] - reach, start[1] + reach + 1)
+        }
+        # Exact landmark membership (lit districts) reads one selected chunk
+        # per district landmark, never the whole record.
+        landmarks = _live("world.lore.map_districts", "landmark_node_ids")()
+        for node_id in landmarks.values():
+            if node_id.startswith("wild:"):
+                _, _, x, y = node_id.split(":")
+                allowed.add(f"{int(x) // CHUNK_CELLS}:{int(y) // CHUNK_CELLS}")
+        stored_chunks = set(_knowledge(visits)["wilderness"][_live("world.maps.wilderness_provider", "WILDERNESS_NAME")])
+        self.assertGreater(len(stored_chunks - allowed), 0, "the record holds chunks far from the window")
+        self.assertTrue(decoded)
+        self.assertLessEqual(set(decoded), allowed)
+        self.assertEqual(before, stored())
+        # The bounded body travels whole through the shared part codec.
+        parts = encode_map_parts("area_map", payload)
+        self.assertEqual(decode_map_parts("area_map", parts), payload)
+
+    @unittest.skipUnless(os.environ.get("MUD_AREA_MAP_BENCHMARK") == "1", "timing benchmark: set MUD_AREA_MAP_BENCHMARK=1")
+    def test_warmed_window_with_twenty_thousand_visits_is_within_fifty_ms(self):
+        start = self._away()
+        self._at_wild(start)
+        self._pin(_synthetic_visits(start, 20_000))
+        _render(self.char1)  # warm caches; setup excluded from the samples
+        samples = []
+        for _ in range(20):
+            began = time.perf_counter()
+            _render(self.char1)
+            samples.append((time.perf_counter() - began) * 1000)
+        median = statistics.median(samples)
+        print(f"area_map wilderness benchmark: median {median:.1f} ms over 20 samples")
+        self.assertLessEqual(median, 50.0)
+
+
+def _synthetic_visits(start, count):
+    """``count`` deterministic visits: a dense block around the window plus a
+    far scatter across the frame, with sights 0..8."""
+    max_x = _live("world.maps.wilderness_provider", "WILDERNESS_MAX_X")
+    max_y = _live("world.maps.wilderness_provider", "WILDERNESS_MAX_Y")
+    visits = {}
+    sx, sy = start
+    for dy in range(-30, 31):
+        for dx in range(-30, 31):
+            if (dx * 7 + dy * 3) % 4 == 0:
+                visits[(sx + dx, sy + dy)] = (dx * dx + dy) % 9
+    seed = 12345
+    while len(visits) < count:
+        seed = (seed * 1103515245 + 12345) % (2**31)
+        x = seed % (max_x + 1)
+        seed = (seed * 1103515245 + 12345) % (2**31)
+        y = seed % (max_y + 1)
+        visits.setdefault((x, y), seed % 9)
+    return visits
 
 
 # ---------------------------------------------------------------------------
@@ -777,7 +1085,7 @@ class MapViewDispatchTests(EvenniaTestCase):
         self.registry = PresentationRegistry("test")
         self.registry.register(_status_spec())
         self.registry.register(
-            PresenterSpec("area_map", 1, ("map_unavailable", "區域地圖目前無法顯示"), spy, on_demand=True)
+            PresenterSpec("area_map", 2, ("map_unavailable", "區域地圖目前無法顯示"), spy, on_demand=True)
         )
         self.session = _Session(self.char)
         self.coordinator = PresentationCoordinator(
@@ -994,7 +1302,7 @@ def _largest_grid_body(labels: int = 16) -> dict:
         for i in range(AREA_MAX_QUEST_MARKERS)
     ]
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "available": True,
         "layer": "grid",
         "map_id": map_key,
@@ -1031,7 +1339,7 @@ class AreaMapNodeEvidenceTests(unittest.TestCase):
         "webclient-area-map::area-maps-reveal-visited-nodes-and-one-step-frontier-across-all-layers"
     )
     @covers_requirement(
-        "webclient-area-map::wilderness-area-maps-cover-a-fifteen-cell-neighbourhood"
+        "wilderness-area-map-reveal::wilderness-runs-disclose-only-revealed-terrain"
     )
     def test_browser_area_map_validator_suite_passes(self):
         result = subprocess.run(

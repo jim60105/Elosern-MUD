@@ -1,4 +1,4 @@
-"""Exact version-1 ``area_map`` / ``world_map`` wire schemas and bounds.
+"""Exact ``area_map`` (schema 2) / ``world_map`` (schema 1) wire schemas and bounds.
 
 The on-demand map panels (world-map drawer design §5.2/§5.3, OpenSpec change
 define-map-panel-protocol) share one fixed wire contract between the server
@@ -37,7 +37,7 @@ from web.webclient.presentation.protocol import (
 
 AREA_MAP_PANEL = "area_map"
 WORLD_MAP_PANEL = "world_map"
-AREA_MAP_SCHEMA_VERSION = 1
+AREA_MAP_SCHEMA_VERSION = 2
 WORLD_MAP_SCHEMA_VERSION = 1
 
 #: The on-demand map panels and their registered schema versions. Only these
@@ -72,17 +72,61 @@ MAP_PANEL_DEPTH = 2
 
 # area_map bounds, measured by publish-area-map-panel (see
 # docs/development/map-panel-protocol.md): the largest settlement graph is 21
-# nodes / 26 roads (about 5 KB fully explored) and the wilderness window is at
-# most 225 cells. The ceilings leave room for much larger settlements and
-# room graphs: 512 nodes (2.3x the window), four roads per node, and a byte
-# cap that holds that graph with 32-character labels and full markers.
+# nodes / 26 roads (about 5 KB fully explored). The graph-layer ceilings leave
+# room for much larger settlements and room graphs: 512 nodes, four roads per
+# node, and a byte cap that holds that graph with 32-character labels and full
+# markers.
 AREA_MAX_NODES = 512
 AREA_MAX_EDGES = 2_048
 AREA_MAX_QUEST_MARKERS = 32
 AREA_MAX_BYTES = 393_216
-WILDERNESS_WINDOW = 15
-WILDERNESS_MAX_NODES = WILDERNESS_WINDOW * WILDERNESS_WINDOW
 AREA_MAX_CELL_KM = 1_000
+
+# Wilderness schema 2 (wilderness-area-map-reveal): a centred 41 x 41 window
+# of run-length-encoded rows, sparse nodes, live-sight entities and distant
+# sightings. Every bound is finite and rejects rather than truncates.
+WILDERNESS_WINDOW = 41
+WILDERNESS_HALF_WINDOW = WILDERNESS_WINDOW // 2
+WILDERNESS_MAX_NODES = WILDERNESS_WINDOW * WILDERNESS_WINDOW
+WILDERNESS_MAX_ENTITIES = 4_096
+WILDERNESS_MAX_SIGHTINGS = 256
+WILDERNESS_MAX_BAND = 15
+WILDERNESS_MAX_TIER = 3
+WILDERNESS_MAX_GROUND_RADIUS = 8
+SIGHTING_DISTANCE_STEP_KM = 5
+#: Terrain classes of a revealed run: the sight rulebook's terrain rows plus
+#: the structural classes (blocked or non-walkable ground).
+AREA_TERRAIN_CLASSES = (
+    "open_ground",
+    "hills",
+    "mountain",
+    "woodland",
+    "water",
+    "ridge",
+    "sea",
+    "settlement",
+)
+AREA_LIGHT_PHASES = ("day", "dusk", "night", "dawn")
+AREA_ENTITY_KINDS = ("hostile", "npc", "character")
+#: The sixteen compass words of a distant sighting, north first, clockwise.
+SIGHTING_BEARINGS = (
+    "北",
+    "北北東",
+    "東北",
+    "東北東",
+    "東",
+    "東南東",
+    "東南",
+    "南南東",
+    "南",
+    "南南西",
+    "西南",
+    "西南西",
+    "西",
+    "西北西",
+    "西北",
+    "北北西",
+)
 
 # Measured production geometry plus the full 5 km checkerboard trail.
 # The original 1 MiB measurement covered only a 20,000-run 1 km trail.
@@ -129,6 +173,8 @@ GRID_MAP_ID_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 ROOM_GRAPH_MAP_ID_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
 MAP_ID_RE = re.compile(r"^[a-z0-9._]{1,64}$")
 _EXIT_REF_RE = re.compile(r"^[\x00-\x7f]{1,64}$")
+#: A wilderness entity identity: a stable, non-semantic observation token.
+ENTITY_ID_RE = re.compile(r"^[0-9a-f]{16}$")
 
 
 class MapPanelError(ProtocolValidationError):
@@ -255,7 +301,18 @@ _AREA_COMMON_FIELDS = (
     "edges",
     "quest_markers",
 )
-_AREA_WILDERNESS_FIELDS = _AREA_COMMON_FIELDS + ("district_name", "cell_km")
+_AREA_WILDERNESS_FIELDS = _AREA_COMMON_FIELDS + (
+    "district_name",
+    "cell_km",
+    "window",
+    "rows",
+    "light_phase",
+    "ground_radius",
+    "entities",
+    "sightings",
+)
+_UNKNOWN_RUN_FIELDS = ("length", "kind")
+_TERRAIN_RUN_FIELDS = ("length", "kind", "terrain", "passable", "band", "tier", "road", "ford")
 
 
 def _area_gateway(value: Any) -> dict[str, str] | None:
@@ -339,6 +396,165 @@ def _area_marker(value: Any) -> dict[str, Any]:
     }
 
 
+def _wild_window(value: Any) -> dict[str, int]:
+    _exact(value, "window", ("min_x", "min_y", "width", "height"))
+    window = {
+        "min_x": _int(value["min_x"], "window.min_x", MAP_COORD_MIN, MAP_COORD_MAX),
+        "min_y": _int(value["min_y"], "window.min_y", MAP_COORD_MIN, MAP_COORD_MAX),
+        "width": _int(value["width"], "window.width", 1, WILDERNESS_WINDOW),
+        "height": _int(value["height"], "window.height", 1, WILDERNESS_WINDOW),
+    }
+    if window["width"] != WILDERNESS_WINDOW or window["height"] != WILDERNESS_WINDOW:
+        raise MapPanelError(f"the wilderness window must be {WILDERNESS_WINDOW} x {WILDERNESS_WINDOW}")
+    return window
+
+
+def _wild_run(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise MapPanelError("a row run must be a JSON object")
+    kind = value.get("kind")
+    if kind == "unknown":
+        _exact(value, "unknown run", _UNKNOWN_RUN_FIELDS)
+        return {"length": _int(value["length"], "run.length", 1, WILDERNESS_WINDOW), "kind": "unknown"}
+    if kind != "terrain":
+        raise MapPanelError("run.kind is not a stable value")
+    _exact(value, "terrain run", _TERRAIN_RUN_FIELDS)
+    if value["terrain"] not in AREA_TERRAIN_CLASSES:
+        raise MapPanelError("run.terrain is not a stable value")
+    return {
+        "length": _int(value["length"], "run.length", 1, WILDERNESS_WINDOW),
+        "kind": "terrain",
+        "terrain": value["terrain"],
+        "passable": _bool(value["passable"], "run.passable"),
+        "band": _int(value["band"], "run.band", 0, WILDERNESS_MAX_BAND),
+        "tier": _int(value["tier"], "run.tier", 0, WILDERNESS_MAX_TIER),
+        "road": _bool(value["road"], "run.road"),
+        "ford": _bool(value["ford"], "run.ford"),
+    }
+
+
+def _wild_rows(value: Any) -> tuple[list[list[dict[str, Any]]], set[tuple[int, int]]]:
+    """The exact rows and the set of revealed (terrain) window offsets."""
+    rows = []
+    revealed: set[tuple[int, int]] = set()
+    for row_index, row in enumerate(_list(value, "rows", minimum=WILDERNESS_WINDOW, maximum=WILDERNESS_WINDOW)):
+        runs = [_wild_run(run) for run in _list(row, "row", minimum=1, maximum=WILDERNESS_WINDOW)]
+        column = 0
+        for index, run in enumerate(runs):
+            previous = runs[index - 1] if index else None
+            if previous is not None and {**run, "length": 0} == {**previous, "length": 0}:
+                raise MapPanelError("equal adjacent runs must be merged")
+            if run["kind"] == "terrain":
+                revealed.update((column + offset, row_index) for offset in range(run["length"]))
+            column += run["length"]
+        if column != WILDERNESS_WINDOW:
+            raise MapPanelError(f"a row's run lengths must sum to {WILDERNESS_WINDOW}")
+        rows.append(runs)
+    return rows, revealed
+
+
+def _wild_cell_of(node: dict[str, Any], cell_km: float) -> tuple[int, int]:
+    return math.floor(node["x"] / cell_km), math.floor(node["y"] / cell_km)
+
+
+def _in_ground_disc(dx: int, dy: int, radius: int) -> bool:
+    reach = radius + 0.5
+    return dx * dx + dy * dy <= reach * reach
+
+
+def _wild_entity(value: Any) -> dict[str, Any]:
+    _exact(value, "entity", ("id", "cell", "kind", "hostile", "label"))
+    entity_id = value["id"]
+    if not isinstance(entity_id, str) or not ENTITY_ID_RE.fullmatch(entity_id):
+        raise MapPanelError("entity.id must be a 16-character lowercase hex token")
+    cell = _exact(value["cell"], "entity.cell", ("x", "y"))
+    if value["kind"] not in AREA_ENTITY_KINDS:
+        raise MapPanelError("entity.kind is not a stable value")
+    return {
+        "id": entity_id,
+        "cell": {
+            "x": _int(cell["x"], "entity.cell.x", MAP_COORD_MIN, MAP_COORD_MAX),
+            "y": _int(cell["y"], "entity.cell.y", MAP_COORD_MIN, MAP_COORD_MAX),
+        },
+        "kind": value["kind"],
+        "hostile": _bool(value["hostile"], "entity.hostile"),
+        "label": _text(value["label"], "entity.label", MAP_MAX_LABEL),
+    }
+
+
+def _wild_sighting(value: Any) -> dict[str, Any]:
+    _exact(value, "sighting", ("bearing", "distance_km", "silhouette_zh", "name"))
+    if value["bearing"] not in SIGHTING_BEARINGS:
+        raise MapPanelError("sighting.bearing is not a stable value")
+    distance = _int(value["distance_km"], "sighting.distance_km", 0, MAP_COORD_MAX)
+    if distance % SIGHTING_DISTANCE_STEP_KM:
+        raise MapPanelError(f"sighting.distance_km must be a multiple of {SIGHTING_DISTANCE_STEP_KM}")
+    name = value["name"]
+    return {
+        "bearing": value["bearing"],
+        "distance_km": distance,
+        "silhouette_zh": _text(value["silhouette_zh"], "sighting.silhouette_zh", MAP_MAX_LABEL),
+        "name": None if name is None else _text(name, "sighting.name", MAP_MAX_LABEL),
+    }
+
+
+def _wilderness_body(payload: dict[str, Any], nodes: list[dict[str, Any]], current: str) -> dict[str, Any]:
+    """Validate the schema-2 wilderness fields against the already-valid nodes."""
+    cell_km = _number(payload["cell_km"], "cell_km", 0, AREA_MAX_CELL_KM)
+    if cell_km <= 0:
+        raise MapPanelError("cell_km must be positive")
+    window = _wild_window(payload["window"])
+    rows, revealed = _wild_rows(payload["rows"])
+    min_x, min_y = window["min_x"], window["min_y"]
+    current_parts = current.split(":")
+    cx, cy = int(current_parts[2]), int(current_parts[3])
+    if (cx - min_x, cy - min_y) != (WILDERNESS_HALF_WINDOW, WILDERNESS_HALF_WINDOW):
+        raise MapPanelError("the wilderness window must be centred on the current cell")
+    for node in nodes:
+        col, row = _wild_cell_of(node, cell_km)
+        offset = (col - min_x, row - min_y)
+        if not (0 <= offset[0] < WILDERNESS_WINDOW and 0 <= offset[1] < WILDERNESS_WINDOW):
+            raise MapPanelError("a wilderness node must lie inside the window")
+        if node["id"].startswith("wild:"):
+            parts = node["id"].split(":")
+            if (int(parts[2]), int(parts[3])) != (col, row):
+                raise MapPanelError("a wild node's position must be its own cell")
+            if offset not in revealed:
+                raise MapPanelError("a wild node must lie on a revealed cell")
+        elif max(abs(col - cx), abs(row - cy)) != 1:
+            raise MapPanelError("a gateway node must be one step from the current cell")
+        elif offset not in revealed:
+            raise MapPanelError("a gateway node must lie on a revealed cell")
+    radius = _int(payload["ground_radius"], "ground_radius", 0, WILDERNESS_MAX_GROUND_RADIUS)
+    if payload["light_phase"] not in AREA_LIGHT_PHASES:
+        raise MapPanelError("light_phase is not a stable value")
+    entities = [
+        _wild_entity(item)
+        for item in _list(payload["entities"], "entities", maximum=WILDERNESS_MAX_ENTITIES)
+    ]
+    _unique([entity["id"] for entity in entities], "entity ids")
+    for entity in entities:
+        x, y = entity["cell"]["x"], entity["cell"]["y"]
+        if (x - min_x, y - min_y) not in revealed:
+            raise MapPanelError("an entity must stand on a revealed window cell")
+        if not _in_ground_disc(x - cx, y - cy, radius):
+            raise MapPanelError("an entity must stand inside the current ground sight")
+    sightings = [
+        _wild_sighting(item)
+        for item in _list(payload["sightings"], "sightings", maximum=WILDERNESS_MAX_SIGHTINGS)
+    ]
+    return {
+        "district_name": _text(payload["district_name"], "district_name", MAP_MAX_TITLE),
+        "cell_km": cell_km,
+        "window": window,
+        "rows": rows,
+        "light_phase": payload["light_phase"],
+        "ground_radius": radius,
+        "entities": entities,
+        "sightings": sightings,
+    }
+
+
 def validate_area_map(payload: Any) -> dict[str, Any]:
     """Validate one exact available ``area_map`` payload (raises MapPanelError)."""
     if not isinstance(payload, dict):
@@ -416,11 +632,7 @@ def validate_area_map(payload: Any) -> dict[str, Any]:
         "quest_markers": markers,
     }
     if layer == "wilderness":
-        result["district_name"] = _text(payload["district_name"], "district_name", MAP_MAX_TITLE)
-        cell_km = _number(payload["cell_km"], "cell_km", 0, AREA_MAX_CELL_KM)
-        if cell_km <= 0:
-            raise MapPanelError("cell_km must be positive")
-        result["cell_km"] = cell_km
+        result.update(_wilderness_body(payload, nodes, current))
     _check_logical_body(result, AREA_MAP_PANEL)
     return result
 

@@ -736,27 +736,11 @@ def has_visited(character: Any, node_id: str) -> bool:
     Validates envelope. For ``grid:`` and ``room:`` checks in ``visited``.
     For ``wild:`` validates only the containing chunk and checks for offset.
     """
-    decoded = decode_node(node_id)
+    decode_node(node_id)
     current = character.attributes.get(KNOWLEDGE_ATTR)
     if current is None:
         return False
-    visited, chunks = _validate_record_envelope(current)
-    prefix = decoded["prefix"]
-    if prefix in (_GRID_PREFIX, _ROOM_PREFIX):
-        return node_id in visited
-    if prefix == _WILD_PREFIX:
-        x = decoded["x"]
-        y = decoded["y"]
-        cx = x // CHUNK_CELLS
-        cy = y // CHUNK_CELLS
-        chunk_key = f"{cx}:{cy}"
-        chunk_data = chunks.get(chunk_key)
-        if not chunk_data:
-            return False
-        decoded_chunk = _decode_chunk_entries(chunk_key, chunk_data)
-        offset = (y % CHUNK_CELLS) * CHUNK_CELLS + (x % CHUNK_CELLS)
-        return offset in decoded_chunk
-    return False
+    return KnowledgeSnapshot.from_record(current).has_visited(node_id)
 
 
 def visits_in_bounds(
@@ -774,53 +758,13 @@ def visits_in_bounds(
     _validate_bounds(bounds)
     if isinstance(padding, bool) or not isinstance(padding, int) or padding < 0:
         raise KnowledgeError("padding must be a non-boolean non-negative integer")
-
     x0, y0, x1, y1 = bounds
     if x0 > x1 or y0 > y1:
         return []
-
     current = character.attributes.get(KNOWLEDGE_ATTR)
     if current is None:
         raise KnowledgeError("character has no map-knowledge record")
-
-    visited, chunks = _validate_record_envelope(current)
-
-    min_x = max(0, x0 - padding)
-    min_y = max(0, y0 - padding)
-    max_x = min(wilderness_provider.WILDERNESS_MAX_X, x1 + padding)
-    max_y = min(wilderness_provider.WILDERNESS_MAX_Y, y1 + padding)
-
-    if min_x > max_x or min_y > max_y:
-        return []
-
-    min_cx = min_x // CHUNK_CELLS
-    max_cx = max_x // CHUNK_CELLS
-    min_cy = min_y // CHUNK_CELLS
-    max_cy = max_y // CHUNK_CELLS
-
-    results: list[NodeVisit] = []
-    for cy in range(min_cy, max_cy + 1):
-        for cx in range(min_cx, max_cx + 1):
-            chunk_key = f"{cx}:{cy}"
-            chunk_data = chunks.get(chunk_key)
-            if not chunk_data:
-                continue
-            decoded_chunk = _decode_chunk_entries(chunk_key, chunk_data)
-            for offset, entry in decoded_chunk.items():
-                local_y = offset // CHUNK_CELLS
-                local_x = offset % CHUNK_CELLS
-                abs_x = cx * CHUNK_CELLS + local_x
-                abs_y = cy * CHUNK_CELLS + local_y
-                if min_x <= abs_x <= max_x and min_y <= abs_y <= max_y:
-                    results.append(
-                        NodeVisit(
-                            node_id=encode_wild(WILDERNESS_NAME, abs_x, abs_y),
-                            first_seen_tick=entry["first_seen_tick"],
-                            last_seen_tick=entry["last_seen_tick"],
-                            sight=entry["sight"],
-                        )
-                    )
-    return sorted(results, key=lambda visit: visit.node_id)
+    return KnowledgeSnapshot.from_record(current).visits_in_bounds(bounds, padding)
 
 
 def _visited_exact_in_record(
@@ -834,57 +778,221 @@ def _visited_exact_in_record(
     in its chunk, so only that chunk is decoded. A corrupt selected chunk
     raises :class:`KnowledgeError` and is diagnosed by the caller.
     """
-    decoded = decode_node(node_id)
-    prefix = decoded["prefix"]
-    if prefix in (_GRID_PREFIX, _ROOM_PREFIX):
-        return node_id in visited
-    if prefix != _WILD_PREFIX:
-        return False
-    x = decoded["x"]
-    y = decoded["y"]
-    chunk_key = f"{x // CHUNK_CELLS}:{y // CHUNK_CELLS}"
-    chunk_data = chunks.get(chunk_key)
-    if not chunk_data:
-        return False
-    decoded_chunk = _decode_chunk_entries(chunk_key, chunk_data)
-    offset = (y % CHUNK_CELLS) * CHUNK_CELLS + (x % CHUNK_CELLS)
-    return offset in decoded_chunk
+    return KnowledgeSnapshot(visited, chunks).has_visited(node_id)
 
 
 def _lit_district_keys_for_record(
     visited: Mapping[str, Any],
     chunks: Mapping[str, Any],
 ) -> frozenset[str]:
-    """Lit district keys from exact landmark membership in one record.
+    """Lit district keys from exact landmark membership in one record."""
+    return KnowledgeSnapshot(visited, chunks).lit_district_keys()
 
-    Only the finite district landmark IDs are tested, never the whole visited
-    projection. A district world that cannot be read yields no trusted lit set;
-    a corrupt landmark chunk is diagnosed and leaves that landmark unlit while
-    independently readable landmarks still count.
-    """
-    from world.lore.map_districts import landmark_node_ids
 
-    try:
-        landmarks = landmark_node_ids()
-    except Exception as error:
-        log_warn(
-            "map_knowledge_reveal_districts_unavailable",
-            exc=error,
-            context={"key": KNOWLEDGE_ATTR},
+def _disc_offsets(radius: int) -> tuple[tuple[int, int], ...]:
+    """The cell offsets of the ground disc of ``radius`` (``in_ground_disc``)."""
+    cached = _DISC_OFFSETS.get(radius)
+    if cached is None:
+        from world.rules.sight import in_ground_disc
+
+        cached = tuple(
+            (dx, dy)
+            for dy in range(-radius, radius + 1)
+            for dx in range(-radius, radius + 1)
+            if in_ground_disc((0, 0), (dx, dy), radius)
         )
-        return frozenset()
-    lit: set[str] = set()
-    for key, node_id in landmarks.items():
+        _DISC_OFFSETS[radius] = cached
+    return cached
+
+
+_DISC_OFFSETS: dict[int, tuple[tuple[int, int], ...]] = {}
+
+
+class KnowledgeSnapshot:
+    """One validated record envelope with lazily decoded, cached chunks.
+
+    A pure read view: it never writes the record. Every read helper of this
+    module runs through it, so a caller that needs several bounded reads in
+    one request (the area map window) validates the envelope once and decodes
+    each selected chunk at most once, with the same answers and diagnostics
+    as the module-level functions.
+    """
+
+    def __init__(self, visited: Mapping[str, Any], chunks: Mapping[str, Any]) -> None:
+        self._visited = visited
+        self._chunks = chunks
+        self._decoded: dict[str, dict[int, dict[str, int]]] = {}
+
+    @classmethod
+    def from_record(cls, record: Any) -> "KnowledgeSnapshot":
+        """Validate one stored record's envelope (raises :class:`KnowledgeError`)."""
+        visited, chunks = _validate_record_envelope(record)
+        return cls(visited, chunks)
+
+    def _chunk(self, chunk_key: str) -> dict[int, dict[str, int]] | None:
+        chunk_data = self._chunks.get(chunk_key)
+        if not chunk_data:
+            return None
+        decoded = self._decoded.get(chunk_key)
+        if decoded is None:
+            decoded = _decode_chunk_entries(chunk_key, chunk_data)
+            self._decoded[chunk_key] = decoded
+        return decoded
+
+    def has_visited(self, node_id: str) -> bool:
+        """Exact membership of one canonical node (decodes only its chunk)."""
+        decoded = decode_node(node_id)
+        prefix = decoded["prefix"]
+        if prefix in (_GRID_PREFIX, _ROOM_PREFIX):
+            return node_id in self._visited
+        if prefix != _WILD_PREFIX:
+            return False
+        x = decoded["x"]
+        y = decoded["y"]
+        chunk = self._chunk(f"{x // CHUNK_CELLS}:{y // CHUNK_CELLS}")
+        if chunk is None:
+            return False
+        return (y % CHUNK_CELLS) * CHUNK_CELLS + (x % CHUNK_CELLS) in chunk
+
+    def visits_in_bounds(
+        self, bounds: tuple[int, int, int, int], padding: int = 0
+    ) -> list[NodeVisit]:
+        """See :func:`visits_in_bounds`."""
+        _validate_bounds(bounds)
+        if isinstance(padding, bool) or not isinstance(padding, int) or padding < 0:
+            raise KnowledgeError("padding must be a non-boolean non-negative integer")
+        x0, y0, x1, y1 = bounds
+        if x0 > x1 or y0 > y1:
+            return []
+        min_x = max(0, x0 - padding)
+        min_y = max(0, y0 - padding)
+        max_x = min(wilderness_provider.WILDERNESS_MAX_X, x1 + padding)
+        max_y = min(wilderness_provider.WILDERNESS_MAX_Y, y1 + padding)
+        if min_x > max_x or min_y > max_y:
+            return []
+        results: list[NodeVisit] = []
+        for cy in range(min_y // CHUNK_CELLS, max_y // CHUNK_CELLS + 1):
+            for cx in range(min_x // CHUNK_CELLS, max_x // CHUNK_CELLS + 1):
+                decoded_chunk = self._chunk(f"{cx}:{cy}")
+                if decoded_chunk is None:
+                    continue
+                for offset, entry in decoded_chunk.items():
+                    abs_x = cx * CHUNK_CELLS + offset % CHUNK_CELLS
+                    abs_y = cy * CHUNK_CELLS + offset // CHUNK_CELLS
+                    if min_x <= abs_x <= max_x and min_y <= abs_y <= max_y:
+                        results.append(
+                            NodeVisit(
+                                node_id=encode_wild(WILDERNESS_NAME, abs_x, abs_y),
+                                first_seen_tick=entry["first_seen_tick"],
+                                last_seen_tick=entry["last_seen_tick"],
+                                sight=entry["sight"],
+                            )
+                        )
+        return sorted(results, key=lambda visit: visit.node_id)
+
+    def lit_district_keys(self) -> frozenset[str]:
+        """Lit district keys from exact landmark membership.
+
+        Only the finite district landmark IDs are tested, never the whole visited
+        projection. A district world that cannot be read yields no trusted lit set;
+        a corrupt landmark chunk is diagnosed and leaves that landmark unlit while
+        independently readable landmarks still count.
+        """
+        from world.lore.map_districts import landmark_node_ids
+
         try:
-            if _visited_exact_in_record(visited, chunks, node_id):
-                lit.add(key)
+            landmarks = landmark_node_ids()
+        except Exception as error:
+            log_warn(
+                "map_knowledge_reveal_districts_unavailable",
+                exc=error,
+                context={"key": KNOWLEDGE_ATTR},
+            )
+            return frozenset()
+        lit: set[str] = set()
+        for key, node_id in landmarks.items():
+            try:
+                if self.has_visited(node_id):
+                    lit.add(key)
+            except KnowledgeError as error:
+                log_warn(
+                    "map_knowledge_reveal_corrupt_chunk",
+                    exc=error,
+                    context={"key": KNOWLEDGE_ATTR, "district": key},
+                )
+        return frozenset(lit)
+
+    def revealed_in_bounds(
+        self, bounds: tuple[int, int, int, int], *, obj: str = ""
+    ) -> frozenset[tuple[int, int]]:
+        """See :func:`revealed_in_bounds` (the envelope is already valid here)."""
+        x0, y0, x1, y1 = _validate_bounds(bounds)
+        x0 = max(0, x0)
+        y0 = max(0, y0)
+        x1 = min(wilderness_provider.WILDERNESS_MAX_X, x1)
+        y1 = min(wilderness_provider.WILDERNESS_MAX_Y, y1)
+        if x0 > x1 or y0 > y1:
+            return frozenset()
+        total = (x1 - x0 + 1) * (y1 - y0 + 1)
+        lit = self.lit_district_keys()
+        revealed: set[tuple[int, int]] = set()
+        try:
+            visits = self.visits_in_bounds((x0, y0, x1, y1), padding=MAX_SIGHT)
         except KnowledgeError as error:
             log_warn(
                 "map_knowledge_reveal_corrupt_chunk",
                 exc=error,
-                context={"key": KNOWLEDGE_ATTR, "district": key},
+                context={"obj": obj, "key": KNOWLEDGE_ATTR},
             )
-    return frozenset(lit)
+            visits = []
+
+        for visit in visits:
+            if len(revealed) == total:
+                break  # every in-bounds cell is already revealed
+            decoded = decode_node(visit.node_id)
+            origin_x = decoded["x"]
+            origin_y = decoded["y"]
+            for dx, dy in _disc_offsets(visit.sight):
+                cell_x = origin_x + dx
+                cell_y = origin_y + dy
+                if x0 <= cell_x <= x1 and y0 <= cell_y <= y1:
+                    revealed.add((cell_x, cell_y))
+
+        if lit and len(revealed) < total:
+            from world.maps.district_partition import district_at
+
+            for cell_y in range(y0, y1 + 1):
+                for cell_x in range(x0, x1 + 1):
+                    if (cell_x, cell_y) in revealed:
+                        continue
+                    try:
+                        owner = district_at((cell_x, cell_y))
+                    except Exception as error:
+                        log_warn(
+                            "map_knowledge_reveal_district_lookup_failed",
+                            exc=error,
+                            context={"cell": f"{cell_x},{cell_y}"},
+                        )
+                        continue
+                    if owner in lit:
+                        revealed.add((cell_x, cell_y))
+        return frozenset(revealed)
+
+
+def read_snapshot(character: Any) -> KnowledgeSnapshot | None:
+    """One request-scoped read view of ``character``'s record, or ``None``.
+
+    Reads the stored Attribute's persisted value directly instead of the
+    per-read deep conversion of ``attributes.get``, so a long wilderness
+    history costs one envelope validation per request. The persisted value
+    is the cached Attribute's own object, so the snapshot is strictly
+    read-only and never hands it out. Raises :class:`KnowledgeError` for a
+    corrupt envelope; never writes.
+    """
+    attribute = character.attributes.get(KNOWLEDGE_ATTR, return_obj=True)
+    if attribute is None or attribute.db_value is None:
+        return None
+    return KnowledgeSnapshot.from_record(attribute.db_value)
 
 
 def revealed_in_bounds(
@@ -917,7 +1025,7 @@ def revealed_in_bounds(
     if current is None:
         return frozenset()
     try:
-        visited, chunks = _validate_record_envelope(current)
+        snapshot = KnowledgeSnapshot.from_record(current)
     except KnowledgeError as error:
         log_warn(
             "map_knowledge_reveal_corrupt_record",
@@ -925,52 +1033,7 @@ def revealed_in_bounds(
             context={"obj": str(character), "key": KNOWLEDGE_ATTR},
         )
         return frozenset()
-
-    lit = _lit_district_keys_for_record(visited, chunks)
-    revealed: set[tuple[int, int]] = set()
-    try:
-        visits = visits_in_bounds(character, (x0, y0, x1, y1), padding=MAX_SIGHT)
-    except KnowledgeError as error:
-        log_warn(
-            "map_knowledge_reveal_corrupt_chunk",
-            exc=error,
-            context={"obj": str(character), "key": KNOWLEDGE_ATTR},
-        )
-        visits = []
-
-    from world.rules.sight import in_ground_disc
-
-    for visit in visits:
-        decoded = decode_node(visit.node_id)
-        origin_x = decoded["x"]
-        origin_y = decoded["y"]
-        radius = visit.sight
-        for cell_y in range(max(y0, origin_y - radius), min(y1, origin_y + radius) + 1):
-            for cell_x in range(
-                max(x0, origin_x - radius), min(x1, origin_x + radius) + 1
-            ):
-                if in_ground_disc((origin_x, origin_y), (cell_x, cell_y), radius):
-                    revealed.add((cell_x, cell_y))
-
-    if lit:
-        from world.maps.district_partition import district_at
-
-        for cell_y in range(y0, y1 + 1):
-            for cell_x in range(x0, x1 + 1):
-                if (cell_x, cell_y) in revealed:
-                    continue
-                try:
-                    owner = district_at((cell_x, cell_y))
-                except Exception as error:
-                    log_warn(
-                        "map_knowledge_reveal_district_lookup_failed",
-                        exc=error,
-                        context={"cell": f"{cell_x},{cell_y}"},
-                    )
-                    continue
-                if owner in lit:
-                    revealed.add((cell_x, cell_y))
-    return frozenset(revealed)
+    return snapshot.revealed_in_bounds((x0, y0, x1, y1), obj=str(character))
 
 
 def is_revealed(character: Any, cell: tuple[int, int]) -> bool:

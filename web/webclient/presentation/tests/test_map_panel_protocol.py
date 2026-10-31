@@ -20,6 +20,7 @@ from web.webclient.presentation import map_panels, map_parts
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.coordinator import PresentationCoordinator
 from web.webclient.presentation.map_panels import (
+    AREA_MAP_SCHEMA_VERSION,
     MAP_NODE_ID_RE,
     MapPanelError,
     validate_area_map,
@@ -110,6 +111,7 @@ class MapSchemaParityTests(unittest.TestCase):
             ("wilderness valid", "area_map", text(wild)),
             ("world valid", "world_map", text(world)),
             ("approximate integral float", "world_map", text(world).replace('"x":650,', '"x":650.0,', 1)),
+            ("wild integral band spelling", "area_map", text(wild).replace('"band":3,', '"band":3.0,', 1)),
         ]
         # Integral number spellings JSON cannot tell from integers: the browser
         # reads them as integers, so the server normalizes and accepts too.
@@ -123,7 +125,26 @@ class MapSchemaParityTests(unittest.TestCase):
             ("boolean coordinate", "area_map", variant(grid, lambda v: v["nodes"][1].update(x=True))),
             ("fractional metre", "area_map", variant(grid, lambda v: v["nodes"][1].update(x=10.5))),
             ("leading-zero node id", "area_map", variant(grid, lambda v: v.update(current_node="grid:t_map:01:1"))),
-            ("current not visited", "area_map", variant(wild, lambda v: v["nodes"][112].update(visited=False))),
+            ("current not visited", "area_map", variant(wild, lambda v: v["nodes"][0].update(visited=False))),
+            ("wild schema 1", "area_map", variant(wild, lambda v: v.update(schema_version=1))),
+            ("unknown run metadata", "area_map", variant(wild, lambda v: v["rows"][0][0].update(terrain="sea"))),
+            ("row total 40", "area_map", variant(wild, lambda v: v["rows"][0].__setitem__(0, {"length": 40, "kind": "unknown"}))),
+            ("unmerged runs", "area_map", variant(wild, lambda v: v["rows"].__setitem__(0, [{"length": 1, "kind": "unknown"}, {"length": 40, "kind": "unknown"}]))),
+            ("band 16", "area_map", variant(wild, lambda v: next(r for r in v["rows"][20] if r["kind"] == "terrain").update(band=16))),
+            ("tier 4", "area_map", variant(wild, lambda v: next(r for r in v["rows"][20] if r["kind"] == "terrain").update(tier=4))),
+            ("visited flag on run", "area_map", variant(wild, lambda v: next(r for r in v["rows"][20] if r["kind"] == "terrain").update(visited=True))),
+            ("off-centre window", "area_map", variant(wild, lambda v: v["window"].update(min_y=v["window"]["min_y"] + 1))),
+            ("node on unknown", "area_map", variant(wild, lambda v: v["nodes"][1].update(id="wild:elosern:100:100", x=100.5, y=100.5))),
+            ("gateway on unknown", "area_map", variant(wild, lambda v: (
+                v["rows"].__setitem__(21, [{"length": 41, "kind": "unknown"}]),
+                v.update(nodes=[n for n in v["nodes"] if int(n["y"]) != 121], edges=[], entities=[]),
+                v["nodes"].append({"id": "grid:t_map:3:3", "label": "門", "x": 121.5, "y": 121.5,
+                                   "visibility": "seen", "visited": False, "gateway": {"leads_to": "鎮"}, "action": None}),
+            ))),
+            ("entity beyond sight", "area_map", variant(wild, lambda v: v["entities"][0]["cell"].update(x=125))),
+            ("semantic entity id", "area_map", variant(wild, lambda v: v["entities"][0].update(id="object:9"))),
+            ("sighting cell", "area_map", variant(wild, lambda v: v["sightings"][0].update(cell=[1, 2]))),
+            ("sighting 7 km", "area_map", variant(wild, lambda v: v["sightings"][0].update(distance_km=7))),
             ("bearing 360", "area_map", variant(grid, lambda v: v["quest_markers"][1]["destination"].update(bearing_deg=360))),
             ("tagged both", "area_map", variant(grid, lambda v: v["quest_markers"][0]["destination"].update(bearing_deg=1))),
             ("unlit enriched", "world_map", variant(world, lambda v: v["districts"][0].update(name="秘"))),
@@ -137,7 +158,8 @@ class MapSchemaParityTests(unittest.TestCase):
         ]
         # Guard: each spelling really reached the wire text.
         self.assertIn('"x":650.0,', accept[4][2])
-        for (_, _, payload_text), spelling in zip(accept[5:], ("3.0", "-0.0", "1e2", "1E1"), strict=True):
+        self.assertIn('"band":3.0,', accept[5][2])
+        for (_, _, payload_text), spelling in zip(accept[6:], ("3.0", "-0.0", "1e2", "1E1"), strict=True):
             self.assertIn(f'"x":{spelling},', payload_text)
         cases = [(name, panel, body, True) for name, panel, body in accept] + [
             (name, panel, body, False) for name, panel, body in reject
@@ -205,6 +227,7 @@ class MapSchemaParityTests(unittest.TestCase):
         self.assertEqual(wild["frame"], {"key": "elosern", "unit": "km"})
         self.assertNotIn("x", interior["nodes"][0])
         self.assertIsInstance(wild["nodes"][0]["x"], float)
+        self.assertEqual(len(wild["rows"]), map_panels.WILDERNESS_WINDOW)
         world = validate_world_map(_copy("world"))
         self.assertEqual(set(world["districts"][0]), {"id", "lit", "outline"})
 
@@ -412,7 +435,7 @@ def _registry(map_body, calls, *, dialogue=False, state=None):
     registry.register(
         PresenterSpec(
             name="area_map",
-            schema_version=1,
+            schema_version=AREA_MAP_SCHEMA_VERSION,
             unavailable_reason=("map_unavailable", "地圖目前無法顯示"),
             presenter=presenter,
             on_demand=True,
@@ -456,7 +479,7 @@ class OnDemandRegistryTests(unittest.TestCase):
         registry = PresentationRegistry("test")
         for spec in (
             PresenterSpec("status", 1, ("x", "x"), lambda ctx: {}, on_demand=True),
-            PresenterSpec("area_map", 1, ("x", "x"), lambda ctx: {}),
+            PresenterSpec("area_map", AREA_MAP_SCHEMA_VERSION, ("x", "x"), lambda ctx: {}),
             PresenterSpec("world_map", 2, ("x", "x"), lambda ctx: {}, on_demand=True),
         ):
             with self.subTest(spec=spec.name), self.assertRaises(ProtocolValidationError):

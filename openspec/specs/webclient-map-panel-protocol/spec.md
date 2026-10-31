@@ -6,7 +6,7 @@ Define the exact on-demand area/world panel wire models and bounded atomic deliv
 ## Requirements
 
 ### Requirement: Map panels use exact layer and precision discriminators
-Area and world map logical payloads SHALL use versioned exact-field schemas with distinct metric grid, coordinate-free room graph and wilderness forms. Each area SHALL identify its stable map and coordinate frame. Local destinations SHALL be node identities; remote area destinations SHALL be bearing/distance. World unlit districts SHALL expose only opaque identity/outline and approximate quest rows SHALL carry only 50km-rounded positions.
+Map panels SHALL use exact versioned layer schemas; wilderness area schema2 carries bounded RLE terrain, current sight and approximate sightings, while metric/coordinate-free graph layers and world-map precision retain their existing contracts.
 
 #### Scenario: Coordinate frames are not interchangeable
 - **WHEN** a player crosses from settlement to wilderness or enters another interior

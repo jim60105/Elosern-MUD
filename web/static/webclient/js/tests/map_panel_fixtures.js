@@ -32,7 +32,7 @@ function gridNode(x, y, overrides) {
 function gridArea(overrides) {
   return Object.assign(
     {
-      schema_version: 1,
+      schema_version: 2,
       available: true,
       layer: "grid",
       map_id: MAP,
@@ -73,7 +73,7 @@ function gridArea(overrides) {
 function interiorArea(overrides) {
   return Object.assign(
     {
-      schema_version: 1,
+      schema_version: 2,
       available: true,
       layer: "interior",
       map_id: "room:40",
@@ -91,43 +91,94 @@ function interiorArea(overrides) {
   );
 }
 
-// A full 15 x 15 wilderness window (225 nodes, 8-neighbour edges): its edge
-// list exceeds the 320-item frame ceiling, so it always travels in parts.
-function wildernessArea(overrides) {
-  const nodes = [];
-  const edges = [];
-  const origin = 100;
-  for (let dy = 0; dy < 15; dy++) {
-    for (let dx = 0; dx < 15; dx++) {
-      const current = dx === 7 && dy === 7;
-      nodes.push({
-        id: `wild:elosern:${origin + dx}:${origin + dy}`,
-        label: current ? "合成曠野中心" : `曠野${dx}-${dy}`,
-        x: origin + dx + 0.5,
-        y: origin + dy + 0.5,
-        visibility: current ? "current" : dx % 3 === 0 ? "visited" : "seen",
-        visited: current || dx % 3 === 0,
-        gateway: null,
-        action: null,
-      });
-      if (dx > 0) edges.push({ source: `wild:elosern:${origin + dx - 1}:${origin + dy}`, destination: `wild:elosern:${origin + dx}:${origin + dy}` });
-      if (dy > 0) edges.push({ source: `wild:elosern:${origin + dx}:${origin + dy - 1}`, destination: `wild:elosern:${origin + dx}:${origin + dy}` });
+// A schema-2 wilderness window (41 x 41, wilderness-area-map-reveal) around
+// cell (120, 120): a revealed disc of radius 6 drawn as merged terrain runs
+// (a west ridge, a river with a ford, woodland in the north), unknown runs
+// everywhere else, a short visited trail with one node per visit, the eight
+// actionable neighbours, two hostile entities inside the radius-4 ground
+// sight and one distant sighting. Its encoded body exceeds one part.
+const WILD_C = 120;
+const WILD_MIN = WILD_C - 20;
+function wildTerrainAt(x, y) {
+  const dx = x - WILD_C;
+  const dy = y - WILD_C;
+  if (dx * dx + dy * dy > 6.5 * 6.5) return null;
+  if (dx === -5) return { terrain: "ridge", passable: false, band: 9, tier: 2, road: false, ford: false };
+  if (dx === 3) return dy === 0
+    ? { terrain: "open_ground", passable: true, band: 2, tier: 0, road: false, ford: true }
+    : { terrain: "water", passable: false, band: 1, tier: 0, road: false, ford: false };
+  if (dy >= 3) return { terrain: "woodland", passable: true, band: 4, tier: 0, road: false, ford: false };
+  return { terrain: "open_ground", passable: true, band: 3 + (dx > 0 ? 1 : 0), tier: 0, road: false, ford: false };
+}
+function wildRowsFor(terrainAt) {
+  const rows = [];
+  for (let row = 0; row < 41; row++) {
+    const runs = [];
+    for (let col = 0; col < 41; col++) {
+      const facts = terrainAt(WILD_MIN + col, WILD_MIN + row);
+      const run = facts ? Object.assign({ length: 1, kind: "terrain" }, facts) : { length: 1, kind: "unknown" };
+      const last = runs[runs.length - 1];
+      const same = last && JSON.stringify(Object.assign({}, last, { length: 0 })) === JSON.stringify(Object.assign({}, run, { length: 0 }));
+      if (same) last.length += 1;
+      else runs.push(run);
     }
+    rows.push(runs);
   }
+  return rows;
+}
+function wildNode(x, y, overrides) {
   return Object.assign(
     {
-      schema_version: 1,
+      id: `wild:elosern:${x}:${y}`,
+      label: "合成曠野",
+      x: x + 0.5,
+      y: y + 0.5,
+      visibility: "seen",
+      visited: false,
+      gateway: null,
+      action: null,
+    },
+    overrides || {}
+  );
+}
+function wildernessArea(overrides) {
+  const current = `wild:elosern:${WILD_C}:${WILD_C}`;
+  const nodes = [wildNode(WILD_C, WILD_C, { label: "合成曠野中心", visibility: "current", visited: true })];
+  for (const [x, y] of [[119, 119], [118, 118], [117, 118], [116, 117]]) {
+    nodes.push(wildNode(x, y, { visibility: "visited", visited: true }));
+  }
+  const edges = [];
+  for (const [dx, dy, ref] of [[0, 1, "n"], [1, 1, "ne"], [1, 0, "e"], [1, -1, "se"], [0, -1, "s"], [-1, 0, "w"], [-1, 1, "nw"]]) {
+    const id = `wild:elosern:${WILD_C + dx}:${WILD_C + dy}`;
+    nodes.push(wildNode(WILD_C + dx, WILD_C + dy, { action: { kind: "move", exit_ref: ref, destination: id } }));
+    edges.push({ source: current, destination: id });
+  }
+  const sw = nodes.find((node) => node.id === "wild:elosern:119:119");
+  sw.action = { kind: "move", exit_ref: "sw", destination: sw.id };
+  edges.push({ source: current, destination: sw.id });
+  return Object.assign(
+    {
+      schema_version: 2,
       available: true,
       layer: "wilderness",
       map_id: "elosern",
       frame: { key: "elosern", unit: "km" },
-      current_node: `wild:elosern:${origin + 7}:${origin + 7}`,
+      current_node: current,
       title: "合成曠野",
       nodes,
       edges,
       quest_markers: [],
       district_name: "合成地區",
       cell_km: 1,
+      window: { min_x: WILD_MIN, min_y: WILD_MIN, width: 41, height: 41 },
+      rows: wildRowsFor(wildTerrainAt),
+      light_phase: "day",
+      ground_radius: 4,
+      entities: [
+        { id: "0123456789abcdef", cell: { x: 122, y: 121 }, kind: "hostile", hostile: true, label: "合成野狼" },
+        { id: "fedcba9876543210", cell: { x: 118, y: 122 }, kind: "npc", hostile: false, label: "合成旅人" },
+      ],
+      sightings: [{ bearing: "北北東", distance_km: 25, silhouette_zh: "一座合成石塔", name: null }],
     },
     overrides || {}
   );
@@ -269,6 +320,10 @@ module.exports = {
   gridArea,
   interiorArea,
   wildernessArea,
+  wildNode,
+  wildRowsFor,
+  WILD_C,
+  WILD_MIN,
   worldMap,
   largeWorldMap,
   worldMapOfBytes,

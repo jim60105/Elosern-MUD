@@ -1,12 +1,17 @@
 <script setup>
 // The area tab's map (OpenSpec change render-area-map-view; approved design
 // docs/superpowers/specs/2026-10-22-world-map-drawer-design.md §6.2-§6.5).
-// It draws one validated `area_map` v1 body and nothing else:
+// It draws one validated `area_map` v2 body and nothing else:
 //   - grid: the settlement's metre coordinates at one uniform scale under
 //     pan and zoom (@elosern/map-view), with no compressed mode;
 //   - instance / interior: coordinate-free rooms on the minimap's radial
 //     placement (no metric position is ever fabricated);
-//   - wilderness: the provider's 15 x 15 cell window and current district.
+//   - wilderness: the server's 41 x 41 window (wilderness-area-map-reveal):
+//     revealed terrain decoded from the run-length rows (remembered cells
+//     without a visit drawn dimmer than walked ones), the unknown remainder
+//     as fog, the live-sight ring of the server's radius, live-sight
+//     entities, distant sightings pinned to the frame rim, and the sparse
+//     nodes (current, visits, steps, gates) over the terrain.
 // Metric views carry a scale-true dot field (dots on round world multiples)
 // and a scale caption that share one formatter, so both always state the
 // same real distance. Fog is the server's: only payload nodes and roads are
@@ -62,6 +67,8 @@ import {
   areaDotField,
   areaStops,
   areaUnit,
+  decodeWindow,
+  entityMarks,
   isRadialLayer,
   labelCandidates,
   leadsToOf,
@@ -69,6 +76,8 @@ import {
   nodeDetail,
   openingView,
   placeNodes,
+  sightCaption,
+  sightingMarks,
   travelAction,
   viewSignature,
   wholeView,
@@ -339,6 +348,103 @@ const edgeDraws = computed(() => {
       };
     })
     .filter(Boolean);
+});
+
+// ── the wilderness window ───────────────────────────────────────────────
+
+function screenRect(col, row) {
+  return cellRect(view.value, frame.value, col, row);
+}
+
+// One cell's side in screen pixels at the current view.
+const cellPx = computed(() => {
+  if (!isWild.value) return 0;
+  const r = screenRect(0, 0);
+  return Math.abs(r.right - r.left);
+});
+
+const windowDraw = computed(() => {
+  if (!isWild.value) return null;
+  const { min_x: x, min_y: y, width, height } = props.area.window;
+  const sw = screenRect(x, y);
+  const ne = screenRect(x + width - 1, y + height - 1);
+  return { x: sw.left, y: ne.top, width: ne.right - sw.left, height: sw.bottom - ne.top };
+});
+
+// Revealed cells only (unknown runs draw nothing over the fog), culled to the
+// frame. Relief: a higher band reads lighter; a remembered cell (revealed,
+// never walked) keeps its terrain but sits back behind a dimmer wash.
+const terrainDraws = computed(() => {
+  if (!isWild.value) return [];
+  const { width, height } = frame.value;
+  const out = [];
+  for (const cell of decodeWindow(props.area)) {
+    const r = screenRect(cell.x, cell.y);
+    if (r.right < 0 || r.left > width || r.bottom < 0 || r.top > height) continue;
+    const relief = cell.band / 15;
+    out.push({
+      key: cell.key,
+      cell,
+      x: r.left,
+      y: r.top,
+      width: Math.max(0.5, r.right - r.left),
+      height: Math.max(0.5, r.bottom - r.top),
+      opacity: cell.state === "remembered" ? 0.5 + relief * 0.3 : 0.78 + relief * 0.22,
+    });
+  }
+  return out;
+});
+
+const markReliefs = computed(() => cellPx.value >= 12);
+
+const sightRing = computed(() => {
+  if (!isWild.value) return null;
+  const here = placedById.value.get(props.area.current_node);
+  if (!here) return null;
+  const p = project(view.value, frame.value, here);
+  return { cx: p.x, cy: p.y, r: (props.area.ground_radius + 0.5) * cellPx.value };
+});
+
+const entityDraws = computed(() => {
+  if (!isWild.value) return [];
+  const size = Math.max(4, Math.min(13 * uiScale.value, cellPx.value * 0.24));
+  return entityMarks(props.area).map((mark) => ({ ...mark, p: project(view.value, frame.value, mark), size }));
+});
+
+const hostileCount = computed(() => entityDraws.value.filter((mark) => mark.hostile).length);
+const sightLine = computed(() => sightCaption(props.area));
+
+// Distant sightings sit on the usable frame's rim along their compass bearing
+// from the current cell, so the player reads "something stands that way"
+// without a fabricated position.
+const SIGHTING_INSET_PX = 40;
+const sightingDraws = computed(() => {
+  if (!isWild.value) return [];
+  const here = placedById.value.get(props.area.current_node);
+  if (!here) return [];
+  const origin = project(view.value, frame.value, here);
+  const inset = SIGHTING_INSET_PX * uiScale.value;
+  const r = usable.value;
+  const box = { left: r.left + inset, right: r.right - inset, top: r.top + inset, bottom: r.bottom - inset * 2.2 };
+  return sightingMarks(props.area).map((mark) => {
+    const dx = Math.sin(mark.angle);
+    const dy = -Math.cos(mark.angle);
+    const ox = Math.min(Math.max(origin.x, box.left), box.right);
+    const oy = Math.min(Math.max(origin.y, box.top), box.bottom);
+    const reach = [
+      dx > 1e-9 ? (box.right - ox) / dx : Infinity,
+      dx < -1e-9 ? (box.left - ox) / dx : Infinity,
+      dy > 1e-9 ? (box.bottom - oy) / dy : Infinity,
+      dy < -1e-9 ? (box.top - oy) / dy : Infinity,
+    ];
+    const t = Math.max(0, Math.min(...reach));
+    const x = ox + dx * t;
+    const y = oy + dy * t;
+    const anchor = dx > 0.35 ? "end" : dx < -0.35 ? "start" : "middle";
+    const textX = x - dx * 18 * uiScale.value + (anchor === "end" ? -6 : anchor === "start" ? 6 : 0);
+    const textY = dy > 0.35 ? y - 30 * uiScale.value : y + 24 * uiScale.value;
+    return { ...mark, x, y, deg: (mark.angle * 180) / Math.PI, anchor, textX, textY };
+  });
 });
 
 const dots = computed(() => areaDotField(props.area, view.value, frame.value, DOT_MIN_GAP_PX * uiScale.value));
@@ -716,6 +822,13 @@ onBeforeUnmount(() => {
           >
             <circle class="area-map__dot" :cx="dots.spacingPx / 2" :cy="dots.spacingPx / 2" r="1.35" />
           </pattern>
+          <pattern :id="`${uid}-fog`" patternUnits="userSpaceOnUse" width="9" height="9" patternTransform="rotate(35)">
+            <rect class="area-map__fog-wash" width="9" height="9" />
+            <line class="area-map__fog-line" x1="0" y1="0" x2="0" y2="9" />
+          </pattern>
+          <pattern :id="`${uid}-hatch`" patternUnits="userSpaceOnUse" width="5" height="5" patternTransform="rotate(-45)">
+            <line class="area-map__hatch-line" x1="0" y1="0" x2="0" y2="5" />
+          </pattern>
           <radialGradient :id="`${uid}-vignette`" cx="50%" cy="48%" r="75%">
             <stop offset="0.55" stop-color="#0a0908" stop-opacity="0" />
             <stop offset="1" stop-color="#0a0908" stop-opacity="0.62" />
@@ -735,6 +848,39 @@ onBeforeUnmount(() => {
           :fill="`url(#${uid}-dots)`"
           aria-hidden="true"
         />
+
+        <g v-if="windowDraw" class="area-map__window" aria-hidden="true" data-testid="area-map__window">
+          <!-- The unknown remainder of the window: an even fog wash. -->
+          <rect class="area-map__fog" :x="windowDraw.x" :y="windowDraw.y" :width="windowDraw.width" :height="windowDraw.height" :fill="`url(#${uid}-fog)`" />
+          <rect
+            v-for="cell in terrainDraws"
+            :key="cell.key"
+            class="area-map__terrain"
+            :class="[`t-${cell.cell.terrain}`, `is-${cell.cell.state}`, { 'is-blocked': !cell.cell.passable }]"
+            data-testid="area-map__terrain"
+            :data-cell="cell.key"
+            :data-terrain="cell.cell.terrain"
+            :x="cell.x"
+            :y="cell.y"
+            :width="cell.width"
+            :height="cell.height"
+            :fill-opacity="cell.opacity"
+          />
+          <template v-if="markReliefs">
+            <template v-for="cell in terrainDraws" :key="`m-${cell.key}`">
+              <rect v-if="cell.cell.terrain === 'ridge' || cell.cell.terrain === 'settlement'" class="area-map__hatch" :x="cell.x" :y="cell.y" :width="cell.width" :height="cell.height" :fill="`url(#${uid}-hatch)`" />
+              <path
+                v-else-if="cell.cell.tier >= 2"
+                class="area-map__relief"
+                :class="`is-tier-${cell.cell.tier}`"
+                :d="`M${cell.x + cell.width * 0.3} ${cell.y + cell.height * 0.66} L${cell.x + cell.width * 0.5} ${cell.y + cell.height * 0.36} L${cell.x + cell.width * 0.7} ${cell.y + cell.height * 0.66}`"
+              />
+              <line v-if="cell.cell.ford" class="area-map__ford" :x1="cell.x + cell.width * 0.15" :y1="cell.y + cell.height * 0.5" :x2="cell.x + cell.width * 0.85" :y2="cell.y + cell.height * 0.5" />
+            </template>
+          </template>
+          <rect class="area-map__window-frame" :x="windowDraw.x" :y="windowDraw.y" :width="windowDraw.width" :height="windowDraw.height" />
+          <circle v-if="sightRing" class="area-map__sight-ring" data-testid="area-map__sight-ring" :cx="sightRing.cx" :cy="sightRing.cy" :r="sightRing.r" />
+        </g>
 
         <g class="area-map__roads" aria-hidden="true">
           <g v-for="edge in edgeDraws" :key="edge.key" class="area-map__road" :class="{ 'is-walked': edge.walked, 'is-frontier': !edge.walked, 'is-travel': edge.travel }">
@@ -775,6 +921,13 @@ onBeforeUnmount(() => {
                    the here-seal or the gate arch (MapNodeGlyph), and the
                    commission diamond, moved to the cell's corner beside
                    either of them. The cell rect itself states travel. -->
+              <circle
+                v-if="node.visibility === 'visited' && !node.gate && !node.quest"
+                class="area-map__trail"
+                :cx="node.x"
+                :cy="node.y"
+                :r="Math.max(1.6, Math.min(4.5, node.cell.width * 0.08))"
+              />
               <g v-if="node.visibility === 'current' || node.gate || node.quest" :transform="`translate(${node.x} ${node.y})`">
                 <MapNodeGlyph
                   v-if="node.visibility === 'current' || node.gate"
@@ -796,6 +949,23 @@ onBeforeUnmount(() => {
                 <MapCommissionGlyph />
               </g>
             </g>
+          </g>
+        </g>
+
+        <g v-if="entityDraws.length" class="area-map__entities" aria-hidden="true">
+          <g
+            v-for="mark in entityDraws"
+            :key="mark.id"
+            class="area-map__entity"
+            :class="`is-${mark.kind}`"
+            data-testid="area-map__entity"
+            :data-kind="mark.kind"
+            :transform="`translate(${mark.p.x} ${mark.p.y})`"
+          >
+            <title>{{ mark.label }}</title>
+            <path v-if="mark.hostile" class="area-map__entity-mark" :d="`M0 ${-mark.size} L${mark.size * 0.8} 0 L0 ${mark.size} L${-mark.size * 0.8} 0 Z`" />
+            <circle v-else class="area-map__entity-mark" :r="mark.size * 0.72" />
+            <circle v-if="mark.hostile" class="area-map__entity-core" :r="mark.size * 0.26" />
           </g>
         </g>
 
@@ -822,10 +992,29 @@ onBeforeUnmount(() => {
         </g>
 
         <rect class="area-map__vignette" x="0" y="0" :width="frame.width" :height="frame.height" :fill="`url(#${uid}-vignette)`" aria-hidden="true" />
+
+        <g v-if="sightingDraws.length" class="area-map__sightings" aria-hidden="true">
+          <g v-for="mark in sightingDraws" :key="mark.key" class="area-map__sighting" data-testid="area-map__sighting" :data-bearing="mark.bearing">
+            <g :transform="`translate(${mark.x} ${mark.y}) rotate(${mark.deg}) scale(${1.3 * uiScale})`">
+              <path class="area-map__sighting-arrow" d="M0 -11 L7 4 L0 0 L-7 4 Z" />
+            </g>
+            <text class="area-map__sighting-text" :x="mark.textX" :y="mark.textY" :text-anchor="mark.anchor">
+              <tspan :x="mark.textX" class="area-map__sighting-head">{{ mark.head }}</tspan>
+              <tspan :x="mark.textX" :dy="fontPx * 1.25">{{ mark.body }}</tspan>
+            </text>
+          </g>
+        </g>
       </svg>
 
       <div class="area-map__legend" data-testid="area-map__legend">
         <p v-if="isWild" class="area-map__district" data-testid="area-map__district">{{ area.district_name }}</p>
+        <p v-if="isWild" class="area-map__sight" data-testid="area-map__sight">
+          <span>{{ sightLine }}</span>
+          <span v-if="hostileCount" class="area-map__threat" data-testid="area-map__threat">
+            <svg viewBox="-6 -8 12 16" width="10" height="13" aria-hidden="true"><path d="M0 -7 L5 0 L0 7 L-5 0 Z" /></svg>
+            視野內敵蹤 {{ hostileCount }}
+          </span>
+        </p>
         <div class="area-map__scale-row">
           <span class="area-map__north" aria-label="上方為北">
             <svg viewBox="0 0 14 18" width="14" height="18" aria-hidden="true"><path d="M7 0 L13 16 L7 12 L1 16 Z" /></svg>
@@ -847,6 +1036,10 @@ onBeforeUnmount(() => {
       </slot>
     </div>
     <p class="area-map__live" aria-live="polite" data-testid="area-map__live">{{ announcement }}</p>
+    <ul v-if="isWild && (entityDraws.length || sightingDraws.length)" class="area-map__live" data-testid="area-map__sr-sight">
+      <li v-for="mark in entityDraws" :key="`sr-${mark.id}`">{{ mark.hostile ? "敵對" : "人物" }}：{{ mark.label }}</li>
+      <li v-for="mark in sightingDraws" :key="`sr-${mark.key}`">遠方：{{ mark.head }}，{{ mark.body }}</li>
+    </ul>
   </div>
 </template>
 
@@ -906,13 +1099,68 @@ onBeforeUnmount(() => {
   stroke-dasharray: none;
 }
 
-/* wilderness cells */
-.area-map__cell { fill: rgba(42, 40, 35, 0.5); stroke: rgba(148, 139, 123, 0.28); stroke-width: 1; }
-.area-map__node.is-visited .area-map__cell { fill: rgba(185, 154, 96, 0.3); stroke: rgba(185, 154, 96, 0.55); }
-.area-map__node.is-current .area-map__cell { fill: rgba(165, 44, 49, 0.2); stroke: var(--seal-400); stroke-width: 1.5; }
-.area-map__node.is-travel .area-map__cell { stroke: var(--gold-500); stroke-width: 1.4; stroke-dasharray: 4 3; }
-.area-map__node.is-gate .area-map__cell { fill: rgba(58, 52, 42, 0.8); }
+/* wilderness window: ink washes over vellum. Terrain hues are muted earth
+   tones keyed to the obsidian palette; relief rides the fill opacity. */
+.area-map {
+  --terrain-open-ground: #7a6d4c;
+  --terrain-hills: #8a7243;
+  --terrain-mountain: #6d6862;
+  --terrain-woodland: #45573f;
+  --terrain-water: #3c5a6e;
+  --terrain-sea: #263a49;
+  --terrain-ridge: #4a443d;
+  --terrain-settlement: #8e7d5a;
+}
+.area-map__fog-wash { fill: #0e0d0b; fill-opacity: 0.55; }
+.area-map__fog-line { stroke: var(--paper-700); stroke-opacity: 0.3; stroke-width: 1; }
+.area-map__window-frame { fill: none; stroke: var(--gold-600); stroke-opacity: 0.55; stroke-width: 1; }
+.area-map__terrain { stroke: #0c0b09; stroke-opacity: 0.18; stroke-width: 0.6; }
+.area-map__terrain.t-open_ground { fill: var(--terrain-open-ground); }
+.area-map__terrain.t-hills { fill: var(--terrain-hills); }
+.area-map__terrain.t-mountain { fill: var(--terrain-mountain); }
+.area-map__terrain.t-woodland { fill: var(--terrain-woodland); }
+.area-map__terrain.t-water { fill: var(--terrain-water); }
+.area-map__terrain.t-sea { fill: var(--terrain-sea); }
+.area-map__terrain.t-ridge { fill: var(--terrain-ridge); }
+.area-map__terrain.t-settlement { fill: var(--terrain-settlement); }
+.area-map__hatch { pointer-events: none; }
+.area-map__hatch-line { stroke: #0c0b09; stroke-opacity: 0.55; stroke-width: 1.4; }
+.area-map__relief { fill: none; stroke: var(--paper-100); stroke-opacity: 0.38; stroke-width: 1.2; stroke-linejoin: round; }
+.area-map__relief.is-tier-3 { stroke-opacity: 0.6; }
+.area-map__ford { stroke: var(--paper-200); stroke-opacity: 0.75; stroke-width: 1.6; stroke-dasharray: 2 2.5; }
+.area-map__sight-ring { fill: var(--gold-400); fill-opacity: 0.05; stroke: var(--gold-400); stroke-opacity: 0.7; stroke-width: 1.4; stroke-dasharray: 5 4; pointer-events: none; }
+
+/* wilderness node cells: the terrain is drawn below; a cell only states its
+   node role (walked trail mark, travel, gate, selection) */
+.area-map__cell { fill: transparent; stroke: none; }
+.area-map__trail { fill: var(--gold-400); fill-opacity: 0.85; stroke: #14120e; stroke-width: 0.8; pointer-events: none; }
+.area-map__node.is-current .area-map__cell { stroke: var(--seal-400); stroke-width: 1.5; }
+.area-map__node.is-travel .area-map__cell { stroke: var(--gold-400); stroke-width: 1.4; stroke-dasharray: 4 3; }
 .area-map__node.is-selected .area-map__cell { stroke: var(--gold-300); stroke-width: 2.4; stroke-dasharray: none; }
+
+/* live-sight entities: a sealed diamond for a hostile, a paper token for
+   a person (shape and colour both differ) */
+.area-map__entity { pointer-events: none; }
+.area-map__entity-mark { stroke: #14120e; stroke-width: 1.2; }
+.area-map__entity.is-hostile .area-map__entity-mark { fill: var(--seal-500); }
+.area-map__entity-core { fill: var(--paper-50); }
+.area-map__entity.is-npc .area-map__entity-mark { fill: var(--paper-200); }
+.area-map__entity.is-character .area-map__entity-mark { fill: var(--gold-400); }
+
+/* distant sightings on the frame rim */
+.area-map__sighting { pointer-events: none; }
+.area-map__sighting-arrow { fill: var(--gold-400); stroke: #14120e; stroke-width: 1.2; stroke-linejoin: round; }
+.area-map__sighting-text {
+  fill: var(--paper-200);
+  font-family: var(--f-sans);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  paint-order: stroke;
+  stroke: #14120e;
+  stroke-width: 4.5px;
+  stroke-linejoin: round;
+}
+.area-map__sighting-head { fill: var(--gold-400); font-family: var(--f-display); }
 
 /* labels: 16 CSS px at ui-scale 1, never smaller; a soot halo keeps them
    legible over roads and dots */
@@ -953,6 +1201,17 @@ onBeforeUnmount(() => {
   font-size: var(--text-md);
   letter-spacing: 0.16em;
 }
+.area-map__sight {
+  display: flex;
+  align-items: center;
+  gap: calc(12px * var(--ui-scale));
+  margin: 0;
+  color: var(--paper-300);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+.area-map__threat { display: inline-flex; align-items: center; gap: calc(5px * var(--ui-scale)); color: var(--seal-400); }
+.area-map__threat path { fill: var(--seal-500); stroke: #14120e; stroke-width: 1; }
 .area-map__scale-row {
   display: flex;
   align-items: center;
