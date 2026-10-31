@@ -89,7 +89,12 @@ const rows = computed(() =>
   margin: 0;
   padding: calc(12px * var(--ui-scale)) calc(12px * var(--ui-scale)) calc(10px * var(--ui-scale));
   list-style: none;
-  background: radial-gradient(130% 150% at 18% 100%, rgba(11, 13, 16, 0.86), rgba(11, 13, 16, 0) 74%);
+  /* Dense where the faces stand, thinning towards the top and right edge,
+     so map chips passing under the strip never compete with a name. */
+  background: radial-gradient(150% 170% at 22% 100%, rgba(11, 13, 16, 0.95), rgba(11, 13, 16, 0.72) 52%, rgba(11, 13, 16, 0) 86%);
+  backdrop-filter: blur(3px);
+  -webkit-mask-image: radial-gradient(135% 150% at 24% 100%, #000 62%, transparent 98%);
+  mask-image: radial-gradient(135% 150% at 24% 100%, #000 62%, transparent 98%);
 }
 .party-medallion {
   display: grid;

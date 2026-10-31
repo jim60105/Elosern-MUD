@@ -88,9 +88,15 @@ const viewKey = computed(() => (props.area ? `${props.area.map_id}|${props.area.
   height: 100%;
   pointer-events: none;
 }
+/* The drawn view spans the open stage between the top band and the bottom
+   band, so its opening fit centres the party where the player looks; the
+   ink and fog above stay full-bleed behind both bands. */
 .travel-map__view {
   position: absolute;
-  inset: 0;
+  top: var(--header-h);
+  right: 0;
+  bottom: var(--band-h);
+  left: 0;
   transition:
     opacity var(--motion-base) var(--ease-standard),
     filter var(--motion-base) var(--ease-standard);
