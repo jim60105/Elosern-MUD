@@ -35,12 +35,12 @@ For a grid, instance or interior map, area_map SHALL include every visited node 
 - **WHEN** a registered grid/wilderness gateway appears
 - **THEN** gateway is null or exactly the validated leads_to object from add-local-map-gateway-metadata, and opaque action identity remains authoritative
 
-### Requirement: Wilderness area maps cover a fifteen-cell neighbourhood
-Wilderness area_map SHALL cover the 15 by 15 cell neighbourhood centred on the player with visited flags and the current district display name. Its eight legal neighbouring steps SHALL carry the existing canonical movement descriptors; invalid sea, blocked terrain and replaced gateway cells SHALL never become fabricated walkable nodes.
+### Requirement: Wilderness area maps cover a revealed forty-one-cell neighbourhood
+Wilderness area_map SHALL cover the centred41-by-41 window using permanent ground reveal and exact unknown runs; only legal revealed neighbouring steps carry canonical movement descriptors and invalid/replaced cells never become fabricated walkable nodes.
 
 #### Scenario: Neighbourhood is bounded around the current cell
 - **WHEN** the player opens area scope in wilderness
-- **THEN** the coordinate window is current minus seven through current plus seven in each axis, clipped to valid geography, visits are identified and only legal immediate steps are actionable
+- **THEN** the coordinate window is current minus twenty through current plus twenty in each axis, with out-of-frame cells unknown, actual visits distinguished from reveal, and only legal revealed immediate steps actionable
 
 ### Requirement: Area commission markers distinguish same-map identity from elsewhere
 Accepted commission markers SHALL carry a canonical node identity when the destination is on this area map and bearing/distance for destinations elsewhere. A uniquely registered ordinary interior or its instance origin SHALL supply its canonical enclosing anchor cell for external bearings. Resolving markers SHALL not reveal unvisited room topology or invent coordinates for coordinate-free rooms.

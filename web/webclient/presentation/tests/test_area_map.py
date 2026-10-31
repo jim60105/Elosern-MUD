@@ -705,7 +705,7 @@ class WildernessAreaTests(EvenniaTest):
         return (ex + 10, ey + 5)
 
     @covers_requirement(
-        "webclient-area-map::wilderness-area-maps-cover-a-fifteen-cell-neighbourhood"
+        "webclient-area-map::wilderness-area-maps-cover-a-revealed-forty-one-cell-neighbourhood"
     )
     def test_window_is_centred_run_length_encoded_and_flags_visits(self):
         start = self._away()
@@ -750,7 +750,7 @@ class WildernessAreaTests(EvenniaTest):
         self.assertTrue(_js_accepts(payload))
 
     @covers_requirement(
-        "webclient-area-map::wilderness-area-maps-cover-a-fifteen-cell-neighbourhood"
+        "webclient-area-map::wilderness-area-maps-cover-a-revealed-forty-one-cell-neighbourhood"
     )
     def test_only_legal_revealed_immediate_steps_are_actionable(self):
         start = self._away()
@@ -779,7 +779,7 @@ class WildernessAreaTests(EvenniaTest):
         self.assertTrue(_js_accepts(payload))
 
     @covers_requirement(
-        "webclient-area-map::wilderness-area-maps-cover-a-fifteen-cell-neighbourhood"
+        "webclient-area-map::wilderness-area-maps-cover-a-revealed-forty-one-cell-neighbourhood"
     )
     @covers_requirement(
         "webclient-area-map::area-maps-reveal-visited-nodes-and-one-step-frontier-across-all-layers"
@@ -810,7 +810,7 @@ class WildernessAreaTests(EvenniaTest):
         self.assertTrue(_js_accepts(payload))
 
     @covers_requirement(
-        "webclient-area-map::wilderness-area-maps-cover-a-fifteen-cell-neighbourhood"
+        "wilderness-area-map-reveal::wilderness-runs-disclose-only-revealed-terrain"
     )
     def test_visited_cell_has_its_own_node_and_reveal_only_cell_has_none(self):
         start = self._away()
@@ -844,7 +844,7 @@ class WildernessAreaTests(EvenniaTest):
         self.assertTrue(_js_accepts(payload))
 
     @covers_requirement(
-        "webclient-area-map::wilderness-area-maps-cover-a-fifteen-cell-neighbourhood"
+        "wilderness-area-map-reveal::wilderness-runs-disclose-only-revealed-terrain"
     )
     def test_anti_peek_across_every_payload_branch(self):
         start = self._away()
@@ -906,6 +906,9 @@ class WildernessAreaTests(EvenniaTest):
     @covers_requirement(
         "wilderness-map-disclosure::all-wilderness-map-publishers-enforce-reveal-boundaries"
     )
+    @covers_requirement(
+        "wilderness-area-map-reveal::wilderness-runs-disclose-only-revealed-terrain"
+    )
     def test_hidden_entry_identity_requires_an_actual_visit(self):
         from world.maps.static_references import settlement_node_xyz
 
@@ -930,7 +933,7 @@ class WildernessAreaTests(EvenniaTest):
         self.assertTrue(_js_accepts(payload))
 
     @covers_requirement(
-        "webclient-area-map::wilderness-area-maps-cover-a-fifteen-cell-neighbourhood"
+        "wilderness-area-map-reveal::existing-maps-consume-bounded-atomic-reveal-payloads"
     )
     def test_oversized_collections_become_unavailable_without_truncation(self):
         start = self._away()
@@ -953,6 +956,9 @@ class WildernessAreaTests(EvenniaTest):
 
     @covers_requirement(
         "webclient-area-map::map-view-requests-publish-the-requested-area-without-changing-gameplay"
+    )
+    @covers_requirement(
+        "wilderness-area-map-reveal::existing-maps-consume-bounded-atomic-reveal-payloads"
     )
     def test_the_window_reads_only_its_own_chunks_and_writes_nothing(self):
         from world.rules import map_knowledge
@@ -1000,9 +1006,6 @@ class WildernessAreaTests(EvenniaTest):
         self.assertEqual(decode_map_parts("area_map", parts), payload)
 
     @unittest.skipUnless(os.environ.get("MUD_AREA_MAP_BENCHMARK") == "1", "timing benchmark: set MUD_AREA_MAP_BENCHMARK=1")
-    @covers_requirement(
-        "webclient-area-map::wilderness-area-maps-cover-a-fifteen-cell-neighbourhood"
-    )
     def test_warmed_window_with_twenty_thousand_visits_is_within_fifty_ms(self):
         start = self._away()
         self._at_wild(start)
@@ -1336,7 +1339,7 @@ class AreaMapNodeEvidenceTests(unittest.TestCase):
         "webclient-area-map::area-maps-reveal-visited-nodes-and-one-step-frontier-across-all-layers"
     )
     @covers_requirement(
-        "webclient-area-map::wilderness-area-maps-cover-a-fifteen-cell-neighbourhood"
+        "wilderness-area-map-reveal::wilderness-runs-disclose-only-revealed-terrain"
     )
     def test_browser_area_map_validator_suite_passes(self):
         result = subprocess.run(
