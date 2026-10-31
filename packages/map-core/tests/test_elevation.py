@@ -40,7 +40,6 @@ from elosern_map_core.terrain import (
     region_for_coordinates,
     ridge_center_x,
 )
-from tools.spec_traceability import covers_requirement
 
 
 _FRAME = 64
@@ -528,10 +527,6 @@ def test_river_clamp_with_diagonal_only_banks():
             assert result.bands[y, x] <= min_bank
 
 
-@covers_requirement(
-    "wilderness-elevation-runtime::"
-    "elevation-artifacts-are-bounded-and-source-identified"
-)
 def test_default_config_matches_codec_mirror_and_digest():
     raw = asdict(DEFAULT_ELEVATION_CONFIG)
     if isinstance(raw.get("prominence_thresholds"), tuple):

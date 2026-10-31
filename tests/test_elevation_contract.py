@@ -5,22 +5,43 @@ namespace blocked, proves repeat-byte determinism and the sea/band/tier
 postconditions on a synthetic frame, and proves that importing the package's
 runtime surface never pulls the generator or NumPy/SciPy.
 
+The publication contract drives the repository's own regeneration entry point
+(``.agents/skills/map-data-authoring/scripts/regenerate_elevation.py``) over a
+synthetic authored world: the published artifact stays within the byte budget,
+its fingerprint moves with the geography, the configuration and the algorithm
+version, and a refusal never replaces prior bytes nor leaves a temporary
+behind.
+
 The requirement annotation targets the canonical requirement synced from the
 wilderness-elevation-generation delta spec.
 """
 
 from __future__ import annotations
 
+import contextlib
+import io
+import json
 import os
 import subprocess
 import sys
+import tempfile
 import textwrap
 import unittest
+from dataclasses import replace
 from pathlib import Path
+from unittest import mock
 
+from elosern_map_core.elevation import DEFAULT_ELEVATION_CONFIG
+from elosern_map_core.elevation_codec import (
+    ELEVATION_ALGORITHM_VERSION,
+    MAX_ELEVATION_BYTES,
+    read_elevation_metadata,
+)
 from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+PACKAGE_TESTS = REPO_ROOT / "packages" / "map-core" / "tests"
+AUTHORING_SCRIPTS = REPO_ROOT / ".agents" / "skills" / "map-data-authoring" / "scripts"
 
 _GENERATION_PROBE = textwrap.dedent(
     """
@@ -188,6 +209,179 @@ class RuntimeWithoutGenerationExtraTests(unittest.TestCase):
         result = _run_probe(_RUNTIME_PROBE)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), "[]")
+
+
+def _publisher_module():
+    """Import the repository's real elevation regeneration entry point."""
+    if str(AUTHORING_SCRIPTS) not in sys.path:
+        sys.path.insert(0, str(AUTHORING_SCRIPTS))
+    import regenerate_elevation
+
+    return regenerate_elevation
+
+
+def _synthetic_workspace(root: Path) -> None:
+    """Write a complete synthetic authored world under ``root``."""
+    if str(PACKAGE_TESTS) not in sys.path:
+        sys.path.insert(0, str(PACKAGE_TESTS))
+    import authoring_fixtures as fixtures
+
+    continent = fixtures.continent_data()
+    for region in continent["regions"].values():
+        # The game-adoption gate refuses a region without a scene archetype; the
+        # value is never resolved because no reference context exists here.
+        region["scene_archetype"] = "wilderness"
+    documents = {
+        "content/maps/continent.yaml": fixtures.yaml_text(continent),
+        "content/maps/locations.yaml": fixtures.yaml_text(fixtures.locations_data()),
+        "content/maps/districts.yaml": fixtures.yaml_text(fixtures.districts_data()),
+        "content/maps/settlements/demo_map.yaml": fixtures.yaml_text(
+            fixtures.settlement_data()
+        ),
+    }
+    for relative_path, text in documents.items():
+        path = root / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+
+
+class ElevationPublicationContractTests(unittest.TestCase):
+    """The publisher writes one bounded, source-identified artifact atomically."""
+
+    def _publish(self, publisher, root: Path) -> tuple[int, str]:
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            status = publisher.main(["regenerate_elevation.py", str(root)])
+        return status, output.getvalue()
+
+    def _metadata(self, target: Path):
+        return read_elevation_metadata(target.read_text(encoding="utf-8"))
+
+    def _temporary_artifacts(self, target: Path) -> list[str]:
+        """Leftover atomic-write temporaries beside the published artifact."""
+        return sorted(
+            path.name
+            for path in target.parent.iterdir()
+            if path.name.startswith(".wilderness_elevation.")
+        )
+
+    @covers_requirement(
+        "wilderness-elevation-runtime::"
+        "elevation-artifacts-are-bounded-and-source-identified"
+    )
+    def test_published_artifact_is_bounded_and_binds_every_declared_input(self):
+        publisher = _publisher_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            _synthetic_workspace(root)
+            target = root / publisher.ELEVATION_PATH
+
+            status, output = self._publish(publisher, root)
+            self.assertEqual(status, 0, output)
+            self.assertLessEqual(target.stat().st_size, MAX_ELEVATION_BYTES)
+            baseline = self._metadata(target)
+
+            continent = root / "content/maps/continent.yaml"
+            continent.write_text(
+                continent.read_text(encoding="utf-8") + "# authored edit\n",
+                encoding="utf-8",
+            )
+            status, output = self._publish(publisher, root)
+            self.assertEqual(status, 0, output)
+            moved_geography = self._metadata(target)
+            self.assertNotEqual(moved_geography.fingerprint, baseline.fingerprint)
+
+            # The seed is the only configuration difference from ``baseline``,
+            # so a fingerprint that ignored the configuration would match it.
+            with mock.patch.object(
+                publisher,
+                "DEFAULT_ELEVATION_CONFIG",
+                replace(DEFAULT_ELEVATION_CONFIG, seed=DEFAULT_ELEVATION_CONFIG.seed + 1),
+            ):
+                status, output = self._publish(publisher, root)
+            self.assertEqual(status, 0, output)
+            changed_config = self._metadata(target)
+            self.assertNotEqual(changed_config.fingerprint, moved_geography.fingerprint)
+
+            # The patch above ends, so this publish differs from
+            # ``moved_geography`` by the algorithm version alone.
+            with mock.patch.object(
+                publisher,
+                "ELEVATION_ALGORITHM_VERSION",
+                ELEVATION_ALGORITHM_VERSION + 1,
+            ):
+                status, output = self._publish(publisher, root)
+            self.assertEqual(status, 0, output)
+            changed_algorithm = self._metadata(target)
+            self.assertEqual(
+                changed_algorithm.algorithm_version, ELEVATION_ALGORITHM_VERSION + 1
+            )
+            self.assertNotEqual(
+                changed_algorithm.fingerprint, moved_geography.fingerprint
+            )
+
+    @covers_requirement(
+        "wilderness-elevation-runtime::"
+        "elevation-artifacts-are-bounded-and-source-identified"
+    )
+    def test_prior_bytes_survive_a_budget_rejection_from_the_real_publisher(self):
+        publisher = _publisher_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            _synthetic_workspace(root)
+            target = root / publisher.ELEVATION_PATH
+
+            # Control: this workspace really reaches the publisher, so the
+            # refusal below cannot pass by never publishing anything.
+            status, _output = self._publish(publisher, root)
+            self.assertEqual(status, 0)
+            prior = target.read_bytes()
+            self.assertTrue(prior)
+
+            with mock.patch("elosern_map_core.elevation_codec.MAX_ELEVATION_BYTES", 50):
+                status, output = self._publish(publisher, root)
+
+            self.assertEqual(status, 1)
+            self.assertIn("budget constraint", output)
+            self.assertEqual(target.read_bytes(), prior)
+            self.assertEqual(self._temporary_artifacts(target), [])
+
+    @covers_requirement(
+        "wilderness-elevation-runtime::"
+        "elevation-artifacts-are-bounded-and-source-identified"
+    )
+    def test_publisher_refuses_when_the_source_changes_before_publication(self):
+        publisher = _publisher_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            _synthetic_workspace(root)
+            target = root / publisher.ELEVATION_PATH
+            target.parent.mkdir(parents=True, exist_ok=True)
+            prior = b'{"prior": "bytes"}\n'
+            target.write_bytes(prior)
+
+            continent = root / "content/maps/continent.yaml"
+            real_generate = publisher.generate_elevation
+
+            def generate_then_edit_the_source(*args, **kwargs):
+                rasters = real_generate(*args, **kwargs)
+                continent.write_text(
+                    continent.read_text(encoding="utf-8") + "# edited mid-run\n",
+                    encoding="utf-8",
+                )
+                return rasters
+
+            with mock.patch.object(
+                publisher,
+                "generate_elevation",
+                side_effect=generate_then_edit_the_source,
+            ):
+                status, output = self._publish(publisher, root)
+
+            self.assertEqual(status, 1)
+            self.assertIn("continent source changed during generation", output)
+            self.assertEqual(target.read_bytes(), prior)
+            self.assertEqual(self._temporary_artifacts(target), [])
 
 
 if __name__ == "__main__":
