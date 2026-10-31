@@ -5,12 +5,13 @@ import PlaceCard from "../../components/PlaceCard.vue";
 import StatusPanel from "../../components/StatusPanel.vue";
 import TravelMap from "../../components/travel/TravelMap.vue";
 import PartyMedallions from "../../components/travel/PartyMedallions.vue";
-import TravelWalkControls from "../../components/travel/TravelWalkControls.vue";
+import LegPanel from "../../components/travel/LegPanel.vue";
+import { legView } from "../../components/travel/leg-model.js";
 import TravelLog from "../../components/travel/TravelLog.vue";
 import { travelJourney, travelLogPanel } from "../fixtures/travel_log.js";
 import { useElosernStore } from "../../stores/elosern.js";
 import * as fx from "../../tests/store/protocol_fixtures.js";
-import { walkArea, walkPanels } from "../fixtures/travel_walk.js";
+import { walkArea, walkCapacity, walkPanels } from "../fixtures/travel_walk.js";
 import { medallionMembers } from "../../components/travel/travel-model.js";
 import { companionFigures } from "../../components/companion-lineup.js";
 import { portraitFor } from "../../components/party-helpers.js";
@@ -28,9 +29,11 @@ import { STATUS_PANEL_SAMPLE } from "../fixtures/status_panels.js";
 // the real adapter over a schema-valid area_map window for the refresh ones),
 // the vitals dock above the party medallions, and the place card alone in the
 // map column. Every body is a synthetic protocol fixture; the medallions join
-// each member to its own status v5 fatigue row. The band keeps the ordinary
-// message and command regions (later travel slices replace them), shown here
-// as quiet samples.
+// each member to its own status fatigue row. The band's message region is
+// the travel log and its command region the leg panel (wilderness-travel-
+// leg-ui), projected by the real `legView` from a status v6 travel capacity
+// fixture, an aimed committed row, a supplied light phase and, for the route
+// preview, a `travel.plan`-shaped result.
 
 // The committed portrait catalog: the bundled default figures as each
 // member's own descriptor (no URL is built by the components).
@@ -105,16 +108,29 @@ function members(fatigue) {
   return medallionMembers(figures, { ...STATUS_PANEL_SAMPLE, fatigue }, "42");
 }
 
-const quiet = (label) =>
-  h(
-    "div",
-    {
-      style:
-        "box-sizing:border-box;height:100%;display:grid;place-items:center;" +
-        "color:#8f8a7e;font:var(--text-xs) var(--f-sans);letter-spacing:.08em;",
-    },
-    label,
-  );
+// The band's command pane as AppClient frames it (the dock pane's padding).
+const commandPane = (child) =>
+  h("div", { style: "box-sizing:border-box;height:100%;display:flex;padding:calc(12px * var(--ui-scale));" }, child);
+
+// The static stories' committed noon and the aimed east row.
+const NOON = { year: 1, season_index: 0, season_label: "春", day_in_season: 3, hour: 12, minute: 0, second: 0 };
+const EAST = { direction: "east", word: "東方", exists: true, enabled: true, reason: null, exitRef: "e_wild_e" };
+
+function staticLeg(args) {
+  return legView({
+    aim: args.legAim === undefined ? (args.aim === "east" ? EAST : null) : args.legAim,
+    plan: args.plan ?? null,
+    locked: !!args.plan,
+    progress: args.progress ?? 0,
+    walking: args.legWalking ?? null,
+    capacity: args.capacity,
+    preferences: args.preferences,
+    phase: args.phase ?? null,
+    error: args.notice ?? null,
+    serverTime: args.serverTime ?? NOON,
+    mapStatus: args.status,
+  });
+}
 
 function withMotion(level, render) {
   return {
@@ -152,7 +168,7 @@ const renderStage = (args) =>
         ],
         map: () => h(PlaceCard, { locationLabel: args.place, timeLabel: args.time, motionLevel: args.motionLevel }),
         "band-message": () => h(TravelLog, { entries: args.log ?? [] }),
-        "band-command": () => quiet("移動控制（行程面板由後續變更取代）"),
+        "band-command": () => commandPane(h(LegPanel, { view: staticLeg(args), motionLevel: args.motionLevel })),
       }),
     ),
   );
@@ -178,6 +194,8 @@ const ADAPTED = decodeTravelGrid(wildernessArea());
 const JOURNEY = travelJourney();
 
 const MORNING = {
+  capacity: walkCapacity({ quotes: { east: 1260 } }),
+  preferences: { pace: "standard", stopAtNight: true },
   grid: MORNING_GRID,
   aim: "east",
   status: "ready",
@@ -198,7 +216,16 @@ export const Morning = { args: MORNING };
 // the sleeper wears the crescent, and the dock shows the damaged gauges.
 export const WearyParty = {
   name: "Weary Party",
-  args: { ...MORNING, fatigue: FATIGUE.weary, vitalsVisible: true, time: "春 3 日 ‧ 14:20・白晝" },
+  args: {
+    ...MORNING,
+    aim: null,
+    fatigue: FATIGUE.weary,
+    vitalsVisible: true,
+    time: "春 3 日 ‧ 14:20・白晝",
+    // The worst member already meets the standard threshold: the intent
+    // advises camping and the gauge is short.
+    capacity: walkCapacity({ normal: 0, light: 0, moderate: 2, severe: 3, cautious: true, standard: true }),
+  },
 };
 
 // A committed step: the last map stays, dimmed, while the next one settles.
@@ -217,7 +244,39 @@ export const Dusk = {
 
 // Night: the deep blue wash, the moonlit disc and only the lights that carry.
 export const Night = {
-  args: { ...MORNING, grid: NIGHT_GRID, aim: null, fatigue: FATIGUE.weary, vitalsVisible: true, time: "春 3 日 ‧ 22:10・夜晚" },
+  args: {
+    ...MORNING, grid: NIGHT_GRID, aim: null, fatigue: FATIGUE.weary, vitalsVisible: true, time: "春 3 日 ‧ 22:10・夜晚",
+    phase: "night", capacity: walkCapacity({ normal: 0, light: 7, moderate: 6, severe: 3 }),
+  },
+};
+
+// The leg gauge over a supplied route preview (the travel.plan result shape
+// planning-ui will lock): stages per step, the moon at nightfall, the camp
+// line at the stop and the steps beyond it.
+const ROUTE = {
+  origin: { x: 60, y: 80 },
+  destination: { x: 74, y: 84 },
+  steps: [
+    ...Array.from({ length: 6 }, (_, i) => ({ cell: { x: 61 + i, y: 80 }, seconds: 1200, fatigue_stage: "normal" })),
+    ...Array.from({ length: 4 }, (_, i) => ({ cell: { x: 67 + i, y: 81 }, seconds: 1334, fatigue_stage: "light" })),
+    ...Array.from({ length: 4 }, (_, i) => ({ cell: { x: 71 + i, y: 82 }, seconds: 1600, fatigue_stage: "moderate" })),
+  ],
+  total_seconds: 6 * 1200 + 4 * 1334 + 1600,
+  nightfall_index: 8,
+  stop_index: 10,
+  stop_reason: "pace_threshold",
+  label: "灰石崗",
+};
+export const RoutePreview = {
+  name: "Route Preview",
+  args: { ...MORNING, aim: null, plan: ROUTE, serverTime: { ...NOON, hour: 14, minute: 20 }, time: "春 3 日 ‧ 14:20・白晝" },
+};
+
+// The capacity read failed (or the party has no physiology): the gauge says
+// so and 出發 stays disabled; 環顧 and 紮營 still work.
+export const CapacityUnavailable = {
+  name: "Capacity Unavailable",
+  args: { ...MORNING, aim: null, capacity: null },
 };
 
 // Woodland: under the canopy, one cell of sight and no horizon.
@@ -235,8 +294,8 @@ export const MotionOff = { name: "Motion Off", args: { ...MORNING, motionLevel: 
 // through the store's own `receive`, adopts that cell's window through
 // `setTravelMap` exactly as the refresh owner does, then calls the store's
 // walking actions. A recording sender keeps every step on the page. The
-// painted map is the full-fact morning grid; the band's movement column is
-// the temporary TravelWalkControls reading `view.travel`.
+// painted map is the full-fact morning grid; the band's command region is
+// the leg panel over `view.travel`, exactly as AppClient projects it.
 function walkingStage(args) {
   return {
     setup() {
@@ -247,13 +306,13 @@ function walkingStage(args) {
       store.beginTransport(1);
       store.setConnected(true);
       const { x, y } = MORNING_GRID.party;
-      const panels = walkPanels(x, y, args.walk?.panels ?? {});
+      const panels = walkPanels(x, y, { capacity: args.capacity, ...(args.walk?.panels ?? {}) });
       store.receive(store.view.generation, "ui_snapshot", [fx.snapshot({ panels })], {});
       // The travel band log through the store's own adoption (and the real
       // travel_log validator), exactly as a committed batch arrives.
       if (args.log?.length) {
         const v = store.view;
-        store.receive(v.generation, "ui_update", [fx.update({ revision: v.revision + 1, panels: { travel_log: travelLogPanel(args.log) } })], {});
+        store.receive(v.generation, "ui_update", [fx.update({ revision: v.revision + 1, panels: { travel_log: travelLogPanel(args.log), status: panels.status } })], {});
       }
       store.setTravelMap({ status: "ready", area: walkArea(x, y) });
       onMounted(() => {
@@ -295,15 +354,26 @@ function walkingStage(args) {
             map: () => h(PlaceCard, { locationLabel: args.place, timeLabel: args.time, motionLevel: args.motionLevel }),
             "band-message": () => h(TravelLog, { entries: travel.entries }),
             "band-command": () =>
-              h(
-                "div",
-                { style: "box-sizing:border-box;height:100%;display:flex;padding:calc(12px * var(--ui-scale));" },
-                h("div", { style: "display:flex;width:calc(250px * var(--ui-scale));" }, h(TravelWalkControls, {
-                  travel,
-                  motionLevel: args.motionLevel,
-                  onStop: () => store.stopTravel("stop"),
-                })),
-              ),
+              commandPane(h(LegPanel, {
+                view: legView({
+                  aim: travel.aimTarget,
+                  walking: travel.walking,
+                  holding: travel.holding,
+                  progress: travel.walking?.progress ?? 0,
+                  capacity: travel.capacity,
+                  preferences: travel.preferences,
+                  phase: args.phase ?? null,
+                  error: travel.notice,
+                  serverTime: store.view.serverTime,
+                  mapStatus: travel.mapStatus,
+                  busy: store.view.dispatch.inFlight !== null,
+                }),
+                motionLevel: args.motionLevel,
+                onPace: (value) => store.setTravelPace(value),
+                onNight: (value) => store.setTravelStopAtNight(value),
+                onStop: () => store.stopTravel("stop"),
+                onLook: () => store.activateRoomLook(),
+              })),
           }),
         );
       };

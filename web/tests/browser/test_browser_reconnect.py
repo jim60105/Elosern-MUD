@@ -279,7 +279,7 @@ class ReconnectTest(BrowserAcceptanceTest):
               const store = window.__elosernBridge.store;
               const before = store.view;
               const status = {
-                schema_version: 5, available: true,
+                schema_version: 6, available: true,
                 actor: { name: 'X', identity: 'y', location: null },
                 resources: { hp: {current: 10, maximum: 10},
                              mp: {current: 10, maximum: 10},
@@ -288,7 +288,7 @@ class ReconnectTest(BrowserAcceptanceTest):
                 fatigue: [{ identity: 'y', name: 'X', reserve_percent: 100,
                             stage: 'normal', label: '精神充沛',
                             severity: 'informational', restriction: null, asleep: false }],
-                disguise_active: false, combat: null,
+                disguise_active: false, combat: null, travel_capacity: null,
               };
               const env = (epoch, revision) => ({
                 protocol_version: 1, presentation_epoch: epoch,
@@ -329,7 +329,7 @@ class ReconnectTest(BrowserAcceptanceTest):
         result = page.evaluate(
             """() => {
               const status = {
-                schema_version: 5, available: true,
+                schema_version: 6, available: true,
                 actor: { name: 'X', identity: 'y', location: null },
                 resources: { hp: {current: 10, maximum: 10},
                              mp: {current: 10, maximum: 10},
@@ -338,7 +338,7 @@ class ReconnectTest(BrowserAcceptanceTest):
                 fatigue: [{ identity: 'y', name: 'X', reserve_percent: 100,
                             stage: 'normal', label: '精神充沛',
                             severity: 'informational', restriction: null, asleep: false }],
-                disguise_active: false, combat: null,
+                disguise_active: false, combat: null, travel_capacity: null,
               };
               function env(epoch, revision) {
                 return { protocol_version: 1, presentation_epoch: epoch,

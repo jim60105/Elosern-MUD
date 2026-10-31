@@ -10,12 +10,19 @@ subject is identified while the owner-keyed resources stay unchanged.
 Version 5 adds the canonical ``asleep`` posture to every row and one row per
 further source-present traveller (the canonical traversal cohort), so the
 travel medallions read each body's own facts.
+Version 6 adds the required ``travel_capacity`` (wilderness-travel-leg-ui):
+``null`` outside wilderness exploration, else the controlled body's
+read-only foot capacity by display stage, the committed move rows' duration
+quotes and the advisory pace state (``world.rules.travel_capacity``). A
+failed capacity read degrades to ``null`` with a diagnostic; the rest of the
+panel still renders.
 """
 
 from typing import Any
 
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.registry import PanelUnavailableError
+from world.observability import log_warn
 from world.rules.status_query import (
     StatusQueryError,
     build_fatigue_subject,
@@ -23,9 +30,30 @@ from world.rules.status_query import (
     present_fatigue_subjects,
 )
 
-STATUS_SCHEMA_VERSION = 5
+STATUS_SCHEMA_VERSION = 6
 #: Mirror of the client's ``STATUS_FATIGUE_MAX_SUBJECTS`` exact bound.
 STATUS_FATIGUE_MAX_SUBJECTS = 8
+#: Mirror of the client's ``STATUS_TRAVEL_MAX_NEIGHBOURS`` exact bound.
+STATUS_TRAVEL_MAX_NEIGHBOURS = 12
+
+
+def _travel_capacity(actor) -> dict[str, Any] | None:
+    """The controlled body's travel capacity object, or ``None``.
+
+    The quotes are built over the exploration presenter's own move-row
+    builder, so they name exactly the committed rows' opaque exit references.
+    """
+    from world.rules.travel_capacity import build_travel_status
+
+    try:
+        return build_travel_status(actor)
+    except Exception as error:
+        log_warn(
+            "status_travel_capacity_unavailable",
+            context={"char": str(getattr(actor, "pk", ""))},
+            exc=error,
+        )
+        return None
 
 
 def _fatigue_entry(row) -> dict[str, Any]:
@@ -128,4 +156,5 @@ def status_presenter(context: PresentationContext) -> dict[str, Any]:
         "fatigue": fatigue,
         "disguise_active": model.disguise_active,
         "combat": combat,
+        "travel_capacity": _travel_capacity(actor),
     }

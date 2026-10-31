@@ -164,7 +164,9 @@ export const CONTROLS_REFERENCE = [
   {
     // The wilderness travel map (wilderness-travel-walking-ui): one focus
     // stop on the stage, focused on entering the wilderness, in place of the
-    // exit compass; the band's movement column shows the intent line and 停步.
+    // exit compass; the band's command region is the leg panel
+    // (wilderness-travel-leg-ui): intent line, gauge, pace, nightfall stop
+    // and 出發/停步, 紮營, 環顧.
     id: "travel",
     title: "荒野旅行",
     entries: [
@@ -192,7 +194,38 @@ export const CONTROLS_REFERENCE = [
         id: "travel-stop",
         keys: ["停步"],
         label: "停下腳步",
-        detail: "放開方向鍵、按下任何其他按鍵、點擊地圖或「停步」按鈕都會停下；已送出的那一步不會撤回。",
+        detail: "放開方向鍵、按下任何其他按鍵、點擊地圖或行程面板的「停步」都會停下；已送出的那一步不會撤回。",
+      },
+      {
+        id: "travel-gauge",
+        keys: [],
+        label: "行程刻度",
+        detail:
+          "行程面板的刻度一格代表一步：沒有路線時顯示依目前地形估計還能步行幾格，越疲勞刻度越矮，重度以空心框表示；金色旗標是所選節制會紮營的位置。",
+      },
+      {
+        id: "travel-pace",
+        keys: ["←", "→"],
+        label: "行程節制",
+        detail: "保守在輕度疲勞時停下、標準在中度疲勞時停下、強行不因疲勞停下；焦點在選項上時以方向鍵切換。行進中無法變更。",
+      },
+      {
+        id: "travel-night",
+        keys: ["入夜停步"],
+        label: "入夜停步",
+        detail: "開啟時，路線會在入夜後停下。設定與節制都會記住，行進中無法變更。",
+      },
+      {
+        id: "travel-look",
+        keys: ["環顧"],
+        label: "環顧四周",
+        detail: "把目前所在格子的完整景色寫進旅途日誌。",
+      },
+      {
+        id: "travel-camp",
+        keys: ["紮營"],
+        label: "紮營休息",
+        detail: "開啟睡眠設定，選擇恢復到精力充足或睡上一段時間。",
       },
       {
         id: "travel-escape",

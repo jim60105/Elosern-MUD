@@ -120,6 +120,8 @@ const CHAIN_SELECTORS = Object.freeze({
   rail: '[data-anchor="presence"] [data-testid="presence-rail"]',
   look: '[data-anchor="map"] [data-testid="place-card-look"]',
   wait: '[data-anchor="map"] [data-testid="place-card-wait"]',
+  // The travel leg panel's 紮營 (not a Tab-chain member; focus return only).
+  camp: '#action-dock [data-testid="leg-camp"]',
   pill: '#action-dock [data-testid="suggestions-pill"]',
 });
 const CHAIN_ORDER = Object.freeze(["compass", "rail", "look", "wait", "pill"]);
@@ -135,7 +137,10 @@ export function useRoomActions(
   const lastTile = ref("wait");
   // The tiles are shown again after a step back: no replayed entrance.
   const returning = ref(false);
-  // Which control opened the open card: "wait" | "pill" | null.
+  // Which control opened the open card: "wait" | "pill" | "camp" | null.
+  // The rest entry layer a travel camp asked for, consumed by the kind
+  // watcher when the entry opens ("sleep" | null).
+  let pendingLayer = null;
   const opener = ref(null);
 
   const roomCard = computed(() => (store.view.mode === "exploration" ? store.view.roomCard : null));
@@ -209,6 +214,34 @@ export function useRoomActions(
     if (store.openRoomCard("wait")) {
       opener.value = "wait";
     }
+  }
+
+  // The travel band's 紮營 (wilderness-travel-leg-ui): the single client
+  // camp entry. Before the camp card exists (wilderness-camping replaces this
+  // destination) it opens the existing rest entry straight on its sleep form;
+  // no new request, rule or placeholder. An entry already open switches to
+  // that layer. Closing it returns focus to 紮營.
+  function openTravelCamp() {
+    if (skipDisabled.value) {
+      return false;
+    }
+    if (roomCard.value?.kind === "wait") {
+      // Already open (on any layer): switch to the sleep form.
+      lastTile.value = "sleep";
+      returning.value = false;
+      waitStep.value = "sleep";
+      opener.value = "camp";
+      return true;
+    }
+    // The kind watcher sets up the opened entry's layers; it consumes the
+    // requested layer instead of the tiles.
+    pendingLayer = "sleep";
+    if (!store.openRoomCard("wait")) {
+      pendingLayer = null;
+      return false;
+    }
+    opener.value = "camp";
+    return true;
   }
 
   function onPill() {
@@ -330,8 +363,10 @@ export function useRoomActions(
   watch(
     () => roomCard.value?.kind ?? null,
     async (kind, previous) => {
-      waitStep.value = null;
-      lastTile.value = "wait";
+      const layer = kind === "wait" ? pendingLayer : null;
+      pendingLayer = null;
+      waitStep.value = layer;
+      lastTile.value = layer ?? "wait";
       returning.value = false;
       if (kind || !previous) {
         return;
@@ -345,7 +380,7 @@ export function useRoomActions(
       if (!focusLost(document.activeElement)) {
         return;
       }
-      if (from && focusMember(from === "pill" ? "pill" : "wait")) {
+      if (from && focusMember(from === "pill" || from === "camp" ? from : "wait")) {
         return;
       }
       if (compassRef.value) {
@@ -475,6 +510,7 @@ export function useRoomActions(
     pillLabel,
     onPlaceLook,
     onPlaceWait,
+    openTravelCamp,
     onPill,
     onRoomCardPick,
     onRoomCardBack,

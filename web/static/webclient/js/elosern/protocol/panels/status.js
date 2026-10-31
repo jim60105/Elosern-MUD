@@ -1,4 +1,4 @@
-// Status v5 presenter wire contract, including read-model provenance and the
+// Status v6 presenter wire contract, including read-model provenance and the
 // physiological fatigue subject rows.
 // Split from the combat panel module.
 
@@ -27,6 +27,10 @@ var STATUS_FATIGUE_MAX_SUBJECTS = C.STATUS_FATIGUE_MAX_SUBJECTS;
 var STATUS_FATIGUE_MAX_RESTRICTION = C.STATUS_FATIGUE_MAX_RESTRICTION;
 var STATUS_FATIGUE_STAGES = C.STATUS_FATIGUE_STAGES;
 var COMBAT_MODES = C.COMBAT_MODES;
+var STATUS_TRAVEL_MAX_NEIGHBOURS = C.STATUS_TRAVEL_MAX_NEIGHBOURS;
+var STATUS_TRAVEL_MAX_EXIT_REF = C.STATUS_TRAVEL_MAX_EXIT_REF;
+var STATUS_TRAVEL_BUCKETS = C.STATUS_TRAVEL_BUCKETS;
+var STATUS_TRAVEL_PACES = C.STATUS_TRAVEL_PACES;
 var SEVERITIES = C.SEVERITIES;
 
 
@@ -144,7 +148,45 @@ function validateFatigueSubject(value) {
   return value;
 }
 
-// Exact available status panel v5 schema (composed full title optional).
+// The v6 wilderness travel capacity: per-display-stage foot step counts, one
+// nullable duration quote per committed move row (opaque exit reference, no
+// destination facts) and the advisory pace state. Null outside wilderness.
+function validateTravelCapacity(value) {
+  if (value === null) {
+    return value;
+  }
+  requireExactFields(value, "travel_capacity", ["capacity", "neighbours", "at_pace"], []);
+  requireExactFields(value.capacity, "travel_capacity.capacity", STATUS_TRAVEL_BUCKETS, []);
+  STATUS_TRAVEL_BUCKETS.forEach(function (key) {
+    requireInt(value.capacity[key], "travel_capacity.capacity." + key, 0, MAX_SAFE_INTEGER);
+  });
+  var neighbours = value.neighbours;
+  if (!Array.isArray(neighbours) || neighbours.length > STATUS_TRAVEL_MAX_NEIGHBOURS) {
+    throw new Error("travel_capacity.neighbours exceeds its bound");
+  }
+  var seen = {};
+  neighbours.forEach(function (quote) {
+    requireExactFields(quote, "travel_capacity neighbour", ["exit_ref", "seconds"], []);
+    requireString(quote.exit_ref, "travel_capacity neighbour.exit_ref", STATUS_TRAVEL_MAX_EXIT_REF);
+    if (!/^[\x21-\x7e]+$/.test(quote.exit_ref)) {
+      throw new Error("travel_capacity neighbour.exit_ref must be nonempty printable ASCII");
+    }
+    if (Object.prototype.hasOwnProperty.call(seen, quote.exit_ref)) {
+      throw new Error("travel_capacity neighbours must name distinct exits");
+    }
+    seen[quote.exit_ref] = true;
+    if (quote.seconds !== null) {
+      requireInt(quote.seconds, "travel_capacity neighbour.seconds", 0, MAX_SAFE_INTEGER);
+    }
+  });
+  requireExactFields(value.at_pace, "travel_capacity.at_pace", STATUS_TRAVEL_PACES, []);
+  STATUS_TRAVEL_PACES.forEach(function (key) {
+    requireBool(value.at_pace[key], "travel_capacity.at_pace." + key);
+  });
+  return value;
+}
+
+// Exact available status panel v6 schema (composed full title optional).
 function validateStatusPanel(payload) {
   requireExactFields(
     payload,
@@ -158,11 +200,12 @@ function validateStatusPanel(payload) {
       "fatigue",
       "disguise_active",
       "combat",
+      "travel_capacity",
     ],
     []
   );
   requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-  if (payload.schema_version !== 5) {
+  if (payload.schema_version !== 6) {
     throw new Error("unsupported status panel schema_version");
   }
 
@@ -246,6 +289,7 @@ function validateStatusPanel(payload) {
     }
     requireInt(payload.combat.round, "combat.round", 0, MAX_SAFE_INTEGER);
   }
+  validateTravelCapacity(payload.travel_capacity);
 
   return payload;
 }

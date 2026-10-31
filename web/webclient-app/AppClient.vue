@@ -63,7 +63,8 @@ import ChoiceCard from "./components/ChoiceCard.vue";
 import QuestionCard from "./components/QuestionCard.vue";
 import PresenceRail from "./components/PresenceRail.vue";
 import TravelMap from "./components/travel/TravelMap.vue";
-import TravelWalkControls from "./components/travel/TravelWalkControls.vue";
+import LegPanel from "./components/travel/LegPanel.vue";
+import { legView } from "./components/travel/leg-model.js";
 import PartyMedallions from "./components/travel/PartyMedallions.vue";
 import { medallionMembers } from "./components/travel/travel-model.js";
 import { useTravelMap } from "./composables/use-travel-map.js";
@@ -132,7 +133,7 @@ const {
   roomCardCaption, roomCardLabel, tilesShown, waitFormOpen, sleepOpen, lastTile, returning,
   waitTileTime, sleepTileFatigue, placeActions, pillShown, pillCount, pillLabel,
   onPlaceLook, onPlaceWait, onPill, onRoomCardPick, onRoomCardBack,
-  onTilePick, onStepBack, onStepClose, onWaitDawn, onWaitSubmit,
+  onTilePick, onStepBack, onStepClose, onWaitDawn, onWaitSubmit, openTravelCamp,
   onSleepRecover, onSleepSubmit, onPlaceHover, onPillHoverChange,
   sleepHandoffSelectionOpen, sleepHandoffQuestionOpen, sleepHandoffContinuationOpen,
   sleepHandoffRows, sleepHandoffContinuationRows, sleepHandoffCaption, sleepHandoffQuestionCaption,
@@ -179,6 +180,33 @@ const {
   onTravelHover, onTravelPick, onTravelStop,
 } = useTravelInput(store, { mapRef: travelMapRef, fullLogOpen: () => fullLogOpen.value });
 const travelStageCss = computed(() => store.view.motionLevel !== "off");
+// The leg panel (wilderness-travel-leg-ui): the pure projection of the
+// committed travel facts. No plan exists until planning-ui supplies one, and
+// the light phase only once the window carries it (window-ui).
+const travelLeg = computed(() => {
+  const travel = store.view.travel;
+  if (!travel?.layout) return null;
+  const walking = travel.walking;
+  return legView({
+    aim: travel.aimTarget,
+    plan: null,
+    locked: false,
+    walking,
+    holding: travel.holding,
+    progress: walking?.progress ?? 0,
+    capacity: travel.capacity,
+    preferences: travel.preferences,
+    phase: travel.map?.phase ?? null,
+    error: travel.notice,
+    serverTime: store.view.serverTime,
+    mapStatus: travel.mapStatus,
+    busy: !store.view.connected || store.view.dispatch.inFlight !== null,
+    asleep: (store.view.panels?.status?.fatigue ?? []).some((row) => row?.asleep === true),
+  });
+});
+function onTravelLook() {
+  store.activateRoomLook();
+}
 // Leaving travel removes the map; focus that was on it returns to the
 // shell's focus home instead of falling to the document.
 watch(travelLayout, async (shown, was) => {
@@ -1492,14 +1520,21 @@ const rootStyle = computed(() => {
               class="exploration-root"
               data-testid="exploration-root"
             >
-              <!-- In travel the band's movement column is the temporary
-                   TravelWalkControls (wilderness-travel-walking-ui); the
-                   compass stays the ordinary exploration control. -->
-              <div v-if="travelLayout" class="exploration-root__travel">
-                <TravelWalkControls
-                  :travel="store.view.travel"
+              <!-- In travel the band's movement column is the leg panel
+                   (wilderness-travel-leg-ui): intent line, leg gauge and
+                   legend, pace and nightfall preferences, and 出發/停步,
+                   紮營 and 環顧. 出發 stays disabled until planning-ui
+                   supplies a locked plan (route-ui wires its departure).
+                   The compass stays the ordinary exploration control. -->
+              <div v-if="travelLayout && travelLeg" class="exploration-root__travel">
+                <LegPanel
+                  :view="travelLeg"
                   :motion-level="store.view.motionLevel"
+                  @pace="store.setTravelPace"
+                  @night="store.setTravelStopAtNight"
                   @stop="onTravelStop"
+                  @look="onTravelLook"
+                  @camp="openTravelCamp"
                 />
               </div>
               <div v-else class="exploration-root__compass" @keydown="onCompassTab">
@@ -1515,7 +1550,7 @@ const rootStyle = computed(() => {
                   @move="onCompassMove"
                 />
               </div>
-              <div class="exploration-root__side">
+              <div v-if="!travelLayout || pillShown" class="exploration-root__side">
                 <button
                   v-if="pillShown"
                   type="button"
@@ -1539,6 +1574,7 @@ const rootStyle = computed(() => {
                   <b v-if="pillCount > 0" class="exploration-pill__count">{{ ` ${pillCount}` }}</b>
                 </button>
                 <ExplorationReadout
+                  v-if="!travelLayout"
                   class="exploration-root__readout"
                   :lead="readoutContent.lead"
                   :text="readoutContent.text"
@@ -2107,14 +2143,17 @@ const rootStyle = computed(() => {
   min-height: 0;
   aspect-ratio: 1 / 1;
 }
-/* The travel movement column: a little wider than the compass square, so
-   the intent line reads beside the rose while the readout column keeps room
-   for its line. */
+/* The travel movement column: the leg panel takes the pane's width; the
+   side column keeps only the 建議 pill (the intent line is the travel
+   readout), and collapses when no pill is shown. */
+.exploration-root:has(> .exploration-root__travel) {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
 .exploration-root__travel {
   display: flex;
   height: 100%;
   min-height: 0;
-  width: calc(250px * var(--ui-scale));
+  min-width: 0;
 }
 .exploration-root__side {
   display: flex;

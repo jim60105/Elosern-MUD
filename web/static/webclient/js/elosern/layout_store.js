@@ -27,7 +27,9 @@
   // the reduced-motion override with the optional motion level (`full` /
   // `reduced` / `off`; OpenSpec change webclient-motion-level). No migration
   // is registered: a version-1 or version-2 wrapper resets to the version-3
-  // default.
+  // default. The travel preferences (pace and the nightfall stop; OpenSpec
+  // change wilderness-travel-leg-ui) are two more optional display keys under
+  // the same version: a wrapper without them loads their defaults.
   var CURRENT_LAYOUT_VERSION = 3;
   var STORAGE_KEY = "elosern.layout";
   // Stock Evennia pre-project keys are never imported by any version.
@@ -62,16 +64,20 @@
     colorblind: "boolean",
     textSpeed: "enum",
     autoAdvance: "boolean",
+    travelPace: "enum",
+    travelStopAtNight: "boolean",
   };
 
   // The allowed values of each "enum" preference. This UMD module cannot
   // import ESM, so it carries its own copies of `TEXT_SPEEDS` from
   // web/webclient-app/lib/message_reveal.js and of `MOTION_LEVELS` from
-  // web/webclient-app/lib/motion_level.js; a node test asserts each pair of
-  // lists is equal.
+  // web/webclient-app/lib/motion_level.js and of `TRAVEL_PACES` from
+  // web/webclient-app/components/travel/leg-model.js; a node test asserts
+  // each pair of lists is equal.
   var PREFERENCE_ENUMS = {
     textSpeed: ["slow", "normal", "fast", "instant"],
     motionLevel: ["full", "reduced", "off"],
+    travelPace: ["cautious", "standard", "forced"],
   };
 
   var REQUIRED_SET = {};
@@ -170,6 +176,8 @@
         colorblind: false,
         textSpeed: "normal",
         autoAdvance: false,
+        travelPace: "standard",
+        travelStopAtNight: true,
       },
     };
   }
@@ -509,6 +517,7 @@
     PREFERENCE_ENUMS: {
       textSpeed: PREFERENCE_ENUMS.textSpeed.slice(),
       motionLevel: PREFERENCE_ENUMS.motionLevel.slice(),
+      travelPace: PREFERENCE_ENUMS.travelPace.slice(),
     },
     DEFAULT_LAYOUT_CONFIG: clone(DEFAULT_LAYOUT_CONFIG),
     defaultWrapper: defaultWrapper,

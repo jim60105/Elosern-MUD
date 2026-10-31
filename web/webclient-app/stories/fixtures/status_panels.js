@@ -13,12 +13,12 @@
 // only, so the offline showcase and the live (C1 store) views cannot drift.
 // ---------------------------------------------------------------------------
 
-// A committed `status` v5 payload (design-draft actor at 霧骨渡口): mixed
+// A committed `status` v6 payload (design-draft actor at 霧骨渡口): mixed
 // gauge states, one buff with a remaining duration, one deterministic
 // combat-modifier condition carrying its exact applied modifiers, an active
 // disguise, the actor's physiological subject row, and no combat session.
 export const STATUS_PANEL_SAMPLE = {
-  schema_version: 5,
+  schema_version: 6,
   available: true,
   actor: {
     name: "艾倫‧灰誓",
@@ -63,6 +63,7 @@ export const STATUS_PANEL_SAMPLE = {
   ],
   disguise_active: true,
   combat: null,
+  travel_capacity: null,
 };
 
 // A titled variant: the HUD head renders the composed full title as the

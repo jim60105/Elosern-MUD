@@ -24,11 +24,20 @@
 // `applyPresentationPreferences` writes the EFFECTIVE level to
 // `<html data-motion>` — the single value the stylesheet's token blocks and
 // the script both read. `data-reduced-motion` is gone.
+//
+// The travel preferences (OpenSpec change wilderness-travel-leg-ui): the
+// leg panel's pace (`travelPace`, one of `TRAVEL_PACES`, default standard)
+// and the nightfall stop (`travelStopAtNight`, default true) persist in the
+// same wrapper, published as `view.travel.preferences`. They are frozen
+// while a walk (or the hold that arms one) is active: both setters refuse a
+// change then. Until route-ui sends them with a route walk they are saved
+// intent and the gauge's markers only; no server move enforces them yet.
 
 import LayoutStore from "../../lib/layout_store.js";
 import { MOTION_LEVELS, resolveMotionLevel } from "../../lib/motion_level.js";
 import { TEXT_SPEEDS } from "../../lib/message_reveal.js";
 import { PROSE_SCALE_DEFAULT, normalizeProseScale } from "../../lib/prose_scale.js";
+import { DEFAULT_TRAVEL_PREFERENCES, TRAVEL_PACES } from "../../components/travel/leg-model.js";
 
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
@@ -45,6 +54,8 @@ export function applyPreferences(ctx) {
     colorblind: false,
     textSpeed: "normal",
     autoAdvance: false,
+    travelPace: DEFAULT_TRAVEL_PREFERENCES.pace,
+    travelStopAtNight: DEFAULT_TRAVEL_PREFERENCES.stopAtNight,
   };
   ctx.prefs = prefs;
 
@@ -103,6 +114,8 @@ export function applyPreferences(ctx) {
       colorblind: prefs.colorblind,
       textSpeed: prefs.textSpeed,
       autoAdvance: prefs.autoAdvance,
+      travelPace: prefs.travelPace,
+      travelStopAtNight: prefs.travelStopAtNight,
     };
     // The motionLevel key is optional (design D2): only write it when a level
     // is stored. Its absence means "follow the OS".
@@ -145,6 +158,12 @@ export function applyPreferences(ctx) {
     }
     if (typeof stored.autoAdvance === "boolean") {
       prefs.autoAdvance = stored.autoAdvance;
+    }
+    if (TRAVEL_PACES.includes(stored.travelPace)) {
+      prefs.travelPace = stored.travelPace;
+    }
+    if (typeof stored.travelStopAtNight === "boolean") {
+      prefs.travelStopAtNight = stored.travelStopAtNight;
     }
     applyPresentationPreferences();
   };
@@ -201,5 +220,33 @@ export function applyPreferences(ctx) {
     prefs.autoAdvance = !!on;
     applyPresentationPreferences();
     persistPresentationPreferences();
+  };
+
+  // The travel preferences are frozen while a walk or its arming hold is
+  // active (the departed walk keeps the pair it left with).
+  function travelFrozen() {
+    return !!ctx.travelWalk || !!ctx.travelHold;
+  }
+
+  /** Set the travel pace; false (nothing changed or written) when refused. */
+  ctx.setTravelPace = function setTravelPace(value) {
+    if (!TRAVEL_PACES.includes(value) || travelFrozen()) {
+      return false;
+    }
+    prefs.travelPace = value;
+    applyPresentationPreferences();
+    persistPresentationPreferences();
+    return true;
+  };
+
+  /** Set the nightfall stop; false (nothing changed or written) when refused. */
+  ctx.setTravelStopAtNight = function setTravelStopAtNight(on) {
+    if (typeof on !== "boolean" || travelFrozen()) {
+      return false;
+    }
+    prefs.travelStopAtNight = on;
+    applyPresentationPreferences();
+    persistPresentationPreferences();
+    return true;
   };
 }

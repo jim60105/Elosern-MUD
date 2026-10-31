@@ -315,6 +315,29 @@ test("the motionLevel enum equals MOTION_LEVELS of the motion lib", async () => 
   assert.deepEqual(LayoutStore.PREFERENCE_ENUMS.motionLevel, MOTION_LEVELS);
 });
 
+test("the travelPace enum equals TRAVEL_PACES of the leg model", async () => {
+  const { TRAVEL_PACES } = await import("../../../../webclient-app/components/travel/leg-model.js");
+  assert.deepEqual(LayoutStore.PREFERENCE_ENUMS.travelPace, TRAVEL_PACES);
+});
+
+test("the travel preferences validate as display keys and fit the wrapper bound", () => {
+  const store = defaultStore();
+  store.save(wrapper({ preferences: { travelPace: "sprint", travelStopAtNight: "yes", textSpeed: "fast" } }));
+  let saved = JSON.parse(store.storage.getItem(LayoutStore.STORAGE_KEY));
+  assert.deepEqual(saved.preferences, { textSpeed: "fast" }, "malformed travel keys are dropped");
+  // The longest value of every preference together stays inside the bound.
+  const longest = {
+    text2html: false, fontScale: 1.125, motionLevel: "reduced", colorblind: false,
+    textSpeed: "instant", autoAdvance: false, travelPace: "standard", travelStopAtNight: false,
+  };
+  store.save(wrapper({ preferences: longest }));
+  saved = JSON.parse(store.storage.getItem(LayoutStore.STORAGE_KEY));
+  assert.deepEqual(saved.preferences, longest);
+  assert.ok(JSON.stringify(saved).length < LayoutStore.MAX_STORAGE_BYTES);
+  assert.equal(LayoutStore.defaultWrapper().preferences.travelPace, "standard");
+  assert.equal(LayoutStore.defaultWrapper().preferences.travelStopAtNight, true);
+});
+
 test("motionLevel validates against its enum and the reducedMotion key is gone", () => {
   const store = defaultStore();
   const saved = store.save(

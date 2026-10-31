@@ -81,7 +81,7 @@ describe("isVitalsVisible (webclient-retire-redundant-hud, design D2)", () => {
     expect(store.view.vitals.visible).toBe(false);
     const unavailable = fx.update({ revision: 2, base_revision: 1, presentation_epoch: fx.EPOCH_B, mode: "combat" });
     unavailable.panels.status = {
-      schema_version: 5, available: false, reason: { code: "status_unavailable", message: "暫無資料" },
+      schema_version: 6, available: false, reason: { code: "status_unavailable", message: "暫無資料" },
     };
     expect(store.receive(2, "ui_update", [unavailable], {}).accepted).toBe(true);
     expect(store.view.vitals.visible).toBe(false);
@@ -341,7 +341,7 @@ describe("isVitalsVisible (webclient-retire-redundant-hud, design D2)", () => {
       mode: "exploration",
       panels: {
         status: {
-          schema_version: 5,
+          schema_version: 6,
           available: false,
           reason: { code: "status_unavailable", message: "無法顯示" },
         },

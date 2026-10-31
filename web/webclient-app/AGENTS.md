@@ -208,10 +208,33 @@ dream or creation surface owns the stage. There is no server travel mode.
   `keydown` listener that stops a walk on any key but the held arrows'
   repeat, without consuming the event; the stopping event neither aims nor
   steps. Entering travel focuses the map and the compass is not mounted
-  there; the band's movement column is the temporary `TravelWalkControls`
-  (intent line and 停步) until the leg panel replaces it.
+  there; the band's command region is the leg panel (below).
+- The leg panel (wilderness-travel-leg-ui; design §7):
+  `components/travel/LegPanel.vue` renders the pure
+  `components/travel/leg-model.js` `legView` — intent line (priority:
+  stale map or the queue's notice, walking, aim with the server's quote,
+  locked/hover plan, the pace threshold from `at_pace`, the night advisory
+  from the supplied phase only, idle), the gauge, its legend, the pace
+  radio (保守/標準/強行) with the 入夜停步 switch, and 出發/停步, 紮營, 環顧.
+  The gauge draws a supplied plan's `fatigue_stage` per step (moon at
+  nightfall, camp line at the stop, spent ticks) or, without one, the
+  status v6 `travel_capacity` counts with the pace's stop flagged; it never
+  derives a count. `components/travel/stage-display.js` is the one stage →
+  tick/route-mark mapping (forced_sleep: severe bucket + crescent, enum
+  kept). Ticks differ by height and outline besides colour. The pace and
+  nightfall stop are persisted view preferences (`travelPace`,
+  `travelStopAtNight` in the layout wrapper; `store.setTravelPace` /
+  `setTravelStopAtNight`, frozen while walking or holding) and only saved
+  intent until route-ui sends them. 出發 needs a locked current plan, a
+  supplied capacity and a live map (no plan exists before planning-ui); 停步
+  is always usable while walking; a failed map read disables the rest.
+  環顧 is `store.activateRoomLook()` (the guarded `explore.look
+  {room:true}`); 紮營 is `openTravelCamp()` (use-room-actions.js), which
+  opens the existing rest entry on its sleep form until the camp card
+  replaces that destination. In travel the dock's side column keeps only
+  the 建議 pill; the intent line is the travel readout.
 - `PartyMedallions` shows the controlled body once, then each member whose
-  own `status.fatigue` row is committed (status v5 emits one per
+  own `status.fatigue` row is committed (status v5+ emits one per
   source-present traveller), with its supplied reserve, stage label and
   `asleep` crescent; a missing row reads unavailable, never full. Only the
   status source's and the controlled body's rows can reveal the vitals dock;

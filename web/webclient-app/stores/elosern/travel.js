@@ -459,6 +459,9 @@ export function applyTravel(ctx) {
     return Object.freeze({
       direction: key,
       word: d.word,
+      // The committed row's opaque reference: the leg panel looks up the
+      // server's duration quote for exactly this row.
+      exitRef: target ? target.exitRef : null,
       exists: !!target,
       enabled: !!target && target.enabled,
       reason: target && !target.enabled ? target.reason || null : null,
@@ -481,6 +484,12 @@ export function applyTravel(ctx) {
     });
   }
 
+  function travelCapacity(status) {
+    if (!status) return undefined;
+    if (status.available === false) return null;
+    return status.travel_capacity ?? null;
+  }
+
   ctx.travelView = function travelView(rs) {
     const selection = travelSelection({
       mode: rs.mode,
@@ -500,6 +509,12 @@ export function applyTravel(ctx) {
       notice: ctx.travelNotice ? Object.freeze({ ...ctx.travelNotice }) : null,
       // The typed travel band log (wilderness-travel-log-ui).
       entries: ctx.travelLogEntries(),
+      // The leg panel (wilderness-travel-leg-ui): the persisted travel
+      // preferences and the status v6 travel capacity — the object, null
+      // when the server supplies none or the status panel is unavailable,
+      // undefined while no status is committed.
+      preferences: Object.freeze({ pace: ctx.prefs.travelPace, stopAtNight: ctx.prefs.travelStopAtNight }),
+      capacity: travelCapacity(rs.panels?.status),
     });
   };
 }

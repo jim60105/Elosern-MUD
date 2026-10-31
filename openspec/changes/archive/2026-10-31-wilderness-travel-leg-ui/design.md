@@ -89,3 +89,11 @@ Pre-release clean cutover. No database migration, compatibility aliases or alter
 | Leg panel projects supplied state and persisted preferences | TravelLegTests.test_gauge_preferences_and_actions |
 
 Focused accompanying tests: world.rules.tests.test_travel_capacity; tests/travel/{preferences,leg}.test.js; TravelLegTests.test_gauge_preferences_and_actions.
+
+## Applied details
+
+- Idle intent: until planning-ui supplies destination planning, the idle line invites a neighbour step (選擇相鄰的一格) with the foot estimate instead of 點選已探明的格子規劃路線, since clicking a non-neighbour cell does nothing in this slice.
+- A party with no constructed physiology has no foot estimate (`travel_capacity` null) rather than an invented bounded count; a party with a sleeper at query start has zero counts and the leg panel says a companion sleeps instead of reading the zero as exhaustion.
+- Settlement gateway rows quote `seconds: null`; their duration is not resolved by the status read.
+- The capacity legend marks the pace's camp line as 依節制紮營; plan legends keep the stop-reason table.
+- The night advisory reads only a supplied phase; the decoded window carries none until window-ui, so it is reachable in stories and tests only.
