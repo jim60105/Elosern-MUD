@@ -229,6 +229,9 @@ class CommitQualifiedResultTests(DjangoTestCase):
     @covers_requirement(
         "webclient-oob-protocol::result-and-protocol-error-envelopes-are-exact-and-non-overlapping"
     )
+    @covers_requirement(
+        "wilderness-travel-interrupts::interrupt-results-respect-movement-failure-boundaries"
+    )
     def test_a_commit_qualified_result_waits_for_the_commit_then_replays(self):
         from django.db import transaction
 

@@ -26,6 +26,7 @@ from world.rules.travel_interrupts import (
     wilderness_cell,
 )
 from world.rules.travel_plan import PACE_STOP_STAGES, _STAGE_RANK
+from tools.spec_traceability import covers_requirement
 
 
 def _night_start_tick() -> int:
@@ -80,6 +81,9 @@ class TransitionTableTests(unittest.TestCase):
         self.assertEqual(movement_flags(before, before), ())
         self.assertEqual(movement_flags(before, before, walk=_CAUTIOUS), ())
 
+    @covers_requirement(
+        "wilderness-travel-interrupts::wilderness-steps-report-stateless-committed-interrupts"
+    )
     def test_each_flag_raises_only_for_its_positive_transition(self):
         night = _night_start_tick()
         cases = {
@@ -133,6 +137,9 @@ class TransitionTableTests(unittest.TestCase):
             with self.subTest(flag=flag):
                 self.assertEqual(movement_flags(before, after, walk=walk), (flag,))
 
+    @covers_requirement(
+        "wilderness-travel-interrupts::wilderness-steps-report-stateless-committed-interrupts"
+    )
     def test_combined_flags_use_the_documented_stable_order(self):
         night = _night_start_tick()
         before = _facts(
@@ -175,6 +182,9 @@ class TransitionTableTests(unittest.TestCase):
         after = _facts(cell=(5, 6), hostiles={"object:9001"})
         self.assertNotIn("hostile_in_sight", movement_flags(before, after))
 
+    @covers_requirement(
+        "wilderness-travel-interrupts::wilderness-steps-report-stateless-committed-interrupts"
+    )
     def test_prospective_materialization_keeps_one_stable_hostile_identity(self):
         # The ambient slot key is the same before (prospective) and after
         # (materialized); only the natural landmark flag may raise.
@@ -193,6 +203,9 @@ class TransitionTableTests(unittest.TestCase):
 class PaceThresholdTests(unittest.TestCase):
     """The move side mirrors the planner's first-legal-step threshold table."""
 
+    @covers_requirement(
+        "wilderness-travel-interrupts::wilderness-steps-report-stateless-committed-interrupts"
+    )
     def test_threshold_table_matches_the_planner_thresholds(self):
         for pace in ("cautious", "standard", "forced"):
             threshold = PACE_STOP_STAGES.get(pace)
@@ -210,6 +223,9 @@ class PaceThresholdTests(unittest.TestCase):
                         expected,
                     )
 
+    @covers_requirement(
+        "wilderness-travel-interrupts::interrupt-results-respect-movement-failure-boundaries"
+    )
     def test_an_already_at_threshold_member_raises_on_the_legal_step(self):
         after = _facts(travellers=(_traveller(stage=FatigueStage.MODERATE),))
         self.assertTrue(
@@ -217,6 +233,9 @@ class PaceThresholdTests(unittest.TestCase):
             "a traveller already at the threshold still stops the first step",
         )
 
+    @covers_requirement(
+        "wilderness-travel-interrupts::interrupt-results-respect-movement-failure-boundaries"
+    )
     def test_forced_pace_never_raises_the_threshold(self):
         after = _facts(travellers=(_traveller(stage=FatigueStage.FORCED_SLEEP),))
         self.assertNotIn(
@@ -245,6 +264,9 @@ class PaceThresholdTests(unittest.TestCase):
 class NightfallTests(unittest.TestCase):
     """Night entry is an absolute hour-boundary crossing of a charged interval."""
 
+    @covers_requirement(
+        "wilderness-travel-interrupts::wilderness-steps-report-stateless-committed-interrupts"
+    )
     def test_a_positive_interval_crossing_into_night_raises(self):
         night = _night_start_tick()
         self.assertTrue(
@@ -263,6 +285,9 @@ class NightfallTests(unittest.TestCase):
             nightfall_crossed(_facts(tick=night), _facts(tick=night + 3600))
         )
 
+    @covers_requirement(
+        "wilderness-travel-interrupts::interrupt-results-respect-movement-failure-boundaries"
+    )
     def test_a_flight_waived_zero_charge_step_cannot_cross_time(self):
         night = _night_start_tick()
         before = _facts(tick=night - 1)
@@ -278,6 +303,9 @@ class NightfallTests(unittest.TestCase):
 class MemberAsleepTests(unittest.TestCase):
     """Only an observed awake -> voluntary/forced transition counts."""
 
+    @covers_requirement(
+        "wilderness-travel-interrupts::wilderness-steps-report-stateless-committed-interrupts"
+    )
     def test_awake_to_voluntary_raises(self):
         self.assertTrue(
             member_fell_asleep(
@@ -286,6 +314,9 @@ class MemberAsleepTests(unittest.TestCase):
             )
         )
 
+    @covers_requirement(
+        "wilderness-travel-interrupts::wilderness-steps-report-stateless-committed-interrupts"
+    )
     def test_awake_to_forced_raises(self):
         before = _facts(travellers=(_traveller(stage=FatigueStage.NORMAL),))
         after = _facts(
@@ -335,6 +366,9 @@ class CollectorDispositionTests(unittest.TestCase):
         self.actor = SimpleNamespace(pk=17)
         self.location = SimpleNamespace(pk=21)
 
+    @covers_requirement(
+        "wilderness-travel-interrupts::interrupt-results-respect-movement-failure-boundaries"
+    )
     def test_a_capture_failure_logs_and_leaves_no_flags(self):
         from world.rules.movement_settlement import capture_movement_observation
 
@@ -360,6 +394,9 @@ class CollectorDispositionTests(unittest.TestCase):
         self.assertEqual(context["char"], 17)
         self.assertEqual(context["step"], "before")
 
+    @covers_requirement(
+        "wilderness-travel-interrupts::interrupt-results-respect-movement-failure-boundaries"
+    )
     def test_a_comparison_failure_logs_and_leaves_no_flags(self):
         from world.rules.movement_settlement import capture_movement_observation
 

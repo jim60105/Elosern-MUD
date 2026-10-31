@@ -423,6 +423,9 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertNotIn("data", result)
 
 
+    @covers_requirement(
+        "wilderness-travel-interrupts::interrupt-results-respect-movement-failure-boundaries"
+    )
     def test_a_refused_step_carries_no_interrupt_data(self):
         before = get_world_clock().tick
         result = self._move(
@@ -433,6 +436,9 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(get_world_clock().tick, before)
 
 
+    @covers_requirement(
+        "wilderness-travel-interrupts::interrupt-results-respect-movement-failure-boundaries"
+    )
     def test_a_movement_owned_failure_restores_knowledge_and_carries_no_interrupts(self):
         import world.rules.map_knowledge as map_knowledge
 
@@ -462,6 +468,9 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
             parse_knowledge(self.player)
 
 
+    @covers_requirement(
+        "wilderness-travel-interrupts::interrupt-results-respect-movement-failure-boundaries"
+    )
     def test_a_caller_rollback_discards_the_commit_qualified_result(self):
         from django.db import transaction
         from twisted.internet.defer import Deferred
@@ -773,6 +782,9 @@ class WildernessMoveInterruptTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(get_world_clock().tick, tick)
 
     # -- evidence --------------------------------------------------------
+    @covers_requirement(
+        "wilderness-travel-interrupts::wilderness-steps-report-stateless-committed-interrupts"
+    )
     def test_a_gate_entry_carries_committed_interrupts_without_a_capture_failure(self):
         from world.rules.travel_interrupts import FLAG_ORDER
 
@@ -785,6 +797,9 @@ class WildernessMoveInterruptTests(BattlefieldIsolation, EvenniaTest):
         self.assertNotIn("pace_threshold", interrupts)
         self.assertNotIn("nightfall", interrupts)
 
+    @covers_requirement(
+        "wilderness-travel-interrupts::wilderness-steps-report-stateless-committed-interrupts"
+    )
     def test_the_natural_arrival_flag_reports_the_landmark_cell(self):
         from world.rules.travel_interrupts import landmark_keys_at
 
@@ -795,6 +810,9 @@ class WildernessMoveInterruptTests(BattlefieldIsolation, EvenniaTest):
             "landmark_reached" in result["data"]["interrupts"], expected
         )
 
+    @covers_requirement(
+        "wilderness-travel-interrupts::wilderness-steps-report-stateless-committed-interrupts"
+    )
     def test_capturing_the_committed_facts_writes_nothing(self):
         from world.rules.surfaces import attribute_snapshot
         from world.rules.travel_interrupts import read_movement_facts
@@ -809,6 +827,9 @@ class WildernessMoveInterruptTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(clock.tick, tick)
         self.assertEqual(attribute_snapshot(self.char1, "map_knowledge"), knowledge)
 
+    @covers_requirement(
+        "wilderness-travel-interrupts::wilderness-steps-report-stateless-committed-interrupts"
+    )
     def test_pooled_room_facts_follow_coordinates_not_object_identity(self):
         from world.rules.travel_interrupts import read_movement_facts
 
@@ -833,6 +854,9 @@ class WildernessMoveInterruptTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(before.cell, first)
         self.assertEqual(after.cell, second)
 
+    @covers_requirement(
+        "wilderness-travel-interrupts::interrupt-results-respect-movement-failure-boundaries"
+    )
     def test_an_after_capture_setup_failure_never_fails_the_committed_move(self):
         import world.rules.movement_settlement as settlement
 
@@ -854,6 +878,9 @@ class WildernessMoveInterruptTests(BattlefieldIsolation, EvenniaTest):
         events = [call.args[0] for call in log_warn.call_args_list]
         self.assertIn("travel_interrupts_failed", events)
 
+    @covers_requirement(
+        "wilderness-travel-interrupts::interrupt-results-respect-movement-failure-boundaries"
+    )
     def test_a_before_capture_failure_reports_the_current_tick(self):
         import world.rules.movement_settlement as settlement
 
@@ -875,6 +902,9 @@ class WildernessMoveInterruptTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(failures[0]["tick"], tick_before)
         self.assertEqual(failures[0]["step"], "before")
 
+    @covers_requirement(
+        "wilderness-travel-interrupts::interrupt-results-respect-movement-failure-boundaries"
+    )
     def test_initial_pace_state_matches_move_interrupt(self):
         from world.rules.fatigue import FatigueStage, get_policy
         from world.rules.tests.test_travel_plan import _STAGE_RESERVES
@@ -907,6 +937,9 @@ class WildernessMoveInterruptTests(BattlefieldIsolation, EvenniaTest):
                         "the move must stop on the same threshold as travel.plan",
                     )
 
+    @covers_requirement(
+        "wilderness-travel-interrupts::interrupt-results-respect-movement-failure-boundaries"
+    )
     def test_nightfall_raises_only_for_a_charged_crossing(self):
         self._enter()
         self._advance_to(_night_start_tick() - 1)
@@ -920,6 +953,9 @@ class WildernessMoveInterruptTests(BattlefieldIsolation, EvenniaTest):
         self.assertGreater(get_world_clock().tick, _night_start_tick() - 1)
         self.assertIn("nightfall", result["data"]["interrupts"])
 
+    @covers_requirement(
+        "wilderness-travel-interrupts::interrupt-results-respect-movement-failure-boundaries"
+    )
     def test_a_flight_waived_zero_charge_step_cannot_cross_into_night(self):
         from world.rules.fatigue import get_policy
 
