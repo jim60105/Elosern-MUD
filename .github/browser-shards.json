@@ -336,7 +336,8 @@
         "web.tests.browser.test_wilderness_travel.TravelMapTests.test_map_viewports",
         "web.tests.browser.test_wilderness_travel.TravelMapTests.test_repaint_budget",
         "web.tests.browser.test_wilderness_travel.TravelWalkingTests.test_keyboard_only_step",
-        "web.tests.browser.test_wilderness_travel.TravelWalkingTests.test_held_walk_release"
+        "web.tests.browser.test_wilderness_travel.TravelWalkingTests.test_held_walk_release",
+        "web.tests.browser.test_wilderness_travel.TravelLogTests.test_committed_log_and_full_prose"
       ],
       "files_b": [
         "web.tests.browser.test_browser_combat_rejection.CombatReconnectBrowserTest.test_confirmed_action_disconnect_shows_no_uncertain_notice",
