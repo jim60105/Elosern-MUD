@@ -62,7 +62,6 @@ import {
   stepZoom,
 } from "../../lib/travel-camera.js";
 import { travelCellAt } from "../../lib/travel-grid.js";
-import { TERRAIN_NAMES } from "../../lib/area_map_view.js";
 import { TRAVEL_GLYPH_CELL } from "../../lib/map_glyphs.js";
 import { ARROW_KEYS, directionForKeys } from "./travel-walk-model.js";
 
@@ -321,9 +320,14 @@ const party = computed(() => props.grid?.party ?? null);
 const partyInWindow = computed(() => !!party.value && !!travelCellAt(props.grid, party.value.x, party.value.y));
 const radius = computed(() => (typeof props.grid?.groundRadius === "number" ? props.grid.groundRadius : null));
 
+// The server's permitted label only (schema 3 `display.terrain_label`): the
+// stage never maps a terrain class to a name itself.
 function terrainLabel(cell) {
-  return cell.display?.terrain_label ?? TERRAIN_NAMES[cell.terrain] ?? cell.terrain;
+  return cell.display?.terrain_label ?? "";
 }
+
+// A hostile whose canonical threat is unavailable says so; no grade is guessed.
+const UNKNOWN_THREAT = "威脅不明";
 
 const neighbours = computed(() => {
   const grid = props.grid;
@@ -373,6 +377,7 @@ const hostiles = computed(() =>
       label: e.label,
       count: Number.isSafeInteger(e.count) && e.count > 1 ? e.count : null,
       threat: typeof e.threat === "string" && e.threat ? e.threat : null,
+      threatKnown: typeof e.threat === "string" && e.threat !== "",
     })),
 );
 
@@ -683,7 +688,8 @@ defineExpose({ focusInside, focus: () => root.value?.focus({ preventScroll: true
             :key="`chip-${h.id}`"
             class="tm-chip tm-chip--seal"
             :style="{ left: `${lx(h.x)}px`, top: `${ly(h.y) + c * 0.48}px` }"
-          >{{ h.label }}<template v-if="h.count"> ×{{ h.count }}</template><template v-if="h.threat">・<b>{{ h.threat }}</b></template></div>
+            data-testid="travel-map__hostile-chip"
+          >{{ h.label }}<template v-if="h.count"> ×{{ h.count }}</template>・<b v-if="h.threatKnown">{{ h.threat }}</b><i v-else class="tm-chip__unknown">{{ UNKNOWN_THREAT }}</i></div>
           <div
             v-for="f in fords"
             :key="`ford-${f.key}`"
@@ -894,6 +900,13 @@ defineExpose({ focusInside, focus: () => root.value?.focus({ preventScroll: true
 .tm-chip--seal b {
   font-weight: 600;
   color: #ffb4a6;
+}
+/* An unavailable threat reads as a quieter, dotted aside: a distinct shape,
+   not just a paler colour, so it never passes for a grade. */
+.tm-chip__unknown {
+  font-style: normal;
+  color: rgba(242, 214, 208, 0.72);
+  border-bottom: 1px dotted rgba(242, 214, 208, 0.55);
 }
 .tm-chip--quiet {
   color: var(--paper-400);

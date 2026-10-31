@@ -3,6 +3,8 @@
 // from committed panels, and nothing here derives a fatigue stage, a reveal or
 // a route.
 
+import { LIGHT_PHASE_NAMES } from "../../lib/area_map_view.js";
+
 /** The committed scene identity `{ subject_id }`, or null when none is admitted. */
 export function travelRoom(art) {
   const subject = art && art.available === true ? art.scene?.artwork?.subject_id : null;
@@ -98,4 +100,28 @@ export const RESERVE_NOTCHES = Object.freeze([20, 40, 70]);
 export function medallionLabel(member) {
   if (!member.available) return `${member.name}：精力資料無法取得`;
   return `${member.name}：精力 ${member.reserve}%（${member.label}）`;
+}
+
+
+/**
+ * The place card's two lines while the travel layout is shown
+ * (wilderness-travel-window-ui; interface design §3): `<district>・<terrain>`
+ * from the party cell's own disclosed run, and the server's time line with
+ * the supplied light phase. A cell with no disclosed district falls back to
+ * the window's caption (the current cell's district, else its region).
+ * Null without an adopted grid, so the ordinary labels stay.
+ */
+export function travelPlace(grid, timeLabel) {
+  if (!grid || !grid.party) return null;
+  const { x, y } = grid.party;
+  const col = x - grid.origin.x;
+  const row = y - grid.origin.y;
+  const cell = col >= 0 && row >= 0 && col < grid.width && row < grid.height ? grid.cells[row * grid.width + col] : null;
+  const district = cell?.display?.district_name ?? grid.districtName ?? null;
+  const terrain = cell?.display?.terrain_label ?? null;
+  const location = [district, terrain].filter((part) => typeof part === "string" && part !== "").join("・");
+  // The supplied phase's word (the phase itself is the server's).
+  const phase = LIGHT_PHASE_NAMES[grid.lightPhase] ?? null;
+  const time = typeof timeLabel === "string" && timeLabel !== "" ? [timeLabel, phase].filter(Boolean).join("・") : null;
+  return Object.freeze({ location: location || null, time });
 }

@@ -43,7 +43,7 @@ const townNode = (id, label, x, y, visibility, extra = {}) => ({
 export function townArea(overrides = {}) {
   const T = TOWN_IDS;
   return {
-    schema_version: 2,
+    schema_version: 3,
     available: true,
     layer: "grid",
     map_id: TOWN,
@@ -149,7 +149,7 @@ const room = (id, label, visibility, extra = {}) => ({ id, label, visibility, ga
 export function dungeonArea(overrides = {}) {
   const D = DUNGEON_IDS;
   return {
-    schema_version: 2,
+    schema_version: 3,
     available: true,
     layer: "instance",
     map_id: "instance:41",
@@ -187,7 +187,7 @@ export function dungeonArea(overrides = {}) {
 
 export function interiorArea() {
   return {
-    schema_version: 2,
+    schema_version: 3,
     available: true,
     layer: "interior",
     map_id: "room:120",
@@ -300,7 +300,25 @@ function wildTerrain(x, y) {
     tier = (x + y) % 5 === 0 ? 2 : 1;
   }
   const passable = !["water", "ridge", "sea", "settlement"].includes(terrain);
-  return { terrain, passable, band, tier, road: false, ford };
+  return { terrain, passable, band, tier, road: false, ford, display: wildDisplay(x, terrain, ford) };
+}
+
+// The synthetic schema-3 display annotation of one cell: the server's class
+// label, the current district east of x = 99 and an undisclosed one west of
+// it, the town's footprint and a ford label. Fixture data only.
+const WILD_LABELS = {
+  open_ground: "曠野", hills: "丘陵", mountain: "山地", woodland: "林地",
+  water: "河川", ridge: "山脊", sea: "海域", settlement: "聚落",
+};
+function wildDisplay(x, terrain, ford) {
+  const disclosed = x >= 99;
+  return {
+    terrain_label: WILD_LABELS[terrain],
+    district_key: disclosed ? "story_east_foothills" : null,
+    district_name: disclosed ? "灰鬃荒原東麓" : null,
+    settlement: terrain === "settlement",
+    ford_label: ford ? "淺灘" : null,
+  };
 }
 
 function revealedAt(x, y) {
@@ -339,6 +357,7 @@ export function wildernessArea({ cellKm = 1 } = {}) {
     visited: false,
     gateway: null,
     action: null,
+    landmark: null,
     ...fields,
   });
   for (const [x, y] of WILD_VISITS) {
@@ -360,6 +379,7 @@ export function wildernessArea({ cellKm = 1 } = {}) {
         visited: false,
         gateway: { leads_to: "灰岩鎮" },
         action: move(`e_wild_${dir}`, WILD_GATE_ID),
+        landmark: null,
       });
       edges.push({ source: current, destination: WILD_GATE_ID });
       continue;
@@ -380,7 +400,7 @@ export function wildernessArea({ cellKm = 1 } = {}) {
   const minX = cx - 20;
   const minY = cy - 20;
   return {
-    schema_version: 2,
+    schema_version: 3,
     available: true,
     layer: "wilderness",
     map_id: "elosern",
@@ -399,9 +419,9 @@ export function wildernessArea({ cellKm = 1 } = {}) {
     light_phase: "day",
     ground_radius: 4,
     entities: [
-      { id: "a1b2c3d4e5f60718", cell: { x: 102, y: 198 }, kind: "hostile", hostile: true, label: "荒原狼" },
-      { id: "b2c3d4e5f6071829", cell: { x: 103, y: 199 }, kind: "hostile", hostile: true, label: "荒原狼" },
-      { id: "c3d4e5f60718293a", cell: { x: 101, y: 197 }, kind: "npc", hostile: false, label: "行腳商人" },
+      { id: "a1b2c3d4e5f60718", cell: { x: 102, y: 198 }, kind: "hostile", hostile: true, label: "荒原狼", count: 1, threat: "低階" },
+      { id: "b2c3d4e5f6071829", cell: { x: 103, y: 199 }, kind: "hostile", hostile: true, label: "荒原狼", count: 1, threat: null },
+      { id: "c3d4e5f60718293a", cell: { x: 101, y: 197 }, kind: "npc", hostile: false, label: "行腳商人", count: 1, threat: null },
     ],
     sightings: [
       { bearing: "北北東", distance_km: 25, silhouette_zh: "一座石塔", name: null },

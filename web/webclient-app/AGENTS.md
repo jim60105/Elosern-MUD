@@ -168,10 +168,22 @@ dream or creation surface owns the stage. There is no server travel mode.
   through `store.setTravelMap`; the walking queue waits while refreshing and
   stops on a failed read. In travel the drawer offers only 世界 and never asks
   for the area.
-- `lib/travel-grid.js` `decodeTravelGrid` is the temporary adapter over the
-  schema-2 window (through `decodeWindow`, never a second decoder); it
-  leaves band/tier/flags/phase/sight empty until window-ui. It also carries
-  the body's `title` and `cellKm` (the scale bar).
+- One decoder (wilderness-travel-window-ui): `lib/wilderness-grid.js`
+  `decodeWildernessGrid` lays out the schema-3 window's run-length rows
+  (south-to-north, exact totals, unknown cells `null` with no fact) and
+  refuses any body it cannot lay out exactly (older schemas and node-form
+  wilderness included). Both consumers read it: the drawer's
+  `area_map_view.decodeWindow` and `lib/travel-grid.js` `decodeTravelGrid`,
+  whose cells carry each run's band/tier/flags and `display` annotation and
+  whose grid carries the window's own phase, radius, entities (`count`,
+  nullable `threat`), sightings, `title`, `cellKm` and body-level
+  `districtName`. The browser computes no phase, radius or label: chips and
+  readouts use `display.terrain_label`/`ford_label` and a node's
+  `landmark.name`; a hostile without a supplied threat says 威脅不明 and
+  unknown ground 未探明. While the layout is shown the place card states
+  `components/travel/travel-model.js` `travelPlace`: the party cell's
+  disclosed `<district>・<terrain>` (else the window's caption) and the
+  server's time line with the supplied phase word.
 - `TravelMap` paints that grid (wilderness-travel-map-ui; design §4.2–4.4):
   `lib/travel-paint.js` `paintTravelMap` draws onto a canvas of exactly
   `width × 12` by `height × 12` pixels (terrain field, brushed reveal mask

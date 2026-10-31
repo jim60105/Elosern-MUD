@@ -1,26 +1,30 @@
-// The travel stage's cell grid (OpenSpec change wilderness-travel-interface,
-// design "Current-protocol adapter"). Dependency-light ES module: no Vue, no
+// The travel stage's cell grid (OpenSpec changes wilderness-travel-interface
+// and wilderness-travel-window-ui). Dependency-light ES module: no Vue, no
 // DOM.
 //
-// `decodeTravelGrid(area)` turns one validated wilderness `area_map` body
-// into the decoded cell grid the travel stage paints from. It is the
-// approved temporary adapter over today's schema-2 run-length window: the
-// revealed terrain comes from the drawer's own `decodeWindow`, never from a
-// second decoder, and window-ui replaces this module at its schema cutover.
+// `decodeTravelGrid(area)` turns one validated schema-3 wilderness
+// `area_map` body into the grid the travel stage paints from. The rows come
+// from the one shared decoder (lib/wilderness-grid.js, the drawer's too), so
+// both maps lay out and refuse a window identically; the base design's
+// temporary adapter is gone.
 //
 // Nothing here is guessed. A cell is `known` only where the window carries a
-// revealed terrain run, and its terrain is that run's explicit canonical
-// class; no label is parsed into terrain. Elevation band, prominence tier,
-// road/ford flags, display metadata, the light phase, the ground radius,
-// entities and sightings keep the shape's empty values until window-ui
-// supplies them. A node keeps its payload object verbatim (its id, action
-// and gateway identity included).
+// revealed run, and its terrain, band, tier, flags and display annotation are
+// that run's; an unknown cell carries no fact at all. The light phase, the
+// ground radius, the live-sight entities and the distant sightings are the
+// committed window's own, passed through unchanged: the browser computes no
+// phase from the hour and no radius from the terrain. A node keeps its
+// payload object verbatim (its id, action, gateway and landmark included).
 
-import { decodeWindow } from "./area_map_view.js";
+import { decodeWildernessGrid } from "./wilderness-grid.js";
 
 /** The cell coordinates `{ x, y }` a payload node stands in. */
 function nodeCell(area, node) {
   return { x: Math.floor(node.x / area.cell_km), y: Math.floor(node.y / area.cell_km) };
+}
+
+function unknownCell(x, y, node) {
+  return Object.freeze({ x, y, known: false, terrain: null, band: null, tier: null, road: false, ford: false, node, display: null });
 }
 
 /**
@@ -32,11 +36,11 @@ function nodeCell(area, node) {
  * node's cell.
  */
 export function decodeTravelGrid(area) {
-  if (!area || area.available !== true || area.layer !== "wilderness" || !area.window) return null;
+  if (!area || area.available !== true || area.layer !== "wilderness") return null;
+  const window = decodeWildernessGrid(area);
+  if (!window || !Array.isArray(area.nodes) || !Array.isArray(area.entities) || !Array.isArray(area.sightings)) return null;
   const current = area.nodes.find((node) => node.id === area.current_node);
   if (!current) return null;
-  const { min_x: minX, min_y: minY, width, height } = area.window;
-  const revealed = new Map(decodeWindow(area).map((cell) => [cell.key, cell]));
   const nodes = new Map();
   for (const node of area.nodes) {
     const { x, y } = nodeCell(area, node);
@@ -45,45 +49,44 @@ export function decodeTravelGrid(area) {
     // payload node on a cell keeps it (payload order is the server's).
     if (!nodes.has(key)) nodes.set(key, node);
   }
-  const cells = [];
-  for (let row = 0; row < height; row += 1) {
-    for (let col = 0; col < width; col += 1) {
-      const x = minX + col;
-      const y = minY + row;
-      const key = `${x}:${y}`;
-      const terrain = revealed.get(key)?.terrain ?? null;
-      cells.push(
-        Object.freeze({
-          x,
-          y,
-          known: terrain !== null,
-          terrain,
-          band: null,
-          tier: null,
-          road: false,
-          ford: false,
-          node: nodes.get(key) ?? null,
-          display: null,
-        }),
-      );
-    }
-  }
+  const { origin, width, height } = window;
+  const cells = window.cells.map((cell, index) => {
+    const x = origin.x + (index % width);
+    const y = origin.y + Math.floor(index / width);
+    const node = nodes.get(`${x}:${y}`) ?? null;
+    if (!cell) return unknownCell(x, y, node);
+    return Object.freeze({
+      x,
+      y,
+      known: true,
+      terrain: cell.terrain,
+      band: cell.band,
+      tier: cell.tier,
+      road: cell.road,
+      ford: cell.ford,
+      node,
+      display: cell.display,
+    });
+  });
   return Object.freeze({
     mapId: area.map_id,
     title: area.title,
     frame: area.frame,
+    // The body-level district caption (the current cell's district, else
+    // its region): the place card's fallback where no district is disclosed.
+    districtName: area.district_name,
     // Kilometres per cell (the stage's scale bar; wilderness-travel-map-ui).
     cellKm: area.cell_km,
     currentNode: area.current_node,
-    origin: Object.freeze({ x: minX, y: minY }),
+    origin,
     width,
     height,
     cells: Object.freeze(cells),
     party: Object.freeze(nodeCell(area, current)),
-    lightPhase: null,
-    groundRadius: null,
-    entities: Object.freeze([]),
-    sightings: Object.freeze([]),
+    lightPhase: area.light_phase,
+    groundRadius: area.ground_radius,
+    entities: Object.freeze(area.entities.map((entity) => Object.freeze({ ...entity, cell: Object.freeze({ ...entity.cell }) }))),
+    sightings: Object.freeze(area.sightings.map((sighting) => Object.freeze({ ...sighting }))),
   });
 }
 

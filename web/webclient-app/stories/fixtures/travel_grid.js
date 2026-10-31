@@ -1,12 +1,16 @@
-// Synthetic full-fact travel grids for the wilderness travel stories
-// (wilderness-travel-map-ui). They are in the decoded TravelGrid shape that
-// lib/travel-grid.js produces (base design's shape), but carry every fact the
-// later window-ui slice supplies — elevation band, prominence tier, road and
-// ford flags, display metadata, landmarks, live hostiles, distant sightings,
-// the light phase and the ground radius — so the painter and overlays can be
-// reviewed against the approved prototype. Every value is a deterministic
-// function of world coordinates; nothing here is shipped geography or a
-// production rule (reveal is a fixed list of synthetic visit discs).
+// Synthetic full-fact wilderness windows for the wilderness travel stories
+// (wilderness-travel-map-ui; converted to exact schema-3 bodies by
+// wilderness-travel-window-ui). Each fixture is an `area_map` body that the
+// real wire validator accepts and the real decoder (lib/travel-grid.js)
+// turns into the painted grid, so the stories show the production path:
+// elevation band, prominence tier, road and ford flags, display annotations,
+// a lit landmark, live hostiles with their threat, distant sightings, the
+// light phase and the ground radius. Every value is a deterministic function
+// of world coordinates; nothing here is shipped geography or a production
+// rule (reveal is a fixed list of synthetic visit discs).
+
+import MapPanels from "../../../static/webclient/js/elosern/protocol/panels/map_panels.js";
+import { decodeTravelGrid } from "../../lib/travel-grid.js";
 
 const SIZE = 41;
 const HALF = 20;
@@ -98,25 +102,44 @@ function revealed(visits, x, y) {
   return visits.some(([vx, vy, r]) => (x - vx) ** 2 + (y - vy) ** 2 <= (r + 0.5) ** 2);
 }
 
-const MOVE = (dir, id) => ({ kind: "move", exit_ref: `e_story_${dir}`, destination: id });
 const NEIGHBOURS = [
-  ["north", 0, 1],
-  ["northeast", 1, 1],
-  ["east", 1, 0],
-  ["southeast", 1, -1],
-  ["south", 0, -1],
-  ["southwest", -1, -1],
-  ["west", -1, 0],
-  ["northwest", -1, 1],
+  ["north", "n", 0, 1],
+  ["northeast", "ne", 1, 1],
+  ["east", "e", 1, 0],
+  ["southeast", "se", 1, -1],
+  ["south", "s", 0, -1],
+  ["southwest", "sw", -1, -1],
+  ["west", "w", -1, 0],
+  ["northwest", "nw", -1, 1],
 ];
-const PASSABLE = new Set(["open_ground", "hills", "woodland", "settlement"]);
+const BLOCKED = new Set(["water", "ridge", "sea", "settlement"]);
+const wildId = (x, y) => `wild:elosern:${x}:${y}`;
+
+function runFacts(x, y) {
+  const terrain = terrainOf(x, y);
+  return {
+    kind: "terrain",
+    terrain,
+    passable: !BLOCKED.has(terrain),
+    band: band(x, y),
+    tier: tierOf(x, y, terrain),
+    road: isRoad(x, y),
+    ford: isRiver(x, y) && isRoad(x, y),
+    display: displayOf(x, y, terrain),
+  };
+}
+
+function sameFacts(a, b) {
+  return JSON.stringify({ ...a, length: 0 }) === JSON.stringify({ ...b, length: 0 });
+}
 
 /**
- * One synthetic grid centred on the party at `party` (default the morning
- * camp on the road), at `lightPhase` with `groundRadius`, carrying
- * `entities` and `sightings` as given.
+ * One synthetic schema-3 wilderness `area_map` body centred on the party at
+ * `party` (default the morning camp on the road), at `lightPhase` with
+ * `groundRadius`, carrying `entities` and `sightings` as given. `landmarks`
+ * name lit landmark cells (each must be revealed by a visit).
  */
-export function travelGridFixture({
+export function travelAreaFixture({
   party = { x: 100, y: 200 },
   lightPhase = "day",
   groundRadius = 4,
@@ -126,6 +149,7 @@ export function travelGridFixture({
   landmarks = [{ x: 108, y: 207, name: "合成石標" }],
 } = {}) {
   const origin = { x: party.x - HALF, y: party.y - HALF };
+  const inWindow = (x, y) => x >= origin.x && x < origin.x + SIZE && y >= origin.y && y < origin.y + SIZE;
   const trail = visits ?? [
     [84, 192, 4],
     [88, 195, 4],
@@ -138,65 +162,79 @@ export function travelGridFixture({
     [96, 205, 3],
     [93, 209, 2],
   ];
+  const current = wildId(party.x, party.y);
+  const node = (x, y, fields) => ({
+    id: wildId(x, y), label: "合成荒原", x: x + 0.5, y: y + 0.5,
+    visibility: "visited", visited: true, gateway: null, action: null, landmark: null, ...fields,
+  });
   const nodes = new Map();
-  const current = { id: `wild:story:${party.x}:${party.y}`, label: "合成荒原", visibility: "current", visited: true, gateway: null, action: null, landmark: null };
-  nodes.set(`${party.x}:${party.y}`, current);
-  for (const [dir, dx, dy] of NEIGHBOURS) {
+  nodes.set(`${party.x}:${party.y}`, node(party.x, party.y, { visibility: "current" }));
+  for (const [vx, vy] of trail) {
+    const key = `${vx}:${vy}`;
+    if (inWindow(vx, vy) && !nodes.has(key)) nodes.set(key, node(vx, vy, {}));
+  }
+  const edges = [];
+  for (const [, dir, dx, dy] of NEIGHBOURS) {
     const x = party.x + dx;
     const y = party.y + dy;
-    if (!PASSABLE.has(terrainOf(x, y))) continue;
-    const id = `wild:story:${x}:${y}`;
-    nodes.set(`${x}:${y}`, { id, label: "合成荒原", visibility: "seen", visited: false, gateway: null, action: MOVE(dir, id), landmark: null });
+    if (BLOCKED.has(terrainOf(x, y)) || !revealed(trail, x, y)) continue;
+    const key = `${x}:${y}`;
+    const id = wildId(x, y);
+    const existing = nodes.get(key) ?? node(x, y, { visibility: "seen", visited: false });
+    nodes.set(key, { ...existing, action: { kind: "move", exit_ref: `e_story_${dir}`, destination: id } });
+    edges.push({ source: current, destination: id });
   }
   for (const mark of landmarks) {
+    if (!inWindow(mark.x, mark.y) || !revealed(trail, mark.x, mark.y)) continue;
     const key = `${mark.x}:${mark.y}`;
-    const existing = nodes.get(key);
-    const id = `wild:story:${mark.x}:${mark.y}`;
-    nodes.set(key, { ...(existing ?? { id, label: mark.name, visibility: "seen", visited: false, gateway: null, action: null }), landmark: { name: mark.name } });
+    nodes.set(key, { ...(nodes.get(key) ?? node(mark.x, mark.y, {})), landmark: { name: mark.name } });
   }
-  const cells = [];
+  const rows = [];
   for (let row = 0; row < SIZE; row += 1) {
+    const runs = [];
     for (let col = 0; col < SIZE; col += 1) {
       const x = origin.x + col;
       const y = origin.y + row;
-      const known = revealed(trail, x, y);
-      const terrain = terrainOf(x, y);
-      cells.push(
-        Object.freeze({
-          x,
-          y,
-          known,
-          terrain: known ? terrain : null,
-          band: known ? band(x, y) : null,
-          tier: known ? tierOf(x, y, terrain) : null,
-          road: known && isRoad(x, y),
-          ford: known && isRiver(x, y) && isRoad(x, y),
-          node: nodes.get(`${x}:${y}`) ?? null,
-          display: known ? displayOf(x, y, terrain) : null,
-        }),
-      );
+      const run = revealed(trail, x, y) ? { length: 1, ...runFacts(x, y) } : { length: 1, kind: "unknown" };
+      const last = runs[runs.length - 1];
+      if (last && sameFacts(last, run)) last.length += 1;
+      else runs.push(run);
     }
+    rows.push(runs);
   }
-  return Object.freeze({
-    mapId: "story",
+  const sorted = [...nodes.values()].sort((a, b) => a.y - b.y || a.x - b.x);
+  return {
+    schema_version: 3,
+    available: true,
+    layer: "wilderness",
+    map_id: "elosern",
+    frame: { key: "elosern", unit: "km" },
+    current_node: current,
     title: "合成荒原",
-    frame: Object.freeze({ key: "story", unit: "km" }),
-    cellKm: 1,
-    currentNode: current.id,
-    origin: Object.freeze(origin),
-    width: SIZE,
-    height: SIZE,
-    cells: Object.freeze(cells),
-    party: Object.freeze({ ...party }),
-    lightPhase,
-    groundRadius,
-    entities: Object.freeze(entities),
-    sightings: Object.freeze(sightings),
-  });
+    nodes: sorted,
+    edges,
+    quest_markers: [],
+    district_name: displayOf(party.x, party.y, terrainOf(party.x, party.y)).district_name,
+    cell_km: 1,
+    window: { min_x: origin.x, min_y: origin.y, width: SIZE, height: SIZE },
+    rows,
+    light_phase: lightPhase,
+    ground_radius: groundRadius,
+    entities,
+    sightings,
+  };
 }
 
+/** The validated, decoded travel grid of one {@link travelAreaFixture} body. */
+export function travelGridFixture(options = {}) {
+  return decodeTravelGrid(MapPanels.validateAreaMapPanel(travelAreaFixture(options)));
+}
+
+// Two wolves of a pack and a boar whose threat the server could not state.
 const WOLVES = [
-  { id: "story-wolf-a", cell: { x: 103, y: 202 }, kind: "hostile", hostile: true, label: "荒原狼", count: 3, threat: "危險" },
+  { id: "a0b1c2d3e4f50617", cell: { x: 102, y: 202 }, kind: "hostile", hostile: true, label: "荒原狼", count: 1, threat: "中階 D 級" },
+  { id: "b1c2d3e4f5061728", cell: { x: 103, y: 201 }, kind: "hostile", hostile: true, label: "荒原狼", count: 1, threat: "中階 D 級" },
+  { id: "c2d3e4f506172839", cell: { x: 98, y: 198 }, kind: "hostile", hostile: true, label: "野豬", count: 1, threat: null },
 ];
 const DAY_SIGHTINGS = [
   { bearing: "北北東", distance_km: 25, silhouette_zh: "一座石塔", name: null },

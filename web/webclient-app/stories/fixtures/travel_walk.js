@@ -1,7 +1,7 @@
 // Synthetic wilderness cells for the travel walking slice (OpenSpec change
 // wilderness-travel-walking-ui): the eager panels of one cell, whose local
 // map names it as the canonical current node and whose exploration panel
-// carries one direction row per step, and the schema-2 window the refresh
+// carries one direction row per step, and the schema-3 window the refresh
 // owner adopts for it. The walking tests and the WildernessTravel stories
 // drive the real store with them. Nothing here names shipped content.
 
@@ -102,7 +102,7 @@ export function walkCapacity({
   };
 }
 
-/** A schema-2 wilderness window centred on `(cx, cy)`: a revealed 3 x 3 block. */
+/** A schema-3 wilderness window centred on `(cx, cy)`: a revealed 3 x 3 block. */
 export function walkArea(cx, cy) {
   const width = 41;
   const rows = [];
@@ -112,20 +112,23 @@ export function walkArea(cx, cy) {
       Math.abs(y - cy) <= 1
         ? [
             { length: 19, kind: "unknown" },
-            { length: 3, kind: "terrain", terrain: "open_ground", passable: true, band: 3, tier: 0, road: false, ford: false },
+            {
+              length: 3, kind: "terrain", terrain: "open_ground", passable: true, band: 3, tier: 0, road: false, ford: false,
+              display: { terrain_label: "曠野", district_key: "synthetic_east", district_name: "合成東麓", settlement: false, ford_label: null },
+            },
             { length: 19, kind: "unknown" },
           ]
         : [{ length: width, kind: "unknown" }],
     );
   }
   const current = walkNode(cx, cy);
-  const nodes = [{ id: current, label: "合成荒原", x: cx + 0.5, y: cy + 0.5, visibility: "current", visited: true, gateway: null, action: null }];
+  const nodes = [{ id: current, label: "合成荒原", x: cx + 0.5, y: cy + 0.5, visibility: "current", visited: true, gateway: null, action: null, landmark: null }];
   for (const [, dir, dx, dy] of WALK_STEPS) {
     const id = walkNode(cx + dx, cy + dy);
-    nodes.push({ id, label: "合成荒原", x: cx + dx + 0.5, y: cy + dy + 0.5, visibility: "seen", visited: false, gateway: null, action: { kind: "move", exit_ref: `e_wild_${dir}`, destination: id } });
+    nodes.push({ id, label: "合成荒原", x: cx + dx + 0.5, y: cy + dy + 0.5, visibility: "seen", visited: false, gateway: null, action: { kind: "move", exit_ref: `e_wild_${dir}`, destination: id }, landmark: null });
   }
   return {
-    schema_version: 2,
+    schema_version: 3,
     available: true,
     layer: "wilderness",
     map_id: "elosern",
