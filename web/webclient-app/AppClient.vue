@@ -2106,13 +2106,14 @@ const rootStyle = computed(() => {
   min-height: 0;
   aspect-ratio: 1 / 1;
 }
-/* The travel movement column: wider than the compass square, so the intent
-   line reads on one line beside the rose. */
+/* The travel movement column: a little wider than the compass square, so
+   the intent line reads beside the rose while the readout column keeps room
+   for its line. */
 .exploration-root__travel {
   display: flex;
   height: 100%;
   min-height: 0;
-  width: calc(300px * var(--ui-scale));
+  width: calc(250px * var(--ui-scale));
 }
 .exploration-root__side {
   display: flex;

@@ -113,7 +113,7 @@ function onStop() {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr) auto;
-  column-gap: calc(14px * var(--ui-scale));
+  column-gap: calc(10px * var(--ui-scale));
   row-gap: calc(10px * var(--ui-scale));
   align-items: center;
   width: 100%;
@@ -130,8 +130,8 @@ function onStop() {
 
 .travel-walk__rose {
   grid-row: 1;
-  width: calc(76px * var(--ui-scale));
-  height: calc(76px * var(--ui-scale));
+  width: calc(58px * var(--ui-scale));
+  height: calc(58px * var(--ui-scale));
 }
 .travel-walk__ring {
   fill: rgba(11, 13, 16, 0.6);
@@ -191,7 +191,7 @@ function onStop() {
   flex-direction: column;
   gap: calc(4px * var(--ui-scale));
   min-width: 0;
-  padding-left: calc(12px * var(--ui-scale));
+  padding-left: calc(10px * var(--ui-scale));
   border-left: 2px solid var(--gold-500);
 }
 .travel-walk__title {

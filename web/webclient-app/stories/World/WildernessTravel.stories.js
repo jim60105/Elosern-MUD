@@ -283,7 +283,7 @@ function walkingStage(args) {
               h(
                 "div",
                 { style: "box-sizing:border-box;height:100%;display:flex;padding:calc(12px * var(--ui-scale));" },
-                h("div", { style: "display:flex;width:calc(300px * var(--ui-scale));" }, h(TravelWalkControls, {
+                h("div", { style: "display:flex;width:calc(250px * var(--ui-scale));" }, h(TravelWalkControls, {
                   travel,
                   motionLevel: args.motionLevel,
                   onStop: () => store.stopTravel("stop"),
