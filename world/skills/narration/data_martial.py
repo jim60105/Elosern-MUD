@@ -85,13 +85,6 @@ ROWS: tuple[NarrationRow, ...] = (
         ),
     ),
     NarrationRow(
-        "light_sword_style",
-        action=(
-            "{actor} 將劍舉至眼前，刃上映著一線光。",
-            "{actor} 側身而立，讓劍身斜擋在身前。",
-        ),
-    ),
-    NarrationRow(
         "shadow_slash",
         action=(
             "{actor} 的身影貼著地面滑出，劍從低處挑起。",

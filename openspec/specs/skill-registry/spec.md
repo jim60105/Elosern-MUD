@@ -388,15 +388,6 @@ the `divine-mystery` capability's requirement.
 - **THEN** its `SKILL_REGISTRY` entry and its `SEXUAL_ACT_REGISTRY` row are the same paired objects
   the catalogue import installs
 
-### Requirement: light_sword_style deals damage via the standard damage convention
-`light_sword_style` SHALL declare `effects=["damage:light:physical"]` (changed from the previously
-inert `weapon_style:light_sword`), resolved by the already-registered `damage` effect handler.
-
-#### Scenario: Casting light_sword_style deals light-elemental physical damage
-- **WHEN** a player casts `light_sword_style` at a valid `SINGLE` target
-- **THEN** the cast resolves successfully (no `UNKNOWN_EFFECT_ID` rejection) and the target takes
-  light-elemental physical damage
-
 ### Requirement: Reincarnation boon labels match the preset character names
 The three per-character 轉生特典 passives SHALL declare labels that read 轉生祝福‧悠花
 (`reincarnation_boon_yuka`), 轉生祝福‧悠奈 (`reincarnation_boon_yuna`), and 轉生祝福‧伊洛希雅
@@ -856,4 +847,3 @@ The lightning spell family SHALL provide the documented 回合 progression as ex
   decides the skip; a 多段 rung resolving three independent strikes under the widened cap with the
   shipped once-paid and single-terminal-emission discipline; a 處決級 execution rung that ignores
   defense; and 毀滅級 devastation rungs
-

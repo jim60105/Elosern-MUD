@@ -192,7 +192,6 @@ class SkillCategoryClassificationTests(unittest.TestCase):
         expected = {
             SkillCategory.MARTIAL_ARTS: {
                 "basic_attack",
-                "light_sword_style",
                 "dual_wield_style",
                 "flee",
                 "basic_swordplay",

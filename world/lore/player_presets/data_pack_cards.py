@@ -26,7 +26,7 @@ ROWS: dict[str, PlayerPreset] = {
         (("hp", 50), ("mp", 50), ("sp", 50), ("atk_phys", 10),
          ("agility", 10), ("defense", 11), ("magic_power", 43)),
         "生命力與魔力均衡的開局配點",
-        active_skills=("light_sword_style",),
+        active_skills=("basic_swordplay",),
         passive_skills=("body_enhancement_basic",),
         starting_items=(("plain_sword", 1), ("leather_armor", 1),
                         ("guild_recruit_badge", 1), ("healing_potion", 2),

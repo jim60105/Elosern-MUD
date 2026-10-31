@@ -176,7 +176,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "f1a9a86f4bce87d927149b79580410a39dd6260dd58ae97b08adce21443eeab3",
+  "fingerprint": "ee7b16f8c1a1d678b2f4d7faa9303327d8db6267c18cf7dba869136d3f6d6c69",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -955,8 +955,8 @@
     "world/lore/npc_tiers.py": "ef6a82a681f9212ab71295771986769e6f7285538367f72297bad6dddb66fd48",
     "world/lore/player_presets/__init__.py": "7640ad1e9fcdee37be50038eb956441baf7ed9f347b4ffc0f748b695c887fee0",
     "world/lore/player_presets/assembly.py": "f285d3efdca8bb76276f5a5c6696f0a3a43c775516affaa8443ab89239cc30a4",
-    "world/lore/player_presets/data_pack_cards.py": "d294866917e5d88adb83b0f604ea5c62c22cc59a44815a5f4aa1b2b7c49895bb",
-    "world/lore/player_presets/data_story_cards.py": "0952410d5fae7e7dc43d3e82cdb2abdfd1fdc1ac994589177a2575ed2c42802b",
+    "world/lore/player_presets/data_pack_cards.py": "7ea6b3a84a7cff03244b005da209fb26279549a1aff9d134807d8ddf5b2834e8",
+    "world/lore/player_presets/data_story_cards.py": "9cbc29ac3ba4e1012105c056cf7c63dbc67a86f5d742f9c0549f9896297aa155",
     "world/lore/player_presets/validation.py": "084c3ff9755e870076bf84f4a0b617968fe5967285519e988eccd120edb3bca9",
     "world/lore/player_presets/vocab.py": "ce785ac741406c576af66408c286b2c93c16d6367b41d4b041d3f5f5b0633661",
     "world/lore/races.py": "d1d3672182c64eae1dfb17f1fe16962c9db5f51fb5a0b7404e70d88b20887ae4",
@@ -1190,7 +1190,7 @@
     "world/rules/progression/_constants.py": "2996c37a60e0f5a120ad7338062513bc7c995e67e9a7cc7169709396c7b058e3",
     "world/rules/progression/_gates.py": "2d9b87b2a1b0bcfcb10dd404d65751b52d4771cfe18ee0cf04760f7daa2d31a8",
     "world/rules/progression/_lineage.py": "e77668e8ea4738ae9115d13480925185cc6711319ff7905693f294256bd205ec",
-    "world/rules/progression/_practice.py": "0a5ff865181fd01eb391fd9ca0e3a3e24f064dfeab3891ade96d9c463da4267d",
+    "world/rules/progression/_practice.py": "5592d305ed5ec0b49ee7db3f9ad426332eeee91844593d23c65bf16793b4faa9",
     "world/rules/progression/_scales.py": "e3fe413762fc31c10ed69e3cfdb2f85ec4ead48047d510e84163a9e0c617edae",
     "world/rules/progression/_scaling.py": "4f487e807f7e294a0185cb79ca599d6b51455c028711df7607644e159555a28b",
     "world/rules/protection_demo.py": "fd92b8d359cb02500ad091e7509dbf2d4b0dd7028fe0bb220e7f1c0d668eeb44",

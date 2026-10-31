@@ -29,7 +29,7 @@ ROWS: dict[str, PlayerPreset] = {
         (("hp", 80), ("mp", 0), ("sp", 100), ("atk_phys", 6),
          ("agility", 8), ("defense", 7), ("magic_power", 23)),
         "體力最強、劍技敏於防禦的近侍配點",
-        active_skills=("light_sword_style",),
+        active_skills=("basic_swordplay",),
         passive_skills=(
             "body_enhancement_basic", "retainer_martial_training",
             "guardian_instinct",

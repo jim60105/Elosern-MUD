@@ -6,7 +6,6 @@ import ast
 from dataclasses import fields
 import pathlib
 import unittest
-from world.lore.elements import ELEMENT_REGISTRY, Element
 from world.skills.effects import (
     DamageEffect,
     HealEffect,
@@ -53,16 +52,6 @@ class SkillContentCompletionTests(unittest.TestCase):
         self.assertIs(style.target_spec, TargetSpec.NONE)
         self.assertEqual(style.cost, {})
         self.assertEqual(style.effects, ["weapon_style:dual_wield"])
-
-    @covers_requirement("skill-registry::light-sword-style-deals-damage-via-the-standard-damage-convention")
-    def test_light_sword_style_declares_the_damage_convention(self):
-        # The cast-side dispatch (a damage: effect resolving through the
-        # standard damage handler) is behavior, covered generically by the
-        # synthetic cast-resolution tests; this contract carries the exact
-        # shipped declaration the requirement names.
-        skill = SKILL_REGISTRY["light_sword_style"]
-        self.assertEqual(skill.effects, ["damage:light:physical"])
-        self.assertIs(skill.element, ELEMENT_REGISTRY["light"])
 
 class DivineMysteryFamilyInvariantTests(unittest.TestCase):
     """Category-wide family invariants of the shipped divine-mystery tree.

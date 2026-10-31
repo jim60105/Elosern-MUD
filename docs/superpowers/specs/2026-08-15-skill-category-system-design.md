@@ -50,9 +50,9 @@ Two secondary defects surface from the same root cause:
 | # | Decision | Rationale |
 |---|---|---|
 | D-1 | **Two new fields on `SkillDef`: `category: SkillCategory` (required, no default) and `group: str \| None` (optional second level).** | Category is genuinely universal — every skill has exactly one — which is the test for belonging on the dataclass rather than in a side table. Contrast the sexual acts' unlock/participant metadata, which only 69 of an eventual 187 skills would ever set and therefore lives in a parallel registry (overview D-1). Making `category` required with no default means a new skill cannot silently land in a junk bucket; it fails at registry-load time, consistent with `parse_effect`'s existing "unrecognized prefix raises at import, not at use" discipline. |
-| D-2 | **Category is explicitly declared, never derived from `element`, `kind`, `effects`, or `target_spec`.** | Derivation demonstrably misclassifies. `basic_attack`, `dual_blade_mastery`, `light_sword_style`, and `shadow_slash` all carry an `element` but declare `damage:<element>:physical` — they are 武技, not 元素魔法. `flight` carries `element="wind"` but is a movement passive. `dual_blade_mastery` even ends in `_mastery` without being an element mastery. Every candidate heuristic breaks on real registry rows. |
+| D-2 | **Category is explicitly declared, never derived from `element`, `kind`, `effects`, or `target_spec`.** | Derivation demonstrably misclassifies. `basic_attack`, `dual_blade_mastery`, and `shadow_slash` all carry an `element` but declare `damage:<element>:physical` — they are 武技, not 元素魔法. `flight` carries `element="wind"` but is a movement passive. `dual_blade_mastery` even ends in `_mastery` without being an element mastery. Every candidate heuristic breaks on real registry rows. |
 | D-3 | **`group` is a plain nullable string, filled by the builder functions, not derived from `element`.** | `_elemental_spells()` already receives the element once for a whole set and can set `group` for free; sexual acts will set the line name. Deriving `group` from `element` would work for one category and be meaningless for the other, requiring a per-category branch in the presenter. A stored string keeps the presenter uniform: read `category`, read `group`, render. |
-| D-4 | **The taxonomy axis is "what the player does with it", not "what it looks like in data".** | This is why `light_sword_style` (a sword art that happens to deal light damage) is `martial_arts` while `light_arrow` is `elemental_magic`. A player looking for their sword techniques will not think to check the light-magic page. |
+| D-4 | **The taxonomy axis is "what the player does with it", not "what it looks like in data".** | This is why `shadow_slash` declares `martial_arts` despite its dark element, which does not assign `elemental_magic`, while `light_arrow` is `elemental_magic`. A player looking for their sword techniques will not think to check the light-magic page. |
 | D-5 | **The three existing sex-related skills move from `divine_mystery`/`innate_gift` into `sexual_act`.** Their acquisition paths (`requires_divine_arts`, race/reincarnation) are untouched; only the display location changes. | A player who owns 性魔法主宰 will look for it under 性愛行為. Category is a presentation concern by construction (D-1's field lives beside `label` and `description`, not beside `cost` or `faction_constraint`), so moving a skill between categories can never change a mechanic. |
 | D-6 | **`flee`'s category is declared at its construction site in `world/rules/disengage.py`**, not special-cased in the registry. | `flee` is deliberately constructed outside `registry.py` (the `universal-action-ownership` spec requires `world/skills/` not to depend on `world/rules/`, so the dependency runs the other way). Because `category` is required, `disengage.py` fails to import until it declares one — the desired fail-closed behaviour, and the reason `A1` owns `disengage.py` as well as `registry.py`. |
 
@@ -60,13 +60,16 @@ Two secondary defects surface from the same root cause:
 
 ## 3. The Taxonomy
 
-Eight categories. Counts are the current registry; the sexual act system adds 69 to `sexual_act`
-(62 counter-gated plus 7 神之秘法).
+Eight categories. The counts and member lists below are the historical snapshot from this design's
+proposal turn; the live member/count authority is the current category census test,
+`SkillCategoryClassificationTests.test_per_category_key_sets_match_the_d4_classification_table`
+in `world/skills/tests/test_skill_registry/test_category_classification.py`. The sexual act system
+adds 69 to `sexual_act` (62 counter-gated plus 7 神之秘法).
 
 | Key | Label | Second level | Count | Members |
 |---|---|---|---|---|
 | `elemental_magic` | 元素魔法 | **element key** | 87 | 8 element masteries + 79 elemental spells |
-| `martial_arts` | 武技 | — | 5 | `basic_attack`, `dual_blade_mastery`, `light_sword_style`, `shadow_slash`, `dual_wield_style` |
+| `martial_arts` | 武技 | — | live census | see the current category census test |
 | `enhancement` | 強化 | — | 11 | `body_enhancement` ×3, `defense_instinct`, `blade_art_mastery`, `extreme_endurance`, `retainer_martial_training`, `guardian_instinct`, `magic_circle_comprehension`, `precise_mana_control`, `concentration` |
 | `innate_gift` | 天賦 | — | 3 | `reincarnation_boon_elosia`, `reincarnation_boon_yuka`, `elf_longevity` |
 | `movement` | 移動 | — | 3 | `flight`, `flash_step`, `flee` |
@@ -74,8 +77,8 @@ Eight categories. Counts are the current registry; the sexual act system adds 69
 | `utility` | 特殊 | — | 2 | `status_disguise`, `dominion_art` |
 | `sexual_act` | 性愛行為 | **line** | 3 (+69) | `divine_sexual_arts`, `divine_sexual_mastery`, `reincarnation_boon_yuna` |
 
-**118 total.** Verified to partition the registry exactly: no skill unassigned, no assignment naming
-an absent key.
+The exact total and the exact-partition guarantee are asserted by that current category census test
+rather than restated here.
 
 ### 3.1 `elemental_magic` second level
 
