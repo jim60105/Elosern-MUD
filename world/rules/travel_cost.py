@@ -619,6 +619,61 @@ def wilderness_step_cost(
     )
 
 
+def wilderness_step_weight(
+    source_xy: tuple[int, int],
+    destination_xy: tuple[int, int],
+    members: Sequence[Any],
+    *,
+    cell_size_m: int | None = None,
+) -> int:
+    """One read-only routing weight for a wilderness step.
+
+    This is the travel planner's candidate-edge price and nothing else. It is
+    the canonical :func:`wilderness_step_cost` duration whenever that preflight
+    admits the step; when the initial-state preflight refuses it (a member
+    depletes strictly before the step's end), it degrades to the pure
+    distance/terrain duration at the initial frozen party speed, so a bounded
+    search can still compare edge lengths. It never authorizes execution: the
+    planner's sequential replay re-runs the canonical preflight before any step
+    is admitted or charged.
+    """
+
+    try:
+        return wilderness_step_cost(
+            source_xy, destination_xy, members, cell_size_m=cell_size_m
+        ).seconds
+    except MovementPreflightRefused:
+        terrain = wilderness_terrain(source_xy, destination_xy)
+        distance = Fraction(
+            wilderness_distance_m(source_xy, destination_xy, cell_size_m=cell_size_m)
+        )
+        speed = party_speed_m_per_hour(members, terrain)
+        return ceil(distance / (speed / 3600))
+
+
+def flight_waives_wilderness_charge(traversing_object: Any, cost_key: str) -> bool:
+    """Whether the flight effect waives this traversal's wilderness charge.
+
+    The single canonical decision used by execution
+    (``world.rules.movement.charge_movement``) and read-only planning: only an
+    owned, currently allowed ``flight`` effect on the actual traverser waives
+    the ``wilderness_move`` charge. ``flash_step`` explicitly does not waive
+    it; that skill only satisfies flight-required exit admission. Admission
+    (sleeping and depletion preflight) is the caller's earlier responsibility,
+    so this predicate never authorizes a traversal on its own.
+    """
+
+    if cost_key != "wilderness_move":
+        return False
+    skills = getattr(traversing_object, "skills", None)
+    owned = getattr(skills, "owned_keys", None)
+    if not callable(owned) or "flight" not in owned():
+        return False
+    from world.skills.restrictions import skill_effect_allowed
+
+    return skill_effect_allowed(traversing_object, "flight")
+
+
 def _find_gate(
     grid_room: Any, wilderness_xy: tuple[int, int]
 ) -> tuple[Any, Any] | None:

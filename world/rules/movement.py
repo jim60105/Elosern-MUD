@@ -76,11 +76,11 @@ def charge_movement(
         MovementPreflightRefused,
         TraversalStatus,
         consume_preflight_resolution,
+        flight_waives_wilderness_charge,
         refuse_sleeping_party,
         resolve_traversal_cost,
         source_present_members,
     )
-    from world.skills.restrictions import skill_effect_allowed
 
     resolution = consume_preflight_resolution(
         traversing_object, cost_key, source_location
@@ -96,11 +96,7 @@ def charge_movement(
     # a sleeping present member (voluntary or forced) and a direct charge call
     # cannot bypass the exit lineages' preflight refusal.
     refuse_sleeping_party(members)
-    if (
-        cost_key == "wilderness_move"
-        and "flight" in traversing_object.skills.owned_keys()
-        and skill_effect_allowed(traversing_object, "flight")
-    ):
+    if flight_waives_wilderness_charge(traversing_object, cost_key):
         # Owning ``flight`` waives the wilderness clock cost entirely — the
         # lore's "可前往遠處的場合" read as unencumbered long-distance travel
         # (movement-skill-waiver design). ``flash_step`` explicitly does NOT
