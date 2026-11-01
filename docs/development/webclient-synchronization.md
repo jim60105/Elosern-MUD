@@ -313,6 +313,46 @@ notice again but never writes it to the full log twice. A recognized non-success
 result during travel adds one local refusal entry (`refusal:<request id>`,
 committed server time, server message) and never a second full-log line.
 
+### Camp preview and camp
+
+The whole-party camp (wilderness-camping) adds two exploration actions with
+exact payloads and exact success data slots, validated on both boundaries
+(`web/webclient/actions/exploration_actions.py` `validate_camp_preview_data` /
+`validate_camp_result_data`, mirrored by `protocol/core.js`
+`validateCampPreviewData` / `validateCampData`):
+
+- `explore.camp_preview` takes exactly `{}` and answers through the
+  result-only path (no panel, no revision): `{available, refusal,
+  dream_offerable, default_mode, current_tick, current_time, modes}` with both
+  modes in `until-dawn`, `until-recovered` order, each `{mode, available,
+  refusal, dream_offerable, wake_tick, wake_time, members}`. An unavailable
+  mode carries only its stable `{code, message}` refusal. Every wake, reserve
+  and percentage is server-computed; the browser derives none.
+- `explore.camp` takes exactly `{mode, dream}` (`dream` an exact boolean) and
+  publishes a full snapshot. Its success data is `{camp_id, phase, timing:
+  {elapsed_seconds, result_tick, result_time, wake_tick, wake_time}, members,
+  events, interrupted, interruption_reason}`; the time fields nest under
+  `timing` because a data slot carries at most eight top-level fields.
+  `phase` is `dream` (pending, zero elapsed), `complete` or `interrupted`
+  with a stable ASCII reason; the result `message` is the server summary.
+  A refusal is an ordinary `rejected` result with the same code and message
+  the preview reports, and writes nothing.
+- The dispatcher hands the camp adapter the admitted request identity
+  (`request_identity: {epoch, request_id}`) after payload validation; it is
+  never a wire key. The adapter's durable camp identity is the SHA-256 of
+  `(owner_dbid, presentation_epoch, request_id)` (text: a fresh uuid), so a
+  replay returns the stored result without settling time, and two owners or a
+  reconnected epoch never collide.
+- The one `camp_result` travel notice is assigned a stable id
+  (`camp:<camp_id>.0`) when the camp finalizes and is stored with the result;
+  a dream departure, reconnect or replay redelivers that same fact, which the
+  travel log deduplicates. A dream entry publishes no notice.
+- `explore.wait` sleep and `explore.sleep_party` accept `sleep_mode:
+  "until-dawn"` and an optional exact boolean `dream` beside an explicit
+  mode; `dream: true` commits the entry and the guarded dream enter together.
+  Absent or false keeps the existing question policy; `{}` stays the default
+  all-party recovery request.
+
 ### General publication parts
 
 An eager `ui_snapshot`/`ui_update` whose canonical document does not fit its

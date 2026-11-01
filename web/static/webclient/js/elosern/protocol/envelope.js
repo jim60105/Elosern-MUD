@@ -15,6 +15,7 @@ var validateMessage = core.validateMessage;
 var validateCorrelationId = core.validateCorrelationId;
 var validateCombatResultData = core.validateCombatResultData;
 var validateTravelResultData = core.validateTravelResultData;
+var validateCampResultData = core.validateCampResultData;
 var validateResultData = core.validateResultData;
 var validateServerTime = core.validateServerTime;
 
@@ -360,6 +361,8 @@ function validateActionResult(payload) {
   validateCombatResultData(payload.code, hasData, result.data);
   // The read-only route preview's exact planner slot (travel.plan success).
   validateTravelResultData(payload.code, payload.outcome, hasData, result.data);
+  // The whole-party camp's exact preview and result slots.
+  validateCampResultData(payload.code, payload.outcome, hasData, result.data);
   return result;
 }
 

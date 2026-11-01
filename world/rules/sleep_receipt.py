@@ -649,7 +649,7 @@ def _validate_camp(value: Any) -> dict[str, Any]:
 def _plain_copy(value: Any) -> Any:
     if isinstance(value, Mapping):
         return {str(key): _plain_copy(child) for key, child in value.items()}
-    if isinstance(value, (list, tuple)):
+    if _camp_list(value):
         return [_plain_copy(child) for child in value]
     return value
 

@@ -4,8 +4,8 @@ The production exploration actions are ``explore.move``, ``explore.look``,
 ``explore.talk_open``, ``explore.talk_scripted``, ``explore.talk_freeform``,
 ``explore.dialogue_complete``, ``explore.dialogue_leave``,
 ``explore.party_invite``, ``explore.party_leave``, ``explore.engage``,
-``explore.wait``, ``explore.practice``, ``explore.possess``, ``explore.possess_release``, and
-``explore.deliver``. Each
+``explore.wait``, ``explore.practice``, ``explore.possess``, ``explore.possess_release``,
+``explore.deliver``, the read-only ``explore.camp_preview`` and ``explore.camp``. Each
 validator enforces an exact bounded payload shape; each adapter re-resolves
 every referenced identity from the actor's **current** location's present
 contents and re-verifies the exact eligibility at commit time, calls only
@@ -420,9 +420,44 @@ def validate_wait_payload(payload: Any) -> dict[str, Any]:
     raise ExplorationActionError("explore.wait requires exactly one of daypart, seconds, or sleep")
 
 
-_SLEEP_WAIT_KEYS = frozenset({"sleep", "sleep_scope", "sleep_mode", "seconds"})
+_SLEEP_WAIT_KEYS = frozenset({"sleep", "sleep_scope", "sleep_mode", "seconds", "dream"})
 _SLEEP_SCOPES = ("self", "party")
-_SLEEP_MODES = ("recovery", "duration")
+_SLEEP_MODES = ("recovery", "duration", "until-dawn")
+
+
+def _validate_sleep_mode_fields(payload: dict[str, Any], action: str) -> dict[str, Any]:
+    """Validate the shared optional ``sleep_mode``/``seconds``/``dream`` grammar.
+
+    A duration requires positive bounded integer seconds; the other modes carry
+    none. ``dream`` is the exact boolean entry-time opt-in and is admitted only
+    beside an explicit mode (the obsolete standalone dream form stays invalid).
+    """
+    values: dict[str, Any] = {}
+    mode = payload.get("sleep_mode", "recovery")
+    if not isinstance(mode, str) or mode not in _SLEEP_MODES:
+        raise ExplorationActionError(f"{action} sleep_mode is not a stable value")
+    if "sleep_mode" in payload:
+        values["sleep_mode"] = mode
+    if mode == "duration":
+        if "seconds" not in payload:
+            raise ExplorationActionError("duration sleep requires seconds")
+        seconds = payload["seconds"]
+        if isinstance(seconds, bool) or not isinstance(seconds, int):
+            raise ExplorationActionError(f"{action} seconds must be an integer")
+        if not 1 <= seconds <= MAX_WEB_SKIP_SECONDS:
+            raise ExplorationActionError(
+                f"{action} seconds must be within 1..{MAX_WEB_SKIP_SECONDS}"
+            )
+        values["seconds"] = seconds
+    elif "seconds" in payload:
+        raise ExplorationActionError(f"{mode} sleep cannot carry seconds")
+    if "dream" in payload:
+        if "sleep_mode" not in payload:
+            raise ExplorationActionError(f"{action} dream requires an explicit sleep_mode")
+        if not isinstance(payload["dream"], bool):
+            raise ExplorationActionError(f"{action} dream must be a boolean")
+        values["dream"] = payload["dream"]
+    return values
 
 
 def _validate_sleep_wait_payload(payload: dict[str, Any]) -> dict[str, Any]:
@@ -445,29 +480,211 @@ def _validate_sleep_wait_payload(payload: dict[str, Any]) -> dict[str, Any]:
     sleep: dict[str, Any] = {"sleep": True}
     if "sleep_scope" in payload:
         sleep["sleep_scope"] = scope
-    if "sleep_mode" in payload:
-        sleep["sleep_mode"] = mode
-    if mode == "duration":
-        if "seconds" not in payload:
-            raise ExplorationActionError("duration sleep requires seconds")
-        seconds = payload["seconds"]
-        if isinstance(seconds, bool) or not isinstance(seconds, int):
-            raise ExplorationActionError("explore.wait seconds must be an integer")
-        if not 1 <= seconds <= MAX_WEB_SKIP_SECONDS:
-            raise ExplorationActionError(
-                f"explore.wait seconds must be within 1..{MAX_WEB_SKIP_SECONDS}"
-            )
-        sleep["seconds"] = seconds
-    elif "seconds" in payload:
-        raise ExplorationActionError("recovery sleep cannot carry seconds")
+    sleep.update(_validate_sleep_mode_fields(payload, "explore.wait"))
     return sleep
 
 
+_SLEEP_PARTY_KEYS = frozenset({"sleep_mode", "seconds", "dream"})
+
+
 def validate_sleep_party_payload(payload: Any) -> dict[str, Any]:
-    """Validate the exact ``explore.sleep_party`` payload (an empty object)."""
+    """Validate ``explore.sleep_party``: ``{}`` or an explicit mode.
+
+    The empty object keeps its default recovery meaning; an explicit
+    ``sleep_mode`` may carry duration ``seconds`` and the exact boolean
+    ``dream`` opt-in.
+    """
+    if not isinstance(payload, dict) or not set(payload) <= _SLEEP_PARTY_KEYS:
+        raise ExplorationActionError("explore.sleep_party carries an unknown field")
+    if payload and "sleep_mode" not in payload:
+        raise ExplorationActionError("explore.sleep_party fields require an explicit sleep_mode")
+    return _validate_sleep_mode_fields(payload, "explore.sleep_party")
+
+
+#: The two camp wire modes (world.rules.camping.WIRE_MODES).
+CAMP_MODES = ("until-dawn", "until-recovered")
+
+
+def validate_camp_preview_payload(payload: Any) -> dict[str, Any]:
+    """Validate the exact read-only ``explore.camp_preview`` payload (``{}``)."""
     if not isinstance(payload, dict) or payload:
-        raise ExplorationActionError("explore.sleep_party requires an empty object")
+        raise ExplorationActionError("explore.camp_preview requires an empty object")
     return {}
+
+
+def validate_camp_payload(payload: Any) -> dict[str, Any]:
+    """Validate the exact ``explore.camp`` payload ``{mode, dream}``."""
+    if not isinstance(payload, dict) or set(payload) != {"mode", "dream"}:
+        raise ExplorationActionError("explore.camp requires exactly mode and dream")
+    if not isinstance(payload["mode"], str) or payload["mode"] not in CAMP_MODES:
+        raise ExplorationActionError("explore.camp mode is not a stable value")
+    if not isinstance(payload["dream"], bool):
+        raise ExplorationActionError("explore.camp dream must be a boolean")
+    return {"mode": payload["mode"], "dream": payload["dream"]}
+
+
+# -- camp result data (mirrored by web/static/webclient/js/elosern/protocol/core.js)
+
+_MAX_CAMP_NAME = 256
+_MAX_CAMP_TIME = 32
+_MAX_CAMP_CODE = 64
+_MAX_CAMP_MEMBERS = 64
+_MAX_CAMP_EVENTS = 48
+_MAX_CAMP_MESSAGE = 512
+
+
+def _exact(value: Any, keys: set[str], name: str) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != keys:
+        raise ExplorationActionError(f"{name} must carry exactly {sorted(keys)}")
+    return value
+
+
+def _safe_int(value: Any, name: str, maximum: int = MAX_SAFE_INTEGER) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= maximum:
+        raise ExplorationActionError(f"{name} must be a non-negative safe integer")
+    return value
+
+
+def _ascii(value: Any, name: str, maximum: int) -> str:
+    if not isinstance(value, str) or not 1 <= len(value) <= maximum or not value.isascii():
+        raise ExplorationActionError(f"{name} must be 1..{maximum} ASCII characters")
+    return value
+
+
+def _text(value: Any, name: str, maximum: int) -> str:
+    if not isinstance(value, str) or not value.strip() or len(value) > maximum:
+        raise ExplorationActionError(f"{name} must be 1..{maximum} code points")
+    return value
+
+
+def _nullable(value: Any, check: Any, *args: Any) -> Any:
+    return None if value is None else check(value, *args)
+
+
+def _refusal(value: Any, name: str) -> None:
+    if value is None:
+        return
+    _exact(value, {"code", "message"}, name)
+    _ascii(value["code"], f"{name}.code", _MAX_CAMP_CODE)
+    _text(value["message"], f"{name}.message", _MAX_CAMP_MESSAGE)
+
+
+def _reserve_triplet(row: dict[str, Any], names: tuple[str, str], percents: tuple[str, str], name: str) -> None:
+    maximum = _safe_int(row["reserve_max"], f"{name}.reserve_max")
+    if maximum < 1:
+        raise ExplorationActionError(f"{name}.reserve_max must be positive")
+    for key in names:
+        _safe_int(row[key], f"{name}.{key}", maximum)
+    for key in percents:
+        _safe_int(row[key], f"{name}.{key}", 100)
+
+
+_PREVIEW_MEMBER_KEYS = {
+    "member_id", "name", "current_reserve", "predicted_reserve", "reserve_max",
+    "current_percent", "predicted_percent", "wake_tick", "wake_time",
+}
+_PREVIEW_MODE_KEYS = {"mode", "available", "refusal", "dream_offerable", "wake_tick", "wake_time", "members"}
+_PREVIEW_KEYS = {"available", "refusal", "dream_offerable", "default_mode", "current_tick", "current_time", "modes"}
+
+
+def validate_camp_preview_data(data: Any) -> dict[str, Any]:
+    """Validate the exact ``explore.camp_preview`` result data."""
+    _exact(data, _PREVIEW_KEYS, "camp preview")
+    if not isinstance(data["available"], bool) or not isinstance(data["dream_offerable"], bool):
+        raise ExplorationActionError("camp preview flags must be booleans")
+    if data["default_mode"] not in CAMP_MODES:
+        raise ExplorationActionError("camp preview default_mode is not a stable value")
+    _safe_int(data["current_tick"], "camp preview current_tick")
+    _text(data["current_time"], "camp preview current_time", _MAX_CAMP_TIME)
+    _refusal(data["refusal"], "camp preview refusal")
+    if (data["refusal"] is None) != data["available"]:
+        raise ExplorationActionError("camp preview refusal must accompany unavailability")
+    modes = data["modes"]
+    if not isinstance(modes, list) or [mode.get("mode") if isinstance(mode, dict) else None for mode in modes] != list(CAMP_MODES):
+        raise ExplorationActionError("camp preview modes must be dawn then recovered")
+    for mode in modes:
+        _exact(mode, _PREVIEW_MODE_KEYS, "camp preview mode")
+        if not isinstance(mode["available"], bool) or not isinstance(mode["dream_offerable"], bool):
+            raise ExplorationActionError("camp preview mode flags must be booleans")
+        _refusal(mode["refusal"], "camp preview mode refusal")
+        members = mode["members"]
+        if not isinstance(members, list) or len(members) > _MAX_CAMP_MEMBERS:
+            raise ExplorationActionError("camp preview members exceed their bound")
+        if mode["available"]:
+            if mode["refusal"] is not None or mode["wake_tick"] is None:
+                raise ExplorationActionError("an available camp mode names its wake and no refusal")
+            _safe_int(mode["wake_tick"], "camp preview wake_tick")
+            _text(mode["wake_time"], "camp preview wake_time", _MAX_CAMP_TIME)
+        elif mode["refusal"] is None or mode["wake_tick"] is not None or mode["wake_time"] is not None or members or mode["dream_offerable"]:
+            raise ExplorationActionError("an unavailable camp mode carries only its refusal")
+        for row in members:
+            _exact(row, _PREVIEW_MEMBER_KEYS, "camp preview member")
+            _ascii(row["member_id"], "camp preview member_id", 64)
+            _text(row["name"], "camp preview name", _MAX_CAMP_NAME)
+            _reserve_triplet(row, ("current_reserve", "predicted_reserve"), ("current_percent", "predicted_percent"), "camp preview member")
+            _safe_int(row["wake_tick"], "camp preview member wake_tick")
+            _text(row["wake_time"], "camp preview member wake_time", _MAX_CAMP_TIME)
+    if data["available"] != any(mode["available"] for mode in modes):
+        raise ExplorationActionError("camp preview availability must match its modes")
+    return data
+
+
+_CAMP_KEYS = {"camp_id", "phase", "timing", "members", "events", "interrupted", "interruption_reason"}
+_CAMP_TIMING_KEYS = {"elapsed_seconds", "result_tick", "result_time", "wake_tick", "wake_time"}
+_CAMP_MEMBER_KEYS = {
+    "member_id", "name", "reserve_before", "reserve_after", "reserve_max",
+    "before_percent", "after_percent", "sleeping", "wake_tick",
+}
+_CAMP_EVENT_KEYS = {"kind", "due_tick", "interactive", "text"}
+_CAMP_PHASES = ("dream", "complete", "interrupted")
+
+
+def validate_camp_result_data(data: Any) -> dict[str, Any]:
+    """Validate the exact ``explore.camp`` result data."""
+    _exact(data, _CAMP_KEYS, "camp result")
+    _ascii(data["camp_id"], "camp result camp_id", 80)
+    if data["phase"] not in _CAMP_PHASES:
+        raise ExplorationActionError("camp result phase is not a stable value")
+    timing = _exact(data["timing"], _CAMP_TIMING_KEYS, "camp result timing")
+    _safe_int(timing["elapsed_seconds"], "camp result elapsed_seconds")
+    _safe_int(timing["result_tick"], "camp result result_tick")
+    _text(timing["result_time"], "camp result result_time", _MAX_CAMP_TIME)
+    if (timing["wake_tick"] is None) != (timing["wake_time"] is None):
+        raise ExplorationActionError("camp result wake tick and time travel together")
+    _nullable(timing["wake_tick"], _safe_int, "camp result wake_tick")
+    _nullable(timing["wake_time"], _text, "camp result wake_time", _MAX_CAMP_TIME)
+    if not isinstance(data["interrupted"], bool):
+        raise ExplorationActionError("camp result interrupted must be a boolean")
+    if data["interrupted"] != (data["phase"] == "interrupted"):
+        raise ExplorationActionError("camp result interruption must match its phase")
+    if data["interrupted"]:
+        _ascii(data["interruption_reason"], "camp result interruption_reason", _MAX_CAMP_CODE)
+    elif data["interruption_reason"] is not None:
+        raise ExplorationActionError("only an interrupted camp names a reason")
+    members = data["members"]
+    if not isinstance(members, list) or len(members) > _MAX_CAMP_MEMBERS:
+        raise ExplorationActionError("camp result members exceed their bound")
+    for row in members:
+        _exact(row, _CAMP_MEMBER_KEYS, "camp result member")
+        _ascii(row["member_id"], "camp result member_id", 64)
+        _text(row["name"], "camp result name", _MAX_CAMP_NAME)
+        _reserve_triplet(row, ("reserve_before", "reserve_after"), ("before_percent", "after_percent"), "camp result member")
+        if not isinstance(row["sleeping"], bool):
+            raise ExplorationActionError("camp result sleeping must be a boolean")
+        _nullable(row["wake_tick"], _safe_int, "camp result member wake_tick")
+    events = data["events"]
+    if not isinstance(events, list) or len(events) > _MAX_CAMP_EVENTS:
+        raise ExplorationActionError("camp result events exceed their bound")
+    for event in events:
+        _exact(event, _CAMP_EVENT_KEYS, "camp result event")
+        _ascii(event["kind"], "camp result event kind", 64)
+        _safe_int(event["due_tick"], "camp result event due_tick")
+        if not isinstance(event["interactive"], bool):
+            raise ExplorationActionError("camp result event interactive must be a boolean")
+        _nullable(event["text"], _text, "camp result event text", _MAX_CAMP_NAME)
+    if data["phase"] == "dream" and (timing["elapsed_seconds"] or events or timing["wake_tick"] is not None):
+        raise ExplorationActionError("a dream camp result is pending at zero elapsed time")
+    return data
 
 
 def validate_sleep_continue_payload(payload: Any) -> dict[str, Any]:
@@ -1338,7 +1555,23 @@ def _wait_adapter(
     try:
         if sleep:
             explicit = "seconds" in payload or "sleep_mode" in payload
-            if payload.get("sleep_scope", "self") == "party":
+            if payload.get("dream") is True:
+                # The explicit entry-time opt-in: entry and the guarded enter
+                # commit together through the shared seam.
+                from uuid import uuid4
+
+                from world.rules.camping import commit_sleep_entry
+
+                outcome = commit_sleep_entry(
+                    actor,
+                    scope=payload.get("sleep_scope", "self"),
+                    mode=payload["sleep_mode"],
+                    seconds=payload.get("seconds"),
+                    answer="enter",
+                    operation_id=uuid4().hex,
+                    session=session,
+                )["outcome"]
+            elif payload.get("sleep_scope", "self") == "party":
                 from world.rules.sleep_control import begin_all_party_sleep
 
                 outcome = begin_all_party_sleep(
@@ -1393,12 +1626,35 @@ def _sleep_party_adapter(
     actor: Any, payload: dict[str, Any], session: Any = None
 ) -> dict[str, Any]:
     """Run the compensated all-party sleep choice; no time passes."""
-    del payload
     from world.rules.sleep_control import begin_all_party_sleep
     from world.rules.possession import PossessionGateError, PossessionWriteError
 
     try:
-        outcome = begin_all_party_sleep(actor, session=session)
+        if payload.get("dream") is True:
+            from uuid import uuid4
+
+            from world.rules.camping import commit_sleep_entry
+
+            outcome = commit_sleep_entry(
+                actor,
+                scope="party",
+                mode=payload["sleep_mode"],
+                seconds=payload.get("seconds"),
+                answer="enter",
+                operation_id=uuid4().hex,
+                session=session,
+            )["outcome"]
+        else:
+            outcome = begin_all_party_sleep(
+                actor,
+                mode=payload.get("sleep_mode", "recovery"),
+                seconds=payload.get("seconds"),
+                session=session,
+            )
+    except SkipRefused as error:  # observability: ignore R2: the stable skip refusal IS the action result
+        return _rejected(
+            "unsafe_skip", rejection_message(error.reason) or "目前無法選擇全員一起睡眠。"
+        )
     except PossessionGateError as error:  # observability: ignore R2: the stable gate refusal IS the action result
         return _rejected(
             error.reason, "目前無法選擇全員一起睡眠。"
@@ -1411,6 +1667,80 @@ def _sleep_party_adapter(
     message = getattr(outcome, "message", None) or "在場成員已進入睡眠。"
     actor.msg(message)
     return _success("sleep_party", message, AFFECTED_FULL)
+
+
+def _camp_preview_adapter(
+    actor: Any, payload: dict[str, Any], session: Any = None
+) -> dict[str, Any]:
+    """Answer the read-only camp preview through the result-only path."""
+    del payload, session
+    from world.rules.camping import preview_camp
+
+    try:
+        data = validate_camp_preview_data(preview_camp(actor))
+    except Exception as error:  # observability: ignore R2: the bounded camp_unavailable result IS the client-facing report; log_error below is its diagnostic
+        log_error("camp_preview_failed", context={"char": actor.pk}, exc=error)
+        return {
+            "outcome": "rejected",
+            "code": "camp_unavailable",
+            "message": "目前無法查看紮營。",
+            "no_presentation": True,
+        }
+    return {
+        "outcome": "success",
+        "code": "explore.camp_preview",
+        "message": "紮營預覽。",
+        "data": data,
+        "affected_panels": (),
+        "no_presentation": True,
+    }
+
+
+def _camp_adapter(
+    actor: Any, payload: dict[str, Any], session: Any = None
+) -> dict[str, Any]:
+    """Run one whole-party camp; the result carries its exact data."""
+    from server.camp_service import camp, operation_identity
+    from world.rules.party_scope import PartyScopeError, resolve_commander
+    from world.rules.possession import PossessionGateError, PossessionWriteError
+
+    identity = payload.get("request_identity") or {}
+    try:
+        commander = resolve_commander(actor)
+    except PartyScopeError as error:  # observability: ignore R2: the stable party refusal IS the action result
+        return _rejected("party_unavailable", error.message)
+    operation_id = operation_identity(
+        int(commander.pk), identity.get("epoch", ""), identity.get("request_id", "")
+    )
+    try:
+        outcome = camp(
+            actor,
+            mode=payload["mode"],
+            dream=payload["dream"],
+            operation_id=operation_id,
+            session=session,
+        )
+        data = validate_camp_result_data(outcome["data"])
+    except SkipRefused as error:  # observability: ignore R2: the stable safety refusal IS the action result
+        return _rejected(error.reason.value, rejection_message(error.reason) or "目前無法紮營。")
+    except SleepRefused as error:  # observability: ignore R2: the stable camp refusal IS the action result
+        return _rejected(error.code, error.message)
+    except PossessionGateError as error:  # observability: ignore R2: the stable gate refusal IS the action result
+        return _rejected("party_unavailable", str(error.reason) or "目前無法紮營。")
+    except PossessionWriteError as error:  # observability: ignore R2: the stable write refusal IS the action result
+        return _rejected(getattr(error, "code", "camp_failed"), "目前無法紮營。")
+    except Exception as error:  # observability: ignore R2: the bounded camp_failed result IS the client-facing report; log_error below is its diagnostic
+        log_error("camp_failed", context={"char": actor.pk}, exc=error)
+        return _rejected("camp_failed", "目前無法紮營。")
+    message = str(outcome["message"])[:512]
+    commander.msg(message)
+    return {
+        "outcome": "success",
+        "code": "explore.camp",
+        "message": message,
+        "data": data,
+        "affected_panels": AFFECTED_FULL,
+    }
 
 
 def _sleep_continue_adapter(
@@ -1850,6 +2180,8 @@ __all__ = [
     "MAX_KEYWORD_ID_CHARS",
     "MAX_NODE_ID_CHARS",
     "MAX_SPEECH_CODE_POINTS",
+    "_camp_adapter",
+    "_camp_preview_adapter",
     "_sleep_continue_adapter",
     "_sleep_dream_adapter",
     "_sleep_party_adapter",
@@ -1864,6 +2196,10 @@ __all__ = [
     "validate_party_leave_payload",
     "validate_possess_payload",
     "validate_possess_release_payload",
+    "validate_camp_payload",
+    "validate_camp_preview_data",
+    "validate_camp_preview_payload",
+    "validate_camp_result_data",
     "validate_sleep_continue_payload",
     "validate_sleep_dream_payload",
     "validate_sleep_party_payload",

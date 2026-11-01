@@ -156,6 +156,8 @@ def build_production_action_registry() -> ActionRegistry:
         _party_leave_adapter,
         _possess_adapter,
         _possess_release_adapter,
+        _camp_adapter,
+        _camp_preview_adapter,
         _sleep_continue_adapter,
         _sleep_dream_adapter,
         _sleep_party_adapter,
@@ -174,6 +176,8 @@ def build_production_action_registry() -> ActionRegistry:
         validate_party_leave_payload,
         validate_possess_payload,
         validate_possess_release_payload,
+        validate_camp_payload,
+        validate_camp_preview_payload,
         validate_sleep_continue_payload,
         validate_sleep_dream_payload,
         validate_sleep_party_payload,
@@ -653,6 +657,24 @@ def build_production_action_registry() -> ActionRegistry:
             validate_payload=validate_sleep_dream_payload,
             adapter=_sleep_dream_adapter,
             affected_panels=("dream", "sleep_handoff", "status"),
+        )
+    )
+    # The read-only camp preview answers through the result-only path; the
+    # camp itself settles time and publishes a full snapshot (wilderness-camping).
+    registry.register(
+        ActionSpec(
+            action_id="explore.camp_preview",
+            validate_payload=validate_camp_preview_payload,
+            adapter=_camp_preview_adapter,
+            affected_panels=(),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="explore.camp",
+            validate_payload=validate_camp_payload,
+            adapter=_camp_adapter,
+            affected_panels=(),
         )
     )
     registry.register(

@@ -297,5 +297,161 @@ class ExplorationValidatorTests(unittest.TestCase):
             with self.assertRaises(ExplorationActionError, msg=payload):
                 validate_deliver_payload(payload)
 
+
+class CampingValidatorTests(unittest.TestCase):
+    """Camp and dawn/dream sleep payloads and result data stay exact."""
+
+    def test_camp_payloads_and_sleep_grammar(self):
+        from web.webclient.actions.exploration_actions import (
+            validate_camp_payload,
+            validate_camp_preview_payload,
+            validate_sleep_party_payload,
+        )
+
+        self.assertEqual(validate_camp_preview_payload({}), {})
+        for bad in (None, [], {"mode": "until-dawn"}, {"x": 1}):
+            with self.assertRaises(ExplorationActionError, msg=bad):
+                validate_camp_preview_payload(bad)
+        self.assertEqual(
+            validate_camp_payload({"mode": "until-dawn", "dream": False}),
+            {"mode": "until-dawn", "dream": False},
+        )
+        for bad in (
+            {},
+            {"mode": "until-dawn"},
+            {"dream": True},
+            {"mode": "until-noon", "dream": False},
+            {"mode": "recovery", "dream": False},
+            {"mode": "until-dawn", "dream": 1},
+            {"mode": "until-dawn", "dream": 0},
+            {"mode": "until-dawn", "dream": "yes"},
+            {"mode": "until-dawn", "dream": False, "seconds": 60},
+            {"mode": "until-dawn", "dream": False, "request_identity": {}},
+            None,
+        ):
+            with self.assertRaises(ExplorationActionError, msg=bad):
+                validate_camp_payload(bad)
+
+        # Dawn and the explicit opt-in on the existing sleep grammar.
+        self.assertEqual(
+            validate_wait_payload({"sleep": True, "sleep_mode": "until-dawn"}),
+            {"sleep": True, "sleep_mode": "until-dawn"},
+        )
+        self.assertEqual(
+            validate_wait_payload(
+                {"sleep": True, "sleep_mode": "duration", "seconds": 60, "dream": True}
+            ),
+            {"sleep": True, "sleep_mode": "duration", "seconds": 60, "dream": True},
+        )
+        self.assertEqual(validate_sleep_party_payload({}), {})
+        self.assertEqual(
+            validate_sleep_party_payload({"sleep_mode": "until-dawn", "dream": False}),
+            {"sleep_mode": "until-dawn", "dream": False},
+        )
+        for bad in (
+            {"sleep": True, "sleep_mode": "until-dawn", "seconds": 60},
+            {"sleep": True, "sleep_mode": "until-dawn", "dream": 1},
+            {"sleep": True, "dream": False},
+        ):
+            with self.assertRaises(ExplorationActionError, msg=bad):
+                validate_wait_payload(bad)
+        for bad in (
+            {"dream": True},
+            {"seconds": 60},
+            {"sleep_mode": "duration"},
+            {"sleep_mode": "until-dawn", "dream": "no"},
+            {"sleep_mode": "until-dawn", "extra": 1},
+            None,
+        ):
+            with self.assertRaises(ExplorationActionError, msg=bad):
+                validate_sleep_party_payload(bad)
+
+    @staticmethod
+    def _preview():
+        member = {
+            "member_id": "7", "name": "同伴", "current_reserve": 180000,
+            "predicted_reserve": 360000, "reserve_max": 360000,
+            "current_percent": 50, "predicted_percent": 100,
+            "wake_tick": 900, "wake_time": "第 1 日 06:00",
+        }
+        return {
+            "available": True, "refusal": None, "dream_offerable": True,
+            "default_mode": "until-dawn", "current_tick": 100,
+            "current_time": "第 1 日 20:00",
+            "modes": [
+                {"mode": "until-dawn", "available": True, "refusal": None,
+                 "dream_offerable": True, "wake_tick": 900,
+                 "wake_time": "第 1 日 06:00", "members": [member]},
+                {"mode": "until-recovered", "available": False,
+                 "refusal": {"code": "party_unavailable", "message": "無法入睡。"},
+                 "dream_offerable": False, "wake_tick": None, "wake_time": None,
+                 "members": []},
+            ],
+        }
+
+    @staticmethod
+    def _result(**overrides):
+        value = {
+            "camp_id": "a" * 64, "phase": "complete",
+            "timing": {"elapsed_seconds": 800, "result_tick": 900,
+                       "result_time": "第 1 日 06:00", "wake_tick": 900,
+                       "wake_time": "第 1 日 06:00"},
+            "members": [{"member_id": "7", "name": "同伴", "reserve_before": 1,
+                         "reserve_after": 2, "reserve_max": 360000,
+                         "before_percent": 0, "after_percent": 0,
+                         "sleeping": False, "wake_tick": 900}],
+            "events": [{"kind": "daily_reset", "due_tick": 864, "interactive": False, "text": None}],
+            "interrupted": False, "interruption_reason": None,
+        }
+        value.update(overrides)
+        return value
+
+    def test_camp_result_data_shapes(self):
+        import copy
+
+        from web.webclient.actions.exploration_actions import (
+            validate_camp_preview_data,
+            validate_camp_result_data,
+        )
+
+        validate_camp_preview_data(self._preview())
+        validate_camp_result_data(self._result())
+        validate_camp_result_data(
+            self._result(phase="interrupted", interrupted=True, interruption_reason="interactive_event",
+                         timing={"elapsed_seconds": 10, "result_tick": 110, "result_time": "x",
+                                 "wake_tick": None, "wake_time": None})
+        )
+        bad_previews = []
+        for mutate in (
+            lambda d: d.update(extra=1),
+            lambda d: d.update(available=1),
+            lambda d: d.update(default_mode="recovery"),
+            lambda d: d["modes"].reverse(),
+            lambda d: d["modes"][1].update(members=[d["modes"][0]["members"][0]]),
+            lambda d: d["modes"][0].update(refusal={"code": "x", "message": "y"}),
+            lambda d: d["modes"][0]["members"][0].update(predicted_percent=101),
+            lambda d: d["modes"][0]["members"][0].update(current_reserve=True),
+            lambda d: d.update(available=False),
+        ):
+            value = copy.deepcopy(self._preview())
+            mutate(value)
+            bad_previews.append(value)
+        for value in bad_previews:
+            with self.assertRaises(ExplorationActionError, msg=value):
+                validate_camp_preview_data(value)
+        for value in (
+            self._result(extra=1),
+            self._result(phase="done"),
+            self._result(interrupted=True),
+            self._result(interruption_reason="interactive_event"),
+            self._result(events=[{"kind": "x", "due_tick": -1, "interactive": False, "text": None}]),
+            self._result(members=[{"member_id": "7"}]),
+            self._result(phase="dream"),
+            self._result(timing={"elapsed_seconds": 1, "result_tick": 1, "result_time": "x",
+                                 "wake_tick": 5, "wake_time": None}),
+        ):
+            with self.assertRaises(ExplorationActionError, msg=value):
+                validate_camp_result_data(value)
+
 if __name__ == "__main__":
     unittest.main()

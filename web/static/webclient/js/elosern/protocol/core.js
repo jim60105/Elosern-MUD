@@ -568,6 +568,219 @@ function validateTravelResultData(code, outcome, hasData, data) {
   validateTravelPlanData(data);
 }
 
+// The whole-party camp (wilderness-camping): the read-only preview and the
+// committed camp each carry one exact data slot on success, mirror of
+// web/webclient/actions/exploration_actions.py validate_camp_preview_data /
+// validate_camp_result_data. The camp's time fields nest under `timing`
+// because a data slot carries at most eight top-level fields.
+var CAMP_PREVIEW_CODE = "explore.camp_preview";
+var CAMP_CODE = "explore.camp";
+var CAMP_MODES = ["until-dawn", "until-recovered"];
+var CAMP_PHASES = ["dream", "complete", "interrupted"];
+var CAMP_MAX_MEMBERS = 64;
+var CAMP_MAX_EVENTS = 48;
+
+function requireCampAscii(value, field, maximum) {
+  if (typeof value !== "string" || value.length < 1 || value.length > maximum || !/^[\x00-\x7f]+$/.test(value)) {
+    throw new Error(field + " must be 1.." + maximum + " ASCII characters");
+  }
+  return value;
+}
+
+function requireCampText(value, field, maximum) {
+  requireString(value, field, maximum);
+  if (!value.trim()) {
+    throw new Error(field + " must not be blank");
+  }
+  return value;
+}
+
+function requireCampRefusal(value, field) {
+  if (value === null) {
+    return;
+  }
+  requireExactFields(value, field, ["code", "message"], []);
+  requireCampAscii(value.code, field + ".code", 64);
+  requireCampText(value.message, field + ".message", 512);
+}
+
+function requireCampReserves(row, field, reserves, percents) {
+  var maximum = requireInt(row.reserve_max, field + ".reserve_max", 1, MAX_SAFE_INTEGER);
+  reserves.forEach(function (key) {
+    requireInt(row[key], field + "." + key, 0, maximum);
+  });
+  percents.forEach(function (key) {
+    requireInt(row[key], field + "." + key, 0, 100);
+  });
+}
+
+function validateCampPreviewData(value) {
+  requireExactFields(
+    value,
+    "camp preview",
+    ["available", "refusal", "dream_offerable", "default_mode", "current_tick", "current_time", "modes"],
+    []
+  );
+  requireBool(value.available, "camp preview available");
+  requireBool(value.dream_offerable, "camp preview dream_offerable");
+  if (CAMP_MODES.indexOf(value.default_mode) === -1) {
+    throw new Error("camp preview default_mode is not a stable value");
+  }
+  requireInt(value.current_tick, "camp preview current_tick", 0, MAX_SAFE_INTEGER);
+  requireCampText(value.current_time, "camp preview current_time", 32);
+  requireCampRefusal(value.refusal, "camp preview refusal");
+  if ((value.refusal === null) !== value.available) {
+    throw new Error("camp preview refusal must accompany unavailability");
+  }
+  var modes = value.modes;
+  if (!Array.isArray(modes) || modes.length !== 2) {
+    throw new Error("camp preview modes must be dawn then recovered");
+  }
+  var anyAvailable = false;
+  modes.forEach(function (mode, index) {
+    requireExactFields(
+      mode,
+      "camp preview mode",
+      ["mode", "available", "refusal", "dream_offerable", "wake_tick", "wake_time", "members"],
+      []
+    );
+    if (mode.mode !== CAMP_MODES[index]) {
+      throw new Error("camp preview modes must be dawn then recovered");
+    }
+    requireBool(mode.available, "camp preview mode available");
+    requireBool(mode.dream_offerable, "camp preview mode dream_offerable");
+    requireCampRefusal(mode.refusal, "camp preview mode refusal");
+    if (!Array.isArray(mode.members) || mode.members.length > CAMP_MAX_MEMBERS) {
+      throw new Error("camp preview members exceed their bound");
+    }
+    if (mode.available) {
+      anyAvailable = true;
+      if (mode.refusal !== null || mode.wake_tick === null) {
+        throw new Error("an available camp mode names its wake and no refusal");
+      }
+      requireInt(mode.wake_tick, "camp preview wake_tick", 0, MAX_SAFE_INTEGER);
+      requireCampText(mode.wake_time, "camp preview wake_time", 32);
+    } else if (
+      mode.refusal === null ||
+      mode.wake_tick !== null ||
+      mode.wake_time !== null ||
+      mode.members.length > 0 ||
+      mode.dream_offerable
+    ) {
+      throw new Error("an unavailable camp mode carries only its refusal");
+    }
+    mode.members.forEach(function (row) {
+      requireExactFields(
+        row,
+        "camp preview member",
+        [
+          "member_id",
+          "name",
+          "current_reserve",
+          "predicted_reserve",
+          "reserve_max",
+          "current_percent",
+          "predicted_percent",
+          "wake_tick",
+          "wake_time",
+        ],
+        []
+      );
+      requireCampAscii(row.member_id, "camp preview member_id", 64);
+      requireCampText(row.name, "camp preview name", 256);
+      requireCampReserves(row, "camp preview member", ["current_reserve", "predicted_reserve"], ["current_percent", "predicted_percent"]);
+      requireInt(row.wake_tick, "camp preview member wake_tick", 0, MAX_SAFE_INTEGER);
+      requireCampText(row.wake_time, "camp preview member wake_time", 32);
+    });
+  });
+  if (anyAvailable !== value.available) {
+    throw new Error("camp preview availability must match its modes");
+  }
+  return value;
+}
+
+function validateCampData(value) {
+  requireExactFields(
+    value,
+    "camp result",
+    ["camp_id", "phase", "timing", "members", "events", "interrupted", "interruption_reason"],
+    []
+  );
+  requireCampAscii(value.camp_id, "camp result camp_id", 80);
+  if (CAMP_PHASES.indexOf(value.phase) === -1) {
+    throw new Error("camp result phase is not a stable value");
+  }
+  var timing = value.timing;
+  requireExactFields(timing, "camp result timing", ["elapsed_seconds", "result_tick", "result_time", "wake_tick", "wake_time"], []);
+  requireInt(timing.elapsed_seconds, "camp result elapsed_seconds", 0, MAX_SAFE_INTEGER);
+  requireInt(timing.result_tick, "camp result result_tick", 0, MAX_SAFE_INTEGER);
+  requireCampText(timing.result_time, "camp result result_time", 32);
+  if ((timing.wake_tick === null) !== (timing.wake_time === null)) {
+    throw new Error("camp result wake tick and time travel together");
+  }
+  if (timing.wake_tick !== null) {
+    requireInt(timing.wake_tick, "camp result wake_tick", 0, MAX_SAFE_INTEGER);
+    requireCampText(timing.wake_time, "camp result wake_time", 32);
+  }
+  requireBool(value.interrupted, "camp result interrupted");
+  if (value.interrupted !== (value.phase === "interrupted")) {
+    throw new Error("camp result interruption must match its phase");
+  }
+  if (value.interrupted) {
+    requireCampAscii(value.interruption_reason, "camp result interruption_reason", 64);
+  } else if (value.interruption_reason !== null) {
+    throw new Error("only an interrupted camp names a reason");
+  }
+  if (!Array.isArray(value.members) || value.members.length > CAMP_MAX_MEMBERS) {
+    throw new Error("camp result members exceed their bound");
+  }
+  value.members.forEach(function (row) {
+    requireExactFields(
+      row,
+      "camp result member",
+      ["member_id", "name", "reserve_before", "reserve_after", "reserve_max", "before_percent", "after_percent", "sleeping", "wake_tick"],
+      []
+    );
+    requireCampAscii(row.member_id, "camp result member_id", 64);
+    requireCampText(row.name, "camp result name", 256);
+    requireCampReserves(row, "camp result member", ["reserve_before", "reserve_after"], ["before_percent", "after_percent"]);
+    requireBool(row.sleeping, "camp result sleeping");
+    if (row.wake_tick !== null) {
+      requireInt(row.wake_tick, "camp result member wake_tick", 0, MAX_SAFE_INTEGER);
+    }
+  });
+  if (!Array.isArray(value.events) || value.events.length > CAMP_MAX_EVENTS) {
+    throw new Error("camp result events exceed their bound");
+  }
+  value.events.forEach(function (event) {
+    requireExactFields(event, "camp result event", ["kind", "due_tick", "interactive", "text"], []);
+    requireCampAscii(event.kind, "camp result event kind", 64);
+    requireInt(event.due_tick, "camp result event due_tick", 0, MAX_SAFE_INTEGER);
+    requireBool(event.interactive, "camp result event interactive");
+    if (event.text !== null) {
+      requireCampText(event.text, "camp result event text", 256);
+    }
+  });
+  if (value.phase === "dream" && (timing.elapsed_seconds !== 0 || value.events.length > 0 || timing.wake_tick !== null)) {
+    throw new Error("a dream camp result is pending at zero elapsed time");
+  }
+  return value;
+}
+
+function validateCampResultData(code, outcome, hasData, data) {
+  if ((code !== CAMP_PREVIEW_CODE && code !== CAMP_CODE) || outcome !== "success") {
+    return;
+  }
+  if (!hasData) {
+    throw new Error("a " + code + " success requires its exact data slot");
+  }
+  if (code === CAMP_PREVIEW_CODE) {
+    validateCampPreviewData(data);
+  } else {
+    validateCampData(data);
+  }
+}
+
 function validateServerTime(value) {
   requireExactFields(
     value,
@@ -655,6 +868,9 @@ module.exports = {
   validatePartyExitPromptData: validatePartyExitPromptData,
   validateTravelResultData: validateTravelResultData,
   validateTravelPlanData: validateTravelPlanData,
+  validateCampResultData: validateCampResultData,
+  validateCampPreviewData: validateCampPreviewData,
+  validateCampData: validateCampData,
   requireInt: requireInt,
   requireBool: requireBool,
   requireString: requireString,

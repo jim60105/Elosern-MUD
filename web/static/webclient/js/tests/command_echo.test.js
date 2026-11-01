@@ -708,6 +708,8 @@ const REGISTERED_MUTATION_ACTIONS = {
   "explore.sleep_continue": { payload: { sleep_id: "sleep-1", revision: 0 }, display: {} },
   "explore.sleep_dream": { payload: { sleep_id: "sleep-1", revision: 0, generation: 1, decision: "enter" }, display: {} },
   "explore.sleep_party": { payload: {}, display: {} },
+  "explore.camp": { payload: { mode: "until-dawn", dream: false }, display: {} },
+  "explore.camp_preview": null,
   "explore.talk_freeform": { payload: { npc_id: "bard", speech: "你好" }, display: { npcLabel: "吟遊詩人" } },
   "explore.talk_open": { payload: { npc_id: 7 }, display: { npcLabel: "旅店老闆" } },
   "explore.talk_scripted": { payload: { npc_id: "bard", keyword_id: "guild" }, display: { npcLabel: "吟遊詩人", keywordLabel: "公會" } },

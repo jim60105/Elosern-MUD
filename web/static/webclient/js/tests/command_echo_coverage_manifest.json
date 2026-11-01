@@ -73,7 +73,9 @@
     "title.decline",
     "title.equip",
     "title.remove",
-    "travel.plan"
+    "travel.plan",
+    "explore.camp",
+    "explore.camp_preview"
   ],
   "silentPresentationControlIds": [
     "account.character.create",
@@ -104,6 +106,7 @@
     "party.view_member",
     "map.view",
     "services.open",
-    "travel.plan"
+    "travel.plan",
+    "explore.camp_preview"
   ]
 }
