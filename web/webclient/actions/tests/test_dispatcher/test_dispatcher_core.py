@@ -71,6 +71,48 @@ class DispatcherTests(unittest.TestCase):
         errors = [call for call in session.sent if "ui_protocol_error" in call]
         self.assertEqual(errors[-1]["ui_protocol_error"][0][0]["code"], "malformed_envelope")
 
+    def test_camp_receives_the_request_identity_after_validation_only(self):
+        """The camp adapter alone receives the admitted transport identity,
+        injected after exact payload validation and never echoed."""
+        seen = {}
+        registry = ActionRegistry("test")
+
+        def validate(payload):
+            seen["validated"] = dict(payload)
+            return dict(payload)
+
+        def adapter(actor, payload, session=None):
+            seen.setdefault("payloads", []).append(dict(payload))
+            return {"outcome": "success", "code": "ok", "message": "完成", "affected_panels": ("status",)}
+
+        registry.register(ActionSpec("explore.camp", validate, adapter, ("status",)))
+        registry.register(ActionSpec("proof.noop", validate, adapter, ("status",)))
+        session = self._session_with_coordinator()
+        coordinator = session.ndb.elosern_coordinator
+        coordinator.full_snapshot(SimpleNamespace(actor=session.puppet, protocol_version=1))
+        payload = {"mode": "until-dawn", "dream": False}
+        handle_ui_action(
+            session, session.puppet,
+            self._envelope(epoch=coordinator.epoch, base_revision=coordinator.revision,
+                           action_id="explore.camp", request_id="camp-1", payload=payload),
+            registry, _presenter_registry(),
+        )
+        self.assertEqual(seen["validated"], payload)
+        self.assertEqual(
+            seen["payloads"][0],
+            {**payload, "request_identity": {"epoch": coordinator.epoch, "request_id": "camp-1"}},
+        )
+        results = [call["ui_action_result"][0][0] for call in session.sent if "ui_action_result" in call]
+        self.assertNotIn("request_identity", str(results[-1]))
+        # Any other action is untouched.
+        handle_ui_action(
+            session, session.puppet,
+            self._envelope(epoch=coordinator.epoch, base_revision=coordinator.revision,
+                           action_id="proof.noop", request_id="other-1", payload={"x": 1}),
+            registry, _presenter_registry(),
+        )
+        self.assertEqual(seen["payloads"][-1], {"x": 1})
+
     @covers_requirement(
         "webclient-action-dispatch::stale-presentation-state-prevents-adapter-invocation"
     )

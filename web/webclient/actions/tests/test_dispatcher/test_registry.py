@@ -88,6 +88,8 @@ class RegistryTests(unittest.TestCase):
                     "explore.possess",
                     "explore.possess_release",
                     "explore.sleep_party",
+                    "explore.camp_preview",
+                    "explore.camp",
                     "explore.sleep_continue",
                     "explore.sleep_dream",
                     "explore.deliver",
