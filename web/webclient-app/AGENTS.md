@@ -155,17 +155,14 @@ dream or creation surface owns the stage. There is no server travel mode.
   (crossfade over `--motion-scene`, none at `off`, the leaving copy inert),
   `StatusPanel` (without its fatigue lines) above `PartyMedallions` in
   `vitals`, the place card alone in `map` (no minimap); the choices,
-  presence, message and command regions are unchanged.
+  presence, message and command region slots are unchanged.
 - The band's message region renders `components/travel/TravelLog.vue` instead
-  of the paged `MessageWindow` (wilderness-travel-log-ui, `AppClient`'s
-  `travelLogShown`) — except while a combat round still plays by itself
-  (`view.dispatch.beatLocked`, webclient-combat-beat-queue D6). A terminal
-  round's publication already commits the exploration mode, so the travel
-  layout can be up while the round plays, and the round's pages — with the
-  `beat-shown` reports the playback paces on — are the message window's own.
-  Swapping the pager out mid-round would strand the playback and the command
-  lock with it, so the log takes the region as soon as the round ends. The
-  日誌 control stays in every mode.
+  of the paged `MessageWindow` while the layout is shown — except while a
+  combat round still plays by itself (`view.dispatch.beatLocked`): a terminal
+  round commits the exploration mode mid-round, and the pager — its pages and
+  their `beat-shown` reports — is what the playback and the command lock ride
+  on. Never unmount the pager mid-round; the log takes the region when the
+  round ends. The 日誌 control stays in every mode.
 - `composables/use-travel-map.js` is the one area `map.view` owner while
   the layout is shown: on entry, a committed current-node or world-time
   change, a completed `explore.look`, each accepted full snapshot (the
