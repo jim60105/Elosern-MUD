@@ -241,8 +241,8 @@ fixture 跑在 suite 中而不在其中（`unittest/case.py` 的 `run()` 在
 
 | 進入點 | 每個清單／分片的成本模型 | 上限 |
 |---|---|---|
-| browser | Σ method ＋ 清單內每個出現類別的暖 boundary ＋（清單用到共享伺服器時）冷啟動一次 ＋ 5 秒 | 行程清單 ≤ 160 秒（預測 job 240 秒；乘上實測最差的 1.67 倍清單變異為 347 秒） |
-| evennia | 依 Django 真實派工順序模擬 makespan：標籤順序即 discovery 順序，Django 接著依 `reorder_by = (TestCase, SimpleTestCase)` 重新分桶並逐 class 分派，模型中套用同樣的分桶與「逐 class 交給最空閒 worker」；標籤以模組成本降序排列 | makespan ≤ 200 秒（預測 job ≤ 258 秒；乘上實測 1.55 倍變異為 359 秒） |
+| browser | Σ method ＋ 清單內每個出現類別的暖 boundary ＋（清單用到共享伺服器時）冷啟動一次 ＋ 5 秒 | 行程清單 ≤ 150 秒（預測 job ≤ 230 秒；乘上實測最差的 1.67 倍清單變異為 330 秒） |
+| evennia | 依 Django 真實派工順序模擬 makespan：標籤順序即 discovery 順序，Django 接著依 `reorder_by = (TestCase, SimpleTestCase)` 重新分桶並逐 class 分派，模型中套用同樣的分桶與「逐 class 交給最空閒 worker」 | makespan ≤ 200 秒（預測 job ≤ 258 秒；乘上實測 1.55 倍變異為 359 秒） |
 
 兩者都在**原始清單**上重算過：browser 的逐清單殘差為 max +23.9 秒、min
 −10.5 秒、rms 9.0 秒（40 個清單，3 個低估且都 ≤ 10.5 秒）；evennia 的
@@ -250,26 +250,45 @@ fixture 跑在 suite 中而不在其中（`unittest/case.py` 的 `run()` 在
 （中位數 +4.9 秒）。相較之下，先前用「Σ ÷ 4」或 LPT 的近似會低估 3.5–88 秒，
 因此模型改為模擬 Django 的真實派工順序與分桶。
 
-**結果：**
+**打包規則：只切不混。** 第一批重平衡把不同舊分片的模組依主題家族重新混合，
+並把標籤按模組成本降序排列；該輪 CI（run 41297991078）有 7 個 evennia 分片與
+3 個瀏覽器分片失敗，暴露出這套 suite 潛在的跨模組狀態依賴：
 
-- 瀏覽器：20 → **57 個分片**（114 個行程清單），最重清單 160 秒、預測最重
-  job 240 秒（4 分鐘），乘上實測最差的 1.67 倍清單變異仍為 347 秒；標籤維持
-  方法層級（590 個方法各屬恰好一個清單）。
-- Evennia：10 → **23 個分片**，其中前端 evidence 套件（`web.webclient.tests`）
-  拆為 4 個 `workers: 1` 的分片，其餘 19 個為 `workers: 4`；標籤改為**逐模組**
-  （900 個已探索模組各屬恰好一個分片）。
+- `server/conf/tests/**` 的兩個守門測試要求該套件由套件層級 `server` 標籤擁有，
+  不得逐模組列出（`test_new_module_path_is_not_listed_in_the_shard_manifest`）。
+- `world/rules/tests/test_guild_economy_sync` 整包在沒有同分片夥伴先發布地圖世界
+  時全數失敗（`SettlementNotLoaded`：`register_catalog()` 會走
+  `ANCHOR_PLACEMENT_REGISTRY`）。已在 `_support.ServiceContentIsolation.setUp`
+  自行呼叫 `map_runtime.ensure_published()`（這是既有測試 fixture 慣例），
+  該模組單獨執行 28 項測試由此轉綠。
+- 其餘分片出現 `IntegrityError: objects_objectdb … db_home_id` 的連鎖，受害者
+  模組（`test_stat_breakdown`、`test_subject_ages` 等）單獨執行皆綠，只在重新
+  混合的分片裡才失敗，且無法在本機以子集重現。
+
+因此最終採用的規則是「只切不混」：每個舊分片（或舊行程清單）依原本的標籤順序
+切成連續片段，片段之間不交換模組，每個新分片都是某個舊分片的連續子序列，
+`server` 保持套件標籤完整。這保留了原本已綠的相鄰關係與 import 順序，並直接
+對應「不要把會互相衝突的測試混在一起」的要求。
+
+**結果（本日最終版）：**
+
+- 瀏覽器：20 → **87 個分片**（174 個行程清單），最重清單 150 秒、預測最重
+  job 230 秒（3.8 分鐘），乘上實測最差的 1.67 倍清單變異為 330 秒；標籤維持
+  方法層級（590 個方法各屬恰好一個清單），且每個清單都是舊清單的連續子序列。
+- Evennia：10 → **29 個分片**，其中前端 evidence 套件（`web.webclient.tests`）
+  拆為 5 個 `workers: 1` 的分片，其餘 24 個為 `workers: 4`；標籤維持**逐模組**
+  （900 個已探索模組各屬恰好一個分片），每個分片都是舊分片標籤順序的連續子序列。
 - manifest 新增 `workers` 欄位，workflow 以 `matrix.workers` 決定 `--parallel`
   （原本以分片名稱字串 `webclient-evidence` 判斷，拆出多個 evidence 分片後
   會回到 4 個 worker 並重新造成 Vitest/build 的 oversubscription）。
-- 最重的單一 class（`ServiceHostIdentityTests`，261.9 秒）是 `--parallel 4`
-  無法再切分的排程單位，因此它獨占一個分片，該分片預測 job 為 311 秒；
-  這是整套分片裡唯一無法再壓低的分片（單一 class 的自身長度即為下限），
-  若它在慢 runner 上超出 6 分鐘，唯一的修法是把該 class 拆成兩個模組，
-  讓兩個 worker 各跑一半。
-- 工作數：1 preflight + 23 evennia + 57 browser + 1 frontend + 1 top-level +
-  1 gate = 84；每個分片本身縮小，整體關鍵路徑由最慢分片決定，代價是瀏覽器
-  runner 的前置約 80 秒在新分片數下不再被攤平（後續可考慮只建置該分片需要的
-  前端 bundle 以降低這 80 秒）。
+- 取捨：每個行程清單都要付一次共享伺服器冷啟動（實測中位數 51.8 秒）與約
+  80 秒的瀏覽器 job 前置，因此切得越細，runner 總分鐘數越高（174 個清單的
+  冷啟動約 9,000 秒，舊版 40 個清單約 2,500 秒）。換得的是每個清單負載低、
+  對 1.67 倍慢 runner 仍有餘裕，且在慢 runner 上不易觸發超時類的 flake。
+- 工作數：1 preflight + 29 evennia + 87 browser + 1 frontend + 1 top-level +
+  1 gate = 120。若後續要把工作數壓回來，可考慮先在 job 前置階段預先啟動共享
+  執行環境（harness 的 `_boot_until_ready` 會沿用既有 runtime）或只建置該分片
+  需要的前端 bundle，兩者都能讓清單上限放寬而不犧牲 6 分鐘預算。
 
 本次重平衡只改 manifest 標籤分配、`workers` 欄位與本文件，未改動任何測試、
 斷言、worker 數以外的設定、超時或預算。推送後的 CI 執行是唯一驗收：每個分片

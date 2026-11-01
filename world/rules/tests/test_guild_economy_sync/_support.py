@@ -31,6 +31,7 @@ from world.maps.bootstrap import (
     sync_grid,
     sync_interiors,
 )
+from world.maps import runtime as map_runtime
 from world.quests.catalog import register_catalog
 from world.quests.definitions import QUEST_DEFINITION_REGISTRY
 from world.quests.tests._fixtures import QuestRegistryIsolation
@@ -309,6 +310,12 @@ def _merchant_shop_key():
 class ServiceContentIsolation(QuestRegistryIsolation):
     def setUp(self):
         super().setUp()
+        # ``register_catalog`` validates every authored quest definition against
+        # the map consumers (``ANCHOR_PLACEMENT_REGISTRY``), which raise until
+        # this process has adopted the authored world. Publish it here so the
+        # package owns that prerequisite instead of inheriting it from whichever
+        # module happened to run first in the same shard.
+        map_runtime.ensure_published()
         register_catalog()
         create_object(Room, key="虛境", location=None)
         sync_grid()
