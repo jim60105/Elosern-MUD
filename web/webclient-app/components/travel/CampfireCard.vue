@@ -375,6 +375,9 @@ onBeforeUnmount(() => timers.forEach(clearTimeout));
   opacity: 0.8;
 }
 .campfire-card__fire i {
+  /* The ember's index in the loop (1-9); the inline style binds each ember's
+     own value, and the declared default is what the token scan reads. */
+  --k: 0;
   position: absolute;
   left: calc(26% + var(--k) * 5%);
   bottom: 60%;
