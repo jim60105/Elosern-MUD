@@ -623,7 +623,6 @@ class TravelWindowTests(_TravelStage):
     remembered ground, distant cards, the supplied phase and the place card
     (wilderness-travel-window-ui)."""
 
-    @covers_requirement("webclient-travel-map::travel-painting-uses-disclosed-cell-facts")
     @covers_requirement("webclient-travel-window::travel-consumes-the-shared-current-wilderness-window")
     def test_live_memory_and_distant_cards(self):
         """Only the supplied annotations draw; a hostile without a threat says
@@ -1571,7 +1570,6 @@ class TravelRouteTests(_TravelStage):
     def _walking(self, page):
         return _travel(page)["walking"]
 
-    @covers_requirement("webclient-travel-walking::held-walking-waits-for-committed-steps-and-dwell")
     @covers_requirement("webclient-travel-route-walking::route-walking-consumes-plans-and-committed-interrupts")
     def test_hostile_interrupt(self):
         """出發 walks the locked plan one committed step at a time with the
@@ -1624,7 +1622,6 @@ class TravelRouteTests(_TravelStage):
         self.assertEqual(len(_moves(page)), 3)
         page.close()
 
-    @covers_requirement("webclient-travel-walking::held-walking-waits-for-committed-steps-and-dwell")
     @covers_requirement("webclient-travel-route-walking::route-walking-consumes-plans-and-committed-interrupts")
     def test_all_interrupt_flags(self):
         """Each of the seven committed flags alone, and a combination, stops
@@ -1659,7 +1656,6 @@ class TravelRouteTests(_TravelStage):
                 page.evaluate("() => window.__elosernBridge.store.clearTravelTarget()")
         page.close()
 
-    @covers_requirement("webclient-travel-log::travel-notices-are-committed-structured-events")
     @covers_requirement("webclient-travel-route-walking::landmark-arrivals-own-focus-through-committed-typed-events")
     def test_landmark_focus(self):
         """A committed typed arrival bound to the reached node opens the card
