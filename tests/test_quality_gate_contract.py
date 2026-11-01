@@ -114,7 +114,9 @@ class QualityGateContractTests(unittest.TestCase):
             step for step in top_level_job["steps"]
             if step["name"] == "Run top-level regression suite with coverage"
         )
-        self.assertIn("unittest discover -s tests -t .", top_level_step["run"])
+        self.assertIn("coverage run -m unittest", top_level_step["run"])
+        self.assertIn("--durations 0", top_level_step["run"])
+        self.assertIn("join(matrix.labels, ' ')", top_level_step["run"])
 
         gate = jobs["gate"]
         gate_step_names = [step["name"] for step in gate["steps"]]
@@ -165,7 +167,9 @@ class QualityGateContractTests(unittest.TestCase):
             step for step in jobs["top-level"]["steps"]
             if step["name"] == "Run top-level regression suite with coverage"
         )
-        self.assertEqual(top_level_step["env"]["COVERAGE_FILE"], "coverage-top-level")
+        self.assertEqual(
+            top_level_step["env"]["COVERAGE_FILE"], "coverage-top-level-shard-${{ matrix.index }}"
+        )
         gate_steps = {step["name"]: step for step in jobs["gate"]["steps"]}
         self.assertIn("coverage combine", gate_steps["Combine coverage data"]["run"])
         self.assertIn("coverage-evennia*", gate_steps["Combine coverage data"]["run"])

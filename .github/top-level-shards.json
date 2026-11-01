@@ -1,0 +1,126 @@
+{
+ "shards": [
+  {
+   "index": 0,
+   "name": "top-level-0",
+   "labels": [
+    "tests.test_map_image_capture"
+   ]
+  },
+  {
+   "index": 1,
+   "name": "top-level-1",
+   "labels": [
+    "tests.test_evennia_test_guard"
+   ]
+  },
+  {
+   "index": 2,
+   "name": "top-level-2",
+   "labels": [
+    "tests.test_frontend_toolchain_contract",
+    "tests.test_official_artwork_preparation",
+    "tests.test_map_authoring_contract"
+   ]
+  },
+  {
+   "index": 3,
+   "name": "top-level-3",
+   "labels": [
+    "tests.test_map_client_contracts",
+    "tests.test_map_reference_context",
+    "tests.test_map_geographic_sources",
+    "tests.test_map_partition_independence",
+    "tests.test_map_view_boundary",
+    "tests.test_map_core_contract",
+    "tests.test_map_editor_generation",
+    "tests.test_converted_stream_contract",
+    "tests.test_elevation_contract"
+   ]
+  },
+  {
+   "index": 4,
+   "name": "top-level-4",
+   "labels": [
+    "tests.test_test_data_lint",
+    "tests.test_spec_traceability",
+    "tests.test_map_capture_snapshot",
+    "tests.test_creation_parity_contract",
+    "tests.test_webclient_frozen_contract",
+    "tests.test_exploration_parity_contract",
+    "tests.test_ai_test_layout_contract",
+    "tests.test_contract_gate",
+    "tests.test_favicon_pack_contract",
+    "tests.test_map_editor_service",
+    "tests.test_context_actions_parity_contract",
+    "tests.test_data_independence_commands",
+    "tests.test_data_independence_rules_combat",
+    "tests.test_data_independence_rules_knowledge",
+    "tests.test_data_independence_rules_sexual",
+    "tests.test_data_independence_webclient_presentation",
+    "tests.test_map_editor_settlements",
+    "tests.test_quest_log_parity_contract",
+    "tests.test_contrib_matrix",
+    "tests.test_preset_authoring_docs_contract",
+    "tests.test_map_editor_independent_environment",
+    "tests.test_fixture_base_contract"
+   ]
+  },
+  {
+   "index": 5,
+   "name": "top-level-5",
+   "labels": [
+    "tests.test_command_docs",
+    "tests.test_container_contract",
+    "tests.test_browser_verification_contract",
+    "tests.test_ai_transport_contract",
+    "tests.test_evennia_test_optimization_contract",
+    "tests.test_map_district_sources",
+    "tests.test_fetch_translate_script",
+    "tests.test_data_independence_browser",
+    "tests.test_map_editor_geography",
+    "tests.test_map_settlement_contract",
+    "tests.test_data_independence_ai_server",
+    "tests.test_data_independence_js_webclient",
+    "tests.test_data_independence_rules_creation",
+    "tests.test_data_independence_rules_monster",
+    "tests.test_data_independence_skills",
+    "tests.test_design_draft_contract",
+    "tests.test_map_knowledge_contract",
+    "tests.test_quests_test_layout_contract",
+    "tests.test_map_editor_persistence",
+    "tests.test_coverage_roots",
+    "tests.test_lore_codex_parity_contract",
+    "tests.test_services_parity_contract"
+   ]
+  },
+  {
+   "index": 6,
+   "name": "top-level-6",
+   "labels": [
+    "tests.test_observability_lint",
+    "tests.test_mono_font_import_tool",
+    "tests.test_mono_font_contract",
+    "tests.test_art_offline_contract",
+    "tests.test_panel_schema_version_parity_contract",
+    "tests.test_map_runtime_contract",
+    "tests.test_quality_gate_contract",
+    "tests.test_data_independence_rules_equipment",
+    "tests.test_map_editor_relationships",
+    "tests.test_rules_skills_test_layout_contract",
+    "tests.test_data_independence_art_imports",
+    "tests.test_data_independence_quests",
+    "tests.test_data_independence_rules_guild",
+    "tests.test_data_independence_rules_party",
+    "tests.test_data_independence_webclient_actions",
+    "tests.test_map_editor_interiors",
+    "tests.test_mono_cells_table",
+    "tests.test_characterization_boundary",
+    "tests.test_client_display_vocabulary_contract",
+    "tests.test_map_editor_watching",
+    "tests.test_map_editor_file_following",
+    "tests.test_utility_lineage_dissolved_contract"
+   ]
+  }
+ ]
+}

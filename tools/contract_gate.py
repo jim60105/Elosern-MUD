@@ -21,7 +21,7 @@ import subprocess
 import sys
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SHARD_MANIFESTS = ("evennia-shards", "browser-shards")
+SHARD_MANIFESTS = ("evennia-shards", "browser-shards", "top-level-shards")
 # Repository-wide ownership contracts that a feature change breaks silently:
 # every test module/method owned by exactly one CI shard, and every managed
 # browser target registered in the frozen webclient audit.

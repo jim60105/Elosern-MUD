@@ -229,8 +229,11 @@ class TestOwnershipContractTests(unittest.TestCase):
             for step in jobs["top-level"]["steps"]
             if step["name"] == "Run top-level regression suite with coverage"
         )
-        self.assertEqual(top_level_step["env"]["COVERAGE_FILE"], "coverage-top-level")
-        self.assertIn("unittest discover -s tests -t .", top_level_step["run"])
+        self.assertEqual(
+            top_level_step["env"]["COVERAGE_FILE"], "coverage-top-level-shard-${{ matrix.index }}"
+        )
+        self.assertIn("coverage run -m unittest", top_level_step["run"])
+        self.assertIn("join(matrix.labels, ' ')", top_level_step["run"])
 
         browser_run = next(
             step
@@ -377,6 +380,35 @@ class TestOwnershipContractTests(unittest.TestCase):
             ([], []),
             "every discovered non-browser test module must be in exactly one shard. "
             f"Add each unowned module to one shard's labels in .github/evennia-shards.json: "
+            f"{unowned}; remove stale labels: {stale}",
+        )
+
+    def test_top_level_shard_manifest_owns_every_tests_module_exactly_once(self):
+        """The repository-wide ``tests/`` suite has one execution owner per module."""
+        import json
+
+        manifest = json.loads(
+            (REPO_ROOT / ".github" / "top-level-shards.json").read_text(encoding="utf-8")
+        )
+        discovered = {
+            ".".join(path.relative_to(REPO_ROOT).with_suffix("").parts)
+            for path in sorted((REPO_ROOT / "tests").glob("test_*.py"))
+        }
+        owner: dict[str, int] = {}
+        duplicates: list[str] = []
+        for shard in manifest["shards"]:
+            for label in shard["labels"]:
+                for module in _resolve_evennia_label(REPO_ROOT, label):
+                    if module in owner:
+                        duplicates.append(module)
+                    owner[module] = shard["index"]
+        unowned = sorted(discovered - set(owner))
+        stale = sorted(set(owner) - discovered)
+        self.assertEqual(
+            (sorted(duplicates), unowned, stale),
+            ([], [], []),
+            "every tests/ module must be in exactly one top-level shard. "
+            f"Add each unowned module to one shard's labels in .github/top-level-shards.json: "
             f"{unowned}; remove stale labels: {stale}",
         )
 

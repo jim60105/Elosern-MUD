@@ -13,6 +13,7 @@ jobs:
     outputs:
       browser-shards: ${{ steps.shards.outputs.matrix }}
       evennia-shards: ${{ steps.evennia-shards.outputs.matrix }}
+      top-level-shards: ${{ steps.top-level-shards.outputs.matrix }}
 
     steps:
       - name: Check out repository
@@ -90,6 +91,13 @@ jobs:
         run: >-
           echo "matrix=$(uv run --locked python -c
           "import json; print(json.dumps(json.load(open('.github/evennia-shards.json'))['shards']))")"
+          >> "$GITHUB_OUTPUT"
+
+      - name: Compute top-level shard matrix
+        id: top-level-shards
+        run: >-
+          echo "matrix=$(uv run --locked python -c
+          "import json; print(json.dumps(json.load(open('.github/top-level-shards.json'))['shards']))")"
           >> "$GITHUB_OUTPUT"
 
   evennia:
@@ -362,6 +370,10 @@ jobs:
   top-level:
     needs: preflight
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.preflight.outputs.top-level-shards) }}
 
     steps:
       - name: Check out repository
@@ -401,18 +413,23 @@ jobs:
 
       - name: Run top-level regression suite with coverage
         env:
-          COVERAGE_FILE: coverage-top-level
-          OPENSPEC_TEST_EVIDENCE: evidence.top-level.jsonl
-        run: uv run --locked coverage run -m unittest discover -s tests -t .
+          COVERAGE_FILE: coverage-top-level-shard-${{ matrix.index }}
+          OPENSPEC_TEST_EVIDENCE: evidence.top-level-shard-${{ matrix.index }}.jsonl
+        # ``--durations 0`` prints every test's wall time: a shard rebalance is
+        # measured from this log rather than from a local timing run.
+        run: >-
+          uv run --locked coverage run -m unittest
+          --durations 0
+          ${{ join(matrix.labels, ' ') }}
 
       - name: Upload coverage and evidence artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: top-level-artifacts
+          name: top-level-shard-${{ matrix.index }}-artifacts
           if-no-files-found: error
           path: |
-            coverage-top-level*
-            evidence.top-level.jsonl
+            coverage-top-level-shard-${{ matrix.index }}*
+            evidence.top-level-shard-${{ matrix.index }}.jsonl
 
   gate:
     needs: [evennia, browser, top-level, frontend]
@@ -458,8 +475,11 @@ jobs:
             test -s "evidence.evennia-shard-${index}.jsonl" || { echo "evidence.evennia-shard-${index}.jsonl is missing or empty"; exit 1; }
           done < <(uv run --locked python -c \
             "import json; print('\n'.join(str(s['index']) for s in json.load(open('.github/evennia-shards.json'))['shards']))")
-          check_glob "top-level" 'coverage-top-level*'
-          test -s evidence.top-level.jsonl || { echo "evidence.top-level.jsonl is missing or empty"; exit 1; }
+          while read -r index; do
+            check_glob "top-level-shard-${index}" "coverage-top-level-shard-${index}*"
+            test -s "evidence.top-level-shard-${index}.jsonl" || { echo "evidence.top-level-shard-${index}.jsonl is missing or empty"; exit 1; }
+          done < <(uv run --locked python -c \
+            "import json; print('\n'.join(str(s['index']) for s in json.load(open('.github/top-level-shards.json'))['shards']))")
           while read -r index; do
             check_glob "browser-shard-${index}" "coverage-browser-shard-${index}*"
             test -s "evidence.browser-shard-${index}.jsonl" || { echo "evidence.browser-shard-${index}.jsonl is missing or empty"; exit 1; }
@@ -468,7 +488,7 @@ jobs:
 
       - name: Concatenate requirement evidence in entry-point order
         run: >-
-          cat evidence.evennia-shard-*.jsonl evidence.browser-shard-*.jsonl evidence.top-level.jsonl
+          cat evidence.evennia-shard-*.jsonl evidence.browser-shard-*.jsonl evidence.top-level-shard-*.jsonl
           > evidence.combined.jsonl
 
       - name: Verify successful requirement execution

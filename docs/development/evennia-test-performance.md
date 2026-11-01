@@ -272,21 +272,38 @@ fixture 跑在 suite 中而不在其中（`unittest/case.py` 的 `run()` 在
 
 **結果（本日最終版）：**
 
-- 瀏覽器：20 → **87 個分片**（174 個行程清單），最重清單 150 秒、預測最重
-  job 230 秒（3.8 分鐘），乘上實測最差的 1.67 倍清單變異為 330 秒；標籤維持
+- 瀏覽器：20 → **72 個分片**（144 個行程清單），最重清單 153 秒、預測最重
+  job 233 秒（3.9 分鐘），乘上實測最差的 1.67 倍清單變異為 335 秒；標籤維持
   方法層級（590 個方法各屬恰好一個清單），且每個清單都是舊清單的連續子序列。
+  清單之間改成全域依負載配對（最重配最輕），配對只決定哪兩個清單共用 runner，
+  不影響任何清單的內容。
+- **每個行程清單都必須含有至少一個 `covers_requirement` 標註的測試**：沒有標註
+  的清單不會產生 evidence 檔，而 workflow 會在該分片「成功卻沒有 evidence」時
+  直接讓步驟失敗——這正是 run 41300923484 裡 10 個瀏覽器分片紅燈的原因。切點
+  因此只落在標註測試之後；若某片段仍無標註，就從鄰近片段移入一個最輕的標註
+  測試（僅搬一個測試，其餘順序不動）。
 - Evennia：10 → **29 個分片**，其中前端 evidence 套件（`web.webclient.tests`）
   拆為 5 個 `workers: 1` 的分片，其餘 24 個為 `workers: 4`；標籤維持**逐模組**
   （900 個已探索模組各屬恰好一個分片），每個分片都是舊分片標籤順序的連續子序列。
+- **Top-level 也分片**：原本單一 `top-level` 工作近兩輪為 1,371 秒與 820 秒
+  （使用者另觀察到一輪超過 20 分鐘仍在跑）。新增 `.github/top-level-shards.json`
+  （7 個分片，80 個 `tests/` 模組各屬恰好一個），workflow 以 matrix 執行
+  `coverage run -m unittest --durations 0 <labels>`，每個分片有自己的
+  `coverage-top-level-shard-N*` 與 `evidence.top-level-shard-N.jsonl`；gate 的
+  完整性迴圈、證據串接與 coverage combine 同步改為逐分片。初步切法把會自己啟動
+  子行程或 Chromium 的重模組（`test_map_image_capture`、`test_evennia_test_guard`、
+  前端工具鏈與地圖作者模組）各自隔離，其餘 80 個模組依測試數平分成三份；每個
+  分片同樣保證至少一個標註測試，`--durations 0` 讓下一輪能用實測值再平衡。
 - manifest 新增 `workers` 欄位，workflow 以 `matrix.workers` 決定 `--parallel`
   （原本以分片名稱字串 `webclient-evidence` 判斷，拆出多個 evidence 分片後
   會回到 4 個 worker 並重新造成 Vitest/build 的 oversubscription）。
-- 取捨：每個行程清單都要付一次共享伺服器冷啟動（實測中位數 51.8 秒）與約
-  80 秒的瀏覽器 job 前置，因此切得越細，runner 總分鐘數越高（174 個清單的
-  冷啟動約 9,000 秒，舊版 40 個清單約 2,500 秒）。換得的是每個清單負載低、
-  對 1.67 倍慢 runner 仍有餘裕，且在慢 runner 上不易觸發超時類的 flake。
-- 工作數：1 preflight + 29 evennia + 87 browser + 1 frontend + 1 top-level +
-  1 gate = 120。若後續要把工作數壓回來，可考慮先在 job 前置階段預先啟動共享
+- 取捨：每個行程清單都要付一次共享伺服器冷啟動（實測中位數 51.8 秒）、約
+  80 秒的瀏覽器 job 前置，以及 top-level 每個分片約 40 秒的工具鏈前置，因此
+  切得越細，runner 總分鐘數越高（144 個瀏覽器清單的冷啟動約 7,500 秒，舊版
+  40 個清單約 2,500 秒）。換得的是每個分片負載低、對 1.67 倍慢 runner 仍有
+  餘裕，且在慢 runner 上不易觸發超時類的 flake。
+- 工作數：1 preflight + 29 evennia + 72 browser + 7 top-level + 1 frontend +
+  1 gate = 111。若後續要把工作數壓回來，可考慮先在 job 前置階段預先啟動共享
   執行環境（harness 的 `_boot_until_ready` 會沿用既有 runtime）或只建置該分片
   需要的前端 bundle，兩者都能讓清單上限放寬而不犧牲 6 分鐘預算。
 

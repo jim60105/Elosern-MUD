@@ -133,7 +133,7 @@ uv run --locked coverage report --fail-under=80
 uv run --locked coverage xml -o coverage.xml
 ```
 
-Evennia 測試執行器擁有 `commands`、`server`、`typeclasses`、`world` 與 `web.webclient` 底下的套件區域測試。明確的瀏覽器探索單獨擁有 `web/tests/browser/`；最上層儲存庫契約仍由 `unittest discover -s tests -t .` 擁有。覆蓋率仍精確測量 `commands`、`server`、`typeclasses`、`web` 與 `world` 這五個第一方根目錄；僅有位於 `*/tests/*` 底下的模組可被排除。相依套件程式碼、OpenSpec 工件與儲存庫工具均位於已設定的原始碼根目錄之外。所有三個覆蓋率資料檔案在套用匯總 80% 硬性門檻（hard gate is 80%）或為 Codecov 產生 `coverage.xml` 之前必須完成合併。專案將 90%（targets 90%）作為文件記載的目標，不作為強制門檻。瀏覽器包裝器記錄其父層測試控管架構，不主張受管伺服器子行程的覆蓋率。
+Evennia 測試執行器擁有 `commands`、`server`、`typeclasses`、`world` 與 `web.webclient` 底下的套件區域測試。明確的瀏覽器探索單獨擁有 `web/tests/browser/`；最上層儲存庫契約仍由 `tests/` 擁有，CI 依 `.github/top-level-shards.json` 把它切成多個連續切片執行（每個 `tests/` 模組仍由恰好一個分片擁有；discover 形式保留給本機執行）。覆蓋率仍精確測量 `commands`、`server`、`typeclasses`、`web` 與 `world` 這五個第一方根目錄；僅有位於 `*/tests/*` 底下的模組可被排除。相依套件程式碼、OpenSpec 工件與儲存庫工具均位於已設定的原始碼根目錄之外。所有三個覆蓋率資料檔案在套用匯總 80% 硬性門檻（hard gate is 80%）或為 Codecov 產生 `coverage.xml` 之前必須完成合併。專案將 90%（targets 90%）作為文件記載的目標，不作為強制門檻。瀏覽器包裝器記錄其父層測試控管架構，不主張受管伺服器子行程的覆蓋率。
 
 專用的保留資料庫為 `server/db/evennia-test.sqlite3`。若資料庫遷移有所變更，可在重建時略過 `--keepdb` 並加上 `--noinput`。若保留狀態已損壞，僅刪除該檔案並重新執行乾淨設定；切勿刪除位於 `server/db/evennia.db3` 的開發者資料庫。
 
