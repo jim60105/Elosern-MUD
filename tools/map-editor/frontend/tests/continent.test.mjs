@@ -51,7 +51,18 @@ function world() {
       border_river_key: "river",
       harbor_sites: [{ id: "port", display_name: "Port", cell: [2, 3], centre_m: [2500, 3500], role: "Trade" }],
       regions: [{ id: "eastern_plains", display_name_zh: "東", nation_key: null, terrain_flavor_zh: ["a", "b"], nominal_nation_keys: [], scene_archetype: null }],
-      ridge: { base_x: 10, passes: [{ y_min: 4, y_max: 5 }] },
+      ridge: {
+        mountain_corridor_half_width: 2,
+        passes: [],
+        stem: [[10, 0], [8, 10]],
+        branches: { west: [[8, 10], [6, 14]], east: [[8, 10], [12, 14]] },
+      },
+      ridge_routes: { stem: [[10, 0], [8, 10]], west: [[8, 10], [6, 14]], east: [[8, 10], [12, 14]] },
+      ridge_routes_m: {
+        stem: [[10500, 500], [8500, 10500]],
+        west: [[8500, 10500], [6500, 14500]],
+        east: [[8500, 10500], [12500, 14500]],
+      },
       coastal_y_max: 10,
       terrain_preview: {
         status: "current",
@@ -92,11 +103,14 @@ test("references parse into feature, point and declaration kinds", () => {
   assert.deepEqual(parseContinentRef("continent:waterway:river#2"), { kind: "waterway", id: "river", index: 2, feature: "continent:waterway:river" });
   assert.deepEqual(parseContinentRef(MAINLAND), { kind: "mainland", id: null, index: null, feature: MAINLAND });
   assert.equal(parseContinentRef("continent:pass#1").index, 1);
+  assert.deepEqual(parseContinentRef("continent:ridge_route:west#1"), { kind: "ridge_route", id: "west", index: 1, feature: "continent:ridge_route:west" });
   assert.equal(parseContinentRef("footprint:town").kind, "footprint");
   assert.equal(parseContinentRef("location:place"), null);
   assert.equal(parseContinentRef("continent:waterway:Bad-Id"), null);
   assert.deepEqual(commandFeature("continent:ford:river#0"), { kind: "waterway_ford", waterway_id: "river" });
+  assert.deepEqual(commandFeature("continent:ridge_route:stem#0"), { kind: "ridge_route", route: "stem" });
   assert.deepEqual(commandFeature("continent:forest_edge#1"), { kind: "forest_edge" });
+  assert.equal(parseContinentRef("continent:ridge_route:north"), null);
 });
 
 test("mainland vertices are kilometres and every other point is a cell index", () => {
@@ -109,6 +123,12 @@ test("mainland vertices are kilometres and every other point is a cell index", (
   const points = featurePoints(w, waterwayRef("river"));
   assert.deepEqual(points.map((p) => p.stored), [[20, 20], [0, 20]]);
   assert.deepEqual(points[0].m, { x: 20500, y: 20500 });
+  // A ridge route is a cell-frame feature with a cell-centre metre companion.
+  assert.equal(frameOf("continent:ridge_route:west#0"), FRAME_CELL);
+  const route = featurePoints(w, "continent:ridge_route:west");
+  assert.deepEqual(route.map((p) => p.stored), [[8, 10], [6, 14]]);
+  assert.deepEqual(route[1].m, { x: 6500, y: 14500 });
+  assert.deepEqual(featurePoints(w, "continent:ridge_route:north"), []);
 });
 
 test("the insertion index follows the nearest segment, extends ends and closes rings", () => {
@@ -153,6 +173,15 @@ test("handles appear only for the selected feature; derived output has none", ()
   assert.ok(selected.marks.every((mark) => mark.layer !== "partition"));
   assert.equal(selected.raster.layer, "terrain");
   assert.equal(selected.marks.find((mark) => mark.kind === "pass").draggable, false);
+  // An authored ridge route is selectable and its handles live on the ridge
+  // layer; the derived walls stay preview-owned.
+  const routeShape = plain.shapes.find((shape) => shape.ref === "continent:ridge_route:west");
+  assert.equal(routeShape.role, "ridge-route");
+  assert.equal(routeShape.layer, "ridge");
+  assert.equal(routeShape.selectable, true);
+  const ridgeHandles = continentScene(w, ["continent:ridge_route:west"]).marks.filter((mark) => mark.kind === "handle");
+  assert.deepEqual(ridgeHandles.map((mark) => mark.id), ["continent:ridge_route:west#0", "continent:ridge_route:west#1"]);
+  assert.ok(ridgeHandles.every((mark) => mark.draggable && mark.layer === "ridge"));
   const hidden = visibleScene(selected, ["terrain", "partition"]);
   assert.equal(hidden.raster, null);
   assert.ok(hidden.shapes.every((shape) => shape.layer !== "partition"));
@@ -184,6 +213,9 @@ test("the catalog keeps continental refs with owner, layer and frame", () => {
   assert.equal(catalog.get("district:d1").relativePath, "content/maps/districts.yaml");
   assert.equal(catalog.get("footprint:town").relativePath, S);
   assert.equal(catalog.get("continent:ford:river#0").layer, "ridge");
+  assert.equal(catalog.get("continent:ridge_route:stem").layer, "ridge");
+  assert.equal(catalog.get("continent:ridge_route:stem#1").relativePath, C);
+  assert.equal(inspect(world(), "continent:ridge_route:stem#1").owner, "continent:ridge_route:stem");
   const text = ompContext({ workspace: { world: world(), preview_state: "current" }, catalog, refs: ["continent:waterway:river#0"] });
   assert.match(text, /1 km 格/);
   assert.match(text, /continent:waterway:river#0/);

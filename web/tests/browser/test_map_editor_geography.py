@@ -314,8 +314,15 @@ class MapEditorGeographyBrowserTest(unittest.TestCase):
         self.assertEqual(page.locator('[data-derived="true"][data-shape-ref]').count(), 0)
         self.assertEqual(page.locator("[data-terrain-preview]").count(), 1)
         page.click('[data-object="continent:ridge"]')
-        page.fill('[data-field-input="ridge-base_x"]', "14")
-        page.press('[data-field-input="ridge-base_x"]', "Enter")
-        self.wait_for(lambda: self.data(CONTINENT)["terrain"]["ridge"]["base_x"] == 14, "the ridge parameter was not saved")
+        # Select the authored stem route, then its second control point and
+        # enter a new cell column. Retired periodic fields no longer exist.
+        page.click('[data-select-route="stem"]')
+        page.click('[data-select-point="continent:ridge_route:stem#1"]')
+        page.fill('[data-field-input="point-0"]', "24")
+        page.press('[data-field-input="point-0"]', "Enter")
+        self.wait_for(
+            lambda: self.data(CONTINENT)["terrain"]["ridge"]["stem"][1]["cell_x"] == 24,
+            "the ridge route point was not saved",
+        )
         self.assertEqual(self.changed(), {CONTINENT})
-        self.assertEqual(self.names(), ["set_terrain_parameter"])
+        self.assertEqual(self.names(), ["move_control_point"])

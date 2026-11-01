@@ -56,11 +56,14 @@ Every coordinate is explicitly named for its domain:
   region keys are required.
 - `harbor_sites.<id>`: `display_name`, `cell`, `role`.
 - `terrain`: `forest_edge[]` (`cell_x`,`cell_y`, X-increasing),
-  `ridge{base_x, period, step, min_x, max_x, north_limit_y,
-  mountain_corridor_half_width, passes[{y_min,y_max}]}`, `coastal_y_max`,
-  `waterways{}` (`{route[], fords[]}` per waterway), `border_river_key`.
-  Terrain geometry is validated by the core `TerrainDefinition`; inconsistent
-  inputs are a saveable `terrain_inconsistent` diagnostic.
+  `ridge{stem[{cell_x,cell_y}] (required, >=2, row 0 first),
+  branches{west[],east[]} (optional, exactly paired, >=2 each),
+  mountain_corridor_half_width, passes[{y_min,y_max}] (possibly empty)}`,
+  `coastal_y_max`, `waterways{}` (`{route[], fords[]}` per waterway),
+  `border_river_key`. The retired `base_x`/`period`/`step`/`min_x`/`max_x`/
+  `north_limit_y` periodic fields are unknown and rejected. Terrain geometry is
+  validated by the core `TerrainDefinition`; inconsistent inputs are a
+  saveable `terrain_inconsistent` diagnostic.
 - `elevation_shapes`: optional ordered list of elevation shape operations.
   Absent means empty and remains absent when serialized; an explicit list preserves order.
   - `shape`: `circle` (with `centre: {cell_x, cell_y}` and positive integer `radius`)

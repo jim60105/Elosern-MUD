@@ -122,6 +122,50 @@ class GeographyProcessTests(unittest.TestCase):
         self.assertEqual(status, 200)
 
     @covers_requirement("map-editor-geography::continental-authored-inputs-have-direct-and-explicit-editing-controls")
+    def test_ridge_route_points_and_zero_passes_round_trip(self):
+        editor = self.start()
+        stem = {"kind": "ridge_route", "route": "stem"}
+        west = {"kind": "ridge_route", "route": "west"}
+        east = {"kind": "ridge_route", "route": "east"}
+        before = synthetic.tree_digest(self.workspace)
+        status, body = self.send(editor, "move_control_point", CONTINENT,
+                                 {"feature": stem, "index": 1, "point": [24, 12]})
+        self.assertEqual(status, 200, body)
+        self.assertEqual(self.changed(before), {CONTINENT})
+        self.assertEqual(
+            editor.workspace_state()["world"]["continent"]["ridge_routes"]["stem"][1],
+            [24, 12],
+        )
+        # Moving either crotch point updates all three shared points at once.
+        status, body = self.send(editor, "move_control_point", CONTINENT,
+                                 {"feature": west, "index": 0, "point": [26, 30]})
+        self.assertEqual(status, 200, body)
+        routes = editor.workspace_state()["world"]["continent"]["ridge_routes"]
+        self.assertEqual(routes["stem"][-1], [26, 30])
+        self.assertEqual(routes["west"][0], [26, 30])
+        self.assertEqual(routes["east"][0], [26, 30])
+        # Shared-point deletion and detaching insertions are refused with no write.
+        protected = synthetic.tree_digest(self.workspace)
+        for name, arguments in (
+            ("remove_control_point", {"feature": stem, "index": 3}),
+            ("remove_control_point", {"feature": west, "index": 0}),
+            ("insert_control_point", {"feature": west, "index": 0, "point": [27, 31]}),
+            ("insert_control_point", {"feature": stem, "index": 4, "point": [27, 31]}),
+        ):
+            status, body = self.send(editor, name, CONTINENT, arguments)
+            self.assertEqual(status, 409, (name, body))
+        self.assertEqual(synthetic.tree_digest(self.workspace), protected)
+        # The pass list may be empty and round-trips to empty.
+        self.assertEqual(self.send(editor, "add_ridge_pass", CONTINENT, {"y_min": 20, "y_max": 22})[0], 200)
+        self.assertEqual(self.send(editor, "remove_ridge_pass", CONTINENT, {"index": 0})[0], 200)
+        self.assertEqual(editor.workspace_state()["world"]["continent"]["ridge"]["passes"], [])
+        # A retired periodic parameter is refused with no write.
+        retired = synthetic.tree_digest(self.workspace)
+        status, body = self.send(editor, "set_terrain_parameter", CONTINENT, {"field": "ridge.base_x", "value": 5})
+        self.assertEqual(status, 400, body)
+        self.assertEqual(synthetic.tree_digest(self.workspace), retired)
+
+    @covers_requirement("map-editor-geography::continental-authored-inputs-have-direct-and-explicit-editing-controls")
     def test_a_location_and_its_local_map_are_separate_commands(self):
         editor = self.start()
         before = synthetic.tree_digest(self.workspace)

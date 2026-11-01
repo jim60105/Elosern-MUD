@@ -57,20 +57,57 @@ registry and the published terrain snapshot into the core rule) decides
 validity: inside the frame, inside the mainland polygon
 evaluated at the cell centre, off the cliff-walled central summit ridge, off
 the authored inland waterways, and outside every live anchor footprint. Sea,
-ridge and water are impassable on foot; the authored pass windows
-(`terrain.ridge.passes`, the principal one near `(1410, 980)`) and the declared
-waterway fords are ordinary walkable ground. Every query is bounded local
-arithmetic, with no frame scan or room materialization; derived tables belong
-to the snapshot, so a reload never reuses another world's results.
+ridge and water are impassable on foot; the declared waterway fords are
+ordinary walkable ground. The authored pass list is empty
+(`terrain.ridge.passes: []`): the range is a continuous barrier and crossings
+go around the inland arm tips through the walkable deep forest. Every query is
+bounded local arithmetic, with no frame scan or room materialization; derived
+tables belong to the snapshot, so a reload never reuses another world's
+results.
 
 `region_for_coordinates` classifies the whole frame into the declared region
-views with the authored bending mountain corridor, the meandering northern
+views with the authored mountain corridor, the meandering northern
 deep forest edge (`terrain.forest_edge`, averaging about Y 1920 and covering
 about one fifth of the land) and the border river; `terrain_description`
 stays the pinned `(x * 92821 + y * 68917) % len(variants)` form. Altoria's
 rasterized footprint is a 40 km² irregular mask and Ciaran is a hidden point
 entrance with one authored entry direction, so unrelated directions there stay
 ordinary wilderness steps.
+
+## Authored ridge routes
+
+The periodic sawtooth that the classifier once derived from
+`base_x`/`period`/`step`/`min_x`/`max_x`/`north_limit_y` was a simplified
+implementation, not authored intent. Those fields are retired. The ridge is
+now an authored route pair in `content/maps/continent.yaml`
+(`terrain.ridge`):
+
+- `stem` (required, at least two cells) begins at row 0 and ends at the
+  crotch; it is the single authority for the physical walls, the
+  `central_mountains` corridor, the nominal nation flip, both displayed
+  political lines and the elevation crest raster.
+- `branches` (optional) carries exactly the paired `west` and `east` routes,
+  each beginning at the stem's last cell and ending north of it on opposite
+  sides. The arms are additional impassable forest barriers with no corridor
+  and no political line; the space between them stays walkable deep forest.
+- `mountain_corridor_half_width` and `passes` remain. `passes` may be empty
+  and ships empty; a pass (when authored) exempts only its stem rows.
+
+Routes are validated semantically: strictly increasing rows, at most one
+column of movement per row, an in-frame stem beginning at row 0, paired arms
+joining the shared crotch and separating without crossing or rejoining, and
+every active stem centre strictly east of the border river's easternmost
+source vertex. Endpoints and derived extents come from the same routes, so no
+second reference axis survives. `ridge_center_x` evaluates the stem and
+continues its endpoint column outside the active rows;
+`ridge_crest_center_x`, `ridge_span`, `ridge_spans`, `ridge_polyline` and
+`is_closed_ridge_cell` read the precomputed route tables. Stem and arms are
+edited with the standard `move_control_point`/`insert_control_point`/
+`remove_control_point` commands (`feature: {kind: ridge_route, route: ...}`),
+with the three shared crotch cells moving atomically.
+
+Whether the range looks geologically plausible is human review against this
+document, never an automated visual test.
 
 ## Border river, forest edge and nominal claims
 
@@ -84,28 +121,28 @@ diagonal steps, so the one-cell line is a complete barrier; its three fords
 (the same waterway's `fords`: upstream `(1150, 1363)`, principal
 `(823, 1366)` on the line between the Altoria and Valhalla capitals,
 downstream `(450, 1345)`) are the only crossings west of the source. East of
-the source the mountain corridor and the ridge passes still connect the two
-banks over mountain-trail ground.
+the source the mountain corridor still connects the two banks over
+mountain-trail ground.
 
 The river divides `western_hills_valleys` from `northwest_highland_forest`;
-`forest_edge_row(x)` starts `north_deep_forest`. The summit ridge keeps its
-own northern limit at Y 2200 inside the forest, and the forest keeps ordinary
+`forest_edge_row(x)` starts `north_deep_forest`. The forest keeps ordinary
 woodland travel speed. Region keys stay terrain only:
 `nominal_nation_for_coordinates` is the coordinate-sensitive nominal claim
-(Grandia east of the ridge centre line, Altoria west of it on or south of the
-river row, Valhalla north of it; the source row continues east to the ridge).
+(Grandia east of the authored stem's centre line, Altoria west of it on or
+south of the river row, Valhalla north of it; the source row continues east to
+the stem).
 The land shares are about Grandia 43 %, Altoria 30 %, Valhalla 27 %; these are
 nominal claims, while `Nation.territory_share` keeps the effective-rule
 targets. `WildernessRegion.nominal_nation_keys` lists every claimant of a
 region, and `nation_key` is `None` for the two shared regions
 (`central_mountains`, `north_deep_forest`). Anchor `nation_key` values are
 lore identity and are not recomputed from cells: 幽月谷村 lies east of the
-ridge in the forest (nominally Grandia) yet stays administratively
-independent.
+stem in the forest yet stays administratively independent, and its nominal
+claim is incidental old geometry rather than an authored nation.
 
 `national_borders()` derives the displayed national lines from the same
-geometry: the river plus its source row to the ridge (Altoria | Valhalla) and
-the ridge centre line split at that row (Altoria | Grandia,
+geometry: the river plus its source row to the stem (Altoria | Valhalla) and
+the stem's clipped authored polyline split at that row (Altoria | Grandia,
 Grandia | Valhalla), stopping at the forest edge. No political polyline is
 authored. The layout prototype under `docs/design/world-map/` predates this
 geography and is not runtime data.
@@ -176,7 +213,7 @@ forest.
   Chinese name in JRPG sword-and-magic vocabulary that fits its terrain:
   coasts, river reaches, hills and mines for Altoria; plains, orchards,
   canals and magic-crystal fields for Grandia; highland forest, hunting and
-  totems for Valhalla; and peaks and passes on the range. A landmark is a
+  totems for Valhalla; and peaks on the range. A landmark is a
   natural feature, ruin, stone, shrine or similar place. It never names a new
   city, settlement, quest or NPC, and it never sits on an elven village or
   dungeon cell, because those stay hidden until visited. As an authoring
@@ -191,7 +228,7 @@ forest.
 database-free and reports every fault as a typed core diagnostic with the
 district identity and source field: identity and field shape, kind/region
 pairing, duplicate landmarks and names, canonical node grammar, sea, blocked
-terrain (ridge, river or anchor footprint), unbound grid projections,
+terrain (ridge wall, river or anchor footprint), unbound grid projections,
 unreachable landmarks, region membership (a Voronoi seed may not sit in
 region-district land) and the spacing rule. A wilderness landmark is
 reachable when it lies in the same walkable component as a registered
@@ -230,7 +267,7 @@ standard library alone, so a process without the extra still reports
 `freshness()` instead of silently recomputing or adopting stale data.
 
 Regenerate after any change to the district document, the terrain model
-(mainland, ridge, passes, waterways, fords, forest edge, nominal claims),
+(mainland, ridge routes, passes, waterways, fords, forest edge, nominal claims),
 anchor footprints, gateways or the settlement routes to a grid landmark:
 
 ```sh
@@ -272,7 +309,7 @@ Datum and units:
   tiles join at cost 1 (cardinal tile step) or √2 (diagonal tile step) only
   where a legal one-kilometre step crosses between them.
 - A legal step joins walkable, non-region cells of the same nominal nation; a
-  diagonal step also needs both orthogonal cells legal. Sea, the ridge,
+  diagonal step also needs both orthogonal cells legal. Sea, the ridge walls,
   rivers, footprints and region land block propagation, and national borders
   stay closed even at passes and fords.
 - The deep forest region district is reserved first, across both claims.
@@ -311,7 +348,8 @@ Stages run in one fixed order:
 
 1. Land from `mainland_row_intervals`, inland water from `waterway_cells`, a
    linear capped coastal rise from the Euclidean distance to sea, the
-   ridge-centre mountain rise across the authored corridor and river carving;
+   maximum authored stem-or-arm ridge-centre rise across the corridor and
+   river carving;
    land is never negative.
 2. Domain-warped multi-octave value noise. The lattice hash is an integer
    avalanche mix (xor shifts 16/15/16 with the MurmurHash3 finalizer
@@ -375,7 +413,7 @@ The runtime adapter lives in `world/maps/elevation.py`:
 | --- | --- | --- |
 | `content/maps/continent.yaml` | `frame_cells`, `cell_size_km`, `mainland_boundary_km` | Ordered mainland boundary vertices in absolute `(east, north)` kilometres; implicitly closed. Shoelace area is exactly 5,000,000 km². Wilderness cells are logical one-kilometre areas; the frame is 2700 × 2700 cells (`0 <= X, Y < 2700`). The cell-centre arithmetic and its `500` metre offset live in `elosern_map_core.geometry`. |
 | `content/maps/continent.yaml` | `regions` | The seven terrain regions with their display names, nominal claims, at least two nonblank prose variants and their map-owned `scene_archetype`, validated against the game scene catalog at publication. |
-| `content/maps/continent.yaml` | `terrain` | Every classifier input: forest edge, ridge parameters and passes, coastal boundary, waterways with their fords and the border-river key. |
+| `content/maps/continent.yaml` | `terrain` | Every classifier input: forest edge, the authored ridge stem and optional paired arms plus the empty-able pass list, coastal boundary, waterways with their fords and the border-river key. |
 | `content/maps/continent.yaml` | `harbor_sites` | Reserved land-side harbor cells with their intended roles. A functional site is not a named anchor, city, quest or population. |
 | `content/maps/locations.yaml` | `locations` | Every static geographic location's kind, name, description, cell and geographic constraint, including locations with no built settlement or interior. |
 | `world/maps/runtime.py` | `compose`, `adopt`, `synchronize`, `current` | The one map composition root: complete-candidate validation, one immutable bundle, and the persistent synchronization that commits it. |

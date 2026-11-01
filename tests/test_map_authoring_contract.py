@@ -316,6 +316,87 @@ class AuthoringRequirementTests(unittest.TestCase):
         )
 
     @covers_requirement(
+        "map-authoring-documents::"
+        "map-documents-are-discovered-and-schema-checked-as-a-complete-candidate"
+    )
+    def test_ridge_requires_an_authored_stem_and_paired_branches(self):
+        # A ridge without its authored stem is structurally incomplete.
+        continent = fixtures.continent_data()
+        del continent["terrain"]["ridge"]["stem"]
+        with self.assertRaises(AuthoringError) as captured:
+            load_authoring_world(
+                fixtures.custom_sources(
+                    continent=continent, settlement=fixtures.settlement_data()
+                )
+            )
+        self.assertIn("missing_field", {item.code for item in captured.exception.diagnostics})
+
+        # A retired periodic field is an unknown field, never a second shape
+        # authority.
+        continent = fixtures.continent_data()
+        continent["terrain"]["ridge"]["base_x"] = 5
+        with self.assertRaises(AuthoringError) as captured:
+            load_authoring_world(
+                fixtures.custom_sources(
+                    continent=continent, settlement=fixtures.settlement_data()
+                )
+            )
+        self.assertIn("unknown_field", {item.code for item in captured.exception.diagnostics})
+
+        # A present branches mapping must carry both west and east.
+        continent = fixtures.continent_data()
+        continent["terrain"]["ridge"]["branches"] = {
+            "west": [
+                {"cell_x": 25, "cell_y": 30},
+                {"cell_x": 21, "cell_y": 34},
+                {"cell_x": 17, "cell_y": 38},
+            ]
+        }
+        with self.assertRaises(AuthoringError) as captured:
+            load_authoring_world(
+                fixtures.custom_sources(
+                    continent=continent, settlement=fixtures.settlement_data()
+                )
+            )
+        self.assertIn("missing_field", {item.code for item in captured.exception.diagnostics})
+
+        # An empty pass list and paired arms are a legal complete candidate,
+        # and the authored routes survive a parse-edit-serialize-reparse.
+        continent = fixtures.continent_data()
+        continent["terrain"]["ridge"]["passes"] = []
+        continent["terrain"]["ridge"]["branches"] = {
+            "west": [
+                {"cell_x": 25, "cell_y": 30},
+                {"cell_x": 21, "cell_y": 34},
+                {"cell_x": 17, "cell_y": 38},
+            ],
+            "east": [
+                {"cell_x": 25, "cell_y": 30},
+                {"cell_x": 29, "cell_y": 34},
+                {"cell_x": 33, "cell_y": 38},
+            ],
+        }
+        world = load_authoring_world(
+            fixtures.custom_sources(continent=continent, settlement=fixtures.settlement_data())
+        )
+        ridge = world.continent.terrain
+        self.assertEqual(ridge.ridge_passes, ())
+        self.assertEqual(set(ridge.ridge_branches), {"west", "east"})
+        self.assertEqual(ridge.ridge_stem[-1], (25, 30))
+
+        parsed = parse_document("content/maps/continent.yaml", fixtures.yaml_text(continent))
+        emitted = serialize_document(parsed.document, parsed.round_trip)
+        reparsed = parse_document("content/maps/continent.yaml", emitted)
+        self.assertEqual(reparsed.document.terrain.ridge_passes, ())
+        self.assertEqual(
+            reparsed.document.terrain.ridge_stem, parsed.document.terrain.ridge_stem
+        )
+        self.assertEqual(
+            dict(reparsed.document.terrain.ridge_branches),
+            dict(parsed.document.terrain.ridge_branches),
+        )
+
+    @covers_requirement(
         "wilderness-elevation-authoring::"
         "elevation-shapes-reject-invalid-candidates"
     )
