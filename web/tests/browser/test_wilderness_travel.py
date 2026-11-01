@@ -379,11 +379,14 @@ _PAINTS = "() => window.__elosernBridge.travelPaint.stats().count"
 # The repaint benchmark: the real painter on the real decoder's output
 # (wilderness-travel-window-ui) for rich synthetic 41 x 41 schema-3 bodies
 # (bands, tiers, roads, a river with a ford, woods, two districts, a
-# settlement footprint, phase and radius), 5 warm-up paints, then 20 timed
+# settlement footprint, phase and radius), 8 warm-up paints, then 20 timed
 # state changes (party, reveal, phase, radius and flags all move). The canvas
-# size comes from the decoded window, never a constant.
+# size comes from the decoded window, never a constant. The budget names a
+# warmed repaint, so the warm-up also drains the canvas: one flush before the
+# timed loop completes the warm-up rasterization instead of charging it, plus
+# the first readback, to the first timed sample.
 _BENCH = """() => {
-  const S = 12, N = 41, phases = ['day', 'dusk', 'night', 'dawn'];
+  const S = 12, N = 41, warmups = 8, phases = ['day', 'dusk', 'night', 'dawn'];
   const labels = { open_ground: '曠', hills: '丘', woodland: '林', water: '河', settlement: '聚' };
   const body = (k) => {
     const ox = 1000 + k, oy = 2000 + (k % 3);
@@ -422,16 +425,17 @@ _BENCH = """() => {
       light_phase: phases[k % 4], ground_radius: 1 + (k % 6), entities: [], sightings: [] };
   };
   const { paintTravelMap, decode } = window.__elosernBridge.travelPaint;
-  const grids = Array.from({ length: 25 }, (_, k) => decode(body(k)));
+  const grids = Array.from({ length: warmups + 20 }, (_, k) => decode(body(k)));
   if (grids.some((g) => !g)) return { error: 'the decoder refused a bench body' };
   const canvas = document.createElement('canvas');
   canvas.width = grids[0].width * S;
   canvas.height = grids[0].height * S;
   const ctx = canvas.getContext('2d');
   const cache = {};
-  for (let k = 0; k < 5; k += 1) paintTravelMap(ctx, grids[k], { cache });
+  for (let k = 0; k < warmups; k += 1) paintTravelMap(ctx, grids[k], { cache });
+  ctx.getImageData(0, 0, 1, 1);
   const samples = [];
-  for (let k = 5; k < 25; k += 1) {
+  for (let k = warmups; k < warmups + 20; k += 1) {
     const started = performance.now();
     paintTravelMap(ctx, grids[k], { cache });
     ctx.getImageData(0, 0, 1, 1);
