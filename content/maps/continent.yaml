@@ -7,26 +7,756 @@ id: continent
 frame_cells: 2700
 cell_size_km: 1
 mainland_boundary_km:
-- east_km: 450
-  north_km: 100
-- east_km: 1850
-  north_km: 100
-- east_km: 2400
-  north_km: 450
-- east_km: 2600
-  north_km: 1350
-- east_km: 1930
-  north_km: 2250
-- east_km: 1800
-  north_km: 2600
-- east_km: 750
-  north_km: 2550
-- east_km: 200
-  north_km: 2050
-- east_km: 100
-  north_km: 1050
-- east_km: 300
-  north_km: 350
+- {east_km: 2638, north_km: 1354}
+- {east_km: 2624, north_km: 1365}
+- {east_km: 2610, north_km: 1376}
+- {east_km: 2596, north_km: 1387}
+- {east_km: 2583, north_km: 1397}
+- {east_km: 2572, north_km: 1407}
+- {east_km: 2562, north_km: 1417}
+- {east_km: 2555, north_km: 1428}
+- {east_km: 2549, north_km: 1438}
+- {east_km: 2544, north_km: 1448}
+- {east_km: 2539, north_km: 1458}
+- {east_km: 2532, north_km: 1468}
+- {east_km: 2523, north_km: 1477}
+- {east_km: 2521, north_km: 1478}
+- {east_km: 2512, north_km: 1486}
+- {east_km: 2501, north_km: 1495}
+- {east_km: 2491, north_km: 1504}
+- {east_km: 2483, north_km: 1513}
+- {east_km: 2475, north_km: 1522}
+- {east_km: 2468, north_km: 1531}
+- {east_km: 2461, north_km: 1540}
+- {east_km: 2454, north_km: 1548}
+- {east_km: 2449, north_km: 1557}
+- {east_km: 2444, north_km: 1566}
+- {east_km: 2440, north_km: 1575}
+- {east_km: 2436, north_km: 1585}
+- {east_km: 2432, north_km: 1593}
+- {east_km: 2426, north_km: 1602}
+- {east_km: 2419, north_km: 1610}
+- {east_km: 2411, north_km: 1618}
+- {east_km: 2404, north_km: 1626}
+- {east_km: 2398, north_km: 1634}
+- {east_km: 2392, north_km: 1643}
+- {east_km: 2386, north_km: 1651}
+- {east_km: 2378, north_km: 1658}
+- {east_km: 2370, north_km: 1665}
+- {east_km: 2361, north_km: 1672}
+- {east_km: 2351, north_km: 1679}
+- {east_km: 2342, north_km: 1686}
+- {east_km: 2335, north_km: 1693}
+- {east_km: 2328, north_km: 1700}
+- {east_km: 2322, north_km: 1707}
+- {east_km: 2316, north_km: 1715}
+- {east_km: 2310, north_km: 1722}
+- {east_km: 2305, north_km: 1730}
+- {east_km: 2300, north_km: 1737}
+- {east_km: 2296, north_km: 1745}
+- {east_km: 2292, north_km: 1753}
+- {east_km: 2287, north_km: 1761}
+- {east_km: 2282, north_km: 1768}
+- {east_km: 2275, north_km: 1775}
+- {east_km: 2268, north_km: 1782}
+- {east_km: 2261, north_km: 1788}
+- {east_km: 2257, north_km: 1796}
+- {east_km: 2253, north_km: 1804}
+- {east_km: 2250, north_km: 1812}
+- {east_km: 2247, north_km: 1821}
+- {east_km: 2243, north_km: 1829}
+- {east_km: 2238, north_km: 1836}
+- {east_km: 2233, north_km: 1843}
+- {east_km: 2227, north_km: 1850}
+- {east_km: 2221, north_km: 1857}
+- {east_km: 2216, north_km: 1864}
+- {east_km: 2210, north_km: 1870}
+- {east_km: 2203, north_km: 1877}
+- {east_km: 2197, north_km: 1883}
+- {east_km: 2193, north_km: 1887}
+- {east_km: 2190, north_km: 1889}
+- {east_km: 2185, north_km: 1896}
+- {east_km: 2182, north_km: 1904}
+- {east_km: 2179, north_km: 1913}
+- {east_km: 2177, north_km: 1923}
+- {east_km: 2175, north_km: 1931}
+- {east_km: 2171, north_km: 1940}
+- {east_km: 2167, north_km: 1947}
+- {east_km: 2162, north_km: 1955}
+- {east_km: 2158, north_km: 1963}
+- {east_km: 2154, north_km: 1971}
+- {east_km: 2151, north_km: 1980}
+- {east_km: 2147, north_km: 1988}
+- {east_km: 2142, north_km: 1995}
+- {east_km: 2136, north_km: 2002}
+- {east_km: 2129, north_km: 2008}
+- {east_km: 2121, north_km: 2013}
+- {east_km: 2114, north_km: 2018}
+- {east_km: 2106, north_km: 2024}
+- {east_km: 2099, north_km: 2028}
+- {east_km: 2090, north_km: 2033}
+- {east_km: 2082, north_km: 2037}
+- {east_km: 2073, north_km: 2041}
+- {east_km: 2066, north_km: 2046}
+- {east_km: 2060, north_km: 2052}
+- {east_km: 2055, north_km: 2060}
+- {east_km: 2051, north_km: 2068}
+- {east_km: 2047, north_km: 2077}
+- {east_km: 2042, north_km: 2084}
+- {east_km: 2036, north_km: 2091}
+- {east_km: 2030, north_km: 2097}
+- {east_km: 2024, north_km: 2103}
+- {east_km: 2018, north_km: 2110}
+- {east_km: 2013, north_km: 2117}
+- {east_km: 2007, north_km: 2125}
+- {east_km: 2002, north_km: 2132}
+- {east_km: 1996, north_km: 2139}
+- {east_km: 1991, north_km: 2147}
+- {east_km: 1987, north_km: 2154}
+- {east_km: 1981, north_km: 2163}
+- {east_km: 1977, north_km: 2172}
+- {east_km: 1972, north_km: 2181}
+- {east_km: 1967, north_km: 2189}
+- {east_km: 1961, north_km: 2196}
+- {east_km: 1954, north_km: 2203}
+- {east_km: 1947, north_km: 2209}
+- {east_km: 1941, north_km: 2216}
+- {east_km: 1936, north_km: 2224}
+- {east_km: 1930, north_km: 2233}
+- {east_km: 1925, north_km: 2242}
+- {east_km: 1921, north_km: 2253}
+- {east_km: 1917, north_km: 2263}
+- {east_km: 1912, north_km: 2274}
+- {east_km: 1907, north_km: 2284}
+- {east_km: 1903, north_km: 2296}
+- {east_km: 1900, north_km: 2309}
+- {east_km: 1896, north_km: 2323}
+- {east_km: 1893, north_km: 2337}
+- {east_km: 1890, north_km: 2352}
+- {east_km: 1886, north_km: 2366}
+- {east_km: 1883, north_km: 2382}
+- {east_km: 1880, north_km: 2398}
+- {east_km: 1877, north_km: 2415}
+- {east_km: 1874, north_km: 2432}
+- {east_km: 1870, north_km: 2448}
+- {east_km: 1865, north_km: 2463}
+- {east_km: 1859, north_km: 2476}
+- {east_km: 1852, north_km: 2488}
+- {east_km: 1846, north_km: 2501}
+- {east_km: 1840, north_km: 2515}
+- {east_km: 1835, north_km: 2531}
+- {east_km: 1829, north_km: 2547}
+- {east_km: 1823, north_km: 2563}
+- {east_km: 1818, north_km: 2580}
+- {east_km: 1811, north_km: 2596}
+- {east_km: 1805, north_km: 2613}
+- {east_km: 1793, north_km: 2614}
+- {east_km: 1781, north_km: 2615}
+- {east_km: 1769, north_km: 2615}
+- {east_km: 1756, north_km: 2614}
+- {east_km: 1743, north_km: 2612}
+- {east_km: 1731, north_km: 2609}
+- {east_km: 1718, north_km: 2606}
+- {east_km: 1705, north_km: 2604}
+- {east_km: 1693, north_km: 2603}
+- {east_km: 1681, north_km: 2603}
+- {east_km: 1669, north_km: 2602}
+- {east_km: 1657, north_km: 2600}
+- {east_km: 1645, north_km: 2596}
+- {east_km: 1633, north_km: 2592}
+- {east_km: 1620, north_km: 2588}
+- {east_km: 1608, north_km: 2585}
+- {east_km: 1597, north_km: 2583}
+- {east_km: 1585, north_km: 2582}
+- {east_km: 1574, north_km: 2580}
+- {east_km: 1563, north_km: 2578}
+- {east_km: 1551, north_km: 2576}
+- {east_km: 1540, north_km: 2574}
+- {east_km: 1529, north_km: 2572}
+- {east_km: 1518, north_km: 2571}
+- {east_km: 1507, north_km: 2570}
+- {east_km: 1496, north_km: 2569}
+- {east_km: 1485, north_km: 2567}
+- {east_km: 1474, north_km: 2564}
+- {east_km: 1463, north_km: 2563}
+- {east_km: 1452, north_km: 2562}
+- {east_km: 1442, north_km: 2564}
+- {east_km: 1431, north_km: 2568}
+- {east_km: 1421, north_km: 2572}
+- {east_km: 1410, north_km: 2576}
+- {east_km: 1400, north_km: 2578}
+- {east_km: 1389, north_km: 2579}
+- {east_km: 1378, north_km: 2580}
+- {east_km: 1367, north_km: 2579}
+- {east_km: 1357, north_km: 2579}
+- {east_km: 1346, north_km: 2578}
+- {east_km: 1335, north_km: 2576}
+- {east_km: 1325, north_km: 2573}
+- {east_km: 1314, north_km: 2569}
+- {east_km: 1304, north_km: 2566}
+- {east_km: 1293, north_km: 2563}
+- {east_km: 1283, north_km: 2561}
+- {east_km: 1272, north_km: 2560}
+- {east_km: 1262, north_km: 2559}
+- {east_km: 1251, north_km: 2557}
+- {east_km: 1241, north_km: 2555}
+- {east_km: 1238, north_km: 2554}
+- {east_km: 1230, north_km: 2552}
+- {east_km: 1220, north_km: 2550}
+- {east_km: 1209, north_km: 2549}
+- {east_km: 1199, north_km: 2550}
+- {east_km: 1188, north_km: 2552}
+- {east_km: 1177, north_km: 2553}
+- {east_km: 1166, north_km: 2554}
+- {east_km: 1155, north_km: 2554}
+- {east_km: 1145, north_km: 2552}
+- {east_km: 1134, north_km: 2551}
+- {east_km: 1123, north_km: 2551}
+- {east_km: 1113, north_km: 2550}
+- {east_km: 1102, north_km: 2549}
+- {east_km: 1091, north_km: 2547}
+- {east_km: 1081, north_km: 2545}
+- {east_km: 1070, north_km: 2544}
+- {east_km: 1060, north_km: 2543}
+- {east_km: 1048, north_km: 2544}
+- {east_km: 1037, north_km: 2545}
+- {east_km: 1025, north_km: 2546}
+- {east_km: 1014, north_km: 2546}
+- {east_km: 1003, north_km: 2545}
+- {east_km: 993, north_km: 2542}
+- {east_km: 982, north_km: 2539}
+- {east_km: 972, north_km: 2536}
+- {east_km: 961, north_km: 2534}
+- {east_km: 950, north_km: 2534}
+- {east_km: 938, north_km: 2533}
+- {east_km: 927, north_km: 2534}
+- {east_km: 915, north_km: 2534}
+- {east_km: 903, north_km: 2534}
+- {east_km: 891, north_km: 2535}
+- {east_km: 878, north_km: 2537}
+- {east_km: 865, north_km: 2540}
+- {east_km: 852, north_km: 2542}
+- {east_km: 839, north_km: 2542}
+- {east_km: 827, north_km: 2542}
+- {east_km: 815, north_km: 2541}
+- {east_km: 803, north_km: 2540}
+- {east_km: 791, north_km: 2539}
+- {east_km: 778, north_km: 2540}
+- {east_km: 764, north_km: 2541}
+- {east_km: 752, north_km: 2540}
+- {east_km: 743, north_km: 2531}
+- {east_km: 735, north_km: 2523}
+- {east_km: 726, north_km: 2514}
+- {east_km: 718, north_km: 2505}
+- {east_km: 709, north_km: 2498}
+- {east_km: 699, north_km: 2492}
+- {east_km: 689, north_km: 2487}
+- {east_km: 678, north_km: 2482}
+- {east_km: 668, north_km: 2477}
+- {east_km: 658, north_km: 2472}
+- {east_km: 647, north_km: 2467}
+- {east_km: 635, north_km: 2464}
+- {east_km: 624, north_km: 2460}
+- {east_km: 613, north_km: 2456}
+- {east_km: 602, north_km: 2451}
+- {east_km: 593, north_km: 2444}
+- {east_km: 584, north_km: 2436}
+- {east_km: 576, north_km: 2428}
+- {east_km: 567, north_km: 2421}
+- {east_km: 557, north_km: 2414}
+- {east_km: 547, north_km: 2409}
+- {east_km: 537, north_km: 2403}
+- {east_km: 527, north_km: 2397}
+- {east_km: 517, north_km: 2390}
+- {east_km: 508, north_km: 2382}
+- {east_km: 500, north_km: 2374}
+- {east_km: 491, north_km: 2366}
+- {east_km: 483, north_km: 2358}
+- {east_km: 475, north_km: 2350}
+- {east_km: 468, north_km: 2341}
+- {east_km: 461, north_km: 2331}
+- {east_km: 455, north_km: 2321}
+- {east_km: 448, north_km: 2311}
+- {east_km: 440, north_km: 2303}
+- {east_km: 432, north_km: 2295}
+- {east_km: 423, north_km: 2288}
+- {east_km: 414, north_km: 2280}
+- {east_km: 406, north_km: 2272}
+- {east_km: 398, north_km: 2263}
+- {east_km: 391, north_km: 2254}
+- {east_km: 383, north_km: 2246}
+- {east_km: 374, north_km: 2238}
+- {east_km: 365, north_km: 2231}
+- {east_km: 355, north_km: 2225}
+- {east_km: 346, north_km: 2217}
+- {east_km: 337, north_km: 2209}
+- {east_km: 329, north_km: 2201}
+- {east_km: 322, north_km: 2192}
+- {east_km: 314, north_km: 2183}
+- {east_km: 306, north_km: 2175}
+- {east_km: 299, north_km: 2166}
+- {east_km: 292, north_km: 2157}
+- {east_km: 285, north_km: 2147}
+- {east_km: 279, north_km: 2137}
+- {east_km: 271, north_km: 2128}
+- {east_km: 263, north_km: 2120}
+- {east_km: 253, north_km: 2113}
+- {east_km: 241, north_km: 2107}
+- {east_km: 230, north_km: 2100}
+- {east_km: 219, north_km: 2093}
+- {east_km: 210, north_km: 2085}
+- {east_km: 201, north_km: 2077}
+- {east_km: 193, north_km: 2068}
+- {east_km: 186, north_km: 2058}
+- {east_km: 185, north_km: 2045}
+- {east_km: 185, north_km: 2031}
+- {east_km: 185, north_km: 2017}
+- {east_km: 187, north_km: 2003}
+- {east_km: 188, north_km: 1989}
+- {east_km: 190, north_km: 1975}
+- {east_km: 192, north_km: 1961}
+- {east_km: 193, north_km: 1947}
+- {east_km: 195, north_km: 1934}
+- {east_km: 197, north_km: 1920}
+- {east_km: 201, north_km: 1906}
+- {east_km: 206, north_km: 1891}
+- {east_km: 210, north_km: 1877}
+- {east_km: 214, north_km: 1863}
+- {east_km: 216, north_km: 1851}
+- {east_km: 216, north_km: 1839}
+- {east_km: 215, north_km: 1835}
+- {east_km: 214, north_km: 1828}
+- {east_km: 213, north_km: 1817}
+- {east_km: 211, north_km: 1806}
+- {east_km: 210, north_km: 1795}
+- {east_km: 208, north_km: 1784}
+- {east_km: 205, north_km: 1774}
+- {east_km: 201, north_km: 1764}
+- {east_km: 196, north_km: 1754}
+- {east_km: 192, north_km: 1744}
+- {east_km: 189, north_km: 1734}
+- {east_km: 185, north_km: 1724}
+- {east_km: 183, north_km: 1714}
+- {east_km: 179, north_km: 1704}
+- {east_km: 176, north_km: 1694}
+- {east_km: 173, north_km: 1683}
+- {east_km: 171, north_km: 1673}
+- {east_km: 172, north_km: 1662}
+- {east_km: 174, north_km: 1650}
+- {east_km: 178, north_km: 1638}
+- {east_km: 182, north_km: 1626}
+- {east_km: 185, north_km: 1615}
+- {east_km: 186, north_km: 1604}
+- {east_km: 186, north_km: 1595}
+- {east_km: 186, north_km: 1594}
+- {east_km: 185, north_km: 1583}
+- {east_km: 183, north_km: 1573}
+- {east_km: 181, north_km: 1563}
+- {east_km: 178, north_km: 1553}
+- {east_km: 175, north_km: 1543}
+- {east_km: 171, north_km: 1533}
+- {east_km: 166, north_km: 1523}
+- {east_km: 162, north_km: 1513}
+- {east_km: 159, north_km: 1503}
+- {east_km: 157, north_km: 1493}
+- {east_km: 155, north_km: 1482}
+- {east_km: 152, north_km: 1472}
+- {east_km: 147, north_km: 1462}
+- {east_km: 141, north_km: 1452}
+- {east_km: 134, north_km: 1442}
+- {east_km: 128, north_km: 1431}
+- {east_km: 124, north_km: 1421}
+- {east_km: 121, north_km: 1410}
+- {east_km: 120, north_km: 1400}
+- {east_km: 120, north_km: 1393}
+- {east_km: 120, north_km: 1389}
+- {east_km: 120, north_km: 1378}
+- {east_km: 120, north_km: 1367}
+- {east_km: 121, north_km: 1357}
+- {east_km: 123, north_km: 1346}
+- {east_km: 124, north_km: 1335}
+- {east_km: 126, north_km: 1325}
+- {east_km: 126, north_km: 1314}
+- {east_km: 126, north_km: 1303}
+- {east_km: 125, north_km: 1293}
+- {east_km: 124, north_km: 1290}
+- {east_km: 123, north_km: 1282}
+- {east_km: 122, north_km: 1271}
+- {east_km: 121, north_km: 1260}
+- {east_km: 119, north_km: 1249}
+- {east_km: 115, north_km: 1238}
+- {east_km: 109, north_km: 1226}
+- {east_km: 101, north_km: 1215}
+- {east_km: 92, north_km: 1203}
+- {east_km: 84, north_km: 1190}
+- {east_km: 80, north_km: 1179}
+- {east_km: 79, north_km: 1167}
+- {east_km: 82, north_km: 1156}
+- {east_km: 86, north_km: 1146}
+- {east_km: 91, north_km: 1135}
+- {east_km: 96, north_km: 1125}
+- {east_km: 100, north_km: 1114}
+- {east_km: 105, north_km: 1104}
+- {east_km: 109, north_km: 1093}
+- {east_km: 113, north_km: 1083}
+- {east_km: 116, north_km: 1072}
+- {east_km: 117, north_km: 1061}
+- {east_km: 118, north_km: 1050}
+- {east_km: 121, north_km: 1039}
+- {east_km: 125, north_km: 1029}
+- {east_km: 128, north_km: 1018}
+- {east_km: 132, north_km: 1008}
+- {east_km: 135, north_km: 1000}
+- {east_km: 135, north_km: 997}
+- {east_km: 137, north_km: 986}
+- {east_km: 136, north_km: 975}
+- {east_km: 135, north_km: 962}
+- {east_km: 133, north_km: 950}
+- {east_km: 132, north_km: 938}
+- {east_km: 132, north_km: 926}
+- {east_km: 133, north_km: 914}
+- {east_km: 134, north_km: 903}
+- {east_km: 136, north_km: 892}
+- {east_km: 138, north_km: 880}
+- {east_km: 141, north_km: 869}
+- {east_km: 145, north_km: 858}
+- {east_km: 149, north_km: 848}
+- {east_km: 154, north_km: 838}
+- {east_km: 158, north_km: 827}
+- {east_km: 161, north_km: 816}
+- {east_km: 163, north_km: 804}
+- {east_km: 164, north_km: 792}
+- {east_km: 166, north_km: 781}
+- {east_km: 170, north_km: 770}
+- {east_km: 175, north_km: 759}
+- {east_km: 180, north_km: 749}
+- {east_km: 185, north_km: 739}
+- {east_km: 190, north_km: 728}
+- {east_km: 194, north_km: 717}
+- {east_km: 198, north_km: 706}
+- {east_km: 200, north_km: 700}
+- {east_km: 202, north_km: 696}
+- {east_km: 207, north_km: 685}
+- {east_km: 212, north_km: 675}
+- {east_km: 217, north_km: 664}
+- {east_km: 221, north_km: 653}
+- {east_km: 224, north_km: 642}
+- {east_km: 227, north_km: 629}
+- {east_km: 230, north_km: 617}
+- {east_km: 233, north_km: 605}
+- {east_km: 237, north_km: 594}
+- {east_km: 240, north_km: 582}
+- {east_km: 243, north_km: 570}
+- {east_km: 245, north_km: 557}
+- {east_km: 247, north_km: 543}
+- {east_km: 250, north_km: 530}
+- {east_km: 254, north_km: 518}
+- {east_km: 259, north_km: 507}
+- {east_km: 265, north_km: 496}
+- {east_km: 270, north_km: 486}
+- {east_km: 275, north_km: 474}
+- {east_km: 279, north_km: 462}
+- {east_km: 283, north_km: 448}
+- {east_km: 285, north_km: 435}
+- {east_km: 288, north_km: 421}
+- {east_km: 290, north_km: 406}
+- {east_km: 293, north_km: 392}
+- {east_km: 295, north_km: 377}
+- {east_km: 297, north_km: 362}
+- {east_km: 300, north_km: 350}
+- {east_km: 300, north_km: 349}
+- {east_km: 301, north_km: 348}
+- {east_km: 308, north_km: 337}
+- {east_km: 315, north_km: 327}
+- {east_km: 324, north_km: 317}
+- {east_km: 325, north_km: 316}
+- {east_km: 333, north_km: 308}
+- {east_km: 340, north_km: 298}
+- {east_km: 346, north_km: 286}
+- {east_km: 351, north_km: 272}
+- {east_km: 356, north_km: 258}
+- {east_km: 361, north_km: 245}
+- {east_km: 367, north_km: 232}
+- {east_km: 375, north_km: 221}
+- {east_km: 383, north_km: 210}
+- {east_km: 391, north_km: 200}
+- {east_km: 400, north_km: 190}
+- {east_km: 408, north_km: 179}
+- {east_km: 416, north_km: 168}
+- {east_km: 424, north_km: 157}
+- {east_km: 432, north_km: 145}
+- {east_km: 438, north_km: 131}
+- {east_km: 442, north_km: 115}
+- {east_km: 446, north_km: 98}
+- {east_km: 458, north_km: 91}
+- {east_km: 472, north_km: 87}
+- {east_km: 487, north_km: 85}
+- {east_km: 504, north_km: 86}
+- {east_km: 522, north_km: 90}
+- {east_km: 540, north_km: 95}
+- {east_km: 558, north_km: 98}
+- {east_km: 575, north_km: 100}
+- {east_km: 590, north_km: 100}
+- {east_km: 599, north_km: 99}
+- {east_km: 604, north_km: 99}
+- {east_km: 617, north_km: 97}
+- {east_km: 621, north_km: 96}
+- {east_km: 631, north_km: 95}
+- {east_km: 645, north_km: 95}
+- {east_km: 660, north_km: 95}
+- {east_km: 674, north_km: 96}
+- {east_km: 689, north_km: 97}
+- {east_km: 704, north_km: 99}
+- {east_km: 719, north_km: 102}
+- {east_km: 735, north_km: 106}
+- {east_km: 750, north_km: 109}
+- {east_km: 764, north_km: 110}
+- {east_km: 777, north_km: 110}
+- {east_km: 789, north_km: 109}
+- {east_km: 799, north_km: 107}
+- {east_km: 801, north_km: 107}
+- {east_km: 814, north_km: 105}
+- {east_km: 826, north_km: 105}
+- {east_km: 839, north_km: 106}
+- {east_km: 853, north_km: 108}
+- {east_km: 866, north_km: 110}
+- {east_km: 879, north_km: 111}
+- {east_km: 892, north_km: 113}
+- {east_km: 905, north_km: 115}
+- {east_km: 918, north_km: 118}
+- {east_km: 932, north_km: 122}
+- {east_km: 945, north_km: 126}
+- {east_km: 957, north_km: 128}
+- {east_km: 969, north_km: 129}
+- {east_km: 981, north_km: 128}
+- {east_km: 988, north_km: 127}
+- {east_km: 992, north_km: 127}
+- {east_km: 1003, north_km: 124}
+- {east_km: 1014, north_km: 122}
+- {east_km: 1025, north_km: 120}
+- {east_km: 1035, north_km: 117}
+- {east_km: 1046, north_km: 114}
+- {east_km: 1057, north_km: 111}
+- {east_km: 1067, north_km: 108}
+- {east_km: 1079, north_km: 106}
+- {east_km: 1090, north_km: 107}
+- {east_km: 1102, north_km: 109}
+- {east_km: 1114, north_km: 113}
+- {east_km: 1126, north_km: 117}
+- {east_km: 1137, north_km: 120}
+- {east_km: 1148, north_km: 121}
+- {east_km: 1160, north_km: 122}
+- {east_km: 1169, north_km: 122}
+- {east_km: 1170, north_km: 122}
+- {east_km: 1181, north_km: 120}
+- {east_km: 1192, north_km: 117}
+- {east_km: 1202, north_km: 113}
+- {east_km: 1212, north_km: 107}
+- {east_km: 1223, north_km: 100}
+- {east_km: 1233, north_km: 94}
+- {east_km: 1244, north_km: 91}
+- {east_km: 1255, north_km: 89}
+- {east_km: 1266, north_km: 91}
+- {east_km: 1277, north_km: 94}
+- {east_km: 1288, north_km: 97}
+- {east_km: 1299, north_km: 99}
+- {east_km: 1310, north_km: 101}
+- {east_km: 1321, north_km: 102}
+- {east_km: 1332, north_km: 102}
+- {east_km: 1343, north_km: 103}
+- {east_km: 1354, north_km: 104}
+- {east_km: 1365, north_km: 103}
+- {east_km: 1376, north_km: 102}
+- {east_km: 1387, north_km: 100}
+- {east_km: 1398, north_km: 98}
+- {east_km: 1409, north_km: 96}
+- {east_km: 1420, north_km: 95}
+- {east_km: 1431, north_km: 94}
+- {east_km: 1442, north_km: 92}
+- {east_km: 1453, north_km: 87}
+- {east_km: 1465, north_km: 80}
+- {east_km: 1477, north_km: 72}
+- {east_km: 1489, north_km: 64}
+- {east_km: 1501, north_km: 58}
+- {east_km: 1513, north_km: 55}
+- {east_km: 1521, north_km: 55}
+- {east_km: 1525, north_km: 56}
+- {east_km: 1536, north_km: 59}
+- {east_km: 1546, north_km: 64}
+- {east_km: 1557, north_km: 69}
+- {east_km: 1568, north_km: 74}
+- {east_km: 1579, north_km: 77}
+- {east_km: 1590, north_km: 80}
+- {east_km: 1601, north_km: 82}
+- {east_km: 1612, north_km: 83}
+- {east_km: 1624, north_km: 83}
+- {east_km: 1635, north_km: 82}
+- {east_km: 1647, north_km: 83}
+- {east_km: 1658, north_km: 85}
+- {east_km: 1669, north_km: 90}
+- {east_km: 1679, north_km: 94}
+- {east_km: 1690, north_km: 98}
+- {east_km: 1700, north_km: 100}
+- {east_km: 1701, north_km: 100}
+- {east_km: 1713, north_km: 98}
+- {east_km: 1727, north_km: 94}
+- {east_km: 1740, north_km: 88}
+- {east_km: 1754, north_km: 84}
+- {east_km: 1767, north_km: 81}
+- {east_km: 1779, north_km: 81}
+- {east_km: 1791, north_km: 83}
+- {east_km: 1802, north_km: 86}
+- {east_km: 1813, north_km: 90}
+- {east_km: 1824, north_km: 94}
+- {east_km: 1835, north_km: 100}
+- {east_km: 1845, north_km: 105}
+- {east_km: 1854, north_km: 114}
+- {east_km: 1864, north_km: 121}
+- {east_km: 1875, north_km: 124}
+- {east_km: 1888, north_km: 123}
+- {east_km: 1903, north_km: 119}
+- {east_km: 1918, north_km: 115}
+- {east_km: 1932, north_km: 111}
+- {east_km: 1946, north_km: 112}
+- {east_km: 1951, north_km: 114}
+- {east_km: 1957, north_km: 117}
+- {east_km: 1966, north_km: 125}
+- {east_km: 1974, north_km: 135}
+- {east_km: 1982, north_km: 146}
+- {east_km: 1990, north_km: 156}
+- {east_km: 1998, north_km: 166}
+- {east_km: 2007, north_km: 174}
+- {east_km: 2015, north_km: 183}
+- {east_km: 2024, north_km: 191}
+- {east_km: 2033, north_km: 198}
+- {east_km: 2043, north_km: 206}
+- {east_km: 2052, north_km: 213}
+- {east_km: 2059, north_km: 221}
+- {east_km: 2060, north_km: 222}
+- {east_km: 2067, north_km: 232}
+- {east_km: 2070, north_km: 236}
+- {east_km: 2072, north_km: 240}
+- {east_km: 2074, north_km: 243}
+- {east_km: 2080, north_km: 255}
+- {east_km: 2087, north_km: 265}
+- {east_km: 2094, north_km: 275}
+- {east_km: 2102, north_km: 283}
+- {east_km: 2111, north_km: 291}
+- {east_km: 2119, north_km: 299}
+- {east_km: 2127, north_km: 307}
+- {east_km: 2134, north_km: 316}
+- {east_km: 2142, north_km: 325}
+- {east_km: 2150, north_km: 333}
+- {east_km: 2158, north_km: 340}
+- {east_km: 2168, north_km: 347}
+- {east_km: 2178, north_km: 353}
+- {east_km: 2187, north_km: 359}
+- {east_km: 2197, north_km: 364}
+- {east_km: 2208, north_km: 370}
+- {east_km: 2219, north_km: 375}
+- {east_km: 2230, north_km: 379}
+- {east_km: 2242, north_km: 383}
+- {east_km: 2254, north_km: 387}
+- {east_km: 2265, north_km: 392}
+- {east_km: 2275, north_km: 399}
+- {east_km: 2284, north_km: 405}
+- {east_km: 2295, north_km: 411}
+- {east_km: 2306, north_km: 417}
+- {east_km: 2318, north_km: 421}
+- {east_km: 2332, north_km: 424}
+- {east_km: 2345, north_km: 428}
+- {east_km: 2359, north_km: 431}
+- {east_km: 2372, north_km: 436}
+- {east_km: 2385, north_km: 441}
+- {east_km: 2396, north_km: 446}
+- {east_km: 2401, north_km: 451}
+- {east_km: 2402, north_km: 453}
+- {east_km: 2402, north_km: 457}
+- {east_km: 2404, north_km: 471}
+- {east_km: 2405, north_km: 486}
+- {east_km: 2404, north_km: 502}
+- {east_km: 2402, north_km: 518}
+- {east_km: 2401, north_km: 534}
+- {east_km: 2402, north_km: 548}
+- {east_km: 2403, north_km: 562}
+- {east_km: 2406, north_km: 574}
+- {east_km: 2409, north_km: 586}
+- {east_km: 2411, north_km: 595}
+- {east_km: 2411, north_km: 598}
+- {east_km: 2413, north_km: 611}
+- {east_km: 2414, north_km: 624}
+- {east_km: 2415, north_km: 637}
+- {east_km: 2417, north_km: 649}
+- {east_km: 2420, north_km: 660}
+- {east_km: 2423, north_km: 671}
+- {east_km: 2427, north_km: 682}
+- {east_km: 2429, north_km: 693}
+- {east_km: 2431, north_km: 705}
+- {east_km: 2432, north_km: 717}
+- {east_km: 2434, north_km: 729}
+- {east_km: 2436, north_km: 740}
+- {east_km: 2439, north_km: 751}
+- {east_km: 2442, north_km: 762}
+- {east_km: 2445, north_km: 773}
+- {east_km: 2445, north_km: 775}
+- {east_km: 2448, north_km: 783}
+- {east_km: 2452, north_km: 793}
+- {east_km: 2457, north_km: 803}
+- {east_km: 2463, north_km: 811}
+- {east_km: 2471, north_km: 820}
+- {east_km: 2479, north_km: 828}
+- {east_km: 2487, north_km: 836}
+- {east_km: 2493, north_km: 846}
+- {east_km: 2498, north_km: 855}
+- {east_km: 2502, north_km: 865}
+- {east_km: 2507, north_km: 875}
+- {east_km: 2513, north_km: 885}
+- {east_km: 2520, north_km: 894}
+- {east_km: 2528, north_km: 902}
+- {east_km: 2536, north_km: 911}
+- {east_km: 2543, north_km: 920}
+- {east_km: 2549, north_km: 930}
+- {east_km: 2554, north_km: 940}
+- {east_km: 2557, north_km: 950}
+- {east_km: 2558, north_km: 953}
+- {east_km: 2558, north_km: 962}
+- {east_km: 2556, north_km: 974}
+- {east_km: 2552, north_km: 987}
+- {east_km: 2547, north_km: 1000}
+- {east_km: 2542, north_km: 1012}
+- {east_km: 2538, north_km: 1025}
+- {east_km: 2537, north_km: 1036}
+- {east_km: 2539, north_km: 1047}
+- {east_km: 2544, north_km: 1056}
+- {east_km: 2550, north_km: 1066}
+- {east_km: 2556, north_km: 1076}
+- {east_km: 2561, north_km: 1086}
+- {east_km: 2566, north_km: 1096}
+- {east_km: 2570, north_km: 1106}
+- {east_km: 2575, north_km: 1116}
+- {east_km: 2579, north_km: 1126}
+- {east_km: 2582, north_km: 1137}
+- {east_km: 2583, north_km: 1143}
+- {east_km: 2584, north_km: 1148}
+- {east_km: 2584, north_km: 1159}
+- {east_km: 2584, north_km: 1170}
+- {east_km: 2584, north_km: 1181}
+- {east_km: 2584, north_km: 1192}
+- {east_km: 2586, north_km: 1202}
+- {east_km: 2588, north_km: 1213}
+- {east_km: 2590, north_km: 1224}
+- {east_km: 2592, north_km: 1234}
+- {east_km: 2594, north_km: 1245}
+- {east_km: 2597, north_km: 1256}
+- {east_km: 2602, north_km: 1266}
+- {east_km: 2610, north_km: 1277}
+- {east_km: 2620, north_km: 1288}
+- {east_km: 2630, north_km: 1298}
+- {east_km: 2638, north_km: 1309}
+- {east_km: 2643, north_km: 1320}
+- {east_km: 2645, north_km: 1328}
+- {east_km: 2645, north_km: 1332}
+- {east_km: 2644, north_km: 1343}
 regions:
   central_mountains:
     display_name_zh: 中央山脈
@@ -193,80 +923,342 @@ terrain:
   waterways:
     border_river:
       route:
-      - cell_x: 1320
-        cell_y: 1410
-      - cell_x: 1210
-        cell_y: 1380
-      - cell_x: 1100
-        cell_y: 1350
-      - cell_x: 990
-        cell_y: 1395
-      - cell_x: 900
-        cell_y: 1380
-      - cell_x: 830
-        cell_y: 1370
-      - cell_x: 740
-        cell_y: 1330
-      - cell_x: 650
-        cell_y: 1310
-      - cell_x: 530
-        cell_y: 1355
-      - cell_x: 400
-        cell_y: 1340
-      - cell_x: 290
-        cell_y: 1300
-      - cell_x: 170
-        cell_y: 1290
-      - cell_x: 124
-        cell_y: 1290
+      - {cell_x: 1320, cell_y: 1410}
+      - {cell_x: 1210, cell_y: 1380}
+      - {cell_x: 1100, cell_y: 1350}
+      - {cell_x: 990, cell_y: 1395}
+      - {cell_x: 900, cell_y: 1380}
+      - {cell_x: 830, cell_y: 1370}
+      - {cell_x: 740, cell_y: 1330}
+      - {cell_x: 650, cell_y: 1310}
+      - {cell_x: 530, cell_y: 1355}
+      - {cell_x: 400, cell_y: 1340}
+      - {cell_x: 290, cell_y: 1300}
+      - {cell_x: 170, cell_y: 1290}
+      - {cell_x: 124, cell_y: 1290}
       fords:
-      - cell_x: 1150
-        cell_y: 1363
-      - cell_x: 823
-        cell_y: 1366
-      - cell_x: 450
-        cell_y: 1345
+      - {cell_x: 1150, cell_y: 1363}
+      - {cell_x: 823, cell_y: 1366}
+      - {cell_x: 450, cell_y: 1345}
     capital_river:
       route:
-      - cell_x: 1150
-        cell_y: 1060
-      - cell_x: 860
-        cell_y: 1040
-      - cell_x: 600
-        cell_y: 800
-      - cell_x: 310
-        cell_y: 360
+      - {cell_x: 1150, cell_y: 1060}
+      - {cell_x: 1128, cell_y: 1070}
+      - {cell_x: 1103, cell_y: 1072}
+      - {cell_x: 1080, cell_y: 1078}
+      - {cell_x: 1053, cell_y: 1075}
+      - {cell_x: 1027, cell_y: 1068}
+      - {cell_x: 1000, cell_y: 1070}
+      - {cell_x: 976, cell_y: 1064}
+      - {cell_x: 954, cell_y: 1052}
+      - {cell_x: 930, cell_y: 1048}
+      - {cell_x: 921, cell_y: 1043}
+      - {cell_x: 909, cell_y: 1048}
+      - {cell_x: 900, cell_y: 1042}
+      - {cell_x: 887, cell_y: 1045}
+      - {cell_x: 874, cell_y: 1042}
+      - {cell_x: 861, cell_y: 1040}
+      - {cell_x: 836, cell_y: 1035}
+      - {cell_x: 813, cell_y: 1023}
+      - {cell_x: 790, cell_y: 1012}
+      - {cell_x: 766, cell_y: 1002}
+      - {cell_x: 743, cell_y: 992}
+      - {cell_x: 720, cell_y: 980}
+      - {cell_x: 700, cell_y: 963}
+      - {cell_x: 682, cell_y: 945}
+      - {cell_x: 660, cell_y: 930}
+      - {cell_x: 636, cell_y: 888}
+      - {cell_x: 624, cell_y: 842}
+      - {cell_x: 600, cell_y: 800}
+      - {cell_x: 592, cell_y: 779}
+      - {cell_x: 581, cell_y: 759}
+      - {cell_x: 566, cell_y: 742}
+      - {cell_x: 550, cell_y: 727}
+      - {cell_x: 541, cell_y: 708}
+      - {cell_x: 530, cell_y: 690}
+      - {cell_x: 512, cell_y: 661}
+      - {cell_x: 491, cell_y: 635}
+      - {cell_x: 476, cell_y: 604}
+      - {cell_x: 460, cell_y: 576}
+      - {cell_x: 447, cell_y: 547}
+      - {cell_x: 430, cell_y: 520}
+      - {cell_x: 422, cell_y: 509}
+      - {cell_x: 408, cell_y: 507}
+      - {cell_x: 400, cell_y: 497}
+      - {cell_x: 389, cell_y: 483}
+      - {cell_x: 381, cell_y: 467}
+      - {cell_x: 372, cell_y: 452}
+      - {cell_x: 361, cell_y: 440}
+      - {cell_x: 354, cell_y: 425}
+      - {cell_x: 348, cell_y: 410}
+      - {cell_x: 335, cell_y: 394}
+      - {cell_x: 323, cell_y: 377}
+      - {cell_x: 310, cell_y: 360}
       fords:
-      - cell_x: 861
-        cell_y: 1040
-      - cell_x: 600
-        cell_y: 800
-      - cell_x: 400
-        cell_y: 497
+      - {cell_x: 861, cell_y: 1040}
+      - {cell_x: 600, cell_y: 800}
+      - {cell_x: 400, cell_y: 497}
     imperial_east_branch:
       route:
-      - cell_x: 2070
-        cell_y: 700
-      - cell_x: 2200
-        cell_y: 600
-      - cell_x: 2390
-        cell_y: 460
+      - {cell_x: 2070, cell_y: 700}
+      - {cell_x: 2086, cell_y: 686}
+      - {cell_x: 2106, cell_y: 677}
+      - {cell_x: 2120, cell_y: 660}
+      - {cell_x: 2135, cell_y: 647}
+      - {cell_x: 2152, cell_y: 637}
+      - {cell_x: 2170, cell_y: 630}
+      - {cell_x: 2188, cell_y: 623}
+      - {cell_x: 2205, cell_y: 612}
+      - {cell_x: 2220, cell_y: 600}
+      - {cell_x: 2234, cell_y: 585}
+      - {cell_x: 2252, cell_y: 575}
+      - {cell_x: 2270, cell_y: 566}
+      - {cell_x: 2283, cell_y: 555}
+      - {cell_x: 2290, cell_y: 539}
+      - {cell_x: 2300, cell_y: 526}
+      - {cell_x: 2312, cell_y: 515}
+      - {cell_x: 2329, cell_y: 513}
+      - {cell_x: 2340, cell_y: 500}
+      - {cell_x: 2359, cell_y: 489}
+      - {cell_x: 2372, cell_y: 472}
+      - {cell_x: 2390, cell_y: 460}
       fords:
-      - cell_x: 2300
-        cell_y: 526
+      - {cell_x: 2300, cell_y: 526}
     imperial_river:
       route:
-      - cell_x: 1950
-        cell_y: 1260
-      - cell_x: 1990
-        cell_y: 1100
-      - cell_x: 2070
-        cell_y: 700
-      - cell_x: 2060
-        cell_y: 250
+      - {cell_x: 1950, cell_y: 1260}
+      - {cell_x: 1954, cell_y: 1244}
+      - {cell_x: 1959, cell_y: 1229}
+      - {cell_x: 1968, cell_y: 1215}
+      - {cell_x: 1973, cell_y: 1196}
+      - {cell_x: 1977, cell_y: 1177}
+      - {cell_x: 1985, cell_y: 1160}
+      - {cell_x: 1986, cell_y: 1140}
+      - {cell_x: 1986, cell_y: 1120}
+      - {cell_x: 1990, cell_y: 1100}
+      - {cell_x: 1999, cell_y: 1081}
+      - {cell_x: 2006, cell_y: 1061}
+      - {cell_x: 2010, cell_y: 1040}
+      - {cell_x: 2019, cell_y: 1013}
+      - {cell_x: 2023, cell_y: 986}
+      - {cell_x: 2035, cell_y: 960}
+      - {cell_x: 2044, cell_y: 934}
+      - {cell_x: 2045, cell_y: 907}
+      - {cell_x: 2050, cell_y: 880}
+      - {cell_x: 2057, cell_y: 854}
+      - {cell_x: 2059, cell_y: 827}
+      - {cell_x: 2062, cell_y: 800}
+      - {cell_x: 2061, cell_y: 766}
+      - {cell_x: 2069, cell_y: 733}
+      - {cell_x: 2070, cell_y: 700}
+      - {cell_x: 2067, cell_y: 680}
+      - {cell_x: 2066, cell_y: 660}
+      - {cell_x: 2068, cell_y: 640}
+      - {cell_x: 2065, cell_y: 627}
+      - {cell_x: 2072, cell_y: 613}
+      - {cell_x: 2067, cell_y: 600}
+      - {cell_x: 2063, cell_y: 587}
+      - {cell_x: 2060, cell_y: 574}
+      - {cell_x: 2060, cell_y: 560}
+      - {cell_x: 2059, cell_y: 533}
+      - {cell_x: 2061, cell_y: 506}
+      - {cell_x: 2066, cell_y: 480}
+      - {cell_x: 2066, cell_y: 453}
+      - {cell_x: 2067, cell_y: 426}
+      - {cell_x: 2072, cell_y: 400}
+      - {cell_x: 2075, cell_y: 373}
+      - {cell_x: 2071, cell_y: 347}
+      - {cell_x: 2068, cell_y: 320}
+      - {cell_x: 2068, cell_y: 296}
+      - {cell_x: 2063, cell_y: 273}
+      - {cell_x: 2060, cell_y: 250}
       fords:
-      - cell_x: 1990
-        cell_y: 1100
-      - cell_x: 2067
-        cell_y: 600
+      - {cell_x: 1990, cell_y: 1100}
+      - {cell_x: 2067, cell_y: 600}
+    hills_river:
+      route:
+      - {cell_x: 1290, cell_y: 690}
+      - {cell_x: 1250, cell_y: 703}
+      - {cell_x: 1210, cell_y: 712}
+      - {cell_x: 1170, cell_y: 725}
+      - {cell_x: 1126, cell_y: 719}
+      - {cell_x: 1083, cell_y: 711}
+      - {cell_x: 1040, cell_y: 700}
+      - {cell_x: 997, cell_y: 716}
+      - {cell_x: 952, cell_y: 729}
+      - {cell_x: 910, cell_y: 748}
+      - {cell_x: 873, cell_y: 754}
+      - {cell_x: 836, cell_y: 764}
+      - {cell_x: 800, cell_y: 775}
+      - {cell_x: 763, cell_y: 776}
+      - {cell_x: 727, cell_y: 765}
+      - {cell_x: 690, cell_y: 762}
+      - {cell_x: 659, cell_y: 772}
+      - {cell_x: 631, cell_y: 791}
+      - {cell_x: 600, cell_y: 800}
+      - {cell_x: 573, cell_y: 813}
+      - {cell_x: 545, cell_y: 822}
+      - {cell_x: 520, cell_y: 838}
+      - {cell_x: 491, cell_y: 847}
+      - {cell_x: 460, cell_y: 849}
+      - {cell_x: 430, cell_y: 852}
+      - {cell_x: 402, cell_y: 853}
+      - {cell_x: 376, cell_y: 860}
+      - {cell_x: 350, cell_y: 870}
+      - {cell_x: 327, cell_y: 862}
+      - {cell_x: 303, cell_y: 863}
+      - {cell_x: 280, cell_y: 858}
+      - {cell_x: 258, cell_y: 856}
+      - {cell_x: 237, cell_y: 862}
+      - {cell_x: 215, cell_y: 866}
+      fords:
+      - {cell_x: 1040, cell_y: 700}
+      - {cell_x: 690, cell_y: 762}
+      - {cell_x: 350, cell_y: 870}
+    south_vale_river:
+      route:
+      - {cell_x: 1240, cell_y: 420}
+      - {cell_x: 1203, cell_y: 412}
+      - {cell_x: 1166, cell_y: 405}
+      - {cell_x: 1130, cell_y: 395}
+      - {cell_x: 1093, cell_y: 383}
+      - {cell_x: 1058, cell_y: 369}
+      - {cell_x: 1020, cell_y: 360}
+      - {cell_x: 979, cell_y: 348}
+      - {cell_x: 941, cell_y: 331}
+      - {cell_x: 900, cell_y: 320}
+      - {cell_x: 871, cell_y: 313}
+      - {cell_x: 848, cell_y: 293}
+      - {cell_x: 820, cell_y: 285}
+      - {cell_x: 780, cell_y: 276}
+      - {cell_x: 741, cell_y: 261}
+      - {cell_x: 700, cell_y: 255}
+      - {cell_x: 668, cell_y: 239}
+      - {cell_x: 632, cell_y: 235}
+      - {cell_x: 600, cell_y: 218}
+      - {cell_x: 568, cell_y: 203}
+      - {cell_x: 532, cell_y: 201}
+      - {cell_x: 500, cell_y: 186}
+      - {cell_x: 474, cell_y: 174}
+      - {cell_x: 446, cell_y: 164}
+      fords:
+      - {cell_x: 1020, cell_y: 360}
+      - {cell_x: 700, cell_y: 255}
+    highland_river:
+      route:
+      - {cell_x: 1300, cell_y: 1700}
+      - {cell_x: 1260, cell_y: 1694}
+      - {cell_x: 1220, cell_y: 1693}
+      - {cell_x: 1180, cell_y: 1690}
+      - {cell_x: 1140, cell_y: 1698}
+      - {cell_x: 1101, cell_y: 1709}
+      - {cell_x: 1060, cell_y: 1712}
+      - {cell_x: 1020, cell_y: 1711}
+      - {cell_x: 980, cell_y: 1706}
+      - {cell_x: 940, cell_y: 1698}
+      - {cell_x: 904, cell_y: 1711}
+      - {cell_x: 868, cell_y: 1720}
+      - {cell_x: 830, cell_y: 1725}
+      - {cell_x: 790, cell_y: 1720}
+      - {cell_x: 749, cell_y: 1720}
+      - {cell_x: 710, cell_y: 1710}
+      - {cell_x: 674, cell_y: 1723}
+      - {cell_x: 636, cell_y: 1724}
+      - {cell_x: 600, cell_y: 1738}
+      - {cell_x: 560, cell_y: 1736}
+      - {cell_x: 520, cell_y: 1726}
+      - {cell_x: 480, cell_y: 1725}
+      - {cell_x: 442, cell_y: 1730}
+      - {cell_x: 407, cell_y: 1743}
+      - {cell_x: 370, cell_y: 1752}
+      - {cell_x: 337, cell_y: 1758}
+      - {cell_x: 303, cell_y: 1757}
+      - {cell_x: 270, cell_y: 1760}
+      - {cell_x: 247, cell_y: 1755}
+      - {cell_x: 223, cell_y: 1759}
+      - {cell_x: 200, cell_y: 1758}
+      fords:
+      - {cell_x: 1060, cell_y: 1712}
+      - {cell_x: 710, cell_y: 1710}
+      - {cell_x: 370, cell_y: 1752}
+    northern_forest_river:
+      route:
+      - {cell_x: 1180, cell_y: 2380}
+      - {cell_x: 1147, cell_y: 2369}
+      - {cell_x: 1115, cell_y: 2355}
+      - {cell_x: 1080, cell_y: 2350}
+      - {cell_x: 1039, cell_y: 2348}
+      - {cell_x: 1000, cell_y: 2336}
+      - {cell_x: 960, cell_y: 2330}
+      - {cell_x: 926, cell_y: 2323}
+      - {cell_x: 893, cell_y: 2310}
+      - {cell_x: 860, cell_y: 2300}
+      - {cell_x: 826, cell_y: 2294}
+      - {cell_x: 793, cell_y: 2283}
+      - {cell_x: 760, cell_y: 2272}
+      - {cell_x: 724, cell_y: 2264}
+      - {cell_x: 687, cell_y: 2256}
+      - {cell_x: 650, cell_y: 2255}
+      - {cell_x: 621, cell_y: 2242}
+      - {cell_x: 591, cell_y: 2233}
+      - {cell_x: 560, cell_y: 2225}
+      - {cell_x: 530, cell_y: 2218}
+      - {cell_x: 500, cell_y: 2209}
+      - {cell_x: 470, cell_y: 2205}
+      - {cell_x: 446, cell_y: 2197}
+      - {cell_x: 423, cell_y: 2185}
+      - {cell_x: 400, cell_y: 2175}
+      - {cell_x: 380, cell_y: 2170}
+      - {cell_x: 360, cell_y: 2174}
+      - {cell_x: 340, cell_y: 2168}
+      fords:
+      - {cell_x: 960, cell_y: 2330}
+      - {cell_x: 650, cell_y: 2255}
+    imperial_west_tributary:
+      route:
+      - {cell_x: 1640, cell_y: 1240}
+      - {cell_x: 1665, cell_y: 1225}
+      - {cell_x: 1692, cell_y: 1213}
+      - {cell_x: 1720, cell_y: 1205}
+      - {cell_x: 1750, cell_y: 1209}
+      - {cell_x: 1781, cell_y: 1209}
+      - {cell_x: 1810, cell_y: 1218}
+      - {cell_x: 1835, cell_y: 1203}
+      - {cell_x: 1865, cell_y: 1196}
+      - {cell_x: 1890, cell_y: 1180}
+      - {cell_x: 1912, cell_y: 1167}
+      - {cell_x: 1937, cell_y: 1160}
+      - {cell_x: 1960, cell_y: 1150}
+      - {cell_x: 1979, cell_y: 1137}
+      - {cell_x: 1994, cell_y: 1119}
+      - {cell_x: 2010, cell_y: 1102}
+      fords:
+      - {cell_x: 1810, cell_y: 1218}
+    east_coast_river:
+      route:
+      - {cell_x: 1900, cell_y: 1500}
+      - {cell_x: 1929, cell_y: 1492}
+      - {cell_x: 1960, cell_y: 1491}
+      - {cell_x: 1990, cell_y: 1490}
+      - {cell_x: 2020, cell_y: 1499}
+      - {cell_x: 2049, cell_y: 1507}
+      - {cell_x: 2080, cell_y: 1512}
+      - {cell_x: 2110, cell_y: 1509}
+      - {cell_x: 2140, cell_y: 1501}
+      - {cell_x: 2170, cell_y: 1500}
+      - {cell_x: 2196, cell_y: 1508}
+      - {cell_x: 2224, cell_y: 1510}
+      - {cell_x: 2250, cell_y: 1520}
+      - {cell_x: 2277, cell_y: 1520}
+      - {cell_x: 2304, cell_y: 1515}
+      - {cell_x: 2330, cell_y: 1510}
+      - {cell_x: 2357, cell_y: 1516}
+      - {cell_x: 2382, cell_y: 1528}
+      - {cell_x: 2410, cell_y: 1532}
+      - {cell_x: 2427, cell_y: 1530}
+      - {cell_x: 2443, cell_y: 1526}
+      - {cell_x: 2460, cell_y: 1528}
+      fords:
+      - {cell_x: 2080, cell_y: 1512}
+      - {cell_x: 2330, cell_y: 1510}
   border_river_key: border_river
