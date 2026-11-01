@@ -277,8 +277,9 @@ dream or creation surface owns the stage. There is no server travel mode.
   Any non-empty `result.data.interrupts` stops the walk the moment its step
   counts (notice `{kind: "interrupted", flags}`; the leg's
   `INTERRUPT_TEXT` names them); a short stop keeps the lock and replans once
-  without departing. A key that stopped a walk never re-departs until it is
-  released (use-travel-input `stopKeys`). The map draws the departed plan
+  without departing. An Enter or Space that stopped a walk never re-departs until that
+  physical key is released (use-travel-input `stopKeys`, by `code`; a
+  pointer press or any other key forgets it). The map draws the departed plan
   with the walked steps removed (`routeProgress`). Lifecycle and stop table:
   `docs/development/webclient-synchronization.md` "Travel route walking".
 - Landmark arrivals: a never-seen typed `landmark_reached` notice is the only

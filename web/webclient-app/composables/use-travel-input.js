@@ -51,22 +51,33 @@ export function useTravelInput(store, { mapRef, fullLogOpen = () => false }) {
   const stopping = new WeakSet();
   // The keyboard destination cursor: a window cell, or null outside cursor mode.
   const cursor = ref(null);
-  // Keys that stopped a walk and are still held: none of them departs.
+  // The physical Enter/Space keys that stopped a walk and are still held:
+  // only these can both stop and depart in one press (Enter clicks a focused
+  // 出發 on keydown, Space on keyup), so only they are tracked, by `code`
+  // (its `key` can change between keydown and keyup). A pointer press or
+  // any other key forgets them, so a lost keyup never blocks departure.
+  const ACTIVATION_KEYS = new Set(["Enter", " "]);
   const stopKeys = new Set();
 
   function onCapture(event) {
+    if (!ACTIVATION_KEYS.has(event.key) && !MODIFIER_KEYS.has(event.key)) stopKeys.clear();
     if (!walking.value) return;
     if (MODIFIER_KEYS.has(event.key) || event.isComposing || event.keyCode === 229) return;
-    if (event.repeat && (ARROW_KEYS.includes(event.key) || event.key === "Enter" || event.key === " ")) return;
+    if (event.repeat && (ARROW_KEYS.includes(event.key) || ACTIVATION_KEYS.has(event.key))) return;
     stopping.add(event);
-    if (store.stopTravel("key")) stopKeys.add(event.key);
+    if (store.stopTravel("key") && ACTIVATION_KEYS.has(event.key)) stopKeys.add(event.code || event.key);
   }
 
   function onKeyUp(event) {
-    if (!stopKeys.has(event.key)) return;
+    const id = event.code || event.key;
+    if (!stopKeys.has(id)) return;
     // Space activates a focused button on keyup, after this listener: the
     // key is released for departure only once that activation has passed.
-    setTimeout(() => stopKeys.delete(event.key), 0);
+    setTimeout(() => stopKeys.delete(id), 0);
+  }
+
+  function onPointerDown() {
+    stopKeys.clear();
   }
 
   /** Depart on the locked current plan (出發, Enter, a second locked click). */
@@ -273,12 +284,14 @@ export function useTravelInput(store, { mapRef, fullLogOpen = () => false }) {
   onMounted(() => {
     document.addEventListener("keydown", onCapture, true);
     document.addEventListener("keyup", onKeyUp, true);
+    document.addEventListener("pointerdown", onPointerDown, true);
     window.addEventListener("blur", onWindowBlur);
     document.addEventListener("visibilitychange", onVisibility);
   });
   onBeforeUnmount(() => {
     document.removeEventListener("keydown", onCapture, true);
     document.removeEventListener("keyup", onKeyUp, true);
+    document.removeEventListener("pointerdown", onPointerDown, true);
     window.removeEventListener("blur", onWindowBlur);
     document.removeEventListener("visibilitychange", onVisibility);
   });

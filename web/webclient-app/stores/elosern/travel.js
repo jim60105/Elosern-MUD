@@ -596,6 +596,10 @@ export function applyTravel(ctx) {
     if (steps.length === 0 || !Number.isInteger(plan.stop_index) || plan.stop_index < 0 || plan.stop_index >= steps.length) {
       return "no_plan";
     }
+    // Every executable step names one integer cell (the queue reads them
+    // inside the publish path, so a malformed one never departs).
+    const cellOk = (c) => !!c && Number.isInteger(c.x) && Number.isInteger(c.y);
+    if (!steps.slice(0, plan.stop_index + 1).every((step) => cellOk(step?.cell))) return "no_plan";
     return null;
   }
 
@@ -624,7 +628,13 @@ export function applyTravel(ctx) {
   // the travel layout shows, and it is forgotten once the session or the node
   // moves on (a delayed arrival after another move never opens). While a
   // higher-priority flow owns the stage (dialogue, combat) it waits. While it
-  // is held the walk stops and a replan waits (`surfaceOpen`).
+  // is held the walk stops and a replan waits (`surfaceOpen`), also while a
+  // modal sleep-handoff card or the dream hides it: those own input
+  // themselves, and the card shows once they close.
+  //
+  // The node binding relies on the server committing a step's notices in the
+  // same causal publication as the step's position (one group per step), so
+  // a fresh arrival is always compared with the node it was reached at.
 
   ctx.noteTravelArrival = function noteTravelArrival(entry, rs) {
     const node = entry?.params?.arrival_node;

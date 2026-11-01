@@ -147,6 +147,21 @@ describe("departure", () => {
     expect(r.moves()).toHaveLength(0);
   });
 
+  it("refuses a plan whose executable step names no integer cell", () => {
+    const r = router();
+    const plan = eastPlan({ x: CX, y: CY }, 4, 3);
+    r.store.lockTravelDestination(plan.destination);
+    let adopted = true;
+    try {
+      r.answer({ ...plan, steps: plan.steps.map((step, i) => (i === 1 ? { ...step, cell: { x: 1.5, y: CY } } : step)) });
+    } catch {
+      adopted = false; // the result validator refused the shape outright
+    }
+    expect(r.store.departTravel().departed).toBe(false);
+    expect(r.moves()).toHaveLength(0);
+    if (adopted) expect(r.store.departTravel().reason).toBe("no_plan");
+  });
+
   it("refuses an empty plan or one without an integer stop", () => {
     for (const data of [
       { ...eastPlan({ x: CX, y: CY }, 4, 3), stop_index: null },
@@ -440,7 +455,14 @@ describe("the mounted input", () => {
       await tick();
       return event;
     };
-    return { ...h, map, moves, key };
+    // The second click on the locked cell: a departure path that does not
+    // depend on 出發's own busy state (the stopped step is still in flight).
+    const pickLocked = async () => {
+      const { default: TravelMap } = await import("../../components/travel/TravelMap.vue");
+      h.w.findComponent(TravelMap).vm.$emit("pick", DEST);
+      await tick();
+    };
+    return { ...h, map, moves, key, pickLocked };
   }
 
   it("Enter departs, a later Enter only stops, and its repeat departs nothing", async () => {
@@ -482,6 +504,54 @@ describe("the mounted input", () => {
     // Once released, 出發 works again (the stopped step is still in flight).
     await new Promise((resolve) => setTimeout(resolve, 5));
     expect(s.store.departTravel().departed).toBe(false);
+  });
+
+  it("an arrow that stops a walk never blocks a later departure", async () => {
+    const s = await stage();
+    s.map().element.focus();
+    await s.key(s.map().element, "keydown", "Enter", { code: "Enter" });
+    await s.key(document.body, "keyup", "Enter", { code: "Enter" });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(s.moves()).toHaveLength(1);
+    await s.key(s.map().element, "keydown", "ArrowUp", { code: "ArrowUp" });
+    expect(s.store.view.travel.walking).toBeNull();
+    // The arrow's keyup is lost; a departure still reaches the store.
+    const spy = vi.spyOn(s.store, "departTravel");
+    await s.pickLocked();
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+
+  it("a lost keyup is forgotten on the next pointer press", async () => {
+    const s = await stage();
+    s.map().element.focus();
+    await s.key(s.map().element, "keydown", "Enter", { code: "Enter" });
+    expect(s.moves()).toHaveLength(1);
+    await s.key(s.map().element, "keydown", "Enter", { code: "Enter" });
+    expect(s.store.view.travel.walking).toBeNull();
+    // The keyup never arrives; a pointer press clears the held key, so the
+    // departure path is no longer suppressed (the store's own gate decides).
+    const spy = vi.spyOn(s.store, "departTravel");
+    await s.pickLocked();
+    expect(spy).not.toHaveBeenCalled();
+    document.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    await s.pickLocked();
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+
+  it("a keyup whose key value changed still releases the held physical key", async () => {
+    const s = await stage();
+    s.map().element.focus();
+    await s.key(s.map().element, "keydown", "Enter", { code: "Enter" });
+    await s.key(s.map().element, "keydown", "Enter", { code: "Enter" });
+    expect(s.store.view.travel.walking).toBeNull();
+    const spy = vi.spyOn(s.store, "departTravel");
+    await s.key(document.body, "keyup", "Unidentified", { code: "Enter" });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await s.pickLocked();
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
   });
 
   it("a second click on the locked cell departs", async () => {
