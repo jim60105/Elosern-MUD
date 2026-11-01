@@ -1348,7 +1348,7 @@ class TravelPlanningTests(_TravelStage):
         """A hovered far cell previews after its debounce and a click locks it
         without a second query; the Shift-arrow cursor plus Enter locks the
         same cell; a current planner error clears the drawn route; a
-        neighbour still aims and steps; 出發 stays disabled."""
+        neighbour still aims and steps; 出發 is offered over the lock."""
         for viewport in ((1451, 790), (2560, 1440)):
             page = self._plan_stage(viewport)
             size = "%dx%d" % viewport
@@ -1388,11 +1388,9 @@ class TravelPlanningTests(_TravelStage):
             described = page.locator('[data-testid="travel-map"]').get_attribute("aria-describedby")
             self.assertTrue(described)
             self.assertTrue(page.evaluate("(id) => document.getElementById(id).textContent.trim()", described))
-            # No route walk exists yet: 出發 stays disabled with its reason.
+            # The locked current plan offers 出發 (TravelRouteTests walks it).
             depart = page.locator('[data-testid="leg-depart"]')
-            self.assertEqual(depart.get_attribute("aria-disabled"), "true")
-            self._click(page, self.FAR)
-            page.wait_for_timeout(300)
+            self.assertIsNone(depart.get_attribute("aria-disabled"))
             self.assertEqual(_moves(page), [])
             self._shoot(page, "travel-route-preview-%s.png" % size)
 
@@ -1474,3 +1472,247 @@ class TravelPlanningTests(_TravelStage):
         self.assertEqual(_moves(page), [])
         self._shoot(page, "travel-plan-supersession-1451x790.png")
         page.close()
+
+
+# ── the route walk and the landmark card (wilderness-travel-route-ui) ──
+
+# Commits held move `index`: the next cell's panels (with any extra panels,
+# such as a travel_log batch) at the declared revision, then the move's
+# successful result carrying `data.interrupts`.
+_COMMIT_ROUTE = """([index, panels, interrupts]) => {
+  const store = window.__elosernBridge.store;
+  const env = window.__travelMoves[index];
+  const v = store.view;
+  const revision = v.revision + 1;
+  const body = store.receive(v.generation, 'ui_update', [{
+    protocol_version: 1, presentation_epoch: v.epoch, base_revision: revision - 1, revision,
+    mode: v.mode, panels, removed_panels: [], layout_version: v.layoutVersion, server_time: v.serverTime,
+  }], {});
+  const result = store.receive(v.generation, 'ui_action_result', [{
+    protocol_version: 1, presentation_epoch: v.epoch, request_id: env.request_id,
+    outcome: 'success', code: 'moved', message: '你向前走去。', presentation_revision: revision,
+    data: { interrupts },
+  }], {});
+  return [!!body.accepted, !!result.accepted];
+}"""
+
+_FLAGS = (
+    "landmark_reached", "district_lit", "landmark_sighted", "hostile_in_sight",
+    "pace_threshold", "nightfall", "member_asleep",
+)
+
+
+def _line_plan(cx: int, cy: int, dx: int, length: int = 2) -> dict:
+    """A synthetic straight plan of ``length`` steps along ``dx`` (+1 east,
+    -1 west), stopping on its last step at the destination."""
+    steps = [
+        {"cell": {"x": cx + dx * (i + 1), "y": cy}, "seconds": 1200, "fatigue_stage": "normal"}
+        for i in range(length)
+    ]
+    return {
+        "origin": {"x": cx, "y": cy}, "destination": dict(steps[-1]["cell"]),
+        "steps": steps, "total_seconds": 1200 * length, "nightfall_index": None,
+        "stop_index": length - 1, "stop_reason": "destination_reached",
+    }
+
+
+def _arrival_log(node: str, serial: int) -> dict:
+    """One committed travel_log batch: a typed arrival reached at ``node``."""
+    return {
+        "travel_log": {
+            "schema_version": 1, "available": True,
+            "entries": [{
+                "id": "%s:route%03d.0" % ("f" * 32, serial), "kind": "landmark_reached",
+                "tick": 4000 + serial, "day": 3, "time": "09:40", "text": "抵達合成古塔。",
+                "params": {
+                    "arrival_node": node, "name": "合成古塔", "lit_district": "合成東麓",
+                    "prose": "石階被風磨得發亮，塔頂的缺口望得見整片東麓。", "artwork": None,
+                },
+            }],
+        },
+    }
+
+
+class TravelRouteTests(_TravelStage):
+    """The guarded route walk through the commit/dwell queue, every committed
+    interrupt, short-stop replanning and the landmark card's focus
+    (wilderness-travel-route-ui)."""
+
+    def _route_stage(self, viewport=(1451, 790)):
+        page = self.logged_in_page(viewport)
+        page.evaluate(_HOLD_MOVES)
+        page.evaluate(_HOLD_PLANS)
+        self._enter(page, _leg_panels(CX, CY))
+        self._wait_views(page, 1)
+        self._answer(page, 0, area=_plan_area(CX, CY))
+        self._wait_ready(page)
+        page.wait_for_selector('[data-testid="leg-panel"][data-gauge="capacity"]', timeout=15000)
+        return page
+
+    def _lock(self, page, destination, plan) -> None:
+        """Lock ``destination`` through the store and answer its query."""
+        before = len(_plans(page))
+        page.evaluate("(cell) => window.__elosernBridge.store.lockTravelDestination(cell)", destination)
+        page.wait_for_function("(n) => window.__travelPlans.length > n", arg=before, timeout=15000)
+        self.assertTrue(page.evaluate(_ANSWER_PLAN, [len(_plans(page)) - 1, plan, None]))
+        page.wait_for_selector('[data-testid="leg-depart"]:not([aria-disabled])', timeout=15000)
+
+    def _commit(self, page, index, cell, interrupts, extra=None) -> None:
+        """Commit move ``index`` to ``cell`` and answer the new cell's map."""
+        views = _held(page)
+        panels = {**_leg_panels(*cell), **(extra or {})}
+        self.assertEqual(page.evaluate(_COMMIT_ROUTE, [index, panels, list(interrupts)]), [True, True])
+        self._wait_views(page, views + 1)
+        self._answer(page, views, area=_plan_area(*cell))
+        page.wait_for_function(
+            "(n) => (window.__elosernBridge.store.view.travel.map || {}).currentNode === n", arg=_node(*cell), timeout=15000,
+        )
+
+    def _walking(self, page):
+        return _travel(page)["walking"]
+
+    @covers_requirement("webclient-travel-walking::held-walking-waits-for-committed-steps-and-dwell")
+    def test_hostile_interrupt(self):
+        """出發 walks the locked plan one committed step at a time with the
+        frozen walk context; a committed hostile_in_sight stops it before the
+        next send, keeps the lock and replans once without departing; Enter
+        departs the new plan and a later Enter only stops."""
+        page = self._route_stage()
+        far = {"x": CX + 3, "y": CY + 1}
+        self._lock(page, far, _plan(CX, CY, (far["x"], far["y"])))
+        self._shoot(page, "travel-route-locked-1451x790.png")
+        page.locator('[data-testid="leg-depart"]').click()
+        page.wait_for_function("() => window.__travelMoves.length >= 1", timeout=15000)
+        self.assertEqual(
+            _moves(page),
+            [{"exit_ref": "e_wild_e", "current_node": _node(CX, CY), "walk": {"pace": "standard", "stop_at_night": True}}],
+        )
+        self.assertEqual(self._walking(page)["kind"], "route")
+
+        # An empty flag list continues after the commit and the new map.
+        self._commit(page, 0, (CX + 1, CY), [])
+        page.wait_for_function("() => window.__travelMoves.length >= 2", timeout=15000)
+        self.assertEqual(_moves(page)[1]["current_node"], _node(CX + 1, CY))
+        self.assertEqual(self._walking(page)["progress"], 1)
+        self._shoot(page, "travel-route-walking-1451x790.png")
+
+        # A hostile in sight stops the walk before any next send.
+        self._commit(page, 1, (CX + 2, CY), ["hostile_in_sight"])
+        page.wait_for_function("() => window.__elosernBridge.store.view.travel.walking === null", timeout=15000)
+        page.wait_for_timeout(1200)
+        self.assertEqual(len(_moves(page)), 2)
+        self.assertEqual(_intent(page), "interrupted")
+        self.assertEqual(_travel(page)["lockedDestination"], far)
+        # The surviving lock asks once from the new position and never departs.
+        page.wait_for_function("() => window.__travelPlans.length >= 2", timeout=15000)
+        self.assertEqual(_plans(page)[1]["destination"], far)
+        self.assertTrue(page.evaluate(_ANSWER_PLAN, [1, _plan(CX + 2, CY, (far["x"], far["y"])), None]))
+        page.wait_for_timeout(800)
+        self.assertEqual(len(_moves(page)), 2)
+        self.assertEqual(len(_plans(page)), 2)
+        self.assertTrue(_map_focused(page))
+        self._shoot(page, "travel-route-interrupted-1451x790.png")
+
+        # Enter departs the fresh plan; a later Enter stops without departing.
+        page.keyboard.press("Enter")
+        page.wait_for_function("() => window.__travelMoves.length >= 3", timeout=15000)
+        self.assertEqual(_moves(page)[2]["current_node"], _node(CX + 2, CY))
+        page.keyboard.press("Enter")
+        page.wait_for_function("() => window.__elosernBridge.store.view.travel.walking === null", timeout=15000)
+        page.wait_for_timeout(800)
+        self.assertEqual(len(_moves(page)), 3)
+        page.close()
+
+    @covers_requirement("webclient-travel-walking::held-walking-waits-for-committed-steps-and-dwell")
+    def test_all_interrupt_flags(self):
+        """Each of the seven committed flags alone, and a combination, stops
+        the route walk on the step that carried it: no next step is sent,
+        the intent names the stop and the lock replans once."""
+        page = self._route_stage()
+        cases = [(flag,) for flag in _FLAGS] + [("landmark_sighted", "hostile_in_sight", "nightfall")]
+        here = (CX, CY)
+        sent = 0
+        for number, flags in enumerate(cases):
+            with self.subTest(flags=flags):
+                dx = 1 if number % 2 == 0 else -1
+                plan = _line_plan(here[0], here[1], dx)
+                self._lock(page, plan["destination"], plan)
+                plans = len(_plans(page))
+                page.locator('[data-testid="leg-depart"]').click()
+                page.wait_for_function("(n) => window.__travelMoves.length > n", arg=sent, timeout=15000)
+                sent += 1
+                here = (here[0] + dx, here[1])
+                self._commit(page, sent - 1, here, flags)
+                page.wait_for_function("() => window.__elosernBridge.store.view.travel.walking === null", timeout=15000)
+                page.wait_for_timeout(400)
+                self.assertEqual(len(_moves(page)), sent)
+                self.assertEqual(_travel(page)["notice"], {"kind": "interrupted", "flags": list(flags)})
+                self.assertEqual(_intent(page), "interrupted")
+                # The short stop replans its lock once; answer it and clear.
+                page.wait_for_function("(n) => window.__travelPlans.length > n", arg=plans, timeout=15000)
+                self.assertEqual(len(_plans(page)), plans + 1)
+                self.assertTrue(page.evaluate(_ANSWER_PLAN, [plans, _line_plan(here[0], here[1], dx, 1), None]))
+                page.wait_for_timeout(300)
+                self.assertEqual(len(_moves(page)), sent)
+                page.evaluate("() => window.__elosernBridge.store.clearTravelTarget()")
+        page.close()
+
+    @covers_requirement("webclient-travel-log::travel-notices-are-committed-structured-events")
+    def test_landmark_focus(self):
+        """A committed typed arrival bound to the reached node opens the card
+        with focus on 繼續 and Tab trapped inside; Enter closes it once and
+        returns focus to the map without restarting the walk; an arrival
+        delivered for a node the party already left opens nothing."""
+        for viewport in ((1451, 790), (2560, 1440)):
+            size = "%dx%d" % viewport
+            page = self._route_stage(viewport)
+            plan = _line_plan(CX, CY, 1, 3)
+            self._lock(page, plan["destination"], plan)
+            page.locator('[data-testid="travel-map"]').focus()
+            page.keyboard.press("Enter")
+            page.wait_for_function("() => window.__travelMoves.length >= 1", timeout=15000)
+            self._commit(page, 0, (CX + 1, CY), ["landmark_reached", "district_lit"], _arrival_log(_node(CX + 1, CY), 1))
+            card = page.locator('[data-testid="landmark-card"]')
+            card.wait_for(timeout=15000)
+            self.assertIsNone(self._walking(page))
+            continue_button = page.locator('[data-testid="landmark-card-continue"]')
+            page.wait_for_function(
+                "() => document.activeElement && document.activeElement.matches('[data-testid=\"landmark-card-continue\"]')",
+                timeout=15000,
+            )
+            self.assertEqual(card.get_attribute("role"), "dialog")
+            self.assertIn("合成東麓", page.locator('[data-testid="landmark-card-lit"]').inner_text())
+            # Every rendered text run keeps the 16px x scale floor.
+            sizes = page.evaluate(
+                "() => Array.from(document.querySelectorAll('[data-testid=\"landmark-card\"] *'))"
+                ".filter((el) => el.childNodes.length && Array.from(el.childNodes).some((n) => n.nodeType === 3 && n.textContent.trim()))"
+                ".map((el) => parseFloat(getComputedStyle(el).fontSize))"
+            )
+            self.assertTrue(sizes)
+            self.assertGreaterEqual(min(sizes), 16 * ui_scale(viewport) - 0.01)
+            page.keyboard.press("Tab")
+            self.assertTrue(page.evaluate("() => !!document.activeElement.closest('[data-testid=\"landmark-card\"]')"))
+            self._shoot(page, "travel-landmark-arrival-%s.png" % size)
+            continue_button.focus()
+            page.keyboard.press("Enter")
+            card.wait_for(state="detached", timeout=15000)
+            page.wait_for_function(
+                "() => document.activeElement && document.activeElement.matches('[data-testid=\"travel-map\"]')", timeout=15000,
+            )
+            page.wait_for_timeout(600)
+            self.assertEqual(len(_moves(page)), 1)
+            self.assertIsNone(self._walking(page))
+            self.assertIsNone(_travel(page)["arrival"])
+
+            # A delayed arrival for the cell already left never opens.
+            page.evaluate(
+                """(panels) => { const s = window.__elosernBridge.store; const v = s.view;
+                s.receive(v.generation, 'ui_update', [{ protocol_version: 1, presentation_epoch: v.epoch,
+                  base_revision: v.revision, revision: v.revision + 1, mode: v.mode, panels, removed_panels: [],
+                  layout_version: v.layoutVersion, server_time: v.serverTime }], {}); }""",
+                _arrival_log(_node(CX, CY), 2),
+            )
+            page.wait_for_timeout(500)
+            self.assertEqual(card.count(), 0)
+            self.assertIsNone(_travel(page)["arrival"])
+            page.close()

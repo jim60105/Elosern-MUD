@@ -263,8 +263,34 @@ dream or creation surface owns the stage. There is no server travel mode.
   double when locked and dashed while previewed, cursor corner brackets
   outside the cell) on a paper-gold thread with an ink casing, so it never
   reads as the painted road; a hover never moves the camera, a lock fits
-  the route. The overlay never repaints the canvas. 出發 stays disabled
-  (`route_pending`) until route-ui installs `store.departTravel`.
+  the route. The overlay never repaints the canvas.
+- Route walking (wilderness-travel-route-ui; design §5/§7/§10): 出發, Enter
+  with neither an aim nor a cursor and a second click on the locked cell call
+  `store.departTravel()`, which departs only a locked, token-current plan
+  from the party's cell (`view.travel.departedPlan`, never replaced during
+  the walk). The queue walks indices `0..stop_index` inclusive; each step
+  re-resolves the CURRENT move row for the direction from the window's party
+  cell to the supplied step and requires its disclosed destination to be the
+  window's node there. Queued steps (route and held direction walks) send
+  `activateExit(exitRef, walk)` with the exact `walk: {pace, stop_at_night}`
+  frozen at the walk's start; a single step keeps the two-field payload.
+  Any non-empty `result.data.interrupts` stops the walk the moment its step
+  counts (notice `{kind: "interrupted", flags}`; the leg's
+  `INTERRUPT_TEXT` names them); a short stop keeps the lock and replans once
+  without departing. A key that stopped a walk never re-departs until it is
+  released (use-travel-input `stopKeys`). The map draws the departed plan
+  with the walked steps removed (`routeProgress`). Lifecycle and stop table:
+  `docs/development/webclient-synchronization.md` "Travel route walking".
+- Landmark arrivals: a never-seen typed `landmark_reached` notice is the only
+  opener (never the flag, never prose). The store keeps one arrival bound to
+  `{generation, epoch, arrival_node, id}` and publishes `view.travel.arrival`
+  only while the canonical current node is its node; a later move or session
+  change forgets it, and while it is held a walk stops and a replan waits.
+  `components/travel/LandmarkCard.vue` renders it in the `choices` anchor
+  after the sleep-handoff cards (ArtworkPreview in a 16:6 frame, or a short
+  header band without a descriptor; `◆ <district>已探明` only when lit; the
+  shared focus trap; 繼續/Enter/Esc close once through
+  `store.dismissTravelArrival(id)` and AppClient returns focus to the map).
 - `PartyMedallions` shows the controlled body once, then each member whose
   own `status.fatigue` row is committed (status v5+ emits one per
   source-present traveller), with its supplied reserve, stage label and

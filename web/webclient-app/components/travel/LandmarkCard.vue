@@ -111,11 +111,34 @@ onMounted(() => {
    foot fades into the ink body, the name in the display face over the
    fade, the gold district line and the serif prose. Every text run keeps
    the 16px x scale floor. */
-.landmark-card {
+/* The frame is the card's own (the doubled class wins over the shared
+   `choice-card` block whichever stylesheet loads last), so the card reads
+   the same wherever it is hosted: an opaque ink panel with a gold hairline
+   that lifts it clear of the painted map beneath. */
+.landmark-card.choice-card {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
   align-self: center;
   width: min(100%, calc(560px * var(--ui-scale)));
+  max-height: 100%;
   padding: 0;
   overflow: hidden auto;
+  background:
+    radial-gradient(120% 60% at 50% 100%, rgba(185, 154, 96, 0.08), transparent 70%),
+    linear-gradient(180deg, rgba(20, 20, 25, 0.98), rgba(11, 12, 16, 0.98));
+  border: 1px solid rgba(185, 154, 96, 0.5);
+  border-radius: var(--radius);
+  box-shadow:
+    var(--shadow-lg),
+    0 0 0 100vmax rgba(6, 7, 10, 0.34),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.55);
+  outline: none;
+  pointer-events: auto;
+}
+.landmark-card.choice-card:focus-visible {
+  border-color: rgba(228, 200, 142, 0.72);
 }
 .landmark-card__art {
   position: relative;
@@ -127,7 +150,15 @@ onMounted(() => {
     radial-gradient(80% 120% at 50% 110%, rgba(185, 154, 96, 0.14), transparent 70%),
     linear-gradient(180deg, #1b1a20, #0e0f13);
 }
-/* No supplied descriptor: a quiet engraved horizon instead of a picture. */
+/* No supplied descriptor: no empty picture frame, only a short engraved
+   header band carrying the kicker over a quiet horizon line. */
+.landmark-card__art.is-empty {
+  aspect-ratio: auto;
+  height: calc(64px * var(--ui-scale));
+}
+.landmark-card__art.is-empty + .landmark-card__body {
+  margin-top: calc(4px * var(--ui-scale));
+}
 .landmark-card__art.is-empty::before {
   content: "";
   position: absolute;

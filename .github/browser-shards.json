@@ -341,6 +341,9 @@
         "web.tests.browser.test_wilderness_travel.TravelLegTests.test_gauge_preferences_and_actions",
         "web.tests.browser.test_wilderness_travel.TravelPlanningTests.test_destination_preview_keyboard_and_pointer",
         "web.tests.browser.test_wilderness_travel.TravelPlanningTests.test_destination_query_supersession",
+        "web.tests.browser.test_wilderness_travel.TravelRouteTests.test_hostile_interrupt",
+        "web.tests.browser.test_wilderness_travel.TravelRouteTests.test_all_interrupt_flags",
+        "web.tests.browser.test_wilderness_travel.TravelRouteTests.test_landmark_focus",
         "web.tests.browser.test_wilderness_travel.TravelLogTests.test_committed_log_and_full_prose"
       ],
       "files_b": [
