@@ -905,20 +905,30 @@ terrain:
   - cell_x: 2699
     cell_y: 1925
   ridge:
-    base_x: 1410
-    period: 60
-    step: 10
-    min_x: 1300
-    max_x: 1520
-    north_limit_y: 2200
     mountain_corridor_half_width: 100
-    passes:
-    - y_min: 410
-      y_max: 425
-    - y_min: 970
-      y_max: 990
-    - y_min: 1770
-      y_max: 1785
+    passes: []
+    stem:
+    - {cell_x: 1410, cell_y: 0}
+    - {cell_x: 1398, cell_y: 150}
+    - {cell_x: 1418, cell_y: 380}
+    - {cell_x: 1404, cell_y: 620}
+    - {cell_x: 1430, cell_y: 890}
+    - {cell_x: 1412, cell_y: 1130}
+    - {cell_x: 1428, cell_y: 1380}
+    - {cell_x: 1408, cell_y: 1660}
+    - {cell_x: 1420, cell_y: 1880}
+    - {cell_x: 1420, cell_y: 2000}
+    branches:
+      west:
+      - {cell_x: 1420, cell_y: 2000}
+      - {cell_x: 1390, cell_y: 2050}
+      - {cell_x: 1355, cell_y: 2150}
+      - {cell_x: 1320, cell_y: 2240}
+      east:
+      - {cell_x: 1420, cell_y: 2000}
+      - {cell_x: 1445, cell_y: 2050}
+      - {cell_x: 1480, cell_y: 2150}
+      - {cell_x: 1510, cell_y: 2240}
   coastal_y_max: 500
   waterways:
     border_river:

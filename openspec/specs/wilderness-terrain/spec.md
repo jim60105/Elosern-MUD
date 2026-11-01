@@ -27,32 +27,27 @@ Game terrain views SHALL expose immutable schema-valid region values loaded from
 - **THEN** authoring validation rejects that region rather than coercing or fabricating prose
 
 ### Requirement: region_for_coordinates is a pure, deterministic function covering the whole bounded map
-`world/maps/wilderness_provider.py` SHALL define `region_for_coordinates(x: int, y: int) -> str`,
-returning a key that exists in the published region views, for every `(x, y)` pair within the
-map's valid coordinate bounds. The function SHALL read the published snapshot's explicit terrain
-definition, no database state, no network state, and no random or wall-clock input, and SHALL
-return the same value for the same input on every call.
+The coordinate classifier SHALL return a declared region for every bounded coordinate using only its immutable terrain snapshot, with deterministic results and the mountain corridor derived from the authored stem route without arm corridors.
 
 #### Scenario: Same input always returns the same output
-- **WHEN** `region_for_coordinates(x, y)` is called twice with the same `(x, y)` in the same process
-- **THEN** both calls return the identical string
+- **WHEN** the classifier is called twice with the same coordinate and snapshot
+- **THEN** both calls return the identical declared region key without database, network, random or clock input
 
 #### Scenario: Every region key is reachable
-- **WHEN** `region_for_coordinates` is evaluated across the full valid coordinate range
+- **WHEN** the classifier is evaluated across the valid coordinate range
 - **THEN** every declared region key is returned by at least one coordinate
 
 #### Scenario: The central mountain band spans the full valid Y range
-- **WHEN** `region_for_coordinates(x, y)` is evaluated around the declared corridor's X band below
-  the northern forest
-- **THEN** the mountain region follows the authored bending corridor (its centre shifts per row)
-  instead of a fixed rectangular band, and it is never a continuous summit wall: the closed ridge
-  is a one-cell cliff wall broken only at the authored passes
+- **WHEN** cells around the authored stem corridor below the forest are classified
+- **THEN** the mountain region follows the stem's per-row centre and authored half-width, while physical passability remains a separate cell property
 
 #### Scenario: capital_altoria's derived anchor cells resolve to Altoria's own territory
-- **WHEN** `region_for_coordinates` is called with `capital_altoria`'s declared cell and with every
-  gate's derived `approach_cell`
-- **THEN** every call returns `"western_hills_valleys"`, matching `world/lore/nations.py`'s own
-  statement that Altoria's territory is "西部丘陵、谷地與西南海岸"
+- **WHEN** the capital's authored cell and all derived gateway approaches are classified
+- **THEN** each remains western_hills_valleys
+
+#### Scenario: Branches leave regions unchanged
+- **WHEN** synthetic terrain definitions retain their authored stem and differ only in paired arm routes
+- **THEN** every frame cell keeps its region and the region search windows are identical; branch cells in the deep forest remain north_deep_forest
 
 ### Requirement: terrain_description is a pure, deterministic function with no LLM or randomness
 `world/maps/wilderness_provider.py` SHALL define `terrain_description(x: int, y: int) -> str`,
@@ -103,19 +98,35 @@ it follows every other lore registry, including idempotency across repeated call
   `"wilderness_regions"` category after the second call
 
 ### Requirement: Terrain and political control follow authored geography
-Terrain, nominal claims and effective control SHALL remain distinct. The deep forest's southern edge SHALL meander around Y1920 and keep ordinary forest travel speed. Every land cell SHALL have nominal Grandia east of the ridge, Altoria west and south of the border river, or Valhalla west and north, with stable region keys. Displayed borders SHALL derive from the ridge and river and be omitted inside deep forest; effective-rule demographic targets SHALL remain unchanged.
+Terrain, nominal claims and effective control SHALL remain distinct, with corridor, nominal nation splits and political lines derived from the same authored stem, a walkable deep forest, and a pass-free forked shipped ridge enclosing the independent hidden valley within declared geographic outcome bounds.
 
 #### Scenario: Anchor relationships
-- **WHEN** the amended geography is evaluated
-- **THEN** 咆哮王城 at (780,1910) is about 10 km south of the forest edge, 幽月谷村 at (1410,2150) and 永夜迷宮 at (900,2350) lie in deep forest, and all declared anchors and harbour sites remain on land and reachable; Altoria remains southwest in hills/river valleys, Valhalla northwest, Grandia eastern productive plains, Ciaran underground on the western flank and Fionnen on the eastern flank
+- **WHEN** the shipped terrain is evaluated through its authored location identities
+- **THEN** Valhalla remains south of the forest edge, Eolas and Eternal Night remain in deep forest, Ciaran and Fionnen remain on the stem's west/east flanks, and all anchors and harbours remain land-side and reachable
 
 #### Scenario: Nominal claims include previously neutral terrain
-- **WHEN** land on either side of the ridge and border river is classified, including mountain and deep-forest cells
-- **THEN** each cell has exactly one nominal nation, the approximate land shares are Grandia 43%, Altoria 30%, Valhalla 27%, elven valleys remain administratively independent in narrative, and the map adds no nominal-versus-effective display distinction
+- **WHEN** land is classified across the stem and border river
+- **THEN** each cell has one nominal nation; sampled shares remain Grandia 0.43, Altoria 0.30 and Valhalla 0.27 within 0.015, with effective-rule targets unchanged and shared regions keeping no administrative nation
 
 #### Scenario: Pass and river constraints
-- **WHEN** the geography is amended
-- **THEN** the one-cell summit ridge retains its declared passes and northern limit, the southwest capital river and southeastern imperial network remain, and no elevation or shipping gameplay is introduced
+- **WHEN** the shipped ridge and waterway declarations are consumed
+- **THEN** no pass exemption exists on the physical range, waterways and their fords remain unchanged, and no movement, elevation-dependent gameplay or shipping rule is introduced
+
+#### Scenario: Hidden valley clearance
+- **WHEN** the shipped Eolas location is compared with the physical crest
+- **THEN** its row lies between the arms at least 30 km from each inner wall edge, no wall lies within a 20 km Euclidean radius, and Eolas remains north_deep_forest with no administrative nation
+
+#### Scenario: Forest detour and preserved shares
+- **WHEN** four-connected walkability excludes sea, complete ridge walls, non-ford water and anchor footprints
+- **THEN** all 9 location targets and 6 harbours share one component through forest around the inland tips; footprinted anchors use legal gateway approaches, ordinary forest stays walkable and sampled forest share remains 0.20 within 0.02
+
+#### Scenario: Political lines remain on the stem
+- **WHEN** a synthetic stem route changes and paired arms are consumed
+- **THEN** the corridor and nominal nation flip follow its row centres, political borders equal its clipped authored polyline and river-source junction, and neither arm nor deep-forest political segments appear
+
+#### Scenario: River-source junction agrees with nominal claims
+- **WHEN** a candidate's border river starts at its easternmost vertex and its active stem stays strictly east of that source
+- **THEN** the source-row political junction agrees with the nominal west-neighbour nation transition; candidates violating either relation reject semantically instead of displaying contradictory political labels
 
 ### Requirement: The border river controls western crossing and classification
 A border river SHALL follow `WATERWAY_ROUTES["border_river"]` from the central range's west flank to the west coast. It SHALL separate western hills/valleys from northwest highland forest and SHALL be impassable on foot except at the fords declared in `WATERWAY_FORDS["border_river"]`.
@@ -127,3 +138,30 @@ A border river SHALL follow `WATERWAY_ROUTES["border_river"]` from the central r
 #### Scenario: Region consumers follow the amended boundaries
 - **WHEN** region-keyed monster placement and species-hunt destination resolution consume cells on either side of the new river and forest edge
 - **THEN** they agree with the amended classifier without unknown region keys or stale rectangular-boundary assumptions
+
+### Requirement: The physical ridge is a continuous forked barrier
+The physical ridge SHALL derive from arbitrary authored stem and arm routes joined without a crotch gap, expose complete wall geometry to traversal, previews and partition alongside active crest-centre elevation profiles, and retain separate arm spans ending inside the forest.
+
+#### Scenario: Deterministic arm bends and crotch
+- **WHEN** paired northward authored routes with arbitrary non-periodic local bends join the stem's last active row
+- **THEN** each arm has deterministic row centres with next-row span closure; the shared crotch is blocked, adjacent rows have no corner-cutting crossing, and the open space between separated arms is not filled
+
+#### Scenario: Arbitrary physical stem replaces periodic generation
+- **WHEN** a synthetic stem authors unequal bend spacing and local direction changes
+- **THEN** blockers, previews, corridor, claims, political lines and elevation derive from the same authored route with repeatable rasterization, never a periodic curve or separate reference axis; the fork joins its endpoint
+
+#### Scenario: Invalid geometric relations
+- **WHEN** a fork has mismatched starts, nonincreasing rows, crossed or rejoined arms beyond the crotch, wrongly sided tips, excessive per-row slope, a crotch pass, off-frame/off-land/non-forest arm cells, or collisions with full waterway cells or authored protected points
+- **THEN** candidate authoring reports a semantic terrain diagnostic and runtime rejects that candidate without moving protected content
+
+#### Scenario: All physical consumers agree
+- **WHEN** a forked ridge is consumed by validity, row-run component indexing, preview/capture, elevation and partition
+- **THEN** complete wall spans block validity/components/partition and appear in previews regardless of the stem's X extent; elevation uses all active crest-centre profiles and maximum overlapping rise before unchanged sea/river clamps and ordered shapes
+
+#### Scenario: No direct cross-range land route
+- **WHEN** the shipped zero-pass ridge is probed across X1300 through X1520
+- **THEN** no active row admits a horizontal land crossing, and no four-connected route joins the band edges while restricted to rows at or south of the highest tip; unrestricted travel can detour north through walkable forest
+
+#### Scenario: Terminal rows and optional passes
+- **WHEN** a synthetic stem pass is added below the crotch or a crest endpoint is queried
+- **THEN** the pass exempts only its stem rows, both arms remain blocked, the last crest row is included and the following row has no wall from that crest

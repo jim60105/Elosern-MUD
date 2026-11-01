@@ -26,7 +26,7 @@ vocabulary supplied by the definition.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cached_property
 from types import MappingProxyType
 from typing import Iterable, Mapping
@@ -49,12 +49,6 @@ REGION_KEYS = frozenset(
 #: Every nation identifier :func:`nominal_nation_for_coordinates` can return,
 #: sorted. The classifier owns this vocabulary; a partition snapshot declares it.
 NATION_KEYS = ("altoria", "grandia", "valhalla")
-
-#: The ridge bend walks this many phases, so its centre moves by at most two
-#: steps either side of ``ridge_base_x``. The phase count is part of the
-#: algorithm, not a per-world setting: every derivation that needs the ridge's
-#: horizontal extent uses the same constant.
-RIDGE_BEND_PHASES = 5
 
 #: Multipliers of the closed-form flavour selector (``(x, y)`` alone).
 TERRAIN_FLAVOR_MULTIPLIER_X = 92821
@@ -177,6 +171,75 @@ def rasterize_routes(routes: Mapping[str, tuple[Point, ...]]) -> frozenset[Point
     return frozenset(cells)
 
 
+def _route_centre(points: tuple[Point, ...], y: int) -> int:
+    """The interpolated centre X of an authored route at row ``y``.
+
+    Integer half-up interpolation inside each segment (the same rule for
+    negative dx), then the nearest endpoint's X continues straight outside the
+    route's Y span. Routes are validated strictly Y-increasing with
+    ``abs(dx) <= dy``, so one row owns exactly one centre.
+    """
+
+    for (x0, y0), (x1, y1) in zip(points, points[1:]):
+        if y0 <= y <= y1:
+            dy = y1 - y0
+            if dy == 0:
+                return x0
+            return x0 + ((x1 - x0) * (y - y0) + dy // 2) // dy
+    return points[0][0] if y < points[0][1] else points[-1][0]
+
+
+def _route_centres(points: tuple[Point, ...]) -> tuple[int, ...]:
+    """One immutable centre X per active row of a route, from its first to last."""
+
+    return tuple(
+        _route_centre(points, y) for y in range(points[0][1], points[-1][1] + 1)
+    )
+
+
+def _closure(centres: tuple[int, ...], index: int) -> tuple[int, int]:
+    """The inclusive wall span closing row ``index`` toward the next active row.
+
+    The terminal active row joins the current centre to itself.
+    """
+
+    current = centres[index]
+    following = centres[index + 1] if index + 1 < len(centres) else current
+    return (min(current, following), max(current, following))
+
+
+def _merge_spans(spans: list[tuple[int, int]]) -> tuple[tuple[int, int], ...]:
+    """Sort spans and merge overlapping or touching ones (never bounding fill)."""
+
+    merged: list[tuple[int, int]] = []
+    for low, high in sorted(spans):
+        if merged and low <= merged[-1][1] + 1:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], high))
+        else:
+            merged.append((low, high))
+    return tuple(merged)
+
+
+def _wall_run_polyline(
+    closure: tuple[tuple[int, int], ...], indices: range, base_y: int
+) -> tuple[Point, ...]:
+    """A physical wall run as a polyline of each closed row's span endpoints.
+
+    Physical previews use raster closure spans (the cells that actually block),
+    never the authored presentation centre line.
+    """
+
+    points: list[Point] = []
+    for index in indices:
+        low, high = closure[index]
+        y = base_y + index
+        for x in (low, high):
+            point = (x, y)
+            if not points or points[-1] != point:
+                points.append(point)
+    return tuple(points)
+
+
 @dataclass(frozen=True)
 class NationalBorder:
     """One displayed national border line in wilderness cell coordinates.
@@ -186,6 +249,74 @@ class NationalBorder:
 
     nation_keys: tuple[str, str]
     points: tuple[Point, ...]
+
+
+def _validate_ridge_route(
+    points: tuple[Point, ...], label: str, frame_cells: int
+) -> None:
+    """One authored crest route: Y-increasing, shallow, wholly in-frame.
+
+    The frame check runs before any row table is allocated, so a tiny document
+    naming an absurd row cannot exhaust memory.
+    """
+
+    for previous, current in zip(points, points[1:]):
+        if current[1] <= previous[1]:
+            raise ValueError(f"{label} rows must strictly increase")
+        if abs(current[0] - previous[0]) > current[1] - previous[1]:
+            raise ValueError(f"{label} must move at most one column per row")
+    for cell in points:
+        if not is_within_frame(frame_cells, cell):
+            raise ValueError(f"{label} must stay inside the frame")
+
+
+def _validate_ridge_relations(
+    river: tuple[Point, ...],
+    stem: tuple[Point, ...],
+    branches: Mapping[str, tuple[Point, ...]],
+    passes: tuple[tuple[int, int], ...],
+) -> None:
+    """Semantic route relations shared by the model and candidate diagnostics."""
+
+    source_x = river[0][0]
+    if source_x != max(x for x, _ in river):
+        raise ValueError("the border river must start at its easternmost vertex")
+    centres = _route_centres(stem)
+    if any(centre <= source_x for centre in centres):
+        raise ValueError(
+            "every active ridge stem centre must lie strictly east of the "
+            "border river source"
+        )
+    if not branches:
+        return
+    crotch_x, crotch_y = stem[-1]
+    if any(low <= crotch_y <= high for low, high in passes):
+        raise ValueError("the shared ridge crotch cannot be a pass window")
+    for name, route in branches.items():
+        if route[0] != (crotch_x, crotch_y):
+            raise ValueError(
+                f"ridge branch {name!r} must start at the stem's last point"
+            )
+        if route[-1][1] <= crotch_y:
+            raise ValueError(f"ridge branch {name!r} must end north of the crotch")
+    if branches["west"][-1][0] >= crotch_x:
+        raise ValueError("the west ridge branch tip must lie west of the crotch")
+    if branches["east"][-1][0] <= crotch_x:
+        raise ValueError("the east ridge branch tip must lie east of the crotch")
+    west = _route_centres(branches["west"])
+    east = _route_centres(branches["east"])
+    separated = False
+    for index in range(min(len(west), len(east))):
+        if west[index] > east[index]:
+            raise ValueError("the paired ridge branches cross")
+        west_span = _closure(west, index)
+        east_span = _closure(east, index)
+        if west_span[1] < east_span[0]:
+            separated = True
+        elif separated:
+            raise ValueError("the paired ridge branches rejoin after separating")
+    if not separated:
+        raise ValueError("the paired ridge branches never separate")
 
 
 @dataclass(frozen=True)
@@ -205,16 +336,14 @@ class TerrainDefinition:
     waterway_routes: Mapping[str, tuple[Point, ...]]
     waterway_fords: Mapping[str, tuple[Point, ...]]
     border_river_key: str
-    ridge_base_x: int
-    ridge_period: int
-    ridge_step: int
-    ridge_min_x: int
-    ridge_max_x: int
-    ridge_north_limit: int
+    ridge_stem: tuple[Point, ...]
     ridge_passes: tuple[tuple[int, int], ...]
     coastal_y_max: int
     mountain_corridor_half_width: int
     region_flavors: Mapping[str, tuple[str, ...]]
+    #: Optional exactly-paired west/east arm routes. Absent means no arms; the
+    #: mapping is frozen on construction and never falls back to a formula.
+    ridge_branches: Mapping[str, tuple[Point, ...]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -248,21 +377,28 @@ class TerrainDefinition:
             increasing=False,
             label=f"waterway_routes[{self.border_river_key!r}]",
         )
-        for name in (
-            "ridge_base_x",
-            "ridge_period",
-            "ridge_step",
-            "ridge_min_x",
-            "ridge_max_x",
-            "ridge_north_limit",
-            "coastal_y_max",
-            "mountain_corridor_half_width",
-        ):
+        for name in ("coastal_y_max", "mountain_corridor_half_width"):
             object.__setattr__(self, name, _int(getattr(self, name), name))
-        if self.ridge_period < 1 or self.ridge_step < 1:
-            raise ValueError("ridge_period and ridge_step must be positive")
-        if self.ridge_min_x > self.ridge_max_x:
-            raise ValueError("ridge_min_x must not exceed ridge_max_x")
+
+        # -- authored ridge routes -------------------------------------------
+        stem = _points(self.ridge_stem, "ridge_stem", minimum_length=2)
+        _validate_ridge_route(stem, "ridge_stem", self.frame_cells)
+        if stem[0][1] != 0:
+            raise ValueError("ridge_stem must begin at row 0")
+        branches = self.ridge_branches
+        if not isinstance(branches, Mapping):
+            raise ValueError("ridge_branches must be a mapping")
+        frozen_branches: dict[str, tuple[Point, ...]] = {}
+        for name, route in branches.items():
+            if name not in ("west", "east"):
+                raise ValueError(f"unknown ridge branch {name!r}")
+            points = _points(route, f"ridge_branches[{name!r}]", minimum_length=2)
+            _validate_ridge_route(
+                points, f"ridge_branches[{name!r}]", self.frame_cells
+            )
+            frozen_branches[name] = points
+        if frozen_branches and set(frozen_branches) != {"west", "east"}:
+            raise ValueError("ridge_branches needs both a west and an east route")
         # Each window is re-built as a tuple: a caller-supplied list must not
         # stay reachable, or a later mutation would silently open or close the
         # ridge wall of an already constructed definition.
@@ -276,7 +412,47 @@ class TerrainDefinition:
             if low > high:
                 raise ValueError(f"ridge pass window {window!r} is inverted")
             passes.append((low, high))
+        object.__setattr__(self, "ridge_stem", stem)
+        object.__setattr__(self, "ridge_branches", MappingProxyType(frozen_branches))
         object.__setattr__(self, "ridge_passes", tuple(passes))
+        _validate_ridge_relations(
+            self.waterway_routes[self.border_river_key],
+            stem,
+            frozen_branches,
+            tuple(passes),
+        )
+
+        # Precompute immutable per-row tables so point validity never searches
+        # a route, builds a raster, scans the frame or allocates a cache.
+        stem_centres = _route_centres(stem)
+        crotch_y = stem[-1][1]
+        arm_centres = {
+            name: _route_centres(route) for name, route in frozen_branches.items()
+        }
+        stem_closure = tuple(
+            _closure(stem_centres, index) for index in range(len(stem_centres))
+        )
+        total_rows = max(
+            [len(stem_centres)]
+            + [crotch_y + len(table) for table in arm_centres.values()]
+        )
+        wall_spans: list[tuple[tuple[int, int], ...]] = []
+        for y in range(total_rows):
+            spans: list[tuple[int, int]] = []
+            if y < len(stem_centres) and not any(
+                low <= y <= high for low, high in passes
+            ):
+                spans.append(stem_closure[y])
+            for table in arm_centres.values():
+                index = y - crotch_y
+                if 0 <= index < len(table):
+                    spans.append(_closure(table, index))
+            wall_spans.append(_merge_spans(spans))
+        object.__setattr__(self, "_stem_centres", stem_centres)
+        object.__setattr__(self, "_stem_closure", stem_closure)
+        object.__setattr__(self, "_arm_centres", MappingProxyType(arm_centres))
+        object.__setattr__(self, "_crotch_y", crotch_y)
+        object.__setattr__(self, "_wall_spans", tuple(wall_spans))
 
         flavors = self.region_flavors
         if not isinstance(flavors, Mapping):
@@ -331,13 +507,16 @@ class TerrainDefinition:
         edge_y_max = max(y for _, y in self.forest_edge)
         river_y_min = min(y for _, y in self.waterway_routes[self.border_river_key])
         river_y_max = max(y for _, y in self.waterway_routes[self.border_river_key])
-        bend_extent = (RIDGE_BEND_PHASES // 2) * self.ridge_step
+        # The mountain window follows the authored stem's own centre extent,
+        # widened by the authored corridor half-width and clipped to the frame.
+        min_centre = min(self._stem_centres)
+        max_centre = max(self._stem_centres)
         return MappingProxyType(
             {
                 "north_deep_forest": (0, max_x, edge_y_min, max_y),
                 "central_mountains": (
-                    self.ridge_base_x - bend_extent - self.mountain_corridor_half_width,
-                    self.ridge_base_x + bend_extent + self.mountain_corridor_half_width,
+                    max(0, min_centre - self.mountain_corridor_half_width),
+                    min(max_x, max_centre + self.mountain_corridor_half_width),
                     0,
                     edge_y_max - 1,
                 ),
@@ -417,43 +596,72 @@ def border_river_row(definition: TerrainDefinition, x: int) -> int:
 
 
 def ridge_center_x(definition: TerrainDefinition, y: int) -> int:
-    """The summit ridge's X centre at row ``y`` (a deterministic bend)."""
+    """The authored stem's X centre at row ``y``.
 
-    bend = (y // definition.ridge_period) % RIDGE_BEND_PHASES - (
-        RIDGE_BEND_PHASES // 2
-    )
-    return definition.ridge_base_x + bend * definition.ridge_step
-
-
-def ridge_span(definition: TerrainDefinition, y: int) -> tuple[int, int]:
-    """The ridge's inclusive X span at row ``y``.
-
-    Spanning every column between this row's centre and the next row's centre
-    keeps the wall 8-connected, so no diagonal gap can slip through it.
+    Outside the stem's active rows the nearest authored endpoint X continues
+    straight, so the region and nominal-nation classifiers stay total over the
+    whole bounded frame. This is a derivation from the same authored route,
+    never a separate reference axis.
     """
 
-    current = ridge_center_x(definition, y)
-    following = ridge_center_x(definition, y + 1)
-    return (min(current, following), max(current, following))
+    centres = definition._stem_centres
+    if y < 0:
+        return centres[0]
+    if y >= len(centres):
+        return centres[-1]
+    return centres[y]
+
+
+def ridge_crest_center_x(
+    definition: TerrainDefinition, crest: str, y: int
+) -> int | None:
+    """The active centre X of one authored crest (``stem``/``west``/``east``).
+
+    Unknown crest keys raise :class:`ValueError`; a known but absent arm or an
+    inactive row returns ``None`` (no formula fallback).
+    """
+
+    if crest == "stem":
+        centres = definition._stem_centres
+        return centres[y] if 0 <= y < len(centres) else None
+    if crest in ("west", "east"):
+        table = definition._arm_centres.get(crest)
+        if table is None:
+            return None
+        index = y - definition._crotch_y
+        return table[index] if 0 <= index < len(table) else None
+    raise ValueError(f"unknown ridge crest {crest!r}")
+
+
+def ridge_span(definition: TerrainDefinition, y: int) -> tuple[int, int] | None:
+    """The active stem's inclusive X closure span at row ``y``.
+
+    Spanning every column between this row's centre and the next active row's
+    centre keeps the wall 8-connected. ``None`` outside the active stem rows;
+    independent of any pass exemption.
+    """
+
+    closure = definition._stem_closure
+    return closure[y] if 0 <= y < len(closure) else None
+
+
+def ridge_spans(definition: TerrainDefinition, y: int) -> tuple[tuple[int, int], ...]:
+    """Every complete blocked X interval at row ``y``.
+
+    The stem span is omitted in an authored pass row; each arm span is always
+    included without pass exemptions. Overlapping or touching spans are merged
+    and separated arms are never filled by their outer bounding interval.
+    """
+
+    spans = definition._wall_spans
+    return spans[y] if 0 <= y < len(spans) else ()
 
 
 def is_closed_ridge_cell(definition: TerrainDefinition, coordinates: Point) -> bool:
-    """Whether ``(x, y)`` is an impassable summit-ridge/cliff cell.
-
-    The ridge bends through the central corridor up to its northern limit; the
-    authored pass windows are open ground, so land crossings require one of
-    them.
-    """
+    """Whether ``(x, y)`` is an impassable ridge/cliff cell of any crest."""
 
     x, y = coordinates
-    if not (definition.ridge_min_x <= x <= definition.ridge_max_x):
-        return False
-    if y >= definition.ridge_north_limit:
-        return False
-    if any(low <= y <= high for low, high in definition.ridge_passes):
-        return False
-    low, high = ridge_span(definition, y)
-    return low <= x <= high
+    return any(low <= x <= high for low, high in ridge_spans(definition, y))
 
 
 def is_inland_water_cell(definition: TerrainDefinition, coordinates: Point) -> bool:
@@ -587,16 +795,25 @@ def nominal_nation_for_coordinates(definition: TerrainDefinition, x: int, y: int
 def ridge_polyline(
     definition: TerrainDefinition, y_start: int, y_end: int
 ) -> tuple[Point, ...]:
-    """The ridge centre line from ``y_start`` to ``y_end`` (inclusive rows)."""
+    """The authored stem route clipped to the inclusive rows ``y_start``..``y_end``.
 
-    points = [(ridge_center_x(definition, y_start), y_start)]
-    for y in range(y_start, y_end):
-        here, following = ridge_center_x(definition, y), ridge_center_x(
-            definition, y + 1
-        )
-        if here != following:
-            points.extend(((here, y), (following, y + 1)))
-    points.append((ridge_center_x(definition, y_end), y_end))
+    Emits the interpolated centre at each clipped boundary plus every authored
+    interior vertex in range, deduplicating equal endpoints. An empty tuple
+    means the interval does not intersect the active stem. This is the
+    presentation line (e.g. a displayed political border), distinct from the
+    raster closure spans that physically block; no periodic substitute or arm
+    segment is ever produced.
+    """
+
+    stem = definition.ridge_stem
+    stem_start, stem_end = stem[0][1], stem[-1][1]
+    low = max(min(y_start, y_end), stem_start)
+    high = min(max(y_start, y_end), stem_end)
+    if low > high:
+        return ()
+    points: list[Point] = [(ridge_center_x(definition, low), low)]
+    points.extend((x, y) for x, y in stem if low < y < high)
+    points.append((ridge_center_x(definition, high), high))
     deduplicated: list[Point] = []
     for point in points:
         if not deduplicated or deduplicated[-1] != point:
@@ -656,21 +873,23 @@ def _sample_cell(index: int, step: int, maximum: int) -> int:
 
 def _ridge_walls(definition: TerrainDefinition) -> tuple[tuple[Point, ...], ...]:
     walls: list[tuple[Point, ...]] = []
+    closure = definition._stem_closure
     start: int | None = None
-    limit = min(definition.ridge_north_limit, definition.frame_cells)
-
-    def closed_row(y: int) -> bool:
-        if any(low <= y <= high for low, high in definition.ridge_passes):
-            return False
-        return definition.ridge_min_x <= ridge_center_x(definition, y) <= definition.ridge_max_x
-
-    for y in range(0, limit + 1):
-        inside = y < limit and closed_row(y)
-        if inside and start is None:
+    for y in range(len(closure)):
+        closed = not any(low <= y <= high for low, high in definition.ridge_passes)
+        if closed and start is None:
             start = y
-        elif not inside and start is not None:
-            walls.append(ridge_polyline(definition, start, y - 1))
+        elif not closed and start is not None:
+            walls.append(_wall_run_polyline(closure, range(start, y), 0))
             start = None
+    if start is not None:
+        walls.append(_wall_run_polyline(closure, range(start, len(closure)), 0))
+    # Each arm is an additional physical barrier drawn from its closure spans.
+    for table in definition._arm_centres.values():
+        arm_closure = tuple(_closure(table, index) for index in range(len(table)))
+        walls.append(
+            _wall_run_polyline(arm_closure, range(len(table)), definition._crotch_y)
+        )
     return tuple(walls)
 
 
@@ -731,7 +950,6 @@ __all__ = [
     "PREVIEW_SURFACES",
     "TerrainPreview",
     "REGION_KEYS",
-    "RIDGE_BEND_PHASES",
     "TerrainDefinition",
     "border_river_row",
     "forest_edge_row",
@@ -746,8 +964,10 @@ __all__ = [
     "rasterize_segment",
     "region_for_coordinates",
     "ridge_center_x",
+    "ridge_crest_center_x",
     "ridge_polyline",
     "ridge_span",
+    "ridge_spans",
     "route_row_at",
     "terrain_description",
     "terrain_preview",

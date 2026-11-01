@@ -6,19 +6,23 @@ Define reproducible offline district ownership and frozen outlines over the cont
 ## Requirements
 
 ### Requirement: Offline partition assigns every land cell once without crossing barriers
-The offline partition SHALL reserve all region-district terrain first and partition remaining land by walking distance on a 5 km 540 by 540 raster, with eight-connected moves and diagonal cost sqrt(2). Sea, summit ridge, rivers and national borders SHALL block Voronoi propagation; passes and fords permit terrain traversal but national borders stay closed. Each land cell SHALL map to exactly one district and each landmark SHALL lie in its own district.
+The offline partition SHALL reserve region-district terrain first and assign remaining land by walking distance on the established 5 km raster, blocking sea, complete physical ridge walls, rivers and national borders while preserving diagonal corner guards, unique district ownership and landmark ownership.
 
 #### Scenario: Coarse diagonal cannot jump a narrow obstacle
-- **WHEN** two 5 km cells have traversable centres but their connection intersects a 1 km river, ridge or closed national boundary
-- **THEN** propagation rejects the crossing, including diagonal corner cutting, while a legal same-nation ford/pass route remains available
+- **WHEN** two 5 km cells have traversable centres but their connection intersects a 1 km river, stem, ridge arm or closed national boundary
+- **THEN** propagation rejects the crossing including diagonal corner cutting, while legal same-nation fords remain available and national borders stay closed
 
 #### Scenario: Forest remains a single region district
-- **WHEN** the entire mainland is partitioned
-- **THEN** all northern deep-forest cells belong to the one region district even across nominal nations, and every remaining land cell has one reachable Voronoi owner
+- **WHEN** a synthetic mainland containing paired forest arms is partitioned
+- **THEN** both arm spans are blocked in the walkability input, forest keeps its single region-district ownership across nominal nations, and every remaining land cell has one reachable Voronoi owner
 
 #### Scenario: A settlement footprint owns the pocket it encloses
 - **WHEN** a same-nation walkable pocket is enclosed on all eight sides by the claimed footprint of a grid landmark
 - **THEN** the pocket belongs to that landmark's district with its footprint, while any other unseeded walkable component fails generation with its coordinates
+
+#### Scenario: Stem passes cannot open political borders
+- **WHEN** a synthetic document authors a stem pass or a ford on a national boundary
+- **THEN** terrain traversal may be open there but partition propagation still cannot cross the national boundary; shipped ridge content authors no passes
 
 ### Requirement: Frozen partition and outlines reproduce deterministically offline
 Frozen partition data SHALL reproduce from identical explicit map inputs and algorithm version, carry their dependency signature and support lightweight runtime decoding/freshness checks without generation dependencies.

@@ -16,6 +16,22 @@ Authoring load SHALL discover the documented source set deterministically and re
 - **WHEN** a nested prototype includes an unknown field or an integer field receives true, a fraction or a numeric string
 - **THEN** loading rejects that field without coercion or partial document publication
 
+#### Scenario: Empty passes are a legal document
+- **WHEN** a continent retains its ridge pass field with an empty list
+- **THEN** parsing succeeds without a structure error or fabricated pass
+
+#### Scenario: Physical stem is authored
+- **WHEN** a continent is parsed
+- **THEN** its ridge requires a physical stem route with at least two integer nonnegative cell points; missing or malformed routes reject without substituting a periodic physical curve
+
+#### Scenario: Retired periodic fields are rejected
+- **WHEN** a ridge document supplies old base, period, step or manually duplicated extent fields
+- **THEN** strict schema validation rejects them as unknown rather than preserving a second shape authority
+
+#### Scenario: Paired branch shape
+- **WHEN** optional ridge branches are present
+- **THEN** exactly west and east routes are required, each with at least two integer nonnegative cell points; missing arms, unknown keys and wrong field types reject as structure errors
+
 ### Requirement: Restricted YAML preserves supported authored information
 Map YAML SHALL accept only restricted data-only values and preserve retained stable-object comments and supported semantic values through round trips.
 
@@ -26,6 +42,10 @@ Map YAML SHALL accept only restricted data-only values and preserve retained sta
 #### Scenario: Round trip
 - **WHEN** multiline text, footprint masks, road bends and comments on a retained ID are edited and serialized
 - **THEN** unmodified semantic values and those comments remain, and the emitted document passes the same parser
+
+#### Scenario: Empty pass and branch preservation
+- **WHEN** a synthetic continent with no passes, an arbitrary physical stem and paired ridge branches is parsed, edited in an unrelated field, serialized and reparsed
+- **THEN** the empty list, stem and both arm routes and supported retained comments survive; no pass or physical curve is dropped or invented
 
 ### Requirement: Authoring diagnostics and runtime acceptance have distinct gates
 Authoring load SHALL use shared map diagnostics to reject invalid structure and permit semantically unfinished maps, while runtime acceptance rejects blocking map errors and requires authoritative external-reference and artifact-freshness validation without treating advisory midpoint disagreement as an error.

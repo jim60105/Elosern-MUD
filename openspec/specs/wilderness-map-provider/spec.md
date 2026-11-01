@@ -162,16 +162,20 @@ region table; the hook SHALL also initialize monster population.
   `typeclasses.exits.WildernessReturnExit`
 
 ### Requirement: The continent remains virtual with bounded local lookup
-The wilderness SHALL comprise 2700 by 2700 one-kilometer logical cells with east/north axes and authoritative coastline/terrain validity. Sea, closed ridges, cliffs and water SHALL be impassable on foot. Ordinary movement SHALL use bounded local masks and sparse indices without whole-frame scans or room materialization.
+The wilderness SHALL comprise 2700 by 2700 one-kilometer logical cells with east/north axes and authoritative coastline/terrain validity, rejecting complete physical ridge walls and water through bounded local lookup without whole-frame scans or room materialization.
 
 #### Scenario: Frame and sea margin
 - **WHEN** (-1,0), (2700,0), and ocean-margin (0,0) are queried
-- **THEN** all are invalid for foot movement; land-side ordinary cells are valid subject to local obstacles and footprints; the frame is never pre-created as rooms.
+- **THEN** all are invalid for foot movement; ordinary land cells remain valid subject to local obstacles and footprints, and the frame is never pre-created as rooms
 
 #### Scenario: Anchor and port land
-- **WHEN** all declared anchor centers and harbor centers are evaluated
-- **THEN** all lie inside the mainland polygon while knowledge visibility remains authoritative and unbuilt anchors create no invented settlement maps.
+- **WHEN** all declared anchor centres and harbour centres are evaluated
+- **THEN** all remain inside the mainland polygon while knowledge visibility remains authoritative and unbuilt anchors create no invented settlement maps
 
 #### Scenario: The closed ridge and waterways are impassable
-- **WHEN** a summit-ridge cell away from every authored pass, or an ordinary river cell, is queried
-- **THEN** it is invalid for foot movement, while the authored pass window and declared fords are walkable.
+- **WHEN** a shipped stem wall, either arm wall, the crotch, ordinary forest between arms, a river cell and a declared ford are queried
+- **THEN** all wall and river cells are refused, forest and ford cells remain walkable subject to footprints, and no mountain-pass exemption exists
+
+#### Scenario: Local work includes branches
+- **WHEN** a single coordinate on a synthetic branch is queried
+- **THEN** validity uses snapshot-local row geometry and existing local terrain masks without scanning the frame, allocating a ridge raster or materializing rooms

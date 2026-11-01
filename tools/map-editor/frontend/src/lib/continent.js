@@ -24,6 +24,8 @@ export const FRAME_LOCAL_M = "m 地方";
 
 export const waterwayRef = (id) => `continent:waterway:${id}`;
 export const fordFeatureRef = (id) => `continent:ford:${id}`;
+export const ridgeRouteRef = (route, index = null) =>
+  index === null ? `continent:ridge_route:${route}` : `continent:ridge_route:${route}#${index}`;
 export const siteRef = (id) => `continent:site:${id}`;
 export const regionRef = (id) => `continent:region:${id}`;
 export const passRef = (index) => `continent:pass#${index}`;
@@ -35,6 +37,7 @@ const ID = "[a-z][a-z0-9_]*";
 const PATTERNS = [
   [new RegExp(`^continent:(mainland|forest_edge)(?:#(\\d+))?$`), (m) => ({ kind: m[1], id: null, index: m[2] })],
   [new RegExp(`^continent:(waterway|ford):(${ID})(?:#(\\d+))?$`), (m) => ({ kind: m[1], id: m[2], index: m[3] })],
+  [/^continent:ridge_route:(stem|west|east)(?:#(\d+))?$/, (m) => ({ kind: "ridge_route", id: m[1], index: m[2] })],
   [/^continent:ridge$/, () => ({ kind: "ridge", id: null })],
   [/^continent:pass#(\d+)$/, (m) => ({ kind: "pass", id: null, index: m[1] })],
   [new RegExp(`^continent:(site|region):(${ID})$`), (m) => ({ kind: m[1], id: m[2] })],
@@ -49,7 +52,7 @@ export function parseContinentRef(ref) {
     if (!match) continue;
     const parsed = build(match);
     const index = parsed.index === undefined || parsed.index === null ? null : Number(parsed.index);
-    const feature = ["mainland", "forest_edge", "waterway", "ford"].includes(parsed.kind)
+    const feature = ["mainland", "forest_edge", "waterway", "ford", "ridge_route"].includes(parsed.kind)
       ? String(ref).replace(/#\d+$/, "")
       : null;
     return { kind: parsed.kind, id: parsed.id, index, feature };
@@ -68,6 +71,7 @@ export function commandFeature(ref) {
   if (!parsed?.feature) return null;
   if (parsed.kind === "mainland") return { kind: "mainland" };
   if (parsed.kind === "forest_edge") return { kind: "forest_edge" };
+  if (parsed.kind === "ridge_route") return { kind: "ridge_route", route: parsed.id };
   if (parsed.kind === "waterway") return { kind: "waterway_route", waterway_id: parsed.id };
   return { kind: "waterway_ford", waterway_id: parsed.id };
 }
@@ -91,6 +95,12 @@ export function featurePoints(world, featureRef) {
     return continent.mainland_boundary_km.map((km) => pair(km, [km[0] * KM, km[1] * KM]));
   }
   if (parsed.kind === "forest_edge") return (continent.forest_edge ?? []).map((cell, i) => pair(cell, continent.forest_edge_m[i]));
+  if (parsed.kind === "ridge_route") {
+    const route = continent.ridge_routes?.[parsed.id];
+    const routeM = continent.ridge_routes_m?.[parsed.id];
+    if (!route || !routeM) return [];
+    return route.map((cell, i) => pair(cell, routeM[i]));
+  }
   const waterway = continent.waterways.find((row) => row.id === parsed.id);
   if (!waterway) return [];
   if (parsed.kind === "waterway") return (waterway.route ?? []).map((cell, i) => pair(cell, waterway.route_m[i]));

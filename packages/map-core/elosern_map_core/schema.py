@@ -280,16 +280,23 @@ _HARBOR_SITE = _mapping(
 
 _RIDGE = _mapping(
     {
-        "base_x": _int(),
-        "period": _int(min_value=1),
-        "step": _int(min_value=1),
-        "min_x": _int(),
-        "max_x": _int(),
-        "north_limit_y": _int(),
+        # The authored stem route (a list of wilderness cells) is the single
+        # shape authority: it replaces the retired periodic base/period/step
+        # and min_x/max_x/north_limit_y fields entirely.
+        "stem": _list(_cell(), min_items=2),
+        # Optional exactly-paired arm routes; a present branches mapping must
+        # carry both west and east, each a real route.
+        "branches": _mapping(
+            {
+                "west": _list(_cell(), min_items=2),
+                "east": _list(_cell(), min_items=2),
+            },
+            required=False,
+        ),
         "mountain_corridor_half_width": _int(min_value=0),
         "passes": _list(
             _mapping({"y_min": _int(), "y_max": _int()}),
-            min_items=1,
+            min_items=0,
         ),
     },
 )

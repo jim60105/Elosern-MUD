@@ -444,13 +444,26 @@ def _base_elevation(
         config.coast_max_rise,
     )
     frame = terrain.frame_cells
-    xs = np.arange(frame, dtype=np.float64)[None, :]
-    centres = _row_centres(terrain)
+    xs = np.arange(frame, dtype=np.float64)
     half_width = terrain.mountain_corridor_half_width
-    if half_width > 0:
-        proximity = np.maximum(0.0, 1.0 - np.abs(xs - centres) / float(half_width))
-    else:
-        proximity = (xs == centres).astype(np.float64)
+    # One reusable full-frame proximity array; every active authored crest
+    # (stem then each arm) raises its own rows to the per-crest maximum, so
+    # overlapping profiles take the greatest contribution, never their sum.
+    proximity = np.zeros((frame, frame), dtype=np.float64)
+
+    def raise_row(values: np.ndarray, centre: int) -> None:
+        if half_width > 0:
+            row = np.maximum(0.0, 1.0 - np.abs(xs - centre) / float(half_width))
+            np.maximum(values, row, out=values)
+        else:
+            values[centre] = 1.0
+
+    for y, centre in enumerate(terrain._stem_centres):
+        raise_row(proximity[y], centre)
+    crotch_y = terrain._crotch_y
+    for table in terrain._arm_centres.values():
+        for index, centre in enumerate(table):
+            raise_row(proximity[crotch_y + index], centre)
     elevation = coast + proximity * config.ridge_mountain_rise
     elevation[river] -= config.river_carve_depth
     np.maximum(elevation, 0.0, out=elevation)

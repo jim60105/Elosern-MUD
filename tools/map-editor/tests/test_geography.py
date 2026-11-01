@@ -157,22 +157,88 @@ def test_a_non_monotone_forest_edge_saves_as_diagnosed_work_in_progress(workspac
     assert state["world"]["continent"]["terrain_preview"]["status"] == "unavailable"
 
 
-# -- ridge, passes, waterways, regions, sites ---------------------------------
-def test_ridge_parameters_and_passes_change_the_derived_walls(workspace):
+# -- ridge routes, passes, waterways, regions, sites --------------------------
+STEM = {"kind": "ridge_route", "route": "stem"}
+WEST = {"kind": "ridge_route", "route": "west"}
+EAST = {"kind": "ridge_route", "route": "east"}
+
+
+def test_ridge_routes_and_passes_change_the_derived_walls(workspace):
     editor = Editor(workspace)
     walls = editor.state()["world"]["continent"]["terrain_preview"]["ridge_walls"]
-    assert _send(editor, "set_terrain_parameter", CONTINENT, {"field": "ridge.base_x", "value": 14})[0] == 200
-    assert _send(editor, "add_ridge_pass", CONTINENT, {"y_min": 20, "y_max": 22})[0] == 200
-    assert _send(editor, "set_ridge_pass", CONTINENT, {"index": 0, "y_min": 3, "y_max": 5})[0] == 200
+    assert len(walls) == 3  # the stem run plus one wall per arm
+    # A corridor-width edit is still one continent write.
+    assert _send(editor, "set_terrain_parameter", CONTINENT,
+                 {"field": "ridge.mountain_corridor_half_width", "value": 3})[0] == 200
+    # Moving an interior stem point re-derives the preview.
+    assert _send(editor, "move_control_point", CONTINENT,
+                 {"feature": STEM, "index": 1, "point": [24, 12]})[0] == 200
     ridge = _data(workspace, CONTINENT)["terrain"]["ridge"]
-    assert ridge["base_x"] == 14 and ridge["passes"] == [{"y_min": 3, "y_max": 5}, {"y_min": 20, "y_max": 22}]
+    assert ridge["stem"][1] == {"cell_x": 24, "cell_y": 12}
+    assert ridge["mountain_corridor_half_width"] == 3
     preview = editor.state()["world"]["continent"]["terrain_preview"]
     assert preview["ridge_walls"] != walls
-    assert [(row["y_min"], row["y_max"]) for row in preview["passes"]] == [(3, 5), (20, 22)]
-    assert _send(editor, "remove_ridge_pass", CONTINENT, {"index": 1})[0] == 200
-    assert len(_data(workspace, CONTINENT)["terrain"]["ridge"]["passes"]) == 1
-    status, body = _send(editor, "set_terrain_parameter", CONTINENT, {"field": "frame_cells", "value": 9})
+    # Empty-pass round trip: add, set, remove back to zero.
+    assert _send(editor, "add_ridge_pass", CONTINENT, {"y_min": 20, "y_max": 22})[0] == 200
+    assert _send(editor, "set_ridge_pass", CONTINENT, {"index": 0, "y_min": 3, "y_max": 5})[0] == 200
+    assert [(row["y_min"], row["y_max"]) for row in editor.state()["world"]["continent"]["terrain_preview"]["passes"]] == [(3, 5)]
+    assert _send(editor, "remove_ridge_pass", CONTINENT, {"index": 0})[0] == 200
+    assert _data(workspace, CONTINENT)["terrain"]["ridge"]["passes"] == []
+    assert editor.state()["world"]["continent"]["terrain_preview"]["passes"] == []
+    # A retired periodic field is refused with no write.
+    before = fixture.tree_digest(workspace)
+    status, body = _send(editor, "set_terrain_parameter", CONTINENT, {"field": "ridge.base_x", "value": 14})
     assert (status, body["error"]["code"]) == (400, "invalid_command")
+    assert (status, _send(editor, "set_terrain_parameter", CONTINENT, {"field": "frame_cells", "value": 9})[1]["error"]["code"]) == (400, "invalid_command")
+    assert fixture.tree_digest(workspace) == before
+
+
+def test_ridge_route_points_move_insert_remove_with_history(workspace):
+    editor = Editor(workspace)
+    original = (workspace / CONTINENT).read_bytes()
+    assert _send(editor, "insert_control_point", CONTINENT,
+                 {"feature": EAST, "index": 2, "point": [33, 36]})[0] == 200
+    east = _data(workspace, CONTINENT)["terrain"]["ridge"]["branches"]["east"]
+    assert east[2] == {"cell_x": 33, "cell_y": 36} and len(east) == 4
+    assert _send(editor, "move_control_point", CONTINENT,
+                 {"feature": EAST, "index": 2, "point": [32, 35]})[0] == 200
+    assert _data(workspace, CONTINENT)["terrain"]["ridge"]["branches"]["east"][2] == {"cell_x": 32, "cell_y": 35}
+    assert _send(editor, "remove_control_point", CONTINENT, {"feature": EAST, "index": 2})[0] == 200
+    assert len(_data(workspace, CONTINENT)["terrain"]["ridge"]["branches"]["east"]) == 3
+    assert editor.undo()[0] == 200 and editor.undo()[0] == 200 and editor.undo()[0] == 200
+    assert (workspace / CONTINENT).read_bytes() == original
+
+
+def test_shared_crotch_move_is_atomic_and_its_deletion_is_refused(workspace):
+    editor = Editor(workspace)
+    assert _send(editor, "move_control_point", CONTINENT,
+                 {"feature": STEM, "index": 3, "point": [26, 30]})[0] == 200
+    ridge = _data(workspace, CONTINENT)["terrain"]["ridge"]
+    assert ridge["stem"][-1] == {"cell_x": 26, "cell_y": 30}
+    assert ridge["branches"]["west"][0] == {"cell_x": 26, "cell_y": 30}
+    assert ridge["branches"]["east"][0] == {"cell_x": 26, "cell_y": 30}
+
+    before = fixture.tree_digest(workspace)
+    for feature, index in ((STEM, 3), (WEST, 0), (EAST, 0)):
+        status, body = _send(editor, "remove_control_point", CONTINENT, {"feature": feature, "index": index})
+        assert (status, body["error"]["code"]) == (409, "deletion_refused"), (feature, index)
+    for feature, index in ((STEM, 4), (WEST, 0), (EAST, 0)):
+        status, body = _send(editor, "insert_control_point", CONTINENT,
+                             {"feature": feature, "index": index, "point": [27, 31]})
+        assert (status, body["error"]["code"]) == (409, "deletion_refused"), (feature, index)
+    assert fixture.tree_digest(workspace) == before
+
+
+def test_an_absent_ridge_arm_is_never_fabricated(workspace):
+    editor = Editor(workspace)
+    continent = _data(workspace, CONTINENT)
+    del continent["terrain"]["ridge"]["branches"]
+    (workspace / CONTINENT).write_text(fixture.yaml_text(continent), encoding="utf-8")
+    editor.reload()
+    before = fixture.tree_digest(workspace)
+    status, body = _send(editor, "move_control_point", CONTINENT, {"feature": WEST, "index": 0, "point": [1, 1]})
+    assert (status, body["error"]["code"]) == (422, "validation_failed")
+    assert fixture.tree_digest(workspace) == before
 
 
 def test_waterways_are_created_and_the_border_river_is_never_removed(workspace):

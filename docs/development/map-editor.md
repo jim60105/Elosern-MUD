@@ -479,14 +479,14 @@ mutation of the thawed document data, comment-preserving serialization
 validated by the core schema, then the authoring gate and the writer. Field
 values are validated by the core schema; the service and the browser keep no
 second schema or classifier. Frames: mainland vertices are kilometre geometry
-(`km 地理`); forest-edge, waterway-route, ford, site, location, ridge and pass
-values are one-kilometre wilderness cell indices (`1 km 格`); the settlement
-local anchor is metres (`m 地方`).
+(`km 地理`); forest-edge, waterway-route, ford, site, location, ridge-route and
+pass values are one-kilometre wilderness cell indices (`1 km 格`); the
+settlement local anchor is metres (`m 地方`).
 
 | Command | Document | Arguments |
 | --- | --- | --- |
-| `move_control_point`, `insert_control_point`, `remove_control_point` | continent | `feature` (`{kind: mainland}`, `{kind: forest_edge}`, or `{kind: waterway_route}` / `{kind: waterway_ford}` with `waterway_id`), `index`, `point` `[a, b]` (move/insert) |
-| `set_terrain_parameter` | continent | `field` (`ridge.base_x`, `ridge.period`, `ridge.step`, `ridge.min_x`, `ridge.max_x`, `ridge.north_limit_y`, `ridge.mountain_corridor_half_width`, `coastal_y_max`, `border_river_key`), `value` |
+| `move_control_point`, `insert_control_point`, `remove_control_point` | continent | `feature` (`{kind: mainland}`, `{kind: forest_edge}`, `{kind: ridge_route, route: stem|west|east}`, or `{kind: waterway_route}` / `{kind: waterway_ford}` with `waterway_id`), `index`, `point` `[a, b]` (move/insert) |
+| `set_terrain_parameter` | continent | `field` (`ridge.mountain_corridor_half_width`, `coastal_y_max`, `border_river_key`), `value`; the retired periodic fields are refused as `invalid_command` |
 | `add_ridge_pass`, `set_ridge_pass`, `remove_ridge_pass` | continent | `y_min`, `y_max`, `index` |
 | `add_waterway`, `remove_waterway` | continent | `waterway_id` (new), `route` cells; the border river is never removed |
 | `set_region_field` | continent | `region_id` (the core's fixed regions), `field` (`display_name_zh`, `nation_key`, `terrain_flavor_zh`, `nominal_nation_keys`, `scene_archetype`), `value` |
@@ -509,8 +509,10 @@ and the partition becomes stale without being rewritten.
 
 The projection adds the core's `terrain_preview` (`terrain_preview()` over
 `terrain_definition()` of the current inputs, sampled on at most 90x90 cells
-with region and surface codes, the closed ridge walls between passes, pass
-centres and the derived national borders), the ridge, coastal and
+with region and surface codes, the complete stem-and-arm ridge wall runs, pass
+centres and the derived national borders), the raw ridge plus
+`ridge_routes`/`ridge_routes_m` (the authored stem and any present arms in
+cells and cell-centre metres), coastal and
 border-river fields, full region fields, ford centres and each settlement's
 `footprint` (`shape`, the authored `offset`, and the derived absolute `origin`
 and `cells`), plus each settlement's derived `world_frame`
@@ -1234,7 +1236,7 @@ preferences and without writing or reading them.
 
 | `view` | Geometry layers | Labels |
 | --- | --- | --- |
-| `continent` | `terrain` (mainland, terrain/passability raster, forest edge), `water` (waterways), `ridge` (ridge walls, passes, fords), `locations` (locations and reserved harbour sites), `footprint` (settlement footprints), `partition` (derived national borders and district outlines) | `labels` |
+| `continent` | `terrain` (mainland, terrain/passability raster, forest edge), `water` (waterways), `ridge` (authored stem/arm routes, complete wall runs, passes, fords), `locations` (locations and reserved harbour sites), `footprint` (settlement footprints), `partition` (derived national borders and district outlines) | `labels` |
 | `settlement` | `nodes` (node marks including gate glyphs), `roads` (authored directed bent links) | `labels` |
 | `interior` | `rooms` (room cards), `connections` (within-interior links and their direction chevrons), `exterior` (the doorway card and its dashed link) | `labels` |
 
@@ -1455,6 +1457,12 @@ Observed success objects: continent `bounds` in kilometres
 are current). Every layer of every view was then hidden in a separate real
 capture at 640×480: all twelve succeeded and each reported exactly the same
 `bounds` as its view's all-visible capture, so hiding never moved the camera.
+
+!> **Superseded:** the continental capture bullets below were reviewed against
+the retired three-pass synthetic workspace. The current synthetic fixture ships
+an authored stem plus two arms and an empty pass list, so the range reads as a
+continuous fork with no pass glyphs; the settlement and interior observations
+stand.
 
 The images were actually opened with the agent's image reader, which decoded
 both `image/webp` and `image/png` (no silent conversion was needed):

@@ -63,14 +63,26 @@ def continent_data() -> dict:
         "terrain": {
             "forest_edge": [{"cell_x": 0, "cell_y": 30}, {"cell_x": 39, "cell_y": 30}],
             "ridge": {
-                "base_x": 10,
-                "period": 5,
-                "step": 1,
-                "min_x": 0,
-                "max_x": 39,
-                "north_limit_y": 35,
+                "stem": [
+                    {"cell_x": 28, "cell_y": 0},
+                    {"cell_x": 26, "cell_y": 12},
+                    {"cell_x": 25, "cell_y": 24},
+                    {"cell_x": 27, "cell_y": 30},
+                ],
+                "branches": {
+                    "west": [
+                        {"cell_x": 27, "cell_y": 30},
+                        {"cell_x": 24, "cell_y": 34},
+                        {"cell_x": 20, "cell_y": 38},
+                    ],
+                    "east": [
+                        {"cell_x": 27, "cell_y": 30},
+                        {"cell_x": 30, "cell_y": 34},
+                        {"cell_x": 34, "cell_y": 38},
+                    ],
+                },
                 "mountain_corridor_half_width": 2,
-                "passes": [{"y_min": 4, "y_max": 5}],
+                "passes": [],
             },
             "coastal_y_max": 10,
             "waterways": {

@@ -164,15 +164,11 @@ def _terrain_definition(continent: ContinentDocument) -> TerrainDefinition:
         },
         waterway_fords={key: value.fords for key, value in terrain.waterways.items()},
         border_river_key=terrain.border_river_key,
-        ridge_base_x=terrain.ridge_base_x,
-        ridge_period=terrain.ridge_period,
-        ridge_step=terrain.ridge_step,
-        ridge_min_x=terrain.ridge_min_x,
-        ridge_max_x=terrain.ridge_max_x,
-        ridge_north_limit=terrain.ridge_north_limit_y,
+        ridge_stem=terrain.ridge_stem,
         ridge_passes=terrain.ridge_passes,
         coastal_y_max=terrain.coastal_y_max,
         mountain_corridor_half_width=terrain.ridge_corridor_half_width,
+        ridge_branches=terrain.ridge_branches,
         region_flavors={
             key: value.terrain_flavor_zh for key, value in continent.regions.items()
         },

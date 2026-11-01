@@ -59,14 +59,14 @@ def continent_data() -> dict:
                 {"cell_x": 39, "cell_y": 30},
             ],
             "ridge": {
-                "base_x": 10,
-                "period": 5,
-                "step": 1,
-                "min_x": 0,
-                "max_x": 39,
-                "north_limit_y": 35,
+                "stem": [
+                    {"cell_x": 26, "cell_y": 0},
+                    {"cell_x": 24, "cell_y": 10},
+                    {"cell_x": 26, "cell_y": 20},
+                    {"cell_x": 25, "cell_y": 30},
+                ],
                 "mountain_corridor_half_width": 2,
-                "passes": [{"y_min": 4, "y_max": 5}],
+                "passes": [],
             },
             "coastal_y_max": 10,
             "waterways": {

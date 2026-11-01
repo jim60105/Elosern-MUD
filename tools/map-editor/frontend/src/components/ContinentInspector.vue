@@ -36,6 +36,7 @@ import {
   removePass,
   removePoint,
   removeWaterway,
+  ridgeRouteRef,
   setPass,
   siteField,
   terrainParameter,
@@ -108,12 +109,6 @@ const DISTRICT_KINDS = [
 ];
 const regionOptions = computed(() => (continent.value.regions ?? []).map((row) => ({ value: row.id, label: `${row.id} · ${row.display_name_zh}` })));
 const RIDGE_FIELDS = [
-  { key: "base_x", label: "中心欄 base_x", unit: "欄 · 1 km 格" },
-  { key: "period", label: "彎折週期 period", unit: "列數 · 1 km 格" },
-  { key: "step", label: "彎折幅度 step", unit: "欄數 · 1 km 格" },
-  { key: "min_x", label: "最西欄 min_x", unit: "欄 · 1 km 格" },
-  { key: "max_x", label: "最東欄 max_x", unit: "欄 · 1 km 格" },
-  { key: "north_limit_y", label: "北端列 north_limit_y", unit: "列 · 1 km 格" },
   { key: "mountain_corridor_half_width", label: "山地廊道半寬", unit: "欄數 · 1 km 格" },
 ];
 
@@ -385,7 +380,7 @@ const generating = computed(() => partitionState.value.state === "generating");
     <template v-if="point">
       <p class="inspector__muted">
         隸屬：<button type="button" class="link" data-owner-link @click="emit('select', point.ford ? waterwayRef(parsed.id) : parsed.feature)">
-          {{ point.ford ? `水系 ${parsed.id}` : parsed.kind === "waterway" ? `水系 ${parsed.id}` : parsed.kind === "mainland" ? "大陸海岸線" : "北部林線" }}
+          {{ point.ford ? `水系 ${parsed.id}` : parsed.kind === "waterway" ? `水系 ${parsed.id}` : parsed.kind === "mainland" ? "大陸海岸線" : parsed.kind === "forest_edge" ? "北部林線" : `中央山脊 ${parsed.id}` }}
         </button>
         （{{ point.points.length }} 個{{ point.ford ? "渡口" : "控制點" }}）
       </p>
@@ -475,6 +470,14 @@ const generating = computed(() => partitionState.value.state === "generating");
         @confirm="send(terrainParameter('coastal_y_max', $event))"
         @drafts="track('coastal')($event)"
       />
+      <h3 class="section-label">路線</h3>
+      <ul class="plain">
+        <li v-for="route in Object.keys(continent.ridge_routes ?? {})" :key="route">
+          <button type="button" class="link" :data-select-route="route" @click="emit('select', ridgeRouteRef(route))">
+            中央山脊 {{ route }} · {{ (continent.ridge_routes[route] ?? []).length }} 個控制點
+          </button>
+        </li>
+      </ul>
       <h3 class="section-label">隘口</h3>
       <ul class="plain">
         <li v-for="(window, index) in ridge.passes" :key="index">

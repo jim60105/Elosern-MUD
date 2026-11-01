@@ -299,12 +299,18 @@ class MapProviderTests(EvenniaTest):
 
     @covers_requirement("wilderness-map-provider::the-continent-remains-virtual-with-bounded-local-lookup")
     def test_closed_ridge_and_water_are_impassable_with_authored_crossings(self):
-        # A summit-ridge cell away from every pass is refused; the pass cell is
-        # walked; a river cell is refused and its ford is walked.
+        # The shipped range is pass-free: a stem cell, the crotch and both arm
+        # tips are refused; a river cell is refused and its ford is walked.
+        terrain = wilderness_provider.terrain_definition()
         self.assertFalse(
-            self.provider.is_valid_coordinates(None, (ridge_center_x(wilderness_provider.terrain_definition(), 1200), 1200))
+            self.provider.is_valid_coordinates(None, (ridge_center_x(terrain, 1200), 1200))
         )
-        self.assertTrue(self.provider.is_valid_coordinates(None, (1410, 980)))
+        self.assertFalse(self.provider.is_valid_coordinates(None, terrain.ridge_stem[-1]))
+        for crest in ("west", "east"):
+            self.assertFalse(
+                self.provider.is_valid_coordinates(None, terrain.ridge_branches[crest][-1]),
+                crest,
+            )
         self.assertFalse(self.provider.is_valid_coordinates(None, (900, 1042)))
         # The authored fords are read from the table, never named here: the
         # waterway keys belong to the geography contract module.
@@ -524,12 +530,26 @@ class MapProviderTests(EvenniaTest):
         room_a = self.char1.location
         north = next(exit_obj for exit_obj in room_a.exits if exit_obj.key == "north")
         self.assertTrue(self._locks_allow(north, "traverse"))
-        # Re-activate the SAME pooled room at the principal pass cell, whose
-        # north neighbor is a closed ridge cell: the stock lock pass recomputes
-        # every self-loop exit's lock from validity and the hook adds nothing
-        # there -- the hook-opened north lock cannot survive the coordinate
-        # change.
-        room_a.set_active_coordinates((1400, 990), self.char1)
+        # Re-activate the SAME pooled room at a closed ridge wall cell, whose
+        # north neighbor is also a closed ridge cell: the stock lock pass
+        # recomputes every self-loop exit's lock from validity and the hook adds
+        # nothing there -- the hook-opened north lock cannot survive the
+        # coordinate change.
+        # Pick a walkable cell whose north neighbour is a closed ridge wall.
+        target = None
+        for wall_y in range(1000, 1400):
+            for wall_x in range(1390, 1450):
+                if (
+                    not wilderness_provider.is_closed_ridge_cell((wall_x, wall_y))
+                    and wilderness_provider.is_closed_ridge_cell((wall_x, wall_y + 1))
+                    and self.provider.is_valid_coordinates(None, (wall_x, wall_y))
+                ):
+                    target = (wall_x, wall_y)
+                    break
+            if target is not None:
+                break
+        self.assertIsNotNone(target, "no walkable cell with a wall to its north")
+        room_a.set_active_coordinates(target, self.char1)
         self.assertFalse(self._locks_allow(north, "traverse"))
         self.assertFalse(self._locks_allow(north, "view"))
 

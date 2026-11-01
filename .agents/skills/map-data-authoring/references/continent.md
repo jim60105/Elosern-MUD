@@ -38,15 +38,19 @@ harbor_sites:                  # reserved land-side port cells (not towns, not a
 terrain:
   forest_edge: [{cell_x, cell_y}, ...]   # ≥ 2 points, cell_x strictly increasing
   ridge:
-    base_x: 1410
-    period: 60            # ≥ 1
-    step: 10              # ≥ 1
-    min_x: 1300           # ≤ max_x
-    max_x: 1520
-    north_limit_y: 2200
+    stem:                 # required, ≥ 2 cells, first row 0, rows strictly increasing
+      - {cell_x: 1410, cell_y: 0}
+      - {cell_x: 1408, cell_y: 1660}
+      - {cell_x: 1420, cell_y: 2000}
+    branches:             # optional; if present exactly west and east, each ≥ 2
+      west:               # first cell equals the stem's last cell; tip west of it
+        - {cell_x: 1420, cell_y: 2000}
+        - {cell_x: 1320, cell_y: 2240}
+      east:               # tip east of the crotch
+        - {cell_x: 1420, cell_y: 2000}
+        - {cell_x: 1510, cell_y: 2240}
     mountain_corridor_half_width: 100
-    passes:               # ≥ 1 window, y_min ≤ y_max
-      - {y_min: 410, y_max: 425}
+    passes: []            # possibly empty, y_min ≤ y_max per window
   coastal_y_max: 500
   waterways:
     <waterway_id>:
@@ -86,11 +90,16 @@ Read this before you move anything. The effects reach far.
 - **Forest edge.** A per-column row table. Cells with `y ≥ forest_edge_row(x)`
   are `north_deep_forest`. The polyline must be strictly X-increasing, and
   should span `x = 0 … 2699`.
-- **Ridge.** For row `y`, the ridge centre is
-  `base_x + ((y // period) % 5 − 2) · step`: a zig-zag bend. Within
-  `min_x … max_x`, and below `north_limit_y`, the cells between this row's
-  centre and the next row's centre are closed walls, **except** rows inside a
-  pass window. Land crossings between west and east therefore need a pass.
+- **Ridge.** The authored `stem` is the single shape authority: each row's
+  centre is the integer half-up interpolation along its segments (at most one
+  column of movement per row), and the cells between this row's centre and the
+  next row's centre are closed walls. `branches.west`/`east` start at the
+  stem's last cell (the shared crotch), end north of it on opposite sides and
+  are additional impassable forest barriers with **no** corridor and **no**
+  political line; the deep forest between the arms stays walkable. A `passes`
+  window (which may be empty, and ships empty) exempts only its stem rows, so
+  the arms never open. The route endpoints therefore own every derived extent;
+  no periodic sawtooth or separate reference axis exists.
 - **Mountain corridor.** `|x − ridge_centre(y)| ≤ mountain_corridor_half_width`
   is `central_mountains`. East of the corridor is `southeast_coast` when
   `y ≤ coastal_y_max`, and `eastern_plains` otherwise. West of it is
@@ -99,9 +108,11 @@ Read this before you move anything. The effects reach far.
 - **Waterways.** Rasterized route segments are impassable water. Ford cells
   are subtracted, so a ford must be a cell on the route to have any effect.
 - **Border river.** This route must be strictly X-**decreasing**: it runs from
-  its source next to the ridge westward to its mouth. Its per-column row also
+  its source next to the stem westward to its mouth, and its first vertex must
+  be its easternmost; every active stem centre must lie strictly east of that
+  source column. Its per-column row also
   divides Altoria (the river row and south) from Valhalla (north), west of the
-  ridge. East of the ridge centre line is Grandia.
+  stem. East of the stem centre line is Grandia.
 
 ## Validation
 
@@ -109,7 +120,11 @@ Read this before you move anything. The effects reach far.
   shows a stale preview.
 - Inconsistent terrain is a saveable **semantic** `terrain_inconsistent`
   diagnostic. Examples: a non-monotone forest edge or border river, an
-  inverted pass, `min_x > max_x`, a missing border river. The editor then shows
+  inverted pass, a stem not beginning at row 0, a steeper-than-one-column
+  segment, branches that do not start at the crotch or that cross/rejoin,
+  a crotch pass, a stem west of the river source, an arm that leaves the
+  frame/land/forest or hits a waterway, harbour, location or resolved
+  landmark, a missing border river. The editor then shows
   `terrain_preview.status: unavailable`.
 - Game-only rules:
   - all 7 regions are present, each with a registered `scene_archetype`;
@@ -125,9 +140,12 @@ Read this before you move anything. The effects reach far.
 
 The editor offers the following continent tools:
 - control-point move, insert and remove for the mainland, forest edge and
-  waterway routes and fords;
-- `set_terrain_parameter` for ridge fields, `coastal_y_max` and
-  `border_river_key`;
+  waterway routes and fords, and for the ridge routes (`feature:
+  {kind: ridge_route, route: stem|west|east}`; moving or deleting a shared
+  crotch cell is atomic/refused);
+- `set_terrain_parameter` for `ridge.mountain_corridor_half_width`,
+  `coastal_y_max` and `border_river_key`; the retired periodic fields are
+  refused;
 - ridge passes: add, set and remove;
 - `add_waterway` and `remove_waterway` (the border river is never removed);
 - `set_region_field`;

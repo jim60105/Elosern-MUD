@@ -5,8 +5,9 @@ step needs both orthogonal cells walkable, so 8-direction reachability equals
 4-connectivity of :func:`world.maps.wilderness_provider.is_valid_wilderness_cell`
 cells. The index stores every row as runs of consecutive valid cells and joins
 runs of adjacent rows that share a column (union-find). Only the cells that can
-be invalid inside the mainland (the summit ridge span, rasterized waterways and
-anchor footprints) are tested per row, so building the index is bounded work
+be invalid inside the mainland (the complete ridge stem-and-arm spans,
+rasterized waterways and anchor footprints) are tested per row, so building the
+index is bounded work
 over about 2,700 rows instead of a scan of every land cell.
 
 The index is a pure derivation of one explicit geography snapshot and the live
@@ -48,8 +49,9 @@ class WalkableComponents:
         self._row_runs: dict[int, list[int]] = {}
         previous: list[int] = []
         for y in range(terrain.max_y + 1):
-            low, high = core_terrain.ridge_span(terrain, y)
-            row_candidates = candidates.get(y, set()) | set(range(low, high + 1))
+            row_candidates = set(candidates.get(y, set()))
+            for low, high in core_terrain.ridge_spans(terrain, y):
+                row_candidates.update(range(low, high + 1))
             current: list[int] = []
             for west, east in mainland_row_intervals(terrain, y):
                 blocked = sorted(
