@@ -212,6 +212,14 @@ def _predict_reserve(state: FatigueState, wake_tick: int, tick: int, endpoint: i
             end = prediction.end
         cursor += step
         current = end
+    else:
+        if cursor < endpoint:
+            from world.observability import log_warn
+
+            log_warn(
+                "camp_prediction_bound",
+                context={"tick": int(tick), "endpoint": int(endpoint), "cursor": int(cursor)},
+            )
     return int(current.reserve_units)
 
 
@@ -305,6 +313,12 @@ def plan_camp(actor: Any, *, mode: str, seconds: int | None = None) -> dict[str,
     }
 
 
+def _name(member: Any) -> str:
+    """A bounded, never-blank display name (the identity when keyless)."""
+    name = str(getattr(member, "key", "") or "").strip()
+    return (name or str(member.pk))[:_MAX_NAME]
+
+
 def _refusal(error: Any) -> dict[str, str]:
     code = str(getattr(error, "code", None) or CODE_PARTY_UNAVAILABLE)[:64]
     message = str(getattr(error, "message", None) or "目前無法紮營。")[:512]
@@ -315,7 +329,7 @@ def _member_wire(row: dict[str, Any]) -> dict[str, Any]:
     member = row["member"]
     return {
         "member_id": str(member.pk)[:_MAX_MEMBER_ID],
-        "name": str(getattr(member, "key", member.pk))[:_MAX_NAME],
+        "name": _name(member),
         "current_reserve": row["current_reserve"],
         "predicted_reserve": row["predicted_reserve"],
         "reserve_max": row["reserve_max"],
@@ -858,14 +872,15 @@ def _wake_of(body: Any, sleep_id: str) -> tuple[bool, int | None]:
     return False, None
 
 
-def _summary(result: dict[str, Any], reason: str | None) -> str:
+def _summary(result: dict[str, Any], reason: str | None, mode: str | None = None) -> str:
     if result["phase"] == "complete":
         lowest = min(
             (member["after_percent"] for member in result["members"]),
             default=100,
         )
         quiet = not any(event["interactive"] for event in result["events"])
-        prefix = "夜裡無事。" if quiet else ""
+        # Only a camp to dawn spent the night.
+        prefix = "夜裡無事。" if quiet and mode == MODE_UNTIL_DAWN else ""
         text = (
             f"{prefix}全隊精力恢復至 {lowest}%，"
             f"{result['timing']['wake_time']} 醒來。"
@@ -1026,7 +1041,7 @@ def finalize_camp(actor: Any, *, reason: str | None = None) -> dict[str, Any] | 
         if phase == "interrupted" and reason is None:
             reason = "continuation_failed"
         result = _result_data(commander, meta, phase=phase, reason=reason)
-        summary = _summary(result, reason)
+        summary = _summary(result, reason, meta["mode"])
         tick = int(result["timing"]["result_tick"])
         day, clock_text = day_and_time(tick)
         event = {
@@ -1127,7 +1142,7 @@ def camp_metadata(*, camp_id: str, mode: str, dream: bool):
             before.append(
                 {
                     "member_id": str(member.pk),
-                    "name": str(getattr(member, "key", member.pk))[:_MAX_NAME],
+                    "name": _name(member),
                     "reserve": int(state.reserve_units),
                     "reserve_max": int(policy.max_units),
                     "percent": reserve_percent(

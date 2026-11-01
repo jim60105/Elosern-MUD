@@ -382,6 +382,13 @@ class CampActionTests(CampFixture):
         # Reconnect while the dream is open: nothing advances.
         dream_service.resume_owner_sleep_continuation(self.player)
         self.assertEqual(get_world_clock().tick, tick)
+        # A new camp waits while this camp's dream is open; nothing is cut off.
+        from world.rules.time_skip import SleepRefused
+
+        with self.assertRaises(SleepRefused) as caught:
+            self._camp(mode="until-dawn", operation_id="camp-other")
+        self.assertEqual(caught.exception.code, "camp_pending")
+        self.assertEqual(read_camp_operation(self.player)["camp_id"], "camp-dream")
         # Departure: the owner continuation, then the slower companion.
         state = dream_service.dream_state(self.player)
         with self.captureOnCommitCallbacks(execute=True):
@@ -394,6 +401,10 @@ class CampActionTests(CampFixture):
         self.assertEqual(len(self.facts), 1)
         dream_service.resume_owner_sleep_continuation(self.player)
         self.assertEqual(len(self.facts), 1)
+        # A replay of the dream camp's request now returns the settled result.
+        replay = self._camp(dream=True, operation_id="camp-dream")["data"]
+        self.assertEqual(replay, meta["result"])
+        self.assertEqual(get_world_clock().tick, tick + 27000)
 
     def test_recovery_across_process_loss(self):
         from world.rules.camping import _commit_entry, camp_metadata, reconcile_camp

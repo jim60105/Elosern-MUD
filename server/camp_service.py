@@ -21,6 +21,17 @@ from uuid import uuid4
 from world.observability import log_error, log_info
 
 DREAM_PENDING_MESSAGE = "你進入了夢境；隊伍的睡眠會在夢境結束後繼續。"
+CODE_CAMP_PENDING = "camp_pending"
+CAMP_PENDING_MESSAGE = "上一次紮營的夢境尚未結束。"
+
+
+def _dream_open(commander: Any) -> bool:
+    """Whether the owner's associated dream session is still open."""
+    from world.narrative import dream_session as lifecycle
+    from world.narrative.dream_surface import associated_session
+
+    session = associated_session(commander)
+    return session is not None and session.state == lifecycle.STATE_OPEN
 _FALLBACK_MESSAGE = "紮營已結束。"
 
 
@@ -93,6 +104,7 @@ def camp(
         finalize_camp,
         internal_mode,
         plan_camp,
+        reconcile_camp,
     )
     from world.rules.party_scope import resolve_commander
     from world.rules.sleep_receipt import MODE_DURATION, read_camp_operation
@@ -114,10 +126,16 @@ def camp(
         if stored["result"] is not None:
             data = finalize_camp(commander)
         elif stored["dream"]:
-            data = dream_result(commander)
+            # A dream that already closed but whose reconciliation did not
+            # finish is reconciled now; an open dream stays pending.
+            data = reconcile_camp(commander) or dream_result(commander)
         else:
             data = continue_camp(commander, camp_id=operation_id)
         return {"data": data, "message": _message(commander, data)}
+    if stored is not None and stored["result"] is None and stored["dream"] and _dream_open(commander):
+        # The earlier camp's dream is still open: its departure owns the
+        # rest of that camp, so a new camp waits instead of cutting it off.
+        raise SleepRefused(CODE_CAMP_PENDING, CAMP_PENDING_MESSAGE)
     plan = plan_camp(actor, mode=internal, seconds=seconds)
     if dream and not plan["dream_offerable"]:
         raise SleepRefused(CODE_DREAM_NOT_OFFERABLE, DREAM_NOT_OFFERABLE_MESSAGE)
