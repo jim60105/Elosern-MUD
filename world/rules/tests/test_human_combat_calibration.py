@@ -1983,8 +1983,14 @@ def _run_encounter_trial(room: Room, cell: EncounterCell, seed: int) -> Encounte
     )
 
 
-class EncounterCalibrationTests(EvenniaTest):
-    """The eight-cell combined player/enemy encounter calibration."""
+class _EncounterCalibrationFixture:
+    """Eight-cell encounter fixture shared by the two calibration classes.
+
+    The fixture is a mixin and the two passes are separate test classes so
+    Django's ``--parallel`` worker pool can schedule them on different
+    processes: one class is an indivisible dispatch unit, and the selected-value
+    pass alone ran longer than this class's shard budget.
+    """
 
     def setUp(self):
         super().setUp()
@@ -2074,6 +2080,10 @@ class EncounterCalibrationTests(EvenniaTest):
             self.assertGreaterEqual(median, 1, "the round median is a real run")
             self.assertLessEqual(median, CALIBRATION_MAX_ROUNDS)
 
+
+class EncounterCalibrationTests(_EncounterCalibrationFixture, EvenniaTest):
+    """The eight-cell combined player/enemy encounter calibration."""
+
     @covers_requirement(
         "human-combat-calibration::human-calibration-uses-real-resolver-gear-restrictions-and-bounded-outcome-evidence"
     )
@@ -2085,6 +2095,10 @@ class EncounterCalibrationTests(EvenniaTest):
     )
     def test_eight_encounter_cells_run_explicit_draft_commands_over_four_seeds(self):
         self._assert_recorded_evidence(self._run_all_cells())
+
+
+class EncounterSelectedValueTests(_EncounterCalibrationFixture, EvenniaTest):
+    """The selected-value reproduction pass, scheduled on its own worker."""
 
     @covers_requirement(
         "human-combat-calibration::human-calibration-uses-real-resolver-gear-restrictions-and-bounded-outcome-evidence"

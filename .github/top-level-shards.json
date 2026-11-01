@@ -18,14 +18,20 @@
    "index": 2,
    "name": "top-level-2",
    "labels": [
-    "tests.test_frontend_toolchain_contract",
-    "tests.test_official_artwork_preparation",
-    "tests.test_map_authoring_contract"
+    "tests.test_frontend_toolchain_contract"
    ]
   },
   {
    "index": 3,
    "name": "top-level-3",
+   "labels": [
+    "tests.test_official_artwork_preparation",
+    "tests.test_map_authoring_contract"
+   ]
+  },
+  {
+   "index": 4,
+   "name": "top-level-4",
    "labels": [
     "tests.test_map_client_contracts",
     "tests.test_map_reference_context",
@@ -39,8 +45,8 @@
    ]
   },
   {
-   "index": 4,
-   "name": "top-level-4",
+   "index": 5,
+   "name": "top-level-5",
    "labels": [
     "tests.test_test_data_lint",
     "tests.test_spec_traceability",
@@ -56,7 +62,13 @@
     "tests.test_data_independence_commands",
     "tests.test_data_independence_rules_combat",
     "tests.test_data_independence_rules_knowledge",
-    "tests.test_data_independence_rules_sexual",
+    "tests.test_data_independence_rules_sexual"
+   ]
+  },
+  {
+   "index": 6,
+   "name": "top-level-6",
+   "labels": [
     "tests.test_data_independence_webclient_presentation",
     "tests.test_map_editor_settlements",
     "tests.test_quest_log_parity_contract",
@@ -67,8 +79,8 @@
    ]
   },
   {
-   "index": 5,
-   "name": "top-level-5",
+   "index": 7,
+   "name": "top-level-7",
    "labels": [
     "tests.test_command_docs",
     "tests.test_container_contract",
@@ -80,7 +92,13 @@
     "tests.test_data_independence_browser",
     "tests.test_map_editor_geography",
     "tests.test_map_settlement_contract",
-    "tests.test_data_independence_ai_server",
+    "tests.test_data_independence_ai_server"
+   ]
+  },
+  {
+   "index": 8,
+   "name": "top-level-8",
+   "labels": [
     "tests.test_data_independence_js_webclient",
     "tests.test_data_independence_rules_creation",
     "tests.test_data_independence_rules_monster",
@@ -95,8 +113,8 @@
    ]
   },
   {
-   "index": 6,
-   "name": "top-level-6",
+   "index": 9,
+   "name": "top-level-9",
    "labels": [
     "tests.test_observability_lint",
     "tests.test_mono_font_import_tool",
@@ -110,7 +128,13 @@
     "tests.test_rules_skills_test_layout_contract",
     "tests.test_data_independence_art_imports",
     "tests.test_data_independence_quests",
-    "tests.test_data_independence_rules_guild",
+    "tests.test_data_independence_rules_guild"
+   ]
+  },
+  {
+   "index": 10,
+   "name": "top-level-10",
+   "labels": [
     "tests.test_data_independence_rules_party",
     "tests.test_data_independence_webclient_actions",
     "tests.test_map_editor_interiors",

@@ -2,7 +2,7 @@
  "shards": [
   {
    "index": 0,
-   "name": "rules-a-0",
+   "name": "rules-0",
    "workers": 4,
    "labels": [
     "world.rules.tests.test_account_roster",
@@ -11,10 +11,17 @@
   },
   {
    "index": 1,
-   "name": "rules-a-1",
+   "name": "rules-1",
    "workers": 4,
    "labels": [
-    "world.rules.tests.test_human_combat_calibration",
+    "world.rules.tests.test_human_combat_calibration"
+   ]
+  },
+  {
+   "index": 2,
+   "name": "rules-2",
+   "workers": 4,
+   "labels": [
     "world.rules.tests.test_action_evidence",
     "world.rules.tests.test_church_combat_ministry",
     "world.rules.tests.test_unconditional_multi_strike",
@@ -71,15 +78,22 @@
     "world.rules.tests.test_combat_session_recovery",
     "world.rules.tests.test_combat_session_sexual_coercion",
     "world.rules.tests.test_combat_session_targeting",
-    "world.rules.tests.test_combat_view",
+    "world.rules.tests.test_combat_view"
+   ]
+  },
+  {
+   "index": 3,
+   "name": "rules-3",
+   "workers": 4,
+   "labels": [
     "world.rules.tests.test_conferral_cast",
     "world.rules.tests.test_conferral_revocation",
     "world.rules.tests.test_creation_messages"
    ]
   },
   {
-   "index": 2,
-   "name": "rules-a-2",
+   "index": 4,
+   "name": "rules-4",
    "workers": 4,
    "labels": [
     "world.rules.tests.test_creation_wizard",
@@ -159,13 +173,20 @@
     "world.rules.tests.test_dialogue_references",
     "world.rules.tests.test_dialogue_progression_conditions",
     "world.rules.tests.test_dialogue_refresh_physical",
-    "world.rules.tests.test_dialogue_refresh_lifecycle",
+    "world.rules.tests.test_dialogue_refresh_lifecycle"
+   ]
+  },
+  {
+   "index": 5,
+   "name": "rules-5",
+   "workers": 4,
+   "labels": [
     "world.rules.tests.test_dialogue_reading_completion"
    ]
   },
   {
-   "index": 3,
-   "name": "rules-b-3",
+   "index": 6,
+   "name": "rules-6",
    "workers": 4,
    "labels": [
     "world.rules.tests.test_freeform_casting.test_preview_and_session_facade",
@@ -205,8 +226,8 @@
    ]
   },
   {
-   "index": 4,
-   "name": "rules-b-4",
+   "index": 7,
+   "name": "rules-7",
    "workers": 4,
    "labels": [
     "world.rules.tests.test_guild_economy_sync.test_altoria_learning_exchange",
@@ -218,24 +239,24 @@
    ]
   },
   {
-   "index": 5,
-   "name": "rules-b-5",
+   "index": 8,
+   "name": "rules-8",
    "workers": 4,
    "labels": [
     "world.rules.tests.test_guild_economy_sync.test_service_host_batch_rollback"
    ]
   },
   {
-   "index": 6,
-   "name": "rules-b-6",
+   "index": 9,
+   "name": "rules-9",
    "workers": 4,
    "labels": [
     "world.rules.tests.test_guild_economy_sync.test_service_host_identity"
    ]
   },
   {
-   "index": 7,
-   "name": "rules-b-7",
+   "index": 10,
+   "name": "rules-10",
    "workers": 4,
    "labels": [
     "world.rules.tests.test_guild_economy_sync.test_service_host_merchant_dialogue",
@@ -267,8 +288,8 @@
    ]
   },
   {
-   "index": 8,
-   "name": "rules-b-8",
+   "index": 11,
+   "name": "rules-11",
    "workers": 4,
    "labels": [
     "world.rules.tests.test_map_knowledge_integration",
@@ -301,8 +322,8 @@
    ]
   },
   {
-   "index": 9,
-   "name": "rules-b-9",
+   "index": 12,
+   "name": "rules-12",
    "workers": 4,
    "labels": [
     "world.rules.tests.test_movement_settlement",
@@ -334,8 +355,8 @@
    ]
   },
   {
-   "index": 10,
-   "name": "rules-c-10",
+   "index": 13,
+   "name": "rules-13",
    "workers": 4,
    "labels": [
     "world.rules.tests.test_sight",
@@ -375,8 +396,8 @@
    ]
   },
   {
-   "index": 11,
-   "name": "rules-c-11",
+   "index": 14,
+   "name": "rules-14",
    "workers": 4,
    "labels": [
     "world.rules.tests.test_saintess_oath_observability",
@@ -448,8 +469,8 @@
    ]
   },
   {
-   "index": 12,
-   "name": "quests-skills-art-ai-lore-12",
+   "index": 15,
+   "name": "quests-15",
    "workers": 4,
    "labels": [
     "world.quests.tests.test_acquire",
@@ -498,8 +519,8 @@
    ]
   },
   {
-   "index": 13,
-   "name": "quests-skills-art-ai-lore-13",
+   "index": 16,
+   "name": "quests-16",
    "workers": 4,
    "labels": [
     "world.quests.tests.test_species_hunt_acceptance",
@@ -582,7 +603,14 @@
     "world.art.tests.test_worker.test_cutout_stage",
     "world.art.tests.test_worker.test_gallery_worker",
     "world.art.tests.test_worker.test_output_format_pipeline",
-    "world.art.tests.test_worker.test_publication_gate",
+    "world.art.tests.test_worker.test_publication_gate"
+   ]
+  },
+  {
+   "index": 17,
+   "name": "quests-17",
+   "workers": 4,
+   "labels": [
     "world.art.tests.test_worker.test_store_isolation",
     "world.art.tests.test_worker.test_translate_stage",
     "world.narrative.tests.test_dialogue_memory",
@@ -590,8 +618,8 @@
    ]
   },
   {
-   "index": 14,
-   "name": "quests-skills-art-ai-lore-14",
+   "index": 18,
+   "name": "quests-18",
    "workers": 4,
    "labels": [
     "world.narrative.tests.test_correspondence_delivery",
@@ -693,8 +721,8 @@
    ]
   },
   {
-   "index": 15,
-   "name": "commands-server-typeclasses-15",
+   "index": 19,
+   "name": "commands-19",
    "workers": 4,
    "labels": [
     "commands.tests.test_art",
@@ -740,7 +768,14 @@
     "typeclasses.tests.test_components",
     "typeclasses.tests.test_entities",
     "typeclasses.tests.test_epithet_nomination_triggers",
-    "typeclasses.tests.test_exit_movement_cost",
+    "typeclasses.tests.test_exit_movement_cost"
+   ]
+  },
+  {
+   "index": 20,
+   "name": "commands-20",
+   "workers": 4,
+   "labels": [
     "typeclasses.tests.test_exits",
     "typeclasses.tests.test_instance_room",
     "typeclasses.tests.test_map_discovery",
@@ -752,8 +787,8 @@
    ]
   },
   {
-   "index": 16,
-   "name": "webclient-actions-16",
+   "index": 21,
+   "name": "webclient-21",
    "workers": 4,
    "labels": [
     "web.webclient.actions.tests.test_account_actions.test_character_create",
@@ -824,7 +859,14 @@
     "web.gm.tests.test_runtime_immutability",
     "web.gm.tests.test_saves_api",
     "web.gm.tests.test_spa_evidence",
-    "web.gm.tests.test_state_api",
+    "web.gm.tests.test_state_api"
+   ]
+  },
+  {
+   "index": 22,
+   "name": "webclient-22",
+   "workers": 4,
+   "labels": [
     "web.gm.tests.test_world_api",
     "web.gm.tests.test_writer_contract",
     "world.tests.test_prototypes",
@@ -832,8 +874,8 @@
    ]
   },
   {
-   "index": 17,
-   "name": "webclient-evidence-17",
+   "index": 23,
+   "name": "webclient-23",
    "workers": 1,
    "labels": [
     "web.webclient.tests.test_ansi_palette",
@@ -842,16 +884,16 @@
    ]
   },
   {
-   "index": 18,
-   "name": "webclient-evidence-18",
+   "index": 24,
+   "name": "webclient-24",
    "workers": 1,
    "labels": [
     "web.webclient.tests.test_node_suite_evidence"
    ]
   },
   {
-   "index": 19,
-   "name": "webclient-evidence-19",
+   "index": 25,
+   "name": "webclient-25",
    "workers": 1,
    "labels": [
     "web.webclient.tests.test_panel_push_factory",
@@ -865,8 +907,8 @@
    ]
   },
   {
-   "index": 20,
-   "name": "webclient-evidence-20",
+   "index": 26,
+   "name": "webclient-26",
    "workers": 1,
    "labels": [
     "web.webclient.tests.test_vue_showcase_evidence",
@@ -874,8 +916,8 @@
    ]
   },
   {
-   "index": 21,
-   "name": "webclient-evidence-21",
+   "index": 27,
+   "name": "webclient-27",
    "workers": 1,
    "labels": [
     "web.webclient.tests.test_vue_showcase_world_evidence",
@@ -885,8 +927,8 @@
    ]
   },
   {
-   "index": 22,
-   "name": "maps-imports-prompts-observability-22",
+   "index": 28,
+   "name": "maps-28",
    "workers": 4,
    "labels": [
     "world.maps.tests.test_altoria_capital",
@@ -901,15 +943,22 @@
     "world.maps.tests.test_instance_reclamation",
     "world.maps.tests.test_instance_spawn",
     "world.maps.tests.test_instance_stage_wiring",
-    "world.maps.tests.test_interior_sources",
+    "world.maps.tests.test_interior_sources"
+   ]
+  },
+  {
+   "index": 29,
+   "name": "maps-29",
+   "workers": 4,
+   "labels": [
     "world.maps.tests.test_limbo_room",
     "world.maps.tests.test_map_district_partition",
     "world.maps.tests.test_map_elevation"
    ]
   },
   {
-   "index": 23,
-   "name": "maps-imports-prompts-observability-23",
+   "index": 30,
+   "name": "maps-30",
    "workers": 4,
    "labels": [
     "world.maps.tests.test_monster_provisioning",
@@ -921,8 +970,8 @@
    ]
   },
   {
-   "index": 24,
-   "name": "maps-imports-prompts-observability-24",
+   "index": 31,
+   "name": "maps-31",
    "workers": 4,
    "labels": [
     "world.maps.tests.test_service_interiors",
@@ -938,11 +987,18 @@
    ]
   },
   {
-   "index": 25,
-   "name": "maps-imports-prompts-observability-25",
+   "index": 32,
+   "name": "maps-32",
    "workers": 4,
    "labels": [
-    "world.maps.tests.test_wilderness_population_species",
+    "world.maps.tests.test_wilderness_population_species"
+   ]
+  },
+  {
+   "index": 33,
+   "name": "maps-33",
+   "workers": 4,
+   "labels": [
     "world.maps.tests.test_wilderness_provider",
     "world.imports.tests.test_age_bounds",
     "world.imports.tests.test_batch_all_or_nothing",
@@ -970,8 +1026,8 @@
    ]
   },
   {
-   "index": 26,
-   "name": "webclient-presentation-a-26",
+   "index": 34,
+   "name": "webclient-34",
    "workers": 4,
    "labels": [
     "web.webclient.presentation.tests.test_affordances.test_contract",
@@ -1011,8 +1067,8 @@
    ]
   },
   {
-   "index": 27,
-   "name": "webclient-presentation-a-27",
+   "index": 35,
+   "name": "webclient-35",
    "workers": 4,
    "labels": [
     "web.webclient.presentation.tests.test_area_map",
@@ -1034,8 +1090,8 @@
    ]
   },
   {
-   "index": 28,
-   "name": "webclient-presentation-b-28",
+   "index": 36,
+   "name": "webclient-36",
    "workers": 4,
    "labels": [
     "web.webclient.presentation.tests.test_art_panel",

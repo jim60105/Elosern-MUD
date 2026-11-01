@@ -270,24 +270,36 @@ fixture 跑在 suite 中而不在其中（`unittest/case.py` 的 `run()` 在
 `server` 保持套件標籤完整。這保留了原本已綠的相鄰關係與 import 順序，並直接
 對應「不要把會互相衝突的測試混在一起」的要求。
 
+**成本模型改用「跨兩輪的最差實測」**：run 41303367823 的 runner 對 CPU 密集的
+遊戲模擬測試比前一輪慢約 2 倍（同一組 `EncounterCalibrationTests` 的兩個測試
+在快池是 132.9 秒 + 64.0 秒，在慢池是 235.4 秒 + 139.4 秒），因此每個測試的權重
+取兩輪的較大值，分片上限也以該慢池的單位表示：瀏覽器清單 160 秒、evennia
+makespan 200 秒、top-level 分片 170 秒。這讓兩種池都能落在 6 分鐘內（快池約
+一半時間，慢池約 230-280 秒的 job）。
+
 **結果（本日最終版）：**
 
-- 瀏覽器：20 → **72 個分片**（144 個行程清單），最重清單 153 秒、預測最重
-  job 233 秒（3.9 分鐘），乘上實測最差的 1.67 倍清單變異為 335 秒；標籤維持
-  方法層級（590 個方法各屬恰好一個清單），且每個清單都是舊清單的連續子序列。
-  清單之間改成全域依負載配對（最重配最輕），配對只決定哪兩個清單共用 runner，
-  不影響任何清單的內容。
+- 瀏覽器：20 → **78 個分片**（156 個行程清單），最重清單 192 秒（上限 160 秒
+  加上合併相鄰片段所致）、預測最重 job 272 秒（4.5 分鐘）；標籤維持方法層級
+  （590 個方法各屬恰好一個清單），每個清單都是目前清單的連續子序列。含
+  `test_repaint_budget` 這類效能預算測試的清單優先配到最輕的夥伴，其餘清單
+  才依負載「最重配最輕」；配對只決定哪兩個清單共用 runner，不影響內容。
 - **每個行程清單都必須含有至少一個 `covers_requirement` 標註的測試**：沒有標註
   的清單不會產生 evidence 檔，而 workflow 會在該分片「成功卻沒有 evidence」時
   直接讓步驟失敗——這正是 run 41300923484 裡 10 個瀏覽器分片紅燈的原因。切點
   因此只落在標註測試之後；若某片段仍無標註，就從鄰近片段移入一個最輕的標註
   測試（僅搬一個測試，其餘順序不動）。
-- Evennia：10 → **29 個分片**，其中前端 evidence 套件（`web.webclient.tests`）
-  拆為 5 個 `workers: 1` 的分片，其餘 24 個為 `workers: 4`；標籤維持**逐模組**
+- Evennia：10 → **37 個分片**，其中前端 evidence 套件（`web.webclient.tests`）
+  為 `workers: 1` 的分片，其餘為 `workers: 4`；標籤維持**逐模組**
   （900 個已探索模組各屬恰好一個分片），每個分片都是舊分片標籤順序的連續子序列。
+- **單一 class 是排程下限，過重就拆**：`--parallel 4` 不能把一個 class 拆給兩個
+  worker，慢池下 `test_human_combat_calibration.EncounterCalibrationTests` 的兩個
+  測試合計 375 秒（一個 worker 序列執行），整批分片無法壓到 6 分鐘內。該 class
+  因此在同一個模組內拆成「共用的 fixture mixin ＋ 兩個測試類別」，讓兩個 pass
+  落到不同 worker；測試、斷言與標註完全未變，模組的所有權也沒有變動。
 - **Top-level 也分片**：原本單一 `top-level` 工作近兩輪為 1,371 秒與 820 秒
   （使用者另觀察到一輪超過 20 分鐘仍在跑）。新增 `.github/top-level-shards.json`
-  （7 個分片，80 個 `tests/` 模組各屬恰好一個），workflow 以 matrix 執行
+  （**11 個分片**，80 個 `tests/` 模組各屬恰好一個），workflow 以 matrix 執行
   `coverage run -m unittest --durations 0 <labels>`，每個分片有自己的
   `coverage-top-level-shard-N*` 與 `evidence.top-level-shard-N.jsonl`；gate 的
   完整性迴圈、證據串接與 coverage combine 同步改為逐分片。初步切法把會自己啟動
@@ -302,8 +314,8 @@ fixture 跑在 suite 中而不在其中（`unittest/case.py` 的 `run()` 在
   切得越細，runner 總分鐘數越高（144 個瀏覽器清單的冷啟動約 7,500 秒，舊版
   40 個清單約 2,500 秒）。換得的是每個分片負載低、對 1.67 倍慢 runner 仍有
   餘裕，且在慢 runner 上不易觸發超時類的 flake。
-- 工作數：1 preflight + 29 evennia + 72 browser + 7 top-level + 1 frontend +
-  1 gate = 111。若後續要把工作數壓回來，可考慮先在 job 前置階段預先啟動共享
+- 工作數：1 preflight + 37 evennia + 78 browser + 11 top-level + 1 frontend +
+  1 gate = 129。若後續要把工作數壓回來，可考慮先在 job 前置階段預先啟動共享
   執行環境（harness 的 `_boot_until_ready` 會沿用既有 runtime）或只建置該分片
   需要的前端 bundle，兩者都能讓清單上限放寬而不犧牲 6 分鐘預算。
 

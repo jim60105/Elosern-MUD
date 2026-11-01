@@ -205,7 +205,8 @@ Backend: Evennia test runner on SQLite (`server/db/evennia-test.sqlite3`); Pytho
 `4bc68a1e`; deterministic per trial (each trial seeds `random` with its cell's seed,
 one trial per cell/seed pair). Focused label:
 `uv run --locked --env-file=<file> evennia test --settings test_settings.py --keepdb
-world.rules.tests.test_human_combat_calibration.EncounterCalibrationTests`.
+world.rules.tests.test_human_combat_calibration.EncounterCalibrationTests
+world.rules.tests.test_human_combat_calibration.EncounterSelectedValueTests`.
 
 ### How one trial is driven
 
@@ -356,14 +357,19 @@ The three discoverable tests that substantively establish this change's added
 `human-combat-calibration` requirement ("Real party encounter evidence records selected
 values and bounded outcomes") are
 `EncounterCalibrationTests.test_eight_encounter_cells_run_explicit_draft_commands_over_four_seeds`,
-`EncounterCalibrationTests.test_selected_values_reproduce_the_measured_encounter_outcomes`
+`EncounterSelectedValueTests.test_selected_values_reproduce_the_measured_encounter_outcomes`
 and
-`EncounterCalibrationTests.test_an_ally_without_a_submitted_command_never_auto_attacks`.
+`EncounterSelectedValueTests.test_an_ally_without_a_submitted_command_never_auto_attacks`.
 They carry the change's own canonical annotation once the delta spec is synced into
 `openspec/specs/`, which is the first gate that can resolve that identifier; until then
 they carry the existing `human-combat-calibration` requirement IDs they also establish.
 Shard ownership is unchanged: the module keeps its single existing entry in
-`.github/evennia-shards.json`, and no test module was added, moved or renamed.
+`.github/evennia-shards.json`, and no test module was added, moved or renamed. The
+shared encounter fixture is a module-level mixin and the selected-value pass is a
+second test class beside the eight-cell pass, so Django's `--parallel` worker pool
+can schedule the two passes on different processes: together they exceeded one
+worker's share of the shard budget, and a single class is an indivisible dispatch
+unit. The tests themselves are unchanged.
 
 ## Assembled party-combat runtime acceptance
 
