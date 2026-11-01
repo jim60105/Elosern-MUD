@@ -535,11 +535,21 @@ class MapProviderTests(EvenniaTest):
         # recomputes every self-loop exit's lock from validity and the hook adds
         # nothing there -- the hook-opened north lock cannot survive the
         # coordinate change.
-        wall_y = 1200
-        room_a.set_active_coordinates(
-            (ridge_center_x(wilderness_provider.terrain_definition(), wall_y), wall_y),
-            self.char1,
-        )
+        # Pick a walkable cell whose north neighbour is a closed ridge wall.
+        target = None
+        for wall_y in range(1000, 1400):
+            for wall_x in range(1390, 1450):
+                if (
+                    not wilderness_provider.is_closed_ridge_cell((wall_x, wall_y))
+                    and wilderness_provider.is_closed_ridge_cell((wall_x, wall_y + 1))
+                    and self.provider.is_valid_coordinates(None, (wall_x, wall_y))
+                ):
+                    target = (wall_x, wall_y)
+                    break
+            if target is not None:
+                break
+        self.assertIsNotNone(target, "no walkable cell with a wall to its north")
+        room_a.set_active_coordinates(target, self.char1)
         self.assertFalse(self._locks_allow(north, "traverse"))
         self.assertFalse(self._locks_allow(north, "view"))
 

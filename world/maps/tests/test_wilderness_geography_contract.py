@@ -326,9 +326,9 @@ class BorderRiverContractTests(unittest.TestCase):
     def test_river_course_stays_in_the_authored_band_from_corridor_to_coast(self):
         route = terrain().waterway_routes["border_river"]
         source, mouth = route[0], route[-1]
-        # Source in the central range's western foothills, west of the summit
-        # ridge centre; the course runs west to the coast.
-        self.assertEqual(region_for_coordinates(*source), "central_mountains")
+        # Source in the western hills, west of the authored stem centre; the
+        # course runs west to the coast.
+        self.assertEqual(region_for_coordinates(*source), "western_hills_valleys")
         self.assertLess(source[0], ridge_center_x(terrain(), source[1]))
         self.assertLess(mouth[0], source[0])
         # The mouth is the last land cell of its row; its western neighbour is
