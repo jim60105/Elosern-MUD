@@ -67,10 +67,11 @@ SKILL_REGISTRY_CLASS_MODULES = {
     "SkillCategoryClassificationTests": "test_skill_registry.py",
     "FleeCategoryDeclarationTests": "test_skill_registry.py",
     "ElementalSpellsBuilderTests": "test_spell_catalogs.py",
-    "WindLineageTreeCatalogTests": "test_spell_catalogs.py",
-    "LightningLineageTreeCatalogTests": "test_spell_catalogs.py",
-    "FireLineageTreeCatalogTests": "test_spell_catalogs.py",
-    "IceLineageTreeCatalogTests": "test_spell_catalogs.py",
+    # The four per-element topology rosters retired with
+    # complete-elemental-mastery, replaced inside the same themed module by the
+    # generic graph contract and the masteries' coverage contract.
+    "LineageGraphContractTests": "test_spell_catalogs.py",
+    "ElementalMasteryCoverageContractTests": "test_spell_catalogs.py",
     # The shipped-content cast classes retired when the cast suite migrated (light/water synthetic behavior precedent)
     # onto the synthetic kit (skills-migration DC2): the cast-resolution
     # behaviour they pinned now lives in these synthetic-scope classes.
