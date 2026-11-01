@@ -197,6 +197,11 @@ def _stale_result() -> dict[str, Any]:
     return {"outcome": "stale", "code": _STALE_CODE, "message": _STALE_MESSAGE}
 
 
+#: Actions whose adapter derives a durable operation identity from the
+#: admitted transport request (wilderness-camping: owner/epoch/request).
+_REQUEST_IDENTITY_ACTIONS = frozenset({"explore.camp"})
+
+
 def handle_ui_action(
     session: Any,
     actor: Any,
@@ -263,6 +268,14 @@ def handle_ui_action(
             session, coordinator.epoch, request_id, _safe_busy_result(), coordinator.revision
         )
         return
+
+    if spec.action_id in _REQUEST_IDENTITY_ACTIONS:
+        # The transport identity reaches the adapter internally, after exact
+        # payload validation: it is never a wire key and never echoed.
+        normalized = {
+            **normalized,
+            "request_identity": {"epoch": coordinator.epoch, "request_id": request_id},
+        }
 
     # Capture the epoch at admission; completion publication requires it to
     # still match so a puppet change cannot publish A-derived state to B.

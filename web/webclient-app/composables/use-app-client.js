@@ -18,6 +18,7 @@ import { useExitCompass } from "./use-exit-compass.js";
 import { usePersonFocus } from "./use-person-focus.js";
 import { useRoomActions } from "./use-room-actions.js";
 import { useSleepHandoff } from "./use-sleep-handoff.js";
+import { useCamp } from "./use-camp.js";
 import { useModeChange } from "./use-mode-change.js";
 import { useNpcPersonaEditor } from "./use-npc-persona-editor.js";
 import { useSkillUse } from "./use-skill-use.js";
@@ -87,5 +88,7 @@ export function useAppClient(store, shellRef, sceneBackdropRef) {
       skipDisabled: restWait.skipDisabled,
       compassRef,
     }),
+    // The camp card and its campfire beat (wilderness-camping).
+    ...useCamp(store, { compassRef }),
   };
 }

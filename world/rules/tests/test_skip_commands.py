@@ -481,3 +481,145 @@ class WaitUntilRoutingTests(unittest.TestCase):
             command.func()
         op.assert_called_once_with(caller, 60)
         caller.msg.assert_called_once_with("時間經過了 60 秒。")
+
+
+from evennia.utils.create import create_object as _create_object
+from evennia.utils.test_resources import EvenniaTest as _EvenniaTest
+
+
+class CampingCommandTests(_EvenniaTest):
+    """Dawn tokens, the dream suffix and the camp alias share the rules seams."""
+
+    def setUp(self):
+        super().setUp()
+        from typeclasses.npcs import NPC
+        from world.rules.clock import _EVENT_SOURCES
+        from world.rules.fatigue import SleepPosture, write_fatigue_state
+        from world.rules.party import join_party
+
+        sources = dict(_EVENT_SOURCES)
+        _EVENT_SOURCES.clear()
+        self.addCleanup(_EVENT_SOURCES.update, sources)
+        self.addCleanup(_EVENT_SOURCES.clear)
+        self.player = self.char1
+        self.companion = _create_object(NPC, key="同伴", location=self.room1)
+        for body in (self.player, self.companion):
+            body.race = "human"
+            body.apply_race_baseline()
+            for key in ("hp", "mp", "sp"):
+                gauge = getattr(body.traits, key)
+                gauge.current = gauge.max
+                gauge.rate = 0.0
+        self.player.location = self.room1
+        self.player.save()
+        join_party(self.companion, self.player)
+        self.player.msg = Mock()
+        for body in (self.player, self.companion):
+            write_fatigue_state(body, 180000, SleepPosture.AWAKE)
+
+    def _at(self, hour):
+        from world.rules.clock import get_world_clock
+
+        clock = get_world_clock()
+        clock._script.db.tick = 3 * 86400 + hour * 3600
+        return int(get_world_clock().tick)
+
+    def _reset(self):
+        from world.rules.fatigue import SleepPosture, write_fatigue_state
+        from world.rules.sleep_receipt import SLEEP_RECEIPT_SURFACES
+
+        for body in (self.player, self.companion):
+            write_fatigue_state(body, 180000, SleepPosture.AWAKE)
+            for key, category in SLEEP_RECEIPT_SURFACES:
+                body.attributes.remove(key, category=category)
+
+    def _run(self, args, cmdstring="sleep"):
+        command = CmdSleep()
+        command.caller = self.player
+        command.args = args
+        command.cmdstring = cmdstring
+        command.session = None
+        command.func()
+
+    def _targets(self):
+        from world.rules.sleep_receipt import read_sleep_receipt
+
+        return tuple(
+            None if read_sleep_receipt(body) is None else read_sleep_receipt(body).target_tick
+            for body in (self.player, self.companion)
+        )
+
+    def test_dawn_alias_camp_and_dream_parity(self):
+        from web.webclient.actions.exploration_actions import _camp_adapter, _wait_adapter
+        from world.rules.clock import get_world_clock
+        from world.rules.sleep_receipt import read_camp_operation, read_sleep_view_decision
+        from world.rules.time_skip import owner_sleep_view_state
+
+        tick = self._at(23)
+        # Text dawn forms and the browser party dawn request are identical.
+        results = []
+        for args in ("all until-dawn", "all 睡到天亮", "all 天亮"):
+            self._run(args)
+            results.append(self._targets())
+            self.assertEqual(int(get_world_clock().tick), tick)
+            self._reset()
+        _wait_adapter(self.player, {"sleep": True, "sleep_scope": "party", "sleep_mode": "until-dawn"})
+        results.append(self._targets())
+        self.assertEqual(set(results), {(tick + 7 * 3600, tick + 7 * 3600)})
+        self.assertTrue(owner_sleep_view_state(self.player)["pending"])
+        self._reset()
+
+        # Malformed, conflicting or repeated tokens write nothing.
+        for args, cmdstring in (
+            ("dream", "sleep"),
+            ("all dream", "sleep"),
+            ("1h dream dream", "sleep"),
+            ("1h until-dawn", "sleep"),
+            ("dream 1h", "sleep"),
+            ("until-dawn 2h", "camp"),
+            ("dream dream", "camp"),
+            ("all", "camp"),
+            ("soon", "camp"),
+        ):
+            self._run(args, cmdstring)
+            self.assertEqual(self._targets(), (None, None), args)
+            self.assertIsNone(read_camp_operation(self.player), args)
+            self.assertEqual(int(get_world_clock().tick), tick, args)
+
+        # The explicit-mode dream suffix opts in at entry: no question.
+        self._run("2h dream")
+        self.assertEqual(self._targets(), (tick + 7200, None))
+        self.assertEqual(read_sleep_view_decision(self.player)["decision"], "entered")
+        self._reset()
+
+        # `camp` at night defaults to dawn and settles the whole camp once;
+        # the browser camp in the equivalent state commits the same result.
+        self._run("", "camp")
+        text = read_camp_operation(self.player)["result"]
+        self.assertEqual(text["phase"], "complete")
+        self.assertEqual(int(get_world_clock().tick), tick + 7 * 3600)
+        self._reset()
+        tick = self._at(23)
+        browser = _camp_adapter(
+            self.player,
+            {"mode": "until-dawn", "dream": False, "request_identity": {"epoch": "e", "request_id": "r"}},
+        )["data"]
+        for key in ("phase", "interrupted"):
+            self.assertEqual(text[key], browser[key])
+        self.assertEqual(text["timing"]["elapsed_seconds"], browser["timing"]["elapsed_seconds"])
+        self.assertEqual(
+            [(row["reserve_before"], row["reserve_after"]) for row in text["members"]],
+            [(row["reserve_before"], row["reserve_after"]) for row in browser["members"]],
+        )
+        self._reset()
+
+        # By day the default is recovery; an explicit duration keeps its mode.
+        tick = self._at(10)
+        self._run("", "camp")
+        self.assertEqual(read_camp_operation(self.player)["mode"], "recovery")
+        self.assertEqual(int(get_world_clock().tick), tick + 15000)
+        self._reset()
+        tick = self._at(10)
+        self._run("1h", "camp")
+        self.assertEqual(read_camp_operation(self.player)["mode"], "duration")
+        self.assertEqual(int(get_world_clock().tick), tick + 3600)

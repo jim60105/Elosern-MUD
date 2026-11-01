@@ -7,6 +7,8 @@ import TravelMap from "../../components/travel/TravelMap.vue";
 import PartyMedallions from "../../components/travel/PartyMedallions.vue";
 import LegPanel from "../../components/travel/LegPanel.vue";
 import LandmarkCard from "../../components/travel/LandmarkCard.vue";
+import CampCard from "../../components/travel/CampCard.vue";
+import CampfireCard from "../../components/travel/CampfireCard.vue";
 import { legView } from "../../components/travel/leg-model.js";
 import TravelLog from "../../components/travel/TravelLog.vue";
 import { travelEntry, travelJourney, travelLogPanel } from "../fixtures/travel_log.js";
@@ -673,4 +675,155 @@ export const LandmarkArrivalPlain = {
   name: "Landmark Arrival Plain",
   args: { ...MORNING, aim: null, art: false, lit: false, time: "春 3 日 ‧ 09:40・白晝" },
   render: landmarkStage,
+};
+
+// ── The camp card and the campfire beat (wilderness-camping) ─────────────
+// The real CampCard renders the store's `view.camp` projection of a synthetic
+// `explore.camp_preview` answer; the real CampfireCard renders a synthetic
+// `explore.camp` result with the party medallions and the night-graded
+// wilderness scene (the bundled forest_path painting through the shared
+// artwork lifecycle). Every wake time, reserve and refusal is server data.
+
+const CAMP_SCENE = sceneDescriptor({
+  subject_id: "wilderness:合成荒原:100,200",
+  attempts: [
+    {
+      type: "image",
+      source_id: "scene.bundled:forest_path",
+      rank: 40,
+      resource: sceneBundledResource("forest_path", { url: "/art/scenes/forest_path.webp" }),
+    },
+  ],
+  retention_sources: [],
+});
+
+const campMember = (id, name, current, predicted, wake) => ({
+  member_id: id, name, current_reserve: current * 3600, predicted_reserve: predicted * 3600, reserve_max: 360000,
+  current_percent: current, predicted_percent: predicted, wake_tick: wake, wake_time: wake === 1000 ? "春 4 日 06:00" : "春 4 日 01:40",
+});
+const CAMP_REFUSAL = { code: "party_unavailable", message: "在場成員都已入睡或已完全恢復" };
+const campModes = ({ recovered = true, dream = true } = {}) => [
+  {
+    mode: "until-dawn", available: true, refusal: null, dream_offerable: dream, wake_tick: 1000, wake_time: "春 4 日 06:00",
+    members: [campMember("42", "艾倫", 61, 100, 1000), campMember("7", "伊蓮", 37, 100, 1000), campMember("8", "莉亞", 54, 100, 1000), campMember("9", "布蘭", 14, 100, 1000)],
+  },
+  recovered
+    ? {
+        mode: "until-recovered", available: true, refusal: null, dream_offerable: false, wake_tick: 700, wake_time: "春 4 日 01:40",
+        members: [campMember("42", "艾倫", 61, 94, 600), campMember("7", "伊蓮", 37, 97, 650), campMember("8", "莉亞", 54, 96, 620), campMember("9", "布蘭", 14, 100, 700)],
+      }
+    : { mode: "until-recovered", available: false, refusal: CAMP_REFUSAL, dream_offerable: false, wake_tick: null, wake_time: null, members: [] },
+];
+function campView({ phase = "choosing", selected = "until-dawn", dream = false, recovered = true, refusal = null } = {}) {
+  const modes = campModes({ recovered });
+  const preview = phase === "previewPending" ? null : { available: phase !== "refused", refusal, dream_offerable: true, default_mode: "until-dawn", current_tick: 600, current_time: "春 3 日 22:10", modes };
+  const entry = preview ? modes.find((m) => m.mode === selected) : null;
+  return {
+    phase, open: true, opener: "leg", openCount: 1, preview, selected, selectedMode: entry,
+    dream, dreamOffered: !!entry && entry.dream_offerable, canConfirm: phase === "choosing" && !!entry && entry.available,
+    refusal, result: null, message: null, handoffShortcut: false,
+  };
+}
+
+const campResult = (overrides = {}) => ({
+  camp_id: "a".repeat(64), phase: "complete",
+  timing: { elapsed_seconds: 28200, result_tick: 1000, result_time: "春 4 日 06:00", wake_tick: 1000, wake_time: "春 4 日 06:00" },
+  members: [
+    { member_id: "42", name: "艾倫", reserve_before: 219600, reserve_after: 360000, reserve_max: 360000, before_percent: 61, after_percent: 100, sleeping: false, wake_tick: 1000 },
+    { member_id: "7", name: "伊蓮", reserve_before: 133200, reserve_after: 360000, reserve_max: 360000, before_percent: 37, after_percent: 100, sleeping: false, wake_tick: 1000 },
+    { member_id: "8", name: "莉亞", reserve_before: 194400, reserve_after: 360000, reserve_max: 360000, before_percent: 54, after_percent: 100, sleeping: false, wake_tick: 1000 },
+    { member_id: "9", name: "布蘭", reserve_before: 50400, reserve_after: 360000, reserve_max: 360000, before_percent: 14, after_percent: 100, sleeping: false, wake_tick: 1000 },
+  ],
+  events: [{ kind: "daily_reset", due_tick: 900, interactive: false, text: "新的一天開始了。" }],
+  interrupted: false, interruption_reason: null,
+  ...overrides,
+});
+
+const NIGHT_ARGS = {
+  ...MORNING, grid: NIGHT_GRID, aim: null, fatigue: FATIGUE.weary, vitalsVisible: true,
+  ...placeOf(NIGHT_GRID, "春 3 日 ‧ 22:10"),
+};
+
+const campStage = (args) =>
+  withMotion(args.motionLevel, () =>
+    h(
+      "div",
+      { style: "position:relative;height:calc(100vh - var(--header-h));" },
+      h(HudFrame, { mode: "exploration", travel: true, cardOpen: true }, {
+        backdrop: () => h(TravelMap, { grid: args.grid, status: args.status, motionLevel: args.motionLevel }),
+        vitals: () => [
+          h(StatusPanel, { status: { ...STATUS_PANEL_SAMPLE, fatigue: args.fatigue }, visible: args.vitalsVisible, motionLevel: args.motionLevel, showFatigue: false }),
+          h(PartyMedallions, { members: members(args.fatigue) }),
+        ],
+        map: () => h(PlaceCard, { locationLabel: args.place, timeLabel: args.time, motionLevel: args.motionLevel }),
+        "band-message": () => h(TravelLog, { entries: [] }),
+        "band-command": () => commandPane(h(LegPanel, { view: staticLeg(args), motionLevel: args.motionLevel })),
+        choices: () =>
+          args.result
+            ? h(CampfireCard, {
+                key: `${args.result.phase}:${args.motionLevel}`,
+                result: args.result,
+                message: args.message,
+                medallions: members(args.fatigue),
+                sceneArtwork: CAMP_SCENE,
+                artPanel: ART,
+                motionLevel: args.motionLevel,
+              })
+            : h(CampCard, { camp: args.camp, place: args.place, entrance: args.motionLevel !== "off" }),
+      }),
+    ),
+  );
+
+// Camp: night on the open steppe; the server's default 睡到天亮 is selected,
+// each member's current-to-predicted 精力 shows, and the dream opt-in is
+// offered unchecked.
+export const Camp = { args: { ...NIGHT_ARGS, camp: campView() }, render: campStage };
+
+// Camp Dream: the player ticked 進入夢境協作 on the dawn tile.
+export const CampDream = { name: "Camp Dream", args: { ...NIGHT_ARGS, camp: campView({ dream: true }) }, render: campStage };
+
+// Camp Mode Refused: 睡到精力全滿 refuses while 睡到天亮 stays reachable; the
+// selected refused tile names the server reason and disables confirmation.
+export const CampModeRefused = {
+  name: "Camp Mode Refused",
+  args: { ...NIGHT_ARGS, camp: campView({ selected: "until-recovered", recovered: false }) },
+  render: campStage,
+};
+
+// Camp Refused: the whole camp is refused (a hostile nearby); only the
+// server reason and 取消 remain.
+export const CampRefused = {
+  name: "Camp Refused",
+  args: { ...NIGHT_ARGS, camp: campView({ phase: "refused", refusal: { code: "hostile_present", message: "附近有活著的怪物，這裡不安全。" } }) },
+  render: campStage,
+};
+
+// Campfire: the beat after a quiet night, bars filling over 1.6 s.
+export const Campfire = {
+  args: { ...NIGHT_ARGS, result: campResult(), message: "夜裡無事。全隊精力恢復至 100%，春 4 日 06:00 醒來。" },
+  render: campStage,
+};
+
+// Campfire Interrupted: a real event cut the night short; the line names why
+// and no full-recovery claim is made.
+export const CampfireInterrupted = {
+  name: "Campfire Interrupted",
+  args: {
+    ...NIGHT_ARGS,
+    result: campResult({
+      phase: "interrupted", interrupted: true, interruption_reason: "interactive_event",
+      timing: { elapsed_seconds: 9000, result_tick: 850, result_time: "春 4 日 00:40", wake_tick: null, wake_time: null },
+      members: campResult().members.map((m) => ({ ...m, reserve_after: m.reserve_before + 108000, after_percent: m.before_percent + 30, sleeping: true, wake_tick: null })),
+      events: [{ kind: "synthetic_interactive", due_tick: 850, interactive: true, text: null }],
+    }),
+    message: "紮營在春 4 日 00:40中斷：途中發生了需要留意的事。",
+  },
+  render: campStage,
+};
+
+// Campfire Motion Off: the final bars and lines on the first frame.
+export const CampfireMotionOff = {
+  name: "Campfire Motion Off",
+  args: { ...NIGHT_ARGS, motionLevel: "off", result: campResult(), message: "夜裡無事。全隊精力恢復至 100%，春 4 日 06:00 醒來。" },
+  render: campStage,
 };

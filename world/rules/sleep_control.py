@@ -235,6 +235,9 @@ def _party_status(
         return False, REASON_NOT_CONTROLLING
     has_awake = False
     has_unmet = False
+    from world.rules.time_skip import _current_tick
+
+    tick = _current_tick()
     for member in members:
         if getattr(member, "_is_deleted", False):
             continue
@@ -250,7 +253,9 @@ def _party_status(
                 _party_member_eligible(member)
             except SleepRefused as error:  # observability: ignore R2: the stable refusal IS the party availability reason
                 return False, error.message
-            accepted, _partial = _accepted_sleep_seconds(member, mode, seconds)
+            accepted, _partial = _accepted_sleep_seconds(
+                member, mode, seconds, tick=tick
+            )
             if accepted > 0:
                 has_unmet = True
     if not has_awake:
@@ -446,8 +451,13 @@ def begin_all_party_sleep(
     mode: str = MODE_RECOVERY,
     seconds: int | None = None,
     session: Any = None,
+    operation_id: str | None = None,
 ) -> Any:
     """Enter every present effective member's sleep and release control.
+
+    ``operation_id`` (optional) names the accepted entry: each new receipt
+    and the party-entry identity carry it, so a caller that owns a larger
+    operation (the camp) can recognize its own receipts.
 
     The controlled companion case releases through the verified possession
     writer inside one outer compensated transaction: any failure after the
@@ -498,7 +508,9 @@ def begin_all_party_sleep(
                 key: (member, _sleep_surface_snapshot(member))
                 for key, member in touched.items()
             }
-            outcome = enter_party_sleep(commander, mode=mode, seconds=seconds)
+            outcome = enter_party_sleep(
+                commander, mode=mode, seconds=seconds, operation_id=operation_id
+            )
             if possessed:
                 release_possession(commander, npc=actor, reason="sleep_handoff")
     except Exception as error:

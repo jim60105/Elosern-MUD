@@ -303,6 +303,18 @@ dream or creation surface owns the stage. There is no server travel mode.
   travel returns it to the shell's focus home. One mounted `role="status"`
   line speaks the map state.
 
+- Camping (wilderness-camping): the leg's 紮營 and the forced-walking-sleep
+  handoff's prepended 全員紮營 open `components/travel/CampCard.vue` over the
+  store's `view.camp` (`stores/elosern/camp.js`, wired by
+  `composables/use-camp.js`). The card shows only the server's
+  `explore.camp_preview` (modes, wake times, reserves, refusals, dream
+  eligibility), traps focus, takes 1/2/D/Enter/Esc and sends one
+  `explore.camp`. A settled camp becomes `CampfireCard.vue`, a
+  presentation-only beat over the committed scene graded to night with a CSS
+  fire; its bars fill over `--motion-camp-fill` and the fire loops on
+  `--motion-campfire` (both still at reduced and off). Any early key or click
+  only finishes the beat.
+
 ## Styling pitfall
 
 `styles/app-shell.css` contains `.elosern-root …` rules that duplicate or override

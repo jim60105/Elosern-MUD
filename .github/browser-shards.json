@@ -344,7 +344,9 @@
         "web.tests.browser.test_wilderness_travel.TravelRouteTests.test_hostile_interrupt",
         "web.tests.browser.test_wilderness_travel.TravelRouteTests.test_all_interrupt_flags",
         "web.tests.browser.test_wilderness_travel.TravelRouteTests.test_landmark_focus",
-        "web.tests.browser.test_wilderness_travel.TravelLogTests.test_committed_log_and_full_prose"
+        "web.tests.browser.test_wilderness_travel.TravelLogTests.test_committed_log_and_full_prose",
+        "web.tests.browser.test_wilderness_camping.CampingTests.test_card_inputs_refusal_and_handoff",
+        "web.tests.browser.test_wilderness_camping.CampingTests.test_dusk_camp_to_dawn_and_beat_controls"
       ],
       "files_b": [
         "web.tests.browser.test_browser_combat_rejection.CombatReconnectBrowserTest.test_confirmed_action_disconnect_shows_no_uncertain_notice",

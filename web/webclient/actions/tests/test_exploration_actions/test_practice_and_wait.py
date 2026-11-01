@@ -461,5 +461,101 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "skip_failed")
 
+    # ------------------------------------------------------------------
+    # explore.camp_preview / explore.camp and the dawn/dream sleep grammar
+    # ------------------------------------------------------------------
+    def _rest_clock(self, hour):
+        clock = get_world_clock()
+        clock._script.db.tick = 4 * 86400 + hour * 3600
+        return int(get_world_clock().tick)
+
+    def test_camp_preview_and_camp_adapters_correlate_requests(self):
+        from server.camp_service import operation_identity
+        from web.webclient.actions.exploration_actions import (
+            _camp_adapter,
+            _camp_preview_adapter,
+            validate_camp_payload,
+        )
+        from world.rules.fatigue import SleepPosture, read_fatigue_state, write_fatigue_state
+        from world.rules.sleep_receipt import read_camp_operation
+
+        write_fatigue_state(self.player, 180000, SleepPosture.AWAKE)
+        tick = self._rest_clock(20)
+        preview = _camp_preview_adapter(self.player, {})
+        self.assertEqual(preview["outcome"], "success")
+        self.assertTrue(preview["no_presentation"])
+        self.assertEqual(get_world_clock().tick, tick)
+        dawn = preview["data"]["modes"][0]
+
+        payload = validate_camp_payload({"mode": "until-dawn", "dream": False})
+        identity = {"epoch": "e" * 22, "request_id": "req-1"}
+        with self.captureOnCommitCallbacks(execute=True):
+            result = _camp_adapter(self.player, {**payload, "request_identity": identity})
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(result["data"]["phase"], "complete")
+        self.assertEqual(result["data"]["timing"]["wake_tick"], dawn["wake_tick"])
+        self.assertEqual(get_world_clock().tick, dawn["wake_tick"])
+        self.assertIs(read_fatigue_state(self.player).posture, SleepPosture.AWAKE)
+        # The persisted camp identity is the owner/epoch/request digest.
+        camp_id = operation_identity(self.player.pk, identity["epoch"], identity["request_id"])
+        self.assertEqual(read_camp_operation(self.player)["camp_id"], camp_id)
+        self.assertEqual(result["data"]["camp_id"], camp_id)
+        # The same request replays the stored camp without settling again.
+        after = get_world_clock().tick
+        again = _camp_adapter(self.player, {**payload, "request_identity": identity})
+        self.assertEqual(again["data"], result["data"])
+        self.assertEqual(get_world_clock().tick, after)
+        # Another owner or a reconnected epoch never collides on the id.
+        self.assertNotEqual(camp_id, operation_identity(self.player.pk + 1, identity["epoch"], "req-1"))
+        self.assertNotEqual(camp_id, operation_identity(self.player.pk, "f" * 22, "req-1"))
+
+    def test_camp_refusal_matches_preview_and_writes_nothing(self):
+        from web.webclient.actions.exploration_actions import _camp_adapter, _camp_preview_adapter
+
+        self._rest_clock(10)
+        monster = create_object(Monster, key="哥布林", location=self.room1)
+        monster.threat_tier = "low"
+        monster.apply_monster_tier("floor")
+        before = get_world_clock().tick
+        preview = _camp_preview_adapter(self.player, {})
+        result = _camp_adapter(
+            self.player,
+            {"mode": "until-dawn", "dream": False, "request_identity": {"epoch": "e", "request_id": "r"}},
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertNotIn("data", result)
+        self.assertEqual(result["code"], preview["data"]["refusal"]["code"])
+        self.assertEqual(result["message"], preview["data"]["refusal"]["message"])
+        self.assertEqual(get_world_clock().tick, before)
+
+    def test_dawn_sleep_with_and_without_dream(self):
+        from world.narrative.dream_surface import associated_session
+        from world.rules.fatigue import SleepPosture, write_fatigue_state
+        from world.rules.sleep_receipt import read_sleep_receipt, read_sleep_view_decision
+        from world.rules.time_skip import owner_sleep_view_state
+
+        write_fatigue_state(self.player, 180000, SleepPosture.AWAKE)
+        tick = self._rest_clock(23)
+        result = _wait_adapter(self.player, {"sleep": True, "sleep_mode": "until-dawn"})
+        self.assertEqual(result["outcome"], "success")
+        receipt = read_sleep_receipt(self.player)
+        self.assertEqual(receipt.target_tick, tick + 7 * 3600)
+        self.assertIsNone(read_sleep_view_decision(self.player))
+        self.assertTrue(owner_sleep_view_state(self.player)["pending"])
+
+        other = create_object(PlayerCharacter, key="夢境旅人")
+        other.race = "human"
+        other.apply_race_baseline()
+        other.location = self.room1
+        write_fatigue_state(other, 180000, SleepPosture.AWAKE)
+        result = _wait_adapter(
+            other, {"sleep": True, "sleep_mode": "until-dawn", "dream": True}
+        )
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(read_sleep_receipt(other).target_tick, tick + 7 * 3600)
+        self.assertFalse(owner_sleep_view_state(other)["pending"])
+        self.assertIsNotNone(associated_session(other))
+        self.assertEqual(get_world_clock().tick, tick)
+
 if __name__ == "__main__":
     unittest.main()

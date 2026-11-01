@@ -163,6 +163,10 @@
     // `travel.plan` is a pure read-only route/preview query answered through
     // the private result slot: no typed command produces or echoes it.
     "travel.plan",
+    // `explore.camp_preview` is the camp card's read-only preview, answered
+    // through the private result slot; only the confirmed `explore.camp`
+    // echoes the typed `camp` line.
+    "explore.camp_preview",
   ];
 
   function isSilentPresentationControl(actionId) {
@@ -272,6 +276,15 @@
     },
     "explore.sleep_continue": function () {
       return "sleep continue";
+    },
+    // The camp card's confirmation echoes the typed alias (commands/skip.py
+    // CmdSleep `camp [<mode>] [dream]`) with its explicit mode and opt-in.
+    "explore.camp": function (payload) {
+      var mode = payload && payload.mode;
+      if (mode !== "until-dawn" && mode !== "until-recovered") {
+        return null;
+      }
+      return join(["camp", mode, payload.dream === true ? "dream" : ""]);
     },
     "explore.sleep_dream": function (payload) {
       return payload && payload.decision === "enter" ? "dream enter" : "dream decline";

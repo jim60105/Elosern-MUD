@@ -490,3 +490,190 @@ def answer_sleep_dream_for(actor, view, decision):
         revision=view["revision"],
         generation=view["generation"],
     )
+
+
+class CampingConsentTests(EvenniaTest):
+    """Entry-time dream consent commits with the entry or not at all."""
+
+    def setUp(self):
+        super().setUp()
+        self.player = self.char1
+        self._body(self.player)
+        self.player.location = self.room1
+        self.player.save()
+        write_fatigue_state(self.player, 180000, SleepPosture.AWAKE)
+        self._sources = dict(_EVENT_SOURCES)
+        _EVENT_SOURCES.clear()
+        self.addCleanup(_EVENT_SOURCES.update, self._sources)
+        self.addCleanup(_EVENT_SOURCES.clear)
+
+    @staticmethod
+    def _body(body):
+        body.race = "human"
+        body.apply_race_baseline()
+        for key in ("hp", "mp", "sp"):
+            gauge = getattr(body.traits, key)
+            gauge.current = gauge.max
+            gauge.rate = 0.0
+
+    def _companion(self, key, reserve=180000):
+        npc = create_object(NPC, key=key, location=self.room1)
+        self._body(npc)
+        join_party(npc, self.player)
+        write_fatigue_state(npc, reserve, SleepPosture.AWAKE)
+        return npc
+
+    @staticmethod
+    def _state(*bodies):
+        return {
+            int(body.pk): sorted(
+                (attr.db_key, attr.db_category or "", repr(attr.value))
+                for attr in body.attributes.all()
+            )
+            for body in bodies
+        }
+
+    def _commit(self, actor, **kwargs):
+        from world.rules.camping import commit_sleep_entry
+
+        values = {"scope": "party", "mode": "duration", "seconds": 3600, "operation_id": "op-consent"}
+        values.update(kwargs)
+        return commit_sleep_entry(actor, **values)
+
+    def test_entry_consent_and_rollback(self):
+        from world.rules.sleep_receipt import (
+            CONTINUATION_NONE,
+            DECISION_DECLINED,
+            DECISION_ENTERED,
+            read_sleep_view_decision,
+        )
+        from world.rules.time_skip import SleepRefused
+
+        companion = self._companion("同伴")
+        tick = int(get_world_clock().tick)
+
+        # Self-only duration opt-in: the owner enters and the dream opens at
+        # zero time without a question; the awake companion is untouched.
+        before_companion = self._state(companion)
+        result = self._commit(self.player, scope="self", answer="enter", operation_id="op-self")
+        self.assertTrue(result["dream_entered"])
+        self.assertEqual(int(get_world_clock().tick), tick)
+        receipt = read_sleep_receipt(self.player)
+        self.assertEqual(receipt.target_tick, tick + 3600)
+        self.assertEqual(read_sleep_view_decision(self.player)["decision"], DECISION_ENTERED)
+        self.assertFalse(owner_sleep_view_state(self.player)["pending"])
+        self.assertIsNotNone(associated_session(self.player))
+        self.assertEqual(self._state(companion), before_companion)
+
+    def test_party_answers_and_question_policy(self):
+        from world.rules.sleep_receipt import (
+            CONTINUATION_NONE,
+            DECISION_DECLINED,
+            read_sleep_view_decision,
+        )
+
+        companion = self._companion("同伴")
+        tick = int(get_world_clock().tick)
+        # Ordinary absent/false: no answer, the question remains.
+        result = self._commit(self.player, answer=None, operation_id="op-plain")
+        self.assertFalse(result["dream_entered"])
+        self.assertIsNone(read_sleep_view_decision(self.player))
+        self.assertTrue(owner_sleep_view_state(self.player)["pending"])
+        # Party/duration parity: both bodies share the explicit deadline.
+        for body in (self.player, companion):
+            self.assertEqual(read_sleep_receipt(body).target_tick, tick + 3600)
+            self.assertEqual(read_sleep_receipt(body).entry_operation_id, "op-plain")
+
+    def test_camp_decline_and_full_owner(self):
+        from world.rules.sleep_receipt import (
+            CONTINUATION_NONE,
+            DECISION_DECLINED,
+            read_sleep_view_decision,
+        )
+
+        companion = self._companion("同伴")
+        # Camp false declines explicitly: no later question, no continuation
+        # authorization is written.
+        self._commit(self.player, answer="decline", operation_id="op-decline")
+        decision = read_sleep_view_decision(self.player)
+        self.assertEqual(decision["decision"], DECISION_DECLINED)
+        self.assertEqual(decision["continuation"], CONTINUATION_NONE)
+        self.assertFalse(owner_sleep_view_state(self.player)["pending"])
+        self.assertIs(read_fatigue_state(companion).posture, SleepPosture.VOLUNTARY)
+
+    def test_full_owner_camp_fabricates_no_answer(self):
+        from world.rules.sleep_receipt import read_sleep_view_decision
+
+        companion = self._companion("同伴")
+        write_fatigue_state(self.player, 360000, SleepPosture.AWAKE)
+        self._commit(self.player, mode="recovery", seconds=None, answer="decline", operation_id="op-full")
+        self.assertIsNone(read_sleep_receipt(self.player))
+        self.assertIsNone(read_sleep_view_decision(self.player))
+        self.assertIsNone(owner_sleep_view_state(self.player))
+        self.assertIs(read_fatigue_state(companion).posture, SleepPosture.VOLUNTARY)
+
+    def test_ineligible_or_failed_consent_writes_nothing(self):
+        from server import dream_service
+        from world.narrative import dream_surface
+        from world.rules.time_skip import SleepRefused
+
+        companion = self._companion("同伴")
+        tick = int(get_world_clock().tick)
+        generation = read_sleep_view_generation(self.player)
+
+        def unchanged(before):
+            self.assertEqual(self._state(self.player, companion), before)
+            self.assertEqual(int(get_world_clock().tick), tick)
+            self.assertIsNone(associated_session(self.player))
+
+        # Forced owner: never enters a dream.
+        write_fatigue_state(self.player, 0, SleepPosture.FORCED)
+        before = self._state(self.player, companion)
+        with self.assertRaises(SleepRefused) as caught:
+            self._commit(self.player, answer="enter")
+        self.assertEqual(caught.exception.code, "dream_not_offerable")
+        unchanged(before)
+        write_fatigue_state(self.player, 180000, SleepPosture.AWAKE)
+
+        # Excluded (already recovered) owner under recovery: nothing to enter.
+        write_fatigue_state(self.player, 360000, SleepPosture.AWAKE)
+        before = self._state(self.player, companion)
+        with self.assertRaises(SleepRefused):
+            self._commit(self.player, mode="recovery", seconds=None, answer="enter")
+        unchanged(before)
+        write_fatigue_state(self.player, 180000, SleepPosture.AWAKE)
+
+        # Companion possession: the request comes from the possessed body.
+        enter_possession(self.player, companion)
+        before = self._state(self.player, companion)
+        with self.assertRaises(SleepRefused):
+            self._commit(companion, answer="enter")
+        self.assertIsNotNone(current_possession(self.player))
+        unchanged(before)
+        release_possession(self.player, npc=companion, reason="handback")
+
+        # An injected answer failure after the entry wrote rolls back the
+        # whole entry, including the cached physiology and the view identity.
+        before = self._state(self.player, companion)
+        generation = read_sleep_view_generation(self.player)
+        with patch.object(
+            dream_surface,
+            "enter_for_owner",
+            side_effect=DreamEntryError("dream_stale_sleep", "stale"),
+        ):
+            with self.assertRaises(SleepRefused):
+                self._commit(self.player, answer="enter", operation_id="op-fail")
+        unchanged(before)
+        self.assertEqual(read_sleep_view_generation(self.player), generation)
+        self.assertIs(read_fatigue_state(companion).posture, SleepPosture.AWAKE)
+
+        # A stale decline during revalidation rolls back the camp entry too.
+        before = self._state(self.player, companion)
+        with patch(
+            "world.rules.time_skip.record_owner_sleep_decision",
+            side_effect=SleepRefused("stale_sleep", "stale"),
+        ):
+            with self.assertRaises(SleepRefused):
+                self._commit(self.player, answer="decline", operation_id="op-stale")
+        unchanged(before)
+        self.assertIsNotNone(dream_service)

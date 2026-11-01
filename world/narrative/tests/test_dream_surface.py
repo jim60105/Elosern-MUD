@@ -1002,3 +1002,62 @@ def _synthetic_webp():
     buffer = BytesIO()
     Image.new("RGB", (8, 8), (200, 200, 200)).save(buffer, format="WEBP")
     return buffer.getvalue()
+
+
+class CampingDreamTests(EvenniaTest):
+    """An entry-time answer binds the new owner receipt; departure settles it."""
+
+    def setUp(self):
+        super().setUp()
+        from world.rules.clock import _EVENT_SOURCES
+        from world.rules.fatigue import SleepPosture, write_fatigue_state
+
+        sources = dict(_EVENT_SOURCES)
+        _EVENT_SOURCES.clear()
+        self.addCleanup(_EVENT_SOURCES.update, sources)
+        self.addCleanup(_EVENT_SOURCES.clear)
+        self.owner = self.char1
+        self.owner.race = "human"
+        self.owner.apply_race_baseline()
+        for key in ("hp", "mp", "sp"):
+            gauge = getattr(self.owner.traits, key)
+            gauge.current = gauge.max
+            gauge.rate = 0.0
+        self.owner.location = self.room1
+        self.owner.save()
+        self.owner.msg = Mock()
+        write_fatigue_state(self.owner, 180000, SleepPosture.AWAKE)
+
+    def test_answered_receipt_and_departure(self):
+        from world.rules.camping import commit_sleep_entry
+        from world.rules.sleep_receipt import STATE_COMPLETED, read_sleep_receipt
+        from world.rules.time_skip import owner_sleep_view_state
+
+        tick = int(get_world_clock().tick)
+        result = commit_sleep_entry(
+            self.owner,
+            scope="self",
+            mode="duration",
+            seconds=1800,
+            answer="enter",
+            operation_id="dream-entry",
+        )
+        self.assertTrue(result["dream_entered"])
+        receipt = read_sleep_receipt(self.owner)
+        state = service.dream_state(self.owner)
+        # The dream binds the newly accepted receipt at zero elapsed time and
+        # no question is pending for it.
+        self.assertTrue(state["open"])
+        self.assertEqual(state["sleep"]["seconds"], 0)
+        self.assertEqual(surface.association(self.owner)["sleep_id"], receipt.sleep_id)
+        self.assertEqual(result["owner_sleep_id"], receipt.sleep_id)
+        self.assertFalse(owner_sleep_view_state(self.owner)["pending"])
+        self.assertIsNone(service.pending_sleep_question(self.owner))
+        self.assertEqual(int(get_world_clock().tick), tick)
+        # Departure continues exactly this accepted sleep to its deadline.
+        with self.captureOnCommitCallbacks(execute=True):
+            service.act(self.owner, "awaken", session_id=state["session_id"], revision=state["revision"])
+        done = read_sleep_receipt(self.owner)
+        self.assertEqual(done.sleep_id, receipt.sleep_id)
+        self.assertEqual(done.state, STATE_COMPLETED)
+        self.assertEqual(int(get_world_clock().tick), tick + 1800)

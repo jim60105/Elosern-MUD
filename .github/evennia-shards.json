@@ -289,7 +289,8 @@
         "world.rules.tests.test_combat_deed_provenance",
         "world.rules.tests.test_divine_digestion_cadence",
         "world.rules.tests.test_sleep_receipt",
-        "world.rules.tests.test_sleep_control"
+        "world.rules.tests.test_sleep_control",
+        "world.rules.tests.test_camping"
       ]
     },
     {

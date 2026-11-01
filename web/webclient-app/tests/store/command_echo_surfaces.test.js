@@ -250,6 +250,17 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       },
     },
     {
+      // explore.camp_preview is the camp card's read-only preview: a private
+      // correlated result that no typed command echoes.
+      id: "EXPECTED SILENCE: explore.camp_preview read-only camp preview",
+      ids: ["explore.camp_preview"],
+      silence: true,
+      prepare() {
+        openExploration();
+        store.dispatchAction("explore.camp_preview", {});
+      },
+    },
+    {
       id: "EXPECTED SILENCE: party.transfer item hand-over",
       ids: ["party.transfer"],
       silence: true,
@@ -920,6 +931,7 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
   const galleryCard = { subject_key: gallerySubject, image_id: "12345678-1234-1234-1234-123456789abc" };
   for (const [actionId, payload, expected] of [
     ["explore.sleep_party", {}, "sleep all"],
+    ["explore.camp", { mode: "until-dawn", dream: true }, "camp until-dawn dream"],
     ["explore.sleep_continue", { sleep_id: "sleep-1", revision: 0 }, "sleep continue"],
     ["explore.sleep_dream", { sleep_id: "sleep-1", revision: 0, decision: "decline" }, "dream decline"],
   ]) {

@@ -36,6 +36,10 @@ VIEW_DECISION_ATTRIBUTE = "sleep_view_decision"
 #: so a decision cannot survive a new view merely because the receipt
 #: revision did not move.
 VIEW_GENERATION_ATTRIBUTE = "sleep_view_generation"
+#: The owner's latest whole-party camp operation (wilderness-camping): its
+#: accepted targets, durable progress, final result and travel fact. A
+#: sibling of the party-entry identity, validated and replaced on its own.
+CAMP_OPERATION_ATTRIBUTE = "sleep_camp_operation"
 
 #: Durable attributes the sleep receipt owner can write.
 SLEEP_RECEIPT_SURFACES: tuple[tuple[str, str | None], ...] = (
@@ -43,6 +47,7 @@ SLEEP_RECEIPT_SURFACES: tuple[tuple[str, str | None], ...] = (
     (PARTY_OPERATION_ATTRIBUTE, None),
     (VIEW_DECISION_ATTRIBUTE, None),
     (VIEW_GENERATION_ATTRIBUTE, None),
+    (CAMP_OPERATION_ATTRIBUTE, None),
 )
 
 KIND_VOLUNTARY = "voluntary"
@@ -52,7 +57,11 @@ KINDS = (KIND_VOLUNTARY, KIND_FORCED)
 MODE_DURATION = "duration"
 MODE_RECOVERY = "recovery"
 MODE_FORCED_THRESHOLD = "forced_threshold"
-MODES = (MODE_DURATION, MODE_RECOVERY, MODE_FORCED_THRESHOLD)
+#: A voluntary sleep retained until the next configured dawn anchor (capped by
+#: the maximum sleep). Like a duration it keeps its deadline: early reserve
+#: saturation never wakes it.
+MODE_UNTIL_DAWN = "until-dawn"
+MODES = (MODE_DURATION, MODE_RECOVERY, MODE_FORCED_THRESHOLD, MODE_UNTIL_DAWN)
 
 STATE_SLEEPING = "sleeping"
 STATE_INTERRUPTED = "interrupted"
@@ -534,6 +543,141 @@ def write_party_operation(
     return payload
 
 
+#: The exact camp metadata keys (wilderness-camping design §3).
+CAMP_FIELDS = frozenset(
+    {
+        "camp_id",
+        "owner_sleep_id",
+        "mode",
+        "dream",
+        "entry_tick",
+        "before",
+        "targets",
+        "progress",
+        "result",
+        "event",
+    }
+)
+CAMP_PROGRESS_FIELDS = frozenset({"elapsed_seconds", "interval_index", "events", "status"})
+CAMP_STATUS_PENDING = "pending"
+CAMP_STATUS_PAUSED = "paused"
+CAMP_STATUS_COMPLETE = "complete"
+CAMP_STATUSES = (CAMP_STATUS_PENDING, CAMP_STATUS_PAUSED, CAMP_STATUS_COMPLETE)
+MAX_CAMP_MEMBERS = 64
+MAX_CAMP_EVENTS = 48
+_CAMP_BEFORE_FIELDS = frozenset({"member_id", "name", "reserve", "reserve_max", "percent"})
+_CAMP_TARGET_FIELDS = frozenset({"member_id", "sleep_id", "target_tick"})
+_CAMP_EVENT_FIELDS = frozenset({"kind", "due_tick", "interactive", "text"})
+
+
+def _camp_list(value: Any) -> bool:
+    # Stored Attributes come back as saver sequences, not plain lists.
+    return isinstance(value, Sequence) and not isinstance(value, (str, bytes))
+
+
+def _camp_int(value: Any) -> bool:
+    return _is_int(value) and value >= 0
+
+
+def _validate_camp(value: Any) -> dict[str, Any]:
+    """Validate one camp metadata mapping exactly, raising ``ValueError``."""
+    if not isinstance(value, Mapping) or set(value) != CAMP_FIELDS:
+        raise ValueError("camp metadata carries unexpected fields")
+    camp_id = value["camp_id"]
+    if not isinstance(camp_id, str) or not 1 <= len(camp_id) <= 80 or not camp_id.isascii():
+        raise ValueError("invalid camp identity")
+    owner_sleep_id = value["owner_sleep_id"]
+    if owner_sleep_id is not None and (
+        not isinstance(owner_sleep_id, str) or not owner_sleep_id or len(owner_sleep_id) > _MAX_ID
+    ):
+        raise ValueError("invalid camp owner sleep identity")
+    if value["mode"] not in MODES or not isinstance(value["dream"], bool):
+        raise ValueError("invalid camp mode or dream flag")
+    if not _camp_int(value["entry_tick"]):
+        raise ValueError("invalid camp entry tick")
+    before = value["before"]
+    targets = value["targets"]
+    if not _camp_list(before) or len(before) > MAX_CAMP_MEMBERS:
+        raise ValueError("invalid camp members")
+    if not _camp_list(targets) or len(targets) > MAX_CAMP_MEMBERS:
+        raise ValueError("invalid camp targets")
+    for row in before:
+        if (
+            not isinstance(row, Mapping)
+            or set(row) != _CAMP_BEFORE_FIELDS
+            or not isinstance(row["member_id"], str)
+            or not isinstance(row["name"], str)
+            or not all(_camp_int(row[key]) for key in ("reserve", "reserve_max", "percent"))
+        ):
+            raise ValueError("invalid camp member row")
+    for row in targets:
+        if (
+            not isinstance(row, Mapping)
+            or set(row) != _CAMP_TARGET_FIELDS
+            or not isinstance(row["member_id"], str)
+            or not isinstance(row["sleep_id"], str)
+            or not _camp_int(row["target_tick"])
+        ):
+            raise ValueError("invalid camp target row")
+    progress = value["progress"]
+    if (
+        not isinstance(progress, Mapping)
+        or set(progress) != CAMP_PROGRESS_FIELDS
+        or not _camp_int(progress["elapsed_seconds"])
+        or not _camp_int(progress["interval_index"])
+        or progress["status"] not in CAMP_STATUSES
+        or not _camp_list(progress["events"])
+        or len(progress["events"]) > MAX_CAMP_EVENTS
+    ):
+        raise ValueError("invalid camp progress")
+    for event in progress["events"]:
+        if (
+            not isinstance(event, Mapping)
+            or set(event) != _CAMP_EVENT_FIELDS
+            or not isinstance(event["kind"], str)
+            or not _camp_int(event["due_tick"])
+            or not isinstance(event["interactive"], bool)
+            or (event["text"] is not None and not isinstance(event["text"], str))
+        ):
+            raise ValueError("invalid camp event")
+    for key in ("result", "event"):
+        if value[key] is not None and not isinstance(value[key], Mapping):
+            raise ValueError(f"invalid camp {key}")
+    return _plain_copy(value)
+
+
+def _plain_copy(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {str(key): _plain_copy(child) for key, child in value.items()}
+    if _camp_list(value):
+        return [_plain_copy(child) for child in value]
+    return value
+
+
+def read_camp_operation(entity: Any) -> dict[str, Any] | None:
+    """Return the owner's validated camp metadata, or ``None``.
+
+    A malformed stored record reads as absent (it can never block ordinary
+    sleep); the caller decides whether that is worth reporting.
+    """
+    attributes = getattr(entity, "attributes", None)
+    if attributes is None or not callable(getattr(attributes, "has", None)):
+        return None
+    if not attributes.has(CAMP_OPERATION_ATTRIBUTE):
+        return None
+    try:
+        return _validate_camp(attributes.get(CAMP_OPERATION_ATTRIBUTE))
+    except (KeyError, TypeError, ValueError):  # observability: ignore R2: a malformed camp record reads as absent; the camp owner reports it
+        return None
+
+
+def write_camp_operation(entity: Any, value: Mapping[str, Any]) -> dict[str, Any]:
+    """Persist one validated camp metadata record (raises on a bad shape)."""
+    clean = _validate_camp(value)
+    _attributes(entity).add(CAMP_OPERATION_ATTRIBUTE, clean)
+    return clean
+
+
 def full_recovery_seconds(entity: Any) -> int:
     """Return the uncapped seconds to full HP/MP/SP and mental reserve.
 
@@ -591,7 +735,8 @@ def recovery_target_tick(entity: Any, receipt: SleepReceipt, tick: int) -> int:
     next boundary without extending ``limit_tick`` or replacing the sleep
     identity. The cap always wins.
     """
-    if receipt.mode == MODE_DURATION:
+    if receipt.mode in (MODE_DURATION, MODE_UNTIL_DAWN):
+        # A declared deadline is retained exactly; the cap is already in it.
         return receipt.target_tick
     if receipt.mode == MODE_FORCED_THRESHOLD:
         return min(receipt.limit_tick, tick + forced_wake_seconds(entity))
@@ -620,6 +765,15 @@ def is_recovery_satisfied(entity: Any, receipt: SleepReceipt) -> bool:
 
 
 __all__ = [
+    "CAMP_OPERATION_ATTRIBUTE",
+    "CAMP_STATUSES",
+    "CAMP_STATUS_COMPLETE",
+    "CAMP_STATUS_PAUSED",
+    "CAMP_STATUS_PENDING",
+    "MAX_CAMP_EVENTS",
+    "MAX_CAMP_MEMBERS",
+    "read_camp_operation",
+    "write_camp_operation",
     "CORRUPT_RECEIPT_CODE",
     "CORRUPT_RECEIPT_MESSAGE",
     "KIND_FORCED",
@@ -631,6 +785,7 @@ __all__ = [
     "MODE_DURATION",
     "MODE_FORCED_THRESHOLD",
     "MODE_RECOVERY",
+    "MODE_UNTIL_DAWN",
     "PARTY_OPERATION_ATTRIBUTE",
     "RECEIPT_ATTRIBUTE",
     "SLEEP_RECEIPT_SURFACES",

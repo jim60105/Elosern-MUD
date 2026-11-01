@@ -67,6 +67,8 @@ import LegPanel from "./components/travel/LegPanel.vue";
 import LandmarkCard from "./components/travel/LandmarkCard.vue";
 import { legView } from "./components/travel/leg-model.js";
 import PartyMedallions from "./components/travel/PartyMedallions.vue";
+import CampCard from "./components/travel/CampCard.vue";
+import CampfireCard from "./components/travel/CampfireCard.vue";
 import { medallionMembers, travelPlace } from "./components/travel/travel-model.js";
 import { useTravelMap } from "./composables/use-travel-map.js";
 import { useTravelInput } from "./composables/use-travel-input.js";
@@ -141,6 +143,7 @@ const {
   onSleepHandoffPick, onSleepContinuationPick,
   onSleepQuestionYes, onSleepQuestionNo, onSleepQuestionClose,
   onCompassTab, onRailTab, onPlaceTab, onPillTab,
+  camp, campCardOpen, campBeatOpen, campOpen, closeCamp, selectMode, toggleDream, confirmCamp, continueTravel,
 } = useAppClient(store, shellRef, sceneBackdropRef);
 // The command line's release (the shell's one focus seam): the free-form
 // borrow ends, and a service row's command hand-off hands focus back to the
@@ -958,7 +961,8 @@ const rootStyle = computed(() => {
           sleepHandoffSelectionOpen ||
           sleepHandoffQuestionOpen ||
           sleepHandoffContinuationOpen ||
-          landmarkCardOpen
+          landmarkCardOpen ||
+          campOpen
         "
         :person-focus="personFocus"
         :formation="!!formation"
@@ -1220,8 +1224,34 @@ const rootStyle = computed(() => {
                list, the exact 全員一起睡眠 option, the owner-only dream
                question and the retained continuation. One modal focus owner
                at a time; the browser never derives eligibility or time. -->
+          <!-- The camp card and its campfire beat (wilderness-camping): the
+               one camp decision opened from the leg's 紮營 or the forced
+               walking sleep handoff, ahead of the sleep cards while it owns
+               the stage; its cancel restores whatever card it covered. -->
+          <CampCard
+            v-if="campCardOpen"
+            :key="`camp:${camp.openCount}`"
+            :camp="camp"
+            :place="placeLocationLabel"
+            :entrance="!modeHydrating && store.view.motionLevel !== 'off'"
+            @select="selectMode"
+            @toggle-dream="toggleDream"
+            @confirm="confirmCamp"
+            @cancel="closeCamp"
+          />
+          <CampfireCard
+            v-else-if="campBeatOpen"
+            :key="`campfire:${camp.result.camp_id}`"
+            :result="camp.result"
+            :message="camp.message || ''"
+            :medallions="partyMedallions"
+            :scene-artwork="panel('art')?.scene?.artwork ?? null"
+            :art-panel="panel('art')"
+            :motion-level="store.view.motionLevel"
+            @continue="continueTravel"
+          />
           <ChoiceCard
-            v-if="sleepHandoffSelectionOpen"
+            v-else-if="sleepHandoffSelectionOpen"
             :key="`sleep-handoff:${sleepHandoffCaption}`"
             test-id="sleep-handoff-card"
             data-card-kind="sleep_handoff"

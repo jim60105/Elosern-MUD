@@ -1093,6 +1093,34 @@ _LEG_TEXT = """() => {
   return out;
 }"""
 
+# Holds the camp card's preview (recorded, never forwarded) and answers it
+# with a refusal, which releases the single-flight gate (wilderness-camping).
+_HOLD_CAMP_PREVIEW = """() => {
+  const store = window.__elosernBridge.store;
+  if (window.__campPreviews) return;
+  const sender = store.getSender();
+  const original = sender.sendAction.bind(sender);
+  window.__campPreviews = [];
+  sender.sendAction = (env) => {
+    if (env && env.action_id === 'explore.camp_preview') {
+      window.__campPreviews.push(env);
+      return undefined;
+    }
+    return original(env);
+  };
+}"""
+
+_REFUSE_CAMP_PREVIEW = """() => {
+  const store = window.__elosernBridge.store;
+  const env = window.__campPreviews.at(-1);
+  const v = store.view;
+  return !!store.receive(v.generation, 'ui_action_result', [{
+    protocol_version: 1, presentation_epoch: v.epoch, request_id: env.request_id,
+    presentation_revision: v.revision, outcome: 'rejected', code: 'hostile_present',
+    message: '附近有活著的怪物，這裡不安全。',
+  }], {}).accepted;
+}"""
+
 _FOCUS_RING = """() => {
   const el = document.activeElement;
   const style = getComputedStyle(el);
@@ -1125,7 +1153,7 @@ class TravelLegTests(_TravelStage):
         every control shows a focus ring; the pace radio and the nightfall
         switch persist through the layout wrapper and freeze while walking,
         when 停步 stays live; 環顧 sends exactly the room look and 紮營 opens
-        the existing sleep form."""
+        the camp card."""
         page = self._leg_stage()
         scale = ui_scale((1451, 790))
         ticks = page.locator('[data-testid="leg-tick"]')
@@ -1175,13 +1203,16 @@ class TravelLegTests(_TravelStage):
         stored = page.evaluate("() => JSON.parse(localStorage.getItem('elosern.layout')).preferences")
         self.assertEqual((stored["travelPace"], stored["travelStopAtNight"]), ("forced", False))
 
-        # 紮營: the existing sleep form, with no request of its own.
+        # 紮營: the camp card (wilderness-camping), asking only for its
+        # read-only preview; cancelling it sends nothing else.
+        page.evaluate(_HOLD_CAMP_PREVIEW)
         page.locator('[data-testid="leg-camp"]').click()
-        page.wait_for_selector('[data-testid="sleep-card"]', timeout=15000)
-        self.assertEqual(_moves(page), [])
+        page.wait_for_selector('[data-testid="camp-card"]', timeout=15000)
+        page.wait_for_function("() => window.__campPreviews.length >= 1", timeout=15000)
+        self.assertEqual(page.evaluate(_REFUSE_CAMP_PREVIEW), True)
         page.keyboard.press("Escape")
-        page.keyboard.press("Escape")
-        page.wait_for_selector('[data-testid="sleep-card"]', state="detached", timeout=15000)
+        page.wait_for_selector('[data-testid="camp-card"]', state="detached", timeout=15000)
+        self.assertEqual(page.evaluate("() => window.__campPreviews.length"), 1)
         self.assertEqual(_moves(page), [])
         self.assertEqual(page.evaluate("() => window.__travelLooks.length"), 0)
 

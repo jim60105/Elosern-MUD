@@ -206,6 +206,12 @@
      window): a looping highlight that states no progress; still at reduced
      and off. */
   --motion-playback-sweep: 1.6s;
+  /* The campfire beat (wilderness-camping): the party's 精力 bars move from
+     the committed before to the after value over this, and the CSS fire's
+     flames, glow and embers loop on multiples of the campfire beat. Both are
+     still at reduced and off (the beat then shows its final state at once). */
+  --motion-camp-fill: 1.6s;
+  --motion-campfire: 0.9s;
   /* The stage target step's focus pulse (webclient-combat-stage-target-
      picking D4): the lit figure's ring breathes on this loop at `full` and
      stands still (static and brighter) at reduced and off. */
@@ -946,6 +952,8 @@
   --motion-stagger: 0ms;
   --motion-marker-bob: 0ms;
   --motion-playback-sweep: 0ms;
+  --motion-camp-fill: 0ms;
+  --motion-campfire: 0ms;
   --motion-target-pulse: 0ms;
   --motion-district-reveal: 0ms;
   --motion-travel: 0;
@@ -977,6 +985,8 @@
   --motion-stagger: 0ms;
   --motion-marker-bob: 0ms;
   --motion-playback-sweep: 0ms;
+  --motion-camp-fill: 0ms;
+  --motion-campfire: 0ms;
   --motion-target-pulse: 0ms;
   --motion-district-reveal: 0ms;
   --motion-travel: 0;
@@ -1019,6 +1029,8 @@
     --motion-stagger: 0ms;
     --motion-marker-bob: 0ms;
     --motion-playback-sweep: 0ms;
+    --motion-camp-fill: 0ms;
+    --motion-campfire: 0ms;
   --motion-target-pulse: 0ms;
   --motion-district-reveal: 0ms;
     --motion-travel: 0;

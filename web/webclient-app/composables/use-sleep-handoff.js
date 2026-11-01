@@ -10,19 +10,24 @@ import { BACK_ROW } from "./use-person-focus.js";
 
 export const SLEEP_HANDOFF_LOCKED_REASON = "上一個行動尚未完成，請稍候。";
 export const SLEEP_CONTINUE_LABEL = "繼續睡眠";
+// The forced-walking-sleep shortcut (wilderness-camping): the first row of
+// that one handoff, opening the camp card.
+export const CAMP_SHORTCUT_LABEL = "全員紮營";
 
 function digitBadge(index) {
   return index < 9 ? String(index + 1) : "·";
 }
 
-export function sleepHandoffRows(panel, locked, includeContinuation) {
+export function sleepHandoffRows(panel, locked, includeContinuation, campShortcut = false) {
   if (!panel) {
     return [];
   }
+  // The shortcut is prepended; every server row keeps its order after it.
+  const offset = campShortcut ? 1 : 0;
   const rows = (panel.selection?.rows || []).map((row, index) => ({
     key: `sleep:${row.kind}:${row.identity}`,
     label: row.label,
-    badge: digitBadge(index),
+    badge: digitBadge(index + offset),
     kind: "verb",
     enabled: !!row.enabled && !locked,
     reason: locked ? SLEEP_HANDOFF_LOCKED_REASON : row.reason,
@@ -30,6 +35,19 @@ export function sleepHandoffRows(panel, locked, includeContinuation) {
     rowKind: row.kind,
     identity: row.identity,
   }));
+  if (campShortcut) {
+    rows.unshift({
+      key: "sleep:camp",
+      label: CAMP_SHORTCUT_LABEL,
+      badge: digitBadge(0),
+      kind: "verb",
+      enabled: !locked,
+      reason: locked ? SLEEP_HANDOFF_LOCKED_REASON : null,
+      testId: "sleep-handoff-camp",
+      rowKind: "camp",
+      identity: null,
+    });
+  }
   const party = panel.party || {};
   rows.push({
     key: "sleep:party",
@@ -137,11 +155,13 @@ export function useSleepHandoff(store, { dispatchIntent, skipDisabled, compassRe
     () => selectionOpen.value || questionOpen.value || continuationOpen.value,
   );
 
+  const campShortcut = computed(() => !!store.view?.camp?.handoffShortcut);
   const selectionRows = computed(() =>
     sleepHandoffRows(
       panel.value,
       skipDisabled.value,
       !dreamPending.value && continuationAvailable.value,
+      campShortcut.value,
     ),
   );
   const continuation = computed(() =>
@@ -177,7 +197,9 @@ export function useSleepHandoff(store, { dispatchIntent, skipDisabled, compassRe
       return;
     }
     const controlled = panel.value.controlled_body_id;
-    if (row.rowKind === "party") {
+    if (row.rowKind === "camp") {
+      store.openTravelCamp?.("handoff");
+    } else if (row.rowKind === "party") {
       dispatchIntent("explore.sleep_party", {});
     } else if (row.rowKind === "continue") {
       const identity = identityForContinue();

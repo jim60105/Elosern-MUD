@@ -85,10 +85,11 @@ def _continue_owner_after_commit(actor, sleep_id, generation):
     crash before this callback leaves a resumable authorization instead of a
     stranded sleep.
     """
+    from world.rules.camping import reconcile_camp
     from world.rules.time_skip import continue_owner_sleep
 
     try:
-        return continue_owner_sleep(
+        result = continue_owner_sleep(
             actor, sleep_id=sleep_id, expected_generation=generation
         )
     except Exception as error:  # observability: ignore R2: the committed narrative closure stays truthful; the durable pending intent resumes the rules continuation
@@ -101,6 +102,10 @@ def _continue_owner_after_commit(actor, sleep_id, generation):
             exc=error,
         )
         return None
+    # A camp that entered this dream continues its slower selected sleepers
+    # under its own retained authorization once the owner's part settled.
+    reconcile_camp(actor)
+    return result
 
 
 def authorize_departure_continuation(actor) -> None:
@@ -158,6 +163,7 @@ def answer_sleep_dream(
     revision,
     generation,
     session=None,
+    defer_continuation=False,
 ):
     """Answer the authenticated owner's current pre-recovery dream question.
 
@@ -166,6 +172,12 @@ def answer_sleep_dream(
     and the accepted receipt; decline records the durable decision and starts
     the retained owner continuation only when every operable present body is
     asleep. Neither branch invents elapsed time.
+
+    ``defer_continuation`` is the sleep-entry seam (``world.rules.camping``):
+    the caller owns the surrounding entry transaction and the continuation.
+    A deferred decline records the explicit decision with no continuation
+    authorization and starts nothing; a deferred enter is the ordinary guarded
+    entry, whose stage the entry's own completion publishes after commit.
     """
     from world.rules.time_skip import (
         decline_owner_sleep_dream,
@@ -224,6 +236,34 @@ def answer_sleep_dream(
 
     if decision != "decline":
         return _sleep_result("rejected", "invalid_decision", "無法執行這個夢境操作。")
+    if defer_continuation:
+        from world.rules.sleep_receipt import CONTINUATION_NONE, DECISION_DECLINED
+        from world.rules.time_skip import record_owner_sleep_decision
+
+        try:
+            record_owner_sleep_decision(
+                actor,
+                sleep_id=sleep_id,
+                revision=revision,
+                generation=generation,
+                decision=DECISION_DECLINED,
+                continuation=CONTINUATION_NONE,
+            )
+        except Exception as error:
+            log_warn(
+                "sleep_dream_answer_rejected",
+                context={**boundary, "reason": "stale_or_invalid"},
+                exc=error,
+            )
+            return _sleep_result(
+                "rejected", "stale_sleep", "這次睡眠已經更新，請重新查看。"
+            )
+        return _sleep_result(
+            "success",
+            "dream_declined",
+            "已保留這次睡眠。",
+            continuation="none",
+        )
     try:
         value, auto = decline_owner_sleep_dream(
             actor,
@@ -266,9 +306,14 @@ def answer_sleep_dream(
 
 def resume_owner_sleep_continuation(actor):
     """Resume one durable pending owner continuation after reconnect."""
+    from world.rules.camping import reconcile_camp
     from world.rules.time_skip import resume_pending_owner_continuation
 
-    return resume_pending_owner_continuation(actor)
+    result = resume_pending_owner_continuation(actor)
+    # Reconcile a pending camp even when the ordinary owner resume returned
+    # early (no receipt, a completed owner sleep or no pending intent).
+    reconcile_camp(actor)
+    return result
 
 
 @defer.inlineCallbacks
