@@ -6,7 +6,7 @@ Implement complete manual continental geometry, location, district, footprint an
 ## Requirements
 
 ### Requirement: Continental authored inputs have direct and explicit editing controls
-The editor SHALL edit continental geometry/classifiers, locations, districts/landmarks and settlement footprints through labelled single-document commands, with location moves translating derived settlement geometry in one undoable operation and footprint controls retaining absolute-cell inputs without editable binding coordinates.
+The editor SHALL retain labelled single-document controls for continental inputs, locations, districts and absolute-cell footprints, edit authored stem and arm control points through move/insert/remove with coherent shared-crotch history, and support empty ridge-pass lists.
 
 #### Scenario: Move river point
 - **WHEN** a river control point is dragged or entered numerically
@@ -38,4 +38,24 @@ The editor SHALL edit continental geometry/classifiers, locations, districts/lan
 
 #### Scenario: EDIT-BROWSER real workflow and restart
 - **WHEN** the real browser drags a synthetic settlement-backed location, then performs undo/redo and restarts the editor service
-- **THEN** observed command traffic and file digests establish one owner per operation and a fresh core load reports the translated node world positions, mask and approach cells from the persisted location
+- **THEN** observed command traffic and file digests establish one owner per operation and a fresh core load reports translated node world positions, mask and approach cells from the persisted location
+
+#### Scenario: Empty-pass editing and branch retention
+- **WHEN** a synthetic paired-branch continent with zero passes receives add/set/remove pass commands below the crotch, including removal of its last pass
+- **THEN** each accepted operation writes only the continent, returning to an empty pass list remains editable with a current preview, and both branches remain preserved and displayed without pass exemptions on their walls
+
+#### Scenario: Hand-authored branches survive unrelated edits
+- **WHEN** stem and arm interior control points are moved, inserted, removed, undone, redone and reloaded in a synthetic ridge document
+- **THEN** each accepted operation writes only the continent, route values/comments survive, history restores exact prior bytes and preview/capture follow the edited crests
+
+#### Scenario: Shared crotch editing
+- **WHEN** any of the three shared crotch control points is moved, or its deletion is requested
+- **THEN** movement updates all three points in one continent command and undo entry, while shared-point deletion is refused without a write or gap
+
+#### Scenario: Crest controls replace formula inputs
+- **WHEN** a crest route is selected in the editor or an old periodic field command is submitted
+- **THEN** route handles and cell-labelled numeric/insert/remove controls are available, political lines remain noneditable derived output, and retired field requests reject without writes
+
+#### Scenario: Branch commands are outside the supported surface
+- **WHEN** a request submits a set-ridge-branch or remove-ridge-branch command
+- **THEN** it is refused as unknown without writes; existing move/insert/remove control-point commands edit authored routes instead

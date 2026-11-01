@@ -101,6 +101,10 @@ class AuthoredTerrainContractTests(unittest.TestCase):
                 )
 
     @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
+    @covers_requirement(
+        "wilderness-terrain::"
+        "the-physical-ridge-is-a-continuous-forked-barrier"
+    )
     def test_the_physical_ridge_is_a_pass_free_forked_barrier(self):
         # The shipped zero-pass range: no authored pass exists, and no active
         # row admits a fully walkable X1300..1520 band.
@@ -554,6 +558,10 @@ class ForestEdgeAndClaimContractTests(unittest.TestCase):
         self.assertIsNone(anchors()["village_eolas"].nation_key)
 
     @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
+    @covers_requirement(
+        "wilderness-terrain::"
+        "the-physical-ridge-is-a-continuous-forked-barrier"
+    )
     def test_forest_around_the_inland_tips_stays_walkable(self):
         from world.rules.travel_cost import WILDERNESS_TERRAIN
 

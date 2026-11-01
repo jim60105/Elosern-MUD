@@ -122,6 +122,10 @@ class GeographyProcessTests(unittest.TestCase):
         self.assertEqual(status, 200)
 
     @covers_requirement("map-editor-geography::continental-authored-inputs-have-direct-and-explicit-editing-controls")
+    @covers_requirement(
+        "wilderness-terrain::"
+        "the-physical-ridge-is-a-continuous-forked-barrier"
+    )
     def test_ridge_route_points_and_zero_passes_round_trip(self):
         editor = self.start()
         stem = {"kind": "ridge_route", "route": "stem"}
