@@ -996,6 +996,12 @@ def continue_sleep(
             }
             if updated is not None:
                 write_sleep_receipt(member, updated.with_result(result_payload))
+            # A pending whole-party camp owning this sleep records the
+            # interval's elapsed cursor and due-event facts in this same
+            # transaction (wilderness-camping); a no-op otherwise.
+            from world.rules.camping import record_camp_interval
+
+            record_camp_interval(actor, result_payload, events)
             if travel_scope and elapsed > 0:
                 # Inside the interval's transaction: a rollback discards it.
                 record_position_change(actor, travel_before, "skip", members=entities)
