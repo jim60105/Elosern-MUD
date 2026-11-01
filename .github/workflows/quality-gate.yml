@@ -61,12 +61,6 @@ jobs:
         working-directory: packages/map-core
         run: uv run --locked --extra generation python -m pytest tests
 
-      - name: Run map-editor service tests
-        # The standalone editor service keeps its own project and lock and must
-        # run without Evennia, Django or the game's dependency set.
-        working-directory: tools/map-editor
-        run: uv run --locked python -m pytest tests
-
       - name: Validate map reference context freshness
         run: uv run --locked python -m tools.map_reference_context --check
 
@@ -99,6 +93,37 @@ jobs:
           echo "matrix=$(uv run --locked python -c
           "import json; print(json.dumps(json.load(open('.github/top-level-shards.json'))['shards']))")"
           >> "$GITHUB_OUTPUT"
+
+  map-editor:
+    # The standalone editor service suite keeps its own project and lock and
+    # must run without Evennia, Django or the game's dependency set, so it is a
+    # job of its own after the cheap preflight gates and before the gate. Its
+    # outcome has nothing to do with the Evennia, browser and top-level shards,
+    # so it must not be a step of the preflight job they all wait on: an editor
+    # failure there would skip every shard job. The suite stays a preflight-free
+    # member of the gate. It needs no Node, no pnpm and no built frontend — the
+    # service suite asserts the "frontend is not built" 503 path and starts the
+    # service with a scrubbed PATH.
+    needs: preflight
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: "0.12.0"
+          enable-cache: true
+          prune-cache: true
+
+      - name: Install pinned Python
+        run: uv python install "$(<.python-version)"
+
+      - name: Run map-editor service tests
+        working-directory: tools/map-editor
+        run: uv run --locked python -m pytest tests
 
   evennia:
     needs: preflight
@@ -432,7 +457,7 @@ jobs:
             evidence.top-level-shard-${{ matrix.index }}.jsonl
 
   gate:
-    needs: [evennia, browser, top-level, frontend]
+    needs: [evennia, browser, top-level, frontend, map-editor]
     runs-on: ubuntu-latest
 
     steps:

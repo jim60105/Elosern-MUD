@@ -323,10 +323,22 @@ makespan 200 秒、top-level 分片 170 秒。這讓兩種池都能落在 6 分�
   切得越細，runner 總分鐘數越高（144 個瀏覽器清單的冷啟動約 7,500 秒，舊版
   40 個清單約 2,500 秒）。換得的是每個分片負載低、對 1.67 倍慢 runner 仍有
   餘裕，且在慢 runner 上不易觸發超時類的 flake。
-- 工作數：1 preflight + 37 evennia + 78 browser + 11 top-level + 1 frontend +
-  1 gate = 129。若後續要把工作數壓回來，可考慮先在 job 前置階段預先啟動共享
-  執行環境（harness 的 `_boot_until_ready` 會沿用既有 runtime）或只建置該分片
-  需要的前端 bundle，兩者都能讓清單上限放寬而不犧牲 6 分鐘預算。
+- **editor service suite 移出 preflight**：原先 `preflight` 內嵌的
+  `tools/map-editor` pytest 步驟，其成敗與 Evennia／browser／top-level 分片
+  毫無關係，卻因為位於共同前置而讓 editor 套件的失敗短路掉後面 128 個工作
+  （其中 126 個是分片工作）；這個耦合本身就是缺陷，把它獨立成 `map-editor`
+  工作（`needs: preflight`，`gate` 的 `needs` 一併加上它）後，無關的套件不再
+  決定分片能不能跑，editor suite 仍是 `gate` 的前置（它失敗就是整個 run 紅），
+  附帶效果是關鍵路徑上的 `preflight` 縮短（所有分片都在等它）。新工作只需
+  checkout、uv 與釘住的 Python：editor 自己的 project/lock 會把
+  `packages/map-core` 當路徑相依解掉，而 suite 刻意用 scrubbed `PATH` 啟動服務
+  並斷言「前端未建置」的 503 路徑，因此不裝 Node/pnpm、也不建置前端。
+  `preflight` 仍保有 map-core 套件測試與 `tools.contract_gate manifests
+  contracts` 等真正的共用契約。
+- 工作數：1 preflight + 1 map-editor + 37 evennia + 78 browser + 11 top-level +
+  1 frontend + 1 gate = 130。若後續要把工作數壓回來，可考慮先在 job 前置階段
+  預先啟動共享執行環境（harness 的 `_boot_until_ready` 會沿用既有 runtime）或
+  只建置該分片需要的前端 bundle，兩者都能讓清單上限放寬而不犧牲 6 分鐘預算。
 
 本次重平衡只改 manifest 標籤分配、`workers` 欄位與本文件，未改動任何測試、
 斷言、worker 數以外的設定、超時或預算。推送後的 CI 執行是唯一驗收：每個分片

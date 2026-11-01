@@ -1138,10 +1138,12 @@ uv run --locked python -m tools.contract_gate
 ```
 
 `<file>` contains `MUD_TEST_SETTINGS=1`. CI runs the same evidence without a
-separate entry point: the editor package tests in the preflight job
-(`tools/map-editor`, its own lock), the repository wrappers in the top-level
-job (`CI` turns an unavailable editor environment into a failure instead of a
-skip), the browser methods in the shards listed in
+separate entry point: the editor package tests in the `map-editor` job
+(`tools/map-editor`, its own lock; it needs no Node, no pnpm and no built
+frontend, because the service suite starts the service with a scrubbed `PATH`
+and asserts the "frontend is not built" 503 path), the repository wrappers in
+the top-level job (`CI` turns an unavailable editor environment into a failure
+instead of a skip), the browser methods in the shards listed in
 `.github/browser-shards.json` (Chromium and Firefox are installed there and the
 editor frontend is built in both workspaces), and `world.maps` in its evennia
 shard. The full managed browser suite and `tools.spec_traceability verify

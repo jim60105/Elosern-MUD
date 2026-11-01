@@ -176,8 +176,20 @@ class TestOwnershipContractTests(unittest.TestCase):
         self.assertEqual(jobs["evennia"]["needs"], "preflight")
         self.assertEqual(jobs["top-level"]["needs"], "preflight")
         self.assertEqual(jobs["frontend"]["needs"], "preflight")
+        self.assertEqual(jobs["map-editor"]["needs"], "preflight")
         self.assertEqual(
-            jobs["gate"]["needs"], ["evennia", "browser", "top-level", "frontend"]
+            jobs["gate"]["needs"],
+            ["evennia", "browser", "top-level", "frontend", "map-editor"],
+        )
+        map_editor_steps = {step["name"]: step for step in jobs["map-editor"]["steps"]}
+        editor_step = map_editor_steps["Run map-editor service tests"]
+        self.assertEqual(editor_step["working-directory"], "tools/map-editor")
+        self.assertEqual(editor_step["run"], "uv run --locked python -m pytest tests")
+        self.assertNotIn(
+            "Run map-editor service tests",
+            [step["name"] for step in jobs["preflight"]["steps"]],
+            "the standalone editor suite must not run inside the shared preflight "
+            "job, because its failure would then skip every shard job",
         )
 
         browser_jobs = [job for name, job in jobs.items() if name.startswith("browser")]
