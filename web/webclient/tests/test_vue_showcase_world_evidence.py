@@ -416,8 +416,11 @@ class VueShowcaseWorldEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
         request") is enforced for the whole app by B1's
         ``test_story_files_import_only_local_or_bundled_modules``; this test
         scopes the same scan to the World family's story files so the B4
-        evidence stands on its own: every import must be ``vue`` (the locked,
-        bundled runtime) or a relative path.
+        evidence stands on its own: every import must be ``vue`` or ``pinia``
+        (the locked, bundled runtimes B1 allows, neither of which requests
+        anything over the network) or a relative path — the wilderness travel
+        stage story drives the real store, so it creates its own pinia the
+        way the core shell story does.
         """
         world_story_files = sorted(
             (APP_ROOT / "stories/World").glob("*.stories.js")
@@ -439,7 +442,8 @@ class VueShowcaseWorldEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
             source = path.read_text(encoding="utf-8")
             for module in import_re.findall(source):
                 self.assertTrue(
-                    module.startswith(("./", "../")) or module == "vue",
+                    module.startswith(("./", "../"))
+                    or module in ("vue", "pinia"),
                     f"{path.name} imports a non-local module: {module}",
                 )
 
