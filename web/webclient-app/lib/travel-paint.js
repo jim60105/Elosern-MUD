@@ -399,22 +399,6 @@ function cellElevations(grid) {
   return { flat: false, elev };
 }
 
-function bilinear(values, width, height, u, v) {
-  const x = Math.min(width - 1, Math.max(0, u - 0.5));
-  const y = Math.min(height - 1, Math.max(0, v - 0.5));
-  const x0 = Math.floor(x);
-  const y0 = Math.floor(y);
-  const x1 = Math.min(width - 1, x0 + 1);
-  const y1 = Math.min(height - 1, y0 + 1);
-  const fx = x - x0;
-  const fy = y - y0;
-  return mix(
-    mix(values[y0 * width + x0], values[y0 * width + x1], fx),
-    mix(values[y1 * width + x0], values[y1 * width + x1], fx),
-    fy,
-  );
-}
-
 // The terrain part of the field: elevation-shaded colour per sample. It
 // depends on terrain and bands only, so a reveal-, party- or light-only
 // change reuses it.
@@ -432,21 +416,55 @@ function buildTerrain(grid, samples, cache) {
   const baseJ = (grid.origin.y + height) * samples - 1;
   // World-anchored noise fields for this window (the apron grids carry one
   // extra sample on every side for the gradients).
-  const relief = flat ? null : noiseGrid(baseI - 1, baseJ + 1, aw, ah, samples * 1.6, 11);
-  const detail = flat ? null : noiseGrid(baseI - 1, baseJ + 1, aw, ah, samples * 0.5, 23);
-  const warpU = noiseGrid(baseI, baseJ, fw, fh, samples * 1.3, 37);
-  const warpV = noiseGrid(baseI, baseJ, fw, fh, samples * 1.3, 41);
-  const grainField = noiseGrid(baseI, baseJ, fw, fh, 5, 7);
+  const apronSize = aw * ah;
+  const relief = flat ? null : noiseGrid(baseI - 1, baseJ + 1, aw, ah, samples * 1.6, 11, cache.relief?.length === apronSize ? cache.relief : undefined);
+  const detail = flat ? null : noiseGrid(baseI - 1, baseJ + 1, aw, ah, samples * 0.5, 23, cache.detail?.length === apronSize ? cache.detail : undefined);
+  if (relief) cache.relief = relief;
+  if (detail) cache.detail = detail;
+  const warpU = noiseGrid(baseI, baseJ, fw, fh, samples * 1.3, 37, cache.warpU?.length === n ? cache.warpU : undefined);
+  const warpV = noiseGrid(baseI, baseJ, fw, fh, samples * 1.3, 41, cache.warpV?.length === n ? cache.warpV : undefined);
+  const grainField = noiseGrid(baseI, baseJ, fw, fh, 5, 7, cache.grainField?.length === n ? cache.grainField : undefined);
+  cache.warpU = warpU;
+  cache.warpV = warpV;
+  cache.grainField = grainField;
   cache.jitter = noiseGrid(baseI, baseJ, fw, fh, samples * 0.55, 3, cache.jitter?.length === n ? cache.jitter : undefined);
-  const fine = noiseGrid(baseI, baseJ, fw, fh, 3, 9);
+  const fine = noiseGrid(baseI, baseJ, fw, fh, 3, 9, cache.fine?.length === n ? cache.fine : undefined);
+  cache.fine = fine;
   for (let k = 0; k < n; k += 1) cache.jitter[k] = cache.jitter[k] * 0.3 + fine[k] * 0.12;
   // Elevation per sample, with a one-sample apron for the gradients.
-  for (let j = -1; j <= fh; j += 1) {
+  if (flat) {
+    elevSamples.fill(0);
+  } else {
+    // Column interpolation is shared by every row, including the apron.
+    const columns = cache.elevColumns?.length === aw * 3 ? cache.elevColumns : new Float64Array(aw * 3);
+    cache.elevColumns = columns;
     for (let i = -1; i <= fw; i += 1) {
-      const k = (j + 1) * aw + (i + 1);
-      elevSamples[k] = flat
-        ? 0
-        : bilinear(elev, width, height, (i + 0.5) / samples, (j + 0.5) / samples) + relief[k] * 0.7 + detail[k] * 0.18;
+      const x = Math.min(width - 1, Math.max(0, (i + 0.5) / samples - 0.5));
+      const x0 = Math.floor(x);
+      const o = (i + 1) * 3;
+      columns[o] = x0;
+      columns[o + 1] = Math.min(width - 1, x0 + 1);
+      columns[o + 2] = x - x0;
+    }
+    for (let j = -1; j <= fh; j += 1) {
+      const y = Math.min(height - 1, Math.max(0, (j + 0.5) / samples - 0.5));
+      const y0 = Math.floor(y);
+      const row0 = y0 * width;
+      const row1 = Math.min(height - 1, y0 + 1) * width;
+      const fy = y - y0;
+      const row = (j + 1) * aw;
+      for (let i = 0; i < aw; i += 1) {
+        const o = i * 3;
+        const x0 = columns[o];
+        const x1 = columns[o + 1];
+        const fx = columns[o + 2];
+        const k = row + i;
+        elevSamples[k] = mix(
+          mix(elev[row0 + x0], elev[row0 + x1], fx),
+          mix(elev[row1 + x0], elev[row1 + x1], fx),
+          fy,
+        ) + relief[k] * 0.7 + detail[k] * 0.18;
+      }
     }
   }
   for (let j = 0; j < fh; j += 1) {
@@ -518,20 +536,22 @@ export function buildField(grid, { samplesPerCell = SAMPLES_PER_CELL } = {}, cac
   const pu = party.col + 0.5;
   const pv = party.srow + 0.5;
   const { rgb, jitter } = cache;
+  const at = (c, r) => (c < 0 || r < 0 || c >= width || r >= height ? 0 : cover[r * width + c]);
   for (let j = 0; j < fh; j += 1) {
     const v = (j + 0.5) / samples;
+    const y = v - 0.5;
+    const y0 = Math.floor(y);
+    const fy = y - y0;
+    const dy = v - pv;
+    const dy2 = dy * dy;
     for (let i = 0; i < fw; i += 1) {
       const u = (i + 0.5) / samples;
       const p = j * fw + i;
       const o = p * 4;
       // Outside the window everything is fog; inside, bilinear cover.
       const x = u - 0.5;
-      const y = v - 0.5;
       const x0 = Math.floor(x);
-      const y0 = Math.floor(y);
-      const at = (c, r) => (c < 0 || r < 0 || c >= width || r >= height ? 0 : cover[r * width + c]);
       const fx = x - x0;
-      const fy = y - y0;
       const base = mix(mix(at(x0, y0), at(x0 + 1, y0), fx), mix(at(x0, y0 + 1), at(x0 + 1, y0 + 1), fx), fy);
       if (base <= 0) {
         rgba[o + 3] = 0;
@@ -549,7 +569,8 @@ export function buildField(grid, { samplesPerCell = SAMPLES_PER_CELL } = {}, cac
       let b = mix(rgb[p * 3 + 2], RIM[2], rim * 0.65);
       if (radius !== null) {
         // Outside live sight the wash loses colour: memory, not sight.
-        const away = smoothstep(radius + 0.1, radius + 1.1, Math.hypot(u - pu, v - pv)) * look.desat;
+        const dx = u - pu;
+        const away = smoothstep(radius + 0.1, radius + 1.1, Math.sqrt(dx * dx + dy2)) * look.desat;
         if (away > 0) {
           const lum = r * 0.3 + g * 0.59 + b * 0.11;
           r = mix(r, lum, away);

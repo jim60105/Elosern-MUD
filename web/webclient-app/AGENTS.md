@@ -193,6 +193,10 @@ dream or creation surface owns the stage. There is no server travel mode.
   no ring, dim or grid; no phase: no wash); rivers follow the canonical
   `water` terrain, roads/fords their flags, districts and walls the
   `display` facts. Texture hashes world coordinates, never a fact.
+  The painter retains size-matched noise buffers and hoists the row/column
+  interpolation coordinates out of its pixel loops per rebuild; that cache
+  must keep full-canvas pixels identical across moving windows, flat/nonflat
+  transitions and reused-cache size changes.
   Repaint keys: only `paintSignature(grid)` (map, origin, size, party,
   phase, radius and every cell's painted facts) repaints, once per
   animation frame; camera, zoom, UI scale, aim, hover, walking, plan and
