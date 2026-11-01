@@ -52,7 +52,11 @@ KINDS = (KIND_VOLUNTARY, KIND_FORCED)
 MODE_DURATION = "duration"
 MODE_RECOVERY = "recovery"
 MODE_FORCED_THRESHOLD = "forced_threshold"
-MODES = (MODE_DURATION, MODE_RECOVERY, MODE_FORCED_THRESHOLD)
+#: A voluntary sleep retained until the next configured dawn anchor (capped by
+#: the maximum sleep). Like a duration it keeps its deadline: early reserve
+#: saturation never wakes it.
+MODE_UNTIL_DAWN = "until-dawn"
+MODES = (MODE_DURATION, MODE_RECOVERY, MODE_FORCED_THRESHOLD, MODE_UNTIL_DAWN)
 
 STATE_SLEEPING = "sleeping"
 STATE_INTERRUPTED = "interrupted"
@@ -591,7 +595,8 @@ def recovery_target_tick(entity: Any, receipt: SleepReceipt, tick: int) -> int:
     next boundary without extending ``limit_tick`` or replacing the sleep
     identity. The cap always wins.
     """
-    if receipt.mode == MODE_DURATION:
+    if receipt.mode in (MODE_DURATION, MODE_UNTIL_DAWN):
+        # A declared deadline is retained exactly; the cap is already in it.
         return receipt.target_tick
     if receipt.mode == MODE_FORCED_THRESHOLD:
         return min(receipt.limit_tick, tick + forced_wake_seconds(entity))
@@ -631,6 +636,7 @@ __all__ = [
     "MODE_DURATION",
     "MODE_FORCED_THRESHOLD",
     "MODE_RECOVERY",
+    "MODE_UNTIL_DAWN",
     "PARTY_OPERATION_ATTRIBUTE",
     "RECEIPT_ATTRIBUTE",
     "SLEEP_RECEIPT_SURFACES",

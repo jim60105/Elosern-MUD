@@ -478,5 +478,101 @@ class SkipHelperAdvanceTests(EvenniaTest):
         return monster
 
 
+class CampingDawnTests(EvenniaTest):
+    """The until-dawn mode is a retained deadline at the strictly next dawn."""
+
+    HOUR = CLOCK_YAML["seconds_per_hour"]
+    DAY = CLOCK_YAML["seconds_per_hour"] * CLOCK_YAML["hours_per_day"]
+
+    def setUp(self):
+        super().setUp()
+        self._event_sources = dict(_EVENT_SOURCES)
+        _EVENT_SOURCES.clear()
+        self.addCleanup(_EVENT_SOURCES.update, self._event_sources)
+        self.addCleanup(_EVENT_SOURCES.clear)
+        self.player = self.char1
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.room1
+        self.player.save()
+        for key in ("hp", "mp", "sp"):
+            gauge = getattr(self.player.traits, key)
+            gauge.current = gauge.max
+            gauge.rate = 0.0
+        # A full reserve: an early saturation must not shorten the deadline.
+        write_fatigue_state(self.player, 360000, SleepPosture.AWAKE)
+
+    def _at(self, day, hour):
+        clock = get_world_clock()
+        clock._script.db.tick = day * self.DAY + hour * self.HOUR
+        return int(get_world_clock().tick)
+
+    def test_strict_dawn_cap_and_interrupt(self):
+        from world.rules import time_skip
+        from world.rules.sleep_receipt import (
+            MODE_UNTIL_DAWN,
+            STATE_COMPLETED,
+            read_sleep_receipt,
+        )
+
+        # Strictly next dawn, below and at the configured cap (12 h).
+        self.assertEqual(time_skip.seconds_until_dawn(4 * self.HOUR), 2 * self.HOUR)
+        self.assertEqual(time_skip.seconds_until_dawn(23 * self.HOUR), 7 * self.HOUR)
+        self.assertEqual(time_skip.seconds_until_dawn(self.DAY), 6 * self.HOUR)
+        self.assertEqual(time_skip.seconds_until_dawn(6 * self.HOUR), MAX_SKIP_SECONDS)
+        self.assertEqual(time_skip.seconds_until_dawn(7 * self.HOUR), MAX_SKIP_SECONDS)
+        with patch.object(time_skip, "MAX_SKIP_SECONDS", 2 * self.DAY):
+            # Exactly at the anchor the target is the next day's dawn.
+            self.assertEqual(time_skip.seconds_until_dawn(6 * self.HOUR), self.DAY)
+            self.assertEqual(time_skip.seconds_until_dawn(7 * self.HOUR), 23 * self.HOUR)
+
+        # Accepted entry: zero time, the retained deadline, no recovery mode.
+        start = self._at(2, 23)
+        entry = enter_sleep(self.player, mode=MODE_UNTIL_DAWN)
+        self.assertEqual(get_world_clock().tick, start)
+        receipt = read_sleep_receipt(self.player)
+        self.assertEqual(receipt.mode, MODE_UNTIL_DAWN)
+        self.assertEqual(receipt.target_tick, start + 7 * self.HOUR)
+        self.assertEqual(receipt.limit_tick, start + 7 * self.HOUR)
+        self.assertFalse(receipt.partial)
+
+        # A due interactive event interrupts the same accepted sleep.
+        boundary = start + 1000
+        register_event_source(
+            "shop_hours",
+            lambda begin, end: [ScheduledEvent("synthetic_interactive", end, {})]
+            if begin < boundary <= end
+            else [],
+            next_boundary=lambda begin, end: boundary
+            if begin < boundary <= end
+            else None,
+        )
+        first = continue_sleep(self.player, entry)
+        self.assertEqual(first.elapsed_seconds, 1000)
+        self.assertIn("synthetic_interactive", [event.kind for event in first.events])
+        self.assertFalse(first.woke)
+        kept = read_sleep_receipt(self.player)
+        self.assertTrue(kept.sleeping)
+        self.assertEqual(kept.sleep_id, receipt.sleep_id)
+        self.assertEqual(kept.target_tick, receipt.target_tick)
+        self.assertIs(read_fatigue_state(self.player).posture, SleepPosture.VOLUNTARY)
+
+        # Resumption settles only the remainder, across midnight, at full
+        # reserve, and completes at the deadline.
+        second = continue_sleep(self.player, entry)
+        self.assertEqual(second.elapsed_seconds, 7 * self.HOUR - 1000)
+        self.assertEqual(get_world_clock().tick, start + 7 * self.HOUR)
+        self.assertTrue(second.woke)
+        done = read_sleep_receipt(self.player)
+        self.assertEqual(done.state, STATE_COMPLETED)
+        self.assertEqual(done.sleep_id, receipt.sleep_id)
+        self.assertEqual(read_fatigue_state(self.player).reserve_units, 360000)
+        self.assertIs(read_fatigue_state(self.player).posture, SleepPosture.AWAKE)
+
+        # A dawn request carries no seconds.
+        with self.assertRaises(SleepRefused):
+            enter_sleep(self.player, mode=MODE_UNTIL_DAWN, seconds=60)
+
+
 if __name__ == "__main__":
     unittest.main()

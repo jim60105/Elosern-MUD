@@ -76,6 +76,7 @@ from world.rules.sleep_receipt import (
     MISSING_RECEIPT_MESSAGE,
     MODE_DURATION,
     MODE_RECOVERY,
+    MODE_UNTIL_DAWN,
     SLEEP_RECEIPT_SURFACES,
     STATE_COMPLETED,
     STATE_SLEEPING,
@@ -133,7 +134,7 @@ ALREADY_RECOVERED_MESSAGE = "身體已完全恢復，無需入睡。"
 PARTIAL_RECOVERY_MESSAGE = "已達睡眠上限，尚未完全恢復。"
 PARTY_SLEEP_ACCEPTED_MESSAGE = "在場成員已進入睡眠。"
 PARTY_SLEEP_NOTHING_MESSAGE = "在場成員都已入睡或已完全恢復。"
-INVALID_SLEEP_MODE_MESSAGE = "睡眠模式無效；請使用 until-recovered 或明確時長。"
+INVALID_SLEEP_MODE_MESSAGE = "睡眠模式無效；請使用 until-recovered、until-dawn 或明確時長。"
 MISSING_DURATION_MESSAGE = "指定時長的睡眠需要一個時長，例如 sleep 2h。"
 STALE_SLEEP_MESSAGE = "這次睡眠已經更新，請依目前狀態重新操作。"
 PARTY_MEMBER_INELIGIBLE_MESSAGE = "隊伍中有成員目前無法入睡：{member}。"
@@ -594,7 +595,7 @@ def _handoff_candidates(member: Any) -> tuple[Any, ...]:
 
 def _validate_sleep_request(mode: Any, seconds: Any) -> int | None:
     """Validate one declared sleep mode/seconds pair without touching state."""
-    if mode not in (MODE_RECOVERY, MODE_DURATION):
+    if mode not in (MODE_RECOVERY, MODE_DURATION, MODE_UNTIL_DAWN):
         raise SleepRefused("invalid_mode", INVALID_SLEEP_MODE_MESSAGE)
     if mode == MODE_DURATION:
         if seconds is None:
@@ -611,12 +612,41 @@ def _validate_sleep_request(mode: Any, seconds: Any) -> int | None:
     return None
 
 
+def _current_tick() -> int:
+    """The committed world tick, read without creating the clock singleton."""
+    from world.rules.clock import read_world_clock
+
+    clock = read_world_clock()
+    return 0 if clock is None else int(clock.tick)
+
+
+def seconds_until_dawn(tick: int) -> int:
+    """The strictly future configured dawn interval from ``tick``, capped.
+
+    ``seconds_until_daypart`` is strictly positive even exactly at the anchor,
+    so a dawn sleep begun at 06:00 runs to the next day's 06:00. The configured
+    maximum sleep caps the deadline; a capped target is simply earlier.
+    """
+    from world.rules.clock import WorldDateTime, seconds_until_daypart
+
+    return min(
+        seconds_until_daypart(WorldDateTime.from_tick(int(tick)), "dawn"),
+        MAX_SKIP_SECONDS,
+    )
+
+
 def _accepted_sleep_seconds(
-    member: Any, mode: str, duration_seconds: int | None
+    member: Any,
+    mode: str,
+    duration_seconds: int | None,
+    *,
+    tick: int | None = None,
 ) -> tuple[int, bool]:
     """Return ``(bounded accepted seconds, capped-partial flag)`` for one entry."""
     if mode == MODE_DURATION:
         return int(duration_seconds or 0), False
+    if mode == MODE_UNTIL_DAWN:
+        return seconds_until_dawn(_current_tick() if tick is None else tick), False
     raw = _uncapped_recovery_seconds(member)
     return min(raw, MAX_SKIP_SECONDS), raw > MAX_SKIP_SECONDS
 
@@ -731,7 +761,9 @@ def enter_sleep(
             if current.posture is SleepPosture.VOLUNTARY:
                 _receipt_for(member)
                 raise SleepRefused("already_asleep", CONTINUE_SLEEP_MESSAGE)
-            accepted, partial = _accepted_sleep_seconds(member, mode, duration)
+            accepted, partial = _accepted_sleep_seconds(
+                member, mode, duration, tick=tick
+            )
             if accepted <= 0:
                 # An already-met recovery target must not invent elapsed sleep
                 # or a sleeping posture that would re-enter a completed episode.
@@ -1679,6 +1711,64 @@ def _party_member_eligible(member: Any) -> None:
         )
 
 
+@dataclass(frozen=True)
+class PartyEntryPlan:
+    """The read-only per-member plan of one explicit all-party sleep entry.
+
+    ``planned`` holds each awake body that would receive a new voluntary
+    receipt with its accepted seconds and capped-partial flag; ``existing``
+    each current sleeper with the accepted receipt (or ``None`` for a forced
+    body without one) it keeps; ``awake_met`` each awake body whose target
+    is already met under the mode. Remote companions never appear: the
+    caller passes the present party scope.
+    """
+
+    planned: tuple[tuple[Any, int, bool], ...]
+    existing: tuple[tuple[Any, SleepReceipt | None], ...]
+    awake_met: tuple[Any, ...]
+
+
+def plan_party_entry(
+    members: Any, mode: str, duration: int | None, *, tick: int
+) -> PartyEntryPlan:
+    """Plan an all-party entry without writing (shared by entry and preview).
+
+    Every present member is validated exactly as the entry validates it; a
+    refusal raises :class:`SleepRefused`. No receipt, posture or clock is
+    created here.
+    """
+    planned: list[tuple[Any, int, bool]] = []
+    existing: list[tuple[Any, SleepReceipt | None]] = []
+    awake_met: list[Any] = []
+    for member in members:
+        if getattr(member, "_is_deleted", False):
+            continue
+        _party_member_eligible(member)
+        state = read_optional_fatigue_state(member)
+        if state is None:  # pragma: no cover - guarded above
+            continue
+        if state.posture in (SleepPosture.FORCED, SleepPosture.VOLUNTARY):
+            receipt = _receipt_for(member)
+            if state.posture is SleepPosture.VOLUNTARY and receipt is None:
+                name = str(getattr(member, "key", member.pk))
+                raise SleepRefused(
+                    MISSING_RECEIPT_CODE,
+                    PARTY_MEMBER_MISSING_RECEIPT_MESSAGE.format(member=name),
+                )
+            # An existing accepted plan (or a forced threshold plan) keeps its
+            # own target and identity.
+            existing.append((member, receipt))
+            continue
+        accepted, partial = _accepted_sleep_seconds(
+            member, mode, duration, tick=tick
+        )
+        if accepted <= 0:
+            awake_met.append(member)
+            continue
+        planned.append((member, accepted, partial))
+    return PartyEntryPlan(tuple(planned), tuple(existing), tuple(awake_met))
+
+
 def enter_party_sleep(
     actor: Any,
     *,
@@ -1703,27 +1793,8 @@ def enter_party_sleep(
     members = present_party_scope(actor)
     tick = int(get_world_clock().tick)
     planned: list[tuple[Any, SleepReceipt, int, bool]] = []
-    for member in members:
-        if getattr(member, "_is_deleted", False):
-            continue
-        _party_member_eligible(member)
-        state = read_optional_fatigue_state(member)
-        if state is None:  # pragma: no cover - guarded above
-            continue
-        if state.posture in (SleepPosture.FORCED, SleepPosture.VOLUNTARY):
-            receipt = _receipt_for(member)
-            if state.posture is SleepPosture.VOLUNTARY and receipt is None:
-                name = str(getattr(member, "key", member.pk))
-                raise SleepRefused(
-                    MISSING_RECEIPT_CODE,
-                    PARTY_MEMBER_MISSING_RECEIPT_MESSAGE.format(member=name),
-                )
-            # An existing accepted plan (or a forced threshold plan) keeps its
-            # own target and identity.
-            continue
-        accepted, partial = _accepted_sleep_seconds(member, mode, duration)
-        if accepted <= 0:
-            continue
+    entry_plan = plan_party_entry(members, mode, duration, tick=tick)
+    for member, accepted, partial in entry_plan.planned:
         sleep_id = uuid4().hex
         receipt = SleepReceipt(
             sleep_id=sleep_id,
@@ -1873,6 +1944,7 @@ __all__ = [
     "MAX_WEB_SKIP_SECONDS",
     "PracticeBooking",
     "PracticeReject",
+    "PartyEntryPlan",
     "PracticeRejectReason",
     "SkipRefused",
     "SkipResult",
@@ -1893,6 +1965,8 @@ __all__ = [
     "enter_sleep",
     "owner_sleep_view_state",
     "parse_duration",
+    "plan_party_entry",
+    "seconds_until_dawn",
     "preflight_practice_booking",
     "read_sleep_receipt",
     "record_owner_sleep_decision",
