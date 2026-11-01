@@ -185,3 +185,36 @@ CI run 33979656279 的分級實測（job 總時數）顯示僅兩個家族超出
 - `.github/browser-shards.json` 由 16 個分片重打包為 **18 個**（36 個行程清單）：以每個類別/method 的 CI 實測每測試權重（重型專用伺服器類別 40–55 秒、共享伺服器類別約 6–12 秒加一次開機）做 LPT 打包，單一走清單上限約 235 秒，預計最壞瀏覽器 job 總時數約 4.8 分鐘。重型類別維持方法層級分割（每清單最多 3–4 個 method），共享伺服器類別以類別層級標籤打包，使每個類別只在單一行程執行一次開機。
 - 擁有權契約（`tests/test_evennia_test_optimization_contract.py`）在離線以相同 AST 解析演算法驗證：378 個非瀏覽器模組各由恰好一個分片擁有；269 個瀏覽器 method 各由 36 個行程清單中的恰好一個擁有。索引皆唯一且排序；本次未改動 workflow 與測試檔。
 - 並行工作數為 1 preflight + 10 evennia + 18 browser + 1 frontend + 1 top-level + 1 gate = 32；超出 20 並行上限的工作排隊執行，因每個 job 本身 ≤ 5 分鐘，僅影響總牆鐘時間而非單一 job 預算。
+
+### 2026-11-01：分片預算改以 CI 的每測試實測為依據
+
+CI run 41290568911（33 個工作全綠）以 run-step 實測（`Run evennia shard N` 與
+`Run browser shard N` 步驟本身）顯示 28 個分片工作中有 **19 個超過 6 分鐘**：
+evennia shard 2（rules-b）與 shard 7（webclient-evidence）各 841 秒、shard 8
+751 秒、shard 1（rules-a）595 秒、shard 4 425 秒；browser shard 9 788 秒、
+shard 16 751 秒、shard 5 568 秒、shard 3 554 秒，另有 shard 7、10、11、2、14、
+12、17、19 落在 6 至 9 分鐘之間。這一輪的 run-step 時間是重新打包唯一採用的
+時間依據（每個瀏覽器分片的兩個行程另外各有一行 `Ran N tests in Xs`）。
+
+分片層級的總和不足以重新打包：同一個清單裡最貴的測試可能佔掉大部分時間，而
+log 只給出行程總和。兩個進入點因此都改為輸出**每測試**時間：
+
+- evennia 分片的指令加上 `--durations 0`。Django 把 `--durations` 轉交
+  `unittest.TextTestRunner`；`--parallel 4` 下送回的仍是各 worker 實測的每測試
+  時間（以拋棄式 Django 專案在本專案環境驗證：`--parallel 2 --durations 0`
+  印出實際的 0.300s/0.200s/0.050s）。
+- `web/tests/browser/unittest_driver.py` 除了 `durations=0`，另裝一個 result
+  class，在跑完後逐列印出每個測試的 **method 時間**與它前面的 **boundary
+  時間**（前一個 `stopTest` 到本測試 `startTest`，其中包含前一類別的
+  `tearDownClass` 與本類別的 `setUpClass`，也就是瀏覽器類別啟動共享 runtime
+  的位置），最後再印 run 與 process 總時間。單一行程的這些數字直接落在該 job
+  的 log 中。
+
+`unittest` 的 `durations` 只涵蓋 method 區間（`setUp` 到 `doCleanups`），類別層級
+fixture 跑在 suite 中而不在其中（`unittest/case.py` 的 `run()` 在
+`_handleClassSetUp` 之後才計時）；瀏覽器的共享 runtime 開機因此必須由 boundary
+欄位補上。打包時也一併對帳 CI 的行程總和（`Ran N tests in Xs`）與 run 總時間，
+兩者的差即為首個類別的 fixture 與 suite 起始成本。
+
+兩項都只增加診斷輸出：不改變標籤、worker 設定、斷言、超時或任何預算，也不
+需要在本機重跑任何分片；重新打包以 CI log 的實測值為準。

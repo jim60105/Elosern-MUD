@@ -14,6 +14,15 @@ Evennia 目前提供的 `EvenniaTest` 會在 `setUp()` 中建立 accounts、room
 
 !> **Non-browser machine shards:** `.github/evennia-shards.json` partitions the suite by package and module across ten independent CI jobs. Each module has exactly one execution owner. Each shard uses four outer Django workers except `webclient-evidence`, whose frontend tools own their parallelism. These shard commands are **CI-only**: they share the local test database path, so never execute multiple shard commands on the same machine. Local verification uses focused labels or the documented full-suite profile.
 
+!> **Per-test timing comes from CI.** The evennia shard command runs with
+`--durations 0`, and the browser driver additionally prints, per test, its
+method wall time and the fixture boundary before it (the previous
+`stopTest`-to-`startTest` gap that carries class-level fixtures such as the
+shared runtime boot, which `durations` alone does not cover). A shard
+rebalance (`docs/development/evennia-test-performance.md`) reads those logs
+instead of timing anything locally; the output is diagnostic only and changes
+no label, worker setting, assertion or budget.
+
 ### Frontend evidence worker profile
 
 The `webclient-evidence` machine shard runs with one outer Django worker.

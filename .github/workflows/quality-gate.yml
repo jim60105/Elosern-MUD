@@ -138,6 +138,8 @@ jobs:
       - name: Run evennia shard ${{ matrix.index }}
         # Vitest owns the frontend evidence shard's worker pool; parallel
         # Django classes would launch competing Vitest/build pools.
+        # ``--durations 0`` prints every test's wall time: a shard rebalance is
+        # measured from this log rather than from a local timing run.
         env:
           COVERAGE_FILE: coverage-evennia-shard-${{ matrix.index }}
           MUD_TEST_SETTINGS: "1"
@@ -146,6 +148,7 @@ jobs:
           uv run --locked coverage run
           --concurrency=multiprocessing --parallel-mode
           -m evennia test --settings test_settings.py --noinput
+          --durations 0
           --parallel ${{ matrix.name == 'webclient-evidence' && 1 || 4 }} ${{ join(matrix.labels, ' ') }}
 
       - name: Upload coverage and evidence artifacts
