@@ -1036,55 +1036,113 @@ terrain:
       - {cell_x: 2300, cell_y: 526}
     imperial_river:
       route:
-      - {cell_x: 1950, cell_y: 1260}
-      - {cell_x: 1954, cell_y: 1244}
-      - {cell_x: 1959, cell_y: 1229}
-      - {cell_x: 1968, cell_y: 1215}
-      - {cell_x: 1973, cell_y: 1196}
-      - {cell_x: 1977, cell_y: 1177}
-      - {cell_x: 1985, cell_y: 1160}
-      - {cell_x: 1986, cell_y: 1140}
-      - {cell_x: 1986, cell_y: 1120}
-      - {cell_x: 1990, cell_y: 1100}
-      - {cell_x: 1999, cell_y: 1081}
-      - {cell_x: 2006, cell_y: 1061}
-      - {cell_x: 2010, cell_y: 1040}
-      - {cell_x: 2019, cell_y: 1013}
-      - {cell_x: 2023, cell_y: 986}
-      - {cell_x: 2035, cell_y: 960}
-      - {cell_x: 2044, cell_y: 934}
-      - {cell_x: 2045, cell_y: 907}
-      - {cell_x: 2050, cell_y: 880}
-      - {cell_x: 2057, cell_y: 854}
-      - {cell_x: 2059, cell_y: 827}
-      - {cell_x: 2062, cell_y: 800}
-      - {cell_x: 2061, cell_y: 766}
-      - {cell_x: 2069, cell_y: 733}
-      - {cell_x: 2070, cell_y: 700}
-      - {cell_x: 2067, cell_y: 680}
-      - {cell_x: 2066, cell_y: 660}
-      - {cell_x: 2068, cell_y: 640}
-      - {cell_x: 2065, cell_y: 627}
-      - {cell_x: 2072, cell_y: 613}
-      - {cell_x: 2067, cell_y: 600}
-      - {cell_x: 2063, cell_y: 587}
-      - {cell_x: 2060, cell_y: 574}
-      - {cell_x: 2060, cell_y: 560}
-      - {cell_x: 2059, cell_y: 533}
-      - {cell_x: 2061, cell_y: 506}
-      - {cell_x: 2066, cell_y: 480}
-      - {cell_x: 2066, cell_y: 453}
-      - {cell_x: 2067, cell_y: 426}
-      - {cell_x: 2072, cell_y: 400}
-      - {cell_x: 2075, cell_y: 373}
-      - {cell_x: 2071, cell_y: 347}
-      - {cell_x: 2068, cell_y: 320}
-      - {cell_x: 2068, cell_y: 296}
-      - {cell_x: 2063, cell_y: 273}
-      - {cell_x: 2060, cell_y: 250}
+      - cell_x: 1896
+        cell_y: 1327
+      - cell_x: 1910
+        cell_y: 1312
+      - cell_x: 1932
+        cell_y: 1297
+      - cell_x: 1953
+        cell_y: 1268
+      - cell_x: 1951
+        cell_y: 1244
+      - cell_x: 1959
+        cell_y: 1229
+      - cell_x: 1968
+        cell_y: 1215
+      - cell_x: 1973
+        cell_y: 1196
+      - cell_x: 1977
+        cell_y: 1177
+      - cell_x: 1985
+        cell_y: 1160
+      - cell_x: 1986
+        cell_y: 1140
+      - cell_x: 1986
+        cell_y: 1120
+      - cell_x: 1990
+        cell_y: 1100
+      - cell_x: 1999
+        cell_y: 1081
+      - cell_x: 2006
+        cell_y: 1061
+      - cell_x: 2010
+        cell_y: 1040
+      - cell_x: 2019
+        cell_y: 1013
+      - cell_x: 2023
+        cell_y: 986
+      - cell_x: 2035
+        cell_y: 960
+      - cell_x: 2044
+        cell_y: 934
+      - cell_x: 2045
+        cell_y: 907
+      - cell_x: 2050
+        cell_y: 880
+      - cell_x: 2057
+        cell_y: 854
+      - cell_x: 2059
+        cell_y: 827
+      - cell_x: 2062
+        cell_y: 800
+      - cell_x: 2061
+        cell_y: 766
+      - cell_x: 2069
+        cell_y: 733
+      - cell_x: 2070
+        cell_y: 700
+      - cell_x: 2067
+        cell_y: 680
+      - cell_x: 2066
+        cell_y: 660
+      - cell_x: 2068
+        cell_y: 640
+      - cell_x: 2065
+        cell_y: 627
+      - cell_x: 2072
+        cell_y: 613
+      - cell_x: 2067
+        cell_y: 600
+      - cell_x: 2063
+        cell_y: 587
+      - cell_x: 2060
+        cell_y: 574
+      - cell_x: 2060
+        cell_y: 560
+      - cell_x: 2059
+        cell_y: 533
+      - cell_x: 2061
+        cell_y: 506
+      - cell_x: 2066
+        cell_y: 480
+      - cell_x: 2066
+        cell_y: 453
+      - cell_x: 2067
+        cell_y: 426
+      - cell_x: 2072
+        cell_y: 400
+      - cell_x: 2075
+        cell_y: 373
+      - cell_x: 2071
+        cell_y: 347
+      - cell_x: 2068
+        cell_y: 320
+      - cell_x: 2068
+        cell_y: 296
+      - cell_x: 2063
+        cell_y: 273
+      - cell_x: 2060
+        cell_y: 250
       fords:
-      - {cell_x: 1990, cell_y: 1100}
-      - {cell_x: 2067, cell_y: 600}
+      - cell_x: 1990
+        cell_y: 1100
+      - cell_x: 2067
+        cell_y: 600
+      - cell_x: 1903
+        cell_y: 1319
+      - cell_x: 1953
+        cell_y: 1268
     hills_river:
       route:
       - {cell_x: 1290, cell_y: 690}

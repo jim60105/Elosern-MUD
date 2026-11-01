@@ -20,8 +20,8 @@ locations:
     display_name_zh: 輝煌帝都
     description: Capital of the Grandia Empire.
     cell:
-      cell_x: 1970
-      cell_y: 1280
+      cell_x: 1957
+      cell_y: 1270
     geographic_constraint: Eastern agricultural plain and major river supply
     scene_archetype:
   capital_valhalla:
@@ -29,8 +29,8 @@ locations:
     display_name_zh: 咆哮王城
     description: Capital of the Valhalla Beast Kingdom.
     cell:
-      cell_x: 780
-      cell_y: 1910
+      cell_x: 712
+      cell_y: 1697
     geographic_constraint: Northwestern highland forest and tribal routes
     scene_archetype:
   dungeon_arcane_ruins:
