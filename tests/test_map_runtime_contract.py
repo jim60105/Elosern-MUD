@@ -11,8 +11,23 @@ from __future__ import annotations
 
 import ast
 import inspect
+import os
 import unittest
 from pathlib import Path
+
+# The adoption checks import the real runtime, whose chain reaches Evennia
+# contrib code that needs configured Django settings. Bootstrap the same way
+# ``tests/test_contrib_matrix.py`` does instead of relying on another module
+# having configured them earlier in the same process.
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "server.conf.settings")
+
+import django  # noqa: E402
+
+django.setup()
+
+import evennia  # noqa: E402
+
+evennia._init()
 
 from elosern_map_core.sources import discover_source_paths
 

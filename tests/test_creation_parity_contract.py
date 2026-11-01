@@ -10,8 +10,23 @@ contracts.
 
 from pathlib import Path
 import importlib
+import os
 import re
 import unittest
+
+# This contract reads game modules whose import chain reaches Evennia contrib
+# code, which needs configured Django settings. Bootstrap the same way
+# ``tests/test_contrib_matrix.py`` does instead of relying on another module
+# having configured them earlier in the same process.
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "server.conf.settings")
+
+import django  # noqa: E402
+
+django.setup()
+
+import evennia  # noqa: E402
+
+evennia._init()
 
 from tools.spec_traceability import covers_requirement
 from tools.protocol_client_source import protocol_client_source

@@ -306,6 +306,15 @@ makespan 200 秒、top-level 分片 170 秒。這讓兩種池都能落在 6 分�
   子行程或 Chromium 的重模組（`test_map_image_capture`、`test_evennia_test_guard`、
   前端工具鏈與地圖作者模組）各自隔離，其餘 80 個模組依測試數平分成三份；每個
   分片同樣保證至少一個標註測試，`--durations 0` 讓下一輪能用實測值再平衡。
+- **分片把隱藏的啟動依賴翻出來**：`tests/test_creation_parity_contract.py` 與
+  `tests/test_map_runtime_contract.py` 在單一 job 裡是靠較早被 discover 的模組
+  （`tests/test_command_docs.py`、`tests/test_contrib_matrix.py`）先把 Django
+  settings 設定好才能 import 遊戲模組；拆成獨立分片後它們的 import 鏈
+  （`evennia.contrib.grid.wilderness`）直接失敗。兩者已改用文件化的
+  top-level bootstrap（`os.environ.setdefault("DJANGO_SETTINGS_MODULE",
+  "server.conf.settings")` + `django.setup()` + `evennia._init()`），單獨執行
+  16 項測試已綠。其餘 9 個頂層模組同樣在 import 遊戲碼但沒有 bootstrap；它們在
+  目前這個切法下綠燈，後續若再重切應優先補上同樣的 bootstrap。
 - manifest 新增 `workers` 欄位，workflow 以 `matrix.workers` 決定 `--parallel`
   （原本以分片名稱字串 `webclient-evidence` 判斷，拆出多個 evidence 分片後
   會回到 4 個 worker 並重新造成 Vitest/build 的 oversubscription）。
