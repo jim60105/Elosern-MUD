@@ -406,7 +406,7 @@ SHALL NEVER drop, clip, or reorder rows to fit a bound.
 - **THEN** validation rejects the payload, because the bound applies to the flattened total, not to
   the count of top-level category-group entries
 
-#### Scenario: The actives flattened bound admits exactly 96 rows and rejects 97
+#### Scenario: The actives flattened bound admits a payload at the bound and rejects one row over it
 - **WHEN** a hand-constructed `actives` payload carries exactly the flattened actives bound's rows
   across its sub-groups — 128 rows at this revision — and a second payload carries one more (129)
 - **THEN** the at-bound payload passes validation and the one-over payload is rejected, while an
