@@ -345,6 +345,9 @@ function tickStyle(index) {
   color: var(--paper-500);
 }
 .leg-tick {
+  /* The tick's place in the gauge; the inline style binds each tick's own
+     index. */
+  --i: 0;
   position: relative;
   flex: 1 1 0;
   min-width: calc(2px * var(--ui-scale));

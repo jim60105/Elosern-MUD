@@ -1079,6 +1079,9 @@ defineExpose({ focusInside, focus: () => root.value?.focus({ preventScroll: true
 /* The world layer: one translation moves the canvas, the overlay and the
    chips together. It glides at full motion and lands at once otherwise. */
 .travel-map__world {
+  /* The camera glide in ms; the inline style binds GLIDE_MS, and an unbound
+     layer lands at once like the snap states. */
+  --travel-glide: 0ms;
   position: absolute;
   left: 0;
   top: 0;
