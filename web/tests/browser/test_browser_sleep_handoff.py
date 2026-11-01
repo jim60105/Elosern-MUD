@@ -238,7 +238,10 @@ class SleepHandoffBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
         self._wait_exploration_available(page)
         self._wait_panel(page, "party", lambda panel: panel.get("available"))
 
-        activate_wait_row(page, "wait-sleep")
+        # A recovery entry, not the helper's explicit hour: the all-party
+        # choice continues every party member to its own recovery target, so
+        # the owner's accepted plan must be the one the party shares.
+        activate_wait_row(page, "wait-sleep", recovery=True)
         try:
             self._card(page).wait_for(state="visible", timeout=30000)
         except Exception as error:

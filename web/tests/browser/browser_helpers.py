@@ -649,7 +649,13 @@ def answer_dream_question(page: Page, dream: bool, timeout: int = 30000) -> None
     press_control(page, DREAM_QUESTION_SELECTOR + ' [data-testid="%s"]' % answer, timeout=timeout)
 
 
-def activate_wait_row(page: Page, key: str, dream: bool = False, timeout: int = 30000) -> None:
+def activate_wait_row(
+    page: Page,
+    key: str,
+    dream: bool = False,
+    timeout: int = 30000,
+    recovery: bool = False,
+) -> None:
     """Run one of the retired wait rows through the two-layer rest entry.
 
     The key vocabulary is the retired rows' (redesign-rest-entry): every path
@@ -658,8 +664,11 @@ def activate_wait_row(page: Page, key: str, dream: bool = False, timeout: int = 
     and the wait form's 等待直到黎明; ``wait-rest`` presses the 等待 tile and
     returns with the wait form open; ``wait-sleep`` presses the 睡眠 tile and
     submits one hour of explicit duration, which keeps the entry positive
-    even on a fully restored fixture. ``dream`` dismisses the contextual
-    roster if it appears and answers the owner question 是; without it the
+    even on a fully restored fixture, unless ``recovery`` selects the form's
+    睡眠至完全恢復 control instead (a fractionally restored fixture makes that
+    entry positive, and shares one recovery target with every party member
+    that joins the same sleep). ``dream`` dismisses the contextual roster if
+    it appears and answers the owner question 是; without it the
     authoritative surface is left for the caller.
     """
     if key not in WAIT_ROW_KEYS:
@@ -675,8 +684,15 @@ def activate_wait_row(page: Page, key: str, dream: bool = False, timeout: int = 
     if key == "wait-sleep":
         form = page.locator('[data-testid="sleep-form"]')
         form.wait_for(state="visible", timeout=timeout)
-        form.locator("input").fill("1")
-        form.locator('button[type="submit"]').click()
+        if recovery:
+            press_control(
+                page,
+                '[data-testid="sleep-form"] [data-testid="sleep-form-recovery"]',
+                timeout=timeout,
+            )
+        else:
+            form.locator("input").fill("1")
+            form.locator('button[type="submit"]').click()
         if not dream:
             return
         page.wait_for_selector(
