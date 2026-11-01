@@ -194,7 +194,9 @@ class CharacterReaderTests(EvenniaTest):
             first = characters.character_detail(self.player)
             self.assertNotIn("lineage", failed_sections(first))
             lineage = section_of(first, "lineage")
-            self.assertEqual(lineage["note"], "完成 0 / 1")
+            # complete-elemental-mastery makes each element's closure carry its
+            # mastery terminal, so the synthetic fire group reads two nodes.
+            self.assertEqual(lineage["note"], "完成 0 / 2")
 
             graph = next(
                 group for group in lineage["groups"] if group["key"] == "t_ember_burst"
