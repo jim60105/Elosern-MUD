@@ -50,6 +50,7 @@ import { applyView } from "./elosern/view.js";
 import { applySkillUse } from "./elosern/skill_use.js";
 import { applyTravel } from "./elosern/travel.js";
 import { applyTravelLog } from "./elosern/travel_log.js";
+import { applyCamp } from "./elosern/camp.js";
 
 export { resolveLocationLabel };
 
@@ -175,6 +176,9 @@ export const useElosernStore = defineStore("elosern", () => {
   // signal the transport seam raises.
   applyTravelLog(ctx);
   applyTravel(ctx);
+  // The whole-party camp card and campfire beat (wilderness-camping): one
+  // more centred card over the travel stage.
+  applyCamp(ctx);
   applyView(ctx);
 
   // The initial committed view (the original `initialView()`): built before
@@ -255,6 +259,15 @@ export const useElosernStore = defineStore("elosern", () => {
     // route-ui): depart on the locked current plan; close an arrival once.
     departTravel: ctx.departTravel,
     dismissTravelArrival: ctx.dismissTravelArrival,
+    // The camp card and its beat (wilderness-camping): open from the leg or
+    // the forced-walking-sleep handoff, the two supplied modes, the dream
+    // opt-in, one confirmation, and the beat's continue.
+    openTravelCamp: ctx.openTravelCamp,
+    closeCamp: ctx.closeCamp,
+    selectCampMode: ctx.selectCampMode,
+    toggleCampDream: ctx.toggleCampDream,
+    confirmCamp: ctx.confirmCamp,
+    continueCampTravel: ctx.continueCampTravel,
     // The route preview (wilderness-travel-planning-ui): the hovered cell's
     // debounced query, a locked destination and Esc's clear.
     hoverTravelCell: ctx.hoverTravelCell,

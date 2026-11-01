@@ -314,36 +314,32 @@ describe("the mounted leg panel", () => {
     expect(looks[0].payload).toEqual({ room: true });
   });
 
-  it("紮營 opens the existing sleep form and closing it returns focus to 紮營", async () => {
+  it("紮營 opens the camp card, asks only for the preview, and cancel returns focus to 紮營", async () => {
     const s = await stage();
     const camp = s.w.get('[data-testid="leg-camp"]');
     camp.element.focus();
     await camp.trigger("click");
     await tick();
-    expect(s.w.find('[data-testid="sleep-card"]').exists()).toBe(true);
-    // No request leaves for opening it.
-    expect(s.sender.sent.actions.filter((a) => a.action_id !== "map.view")).toHaveLength(0);
-    s.store.closeRoomCard();
+    expect(s.w.find('[data-testid="camp-card"]').exists()).toBe(true);
+    // Opening sends the read-only preview and never a camp.
+    const sent = s.sender.sent.actions.filter((a) => a.action_id !== "map.view").map((a) => a.action_id);
+    expect(sent).toEqual(["explore.camp_preview"]);
+    await s.w.get('[data-testid="camp-card"]').trigger("keydown", { key: "Escape" });
     await tick();
     await tick();
-    expect(s.w.find('[data-testid="sleep-card"]').exists()).toBe(false);
+    expect(s.w.find('[data-testid="camp-card"]').exists()).toBe(false);
     expect(document.activeElement).toBe(s.w.get('[data-testid="leg-camp"]').element);
   });
 
-  it("紮營 on an already open rest entry switches it to the sleep form", async () => {
+  it("紮營 over an open rest entry replaces it with the camp card", async () => {
     const s = await stage();
     expect(s.store.openRoomCard("wait")).toBe(true);
     await tick();
-    expect(s.w.find('[data-testid="sleep-card"]').exists()).toBe(false);
     await s.w.get('[data-testid="leg-camp"]').trigger("click");
     await tick();
-    expect(s.w.find('[data-testid="sleep-card"]').exists()).toBe(true);
-    // The next ordinary opening starts on the tiles again.
-    s.store.closeRoomCard();
-    await tick();
-    expect(s.store.openRoomCard("wait")).toBe(true);
-    await tick();
-    expect(s.w.find('[data-testid="sleep-card"]').exists()).toBe(false);
+    expect(s.w.find('[data-testid="camp-card"]').exists()).toBe(true);
+    // One modal owner: the rest entry's card is gone.
+    expect(s.w.findAll('[data-anchor="choices"] .choice-card').map((c) => c.attributes("data-testid"))).toEqual(["camp-card"]);
   });
 
   it("a failed map read freezes the radio: its reason is named and arrows do nothing", async () => {

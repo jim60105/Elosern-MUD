@@ -353,6 +353,21 @@ exact payloads and exact success data slots, validated on both boundaries
   Absent or false keeps the existing question policy; `{}` stays the default
   all-party recovery request.
 
+In the browser, the camp group of the composed store
+(`web/webclient-app/stores/elosern/camp.js`, published as `view.camp`) owns
+the one card: `closed -> previewPending -> choosing | refused -> submitting ->
+dream | beat -> closed`. Opening (the leg's 紮營, or 全員紮營, which the
+handoff prepends only for a sleep-control view that first appeared while a
+walk or hold was active) stops the walk and sends the preview once the
+single-flight gate is free, so an admitted move commits first. Only the
+token's own result (request id, epoch, and the session it was asked in) is
+adopted; a disconnect, an epoch or generation change, or leaving exploration
+discards the card and never re-submits. The dream opt-in resets unchecked on
+every opening and clears when the selected mode cannot offer it. A
+confirmation sends exactly one `explore.camp`; a refusal returns to the card
+with the server reason, a dream entry hands over to the existing dream
+stage, and a settled camp becomes the presentation-only campfire beat.
+
 ### General publication parts
 
 An eager `ui_snapshot`/`ui_update` whose canonical document does not fit its

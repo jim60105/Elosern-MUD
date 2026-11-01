@@ -261,6 +261,8 @@ export function applyView(ctx) {
       // `{ mode, layout, room, map, mapReady, mapStatus, area, aim,
       // aimTarget, walking, holding, notice }`.
       travel: ctx.travelView(rs),
+      // The camp card and its beat (wilderness-camping).
+      camp: ctx.campView(rs),
       mutationsLocked: rs.mutationsLocked,
       protocolError: rs.protocolError,
       // The bounded complete recovery state (webclient-sync-recovery): the
@@ -569,6 +571,7 @@ export function applyView(ctx) {
     ctx.settleCombatActorSelection(rs);
     ctx.settlePresence(rs);
     ctx.settleRoomCard(rs);
+    ctx.settleCamp(rs);
     ctx.syncHudDrawer(prev, rs);
     ctx.syncSkillUse(prev, rs);
     // A free-form borrow speaks to the conversation's host. A refused

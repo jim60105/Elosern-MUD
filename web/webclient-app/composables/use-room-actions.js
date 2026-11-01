@@ -217,31 +217,11 @@ export function useRoomActions(
   }
 
   // The travel band's 紮營 (wilderness-travel-leg-ui): the single client
-  // camp entry. Before the camp card exists (wilderness-camping replaces this
-  // destination) it opens the existing rest entry straight on its sleep form;
-  // no new request, rule or placeholder. An entry already open switches to
-  // that layer. Closing it returns focus to 紮營.
+  // camp entry. Its destination is the camp card (wilderness-camping): the
+  // store stops any walk and asks for the server's camp preview; the card
+  // returns focus to 紮營 when it closes. Opening sends no camp.
   function openTravelCamp() {
-    if (skipDisabled.value) {
-      return false;
-    }
-    if (roomCard.value?.kind === "wait") {
-      // Already open (on any layer): switch to the sleep form.
-      lastTile.value = "sleep";
-      returning.value = false;
-      waitStep.value = "sleep";
-      opener.value = "camp";
-      return true;
-    }
-    // The kind watcher sets up the opened entry's layers; it consumes the
-    // requested layer instead of the tiles.
-    pendingLayer = "sleep";
-    if (!store.openRoomCard("wait")) {
-      pendingLayer = null;
-      return false;
-    }
-    opener.value = "camp";
-    return true;
+    return store.openTravelCamp ? store.openTravelCamp("leg") : false;
   }
 
   function onPill() {
