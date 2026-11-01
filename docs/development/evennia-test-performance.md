@@ -343,3 +343,16 @@ makespan 200 秒、top-level 分片 170 秒。這讓兩種池都能落在 6 分�
 本次重平衡只改 manifest 標籤分配、`workers` 欄位與本文件，未改動任何測試、
 斷言、worker 數以外的設定、超時或預算。推送後的 CI 執行是唯一驗收：每個分片
 的**完整 job 時長**（含前置與上傳，即 GitHub 顯示的 job 時間）必須 ≤ 6 分鐘。
+
+實測結果（以 GitHub job 時間為準，非本地推測）：
+
+| 執行 | 提交 | 分片工作 | 超過 360 秒 | 最慢分片工作 | 其他工作 |
+|---|---|---:|---:|---|---|
+| `41305471250` | `3c7f00eb` | 126 | 0 | 311 秒 | 兩個頂層分片缺 Django bootstrap 而紅 |
+| `41307019044` | `edfff8ca` | 126 | 0 | 317 秒（`evennia` `webclient-26`，`workers: 1`） | preflight 122 秒、frontend 217 秒、gate 57 秒，全綠 |
+| `41308349284` | `9407416d` | 126 | 0 | 328 秒（`evennia` `webclient-24`，`workers: 1`） | preflight 58 秒、map-editor 105 秒、frontend 255 秒、gate 59 秒，全綠 |
+
+`41305471250` 的兩個失敗分片由 `edfff8ca` 修掉（top-level 的 settings bootstrap），
+下一輪 `41307019044` 全綠且仍在預算內。`41308349284` 是 editor suite 移出
+preflight 後的驗收：`map-editor` 自成一個工作（105 秒，遠低於 6 分鐘預算），
+而所有分片都在等的 `preflight` 由 122 秒縮到 58 秒。
