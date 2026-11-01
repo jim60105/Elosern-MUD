@@ -52,6 +52,44 @@ touches the runtime:
 uv run --locked --env-file=<file with MUD_TEST_SETTINGS=1> evennia test --settings test_settings.py --keepdb world.maps.tests.test_editor_final_yaml_adoption
 ```
 
+## Focused tests
+
+Static checks never import the game. Run the tests that consume what you
+changed. The repository's test guard only accepts a single standalone
+command: no pipes, redirects, `;` trailers or inline `VAR=value` prefixes, and
+at most 100 discovered tests per run. It also refuses a script file or inline
+interpreter payload whose text contains a test command, so edit documentation
+that quotes these commands with the Edit tool, not a shell heredoc. Split a
+larger set into several runs.
+
+Evennia tests need the game settings. Without `--settings settings.py` they
+use Evennia's defaults and fail in `setUp` with `KeyError: 'Found 0 matching
+prototypes.'`, which looks like a real failure but is not.
+
+```console
+# Locations, kinds and lore rows
+uv run evennia test --keepdb --settings settings.py world.lore.tests.test_anchors world.lore.tests.test_nations world.lore.tests.test_settlements world.lore.tests.test_map_district_content
+# World map, sight and disclosure (public versus hidden kinds)
+uv run evennia test --keepdb --settings settings.py web.webclient.presentation.tests.test_world_map web.webclient.presentation.tests.test_map_panel_protocol world.rules.tests.test_sight world.rules.tests.test_ground_reveal
+# Terrain and geography contracts (rivers, fords, forest edge, capitals)
+uv run evennia test --keepdb --settings settings.py world.maps.tests.test_geography_source world.maps.tests.test_wilderness_geography_contract world.lore.tests.test_wilderness_regions
+# Top-level map contracts
+uv run --locked python -m unittest tests.test_map_authoring_contract tests.test_map_geographic_sources tests.test_map_partition_independence tests.test_elevation_contract tests.test_map_editor_geography
+```
+
+The map-core package and the editor keep their own projects, as CI runs them:
+
+```console
+cd packages/map-core && uv run --locked --extra generation python -m pytest tests -q
+cd tools/map-editor && uv run --locked python -m pytest tests -q
+pnpm --dir tools/map-editor/frontend test
+```
+
+`tests.test_map_core_contract` needs Django settings that a standalone
+`unittest` run does not provide, so it errors with `ImproperlyConfigured`
+even on a clean tree. When a test fails, check it against the baseline you
+recorded before editing before you blame your change.
+
 ## District partition (`world/maps/data/district_partition.json`)
 
 This is the walking-distance ownership raster behind the world-map districts.
@@ -100,7 +138,8 @@ This is an index the game exports and the editor reads. It contains:
 
 It does **not** cover map geometry, so moving or editing map objects never
 requires regenerating it. It goes stale only when external Python lore changes:
-places, service hosts, quests, scene catalogues and the like. Regenerate it with
+places, service hosts, quests, scene catalogues, `ANCHOR_LORE` rows, kind
+enums and the like. Regenerate it with
 `uv run --locked python -m tools.map_reference_context` and commit it with the
 lore change that caused it. CI checks it with `--check`.
 

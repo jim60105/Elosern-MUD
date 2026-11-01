@@ -11,7 +11,7 @@ kind: locations
 id: locations
 locations:
   village_ciaran:                       # stable id; never rename
-    kind: elven_village                 # capital | elven_village | dungeon
+    kind: elven_village                 # capital | city | town | port | elven_village | dungeon
     display_name_zh: 暗影谷村
     description: Ciaran village underground on the western side of the neutral
       central range.                    # map-facing English prose
@@ -45,6 +45,42 @@ Rules and joins:
   empty part is left out: `location:village_ciaran`,
   `settlement_node:capital_altoria:central_plaza`,
   `wilderness_cell:1250,2420`.
+
+### Location kinds
+
+`kind` is a closed list: `capital`, `city`, `town`, `port`, `elven_village`,
+`dungeon`. Use the matching ID prefix (`capital_`, `city_`, `town_`,
+`port_`, `village_`, `dungeon_`).
+
+| Kind | Use it for |
+| --- | --- |
+| `capital` | a nation's seat; `NATION_REGISTRY` names it |
+| `city` | an inland national settlement of about 25,000 people or more, including a beast tribal city |
+| `town` | a smaller national settlement, a frontier keep or a ferry town |
+| `port` | a settlement whose role is a sea harbour, whatever its size |
+| `elven_village` | hidden; neutral, no nation |
+| `dungeon` | hidden; carries floors, not population |
+
+`elven_village` and `dungeon` are hidden from public map knowledge; every
+other kind is public. A capital draws as `capital` on the world map and the
+other public kinds as `settlement`.
+
+Adding or renaming a kind is a code change that must agree in all of these
+places, so ask before you do it:
+
+- `packages/map-core/elosern_map_core/schema.py` → `LOCATION_KINDS`;
+- `world/lore/anchors.py` → `AnchorKind`;
+- `tools/map-editor/frontend/src/components/ContinentInspector.vue` →
+  `LOCATION_KINDS` (the inspector's dropdown labels);
+- `web/webclient/presentation/world_map_geometry.py` → `_place_geometry`
+  (which wire kind a place draws as);
+- `world/rules/sight.py` and `world/rules/wilderness_disclosure.py` →
+  `HIDDEN_ANCHOR_KINDS`, only when the new kind is hidden;
+- `world/lore/tests/test_anchors.py`, which expects every `AnchorKind` to be
+  used by some shipped location.
+
+A national location also needs its `ANCHOR_LORE` row (nation and population).
+That change stales the reference context; regenerate it.
 
 ## `content/maps/districts.yaml`
 

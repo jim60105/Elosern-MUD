@@ -1,6 +1,6 @@
 ---
 name: map-data-authoring
-description: Read, change and verify Elosern's authored static map data, the same YAML the standalone map editor edits. Covers the continent (mainland, terrain regions, ridge, passes, waterways, fords, forest edge, harbour sites), geographic locations, districts and landmarks, settlement local maps (nodes, roads, bends, bindings, footprints, wilderness gates, city gate), permanent interiors (rooms, connections, interior links, exterior doorways) and editor layouts. Use it whenever a task touches `content/maps/`, `content/map-editor-layouts/`, `world/maps/data/district_partition.json` or `content/map-reference-context.json`, or when the user wants to move, add or remove a city, village, dungeon, node, road, room, door, gate, river, pass or district, or pastes an "OMP context" copied from the map editor, even if they never say "map editor" or "YAML".
+description: Read, change and verify Elosern's authored static map data, the same YAML the standalone map editor edits. Covers the continent (mainland, terrain regions, ridge, passes, waterways, fords, forest edge, harbour sites), geographic locations, districts and landmarks, settlement local maps (nodes, roads, bends, bindings, footprints, wilderness gates, city gate), permanent interiors (rooms, connections, interior links, exterior doorways) and editor layouts. Use it whenever a task touches `content/maps/`, `content/map-editor-layouts/`, `world/maps/data/district_partition.json` or `content/map-reference-context.json`, or when the user wants to move, add or remove a city, town, port, village, dungeon, node, road, room, door, gate, river, pass or district, plan where new settlements should sit on the continent, add a location kind, or check that rivers reach the sea, or pastes an "OMP context" copied from the map editor, even if they never say "map editor" or "YAML".
 ---
 
 # Map data authoring
@@ -21,7 +21,7 @@ Editing the YAML is the whole change. The parts that make it work are:
 | File | Owns | Reference |
 | --- | --- | --- |
 | `content/maps/continent.yaml` | frame, mainland polygon, 7 terrain regions, ridge and passes, waterways and fords, forest edge, coastal band, harbour sites | [continent.md](references/continent.md) |
-| `content/maps/locations.yaml` | every geographic location (capital, elven village, dungeon): name, prose, cell | [locations-and-districts.md](references/locations-and-districts.md) |
+| `content/maps/locations.yaml` | every geographic location (capital, city, town, port, elven village, dungeon): name, prose, cell | [locations-and-districts.md](references/locations-and-districts.md) |
 | `content/maps/districts.yaml` | world-map districts and their landmark references | [locations-and-districts.md](references/locations-and-districts.md) |
 | `content/maps/settlements/<map_id>.yaml` | one local map: binding to its location, nodes, directed roads, footprint and wilderness gates, city gate | [settlements.md](references/settlements.md) |
 | `content/maps/interiors/<interior_id>.yaml` | permanent rooms, connections, links to other interiors, the exterior doorway | [interiors.md](references/interiors.md) |
@@ -131,7 +131,12 @@ is not game-ready until you regenerate the partition.
 1. **Orient.** Run `git status`, read the target document, and find the
    objects you will touch by ID. For a coordinate question, read the relevant
    reference file first. The axis directions and the mask row order are easy to
-   get backwards.
+   get backwards. Run the check script once **before** you edit and note what
+   it already reports: the committed partition or reference index can already
+   be stale, and a contract test can already fail on master. Without a
+   baseline you cannot tell your breakage from what you inherited, and you
+   cannot compare against a clean tree later because a stale committed
+   partition makes the game refuse to load it.
 2. **Edit** the YAML directly. Prefer small, surgical edits that keep the
    surrounding comments.
 3. **Check** from the repository root:
@@ -164,7 +169,18 @@ is not game-ready until you regenerate the partition.
    ```console
    uv run --locked --project tools/map-editor python .agents/skills/map-data-authoring/scripts/regenerate_elevation.py
    ```
-5. **Report** which documents you changed, each object by qualified ID, the
+
+   Regenerate **after your last source edit**, then run the check again. The
+   partition signature covers every location cell, so even a three-cell nudge
+   to one town after regenerating makes the game refuse the whole world in
+   every test that loads it. If you change Python lore the index reads (for
+   example `ANCHOR_LORE` or a kind enum), regenerate the reference context too
+   (`uv run --locked python -m tools.map_reference_context`).
+5. **Test** what the change can reach. Static checks never load the game, so a
+   new location kind or lore row is only proven by the tests that consume it.
+   See [verification.md](references/verification.md#focused-tests) for the
+   labels and the test runner's rules.
+6. **Report** which documents you changed, each object by qualified ID, the
    check result, and anything left stale or unfinished.
 
 ## Seeing a map
@@ -206,6 +222,52 @@ path rather than converting silently. Capture once at overview size, then a
 regional `--bounds` view for small labels. Do not claim token savings from
 WebP: bytes and model tokens are different measurements.
 
+## Placing sites
+
+Before you author a new location, harbour site or district landmark cell,
+check the candidate cells with `place_sites.py`. It reads the current
+continent from disk and, for each site, reports whether the cell is walkable
+or waterway, its terrain region and nominal nation, its distance in cells to
+the nearest waterway and to the sea, and every pair of sites closer than
+`--min-km`. A site with `snap` moves to the nearest walkable, non-water cell
+within 2 cells of a waterway (`river`), of the sea (`sea`) or of both
+(`both`). The terrain checks are CPU-bound Python, so the script spreads the
+sites over a process pool with one worker per CPU (`--jobs` overrides it).
+
+```console
+# Candidates: [{"id": "my_port", "cell": [2073, 247], "snap": "sea"}, ...]
+uv run --locked --project packages/map-core python \
+    .agents/skills/map-data-authoring/scripts/place_sites.py candidates.json \
+    --output snapped.json
+
+# Re-check every authored location and harbour site after a terrain edit.
+uv run --locked --project packages/map-core python \
+    .agents/skills/map-data-authoring/scripts/place_sites.py --locations
+```
+
+It never writes map sources; copy the snapped cells into the YAML yourself,
+then run the check script. A terrain edit such as a moved river or coast can
+strand an existing location, so run `--locations` after one. Exit code 1
+means at least one site is not walkable, sits on a waterway or found no cell
+to snap to.
+
+`--rivers` checks every waterway's mouth instead: its last route vertex must
+be within 2 cells of the sea or of another waterway. The core accepts a river
+that simply stops inland, and on the canvas it looks finished, so run this
+after any waterway edit and before you put a "river mouth" port on one.
+
+Placement habits that saved rework:
+
+- Snap ports with `sea` and river or ford towns with `river`, then read the
+  reported distances. A town on the wrong side of a border river lands in the
+  other nation; the `nation` column shows it.
+- Keep a location off its harbour site's cell. The harbour site is the
+  reserved landing, the town sits a few cells inland, and two markers on one
+  cell hide each other.
+- Treat the `--min-km` pair list as a review prompt, not an error: twin towns
+  across a ford are meant to be close; two unrelated towns 20 km apart
+  usually are not.
+
 ## Common tasks
 
 These are short recipes. Each reference file has the details.
@@ -230,10 +292,36 @@ These are short recipes. Each reference file has the details.
   `interiors/<id>.yaml` with its rooms and `connections`, plus `exterior:
   {settlement, node, room, doorway_key, doorway_aliases}`. Nothing in the
   settlement file changes: the door belongs to the interior.
-- **Add a new location without a local map.** Add it to `locations.yaml`
-  only. A local map is a separate later step: a new
-  `settlements/<map>.yaml` with `location_ref: <id>`. Locations never list
-  their maps.
+- **Add a new location without a local map.**
+  1. Pick its cell with `place_sites.py` (see *Placing sites* below), so it is
+     walkable, off the water and on the right bank or shore.
+  2. Add it to `locations.yaml` with a `kind` of `capital`, `city`, `town`,
+     `port`, `elven_village` or `dungeon`. A national settlement uses `city`
+     (inland, about 25,000 people or more), `town` (smaller) or `port` (its
+     role is a sea harbour, whatever its size). Write the ID with the matching
+     prefix, such as `port_white_sail` or `town_scarp`.
+  3. Add its `ANCHOR_LORE` row in `world/lore/anchors.py` (nation and
+     population). Every lore row must join a location and the reverse, so the
+     two change together. This is Python lore: do it only when the user asked
+     for the location.
+  4. A local map is a separate later step: a new `settlements/<map>.yaml` with
+     `location_ref: <id>`. Locations never list their maps.
+  5. Regenerate the partition and the reference context.
+
+  For many locations at once, write them through the core codec instead of
+  hand-typing YAML, so the wrapping and key order match the editor:
+  `parse_document` the file, add entries to a thawed copy of
+  `parsed.document.data`, build it with `document_from_data`, and write
+  `serialize_document(document, parsed.round_trip)` (all in
+  `elosern_map_core.codec`). New keys land after the existing ones.
+- **Add a location kind.** The kind list is closed and lives in several
+  places that must agree; the full list is in
+  [locations-and-districts.md](references/locations-and-districts.md#location-kinds).
+  Ask first: it is a code change, not map data.
+- **Move, extend or add a waterway.** End it in a sea cell (or on another
+  waterway), keep it clear of harbour sites, then run `place_sites.py
+  --rivers` and `--locations`, because a moved river can swallow a town's cell
+  or leave a river port dry. Regenerate the partition and the elevation.
 - **Add or move a district.** Edit `districts.yaml`. The landmark is a
   qualified reference, never a coordinate, unless its domain is
   `wilderness_cell`. Then regenerate the partition.

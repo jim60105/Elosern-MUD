@@ -107,6 +107,12 @@ Read this before you move anything. The effects reach far.
   of the border river, and `western_hills_valleys` otherwise.
 - **Waterways.** Rasterized route segments are impassable water. Ford cells
   are subtracted, so a ford must be a cell on the route to have any effect.
+  A route runs from source to mouth, so its **last** vertex is the mouth. End
+  it on a sea cell or on another waterway: the core accepts a river that
+  stops inland, but every "river mouth" port and harbour beside it is then
+  dry. A tributary should stop where it meets its river, not cross it and
+  keep going. `place_sites.py --rivers` reports each mouth's distance to the
+  sea and to other water.
 - **Border river.** This route must be strictly X-**decreasing**: it runs from
   its source next to the stem westward to its mouth, and its first vertex must
   be its easternmost; every active stem centre must lie strictly east of that
