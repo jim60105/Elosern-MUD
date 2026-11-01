@@ -176,7 +176,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "4271fead62ec1941e85082f68a456af49e39453abe809d1987a9a39e7e92efae",
+  "fingerprint": "302eacdb87dea242bc657855fa1bf14b21a8fff4f35d86673156291a800d6d08",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -899,7 +899,7 @@
     "packages/map-core/elosern_map_core/partition_codec.py": "ddc5834c0e74e38f045c65e21fff95f65ae3360daa3b4192e87b1f19ae897e48",
     "packages/map-core/elosern_map_core/reference_context.py": "23b290c95e6a94f281bc8281c075a1074dab0e7aebb061237640de759607cd13",
     "packages/map-core/elosern_map_core/references.py": "64d5a263d1c9148979cf9af2806a2a5644ce81ba1757f0e41ad108c496dff513",
-    "packages/map-core/elosern_map_core/schema.py": "940bb35450af020d8e905802a4520acf85e38aaa581d7fdf479c6b7ef4042ac3",
+    "packages/map-core/elosern_map_core/schema.py": "0458f4a076803766c035487c74bed8739123e44f6910be8ddb0ad517ebeda6ba",
     "packages/map-core/elosern_map_core/sources.py": "b0e4642835cac8ce8ffdf22e00092fef5af91a1c693fbbf083b21ab8e9469fff",
     "packages/map-core/elosern_map_core/sparse.py": "7ef86b108afd37af4cc79e604632aefd61195a4de7a32262b915cd0ebd7f2f3a",
     "packages/map-core/elosern_map_core/terrain.py": "d9042d45c2bc81c017c4e01232fbcdbac5a53b3eca27b06858f0a68ee77240e6",
@@ -907,7 +907,7 @@
     "world/lore/__init__.py": "2ca4eda0bdc91f2b0b85bd3d4fab00c08cd2f8c2dffc66d0d430c7e6657e73db",
     "world/lore/action_evidence.py": "289a02f07d315ce03a24eb38bebf9cf46e7c7913b2c5b3f4adc68f85f9438b33",
     "world/lore/anchor_placement.py": "54bee28f0b1ed82d419431355140af86577371783077684bb3cea119bba37057",
-    "world/lore/anchors.py": "26cc64a31ac1cdafc10e777000f25edaf016c04e230c097f9c54cdbc3362d037",
+    "world/lore/anchors.py": "0cf084637bb61f1569b69f3aa5dbe397fc11611e3c85e31d251b8f77a40558ba",
     "world/lore/bestiary_documentation.py": "004694a0d21709fdf088b50f9bff46251bbc9f49a23d7b50208f459dd779703b",
     "world/lore/church/__init__.py": "49eca094998f4e49bae0354201121d22e895b386b737144af356e0acdf454694",
     "world/lore/church/places.py": "65d5e913b93cb203373da101c8c500a1fedc3e9abb2a299bf367b8279091f8f3",

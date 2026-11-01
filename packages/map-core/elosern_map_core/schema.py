@@ -45,7 +45,7 @@ from .terrain import REGION_KEYS
 SCHEMA_VERSION = 1
 IDENTIFIER_PATTERN = r"^[a-z][a-z0-9_]*$"
 COMPASS_DIRECTIONS = ("n", "ne", "e", "se", "s", "sw", "w", "nw")
-LOCATION_KINDS = ("capital", "elven_village", "dungeon")
+LOCATION_KINDS = ("capital", "city", "town", "port", "elven_village", "dungeon")
 DISTRICT_KINDS = ("voronoi", "region")
 ELEVATION_SHAPES = ("circle", "polygon")
 ELEVATION_OPS = ("raise", "lower", "flatten", "no_prominence")

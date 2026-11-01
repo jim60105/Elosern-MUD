@@ -100,6 +100,9 @@ const locationSettlements = computed(() =>
 
 const LOCATION_KINDS = [
   { value: "capital", label: "capital · 首都" },
+  { value: "city", label: "city · 都市" },
+  { value: "town", label: "town · 城鎮" },
+  { value: "port", label: "port · 港市" },
   { value: "elven_village", label: "elven_village · 精靈村落" },
   { value: "dungeon", label: "dungeon · 地城" },
 ];

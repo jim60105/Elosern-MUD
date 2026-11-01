@@ -273,7 +273,8 @@ def _place_geometry(_signature):
         anchor=anchors()[key]
         x,y=geo.cell
         hidden=anchor.kind in (AnchorKind.ELVEN_VILLAGE,AnchorKind.DUNGEON)
-        kind="hidden" if hidden else "capital"
+        kind=("hidden" if hidden else "capital" if anchor.kind is AnchorKind.CAPITAL
+              else "settlement")
         ids={encode_wild(WILDERNESS_NAME,x,y)}
         placement=ANCHOR_PLACEMENT_REGISTRY.get(key)
         if placement is not None:

@@ -45,10 +45,27 @@ class AnchorRegistryTests(unittest.TestCase):
 
     def test_every_supported_kind_appears_without_a_fixed_roster_count(self):
         kinds = {anchor.kind for anchor in anchors().values()}
-        self.assertEqual(
-            kinds,
-            {AnchorKind.CAPITAL, AnchorKind.ELVEN_VILLAGE, AnchorKind.DUNGEON},
-        )
+        self.assertEqual(kinds, set(AnchorKind))
+
+    def test_national_settlements_carry_nation_and_population(self):
+        settlement_kinds = {AnchorKind.CITY, AnchorKind.TOWN, AnchorKind.PORT}
+        settlements = {
+            key: anchor
+            for key, anchor in anchors().items()
+            if anchor.kind in settlement_kinds
+        }
+        self.assertTrue(settlements)
+        capitals = {
+            anchor.nation_key: anchor.population
+            for anchor in anchors().values()
+            if anchor.kind is AnchorKind.CAPITAL
+        }
+        for key, anchor in settlements.items():
+            with self.subTest(anchor=key):
+                self.assertIn(anchor.nation_key, capitals)
+                self.assertIsNone(anchor.floors)
+                self.assertGreater(anchor.population, 0)
+                self.assertLess(anchor.population, capitals[anchor.nation_key])
 
     @covers_requirement("lore-registries::anchor-registry-covers-capitals-elven-villages-and-known-dungeons")
     def test_dungeon_floor_counts_follow_their_own_lore_owner(self):

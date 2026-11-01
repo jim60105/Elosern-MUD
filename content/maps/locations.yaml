@@ -93,3 +93,548 @@ locations:
       cell_y: 1237
     geographic_constraint: Forest on the eastern mountain flank
     scene_archetype:
+  port_golden_sheaf:
+    kind: port
+    display_name_zh: 金穗港
+    description: The Grandia Empire's largest port, where grain and magical 
+      goods leave the continent.
+    cell:
+      cell_x: 2067
+      cell_y: 238
+    geographic_constraint: Imperial river mouth on the southeast coast beside 
+      the main harbour site
+    scene_archetype:
+  city_twin_currents:
+    kind: city
+    display_name_zh: 雙流城
+    description: Inland river hub where the imperial river meets its eastern 
+      branch.
+    cell:
+      cell_x: 2067
+      cell_y: 708
+    geographic_constraint: Confluence of the imperial river and its eastern 
+      branch on the eastern plain
+    scene_archetype:
+  port_south_cape:
+    kind: port
+    display_name_zh: 南岬港
+    description: Southern imperial port and the eastern terminal of the coastal 
+      sea route around the central range.
+    cell:
+      cell_x: 1700
+      cell_y: 104
+    geographic_constraint: South coast harbour site nearest the southern tip of 
+      the central range
+    scene_archetype:
+  port_east_bay:
+    kind: port
+    display_name_zh: 東灣港
+    description: Eastern collection port at the mouth of the imperial river's 
+      eastern branch.
+    cell:
+      cell_x: 2400
+      cell_y: 461
+    geographic_constraint: Mouth of the imperial eastern branch beside the 
+      secondary southeastern harbour site
+    scene_archetype:
+  city_starglow:
+    kind: city
+    display_name_zh: 星輝城
+    description: Workshop city of the empire's magical-goods makers on the 
+      imperial river.
+    cell:
+      cell_x: 2031
+      cell_y: 961
+    geographic_constraint: Imperial river bank on the wizard tower plain
+    scene_archetype:
+  city_wheatwave:
+    kind: city
+    display_name_zh: 麥浪城
+    description: Market city of the northern imperial grain belt.
+    cell:
+      cell_x: 2082
+      cell_y: 1514
+    geographic_constraint: East coast river ford on the northern eastern plain
+    scene_archetype:
+  city_imperial_ferry:
+    kind: city
+    display_name_zh: 帝河津
+    description: River port below the imperial capital where the western 
+      tributary joins the imperial river.
+    cell:
+      cell_x: 1988
+      cell_y: 1131
+    geographic_constraint: Confluence of the imperial river and its western 
+      tributary south of the capital
+    scene_archetype:
+  port_dawnlight:
+    kind: port
+    display_name_zh: 朝陽港
+    description: Port and fishing city on the empire's eastern shore.
+    cell:
+      cell_x: 2466
+      cell_y: 1530
+    geographic_constraint: East coast river mouth on the eastern shore
+    scene_archetype:
+  city_spice_road:
+    kind: city
+    display_name_zh: 香道城
+    description: Overland road junction between the southern ports and the river
+      hub.
+    cell:
+      cell_x: 1976
+      cell_y: 522
+    geographic_constraint: Open southern plain on the overland road between the 
+      coast and the confluence
+    scene_archetype:
+  town_east_pasture:
+    kind: town
+    display_name_zh: 東牧鎮
+    description: Livestock market town of the eastern pastures.
+    cell:
+      cell_x: 2300
+      cell_y: 900
+    geographic_constraint: Eastern pasture uplands
+    scene_archetype:
+  town_emerald_lake:
+    kind: town
+    display_name_zh: 翠湖鎮
+    description: Lakeside town of fishers and boatwrights.
+    cell:
+      cell_x: 1896
+      cell_y: 906
+    geographic_constraint: Emerald lake shore on the central eastern plain
+    scene_archetype:
+  town_crystal:
+    kind: town
+    display_name_zh: 魔晶鎮
+    description: Mining town that digs magic crystal from the northern plain.
+    cell:
+      cell_x: 1871
+      cell_y: 1633
+    geographic_constraint: Crystal plain of the northern eastern plain
+    scene_archetype:
+  town_steed_plain:
+    kind: town
+    display_name_zh: 駿原鎮
+    description: Horse-breeding town that mounts the imperial army.
+    cell:
+      cell_x: 1687
+      cell_y: 864
+    geographic_constraint: Open grassland west of the imperial river
+    scene_archetype:
+  town_silver_ridge:
+    kind: town
+    display_name_zh: 銀嶺鎮
+    description: Upland mining town on the eastern foothills of the central 
+      range.
+    cell:
+      cell_x: 1520
+      cell_y: 761
+    geographic_constraint: Eastern foothills of the central range near the 
+      mithril workings
+    scene_archetype:
+  town_black_soil:
+    kind: town
+    display_name_zh: 黑土鎮
+    description: Farming town of the black-soil plain.
+    cell:
+      cell_x: 1623
+      cell_y: 1428
+    geographic_constraint: Black-soil plain below the eastern mountain flank
+    scene_archetype:
+  port_tide_wind:
+    kind: port
+    display_name_zh: 潮風鎮
+    description: Fishing port on the empire's eastern cape.
+    cell:
+      cell_x: 2582
+      cell_y: 1160
+    geographic_constraint: Eastern cape shore
+    scene_archetype:
+  town_maple_foot:
+    kind: town
+    display_name_zh: 楓麓鎮
+    description: Foothill town at the head of the western tributary, the last 
+      imperial town before the eastern mountain flank.
+    cell:
+      cell_x: 1645
+      cell_y: 1240
+    geographic_constraint: Western tributary source at the foot of the central 
+      range
+    scene_archetype:
+  town_orange_blossom:
+    kind: town
+    display_name_zh: 橙花鎮
+    description: Orchard town of the southern plain.
+    cell:
+      cell_x: 1805
+      cell_y: 518
+    geographic_constraint: Southern orchard plain
+    scene_archetype:
+  town_north_wood_keep:
+    kind: town
+    display_name_zh: 北林堡
+    description: Fortified frontier town at the deep forest edge and the guild 
+      base for the dragon nest.
+    cell:
+      cell_x: 1815
+      cell_y: 1885
+    geographic_constraint: Northern deep forest edge north of the eastern plain
+    scene_archetype:
+  town_sunrise:
+    kind: town
+    display_name_zh: 日出鎮
+    description: Market town of the eastern downs.
+    cell:
+      cell_x: 2394
+      cell_y: 1464
+    geographic_constraint: Eastern downs near the east coast
+    scene_archetype:
+  town_sunken_bell:
+    kind: town
+    display_name_zh: 沉鐘鎮
+    description: Lake town of the far northeastern plain.
+    cell:
+      cell_x: 2224
+      cell_y: 1723
+    geographic_constraint: Sunken bell lake district in the northeast
+    scene_archetype:
+  port_white_sail:
+    kind: port
+    display_name_zh: 白帆港
+    description: The Altoria Kingdom's largest port, where river barges meet 
+      sea-going ships.
+    cell:
+      cell_x: 300
+      cell_y: 357
+    geographic_constraint: Capital river mouth beside the southwestern main 
+      harbour site
+    scene_archetype:
+  city_confluence:
+    kind: city
+    display_name_zh: 合流城
+    description: River city where the hills river joins the capital river.
+    cell:
+      cell_x: 606
+      cell_y: 806
+    geographic_constraint: Confluence ford of the capital river and the hills 
+      river
+    scene_archetype:
+  port_south_tide:
+    kind: port
+    display_name_zh: 南潮港
+    description: Southern kingdom port and the western terminal of the coastal 
+      sea route around the central range.
+    cell:
+      cell_x: 600
+      cell_y: 100
+    geographic_constraint: South coast harbour site of the kingdom
+    scene_archetype:
+  port_west_ore:
+    kind: port
+    display_name_zh: 西礦港
+    description: Western port that ships ore and craft goods from the western 
+      hills.
+    cell:
+      cell_x: 203
+      cell_y: 698
+    geographic_constraint: West coast harbour site below the western ore hills
+    scene_archetype:
+  city_greyrock:
+    kind: city
+    display_name_zh: 灰岩城
+    description: Mining city of the western ore hills, home of hill-folk miners.
+    cell:
+      cell_x: 330
+      cell_y: 1000
+    geographic_constraint: Western ore hills
+    scene_archetype:
+  city_east_river:
+    kind: city
+    display_name_zh: 東河城
+    description: Upstream river city of the capital river valley.
+    cell:
+      cell_x: 1054
+      cell_y: 1072
+    geographic_constraint: Upper capital river east of the royal capital
+    scene_archetype:
+  city_salt_ferry:
+    kind: city
+    display_name_zh: 鹽津城
+    description: Ferry city on the lower capital river between the confluence 
+      and the sea.
+    cell:
+      cell_x: 405
+      cell_y: 500
+    geographic_constraint: Lower capital river ford
+    scene_archetype:
+  city_salt_road:
+    kind: city
+    display_name_zh: 鹽道城
+    description: Ferry city where the salt road crosses the south vale river.
+    cell:
+      cell_x: 1020
+      cell_y: 362
+    geographic_constraint: South vale river ford on the salt road
+    scene_archetype:
+  city_border_bridge:
+    kind: city
+    display_name_zh: 界橋城
+    description: Kingdom bank of the main border-river crossing into the 
+      Valhalla Beast Kingdom.
+    cell:
+      cell_x: 822
+      cell_y: 1363
+    geographic_constraint: South bank of the central border river ford
+    scene_archetype:
+  town_olive_ferry:
+    kind: town
+    display_name_zh: 橄欖津
+    description: Olive-growing ferry town on the south vale river.
+    cell:
+      cell_x: 700
+      cell_y: 257
+    geographic_constraint: South vale river ford among the olive slopes
+    scene_archetype:
+  town_ruins_gate:
+    kind: town
+    display_name_zh: 遺跡鎮
+    description: Guild town that serves expeditions into the arcane ruins.
+    cell:
+      cell_x: 505
+      cell_y: 1135
+    geographic_constraint: Western hills south of the arcane ruins
+    scene_archetype:
+  port_fishers_cove:
+    kind: port
+    display_name_zh: 漁灣鎮
+    description: Fishing port at the mouth of the south vale river.
+    cell:
+      cell_x: 429
+      cell_y: 153
+    geographic_constraint: South vale river mouth on the southwest coast
+    scene_archetype:
+  town_honey_vale:
+    kind: town
+    display_name_zh: 蜜谷鎮
+    description: Ferry town of the honey vale on the hills river.
+    cell:
+      cell_x: 1040
+      cell_y: 698
+    geographic_constraint: Hills river ford in the eastern kingdom
+    scene_archetype:
+  port_hills_mouth:
+    kind: port
+    display_name_zh: 丘河鎮
+    description: Small port at the mouth of the hills river.
+    cell:
+      cell_x: 156
+      cell_y: 838
+    geographic_constraint: Hills river mouth on the west coast
+    scene_archetype:
+  town_west_ferry:
+    kind: town
+    display_name_zh: 西渡鎮
+    description: Kingdom bank of the western border-river crossing.
+    cell:
+      cell_x: 450
+      cell_y: 1343
+    geographic_constraint: South bank of the western border river ford
+    scene_archetype:
+  town_vineyard:
+    kind: town
+    display_name_zh: 葡萄鎮
+    description: Wine town of the vineyard slopes north of the capital.
+    cell:
+      cell_x: 996
+      cell_y: 1161
+    geographic_constraint: Vineyard slopes north of the royal capital
+    scene_archetype:
+  town_scarp:
+    kind: town
+    display_name_zh: 斷崖鎮
+    description: Upland town at the hills river source, the nearest human town 
+      to the western mountain flank.
+    cell:
+      cell_x: 1279
+      cell_y: 696
+    geographic_constraint: Hills river source below the western flank of the 
+      central range
+    scene_archetype:
+  town_east_ferry:
+    kind: town
+    display_name_zh: 東渡鎮
+    description: Kingdom bank of the eastern border-river crossing.
+    cell:
+      cell_x: 1149
+      cell_y: 1360
+    geographic_constraint: South bank of the eastern border river ford
+    scene_archetype:
+  port_westwind:
+    kind: port
+    display_name_zh: 西風鎮
+    description: Fishing village-town on the kingdom's western shore.
+    cell:
+      cell_x: 133
+      cell_y: 1010
+    geographic_constraint: Western downs shore
+    scene_archetype:
+  city_mutual_market:
+    kind: city
+    display_name_zh: 互市城
+    description: Mixed-tribe trading city on the Valhalla bank of the main 
+      border crossing.
+    cell:
+      cell_x: 824
+      cell_y: 1370
+    geographic_constraint: North bank of the central border river ford
+    scene_archetype:
+  city_iron_claw:
+    kind: city
+    display_name_zh: 鐵爪城
+    description: Bearfolk tribal city of the iron-vein mines.
+    cell:
+      cell_x: 1175
+      cell_y: 1605
+    geographic_constraint: Iron-vein highlands of the eastern highland forest
+    scene_archetype:
+  city_horn_plain:
+    kind: city
+    display_name_zh: 角原城
+    description: Bullfolk tribal city of the bison plateau herds.
+    cell:
+      cell_x: 391
+      cell_y: 1661
+    geographic_constraint: Bison plateau of the western highland forest
+    scene_archetype:
+  city_shadow_wood:
+    kind: city
+    display_name_zh: 影林城
+    description: Catfolk tribal city in the coastal moss woods.
+    cell:
+      cell_x: 186
+      cell_y: 1583
+    geographic_constraint: Moss-wood shore of the northwest coast
+    scene_archetype:
+  city_moon_howl:
+    kind: city
+    display_name_zh: 月嚎城
+    description: Western wolffolk tribal city of the high woods.
+    cell:
+      cell_x: 469
+      cell_y: 1850
+    geographic_constraint: Stag-call highlands near the deep forest edge
+    scene_archetype:
+  city_swift_wind:
+    kind: city
+    display_name_zh: 疾風城
+    description: Rabbitfolk tribal city on the open grass north of the border 
+      river.
+    cell:
+      cell_x: 600
+      cell_y: 1440
+    geographic_constraint: Grassland north of the border river
+    scene_archetype:
+  city_tiger_roar:
+    kind: city
+    display_name_zh: 虎嘯城
+    description: Tigerfolk tribal city facing the deep forest and the road to 
+      the eternal night dungeon.
+    cell:
+      cell_x: 1000
+      cell_y: 1870
+    geographic_constraint: Northern deep forest edge of the highland forest
+    scene_archetype:
+  city_fox_fire:
+    kind: city
+    display_name_zh: 狐火城
+    description: Foxfolk tribal city of the hot-spring foothills.
+    cell:
+      cell_x: 1299
+      cell_y: 1700
+    geographic_constraint: Highland river source among hot springs below the 
+      central range
+    scene_archetype:
+  town_pine_ferry:
+    kind: town
+    display_name_zh: 松濤渡
+    description: Ferry town on the eastern crossing of the highland river.
+    cell:
+      cell_x: 1060
+      cell_y: 1714
+    geographic_constraint: Eastern highland river ford
+    scene_archetype:
+  town_stag_ferry:
+    kind: town
+    display_name_zh: 鹿鳴渡
+    description: Ferry town on the western crossing of the highland river.
+    cell:
+      cell_x: 370
+      cell_y: 1754
+    geographic_constraint: Western highland river ford
+    scene_archetype:
+  town_ancestor_shrine:
+    kind: town
+    display_name_zh: 祖靈聖地
+    description: Shrine town where the beast-soul rite is held among the 
+      ancestor cairns.
+    cell:
+      cell_x: 729
+      cell_y: 1595
+    geographic_constraint: Ancestor cairn hills south of the howling capital
+    scene_archetype:
+  town_falcon:
+    kind: town
+    display_name_zh: 獵鷹鎮
+    description: Hunting town of the falcon rise.
+    cell:
+      cell_x: 1093
+      cell_y: 1455
+    geographic_constraint: Falcon rise uplands north of the border river
+    scene_archetype:
+  town_west_ford_camp:
+    kind: town
+    display_name_zh: 西渡營
+    description: Valhalla bank of the western border-river crossing.
+    cell:
+      cell_x: 450
+      cell_y: 1348
+    geographic_constraint: North bank of the western border river ford
+    scene_archetype:
+  town_grizzly:
+    kind: town
+    display_name_zh: 灰熊鎮
+    description: Hunting town of the grizzly vale.
+    cell:
+      cell_x: 896
+      cell_y: 1489
+    geographic_constraint: Grizzly vale south of the howling capital
+    scene_archetype:
+  town_frost_wind:
+    kind: town
+    display_name_zh: 霜風鎮
+    description: Coastal hunting town of the frost heath.
+    cell:
+      cell_x: 212
+      cell_y: 1813
+    geographic_constraint: Frost heath on the northwest shore
+    scene_archetype:
+  town_shaman_cave:
+    kind: town
+    display_name_zh: 巫醫窟
+    description: Shaman town around the healers' caves.
+    cell:
+      cell_x: 1168
+      cell_y: 1816
+    geographic_constraint: Shaman cave woods near the deep forest edge
+    scene_archetype:
+  town_east_ford_camp:
+    kind: town
+    display_name_zh: 東渡營
+    description: Valhalla bank of the eastern border-river crossing.
+    cell:
+      cell_x: 1150
+      cell_y: 1366
+    geographic_constraint: North bank of the eastern border river ford
+    scene_archetype:

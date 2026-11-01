@@ -844,6 +844,12 @@ harbor_sites:
       cell_x: 2400
       cell_y: 454
     role: Eastern coastal collection
+  imperial_east_coast_port:
+    display_name: Imperial eastern coast port
+    cell:
+      cell_x: 2467
+      cell_y: 1531
+    role: Northern grain shipping and eastern shore fishing
   imperial_southern_secondary_port:
     display_name: Imperial southern secondary port
     cell:
@@ -1004,6 +1010,7 @@ terrain:
       - {cell_x: 335, cell_y: 394}
       - {cell_x: 323, cell_y: 377}
       - {cell_x: 310, cell_y: 360}
+      - {cell_x: 298, cell_y: 355}
       fords:
       - {cell_x: 861, cell_y: 1040}
       - {cell_x: 600, cell_y: 800}
@@ -1032,6 +1039,7 @@ terrain:
       - {cell_x: 2359, cell_y: 489}
       - {cell_x: 2372, cell_y: 472}
       - {cell_x: 2390, cell_y: 460}
+      - {cell_x: 2402, cell_y: 459}
       fords:
       - {cell_x: 2300, cell_y: 526}
     imperial_river:
@@ -1134,6 +1142,8 @@ terrain:
         cell_y: 273
       - cell_x: 2060
         cell_y: 250
+      - cell_x: 2062
+        cell_y: 224
       fords:
       - cell_x: 1990
         cell_y: 1100
@@ -1179,6 +1189,9 @@ terrain:
       - {cell_x: 258, cell_y: 856}
       - {cell_x: 237, cell_y: 862}
       - {cell_x: 215, cell_y: 866}
+      - {cell_x: 193, cell_y: 858}
+      - {cell_x: 172, cell_y: 846}
+      - {cell_x: 154, cell_y: 836}
       fords:
       - {cell_x: 1040, cell_y: 700}
       - {cell_x: 690, cell_y: 762}
@@ -1209,6 +1222,8 @@ terrain:
       - {cell_x: 500, cell_y: 186}
       - {cell_x: 474, cell_y: 174}
       - {cell_x: 446, cell_y: 164}
+      - {cell_x: 436, cell_y: 157}
+      - {cell_x: 427, cell_y: 151}
       fords:
       - {cell_x: 1020, cell_y: 360}
       - {cell_x: 700, cell_y: 255}
@@ -1279,6 +1294,8 @@ terrain:
       - {cell_x: 380, cell_y: 2170}
       - {cell_x: 360, cell_y: 2174}
       - {cell_x: 340, cell_y: 2168}
+      - {cell_x: 330, cell_y: 2178}
+      - {cell_x: 319, cell_y: 2189}
       fords:
       - {cell_x: 960, cell_y: 2330}
       - {cell_x: 650, cell_y: 2255}
@@ -1298,8 +1315,7 @@ terrain:
       - {cell_x: 1937, cell_y: 1160}
       - {cell_x: 1960, cell_y: 1150}
       - {cell_x: 1979, cell_y: 1137}
-      - {cell_x: 1994, cell_y: 1119}
-      - {cell_x: 2010, cell_y: 1102}
+      - {cell_x: 1986, cell_y: 1129}
       fords:
       - {cell_x: 1810, cell_y: 1218}
     east_coast_river:
@@ -1326,6 +1342,7 @@ terrain:
       - {cell_x: 2427, cell_y: 1530}
       - {cell_x: 2443, cell_y: 1526}
       - {cell_x: 2460, cell_y: 1528}
+      - {cell_x: 2465, cell_y: 1534}
       fords:
       - {cell_x: 2080, cell_y: 1512}
       - {cell_x: 2330, cell_y: 1510}
