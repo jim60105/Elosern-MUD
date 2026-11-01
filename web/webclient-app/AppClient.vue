@@ -174,6 +174,13 @@ watch(
 // the medallions under the vitals dock and both portrait anchors are empty.
 const travelLayout = computed(() => !!store.view.travel?.layout);
 const travelMapStatus = computed(() => store.view.travel?.mapStatus ?? "refreshing");
+// The band's travel log takes the message region (wilderness-travel-log-ui)
+// only while no combat round still plays (webclient-combat-beat-queue D6). A
+// terminal round's publication already committed the exploration mode, so the
+// travel layout is up while the round still plays; the round's beat pages and
+// their `beat-shown` reports are the message window's own, so swapping it for
+// the log mid-round would strand the playback and its lock with it.
+const travelLogShown = computed(() => travelLayout.value && !store.view.dispatch.beatLocked);
 // The place card while travelling (wilderness-travel-window-ui): the party
 // cell's disclosed `<district>・<terrain>` and the server's time line with
 // the supplied light phase; the ordinary labels everywhere else.
@@ -967,7 +974,7 @@ const rootStyle = computed(() => {
         :person-focus="personFocus"
         :formation="!!formation"
         :travel="travelLayout"
-        :travel-log="travelLayout ? store.view.travel.entries : null"
+        :travel-log="travelLogShown ? store.view.travel.entries : null"
         :speaker="speaker"
         :mode-hydrating="modeHydrating"
         :connection-status="store.view.connectionStatus"

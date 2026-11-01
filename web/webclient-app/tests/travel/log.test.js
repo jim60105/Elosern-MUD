@@ -4,10 +4,11 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
+import CombatMenu from "../../lib/combat_menu.js";
 import TravelLog from "../../components/travel/TravelLog.vue";
 import { MAX_TRAVEL_LOG_ENTRIES } from "../../stores/elosern/travel_log.js";
 import { travelEntry, travelLogPanel } from "../../stories/fixtures/travel_log.js";
-import { TOWN_SUBJECT, WILD_SUBJECT, fx, liveTravel, panelsAt, tick, walkArea, walkPanels } from "./support.js";
+import { artFor, TOWN_SUBJECT, WILD_SUBJECT, fx, liveTravel, panelsAt, tick, walkArea, walkPanels } from "./support.js";
 
 const wrappers = [];
 afterEach(() => {
@@ -195,5 +196,94 @@ describe("a refused travel step", () => {
     const t = h.store.view.serverTime;
     expect(refusal.day).toBe(7);
     expect(refusal.time).toBe(`${String(t.hour).padStart(2, "0")}:${String(t.minute).padStart(2, "0")}`);
+  });
+});
+
+// The terminal round's hold (webclient-combat-beat-queue D6) commits the
+// exploration mode while the round still plays. In the wilderness that raises
+// the travel layout mid-round, and the round's pages plus their `beat-shown`
+// reports are the message window's own — swapping it for the log there strands
+// the playback and every command with it (nothing is left to report a beat).
+const ATTACK_KEY = CombatMenu.BASIC_ATTACK_KEY;
+const ROUND_ID = "s-1/1";
+const ROUND_LINES = ["你擲出了骰子。", "你擊中了灰袍盜賊，造成 12 點傷害。"];
+
+function terminalBeats() {
+  return {
+    schema_version: 1,
+    available: true,
+    round: ROUND_ID,
+    beats: [
+      { seq: 0, action: 0, kind: "roll", actor: "42", target: "7", amount: null, hp_after: null, text: ROUND_LINES[0] },
+      { seq: 1, action: 1, kind: "damage", actor: "42", target: "7", amount: 12, hp_after: 68, text: ROUND_LINES[1] },
+    ],
+  };
+}
+
+function combatants() {
+  return [
+    { identity: 7, token: "e1", display_name: "灰袍盜賊", team: "foes", state: "active", hp_current: 80, hp_maximum: 80, portrait_ref: "7", conditions: [] },
+    { identity: 42, token: "a1", display_name: "影行者", team: "party", state: "active", hp_current: 80, hp_maximum: 100, portrait_ref: "42", conditions: [] },
+  ];
+}
+
+describe("a terminal combat round in travel", () => {
+  beforeEach(() => vi.useFakeTimers());
+
+  it("keeps the message window while the round plays and gives the band back to the log once it ends", async () => {
+    const h = liveTravel({ wrappers });
+    h.store.setLoggedIn(true);
+    await tick();
+    await h.answerMap(walkArea(CX, CY));
+    await tick();
+    expect(h.store.view.travel.layout).toBe(true);
+
+    // The fight opens in the same wilderness room.
+    h.publish(
+      {
+        status: fx.statusPanel(),
+        context_actions: fx.combatActions({ participants: combatants() }),
+        art: artFor(WILD_SUBJECT),
+      },
+      { mode: "combat" },
+    );
+    await tick();
+    expect(h.store.view.mode).toBe("combat");
+
+    // The player's basic attack and the round's lines, then the terminal
+    // publication: exploration is committed while the round still plays.
+    const requestId = h.store.dispatchAction("combat.command", ATTACK_KEY);
+    for (const line of ROUND_LINES) h.store.appendText("out", line);
+    h.publish(panelsAt(WILD_SUBJECT, { combat_beats: terminalBeats() }), { mode: "exploration" });
+    h.accept(
+      "ui_action_result",
+      fx.actionResult({
+        request_id: requestId,
+        presentation_revision: h.store.view.revision,
+        outcome: "success",
+        code: "round",
+      }),
+    );
+    await tick();
+
+    expect(h.store.view.mode).toBe("exploration");
+    expect(h.store.view.travel.layout).toBe(true);
+    expect(h.store.view.beatHold).toBe(true);
+    expect(h.store.view.dispatch.beatLocked).toBe(true);
+    expect(h.w.find('[data-testid="travel-log"]').exists()).toBe(false);
+    expect(h.w.find('[data-testid="message-page"]').exists()).toBe(true);
+
+    // Each beat reports itself shown, as the mounted window does; the round
+    // then ends by itself and the band hands over to the log.
+    h.store.beatShown(0);
+    vi.advanceTimersByTime(10000);
+    h.store.beatShown(1);
+    vi.advanceTimersByTime(10000);
+    expect(h.store.view.beatPlayback.phase).toBe("done");
+    expect(h.store.view.beatHold).toBe(false);
+    expect(h.store.view.dispatch.beatLocked).toBe(false);
+    await tick();
+    expect(h.w.find('[data-testid="travel-log"]').exists()).toBe(true);
+    expect(h.w.find('[data-testid="message-page"]').exists()).toBe(false);
   });
 });

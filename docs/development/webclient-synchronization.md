@@ -237,6 +237,15 @@ allocated once at the source, and the fact is delivered through
 or a compensated step delivers nothing, and every watcher coordinator gets
 the same ids.
 
+The band's message region renders `TravelLog` instead of the paged
+`MessageWindow` while the travel layout is shown (`AppClient`'s
+`travelLogShown`), except while a combat round still plays by itself: a
+terminal round's publication already commits the exploration mode, so the
+layout can be up mid-round, and the round's pages — with the `beat-shown`
+reports the playback paces on — belong to the message window. The log takes
+the region as soon as the round ends, and the 日誌 control stays in every
+mode.
+
 | Source | Owner seam | Notices |
 |---|---|---|
 | Settled wilderness step (exit traversal or gate entry) | `movement_settlement.settle_movement` | `region_entered` (region identity changed), `woodland_entered` (woodland entered from outside it), `ford_crossed` (the reached cell is a ford), `landmark_reached` (the reached cell is a district's exact landmark; `lit_district` only when this arrival lit it; prose is the reached room's ordinary appearance, art its scene descriptor), `dusk` / `nightfall` (each phase entry inside the charged step), `hostile_sighted`, `landmark_sighted`, `fatigue_stage` |
