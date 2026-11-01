@@ -111,6 +111,16 @@ RUN --mount=type=cache,id=uv-map-editor-$TARGETARCH$TARGETVARIANT,sharing=locked
     uv sync --locked --no-dev --no-editable --project tools/map-editor && \
     chmod -R a+rX /venv
 
+# Both local path packages keep their version number across source edits, so a
+# sync can satisfy them from a cached wheel of the previous revision and bake a
+# stale core or a stale editor into the image while /workspace (the mounted
+# checkout) carries the new one. Reinstall them from the copied sources instead:
+# the core must never lag the documents it validates.
+RUN --mount=type=cache,id=uv-map-editor-$TARGETARCH$TARGETVARIANT,sharing=locked,target=/root/.cache/uv \
+    uv pip install --no-deps --force-reinstall --no-editable packages/map-core && \
+    uv pip install --no-deps --force-reinstall --no-editable tools/map-editor && \
+    chmod -R a+rX /venv
+
 ########################################
 # Final stage
 ########################################
