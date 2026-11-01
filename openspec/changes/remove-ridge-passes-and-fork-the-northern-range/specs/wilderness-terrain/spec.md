@@ -52,6 +52,10 @@ Terrain, nominal claims and effective control SHALL remain distinct, with corrid
 - **WHEN** a synthetic stem route changes and paired arms are consumed
 - **THEN** the corridor and nominal nation flip follow its row centres, political borders equal its clipped authored polyline and river-source junction, and neither arm nor deep-forest political segments appear
 
+#### Scenario: River-source junction agrees with nominal claims
+- **WHEN** a candidate's border river starts at its easternmost vertex and its active stem stays strictly east of that source
+- **THEN** the source-row political junction agrees with the nominal west-neighbour nation transition; candidates violating either relation reject semantically instead of displaying contradictory political labels
+
 ## ADDED Requirements
 
 ### Requirement: The physical ridge is a continuous forked barrier
