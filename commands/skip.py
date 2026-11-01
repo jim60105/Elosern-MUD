@@ -72,9 +72,13 @@ _REST_ARGS_RE = re.compile(
 _REST_USAGE = "用法：rest <數字><s|m|h|d> [practice <技能>]"
 _SLEEP_ACCEPTED_MESSAGE = "你進入睡眠。"
 _SLEEP_USAGE = (
-    "用法：sleep [<時長>|until-recovered]、"
-    "sleep all [<時長>|until-recovered]、sleep continue"
+    "用法：sleep [<時長>|until-recovered|until-dawn] [dream]、"
+    "sleep all [<時長>|until-recovered|until-dawn] [dream]、sleep continue、"
+    "camp [<時長>|until-recovered|until-dawn] [dream]"
 )
+_RECOVERY_TOKENS = ("until-recovered", "until_recovered")
+_DAWN_TOKENS = ("until-dawn", "until_dawn", "睡到天亮", "天亮")
+_DREAM_TOKEN = "dream"
 
 # ``修煉 <技能> [= <成員>]``: one whitespace-free skill key plus an optional
 # member token naming a present party member (default: the caller).
@@ -142,32 +146,117 @@ class CmdRest(Command):
 
 class CmdSleep(Command):
     key = "sleep"
-    aliases = ("睡眠",)
+    # ``camp`` is the whole-party camp alias (wilderness-camping): one
+    # decision through the shared camp service, never a literal rewrite of
+    # ``sleep all`` (which would leave the owner's dream question open).
+    aliases = ("睡眠", "camp")
 
-    def _request(
-        self, tokens: list[str]
-    ) -> tuple[str, int | None, bool] | None:
-        """Parse the accepted sleep argument forms into ``(mode, seconds, explicit)``."""
-        from world.rules.sleep_receipt import MODE_DURATION, MODE_RECOVERY
+    @staticmethod
+    def _mode_token(token: str) -> tuple[str, int | None] | None:
+        """One explicit mode token as ``(mode, seconds)``, or ``None``."""
+        from world.rules.sleep_receipt import (
+            MODE_DURATION,
+            MODE_RECOVERY,
+            MODE_UNTIL_DAWN,
+        )
 
-        if not tokens:
-            return MODE_RECOVERY, None, False
-        if len(tokens) != 1:
-            return None
-        token = tokens[0]
-        if token in ("until-recovered", "until_recovered"):
-            return MODE_RECOVERY, None, True
+        if token in _RECOVERY_TOKENS:
+            return MODE_RECOVERY, None
+        if token in _DAWN_TOKENS:
+            return MODE_UNTIL_DAWN, None
         try:
             seconds = parse_duration(token)
         except DurationParseError:
             return None
         if seconds < 1:
             return None
-        return MODE_DURATION, seconds, True
+        return MODE_DURATION, seconds
+
+    def _request(
+        self, tokens: list[str]
+    ) -> tuple[str, int | None, bool] | None:
+        """Parse the accepted sleep argument forms into ``(mode, seconds, explicit)``."""
+        from world.rules.sleep_receipt import MODE_RECOVERY
+
+        if not tokens:
+            return MODE_RECOVERY, None, False
+        if len(tokens) != 1:
+            return None
+        parsed = self._mode_token(tokens[0])
+        if parsed is None:
+            return None
+        return parsed[0], parsed[1], True
+
+    def _with_dream(self, tokens: list[str], *, mode_required: bool) -> tuple[list[str], bool] | None:
+        """Split one optional terminal ``dream`` token off the arguments.
+
+        It is admitted once, last, and (for ``sleep``) only after an explicit
+        mode; a repeated or misplaced token rejects the whole request.
+        """
+        dream = bool(tokens) and tokens[-1] == _DREAM_TOKEN
+        rest = tokens[:-1] if dream else tokens
+        if _DREAM_TOKEN in rest:
+            return None
+        if dream and mode_required and not rest:
+            return None
+        return rest, dream
+
+    def _camp(self, tokens: list[str]) -> None:
+        """The ``camp [<mode>] [dream]`` alias through the shared camp service."""
+        from server.camp_service import camp, text_operation_identity
+        from world.rules.camping import default_wire_mode, read_tick
+        from world.rules.party_scope import PartyScopeError, resolve_commander
+        from world.rules.possession import PossessionGateError, PossessionWriteError
+        from world.rules.sleep_receipt import MODE_DURATION, MODE_RECOVERY, MODE_UNTIL_DAWN
+
+        split = self._with_dream(tokens, mode_required=False)
+        if split is None or len(split[0]) > 1:
+            self.caller.msg(_SLEEP_USAGE)
+            return
+        rest, dream = split
+        if rest:
+            parsed = self._mode_token(rest[0])
+            if parsed is None:
+                self.caller.msg(_SLEEP_USAGE)
+                return
+            mode, seconds = parsed
+            wire = {
+                MODE_RECOVERY: "until-recovered",
+                MODE_UNTIL_DAWN: "until-dawn",
+                MODE_DURATION: MODE_DURATION,
+            }[mode]
+        else:
+            wire, seconds = default_wire_mode(read_tick()), None
+        try:
+            commander = resolve_commander(self.caller)
+            outcome = camp(
+                self.caller,
+                mode=wire,
+                dream=dream,
+                operation_id=text_operation_identity(int(commander.pk)),
+                seconds=seconds,
+                session=getattr(self, "session", None),
+            )
+        except PartyScopeError as error:
+            self.caller.msg(error.message)
+            return
+        except SkipRefused as error:
+            self.caller.msg(rejection_message(error.reason))
+            return
+        except SleepRefused as error:
+            self.caller.msg(error.message)
+            return
+        except (PossessionGateError, PossessionWriteError):
+            self.caller.msg("目前無法紮營。")
+            return
+        commander.msg(outcome["message"])
 
     def func(self) -> None:
         choice = self.args.strip()
         tokens = choice.split()
+        if getattr(self, "cmdstring", None) == "camp":
+            self._camp(tokens)
+            return
         scope = "self"
         if tokens and tokens[0] == "all":
             scope = "party"
@@ -226,6 +315,11 @@ class CmdSleep(Command):
                 self.caller, notices_from_events(result.events), announce=False
             )
             return
+        split = self._with_dream(tokens, mode_required=True)
+        if split is None:
+            self.caller.msg(_SLEEP_USAGE)
+            return
+        tokens, dream = split
         request = self._request(tokens)
         if request is None:
             self.caller.msg(_SLEEP_USAGE)
@@ -233,6 +327,9 @@ class CmdSleep(Command):
         if not _safe_to_skip(self.caller):
             return
         mode, seconds, explicit = request
+        if dream:
+            self._sleep_with_dream(scope, mode, seconds)
+            return
         try:
             if scope == "party":
                 from world.rules.sleep_control import begin_all_party_sleep
@@ -285,6 +382,35 @@ class CmdSleep(Command):
         deliver_unlocks(
             self.caller, notices_from_events(result.events), announce=False
         )
+
+    def _sleep_with_dream(self, scope: str, mode: str, seconds: int | None) -> None:
+        """``sleep [all] <mode> dream``: entry and the guarded enter together."""
+        from uuid import uuid4
+
+        from world.rules.camping import commit_sleep_entry
+        from world.rules.possession import PossessionGateError, PossessionWriteError
+
+        try:
+            commit_sleep_entry(
+                self.caller,
+                scope=scope,
+                mode=mode,
+                seconds=seconds,
+                answer="enter",
+                operation_id=uuid4().hex,
+                session=getattr(self, "session", None),
+            )
+        except SkipRefused as error:
+            self.caller.msg(rejection_message(error.reason))
+            return
+        except SleepRefused as error:
+            self.caller.msg(error.message)
+            return
+        except (PossessionGateError, PossessionWriteError):
+            self.caller.msg("目前無法選擇全員一起睡眠。")
+            return
+        self.caller.msg("你進入睡眠，並進入了夢境。")
+
 
 class CmdWaitUntil(Command):
     key = "wait"

@@ -83,7 +83,11 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
     "rest": {"syntax": "rest <duration> [practice <skill>]", "context": "一般"},
     "修煉": {"syntax": "修煉 <技能> [= <成員>]", "context": "一般（戰鬥中拒絕）"},
     "sleep": {
-        "syntax": "sleep [<時長>|until-recovered]、sleep all [<時長>|until-recovered]、sleep continue",
+        "syntax": (
+            "sleep [<時長>|until-recovered|until-dawn] [dream]、"
+            "sleep all [<時長>|until-recovered|until-dawn] [dream]、sleep continue、"
+            "camp [<時長>|until-recovered|until-dawn] [dream]"
+        ),
         "context": "一般",
     },
     "handoff": {
