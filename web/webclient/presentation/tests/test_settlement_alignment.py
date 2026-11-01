@@ -43,6 +43,10 @@ from web.webclient.presentation.ingress import (
     build_presentation_context,
     build_production_registry,
 )
+from web.webclient.presentation.map_panels import (
+    AREA_MAP_PANEL,
+    AREA_MAP_SCHEMA_VERSION,
+)
 from web.webclient.presentation.registry import PresenterSpec, PresentationRegistry
 from web.webclient.presentation.watchers import clear_watchers, register_watcher
 from world.rules.clock import (
@@ -1009,8 +1013,8 @@ class CheckpointCompletenessTests(BattlefieldIsolation, _WatcherFixture, Evennia
             )
         registry.register(
             PresenterSpec(
-                name="area_map",
-                schema_version=2,
+                name=AREA_MAP_PANEL,
+                schema_version=AREA_MAP_SCHEMA_VERSION,
                 unavailable_reason=("missing_data", "無法讀取"),
                 presenter=self._unopened_map,
                 on_demand=True,

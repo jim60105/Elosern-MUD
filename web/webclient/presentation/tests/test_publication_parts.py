@@ -21,6 +21,10 @@ from web.webclient.presentation.lore_codex import (
     LORE_CODEX_CATEGORIES,
     validate_lore_codex,
 )
+from web.webclient.presentation.map_panels import (
+    AREA_MAP_PANEL,
+    AREA_MAP_SCHEMA_VERSION,
+)
 from web.webclient.presentation.protocol import (
     CLIENT_MESSAGES,
     DIALOGUE_ENVELOPE_MAX_BYTES,
@@ -760,8 +764,8 @@ def _codex_registry(holder):
 def _register_area_map(registry):
     registry.register(
         PresenterSpec(
-            name="area_map",
-            schema_version=2,
+            name=AREA_MAP_PANEL,
+            schema_version=AREA_MAP_SCHEMA_VERSION,
             unavailable_reason=("map_unavailable", "地圖目前無法顯示"),
             # An available body violating the map schema degrades to the
             # unavailable map form.
