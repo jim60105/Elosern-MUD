@@ -218,3 +218,59 @@ fixture 跑在 suite 中而不在其中（`unittest/case.py` 的 `run()` 在
 
 兩項都只增加診斷輸出：不改變標籤、worker 設定、斷言、超時或任何預算，也不
 需要在本機重跑任何分片；重新打包以 CI log 的實測值為準。
+
+同一日隨後的 CI run 41294398351（`5da11906`，34 個工作全綠）即以此輸出重新
+打包，該輪本身的 run-step 也顯示原清單已普遍超出上限：瀏覽器 20 個分片有 19
+個超過 5 分鐘（最差的 shard 9 為 1,045 秒），evennia 10 個分片有 5 個超過
+（最差的 shard 2 為 831 秒）。
+
+**打包模型（輸入全部來自該輪 CI 實測）：**
+
+成本被拆成三塊，各自的量都直接來自該輪的每測試輸出：
+
+- **每測試 method 時間**：`durations`／driver 表的 method 欄位。
+- **類別層級 fixture**：driver 表的 boundary 欄位。boundary 是「前一個
+  `stopTest` 到本測試 `startTest`」，因此它同時包含前一類別的 `tearDownClass`
+  與本類別的 `setUpClass`；同一個類別因此有兩種觀測：進入「已在同一個清單裡
+  用過共享伺服器」的類別（暖、實測中位數 0 秒），與該清單第一次用到共享伺服器
+  的那一次（冷）。冷啟動的實測中位數為 **51.8 秒**（22 次觀測，範圍 33–67 秒），
+  暖轉換為 0 秒。
+- **行程層級開銷**：共享伺服器啟動（每個用到共享伺服器的清單一次，不隨類別數
+  增加）、suite 常數約 5 秒，以及瀏覽器 job 的前置（兩次 checkout、兩次
+  `uv sync`、Node/pnpm 與三份前端 bundle 建置、Playwright 安裝）約 80 秒。
+
+| 進入點 | 每個清單／分片的成本模型 | 上限 |
+|---|---|---|
+| browser | Σ method ＋ 清單內每個出現類別的暖 boundary ＋（清單用到共享伺服器時）冷啟動一次 ＋ 5 秒 | 行程清單 ≤ 160 秒（預測 job 240 秒；乘上實測最差的 1.67 倍清單變異為 347 秒） |
+| evennia | 依 Django 真實派工順序模擬 makespan：標籤順序即 discovery 順序，Django 接著依 `reorder_by = (TestCase, SimpleTestCase)` 重新分桶並逐 class 分派，模型中套用同樣的分桶與「逐 class 交給最空閒 worker」；標籤以模組成本降序排列 | makespan ≤ 200 秒（預測 job ≤ 258 秒；乘上實測 1.55 倍變異為 359 秒） |
+
+兩者都在**原始清單**上重算過：browser 的逐清單殘差為 max +23.9 秒、min
+−10.5 秒、rms 9.0 秒（40 個清單，3 個低估且都 ≤ 10.5 秒）；evennia 的
+分桶後 makespan 對 10 個分片預測 `Ran N tests in Xs` 的落差為 −8.3 至 +28.3 秒
+（中位數 +4.9 秒）。相較之下，先前用「Σ ÷ 4」或 LPT 的近似會低估 3.5–88 秒，
+因此模型改為模擬 Django 的真實派工順序與分桶。
+
+**結果：**
+
+- 瀏覽器：20 → **57 個分片**（114 個行程清單），最重清單 160 秒、預測最重
+  job 240 秒（4 分鐘），乘上實測最差的 1.67 倍清單變異仍為 347 秒；標籤維持
+  方法層級（590 個方法各屬恰好一個清單）。
+- Evennia：10 → **23 個分片**，其中前端 evidence 套件（`web.webclient.tests`）
+  拆為 4 個 `workers: 1` 的分片，其餘 19 個為 `workers: 4`；標籤改為**逐模組**
+  （900 個已探索模組各屬恰好一個分片）。
+- manifest 新增 `workers` 欄位，workflow 以 `matrix.workers` 決定 `--parallel`
+  （原本以分片名稱字串 `webclient-evidence` 判斷，拆出多個 evidence 分片後
+  會回到 4 個 worker 並重新造成 Vitest/build 的 oversubscription）。
+- 最重的單一 class（`ServiceHostIdentityTests`，261.9 秒）是 `--parallel 4`
+  無法再切分的排程單位，因此它獨占一個分片，該分片預測 job 為 311 秒；
+  這是整套分片裡唯一無法再壓低的分片（單一 class 的自身長度即為下限），
+  若它在慢 runner 上超出 6 分鐘，唯一的修法是把該 class 拆成兩個模組，
+  讓兩個 worker 各跑一半。
+- 工作數：1 preflight + 23 evennia + 57 browser + 1 frontend + 1 top-level +
+  1 gate = 84；每個分片本身縮小，整體關鍵路徑由最慢分片決定，代價是瀏覽器
+  runner 的前置約 80 秒在新分片數下不再被攤平（後續可考慮只建置該分片需要的
+  前端 bundle 以降低這 80 秒）。
+
+本次重平衡只改 manifest 標籤分配、`workers` 欄位與本文件，未改動任何測試、
+斷言、worker 數以外的設定、超時或預算。推送後的 CI 執行是唯一驗收：每個分片
+的**完整 job 時長**（含前置與上傳，即 GitHub 顯示的 job 時間）必須 ≤ 6 分鐘。

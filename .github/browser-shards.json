@@ -1,633 +1,1050 @@
 {
-  "shards": [
-    {
-      "index": 0,
-      "name": "combat-0",
-      "files_a": [
-        "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_attack_flow_submits_basic_attack_once",
-        "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_actor_selector_chrome_returns_to_root_without_a_command",
-        "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_item_and_tactic_choices_send_the_actor_command",
-        "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_self_skill_submits_no_target_field",
-        "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_single_skill_target_flow",
-        "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_skill_frame_refreshes_on_panel_update",
-        "web.tests.browser.test_browser_services_guild.GuildTurninJourneys.test_completed_quest_turnin",
-        "web.tests.browser.test_map_editor_workflows.MapEditorWorkflowsChromiumTest.test_continental_authoring_reloads_in_the_core_after_every_operation",
-        "web.tests.browser.test_map_editor_workflows.MapEditorFollowingLargeChromiumTest.test_a_save_racing_an_external_write_is_refused_by_the_fingerprint_guard"
-      ],
-      "files_b": [
-        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_command_line_hint_names_history_and_completion_and_controls_share_the_walk",
-        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_command_line_is_permanently_present_and_focusable",
-        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_field_is_focusable_without_an_opening_action",
-        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_settings_prose_scale_is_a_client_local_preference",
-        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_slash_focuses_the_always_present_field",
-        "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest",
-        "web.tests.browser.test_vue_typography.VueTypographyBrowserTest",
-        "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_a_location_with_a_local_map_opens_it_and_refuses_deletion",
-        "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_footprint_cells_and_a_district_landmark_by_keyboard_write_only_their_owner",
-        "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_derived_borders_have_no_handles_at_the_large_viewport"
-      ]
-    },
-    {
-      "index": 1,
-      "name": "combat-1",
-      "files_a": [
-        "web.tests.browser.test_browser_combat_scales.CombatMenuBrowserTest.test_area_space_selects_once_even_when_held",
-        "web.tests.browser.test_browser_combat_scales.CombatMenuBrowserTest.test_combat_dock_renders_mockup_grid_and_detail_at_both_viewports",
-        "web.tests.browser.test_browser_combat_panels.CombatMenuBrowserTest.test_combat_rebuilds_keyboard_menu_after_round",
-        "web.tests.browser.test_browser_combat_panels.CombatMenuBrowserTest.test_combat_renders_at_minimum_viewport",
-        "web.tests.browser.test_browser_services_quest_drawer.KeyboardServiceDrawerJourneys.test_keyboard_service_journey_frameless_drawer",
-        "web.tests.browser.test_map_editor_standalone.MapEditorStandaloneBrowserTest.test_continent_settlement_and_interior_snapshots_render",
-        "web.tests.browser.test_map_editor_standalone.MapEditorStandaloneBrowserTest.test_local_build_assets_load_with_node_unavailable_and_network_denied",
-        "web.tests.browser.test_map_editor_standalone.MapEditorStandaloneBrowserTest.test_game_theme_scales_without_the_game_shell",
-        "web.tests.browser.test_map_editor_standalone.MapEditorStandaloneBrowserTest.test_authored_prose_and_scene_ids_stay_inert_text",
-        "web.tests.browser.test_map_editor_standalone.MapEditorStalePreviewBrowserTest.test_a_failed_reread_keeps_the_last_preview_marked_stale",
-        "web.tests.browser.test_map_editor_standalone.MapEditorStalePreviewBrowserTest.test_an_unloadable_workspace_shows_no_preview_with_diagnostics",
-        "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_a_loadable_external_change_is_adopted_with_the_view_and_selection_kept",
-        "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_an_open_draft_holds_the_external_change_until_load_new_version",
-        "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_tab_reaches_load_new_version_without_confirming_a_held_draft",
-        "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_an_invalid_draft_cannot_be_removed_by_selection_or_navigation",
-        "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_hiding_a_layer_cannot_remove_an_invalid_field_draft",
-        "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_a_draft_confirmed_against_the_old_snapshot_is_rejected_without_changing_disk",
-        "web.tests.browser.test_map_capture_surface.MapCaptureSurfaceBrowserTest",
-        "web.tests.browser.test_map_capture_surface.MapSurfaceEditorSmokeBrowserTest",
-        "web.tests.browser.test_map_image_capture.MapImageCaptureBrowserTest"
-      ],
-      "files_b": [
-        "web.tests.browser.test_browser_combat_scales.CombatMenuBrowserTest.test_master_scale_step_casts_at_the_chosen_magnitude",
-        "web.tests.browser.test_browser_combat_scales.CombatMenuBrowserTest.test_panel_advertises_scales_only_for_the_mastered_element",
-        "web.tests.browser.test_browser_combat_scales.CombatMenuBrowserTest.test_panel_groups_skills_by_category_in_enum_order",
-        "web.tests.browser.test_browser_creation_reconnect.ReconnectCreationJourney.test_reconnect_restores_saved_stage_and_never_auto_resubmits",
-        "web.tests.browser.test_browser_unified_scenes.UnifiedScenesBrowserTest.test_provisional_and_terminal_failures_are_reached_once",
-        "web.tests.browser.test_map_editor_persistence.MapEditorPersistenceBrowserTest.test_a_drag_is_one_saved_operation_that_undoes_to_absence_and_redoes",
-        "web.tests.browser.test_map_editor_persistence.MapEditorPersistenceBrowserTest.test_escape_cancels_a_drag_and_shift_arrow_nudges_one_step_per_press",
-        "web.tests.browser.test_map_editor_persistence.MapEditorPersistenceBrowserTest.test_an_incomplete_field_draft_is_never_written_and_escape_restores_it",
-        "web.tests.browser.test_map_editor_persistence.MapEditorPersistenceBrowserTest.test_a_refreshed_page_does_not_inherit_undo_history",
-        "web.tests.browser.test_map_editor_persistence.MapEditorPersistenceBrowserTest.test_a_failed_save_is_reported_with_the_baseline_intact_and_no_retry",
-        "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_malformed_yaml_is_shown_stale_and_recovers_automatically",
-        "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_an_externally_removed_selection_is_cleared_with_a_notice",
-        "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_a_restart_keeps_a_stale_inspectable_snapshot_and_needs_an_explicit_read"
-      ]
-    },
-    {
-      "index": 2,
-      "name": "combat-2",
-      "files_a": [
-        "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_crumb_absent_at_depth_one_present_at_depth_two_and_back_pops_one_level",
-        "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_dock_and_figure_plate_geometry_at_both_desktop_viewports",
-        "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_focus_stays_on_action_dock_in_combat",
-        "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_pointer_root_row_click_activates_once",
-        "web.tests.browser.test_browser_services_dispatch.ReconnectJourney.test_reconnect_rebuilds_services_and_discards_unsubmitted_quantity",
-        "web.tests.browser.test_browser_party_acceptance.PartyManagementFixtureSmokeBrowserTest.test_dedicated_fixture_publishes_members_merchant_and_lineage",
-        "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_a_river_point_drag_is_one_continent_command_that_stales_the_partition",
-        "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_an_incomplete_number_writes_nothing_and_escape_restores_it",
-        "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_a_new_location_without_a_local_map_is_searchable_and_fabricates_nothing"
-      ],
-      "files_b": [
-        "web.tests.browser.test_browser_action_feedback.ActionFeedbackBrowserTest.test_failed_concept_surfaces_one_crit_toast_above_the_overlay",
-        "web.tests.browser.test_browser_action_feedback.ActionFeedbackBrowserTest.test_queue_bounds_order_dismiss_and_reload",
-        "web.tests.browser.test_browser_creation_viewport_pointer.PointerCreationJourneys.test_pointer_click_on_reset_opens_the_destructive_confirm",
-        "web.tests.browser.test_browser_creation_viewport_pointer.PointerCreationJourneys.test_pointer_click_on_submit_emits_exactly_one_custom_save",
-        "web.tests.browser.test_browser_party_acceptance.PartyAcceptanceBrowserTest.test_cancelled_exit_keeps_the_whole_draft_and_a_committed_exit_settles_once",
-        "web.tests.browser.test_browser_party_acceptance.PartyAcceptanceBrowserTest.test_member_journey_commands_a_companion_skill_and_item_and_revises_a_choice",
-        "web.tests.browser.test_browser_party_acceptance.PartyAcceptanceBrowserTest.test_unfinished_draft_survives_reconnect_without_replaying_intent",
-        "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_clicking_a_feature_shape_selects_it_and_shows_its_handles",
-        "web.tests.browser.test_map_editor_workflows.MapEditorFollowingLargeChromiumTest.test_malformed_then_corrected_files_recover_and_semantic_work_in_progress_loads"
-      ]
-    },
-    {
-      "index": 3,
-      "name": "combat-3",
-      "files_a": [
-        "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_area_shorthand_flow",
-        "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_disabled_items_defend_send_no_packet",
-        "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_party_exit_prompt_confirm_sends_one_exit_confirm",
-        "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_none_skill_submits_skill_key_only",
-        "web.tests.browser.test_browser_services_shop.ShopClosedJourneys.test_closed_shop_disables_all_trades",
-        "web.tests.browser.test_browser_sleep_handoff.SleepHandoffBrowserTest.test_keyboard_sleep_handoff_returns_control_and_survives_reload",
-        "web.tests.browser.test_browser_sleep_handoff.SleepHandoffBrowserTest.test_keyboard_sleep_handoff_transfers_to_an_awake_companion",
-        "web.tests.browser.test_browser_sleep_handoff.SleepHandoffBrowserTest.test_all_party_choice_declines_and_wakes_owner",
-        "web.tests.browser.test_browser_sleep_handoff.TerminalSleepStatusBrowserTest.test_all_forced_sleep_engagement_settles_and_keeps_sleep_status"
-      ],
-      "files_b": [
-        "web.tests.browser.test_browser_local_map_rendering.LocalMapBrowserTest.test_gate_room_renders_its_own_approach_cell_and_no_footprint",
-        "web.tests.browser.test_browser_local_map_geometry.LocalMapBrowserTest.test_island_type_ladder_stays_under_its_own_chrome_step",
-        "web.tests.browser.test_browser_local_map_geometry.LocalMapBrowserTest.test_minimap_content_stays_inside_its_island",
-        "web.tests.browser.test_browser_local_map_geometry.LocalMapBrowserTest.test_mirrors_are_clipped_non_focusable_and_do_not_change_island_box",
-        "web.tests.browser.test_browser_local_map_rendering.LocalMapBrowserTest.test_minimap_renders_and_distinguishes_states_without_color",
-        "web.tests.browser.test_browser_local_map_rendering.LocalMapBrowserTest.test_reconnect_rebuilds_minimap_from_persisted_knowledge",
-        "web.tests.browser.test_browser_local_map_rendering.LocalMapBrowserTest.test_remembered_remote_node_presentation_and_accessibility",
-        "web.tests.browser.test_browser_local_map_rendering.LocalMapBrowserTest.test_unknown_nodes_never_appear_in_the_dom",
-        "web.tests.browser.test_browser_services_dispatch.ServiceDispatchJourneys.test_duplicate_request_executes_buy_once",
-        "web.tests.browser.test_browser_services_dispatch.ServiceDispatchJourneys.test_stale_revision_returns_stale_without_mutation"
-      ]
-    },
-    {
-      "index": 4,
-      "name": "combat-4",
-      "files_a": [
-        "web.tests.browser.test_browser_combat_panels.CombatMenuBrowserTest.test_area_explicit_multi_selection",
-        "web.tests.browser.test_browser_combat_panels.CombatMenuBrowserTest.test_disabled_reason_is_visible_without_packet",
-        "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_party_exit_cancel_keeps_the_draft_and_the_clock",
-        "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_terminal_outcome_publishes_fresh_exploration_panels",
-        "web.tests.browser.test_browser_services_quest_drawer.ServicesUnavailableJourney.test_unavailable_services_drawer_renders_reason_only",
-        "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_search_tells_equal_names_apart_and_alt_left_returns",
-        "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_diagnostics_locate_targets_and_reveal_a_hidden_layer",
-        "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_dragging_a_referenced_node_is_one_command_that_keeps_its_relations",
-        "web.tests.browser.test_map_editor_relationships.MapEditorRelationshipBrowserTest.test_an_unavailable_index_refuses_deletion_at_the_action_while_entrance_edits_save"
-      ],
-      "files_b": [
-        "web.tests.browser.test_browser_creation_reconnect.ReconnectPresetCreationJourney.test_reconnect_restores_preset_stage_and_never_auto_activates",
-        "web.tests.browser.test_browser_inventory_actions.InventoryActionJourneys.test_backpack_row_actions_echo_their_typed_commands",
-        "web.tests.browser.test_browser_inventory_actions.InventoryActionJourneys.test_dialogs_and_dispatch_state_fail_closed_across_interruptions",
-        "web.tests.browser.test_browser_inventory_actions.InventoryActionJourneys.test_keyboard_and_pointer_item_actions_are_confirmation_protected",
-        "web.tests.browser.test_browser_console_saves.ConsoleSnapshotFailureBrowserTest.test_snapshot_failure_refuses_before_mutation_and_keeps_the_baseline",
-        "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_an_unknown_index_explains_refused_deletion_and_editing_still_saves",
-        "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_a_referenced_object_lists_its_references_inline_and_writes_nothing",
-        "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_the_road_tool_creates_a_two_way_street_in_one_command",
-        "web.tests.browser.test_map_editor_workflows.MapEditorFollowingLargeChromiumTest.test_an_old_tab_after_a_restart_reads_again_before_writing"
-      ]
-    },
-    {
-      "index": 5,
-      "name": "exploration-5",
-      "files_a": [
-        "web.tests.browser.test_browser_exploration_nav.ExplorationBrowserTest.test_escape_at_intermediate_depth_keeps_cells_matched_to_the_frame",
-        "web.tests.browser.test_browser_exploration_nav.ExplorationBrowserTest.test_escape_from_quests_drawer_leaves_root_clean",
-        "web.tests.browser.test_browser_exploration_nav.ExplorationBrowserTest.test_keyboard_only_journey_walks_the_overview",
-        "web.tests.browser.test_browser_exploration_nav.ExplorationBrowserTest.test_room_actions_hold_at_both_reference_viewports",
-        "web.tests.browser.test_browser_exploration_tiles.ExplorationBrowserTest.test_crowded_room_folds_into_the_rail_at_a_narrow_viewport",
-        "web.tests.browser.test_browser_pointer.PointerServiceAcceptanceTest.test_pointer_service_submenu_submission",
-        "web.tests.browser.test_browser_services_quest_drawer.QuestBookAwayFromClerkJourneys.test_away_from_clerk_renders_book_with_no_clerk_marker",
-        "web.tests.browser.test_browser_services_quest_drawer.QuestBookAwayFromClerkJourneys.test_keyboard_reaches_both_tablists_and_the_list",
-        "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_fixed_column_skill_pane_keeps_its_rows_inside_the_command_region",
-        "web.tests.browser.test_browser_exploration_nav.ExplorationPortraitMediaBrowserTest.test_admitted_media_loads_on_both_medallions_and_the_non_party_focus"
-      ],
-      "files_b": [
-        "web.tests.browser.test_browser_session_lifecycle.SessionLifecycleBrowserTest",
-        "web.tests.browser.test_browser_shell_dock.ShellAcceptanceTest.test_action_dock_renders_the_mockup_command_surface",
-        "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_vitals_island_hides_at_full_health_outside_combat",
-        "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_vitals_dock_stands_on_the_band_edge_with_chromeless_icons",
-        "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_command_line_field_button_alignment_at_both_viewports",
-        "web.tests.browser.test_browser_shell_dock.ShellAcceptanceTest.test_dock_shortcut_legend_renders_once_with_real_behaviour_wording",
-        "web.tests.browser.test_browser_shell_dock.ShellAcceptanceTest.test_full_log_opens_in_one_action_and_escapes_with_focus_restoration",
-        "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_low_hp_state_drives_the_stage_hook",
-        "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_minimap_present_in_exploration_absent_in_combat",
-        "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_open_rest_form_never_swallows_command_line_enter",
-        "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_populated_island_stack_fits_its_anchor_at_both_viewports",
-        "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_shift_enter_in_field_inserts_newline_without_sending",
-        "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_rejected_send_keeps_the_line_open",
-        "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_toggle_collapses_and_keeps_focus",
-        "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_borrowed_send_outside_the_active_phase_keeps_the_speech",
-        "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_stage_anchors_do_not_intersect_at_both_viewports"
-      ]
-    },
-    {
-      "index": 6,
-      "name": "input_narrative-6",
-      "files_a": [
-        "web.tests.browser.test_browser_art.ArtImageLoadFailureTest.test_image_load_failure_shows_fallback_without_refetch",
-        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_catalog_echo_never_alters_the_ui_action_envelope",
-        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_first_log_line_needs_no_divider",
-        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_full_log_frame_returns_to_latest_without_touching_the_reader",
-        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_markup_like_labels_render_as_literal_text",
-        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_message_page_types_and_completes",
-        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_message_window_repages_on_resize",
-        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_reading_preferences_persist",
-        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_reading_sample_previews_preferences_without_touching_play",
-        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_reduced_motion_pages_are_instant",
-        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_slash_typed_in_a_focused_editable_stays_ordinary_text",
-        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_slash_while_the_rest_form_is_open_never_toggles_the_command_line",
-        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_typed_command_echoes_one_input_line_with_a_divider",
-        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_typed_command_while_reading_flushes_to_new_response_and_logs_divider",
-        "web.tests.browser.test_browser_services_guild.GuildBoardJourneys.test_board_frame_refreshes_on_committed_update",
-        "web.tests.browser.test_browser_services_guild.GuildBoardJourneys.test_board_list_to_accept",
-        "web.tests.browser.test_browser_services_guild.GuildBoardJourneys.test_grade_rail_reaches_a_locked_grade_by_keyboard",
-        "web.tests.browser.test_browser_services_guild.GuildBoardJourneys.test_reception_counter_shows_the_independent_rank_card",
-        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_seeded_motion_level_is_applied",
-        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_os_reduced_motion_resolves_to_reduced",
-        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_stored_motion_level_overrides_os",
-        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_motion_off_is_instant",
-        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_transitions_never_gate_commit"
-      ],
-      "files_b": [
-        "web.tests.browser.test_browser_actions.ActionLockingTest",
-        "web.tests.browser.test_harness.ManagedServerFastTests",
-        "web.tests.browser.test_harness.StartupLockTests",
-        "web.tests.browser.test_harness.StartupSerializationTests",
-        "web.tests.browser.test_browser_console_saves.ConsoleSaveConfigurationTests",
-        "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_the_room_tool_creates_a_standalone_room_without_a_layout_write",
-        "web.tests.browser.test_map_editor_generation.MapEditorGenerationBrowserTest.test_only_the_explicit_controls_regenerate_and_old_outlines_are_labelled",
-        "web.tests.browser.test_map_editor_workflows.MapEditorWorkflowsChromiumTest.test_local_map_and_interior_authoring_reloads_in_the_core_after_every_operation",
-        "web.tests.browser.test_map_editor_workflows.MapEditorWorkflowsChromiumTest.test_a_location_drag_is_one_command_and_undo_redo_and_restart_agree",
-        "web.tests.browser.test_map_editor_workflows.MapEditorFollowingReferenceFirefoxTest.test_external_changes_are_adopted_or_held_behind_an_open_draft"
-      ]
-    },
-    {
-      "index": 7,
-      "name": "exploration-7",
-      "files_a": [
-        "web.tests.browser.test_browser_exploration_state.ExplorationBrowserTest.test_focus_follows_the_item_key_across_committed_re_resolution",
-        "web.tests.browser.test_browser_exploration_state.ExplorationBrowserTest.test_suggestions_frame_is_status_driven",
-        "web.tests.browser.test_browser_exploration_state.ExplorationBrowserTest.test_whole_stack_loss_cascades_to_the_degraded_root_and_recovers",
-        "web.tests.browser.test_browser_lineage.PartyLineageTabBrowserTest",
-        "web.tests.browser.test_incremental_sync.IncrementalSyncBrowserTests.test_graphical_and_text_checkpoint_sequence",
-        "web.tests.browser.test_incremental_sync.IncrementalSyncBrowserTests.test_oversized_snapshot_and_delta_adopt_once",
-        "web.tests.browser.test_incremental_sync.IncrementalSyncBrowserTests.test_missing_publication_recovers_complete_baseline",
-        "web.tests.browser.test_incremental_sync.IncrementalSyncBrowserTests.test_failed_recovery_and_alignment_preserve_local_state",
-        "web.tests.browser.test_map_editor_workflows.MapEditorFollowingReferenceFirefoxTest.test_a_save_racing_an_external_write_is_refused_by_the_fingerprint_guard"
-      ],
-      "files_b": [
-        "web.tests.browser.test_browser_creation_concept.ConceptCreationJourneys.test_concept_field_journey_to_activation_at_the_capped_viewport",
-        "web.tests.browser.test_browser_creation_concept.ConceptCreationJourneys.test_concept_field_journey_to_activation_at_the_reference_viewport",
-        "web.tests.browser.test_browser_inventory_grid.InventoryGridJourneys.test_bag_tab_lists_the_committed_rows_with_keyboard_reach",
-        "web.tests.browser.test_browser_console_saves.ConsoleSaveIsolationBrowserTest.test_first_protected_teleport_saves_the_before_state_privately",
-        "web.tests.browser.test_browser_synth_lineage.SynthLineageBrowserTest.test_synthetic_member_lineage_matches_text_and_panel",
-        "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_the_connection_tool_creates_a_two_way_pair_in_one_command_and_undo_removes_it",
-        "web.tests.browser.test_map_editor_relationships.MapEditorRelationshipBrowserTest.test_the_settlement_entrance_tool_adds_a_gate_with_one_settlement_write",
-        "web.tests.browser.test_map_editor_workflows.MapEditorWorkflowsFirefoxTest.test_continental_authoring_reloads_in_the_core_after_every_operation",
-        "web.tests.browser.test_map_editor_workflows.MapEditorWorkflowsFirefoxTest.test_a_location_drag_is_one_command_and_undo_redo_and_restart_agree",
-        "web.tests.browser.test_map_editor_workflows.MapEditorFollowingReferenceFirefoxTest.test_malformed_then_corrected_files_recover_and_semantic_work_in_progress_loads"
-      ]
-    },
-    {
-      "index": 8,
-      "name": "exploration-8",
-      "files_a": [
-        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_cancelled_freeform_dialogue_cannot_capture_a_later_command",
-        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_engage_transitions_to_combat",
-        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_freeform_dialogue_degrades_offline_through_the_command_line",
-        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_talk_open_enters_the_dialogue_in_one_step",
-        "web.tests.browser.test_browser_exploration_actions.ExplorationBrowserTest.test_unsafe_skip_rejects_before_any_clock_advance",
-        "web.tests.browser.test_browser_local_map_layout_variants.LayoutVariantsBrowserTest",
-        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_pointer_opened_choices_highlight_the_first_choice_without_answering",
-        "web.tests.browser.test_map_editor_workflows.MapEditorWorkflowsFirefoxTest.test_local_map_and_interior_authoring_reloads_in_the_core_after_every_operation",
-        "web.tests.browser.test_map_editor_workflows.MapEditorFollowingReferenceFirefoxTest.test_an_old_tab_after_a_restart_reads_again_before_writing"
-      ],
-      "files_b": [
-        "web.tests.browser.test_browser_creation_custom.CustomCreationJourneys.test_out_of_range_apparent_age_rejected_independently",
-        "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_header_shows_location_time_and_connection_dot",
-        "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_keyboard_field_focus_send_cancel_and_focus_restoration",
-        "web.tests.browser.test_browser_shell_narrative.ShellAcceptanceTest.test_keydown_noise_is_gone_during_keyboard_navigation",
-        "web.tests.browser.test_browser_shell_narrative.ShellAcceptanceTest.test_narrative_renders_styled_prose_not_markup_source",
-        "web.tests.browser.test_browser_shell_narrative.ShellAcceptanceTest.test_narrative_wide_row_soft_wraps_inside_the_pane",
-        "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_page_surface_keyboard_advance_and_dock_isolation",
-        "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_paging_marker_and_append_keep_page",
-        "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_pointer_focused_field_sends_on_enter",
-        "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_surfaces_visible_at_the_capped_viewport",
-        "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_surfaces_visible_at_the_reference_viewport",
-        "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_unavailable_placeholders_and_numeric_status",
-        "web.tests.browser.test_browser_wait_helper",
-        "web.tests.browser.test_harness_mixins"
-      ]
-    },
-    {
-      "index": 9,
-      "name": "exploration-9",
-      "files_a": [
-        "web.tests.browser.test_browser_exploration_state.ExplorationBrowserTest.test_escape_from_character_panel_returns_keyboard_to_the_exploration_root",
-        "web.tests.browser.test_browser_exploration_state.ExplorationBrowserTest.test_companion_lineup_dialogue_geometry_and_real_possession",
-        "web.tests.browser.test_browser_exploration_state.ExplorationBrowserTest.test_party_window_opens_on_a_lineup_companion_and_switches_members",
-        "web.tests.browser.test_browser_exploration_state.ExplorationBrowserTest.test_exploration_companion_focus_reuses_the_lineup_figure",
-        "web.tests.browser.test_browser_exploration_frame.ExplorationBrowserTest.test_keyboard_move_charges_time_and_refreshes_map",
-        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_look_at_scripted_host_shows_the_affinity_stage_line",
-        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_scripted_keyword_dialogue_completes",
-        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_dialogue_stage_collapses_the_band_and_stands_both_actors",
-        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_dialogue_choices_sit_over_the_stage_and_the_dock_collapses",
-        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_dialogue_stage_journey_completes_by_keyboard",
-        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_dialogue_exit_row_moves_with_the_committed_exit_payload",
-        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_presence_rail_and_verb_card_hold_at_both_reference_viewports",
-        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_authored_scene_plays_line_by_line_with_synchronized_portraits",
-        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_generated_package_scene_plays_multi_line_on_the_stage",
-        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_dialogue_completion_retry_without_rereading",
-        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_dialogue_completion_reload_discards_pending",
-        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_possessed_companion_plays_an_authored_scene_with_its_own_portrait",
-        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_locked_topic_shows_its_hint_and_plays_its_refusal",
-        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_unlock_during_a_scene_shows_one_deferred_notice",
-        "web.tests.browser.test_harness.PortAllocationTests"
-      ],
-      "files_b": [
-        "web.tests.browser.test_browser_combat_rejection.CombatRejectionBrowserTest.test_forged_exit_confirmation_rejects",
-        "web.tests.browser.test_browser_combat_rejection.CombatRejectionBrowserTest.test_tampered_target_rejects_without_round",
-        "web.tests.browser.test_browser_services_shop.ShopJourneys.test_buy_quantity_validation_exact_copper",
-        "web.tests.browser.test_browser_services_shop.ShopJourneys.test_sell_and_repeated_inventory_without_use_control",
-        "web.tests.browser.test_browser_services_shop.ShopCompanionJourneys.test_buy_potions_for_a_companion",
-        "web.tests.browser.test_browser_services_shop.ShopCompanionJourneys.test_possessed_shop_opens_at_the_large_acceptance_viewport",
-        "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_auto_arrange_writes_only_the_layout_and_names_it",
-        "web.tests.browser.test_map_editor_workflows.MapEditorFollowingReferenceChromiumTest.test_external_changes_are_adopted_or_held_behind_an_open_draft",
-        "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityFirefoxTest.test_supported_viewports_keep_status_and_operations_reachable_in_firefox"
-      ]
-    },
-    {
-      "index": 10,
-      "name": "exploration-10",
-      "files_a": [
-        "web.tests.browser.test_browser_art.ArtFailedSceneTest.test_failed_regeneration_keeps_a_visible_reached_failure",
-        "web.tests.browser.test_browser_exploration_frame.ExplorationBrowserTest.test_frame_resolver_follows_committed_state_across_a_real_move",
-        "web.tests.browser.test_browser_exploration_frame.ExplorationBrowserTest.test_open_overview_follows_a_committed_move",
-        "web.tests.browser.test_browser_exploration_actions.ExplorationBrowserTest.test_safe_wait_until_dawn_advances_the_clock",
-        "web.tests.browser.test_browser_exploration_actions.ExplorationBrowserTest.test_rest_entry_tile_form_dispatch_path",
-        "web.tests.browser.test_browser_exploration_actions.ExplorationBrowserTest.test_stale_and_tampered_submissions_do_nothing",
-        "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_a_stale_multi_selection_copies_every_source_without_secrets_or_actions",
-        "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_supported_viewports_keep_status_and_operations_reachable",
-        "web.tests.browser.test_wilderness_travel.TravelLayoutTests.test_settlement_gate_layout",
-        "web.tests.browser.test_wilderness_travel.TravelLayoutTests.test_refresh_adoption",
-        "web.tests.browser.test_wilderness_travel.TravelLayoutTests.test_medallion_subjects",
-        "web.tests.browser.test_wilderness_travel.TravelMapTests.test_map_fact_layers",
-        "web.tests.browser.test_wilderness_travel.TravelMapTests.test_map_viewports",
-        "web.tests.browser.test_wilderness_travel.TravelMapTests.test_repaint_budget",
-        "web.tests.browser.test_wilderness_travel.TravelWindowTests.test_live_memory_and_distant_cards",
-        "web.tests.browser.test_wilderness_travel.TravelWalkingTests.test_keyboard_only_step",
-        "web.tests.browser.test_wilderness_travel.TravelWalkingTests.test_held_walk_release",
-        "web.tests.browser.test_wilderness_travel.TravelLegTests.test_gauge_preferences_and_actions",
-        "web.tests.browser.test_wilderness_travel.TravelPlanningTests.test_destination_preview_keyboard_and_pointer",
-        "web.tests.browser.test_wilderness_travel.TravelPlanningTests.test_destination_query_supersession",
-        "web.tests.browser.test_wilderness_travel.TravelRouteTests.test_hostile_interrupt",
-        "web.tests.browser.test_wilderness_travel.TravelRouteTests.test_all_interrupt_flags",
-        "web.tests.browser.test_wilderness_travel.TravelRouteTests.test_landmark_focus",
-        "web.tests.browser.test_wilderness_travel.TravelLogTests.test_committed_log_and_full_prose",
-        "web.tests.browser.test_wilderness_camping.CampingTests.test_card_inputs_refusal_and_handoff",
-        "web.tests.browser.test_wilderness_camping.CampingTests.test_dusk_camp_to_dawn_and_beat_controls"
-      ],
-      "files_b": [
-        "web.tests.browser.test_browser_combat_rejection.CombatReconnectBrowserTest.test_confirmed_action_disconnect_shows_no_uncertain_notice",
-        "web.tests.browser.test_browser_combat_rejection.CombatReconnectBrowserTest.test_disconnect_after_submit_shows_uncertain_notice_no_retry",
-        "web.tests.browser.test_browser_combat_rejection.CombatReconnectBrowserTest.test_reconnect_resumes_same_session_without_new_round",
-        "web.tests.browser.test_browser_creation_reset_draft.ResetAndDraftJourneys.test_escape_preserves_the_saved_draft",
-        "web.tests.browser.test_browser_exit_compass.ExitCompassBrowserTest.test_holding_a_direction_walks_until_a_dead_end",
-        "web.tests.browser.test_browser_exit_compass.ExitCompassBrowserTest.test_a_disabled_exit_reads_its_reason_from_the_readout",
-        "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_keyboard_only_workflow_in_chromium",
-        "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityFirefoxTest.test_keyboard_only_workflow_in_firefox",
-        "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_a_retargeted_road_and_a_new_bend_stay_selected"
-      ]
-    },
-    {
-      "index": 11,
-      "name": "exploration-11",
-      "files_a": [
-        "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_defeated_participant_leaves_the_catalog_in_the_same_update",
-        "web.tests.browser.test_browser_exploration_actions.ExplorationBrowserTest.test_no_take_or_drop_control_is_rendered",
-        "web.tests.browser.test_browser_exploration_actions.ExplorationBrowserTest.test_non_success_action_results_speak_once_in_the_narrative",
-        "web.tests.browser.test_browser_exploration_nav.ExplorationBrowserTest.test_pointer_back_cell_returns_to_the_root_without_an_action",
-        "web.tests.browser.test_browser_exploration_state.ExplorationBrowserTest.test_reconnect_rebuilds_exploration_without_replay",
-        "web.tests.browser.test_browser_npc_services.MerchantServiceCardJourneys.test_merchant_purchase_returns_focus_to_its_service_row",
-        "web.tests.browser.test_browser_npc_services.MerchantServiceCardJourneys.test_a_departed_provider_retires_the_card_and_its_drawer",
-        "web.tests.browser.test_browser_npc_services.ReceptionServiceCardJourneys.test_reception_row_opens_the_rank_flow_without_starting_an_exam",
-        "web.tests.browser.test_browser_npc_services.GroupedCardOverflowJourneys.test_the_card_groups_eleven_services_and_digits_stop_at_nine"
-      ],
-      "files_b": [
-        "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_alternative_text_is_present_outside_the_bitmap",
-        "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_done_scene_renders_same_origin_image",
-        "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_scene_caption_and_status_usable_at_the_reference_viewport",
-        "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_scene_caption_sits_on_the_stage_floor_between_the_portraits",
-        "web.tests.browser.test_browser_layout.LayoutMigrationTest",
-        "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_a_new_local_map_from_a_location_is_empty_and_unfinished",
-        "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_a_referenced_room_refuses_deletion_and_a_connection_is_deleted_directly",
-        "web.tests.browser.test_map_editor_relationships.MapEditorRelationshipBrowserTest.test_changing_an_endpoint_with_the_selector_by_keyboard_writes_the_qualified_id"
-      ]
-    },
-    {
-      "index": 12,
-      "name": "pointer-12",
-      "files_a": [
-        "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_composite_widget_semantics_are_dom_observable",
-        "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_pointer_exploration_journey_at_both_viewports",
-        "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_pointer_under_offline_overlay_emits_nothing",
-        "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_real_mouse_double_click_pushes_one_frame",
-        "web.tests.browser.test_browser_services_guild.GuildExamAppointmentJourney.test_appointment_journey_at_the_reference_viewport",
-        "web.tests.browser.test_browser_services_guild.GuildExamAppointmentJourney.test_appointment_journey_at_the_wide_viewport",
-        "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_a_bend_drag_is_one_command_and_keeps_the_direction_at_the_large_viewport",
-        "web.tests.browser.test_map_editor_workflows.MapEditorFollowingReferenceChromiumTest.test_a_save_racing_an_external_write_is_refused_by_the_fingerprint_guard"
-      ],
-      "files_b": [
-        "web.tests.browser.test_browser_options_surface.OptionsSurfaceBrowserTest",
-        "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest",
-        "web.tests.browser.test_browser_synth_journey.SynthJourneySmokeTest.test_shop_stock_rows_resolve_synthetic_keys_end_to_end",
-        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_combat_command_card_stands_at_dead_centre",
-        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_foes_stand_opposite_the_player",
-        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_targets_are_picked_on_the_stage",
-        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_cross_side_cast_asks_first",
-        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_area_targets_light_groups_on_the_stage",
-        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_combat_formation_shares_one_scale_and_keeps_the_centre_clear",
-        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_foes_off_is_instant",
-        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_every_active_foe_stands",
-        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_figure_plates_show_conditions_and_alarm"
-      ]
-    },
-    {
-      "index": 13,
-      "name": "pointer-13",
-      "files_a": [
-        "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_pointer_combat_target_selection_uses_keyboard_path",
-        "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_pointer_disabled_row_explains_without_submitting",
-        "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_pointer_exploration_root_and_submenu_submission",
-        "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_rapid_double_activation_pushes_one_frame",
-        "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_a_referenced_node_refuses_deletion_and_an_unreferenced_one_is_deleted",
-        "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_room_fields_by_keyboard_keep_the_id_and_a_connection_is_relabelled",
-        "web.tests.browser.test_map_editor_generation.MapEditorGenerationBrowserTest.test_browsing_then_cancelling_keeps_the_last_artifact_and_refuses_world_edits",
-        "web.tests.browser.test_map_editor_workflows.MapEditorFollowingReferenceChromiumTest.test_malformed_then_corrected_files_recover_and_semantic_work_in_progress_loads"
-      ],
-      "files_b": [
-        "web.tests.browser.test_browser_art.ArtPendingSceneTest.test_pending_generating_notice_clears_dock_and_command_line",
-        "web.tests.browser.test_browser_art.ArtPendingSceneTest.test_pending_scene_shows_its_own_bundled_art_with_progress",
-        "web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_action_dock_fills_the_band_command_region_across_modes",
-        "web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_breadcrumb_tracks_router_depth",
-        "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_command_line_never_overlaps_dock_caption_or_hud",
-        "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_band_height_is_fixed_across_frames_and_modes",
-        "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_stage_box_is_at_least_65_percent_at_the_reference_viewport",
-        "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_objective_line_shows_only_in_exploration",
-        "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_codex_drawer_opens_from_the_utility_strip",
-        "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_codex_drawer_replaces_the_open_drawer_or_overlay",
-        "web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_combat_dock_root_vertical_list_truthful_skills_count",
-        "web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_verb_card_leaves_the_command_region_unchanged",
-        "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_h5_overlay_triggers_exclusion_and_focus_restoration",
-        "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_help_party_rules_are_static_and_absent_from_the_bag",
-        "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_minimap_island_single_affordance_keyboard_and_movement",
-        "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_narrative_caption_bounded_full_log_one_action",
-        "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_open_drawer_or_overlay_dims_stage",
-        "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_scene_backdrop_renders_art_payload_truthfully",
-        "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_surface_visibility_gated_by_committed_game_mode",
-        "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_full_log_opens_at_latest_line",
-        "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_top_bar_tool_group_fits_and_opens_with_line_collapsed",
-        "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_the_two_codex_controls_are_distinguishable",
-        "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_prose_typesetting_follows_the_measured_column"
-      ]
-    },
-    {
-      "index": 14,
-      "name": "local_map-14",
-      "files_a": [
-        "web.tests.browser.test_browser_local_map_interaction.LocalMapBrowserTest.test_adjacent_traversable_node_submits_explore_move",
-        "web.tests.browser.test_browser_local_map_interaction.LocalMapBrowserTest.test_gateway_exit_stub_is_a_named_keyboard_button_moving_once",
-        "web.tests.browser.test_browser_local_map_interaction.LocalMapBrowserTest.test_unleadered_stub_gap_preserves_street_pointer_and_native_gateway_actions",
-        "web.tests.browser.test_browser_local_map_lattice.LocalMapBrowserTest.test_densely_populated_lattice_scales_down_without_reintroducing_overlap",
-        "web.tests.browser.test_browser_local_map_lattice.LocalMapBrowserTest.test_long_remembered_list_never_resizes_the_island",
-        "web.tests.browser.test_browser_local_map_lattice.LocalMapBrowserTest.test_metric_projection_keeps_gap_ratio_and_actions",
-        "web.tests.browser.test_browser_local_map_interaction.LocalMapBrowserTest.test_minimap_pointer_events_blank_canvas_opens_overlay_while_actionable_moves",
-        "web.tests.browser.test_browser_local_map_interaction.LocalMapBrowserTest.test_minimap_visible_and_keyboard_usable_at_both_viewports",
-        "web.tests.browser.test_browser_services_guild.GuildQuestJourneys.test_abandon_requires_confirmation",
-        "web.tests.browser.test_browser_services_guild.GuildQuestJourneys.test_quest_vanishes_book_drops_row_drawer_stays_open",
-        "web.tests.browser.test_harness.RealServerBootTest.test_real_server_boots_and_cleans_up",
-        "web.tests.browser.test_browser_services_guild.GuildQuestJourneys.test_drawer_renders_book_and_counter_without_duplication"
-      ],
-      "files_b": [
-        "web.tests.browser.test_browser_art.ArtExhaustedSceneTest.test_exhausted_scene_uses_one_placeholder_and_play_continues",
-        "web.tests.browser.test_browser_art.ArtExhaustedSceneTest.test_scene_backdrop_captions_clear_dock_and_command_line",
-        "web.tests.browser.test_browser_contextual_hud_anchors.ContextualHudBrowserTest.test_caption_wider_and_no_anchor_overlap",
-        "web.tests.browser.test_browser_contextual_hud_anchors.ContextualHudBrowserTest.test_dialogue_host_stands_opposite_the_player",
-        "web.tests.browser.test_browser_contextual_hud_anchors.ContextualHudBrowserTest.test_dialogue_choices_sit_centred_between_the_portraits",
-        "web.tests.browser.test_browser_contextual_hud_combat.ContextualHudBrowserTest.test_combat_figure_plates_present_the_drawn_participants",
-        "web.tests.browser.test_browser_contextual_hud_combat.ContextualHudBrowserTest.test_combat_skills_bounded_master_detail",
-        "web.tests.browser.test_browser_contextual_hud_combat.ContextualHudBrowserTest.test_destructive_combat_confirmation_two_step_panel",
-        "web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_digit_keys_pick_the_rows_of_the_current_frame",
-        "web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_dock_panes_render_per_kind_vocabulary",
-        "web.tests.browser.test_browser_contextual_hud_anchors.ContextualHudBrowserTest.test_local_map_unavailable_renders_registry_reason_in_map_overlay",
-        "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_quest_drawer_offers_no_codex_control",
-        "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_reference_drawer_close_focus_and_absent_surfaces",
-        "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_reference_drawer_recession_mark_lifecycle",
-        "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_status_tab_rows_fit_with_no_overlap",
-        "web.tests.browser.test_browser_contextual_hud_combat.ContextualHudBrowserTest.test_command_window_scrolls_its_rows_and_details_the_current_frame",
-        "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_reference_surfaces_share_one_opaque_workspace_frame"
-      ]
-    },
-    {
-      "index": 15,
-      "name": "reconnect-15",
-      "files_a": [
-        "web.tests.browser.test_browser_layout.ProtocolMismatchTest",
-        "web.tests.browser.test_browser_reconnect.ReconnectTest",
-        "web.tests.browser.test_browser_services_guild.GuildRegistrationJourneys.test_register_and_idempotent_reregister",
-        "web.tests.browser.test_browser_services_guild.GuildRegistrationJourneys.test_viewport_reference_keeps_controls_visible",
-        "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_dialogue_enter_and_leave_full",
-        "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_combat_enter_and_leave_full",
-        "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_no_stage_ancestor_scrolls_horizontally_full",
-        "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_choices_stagger_full"
-      ],
-      "files_b": [
-        "web.tests.browser.test_browser_creation_dispatch.CreationDispatchJourneys.test_duplicate_request_executes_custom_once",
-        "web.tests.browser.test_browser_creation_dispatch.CreationDispatchJourneys.test_stale_custom_preserves_typed_values_and_asks_for_review",
-        "web.tests.browser.test_browser_creation_dispatch.CreationDispatchJourneys.test_stale_revision_returns_stale_without_mutation",
-        "web.tests.browser.test_browser_creation_viewport_pointer.ViewportCreationJourney.test_reference_viewport_keeps_creation_essentials_visible_and_literal",
-        "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_reload_in_combat_plays_nothing",
-        "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_mode_transitions_reduced",
-        "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_mode_transitions_off",
-        "web.tests.browser.test_map_editor_relationships.MapEditorRelationshipBrowserTest.test_the_exterior_card_leads_to_the_other_end_and_alt_left_returns"
-      ]
-    },
-    {
-      "index": 16,
-      "name": "art-16",
-      "files_a": [
-        "web.tests.browser.test_browser_bundled_scene_assets.BundledSceneAssetsBrowserTest.test_outdoor_pack_static_decode",
-        "web.tests.browser.test_browser_bundled_scene_assets.BundledSceneAssetsBrowserTest.test_interior_pack_static_decode",
-        "web.tests.browser.test_browser_bundled_scene_assets.BundledSceneAssetsBrowserTest.test_sacred_pack_static_decode",
-        "web.tests.browser.test_browser_bundled_scene_assets.BundledSceneAssetsBrowserTest.test_terminal_pack_static_decode",
-        "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_combat_portrait_overlay_shows_name_and_role",
-        "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_keyboard_focus_switches_the_portrait_without_a_packet",
-        "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_portrait_overlay_usable_at_the_reference_viewport",
-        "web.tests.browser.test_browser_image_loading_core.ImageLoadingCoreBrowserTest.test_original_failure_has_persistent_local_state",
-        "web.tests.browser.test_browser_gallery_image_contract.GalleryImageContractBrowserTest.test_original_404_falls_back_with_local_failure",
-        "web.tests.browser.test_browser_gallery_image_contract.GalleryImageContractBrowserTest.test_official_and_synthetic_rows_carry_their_own_truth",
-        "web.tests.browser.test_browser_original_editors.OriginalEditorsBrowserTest.test_failed_original_never_saves",
-        "web.tests.browser.test_browser_inventory_actions.CombatBagDrawerJourney.test_combat_bag_row_opens_the_drawer_and_confirms_one_item_use",
-        "web.tests.browser.test_browser_inventory_actions.PartyBagTransferJourney.test_give_and_equip_a_companion_then_combat_disables_transfer",
-        "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_full_motion_scene_change",
-        "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_full_motion_place_card_and_clear",
-        "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_full_motion_minimap_pan",
-        "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_minimap_scale_change_follows_motion_level"
-      ],
-      "files_b": [
-        "web.tests.browser.test_browser_creation_custom.CustomCreationJourneys.test_custom_form_keyboard_journey_to_activation",
-        "web.tests.browser.test_browser_creation_custom.CustomCreationJourneys.test_rejected_custom_save_stays_on_the_form_without_confirmation",
-        "web.tests.browser.test_browser_creation_custom.CustomCreationJourneys.test_out_of_range_actual_age_rejected_despite_disabled_client_validation",
-        "web.tests.browser.test_browser_input_narrative.InputEchoExplorationTest",
-        "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_vitals_reveal_and_inert",
-        "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_reduced_motion_fades_only",
-        "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_off_motion_is_instant",
-        "web.tests.browser.test_browser_drawer_content.DrawerContentBrowserTest.test_same_label_lineage_rows_carry_their_root_names_beside_counts",
-        "web.tests.browser.test_browser_stage_silhouette.StageSilhouetteBrowserTest.test_each_built_in_key_paints_its_own_alpha_mask_on_the_stage",
-        "web.tests.browser.test_browser_stage_silhouette.StageSilhouetteBrowserTest.test_the_masked_figure_is_floor_aligned_aspect_preserved_and_unstretched",
-        "web.tests.browser.test_browser_stage_silhouette.StageSilhouetteBrowserTest.test_a_resolved_image_replaces_the_silhouette_and_failure_returns_to_it",
-        "web.tests.browser.test_browser_stage_silhouette.StageSilhouetteBrowserTest.test_a_failed_bundled_mask_keeps_the_frame_usable",
-        "web.tests.browser.test_browser_scene_media.SceneMediaBrowserTest.test_bundled_namespace_and_operator_isolation",
-        "web.tests.browser.test_browser_scene_media.SceneMediaBrowserTest.test_configured_root_failure_keeps_bundled_media",
-        "web.tests.browser.test_browser_original_editors.OriginalEditorsBrowserTest.test_new_original_recovers_and_ruler_failure_is_local",
-        "web.tests.browser.test_browser_unified_figures.UnifiedFiguresBrowserTest.test_exploration_dialogue_combat_and_drawer_share_descriptor",
-        "web.tests.browser.test_browser_avatar_artwork.AvatarArtworkBrowserTest.test_roster_presence_party_participant_fallback_is_accessible"
-      ]
-    },
-    {
-      "index": 17,
-      "name": "creation-17",
-      "files_a": [
-        "web.tests.browser.test_browser_creation_preset.PresetCreationJourneys.test_escape_from_preset_confirm_returns_to_list_without_mutation",
-        "web.tests.browser.test_browser_creation_preset.PresetCreationJourneys.test_preset_selection_confirm_activate_reaches_exploration",
-        "web.tests.browser.test_browser_creation_preset.PresetCreationJourneys.test_rejected_preset_save_stays_on_the_list_without_confirmation",
-        "web.tests.browser.test_browser_layout.ContextualHudStandingJourneyTest",
-        "web.tests.browser.test_browser_drawer_content.DrawerContentBrowserTest.test_status_opens_the_party_window_hero_and_no_drawer_stands_art",
-        "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_prototype_name_and_scene_fields_by_keyboard",
-        "web.tests.browser.test_map_editor_relationships.MapEditorRelationshipBrowserTest.test_a_referenced_node_locates_its_exterior_which_is_removed_before_the_node",
-        "web.tests.browser.test_map_editor_workflows.MapEditorFollowingReferenceChromiumTest.test_an_old_tab_after_a_restart_reads_again_before_writing"
-      ],
-      "files_b": [
-        "web.tests.browser.test_browser_creation_reset_draft.ResetAndDraftJourneys.test_escape_from_reset_confirm_returns_to_form_without_mutation",
-        "web.tests.browser.test_browser_creation_reset_draft.ResetAndDraftJourneys.test_reset_confirm_shows_refreshed_server_text_when_withdrawn",
-        "web.tests.browser.test_browser_creation_reset_draft.ResetAndDraftJourneys.test_reset_requires_confirmation_and_clears_the_draft",
-        "web.tests.browser.test_browser_title_codex.TitleCodexBrowserTest",
-        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_foes_enter_and_leave_full",
-        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_reload_in_combat_plays_no_entrance",
-        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_foes_reduced_only_fade",
-        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_fallen_figures_keep_their_slot_and_read_as_fallen",
-        "web.tests.browser.test_browser_drawer_content.DrawerContentBrowserTest.test_empty_quest_guidance_gives_way_to_the_unavailable_reason"
-      ]
-    },
-    {
-      "index": 18,
-      "name": "beats-18",
-      "files_a": [
-        "web.tests.browser.test_browser_combat_beats.CombatBeatsBrowserTest.test_round_pages_beats_at_off",
-        "web.tests.browser.test_browser_combat_beats.CombatBeatsBrowserTest.test_round_plays_and_skips_reduced",
-        "web.tests.browser.test_browser_chrome_navigation.ChromeNavigationBrowserTest",
-        "web.tests.browser.test_browser_proportional_ui_scale.ProportionalUiScaleBrowserTest",
-        "web.tests.browser.test_browser_skillbook_casting.SkillBookFieldCastJourneyTest.test_keyboard_self_none_and_single_utility_casts",
-        "web.tests.browser.test_browser_skillbook_casting.SkillBookFieldCastJourneyTest.test_area_opening_at_a_chosen_scale_starts_combat_then_book_hands_off",
-        "web.tests.browser.test_browser_skillbook_casting.CompanionFieldCastJourneyTest.test_companion_casts_a_field_heal_from_the_skill_tab",
-        "web.tests.browser.test_map_editor_relationships.MapEditorRelationshipBrowserTest.test_the_interior_entrance_tool_creates_a_two_way_link_as_one_record"
-      ],
-      "files_b": [
-        "web.tests.browser.test_browser_combat_beats.CombatBeatsBrowserTest.test_reconnect_replays_no_round",
-        "web.tests.browser.test_browser_combat_choreography.CombatChoreographyBrowserTest",
-        "web.tests.browser.test_browser_map_legibility.MapLegibilityBrowserTest.test_dense_island_keeps_every_node_and_name_reachable",
-        "web.tests.browser.test_browser_map_legibility.MapLegibilityBrowserTest.test_ordinary_island_reads_at_its_chrome_step",
-        "web.tests.browser.test_map_transport.WorldMapTransportTests.test_representative_world_map_round_trips_intact",
-        "web.tests.browser.test_map_transport.WorldMapTransportTests.test_supported_worst_case_world_map_round_trips_intact",
-        "web.tests.browser.test_map_drawer.MapDrawerWalkTests.test_open_switch_tabs_and_refresh_after_a_committed_move",
-        "web.tests.browser.test_map_drawer.MapDrawerWalkTests.test_escape_unwinds_legend_selection_then_map"
-      ]
-    },
-    {
-      "index": 19,
-      "name": "npc_persona-19",
-      "files_a": [
-        "web.tests.browser.test_browser_npc_persona_editor.NpcPersonaEditorBrowserTest.test_save_reopen_and_offline_greeting",
-        "web.tests.browser.test_browser_npc_persona_editor.NpcPersonaEditorBrowserTest.test_keyboard_dirty_close_and_field_rejection",
-        "web.tests.browser.test_browser_npc_persona_editor.NpcPersonaEditorBrowserTest.test_single_page_conflict_reload_and_discard",
-        "web.tests.browser.test_browser_unified_scenes.UnifiedScenesBrowserTest.test_room_precedence_retention_movement_and_fullview",
-        "web.tests.browser.test_browser_dream_artwork.DreamArtworkBrowserTest.test_offline_dream_and_official_failure_use_shared_scene",
-        "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_list_multi_selection_moves_as_one_command_and_cross_document_is_inspect_only",
-        "web.tests.browser.test_map_editor_generation.MapEditorGenerationBrowserTest.test_an_external_source_change_during_a_job_never_shows_it_current",
-        "web.tests.browser.test_map_editor_workflows.MapEditorFollowingLargeChromiumTest.test_external_changes_are_adopted_or_held_behind_an_open_draft"
-      ],
-      "files_b": [
-        "web.tests.browser.test_browser_npc_persona_editor_edges.NpcPersonaEditorEdgesBrowserTest.test_late_read_does_not_seed_different_npc",
-        "web.tests.browser.test_browser_npc_persona_editor_edges.NpcPersonaEditorEdgesBrowserTest.test_npc_departure_and_return_protects_draft",
-        "web.tests.browser.test_browser_npc_persona_editor_edges.NpcPersonaEditorEdgesBrowserTest.test_puppet_switch_clears_editor",
-        "web.tests.browser.test_browser_npc_persona_editor_edges.NpcPersonaEditorEdgesBrowserTest.test_cross_tab_conflict_reload_and_discard",
-        "web.tests.browser.test_browser_npc_persona_editor_edges.NpcPersonaEditorEdgesBrowserTest.test_visibility_denial_and_restore_protects_draft",
-        "web.tests.browser.test_browser_skillbook_casting.SkillBookCastingBrowserTest.test_book_hierarchy_geometry_and_focus_at_both_viewports",
-        "web.tests.browser.test_browser_skillbook_casting.SkillBookCastingBrowserTest.test_cancel_back_returns_to_the_book_without_casting",
-        "web.tests.browser.test_browser_skillbook_casting.SkillBookCastingBrowserTest.test_monster_openings_disclose_the_whole_line_up",
-        "web.tests.browser.test_browser_skillbook_casting.SkillBookCastingBrowserTest.test_tampered_cast_shapes_are_rejected_without_casting"
-      ]
-    }
-  ]
+ "shards": [
+  {
+   "index": 0,
+   "name": "narrative-0",
+   "files_a": [
+    "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_catalog_echo_never_alters_the_ui_action_envelope",
+    "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_command_line_is_permanently_present_and_focusable",
+    "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_field_is_focusable_without_an_opening_action",
+    "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_first_log_line_needs_no_divider",
+    "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_full_log_frame_returns_to_latest_without_touching_the_reader",
+    "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_message_window_repages_on_resize",
+    "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_motion_off_is_instant",
+    "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_os_reduced_motion_resolves_to_reduced",
+    "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_reduced_motion_pages_are_instant",
+    "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_settings_prose_scale_is_a_client_local_preference",
+    "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_slash_focuses_the_always_present_field",
+    "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_slash_while_the_rest_form_is_open_never_toggles_the_command_line",
+    "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_stored_motion_level_overrides_os",
+    "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_transitions_never_gate_commit",
+    "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_typed_command_while_reading_flushes_to_new_response_and_logs_divider",
+    "web.tests.browser.test_browser_stage_silhouette.StageSilhouetteBrowserTest.test_a_resolved_image_replaces_the_silhouette_and_failure_returns_to_it"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_console_saves.ConsoleSaveConfigurationTests.test_configured_retention_prunes_each_private_root_independently",
+    "web.tests.browser.test_browser_console_saves.ConsoleSaveConfigurationTests.test_managed_settings_resolve_every_save_path_inside_the_runtime_root",
+    "web.tests.browser.test_browser_console_saves.ConsoleSaveConfigurationTests.test_two_invocations_own_disjoint_private_roots",
+    "web.tests.browser.test_browser_local_map_layout_variants.LayoutVariantsBrowserTest.test_layout_follows_payload_layer_without_any_control",
+    "web.tests.browser.test_browser_local_map_layout_variants.LayoutVariantsBrowserTest.test_walked_instance_layer_renders_radial_on_both_surfaces",
+    "web.tests.browser.test_browser_wait_helper.SubmitUntilAdmittedTest.test_a_domain_rejection_returns_without_reactivation",
+    "web.tests.browser.test_browser_wait_helper.SubmitUntilAdmittedTest.test_an_unrelated_result_never_stands_in_for_the_activation",
+    "web.tests.browser.test_browser_wait_helper.SubmitUntilAdmittedTest.test_one_activation_that_dispatches_twice_fails",
+    "web.tests.browser.test_browser_wait_helper.SubmitUntilAdmittedTest.test_stale_activation_is_repeated_once_and_admitted",
+    "web.tests.browser.test_browser_wait_helper.SubmitUntilAdmittedTest.test_three_consecutive_stale_answers_fail_the_journey",
+    "web.tests.browser.test_browser_wait_helper.WaitForStoreStateTest.test_action_gates_adopt_a_fresh_epoch_once_it_settles",
+    "web.tests.browser.test_browser_wait_helper.WaitForStoreStateTest.test_action_gates_hold_while_a_fresh_epoch_still_advances",
+    "web.tests.browser.test_browser_wait_helper.WaitForStoreStateTest.test_action_gates_wait_for_same_epoch_publication",
+    "web.tests.browser.test_browser_wait_helper.WaitForStoreStateTest.test_both_gates_must_hold",
+    "web.tests.browser.test_browser_wait_helper.WaitForStoreStateTest.test_non_navigation_dom_error_surfaced_in_diagnostic",
+    "web.tests.browser.test_browser_wait_helper.WaitForStoreStateTest.test_none_read_flagged_in_timeout",
+    "web.tests.browser.test_browser_wait_helper.WaitForStoreStateTest.test_none_read_tolerated_and_predicate_not_invoked_on_none",
+    "web.tests.browser.test_browser_wait_helper.WaitForStoreStateTest.test_store_gate_returns_when_predicate_true",
+    "web.tests.browser.test_browser_wait_helper.WaitForStoreStateTest.test_timeout_diagnostic_carries_required_fields",
+    "web.tests.browser.test_harness.PortAllocationTests.test_allocate_ports_are_distinct_per_call",
+    "web.tests.browser.test_harness.PortAllocationTests.test_create_runtime_defers_port_allocation",
+    "web.tests.browser.test_harness.PortAllocationTests.test_repeated_runtimes_are_fully_isolated",
+    "web.tests.browser.test_harness.StartupLockTests.test_dead_owner_lock_is_reacquirable",
+    "web.tests.browser.test_harness.StartupLockTests.test_lock_serializes_holders",
+    "web.tests.browser.test_harness.StartupLockTests.test_wedged_holder_times_out_with_named_cause",
+    "web.tests.browser.test_harness.StartupSerializationTests.test_boot_and_allocation_run_under_the_startup_lock",
+    "web.tests.browser.test_harness.StartupSerializationTests.test_foreign_portal_boot_fails_fast_and_retries",
+    "web.tests.browser.test_harness.StartupSerializationTests.test_preallocated_runtime_is_rejected",
+    "web.tests.browser.test_harness_mixins.ManagedServerTearDownMixinTest.test_stop_helper_reports_stop_failures_without_hiding_them",
+    "web.tests.browser.test_harness_mixins.ManagedServerTearDownMixinTest.test_stop_snapshot_helper_drops_attribute",
+    "web.tests.browser.test_harness_mixins.ManagedServerTearDownMixinTest.test_tear_down_runs_base_then_stops_server",
+    "web.tests.browser.test_harness_mixins.ManagedServerTearDownMixinTest.test_tear_down_without_server_is_clean",
+    "web.tests.browser.test_harness_mixins.ManagedServerTearDownMixinTest.test_variant_a_override_stops_the_server_exactly_once",
+    "web.tests.browser.test_harness_mixins.WaitCommandFieldReleasedTest.test_gate_passes_when_store_connected_and_dock_focused",
+    "web.tests.browser.test_harness_mixins.WaitCommandFieldReleasedTest.test_gate_timeouts_when_dock_never_focused",
+    "web.tests.browser.test_harness_mixins.WaitCommandFieldReleasedTest.test_gate_timeouts_when_store_never_connected",
+    "web.tests.browser.test_map_capture_surface.MapCaptureSurfaceBrowserTest.test_a_delayed_local_font_holds_readiness_until_it_arrives",
+    "web.tests.browser.test_map_capture_surface.MapCaptureSurfaceBrowserTest.test_a_full_fit_keeps_cards_and_measured_labels_inside_the_image",
+    "web.tests.browser.test_map_capture_surface.MapCaptureSurfaceBrowserTest.test_a_page_whose_script_is_missing_never_reports_readiness",
+    "web.tests.browser.test_map_capture_surface.MapCaptureSurfaceBrowserTest.test_a_small_output_still_draws_the_requested_map",
+    "web.tests.browser.test_map_capture_surface.MapCaptureSurfaceBrowserTest.test_an_automatic_fit_that_cannot_hold_the_surface_is_refused",
+    "web.tests.browser.test_map_capture_surface.MapCaptureSurfaceBrowserTest.test_authored_text_and_url_like_names_stay_inert",
+    "web.tests.browser.test_map_capture_surface.MapCaptureSurfaceBrowserTest.test_each_view_renders_from_a_file_page_with_network_denied",
+    "web.tests.browser.test_map_capture_surface.MapCaptureSurfaceBrowserTest.test_every_continent_layer_hides_exactly_its_own_geometry",
+    "web.tests.browser.test_map_capture_surface.MapCaptureSurfaceBrowserTest.test_everything_hidden_leaves_the_background_at_the_same_camera",
+    "web.tests.browser.test_map_capture_surface.MapCaptureSurfaceBrowserTest.test_faces_introduced_by_a_later_capture_still_settle_before_readiness",
+    "web.tests.browser.test_map_capture_surface.MapCaptureSurfaceBrowserTest.test_hidden_geometry_takes_only_its_own_labels",
+    "web.tests.browser.test_map_capture_surface.MapCaptureSurfaceBrowserTest.test_hiding_labels_keeps_cards_glyphs_and_direction_indicators",
+    "web.tests.browser.test_map_capture_surface.MapCaptureSurfaceBrowserTest.test_malformed_requests_reject_without_a_partial_render",
+    "web.tests.browser.test_map_capture_surface.MapCaptureSurfaceBrowserTest.test_readiness_waits_for_fonts_and_layout",
+    "web.tests.browser.test_map_capture_surface.MapCaptureSurfaceBrowserTest.test_settlement_nodes_and_roads_are_independent",
+    "web.tests.browser.test_map_capture_surface.MapCaptureSurfaceBrowserTest.test_the_continent_camera_converts_kilometres_and_keeps_one_scale",
+    "web.tests.browser.test_map_capture_surface.MapCaptureSurfaceBrowserTest.test_the_interior_camera_reports_down_positive_layout_units",
+    "web.tests.browser.test_map_capture_surface.MapSurfaceEditorSmokeBrowserTest.test_selection_pan_zoom_and_one_mark_move_still_work",
+    "web.tests.browser.test_map_editor_standalone.MapEditorStalePreviewBrowserTest.test_a_failed_reread_keeps_the_last_preview_marked_stale",
+    "web.tests.browser.test_map_editor_standalone.MapEditorStalePreviewBrowserTest.test_an_unloadable_workspace_shows_no_preview_with_diagnostics",
+    "web.tests.browser.test_map_editor_standalone.MapEditorStandaloneBrowserTest.test_authored_prose_and_scene_ids_stay_inert_text",
+    "web.tests.browser.test_map_editor_standalone.MapEditorStandaloneBrowserTest.test_continent_settlement_and_interior_snapshots_render",
+    "web.tests.browser.test_map_editor_standalone.MapEditorStandaloneBrowserTest.test_game_theme_scales_without_the_game_shell",
+    "web.tests.browser.test_map_editor_standalone.MapEditorStandaloneBrowserTest.test_local_build_assets_load_with_node_unavailable_and_network_denied",
+    "web.tests.browser.test_map_image_capture.MapImageCaptureBrowserTest.test_a_page_without_the_entry_script_never_reports_readiness",
+    "web.tests.browser.test_map_image_capture.MapImageCaptureBrowserTest.test_a_refused_command_publishes_nothing_and_preserves_an_existing_image",
+    "web.tests.browser.test_map_image_capture.MapImageCaptureBrowserTest.test_a_viewport_other_than_the_document_default_still_captures_exactly",
+    "web.tests.browser.test_map_image_capture.MapImageCaptureBrowserTest.test_readiness_waits_for_a_delayed_local_face",
+    "web.tests.browser.test_map_image_capture.MapImageCaptureBrowserTest.test_the_command_publishes_one_exact_image_and_leaves_the_sources_untouched",
+    "web.tests.browser.test_map_image_capture.MapImageCaptureBrowserTest.test_the_loader_payload_renders_map_only_at_the_exact_pixel_rectangle"
+   ]
+  },
+  {
+   "index": 1,
+   "name": "services-1",
+   "files_a": [
+    "web.tests.browser.test_browser_creation_preset.PresetCreationJourneys.test_escape_from_preset_confirm_returns_to_list_without_mutation",
+    "web.tests.browser.test_browser_exploration_actions.ExplorationBrowserTest.test_safe_wait_until_dawn_advances_the_clock",
+    "web.tests.browser.test_browser_npc_services.ReceptionServiceCardJourneys.test_reception_row_opens_the_rank_flow_without_starting_an_exam"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_console_saves.ConsoleSnapshotFailureBrowserTest.test_snapshot_failure_refuses_before_mutation_and_keeps_the_baseline",
+    "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_bundle_blocked_keeps_text_playable",
+    "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_dispatch_via_bridge",
+    "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_incompatible_oob_locks_graphical_keeps_text",
+    "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_live_transport_round_trips_and_store_adopts_snapshot",
+    "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_production_base_html_default_is_vue",
+    "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_reduced_motion_and_status_not_color_only"
+   ]
+  },
+  {
+   "index": 2,
+   "name": "hud-2",
+   "files_a": [
+    "web.tests.browser.test_browser_exit_compass.ExitCompassBrowserTest.test_a_disabled_exit_reads_its_reason_from_the_readout",
+    "web.tests.browser.test_browser_exit_compass.ExitCompassBrowserTest.test_holding_a_direction_walks_until_a_dead_end",
+    "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_command_line_hint_names_history_and_completion_and_controls_share_the_walk",
+    "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_message_page_types_and_completes",
+    "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_reading_preferences_persist",
+    "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_reading_sample_previews_preferences_without_touching_play",
+    "web.tests.browser.test_browser_shell_dock.ShellAcceptanceTest.test_action_dock_renders_the_mockup_command_surface",
+    "web.tests.browser.test_browser_shell_dock.ShellAcceptanceTest.test_dock_shortcut_legend_renders_once_with_real_behaviour_wording",
+    "web.tests.browser.test_browser_shell_dock.ShellAcceptanceTest.test_full_log_opens_in_one_action_and_escapes_with_focus_restoration"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_unified_scenes.UnifiedScenesBrowserTest.test_provisional_and_terminal_failures_are_reached_once",
+    "web.tests.browser.test_browser_unified_scenes.UnifiedScenesBrowserTest.test_room_precedence_retention_movement_and_fullview"
+   ]
+  },
+  {
+   "index": 3,
+   "name": "services-3",
+   "files_a": [
+    "web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_action_dock_fills_the_band_command_region_across_modes",
+    "web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_breadcrumb_tracks_router_depth",
+    "web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_combat_dock_root_vertical_list_truthful_skills_count",
+    "web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_digit_keys_pick_the_rows_of_the_current_frame",
+    "web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_dock_panes_render_per_kind_vocabulary",
+    "web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_verb_card_leaves_the_command_region_unchanged",
+    "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_quest_drawer_offers_no_codex_control",
+    "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_h5_overlay_triggers_exclusion_and_focus_restoration",
+    "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_surface_visibility_gated_by_committed_game_mode"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_party_acceptance.PartyManagementFixtureSmokeBrowserTest.test_dedicated_fixture_publishes_members_merchant_and_lineage",
+    "web.tests.browser.test_browser_services_quest_drawer.KeyboardServiceDrawerJourneys.test_keyboard_service_journey_frameless_drawer"
+   ]
+  },
+  {
+   "index": 4,
+   "name": "combat-4",
+   "files_a": [
+    "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_area_targets_light_groups_on_the_stage",
+    "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_cross_side_cast_asks_first",
+    "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_every_active_foe_stands",
+    "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_fallen_figures_keep_their_slot_and_read_as_fallen",
+    "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_figure_plates_show_conditions_and_alarm",
+    "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_foes_enter_and_leave_full",
+    "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_foes_reduced_only_fade",
+    "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_foes_stand_opposite_the_player",
+    "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_reload_in_combat_plays_no_entrance",
+    "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_targets_are_picked_on_the_stage",
+    "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_toggle_collapses_and_keeps_focus"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_actor_selector_chrome_returns_to_root_without_a_command",
+    "web.tests.browser.test_incremental_sync.IncrementalSyncBrowserTests.test_oversized_snapshot_and_delta_adopt_once"
+   ]
+  },
+  {
+   "index": 5,
+   "name": "combat-5",
+   "files_a": [
+    "web.tests.browser.test_browser_actions.ActionLockingTest.test_disabled_controls_do_not_send",
+    "web.tests.browser.test_browser_actions.ActionLockingTest.test_html_like_player_text_renders_literal",
+    "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_a_referenced_object_lists_its_references_inline_and_writes_nothing",
+    "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_a_stale_multi_selection_copies_every_source_without_secrets_or_actions",
+    "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_an_unknown_index_explains_refused_deletion_and_editing_still_saves",
+    "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_diagnostics_locate_targets_and_reveal_a_hidden_layer",
+    "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_keyboard_only_workflow_in_chromium",
+    "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_search_tells_equal_names_apart_and_alt_left_returns",
+    "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityBrowserTest.test_supported_viewports_keep_status_and_operations_reachable",
+    "web.tests.browser.test_map_editor_workflows.MapEditorFollowingReferenceChromiumTest.test_a_save_racing_an_external_write_is_refused_by_the_fingerprint_guard",
+    "web.tests.browser.test_map_editor_workflows.MapEditorFollowingReferenceChromiumTest.test_an_old_tab_after_a_restart_reads_again_before_writing",
+    "web.tests.browser.test_map_editor_workflows.MapEditorFollowingReferenceChromiumTest.test_external_changes_are_adopted_or_held_behind_an_open_draft",
+    "web.tests.browser.test_map_editor_workflows.MapEditorFollowingReferenceChromiumTest.test_malformed_then_corrected_files_recover_and_semantic_work_in_progress_loads",
+    "web.tests.browser.test_wilderness_travel.TravelLogTests.test_committed_log_and_full_prose"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_party_exit_prompt_confirm_sends_one_exit_confirm",
+    "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_terminal_outcome_publishes_fresh_exploration_panels"
+   ]
+  },
+  {
+   "index": 6,
+   "name": "services-6",
+   "files_a": [
+    "web.tests.browser.test_browser_contextual_hud_anchors.ContextualHudBrowserTest.test_local_map_unavailable_renders_registry_reason_in_map_overlay",
+    "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_full_log_opens_at_latest_line",
+    "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_help_party_rules_are_static_and_absent_from_the_bag",
+    "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_minimap_island_single_affordance_keyboard_and_movement",
+    "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_narrative_caption_bounded_full_log_one_action",
+    "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_objective_line_shows_only_in_exploration",
+    "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_open_drawer_or_overlay_dims_stage",
+    "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_scene_backdrop_renders_art_payload_truthfully",
+    "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_seeded_motion_level_is_applied",
+    "web.tests.browser.test_wilderness_travel.TravelPlanningTests.test_destination_preview_keyboard_and_pointer",
+    "web.tests.browser.test_wilderness_travel.TravelPlanningTests.test_destination_query_supersession"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_party_acceptance.PartyAcceptanceBrowserTest.test_member_journey_commands_a_companion_skill_and_item_and_revises_a_choice"
+   ]
+  },
+  {
+   "index": 7,
+   "name": "services-7",
+   "files_a": [
+    "web.tests.browser.test_browser_contextual_hud_anchors.ContextualHudBrowserTest.test_caption_wider_and_no_anchor_overlap",
+    "web.tests.browser.test_browser_contextual_hud_anchors.ContextualHudBrowserTest.test_dialogue_choices_sit_centred_between_the_portraits",
+    "web.tests.browser.test_browser_contextual_hud_anchors.ContextualHudBrowserTest.test_dialogue_host_stands_opposite_the_player",
+    "web.tests.browser.test_map_drawer.MapDrawerWalkTests.test_escape_unwinds_legend_selection_then_map",
+    "web.tests.browser.test_map_drawer.MapDrawerWalkTests.test_open_switch_tabs_and_refresh_after_a_committed_move"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_services_guild.GuildRegistrationJourneys.test_register_and_idempotent_reregister",
+    "web.tests.browser.test_browser_services_guild.GuildRegistrationJourneys.test_viewport_reference_keeps_controls_visible"
+   ]
+  },
+  {
+   "index": 8,
+   "name": "exploration-8",
+   "files_a": [
+    "web.tests.browser.test_browser_action_feedback.ActionFeedbackBrowserTest.test_queue_bounds_order_dismiss_and_reload",
+    "web.tests.browser.test_browser_creation_dispatch.CreationDispatchJourneys.test_duplicate_request_executes_custom_once",
+    "web.tests.browser.test_browser_synth_journey.SynthJourneySmokeTest.test_shop_stock_rows_resolve_synthetic_keys_end_to_end"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_exploration_state.ExplorationBrowserTest.test_companion_lineup_dialogue_geometry_and_real_possession",
+    "web.tests.browser.test_browser_exploration_state.ExplorationBrowserTest.test_party_window_opens_on_a_lineup_companion_and_switches_members"
+   ]
+  },
+  {
+   "index": 9,
+   "name": "exploration-9",
+   "files_a": [
+    "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_skill_frame_refreshes_on_panel_update",
+    "web.tests.browser.test_browser_dream_artwork.DreamArtworkBrowserTest.test_offline_dream_and_official_failure_use_shared_scene"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_authored_scene_plays_line_by_line_with_synchronized_portraits",
+    "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_unlock_during_a_scene_shows_one_deferred_notice",
+    "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_a_draft_confirmed_against_the_old_snapshot_is_rejected_without_changing_disk",
+    "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_a_loadable_external_change_is_adopted_with_the_view_and_selection_kept",
+    "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_hiding_a_layer_cannot_remove_an_invalid_field_draft"
+   ]
+  },
+  {
+   "index": 10,
+   "name": "services-10",
+   "files_a": [
+    "web.tests.browser.test_browser_input_narrative.InputEchoExplorationTest.test_freeform_dialogue_echoes_exactly_one_line_at_dispatch",
+    "web.tests.browser.test_incremental_sync.IncrementalSyncBrowserTests.test_failed_recovery_and_alignment_preserve_local_state",
+    "web.tests.browser.test_incremental_sync.IncrementalSyncBrowserTests.test_missing_publication_recovers_complete_baseline"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_npc_persona_editor.NpcPersonaEditorBrowserTest.test_keyboard_dirty_close_and_field_rejection",
+    "web.tests.browser.test_browser_npc_persona_editor.NpcPersonaEditorBrowserTest.test_single_page_conflict_reload_and_discard"
+   ]
+  },
+  {
+   "index": 11,
+   "name": "creation-11",
+   "files_a": [
+    "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_combat_command_card_stands_at_dead_centre",
+    "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_combat_formation_shares_one_scale_and_keeps_the_centre_clear",
+    "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_foes_off_is_instant",
+    "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_pointer_focused_field_sends_on_enter"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_creation_reconnect.ReconnectPresetCreationJourney.test_reconnect_restores_preset_stage_and_never_auto_activates",
+    "web.tests.browser.test_browser_services_shop.ShopClosedJourneys.test_closed_shop_disables_all_trades"
+   ]
+  },
+  {
+   "index": 12,
+   "name": "services-12",
+   "files_a": [
+    "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_combat_enter_and_leave_full",
+    "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_dialogue_enter_and_leave_full",
+    "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_mode_transitions_off",
+    "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_mode_transitions_reduced",
+    "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_no_stage_ancestor_scrolls_horizontally_full",
+    "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_reload_in_combat_plays_nothing",
+    "web.tests.browser.test_browser_reconnect.ReconnectTest.test_lower_revision_adoption_in_new_generation",
+    "web.tests.browser.test_browser_reconnect.ReconnectTest.test_offline_locking_no_retry_and_uncertain_notice",
+    "web.tests.browser.test_browser_reconnect.ReconnectTest.test_offline_overlay_outranks_open_full_views_and_full_log",
+    "web.tests.browser.test_browser_reconnect.ReconnectTest.test_offline_overlay_outranks_open_fullscreen_overlay",
+    "web.tests.browser.test_browser_reconnect.ReconnectTest.test_offline_overlay_outranks_open_reference_drawer",
+    "web.tests.browser.test_browser_reconnect.ReconnectTest.test_rejects_prior_generation_and_different_epoch_on_active_socket",
+    "web.tests.browser.test_browser_reconnect.ReconnectTest.test_retired_epoch_rejected_while_awaiting_first_snapshot",
+    "web.tests.browser.test_browser_stage_silhouette.StageSilhouetteBrowserTest.test_each_built_in_key_paints_its_own_alpha_mask_on_the_stage"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_services_guild.GuildExamAppointmentJourney.test_appointment_journey_at_the_reference_viewport",
+    "web.tests.browser.test_browser_services_guild.GuildExamAppointmentJourney.test_appointment_journey_at_the_wide_viewport"
+   ]
+  },
+  {
+   "index": 13,
+   "name": "narrative-13",
+   "files_a": [
+    "web.tests.browser.test_browser_drawer_content.DrawerContentBrowserTest.test_status_opens_the_party_window_hero_and_no_drawer_stands_art",
+    "web.tests.browser.test_browser_map_legibility.MapLegibilityBrowserTest.test_dense_island_keeps_every_node_and_name_reachable",
+    "web.tests.browser.test_browser_map_legibility.MapLegibilityBrowserTest.test_ordinary_island_reads_at_its_chrome_step",
+    "web.tests.browser.test_wilderness_travel.TravelLegTests.test_gauge_preferences_and_actions",
+    "web.tests.browser.test_wilderness_travel.TravelRouteTests.test_hostile_interrupt",
+    "web.tests.browser.test_wilderness_travel.TravelWindowTests.test_live_memory_and_distant_cards"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_title_codex.TitleCodexBrowserTest.test_both_equip_paths_swap_slots_and_update_the_preview",
+    "web.tests.browser.test_browser_title_codex.TitleCodexBrowserTest.test_codex_window_renders_rows_flags_and_ballot_tab_verbatim"
+   ]
+  },
+  {
+   "index": 14,
+   "name": "harness-14",
+   "files_a": [
+    "web.tests.browser.test_browser_actions.ActionLockingTest.test_ordinary_text_works_when_structured_oob_rendering_fails",
+    "web.tests.browser.test_browser_actions.ActionLockingTest.test_submit_refused_while_disconnected",
+    "web.tests.browser.test_browser_actions.ActionLockingTest.test_submit_refused_while_mutations_locked",
+    "web.tests.browser.test_browser_layout.ProtocolMismatchTest.test_incompatible_protocol_locks_actions_but_text_continues",
+    "web.tests.browser.test_browser_lineage.PartyLineageTabBrowserTest.test_lineage_tab_renders_the_committed_ledger_verbatim",
+    "web.tests.browser.test_browser_lineage.PartyLineageTabBrowserTest.test_unavailable_lineage_renders_only_the_registry_reason",
+    "web.tests.browser.test_browser_session_lifecycle.SessionLifecycleBrowserTest.test_no_puppet_action_gets_bounded_rejection_through_real_wire",
+    "web.tests.browser.test_browser_session_lifecycle.SessionLifecycleBrowserTest.test_ooc_clears_ui_and_blocks_mutations_without_stale_click",
+    "web.tests.browser.test_browser_session_lifecycle.SessionLifecycleBrowserTest.test_repuppet_of_same_character_adopts_fresh_state",
+    "web.tests.browser.test_browser_session_lifecycle.SessionLifecycleBrowserTest.test_second_ooc_without_puppet_keeps_detached_state",
+    "web.tests.browser.test_browser_shell_narrative.ShellAcceptanceTest.test_keydown_noise_is_gone_during_keyboard_navigation",
+    "web.tests.browser.test_browser_shell_narrative.ShellAcceptanceTest.test_narrative_renders_styled_prose_not_markup_source",
+    "web.tests.browser.test_browser_shell_narrative.ShellAcceptanceTest.test_narrative_wide_row_soft_wraps_inside_the_pane",
+    "web.tests.browser.test_browser_stage_silhouette.StageSilhouetteBrowserTest.test_a_failed_bundled_mask_keeps_the_frame_usable",
+    "web.tests.browser.test_browser_stage_silhouette.StageSilhouetteBrowserTest.test_the_masked_figure_is_floor_aligned_aspect_preserved_and_unstretched"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_services_guild.GuildQuestJourneys.test_drawer_renders_book_and_counter_without_duplication",
+    "web.tests.browser.test_incremental_sync.IncrementalSyncBrowserTests.test_graphical_and_text_checkpoint_sequence"
+   ]
+  },
+  {
+   "index": 15,
+   "name": "creation-15",
+   "files_a": [
+    "web.tests.browser.test_browser_drawer_content.DrawerContentBrowserTest.test_same_label_lineage_rows_carry_their_root_names_beside_counts",
+    "web.tests.browser.test_browser_layout.LayoutMigrationTest.test_known_layout_version_persists_across_reload",
+    "web.tests.browser.test_browser_layout.LayoutMigrationTest.test_migration_registry_migrates_known_prior_version",
+    "web.tests.browser.test_browser_layout.LayoutMigrationTest.test_mounted_shell_renders_no_tab_strip",
+    "web.tests.browser.test_browser_layout.LayoutMigrationTest.test_one_sync_malformed_panel_degrades_without_loop",
+    "web.tests.browser.test_browser_layout.LayoutMigrationTest.test_unknown_malformed_layout_resets",
+    "web.tests.browser.test_wilderness_travel.TravelMapTests.test_map_fact_layers",
+    "web.tests.browser.test_wilderness_travel.TravelMapTests.test_map_viewports",
+    "web.tests.browser.test_wilderness_travel.TravelMapTests.test_repaint_budget"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_creation_custom.CustomCreationJourneys.test_custom_form_keyboard_journey_to_activation",
+    "web.tests.browser.test_browser_creation_custom.CustomCreationJourneys.test_out_of_range_apparent_age_rejected_independently",
+    "web.tests.browser.test_browser_creation_custom.CustomCreationJourneys.test_rejected_custom_save_stays_on_the_form_without_confirmation"
+   ]
+  },
+  {
+   "index": 16,
+   "name": "exploration-16",
+   "files_a": [
+    "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_dialogue_completion_reload_discards_pending",
+    "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_generated_package_scene_plays_multi_line_on_the_stage",
+    "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_pointer_opened_choices_highlight_the_first_choice_without_answering"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_exploration_state.ExplorationBrowserTest.test_focus_follows_the_item_key_across_committed_re_resolution",
+    "web.tests.browser.test_browser_services_shop.ShopCompanionJourneys.test_possessed_shop_opens_at_the_large_acceptance_viewport"
+   ]
+  },
+  {
+   "index": 17,
+   "name": "combat-17",
+   "files_a": [
+    "web.tests.browser.test_browser_chrome_navigation.ChromeNavigationBrowserTest.test_p_and_b_open_the_party_window_and_typing_never_does",
+    "web.tests.browser.test_browser_chrome_navigation.ChromeNavigationBrowserTest.test_place_card_sets_heading_rule_and_tabular_time",
+    "web.tests.browser.test_browser_chrome_navigation.ChromeNavigationBrowserTest.test_pointer_tooltip_is_hoverable_and_hides_on_activation",
+    "web.tests.browser.test_browser_chrome_navigation.ChromeNavigationBrowserTest.test_settings_and_tools_hold_their_place_from_exploration_to_combat",
+    "web.tests.browser.test_browser_chrome_navigation.ChromeNavigationBrowserTest.test_tab_focus_tooltip_dismisses_on_escape_and_the_next_escape_reaches_the_dock",
+    "web.tests.browser.test_browser_chrome_navigation.ChromeNavigationBrowserTest.test_unavailable_quest_entry_leaves_no_placeholder",
+    "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_codex_drawer_opens_from_the_utility_strip",
+    "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_codex_drawer_replaces_the_open_drawer_or_overlay",
+    "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_reference_drawer_close_focus_and_absent_surfaces",
+    "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_reference_drawer_recession_mark_lifecycle",
+    "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_reference_surfaces_share_one_opaque_workspace_frame",
+    "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_status_tab_rows_fit_with_no_overlap",
+    "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_the_two_codex_controls_are_distinguishable"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_area_shorthand_flow",
+    "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_party_exit_cancel_keeps_the_draft_and_the_clock"
+   ]
+  },
+  {
+   "index": 18,
+   "name": "art-18",
+   "files_a": [
+    "web.tests.browser.test_browser_exploration_actions.ExplorationBrowserTest.test_stale_and_tampered_submissions_do_nothing",
+    "web.tests.browser.test_browser_npc_services.GroupedCardOverflowJourneys.test_the_card_groups_eleven_services_and_digits_stop_at_nine",
+    "web.tests.browser.test_browser_services_guild.GuildTurninJourneys.test_completed_quest_turnin"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_art.ArtExhaustedSceneTest.test_exhausted_scene_uses_one_placeholder_and_play_continues",
+    "web.tests.browser.test_browser_art.ArtExhaustedSceneTest.test_scene_backdrop_captions_clear_dock_and_command_line"
+   ]
+  },
+  {
+   "index": 19,
+   "name": "exploration-19",
+   "files_a": [
+    "web.tests.browser.test_browser_local_map_lattice.LocalMapBrowserTest.test_densely_populated_lattice_scales_down_without_reintroducing_overlap",
+    "web.tests.browser.test_browser_local_map_lattice.LocalMapBrowserTest.test_long_remembered_list_never_resizes_the_island",
+    "web.tests.browser.test_browser_local_map_lattice.LocalMapBrowserTest.test_metric_projection_keeps_gap_ratio_and_actions",
+    "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_borrowed_send_outside_the_active_phase_keeps_the_speech",
+    "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_command_line_field_button_alignment_at_both_viewports",
+    "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_keyboard_field_focus_send_cancel_and_focus_restoration",
+    "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_open_rest_form_never_swallows_command_line_enter",
+    "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_rejected_send_keeps_the_line_open",
+    "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_shift_enter_in_field_inserts_newline_without_sending"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_exploration_frame.ExplorationBrowserTest.test_frame_resolver_follows_committed_state_across_a_real_move",
+    "web.tests.browser.test_browser_exploration_frame.ExplorationBrowserTest.test_keyboard_move_charges_time_and_refreshes_map",
+    "web.tests.browser.test_browser_exploration_frame.ExplorationBrowserTest.test_open_overview_follows_a_committed_move"
+   ]
+  },
+  {
+   "index": 20,
+   "name": "creation-20",
+   "files_a": [
+    "web.tests.browser.test_browser_creation_concept.ConceptCreationJourneys.test_concept_field_journey_to_activation_at_the_capped_viewport",
+    "web.tests.browser.test_browser_creation_concept.ConceptCreationJourneys.test_concept_field_journey_to_activation_at_the_reference_viewport",
+    "web.tests.browser.test_browser_creation_preset.PresetCreationJourneys.test_rejected_preset_save_stays_on_the_list_without_confirmation"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_combat_panels.CombatMenuBrowserTest.test_combat_renders_at_minimum_viewport",
+    "web.tests.browser.test_browser_combat_panels.CombatMenuBrowserTest.test_disabled_reason_is_visible_without_packet"
+   ]
+  },
+  {
+   "index": 21,
+   "name": "combat-21",
+   "files_a": [
+    "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_header_shows_location_time_and_connection_dot",
+    "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_low_hp_state_drives_the_stage_hook",
+    "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_minimap_present_in_exploration_absent_in_combat",
+    "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_surfaces_visible_at_the_capped_viewport",
+    "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_surfaces_visible_at_the_reference_viewport",
+    "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_unavailable_placeholders_and_numeric_status",
+    "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_vitals_island_hides_at_full_health_outside_combat",
+    "web.tests.browser.test_browser_skillbook_casting.SkillBookCastingBrowserTest.test_book_hierarchy_geometry_and_focus_at_both_viewports",
+    "web.tests.browser.test_browser_skillbook_casting.SkillBookCastingBrowserTest.test_cancel_back_returns_to_the_book_without_casting",
+    "web.tests.browser.test_browser_skillbook_casting.SkillBookCastingBrowserTest.test_monster_openings_disclose_the_whole_line_up",
+    "web.tests.browser.test_browser_unified_figures.UnifiedFiguresBrowserTest.test_exploration_dialogue_combat_and_drawer_share_descriptor"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_combat_panels.CombatMenuBrowserTest.test_area_explicit_multi_selection",
+    "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_pointer_disabled_row_explains_without_submitting"
+   ]
+  },
+  {
+   "index": 22,
+   "name": "pointer-22",
+   "files_a": [
+    "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_populated_island_stack_fits_its_anchor_at_both_viewports",
+    "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_stage_anchors_do_not_intersect_at_both_viewports",
+    "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_vitals_dock_stands_on_the_band_edge_with_chromeless_icons",
+    "web.tests.browser.test_browser_skillbook_casting.SkillBookCastingBrowserTest.test_tampered_cast_shapes_are_rejected_without_casting",
+    "web.tests.browser.test_map_transport.WorldMapTransportTests.test_representative_world_map_round_trips_intact",
+    "web.tests.browser.test_map_transport.WorldMapTransportTests.test_supported_worst_case_world_map_round_trips_intact"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_pointer_exploration_journey_at_both_viewports",
+    "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_real_mouse_double_click_pushes_one_frame"
+   ]
+  },
+  {
+   "index": 23,
+   "name": "narrative-23",
+   "files_a": [
+    "web.tests.browser.test_browser_sleep_handoff.SleepHandoffBrowserTest.test_keyboard_sleep_handoff_returns_control_and_survives_reload",
+    "web.tests.browser.test_browser_sleep_handoff.SleepHandoffBrowserTest.test_keyboard_sleep_handoff_transfers_to_an_awake_companion",
+    "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_core_surfaces_render_usable_at_supported_viewports",
+    "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_text_console_round_trips_commands_without_jquery",
+    "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_vue_bundle_loads_from_origin_offline",
+    "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_window_elosern_bridge_facades_resolve_and_route"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_dialogue_stage_collapses_the_band_and_stands_both_actors",
+    "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_possessed_companion_plays_an_authored_scene_with_its_own_portrait",
+    "web.tests.browser.test_map_editor_generation.MapEditorGenerationBrowserTest.test_an_external_source_change_during_a_job_never_shows_it_current",
+    "web.tests.browser.test_map_editor_generation.MapEditorGenerationBrowserTest.test_browsing_then_cancelling_keeps_the_last_artifact_and_refuses_world_edits",
+    "web.tests.browser.test_map_editor_generation.MapEditorGenerationBrowserTest.test_only_the_explicit_controls_regenerate_and_old_outlines_are_labelled"
+   ]
+  },
+  {
+   "index": 24,
+   "name": "combat-24",
+   "files_a": [
+    "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_focus_stays_on_action_dock_in_combat",
+    "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_pointer_root_row_click_activates_once",
+    "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_a_restart_keeps_a_stale_inspectable_snapshot_and_needs_an_explicit_read",
+    "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_an_externally_removed_selection_is_cleared_with_a_notice",
+    "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_an_invalid_draft_cannot_be_removed_by_selection_or_navigation",
+    "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_an_open_draft_holds_the_external_change_until_load_new_version",
+    "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_malformed_yaml_is_shown_stale_and_recovers_automatically",
+    "web.tests.browser.test_map_editor_file_following.MapEditorFileFollowingBrowserTest.test_tab_reaches_load_new_version_without_confirming_a_held_draft"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_attack_flow_submits_basic_attack_once",
+    "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_crumb_absent_at_depth_one_present_at_depth_two_and_back_pops_one_level"
+   ]
+  },
+  {
+   "index": 25,
+   "name": "exploration-25",
+   "files_a": [
+    "web.tests.browser.test_browser_exploration_state.ExplorationBrowserTest.test_reconnect_rebuilds_exploration_without_replay",
+    "web.tests.browser.test_browser_exploration_state.ExplorationBrowserTest.test_suggestions_frame_is_status_driven",
+    "web.tests.browser.test_browser_exploration_state.ExplorationBrowserTest.test_whole_stack_loss_cascades_to_the_degraded_root_and_recovers"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_services_guild.GuildQuestJourneys.test_abandon_requires_confirmation",
+    "web.tests.browser.test_browser_services_guild.GuildQuestJourneys.test_quest_vanishes_book_drops_row_drawer_stays_open"
+   ]
+  },
+  {
+   "index": 26,
+   "name": "combat-26",
+   "files_a": [
+    "web.tests.browser.test_browser_contextual_hud_combat.ContextualHudBrowserTest.test_combat_figure_plates_present_the_drawn_participants",
+    "web.tests.browser.test_browser_contextual_hud_combat.ContextualHudBrowserTest.test_combat_skills_bounded_master_detail",
+    "web.tests.browser.test_browser_contextual_hud_combat.ContextualHudBrowserTest.test_command_window_scrolls_its_rows_and_details_the_current_frame",
+    "web.tests.browser.test_browser_contextual_hud_combat.ContextualHudBrowserTest.test_destructive_combat_confirmation_two_step_panel",
+    "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_choices_stagger_full",
+    "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_full_motion_minimap_pan",
+    "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_full_motion_place_card_and_clear",
+    "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_full_motion_scene_change",
+    "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_minimap_scale_change_follows_motion_level",
+    "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_reduced_motion_fades_only",
+    "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_vitals_reveal_and_inert",
+    "web.tests.browser.test_wilderness_camping.CampingTests.test_card_inputs_refusal_and_handoff",
+    "web.tests.browser.test_wilderness_camping.CampingTests.test_dusk_camp_to_dawn_and_beat_controls"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_input_narrative.InputEchoExplorationTest.test_button_action_echoes_its_resolved_command_line",
+    "web.tests.browser.test_browser_inventory_actions.CombatBagDrawerJourney.test_combat_bag_row_opens_the_drawer_and_confirms_one_item_use",
+    "web.tests.browser.test_browser_inventory_actions.PartyBagTransferJourney.test_give_and_equip_a_companion_then_combat_disables_transfer"
+   ]
+  },
+  {
+   "index": 27,
+   "name": "services-27",
+   "files_a": [
+    "web.tests.browser.test_browser_local_map_interaction.LocalMapBrowserTest.test_adjacent_traversable_node_submits_explore_move",
+    "web.tests.browser.test_browser_local_map_interaction.LocalMapBrowserTest.test_gateway_exit_stub_is_a_named_keyboard_button_moving_once",
+    "web.tests.browser.test_browser_local_map_interaction.LocalMapBrowserTest.test_minimap_pointer_events_blank_canvas_opens_overlay_while_actionable_moves",
+    "web.tests.browser.test_browser_local_map_interaction.LocalMapBrowserTest.test_minimap_visible_and_keyboard_usable_at_both_viewports",
+    "web.tests.browser.test_browser_local_map_interaction.LocalMapBrowserTest.test_unleadered_stub_gap_preserves_street_pointer_and_native_gateway_actions",
+    "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_page_surface_keyboard_advance_and_dock_isolation",
+    "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_paging_marker_and_append_keep_page"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_combat_panels.CombatMenuBrowserTest.test_combat_rebuilds_keyboard_menu_after_round",
+    "web.tests.browser.test_browser_npc_persona_editor.NpcPersonaEditorBrowserTest.test_save_reopen_and_offline_greeting"
+   ]
+  },
+  {
+   "index": 28,
+   "name": "services-28",
+   "files_a": [
+    "web.tests.browser.test_browser_exploration_state.ExplorationBrowserTest.test_escape_from_character_panel_returns_keyboard_to_the_exploration_root",
+    "web.tests.browser.test_browser_exploration_state.ExplorationBrowserTest.test_exploration_companion_focus_reuses_the_lineup_figure",
+    "web.tests.browser.test_vue_typography.VueTypographyBrowserTest.test_changed_numerals_keep_columns_and_tabular_glyph_widths",
+    "web.tests.browser.test_vue_typography.VueTypographyBrowserTest.test_dense_chrome_floor_and_bounded_controls",
+    "web.tests.browser.test_vue_typography.VueTypographyBrowserTest.test_keycaps_and_command_input_keep_monospace",
+    "web.tests.browser.test_vue_typography.VueTypographyBrowserTest.test_monospace_cells_are_exact"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_npc_persona_editor_edges.NpcPersonaEditorEdgesBrowserTest.test_cross_tab_conflict_reload_and_discard",
+    "web.tests.browser.test_browser_npc_persona_editor_edges.NpcPersonaEditorEdgesBrowserTest.test_npc_departure_and_return_protects_draft"
+   ]
+  },
+  {
+   "index": 29,
+   "name": "combat-29",
+   "files_a": [
+    "web.tests.browser.test_browser_combat_choreography.CombatChoreographyBrowserTest.test_beat_gestures_full_motion",
+    "web.tests.browser.test_browser_combat_choreography.CombatChoreographyBrowserTest.test_beat_gestures_reduced",
+    "web.tests.browser.test_browser_combat_choreography.CombatChoreographyBrowserTest.test_terminal_round_at_off_holds_nothing",
+    "web.tests.browser.test_browser_combat_choreography.CombatChoreographyBrowserTest.test_terminal_round_holds_the_stage",
+    "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_markup_like_labels_render_as_literal_text",
+    "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_slash_typed_in_a_focused_editable_stays_ordinary_text",
+    "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_typed_command_echoes_one_input_line_with_a_divider",
+    "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_off_motion_is_instant",
+    "web.tests.browser.test_wilderness_travel.TravelLayoutTests.test_medallion_subjects",
+    "web.tests.browser.test_wilderness_travel.TravelLayoutTests.test_refresh_adoption",
+    "web.tests.browser.test_wilderness_travel.TravelLayoutTests.test_settlement_gate_layout",
+    "web.tests.browser.test_wilderness_travel.TravelWalkingTests.test_held_walk_release"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_console_saves.ConsoleSaveIsolationBrowserTest.test_first_protected_teleport_saves_the_before_state_privately",
+    "web.tests.browser.test_browser_local_map_rendering.LocalMapBrowserTest.test_gate_room_renders_its_own_approach_cell_and_no_footprint",
+    "web.tests.browser.test_browser_local_map_rendering.LocalMapBrowserTest.test_minimap_renders_and_distinguishes_states_without_color",
+    "web.tests.browser.test_browser_local_map_rendering.LocalMapBrowserTest.test_reconnect_rebuilds_minimap_from_persisted_knowledge",
+    "web.tests.browser.test_browser_local_map_rendering.LocalMapBrowserTest.test_remembered_remote_node_presentation_and_accessibility",
+    "web.tests.browser.test_browser_local_map_rendering.LocalMapBrowserTest.test_unknown_nodes_never_appear_in_the_dom"
+   ]
+  },
+  {
+   "index": 30,
+   "name": "exploration-30",
+   "files_a": [
+    "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_cancelled_freeform_dialogue_cannot_capture_a_later_command",
+    "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_dialogue_exit_row_moves_with_the_committed_exit_payload",
+    "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_engage_transitions_to_combat"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_pointer_combat_target_selection_uses_keyboard_path",
+    "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_rapid_double_activation_pushes_one_frame"
+   ]
+  },
+  {
+   "index": 31,
+   "name": "creation-31",
+   "files_a": [
+    "web.tests.browser.test_browser_drawer_content.DrawerContentBrowserTest.test_empty_quest_guidance_gives_way_to_the_unavailable_reason",
+    "web.tests.browser.test_browser_layout.ContextualHudStandingJourneyTest.test_complete_log_reachable_in_one_action_from_bounded_caption",
+    "web.tests.browser.test_browser_layout.ContextualHudStandingJourneyTest.test_mode_gating_hides_and_restores_surfaces",
+    "web.tests.browser.test_browser_layout.ContextualHudStandingJourneyTest.test_no_stage_anchor_overlaps_at_supported_viewports",
+    "web.tests.browser.test_wilderness_travel.TravelRouteTests.test_all_interrupt_flags",
+    "web.tests.browser.test_wilderness_travel.TravelRouteTests.test_landmark_focus"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_creation_reconnect.ReconnectCreationJourney.test_reconnect_restores_saved_stage_and_never_auto_resubmits",
+    "web.tests.browser.test_browser_title_codex.TitleCodexBrowserTest.test_removal_card_cancels_then_confirms_and_the_ballot_answers",
+    "web.tests.browser.test_map_editor_workflows.MapEditorWorkflowsChromiumTest.test_a_location_drag_is_one_command_and_undo_redo_and_restart_agree",
+    "web.tests.browser.test_map_editor_workflows.MapEditorWorkflowsChromiumTest.test_continental_authoring_reloads_in_the_core_after_every_operation",
+    "web.tests.browser.test_map_editor_workflows.MapEditorWorkflowsChromiumTest.test_local_map_and_interior_authoring_reloads_in_the_core_after_every_operation"
+   ]
+  },
+  {
+   "index": 32,
+   "name": "services-32",
+   "files_a": [
+    "web.tests.browser.test_browser_input_narrative.InputEchoExplorationTest.test_message_window_pages_and_flushes",
+    "web.tests.browser.test_browser_services_quest_drawer.QuestBookAwayFromClerkJourneys.test_away_from_clerk_renders_book_with_no_clerk_marker",
+    "web.tests.browser.test_browser_services_quest_drawer.QuestBookAwayFromClerkJourneys.test_keyboard_reaches_both_tablists_and_the_list"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_inventory_actions.InventoryActionJourneys.test_keyboard_and_pointer_item_actions_are_confirmation_protected",
+    "web.tests.browser.test_browser_sleep_handoff.SleepHandoffBrowserTest.test_all_party_choice_declines_and_wakes_owner",
+    "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityFirefoxTest.test_keyboard_only_workflow_in_firefox",
+    "web.tests.browser.test_map_editor_accessibility.MapEditorAccessibilityFirefoxTest.test_supported_viewports_keep_status_and_operations_reachable_in_firefox"
+   ]
+  },
+  {
+   "index": 33,
+   "name": "exploration-33",
+   "files_a": [
+    "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_dialogue_completion_retry_without_rereading",
+    "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_locked_topic_shows_its_hint_and_plays_its_refusal",
+    "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_talk_open_enters_the_dialogue_in_one_step"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_alternative_text_is_present_outside_the_bitmap",
+    "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_done_scene_renders_same_origin_image"
+   ]
+  },
+  {
+   "index": 34,
+   "name": "services-34",
+   "files_a": [
+    "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_band_height_is_fixed_across_frames_and_modes",
+    "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_command_line_never_overlaps_dock_caption_or_hud",
+    "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_prose_typesetting_follows_the_measured_column",
+    "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_stage_box_is_at_least_65_percent_at_the_reference_viewport",
+    "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_top_bar_tool_group_fits_and_opens_with_line_collapsed"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_services_dispatch.ServiceDispatchJourneys.test_duplicate_request_executes_buy_once",
+    "web.tests.browser.test_browser_services_dispatch.ServiceDispatchJourneys.test_stale_revision_returns_stale_without_mutation",
+    "web.tests.browser.test_map_editor_workflows.MapEditorFollowingLargeChromiumTest.test_a_save_racing_an_external_write_is_refused_by_the_fingerprint_guard",
+    "web.tests.browser.test_map_editor_workflows.MapEditorFollowingLargeChromiumTest.test_an_old_tab_after_a_restart_reads_again_before_writing",
+    "web.tests.browser.test_map_editor_workflows.MapEditorFollowingLargeChromiumTest.test_external_changes_are_adopted_or_held_behind_an_open_draft",
+    "web.tests.browser.test_map_editor_workflows.MapEditorFollowingLargeChromiumTest.test_malformed_then_corrected_files_recover_and_semantic_work_in_progress_loads"
+   ]
+  },
+  {
+   "index": 35,
+   "name": "exploration-35",
+   "files_a": [
+    "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_dialogue_choices_sit_over_the_stage_and_the_dock_collapses",
+    "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_dialogue_stage_journey_completes_by_keyboard",
+    "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_scripted_keyword_dialogue_completes"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_dock_and_figure_plate_geometry_at_both_desktop_viewports",
+    "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_item_and_tactic_choices_send_the_actor_command"
+   ]
+  },
+  {
+   "index": 36,
+   "name": "exploration-36",
+   "files_a": [
+    "web.tests.browser.test_browser_exploration_nav.ExplorationBrowserTest.test_escape_from_quests_drawer_leaves_root_clean",
+    "web.tests.browser.test_browser_exploration_nav.ExplorationBrowserTest.test_pointer_back_cell_returns_to_the_root_without_an_action",
+    "web.tests.browser.test_browser_exploration_nav.ExplorationBrowserTest.test_room_actions_hold_at_both_reference_viewports"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_inventory_actions.InventoryActionJourneys.test_backpack_row_actions_echo_their_typed_commands",
+    "web.tests.browser.test_browser_inventory_actions.InventoryActionJourneys.test_dialogs_and_dispatch_state_fail_closed_across_interruptions",
+    "web.tests.browser.test_map_editor_persistence.MapEditorPersistenceBrowserTest.test_a_drag_is_one_saved_operation_that_undoes_to_absence_and_redoes",
+    "web.tests.browser.test_map_editor_persistence.MapEditorPersistenceBrowserTest.test_a_failed_save_is_reported_with_the_baseline_intact_and_no_retry",
+    "web.tests.browser.test_map_editor_persistence.MapEditorPersistenceBrowserTest.test_a_refreshed_page_does_not_inherit_undo_history",
+    "web.tests.browser.test_map_editor_persistence.MapEditorPersistenceBrowserTest.test_an_incomplete_field_draft_is_never_written_and_escape_restores_it",
+    "web.tests.browser.test_map_editor_persistence.MapEditorPersistenceBrowserTest.test_escape_cancels_a_drag_and_shift_arrow_nudges_one_step_per_press"
+   ]
+  },
+  {
+   "index": 37,
+   "name": "services-37",
+   "files_a": [
+    "web.tests.browser.test_browser_art.ArtPendingSceneTest.test_pending_generating_notice_clears_dock_and_command_line",
+    "web.tests.browser.test_browser_art.ArtPendingSceneTest.test_pending_scene_shows_its_own_bundled_art_with_progress",
+    "web.tests.browser.test_browser_creation_preset.PresetCreationJourneys.test_preset_selection_confirm_activate_reaches_exploration"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_services_guild.GuildBoardJourneys.test_board_list_to_accept",
+    "web.tests.browser.test_browser_services_guild.GuildBoardJourneys.test_grade_rail_reaches_a_locked_grade_by_keyboard",
+    "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_a_referenced_room_refuses_deletion_and_a_connection_is_deleted_directly",
+    "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_auto_arrange_writes_only_the_layout_and_names_it",
+    "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_room_fields_by_keyboard_keep_the_id_and_a_connection_is_relabelled",
+    "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_the_connection_tool_creates_a_two_way_pair_in_one_command_and_undo_removes_it",
+    "web.tests.browser.test_map_editor_interiors.MapEditorInteriorBrowserTest.test_the_room_tool_creates_a_standalone_room_without_a_layout_write"
+   ]
+  },
+  {
+   "index": 38,
+   "name": "services-38",
+   "files_a": [
+    "web.tests.browser.test_browser_input_narrative.InputEchoExplorationTest.test_locked_borrowed_send_keeps_the_speech_and_never_echoes",
+    "web.tests.browser.test_browser_party_acceptance.PartyAcceptanceBrowserTest.test_cancelled_exit_keeps_the_whole_draft_and_a_committed_exit_settles_once"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_local_map_geometry.LocalMapBrowserTest.test_island_type_ladder_stays_under_its_own_chrome_step",
+    "web.tests.browser.test_browser_local_map_geometry.LocalMapBrowserTest.test_minimap_content_stays_inside_its_island",
+    "web.tests.browser.test_browser_local_map_geometry.LocalMapBrowserTest.test_mirrors_are_clipped_non_focusable_and_do_not_change_island_box",
+    "web.tests.browser.test_browser_proportional_ui_scale.ProportionalUiScaleBrowserTest.test_a_narrow_tall_window_keeps_the_reference_chrome",
+    "web.tests.browser.test_browser_proportional_ui_scale.ProportionalUiScaleBrowserTest.test_acceptance_viewports_render_at_the_contract_scale",
+    "web.tests.browser.test_browser_proportional_ui_scale.ProportionalUiScaleBrowserTest.test_large_desktop_renders_the_reference_at_the_chrome_cap",
+    "web.tests.browser.test_browser_proportional_ui_scale.ProportionalUiScaleBrowserTest.test_prose_preference_changes_prose_but_not_chrome",
+    "web.tests.browser.test_browser_proportional_ui_scale.ProportionalUiScaleBrowserTest.test_resize_keeps_pointer_targets_live",
+    "web.tests.browser.test_map_editor_workflows.MapEditorFollowingReferenceFirefoxTest.test_a_save_racing_an_external_write_is_refused_by_the_fingerprint_guard",
+    "web.tests.browser.test_map_editor_workflows.MapEditorFollowingReferenceFirefoxTest.test_an_old_tab_after_a_restart_reads_again_before_writing",
+    "web.tests.browser.test_map_editor_workflows.MapEditorFollowingReferenceFirefoxTest.test_external_changes_are_adopted_or_held_behind_an_open_draft",
+    "web.tests.browser.test_map_editor_workflows.MapEditorFollowingReferenceFirefoxTest.test_malformed_then_corrected_files_recover_and_semantic_work_in_progress_loads",
+    "web.tests.browser.test_map_editor_workflows.MapEditorWorkflowsFirefoxTest.test_a_location_drag_is_one_command_and_undo_redo_and_restart_agree",
+    "web.tests.browser.test_map_editor_workflows.MapEditorWorkflowsFirefoxTest.test_continental_authoring_reloads_in_the_core_after_every_operation",
+    "web.tests.browser.test_map_editor_workflows.MapEditorWorkflowsFirefoxTest.test_local_map_and_interior_authoring_reloads_in_the_core_after_every_operation"
+   ]
+  },
+  {
+   "index": 39,
+   "name": "art-39",
+   "files_a": [
+    "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_scene_caption_and_status_usable_at_the_reference_viewport",
+    "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_scene_caption_sits_on_the_stage_floor_between_the_portraits",
+    "web.tests.browser.test_browser_gallery_image_contract.GalleryImageContractBrowserTest.test_original_404_falls_back_with_local_failure"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_creation_viewport_pointer.ViewportCreationJourney.test_reference_viewport_keeps_creation_essentials_visible_and_literal",
+    "web.tests.browser.test_browser_exploration_nav.ExplorationPortraitMediaBrowserTest.test_admitted_media_loads_on_both_medallions_and_the_non_party_focus",
+    "web.tests.browser.test_browser_exploration_tiles.ExplorationBrowserTest.test_crowded_room_folds_into_the_rail_at_a_narrow_viewport"
+   ]
+  },
+  {
+   "index": 40,
+   "name": "combat-40",
+   "files_a": [
+    "web.tests.browser.test_browser_bundled_scene_assets.BundledSceneAssetsBrowserTest.test_outdoor_pack_static_decode",
+    "web.tests.browser.test_browser_combat_rejection.CombatRejectionBrowserTest.test_tampered_target_rejects_without_round"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_combat_scales.CombatMenuBrowserTest.test_area_space_selects_once_even_when_held",
+    "web.tests.browser.test_browser_combat_scales.CombatMenuBrowserTest.test_combat_dock_renders_mockup_grid_and_detail_at_both_viewports"
+   ]
+  },
+  {
+   "index": 41,
+   "name": "services-41",
+   "files_a": [
+    "web.tests.browser.test_browser_avatar_artwork.AvatarArtworkBrowserTest.test_roster_presence_party_participant_fallback_is_accessible",
+    "web.tests.browser.test_browser_image_loading_core.ImageLoadingCoreBrowserTest.test_original_failure_has_persistent_local_state",
+    "web.tests.browser.test_browser_original_editors.OriginalEditorsBrowserTest.test_failed_original_never_saves",
+    "web.tests.browser.test_browser_original_editors.OriginalEditorsBrowserTest.test_new_original_recovers_and_ruler_failure_is_local"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_npc_services.MerchantServiceCardJourneys.test_a_departed_provider_retires_the_card_and_its_drawer",
+    "web.tests.browser.test_browser_npc_services.MerchantServiceCardJourneys.test_merchant_purchase_returns_focus_to_its_service_row",
+    "web.tests.browser.test_map_editor_relationships.MapEditorRelationshipBrowserTest.test_a_referenced_node_locates_its_exterior_which_is_removed_before_the_node",
+    "web.tests.browser.test_map_editor_relationships.MapEditorRelationshipBrowserTest.test_an_unavailable_index_refuses_deletion_at_the_action_while_entrance_edits_save",
+    "web.tests.browser.test_map_editor_relationships.MapEditorRelationshipBrowserTest.test_changing_an_endpoint_with_the_selector_by_keyboard_writes_the_qualified_id",
+    "web.tests.browser.test_map_editor_relationships.MapEditorRelationshipBrowserTest.test_the_exterior_card_leads_to_the_other_end_and_alt_left_returns",
+    "web.tests.browser.test_map_editor_relationships.MapEditorRelationshipBrowserTest.test_the_interior_entrance_tool_creates_a_two_way_link_as_one_record",
+    "web.tests.browser.test_map_editor_relationships.MapEditorRelationshipBrowserTest.test_the_settlement_entrance_tool_adds_a_gate_with_one_settlement_write"
+   ]
+  },
+  {
+   "index": 42,
+   "name": "combat-42",
+   "files_a": [
+    "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_fixed_column_skill_pane_keeps_its_rows_inside_the_command_region",
+    "web.tests.browser.test_browser_services_shop.ShopCompanionJourneys.test_buy_potions_for_a_companion",
+    "web.tests.browser.test_harness.ManagedServerFastTests.test_a_pre_bootstrap_server_is_not_ready",
+    "web.tests.browser.test_harness.ManagedServerFastTests.test_a_server_without_the_django_login_page_is_not_ready",
+    "web.tests.browser.test_harness.ManagedServerFastTests.test_boot_failure_raised",
+    "web.tests.browser.test_harness.ManagedServerFastTests.test_clear_and_restore_pidfiles",
+    "web.tests.browser.test_harness.ManagedServerFastTests.test_port_conflict_boot_is_retried_with_fresh_runtime",
+    "web.tests.browser.test_harness.ManagedServerFastTests.test_port_conflict_retries_exhausted_raises",
+    "web.tests.browser.test_harness.ManagedServerFastTests.test_readiness_timeout_cleans_up_automatically",
+    "web.tests.browser.test_harness.ManagedServerFastTests.test_readiness_timeout_is_reported",
+    "web.tests.browser.test_harness.ManagedServerFastTests.test_recorded_pids_kill_only_owned_processes",
+    "web.tests.browser.test_harness.ManagedServerFastTests.test_remove_pidfiles_only_for_recorded_pids",
+    "web.tests.browser.test_harness.ManagedServerFastTests.test_startup_failure_is_detected",
+    "web.tests.browser.test_harness.ManagedServerFastTests.test_stop_cleans_runtime_and_restores_pidfiles"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_combat_rejection.CombatReconnectBrowserTest.test_reconnect_resumes_same_session_without_new_round"
+   ]
+  },
+  {
+   "index": 43,
+   "name": "narrative-43",
+   "files_a": [
+    "web.tests.browser.test_browser_exploration_actions.ExplorationBrowserTest.test_unsafe_skip_rejects_before_any_clock_advance",
+    "web.tests.browser.test_browser_pointer.PointerServiceAcceptanceTest.test_pointer_service_submenu_submission",
+    "web.tests.browser.test_browser_sleep_handoff.TerminalSleepStatusBrowserTest.test_all_forced_sleep_engagement_settles_and_keeps_sleep_status"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_skillbook_casting.SkillBookFieldCastJourneyTest.test_keyboard_self_none_and_single_utility_casts",
+    "web.tests.browser.test_browser_synth_lineage.SynthLineageBrowserTest.test_synthetic_member_lineage_matches_text_and_panel",
+    "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_a_location_with_a_local_map_opens_it_and_refuses_deletion",
+    "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_a_new_location_without_a_local_map_is_searchable_and_fabricates_nothing",
+    "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_a_river_point_drag_is_one_continent_command_that_stales_the_partition",
+    "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_an_incomplete_number_writes_nothing_and_escape_restores_it",
+    "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_clicking_a_feature_shape_selects_it_and_shows_its_handles",
+    "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_derived_borders_have_no_handles_at_the_large_viewport",
+    "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_footprint_cells_and_a_district_landmark_by_keyboard_write_only_their_owner"
+   ]
+  },
+  {
+   "index": 44,
+   "name": "services-44",
+   "files_a": [
+    "web.tests.browser.test_browser_npc_persona_editor_edges.NpcPersonaEditorEdgesBrowserTest.test_late_read_does_not_seed_different_npc",
+    "web.tests.browser.test_browser_npc_persona_editor_edges.NpcPersonaEditorEdgesBrowserTest.test_visibility_denial_and_restore_protects_draft"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_action_feedback.ActionFeedbackBrowserTest.test_failed_concept_surfaces_one_crit_toast_above_the_overlay",
+    "web.tests.browser.test_browser_creation_custom.CustomCreationJourneys.test_out_of_range_actual_age_rejected_despite_disabled_client_validation",
+    "web.tests.browser.test_browser_skillbook_casting.CompanionFieldCastJourneyTest.test_companion_casts_a_field_heal_from_the_skill_tab"
+   ]
+  },
+  {
+   "index": 45,
+   "name": "art-45",
+   "files_a": [
+    "web.tests.browser.test_browser_creation_reset_draft.ResetAndDraftJourneys.test_escape_from_reset_confirm_returns_to_form_without_mutation",
+    "web.tests.browser.test_browser_gallery_image_contract.GalleryImageContractBrowserTest.test_official_and_synthetic_rows_carry_their_own_truth",
+    "web.tests.browser.test_browser_inventory_grid.InventoryGridJourneys.test_bag_tab_lists_the_committed_rows_with_keyboard_reach"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_art.ArtImageLoadFailureTest.test_image_load_failure_shows_fallback_without_refetch",
+    "web.tests.browser.test_browser_npc_persona_editor_edges.NpcPersonaEditorEdgesBrowserTest.test_puppet_switch_clears_editor"
+   ]
+  },
+  {
+   "index": 46,
+   "name": "exploration-46",
+   "files_a": [
+    "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_freeform_dialogue_degrades_offline_through_the_command_line",
+    "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_look_at_scripted_host_shows_the_affinity_stage_line",
+    "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_presence_rail_and_verb_card_hold_at_both_reference_viewports"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_combat_rejection.CombatReconnectBrowserTest.test_confirmed_action_disconnect_shows_no_uncertain_notice"
+   ]
+  },
+  {
+   "index": 47,
+   "name": "creation-47",
+   "files_a": [
+    "web.tests.browser.test_browser_party_acceptance.PartyAcceptanceBrowserTest.test_unfinished_draft_survives_reconnect_without_replaying_intent"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_creation_reset_draft.ResetAndDraftJourneys.test_escape_preserves_the_saved_draft",
+    "web.tests.browser.test_browser_creation_reset_draft.ResetAndDraftJourneys.test_reset_confirm_shows_refreshed_server_text_when_withdrawn",
+    "web.tests.browser.test_browser_creation_reset_draft.ResetAndDraftJourneys.test_reset_requires_confirmation_and_clears_the_draft"
+   ]
+  },
+  {
+   "index": 48,
+   "name": "combat-48",
+   "files_a": [
+    "web.tests.browser.test_browser_combat_scales.CombatMenuBrowserTest.test_master_scale_step_casts_at_the_chosen_magnitude",
+    "web.tests.browser.test_browser_combat_scales.CombatMenuBrowserTest.test_panel_advertises_scales_only_for_the_mastered_element"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_combat_rejection.CombatReconnectBrowserTest.test_disconnect_after_submit_shows_uncertain_notice_no_retry"
+   ]
+  },
+  {
+   "index": 49,
+   "name": "exploration-49",
+   "files_a": [
+    "web.tests.browser.test_browser_creation_viewport_pointer.PointerCreationJourneys.test_pointer_click_on_reset_opens_the_destructive_confirm",
+    "web.tests.browser.test_browser_creation_viewport_pointer.PointerCreationJourneys.test_pointer_click_on_submit_emits_exactly_one_custom_save",
+    "web.tests.browser.test_harness.RealServerBootTest.test_real_server_boots_and_cleans_up"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_exploration_actions.ExplorationBrowserTest.test_no_take_or_drop_control_is_rendered",
+    "web.tests.browser.test_browser_exploration_actions.ExplorationBrowserTest.test_non_success_action_results_speak_once_in_the_narrative",
+    "web.tests.browser.test_browser_exploration_actions.ExplorationBrowserTest.test_rest_entry_tile_form_dispatch_path"
+   ]
+  },
+  {
+   "index": 50,
+   "name": "art-50",
+   "files_a": [
+    "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_combat_portrait_overlay_shows_name_and_role",
+    "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_defeated_participant_leaves_the_catalog_in_the_same_update",
+    "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_keyboard_focus_switches_the_portrait_without_a_packet"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_combat_scales.CombatMenuBrowserTest.test_panel_groups_skills_by_category_in_enum_order",
+    "web.tests.browser.test_browser_services_dispatch.ReconnectJourney.test_reconnect_rebuilds_services_and_discards_unsubmitted_quantity"
+   ]
+  },
+  {
+   "index": 51,
+   "name": "combat-51",
+   "files_a": [
+    "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_disabled_items_defend_send_no_packet",
+    "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_none_skill_submits_skill_key_only",
+    "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_a_bend_drag_is_one_command_and_keeps_the_direction_at_the_large_viewport",
+    "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_a_new_local_map_from_a_location_is_empty_and_unfinished",
+    "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_a_referenced_node_refuses_deletion_and_an_unreferenced_one_is_deleted",
+    "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_a_retargeted_road_and_a_new_bend_stay_selected",
+    "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_dragging_a_referenced_node_is_one_command_that_keeps_its_relations",
+    "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_list_multi_selection_moves_as_one_command_and_cross_document_is_inspect_only",
+    "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_prototype_name_and_scene_fields_by_keyboard",
+    "web.tests.browser.test_map_editor_settlements.MapEditorSettlementBrowserTest.test_the_road_tool_creates_a_two_way_street_in_one_command"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_combat_beats.CombatBeatsBrowserTest.test_reconnect_replays_no_round",
+    "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_composite_widget_semantics_are_dom_observable"
+   ]
+  },
+  {
+   "index": 52,
+   "name": "services-52",
+   "files_a": [
+    "web.tests.browser.test_browser_services_shop.ShopJourneys.test_buy_quantity_validation_exact_copper",
+    "web.tests.browser.test_browser_services_shop.ShopJourneys.test_sell_and_repeated_inventory_without_use_control",
+    "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_frozen_manifest_grows_only_in_lockstep_with_stories",
+    "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_storybook_stories_render_offline",
+    "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_vue_default_loads_when_flag_is_absent"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_options_surface.OptionsSurfaceBrowserTest.test_degraded_rule_cards_render_in_dock_only",
+    "web.tests.browser.test_browser_options_surface.OptionsSurfaceBrowserTest.test_dismiss_control_hides_the_section",
+    "web.tests.browser.test_browser_options_surface.OptionsSurfaceBrowserTest.test_freeform_card_sends_speech_label",
+    "web.tests.browser.test_browser_options_surface.OptionsSurfaceBrowserTest.test_known_card_click_dispatches_the_exact_envelope",
+    "web.tests.browser.test_browser_options_surface.OptionsSurfaceBrowserTest.test_locked_client_rejects_card_clicks_without_side_effects",
+    "web.tests.browser.test_browser_options_surface.OptionsSurfaceBrowserTest.test_login_shows_generating_line_then_ready_cards",
+    "web.tests.browser.test_browser_options_surface.OptionsSurfaceBrowserTest.test_move_into_room_shows_generating_then_ready",
+    "web.tests.browser.test_browser_options_surface.OptionsSurfaceBrowserTest.test_section_gated_while_the_character_sub_dock_owns_the_surface",
+    "web.tests.browser.test_browser_options_surface.OptionsSurfaceBrowserTest.test_suggestions_only_update_rerenders_section_without_dock_rebuild",
+    "web.tests.browser.test_browser_options_surface.OptionsSurfaceBrowserTest.test_zero_card_degraded_renders_the_defined_empty_state",
+    "web.tests.browser.test_wilderness_travel.TravelWalkingTests.test_keyboard_only_step"
+   ]
+  },
+  {
+   "index": 53,
+   "name": "creation-53",
+   "files_a": [
+    "web.tests.browser.test_browser_combat_rejection.CombatRejectionBrowserTest.test_forged_exit_confirmation_rejects",
+    "web.tests.browser.test_browser_scene_media.SceneMediaBrowserTest.test_configured_root_failure_keeps_bundled_media"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_art.ArtFailedSceneTest.test_failed_regeneration_keeps_a_visible_reached_failure",
+    "web.tests.browser.test_browser_creation_dispatch.CreationDispatchJourneys.test_stale_custom_preserves_typed_values_and_asks_for_review",
+    "web.tests.browser.test_browser_creation_dispatch.CreationDispatchJourneys.test_stale_revision_returns_stale_without_mutation"
+   ]
+  },
+  {
+   "index": 54,
+   "name": "pointer-54",
+   "files_a": [
+    "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_pointer_exploration_root_and_submenu_submission",
+    "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_pointer_under_offline_overlay_emits_nothing",
+    "web.tests.browser.test_browser_scene_media.SceneMediaBrowserTest.test_bundled_namespace_and_operator_isolation"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_portrait_overlay_usable_at_the_reference_viewport",
+    "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_self_skill_submits_no_target_field",
+    "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_single_skill_target_flow"
+   ]
+  },
+  {
+   "index": 55,
+   "name": "exploration-55",
+   "files_a": [
+    "web.tests.browser.test_browser_bundled_scene_assets.BundledSceneAssetsBrowserTest.test_terminal_pack_static_decode",
+    "web.tests.browser.test_browser_services_guild.GuildBoardJourneys.test_board_frame_refreshes_on_committed_update",
+    "web.tests.browser.test_browser_services_guild.GuildBoardJourneys.test_reception_counter_shows_the_independent_rank_card"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_bundled_scene_assets.BundledSceneAssetsBrowserTest.test_interior_pack_static_decode",
+    "web.tests.browser.test_browser_exploration_nav.ExplorationBrowserTest.test_escape_at_intermediate_depth_keeps_cells_matched_to_the_frame",
+    "web.tests.browser.test_browser_exploration_nav.ExplorationBrowserTest.test_keyboard_only_journey_walks_the_overview"
+   ]
+  },
+  {
+   "index": 56,
+   "name": "combat-56",
+   "files_a": [
+    "web.tests.browser.test_browser_combat_beats.CombatBeatsBrowserTest.test_round_pages_beats_at_off",
+    "web.tests.browser.test_browser_combat_beats.CombatBeatsBrowserTest.test_round_plays_and_skips_reduced"
+   ],
+   "files_b": [
+    "web.tests.browser.test_browser_bundled_scene_assets.BundledSceneAssetsBrowserTest.test_sacred_pack_static_decode",
+    "web.tests.browser.test_browser_services_quest_drawer.ServicesUnavailableJourney.test_unavailable_services_drawer_renders_reason_only",
+    "web.tests.browser.test_browser_skillbook_casting.SkillBookFieldCastJourneyTest.test_area_opening_at_a_chosen_scale_starts_combat_then_book_hands_off"
+   ]
+  }
+ ]
 }
