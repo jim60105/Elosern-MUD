@@ -48,7 +48,8 @@ Assertions removed from surviving tests:
 - the capital-river and imperial-river mouth regions;
 - the fixed probe cells `(900, 1042)`, `(900, 2350)`, `(700, 1960)`;
 - `ridge_passes == ()` and the X1300..1520 band;
-- the `ridge_center_x(100) != ridge_center_x(1200)` bend check.
+- the `ridge_center_x(100) != ridge_center_x(1200)` bend check;
+- the `capital_altoria` connectivity hub, replaced by the first anchor key in sorted order.
 
 ### D2. Derive probes from the authored data
 
@@ -91,7 +92,7 @@ Four requirements change ID:
 | `lore-registries::anchor-registry-covers-capitals-elven-villages-and-known-dungeons` | `lore-registries::anchor-registry-composes-every-declared-location-kind` |
 | `continental-geography::the-known-continent-has-frozen-geographic-declarations` | `continental-geography::known-continent-geographic-declarations-are-frozen` |
 
-During apply, the main specs still hold only the old IDs. So every surviving and newly added decorator uses the OLD ID, and `uv run --locked python -m tools.spec_traceability check` stays at 0 errors / 0 uncovered. The archive step syncs the delta, so the old IDs disappear and the new ones appear. Task group 5 then replaces each old literal with its new one. The full file list is in tasks.md: `world/maps/tests/test_wilderness_geography_contract.py`, `world/maps/tests/test_wilderness_provider.py`, `world/lore/tests/test_anchors.py`, `world/lore/tests/test_anchor_placement.py`, `world/lore/tests/test_wilderness_regions.py`. This follows the project's established "post-sync re-pin" practice (for example `2026-08-29-add-subrace-starting-kits`).
+During apply, the main specs still hold only the old IDs. So every surviving and newly added decorator uses the OLD ID, and `uv run --locked python -m tools.spec_traceability check` stays at 0 errors / 0 uncovered. The archive step syncs the delta, so the old IDs disappear and the new ones appear. In the same commit as the sync, the "Workflow follow-up" steps replace each old literal with its new one. Splitting them would leave `quality-gate.yml`'s traceability check red. The full file list is in tasks.md: `world/maps/tests/test_wilderness_geography_contract.py`, `world/maps/tests/test_wilderness_provider.py`, `world/lore/tests/test_anchors.py`, `world/lore/tests/test_anchor_placement.py`, `world/lore/tests/test_wilderness_regions.py`. This follows the project's established "post-sync re-pin" practice (for example `2026-08-29-add-subrace-starting-kits`).
 
 Rejected alternative: keep stale scenario titles under MODIFIED to avoid ID churn. Rejected because the titles themselves ("Nine geographic anchors", "capital_altoria's derived anchor cells…") are the data pins being removed.
 
@@ -99,7 +100,7 @@ Rejected alternative: keep stale scenario titles under MODIFIED to avoid ID chur
 
 - [Risk] Removing pins weakens detection of an accidental geometry edit, such as a mistyped forest-edge vertex. → Mitigation: authoring diagnostics, the editor preview and the remaining invariants (reachability, claim/region agreement, ford and water semantics, political-line derivation) still catch structural mistakes. A deliberate shape is reviewed by a person in the map editor, not by a test.
 - [Risk] `_RunComponents` is built five times plus once per ford, as it is today. Runtime stays about the same as on master.
-- [Risk] A weak worker updates decorators to new IDs during apply, and traceability reports `unknown-requirement-id`. → Mitigation: task 5 is explicitly post-sync and its own acceptance check names the expected counts.
+- [Risk] A weak worker updates decorators to new IDs during apply, and traceability reports `unknown-requirement-id`. → Mitigation: the re-anchor sits in "Workflow follow-up", is explicitly post-sync, and must land in the same commit as the archive sync.
 - [Trade-off] `test_classifier_and_claims_flip_across_the_river` still names the regions `western_hills_valleys`/`northwest_highland_forest` and the nations `altoria`/`valhalla`. These are the border river's defined role in the classifier (code-owned `REGION_KEYS`) and in the requirement body, not authored coordinates.
 
 ## Migration Plan

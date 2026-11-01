@@ -23,7 +23,7 @@ The game SHALL compose immutable location views from map-owned identity/kind/nam
 
 #### Scenario: The location kind vocabulary is closed and shared
 - **WHEN** the map schema's location kinds are compared with the game's anchor kinds and a synthetic source declares one location of each kind
-- **THEN** both vocabularies are the same set and each synthetic identity composes with its declared kind and no duplicates; shipped content need not use every kind and no production roster size is imposed
+- **THEN** both vocabularies are the same set and each synthetic identity composes exactly once with its declared kind; shipped content need not use every kind and no production roster size is imposed
 
 #### Scenario: Dungeon floor counts match world_info.md
 - **WHEN** a dungeon's map-facing location fields change while its separate floor lore remains unchanged

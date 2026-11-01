@@ -30,7 +30,7 @@ The coordinate classifier SHALL return a declared region for every bounded coord
 - **THEN** every frame cell keeps its region and the region search windows are identical; branch cells in the deep forest remain north_deep_forest
 
 ### Requirement: Terrain and political control derive from authored geography
-Terrain, nominal claims and effective control SHALL remain distinct, with the corridor, nominal nation splits and political lines derived from the same authored stem, deep forest walkable off the ridge, and every authored location and harbour on walkable land in one connected component; no individual site's position, region or nation and no measured area share is contract.
+Terrain, nominal claims and effective control SHALL remain distinct, with the corridor, nominal nation splits and political lines derived from the same authored stem, walkable deep forest beyond the arm tips, and every authored location and harbour on walkable land in one connected component; no individual site's position, region or nation and no measured area share is contract.
 
 #### Scenario: Authored sites stay classified, walkable and connected
 - **WHEN** the shipped terrain is evaluated through every authored location and harbour identity
@@ -90,7 +90,7 @@ The physical ridge SHALL derive from arbitrary authored stem and arm routes join
 
 #### Scenario: No direct cross-range land route
 - **WHEN** every active stem row of the shipped ridge outside its declared pass rows is probed at the stem centre, and each arm tip and the cell north of it are probed
-- **THEN** each probed centre is a closed wall cell for the game's validity rule, each tip is closed and the cell north of it is open, so unrestricted travel crosses the range only through declared passes or the forest beyond the tips
+- **THEN** each probed centre is a closed wall cell that the game's validity rule rejects, and each tip is closed while the cell north of it is open
 
 #### Scenario: Terminal rows and optional passes
 - **WHEN** a synthetic stem pass is added below the crotch or a crest endpoint is queried

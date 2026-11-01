@@ -171,7 +171,20 @@ File: `world/maps/tests/test_wilderness_geography_contract.py` only. Requires gr
           source_row = terrain().waterway_routes["border_river"][0][1]
           self.assertEqual(river[-1], (ridge_center_x(terrain(), source_row), source_row))
   ```
-- [ ] 2.14 Pin scan. Run `grep -nE "1920|0\.20|0\.43|0\.30|0\.27|1300|1520|1410|1290|\(900, |\(700, |capital_valhalla|village_eolas|village_ciaran|village_fionnen|dungeon_eternal_night" world/maps/tests/test_wilderness_geography_contract.py`. Expected: no output. Then run `uv run evennia test --keepdb --settings settings.py world.maps.tests.test_wilderness_geography_contract`. Expected: `OK` with `Ran 17 tests`. Master has 20; group 1 deletes 1 and this group deletes 2. `grep -c "    def test_" world/maps/tests/test_wilderness_geography_contract.py` must also print `17`.
+- [ ] 2.13a In `test_every_anchor_and_harbour_is_walkable_and_mutually_reachable`, replace the two lines
+  ```python
+          altoria = anchor_geography()["capital_altoria"]
+          hub = components.component(_anchor_targets("capital_altoria", altoria.cell)[0])
+  ```
+  with
+  ```python
+          hub_key = sorted(anchor_geography())[0]
+          hub = components.component(
+              _anchor_targets(hub_key, anchor_geography()[hub_key].cell)[0]
+          )
+  ```
+  Change nothing else in the method. Check: `grep -c "capital_altoria" world/maps/tests/test_wilderness_geography_contract.py` prints `0`.
+- [ ] 2.14 Pin scan. Run `grep -nE "1920|0\.20|0\.43|0\.30|0\.27|1300|1520|1410|1290|\(900, |\(700, |capital_altoria|capital_valhalla|village_eolas|village_ciaran|village_fionnen|dungeon_eternal_night" world/maps/tests/test_wilderness_geography_contract.py`. Expected: no output. Then run `uv run evennia test --keepdb --settings settings.py world.maps.tests.test_wilderness_geography_contract`. Expected: `OK` with `Ran 17 tests`. Master has 20; group 1 deletes 1 and this group deletes 2. `grep -c "    def test_" world/maps/tests/test_wilderness_geography_contract.py` must also print `17`.
 
 ## 3. Anchor kind vocabulary and national-settlement lore checks
 
@@ -210,6 +223,7 @@ File: `world/lore/tests/test_anchors.py` only. Independent of groups 1–2.
           for key, declaration in synthetic.items():
               with self.subTest(kind=declaration["kind"]):
                   self.assertEqual(snapshot.anchors[key].kind, AnchorKind(declaration["kind"]))
+          self.assertEqual(set(snapshot.anchors), set(data["locations"]))
   ```
 - [ ] 3.2 Replace the whole method `test_national_settlements_carry_nation_and_population` with:
   ```python
@@ -295,7 +309,7 @@ Requires groups 1–4.
 
 ## Workflow follow-up
 
-These steps run AFTER the archive syncs this delta into `openspec/specs/`. Until then the new IDs are unknown to `tools.spec_traceability`.
+These steps run AFTER the archive syncs this delta into `openspec/specs/`. Until then the new IDs are unknown to `tools.spec_traceability`. The archive sync and this re-anchor MUST land in the same commit (or at least the same merge). Between them `tools.spec_traceability check` is red: the four old IDs are unknown and the four new requirements are uncovered. CI runs that check in `.github/workflows/quality-gate.yml`, so no commit may sit on the primary branch between the two steps.
 
 - Re-anchor the four re-identified requirement IDs with these exact literal replacements:
   - In `world/maps/tests/test_wilderness_geography_contract.py` and `world/maps/tests/test_wilderness_provider.py`, replace `wilderness-terrain::region-for-coordinates-is-a-pure-deterministic-function-covering-the-whole-bounded-map` with `wilderness-terrain::the-coordinate-classifier-is-a-pure-deterministic-function-over-the-whole-bounded-map`.
