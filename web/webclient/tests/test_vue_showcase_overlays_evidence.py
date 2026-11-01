@@ -285,6 +285,9 @@ PREVIOUS_MANIFEST_KEYS = {
     "World/AreaMapView",
     # The world tab renderer of the world-map drawer (render-world-map-view).
     "World/WorldMapView",
+    # The wilderness travel stage story joined the frozen set with
+    # wilderness-travel-interface.
+    "World/WildernessTravel",
 }
 
 # The Overlays-directory story files that sit outside the B5 family: the

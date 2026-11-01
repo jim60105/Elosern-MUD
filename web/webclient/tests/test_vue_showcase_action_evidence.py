@@ -273,6 +273,9 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 # exploration-room-actions.
                 "Core/QuestionCard",
                 "Core/TimeChoiceCard",
+                # The wilderness travel stage story joined the frozen set with
+                # wilderness-travel-interface.
+                "World/WildernessTravel",
             },
         )
         result = run_node(["scripts/component-coverage.mjs"], timeout=120)

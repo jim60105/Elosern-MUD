@@ -264,6 +264,9 @@ class VueShowcaseDataEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 # World/QuestLog.
                 "World/QuestList",
                 "World/QuestDetail",
+                # The wilderness travel stage story joined the frozen set with
+                # wilderness-travel-interface.
+                "World/WildernessTravel",
             },
         )
         result = run_node(["scripts/component-coverage.mjs"], timeout=120)

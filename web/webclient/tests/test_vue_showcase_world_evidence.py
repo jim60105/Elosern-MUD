@@ -260,6 +260,9 @@ PREVIOUS_MANIFEST_KEYS = {
     # in the family.
     "World/QuestList",
     "World/QuestDetail",
+    # The wilderness travel stage story joined the frozen set with
+    # wilderness-travel-interface.
+    "World/WildernessTravel",
 }
 
 # The World-directory story files that sit outside the B4 family: the
@@ -269,6 +272,7 @@ PREVIOUS_MANIFEST_KEYS = {
 # World/LettersPanel joined when the correspondence folio landed, and
 # World/GradeGem and World/GuildRankCard with quest-drawer-ui-primitives,
 # and World/QuestList and World/QuestDetail with quest-drawer-book-tab.
+# World/WildernessTravel joined with wilderness-travel-interface.
 WORLD_KEYS_JOINED_AFTER_B4 = (
     "World/TitleBallotMenu",
     "World/DreamPanel",
@@ -281,6 +285,8 @@ WORLD_KEYS_JOINED_AFTER_B4 = (
     "World/AreaMapView",
     # The world-map drawer's world tab (render-world-map-view).
     "World/WorldMapView",
+    # The wilderness travel stage story (wilderness-travel-interface).
+    "World/WildernessTravel",
 )
 
 
