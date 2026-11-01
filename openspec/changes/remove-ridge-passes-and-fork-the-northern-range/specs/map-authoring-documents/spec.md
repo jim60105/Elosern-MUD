@@ -21,6 +21,10 @@ Authoring load SHALL discover the documented source set deterministically and re
 - **WHEN** a continent is parsed
 - **THEN** its ridge requires a physical stem route with at least two integer nonnegative cell points; missing or malformed routes reject without substituting a periodic physical curve
 
+#### Scenario: Retired periodic fields are rejected
+- **WHEN** a ridge document supplies old base, period, step or manually duplicated extent fields
+- **THEN** strict schema validation rejects them as unknown rather than preserving a second shape authority
+
 #### Scenario: Paired branch shape
 - **WHEN** optional ridge branches are present
 - **THEN** exactly west and east routes are required, each with at least two integer nonnegative cell points; missing arms, unknown keys and wrong field types reject as structure errors

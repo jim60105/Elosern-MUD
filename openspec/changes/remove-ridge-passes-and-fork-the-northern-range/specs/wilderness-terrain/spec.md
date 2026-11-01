@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: region_for_coordinates is a pure, deterministic function covering the whole bounded map
-The coordinate classifier SHALL return a declared region for every bounded coordinate using only its immutable terrain snapshot, with deterministic results and the mountain corridor derived solely from the stem reference axis.
+The coordinate classifier SHALL return a declared region for every bounded coordinate using only its immutable terrain snapshot, with deterministic results and the mountain corridor derived from the authored stem route without arm corridors.
 
 #### Scenario: Same input always returns the same output
 - **WHEN** the classifier is called twice with the same coordinate and snapshot
@@ -14,19 +14,19 @@ The coordinate classifier SHALL return a declared region for every bounded coord
 - **THEN** every declared region key is returned by at least one coordinate
 
 #### Scenario: The central mountain band spans the full valid Y range
-- **WHEN** cells around the bending stem corridor below the forest are classified
-- **THEN** the mountain region follows the authored corridor; the separate physical crest's passability does not define region membership
+- **WHEN** cells around the authored stem corridor below the forest are classified
+- **THEN** the mountain region follows the stem's per-row centre and authored half-width, while physical passability remains a separate cell property
 
 #### Scenario: capital_altoria's derived anchor cells resolve to Altoria's own territory
 - **WHEN** the capital's authored cell and all derived gateway approaches are classified
 - **THEN** each remains western_hills_valleys
 
 #### Scenario: Branches leave regions unchanged
-- **WHEN** synthetic terrain definitions retain reference-axis inputs and differ in arbitrary authored physical stem and arm routes
+- **WHEN** synthetic terrain definitions retain their authored stem and differ only in paired arm routes
 - **THEN** every frame cell keeps its region and the region search windows are identical; branch cells in the deep forest remain north_deep_forest
 
 ### Requirement: Terrain and political control follow authored geography
-Terrain, nominal claims and effective control SHALL remain distinct, with unchanged stem-derived political lines and region boundaries, a walkable deep forest, and a pass-free forked shipped ridge enclosing the independent hidden valley.
+Terrain, nominal claims and effective control SHALL remain distinct, with corridor, nominal nation splits and political lines derived from the same authored stem, a walkable deep forest, and a pass-free forked shipped ridge enclosing the independent hidden valley within declared geographic outcome bounds.
 
 #### Scenario: Anchor relationships
 - **WHEN** the shipped terrain is evaluated through its authored location identities
@@ -49,8 +49,8 @@ Terrain, nominal claims and effective control SHALL remain distinct, with unchan
 - **THEN** all 9 location targets and 6 harbours share one component through forest around the inland tips; footprinted anchors use legal gateway approaches, ordinary forest stays walkable and sampled forest share remains 0.20 within 0.02
 
 #### Scenario: Political lines remain on the stem
-- **WHEN** synthetic worlds retain reference-axis inputs and differ in arbitrary authored physical stem and arm routes
-- **THEN** nominal claims and displayed border point sequences are identical, political lines remain derived from the stem reference without arm segments, and deep-forest political segments remain omitted
+- **WHEN** a synthetic stem route changes and paired arms are consumed
+- **THEN** the corridor and nominal nation flip follow its row centres, political borders equal its clipped authored polyline and river-source junction, and neither arm nor deep-forest political segments appear
 
 ## ADDED Requirements
 
@@ -62,16 +62,16 @@ The physical ridge SHALL derive from arbitrary authored stem and arm routes join
 - **THEN** each arm has deterministic row centres with next-row span closure; the shared crotch is blocked, adjacent rows have no corner-cutting crossing, and the open space between separated arms is not filled
 
 #### Scenario: Arbitrary physical stem replaces periodic generation
-- **WHEN** a synthetic physical stem authors unequal bend spacing and local direction changes while reference-axis parameters remain fixed
-- **THEN** physical blockers and previews follow the authored route with repeatable rasterization, never a substituted periodic curve; the fork joins the authored stem endpoint
+- **WHEN** a synthetic stem authors unequal bend spacing and local direction changes
+- **THEN** blockers, previews, corridor, claims, political lines and elevation derive from the same authored route with repeatable rasterization, never a periodic curve or separate reference axis; the fork joins its endpoint
 
 #### Scenario: Invalid geometric relations
-- **WHEN** a fork has mismatched starts, a stem clipped away from its crotch, nonincreasing rows, crossed or rejoined arms beyond the crotch, wrongly sided tips, excessive per-row slope, a crotch pass, off-frame/off-land/non-forest wall cells, or collisions with full waterway cells or authored protected points
+- **WHEN** a fork has mismatched starts, nonincreasing rows, crossed or rejoined arms beyond the crotch, wrongly sided tips, excessive per-row slope, a crotch pass, off-frame/off-land/non-forest arm cells, or collisions with full waterway cells or authored protected points
 - **THEN** candidate authoring reports a semantic terrain diagnostic and runtime rejects that candidate without moving protected content
 
 #### Scenario: All physical consumers agree
 - **WHEN** a forked ridge is consumed by validity, row-run component indexing, preview/capture, elevation and partition
-- **THEN** complete wall spans block validity/components/partition and appear in previews, including arms outside stem X bounds; elevation uses both active arm-centre profiles and maximum overlapping rise before unchanged sea/river clamps and ordered shapes
+- **THEN** complete wall spans block validity/components/partition and appear in previews regardless of the stem's X extent; elevation uses all active crest-centre profiles and maximum overlapping rise before unchanged sea/river clamps and ordered shapes
 
 #### Scenario: No direct cross-range land route
 - **WHEN** the shipped zero-pass ridge is probed across X1300 through X1520
