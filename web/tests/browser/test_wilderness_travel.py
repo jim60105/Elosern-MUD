@@ -382,9 +382,11 @@ _PAINTS = "() => window.__elosernBridge.travelPaint.stats().count"
 # settlement footprint, phase and radius), 8 warm-up paints, then 20 timed
 # state changes (party, reveal, phase, radius and flags all move). The canvas
 # size comes from the decoded window, never a constant. The budget names a
-# warmed repaint, so the warm-up also drains the canvas: one flush before the
-# timed loop completes the warm-up rasterization instead of charging it, plus
-# the first readback, to the first timed sample.
+# warmed repaint, so the warm-up also drains the canvas: a full-canvas readback
+# before the timed loop rasterizes everything the warm-ups left pending, which
+# a 1 x 1 readback does not. Otherwise the first timed sample pays for every
+# warm-up paint instead of one repaint. Each sample reports the painter's own
+# duration alongside the total, so paint work and rasterization stay separable.
 _BENCH = """() => {
   const S = 12, N = 41, warmups = 8, phases = ['day', 'dusk', 'night', 'dawn'];
   const labels = { open_ground: '曠', hills: '丘', woodland: '林', water: '河', settlement: '聚' };
@@ -433,15 +435,16 @@ _BENCH = """() => {
   const ctx = canvas.getContext('2d');
   const cache = {};
   for (let k = 0; k < warmups; k += 1) paintTravelMap(ctx, grids[k], { cache });
-  ctx.getImageData(0, 0, 1, 1);
+  ctx.getImageData(0, 0, canvas.width, canvas.height);
   const samples = [];
+  const inside = [];
   for (let k = warmups; k < warmups + 20; k += 1) {
     const started = performance.now();
-    paintTravelMap(ctx, grids[k], { cache });
+    inside.push(paintTravelMap(ctx, grids[k], { cache }));
     ctx.getImageData(0, 0, 1, 1);
     samples.push(performance.now() - started);
   }
-  return { samples, ua: navigator.userAgent, dpr: window.devicePixelRatio, size: [canvas.width, canvas.height],
+  return { samples, inside, ua: navigator.userAgent, dpr: window.devicePixelRatio, size: [canvas.width, canvas.height],
     known: grids[0].cells.filter((c) => c.known).length };
 }"""
 
@@ -533,8 +536,16 @@ class TravelMapTests(_TravelStage):
             self.assertGreater(result["known"], 0)
             samples = result["samples"]
             lines.append(
-                "%dx%d dpr=%s canvas=%s ua=%s samples_ms=%s"
-                % (viewport[0], viewport[1], result["dpr"], result["size"], result["ua"], [round(v, 2) for v in samples])
+                "%dx%d dpr=%s canvas=%s ua=%s samples_ms=%s paint_ms=%s"
+                % (
+                    viewport[0],
+                    viewport[1],
+                    result["dpr"],
+                    result["size"],
+                    result["ua"],
+                    [round(v, 2) for v in samples],
+                    [round(v, 2) for v in result["inside"]],
+                )
             )
             self.assertEqual(len(samples), 20)
             self.assertLessEqual(max(samples), 50.0, lines[-1])
