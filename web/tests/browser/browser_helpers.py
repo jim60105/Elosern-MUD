@@ -103,18 +103,19 @@ def seed_motion_level(target, level: str) -> None:
     target.add_init_script(script=_SEED_MOTION_LEVEL_SCRIPT % json.dumps(level))
 
 # Guaranteed shell surfaces the Vue SPA always renders: the header, the
-# message window, and the ⌨ command-line toggle in `#band-message`
+# message region (the travel log in wilderness, otherwise the message
+# window), and the ⌨ command-line toggle in `#band-message`
 # (webclient-collapsible-command-line: the command line itself starts
 # collapsed with `display:none`, while its toggle is rendered in every mode
 # that renders the message region).
 # The status panel and the action dock are conditional (rendered only when
 # their panels are available), so they are also not required here. The
-# message window and the command-line toggle are addressed through the Vue
+# message region and the command-line toggle are addressed through the Vue
 # SPA's stable `data-testid` hooks; the header renders under
 # `[data-testid="topbar"]`.
 REQUIRED_SURFACES = (
     '[data-testid="topbar"]',
-    '[data-testid="message-window"]',
+    '[data-testid="message-window"], [data-testid="travel-log"]',
     '[data-testid="command-line-toggle"]',
 )
 

@@ -97,7 +97,6 @@ class QualityGateContractTests(unittest.TestCase):
             evennia_command,
         )
         self.assertIn("--concurrency=multiprocessing --parallel-mode", evennia_command)
-        self.assertIn("--parallel 4", evennia_command)
         self.assertIn("join(matrix.labels, ' ')", evennia_command)
         self.assertEqual(evennia_step["env"]["MUD_TEST_SETTINGS"], "1")
         self.assertEqual(

@@ -136,6 +136,8 @@ jobs:
         run: mkdir -p server/db server/logs
 
       - name: Run evennia shard ${{ matrix.index }}
+        # Vitest owns the frontend evidence shard's worker pool; parallel
+        # Django classes would launch competing Vitest/build pools.
         env:
           COVERAGE_FILE: coverage-evennia-shard-${{ matrix.index }}
           MUD_TEST_SETTINGS: "1"
@@ -144,7 +146,7 @@ jobs:
           uv run --locked coverage run
           --concurrency=multiprocessing --parallel-mode
           -m evennia test --settings test_settings.py --noinput
-          --parallel 4 ${{ join(matrix.labels, ' ') }}
+          --parallel ${{ matrix.name == 'webclient-evidence' && 1 || 4 }} ${{ join(matrix.labels, ' ') }}
 
       - name: Upload coverage and evidence artifacts
         uses: actions/upload-artifact@v7

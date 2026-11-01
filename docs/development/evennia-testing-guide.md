@@ -12,7 +12,21 @@ Evennia 目前提供的 `EvenniaTest` 會在 `setUp()` 中建立 accounts、room
 
 !> **CI 的 quality gate 已改為多 job 平行結構（2026-08-11）**：non-browser Evennia suite 在 CI 以 `--parallel 4` 加上 subprocess-aware coverage 執行（`coverage run --concurrency=multiprocessing --parallel-mode`），managed browser suite 依 `.github/browser-shards.json` 的 manifest 分成 18 個 two-process shard job（每個 shard 在同一台 runner 上用 `w-a`／`w-b` 兩個獨立 checkout 各跑一個序列 process，每個 test method 只有一個序列執行 owner；Evennia launcher 的 pidfile 是 GAMEDIR-relative，兩個 harness 不能共用一個 working tree），另有一個獨立的 top-level regression job；最後的 gate job 會下載所有 artifact、驗證每個預期的 coverage 與 evidence 檔都存在且非空、依 entry-point 順序合併 evidence、執行 `spec_traceability verify`、`coverage combine` 所有 sidecar、驗證 coverage roots、執行 80% aggregate hard gate，再產出並上傳 Codecov XML。top-level 的 contract tests（`tests/test_quality_gate_contract.py`、`tests/test_browser_verification_contract.py`、`tests/test_evennia_test_optimization_contract.py`）會持續 pin 這個結構。
 
-!> **non-browser Evennia suite 已機器級 shard（2026-08-16）**：`.github/evennia-shards.json` manifest 把整個 non-browser Evennia suite 依 package 與檔案切成十個 disjoint shard，CI 以 matrix job 一次在十台 runner 上平行執行（每個 shard 仍是 `--parallel 4`），每個 test module 只有一個序列執行 owner。這些 shard 指令是 **CI-only**：每次執行都使用同一條 local test database 路徑（`server/db/evennia-test.sqlite3`），同一台機器上絕不可同時執行多個 shard。本機仍以完整的 `commands server typeclasses world web.webclient` 指令為主。
+!> **Non-browser machine shards:** `.github/evennia-shards.json` partitions the suite by package and module across ten independent CI jobs. Each module has exactly one execution owner. Each shard uses four outer Django workers except `webclient-evidence`, whose frontend tools own their parallelism. These shard commands are **CI-only**: they share the local test database path, so never execute multiple shard commands on the same machine. Local verification uses focused labels or the documented full-suite profile.
+
+### Frontend evidence worker profile
+
+The `webclient-evidence` machine shard runs with one outer Django worker.
+Its tests launch Vitest, Vite, and Storybook, which manage their own worker
+pools. Running several evidence classes concurrently oversubscribes the
+runner and can time out synchronous AppClient teardown. Other non-browser
+shards retain four Django workers. This changes scheduling only: labels,
+coverage/evidence collection, assertions, and timeout budgets are unchanged.
+
+Browser shell readiness requires the top bar, command-line toggle, and
+message region. The wilderness travel log replaces the paged message
+window; both are valid message-region implementations when tests reconnect
+to a shared runtime.
 
 ## 先量測測試時間
 

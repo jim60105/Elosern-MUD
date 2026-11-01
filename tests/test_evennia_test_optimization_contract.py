@@ -220,7 +220,6 @@ class TestOwnershipContractTests(unittest.TestCase):
         )
         self.assertIn("join(matrix.labels, ' ')", evennia_step["run"])
         self.assertIn("--noinput", evennia_step["run"])
-        self.assertIn("--parallel 4", evennia_step["run"])
         self.assertIn("--concurrency=multiprocessing --parallel-mode", evennia_step["run"])
         self.assertNotIn(" commands server typeclasses web world", evennia_step["run"])
         self.assertNotIn("web.tests.browser", evennia_step["run"])
