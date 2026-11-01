@@ -1572,6 +1572,7 @@ class TravelRouteTests(_TravelStage):
         return _travel(page)["walking"]
 
     @covers_requirement("webclient-travel-walking::held-walking-waits-for-committed-steps-and-dwell")
+    @covers_requirement("webclient-travel-route-walking::route-walking-consumes-plans-and-committed-interrupts")
     def test_hostile_interrupt(self):
         """出發 walks the locked plan one committed step at a time with the
         frozen walk context; a committed hostile_in_sight stops it before the
@@ -1624,6 +1625,7 @@ class TravelRouteTests(_TravelStage):
         page.close()
 
     @covers_requirement("webclient-travel-walking::held-walking-waits-for-committed-steps-and-dwell")
+    @covers_requirement("webclient-travel-route-walking::route-walking-consumes-plans-and-committed-interrupts")
     def test_all_interrupt_flags(self):
         """Each of the seven committed flags alone, and a combination, stops
         the route walk on the step that carried it: no next step is sent,
@@ -1658,6 +1660,7 @@ class TravelRouteTests(_TravelStage):
         page.close()
 
     @covers_requirement("webclient-travel-log::travel-notices-are-committed-structured-events")
+    @covers_requirement("webclient-travel-route-walking::landmark-arrivals-own-focus-through-committed-typed-events")
     def test_landmark_focus(self):
         """A committed typed arrival bound to the reached node opens the card
         with focus on 繼續 and Tab trapped inside; Enter closes it once and
