@@ -22,7 +22,7 @@ The coordinate classifier SHALL return a declared region for every bounded coord
 - **THEN** each remains western_hills_valleys
 
 #### Scenario: Branches leave regions unchanged
-- **WHEN** otherwise identical synthetic terrain definitions differ only by paired physical branches
+- **WHEN** synthetic terrain definitions retain reference-axis inputs and differ in arbitrary authored physical stem and arm routes
 - **THEN** every frame cell keeps its region and the region search windows are identical; branch cells in the deep forest remain north_deep_forest
 
 ### Requirement: Terrain and political control follow authored geography
@@ -49,25 +49,29 @@ Terrain, nominal claims and effective control SHALL remain distinct, with unchan
 - **THEN** all 9 location targets and 6 harbours share one component through forest around the inland tips; footprinted anchors use legal gateway approaches, ordinary forest stays walkable and sampled forest share remains 0.20 within 0.02
 
 #### Scenario: Political lines remain on the stem
-- **WHEN** otherwise identical synthetic worlds differ only in physical branches
-- **THEN** nominal claims and displayed border point sequences are identical, and political lines continue to omit deep-forest segments
+- **WHEN** synthetic worlds retain reference-axis inputs and differ in arbitrary authored physical stem and arm routes
+- **THEN** nominal claims and displayed border point sequences are identical, political lines remain derived from the stem reference without arm segments, and deep-forest political segments remain omitted
 
 ## ADDED Requirements
 
 ### Requirement: The physical ridge is a continuous forked barrier
-The physical ridge SHALL join its active stem and paired deterministic crest arms without a crotch gap, block their wall cells through every physical consumer, and retain separate arm spans with no wall beyond the inland forest tips.
+The physical ridge SHALL derive from arbitrary authored stem and arm routes joined without a crotch gap, expose complete wall geometry to traversal, previews and partition alongside active crest-centre elevation profiles, and retain separate arm spans ending inside the forest.
 
 #### Scenario: Deterministic arm bends and crotch
-- **WHEN** paired monotone branch routes join the stem's last active row
+- **WHEN** paired northward authored routes with arbitrary non-periodic local bends join the stem's last active row
 - **THEN** each arm has deterministic row centres with next-row span closure; the shared crotch is blocked, adjacent rows have no corner-cutting crossing, and the open space between separated arms is not filled
 
+#### Scenario: Arbitrary physical stem replaces periodic generation
+- **WHEN** a synthetic physical stem authors unequal bend spacing and local direction changes while reference-axis parameters remain fixed
+- **THEN** physical blockers and previews follow the authored route with repeatable rasterization, never a substituted periodic curve; the fork joins the authored stem endpoint
+
 #### Scenario: Invalid geometric relations
-- **WHEN** a fork has mismatched starts, nonincreasing rows, inverted arm direction, excessive per-row slope, a crotch pass, off-frame/off-land/non-forest wall cells, or collisions with full waterway cells or authored protected points
+- **WHEN** a fork has mismatched starts, a stem clipped away from its crotch, nonincreasing rows, crossed or rejoined arms beyond the crotch, wrongly sided tips, excessive per-row slope, a crotch pass, off-frame/off-land/non-forest wall cells, or collisions with full waterway cells or authored protected points
 - **THEN** candidate authoring reports a semantic terrain diagnostic and runtime rejects that candidate without moving protected content
 
 #### Scenario: All physical consumers agree
-- **WHEN** stem and arm wall cells are passed to validity, row-run component indexing, preview/capture, elevation and partition
-- **THEN** validity and components reject them, preview/capture draw them, elevation raises them and partition input marks them blocked, including arms outside a synthetic stem's X bounds
+- **WHEN** a forked ridge is consumed by validity, row-run component indexing, preview/capture, elevation and partition
+- **THEN** complete wall spans block validity/components/partition and appear in previews, including arms outside stem X bounds; elevation uses both active arm-centre profiles and maximum overlapping rise before unchanged sea/river clamps and ordered shapes
 
 #### Scenario: No direct cross-range land route
 - **WHEN** the shipped zero-pass ridge is probed across X1300 through X1520

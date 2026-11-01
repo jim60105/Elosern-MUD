@@ -20,3 +20,7 @@ The offline generator SHALL derive identical band and prominence rasters from id
 #### Scenario: Forest arms retain canopy
 - **WHEN** arms lie inside synthetic deep forest
 - **THEN** their elevation rises without changing region classification or producing a nonzero forest prominence tier
+
+#### Scenario: Zero-width relief keeps centre semantics
+- **WHEN** a synthetic zero-half-width crest bends across adjacent columns
+- **THEN** its pre-clamp ridge contribution raises active centres and leaves non-centre bend-closure cells at zero contribution, while all physical span cells still block traversal and sea remains band zero

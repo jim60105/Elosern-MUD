@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Continental authored inputs have direct and explicit editing controls
-The editor SHALL retain labelled single-document controls for its supported continental inputs, locations, districts and absolute-cell footprints, support empty ridge-pass lists, and display and preserve hand-authored paired ridge branches through edits and history.
+The editor SHALL retain labelled single-document controls for its supported continental inputs, locations, districts and absolute-cell footprints, support empty ridge-pass lists, and display and preserve hand-authored physical stem and paired arm routes through edits and history.
 
 #### Scenario: Move river point
 - **WHEN** a river control point is dragged or entered numerically
@@ -42,8 +42,8 @@ The editor SHALL retain labelled single-document controls for its supported cont
 - **THEN** each accepted operation writes only the continent, returning to an empty pass list remains editable with a current preview, and both branches remain preserved and displayed without pass exemptions on their walls
 
 #### Scenario: Hand-authored branches survive unrelated edits
-- **WHEN** an unrelated supported terrain parameter is edited, undone, redone and reloaded in a synthetic branch document
-- **THEN** branch values and supported retained comments survive, history restores exact prior bytes, and the preview still draws both arms
+- **WHEN** an unrelated supported terrain parameter is edited, undone, redone and reloaded in a synthetic arbitrary-stem/branch document
+- **THEN** all physical route values and supported retained comments survive, history restores exact prior bytes, and the preview still draws the authored stem and both arms
 
 #### Scenario: Branch commands are outside the supported surface
 - **WHEN** a request submits a set-ridge-branch or remove-ridge-branch command
