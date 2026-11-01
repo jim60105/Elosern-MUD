@@ -165,7 +165,16 @@ class MapKnowledgeSeamTests(EvenniaTest):
         # The sight boundary is injected, so the assertion establishes the
         # arrival seam's use of the committed cell radius without pinning the
         # shipped rulebook numbers.
-        with patch("world.rules.sight.ground_radius_at", return_value=5) as radius:
+        # Two committed consumers read the one ground-radius rule on this
+        # traversal: the arrival seam below (this test's subject) and the travel
+        # notice collector's live-sight hostile check
+        # (wilderness-travel-log-ui), which reads the same disc for its own
+        # comparison. The travel consumer is stubbed so the single-call claim
+        # keeps naming the arrival seam alone.
+        with (
+            patch("world.rules.travel_events._hostiles_in_sight", return_value=()),
+            patch("world.rules.sight.ground_radius_at", return_value=5) as radius,
+        ):
             self.gate.at_traverse(self.char1, self.east_gate)
         radius.assert_called_once()
         self.assertEqual(radius.call_args.args[0], self.entry_xy)
