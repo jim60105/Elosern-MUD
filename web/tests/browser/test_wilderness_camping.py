@@ -11,6 +11,8 @@ shipped content or pins copy.
 
 from __future__ import annotations
 
+from tools.spec_traceability import covers_requirement
+
 from .test_wilderness_travel import (
     CX,
     CY,
@@ -144,6 +146,7 @@ class CampingTests(_TravelStage):
         page.wait_for_function("(n) => window.__campHeld.length > n", arg=index, timeout=15000)
         self.assertTrue(page.evaluate(_ANSWER_CAMP, [index, data, code, message, panels, time]))
 
+    @covers_requirement("wilderness-camping::camp-card-selects-only-server-supplied-choices")
     def test_card_inputs_refusal_and_handoff(self):
         """The leg's 紮營 opens a focused card asking only for the preview;
         1/2/D/Enter/Esc act on server choices only, a refused mode disables
@@ -234,6 +237,7 @@ class CampingTests(_TravelStage):
         self.assertEqual(after, ids)
         page.close()
 
+    @covers_requirement("wilderness-camping::campfire-beat-is-presentation-only-and-skippable")
     def test_dusk_camp_to_dawn_and_beat_controls(self):
         """A dusk camp to dawn: one camp request, the committed dawn clock and
         recovered reserve, the beat finishing early on a key without another

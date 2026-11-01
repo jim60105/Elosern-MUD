@@ -12,6 +12,7 @@ from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
+from tools.spec_traceability import covers_requirement
 from world.rules.camping import plan_camp, preview_camp
 from world.rules.clock import CLOCK_YAML, _EVENT_SOURCES, get_world_clock
 from world.rules.fatigue import POSTURE_ATTRIBUTE, RESERVE_ATTRIBUTE, SleepPosture, read_optional_fatigue_state, write_fatigue_state
@@ -75,6 +76,7 @@ class CampFixture(EvenniaTest):
 
 
 class CampPreviewTests(CampFixture):
+    @covers_requirement("wilderness-camping::camp-preview-is-read-only-and-authoritative")
     def test_preview_parity_and_no_writes(self):
         tired = self._companion("疲憊同伴", reserve=180000)
         remote = self._companion("遠方同伴", reserve=36000, location=self.room2)
@@ -235,6 +237,7 @@ class CampActionTests(CampFixture):
             self.assertEqual(actual[member_id]["reserve_after"], row["predicted_reserve"], member_id)
         self.assertEqual(result["timing"]["wake_tick"], preview_mode["wake_tick"])
 
+    @covers_requirement("wilderness-camping::camp-commits-consent-and-continues-accepted-party-sleep")
     def test_atomic_admission_and_continuation(self):
         from world.rules.sleep_receipt import read_sleep_receipt, read_sleep_view_decision
 
@@ -283,6 +286,7 @@ class CampActionTests(CampFixture):
         self.assertEqual(data["timing"]["wake_tick"], tick + 27000)
         self._assert_parity(preview, data)
 
+    @covers_requirement("wilderness-camping::camp-commits-consent-and-continues-accepted-party-sleep")
     def test_refusals_write_nothing(self):
         from server.camp_service import camp
         from world.rules.time_skip import SleepRefused
@@ -317,6 +321,7 @@ class CampActionTests(CampFixture):
         self.assertEqual(get_world_clock().tick, tick)
         self.assertEqual(self.facts, [])
 
+    @covers_requirement("wilderness-camping::camp-results-describe-committed-recovery-once")
     def test_result_interruption_dream_and_replay(self):
         from world.rules.clock import ScheduledEvent, register_event_source
         from world.rules.sleep_receipt import read_camp_operation, read_sleep_receipt
@@ -362,6 +367,7 @@ class CampActionTests(CampFixture):
         self.assertEqual({fact.events[0].id for fact in self.facts}, {event_id})
         self.assertIsNotNone(read_sleep_receipt(tired))
 
+    @covers_requirement("wilderness-camping::camp-results-describe-committed-recovery-once")
     def test_dream_defers_and_departure_finalizes_once(self):
         from server import dream_service
         from world.narrative.dream_surface import associated_session
@@ -406,6 +412,7 @@ class CampActionTests(CampFixture):
         self.assertEqual(replay, meta["result"])
         self.assertEqual(get_world_clock().tick, tick + 27000)
 
+    @covers_requirement("wilderness-camping::camp-results-describe-committed-recovery-once")
     def test_recovery_across_process_loss(self):
         from world.rules.camping import _commit_entry, camp_metadata, reconcile_camp
         from world.rules.clock import ScheduledEvent, register_event_source

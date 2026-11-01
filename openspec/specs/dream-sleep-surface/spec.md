@@ -6,7 +6,7 @@ Offers owner-only optional collaboration while one accepted sleep receipt still 
 ## Requirements
 
 ### Requirement: Optional collaboration follows one accepted sleep result
-Optional dream entry SHALL be asked while the authenticated owner still sleeps and no companion is possessed, before recovery completes. Accepted zero-time entry SHALL qualify without claiming completed sleep. Other companions SHALL need no sleeping prerequisite. Rejected sleep SHALL open no dream. Any sleep type SHALL require explicit opt-in; forced sleep SHALL never auto-enter. Confirmation SHALL revalidate owner, control and accepted receipt.
+Optional dream entry SHALL require explicit opt-in while the authenticated owner sleeps without possession. An eligible voluntary sleep-entry `dream: true` SHALL record enter atomically with entry, without a question. Forced sleep SHALL never enter a dream. Rejected entry or failed owner/control/receipt revalidation SHALL write nothing. Ordinary false/absent flags SHALL record no answer; camp false SHALL record decline for a sleeping owner.
 
 #### Scenario: Fully restored entry
 - **WHEN** until-recovered sleep has an already-met target
@@ -25,12 +25,28 @@ Optional dream entry SHALL be asked while the authenticated owner still sleeps a
 - **THEN** only committed progress is retained and resumption never invents or repeats the interval
 
 #### Scenario: Released sleeping owner
-- **WHEN** owner sleep is followed by companion possession and explicit release while the owner remains asleep
+- **WHEN** unanswered owner sleep is followed by companion possession and explicit release while the owner remains asleep
 - **THEN** the question appears for the owner even with awake companions present
 
 #### Scenario: Confirmation rechecks current control
 - **WHEN** the owner wakes, possession changes or the receipt becomes stale before a dream answer arrives
 - **THEN** confirmation rejects without dream or time writes and returns the current authoritative view
+
+#### Scenario: Atomic entry opt-in
+- **WHEN** the authenticated owner is selected for new voluntary sleep, no companion is possessed and true is submitted
+- **THEN** entry and guarded enter commit together, the dream opens without a question, and elapsed time stays zero
+
+#### Scenario: Consent ineligible or stale
+- **WHEN** true is submitted for forced sleep, an excluded owner, companion possession, unauthenticated owner, or receipt/control changes during revalidation
+- **THEN** the entire requested entry rejects without posture, receipt, decision, dream or time writes
+
+#### Scenario: False and absent differ from camp decline
+- **WHEN** equivalent owner sleeps are started with ordinary false, ordinary absent, or camp false
+- **THEN** the ordinary requests record no answer and retain the question policy, while camp records explicit decline and exposes no later question
+
+#### Scenario: No sleeping owner receipt
+- **WHEN** camp recovery leaves an already-recovered owner awake while a companion sleeps
+- **THEN** no owner receipt or answer is fabricated and no owner-sleep question appears
 
 ### Requirement: Dream departure never settles sleep again
 Exchanges and ordinary draft saves SHALL add no time/restoration; draft save SHALL keep the dream open. Explicit confirm/awaken departure, including after draft preservation or generation failure, SHALL continue the same accepted owner sleep using only uncommitted intervals, then reconcile wake. Reconnect/cancel SHALL never open a second sleep or replay settlement. Physical interruptions SHALL remain actionable offline; completion SHALL be durable and idempotent.
@@ -71,11 +87,11 @@ Confirmation SHALL close dream interaction and acknowledge receipt distinct from
 - **THEN** deterministic movement/quests are available under normal gates without another sleep or generation charge
 
 ### Requirement: Dream collaboration consumes the committed elapsed result
-Dream collaboration SHALL associate the authenticated owner's single accepted sleep receipt before recovery finishes and accumulate only actual committed intervals. Control-view transitions SHALL offer entry while the owner sleeps and no companion is possessed. Companion ownership SHALL never substitute for player ownership. Posture entry SHALL remain distinct from elapsed completion.
+Dream collaboration SHALL bind one authenticated owner receipt before recovery and accumulate only committed intervals. Control transitions SHALL offer unanswered sleeping-owner entry without possession. An entry-time answer or camp decline SHALL suppress that receipt's question. Companion ownership SHALL never substitute for owner identity; posture entry SHALL remain distinct from elapsed completion.
 
 #### Scenario: Recovery then dream
 - **WHEN** an accepted owner sleep has zero committed elapsed time and the no-possession view is entered
-- **THEN** the question appears before recovery, with explicit opt-in required and no fictitious positive-elapsed receipt
+- **THEN** an unanswered receipt shows the question before recovery, with explicit opt-in required and no fictitious positive-elapsed receipt
 
 #### Scenario: Companion cannot own player dream
 - **WHEN** a controlled companion sleeps or a forged request names its identity
@@ -86,7 +102,7 @@ Dream collaboration SHALL associate the authenticated owner's single accepted sl
 - **THEN** no dream entry is offered or accepted until possession is released
 
 ### Requirement: Explicit dream answers have browser and text parity
-Text SHALL expose `dream enter` and `dream decline` for the current accepted owner-sleep question, with bare `dream` showing the pending question or associated state. Browser yes/no/close SHALL invoke the same guarded answer operation. Existing say/draft/confirm/awaken SHALL retain offline escape and bounded exchange behavior. Obsolete `sleep dream` SHALL be removed from callers and both command documents.
+Text `sleep [all] <mode> dream` and browser entry-time opt-in SHALL invoke the same guarded answer as `dream enter`. `dream enter`, `dream decline` and bare `dream` SHALL remain available for unanswered sleeps; browser yes/no/close SHALL share those operations. Existing say/draft/confirm/awaken SHALL retain offline escape. The standalone obsolete `sleep dream` form SHALL remain invalid; both command documents SHALL describe the explicit-mode form.
 
 #### Scenario: Explicit answer parity
 - **WHEN** text enter/decline or browser yes/no/close answers an equivalent current question

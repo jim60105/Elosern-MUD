@@ -103,7 +103,7 @@ Define deterministic player commands that advance game time through the world cl
   settled by the advance itself through the clock's practice stage
 
 ### Requirement: sleep computes its own duration from gauge regen, capped at a configured maximum
-Voluntary sleep SHALL select only the named body (default acting body), unless explicit party sleep is chosen. Default/until-recovered mode SHALL target full HP/MP/SP and mental reserve; explicit duration SHALL retain its accepted deadline despite reserve saturation. Existing skip bounds and safety SHALL apply. Entry SHALL commit at zero elapsed time before handoff or continuation, and entry alone SHALL claim no completed sleep.
+Voluntary sleep SHALL select the acting body unless party sleep is explicit, commit entry at zero time, and retain safety/bounds. Recovery SHALL target full gauges/reserve; duration SHALL retain its deadline. Until-dawn SHALL retain a deadline at the next configured dawn, capped by maximum sleep, regardless of early full recovery. Entry SHALL claim no completed sleep.
 
 #### Scenario: Full gauges with low reserve
 - **WHEN** a safe actor has full HP/MP/SP and 180000 reserve units and explicitly continues recovery sleep with no earlier boundary
@@ -132,6 +132,14 @@ Voluntary sleep SHALL select only the named body (default acting body), unless e
 #### Scenario: Exact explicit duration
 - **WHEN** a safe full-reserve body accepts `sleep 2h` and uninterrupted continuation begins
 - **THEN** its planned wake deadline is entry tick plus 7200, and reserve saturation does not shorten it
+
+#### Scenario: Strict next dawn and cap
+- **WHEN** safe until-dawn sleep begins before dawn, exactly at dawn, after dawn or across midnight
+- **THEN** the accepted interval is the strictly future configured dawn interval capped by maximum sleep; a full-reserve body still retains that deadline
+
+#### Scenario: Dawn mode remains interruptible
+- **WHEN** an interaction or safety interruption precedes an until-dawn deadline
+- **THEN** only the safe prefix commits and due events, retained identity and resume behavior match existing sleep continuation
 
 ### Requirement: wait until <daypart> computes seconds to the next occurrence of a named daypart
 `commands/skip.py::CmdWaitUntil` SHALL parse a named daypart (`midnight`, `dawn`, `noon`, `dusk`, from `rulebook/clock.yaml`'s `dayparts` mapping) and compute the seconds from the current `WorldClock.calendar` state to the next future occurrence of that daypart's hour, always strictly positive: a request matching the current hour resolves to the following day's occurrence. That interval SHALL be the request limit; only time to the earliest relevant boundary commits.
@@ -238,7 +246,7 @@ An explicit party-sleep operation SHALL select all present living physiological 
 - **THEN** no new entry survives on any body and persisted/cache state and tick equal their pre-request values
 
 ### Requirement: Sleep transports expose declared duration and recovery modes
-Text SHALL accept `sleep [<duration>|until-recovered]`, `sleep all [<duration>|until-recovered]` and `sleep continue`, with existing localized alias and bounded duration parsing. Browser requests SHALL select the same rules modes. Malformed or ambiguous input SHALL reject before writes. Both command documents SHALL describe syntax and sleeping-view availability.
+Text SHALL accept `sleep [all] [<duration>|until-recovered|until-dawn]`, an optional terminal `dream` after an explicit mode, `sleep continue` and `camp [<duration>|until-recovered|until-dawn] [dream]`, with existing aliases and dawn tokens 睡到天亮 / 天亮. Browser sleep SHALL select the same modes. Malformed input SHALL reject before writes. Camp SHALL use party scope and the shared daypart default. Both command documents SHALL describe syntax and sleeping availability.
 
 #### Scenario: Transport parity
 - **WHEN** text `sleep all 2h` and a browser all-party duration request are separately issued against equivalent states
@@ -247,3 +255,15 @@ Text SHALL accept `sleep [<duration>|until-recovered]`, `sleep all [<duration>|u
 #### Scenario: No implicit replacement
 - **WHEN** `sleep 1h` is issued for a body with an active accepted plan
 - **THEN** it rejects target replacement and offers continuation of that plan without resetting the deadline
+
+#### Scenario: Dawn transport and localized parity
+- **WHEN** equivalent states receive `sleep all until-dawn`, the same syntax with either localized dawn token, or browser party dawn selection
+- **THEN** their per-body accepted deadlines and zero-time entries match
+
+#### Scenario: Camp alias and default
+- **WHEN** `camp` is issued at dusk/night or dawn/day, or with a valid explicit mode and optional dream token
+- **THEN** it invokes the same whole-party camp operation as the browser, defaults to dawn at dusk/night and recovery otherwise, and keeps explicit mode/dream intent
+
+#### Scenario: Malformed suffix
+- **WHEN** mode tokens conflict, dream repeats, or a duration is malformed
+- **THEN** input rejects before safety checks, sleep writes or clock advancement
