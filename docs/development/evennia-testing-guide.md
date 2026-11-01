@@ -28,6 +28,13 @@ message region. The wilderness travel log replaces the paged message
 window; both are valid message-region implementations when tests reconnect
 to a shared runtime.
 
+Action readiness compares a result's publication revision only within its
+presentation epoch. A puppet transition retires the sequence and restarts the
+revision count, so a retired result names no reachable target; that case falls
+back to the quiet-gap settle, adopting the fresh active sequence only after
+three consecutive agreeing polls. A submit landing inside a still-advancing
+burst is refused `stale` before its adapter runs.
+
 ## 先量測測試時間
 
 不要直接從重構測試開始。先確認時間花在哪裡。

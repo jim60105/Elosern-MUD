@@ -207,6 +207,37 @@ def install_result_recorder(page: Page) -> None:
     )
 
 
+#: Consecutive agreeing polls that adopt a fresh sequence after a puppet
+#: transition. A retired epoch's result names no reachable target, so the
+#: quiet-gap rule is the only adoptable signal; three polls at the shared
+#: interval prove the burst landed.
+_SETTLED_POLLS = 3
+
+
+def retired_result(result: dict, state: dict) -> bool:
+    """Whether an action result names an epoch the sequence no longer runs."""
+    result_epoch = result.get("epoch")
+    state_epoch = state.get("epoch")
+    return (
+        result_epoch is not None
+        and state_epoch is not None
+        and result_epoch != state_epoch
+    )
+
+
+def settled_sequence(state: dict, quiet: dict) -> bool:
+    """Whether the live sequence has stopped advancing across the polls.
+
+    ``quiet`` carries the poll count between calls. Any change of the live
+    epoch or revision restarts the count, so a publication still landing keeps
+    the gate closed.
+    """
+    key = (state.get("epoch"), state.get("revision"))
+    quiet["polls"] = quiet.get("polls", 0) + 1 if quiet.get("key") == key else 1
+    quiet["key"] = key
+    return quiet["polls"] >= _SETTLED_POLLS
+
+
 def wait_for_submit_ready(page: Page, timeout: int = 30000) -> None:
     """Wait until a fresh submit can actually be dispatched and admitted.
 
@@ -216,21 +247,35 @@ def wait_for_submit_ready(page: Page, timeout: int = 30000) -> None:
     before any adapter runs. So the previous action's own publication revision
     must already be committed (``presentationRevision``), nothing may be in
     flight, no repair episode may be open, and the transport must be active.
+
+    Revisions are compared only within one epoch: a puppet transition retires
+    the sequence and restarts the revision count, so a retired result names no
+    reachable target and the fresh sequence must settle instead.
     """
+    quiet: dict = {}
 
     def _ready(state: dict) -> bool:
+        # Only a poll that holds every gate counts toward the quiet streak.
         if not state.get("connected") or state.get("mutationsLocked"):
+            quiet.clear()
             return False
         if state.get("phase") != "active":
+            quiet.clear()
             return False
         if (state.get("recovery") or {}).get("status") not in (None, "idle"):
+            quiet.clear()
             return False
         dispatch = state.get("dispatch") or {}
         if dispatch.get("inFlight") is not None or dispatch.get("uncertain"):
+            quiet.clear()
             return False
-        target = (state.get("lastActionResult") or {}).get("presentationRevision")
+        result = state.get("lastActionResult") or {}
+        target = result.get("presentationRevision")
         if target is None:
+            quiet.clear()
             return True
+        if retired_result(result, state):
+            return settled_sequence(state, quiet)
         return int(state.get("revision") or 0) >= int(target)
 
     wait_for_store_state(page, _ready, timeout=timeout)
@@ -1186,21 +1231,36 @@ def wait_for_presentation_adopted(page: Page, timeout: int = 30000) -> None:
     the next submit is only safe once that revision is adopted and nothing is
     in flight. This is stronger than the quiet-gap settle: a slow runner can
     pause a publication burst longer than two polls.
+
+    A puppet transition retires the sequence and restarts the revision count,
+    so a result from that retired epoch names no reachable target. That case
+    falls back to the quiet-gap settle, adopting the fresh sequence only once
+    it stops advancing.
     """
+    quiet: dict = {}
 
     def _adopted(state: dict) -> bool:
+        # Only a poll that holds every gate counts toward the quiet streak.
         dispatch = state.get("dispatch") or {}
         if dispatch.get("inFlight") is not None or dispatch.get("uncertain"):
+            quiet.clear()
             return False
         if not state.get("connected"):
+            quiet.clear()
             return False
         if (state.get("recovery") or {}).get("status") not in (None, "idle"):
+            quiet.clear()
             return False
-        target = (state.get("lastActionResult") or {}).get(
-            "presentationRevision"
-        )
+        if state.get("phase") != "active":
+            quiet.clear()
+            return False
+        result = state.get("lastActionResult") or {}
+        target = result.get("presentationRevision")
         if target is None:
+            quiet.clear()
             return False
+        if retired_result(result, state):
+            return settled_sequence(state, quiet)
         return int(state.get("revision") or 0) >= int(target)
 
     wait_for_store_state(page, _adopted, timeout=timeout)

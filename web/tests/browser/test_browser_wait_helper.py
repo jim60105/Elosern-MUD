@@ -16,7 +16,13 @@ import unittest
 from playwright.sync_api import Error
 from tools.spec_traceability import covers_requirement
 
-from .browser_helpers import submit_until_admitted, wait_for_store_state
+from .browser_helpers import (
+    _SETTLED_POLLS,
+    submit_until_admitted,
+    wait_for_presentation_adopted,
+    wait_for_store_state,
+    wait_for_submit_ready,
+)
 
 _REQUIREMENT_ID = "webclient-browser-verification::browser-test-waits-gate-on-deterministic-state-within-a-bounded-deadline"
 
@@ -143,6 +149,69 @@ class WaitForStoreStateTest(unittest.TestCase):
         page.store_queue = [None, self._shell_ready_state()]
         wait_for_store_state(page, counting_predicate, timeout=300)
         self.assertEqual(calls["n"], 1)
+
+    def test_action_gates_wait_for_same_epoch_publication(self) -> None:
+        for gate in (wait_for_submit_ready, wait_for_presentation_adopted):
+            with self.subTest(gate=gate.__name__):
+                state = {
+                    **self._shell_ready_state(),
+                    "epoch": "current",
+                    "revision": 6,
+                    "lastActionResult": {"epoch": "current", "presentationRevision": 9},
+                }
+                page = _FakePage()
+                page.store_queue = [state, {**state, "revision": 9}]
+                gate(page, timeout=300)
+                self.assertEqual(page._store_index, 2)
+
+    @covers_requirement(
+        "webclient-browser-verification::browser-test-waits-gate-on-deterministic-state-within-a-bounded-deadline"
+    )
+    def test_action_gates_adopt_a_fresh_epoch_once_it_settles(self) -> None:
+        for gate in (wait_for_submit_ready, wait_for_presentation_adopted):
+            with self.subTest(gate=gate.__name__):
+                state = {
+                    **self._shell_ready_state(),
+                    "epoch": "new",
+                    "revision": 1,
+                    "lastActionResult": {"epoch": "retired", "presentationRevision": 9},
+                }
+                page = _FakePage()
+                page.store_queue = [
+                    {**state, "phase": "detached", "epoch": "retired"},
+                    state,
+                    {**state},
+                    {**state},
+                ]
+                gate(page, timeout=1000)
+                # The detached state never qualifies, and the fresh epoch is
+                # adopted only after the shared quiet polls agree on it.
+                self.assertEqual(page._store_index, 1 + _SETTLED_POLLS)
+
+    @covers_requirement(
+        "webclient-browser-verification::browser-test-waits-gate-on-deterministic-state-within-a-bounded-deadline"
+    )
+    def test_action_gates_hold_while_a_fresh_epoch_still_advances(self) -> None:
+        for gate in (wait_for_submit_ready, wait_for_presentation_adopted):
+            with self.subTest(gate=gate.__name__):
+                state = {
+                    **self._shell_ready_state(),
+                    "epoch": "new",
+                    "revision": 1,
+                    "lastActionResult": {"epoch": "retired", "presentationRevision": 9},
+                }
+                page = _FakePage()
+                page.store_queue = [
+                    {**state, "revision": 1},
+                    {**state, "revision": 2},
+                    {**state, "revision": 3},
+                    {**state, "revision": 3},
+                    {**state, "revision": 3},
+                ]
+                gate(page, timeout=1000)
+                # A publication still landing restarts the count, so the fresh
+                # epoch is never adopted mid-burst.
+                self.assertEqual(page._store_index, 2 + _SETTLED_POLLS)
 
     def test_both_gates_must_hold(self) -> None:
         page = _FakePage()
