@@ -251,6 +251,10 @@ export const useElosernStore = defineStore("elosern", () => {
     holdTravel: ctx.holdTravel,
     releaseTravel: ctx.releaseTravel,
     stopTravel: ctx.stopTravel,
+    // The route walk and the landmark arrival card (wilderness-travel-
+    // route-ui): depart on the locked current plan; close an arrival once.
+    departTravel: ctx.departTravel,
+    dismissTravelArrival: ctx.dismissTravelArrival,
     // The route preview (wilderness-travel-planning-ui): the hovered cell's
     // debounced query, a locked destination and Esc's clear.
     hoverTravelCell: ctx.hoverTravelCell,

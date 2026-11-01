@@ -236,9 +236,8 @@ describe("the leg follows the supplied plan", () => {
     expect(routeSummary(EMPTY)).toBe("");
   });
 
-  it("a locked plan waits for route-ui's route walk before 出發", () => {
-    expect(legView({ plan: FULL, locked: true, capacity: CAPACITY, routeReady: false }).actions.primary).toMatchObject({ enabled: false, code: "route_pending" });
-    expect(legView({ plan: FULL, locked: true, capacity: CAPACITY, routeReady: true }).actions.primary).toMatchObject({ enabled: true, code: null });
+  it("a locked current plan offers 出發", () => {
+    expect(legView({ plan: FULL, locked: true, capacity: CAPACITY }).actions.primary).toMatchObject({ enabled: true, code: null });
   });
 
   it("the intent follows the cursor, the error and the pending query", () => {

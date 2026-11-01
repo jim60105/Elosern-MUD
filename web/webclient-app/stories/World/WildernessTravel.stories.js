@@ -6,16 +6,17 @@ import StatusPanel from "../../components/StatusPanel.vue";
 import TravelMap from "../../components/travel/TravelMap.vue";
 import PartyMedallions from "../../components/travel/PartyMedallions.vue";
 import LegPanel from "../../components/travel/LegPanel.vue";
+import LandmarkCard from "../../components/travel/LandmarkCard.vue";
 import { legView } from "../../components/travel/leg-model.js";
 import TravelLog from "../../components/travel/TravelLog.vue";
-import { travelJourney, travelLogPanel } from "../fixtures/travel_log.js";
+import { travelEntry, travelJourney, travelLogPanel } from "../fixtures/travel_log.js";
 import { useElosernStore } from "../../stores/elosern.js";
 import * as fx from "../../tests/store/protocol_fixtures.js";
-import { walkArea, walkCapacity, walkPanels } from "../fixtures/travel_walk.js";
+import { walkArea, walkCapacity, walkNode, walkPanels } from "../fixtures/travel_walk.js";
 import { medallionMembers, travelPlace } from "../../components/travel/travel-model.js";
 import { companionFigures } from "../../components/companion-lineup.js";
 import { portraitFor } from "../../components/party-helpers.js";
-import { artworkDescriptor, artworkEntry, artworkResource, fixtureDigest } from "../fixtures/art_panels.js";
+import { artworkDescriptor, artworkEntry, artworkResource, fixtureDigest, sceneBundledResource, sceneDescriptor } from "../fixtures/art_panels.js";
 import { wildernessArea } from "../fixtures/area_map.js";
 import { DUSK_GRID, MORNING_AREA, MORNING_GRID, NIGHT_GRID, WOODLAND_GRID } from "../fixtures/travel_grid.js";
 import { decodeTravelGrid } from "../../lib/travel-grid.js";
@@ -37,7 +38,10 @@ import { STATUS_PANEL_SAMPLE } from "../fixtures/status_panels.js";
 // preview stories (wilderness-travel-planning-ui) drive the real store: a
 // destination locked (or hovered) through its own actions, the window adopted
 // through `setTravelMap`, and the `travel.plan` answer delivered through the
-// real result validator.
+// real result validator. The route walk and the landmark arrival
+// (wilderness-travel-route-ui) drive the same store: a departure through
+// `departTravel`, and a typed `landmark_reached` notice adopted through the
+// real travel_log validator into the card in the choices anchor.
 
 // The committed portrait catalog: the bundled default figures as each
 // member's own descriptor (no URL is built by the components).
@@ -446,7 +450,7 @@ function planningStage(args) {
       store.receive(store.view.generation, "ui_snapshot", [fx.snapshot({ panels })], {});
       store.setTravelMap({ status: "ready", area: MORNING_AREA });
       onMounted(() => {
-        const { lock, hover, answer } = args.route;
+        const { lock, hover, answer, depart } = args.route;
         if (lock) store.lockTravelDestination(lock);
         if (hover) store.hoverTravelCell(hover);
         const request = () => sender.sent.actions.filter((a) => a.action_id === "travel.plan").at(-1);
@@ -462,14 +466,18 @@ function planningStage(args) {
         // A hovered cell is asked for after its debounce.
         if (hover) setTimeout(reply, 200);
         else reply();
+        // The route walk departs on the answered lock through the store.
+        if (depart) store.departTravel();
       });
       onBeforeUnmount(() => {
+        store.stopTravel("story");
         store.clearTravelTarget();
         disposePinia(pinia);
       });
       const render = () => {
         const travel = store.view.travel;
-        const plan = travel.plan ? { ...travel.plan, label: travel.planTarget?.label ?? null } : null;
+        const shown = travel.departedPlan ?? travel.plan;
+        const plan = shown ? { ...shown, label: travel.planTarget?.label ?? null } : null;
         return h(
           "div",
           { style: "position:relative;height:calc(100vh - var(--header-h));" },
@@ -480,7 +488,8 @@ function planningStage(args) {
                 status: travel.mapStatus,
                 aim: travel.aim,
                 walking: travel.walking,
-                plan: travel.plan,
+                plan: shown,
+                routeProgress: travel.walking?.kind === "route" ? travel.walking.progress : 0,
                 locked: !!travel.lockedDestination,
                 target: travel.planTarget,
                 motionLevel: args.motionLevel,
@@ -500,7 +509,9 @@ function planningStage(args) {
                   pending: travel.planPending,
                   planError: travel.planError,
                   target: travel.planTarget,
-                  routeReady: false,
+                  walking: travel.walking,
+                  holding: travel.holding,
+                  progress: travel.walking?.progress ?? 0,
                   capacity: travel.capacity,
                   preferences: travel.preferences,
                   phase: args.phase ?? null,
@@ -523,7 +534,7 @@ const ROUTE_ARGS = { ...MORNING, aim: null, time: "春 3 日 ‧ 09:40・白晝"
 // Route Preview: the stone marker locked; the server's plan draws one stage
 // mark per step, the camp at the pace stop, the moon on the nightfall step
 // beyond it and the faint planned steps past the camp, and the camera frames
-// the whole leg. 出發 waits for the route walk.
+// the whole leg. 出發 departs on it.
 export const RoutePreview = {
   name: "Route Preview",
   args: { ...ROUTE_ARGS, route: { lock: MARKER, answer: { plan: ROUTE_PLAN } } },
@@ -560,4 +571,106 @@ export const RouteTerminalSleep = {
   name: "Route Terminal Sleep",
   args: { ...ROUTE_ARGS, fatigue: FATIGUE.weary, vitalsVisible: true, route: { lock: { x: 105, y: 204 }, answer: { plan: SLEEP_PLAN } } },
   render: planningStage,
+};
+
+// ── route walking and the landmark arrival (wilderness-travel-route-ui) ──
+
+// The morning party has departed on the locked road east: the first step
+// waits for its commit, the camera follows the party, 停步 is live and the
+// leg counts the walked steps of the departed plan.
+export const RouteWalking = {
+  name: "Route Walking",
+  args: { ...ROUTE_ARGS, route: { lock: MARKER, answer: { plan: ROUTE_PLAN }, depart: true } },
+  render: planningStage,
+};
+
+// The reached room's scene descriptor, as `landmark_reached` carries it.
+const LANDMARK_ART = sceneDescriptor({
+  subject_id: "wilderness:合成荒原:100,200",
+  attempts: [
+    {
+      type: "image",
+      source_id: "scene.bundled:mountain_path",
+      rank: 40,
+      resource: sceneBundledResource("mountain_path", { url: "/art/scenes/mountain_path.webp" }),
+    },
+  ],
+  retention_sources: [],
+});
+
+function landmarkStage(args) {
+  return {
+    setup() {
+      const pinia = createPinia();
+      const store = useElosernStore(pinia);
+      const sender = fx.createFakeSender();
+      store.setSender(sender);
+      store.beginTransport(1);
+      store.setConnected(true);
+      const { x, y } = MORNING_GRID.party;
+      const panels = walkPanels(x, y, { capacity: args.capacity });
+      store.receive(store.view.generation, "ui_snapshot", [fx.snapshot({ panels })], {});
+      store.setTravelMap({ status: "ready", area: walkArea(x, y) });
+      // The step's committed notices: the arrival bound to the reached node.
+      const arrival = travelEntry(
+        "landmark_reached",
+        {
+          arrival_node: walkNode(x, y),
+          name: "合成古哨塔",
+          lit_district: args.lit ? "合成東麓" : null,
+          prose: "石階被風磨得發亮，塔頂的缺口望得見整片東麓的草原。守塔人留下的火盆早已冷卻，只剩幾道焦黑的痕跡。",
+          artwork: args.art ? LANDMARK_ART : null,
+        },
+        { day: 3, time: "09:40", text: "抵達合成古哨塔。" },
+      );
+      const v = store.view;
+      store.receive(v.generation, "ui_update", [fx.update({ revision: v.revision + 1, panels: { travel_log: travelLogPanel([...JOURNEY.slice(0, 3), arrival]), status: panels.status } })], {});
+      onBeforeUnmount(() => disposePinia(pinia));
+      const render = () => {
+        const travel = store.view.travel;
+        return h(
+          "div",
+          { style: "position:relative;height:calc(100vh - var(--header-h));" },
+          h(HudFrame, { mode: "exploration", travel: true, cardOpen: !!travel.arrival }, {
+            backdrop: () => h(TravelMap, { grid: args.grid, status: args.status, motionLevel: args.motionLevel }),
+            vitals: () => [
+              h(StatusPanel, { status: { ...STATUS_PANEL_SAMPLE, fatigue: args.fatigue }, visible: args.vitalsVisible, motionLevel: args.motionLevel, showFatigue: false }),
+              h(PartyMedallions, { members: members(args.fatigue) }),
+            ],
+            map: () => h(PlaceCard, { locationLabel: args.place, timeLabel: args.time, motionLevel: args.motionLevel }),
+            "band-message": () => h(TravelLog, { entries: travel.entries }),
+            "band-command": () => commandPane(h(LegPanel, { view: staticLeg({ ...args, aim: null }), motionLevel: args.motionLevel })),
+            choices: () =>
+              travel.arrival
+                ? h(LandmarkCard, {
+                    key: travel.arrival.id,
+                    arrival: travel.arrival,
+                    artPanel: ART,
+                    entrance: args.motionLevel !== "off",
+                    onContinue: () => store.dismissTravelArrival(travel.arrival.id),
+                  })
+                : null,
+          }),
+        );
+      };
+      return withMotion(args.motionLevel, render).setup();
+    },
+  };
+}
+
+// Landmark Arrival: the party stands on the stone marker; the card shows the
+// reached room's scene in its 16:6 frame, the name, the district this
+// arrival lit and the prose, with focus on 繼續.
+export const LandmarkArrival = {
+  name: "Landmark Arrival",
+  args: { ...MORNING, aim: null, art: true, lit: true, time: "春 3 日 ‧ 09:40・白晝" },
+  render: landmarkStage,
+};
+
+// An arrival without a scene descriptor and on an already-lit district: a
+// quiet ink frame stands in for the picture, and no district line shows.
+export const LandmarkArrivalPlain = {
+  name: "Landmark Arrival Plain",
+  args: { ...MORNING, aim: null, art: false, lit: false, time: "春 3 日 ‧ 09:40・白晝" },
+  render: landmarkStage,
 };

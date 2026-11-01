@@ -686,6 +686,9 @@ def record_room_look(actor: Any, appearance: Any) -> TravelLogFact | None:
         return None
 
 
+_UNREAD = object()
+
+
 def record_position_change(
     actor: Any,
     before: TravelCapture | None,
@@ -693,18 +696,21 @@ def record_position_change(
     *,
     knowledge_owner: Any = None,
     members: Iterable[Any] | None = None,
+    after: Any = _UNREAD,
 ) -> TravelLogFact | None:
     """Capture the committed after-position and record its notices.
 
     Used by the movement and explicit-skip owners only after their operation
     settled. Nothing is recorded off the wilderness, and every failure is
-    reported instead of raised.
+    reported instead of raised. ``after`` is the reached position's capture
+    an observation owner already took (``None``: that read failed and
+    reported itself, so nothing is recorded); omitted, it is read here.
     """
     try:
         # A savepoint: a failed read or record rolls back only itself (and the
         # delivery it registered), never the owner's enclosing transaction.
         with transaction.atomic():
-            return _record_position_change(actor, before, cause, knowledge_owner, members)
+            return _record_position_change(actor, before, cause, knowledge_owner, members, after)
     except Exception as error:  # observability: R2 reported here; a notice never fails a committed operation
         log_warn(
             "travel_events_record_failed",
@@ -714,14 +720,15 @@ def record_position_change(
         return None
 
 
-def _record_position_change(actor, before, cause, knowledge_owner, members):
+def _record_position_change(actor, before, cause, knowledge_owner, members, after=_UNREAD):
     location = getattr(actor, "location", None)
     cell = _wilderness_cell(location)
     if cell is None:
         return None
-    after = capture_travel_facts(
-        actor, location=location, knowledge_owner=knowledge_owner, members=members
-    )
+    if after is _UNREAD:
+        after = capture_travel_facts(
+            actor, location=location, knowledge_owner=knowledge_owner, members=members
+        )
     if after is None:
         return None
     prose = artwork = node = None

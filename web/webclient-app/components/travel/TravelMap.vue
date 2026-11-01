@@ -109,6 +109,10 @@ const props = defineProps({
   // The current travel.plan result exactly as the server sent it
   // ({origin, destination, steps: [{cell, seconds, fatigue_stage}], ...}).
   plan: { type: Object, default: null },
+  // During a route walk (wilderness-travel-route-ui) the committed steps
+  // already walked: their marks leave the map and the thread starts at the
+  // party, while the steps beyond the stop stay as the planned future.
+  routeProgress: { type: Number, default: 0 },
   locked: { type: Boolean, default: false },
   // The previewed or locked destination (`view.travel.planTarget`:
   // {x, y, label, locked}), or null.
@@ -506,7 +510,9 @@ const routeSteps = computed(() => {
   if (!props.grid || !plan || !Array.isArray(plan.steps) || plan.steps.length === 0) return [];
   const stop = Number.isInteger(plan.stop_index) ? plan.stop_index : null;
   const night = Number.isInteger(plan.nightfall_index) ? plan.nightfall_index : null;
-  return plan.steps.map((step, index) => {
+  const walked = Math.max(0, props.routeProgress | 0);
+  return plan.steps.flatMap((step, index) => {
+    if (index < walked) return [];
     const display = stageDisplay(step.fatigue_stage) ?? { bucket: "normal", sleep: false };
     return {
       index,
@@ -524,7 +530,7 @@ const routeMarks = computed(() => {
   const plan = props.plan;
   const steps = routeSteps.value;
   if (!steps.length) return { moon: null, camp: null };
-  const at = (i) => (Number.isInteger(i) && steps[i] ? steps[i] : null);
+  const at = (i) => (Number.isInteger(i) ? steps.find((s) => s.index === i) ?? null : null);
   return {
     moon: at(plan.nightfall_index),
     camp: plan.stop_reason !== "destination_reached" ? at(plan.stop_index) : null,

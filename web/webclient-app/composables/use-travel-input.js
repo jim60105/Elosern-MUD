@@ -12,20 +12,24 @@
 //   included). Hovering a disclosed cell further away previews its route
 //   (the store debounces it); clicking one locks it. The party's own cell
 //   and unknown cells do nothing beyond the hover outline; a second click on
-//   the locked cell is route-ui's departure and does nothing here.
+//   the locked cell departs on its current plan (wilderness-travel-route-ui).
 // - Destination cursor (wilderness-travel-planning-ui): Shift+arrows move a
 //   visible cursor one cell inside the current window, clear the neighbour
 //   aim and preview a disclosed far cell like a hover. Enter with an aim
 //   still steps; otherwise Enter on the cursor locks a disclosed non-party
 //   cell (a neighbour too) and leaves cursor mode, while an unknown or party
-//   cell is only inspected. Esc clears, in order: a walk or the aim, the
+//   cell is only inspected. Enter with neither an aim nor a cursor departs
+//   on the locked current plan, exactly as 出發 does. Esc clears, in order: a walk or the aim, the
 //   cursor, then the lock and preview.
 // - One document keydown listener in the CAPTURE phase stops an active walk
 //   before any other handler runs. The held arrows' native repeat is the
 //   walk's continuation, not a new key. The stopping event is recorded, so
 //   the map's own intent for that same event neither aims nor steps; the
 //   listener never cancels or stops the event, so existing hotkeys and the
-//   keyboard bridge still see it.
+//   keyboard bridge still see it. A key that stopped a walk can never also
+//   depart: the stopping key stays suppressed for departure until it is
+//   released (Enter clicks a focused 出發 on keydown, Space on keyup), and a
+//   native repeat of the key that departed is the same press, not a stop.
 // - A window blur, a hidden document and the full log stop the walk too.
 // - When a walk ends, focus returns to the map unless another surface
 //   (a drawer, an overlay, a card, the full log, a text entry) holds it.
@@ -47,13 +51,42 @@ export function useTravelInput(store, { mapRef, fullLogOpen = () => false }) {
   const stopping = new WeakSet();
   // The keyboard destination cursor: a window cell, or null outside cursor mode.
   const cursor = ref(null);
+  // The physical Enter/Space keys that stopped a walk and are still held:
+  // only these can both stop and depart in one press (Enter clicks a focused
+  // 出發 on keydown, Space on keyup), so only they are tracked, by `code`
+  // (its `key` can change between keydown and keyup). A pointer press or
+  // any other key forgets them, so a lost keyup never blocks departure.
+  const ACTIVATION_KEYS = new Set(["Enter", " "]);
+  const stopKeys = new Set();
 
   function onCapture(event) {
+    if (!ACTIVATION_KEYS.has(event.key) && !MODIFIER_KEYS.has(event.key)) stopKeys.clear();
     if (!walking.value) return;
     if (MODIFIER_KEYS.has(event.key) || event.isComposing || event.keyCode === 229) return;
-    if (event.repeat && ARROW_KEYS.includes(event.key)) return;
+    if (event.repeat && (ARROW_KEYS.includes(event.key) || ACTIVATION_KEYS.has(event.key))) return;
     stopping.add(event);
-    store.stopTravel("key");
+    if (store.stopTravel("key") && ACTIVATION_KEYS.has(event.key)) stopKeys.add(event.code || event.key);
+  }
+
+  function onKeyUp(event) {
+    const id = event.code || event.key;
+    if (!stopKeys.has(id)) return;
+    // Space activates a focused button on keyup, after this listener: the
+    // key is released for departure only once that activation has passed.
+    setTimeout(() => stopKeys.delete(id), 0);
+  }
+
+  function onPointerDown() {
+    stopKeys.clear();
+  }
+
+  /** Depart on the locked current plan (出發, Enter, a second locked click). */
+  function depart() {
+    if (stopKeys.size > 0 || active.value) return false;
+    // A hovered neighbour leaves a persistent aim; the explicit departure
+    // supersedes it (Enter with an aim still steps instead).
+    if (travel.value?.aim) store.aimTravel(null);
+    return store.departTravel?.()?.departed === true;
   }
 
   function swallowed(event) {
@@ -76,6 +109,10 @@ export function useTravelInput(store, { mapRef, fullLogOpen = () => false }) {
     // An ordinary aim keeps its single step.
     if (!travel.value?.aim && cursor.value) {
       if (store.lockTravelDestination(cursor.value)) cursor.value = null;
+      return;
+    }
+    if (!travel.value?.aim && travel.value?.lockedDestination) {
+      if (!event?.repeat) depart();
       return;
     }
     store.stepTravel();
@@ -163,8 +200,12 @@ export function useTravelInput(store, { mapRef, fullLogOpen = () => false }) {
       store.stepTravel(direction);
       return;
     }
-    // A second click on the locked cell is the departure route-ui installs.
-    if (!cell || sameCell(cell, travel.value?.lockedDestination)) return;
+    if (!cell) return;
+    // A second click on the locked cell departs.
+    if (sameCell(cell, travel.value?.lockedDestination)) {
+      depart();
+      return;
+    }
     store.lockTravelDestination(cell);
   }
 
@@ -182,7 +223,13 @@ export function useTravelInput(store, { mapRef, fullLogOpen = () => false }) {
     store.stopTravel("stop");
   }
 
+  function onDepart() {
+    depart();
+  }
+
   function onWindowBlur() {
+    // A key released outside the window never reports its keyup.
+    stopKeys.clear();
     if (active.value) store.stopTravel("blur");
   }
   function onVisibility() {
@@ -236,11 +283,15 @@ export function useTravelInput(store, { mapRef, fullLogOpen = () => false }) {
 
   onMounted(() => {
     document.addEventListener("keydown", onCapture, true);
+    document.addEventListener("keyup", onKeyUp, true);
+    document.addEventListener("pointerdown", onPointerDown, true);
     window.addEventListener("blur", onWindowBlur);
     document.addEventListener("visibilitychange", onVisibility);
   });
   onBeforeUnmount(() => {
     document.removeEventListener("keydown", onCapture, true);
+    document.removeEventListener("keyup", onKeyUp, true);
+    document.removeEventListener("pointerdown", onPointerDown, true);
     window.removeEventListener("blur", onWindowBlur);
     document.removeEventListener("visibilitychange", onVisibility);
   });
@@ -254,6 +305,7 @@ export function useTravelInput(store, { mapRef, fullLogOpen = () => false }) {
     onTravelHover: onHover,
     onTravelPick: onPick,
     onTravelStop: onStop,
+    onTravelDepart: onDepart,
     onTravelCursor: onCursor,
     travelCursor: cursorView,
   };
