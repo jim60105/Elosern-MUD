@@ -109,6 +109,21 @@ onMounted(() => {
   trap.enter();
 });
 
+// A phase change that removes the focused control (a refusal replacing the
+// tiles) keeps focus inside the card, on its always-present 取消.
+watch(
+  () => props.camp.phase,
+  () => {
+    if (typeof document === "undefined") return;
+    Promise.resolve().then(() => {
+      if (root.value && !root.value.contains(document.activeElement)) {
+        root.value.querySelector('[data-testid="camp-card-cancel"]')?.focus({ preventScroll: true });
+      }
+    });
+  },
+  { flush: "post" },
+);
+
 // Focus follows the server preview's arrival onto the selected tile, and a
 // keyboard selection keeps focus on the tile it moved to.
 watch(
