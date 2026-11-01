@@ -14,7 +14,7 @@ import math
 import unittest
 from collections import deque
 
-from elosern_map_core.terrain import rasterize_routes, ridge_center_x, ridge_span
+from elosern_map_core.terrain import rasterize_routes, ridge_center_x, ridge_span, ridge_spans
 
 from world.lore.wilderness_regions import (
     mainland_boundary_km,
@@ -101,19 +101,24 @@ class AuthoredTerrainContractTests(unittest.TestCase):
                 )
 
     @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
-    def test_principal_pass_is_open_mountain_trail_and_ridge_blocks_elsewhere(self):
-        from world.rules.travel_cost import WILDERNESS_TERRAIN, terrain_speed_m_per_hour
-
-        # The principal pass near (1410, 980) is open ground in the mountain
-        # region, costed as mountain trail: an explicit slower crossing, never
-        # an all-road shortcut.
-        self.assertIn(980, range(*terrain().ridge_passes[1]))
-        self.assertFalse(is_closed_ridge_cell((1410, 980)))
-        self.assertEqual(region_for_coordinates(1410, 980), "central_mountains")
-        mountain = terrain_speed_m_per_hour(WILDERNESS_TERRAIN["central_mountains"])
-        self.assertLess(mountain, terrain_speed_m_per_hour("road"))
-        # Away from an authored pass the summit ridge is a closed cliff wall.
+    def test_the_physical_ridge_is_a_pass_free_forked_barrier(self):
+        # The shipped zero-pass range: no authored pass exists, and no active
+        # row admits a fully walkable X1300..1520 band.
+        self.assertEqual(terrain().ridge_passes, ())
+        for y in range(wilderness_provider.WILDERNESS_MAX_Y + 1):
+            if not ridge_spans(terrain(), y):
+                continue
+            self.assertTrue(
+                any(low <= 1520 and high >= 1300 for low, high in ridge_spans(terrain(), y)), y
+            )
+        # The stem's crotch and both arm tips are closed cliff walls.
+        crotch = terrain().ridge_stem[-1]
+        self.assertTrue(is_closed_ridge_cell(crotch))
         self.assertTrue(is_closed_ridge_cell((ridge_center_x(terrain(), 1200), 1200)))
+        for crest in ("west", "east"):
+            tip = terrain().ridge_branches[crest][-1]
+            self.assertTrue(is_closed_ridge_cell(tip), crest)
+            self.assertFalse(is_closed_ridge_cell((tip[0], tip[1] + 1)), crest)
 
     @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
     def test_rivers_are_authored_water_with_declared_fords(self):
@@ -224,8 +229,9 @@ class _RunComponents:
         self.parent: list[int] = []
         previous: list[int] = []
         for y in range(wilderness_provider.WILDERNESS_MAX_Y + 1):
-            low, high = ridge_span(terrain(), y)
-            row_candidates = set(candidates.get(y, ())) | set(range(low, high + 1))
+            row_candidates = set(candidates.get(y, ()))
+            for low, high in ridge_spans(terrain(), y):
+                row_candidates.update(range(low, high + 1))
             row_candidates |= {x for x, row in extra_blocked if row == y}
             current: list[int] = []
             for west, east in _mainland_row_intervals(y):
@@ -539,24 +545,28 @@ class ForestEdgeAndClaimContractTests(unittest.TestCase):
         self.assertEqual(nominal_nation_for_coordinates(*ciaran), "altoria")
         self.assertEqual(nominal_nation_for_coordinates(*fionnen), "grandia")
         eolas = anchor_geography()["village_eolas"].cell
-        self.assertEqual(nominal_nation_for_coordinates(*eolas), "grandia")
+        self.assertEqual(region_for_coordinates(*eolas), "north_deep_forest")
+        # Nominal classification is total (one authored nation) but the hidden
+        # valley keeps no administrative nation of its own.
+        self.assertIn(
+            nominal_nation_for_coordinates(*eolas), ("altoria", "grandia", "valhalla")
+        )
         self.assertIsNone(anchors()["village_eolas"].nation_key)
 
     @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
-    def test_ridge_northern_limit_passes_and_forest_speed_are_unchanged(self):
+    def test_forest_around_the_inland_tips_stays_walkable(self):
         from world.rules.travel_cost import WILDERNESS_TERRAIN
 
-        passes = terrain().ridge_passes
-        self.assertTrue(passes)
-        for low, high in passes:
-            self.assertLessEqual(low, high)
-        self.assertTrue(any(low <= 980 <= high for low, high in passes))
-        # The ridge closes inside the forest up to its authored northern limit
-        # and stops there.
-        limit = terrain().ridge_north_limit
-        self.assertTrue(is_closed_ridge_cell((ridge_center_x(terrain(), limit - 1), limit - 1)))
-        self.assertFalse(is_closed_ridge_cell((ridge_center_x(terrain(), limit), limit)))
-        self.assertEqual(region_for_coordinates(ridge_center_x(terrain(), 2100), 2100), "north_deep_forest")
+        # The stem ends at its crotch; the arms end inland and the very next
+        # row north of each tip is walkable deep forest (the intended detour).
+        crotch_y = terrain().ridge_stem[-1][1]
+        self.assertIsNone(ridge_span(terrain(), crotch_y + 1))
+        for crest in ("west", "east"):
+            tip = terrain().ridge_branches[crest][-1]
+            north = (tip[0], tip[1] + 1)
+            self.assertFalse(is_closed_ridge_cell(north), crest)
+            self.assertTrue(is_valid_wilderness_cell(north), crest)
+            self.assertEqual(region_for_coordinates(*north), "north_deep_forest", crest)
         self.assertEqual(WILDERNESS_TERRAIN["north_deep_forest"], "woodland")
         # Forest cells off the ridge stay walkable (no new movement block).
         self.assertTrue(is_valid_wilderness_cell((900, 2350)))

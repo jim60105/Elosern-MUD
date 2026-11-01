@@ -17,6 +17,7 @@ import {
   passRef,
   pointRef,
   regionRef,
+  ridgeRouteRef,
   siteRef,
   waterwayRef,
 } from "./continent.js";
@@ -204,7 +205,12 @@ function continentEntries(world, catalog) {
     points(waterwayRef(waterway.id), waterway.id, "water");
     points(fordFeatureRef(waterway.id), waterway.id, "ridge");
   }
-  add(RIDGE, "ridge", "中央山脊", "ridge", "山脊參數：1 km 格（欄／列索引與格數）");
+  add(RIDGE, "ridge", "中央山脊", "ridge", "山脊路線與隘口：1 km 格");
+  for (const route of ["stem", "west", "east"]) {
+    if (!continent.ridge_routes?.[route]) continue;
+    add(ridgeRouteRef(route), "ridge_route", `中央山脊 ${route}`, "ridge", "山脊路線控制點：1 km 格");
+    points(ridgeRouteRef(route), `中央山脊 ${route}`, "ridge");
+  }
   for (const pass of continent.terrain_preview?.passes ?? []) {
     add(passRef(pass.index), "pass", `隘口 ${pass.index + 1}`, "ridge", `列 ${pass.y_min}–${pass.y_max}（1 km 格）`);
   }

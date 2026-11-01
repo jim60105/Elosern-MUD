@@ -227,12 +227,8 @@ class TerrainDeclaration:
     cell_size_km: int
     mainland_boundary_km: tuple[tuple[int, int], ...]
     forest_edge: tuple[Cell, ...]
-    ridge_base_x: int
-    ridge_period: int
-    ridge_step: int
-    ridge_min_x: int
-    ridge_max_x: int
-    ridge_north_limit_y: int
+    ridge_stem: tuple[Cell, ...]
+    ridge_branches: Mapping[str, tuple[Cell, ...]]
     ridge_corridor_half_width: int
     ridge_passes: tuple[tuple[int, int], ...]
     coastal_y_max: int
@@ -430,12 +426,13 @@ class ContinentDocument(AuthoringDocument):
                 for vertex in data["mainland_boundary_km"]
             ),
             forest_edge=tuple(_cell(cell) for cell in terrain_data["forest_edge"]),
-            ridge_base_x=int(ridge["base_x"]),
-            ridge_period=int(ridge["period"]),
-            ridge_step=int(ridge["step"]),
-            ridge_min_x=int(ridge["min_x"]),
-            ridge_max_x=int(ridge["max_x"]),
-            ridge_north_limit_y=int(ridge["north_limit_y"]),
+            ridge_stem=tuple(_cell(cell) for cell in ridge["stem"]),
+            ridge_branches=MappingProxyType(
+                {
+                    name: tuple(_cell(cell) for cell in route)
+                    for name, route in ridge.get("branches", {}).items()
+                }
+            ),
             ridge_corridor_half_width=int(ridge["mountain_corridor_half_width"]),
             ridge_passes=tuple(
                 (int(window["y_min"]), int(window["y_max"]))

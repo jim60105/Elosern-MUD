@@ -73,15 +73,11 @@ ISOLATED_GEOGRAPHY = textwrap.dedent(
             key: value.fords for key, value in document.terrain.waterways.items()
         },
         border_river_key=document.terrain.border_river_key,
-        ridge_base_x=document.terrain.ridge_base_x,
-        ridge_period=document.terrain.ridge_period,
-        ridge_step=document.terrain.ridge_step,
-        ridge_min_x=document.terrain.ridge_min_x,
-        ridge_max_x=document.terrain.ridge_max_x,
-        ridge_north_limit=document.terrain.ridge_north_limit_y,
+        ridge_stem=document.terrain.ridge_stem,
         ridge_passes=document.terrain.ridge_passes,
         coastal_y_max=document.terrain.coastal_y_max,
         mountain_corridor_half_width=document.terrain.ridge_corridor_half_width,
+        ridge_branches=document.terrain.ridge_branches,
         region_flavors={
             key: value.terrain_flavor_zh for key, value in document.regions.items()
         },

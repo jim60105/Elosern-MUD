@@ -528,6 +528,20 @@ def _project(world, layouts: Mapping[str, dict[str, Any]]) -> dict[str, Any]:
                 for region_id, region in sorted(continent.data["regions"].items())
             ],
             "ridge": thaw(continent.data["terrain"]["ridge"]),
+            "ridge_routes": {
+                "stem": [_cell(cell) for cell in terrain.ridge_stem],
+                **{
+                    name: [_cell(cell) for cell in route]
+                    for name, route in terrain.ridge_branches.items()
+                },
+            },
+            "ridge_routes_m": {
+                "stem": [list(cell_center_m(cell)) for cell in terrain.ridge_stem],
+                **{
+                    name: [list(cell_center_m(cell)) for cell in route]
+                    for name, route in terrain.ridge_branches.items()
+                },
+            },
             "coastal_y_max": continent.data["terrain"]["coastal_y_max"],
             "border_river_key": continent.data["terrain"]["border_river_key"],
             "terrain_preview": _terrain_preview(continent),

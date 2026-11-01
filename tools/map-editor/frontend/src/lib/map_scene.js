@@ -22,6 +22,7 @@ import {
   passRef,
   pointRef,
   regionRef,
+  ridgeRouteRef,
   siteRef,
   waterwayRef,
 } from "./continent.js";
@@ -76,6 +77,17 @@ export function continentScene(world, selection = [], partition = null) {
       ),
     ),
     feature("forest-edge", FOREST, "forest", "polyline", continent.forest_edge_m.map(point), "北部林線", "terrain"),
+    ...Object.entries(continent.ridge_routes_m ?? {}).map(([route, routeM]) =>
+      feature(
+        `ridge-route:${route}`,
+        ridgeRouteRef(route),
+        "ridge-route",
+        "polyline",
+        routeM.map(([x, y]) => ({ x, y })),
+        `中央山脊 ${route}`,
+        "ridge",
+      ),
+    ),
     ...(preview?.ridge_walls ?? []).map((wall, index) => ({
       id: `ridge-wall:${index}`,
       ref: RIDGE,
@@ -158,7 +170,7 @@ export function continentScene(world, selection = [], partition = null) {
       ...centre(pass.centre),
     })),
   ];
-  const featureLayers = { mainland: "terrain", forest_edge: "terrain", waterway: "water" };
+  const featureLayers = { mainland: "terrain", forest_edge: "terrain", waterway: "water", ridge_route: "ridge" };
   for (const featureRef of active) {
     const parsed = parseContinentRef(featureRef);
     if (parsed.kind === "ford") continue; // fords are their own point marks
@@ -179,6 +191,7 @@ export function continentScene(world, selection = [], partition = null) {
     { id: FOREST, label: "北部林線", layer: "terrain" },
     ...continent.waterways.map((waterway) => ({ id: waterwayRef(waterway.id), label: `水系 ${waterway.id}`, layer: "water" })),
     { id: RIDGE, label: "中央山脊", layer: "ridge" },
+    ...Object.keys(continent.ridge_routes ?? {}).map((route) => ({ id: ridgeRouteRef(route), label: `中央山脊 ${route}`, layer: "ridge" })),
     ...(continent.regions ?? []).map((region) => ({ id: regionRef(region.id), label: `地形區 ${region.display_name_zh}`, layer: "terrain" })),
     ...(world.districts ?? []).map((district) => ({ id: districtRef(district.id), label: `分區 ${district.district_name_zh}`, layer: "partition" })),
     ...world.settlements
@@ -199,6 +212,7 @@ export function featureLabel(featureRef) {
   if (!parsed) return featureRef;
   if (parsed.kind === "mainland") return "大陸海岸線";
   if (parsed.kind === "forest_edge") return "北部林線";
+  if (parsed.kind === "ridge_route") return `中央山脊 ${parsed.id}`;
   if (parsed.kind === "ford") return `${parsed.id} 渡口`;
   return parsed.id;
 }

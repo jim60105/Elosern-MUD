@@ -24,6 +24,8 @@ from unittest.mock import patch
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase, EvenniaTest
 
+from elosern_map_core.terrain import ridge_center_x
+
 from typeclasses.rooms import Room, TerrainRoom
 from world.lore.sync import sync_all
 from world.maps.bootstrap import sync_grid, sync_wilderness
@@ -376,7 +378,11 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
             SOUTH_APPROACH,
         )
         # The closed ridge refuses a step into its cliff wall.
-        self.assertIsNone(wilderness_neighbor(1400, 990, "n"))
+        terrain = wilderness_provider.terrain_definition()
+        wall_y = 1200
+        self.assertIsNone(
+            wilderness_neighbor(ridge_center_x(terrain, wall_y), wall_y - 1, "n")
+        )
 
     @covers_requirement("canonical-wilderness-destination::wilderness-destination-resolution-is-canonical-shared-and-registry-driven")
     def test_resolver_ordinary_steps_agree_with_wilderness_neighbor(self):

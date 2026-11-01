@@ -148,7 +148,14 @@ def _duplicate(identity: str, field_path: str) -> CommandError:
 
 
 # -- continent ---------------------------------------------------------------
-_FEATURE_KINDS = ("mainland", "forest_edge", "waterway_route", "waterway_ford")
+_FEATURE_KINDS = (
+    "mainland",
+    "forest_edge",
+    "waterway_route",
+    "waterway_ford",
+    "ridge_route",
+)
+_RIDGE_ROUTES = ("stem", "west", "east")
 
 
 def _feature(arguments: dict[str, Any]) -> dict[str, str]:
@@ -159,6 +166,11 @@ def _feature(arguments: dict[str, Any]) -> dict[str, str]:
         if set(feature) != {"kind", "waterway_id"}:
             raise _invalid("a waterway feature carries exactly kind and waterway_id")
         _identifier(feature["waterway_id"], "feature.waterway_id")
+    elif feature["kind"] == "ridge_route":
+        if set(feature) != {"kind", "route"}:
+            raise _invalid("a ridge route feature carries exactly kind and route")
+        if feature["route"] not in _RIDGE_ROUTES:
+            raise _invalid(f"feature.route is one of {', '.join(_RIDGE_ROUTES)}")
     elif set(feature) != {"kind"}:
         raise _invalid("this feature carries exactly kind")
     return feature
@@ -184,10 +196,44 @@ def _points(data: dict[str, Any], feature: dict[str, str]) -> list[dict[str, int
         return data["mainland_boundary_km"]
     if kind == "forest_edge":
         return data["terrain"]["forest_edge"]
+    if kind == "ridge_route":
+        ridge = data["terrain"]["ridge"]
+        route = feature["route"]
+        if route == "stem":
+            return ridge["stem"]
+        branches = ridge.get("branches")
+        if not branches or route not in branches:
+            raise _unknown("ridge_route", route, "arguments.feature.route")
+        return branches[route]
     waterway = _waterway(data, feature["waterway_id"])
     if kind == "waterway_route":
         return waterway["route"]
     return waterway.setdefault("fords", [])
+
+
+def _ridge_crotch_index(data: dict[str, Any], feature: dict[str, str]) -> int | None:
+    """The shared crotch index of a paired ridge route, or ``None``.
+
+    ``None`` means no branches are authored or the feature is not a ridge route,
+    so there is no shared point to protect.
+    """
+
+    if feature["kind"] != "ridge_route":
+        return None
+    if not data["terrain"]["ridge"].get("branches"):
+        return None
+    points = _points(data, feature)
+    return 0 if feature["route"] in ("west", "east") else len(points) - 1
+
+
+def _set_ridge_crotch(data: dict[str, Any], cell: dict[str, int]) -> None:
+    """Move all three shared crotch points (stem end, west start, east start)."""
+
+    ridge = data["terrain"]["ridge"]
+    branches = ridge["branches"]
+    ridge["stem"][-1] = dict(cell)
+    branches["west"][0] = dict(cell)
+    branches["east"][0] = dict(cell)
 
 
 class _Continent(DocumentCommand):
@@ -206,7 +252,13 @@ class MoveControlPoint(_Continent):
     def mutate(self, data, arguments):
         feature = _feature(arguments)
         points = _points(data, feature)
-        points[_index(arguments["index"], len(points), "index")] = _point(feature, arguments["point"])
+        index = _index(arguments["index"], len(points), "index")
+        point = _point(feature, arguments["point"])
+        points[index] = point
+        crotch = _ridge_crotch_index(data, feature)
+        if crotch is not None and index == crotch:
+            # The three shared crotch points move atomically in one write.
+            _set_ridge_crotch(data, point)
 
 
 class InsertControlPoint(_Continent):
@@ -220,7 +272,23 @@ class InsertControlPoint(_Continent):
     def mutate(self, data, arguments):
         feature = _feature(arguments)
         points = _points(data, feature)
-        points.insert(_index(arguments["index"], len(points), "index", insert=True), _point(feature, arguments["point"]))
+        index = _index(arguments["index"], len(points), "index", insert=True)
+        crotch = _ridge_crotch_index(data, feature)
+        detaches = (
+            crotch is not None
+            and (
+                (feature["route"] in ("west", "east") and index == 0)
+                or (feature["route"] == "stem" and index == len(points))
+            )
+        )
+        if detaches:
+            raise CommandError(
+                409,
+                "deletion_refused",
+                "a control point inserted here would detach the paired ridge crotch",
+                field_path="arguments.index",
+            )
+        points.insert(index, _point(feature, arguments["point"]))
 
 
 class RemoveControlPoint(_Continent):
@@ -234,11 +302,29 @@ class RemoveControlPoint(_Continent):
     def mutate(self, data, arguments):
         feature = _feature(arguments)
         points = _points(data, feature)
-        del points[_index(arguments["index"], len(points), "index")]
+        index = _index(arguments["index"], len(points), "index")
+        crotch = _ridge_crotch_index(data, feature)
+        if crotch is not None and index == crotch:
+            raise CommandError(
+                409,
+                "deletion_refused",
+                "the shared ridge crotch point cannot be removed",
+                field_path="arguments.index",
+            )
+        if feature["kind"] == "ridge_route" and len(points) <= 2:
+            raise refused_value(
+                "ridge_route_minimum",
+                "a ridge route needs at least two control points",
+                "arguments.index",
+            )
+        del points[index]
 
 
-_RIDGE_FIELDS = ("base_x", "period", "step", "min_x", "max_x", "north_limit_y", "mountain_corridor_half_width")
-_TERRAIN_FIELDS = (*(f"ridge.{name}" for name in _RIDGE_FIELDS), "coastal_y_max", "border_river_key")
+_TERRAIN_FIELDS = (
+    "ridge.mountain_corridor_half_width",
+    "coastal_y_max",
+    "border_river_key",
+)
 
 
 class SetTerrainParameter(_Continent):

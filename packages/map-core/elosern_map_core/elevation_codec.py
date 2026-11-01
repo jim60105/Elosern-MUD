@@ -20,8 +20,9 @@ from typing import Any
 #: Version of the stored elevation artifact.
 ELEVATION_FORMAT_VERSION = 1
 
-#: Version of the deterministic generation algorithm.
-ELEVATION_ALGORITHM_VERSION = 1
+#: Version of the deterministic generation algorithm. Version 2 replaces the
+#: periodic ridge rise with the maximum active authored stem-or-arm profile.
+ELEVATION_ALGORITHM_VERSION = 2
 
 #: Cell dimension of each square tile.
 ELEVATION_TILE_CELLS = 64

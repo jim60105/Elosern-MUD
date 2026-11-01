@@ -45,7 +45,12 @@ from .documents import (
     SettlementDocument,
     WildernessEntryGeometry,
 )
-from .geometry import is_simple_polygon, is_within_frame
+from .geometry import (
+    METRES_PER_WILDERNESS_CELL,
+    is_simple_polygon,
+    is_within_frame,
+    local_to_world_m,
+)
 from .sources import SourceDocument, fingerprint_text, is_world_source
 from .sparse import (
     SparseGraphError,
@@ -68,7 +73,11 @@ from .references import (
 from .terrain import (
     REGION_KEYS,
     TerrainDefinition,
+    is_land_cell,
     is_walkable_cell,
+    rasterize_routes,
+    region_for_coordinates,
+    ridge_crest_center_x,
 )
 
 EXTERNAL_RESULT_VERSION = 1
@@ -1241,19 +1250,110 @@ def terrain_definition(continent: ContinentDocument) -> TerrainDefinition:
             key: value.fords for key, value in terrain.waterways.items()
         },
         border_river_key=terrain.border_river_key,
-        ridge_base_x=terrain.ridge_base_x,
-        ridge_period=terrain.ridge_period,
-        ridge_step=terrain.ridge_step,
-        ridge_min_x=terrain.ridge_min_x,
-        ridge_max_x=terrain.ridge_max_x,
-        ridge_north_limit=terrain.ridge_north_limit_y,
+        ridge_stem=terrain.ridge_stem,
         ridge_passes=terrain.ridge_passes,
         coastal_y_max=terrain.coastal_y_max,
         mountain_corridor_half_width=terrain.ridge_corridor_half_width,
+        ridge_branches=terrain.ridge_branches,
         region_flavors={
             key: value.terrain_flavor_zh for key, value in continent.regions.items()
         },
     )
+
+
+def _candidate_protected_cells(world: AuthoringWorld) -> set[tuple[int, int]]:
+    """Wilderness cells an arm wall must never cover (candidate inputs only).
+
+    Every authored location and harbour cell, plus each district's resolved
+    landmark: a wilderness cell is itself, a location landmark is its cell, and
+    a settlement-node landmark is its node position projected through the
+    settlement's location cell and local anchor into a wilderness cell.
+    """
+
+    cells: set[tuple[int, int]] = set()
+    location_cells = location_cells_of(world.locations)
+    cells.update(location_cells.values())
+    cells.update(site.cell for site in world.continent.harbor_sites.values())
+    for district in world.districts.districts.values():
+        landmark = district.landmark
+        if landmark.domain == "wilderness_cell" and landmark.cell is not None:
+            cells.add((int(landmark.cell[0]), int(landmark.cell[1])))
+        elif landmark.domain == "location" and landmark.object_id in location_cells:
+            cells.add(location_cells[landmark.object_id])
+        elif landmark.domain == "settlement_node" and landmark.map_id is not None:
+            settlement = world.settlements.get(landmark.map_id)
+            if settlement is None:
+                continue
+            node = settlement.nodes.get(landmark.object_id)
+            location_cell = location_cells.get(settlement.location_ref)
+            anchor = settlement.local_anchor_m
+            if node is None or location_cell is None or anchor is None:
+                continue
+            east, north = local_to_world_m(
+                location_cell, anchor, (node.x_m, node.y_m)
+            )
+            cells.add(
+                (east // METRES_PER_WILDERNESS_CELL, north // METRES_PER_WILDERNESS_CELL)
+            )
+    return cells
+
+
+def _ridge_arm_diagnostics(
+    terrain: TerrainDefinition, world: AuthoringWorld
+) -> list[Diagnostic]:
+    """Reject arms that leave the frame/land/forest or hit protected geometry.
+
+    Only the paired arm routes are checked: the sea-side southern stem stays
+    legal. Any offending row reports one semantic ``terrain_inconsistent``
+    diagnostic; nothing here moves protected content or invents a frame.
+    """
+
+    if not terrain.ridge_branches:
+        return []
+    protected = _candidate_protected_cells(world)
+    full_water = rasterize_routes(terrain.waterway_routes)
+    crotch_y = terrain.ridge_stem[-1][1]
+    diagnostics: list[Diagnostic] = []
+    for name in ("west", "east"):
+        if name not in terrain.ridge_branches:
+            continue
+        y = crotch_y
+        while True:
+            centre = ridge_crest_center_x(terrain, name, y)
+            if centre is None:
+                break
+            following = ridge_crest_center_x(terrain, name, y + 1)
+            if following is None:
+                following = centre
+            low, high = min(centre, following), max(centre, following)
+            problem: str | None = None
+            for x in range(low, high + 1):
+                cell = (x, y)
+                if not is_within_frame(terrain.frame_cells, cell):
+                    problem = "leaves the frame"
+                elif not is_land_cell(terrain, cell):
+                    problem = "leaves the mainland"
+                elif region_for_coordinates(terrain, x, y) != "north_deep_forest":
+                    problem = "is not in the deep forest"
+                elif cell in full_water:
+                    problem = "collides with a waterway or ford"
+                elif cell in protected:
+                    problem = "collides with a protected location, harbour or landmark"
+                if problem is not None:
+                    break
+            if problem is not None:
+                diagnostics.append(
+                    _diagnostic(
+                        "terrain_inconsistent",
+                        SEMANTIC,
+                        f"ridge branch {name!r} cell {(low, y)} {problem}",
+                        document=world.continent,
+                        field_path=f"terrain.ridge.branches.{name}",
+                    )
+                )
+                break
+            y += 1
+    return diagnostics
 
 
 def _semantic_diagnostics(world: AuthoringWorld) -> list[Diagnostic]:
@@ -1277,6 +1377,8 @@ def _semantic_diagnostics(world: AuthoringWorld) -> list[Diagnostic]:
         world.settlements, location_cells_of(world.locations)
     ).values():
         footprints.update(geometry.footprint_cells)
+    if terrain is not None:
+        diagnostics.extend(_ridge_arm_diagnostics(terrain, world))
 
     reachable_cache: dict[str, frozenset[str]] = {}
     for settlement_id, settlement in world.settlements.items():
