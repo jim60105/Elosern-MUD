@@ -25,7 +25,7 @@ class LocalMapPerGateFootprintTests(EvenniaTest):
     """Per-gate presentation on both sides and the footprint boundary (P1b).
 
     Registry geometry (probed, not authored): the sample city's footprint is
-    a five-by-five mask; gate "n" -> 南門 ``SOUTH_GATE_XYZ`` with its
+    its authored mask; gate "n" -> 南門 ``SOUTH_GATE_XYZ`` with its
     south-approach cell, gate "w" -> 東門 ``EAST_GATE_XYZ`` with its
     east-approach cell. ``EvenniaTest`` because the round-trips traverse
     real gateway exits (same fixture need as

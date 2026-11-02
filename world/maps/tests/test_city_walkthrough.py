@@ -30,7 +30,7 @@ class SampleCityWalkthroughTests(EvenniaTest):
 
     def test_walk_from_limbo_to_central_plaza_and_render(self):
         limbo = self.room2
-        # Two registry rows bridge Limbo; pick the capital's by destination,
+        # The registry's rows bridge Limbo; pick the capital's by destination,
         # never by exit ordering.
         south_gate = next(
             exit_obj.destination for exit_obj in limbo.exits if exit_obj.destination.xyz == SOUTH_GATE_XYZ

@@ -243,27 +243,33 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         self.assertEqual([exit_obj.key for exit_obj in dbref2.exits], [])
         self.assertEqual(
             sorted(exit_obj.key for exit_obj in limbo.exits),
-            ["南門", "隱密小徑"],
+            sorted(row.exit_key for row in CITY_GATE_REGISTRY.values()),
         )
 
     def test_east_gate_holds_only_its_west_grid_link_before_wilderness_sync(self):
-        # Before sync_wilderness() the 東門 is the one room whose sole grid
-        # link runs west to 東市; the wilderness gate exit it later carries
-        # is provisioned per-gate (wilderness-anchor-footprint).
+        # Before sync_wilderness() each of the east gate's grid links is one
+        # authored road leaving the node; the wilderness gate exit it later
+        # carries is provisioned per-gate (wilderness-anchor-footprint).
         create_object(Room, key=LIMBO_KEY, location=None)
         sync_grid()
+        from world.maps.map_data import current
 
         east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
         exits = list(east_gate.exits)
-        self.assertEqual(len(exits), 1)
-        from world.maps.map_data import SETTLEMENT_GRAPHS
-
+        document = current().settlements[EAST_GATE_XYZ[2]]
+        authored = [
+            road for road in document.roads if road.source == "east_gate"
+        ]
+        self.assertEqual(len(exits), len(authored))
         self.assertEqual(
-            exits[0].destination.xyz,
-            (
-                *SETTLEMENT_GRAPHS["capital_altoria"].node("east_market").coordinate,
-                "capital_altoria",
-            ),
+            {exit_obj.destination.xyz for exit_obj in exits},
+            {
+                (
+                    *document.nodes[road.destination].coordinate,
+                    EAST_GATE_XYZ[2],
+                )
+                for road in authored
+            },
         )
 
     def test_absent_limbo_degrades_without_raising(self):
@@ -295,8 +301,14 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
     @covers_requirement("limbo-one-way-gates::the-city-gate-registry-is-the-sole-authored-source-of-虛境-city-gates")
     def test_registry_pins_the_capital_row_and_rejects_mutation(self):
         from dataclasses import FrozenInstanceError
+        from world.maps.map_data import current
 
-        self.assertEqual(list(CITY_GATE_REGISTRY), ["capital_altoria", "village_ciaran"])
+        authored_rows = {
+            map_id
+            for map_id, document in current().settlements.items()
+            if document.city_gate is not None
+        }
+        self.assertEqual(set(CITY_GATE_REGISTRY), authored_rows)
         row = CITY_GATE_REGISTRY["capital_altoria"]
         self.assertEqual(settlement_node_xyz(row.gate), SOUTH_GATE_XYZ)
         self.assertEqual(row.exit_key, "南門")
@@ -315,7 +327,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
             del CITY_GATE_REGISTRY["capital_altoria"]
         with self.assertRaises(FrozenInstanceError):
             row.exit_key = "篡改"
-        self.assertEqual(list(CITY_GATE_REGISTRY), ["capital_altoria", "village_ciaran"])
+        self.assertEqual(set(CITY_GATE_REGISTRY), authored_rows)
 
     @covers_requirement("limbo-one-way-gates::the-city-gate-registry-is-the-sole-authored-source-of-虛境-city-gates")
     def test_no_exit_key_or_alias_collides_between_registry_rows(self):
@@ -582,7 +594,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
 
         self.assertEqual(self._count_grid_rooms(), _declared_node_count())
         self.assertEqual(self._count_city_exits(), _declared_road_count())
-        self.assertEqual(len(self._bridging_exits()), 2)
+        self.assertEqual(len(self._bridging_exits()), len(CITY_GATE_REGISTRY))
 
 
 class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
