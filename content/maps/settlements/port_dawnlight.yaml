@@ -1,0 +1,180 @@
+version: 1
+kind: settlement
+id: port_dawnlight
+location_ref: port_dawnlight
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 595
+    y_m: 595
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 朝陽港的中央廣場，離海不到一刻鐘的路。清晨的光先從東北的海面照到這裡，石板上還留著夜裡的潮氣。
+    anchor_key: port_dawnlight
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 西南門
+    desc: 西南門外通往日出鎮的路，沿著丘陵慢慢往內陸去。路旁的草被海風吹得貼地，走遠了才直起來。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northwest_gate:
+    x_m: 100
+    y_m: 1090
+    prototype_parent: grid_room
+    key: 西北門
+    desc: 西北門朝沉鐘鎮的方向，湖區的魚乾與蘆蓆由此進港。擔子一放下，整條門洞都是曬過的腥香。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate_road_1:
+    x_m: 399
+    y_m: 463
+    prototype_parent: grid_room
+    key: 西南直街
+    desc: 從西南門進城的一段直街，車馬與漁擔在此錯身。挑擔的人習慣走在靠牆那一側，讓車先過，牆面因此磨得發亮。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northwest_gate_road_1:
+    x_m: 405
+    y_m: 906
+    prototype_parent: grid_room
+    key: 西北直街
+    desc: 西北門內的一段路，兩側是曬網與補帆的人家。網張在竹竿之間，整條街像罩著一層薄霧，走過去要彎腰。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  quay:
+    x_m: 2045
+    y_m: 595
+    prototype_parent: grid_room
+    key: 碼頭
+    desc: 碼頭在城東的海岸上，漁船與沿海的貨船擠在一處。退潮時灘上留下一排擱淺的船影，像被忘在那裡。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 730
+    y_m: 755
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街在廣場東北，魚市散得早，午後是雜貨的天下。同一個攤位，早上賣魚，下午賣繩與燈油。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  harbour_office:
+    x_m: 2045
+    y_m: 1045
+    prototype_parent: grid_room
+    key: 港務總管府前
+    desc: 港務總管府前在城東，進出港的船隻都在此登記。冊子上記著船名與貨色，一頁一頁翻得起了毛邊。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 781
+    y_m: 389
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前在東南，分會的委託多與海上的失蹤船隻有闕。張貼的紙被海風掀起一角，上頭壓著一塊石頭。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  temple_forecourt:
+    x_m: 598
+    y_m: 259
+    prototype_parent: grid_room
+    key: 神殿前
+    desc: 神殿前在城南，出海前的人會來此上香。爐裡的香常年不熄，海風一吹，煙就貼著地面往港口去。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: southwest_gate_road_1
+  direction: sw
+- source: central_plaza
+  destination: northwest_gate_road_1
+  direction: nw
+- source: central_plaza
+  destination: market_street
+  direction: ne
+- source: central_plaza
+  destination: guild_forecourt
+  direction: se
+- source: central_plaza
+  destination: temple_forecourt
+  direction: s
+- source: southwest_gate
+  destination: southwest_gate_road_1
+  direction: ne
+- source: northwest_gate
+  destination: northwest_gate_road_1
+  direction: se
+- source: southwest_gate_road_1
+  destination: central_plaza
+  direction: ne
+- source: southwest_gate_road_1
+  destination: southwest_gate
+  direction: sw
+- source: southwest_gate_road_1
+  destination: temple_forecourt
+  direction: se
+- source: northwest_gate_road_1
+  destination: central_plaza
+  direction: se
+- source: northwest_gate_road_1
+  destination: northwest_gate
+  direction: nw
+- source: quay
+  destination: harbour_office
+  direction: n
+- source: quay
+  destination: guild_forecourt
+  direction: w
+- source: market_street
+  destination: central_plaza
+  direction: sw
+- source: harbour_office
+  destination: quay
+  direction: s
+- source: guild_forecourt
+  destination: central_plaza
+  direction: nw
+- source: guild_forecourt
+  destination: quay
+  direction: e
+- source: guild_forecourt
+  destination: temple_forecourt
+  direction: sw
+- source: temple_forecourt
+  destination: central_plaza
+  direction: n
+- source: temple_forecourt
+  destination: southwest_gate_road_1
+  direction: nw
+- source: temple_forecourt
+  destination: guild_forecourt
+  direction: ne
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: ne
+    destination_node: southwest_gate
+  - return_direction: se
+    destination_node: northwest_gate
+city_gate:

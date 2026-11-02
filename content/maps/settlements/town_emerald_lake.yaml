@@ -1,0 +1,144 @@
+version: 1
+kind: settlement
+id: town_emerald_lake
+location_ref: town_emerald_lake
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 564
+    y_m: 465
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 翠湖鎮的中央廣場，往北是帝河津的路，往東通往星輝城。清晨湖上的霧會一路漫進鎮裡，把屋簷泡得發軟。
+    anchor_key: town_emerald_lake
+    typeclass:
+    scene_archetype: city_street
+  north_gate:
+    x_m: 564
+    y_m: 940
+    prototype_parent: grid_room
+    key: 北門
+    desc: 北門外的路沿著湖岸上行，通往帝河津。岸邊的蘆葦比人高，風一過就像有人在那裡走動。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  east_gate:
+    x_m: 1439
+    y_m: 465
+    prototype_parent: grid_room
+    key: 東門
+    desc: 東門朝著星輝城，載魚與木料的車從這裡出去。木料還帶著鋸末，一路撒在門外的路上，引來成群的麻雀。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  east_gate_road_1:
+    x_m: 1061
+    y_m: 525
+    prototype_parent: grid_room
+    key: 東門大街
+    desc: 東門大街是鎮上最熱鬧的一段，漁販與船匠的鋪子夾在兩旁。鋪前的水溝裡浮著刨花，一路漂到鎮外。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 477
+    y_m: 301
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街在廣場西南，晒過的魚乾在此論斤賣。繩上掛著的魚乾一排排，像是給整條街遮陽。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 401
+    y_m: 576
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前在西北，分會的任務板常貼著湖上的巡守委託。湖面起風時，委託的數量會多上一倍。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  temple_forecourt:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 神殿前
+    desc: 神殿前在西南，船匠下水前會來此上香。廟前立著一截舊船骨，據說是從湖底撈上來的，木紋已經發黑。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  inn_lane:
+    x_m: 764
+    y_m: 563
+    prototype_parent: grid_room
+    key: 客棧巷
+    desc: 客棧巷在東北，等著過湖的旅人在此歇腳。房間的窗朝著水面，夜裡能看見對岸零星的漁火。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: north_gate
+  direction: n
+- source: central_plaza
+  destination: east_gate_road_1
+  direction: e
+- source: central_plaza
+  destination: market_street
+  direction: sw
+- source: central_plaza
+  destination: guild_forecourt
+  direction: nw
+- source: central_plaza
+  destination: inn_lane
+  direction: ne
+- source: north_gate
+  destination: central_plaza
+  direction: s
+- source: east_gate
+  destination: east_gate_road_1
+  direction: w
+- source: east_gate_road_1
+  destination: central_plaza
+  direction: w
+- source: east_gate_road_1
+  destination: east_gate
+  direction: e
+- source: east_gate_road_1
+  destination: inn_lane
+  direction: nw
+- source: market_street
+  destination: central_plaza
+  direction: ne
+- source: market_street
+  destination: temple_forecourt
+  direction: sw
+- source: guild_forecourt
+  destination: central_plaza
+  direction: se
+- source: temple_forecourt
+  destination: market_street
+  direction: ne
+- source: inn_lane
+  destination: central_plaza
+  direction: sw
+- source: inn_lane
+  destination: east_gate_road_1
+  direction: e
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: s
+    destination_node: north_gate
+  - return_direction: w
+    destination_node: east_gate
+city_gate:

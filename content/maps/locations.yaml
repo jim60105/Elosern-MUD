@@ -20,8 +20,8 @@ locations:
     display_name_zh: 輝煌帝都
     description: Capital of the Grandia Empire.
     cell:
-      cell_x: 1957
-      cell_y: 1270
+      cell_x: 1955
+      cell_y: 1269
     geographic_constraint: Eastern agricultural plain and major river supply
     scene_archetype:
   capital_valhalla:

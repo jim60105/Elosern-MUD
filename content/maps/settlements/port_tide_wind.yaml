@@ -1,0 +1,144 @@
+version: 1
+kind: settlement
+id: port_tide_wind
+location_ref: port_tide_wind
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 600
+    y_m: 550
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 潮風鎮的中央廣場，海在東邊，風整年從那個方向來。廣場上的旗子都朝同一個方向擺，連旗面都磨出同樣的褶。
+    anchor_key: port_tide_wind
+    typeclass:
+    scene_archetype: city_street
+  west_gate:
+    x_m: 100
+    y_m: 550
+    prototype_parent: grid_room
+    key: 西門
+    desc: 西門通往星輝城，換來的布匹與鐵器由此進鎮。車上的鐵器用稻草裹著，一路叮噹作響，老遠就聽得見。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northwest_gate:
+    x_m: 105
+    y_m: 1045
+    prototype_parent: grid_room
+    key: 西北門
+    desc: 西北門朝著日出鎮與東牧鎮的路，獵戶與牧人在此進出。門口的守衛與他們熟得像鄰居，連名字都不用問。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northwest_gate_road_1:
+    x_m: 383
+    y_m: 726
+    prototype_parent: grid_room
+    key: 西北街
+    desc: 西北街是鎮裡少見的一段石板路，兩旁是漁具與繩索的鋪子。鋪子把貨掛到簷外，走過去要側身。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  quay:
+    x_m: 2050
+    y_m: 550
+    prototype_parent: grid_room
+    key: 碼頭
+    desc: 碼頭在鎮東的沙岸上，漁船趁退潮時整排靠在灘邊。船底的貝殼晒得發白，孩子蹲在旁邊撿。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 755
+    y_m: 680
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街在廣場東北，天未亮開市，日頭一起就收。散市後地上只剩魚鱗，被海水沖上岸的浪帶走。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  harbour_office:
+    x_m: 2050
+    y_m: 100
+    prototype_parent: grid_room
+    key: 港務總管府前
+    desc: 港務總管府前在鎮東，登記進出港的漁船與貨船。辦事的人坐在窗後，抬眼就能看見整片灘。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 382
+    y_m: 485
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前在廣場西側，分會在此張貼沿海的委託。紙角壓著貝殼，風再大也吹不跑，字跡卻被鹽氣蝕得發白。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: west_gate
+  direction: w
+- source: central_plaza
+  destination: northwest_gate_road_1
+  direction: nw
+- source: central_plaza
+  destination: market_street
+  direction: ne
+- source: central_plaza
+  destination: guild_forecourt
+  direction: sw
+- source: west_gate
+  destination: central_plaza
+  direction: e
+- source: northwest_gate
+  destination: northwest_gate_road_1
+  direction: se
+- source: northwest_gate_road_1
+  destination: central_plaza
+  direction: se
+- source: northwest_gate_road_1
+  destination: northwest_gate
+  direction: nw
+- source: northwest_gate_road_1
+  destination: guild_forecourt
+  direction: s
+- source: quay
+  destination: market_street
+  direction: w
+- source: quay
+  destination: harbour_office
+  direction: s
+- source: market_street
+  destination: central_plaza
+  direction: sw
+- source: market_street
+  destination: quay
+  direction: e
+- source: harbour_office
+  destination: quay
+  direction: n
+- source: guild_forecourt
+  destination: central_plaza
+  direction: e
+- source: guild_forecourt
+  destination: northwest_gate_road_1
+  direction: n
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: e
+    destination_node: west_gate
+  - return_direction: se
+    destination_node: northwest_gate
+city_gate:

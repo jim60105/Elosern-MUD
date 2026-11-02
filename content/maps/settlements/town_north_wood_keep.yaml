@@ -1,0 +1,144 @@
+version: 1
+kind: settlement
+id: town_north_wood_keep
+location_ref: town_north_wood_keep
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 266
+    y_m: 600
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 北林堡的中央廣場，城牆比鎮上的屋舍還老。北邊的林子一直長到牆腳下，枝條越過垛口垂進城裡。
+    anchor_key: town_north_wood_keep
+    typeclass:
+    scene_archetype: city_street
+  south_gate:
+    x_m: 266
+    y_m: 100
+    prototype_parent: grid_room
+    key: 南門
+    desc: 南門外的路通往魔晶鎮與黑土鎮，進山的隊伍由此出發。門邊的告示牌寫著最近一週的獸蹤。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  east_gate:
+    x_m: 941
+    y_m: 600
+    prototype_parent: grid_room
+    key: 東門
+    desc: 東門朝著沉鐘鎮，獵戶與木材販從這條路進出。車上的原木還帶著樹皮，進門時要斜著放才過得去。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  south_gate_road_1:
+    x_m: 219
+    y_m: 348
+    prototype_parent: grid_room
+    key: 南門大街
+    desc: 南門大街是堡裡的主街，兩側是兵器鋪與糧行。鋪子門口掛著修好的甲片，風一吹互相碰撞。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 325
+    y_m: 453
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街在廣場南側，皮毛與林產在此論價。毛皮攤的後面就是烘乾的架子，氣味一直散不掉。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 100
+    y_m: 540
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前在廣場西側，分會是往龍巢探險的隊伍最後補給的地方。牆上釘著一張磨損的山勢圖。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  temple_forecourt:
+    x_m: 688
+    y_m: 697
+    prototype_parent: grid_room
+    key: 神殿前
+    desc: 神殿前在東側，守軍換防前會來此上香。廟裡的長明燈由堡主供著，油從來不缺，燈芯也按旬修剪。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  inn_lane:
+    x_m: 445
+    y_m: 536
+    prototype_parent: grid_room
+    key: 客棧巷
+    desc: 客棧巷在城東，等嚮導的隊伍在此過夜。通鋪上擠著人，火爐邊永遠有人在補靴子或磨刀。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: east_gate
+  direction: e
+- source: central_plaza
+  destination: south_gate_road_1
+  direction: s
+- source: central_plaza
+  destination: market_street
+  direction: se
+- source: central_plaza
+  destination: guild_forecourt
+  direction: w
+- source: south_gate
+  destination: south_gate_road_1
+  direction: n
+- source: east_gate
+  destination: central_plaza
+  direction: w
+- source: east_gate
+  destination: temple_forecourt
+  direction: nw
+- source: south_gate_road_1
+  destination: central_plaza
+  direction: n
+- source: south_gate_road_1
+  destination: south_gate
+  direction: s
+- source: south_gate_road_1
+  destination: market_street
+  direction: ne
+- source: market_street
+  destination: central_plaza
+  direction: n
+- source: market_street
+  destination: south_gate_road_1
+  direction: sw
+- source: market_street
+  destination: inn_lane
+  direction: ne
+- source: guild_forecourt
+  destination: central_plaza
+  direction: e
+- source: temple_forecourt
+  destination: east_gate
+  direction: e
+- source: inn_lane
+  destination: market_street
+  direction: sw
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: n
+    destination_node: south_gate
+  - return_direction: w
+    destination_node: east_gate
+city_gate:

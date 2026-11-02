@@ -1,0 +1,180 @@
+version: 1
+kind: settlement
+id: city_imperial_ferry
+location_ref: city_imperial_ferry
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 1550
+    y_m: 600
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 帝河津的中央廣場，帝河與西支流在城西合流。渡船靠岸的號子聲從廣場邊上就聽得見，整座城跟著那節奏起伏。
+    anchor_key: city_imperial_ferry
+    typeclass:
+    scene_archetype: city_street
+  north_gate:
+    x_m: 1550
+    y_m: 1075
+    prototype_parent: grid_room
+    key: 北門
+    desc: 北門外的官道上行就是輝煌帝都，關防在門內查驗。往來的車馬在此排成兩列，一列進城，一列出城。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  south_gate:
+    x_m: 1550
+    y_m: 100
+    prototype_parent: grid_room
+    key: 南門
+    desc: 南門通往星輝城與翠湖鎮的方向，載晶砂的車隊由此南下。車轍裡的細砂在陽光下閃，掃街的人怎麼掃也掃不乾淨。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 1591
+    y_m: 822
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街在廣場北側，渡口運上來的鹽與布匹在此開市。鹽包一落地，買家就圍了上去，先摸一把濕度再開口。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 1715
+    y_m: 441
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前在東南，分會最常接的是護送渡船的委託。樓下告示板貼著水位與天候，出船的人出門前都要看一眼。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  river_quay:
+    x_m: 100
+    y_m: 600
+    prototype_parent: grid_room
+    key: 河港碼頭
+    desc: 河港碼頭在城西的匯流口，兩條河的水在此合成一股。船家靠岸時先看水色，才知道今天的流往哪邊推。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  temple_forecourt:
+    x_m: 872
+    y_m: 974
+    prototype_parent: grid_room
+    key: 神殿前
+    desc: 神殿前在西北的高處，是城裡唯一望得見兩條河的地方。鐘樓的影子在兩水之間拉長，傍晚像一根指針。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  inn_lane:
+    x_m: 1286
+    y_m: 633
+    prototype_parent: grid_room
+    key: 客棧巷
+    desc: 客棧巷在城西，等渡船的旅人在此歇腳。房錢隨著水位漲落，洪水季節連走廊都擺上床板。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  riverbank:
+    x_m: 100
+    y_m: 150
+    prototype_parent: grid_room
+    key: 河岸道
+    desc: 河岸道沿西岸鋪開，洪水季節留下的石痕還印在牆上。老人指著最高的一道說，那年整個渡口都泡在水裡。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  craft_alley:
+    x_m: 100
+    y_m: 1050
+    prototype_parent: grid_room
+    key: 工匠巷
+    desc: 工匠巷在城西水門旁，船匠與繩匠共用一段河灘。翻修中的船底朝天擱在沙上，木屑浮在水面慢慢漂走。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: north_gate
+  direction: n
+- source: central_plaza
+  destination: south_gate
+  direction: s
+- source: central_plaza
+  destination: market_street
+  direction: ne
+- source: central_plaza
+  destination: guild_forecourt
+  direction: se
+- source: central_plaza
+  destination: inn_lane
+  direction: w
+- source: north_gate
+  destination: central_plaza
+  direction: s
+- source: north_gate
+  destination: market_street
+  direction: se
+- source: south_gate
+  destination: central_plaza
+  direction: n
+- source: south_gate
+  destination: guild_forecourt
+  direction: ne
+- source: market_street
+  destination: central_plaza
+  direction: s
+- source: market_street
+  destination: north_gate
+  direction: n
+- source: guild_forecourt
+  destination: central_plaza
+  direction: nw
+- source: guild_forecourt
+  destination: south_gate
+  direction: sw
+- source: river_quay
+  destination: riverbank
+  direction: s
+- source: river_quay
+  destination: craft_alley
+  direction: n
+- source: temple_forecourt
+  destination: inn_lane
+  direction: se
+- source: temple_forecourt
+  destination: craft_alley
+  direction: w
+- source: inn_lane
+  destination: central_plaza
+  direction: e
+- source: inn_lane
+  destination: temple_forecourt
+  direction: nw
+- source: riverbank
+  destination: river_quay
+  direction: n
+- source: craft_alley
+  destination: river_quay
+  direction: s
+- source: craft_alley
+  destination: temple_forecourt
+  direction: e
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: -1
+    dy: 0
+  gates:
+  - return_direction: s
+    destination_node: north_gate
+  - return_direction: n
+    destination_node: south_gate
+city_gate:

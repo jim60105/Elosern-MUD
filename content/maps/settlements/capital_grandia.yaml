@@ -1,0 +1,500 @@
+version: 1
+kind: settlement
+id: capital_grandia
+location_ref: capital_grandia
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 2550
+    y_m: 2600
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 輝煌帝都的中央廣場，城裡所有大道都在此交會。西邊的河風越過層層屋脊吹進來，往東南地勢漸高，石板一路抬向學院與大神殿所在的台地。
+    anchor_key: capital_grandia
+    typeclass:
+    scene_archetype: city_street
+  ford_crossing:
+    x_m: 550
+    y_m: 1600
+    prototype_parent: grid_room
+    key: 渡口
+    desc: 帝都西南的渡口，帝河在這一段放寬成平緩的水面，石砌的斜坡一直下到水邊。南來北往的貨車在此換上平底渡船，再順著大道往東進城。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  south_gate:
+    x_m: 2550
+    y_m: 100
+    prototype_parent: grid_room
+    key: 南門
+    desc: 南門朝帝河津的方向敞開，門外的官道順著帝河一路往下游去。守門的禁軍在此查驗商隊的關防，車轍在門洞裡壓出兩道深溝。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northeast_gate:
+    x_m: 4035
+    y_m: 4085
+    prototype_parent: grid_room
+    key: 東北門
+    desc: 東北門外的大道通往麥浪城，糧車與糧商都從這扇門進出帝都。門樓的旗幟換得比別處勤，風一大就獵獵作響。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate:
+    x_m: 1065
+    y_m: 1115
+    prototype_parent: grid_room
+    key: 西南門
+    desc: 西南門外的道路折向西邊的楓麓鎮，山貨與木料由此運抵。門內是一段下坡，雨天總積著水，挑夫走過都要放慢腳步。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  north_gate:
+    x_m: 2550
+    y_m: 5075
+    prototype_parent: grid_room
+    key: 北門
+    desc: 北門守著通往北面平原的路，清晨第一班糧隊總在門開的那一刻就到。門樓的火把是整段城牆上最後熄滅的一盞。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  south_gate_road_1:
+    x_m: 2651
+    y_m: 1030
+    prototype_parent: grid_room
+    key: 南門大街
+    desc: 從南門進城的第一段大道，兩側是車馬行與關防稅亭。往北走到底就是中央廣場，稅吏在此攔下每一車要過秤的貨。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  south_gate_road_2:
+    x_m: 2491
+    y_m: 1911
+    prototype_parent: grid_room
+    key: 南門內街
+    desc: 南門內街是稅關與腳店聚集的一段，離中央廣場只剩幾步路。挑夫把貨從渡口一路扛到這裡，換上城裡的車再往市街去。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northeast_gate_road_1:
+    x_m: 2995
+    y_m: 3404
+    prototype_parent: grid_room
+    key: 東北大街
+    desc: 東北門通往麥浪城的大道在城內的一段，糧行與車店沿街排開。麥袋在騎樓下堆成牆，空氣裡全是曬過的穀味。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate_road_1:
+    x_m: 1799
+    y_m: 1942
+    prototype_parent: grid_room
+    key: 西南大街
+    desc: 西南門內的大街，坡道旁擠著木料行與炭鋪。往廣場去要一路往上走，推車的人到街口都得停下來喘口氣。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  north_gate_road_2:
+    x_m: 2496
+    y_m: 3403
+    prototype_parent: grid_room
+    key: 北門大街
+    desc: 北門大街連著中央廣場，清晨的糧車與送水的車在此錯身。街面的石板補過許多回，顏色深淺不一。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 2687
+    y_m: 2241
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街在廣場南側，帝都的糧價在此議定。攤棚從街口一路擺到河岸，討價還價的聲音蓋過旁邊鐵匠的敲打。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  palace_forecourt:
+    x_m: 2947
+    y_m: 168
+    prototype_parent: grid_room
+    key: 王宮前庭
+    desc: 王宮前庭在廣場南端，是帝國議政的正門。石階兩側的衛兵不與任何人交談，宮牆上的浮雕記著歷代皇帝的功業。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 2959
+    y_m: 2805
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前是帝都冒險者分會的門前空地，任務板掛在廊下。來自各國的隊伍在此核對委託，獵裝與長袍混在一起。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  river_quay:
+    x_m: 100
+    y_m: 2600
+    prototype_parent: grid_room
+    key: 河港碼頭
+    desc: 河港碼頭在帝都西側的帝河岸邊，平底貨船在此卸下南方的鹽與香料。搬運的人沿著石階上上下下，號子聲一刻不停。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  temple_forecourt:
+    x_m: 3957
+    y_m: 1219
+    prototype_parent: grid_room
+    key: 神殿前
+    desc: 神殿前是帝都大神殿前的廣場，規模在全大陸數一數二。鐘聲從台地上一路傳到河岸，連對岸的漁村都聽得見。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  noble_quarter:
+    x_m: 3505
+    y_m: 1244
+    prototype_parent: grid_room
+    key: 貴族區前
+    desc: 貴族區前是城東南宅邸街的入口，車駕與護衛在此等候。門房認得每一家徽記，陌生人進不去那條鋪著石板的巷子。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  inn_lane:
+    x_m: 2107
+    y_m: 2797
+    prototype_parent: grid_room
+    key: 客棧巷
+    desc: 客棧巷在廣場西北，往來的商隊在此過夜。巷口那盞燈整夜不熄，晚到的旅人循著光就能找到門。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  exchange_forecourt:
+    x_m: 2747
+    y_m: 3094
+    prototype_parent: grid_room
+    key: 商會前
+    desc: 商會前是帝國商會公所的門前，糧價與河運的契約在此簽下。書記官的算盤聲從窗裡傳出來，一整天沒停過。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  riverbank:
+    x_m: 100
+    y_m: 2050
+    prototype_parent: grid_room
+    key: 河岸道
+    desc: 河岸道沿著帝河西岸鋪開，縴夫與漁人各自占著一段。漲水時水面離石階只剩一級，孩子們在岸邊等著撈漂下來的木片。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  craft_alley:
+    x_m: 100
+    y_m: 1150
+    prototype_parent: grid_room
+    key: 工匠巷
+    desc: 工匠巷在城西南，鐵匠與製符匠的爐火終日不熄。巷子裡一半是熱氣，一半是磨晶石時發出的細響。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  academy:
+    x_m: 3840
+    y_m: 1654
+    prototype_parent: grid_room
+    key: 學院前
+    desc: 學院前是皇家魔法學院的門前，也是大陸上最大的一所。學徒抱著書卷從石階上跑過，袍角掃過階面刻著的符文。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  training_ground:
+    x_m: 3365
+    y_m: 3086
+    prototype_parent: grid_room
+    key: 校場外
+    desc: 校場外是禁軍操練場的邊上，金屬撞擊聲從圍牆後傳出來。教頭的口令一句接一句，牆外的孩子跟著比畫。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  bath_forecourt:
+    x_m: 2032
+    y_m: 2377
+    prototype_parent: grid_room
+    key: 浴場前
+    desc: 浴場前是帝都公共浴場的入口，蒸氣從門縫裡漫到街上。冬天傍晚，這一帶的霧比河邊還濃。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  lane_01:
+    x_m: 894
+    y_m: 3997
+    prototype_parent: grid_room
+    key: 燈籠巷
+    desc: 燈籠巷在城西北，做燈與糊紙的人家把半成品掛滿了街。夜裡整條巷子透著暖黃的光，遠處看像一串低垂的星。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  lane_02:
+    x_m: 1162
+    y_m: 3076
+    prototype_parent: grid_room
+    key: 井邊巷
+    desc: 井邊巷靠著帝河，巷底那口井的水從河裡滲來。清晨排隊取水的人一路站到巷口，木桶碰在石沿上咚咚作響。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  lane_03:
+    x_m: 1840
+    y_m: 753
+    prototype_parent: grid_room
+    key: 舊牆巷
+    desc: 舊牆巷沿著更早一代的城牆走，磚石被後來的屋舍吃掉一半。牆根的苔痕每年往上一寸，老住戶說那就是城的年紀。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  lane_04:
+    x_m: 1740
+    y_m: 3988
+    prototype_parent: grid_room
+    key: 銅匠巷
+    desc: 銅匠巷在城西北角，敲打聲從早到晚沒有停過。巷子窄得只容兩人錯身，抬著銅器的學徒一路吆喝著穿過去。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: south_gate_road_2
+  direction: s
+- source: central_plaza
+  destination: northeast_gate_road_1
+  direction: ne
+- source: central_plaza
+  destination: southwest_gate_road_1
+  direction: sw
+- source: central_plaza
+  destination: north_gate_road_2
+  direction: n
+- source: central_plaza
+  destination: market_street
+  direction: se
+- source: central_plaza
+  destination: inn_lane
+  direction: nw
+- source: ford_crossing
+  destination: southwest_gate
+  direction: se
+- source: ford_crossing
+  destination: riverbank
+  direction: nw
+- source: ford_crossing
+  destination: craft_alley
+  direction: sw
+- source: south_gate
+  destination: south_gate_road_1
+  direction: n
+- source: south_gate
+  destination: palace_forecourt
+  direction: e
+- source: northeast_gate
+  destination: northeast_gate_road_1
+  direction: sw
+- source: southwest_gate
+  destination: ford_crossing
+  direction: nw
+- source: southwest_gate
+  destination: southwest_gate_road_1
+  direction: ne
+- source: southwest_gate
+  destination: lane_03
+  direction: se
+- source: north_gate
+  destination: north_gate_road_2
+  direction: s
+- source: south_gate_road_1
+  destination: south_gate
+  direction: s
+- source: south_gate_road_1
+  destination: south_gate_road_2
+  direction: n
+- source: south_gate_road_1
+  destination: noble_quarter
+  direction: e
+- source: south_gate_road_2
+  destination: central_plaza
+  direction: n
+- source: south_gate_road_2
+  destination: south_gate_road_1
+  direction: s
+- source: south_gate_road_2
+  destination: southwest_gate_road_1
+  direction: w
+- source: south_gate_road_2
+  destination: market_street
+  direction: ne
+- source: south_gate_road_2
+  destination: bath_forecourt
+  direction: nw
+- source: northeast_gate_road_1
+  destination: central_plaza
+  direction: s
+- source: northeast_gate_road_1
+  destination: northeast_gate
+  direction: ne
+- source: northeast_gate_road_1
+  destination: north_gate_road_2
+  direction: w
+- source: northeast_gate_road_1
+  destination: exchange_forecourt
+  direction: sw
+- source: northeast_gate_road_1
+  destination: training_ground
+  direction: se
+- source: southwest_gate_road_1
+  destination: central_plaza
+  direction: ne
+- source: southwest_gate_road_1
+  destination: southwest_gate
+  direction: sw
+- source: southwest_gate_road_1
+  destination: south_gate_road_2
+  direction: e
+- source: southwest_gate_road_1
+  destination: bath_forecourt
+  direction: n
+- source: north_gate_road_2
+  destination: central_plaza
+  direction: s
+- source: north_gate_road_2
+  destination: north_gate
+  direction: n
+- source: north_gate_road_2
+  destination: northeast_gate_road_1
+  direction: e
+- source: north_gate_road_2
+  destination: exchange_forecourt
+  direction: se
+- source: north_gate_road_2
+  destination: lane_04
+  direction: nw
+- source: market_street
+  destination: central_plaza
+  direction: n
+- source: market_street
+  destination: south_gate_road_2
+  direction: sw
+- source: market_street
+  destination: bath_forecourt
+  direction: w
+- source: palace_forecourt
+  destination: south_gate
+  direction: w
+- source: guild_forecourt
+  destination: exchange_forecourt
+  direction: nw
+- source: guild_forecourt
+  destination: training_ground
+  direction: ne
+- source: river_quay
+  destination: riverbank
+  direction: s
+- source: temple_forecourt
+  destination: noble_quarter
+  direction: w
+- source: temple_forecourt
+  destination: academy
+  direction: n
+- source: noble_quarter
+  destination: south_gate_road_1
+  direction: w
+- source: noble_quarter
+  destination: temple_forecourt
+  direction: e
+- source: noble_quarter
+  destination: academy
+  direction: ne
+- source: inn_lane
+  destination: central_plaza
+  direction: se
+- source: inn_lane
+  destination: bath_forecourt
+  direction: s
+- source: exchange_forecourt
+  destination: northeast_gate_road_1
+  direction: ne
+- source: exchange_forecourt
+  destination: north_gate_road_2
+  direction: nw
+- source: exchange_forecourt
+  destination: guild_forecourt
+  direction: se
+- source: riverbank
+  destination: ford_crossing
+  direction: se
+- source: riverbank
+  destination: river_quay
+  direction: n
+- source: craft_alley
+  destination: ford_crossing
+  direction: ne
+- source: academy
+  destination: temple_forecourt
+  direction: s
+- source: academy
+  destination: noble_quarter
+  direction: sw
+- source: training_ground
+  destination: northeast_gate_road_1
+  direction: nw
+- source: training_ground
+  destination: guild_forecourt
+  direction: sw
+- source: bath_forecourt
+  destination: south_gate_road_2
+  direction: se
+- source: bath_forecourt
+  destination: southwest_gate_road_1
+  direction: sw
+- source: bath_forecourt
+  destination: market_street
+  direction: e
+- source: bath_forecourt
+  destination: inn_lane
+  direction: n
+- source: lane_01
+  destination: lane_02
+  direction: s
+- source: lane_01
+  destination: lane_04
+  direction: e
+- source: lane_02
+  destination: lane_01
+  direction: n
+- source: lane_03
+  destination: southwest_gate
+  direction: nw
+- source: lane_04
+  destination: north_gate_road_2
+  direction: se
+- source: lane_04
+  destination: lane_01
+  direction: w
+wilderness_entry:
+  shape:
+  - .##..
+  - '####.'
+  - '#####'
+  - '####.'
+  - ..#..
+  offset:
+    dx: -2
+    dy: -2
+  gates:
+  - return_direction: n
+    destination_node: south_gate
+  - return_direction: sw
+    destination_node: northeast_gate
+  - return_direction: ne
+    destination_node: southwest_gate
+  - return_direction: s
+    destination_node: north_gate
+city_gate:

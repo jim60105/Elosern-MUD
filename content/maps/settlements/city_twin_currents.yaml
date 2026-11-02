@@ -1,0 +1,218 @@
+version: 1
+kind: settlement
+id: city_twin_currents
+location_ref: city_twin_currents
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 595
+    y_m: 803
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 雙流城的中央廣場，兩條河在城東匯成一條。石板路上的水痕乾得比別處慢，挑水的人來回都得繞過那幾段濕地。
+    anchor_key: city_twin_currents
+    typeclass:
+    scene_archetype: city_street
+  north_gate:
+    x_m: 595
+    y_m: 2278
+    prototype_parent: grid_room
+    key: 北門
+    desc: 北門外的路通往星輝城，河運的貨物在這裡轉成陸路北上。門邊的告示板貼著當日船期，字跡被雨打糊了一半。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate:
+    x_m: 100
+    y_m: 308
+    prototype_parent: grid_room
+    key: 西南門
+    desc: 西南門朝香道城的方向，過路的商隊在此歇腳補水。門外的石槽常年盛著水，馬伕排著隊讓牲口喝足。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  north_gate_road_1:
+    x_m: 660
+    y_m: 1524
+    prototype_parent: grid_room
+    key: 北門大街
+    desc: 北門大街連著廣場，兩側是糧行與腳店。挑夫在騎樓下歇息，扁擔擱在腳邊，等著下一批要上船的貨。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 673
+    y_m: 558
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街在廣場南邊，河鮮與穀物在此交易日日不歇。木盆裡的魚還帶著河底的泥，買賣的人蹲在盆邊講價。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 327
+    y_m: 767
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前在廣場西側，分會的任務板前總排著人。河上多風浪，張貼的委託十件有三件與翻船有關。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  river_quay:
+    x_m: 2045
+    y_m: 803
+    prototype_parent: grid_room
+    key: 河港碼頭
+    desc: 河港碼頭在城東的匯流口，平底船在此換艙轉運。兩條河的水色不同，在船舷邊交會成一條清晰的界線。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  temple_forecourt:
+    x_m: 308
+    y_m: 100
+    prototype_parent: grid_room
+    key: 神殿前
+    desc: 神殿前在城南，屋脊正對著兩河交會的方向。漁家在此祈求出水平安，香爐裡的灰積得比城裡任何一處都厚。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  inn_lane:
+    x_m: 897
+    y_m: 701
+    prototype_parent: grid_room
+    key: 客棧巷
+    desc: 客棧巷在城東近水處，船伕與行商在此過夜。窗子一開就是河，夜裡能聽見撐篙觸到河底的悶響。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  exchange_forecourt:
+    x_m: 655
+    y_m: 1120
+    prototype_parent: grid_room
+    key: 商會前
+    desc: 商會前在廣場北側，兩條河的船期在此排定。書記官把日期寫上黑板，底下立刻有人抄下來帶走。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  riverbank:
+    x_m: 2045
+    y_m: 353
+    prototype_parent: grid_room
+    key: 河岸道
+    desc: 河岸道沿著匯流口鋪開，拉縴的人沿著石階上上下下。水退時露出成排的樁孔，那是更早的碼頭留下的痕跡。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  craft_alley:
+    x_m: 2045
+    y_m: 1253
+    prototype_parent: grid_room
+    key: 工匠巷
+    desc: 工匠巷在城東水門旁，修船的木匠與打鐵的同在一條街上。桐油與鐵鏽的味道混在一起，從水門一路飄進城裡。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: southwest_gate
+  direction: sw
+- source: central_plaza
+  destination: north_gate_road_1
+  direction: n
+- source: central_plaza
+  destination: market_street
+  direction: s
+- source: central_plaza
+  destination: guild_forecourt
+  direction: w
+- source: central_plaza
+  destination: inn_lane
+  direction: e
+- source: central_plaza
+  destination: exchange_forecourt
+  direction: ne
+- source: north_gate
+  destination: north_gate_road_1
+  direction: s
+- source: southwest_gate
+  destination: central_plaza
+  direction: ne
+- source: southwest_gate
+  destination: guild_forecourt
+  direction: n
+- source: southwest_gate
+  destination: temple_forecourt
+  direction: se
+- source: north_gate_road_1
+  destination: central_plaza
+  direction: sw
+- source: north_gate_road_1
+  destination: north_gate
+  direction: n
+- source: north_gate_road_1
+  destination: exchange_forecourt
+  direction: s
+- source: market_street
+  destination: central_plaza
+  direction: n
+- source: market_street
+  destination: inn_lane
+  direction: ne
+- source: guild_forecourt
+  destination: central_plaza
+  direction: e
+- source: guild_forecourt
+  destination: southwest_gate
+  direction: sw
+- source: river_quay
+  destination: inn_lane
+  direction: w
+- source: river_quay
+  destination: riverbank
+  direction: s
+- source: river_quay
+  destination: craft_alley
+  direction: n
+- source: temple_forecourt
+  destination: southwest_gate
+  direction: nw
+- source: inn_lane
+  destination: central_plaza
+  direction: w
+- source: inn_lane
+  destination: market_street
+  direction: sw
+- source: inn_lane
+  destination: river_quay
+  direction: e
+- source: exchange_forecourt
+  destination: central_plaza
+  direction: s
+- source: exchange_forecourt
+  destination: north_gate_road_1
+  direction: n
+- source: riverbank
+  destination: river_quay
+  direction: n
+- source: craft_alley
+  destination: river_quay
+  direction: s
+wilderness_entry:
+  shape:
+  - '#.'
+  - '##'
+  - '#.'
+  offset:
+    dx: 0
+    dy: -1
+  gates:
+  - return_direction: s
+    destination_node: north_gate
+  - return_direction: ne
+    destination_node: southwest_gate
+city_gate:

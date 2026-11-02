@@ -1,0 +1,144 @@
+version: 1
+kind: settlement
+id: town_east_pasture
+location_ref: town_east_pasture
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 600
+    y_m: 579
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 東牧鎮的中央廣場，牲畜市就開在廣場邊的圍欄裡。風把草屑吹得滿街都是，石板縫裡也長著草。
+    anchor_key: town_east_pasture
+    typeclass:
+    scene_archetype: city_street
+  northwest_gate:
+    x_m: 105
+    y_m: 1074
+    prototype_parent: grid_room
+    key: 西北門
+    desc: 西北門外的路通往帝河津，馬販與鹽商從這條路進鎮。門邊的拴馬樁不夠用時，連樹上都會繫上繩。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  west_gate:
+    x_m: 100
+    y_m: 579
+    prototype_parent: grid_room
+    key: 西門
+    desc: 西門朝著星輝城，載草料的大車從這裡出去。車頂堆得比門洞還高，進出都得有人在旁看著才挪得過去。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northwest_gate_road_1:
+    x_m: 408
+    y_m: 802
+    prototype_parent: grid_room
+    key: 西北街
+    desc: 西北街是進鎮之後最寬的一段，拴馬樁沿著街邊排開。馬蹄把路面踩出一個個淺坑，雨後積著水。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 527
+    y_m: 409
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街在廣場西南，皮毛與乳酪在此論價。羊皮的氣味混著奶香，外地人走一趟要掩著鼻子。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 801
+    y_m: 560
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前在廣場東側，分會的委託多半是找走失的牲口。板子上釘著手畫的馬與牛，畫得歪歪扭扭。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  temple_forecourt:
+    x_m: 424
+    y_m: 100
+    prototype_parent: grid_room
+    key: 神殿前
+    desc: 神殿前在鎮南，牧人出門前會來點一炷香。香案旁放著一盆清水，據說能洗掉牲口帶回來的晦氣。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  inn_lane:
+    x_m: 654
+    y_m: 830
+    prototype_parent: grid_room
+    key: 客棧巷
+    desc: 客棧巷在鎮北，趕牲口的人在此過夜。院子裡整夜有蹄聲與鈴聲，睡不慣的旅人天亮就上路。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: west_gate
+  direction: w
+- source: central_plaza
+  destination: northwest_gate_road_1
+  direction: nw
+- source: central_plaza
+  destination: market_street
+  direction: sw
+- source: central_plaza
+  destination: guild_forecourt
+  direction: e
+- source: central_plaza
+  destination: inn_lane
+  direction: n
+- source: northwest_gate
+  destination: northwest_gate_road_1
+  direction: se
+- source: west_gate
+  destination: central_plaza
+  direction: e
+- source: northwest_gate_road_1
+  destination: central_plaza
+  direction: se
+- source: northwest_gate_road_1
+  destination: northwest_gate
+  direction: nw
+- source: northwest_gate_road_1
+  destination: inn_lane
+  direction: e
+- source: market_street
+  destination: central_plaza
+  direction: ne
+- source: market_street
+  destination: temple_forecourt
+  direction: s
+- source: guild_forecourt
+  destination: central_plaza
+  direction: w
+- source: temple_forecourt
+  destination: market_street
+  direction: n
+- source: inn_lane
+  destination: central_plaza
+  direction: s
+- source: inn_lane
+  destination: northwest_gate_road_1
+  direction: w
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: se
+    destination_node: northwest_gate
+  - return_direction: e
+    destination_node: west_gate
+city_gate:
