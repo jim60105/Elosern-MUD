@@ -56,6 +56,11 @@ def _lint_radius(document: Any, location_cell: tuple[int, int]) -> int:
         cell_of(world_position(location_cell, anchor, node.coordinate))
         for node in document.nodes.values()
     ]
+    for road in document.roads:
+        cells.extend(
+            cell_of(world_position(location_cell, anchor, (bend.x_m, bend.y_m)))
+            for bend in road.bends
+        )
     geometry = document.wilderness_geometry(location_cell)
     if geometry is not None:
         cells.extend(geometry.footprint_cells)

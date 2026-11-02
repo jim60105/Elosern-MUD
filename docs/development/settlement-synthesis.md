@@ -139,11 +139,17 @@ stream inside a cell cannot be represented, so a water-edge role is allowed a
 generous distance rather than an exact shoreline. Road polylines are sampled
 every 50 m or less, endpoints included.
 
-The terrain window is sized from the map's nodes, footprint cells and gate
-approaches, so a road that bends far outside that box is only checked where the
-box reaches. A road that leaves the neighbourhood and crosses water beyond it is
-not reported; extending the window (and the sampled bends with it) is a design
-change, not a local tolerance.
+The terrain window is sized from every cell the lint reads: the map's nodes,
+road bends, footprint cells and gate approaches. A window is a convex square, so
+every sampled point of a segment whose endpoints are inside it is inside it too;
+the whole of each road polyline is therefore checked, however far a bend
+reaches.
+
+Water is only known per 1 km cell, and the sampler tests points rather than
+cell entries: a road that clips the corner of a water cell for less than the
+50 m sample spacing can pass between two samples. That is a limit of the
+approved sampling rule; the fix for a reported crossing is the same either way,
+so it is documented rather than papered over.
 
 Errors mean the graph contradicts its terrain. Warnings are review prompts:
 they name a gate that faces inward or a road whose authored exit name drifts

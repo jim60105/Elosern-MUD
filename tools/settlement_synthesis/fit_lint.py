@@ -175,7 +175,7 @@ def lint_settlement(
                         object_id=node_id,
                         message=(
                             f"{node_id} claims a water-edge role but no water lies "
-                            f"within the {config.water_edge_max_m} m window"
+                            "in the checked terrain window"
                         ),
                     )
                 )
