@@ -94,7 +94,7 @@ Run the module list in tasks.md, then restore with `git checkout` and `rm`. A mo
 - Ciaran node keys and its 394 s duration are untouched.
 - The `sample-city-altoria` scenario titles still say "South Gate" and "East Gate". Those node ids are permanent.
 
-Removing these would mean rewriting about 40 more modules. That is a separate decision; see the report's open questions.
+Removing these would mean rewriting about 40 more modules. That is deferred to a later change; this change keeps those assumptions.
 
 ## Risks / Trade-offs
 

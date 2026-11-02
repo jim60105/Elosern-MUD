@@ -29,18 +29,18 @@ See proposal.md (Why). Facts verified on master at proposal time:
 
 ## Decisions
 
-### D1. Relocate the capital to the north bank (default; confirm with the user)
+### D1. Relocate the capital to the north bank (approved by the user, 2026-11-02)
 
 These are the options for the quay-versus-river mismatch:
 
 | Option | Effect | Verdict |
 | --- | --- | --- |
-| A. Move the cell to (861, 1042), on the north bank by the ford | The river is south, the terraces climb north, and the ford feeds the south gate. This matches "riverfront below northern terraces", the south gate's 渡口 origin and the existing "從碼頭沿著北岸向東" riverbank prose. | **Default** |
+| A. Move the cell to (861, 1042), on the north bank by the ford | The river is south, the terraces climb north, and the ford feeds the south gate. This matches "riverfront below northern terraces", the south gate's 渡口 origin and the existing "從碼頭沿著北岸向東" riverbank prose. | **Chosen** |
 | B. Move to the south bank, around (850, 1034) | The river lies north, which contradicts "below northern terraces". | Rejected |
 | C. Keep the cell and redraw `capital_river` north of it | This edits continent terrain: elevation, partition, every river consumer and the ford. | Rejected as out of scope |
 | D. Keep the cell and drop the water roles | This contradicts the lore and the existing quay interior prose. | Rejected |
 
-Option A changes the world position of everything in Altoria by about (+11 km, +19 km), and the district partition is regenerated. If the user rejects A before this change is applied, stop. The change has to be re-proposed with the user's chosen option.
+Option A changes the world position of everything in Altoria by about (+11 km, +19 km), and the district partition is regenerated. The user approved option A on 2026-11-02.
 
 ### D2. Binding table (exact file content)
 

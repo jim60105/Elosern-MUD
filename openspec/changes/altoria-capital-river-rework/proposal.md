@@ -11,7 +11,7 @@ The lore supports moving the town to the river. Its `geographic_constraint` read
 
 ## What Changes
 
-- **Data.** Move `locations.capital_altoria.cell` from (850, 1024) to (861, 1042). That cell is on the north bank, 2 cells north of the `capital_river` ford at (861, 1040). `place_sites.py` reports it as walkable, in `western_hills_valleys`, nominal nation `altoria`. This is the default answer to the quay-versus-river question and is flagged for user confirmation; see design D1 for the alternatives.
+- **Data.** Move `locations.capital_altoria.cell` from (850, 1024) to (861, 1042). That cell is on the north bank, 2 cells north of the `capital_river` ford at (861, 1040). `place_sites.py` reports it as walkable, in `western_hills_valleys`, nominal nation `altoria`. The user approved this answer to the quay-versus-river question on 2026-11-02; see design D1 for the rejected alternatives.
 - **Data.** Regenerate `content/maps/settlements/capital_altoria.yaml` with `generate capital_altoria --replace --bind … --gates s,e`. The result is a `river_crossing` layout:
   - a 13-cell footprint that reaches the ford;
   - 28 nodes, among them a new `ford_crossing` node, two more neighbour-facing gates, approach streets and lanes;

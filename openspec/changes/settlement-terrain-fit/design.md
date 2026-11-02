@@ -233,7 +233,7 @@ The `size_budget` rules, in order:
 
 **Exponent.** Cesaretti et al. (2016, *PLOS ONE*) give an exponent of about 0.714 over 173 medieval European cities. That paper is the research basis (tmp/Elosern_Settlement_Research_2026.md item 12).
 
-**Density anchor.** The user's brief and the late-medieval walled-town literature describe densities of roughly 100–250 inhabitants per hectare. 150/ha at 10,000 people is the mid-range anchor, which gives about 0.67 km². This proposal did not independently re-verify the anchor, so it stays an open question for the user. With exponent 0.714, density rises as population^0.286. Illustrative default output:
+**Density anchor.** The user's brief and the late-medieval walled-town literature describe densities of roughly 100–250 inhabitants per hectare. 150/ha at 10,000 people is the mid-range anchor, which gives about 0.67 km². The user accepted this anchor on 2026-11-02; it is a tunable default in the size budget, not a verified constant. With exponent 0.714, density rises as population^0.286. Illustrative default output:
 
 | population | area km² | cells | envelope radius m | inh/ha |
 | ---: | ---: | ---: | ---: | ---: |
