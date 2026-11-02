@@ -4,7 +4,7 @@ Ground rules for every task:
 - Edit ONLY the test files a task names, plus the extra modules that task 9.3 identifies. Do NOT touch production code, `content/` (except the temporary canary in group 9, which you revert), `docs/`, `tools/`, `.github/` or `openspec/specs/`.
 - Keep each `@covers_requirement(...)` ID exactly as it is. Never change the first docstring line of a `Data-contract test:` module.
 - Run Evennia tests as ONE standalone command with no pipes, redirects or env prefixes. For example: `uv run evennia test --keepdb --settings settings.py world.maps.tests.test_city_walkthrough`. Without `--settings settings.py` the run fails with a misleading prototype `KeyError`. If output is truncated, read the log artifact path the tool prints.
-- Expected values come from the authored documents (design D1) or from the `_walk_seconds` oracle (design D2). Never copy a number from the current YAML into a test.
+- Expected values come from the authored documents (design D1) or are checked by the bracketing relation in design D2. Never copy a number from the current YAML into a test.
 - Keep the indentation exactly as shown. Methods are indented 4 spaces inside their class.
 
 ## 1. Baseline
@@ -81,7 +81,37 @@ Ground rules for every task:
   - The capital gate list literal `[("n", "capital_altoria", "south_gate"), ("w", "capital_altoria", "east_gate")]` → `[(g.return_direction, "capital_altoria", g.destination_node) for g in document.wilderness_entry.gates]`.
   - Leave the village assertions unchanged.
 
-  Check: `grep -nE "847, 1020|, 40\)" world/lore/tests/test_wilderness_entry.py` prints nothing, and the module passes.
+- [ ] 3.2 In `test_derived_geometry_matches_the_authored_mask`, keep the footprint-cells comprehension, the point-shape check and the 4-connectivity walk. Replace the literal assertions as follows, with these definitions at the top of the method:
+
+  ```python
+  document = current().settlements["capital_altoria"]
+  cell = geography.current().locations.locations["capital_altoria"].cell
+  geometry = document.wilderness_geometry(cell)
+  ```
+
+  Import `gate_approach_cell` from `elosern_map_core.authoring`.
+  - The 7×9 `shape` tuple literal → `self.assertEqual(_capital().shape, document.wilderness_entry.shape)`.
+  - `hash_cell_count == 40` → `== geometry.hash_cell_count`.
+  - `anchor_cell == (850, 1024)` → `== geometry.anchor_cell`.
+  - The two `approach_cell(...)` literals `(850, 1021)` and `(854, 1024)` become a loop over `document.wilderness_entry.gates`. For each gate, assert `_capital().approach_cell(_capital().gate_for(g.return_direction)) == gate_approach_cell(geometry, g.return_direction)`.
+  - Rewrite the leading comment so that it no longer states "40 km²" or "7x9".
+- [ ] 3.3 In `test_gate_lookup_by_return_direction`:
+  - Keep the `gate_for("n")` and `gate_for("w")` destination assertions.
+  - Replace the two `assertIsNone(...gate_for("s"/"e"))` lines and their comment with:
+
+    ```python
+    from world.maps.map_data import current
+
+    authored = {g.return_direction for g in current().settlements["capital_altoria"].wilderness_entry.gates}
+    for direction in ("n", "ne", "e", "se", "s", "sw", "w", "nw"):
+        with self.subTest(direction=direction):
+            if direction in authored:
+                self.assertIsNotNone(_capital().gate_for(direction))
+            else:
+                self.assertIsNone(_capital().gate_for(direction))
+    ```
+
+  Check: `grep -nE "847, 1020|, 40\)|850, 102|854, 1024|#\.\.\.\.\.#" world/lore/tests/test_wilderness_entry.py` prints nothing, and the module passes.
 
 ## 4. Bootstrap sync (`world/maps/tests/test_bootstrap.py`)
 
@@ -104,7 +134,32 @@ Ground rules for every task:
   ```
   Call `_plaza_key()` at each use site. A module-level constant would read the published view at import time, so use the function. Leave the compact keys `"grid:capital_altoria:3:3"`, `"grid:capital_altoria:3:0"` and `"grid:village_ciaran:1:1"` unchanged.
 
-  Check: `grep -nE "3500:2850|twenty_one|fifty_two" world/maps/tests/test_bootstrap.py` prints nothing, and the module passes. Run it class by class if the guard reports more than 100 tests.
+- [ ] 4.4 In `WildernessBootstrapTests`:
+  - In `test_sync_wilderness_provisions_one_gate_exit_per_authored_gate` and `test_sync_wilderness_is_idempotent`, replace `WildernessGateExit.objects.all().count(), 3` with:
+
+    ```python
+    WildernessGateExit.objects.all().count(),
+    sum(len(d.wilderness_entry.gates) for d in current().settlements.values() if d.wilderness_entry is not None),
+    ```
+
+    Import `current` from `world.maps.map_data` inside each method.
+  - In `test_provisioned_gates_are_immediately_traversable`, replace `(854, 1024)` with `_approach("w")` and `(850, 1021)` with `_approach("n")`. Add a module-level function:
+
+    ```python
+    def _approach(return_direction):
+        from elosern_map_core.authoring import gate_approach_cell
+        from world.maps import geography
+        from world.maps.map_data import current
+
+        document = current().settlements["capital_altoria"]
+        cell = geography.current().locations.locations["capital_altoria"].cell
+        return gate_approach_cell(document.wilderness_geometry(cell), return_direction)
+    ```
+
+  - In the same test, replace `self._gate_exits()[1][0]` with `next(e for e in self._gate_exits()[1] if e.db.gate_direction == "w")`, and the south one with the same pattern using `"n"`.
+  - In `test_sync_wilderness_provisions_one_gate_exit_per_authored_gate`, the per-room `len(gates) == 1` checks hold only while each of those rooms carries one gate. Replace them with `len([g for g in gates if g.db.gate_direction == "w"]) == 1`, and the south check with the same pattern using `"n"`.
+
+  Check: `grep -nE "3500:2850|twenty_one|fifty_two|854, 1024|850, 1021|count\(\), 3\)" world/maps/tests/test_bootstrap.py` prints nothing, and the module passes. Run it class by class if the guard reports more than 100 tests.
 
 ## 5. City walkthrough (`world/maps/tests/test_city_walkthrough.py`)
 
@@ -130,21 +185,22 @@ Ground rules for every task:
 
 ## 6. City movement cost (`world/maps/tests/test_city_movement_cost.py`)
 
-- [ ] 6.1 Add the `_walk_seconds` function from design D2 at module level. Delete `SOUTH_GATE_TO_AVENUE_SECONDS` and its comment line (`南門 (3050,150) -> ...`), and keep `HIDDEN_PATH_TO_PLAZA_SECONDS`.
+- [ ] 6.1 Add `_polyline_metres` and the `assertChargedFor` mixin method from design D2. The mixin is a small class `_ChargeAssertions` that the test class also inherits. Delete `SOUTH_GATE_TO_AVENUE_SECONDS` and its comment line (`南門 (3050,150) -> ...`), and keep `HIDDEN_PATH_TO_PLAZA_SECONDS`.
 - [ ] 6.2 In `test_fresh_intra_city_traversal_advances_clock_by_move`:
   - Replace the `"南大道"` lookup with `city_exit = next(e for e in south_gate.exits if isinstance(e, CostedXYZExit))`.
   - Compute `document = current().settlements["capital_altoria"]`.
   - Find the road: `road = next(r for r in document.roads if r.source == south_gate.sparse_node_id and r.destination == city_exit.destination.sparse_node_id)`.
-  - Build `points = [document.nodes[road.source].coordinate, *[(b.x_m, b.y_m) for b in road.bends], document.nodes[road.destination].coordinate]` and `expected = _walk_seconds(points)`.
-  - Assert `self.char1.location == city_exit.destination` instead of comparing keys. Assert `tick == before + expected` and `assertNotEqual(expected, MOVE)`.
+  - Build `points = [document.nodes[road.source].coordinate, *[(b.x_m, b.y_m) for b in road.bends], document.nodes[road.destination].coordinate]`.
+  - Assert `self.char1.location == city_exit.destination` instead of comparing keys.
+  - With `delta = tick - before`, assert `self.assertChargedFor(delta, _polyline_metres(points))` and `assertNotEqual(delta, MOVE)`.
 
   Check: `grep -n "724\|南大道" world/maps/tests/test_city_movement_cost.py` prints nothing, and the module passes.
 
 ## 7. City–wilderness roundtrip (`world/maps/tests/test_city_wilderness_roundtrip.py`)
 
-- [ ] 7.1 Add `_walk_seconds` (design D2) at module level. Replace the constant `GATE_APPROACH_SECONDS = 811` and its comment with a function:
+- [ ] 7.1 Add `_polyline_metres` and the `_ChargeAssertions` mixin (design D2), and make `CityWildernessRoundTripTests` inherit the mixin. Replace the constant `GATE_APPROACH_SECONDS = 811` and its comment with a function:
   ```python
-  def _gate_approach_seconds():
+  def _gate_approach_metres():
       from world.maps import geography
       from world.maps.map_data import current
 
@@ -154,10 +210,17 @@ Ground rules for every task:
       gate_x, gate_y = document.nodes[_EAST_GATE.destination.object_id].coordinate
       gate_world = (1000 * cell_x + 500 + gate_x - anchor_x, 1000 * cell_y + 500 + gate_y - anchor_y)
       approach_world = (1000 * EAST_APPROACH[0] + 500, 1000 * EAST_APPROACH[1] + 500)
-      return _walk_seconds([gate_world, approach_world])
+      return _polyline_metres([gate_world, approach_world])
   ```
-  Replace each use of `GATE_APPROACH_SECONDS` with `_gate_approach_seconds()`. Keep `WILDERNESS_STEP_SECONDS`.
-- [ ] 7.2 In `test_intra_city_grid_traversal_advances_clock_by_move`, apply the same rewrite as task 6.2: any `CostedXYZExit` of the south gate, with the expected value from the document road and `_walk_seconds`. This replaces the `"南大道"` lookups and `before + 724`.
+
+  In `test_full_round_trip_leaves_no_leaked_bookkeeping`, replace the `assertEqual(advances, [...])` and the total-tick assertion with these assertions:
+  - `advances[1] == advances[2] == WILDERNESS_STEP_SECONDS`;
+  - `advances[0] == advances[3]`;
+  - `self.assertChargedFor(advances[0], _gate_approach_metres())`;
+  - `get_world_clock().tick == before + sum(advances)`.
+
+  Apply the same pattern to every other use of `GATE_APPROACH_SECONDS`: the charged delta of a gate crossing must satisfy `assertChargedFor(delta, _gate_approach_metres())`. Keep `WILDERNESS_STEP_SECONDS`.
+- [ ] 7.2 In `test_intra_city_grid_traversal_advances_clock_by_move`, apply the same rewrite as task 6.2: any `CostedXYZExit` of the south gate, checked with `assertChargedFor` against the document road's polyline metres. This replaces the `"南大道"` lookups and `before + 724`.
 
   Check: `grep -nE "811|724|6500,3010|南大道" world/maps/tests/test_city_wilderness_roundtrip.py` prints nothing, and the module passes.
 
@@ -236,7 +299,10 @@ Ground rules for every task:
   Then make these edits in `content/maps/settlements/capital_altoria.yaml`:
   - set `south_gate.x_m` to `3090` and `east_gate.x_m` to `6540`;
   - add a node `canary_lane` with every node field: `x_m: 3620`, `y_m: 2960`, `prototype_parent: grid_room`, `key: 金絲雀巷`, `desc: 金絲雀測試。`, `anchor_key:` empty, `typeclass:` empty, `scene_archetype: city_street`;
-  - append two roads: `central_plaza → canary_lane`, direction `ne`, and `canary_lane → central_plaza`, direction `sw`.
+  - append two roads: `central_plaza → canary_lane`, direction `ne`, and `canary_lane → central_plaza`, direction `sw`;
+  - under `wilderness_entry.gates`, after the `w`/`east_gate` entry, append two gates: `return_direction: s` with `destination_node: palace_forecourt`, and `return_direction: e` with `destination_node: craft_alley`.
+
+  In `content/maps/locations.yaml`, under `capital_altoria:` → `cell:`, change `cell_x: 850` to `cell_x: 851`.
 
   Run `uv run --locked --project tools/map-editor python .agents/skills/map-data-authoring/scripts/regenerate_partition.py`. Check: `uv run --locked --project packages/map-core python .agents/skills/map-data-authoring/scripts/check_map_sources.py` prints `district partition: current`, and it reports no structure error and no game-adoption problem.
 - [ ] 9.2 With the canary applied, run every module below, one per command. Use `uv run evennia test --keepdb --settings settings.py <label>` for Evennia modules and `uv run --locked python -m unittest <label>` for the `tests.` module. Record each failure in a scratch note. Run a module class by class if the guard reports more than 100 tests.
@@ -245,7 +311,7 @@ Ground rules for every task:
 
   Check: you have one recorded result per module.
 - [ ] 9.3 For every module that failed in 9.2 but passed in a clean run (task 1.1, or a clean rerun of that module after a temporary revert), find the copied settlement value: a literal coordinate, count, duration, node key or roster. Rewrite it with the D1/D2 recipes in that module, keeping requirement IDs. A failure that has a real cause other than a copied settlement value is a finding to report, not something to fix here. Check: rerunning the module with the canary applied passes.
-- [ ] 9.4 Revert the canary: `rm content/maps/settlements/town_scarp.yaml` and `git checkout -- content/maps/settlements/capital_altoria.yaml world/maps/data/district_partition.json`. Check: `git status --porcelain content world/maps/data` prints nothing, and `check_map_sources.py` exits 0 or prints the same result as before group 9.
+- [ ] 9.4 Revert the canary: `rm content/maps/settlements/town_scarp.yaml` and `git checkout -- content/maps/settlements/capital_altoria.yaml content/maps/locations.yaml world/maps/data/district_partition.json`. Check: `git status --porcelain content world/maps/data` prints nothing, and `check_map_sources.py` exits 0 or prints the same result as before group 9.
 
 ## 10. Final checks
 

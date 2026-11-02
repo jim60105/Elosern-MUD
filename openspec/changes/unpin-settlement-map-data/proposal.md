@@ -11,14 +11,15 @@ The planned settlement work adds 59 settlement maps for the national cities, tow
   - local coordinates, entrance coordinates and knowledge keys → read from the document's nodes;
   - mask cell count and origin → derived from the document's `wilderness_entry`;
   - room and exit counts → the document's node and road counts;
-  - durations → an independent geometry oracle over the authored metres;
+  - mask shape, anchor and approach cells, and gate counts → the document geometry and `gate_approach_cell`;
+  - durations → a bracketing relation between the charged seconds and the authored polyline metres;
   - the walk chain → a shortest route from the city-gate node to the anchor.
 - Make the metric-cutover seeding in `world/maps/tests/test_bootstrap.py` seed only the maps and nodes its historical table lists. Adding a settlement then no longer raises `KeyError`.
 - Remove the coordinate pins from the scenarios of four requirements. The behaviour stays the same:
   - `sample-city-altoria`: entrance and wilderness-gate rooms;
   - `grid-room-sync`: Limbo bridge destination;
   - `wilderness-gateway`: registry roster and return-exit destinations, two requirements.
-- Prove the change with a canary step, as evidence only. Add one throwaway settlement document and perturb Altoria (move two nodes, add one node and a road pair). Run the affected test modules, then restore the data. Nothing from the canary is committed.
+- Prove the change with a canary step, as evidence only. Add one throwaway settlement document and perturb Altoria: move two nodes, add one node and a road pair, add two gates whose return directions are `s` and `e`, and shift its location cell by one. Run the affected test modules, then restore the data. Nothing from the canary is committed.
 - No production code, content, docs or shard manifest changes.
 
 ## Capabilities
