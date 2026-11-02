@@ -30,6 +30,7 @@ None. `skip_specs: true` is set.
 
 ## Batch:
 
+- depends-on: settlement-sync-cost-probe
 - depends-on: altoria-settlement-maps
 - depends-on: settlement-rework-and-prose
 - conflicts: rewrites `world/maps/data/district_partition.json` after `altoria-settlement-maps`. The Altoria border-river footprints are blocked cells here.

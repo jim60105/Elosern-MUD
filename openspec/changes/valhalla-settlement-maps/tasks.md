@@ -11,6 +11,7 @@ Ground rules:
 
 ## 1. Baseline and plan
 
+- [ ] 1.0 Read `docs/development/settlement-synthesis.md` § Runtime cost. Check: its decision word is **proceed**. If it is **blocked** or missing, stop without changing anything and report.
 - [ ] 1.1 Run `check_map_sources.py` and `uv run --locked python -m tools.settlement_synthesis lint`. Check: record both results, and confirm the lint exits 0.
 - [ ] 1.2 Run `uv run --locked evennia test --keepdb --settings settings.py world.maps.tests.test_bootstrap`. Check: record `Ran N tests in X s` as the D3 baseline.
 - [ ] 1.3 Run `generate --missing --nation valhalla --plan-only`. Check:
@@ -37,7 +38,7 @@ Ground rules:
 
 - [ ] 3.1 Regenerate the partition, then run `check_map_sources.py`. Check: exit 0, and partition, elevation and reference context are all current.
 - [ ] 3.2 Rerun `world.maps.tests.test_bootstrap` and apply the D3 gate. Check: the gate passes. If it does not, stop, do not commit, and report.
-- [ ] 3.3 Run the test labels in `grandia-settlement-maps` tasks.md 4.3, one per command. Check: all pass.
+- [ ] 3.3 Run every module in `docs/development/settlement-synthesis.md` § Settlement-sensitive test modules, one per command. Check: all pass. Handle a failure with that doc section's "Residual pin rule", and list every rewritten test in the hand-off. Any other failure stops the change without a commit.
 - [ ] 3.4 Capture the continent with `--hide partition`, plus the settlement views of `capital_valhalla`, `city_mutual_market` and `town_east_ford_camp`, and read the images. Check: the hand-off describes each ring layout and its gates.
 - [ ] 3.5 Run `tools.contract_gate` and `openspec validate valhalla-settlement-maps --strict`. Check: both succeed. The hand-off lists any unresolved ids and the D3 numbers.
 
