@@ -47,6 +47,7 @@ from tools.settlement_synthesis.roles import RoleEntry
 from tools.settlement_synthesis.site import SettlementRef, analyse_site
 from tools.settlement_synthesis.terrain_view import GridTerrain
 from tools.settlement_synthesis.workspace import load_workspace
+from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EDITOR_TESTS = REPO_ROOT / "tools" / "map-editor" / "tests"
@@ -275,6 +276,9 @@ def _assert_direction_geometry(test: unittest.TestCase, result) -> None:
 
 
 class DeterminismTests(unittest.TestCase):
+    @covers_requirement(
+        "settlement-graph-generation::generation-is-deterministic-and-seeded-by-location-identity"
+    )
     def test_repeat_runs_are_byte_identical(self) -> None:
         terrain = _open_terrain()
         first = generate_settlement(_input(_ref(), terrain))
@@ -287,6 +291,9 @@ class DeterminismTests(unittest.TestCase):
         reparsed = parse_document("content/maps/settlements/site_a.yaml", one)
         self.assertEqual(serialize_document(reparsed.document, None), one)
 
+    @covers_requirement(
+        "settlement-graph-generation::generation-is-deterministic-and-seeded-by-location-identity"
+    )
     def test_different_identity_changes_the_layout(self) -> None:
         terrain = _open_terrain()
 
@@ -302,6 +309,9 @@ class DeterminismTests(unittest.TestCase):
 
 
 class MorphologyTests(unittest.TestCase):
+    @covers_requirement(
+        "settlement-graph-generation::morphology-follows-the-site-and-a-dry-port-is-refused"
+    )
     def test_selection_order(self) -> None:
         cases = (
             (
@@ -335,6 +345,9 @@ class MorphologyTests(unittest.TestCase):
                 result = generate_settlement(_input(ref, terrain, budget=budget))
                 self.assertEqual(result.morphology, expected[label])
 
+    @covers_requirement(
+        "settlement-graph-generation::morphology-follows-the-site-and-a-dry-port-is-refused"
+    )
     def test_dry_port_is_refused(self) -> None:
         ref = _ref("site_dry_port", "port")
         budget = _budget(2, nodes=10, radius=500, location_id=ref.location_id)
@@ -347,6 +360,9 @@ class MorphologyTests(unittest.TestCase):
 
 
 class FootprintTests(unittest.TestCase):
+    @covers_requirement(
+        "settlement-graph-generation::generated-footprints-are-connected-walkable-masks-centred-on-the-location"
+    )
     def test_open_ground(self) -> None:
         ref = _ref()
         budget = _budget(5, nodes=10, radius=500)
@@ -366,6 +382,9 @@ class FootprintTests(unittest.TestCase):
             LOCATION,
         )
 
+    @covers_requirement(
+        "settlement-graph-generation::generated-footprints-are-connected-walkable-masks-centred-on-the-location"
+    )
     def test_blocked_cells_and_river_contact(self) -> None:
         ref = _ref()
         terrain = _river_terrain()
@@ -388,6 +407,9 @@ class FootprintTests(unittest.TestCase):
         )
         self.assertTrue(touching)
 
+    @covers_requirement(
+        "settlement-graph-generation::generated-footprints-are-connected-walkable-masks-centred-on-the-location"
+    )
     def test_unreachable_water_is_refused(self) -> None:
         ref = _ref()
         neighbours = {
@@ -415,6 +437,9 @@ class FootprintTests(unittest.TestCase):
         self.assertIn("site_a", str(caught.exception))
         self.assertIn("water_unreachable", str(caught.exception))
 
+    @covers_requirement(
+        "settlement-graph-generation::generated-footprints-are-connected-walkable-masks-centred-on-the-location"
+    )
     def test_corridor_reports_the_offset(self) -> None:
         ref = _ref()
         corridor = frozenset((x, LOCATION[1]) for x in range(0, LOCATION[0] + 1))
@@ -433,6 +458,9 @@ class FootprintTests(unittest.TestCase):
         self.assertNotEqual(midpoint, LOCATION)
         self.assertIn("footprint_location_offset", result.warnings)
 
+    @covers_requirement(
+        "settlement-graph-generation::generated-footprints-are-connected-walkable-masks-centred-on-the-location"
+    )
     def test_midpoint_outside_the_footprint_is_refused(self) -> None:
         ref = _ref()
         horizontal = {(x, 15) for x in range(12, 16)}
@@ -454,6 +482,9 @@ class FootprintTests(unittest.TestCase):
 
 
 class StructureTests(unittest.TestCase):
+    @covers_requirement(
+        "settlement-graph-generation::generated-graphs-satisfy-the-structure-rules-and-the-terrain-fit-lint"
+    )
     def test_degree_cap_cannot_be_raised_above_six(self) -> None:
         with self.assertRaises(ValueError):
             GenerationConfig(max_degree=7)
@@ -504,6 +535,9 @@ class StructureTests(unittest.TestCase):
 
         _assert_direction_geometry(self, result)
 
+    @covers_requirement(
+        "settlement-graph-generation::generated-graphs-satisfy-the-structure-rules-and-the-terrain-fit-lint"
+    )
     def test_open_riverside_and_coastal_layouts(self) -> None:
         cases = (
             ("open", _ref("site_open"), _open_terrain(), 5, "crossroads"),
@@ -529,6 +563,9 @@ class StructureTests(unittest.TestCase):
                 self.assertEqual(result.morphology, morphology)
                 self._assert_structure(ref, terrain, result)
 
+    @covers_requirement(
+        "settlement-graph-generation::generated-graphs-satisfy-the-structure-rules-and-the-terrain-fit-lint"
+    )
     def test_collision_repaired_crossing_keeps_its_directions(self) -> None:
         # A ford on the location cell puts the plaza and the crossing on one
         # point; the document separates them by a metre, and the directions
@@ -560,6 +597,9 @@ class StructureTests(unittest.TestCase):
 
 
 class GateTests(unittest.TestCase):
+    @covers_requirement(
+        "settlement-graph-generation::gates-face-their-neighbours-on-distinct-walkable-approaches"
+    )
     def test_ordered_and_skipped_bearings(self) -> None:
         ref = _ref("site_gate")
         capital = _ref("cap_x", "capital", "nat_a", 90_000, (15, 21))
@@ -607,6 +647,9 @@ class GateTests(unittest.TestCase):
 
 
 class RoleTests(unittest.TestCase):
+    @covers_requirement(
+        "settlement-graph-generation::roles-come-from-the-catalogue-and-are-placed-by-the-site"
+    )
     def test_class_and_budget_filter(self) -> None:
         catalogue = (
             RoleEntry("quay", "碼頭", frozenset({"port"}), "water_edge", 5, 0, None),
@@ -624,6 +667,9 @@ class RoleTests(unittest.TestCase):
         self.assertNotIn("quay", slot_ids)
         self.assertNotIn("lane_far", slot_ids)
 
+    @covers_requirement(
+        "settlement-graph-generation::roles-come-from-the-catalogue-and-are-placed-by-the-site"
+    )
     def test_dry_and_river_sites(self) -> None:
         catalogue = (
             RoleEntry(
@@ -657,6 +703,9 @@ class RoleTests(unittest.TestCase):
         )
         self.assertLessEqual(nearest, 600)
 
+    @covers_requirement(
+        "settlement-graph-generation::roles-come-from-the-catalogue-and-are-placed-by-the-site"
+    )
     def test_high_ground_goes_uphill(self) -> None:
         catalogue = (
             RoleEntry(
@@ -676,6 +725,9 @@ class RoleTests(unittest.TestCase):
         slot = next(slot for slot in result.slots if slot.slot_id == "temple_forecourt")
         self.assertGreater(slot.rel_m[1], 0)
 
+    @covers_requirement(
+        "settlement-graph-generation::roles-come-from-the-catalogue-and-are-placed-by-the-site"
+    )
     def test_downstream_takes_the_easternmost_edge(self) -> None:
         terrain = _terrain(
             inland_water=frozenset((x, 14) for x in range(0, 31)),
@@ -779,6 +831,9 @@ class CommandTests(unittest.TestCase):
             synthetic.yaml_text(data), encoding="utf-8"
         )
 
+    @covers_requirement(
+        "settlement-graph-generation::the-generator-never-overwrites-and-batches-in-a-fixed-order"
+    )
     def test_existing_document_is_refused(self) -> None:
         # The stock workspace binds synthetic_place through a document with
         # another identity, so the refusal must find the binding, not the file.
@@ -796,6 +851,9 @@ class CommandTests(unittest.TestCase):
         self.assertIn("exists: content/maps/settlements/synthetic_burg.yaml", canonical.stdout)
         self.assertEqual(synthetic.tree_digest(self.root), digest)
 
+    @covers_requirement(
+        "settlement-graph-generation::the-generator-never-overwrites-and-batches-in-a-fixed-order"
+    )
     def test_plan_only_and_batch_order(self) -> None:
         plan = self._run(
             "generate", "--missing", "--nation", "nat_a", "--plan-only",
@@ -844,6 +902,9 @@ class CommandTests(unittest.TestCase):
         lint = self._run("lint")
         self.assertEqual(lint.returncode, 0, lint.stdout + lint.stderr)
 
+    @covers_requirement(
+        "settlement-graph-generation::the-generator-never-overwrites-and-batches-in-a-fixed-order"
+    )
     def test_blocked_cells_reserves_other_sources_and_excludes_own_location(self) -> None:
         blocked = load_workspace(self.root, self.lore).blocked_cells("synthetic_burg")
 
@@ -854,6 +915,9 @@ class CommandTests(unittest.TestCase):
         # This map's own location row is not.
         self.assertNotIn((34, 8), blocked)
 
+    @covers_requirement(
+        "settlement-graph-generation::the-generator-never-overwrites-and-batches-in-a-fixed-order"
+    )
     def test_later_batch_map_avoids_the_earlier_mask(self) -> None:
         # synthetic_edge sits two cells west of synthetic_burg; on its own its
         # footprint reaches into burg's mask, so the batch must reserve it.
