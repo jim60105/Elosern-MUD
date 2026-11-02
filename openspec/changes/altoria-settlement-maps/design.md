@@ -35,18 +35,69 @@ Plan, relocate, generate, write prose, verify. This is the same order as `grandi
 
 ### D2. Relocation rule (explicit; no other location edit is allowed)
 
-The rule is triggered only when `generate <id> --plan-only` fails with `water_gap`. Let `L` be the failing location. The target `T` is `site L --radius 12`'s `sea.nearest_cell`, or, when no sea is reported, `rivers[0].nearest_cell`.
+There are two triggers:
 
-For `k = 1, 2, 3`:
+- (a) `generate <id> --plan-only` fails with `water_gap` for a port;
+- (b) `generate <id> --plan-only` fails with `anchor_outside_footprint`. A
+  two-cell footprint whose nearest water cell is diagonal forces a five-cell
+  path to the water, so the footprint's bounding-box midpoint falls on a cell
+  it does not contain. This trigger was added during implementation: the
+  proposal expected only ports to fail, but no port does, and
+  `city_border_bridge`, `city_east_river` and `town_east_ferry` hit (b).
 
-1. Compute `c_k = L.cell + round_away(k * (T - L.cell) / max(|T.x - L.x|, |T.y - L.y|))`.
-2. Reject `c_k` in any of these cases:
-   - `place_sites.py`, run on a candidate file `[{"id": "<L>", "cell": [c_k.x, c_k.y]}]` (the cell is a two-item JSON list), reports `walkable=False` or `water_cell=True` for it;
-   - its region or nation differs from `L`'s;
-   - it equals any location cell or harbour cell.
-3. Otherwise set the cell and rerun `generate L --plan-only`. Accept `c_k` once the plan succeeds. If it still fails, restore the cell and try the next `k`.
+Let `L` be the failing location. The target `T` is `site L --radius 12`'s
+`sea.nearest_cell`, or, when no sea is reported, `rivers[0].nearest_cell`.
 
-If no `c_k` is accepted, restore the cell and report the location as unresolved without generating it. Record every accepted move as `id: old → new`.
+Reject any candidate cell that:
+
+- `place_sites.py`, run on a candidate file `[{"id": "<L>", "cell": [x, y]}]`
+  (the cell is a two-item JSON list), reports `walkable=False` or
+  `water_cell=True` for;
+- has a region or nation different from `L`'s;
+- equals any location cell or harbour cell;
+- under trigger (b), would put an authored ford inside its generated footprint,
+  because the district contract requires the principal border ford to stay
+  reachable wilderness that joins the banks.
+
+Try candidates in this order, and accept the first whose rerun of
+`generate L --plan-only` no longer fails the trigger:
+
+1. For `k = 1, 2, 3`, the ray candidate
+   `c_k = L.cell + round_away(k * (T - L.cell) / max(|T.x - L.x|, |T.y - L.y|))`.
+2. If the ray is exhausted under trigger (b), every other cell within
+   Chebyshev 3 of `L.cell` that passes the rejections, ordered by displacement
+   then `y` then `x`. For a border-river town the cell must stay on the
+   Altoria (south) bank; a candidate that crosses the border river is rejected
+   even when its nominal nation classifier still says Altoria.
+
+The user approved this extension, including the exact cells below. The ray
+dead-ends for the two border towns: `k = 1` still fails, `k = 2` is the river
+cell, and `k = 3` crosses into Valhalla. The approved cells therefore come
+from step 2 and stay on the Altoria bank.
+
+If no candidate is accepted, restore the cell and report the location as
+unresolved without generating it. Record every accepted move as
+`id: old → new`.
+
+**Generator precondition: a town's own wilderness landmark must not sit on
+its location cell.** `tools/settlement_synthesis/workspace.py::blocked_cells`
+reserves every `wilderness_cell` district landmark, so a landmark on the
+settlement's own cell blocks the mandatory anchor cell and `generate` refuses
+with `location cell not walkable`. Rebinding is not the remedy: the shipped
+contract (`world/lore/tests/test_map_district_content.py`) requires a
+wilderness landmark cell to stay valid wilderness, which a settlement
+footprint destroys. Two Altoria landmarks collide this way:
+`western_ore_hills` on `city_greyrock` and `vineyard_slopes` on
+`town_vineyard`. Each moves three cells north to a walkable, dry, same-region
+cell that stays over 100 km from every other Voronoi landmark.
+
+**Accepted moves in this change:**
+
+- `city_greyrock`: unchanged; its landmark moved instead.
+- `town_vineyard`: unchanged; its landmark moved instead.
+- `city_border_bridge`: 822,1363 → 819,1363.
+- `city_east_river`: 1054,1072 → 1053,1073.
+- `town_east_ferry`: 1149,1360 → 1148,1360.
 
 ### D3. Prose
 

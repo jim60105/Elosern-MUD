@@ -7,7 +7,7 @@ The Altoria Kingdom has 19 national settlements besides its capital: 6 cities, 6
 ## What Changes
 
 - **Data.** Generate `content/maps/settlements/<location_id>.yaml` with `generate --missing --nation altoria`. `capital_altoria` already has a map, so the generator skips it and never overwrites it. Roster, largest first: `port_white_sail`, `city_confluence`, `port_south_tide`, `port_west_ore`, `city_greyrock`, `city_border_bridge`, `city_east_river`, `city_salt_ferry`, `city_salt_road`, `town_olive_ferry`, `town_ruins_gate`, `port_fishers_cove`, `town_honey_vale`, `port_hills_mouth`, `town_vineyard`, `town_west_ferry`, `port_westwind`, `town_east_ferry`, `town_scarp`.
-- **Data, only where needed.** A port that the generator refuses with `water_gap` may be moved by at most 3 cells toward its water. The relocation rule is in design D2, and the likely candidates are `port_west_ore` and `port_westwind`, each about 3 cells from the sea. Every move is listed in the hand-off.
+- **Data, only where needed.** A location that the generator refuses may be moved by at most 3 cells toward its water. The relocation rule is in design D2; its `water_gap` trigger found no port, because every port reaches sea or river, and its added `anchor_outside_footprint` trigger moves `city_border_bridge`, `city_east_river` and `town_east_ferry`. Two towns also move nothing themselves: their own wilderness landmarks sit on their cells, so the landmark moves three cells north. Every move is listed in design D2 and the hand-off.
 - **Data.** Write zh-TW prose for every generated node.
 - **Regenerated.** `world/maps/data/district_partition.json`.
 - Spec-less: game data only.

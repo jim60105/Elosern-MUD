@@ -1,0 +1,146 @@
+version: 1
+kind: settlement
+id: town_olive_ferry
+location_ref: town_olive_ferry
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 595
+    y_m: 2100
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 廣場四周種著老橄欖樹，南面傳來渡口的槳聲，東北的坡上是一片銀綠的枝葉，油商在樹蔭下清點罈數。
+    anchor_key: town_olive_ferry
+    typeclass:
+    scene_archetype: city_street
+  ford_crossing:
+    x_m: 595
+    y_m: 100
+    prototype_parent: grid_room
+    key: 渡口
+    desc: 渡口在南面的淺灘，木樁間拴著兩艘平底船，船伕把橄欖油罈小心搬上船，草繩在船舷上勒出印子。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  north_gate:
+    x_m: 595
+    y_m: 2575
+    prototype_parent: grid_room
+    key: 北門
+    desc: 北門朝鹽道城的方向敞開，門外坡地種滿橄欖，採果人背著竹簍進出，枝葉間透下細碎的光。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate:
+    x_m: 100
+    y_m: 1605
+    prototype_parent: grid_room
+    key: 西南門
+    desc: 西南門通往南潮港，門洞裡灌進海風，運油的車隊在此集結，守衛替車伕檢視封好的罈口。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate_road_1:
+    x_m: 381
+    y_m: 1896
+    prototype_parent: grid_room
+    key: 油商大街
+    desc: 油商大街從西南門通往廣場，兩旁作坊把新榨的油裝進陶罐，地上留著成片的油漬，麻雀在縫裡啄食。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 642
+    y_m: 2264
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街往北延伸，攤上賣著橄欖、油餅與粗布，樹蔭下坐著歇腳的挑夫，笑聲順著坡道散開。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 766
+    y_m: 2022
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前朝東南，牆上貼著巡守油坊的委託，幾名冒險者在樹下分食乾糧，腳邊擺著包鐵的油燈。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  river_quay:
+    x_m: 1045
+    y_m: 650
+    prototype_parent: grid_room
+    key: 河港碼頭
+    desc: 河港碼頭設在南岸的蘆葦邊，油罈沿跳板排成一列，船伕忙著用草繩固定，水鳥在淺灘上踱步。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: north_gate
+  direction: n
+- source: central_plaza
+  destination: southwest_gate_road_1
+  direction: sw
+- source: central_plaza
+  destination: market_street
+  direction: ne
+- source: central_plaza
+  destination: guild_forecourt
+  direction: se
+- source: ford_crossing
+  destination: river_quay
+  direction: ne
+- source: north_gate
+  destination: central_plaza
+  direction: s
+- source: north_gate
+  destination: market_street
+  direction: se
+- source: southwest_gate
+  destination: southwest_gate_road_1
+  direction: ne
+- source: southwest_gate
+  destination: river_quay
+  direction: se
+- source: southwest_gate_road_1
+  destination: central_plaza
+  direction: ne
+- source: southwest_gate_road_1
+  destination: southwest_gate
+  direction: sw
+- source: market_street
+  destination: central_plaza
+  direction: s
+- source: market_street
+  destination: north_gate
+  direction: n
+- source: guild_forecourt
+  destination: central_plaza
+  direction: nw
+- source: river_quay
+  destination: ford_crossing
+  direction: sw
+- source: river_quay
+  destination: southwest_gate
+  direction: nw
+wilderness_entry:
+  shape:
+  - '#'
+  - '#'
+  - '#'
+  offset:
+    dx: 0
+    dy: -2
+  gates:
+  - return_direction: s
+    destination_node: north_gate
+  - return_direction: ne
+    destination_node: southwest_gate
+city_gate:

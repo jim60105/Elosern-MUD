@@ -4,6 +4,9 @@ Ground rules:
 - Change only these files, plus residual-pin test rewrites under the doc's "Residual pin rule":
   - new `content/maps/settlements/<id>.yaml` files for the 19 roster ids;
   - `content/maps/locations.yaml` cells that the D2 rule accepts;
+  - `content/maps/districts.yaml` landmark cells that D2's generator
+    precondition accepts;
+  - current-tense documentation statements that count the mapped settlements;
   - `world/maps/data/district_partition.json`.
 - Never touch `content/maps/settlements/capital_altoria.yaml`.
 - Keep scratch files in the scratchpad.
@@ -12,22 +15,23 @@ Ground rules:
 
 ## 1. Baseline and plan
 
-- [ ] 1.1 Run `check_map_sources.py` and `uv run --locked python -m tools.settlement_synthesis lint`. Check: record both, and confirm the lint exits 0.
-- [ ] 1.2 Run `uv run --locked evennia test --keepdb --settings settings.py world.maps.tests.test_bootstrap`. Check: record `Ran N tests in X s` as the D4 baseline.
-- [ ] 1.3 Run `uv run --locked python -m tools.settlement_synthesis generate --missing --nation altoria --plan-only`. Check: save the output, list the failed locations, and confirm `capital_altoria` is absent from the output because it already has a document.
+- [x] 1.1 Run `check_map_sources.py` and `uv run --locked python -m tools.settlement_synthesis lint`. Check: record both, and confirm the lint exits 0.
+- [x] 1.2 Run `uv run --locked evennia test --keepdb --settings settings.py world.maps.tests.test_bootstrap`. Check: record `Ran N tests in X s` as the D4 baseline.
+- [x] 1.3 Run `uv run --locked python -m tools.settlement_synthesis generate --missing --nation altoria --plan-only`. Check: save the output, list the failed locations, and confirm `capital_altoria` is absent from the output because it already has a document.
 
 ## 2. Relocations (design D2 only)
 
-- [ ] 2.1 Apply the D2 rule to each `water_gap` failure from 1.3, in roster order. Edit only the two integers of each accepted cell. Check: rerunning the plan-only batch shows no `water_gap` except the unresolved ones, and `place_sites.py --locations` reports every Altoria location ok with nation `altoria`.
+- [x] 2.1 Apply the D2 rule to each failure from 1.3, in roster order: `water_gap` for a port, and `anchor_outside_footprint` for a two-cell footprint whose diagonal water path overshoots the mask midpoint. Edit only the two integers of each accepted cell. Check: rerunning the plan-only batch shows no `water_gap` or `anchor_outside_footprint` except the unresolved ones, and `place_sites.py --locations` reports every Altoria location ok with nation `altoria`.
+- [x] 2.2 Apply D2's generator precondition to every `location cell not walkable` failure from 1.3: move that town's own `wilderness_cell` district landmark three cells north to a walkable, dry, same-region cell over 100 km from every other Voronoi landmark. Check: the two towns plan clean, and the moved landmarks stay valid wilderness.
 
 ## 3. Generate and name
 
-- [ ] 3.1 Run `generate --missing --nation altoria`. Check:
+- [x] 3.1 Run `generate --missing --nation altoria`. Check:
   - the exit status is 0, or 1 only when an unresolved location remains;
   - each generated id has exactly one new file;
   - `lint` exits 0;
   - `git diff --quiet content/maps/settlements/capital_altoria.yaml` succeeds.
-- [ ] 3.2 For each generated map, in roster order:
+- [x] 3.2 For each generated map, in roster order:
   1. run `brief <id>`;
   2. write `<scratchpad>/prose_<id>.json` following design D3;
   3. run `prose <id> <file>`.

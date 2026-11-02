@@ -1,0 +1,144 @@
+version: 1
+kind: settlement
+id: town_ruins_gate
+location_ref: town_ruins_gate
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 316
+    y_m: 187
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 廣場上立著幾塊從遺跡搬來的殘碑，東邊大道通往灰岩城，北面是往西渡鎮的岔路，拓碑人蹲在碑前描字。
+    anchor_key: town_ruins_gate
+    typeclass:
+    scene_archetype: city_street
+  east_gate:
+    x_m: 1091
+    y_m: 187
+    prototype_parent: grid_room
+    key: 東門
+    desc: 東門朝灰岩城敞開，門外大道兩旁擺著收購古物的小攤，守衛盤查著來歷不明的箱籠，問話聲此起彼落。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  north_gate:
+    x_m: 316
+    y_m: 662
+    prototype_parent: grid_room
+    key: 北門
+    desc: 北門通往西渡鎮與荒野，門洞裡貼著進山的告示，獵人與採藥人結伴進出，門邊靠著捲起的繩梯。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  east_gate_road_1:
+    x_m: 761
+    y_m: 259
+    prototype_parent: grid_room
+    key: 古物大街
+    desc: 古物大街從東門通到廣場，兩側店鋪陳列著破損的石雕與鏽蝕的銅器，夥計用軟布拂去浮塵。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 459
+    y_m: 100
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街朝東南延伸，攤上除了糧食，還有人兜售從遺跡撿回的碎片，買主翻來覆去辨認紋路。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 113
+    y_m: 223
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前朝西，布告上滿是探查遺跡的委託，冒險者圍著地圖爭論路線，牆邊靠著掘土用的鐵鍬。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  temple_forecourt:
+    x_m: 100
+    y_m: 615
+    prototype_parent: grid_room
+    key: 神殿前
+    desc: 神殿前在西北的坡地，鐘樓望著荒野，朝聖者把從遺跡帶回的碎石供在階前，香煙順風散開。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  inn_lane:
+    x_m: 495
+    y_m: 330
+    prototype_parent: grid_room
+    key: 客棧巷
+    desc: 客棧巷朝東北，屋裡點著油燈，探險歸來的人把沾泥的裝備堆在門邊，樓下有人低聲交換發現。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: north_gate
+  direction: n
+- source: central_plaza
+  destination: east_gate_road_1
+  direction: e
+- source: central_plaza
+  destination: market_street
+  direction: se
+- source: central_plaza
+  destination: guild_forecourt
+  direction: w
+- source: central_plaza
+  destination: inn_lane
+  direction: ne
+- source: east_gate
+  destination: east_gate_road_1
+  direction: w
+- source: north_gate
+  destination: central_plaza
+  direction: s
+- source: north_gate
+  destination: temple_forecourt
+  direction: w
+- source: east_gate_road_1
+  destination: central_plaza
+  direction: w
+- source: east_gate_road_1
+  destination: east_gate
+  direction: e
+- source: market_street
+  destination: central_plaza
+  direction: nw
+- source: market_street
+  destination: inn_lane
+  direction: n
+- source: guild_forecourt
+  destination: central_plaza
+  direction: e
+- source: temple_forecourt
+  destination: north_gate
+  direction: e
+- source: inn_lane
+  destination: central_plaza
+  direction: sw
+- source: inn_lane
+  destination: market_street
+  direction: s
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: w
+    destination_node: east_gate
+  - return_direction: s
+    destination_node: north_gate
+city_gate:

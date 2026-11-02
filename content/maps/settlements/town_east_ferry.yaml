@@ -1,0 +1,115 @@
+version: 1
+kind: settlement
+id: town_east_ferry
+location_ref: town_east_ferry
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 542
+    y_m: 542
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 廣場離界河的南岸不遠，北面傳來渡船的聲響，西南的坡地通往葡萄鎮，通關的商販在石階旁換氣。
+    anchor_key: town_east_ferry
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 西南門
+    desc: 西南門朝葡萄鎮敞開，門外坡道兩旁種著果樹，馱馬在門蔭下歇腳，守衛替過客指路，果香順著坡道飄來。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  north_gate:
+    x_m: 542
+    y_m: 1167
+    prototype_parent: grid_room
+    key: 北門
+    desc: 北門面向東渡營與渡口，門洞裡擠著兩邊的商販，守衛逐一核對過河的憑證，爭執聲混著叫賣聲。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate_road_1:
+    x_m: 260
+    y_m: 429
+    prototype_parent: grid_room
+    key: 渡口大街
+    desc: 渡口大街從西南門通到廣場，路面混著碎石與車轍，兩旁擺著等渡的貨擔，挑夫靠著牆根歇肩。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 402
+    y_m: 651
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街往西北延伸，攤上擺著麥餅、燻肉與草繩，兩國的口音在棚下交錯，價錢用兩種算法談。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 425
+    y_m: 389
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前朝西南，牆上貼著護送商隊過河的委託，冒險者在簷下整理繩索，門邊靠著包鐵的木箱。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: north_gate
+  direction: n
+- source: central_plaza
+  destination: southwest_gate_road_1
+  direction: w
+- source: central_plaza
+  destination: market_street
+  direction: nw
+- source: central_plaza
+  destination: guild_forecourt
+  direction: sw
+- source: southwest_gate
+  destination: southwest_gate_road_1
+  direction: ne
+- source: north_gate
+  destination: central_plaza
+  direction: s
+- source: southwest_gate_road_1
+  destination: central_plaza
+  direction: ne
+- source: southwest_gate_road_1
+  destination: southwest_gate
+  direction: sw
+- source: southwest_gate_road_1
+  destination: guild_forecourt
+  direction: e
+- source: market_street
+  destination: central_plaza
+  direction: se
+- source: guild_forecourt
+  destination: central_plaza
+  direction: ne
+- source: guild_forecourt
+  destination: southwest_gate_road_1
+  direction: w
+wilderness_entry:
+  shape:
+  - '#'
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: ne
+    destination_node: southwest_gate
+  - return_direction: s
+    destination_node: north_gate
+city_gate:

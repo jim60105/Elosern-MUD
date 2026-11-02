@@ -1,0 +1,115 @@
+version: 1
+kind: settlement
+id: town_scarp
+location_ref: town_scarp
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 725
+    y_m: 217
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 廣場背靠東邊的斷崖，南面是河源的方向，風從崖頂落下，帶著松脂的氣味，石階上散著細碎的石屑。
+    anchor_key: town_scarp
+    typeclass:
+    scene_archetype: city_street
+  northwest_gate:
+    x_m: 283
+    y_m: 659
+    prototype_parent: grid_room
+    key: 西北門
+    desc: 西北門朝東河城敞開，門外山道貼著崖壁盤旋，馬車在轉角處放慢，車伕緊握韁繩，崖壁滴水打濕了車板。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  west_gate:
+    x_m: 100
+    y_m: 217
+    prototype_parent: grid_room
+    key: 西門
+    desc: 西門通往蜜谷鎮，門洞裡吹進果園的甜風，採石人挑著石塊進出，扁擔在肩上壓出深痕，石屑沿著坡道滾落。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northwest_gate_road_1:
+    x_m: 429
+    y_m: 345
+    prototype_parent: grid_room
+    key: 崖道大街
+    desc: 崖道大街從西北門通到廣場，一側是石壁，一側是欄杆，底下是河的淺灘，風從谷底翻上來。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 587
+    y_m: 313
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街往西北延伸，攤上擺著石雕、松果與河魚，崖風把棚布吹得鼓脹，攤主忙著壓住邊角。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 585
+    y_m: 100
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前朝西南，牆上貼著巡崖與護送石車的委託，冒險者在簷下檢查繩具，腳邊擺著磨損的鐵鉤。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: west_gate
+  direction: w
+- source: central_plaza
+  destination: northwest_gate_road_1
+  direction: n
+- source: central_plaza
+  destination: market_street
+  direction: nw
+- source: central_plaza
+  destination: guild_forecourt
+  direction: sw
+- source: northwest_gate
+  destination: northwest_gate_road_1
+  direction: se
+- source: west_gate
+  destination: central_plaza
+  direction: e
+- source: northwest_gate_road_1
+  destination: central_plaza
+  direction: se
+- source: northwest_gate_road_1
+  destination: northwest_gate
+  direction: nw
+- source: northwest_gate_road_1
+  destination: market_street
+  direction: e
+- source: market_street
+  destination: central_plaza
+  direction: se
+- source: market_street
+  destination: northwest_gate_road_1
+  direction: w
+- source: guild_forecourt
+  destination: central_plaza
+  direction: ne
+wilderness_entry:
+  shape:
+  - '#.'
+  - '##'
+  offset:
+    dx: -1
+    dy: -1
+  gates:
+  - return_direction: se
+    destination_node: northwest_gate
+  - return_direction: e
+    destination_node: west_gate
+city_gate:

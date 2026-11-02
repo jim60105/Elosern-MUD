@@ -1,0 +1,216 @@
+version: 1
+kind: settlement
+id: city_confluence
+location_ref: city_confluence
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 1550
+    y_m: 588
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 廣場位於兩河交會的台地上，西邊傳來水聲，東北的石階一路通向神殿，市集沿坡鋪開，糧車與布商在樹蔭下交易。
+    anchor_key: city_confluence
+    typeclass:
+    scene_archetype: city_street
+  northeast_gate:
+    x_m: 2045
+    y_m: 1083
+    prototype_parent: grid_room
+    key: 東北門
+    desc: 東北門順著上坡通往聖潔王都的方向，門外大道兩側種著修剪整齊的栗樹，驛馬在門房的棚下換鞍。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northwest_gate:
+    x_m: 1055
+    y_m: 1083
+    prototype_parent: grid_room
+    key: 西北門
+    desc: 西北門面向灰岩城的礦道，門洞裡堆著待運的鐵錠，守衛替馱馬檢查蹄鐵，鐵匠在牆邊補著裂開的掌釘。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 1481
+    y_m: 824
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街順著坡勢往北延伸，糧商與布販的棚子擠在一處，空氣裡混著麥香與河泥味，秤盤從早響到晚。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 1405
+    y_m: 326
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前正對渡口下來的石階，剛交完貨的鏢師在簷下喝水，布告上貼著河運的招募，字跡被雨水暈開。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  river_quay:
+    x_m: 100
+    y_m: 1038
+    prototype_parent: grid_room
+    key: 河港碼頭
+    desc: 河港碼頭設在兩河匯流處，木排與平底船首尾相接，搬運工喊著號子把糧袋抬上岸，繩索在樁上勒出深痕。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  temple_forecourt:
+    x_m: 1868
+    y_m: 830
+    prototype_parent: grid_room
+    key: 神殿前
+    desc: 神殿前是城裡最高的一塊平地，鐘樓的影子落在河面，朝聖者沿石階一路走上來，階前擺著還願的乾花。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  inn_lane:
+    x_m: 1816
+    y_m: 448
+    prototype_parent: grid_room
+    key: 客棧巷
+    desc: 客棧巷藏在市場後方，木窗朝著東南的窯口，旅人聞得到燒磚的氣味，馬廄的乾草堆在巷口。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  exchange_forecourt:
+    x_m: 1218
+    y_m: 699
+    prototype_parent: grid_room
+    key: 商會前
+    desc: 商會前擺著一列記貨的石板，糧價與船期寫得密實，夥計忙著替兩岸的買主牽線，算盤聲不停。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  manor_gate:
+    x_m: 1612
+    y_m: 1082
+    prototype_parent: grid_room
+    key: 領主宅邸前
+    desc: 領主宅邸前立著兩棵老槐，家臣在門房登記訪客，牆頭晾著剛染好的家徽布旗，院裡拴著一匹棗紅馬。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  training_ground:
+    x_m: 1890
+    y_m: 100
+    prototype_parent: grid_room
+    key: 校場外
+    desc: 校場外傳來木劍相擊的聲響，見習騎士在東南的坡地上列隊，馬廄的乾草味隨風散開，地上插著幾支斷箭。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  bath_forecourt:
+    x_m: 1010
+    y_m: 445
+    prototype_parent: grid_room
+    key: 浴場前
+    desc: 浴場前的水渠引自西邊的河，挑水人來回穿梭，石階上坐著曬太陽的老人，門邊木架上晾著粗布巾。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: northeast_gate
+  direction: ne
+- source: central_plaza
+  destination: northwest_gate
+  direction: nw
+- source: central_plaza
+  destination: market_street
+  direction: n
+- source: central_plaza
+  destination: guild_forecourt
+  direction: sw
+- source: central_plaza
+  destination: inn_lane
+  direction: se
+- source: central_plaza
+  destination: exchange_forecourt
+  direction: w
+- source: northeast_gate
+  destination: central_plaza
+  direction: sw
+- source: northeast_gate
+  destination: temple_forecourt
+  direction: s
+- source: northwest_gate
+  destination: central_plaza
+  direction: se
+- source: northwest_gate
+  destination: river_quay
+  direction: w
+- source: market_street
+  destination: central_plaza
+  direction: s
+- source: market_street
+  destination: exchange_forecourt
+  direction: sw
+- source: market_street
+  destination: manor_gate
+  direction: ne
+- source: guild_forecourt
+  destination: central_plaza
+  direction: ne
+- source: river_quay
+  destination: northwest_gate
+  direction: e
+- source: temple_forecourt
+  destination: northeast_gate
+  direction: ne
+- source: temple_forecourt
+  destination: inn_lane
+  direction: s
+- source: temple_forecourt
+  destination: manor_gate
+  direction: nw
+- source: inn_lane
+  destination: central_plaza
+  direction: nw
+- source: inn_lane
+  destination: temple_forecourt
+  direction: n
+- source: inn_lane
+  destination: training_ground
+  direction: s
+- source: exchange_forecourt
+  destination: central_plaza
+  direction: e
+- source: exchange_forecourt
+  destination: market_street
+  direction: ne
+- source: exchange_forecourt
+  destination: bath_forecourt
+  direction: sw
+- source: manor_gate
+  destination: market_street
+  direction: sw
+- source: manor_gate
+  destination: temple_forecourt
+  direction: se
+- source: training_ground
+  destination: inn_lane
+  direction: n
+- source: bath_forecourt
+  destination: exchange_forecourt
+  direction: ne
+wilderness_entry:
+  shape:
+  - '###'
+  offset:
+    dx: -1
+    dy: 0
+  gates:
+  - return_direction: sw
+    destination_node: northeast_gate
+  - return_direction: se
+    destination_node: northwest_gate
+city_gate:

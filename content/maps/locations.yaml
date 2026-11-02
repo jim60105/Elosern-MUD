@@ -355,8 +355,8 @@ locations:
     display_name_zh: 東河城
     description: Upstream river city of the capital river valley.
     cell:
-      cell_x: 1054
-      cell_y: 1072
+      cell_x: 1053
+      cell_y: 1073
     geographic_constraint: Upper capital river east of the royal capital
     scene_archetype:
   city_salt_ferry:
@@ -384,7 +384,7 @@ locations:
     description: Kingdom bank of the main border-river crossing into the 
       Valhalla Beast Kingdom.
     cell:
-      cell_x: 822
+      cell_x: 819
       cell_y: 1363
     geographic_constraint: South bank of the central border river ford
     scene_archetype:
@@ -467,7 +467,7 @@ locations:
     display_name_zh: 東渡鎮
     description: Kingdom bank of the eastern border-river crossing.
     cell:
-      cell_x: 1149
+      cell_x: 1148
       cell_y: 1360
     geographic_constraint: South bank of the eastern border river ford
     scene_archetype:
