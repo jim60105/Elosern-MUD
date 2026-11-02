@@ -28,6 +28,7 @@ from elosern_map_core.codec import (
     parse_document,
     serialize_document,
 )
+from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EDITOR_TESTS = REPO_ROOT / "tools" / "map-editor" / "tests"
@@ -208,6 +209,9 @@ class _Workspace(unittest.TestCase):
 
 
 class ReplaceTests(_Workspace):
+    @covers_requirement(
+        "settlement-map-rework::replacing-a-settlement-preserves-every-referenced-node-identity"
+    )
     def test_missing_protected_binding_is_refused(self) -> None:
         before = self._digest()
 
@@ -217,6 +221,9 @@ class ReplaceTests(_Workspace):
         self.assertIn("unbound_protected:yard", result.stderr)
         self.assertEqual(self._digest(), before)
 
+    @covers_requirement(
+        "settlement-map-rework::replacing-a-settlement-preserves-every-referenced-node-identity"
+    )
     def test_bound_identities_survive(self) -> None:
         result = self._replace(
             {"gate": "central_plaza", "yard": "nearest:central_plaza"}
@@ -261,6 +268,9 @@ class ReplaceTests(_Workspace):
         lint = self._run("lint", SETTLEMENT)
         self.assertEqual(lint.returncode, 0, lint.stdout + lint.stderr)
 
+    @covers_requirement(
+        "settlement-map-rework::replacing-a-settlement-preserves-every-referenced-node-identity"
+    )
     def test_refused_bindings(self) -> None:
         plan = self._replace(
             {"gate": "central_plaza", "yard": "nearest:central_plaza"},
@@ -307,6 +317,9 @@ class ReplaceTests(_Workspace):
                 self.assertIn(problem, result.stderr)
                 self.assertEqual(self._digest(), before)
 
+    @covers_requirement(
+        "settlement-map-rework::replacing-a-settlement-preserves-every-referenced-node-identity"
+    )
     def test_unreferenced_node_is_dropped_with_an_index(self) -> None:
         self._add_node("stray")
         before = self._digest()
@@ -323,6 +336,9 @@ class ReplaceTests(_Workspace):
         self.assertIn("yard", nodes)
         self.assertNotEqual(self._digest(), before)
 
+    @covers_requirement(
+        "settlement-map-rework::replacing-a-settlement-preserves-every-referenced-node-identity"
+    )
     def test_missing_index_protects_every_existing_node(self) -> None:
         self._add_node("stray")
         (self.root / "content" / "map-reference-context.json").unlink()
@@ -379,6 +395,9 @@ class NearestBindingTests(_Workspace):
             "stray_a": "nearest:central_plaza",
         }
 
+    @covers_requirement(
+        "settlement-map-rework::nearest-bindings-resolve-deterministically"
+    )
     def test_nearest_resolution_and_repeat(self) -> None:
         self._add_node("stray_a")
         original = self._settlement_path().read_bytes()
@@ -412,6 +431,9 @@ class NearestBindingTests(_Workspace):
         self.assertEqual(second.returncode, 0, second.stderr)
         self.assertEqual(first_bytes, self._settlement_path().read_bytes())
 
+    @covers_requirement(
+        "settlement-map-rework::nearest-bindings-resolve-deterministically"
+    )
     def test_identifier_collision_takes_the_first_free_suffix(self) -> None:
         self._add_node("market_street")
 
@@ -449,6 +471,9 @@ class ProseTests(_Workspace):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    @covers_requirement(
+        "settlement-map-rework::prose-briefs-and-prose-application-touch-only-names-and-descriptions"
+    )
     def test_brief_is_read_only(self) -> None:
         self._add_location(
             "synthetic_neighbour",
@@ -491,6 +516,9 @@ class ProseTests(_Workspace):
         self.assertEqual(neighbour["display_name_zh"], "鄰鎮")
         self.assertEqual(self._digest(), before)
 
+    @covers_requirement(
+        "settlement-map-rework::prose-briefs-and-prose-application-touch-only-names-and-descriptions"
+    )
     def test_prose_changes_only_the_listed_names_and_descriptions(self) -> None:
         before = self._document().data
         entries = {
@@ -510,6 +538,9 @@ class ProseTests(_Workspace):
             self.assertEqual(after["nodes"][node_id]["desc"], fields["desc"])
         self.assertEqual(_masked(before, ("gate", "yard")), _masked(after, ("gate", "yard")))
 
+    @covers_requirement(
+        "settlement-map-rework::prose-briefs-and-prose-application-touch-only-names-and-descriptions"
+    )
     def test_invalid_entries_are_rejected_atomically(self) -> None:
         before = self._settlement_path().read_bytes()
         prose = self.aux / "invalid.json"
