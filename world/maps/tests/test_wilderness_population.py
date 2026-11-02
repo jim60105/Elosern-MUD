@@ -111,14 +111,21 @@ def live_anchor_entry():
 
 
 def live_gateway_entry():
-    """The sole registry entry exposing both an "n" and a "w" gate."""
-    entries = [
-        entry
-        for entry in live_entry_registry().values()
-        if entry.gate_for("n") is not None and entry.gate_for("w") is not None
-    ]
-    if len(entries) != 1:
-        raise AssertionError("expected exactly one wilderness entry with both n and w gates")
+    """The registry entry exposing both an "n" and a "w" gate.
+
+    Several settlements can author both faces, so the pick is the lowest
+    authored anchor key: deterministic, and the same entry on every call.
+    """
+    entries = sorted(
+        (
+            entry
+            for entry in live_entry_registry().values()
+            if entry.gate_for("n") is not None and entry.gate_for("w") is not None
+        ),
+        key=lambda entry: entry.anchor_key,
+    )
+    if not entries:
+        raise AssertionError("no wilderness entry authors both gateway faces")
     return entries[0]
 
 
