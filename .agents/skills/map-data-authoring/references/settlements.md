@@ -182,6 +182,12 @@ can start in need it.
 
 ## Creating a new local map
 
+For a national settlement, generate it:
+`uv run --locked python -m tools.settlement_synthesis generate <location_id> --plan-only`,
+then without `--plan-only`; the generator never overwrites, and the prose pass is
+described in `settlement-rework-and-prose`'s documentation. The steps below are
+the hand-authored path.
+
 1. Make sure the location already exists in `locations.yaml`.
 2. Create `content/maps/settlements/<new_map_id>.yaml` with these fields:
    - `version`, `kind`, `id`;

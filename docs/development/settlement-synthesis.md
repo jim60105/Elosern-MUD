@@ -1,7 +1,6 @@
 # Settlement synthesis
 
-`tools/settlement_synthesis/` answers three questions about a settlement before
-any street graph is drawn or edited:
+`tools/settlement_synthesis/` answers four questions about a settlement:
 
 - **Where does it sit?** `site` derives the rivers, sea, fords, harbour sites,
   relief and neighbour bearings around one location.
@@ -9,11 +8,14 @@ any street graph is drawn or edited:
   wilderness footprint, a metre envelope and a gameplay tier.
 - **Does the drawn graph fit?** `lint` checks authored nodes, roads and gates
   against the terrain in world metres.
+- **What is the coarse street graph?** `generate` grows a footprint, places the
+  role nodes and connects them with directed roads, then writes the document.
 
-All three are read-only. They live in the game environment because they join
-`world.lore.anchors.ANCHOR_LORE` for nation and population; they need no Django
-setup and write no file. `--lore FILE` replaces that join with a JSON override,
-which is how the tests stay off shipped lore.
+`site`, `budget` and `lint` are read-only. `generate` is the one writing
+command, and it only creates a settlement source that does not exist yet. They
+live in the game environment because they join `world.lore.anchors.ANCHOR_LORE`
+for nation and population; they need no Django setup. `--lore FILE` replaces
+that join with a JSON override, which is how the tests stay off shipped lore.
 
 ## Scales
 
@@ -163,6 +165,8 @@ Run from the repository root:
 uv run --locked python -m tools.settlement_synthesis site LOCATION_ID [--root DIR] [--lore FILE] [--radius N]
 uv run --locked python -m tools.settlement_synthesis budget LOCATION_ID [--root DIR] [--lore FILE]
 uv run --locked python -m tools.settlement_synthesis lint [MAP_ID ...] [--root DIR]
+uv run --locked python -m tools.settlement_synthesis generate LOCATION_ID [--root DIR] [--lore FILE] [--gates OCTANT[,OCTANT...]] [--plan-only]
+uv run --locked python -m tools.settlement_synthesis generate --missing --nation NATION [--root DIR] [--lore FILE] [--plan-only]
 ```
 
 - `site` prints the `SiteContext` as JSON and exits 0. `--radius` is the water
@@ -174,13 +178,116 @@ uv run --locked python -m tools.settlement_synthesis lint [MAP_ID ...] [--root D
   message`, then `fit: N errors, M warnings`. It exits 0 when no error-severity
   finding exists, 1 when any does, and 2 when the map sources do not load or a
   requested map id is unknown. Warnings alone still exit 0.
+- `generate` prints a report per generated map, `{"map_id",
+  "settlement_class", "morphology", "footprint_cells", "warnings", "slots":
+  [{"id", "role", "key", "x_m", "y_m"}]}`, and writes
+  `content/maps/settlements/<location_id>.yaml` unless `--plan-only`. It exits
+  1 when the location has no size budget, already has a settlement document
+  (printing `exists: <relative path>`), or cannot be generated, and 2 when the
+  workspace does not load. `--missing` targets the roster rows of one nation
+  that are national kinds without a settlement source, largest population
+  first, reloading the workspace before each map so later footprints see the
+  earlier ones; per-location errors do not stop the batch.
 - `--root` defaults to the current directory. Nothing is written, so a run can
-  never change the sources it inspects.
+  never change the sources it inspects; `generate` is the one exception and it
+  refuses an existing file.
 
 The lint is a workflow tool, not a CI gate over shipped data. It currently
 reports `capital_altoria`'s dry `quay` and `riverbank_road` nodes, four of its
 nodes outside the authored footprint mask, and nothing else; `altoria-capital-river-rework`
 resolves the water mismatch.
+
+## Generation
+
+`generate` produces the coarse fit only: a footprint, the role nodes, gates and
+the directed roads between them. Bridges, district shape and appearance are
+finished by a person in the map editor. Node `key`s are role labels in zh-TW,
+`desc` stays empty for the prose pass, and `city_gate` is always empty. The
+output goes through the map-core codec, so it matches the editor's bytes.
+
+Generation is deterministic and seeded by the location id: the seed is the first
+eight bytes of `sha256("settlement:<id>:v1")`, one `random.Random` is created per
+call, and only `random()` is drawn, never `randint`, `choice` or `shuffle`.
+Identical inputs therefore produce byte-identical output, and every set whose
+iteration could affect the result is sorted.
+
+**Settlement class.** A nation in the configured beast nations is
+`beast_capital` for a capital and `beast_town` otherwise. Other nations give
+`human_capital` for a capital, `port` for a port, and `human_town` for a city or
+town.
+
+**Reach and morphology.** `reach = ceil(sqrt(footprint_cells) / 2) + 1` cells.
+The first river within a Chebyshev reach of the location cell, the sea on the
+same terms, and the first ford of that river are the site's water facts. The
+morphology is the first match: a beast class gives `tribal_ring`; a port gives
+`harbour_crescent` with the sea, else `waterside_linear` with a river, else it is
+refused with `water_gap`; a river with a ford gives `river_crossing`; a river
+alone gives `waterside_linear`; relief of at least two bands gives
+`hill_terraces`; anything else gives `crossroads`.
+
+**Footprint growth.** The footprint starts on the location cell. A water target
+adds the shortest 4-connected walkable path to the nearest walkable cell that
+touches the water, which can overflow the cell budget and reports
+`footprint_reach_overflow:<cells>`. The rest grows one cell at a time, preferring
+the candidates that keep the bounding-box midpoint on the location cell and then
+the one nearest the growth centre, which leans half a cell toward the water. A
+footprint that cannot reach its budget is refused (`footprint_short`). The
+midpoint must be a footprint cell (`anchor_outside_footprint` otherwise), and an
+offset midpoint reports `footprint_location_offset`. The result is always
+4-connected, walkable, free of blocked cells and clear of other maps, gate
+approaches, location cells, harbour sites and wilderness landmarks.
+
+**Frame and candidates.** Local metre coordinates are measured from the
+location cell centre; the world position is `(1000X + 500 + east, 1000Y + 500 +
+north)`. Point selection happens inside an ellipse: a circle of the envelope
+radius, or for a waterside, harbour or crossing layout an ellipse whose major
+axis runs along the water, and for terraces one whose major axis runs across the
+uphill direction. The candidate grid has half-spacing steps over the
+footprint's metre bounding box, each point jittered by up to 30% of the step.
+Spacing is `min(600, max(60, round(0.8 * R * sqrt(pi / nodes))))` metres; a role
+or approach point keeps 0.6 of it, a filler the whole of it. Water-edge
+candidates clamp the neighbouring water cell's centre into the footprint cell's
+square, inset 50 m, and must stay within the 600 m water-edge limit.
+
+**Placement order.** Anchor `central_plaza` on the location cell; a
+`ford_crossing` for a river crossing; gates; approach streets; catalogue roles;
+fillers. Gate bearings are taken in priority order — forced octants, the own
+capital, the neighbours nearest first, the fords, then `s, n, e, w, se, sw, ne,
+nw` — and a bearing is accepted only when its approach cell (walking from the
+footprint midpoint until the mask ends) is walkable, unblocked and unused. Fewer
+gates than the tier allows reports `gate_shortfall:<missing>`; none is refused
+(`no_gate`). Approach streets step from each gate toward the plaza, capped by the
+tier and by a third of the remaining nodes, and report a `role_unplaced` warning
+when no candidate fits. Catalogue roles are taken by class, minimum node count
+and water requirement, in priority order: `near_anchor`, `high_ground`
+(elevation band, then uphill), `periphery`, `ring`, `water_edge` and
+`water_downstream` (the most downstream water position). Fillers are lane slots
+that maximise their distance from every placed node.
+
+**Roads and directions.** The undirected candidates are the Gabriel graph over
+the placed nodes, minus any edge whose sampled polyline enters water unless one
+endpoint's identifier carries `bridge`, `ford` or `ferry`. Each gate's chain to
+the plaza is forced when it does not cross water. A Kruskal spanning tree runs
+over the forced edges first and then the shortest candidates, never raising a
+degree above six; a disconnected forest is joined by the shortest remaining
+candidates, and a graph that still cannot connect is refused. The tier's loop
+target adds the shortest non-tree candidates that keep both endpoints below six
+roads, and a shortfall reports `loop_shortfall:<deficit>`.
+
+Each node's incident roads are assigned to distinct compass directions by
+minimising the total octant deviation; a road that still deviates by more than
+three octants costs the longest removable loop edge, and a node with no removable
+edge reports `direction_deviation:<node>`. A road `A → B` carries A's direction
+and `B → A` carries B's.
+
+**Warnings.** Every warning is a review prompt, never a silent change:
+`footprint_reach_overflow`, `footprint_location_offset`, `gate_shortfall`,
+`role_unplaced`, `loop_shortfall` and `direction_deviation`, reported sorted and
+deduplicated. Refusals are `water_gap`, `footprint_short`,
+`anchor_outside_footprint`, `no_gate`, `envelope_full`, `graph_disconnected`,
+`degree_overflow` and any terrain-fit lint error; none of them writes a file.
+An existing settlement is never overwritten, and a run that finds one exits
+with `exists: <relative path>` and changes nothing.
 
 ## Human review
 
@@ -194,3 +301,7 @@ These qualities are reviewed by a person against this page, not tested:
 - Does every identifier with a water-edge word belong at the water, and every
   gate's outward bearing match the direction a traveller actually approaches
   from?
+- Does the layout read as grown, not gridded?
+- Do the approach streets converge on the plaza?
+- Is the quay on the water side, the temple uphill and the crafts downstream?
+- Are the gates plausible toward their neighbours?
