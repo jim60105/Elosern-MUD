@@ -1,1 +1,1 @@
-"""Read-only settlement site analysis, size budget and terrain-fit lint (settlement-terrain-fit)."""
+"""Settlement site analysis, size budget, terrain-fit lint and street-graph generation."""
