@@ -230,7 +230,7 @@ Ground rules for every task:
 
 ## 9. Canary proof (temporary data, never committed)
 
-- [ ] 9.1 Apply the canary. Create `content/maps/settlements/town_scarp.yaml` with exactly this content:
+- [x] 9.1 Apply the canary. Create `content/maps/settlements/town_scarp.yaml` with exactly this content:
   ```yaml
   version: 1
   kind: settlement
@@ -311,10 +311,10 @@ Ground rules for every task:
 
   Check: you have one recorded result per module.
 - [ ] 9.3 For every module that failed in 9.2 but passed in a clean run (task 1.1, or a clean rerun of that module after a temporary revert), find the copied settlement value: a literal coordinate, count, duration, node key or roster. Rewrite it with the D1/D2 recipes in that module, keeping requirement IDs. A failure that has a real cause other than a copied settlement value is a finding to report, not something to fix here. Check: rerunning the module with the canary applied passes.
-- [ ] 9.4 Revert the canary: `rm content/maps/settlements/town_scarp.yaml` and `git checkout -- content/maps/settlements/capital_altoria.yaml content/maps/locations.yaml world/maps/data/district_partition.json`. Check: `git status --porcelain content world/maps/data` prints nothing, and `check_map_sources.py` exits 0 or prints the same result as before group 9.
+- [x] 9.4 Revert the canary: `rm content/maps/settlements/town_scarp.yaml` and `git checkout -- content/maps/settlements/capital_altoria.yaml content/maps/locations.yaml world/maps/data/district_partition.json`. Check: `git status --porcelain content world/maps/data` prints nothing, and `check_map_sources.py` exits 0 or prints the same result as before group 9.
 
 ## 10. Final checks
 
-- [ ] 10.1 Rerun every module edited in groups 2–9 on the clean tree. Check: each passes.
-- [ ] 10.2 Run `uv run --locked python -m tools.spec_traceability check`, `uv run --locked python -m tools.test_data_lint check` and `uv run --locked python -m tools.contract_gate`. Check: each exits 0, and traceability still reports `0 uncovered`.
-- [ ] 10.3 Run `openspec validate unpin-settlement-map-data --strict`. Check: it prints `is valid`.
+- [x] 10.1 Rerun every module edited in groups 2–9 on the clean tree. Check: each passes.
+- [x] 10.2 Run `uv run --locked python -m tools.spec_traceability check`, `uv run --locked python -m tools.test_data_lint check` and `uv run --locked python -m tools.contract_gate`. Check: each exits 0, and traceability still reports `0 uncovered`.
+- [x] 10.3 Run `openspec validate unpin-settlement-map-data --strict`. Check: it prints `is valid`.

@@ -83,12 +83,24 @@ from world.tests.geography_fixture import publish_shipped_geography
 publish_shipped_geography()
 
 MOVE = CLOCK_YAML["command_defaults"]["move"]
-#: Integrated physical durations for a full-reserve party: the east-gate
-#: approach is 13,500 s at 1.25 m/s plus (27,001 m - 16,875 m) at the 1.125 m/s
-#: light speed = 22,501 s, and one 10 km open-ground wilderness step is
-#: 12,000 s at 3 km/h while no fatigue threshold is crossed.
-EAST_GATE_SECONDS = 811
+#: One open-ground wilderness step stays 1,200 s (no threshold crossed).
 WILDERNESS_STEP_SECONDS = 1200
+
+
+def _polyline_metres(points):
+    """Authored length only; the charged seconds come from the clock, never from here."""
+    import math
+
+    return sum(math.dist(a, b) for a, b in zip(points, points[1:]))
+
+
+class _ChargeAssertions:
+    def assertChargedFor(self, delta, metres):
+        """The spec's healthy settlement speed is 1.25 m/s with one upward rounding."""
+        self.assertGreater(delta, 0)
+        self.assertLess((delta - 1) * 1.25, metres)
+        self.assertLessEqual(metres, delta * 1.25)
+
 
 #: File-local synthetic timed buff: expires inside every advance under test
 #: and carries no modifiers, so it never changes gauge arithmetic.
@@ -146,7 +158,23 @@ EAST_GATE_XYZ = settlement_node_xyz(_EAST_GATE.destination)
 ENTRY_XY = _CAPITAL.approach_cell(_EAST_GATE)
 
 
-class _PartySettlementFixture:
+def _gate_approach_metres():
+    from world.maps import geography
+    from world.maps.map_data import current
+
+    document = current().settlements[_CAPITAL.anchor_key]
+    cell_x, cell_y = geography.current().locations.locations[document.location_ref].cell
+    anchor_x, anchor_y = document.local_anchor_m
+    gate_x, gate_y = document.nodes[_EAST_GATE.destination.object_id].coordinate
+    gate_world = (
+        1000 * cell_x + 500 + gate_x - anchor_x,
+        1000 * cell_y + 500 + gate_y - anchor_y,
+    )
+    approach_world = (1000 * ENTRY_XY[0] + 500, 1000 * ENTRY_XY[1] + 500)
+    return _polyline_metres([gate_world, approach_world])
+
+
+class _PartySettlementFixture(_ChargeAssertions):
     """Synthetic commander/companions, gauges, and a timed probe buff."""
 
     def _make_companion(self, key, location=None):
@@ -636,10 +664,17 @@ class WildernessPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         self.assertEqual(self.player.location.coordinates, ENTRY_XY)
         self.assertEqual(self.ella.location.coordinates, ENTRY_XY)
         self.assertEqual(self.kahn.location.coordinates, ENTRY_XY)
-        self.assertEqual(get_world_clock().tick - before, EAST_GATE_SECONDS)
-        # 811 s at the fixture rates: 10 + floor(0.811), 10 +
-        # floor(1.622), 10 + floor(2.433).
-        self.assertEqual(self._gauges(self.ella), (10, 11, 12))
+        delta = get_world_clock().tick - before
+        self.assertChargedFor(delta, _gate_approach_metres())
+        # The fixture's gauges accrue 0.001 / 0.002 / 0.003 units per second.
+        self.assertEqual(
+            self._gauges(self.ella),
+            (
+                10 + int(0.001 * delta),
+                10 + int(0.002 * delta),
+                10 + int(0.003 * delta),
+            ),
+        )
         self.assertNotIn(_PROBE_BUFF, entity_active_buffs(self.ella))
 
     @covers_requirement(

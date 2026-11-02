@@ -728,11 +728,36 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
         from world.maps.wilderness_destination import gate_approach_distance_m
 
+        import math
+
+        from elosern_map_core.authoring import gate_approach_cell
+
+        from world.maps import geography
+        from world.maps.map_data import current
+
         entry = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
+        document = current().settlements[entry.anchor_key]
+        cell = geography.current().locations.locations[document.location_ref].cell
+        anchor_x, anchor_y = document.local_anchor_m
+
+        def authored_segment(return_direction):
+            gate = entry.gate_for(return_direction)
+            gate_x, gate_y = document.nodes[gate.destination.object_id].coordinate
+            gate_world = (
+                1000 * cell[0] + 500 + gate_x - anchor_x,
+                1000 * cell[1] + 500 + gate_y - anchor_y,
+            )
+            approach = gate_approach_cell(
+                document.wilderness_geometry(cell), return_direction
+            )
+            return math.dist(
+                gate_world, (1000 * approach[0] + 500, 1000 * approach[1] + 500)
+            )
+
         south = gate_approach_distance_m(entry, entry.gate_for("n"))
         east = gate_approach_distance_m(entry, entry.gate_for("w"))
-        self.assertAlmostEqual(south, 540.83, delta=0.1)
-        self.assertAlmostEqual(east, 1012.72, delta=0.1)
+        self.assertAlmostEqual(south, authored_segment("n"))
+        self.assertAlmostEqual(east, authored_segment("w"))
         self.assertNotEqual(south, east)
         # Both directions of a crossing measure the single authored segment.
         self.assertEqual(
@@ -851,23 +876,24 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         )
 
         script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
-        ok = enter_wilderness(self.char1, coordinates=(854, 1024), name=WILDERNESS_NAME)
+        x, y = _approach("w")
+        ok = enter_wilderness(self.char1, coordinates=(x, y), name=WILDERNESS_NAME)
         self.assertTrue(ok)
         room = self.char1.location
-        self.assertEqual(room.ndb.active_desc, terrain_description(854, 1024))
+        self.assertEqual(room.ndb.active_desc, terrain_description(x, y))
         room.ndb.active_desc = None  # wipe like a restart would
         room.ndb.someother = 1
         # The returned room is retained (account still present); re-running
         # sync_wilderness must re-prepare it.
         sync_wilderness()
-        self.assertEqual(room.ndb.active_desc, terrain_description(854, 1024))
+        self.assertEqual(room.ndb.active_desc, terrain_description(x, y))
         self.assertEqual(
             room.scene_archetype,
-            regions()[region_for_coordinates(854, 1024)].scene_archetype,
+            regions()[region_for_coordinates(x, y)].scene_archetype,
         )
         self.assertEqual(
             room.scene_identity,
-            wilderness_scene_identity(WILDERNESS_NAME, 854, 1024),
+            wilderness_scene_identity(WILDERNESS_NAME, x, y),
         )
 
     def test_sync_wilderness_heals_miskeyed_gate(self):

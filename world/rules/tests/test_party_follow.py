@@ -34,31 +34,63 @@ from world.rules.party import (
 )
 
 MOVE = CLOCK_YAML["command_defaults"]["move"]
-#: Integrated physical durations: the east-gate approach is 1,012.72 m at
-#: 1.25 m/s = 811 s, and one 1 km open-ground wilderness step is 1,200 s.
-#: The approach is far too short to cross a fatigue threshold, so the
-#: following step keeps the same ordinary duration.
-EAST_GATE_SECONDS = 811
+#: One open-ground wilderness step stays 1,200 s (no threshold crossed).
 WILDERNESS_STEP_SECONDS = 1200
 
 
-def _east_gate_probe():
-    """The capital's east gate room + approach cell, probed from the live
-    wilderness-entry registry (test-data gate: no authored coordinates)."""
+def _polyline_metres(points):
+    """Authored length only; the charged seconds come from the clock, never from here."""
+    import math
+
+    return sum(math.dist(a, b) for a, b in zip(points, points[1:]))
+
+
+class _ChargeAssertions:
+    def assertChargedFor(self, delta, metres):
+        """The spec's healthy settlement speed is 1.25 m/s with one upward rounding."""
+        self.assertGreater(delta, 0)
+        self.assertLess((delta - 1) * 1.25, metres)
+        self.assertLessEqual(metres, delta * 1.25)
+
+
+def _gateway_entry():
     import importlib
 
     entries = getattr(
         importlib.import_module("world.lore.wilderness_entry"),
         "WILDERNESS_ENTRY" + "_REGISTRY",
     ).values()
-    entry = next(
-        entry for entry in entries if entry.gate_for("w") is not None
-    )
+    return next(entry for entry in entries if entry.gate_for("w") is not None)
+
+
+def _east_gate_probe():
+    """The capital's east gate room + approach cell, probed from the live
+    wilderness-entry registry (test-data gate: no authored coordinates)."""
+    entry = _gateway_entry()
     gate = entry.gate_for("w")
     return settlement_node_xyz(gate.destination), entry.approach_cell(gate)
 
 
 EAST_GATE_XYZ, ENTRY_XY = _east_gate_probe()  # the east-gate approach cell
+
+
+def _gate_approach_metres():
+    from world.maps import geography
+    from world.maps.map_data import current
+
+    entry = _gateway_entry()
+    gate = entry.gate_for("w")
+    document = current().settlements[entry.anchor_key]
+    cell_x, cell_y = geography.current().locations.locations[document.location_ref].cell
+    anchor_x, anchor_y = document.local_anchor_m
+    gate_x, gate_y = document.nodes[gate.destination.object_id].coordinate
+    gate_world = (
+        1000 * cell_x + 500 + gate_x - anchor_x,
+        1000 * cell_y + 500 + gate_y - anchor_y,
+    )
+    approach = entry.approach_cell(gate)
+    approach_world = (1000 * approach[0] + 500, 1000 * approach[1] + 500)
+    return _polyline_metres([gate_world, approach_world])
 
 
 def follow_lines(msg):
@@ -328,7 +360,7 @@ class GridFollowTests(EvenniaTest):
         self.assertIs(warn.call_args.kwargs["context"]["possessed"], False)
 
 
-class WildernessFollowTests(EvenniaTest):
+class WildernessFollowTests(_ChargeAssertions, EvenniaTest):
     def setUp(self):
         super().setUp()
         self.room1.key = "Room1"
@@ -371,7 +403,7 @@ class WildernessFollowTests(EvenniaTest):
         self.assertEqual(first.location.coordinates, ENTRY_XY)
         self.assertIsInstance(second.location, TerrainRoom)
         self.assertEqual(second.location.coordinates, ENTRY_XY)
-        self.assertEqual(self._tick(), before + EAST_GATE_SECONDS)
+        self.assertChargedFor(self._tick() - before, _gate_approach_metres())
 
     @covers_requirement("wilderness-gateway::every-successful-wildernessreturnexit-traversal-advances-the-clock-not-only-the-registered-return-branch")
     @covers_requirement("party-system::companions-follow-the-player-through-every-exit-traversal")
@@ -402,7 +434,7 @@ class WildernessFollowTests(EvenniaTest):
         self._exit("west").at_traverse(self.char1, self.char1.location)
         self.assertIs(self.char1.location, self.east_gate)
         self.assertIs(companion.location, self.east_gate)
-        self.assertEqual(self._tick(), before + EAST_GATE_SECONDS)
+        self.assertChargedFor(self._tick() - before, _gate_approach_metres())
 
     def test_return_clears_the_wilderness_registration(self):
         from world.rules.fatigue import SleepPosture, write_fatigue_state

@@ -81,7 +81,7 @@ def _gate_approach_metres():
     from world.maps import geography
     from world.maps.map_data import current
 
-    document = current().settlements["capital_altoria"]
+    document = current().settlements[_ENTRY.anchor_key]
     cell_x, cell_y = geography.current().locations.locations[document.location_ref].cell
     anchor_x, anchor_y = document.local_anchor_m
     gate_x, gate_y = document.nodes[_EAST_GATE.destination.object_id].coordinate
@@ -194,7 +194,7 @@ class CityWildernessRoundTripTests(_ChargeAssertions, EvenniaTest):
         self.char1.location = south_gate
         city_exit = next(e for e in south_gate.exits if isinstance(e, CostedXYZExit))
         self.assertIsInstance(city_exit, CostedXYZExit)
-        document = current().settlements["capital_altoria"]
+        document = current().settlements[_ENTRY.anchor_key]
         road = next(
             road
             for road in document.roads

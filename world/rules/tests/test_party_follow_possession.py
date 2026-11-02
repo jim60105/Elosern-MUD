@@ -54,27 +54,62 @@ from world.rules.possession import (
 from world.quests.room_observation import observe_room_entry
 
 MOVE = CLOCK_YAML["command_defaults"]["move"]
-#: Integrated physical durations for a full-reserve party: the east-gate
-#: approach is 13,500 s at 1.25 m/s then the light-stage 1.125 m/s to 22,501 s,
-#: and one 10 km open-ground wilderness step stays 12,000 s (no threshold).
-EAST_GATE_SECONDS = 811
+#: One open-ground wilderness step stays 1,200 s (no threshold crossed).
 WILDERNESS_STEP_SECONDS = 1200
 
 
-def _east_gate_probe():
-    """The capital's east gate room + approach cell from the live registry."""
+def _polyline_metres(points):
+    """Authored length only; the charged seconds come from the clock, never from here."""
+    import math
+
+    return sum(math.dist(a, b) for a, b in zip(points, points[1:]))
+
+
+class _ChargeAssertions:
+    def assertChargedFor(self, delta, metres):
+        """The spec's healthy settlement speed is 1.25 m/s with one upward rounding."""
+        self.assertGreater(delta, 0)
+        self.assertLess((delta - 1) * 1.25, metres)
+        self.assertLessEqual(metres, delta * 1.25)
+
+
+def _gateway_entry():
     import importlib
 
     entries = getattr(
         importlib.import_module("world.lore.wilderness_entry"),
         "WILDERNESS_ENTRY" + "_REGISTRY",
     ).values()
-    entry = next(entry for entry in entries if entry.gate_for("w") is not None)
+    return next(entry for entry in entries if entry.gate_for("w") is not None)
+
+
+def _east_gate_probe():
+    """The capital's east gate room + approach cell from the live registry."""
+    entry = _gateway_entry()
     gate = entry.gate_for("w")
     return settlement_node_xyz(gate.destination), entry.approach_cell(gate)
 
 
 EAST_GATE_XYZ, ENTRY_XY = _east_gate_probe()
+
+
+def _gate_approach_metres():
+    from world.maps import geography
+    from world.maps.map_data import current
+
+    entry = _gateway_entry()
+    gate = entry.gate_for("w")
+    document = current().settlements[entry.anchor_key]
+    cell_x, cell_y = geography.current().locations.locations[document.location_ref].cell
+    anchor_x, anchor_y = document.local_anchor_m
+    gate_x, gate_y = document.nodes[gate.destination.object_id].coordinate
+    gate_world = (
+        1000 * cell_x + 500 + gate_x - anchor_x,
+        1000 * cell_y + 500 + gate_y - anchor_y,
+    )
+    approach = entry.approach_cell(gate)
+    approach_world = (1000 * approach[0] + 500, 1000 * approach[1] + 500)
+    return _polyline_metres([gate_world, approach_world])
 
 
 def follow_lines(msg):
@@ -97,7 +132,7 @@ class PossessionSelectiveRejectingRoom(Room):
         return True
 
 
-class PossessedFollowTestCase(EvenniaTest):
+class PossessedFollowTestCase(_ChargeAssertions, EvenniaTest):
     """A possessed companion with the owner body and a second companion."""
 
     def setUp(self):
@@ -343,7 +378,7 @@ class PossessedWildernessFollowTests(PossessedFollowTestCase):
         self.assertEqual(self.npc.location.coordinates, ENTRY_XY)
         self.assertEqual(self.char1.location.coordinates, ENTRY_XY)
         self.assertEqual(self.other.location.coordinates, ENTRY_XY)
-        self.assertEqual(self._tick(), before + EAST_GATE_SECONDS)
+        self.assertChargedFor(self._tick() - before, _gate_approach_metres())
         self.assertEqual(self._script().itemcoordinates.get(self.char1), ENTRY_XY)
         self.assertTrue(has_visited(self.char1, f"wild:{WILDERNESS_NAME}:{ENTRY_XY[0]}:{ENTRY_XY[1]}"))
         commander_visit = {
@@ -389,7 +424,7 @@ class PossessedWildernessFollowTests(PossessedFollowTestCase):
         self.assertIs(self.npc.location, self.east_gate)
         self.assertIs(self.char1.location, self.east_gate)
         self.assertIs(self.other.location, self.east_gate)
-        self.assertEqual(self._tick(), before + EAST_GATE_SECONDS)
+        self.assertChargedFor(self._tick() - before, _gate_approach_metres())
         itemcoordinates = self._script().itemcoordinates
         for member in (self.npc, self.char1, self.other):
             self.assertNotIn(member, itemcoordinates)

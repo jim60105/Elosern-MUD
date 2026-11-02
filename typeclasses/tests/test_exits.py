@@ -63,17 +63,44 @@ SOUTH_GATE_XYZ = settlement_node_xyz(_CAPITAL.gate_for("n").destination)
 EAST_APPROACH = _CAPITAL.approach_cell(_CAPITAL.gate_for("w"))
 SOUTH_APPROACH = _CAPITAL.approach_cell(_CAPITAL.gate_for("n"))
 
-#: Integrated physical durations for a full-reserve party at the current 10 km
-#: wilderness cell span: the east approach (27,000.47 m) is 13,500 s at
-#: 1.25 m/s plus the remainder at the light-stage 1.125 m/s = 22,501 s; the
-#: south approach (27,303.71 m) integrates to 22,770 s; and one 10 km
-#: open-ground wilderness step stays 12,000 s (no threshold crossed).
-EAST_GATE_SECONDS = 811
-SOUTH_GATE_SECONDS = 433
+#: One open-ground wilderness step stays 12,000 s (no threshold crossed).
 WILDERNESS_STEP_SECONDS = 1200
 
 
-class WildernessGatewayExitTests(EvenniaTest):
+def _polyline_metres(points):
+    """Authored length only; the charged seconds come from the clock, never from here."""
+    import math
+
+    return sum(math.dist(a, b) for a, b in zip(points, points[1:]))
+
+
+class _ChargeAssertions:
+    def assertChargedFor(self, delta, metres):
+        """The spec's healthy settlement speed is 1.25 m/s with one upward rounding."""
+        self.assertGreater(delta, 0)
+        self.assertLess((delta - 1) * 1.25, metres)
+        self.assertLessEqual(metres, delta * 1.25)
+
+
+def _gate_approach_metres(return_direction):
+    from world.maps import geography
+    from world.maps.map_data import current
+
+    document = current().settlements[_CAPITAL.anchor_key]
+    cell_x, cell_y = geography.current().locations.locations[document.location_ref].cell
+    anchor_x, anchor_y = document.local_anchor_m
+    gate = _CAPITAL.gate_for(return_direction)
+    gate_x, gate_y = document.nodes[gate.destination.object_id].coordinate
+    gate_world = (
+        1000 * cell_x + 500 + gate_x - anchor_x,
+        1000 * cell_y + 500 + gate_y - anchor_y,
+    )
+    approach = _CAPITAL.approach_cell(gate)
+    approach_world = (1000 * approach[0] + 500, 1000 * approach[1] + 500)
+    return _polyline_metres([gate_world, approach_world])
+
+
+class WildernessGatewayExitTests(_ChargeAssertions, EvenniaTest):
     def setUp(self):
         super().setUp()
         self.room1.key = "Room1"
@@ -105,7 +132,7 @@ class WildernessGatewayExitTests(EvenniaTest):
 
         self.assertIsInstance(self.char1.location, TerrainRoom)
         self.assertEqual(self.char1.location.coordinates, EAST_APPROACH)
-        self.assertEqual(self._tick(), before + EAST_GATE_SECONDS)
+        self.assertChargedFor(self._tick() - before, _gate_approach_metres("w"))
 
     @covers_requirement("wilderness-gateway::wildernessgateexit-moves-a-traversing-object-from-a-grid-room-into-the-wilderness")
     def test_each_gate_exit_lands_on_its_own_gate_approach_cell(self):
@@ -179,7 +206,7 @@ class WildernessGatewayExitTests(EvenniaTest):
         before = self._tick()
         self._exit("west").at_traverse(self.char1, self.char1.location)
         self.assertIs(self.char1.location, self.east_gate)
-        self.assertEqual(self._tick(), before + EAST_GATE_SECONDS)
+        self.assertChargedFor(self._tick() - before, _gate_approach_metres("w"))
 
     @covers_requirement("wilderness-gateway::wildernessreturnexit-routes-every-registered-approach-cell-and-direction-pair-back-to-the-grid")
     def test_north_from_south_approach_returns_to_the_south_gate_room(self):
@@ -188,7 +215,7 @@ class WildernessGatewayExitTests(EvenniaTest):
         before = self._tick()
         self._exit("north").at_traverse(self.char1, self.char1.location)
         self.assertIs(self.char1.location, self.south_gate)
-        self.assertEqual(self._tick(), before + SOUTH_GATE_SECONDS)
+        self.assertChargedFor(self._tick() - before, _gate_approach_metres("n"))
 
     @covers_requirement("movement-settlement-atomicity::movement-settles-relocation-clock-cost-map-knowledge-and-companion-following-as-one-coherent-transaction")
     def test_intermediate_steps_each_advance_clock_by_one_wilderness_move(self):
@@ -209,17 +236,19 @@ class WildernessGatewayExitTests(EvenniaTest):
         script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
         before = self._tick()
         self.gate.at_traverse(self.char1, self.east_gate)
+        entry_delta = self._tick() - before
+        self.assertChargedFor(entry_delta, _gate_approach_metres("w"))
+        middle_before = self._tick()
         for _ in range(3):
             self._exit("east").at_traverse(self.char1, self.char1.location)
         for _ in range(3):
             self._exit("west").at_traverse(self.char1, self.char1.location)
-        self._exit("west").at_traverse(self.char1, self.char1.location)
         self.assertEqual(
-            self._tick(),
-            before
-            + 2 * EAST_GATE_SECONDS
-            + 6 * WILDERNESS_STEP_SECONDS,
+            self._tick() - middle_before, 6 * WILDERNESS_STEP_SECONDS
         )
+        return_before = self._tick()
+        self._exit("west").at_traverse(self.char1, self.char1.location)
+        self.assertChargedFor(self._tick() - return_before, _gate_approach_metres("w"))
         self.assertIs(self.char1.location, self.east_gate)
         # The return-exit cleanup drops the player, but each visited coordinate
         # keeps its deterministic population monster (wilderness-monster-

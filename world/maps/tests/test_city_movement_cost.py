@@ -91,7 +91,7 @@ class SampleCityCostedExitTests(_ChargeAssertions, EvenniaTest):
             sync_grid()
 
         loaded = self._intra_city_exits()
-        self.assertEqual(len(loaded), 52)
+        self.assertEqual(len(loaded), len(capital.roads))
         for exit_obj in loaded:
             self.assertEqual(type(exit_obj).__name__, "XYZExit")
 
