@@ -5,7 +5,7 @@
 See proposal.md (Why). Facts verified on master at proposal time:
 
 - `capital_river` flows westward. Its route starts at (1150, 1060) and runs toward (830, 1031). Near the city its raster occupies (862–867, 1040) and (856–860, 1039), with the ford at (861, 1040). The cells (861, 1041) and (861, 1042) are land on the north bank. (861, 1039) is land on the south bank. The elevation bands around the city are 5–6, which is mild relief.
-- `place_sites.py` reports (861, 1043): `walkable=True water_cell=False region=western_hills_valleys nation=altoria river=3`.
+- `place_sites.py` reports (861, 1042): `walkable=True water_cell=False region=western_hills_valleys nation=altoria river=2`.
 - The default budget for `capital_altoria` gives 13 footprint cells, envelope radius about 1,987 m, 28 nodes, 4 gates and loop ratio 0.35. The reach is `ceil(sqrt(13)/2)+1 = 3`, so the ford is within reach and the morphology is `river_crossing`.
 - Nodes that something joins on:
   - interior doorways: `academy`, `bath_forecourt`, `craft_alley`, `east_market`, `great_temple`, `guild_forecourt`, `inn_lane`, `market_street`, `noble_quarter`, `palace_forecourt`, `south_avenue`, `south_gate`, `training_ground`;
@@ -35,7 +35,7 @@ These are the options for the quay-versus-river mismatch:
 
 | Option | Effect | Verdict |
 | --- | --- | --- |
-| A. Move the cell to (861, 1043), on the north bank by the ford | The river is south, the terraces climb north, and the ford feeds the south gate. This matches "riverfront below northern terraces", the south gate's 渡口 origin and the existing "從碼頭沿著北岸向東" riverbank prose. | **Default** |
+| A. Move the cell to (861, 1042), on the north bank by the ford | The river is south, the terraces climb north, and the ford feeds the south gate. This matches "riverfront below northern terraces", the south gate's 渡口 origin and the existing "從碼頭沿著北岸向東" riverbank prose. | **Default** |
 | B. Move to the south bank, around (850, 1034) | The river lies north, which contradicts "below northern terraces". | Rejected |
 | C. Keep the cell and redraw `capital_river` north of it | This edits continent terrain: elevation, partition, every river consumer and the ford. | Rejected as out of scope |
 | D. Keep the cell and drop the water roles | This contradicts the lore and the existing quay interior prose. | Rejected |
@@ -97,7 +97,7 @@ Write prose for each of them to `<scratchpad>/altoria_prose.json`, following `do
 
 ## Risks / Trade-offs
 
-- [`river_crossing` places the south gate's approach on the south bank (861, 1039) only if the reach path runs straight down x=861] → BFS from (861, 1043) to the ford (861, 1040) is a straight 4-step path, so this holds. Task 2.2 checks the approach in the report.
+- [`river_crossing` places the south gate's approach on the south bank (861, 1039) only if the reach path runs straight down x=861] → BFS from (861, 1042) to the ford (861, 1040) is a straight 2-step path, so this holds. Task 2.3 checks the written gate approach.
 - [Moving 19 km changes which district owns surrounding wilderness] → The partition is regenerated, and `check_map_sources.py` verifies landmark spacing.
 - [Kept prose conflicts with new geometry] → D3 covers it with a reread of the 21 kept descriptions. The user's editor review is the final check.
 - [Tests that still assume Altoria data] → The canary in `unpin-settlement-map-data` ran exactly this kind of change. Task 4.2 reruns the same module list on the real data.
