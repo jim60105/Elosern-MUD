@@ -136,6 +136,43 @@ The entry is how the continent-scale wilderness connects to this map.
   cells, grows the mask with `.` padding (at most 64×64) and saves the
   converted offset. Hand edits must keep it rectangular.
 
+## Terrain fit and size
+
+Two scales meet in this file. The wilderness is a 1 km grid whose cell centres
+are `(1000X + 500, 1000Y + 500)` m; the map's `x_m`/`y_m` are integer metres in
+the settlement's own frame. The footprint is the settlement's wilderness
+occupancy in whole cells, and the street graph's extent is the built-up area in
+metres — one area seen at two scales, never a second size authority. Rounding
+the footprint up to whole cells absorbs walls, suburbs and gardens; the streets
+stay at the built-up size. A 6,000-person town is about 770 m across (a
+ten-minute walk); a 600,000-person capital is about 4 km across.
+
+Three read-only commands report on that fit, in the game environment:
+
+```console
+uv run --locked python -m tools.settlement_synthesis site <location_id>
+uv run --locked python -m tools.settlement_synthesis budget <location_id>
+uv run --locked python -m tools.settlement_synthesis lint <map_id>
+```
+
+- `site` lists the nearby rivers and sea with distance and bearing, each
+  river's downstream bearing, fords, harbour sites, relief and uphill bearing,
+  the nearest national settlements and the bearing to the location's capital.
+- `budget` gives the built-up area, footprint cells, envelope radius and the
+  node, gate and loop targets for the population.
+- `lint` checks this file against the terrain: a node in water, a water-edge
+  identifier (`quay`, `wharf`, `dock`, `docks`, `pier`, `landing`, `riverbank`,
+  `waterfront`) more than 600 m from water, a road crossing water with no
+  `bridge`, `ford` or `ferry` endpoint, a node outside a multi-cell footprint,
+  an unwalkable gate approach, a gate facing inward, and a road whose authored
+  direction drifts from its drawn segment. Words are whole underscore-separated
+  tokens, and a ford cell never counts as water. Errors must be fixed; warnings
+  are review prompts.
+
+The scale rule, the density assumption with its sources, the tier table and the
+human-review checklist are in
+[`docs/development/settlement-synthesis.md`](../../../../docs/development/settlement-synthesis.md).
+
 ## City gate
 
 `city_gate` is the one-way entry from the character-creation starting room
