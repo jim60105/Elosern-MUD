@@ -21,16 +21,40 @@ publish_shipped_geography()
 
 MOVE = CLOCK_YAML["command_defaults"]["move"]
 
-#: Physical per-edge durations from the authored meter positions
-#: (world-map-scale §8/§9) at 1.25 m/s settlement speed, rounded once each:
-#:   南門->南大道 904.49m=724s, 南大道->大道北段 953.43m=763s,
-#:   大道北段->中央廣場 882.84m=707s, 中央廣場->公會前 892.70m=715s,
-#:   公會前->東市 1011.19m=809s, 東市->東門 1131.37m=906s.
-#: Gate approach (east gate -> approach cell center) at 1.25 m/s = 811 s; one
-#: 1 km open-ground wilderness step = 1,200 s (no threshold crossed).
-CITY_EDGE_SECONDS = (724, 763, 707, 715, 809, 906)
-GATE_APPROACH_SECONDS = 811
+#: One open-ground wilderness step stays 1,200 s (no threshold crossed).
 WILDERNESS_STEP_SECONDS = 1200
+
+
+def _polyline_metres(points):
+    """Authored length only; the charged seconds come from the clock, never from here."""
+    import math
+
+    return sum(math.dist(a, b) for a, b in zip(points, points[1:]))
+
+
+class _ChargeAssertions:
+    def assertChargedFor(self, delta, metres):
+        """The spec's healthy settlement speed is 1.25 m/s with one upward rounding."""
+        self.assertGreater(delta, 0)
+        self.assertLess((delta - 1) * 1.25, metres)
+        self.assertLessEqual(metres, delta * 1.25)
+
+
+def _gate_approach_metres():
+    from world.maps import geography
+    from world.maps.map_data import current
+
+    document = current().settlements[_ENTRY.anchor_key]
+    cell_x, cell_y = geography.current().locations.locations[document.location_ref].cell
+    anchor_x, anchor_y = document.local_anchor_m
+    gate_x, gate_y = document.nodes[_EAST_GATE.destination.object_id].coordinate
+    gate_world = (
+        1000 * cell_x + 500 + gate_x - anchor_x,
+        1000 * cell_y + 500 + gate_y - anchor_y,
+    )
+    approach = _ENTRY.approach_cell(_EAST_GATE)
+    approach_world = (1000 * approach[0] + 500, 1000 * approach[1] + 500)
+    return _polyline_metres([gate_world, approach_world])
 
 
 def live_gateway_entry():
@@ -57,7 +81,7 @@ EAST_GATE_XYZ = settlement_node_xyz(_EAST_GATE.destination)
 SOUTH_GATE_XYZ = settlement_node_xyz(_ENTRY.gate_for("n").destination)
 
 
-class MovementLineageRoundTripTests(EvenniaTest):
+class MovementLineageRoundTripTests(_ChargeAssertions, EvenniaTest):
     def setUp(self):
         super().setUp()
         self.room1.key = "Room1"
@@ -76,8 +100,10 @@ class MovementLineageRoundTripTests(EvenniaTest):
         ][0]
 
     def test_every_lineage_charges_and_one_failure_charges_nothing(self):
-        before = get_world_clock().tick
-        advances = []
+        from collections import deque
+
+        from typeclasses.exits import CostedXYZExit
+        from world.maps.map_data import current
 
         # 1. Limbo -> South Gate via the bridging Exit (move).
         limbo_to_city = [
@@ -87,22 +113,46 @@ class MovementLineageRoundTripTests(EvenniaTest):
         self.char1.location = self.limbo
         previous = get_world_clock().tick
         limbo_to_city.at_traverse(self.char1, self.south_gate)
-        advances.append(get_world_clock().tick - previous)
+        self.assertEqual(get_world_clock().tick - previous, MOVE)
         self.assertIs(self.char1.location, self.south_gate)
 
-        # 2. Across the city via CostedXYZExit links: South Gate -> 南大道 ->
-        #    大道北段 -> 中央廣場 -> 公會前 -> 東市 -> East Gate (6 move legs).
-        path = ["南大道", "大道北段", "中央廣場", "公會前", "東市", "東門"]
-        for expected_key in path:
-            exit_obj = [
-                e
-                for e in self.char1.location.exits
-                if e.destination.key == expected_key
-            ][0]
+        # 2. Across the city via CostedXYZExit links, along the authored road
+        #    route from the South Gate to the East Gate. Each leg is checked
+        #    against its own authored polyline, never a copied duration.
+        document = current().settlements[_ENTRY.anchor_key]
+        frontier = deque([(self.south_gate, [])])
+        seen, route = {self.south_gate}, None
+        while frontier and route is None:
+            room, path = frontier.popleft()
+            if room.pk == self.east_gate.pk:
+                route = path
+                break
+            for exit_obj in room.exits:
+                if not isinstance(exit_obj, CostedXYZExit):
+                    continue
+                destination = exit_obj.destination
+                if destination not in seen:
+                    seen.add(destination)
+                    frontier.append((destination, path + [exit_obj]))
+        self.assertTrue(route, "the authored roads must connect both gates")
+        for exit_obj in route:
+            road = next(
+                road
+                for road in document.roads
+                if road.source == exit_obj.location.sparse_node_id
+                and road.destination == exit_obj.destination.sparse_node_id
+            )
+            points = [
+                document.nodes[road.source].coordinate,
+                *[(bend.x_m, bend.y_m) for bend in road.bends],
+                document.nodes[road.destination].coordinate,
+            ]
             previous = get_world_clock().tick
             exit_obj.at_traverse(self.char1, exit_obj.destination)
-            advances.append(get_world_clock().tick - previous)
-            self.assertEqual(self.char1.location.key, expected_key)
+            self.assertChargedFor(
+                get_world_clock().tick - previous, _polyline_metres(points)
+            )
+            self.assertIs(self.char1.location, exit_obj.destination)
         self.assertIs(self.char1.location, self.east_gate)
 
         # 3. Into the wilderness through WildernessGateExit (wilderness_move),
@@ -110,19 +160,25 @@ class MovementLineageRoundTripTests(EvenniaTest):
         #    special-cased return (3 more wilderness_move legs).
         previous = get_world_clock().tick
         self.gate.at_traverse(self.char1, self.east_gate)
-        advances.append(get_world_clock().tick - previous)
+        self.assertChargedFor(
+            get_world_clock().tick - previous, _gate_approach_metres()
+        )
         self.assertIsInstance(self.char1.location, TerrainRoom)
         entry_xy = self.char1.location.coordinates
         for direction in ("east", "west"):
             exit_obj = [e for e in self.char1.location.exits if e.key == direction][0]
             previous = get_world_clock().tick
             exit_obj.at_traverse(self.char1, self.char1.location)
-            advances.append(get_world_clock().tick - previous)
+            self.assertEqual(
+                get_world_clock().tick - previous, WILDERNESS_STEP_SECONDS
+            )
         self.assertEqual(self.char1.location.coordinates, entry_xy)
         exit_obj = [e for e in self.char1.location.exits if e.key == "west"][0]
         previous = get_world_clock().tick
         exit_obj.at_traverse(self.char1, self.char1.location)
-        advances.append(get_world_clock().tick - previous)
+        self.assertChargedFor(
+            get_world_clock().tick - previous, _gate_approach_metres()
+        )
         self.assertIs(self.char1.location, self.east_gate)
 
         # 4. A synthetic origin/return Exit pair, mirroring change 14's
@@ -136,11 +192,11 @@ class MovementLineageRoundTripTests(EvenniaTest):
         self.char1.location = origin
         previous = get_world_clock().tick
         instance_enter.at_traverse(self.char1, target)
-        advances.append(get_world_clock().tick - previous)
+        self.assertEqual(get_world_clock().tick - previous, MOVE)
         self.assertIs(self.char1.location, target)
         previous = get_world_clock().tick
         instance_return.at_traverse(self.char1, origin)
-        advances.append(get_world_clock().tick - previous)
+        self.assertEqual(get_world_clock().tick - previous, MOVE)
         self.assertIs(self.char1.location, origin)
 
         # 5. A deliberately failed traversal (locked exit) contributes 0.
@@ -153,28 +209,5 @@ class MovementLineageRoundTripTests(EvenniaTest):
         command.caller = self.char1
         previous = get_world_clock().tick
         command.func()
-        advances.append(get_world_clock().tick - previous)
+        self.assertEqual(get_world_clock().tick - previous, 0)
         self.assertIs(self.char1.location, origin)
-
-        self.assertEqual(
-            advances,
-            [
-                MOVE,
-                *CITY_EDGE_SECONDS,
-                GATE_APPROACH_SECONDS,
-                WILDERNESS_STEP_SECONDS,
-                WILDERNESS_STEP_SECONDS,
-                GATE_APPROACH_SECONDS,
-                MOVE,
-                MOVE,
-                0,
-            ],
-        )
-        self.assertEqual(
-            get_world_clock().tick,
-            before
-            + 3 * MOVE
-            + sum(CITY_EDGE_SECONDS)
-            + 2 * GATE_APPROACH_SECONDS
-            + 2 * WILDERNESS_STEP_SECONDS,
-        )

@@ -146,25 +146,25 @@ Map-owned permanent interiors SHALL attach by qualified relationships without be
   by interior attachment
 
 ### Requirement: The sample city connects to the rest of the world through exactly one bridging exit
-The South Gate room, at `(3050, 150)`, SHALL be the sample city's entrance from Limbo,
+The room of the capital's authored `city_gate` node SHALL be the sample city's entrance from Limbo,
 reached via the single forward bridging `Exit` from Limbo described by the `grid-room-sync`
 capability, exactly one forward bridging exit per `CITY_GATE_REGISTRY` row, of which
 `capital_altoria` is one. Wilderness gates and service interiors SHALL remain separate
-from that bridge. The East Gate room, at `(6500, 3010)`, SHALL carry its declared
+from that bridge. Every room a capital wilderness gate targets SHALL carry its declared
 wilderness gate and SHALL NOT be a dead end.
 
 #### Scenario: The South Gate is the only room reachable from Limbo
 - **WHEN** Limbo's exits are inspected after `sync_grid()` runs
 - **THEN** they are exactly the registry's forward gate exits, one per `CITY_GATE_REGISTRY` row,
-  and the `capital_altoria` row's exit leads into that map, at `(3050, 150)`
+  and the `capital_altoria` row's exit leads into that map, at the city-gate node's current authored coordinate
 
 #### Scenario: No city room leads back to Limbo
 - **WHEN** every exit of every spawned `capital_altoria` room is inspected after `sync_grid()` runs
 - **THEN** none of them has the Limbo starting room as its destination
 
 #### Scenario: The East Gate connects the city and wilderness
-- **WHEN** the East Gate room's exits are inspected
-- **THEN** it holds its link west back into the city and the wilderness gate exit its
+- **WHEN** the exits of each room a capital wilderness gate targets are inspected
+- **THEN** it holds one city exit per authored road leaving that node and the wilderness gate exit its
   `WILDERNESS_ENTRY_REGISTRY` row authorises, and no other exit
 
 #### Scenario: The bridge is one-way and pruned on every sync

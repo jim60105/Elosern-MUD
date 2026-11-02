@@ -274,9 +274,10 @@ class SnapshotIsolationTests(unittest.TestCase):
     def test_retained_adapter_keeps_its_snapshot_coordinates(self):
         from world.lore.map_districts import _ProductionTerrain
 
+        anchor_xy = map_data.current().settlements["capital_altoria"].local_anchor_m
         first = geography.current()
         retained = _ProductionTerrain(first)
-        before = retained.grid_site("capital_altoria", (3500, 2850))
+        before = retained.grid_site("capital_altoria", anchor_xy)
         self.assertIsNotNone(before)
         data = _plain(first.locations.data)
         cell = data["locations"]["capital_altoria"]["cell"]
@@ -289,9 +290,9 @@ class SnapshotIsolationTests(unittest.TestCase):
             fingerprints=dict(first.fingerprints),
         )
         publish_geography(second)
-        after = retained.grid_site("capital_altoria", (3500, 2850))
+        after = retained.grid_site("capital_altoria", anchor_xy)
         self.assertEqual(after.position_m, before.position_m)
-        fresh = _ProductionTerrain(second).grid_site("capital_altoria", (3500, 2850))
+        fresh = _ProductionTerrain(second).grid_site("capital_altoria", anchor_xy)
         self.assertEqual(fresh.position_m[0] - before.position_m[0], 1000)
 
     def test_candidate_without_a_classifier_region_is_rejected(self):

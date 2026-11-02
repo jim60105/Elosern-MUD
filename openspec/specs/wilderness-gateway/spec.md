@@ -14,11 +14,10 @@ Immutable game wilderness-entry views SHALL derive solely from settlement-owned 
 
 #### Scenario: The registry declares settlement footprints and gate destinations
 - **WHEN** `WILDERNESS_ENTRY_REGISTRY` is inspected
-- **THEN** it contains the authored entries; `"capital_altoria"` has its declared irregular
-  footprint and gates returning to the `south_gate` and `east_gate` sparse nodes on map
-  `capital_altoria`; `"village_ciaran"` is a point shape with one gate
-  returning to the village's entrance node; and no test asserts that any other
-  `ANCHOR_PLACEMENT_REGISTRY` key must also appear
+- **THEN** it contains exactly one entry per discovered settlement document whose
+  `wilderness_entry` is set, keyed by that document's `location_ref`, each carrying that
+  document's footprint mask and gate destination nodes; every single-`#` entry has exactly one
+  gate; and no test asserts a fixed roster of entries, a fixed cell count or a fixed origin
 
 #### Scenario: Derived geometry matches the authored mask
 - **WHEN** a synthetic mask with rows `###`, `.##`, `###` is placed at origin `(10,20)` with north and west return gates
@@ -193,13 +192,13 @@ coordinate in that settlement's local frame.
 
 #### Scenario: Traversing north from the south approach cell returns through the south gate
 - **WHEN** a character at the south gate's derived approach cell traverses the `"north"` exit
-- **THEN** the character's new location is the `capital_altoria` 南門 `GridRoom` object at grid
-  `(3050, 150, "capital_altoria")`
+- **THEN** the character's new location is the `capital_altoria` South Gate `GridRoom` object at
+  the gate destination node's current authored grid coordinate
 
 #### Scenario: Traversing west from the east approach cell returns through the east gate
 - **WHEN** a character at the east gate's derived approach cell traverses the `"west"` exit
 - **THEN** the character's new location is the `capital_altoria` East Gate `GridRoom` object at
-  grid `(6500, 3010, "capital_altoria")` (the same object instance that existed before the character
+  the gate destination node's current authored grid coordinate (the same object instance that existed before the character
   first entered the wilderness through it)
 
 #### Scenario: The return direction at the wrong approach cell is not a gateway

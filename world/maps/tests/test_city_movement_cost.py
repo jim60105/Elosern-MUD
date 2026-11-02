@@ -29,15 +29,28 @@ SOUTH_GATE_XYZ = settlement_node_xyz(
 
 MOVE = CLOCK_YAML["command_defaults"]["move"]
 
-# Pinned physical durations from the authored meter positions (world-map-scale
-# §8/§9) at the settlement 1.25 m/s calibration, rounded upward once:
-#   南門 (3050,150) -> 南大道 (3140,1050): hypot(90,900)=904.49 m -> 724 s
-#   隱密小徑 (0,192) -> 村中廣場 (479,305): hypot(479,113)=492.15 m -> 394 s
-SOUTH_GATE_TO_AVENUE_SECONDS = 724
+# The village's authored physical duration (world-map-scale §8/§9) at the
+# settlement 1.25 m/s calibration, rounded upward once; the capital's own
+# duration is checked against the authored polyline instead.
 HIDDEN_PATH_TO_PLAZA_SECONDS = 394
 
 
-class SampleCityCostedExitTests(EvenniaTest):
+def _polyline_metres(points):
+    """Authored length only; the charged seconds come from the clock, never from here."""
+    import math
+
+    return sum(math.dist(a, b) for a, b in zip(points, points[1:]))
+
+
+class _ChargeAssertions:
+    def assertChargedFor(self, delta, metres):
+        """The spec's healthy settlement speed is 1.25 m/s with one upward rounding."""
+        self.assertGreater(delta, 0)
+        self.assertLess((delta - 1) * 1.25, metres)
+        self.assertLessEqual(metres, delta * 1.25)
+
+
+class SampleCityCostedExitTests(_ChargeAssertions, EvenniaTest):
     def setUp(self):
         super().setUp()
         self.room1.key = "Room1"
@@ -78,7 +91,7 @@ class SampleCityCostedExitTests(EvenniaTest):
             sync_grid()
 
         loaded = self._intra_city_exits()
-        self.assertEqual(len(loaded), 52)
+        self.assertEqual(len(loaded), len(capital.roads))
         for exit_obj in loaded:
             self.assertEqual(type(exit_obj).__name__, "XYZExit")
 
@@ -107,20 +120,33 @@ class SampleCityCostedExitTests(EvenniaTest):
         "movement-cost-charging::typeclasses-exits-exit-and-costedxyzexit-both-carry-movementcostmixin-with",
     )
     def test_fresh_intra_city_traversal_advances_clock_by_move(self):
+        from world.maps.map_data import current
+
         sync_grid()
         south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
         self.char1.location = south_gate
-        city_exit = [e for e in south_gate.exits if e.destination.key == "南大道"][0]
+        city_exit = next(e for e in south_gate.exits if isinstance(e, CostedXYZExit))
         self.assertIsInstance(city_exit, CostedXYZExit)
+        document = current().settlements["capital_altoria"]
+        road = next(
+            road
+            for road in document.roads
+            if road.source == south_gate.sparse_node_id
+            and road.destination == city_exit.destination.sparse_node_id
+        )
+        points = [
+            document.nodes[road.source].coordinate,
+            *[(bend.x_m, bend.y_m) for bend in road.bends],
+            document.nodes[road.destination].coordinate,
+        ]
         before = get_world_clock().tick
         city_exit.at_traverse(self.char1, city_exit.destination)
-        self.assertEqual(self.char1.location.key, "南大道")
+        self.assertEqual(self.char1.location, city_exit.destination)
         # A settlement edge charges its authored physical duration, not the
         # flat non-distance connector default.
-        self.assertEqual(
-            get_world_clock().tick, before + SOUTH_GATE_TO_AVENUE_SECONDS
-        )
-        self.assertNotEqual(SOUTH_GATE_TO_AVENUE_SECONDS, MOVE)
+        delta = get_world_clock().tick - before
+        self.assertChargedFor(delta, _polyline_metres(points))
+        self.assertNotEqual(delta, MOVE)
 
     @covers_requirement(
         "movement-cost-charging::distance-bearing-traversal-uses-authored-physical-geometry",

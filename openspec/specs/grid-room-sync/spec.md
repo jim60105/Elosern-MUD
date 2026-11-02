@@ -79,8 +79,8 @@ never an exit back to the starting room, never duplicated on repeated calls.
 
 #### Scenario: The bridging exit exists after sync_grid runs
 - **WHEN** `sync_grid()` runs against a database containing a room keyed `LIMBO_KEY`
-- **THEN** that room has exactly one exit leading to `(3050, 150, "capital_altoria")`, and the South Gate
-  room has no exit leading back to it
+- **THEN** that room has exactly one exit leading to the `capital_altoria` city-gate node's current grid
+  coordinate, and that gate room has no exit leading back to it
 
 #### Scenario: Repeated calls do not duplicate the bridging exit
 - **WHEN** `sync_grid()` is called twice against a database containing a room keyed `LIMBO_KEY`

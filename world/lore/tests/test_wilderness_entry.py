@@ -42,21 +42,34 @@ class WildernessEntryRegistryShapeTests(unittest.TestCase):
         "wilderness-gateway::wilderness-entry-registry-links-a-grid-placed-anchor-to-an-authored-wilderness-footprint-and-gates"
     )
     def test_registry_has_two_v2_entries_keyed_by_settlement(self):
+        from world.maps import geography
+        from world.maps.map_data import current
+
+        document = current().settlements["capital_altoria"]
         self.assertEqual(
-            list(WILDERNESS_ENTRY_REGISTRY),
-            ["capital_altoria", "village_ciaran"],
+            set(WILDERNESS_ENTRY_REGISTRY),
+            {
+                published.location_ref
+                for published in current().settlements.values()
+                if published.wilderness_entry is not None
+            },
         )
         self.assertEqual(_capital().anchor_key, "capital_altoria")
-        self.assertEqual(_capital().hash_cell_count, 40)
-        self.assertEqual(_capital().origin_xy, (847, 1020))
+        self.assertEqual(
+            _capital().hash_cell_count,
+            sum(row.count("#") for row in document.wilderness_entry.shape),
+        )
+        cell_x, cell_y = geography.current().locations.locations["capital_altoria"].cell
+        dx, dy = document.wilderness_entry.offset
+        self.assertEqual(_capital().origin_xy, (cell_x + dx, cell_y + dy))
         self.assertEqual(
             [
                 (gate.return_direction, gate.z_map_key, gate.destination.object_id)
                 for gate in _capital().gates
             ],
             [
-                ("n", "capital_altoria", "south_gate"),
-                ("w", "capital_altoria", "east_gate"),
+                (gate.return_direction, "capital_altoria", gate.destination_node)
+                for gate in document.wilderness_entry.gates
             ],
         )
         village = WILDERNESS_ENTRY_REGISTRY["village_ciaran"]
@@ -96,24 +109,23 @@ class WildernessEntryRegistryShapeTests(unittest.TestCase):
         "wilderness-gateway::wilderness-entry-registry-links-a-grid-placed-anchor-to-an-authored-wilderness-footprint-and-gates"
     )
     def test_derived_geometry_matches_the_authored_mask(self):
-        # The authored mask rows are contract: 40 km² inside a 7x9 km box, the
-        # plaza cell as derived anchor, and one exterior approach per gate ray.
+        # The authored mask rows are the contract: the composed registry must
+        # reproduce the document's mask, its derived anchor and one exterior
+        # approach per authored gate ray.
+        from elosern_map_core.authoring import gate_approach_cell
+
+        from world.maps import geography
+        from world.maps.map_data import current
+
+        document = current().settlements["capital_altoria"]
+        cell = geography.current().locations.locations["capital_altoria"].cell
+        geometry = document.wilderness_geometry(cell)
         self.assertEqual(
             _capital().shape,
-            (
-                "#.....#",
-                "##...##",
-                ".#####.",
-                "#######",
-                "#######",
-                "####..#",
-                "#..#.##",
-                "####...",
-                "..##...",
-            ),
+            document.wilderness_entry.shape,
         )
-        self.assertEqual(_capital().hash_cell_count, 40)
-        self.assertEqual(_capital().anchor_cell, (850, 1024))
+        self.assertEqual(_capital().hash_cell_count, geometry.hash_cell_count)
+        self.assertEqual(_capital().anchor_cell, geometry.anchor_cell)
         self.assertIn(_capital().anchor_cell, _capital().footprint_cells)
         self.assertEqual(
             _capital().footprint_cells,
@@ -124,8 +136,12 @@ class WildernessEntryRegistryShapeTests(unittest.TestCase):
                 if char == "#"
             ),
         )
-        self.assertEqual(_capital().approach_cell(_capital().gate_for("n")), (850, 1021))
-        self.assertEqual(_capital().approach_cell(_capital().gate_for("w")), (854, 1024))
+        for gate in document.wilderness_entry.gates:
+            with self.subTest(gate=gate.return_direction):
+                self.assertEqual(
+                    _capital().approach_cell(_capital().gate_for(gate.return_direction)),
+                    gate_approach_cell(geometry, gate.return_direction),
+                )
         self.assertFalse(_capital().is_point_shape)
         # 4-connected: every mask cell is reachable from the anchor cell.
         seen = {_capital().anchor_cell}
@@ -157,10 +173,18 @@ class WildernessEntryRegistryShapeTests(unittest.TestCase):
     def test_gate_lookup_by_return_direction(self):
         self.assertEqual(_capital().gate_for("n").destination.object_id, "south_gate")
         self.assertEqual(_capital().gate_for("w").destination.object_id, "east_gate")
-        # The capital's second gate is the 東門 since the replan; the old
-        # 北門 directions are authored nowhere.
-        self.assertIsNone(_capital().gate_for("s"))
-        self.assertIsNone(_capital().gate_for("e"))
+        from world.maps.map_data import current
+
+        authored = {
+            gate.return_direction
+            for gate in current().settlements["capital_altoria"].wilderness_entry.gates
+        }
+        for direction in ("n", "ne", "e", "se", "s", "sw", "w", "nw"):
+            with self.subTest(direction=direction):
+                if direction in authored:
+                    self.assertIsNotNone(_capital().gate_for(direction))
+                else:
+                    self.assertIsNone(_capital().gate_for(direction))
 
     @covers_requirement(
         "village-ciaran-map::the-village-has-a-wilderness-footprint-disjoint-from-every-other-settlement"

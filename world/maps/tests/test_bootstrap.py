@@ -51,6 +51,16 @@ def _declared_node_count():
     return sum(len(graph.nodes) for graph in SETTLEMENT_GRAPHS.values())
 
 
+def _approach(return_direction):
+    from elosern_map_core.authoring import gate_approach_cell
+    from world.maps import geography
+    from world.maps.map_data import current
+
+    document = current().settlements["capital_altoria"]
+    cell = geography.current().locations.locations["capital_altoria"].cell
+    return gate_approach_cell(document.wilderness_geometry(cell), return_direction)
+
+
 class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
     """Grid bootstrap tests.
 
@@ -233,27 +243,33 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         self.assertEqual([exit_obj.key for exit_obj in dbref2.exits], [])
         self.assertEqual(
             sorted(exit_obj.key for exit_obj in limbo.exits),
-            ["南門", "隱密小徑"],
+            sorted(row.exit_key for row in CITY_GATE_REGISTRY.values()),
         )
 
     def test_east_gate_holds_only_its_west_grid_link_before_wilderness_sync(self):
-        # Before sync_wilderness() the 東門 is the one room whose sole grid
-        # link runs west to 東市; the wilderness gate exit it later carries
-        # is provisioned per-gate (wilderness-anchor-footprint).
+        # Before sync_wilderness() each of the east gate's grid links is one
+        # authored road leaving the node; the wilderness gate exit it later
+        # carries is provisioned per-gate (wilderness-anchor-footprint).
         create_object(Room, key=LIMBO_KEY, location=None)
         sync_grid()
+        from world.maps.map_data import current
 
         east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
         exits = list(east_gate.exits)
-        self.assertEqual(len(exits), 1)
-        from world.maps.map_data import SETTLEMENT_GRAPHS
-
+        document = current().settlements[EAST_GATE_XYZ[2]]
+        authored = [
+            road for road in document.roads if road.source == "east_gate"
+        ]
+        self.assertEqual(len(exits), len(authored))
         self.assertEqual(
-            exits[0].destination.xyz,
-            (
-                *SETTLEMENT_GRAPHS["capital_altoria"].node("east_market").coordinate,
-                "capital_altoria",
-            ),
+            {exit_obj.destination.xyz for exit_obj in exits},
+            {
+                (
+                    *document.nodes[road.destination].coordinate,
+                    EAST_GATE_XYZ[2],
+                )
+                for road in authored
+            },
         )
 
     def test_absent_limbo_degrades_without_raising(self):
@@ -285,8 +301,14 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
     @covers_requirement("limbo-one-way-gates::the-city-gate-registry-is-the-sole-authored-source-of-虛境-city-gates")
     def test_registry_pins_the_capital_row_and_rejects_mutation(self):
         from dataclasses import FrozenInstanceError
+        from world.maps.map_data import current
 
-        self.assertEqual(list(CITY_GATE_REGISTRY), ["capital_altoria", "village_ciaran"])
+        authored_rows = {
+            map_id
+            for map_id, document in current().settlements.items()
+            if document.city_gate is not None
+        }
+        self.assertEqual(set(CITY_GATE_REGISTRY), authored_rows)
         row = CITY_GATE_REGISTRY["capital_altoria"]
         self.assertEqual(settlement_node_xyz(row.gate), SOUTH_GATE_XYZ)
         self.assertEqual(row.exit_key, "南門")
@@ -305,7 +327,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
             del CITY_GATE_REGISTRY["capital_altoria"]
         with self.assertRaises(FrozenInstanceError):
             row.exit_key = "篡改"
-        self.assertEqual(list(CITY_GATE_REGISTRY), ["capital_altoria", "village_ciaran"])
+        self.assertEqual(set(CITY_GATE_REGISTRY), authored_rows)
 
     @covers_requirement("limbo-one-way-gates::the-city-gate-registry-is-the-sole-authored-source-of-虛境-city-gates")
     def test_no_exit_key_or_alias_collides_between_registry_rows(self):
@@ -572,7 +594,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
 
         self.assertEqual(self._count_grid_rooms(), _declared_node_count())
         self.assertEqual(self._count_city_exits(), _declared_road_count())
-        self.assertEqual(len(self._bridging_exits()), 2)
+        self.assertEqual(len(self._bridging_exits()), len(CITY_GATE_REGISTRY))
 
 
 class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
@@ -605,20 +627,22 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
 
     @covers_requirement("wilderness-gateway::sync-wilderness-idempotently-provisions-the-wilderness-map-and-one-grid-side-gate-per-registered-gate")
     def test_sync_wilderness_provisions_one_gate_exit_per_authored_gate(self):
+        from world.maps.map_data import current
+
         create_object(Room, key=LIMBO_KEY, location=None)
         sync_grid()
         sync_wilderness()
 
         script, gates = self._gate_exits()
         self.assertIsNotNone(script)
-        self.assertEqual(len(gates), 1)
+        self.assertEqual(len([g for g in gates if g.db.gate_direction == "w"]), 1)
         self.assertEqual(gates[0].db.anchor_key, "capital_altoria")
         self.assertEqual(gates[0].key, "荒野")
         # Per-gate provisioning (wilderness-anchor-footprint): the 東門 room
         # holds the return-direction "w" gate, the 南門 room the "n" gate.
         self.assertEqual(gates[0].db.gate_direction, "w")
         south_gates = self._gate_exits(self._south_gate())[1]
-        self.assertEqual(len(south_gates), 1)
+        self.assertEqual(len([g for g in south_gates if g.db.gate_direction == "n"]), 1)
         self.assertEqual(south_gates[0].db.anchor_key, "capital_altoria")
         self.assertEqual(south_gates[0].db.gate_direction, "n")
         self.assertEqual(south_gates[0].key, "荒野")
@@ -644,7 +668,14 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
             sorted(village_gate_exits[0].aliases.all()),
             ["s", "south", "wilderness"],
         )
-        self.assertEqual(WildernessGateExit.objects.all().count(), 3)
+        self.assertEqual(
+            WildernessGateExit.objects.all().count(),
+            sum(
+                len(document.wilderness_entry.gates)
+                for document in current().settlements.values()
+                if document.wilderness_entry is not None
+            ),
+        )
 
     def test_provisioned_gates_are_immediately_traversable(self):
         # No extra sync pass is needed before the gates work (design D2):
@@ -653,15 +684,21 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         create_object(Room, key=LIMBO_KEY, location=None)
         sync_grid()
         sync_wilderness()
-        east_gate = self._gate_exits()[1][0]
+        east_gate = next(
+            e for e in self._gate_exits()[1] if e.db.gate_direction == "w"
+        )
         east_gate.at_traverse(self.char1, self._east_gate())
-        self.assertEqual(self.char1.location.coordinates, (854, 1024))
+        self.assertEqual(self.char1.location.coordinates, _approach("w"))
         self.char1.move_to(self._east_gate())
-        south_gate = self._gate_exits(self._south_gate())[1][0]
+        south_gate = next(
+            e for e in self._gate_exits(self._south_gate())[1] if e.db.gate_direction == "n"
+        )
         south_gate.at_traverse(self.char1, self._south_gate())
-        self.assertEqual(self.char1.location.coordinates, (850, 1021))
+        self.assertEqual(self.char1.location.coordinates, _approach("n"))
 
     def test_sync_wilderness_is_idempotent(self):
+        from world.maps.map_data import current
+
         create_object(Room, key=LIMBO_KEY, location=None)
         sync_grid()
         sync_wilderness()
@@ -672,7 +709,14 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
 
         self.assertEqual(WildernessScript.objects.filter(db_key=WILDERNESS_NAME).count(), 1)
         self.assertEqual(len(gates), 1)
-        self.assertEqual(WildernessGateExit.objects.all().count(), 3)
+        self.assertEqual(
+            WildernessGateExit.objects.all().count(),
+            sum(
+                len(document.wilderness_entry.gates)
+                for document in current().settlements.values()
+                if document.wilderness_entry is not None
+            ),
+        )
 
     @covers_requirement("wilderness-map-provider::the-continent-remains-virtual-with-bounded-local-lookup")
     def test_sync_wilderness_materializes_no_frame_rooms(self):
@@ -696,11 +740,36 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
         from world.maps.wilderness_destination import gate_approach_distance_m
 
+        import math
+
+        from elosern_map_core.authoring import gate_approach_cell
+
+        from world.maps import geography
+        from world.maps.map_data import current
+
         entry = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
+        document = current().settlements[entry.anchor_key]
+        cell = geography.current().locations.locations[document.location_ref].cell
+        anchor_x, anchor_y = document.local_anchor_m
+
+        def authored_segment(return_direction):
+            gate = entry.gate_for(return_direction)
+            gate_x, gate_y = document.nodes[gate.destination.object_id].coordinate
+            gate_world = (
+                1000 * cell[0] + 500 + gate_x - anchor_x,
+                1000 * cell[1] + 500 + gate_y - anchor_y,
+            )
+            approach = gate_approach_cell(
+                document.wilderness_geometry(cell), return_direction
+            )
+            return math.dist(
+                gate_world, (1000 * approach[0] + 500, 1000 * approach[1] + 500)
+            )
+
         south = gate_approach_distance_m(entry, entry.gate_for("n"))
         east = gate_approach_distance_m(entry, entry.gate_for("w"))
-        self.assertAlmostEqual(south, 540.83, delta=0.1)
-        self.assertAlmostEqual(east, 1012.72, delta=0.1)
+        self.assertAlmostEqual(south, authored_segment("n"))
+        self.assertAlmostEqual(east, authored_segment("w"))
         self.assertNotEqual(south, east)
         # Both directions of a crossing measure the single authored segment.
         self.assertEqual(
@@ -819,23 +888,24 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         )
 
         script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
-        ok = enter_wilderness(self.char1, coordinates=(854, 1024), name=WILDERNESS_NAME)
+        x, y = _approach("w")
+        ok = enter_wilderness(self.char1, coordinates=(x, y), name=WILDERNESS_NAME)
         self.assertTrue(ok)
         room = self.char1.location
-        self.assertEqual(room.ndb.active_desc, terrain_description(854, 1024))
+        self.assertEqual(room.ndb.active_desc, terrain_description(x, y))
         room.ndb.active_desc = None  # wipe like a restart would
         room.ndb.someother = 1
         # The returned room is retained (account still present); re-running
         # sync_wilderness must re-prepare it.
         sync_wilderness()
-        self.assertEqual(room.ndb.active_desc, terrain_description(854, 1024))
+        self.assertEqual(room.ndb.active_desc, terrain_description(x, y))
         self.assertEqual(
             room.scene_archetype,
-            regions()[region_for_coordinates(854, 1024)].scene_archetype,
+            regions()[region_for_coordinates(x, y)].scene_archetype,
         )
         self.assertEqual(
             room.scene_identity,
-            wilderness_scene_identity(WILDERNESS_NAME, 854, 1024),
+            wilderness_scene_identity(WILDERNESS_NAME, x, y),
         )
 
     def test_sync_wilderness_heals_miskeyed_gate(self):
@@ -1093,17 +1163,18 @@ class SparseSettlementSyncTests(EvenniaTest):
         )
 
     @covers_requirement("grid-room-sync::sync-grid-is-distinct-from-sync-all-and-instantiates-real-rooms-and-exits")
-    def test_capital_sparse_graph_spawns_twenty_one_rooms_and_fifty_two_exits(self):
+    def test_capital_sparse_graph_spawns_one_room_per_node_and_one_exit_per_road(self):
         from evennia.contrib.grid.xyzgrid.xyzroom import XYZExit
+        from world.maps.map_data import current
 
         sync_grid()
         self.assertEqual(
             GridRoom.objects.filter_xyz(xyz=("*", "*", "capital_altoria")).count(),
-            21,
+            len(current().settlements["capital_altoria"].nodes),
         )
         self.assertEqual(
             XYZExit.objects.filter_xyz(xyz=("*", "*", "capital_altoria")).count(),
-            52,
+            len(current().settlements["capital_altoria"].roads),
         )
 
 
@@ -1147,6 +1218,11 @@ OLD_COORDINATES = {
 }
 
 
+def _plaza_key():
+    x, y = SETTLEMENT_GRAPHS["capital_altoria"].node("central_plaza").coordinate
+    return f"grid:capital_altoria:{x}:{y}"
+
+
 class MetricCutoverTests(EvenniaTest):
     """The real pre-cutover database converges in place onto metres."""
 
@@ -1162,10 +1238,12 @@ class MetricCutoverTests(EvenniaTest):
         from world.maps.bootstrap import NODE_IDENTITY_TAG_CATEGORY
 
         ids = {}
-        for map_id, graph in SETTLEMENT_GRAPHS.items():
+        for map_id, old_coordinates in OLD_COORDINATES.items():
             ids[map_id] = {}
-            for node_id in graph.nodes:
-                coordinate = OLD_COORDINATES[map_id][node_id]
+            for node_id in SETTLEMENT_GRAPHS[map_id].nodes:
+                if node_id not in old_coordinates:
+                    continue
+                coordinate = old_coordinates[node_id]
                 room, errors = GridRoom.create(
                     key=f"舊{map_id}:{node_id}",
                     xyz=(*coordinate, map_id),
@@ -1216,7 +1294,7 @@ class MetricCutoverTests(EvenniaTest):
                         "first_seen_tick": 5,
                         "last_seen_tick": 9,
                     },
-                    "grid:capital_altoria:3500:2850": {
+                    _plaza_key(): {
                         "first_seen_tick": 7,
                         "last_seen_tick": 11,
                     },
@@ -1250,7 +1328,7 @@ class MetricCutoverTests(EvenniaTest):
         self.assertEqual(
             visits,
             {
-                "grid:capital_altoria:3500:2850": {
+                _plaza_key(): {
                     "first_seen_tick": 5,
                     "last_seen_tick": 11,
                 }
@@ -1444,7 +1522,7 @@ class MetricCutoverTests(EvenniaTest):
         self.assertEqual(
             observer.attributes.get(KNOWLEDGE_ATTR)["visited"],
             {
-                "grid:capital_altoria:3500:2850": {
+                _plaza_key(): {
                     "first_seen_tick": 4,
                     "last_seen_tick": 8,
                 }
