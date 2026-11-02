@@ -1,7 +1,7 @@
 # Tasks
 
 Ground rules:
-- Change only:
+- Change only these files, plus residual-pin test rewrites under the doc's "Residual pin rule":
   - new `content/maps/settlements/<id>.yaml` files for the 22 roster ids;
   - `content/maps/locations.yaml` cells that the D2 rule accepts;
   - `world/maps/data/district_partition.json`.
@@ -11,6 +11,7 @@ Ground rules:
 
 ## 1. Baseline and plan
 
+- [ ] 1.0 Read `docs/development/settlement-synthesis.md` § Runtime cost. Check: its decision word is **proceed**. If it is **blocked** or missing, stop without changing anything and report.
 - [ ] 1.1 Run `check_map_sources.py` and `uv run --locked python -m tools.settlement_synthesis lint`. Check: record both results. The lint must exit 0, because Altoria was fixed by `altoria-capital-river-rework`.
 - [ ] 1.2 Run `uv run --locked evennia test --keepdb --settings settings.py world.maps.tests.test_bootstrap` once. Check: record its `Ran N tests in X s` line as the D4 baseline.
 - [ ] 1.3 Run `uv run --locked python -m tools.settlement_synthesis generate --missing --nation grandia --plan-only`. Check: save the output. List every location whose plan failed, and the morphology of `capital_grandia`.
@@ -36,19 +37,7 @@ Ground rules:
 
 - [ ] 4.1 Regenerate the partition, then run `check_map_sources.py`. Check: exit 0, with partition, elevation and reference context all `current`.
 - [ ] 4.2 Rerun `world.maps.tests.test_bootstrap` as in 1.2 and apply the D4 gate. Check: `X_after ≤ 2.5 × X_baseline` and `X_after ≤ 600`. Otherwise stop, do not commit, and report.
-- [ ] 4.3 Run each of these test labels, one per command:
-  - `world.lore.tests.test_anchor_placement`
-  - `world.lore.tests.test_wilderness_entry`
-  - `world.lore.tests.test_map_district_content`
-  - `world.maps.tests.test_runtime_adoption`
-  - `world.maps.tests.test_settlement_reload`
-  - `world.maps.tests.test_wilderness_destination`
-  - `world.maps.tests.test_wilderness_provider`
-  - `world.maps.tests.test_editor_final_yaml_adoption` (with `test_settings.py` and the env file)
-  - `web.webclient.presentation.tests.test_world_map`
-  - `uv run --locked python -m unittest tests.test_map_authoring_contract tests.test_map_partition_independence`
-
-  Check: all pass.
+- [ ] 4.3 Run every module in `docs/development/settlement-synthesis.md` § Settlement-sensitive test modules, one per command, and also `uv run --locked python -m unittest tests.test_map_authoring_contract tests.test_map_partition_independence`. Check: all pass. Handle a failure with the "Residual pin rule" in that same doc section, and list every rewritten test in the hand-off. Any other failure stops the change without a commit.
 - [ ] 4.4 Capture a continent overview with `--hide partition` and the settlement views of `capital_grandia`, `port_golden_sheaf` and one town. Read the images. Check: the hand-off describes each map's water side and gates.
 - [ ] 4.5 Run `uv run --locked python -m tools.contract_gate` and `openspec validate grandia-settlement-maps --strict`. Check: both succeed. The hand-off lists every relocation, every unresolved location and the D4 numbers.
 

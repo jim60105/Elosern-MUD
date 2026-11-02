@@ -56,7 +56,7 @@ For `k = 1, 2, 3`:
 
 1. Compute `c_k = L.cell + round_away(k * (T - L.cell) / max(|T.x - L.x|, |T.y - L.y|))`. `round_away` rounds halves away from zero.
 2. Reject `c_k` if:
-   - `place_sites.py` on `[{"id": "<L>", "cell": c_k}]` reports `walkable=False` or `water_cell=True`;
+   - `place_sites.py` on a candidate file `[{"id": "<L>", "cell": [c_k.x, c_k.y]}]` (the cell is a two-item JSON list) reports `walkable=False` or `water_cell=True`;
    - the region or nation differs from `L`'s current values;
    - `c_k` equals any location or harbour cell.
 3. Otherwise set the cell temporarily and rerun `generate L --plan-only`. Accept `c_k` when (a) no longer fails, or when (b) reports `river_crossing`. Otherwise restore the old cell and try the next `k`.
