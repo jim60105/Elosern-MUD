@@ -9,6 +9,7 @@ windowed terrain view per check. It reads only; nothing here writes a file.
 from __future__ import annotations
 
 import json
+import math
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -29,12 +30,21 @@ from elosern_map_core.terrain import (
     rasterize_routes,
 )
 
+from tools.settlement_synthesis.budget import size_budget
+from tools.settlement_synthesis.generate import (
+    GenerationConfig,
+    GenerationInput,
+)
 from tools.settlement_synthesis.geometry import Cell
-from tools.settlement_synthesis.site import SettlementRef
+from tools.settlement_synthesis.roles import DEFAULT_CATALOGUE
+from tools.settlement_synthesis.site import SettlementRef, analyse_site
 from tools.settlement_synthesis.terrain_view import GridTerrain
 
 #: The committed elevation tile bundle, relative to the workspace root.
 ELEVATION_PATH = Path("content") / "maps" / "wilderness_elevation.json"
+
+#: The committed external reference index, relative to the workspace root.
+REFERENCE_CONTEXT_PATH = Path("content") / "map-reference-context.json"
 
 #: One 64x64 elevation tile edge, matching the map core's tile format.
 TILE_CELLS = 64
@@ -280,6 +290,54 @@ def _roster(
             )
         )
     return tuple(rows)
+
+
+def incoming_reference_keys(root: Path) -> frozenset[str] | None:
+    """The qualified ids the reference index names, or ``None`` when it is absent."""
+
+    path = Path(root) / REFERENCE_CONTEXT_PATH
+    if not path.is_file():
+        return None
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise WorkspaceError(f"{path}: {error}") from error
+    incoming = document.get("incoming_references") if isinstance(document, dict) else None
+    if not isinstance(incoming, dict):
+        raise WorkspaceError(f"{path}: incoming_references must be a mapping")
+    return frozenset(str(key) for key in incoming)
+
+
+def analysis_input(
+    view: WorkspaceView,
+    location: SettlementRef,
+    *,
+    forced_gates: tuple[str, ...] = (),
+    map_id: str | None = None,
+) -> GenerationInput:
+    """The generator input one view yields for one roster row."""
+
+    budget = size_budget(location)
+    reach = math.ceil(math.sqrt(budget.footprint_cells) / 2) + 1
+    radius = max(
+        reach + 6,
+        math.ceil(1.5 * budget.envelope_radius_m / 1000) + 6,
+        10,
+    )
+    terrain = view.terrain_window(location.cell, radius)
+    site = analyse_site(location, terrain, view.roster)
+    identity = location.location_id if map_id is None else map_id
+    return GenerationInput(
+        map_id=identity,
+        location=location,
+        site=site,
+        budget=budget,
+        terrain=terrain,
+        blocked=view.blocked_cells(identity),
+        catalogue=DEFAULT_CATALOGUE,
+        forced_gates=forced_gates,
+        config=GenerationConfig(),
+    )
 
 
 def load_workspace(root: Path, lore: Path | None = None) -> WorkspaceView:
