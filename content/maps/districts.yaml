@@ -633,7 +633,7 @@ districts:
       object_id:
       cell:
         cell_x: 2224
-        cell_y: 1723
+        cell_y: 1726
     kind: voronoi
     region_key:
   stag_plateau:
@@ -657,7 +657,7 @@ districts:
       object_id:
       cell:
         cell_x: 1871
-        cell_y: 1633
+        cell_y: 1636
     kind: voronoi
     region_key:
   starfall_plain:
@@ -717,7 +717,7 @@ districts:
       object_id:
       cell:
         cell_x: 2394
-        cell_y: 1464
+        cell_y: 1467
     kind: voronoi
     region_key:
   orchard_plain:
@@ -741,7 +741,7 @@ districts:
       object_id:
       cell:
         cell_x: 1623
-        cell_y: 1428
+        cell_y: 1431
     kind: voronoi
     region_key:
   poplar_plain:
@@ -933,7 +933,7 @@ districts:
       object_id:
       cell:
         cell_x: 1896
-        cell_y: 906
+        cell_y: 909
     kind: voronoi
     region_key:
   eastern_pasture:
@@ -945,7 +945,7 @@ districts:
       object_id:
       cell:
         cell_x: 2300
-        cell_y: 900
+        cell_y: 903
     kind: voronoi
     region_key:
   horse_plain:
@@ -957,7 +957,7 @@ districts:
       object_id:
       cell:
         cell_x: 1687
-        cell_y: 864
+        cell_y: 867
     kind: voronoi
     region_key:
   golden_dune_downs:
@@ -1089,7 +1089,7 @@ districts:
       object_id:
       cell:
         cell_x: 1976
-        cell_y: 522
+        cell_y: 525
     kind: voronoi
     region_key:
   orange_blossom_plain:
@@ -1101,7 +1101,7 @@ districts:
       object_id:
       cell:
         cell_x: 1805
-        cell_y: 518
+        cell_y: 521
     kind: voronoi
     region_key:
   giants_stair_highlands:

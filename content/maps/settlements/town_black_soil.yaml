@@ -1,0 +1,144 @@
+version: 1
+kind: settlement
+id: town_black_soil
+location_ref: town_black_soil
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 353
+    y_m: 600
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 黑土鎮的中央廣場，土是深黑色的，雨後特別黏腳。鎮外的麥子長得比別處高，穗子壓得莖都彎了。
+    anchor_key: town_black_soil
+    typeclass:
+    scene_archetype: city_street
+  southeast_gate:
+    x_m: 848
+    y_m: 105
+    prototype_parent: grid_room
+    key: 東南門
+    desc: 東南門外的官道通往輝煌帝都，糧車從這裡進京。車過門洞時要收篷，否則會撞上橫樑，車伕都得低聲提醒。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  south_gate:
+    x_m: 353
+    y_m: 100
+    prototype_parent: grid_room
+    key: 南門
+    desc: 南門朝著楓麓鎮，山腳的木材由此運上來。木頭還帶著樹脂，堆在門邊散著一股香，過路的人都會多聞兩下。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southeast_gate_road_1:
+    x_m: 639
+    y_m: 381
+    prototype_parent: grid_room
+    key: 東南大街
+    desc: 東南大街是進城的一段，兩邊的糧倉一間挨著一間。倉門上的鎖都擦得發亮，看得出常有人來。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 494
+    y_m: 523
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街在廣場東南，黑土長出來的麥在此論價。買家抓起一把搓開，看的是穗粒的飽滿，看完才開口。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 282
+    y_m: 755
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前在西北，分會的委託多與農忙時的護田有關。夜裡巡田的燈籠由這裡借出，天亮前送回來。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  temple_forecourt:
+    x_m: 100
+    y_m: 1051
+    prototype_parent: grid_room
+    key: 神殿前
+    desc: 神殿前在西北，秋收之後的謝神禮在此舉行。供桌上擺的是當年第一把割下的麥，穗頭還繫著紅線。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  inn_lane:
+    x_m: 276
+    y_m: 349
+    prototype_parent: grid_room
+    key: 客棧巷
+    desc: 客棧巷在鎮南，趕車的人在此歇腳。後院的水井打上來的帶著泥味，店家會先沉一夜再用。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: south_gate
+  direction: s
+- source: central_plaza
+  destination: southeast_gate_road_1
+  direction: se
+- source: central_plaza
+  destination: market_street
+  direction: e
+- source: central_plaza
+  destination: guild_forecourt
+  direction: nw
+- source: southeast_gate
+  destination: southeast_gate_road_1
+  direction: nw
+- source: south_gate
+  destination: central_plaza
+  direction: n
+- source: south_gate
+  destination: inn_lane
+  direction: nw
+- source: southeast_gate_road_1
+  destination: central_plaza
+  direction: w
+- source: southeast_gate_road_1
+  destination: southeast_gate
+  direction: se
+- source: southeast_gate_road_1
+  destination: market_street
+  direction: nw
+- source: market_street
+  destination: central_plaza
+  direction: nw
+- source: market_street
+  destination: southeast_gate_road_1
+  direction: se
+- source: guild_forecourt
+  destination: central_plaza
+  direction: se
+- source: guild_forecourt
+  destination: temple_forecourt
+  direction: nw
+- source: temple_forecourt
+  destination: guild_forecourt
+  direction: se
+- source: inn_lane
+  destination: south_gate
+  direction: s
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: nw
+    destination_node: southeast_gate
+  - return_direction: n
+    destination_node: south_gate
+city_gate:

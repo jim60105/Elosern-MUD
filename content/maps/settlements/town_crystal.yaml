@@ -1,0 +1,144 @@
+version: 1
+kind: settlement
+id: town_crystal
+location_ref: town_crystal
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 287
+    y_m: 600
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 魔晶鎮的中央廣場，鎮上的路都朝著礦坑的方向去。東南地勢漸高，敲鑿聲從那邊一路傳到廣場上。
+    anchor_key: town_crystal
+    typeclass:
+    scene_archetype: city_street
+  south_gate:
+    x_m: 287
+    y_m: 100
+    prototype_parent: grid_room
+    key: 南門
+    desc: 南門外的路通往黑土鎮，運礦的車隊由此南下。車斗裡的碎石一路顛出來，路邊積成一條灰帶。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southeast_gate:
+    x_m: 782
+    y_m: 105
+    prototype_parent: grid_room
+    key: 東南門
+    desc: 東南門朝著麥浪城，糧車與礦車在門外交會。兩邊的車伕互相打過招呼，才各自讓開半邊路。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southeast_gate_road_1:
+    x_m: 602
+    y_m: 421
+    prototype_parent: grid_room
+    key: 東南大街
+    desc: 東南大街是礦工上下工必經的一段，街邊堆著篩過的碎石。碎石堆得比人還高，孩子在上頭跳來跳去。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 474
+    y_m: 560
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街在廣場東側，未切的原礦在此成堆估價。收購的人拿小錘敲下一角，對著光看很久才開口。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 100
+    y_m: 677
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前在廣場西側，分會的委託多是礦道的護衛。板子上的地圖釘了又拆，紙面滿是小孔。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  temple_forecourt:
+    x_m: 820
+    y_m: 413
+    prototype_parent: grid_room
+    key: 神殿前
+    desc: 神殿前在東側靠礦區，礦工出門前會來此求平安。神像手上纏著礦工留下的布條，顏色深深淺淺。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  inn_lane:
+    x_m: 224
+    y_m: 405
+    prototype_parent: grid_room
+    key: 客棧巷
+    desc: 客棧巷在鎮南，收購原礦的行商在此落腳。房裡擺著秤與油燈，談價常常談到深夜才熄火。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: south_gate
+  direction: s
+- source: central_plaza
+  destination: southeast_gate_road_1
+  direction: se
+- source: central_plaza
+  destination: market_street
+  direction: e
+- source: central_plaza
+  destination: guild_forecourt
+  direction: w
+- source: central_plaza
+  destination: inn_lane
+  direction: sw
+- source: south_gate
+  destination: central_plaza
+  direction: n
+- source: southeast_gate
+  destination: southeast_gate_road_1
+  direction: nw
+- source: southeast_gate_road_1
+  destination: central_plaza
+  direction: w
+- source: southeast_gate_road_1
+  destination: southeast_gate
+  direction: se
+- source: southeast_gate_road_1
+  destination: market_street
+  direction: nw
+- source: southeast_gate_road_1
+  destination: temple_forecourt
+  direction: e
+- source: market_street
+  destination: central_plaza
+  direction: w
+- source: market_street
+  destination: southeast_gate_road_1
+  direction: se
+- source: guild_forecourt
+  destination: central_plaza
+  direction: e
+- source: temple_forecourt
+  destination: southeast_gate_road_1
+  direction: w
+- source: inn_lane
+  destination: central_plaza
+  direction: n
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: n
+    destination_node: south_gate
+  - return_direction: nw
+    destination_node: southeast_gate
+city_gate:

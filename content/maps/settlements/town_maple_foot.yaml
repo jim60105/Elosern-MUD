@@ -1,0 +1,145 @@
+version: 1
+kind: settlement
+id: town_maple_foot
+location_ref: town_maple_foot
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 1550
+    y_m: 1550
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 楓麓鎮的中央廣場，西支流的源頭就在鎮南不遠。北邊是山口，鎮上的人慣常往高處走，連井都打在坡上。
+    anchor_key: town_maple_foot
+    typeclass:
+    scene_archetype: city_street
+  east_gate:
+    x_m: 2025
+    y_m: 1550
+    prototype_parent: grid_room
+    key: 東門
+    desc: 東門外的官道通往輝煌帝都與帝河津，山貨由此進京。車上裝的多是木料與楓糖，走起來一路滴著甜味。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  north_gate:
+    x_m: 1550
+    y_m: 2025
+    prototype_parent: grid_room
+    key: 北門
+    desc: 北門朝著黑土鎮，越過山口就是平原。門洞裡常年有風，守門的人換班時都要先在裡側暖手。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 1411
+    y_m: 1497
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街在廣場西側，木材與楓糖在此論價。木頭按年輪分堆，切口處還滲著樹汁，甜味混著松脂味。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 1656
+    y_m: 1658
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前在東北，分會的任務板常貼著山道的巡守委託。山裡出的野獸不多，倒是迷路的旅人不少。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  river_quay:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 河港碼頭
+    desc: 河港碼頭在鎮西南的溪口，水淺，只容得下平底木筏。筏子靠岸時幾乎不響，撐篙的人只要一蹬就能停。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  temple_forecourt:
+    x_m: 1415
+    y_m: 1762
+    prototype_parent: grid_room
+    key: 神殿前
+    desc: 神殿前在西北較高的地上，是鎮裡視野最好的一處。從階前望出去，能看見西支流繞過整片楓林。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  inn_lane:
+    x_m: 1656
+    y_m: 1436
+    prototype_parent: grid_room
+    key: 客棧巷
+    desc: 客棧巷在東南，下山來的樵夫與行商在此過夜。房裡的炭盆燒得旺，牆上掛著客人留下的斗笠。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: east_gate
+  direction: e
+- source: central_plaza
+  destination: north_gate
+  direction: n
+- source: central_plaza
+  destination: market_street
+  direction: w
+- source: central_plaza
+  destination: guild_forecourt
+  direction: ne
+- source: central_plaza
+  destination: temple_forecourt
+  direction: nw
+- source: central_plaza
+  destination: inn_lane
+  direction: se
+- source: east_gate
+  destination: central_plaza
+  direction: w
+- source: north_gate
+  destination: central_plaza
+  direction: s
+- source: market_street
+  destination: central_plaza
+  direction: e
+- source: market_street
+  destination: river_quay
+  direction: sw
+- source: guild_forecourt
+  destination: central_plaza
+  direction: sw
+- source: guild_forecourt
+  destination: temple_forecourt
+  direction: nw
+- source: river_quay
+  destination: market_street
+  direction: ne
+- source: temple_forecourt
+  destination: central_plaza
+  direction: se
+- source: temple_forecourt
+  destination: guild_forecourt
+  direction: e
+- source: inn_lane
+  destination: central_plaza
+  direction: nw
+wilderness_entry:
+  shape:
+  - '#.'
+  - '##'
+  offset:
+    dx: -1
+    dy: -1
+  gates:
+  - return_direction: w
+    destination_node: east_gate
+  - return_direction: s
+    destination_node: north_gate
+city_gate:

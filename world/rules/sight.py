@@ -52,7 +52,7 @@ HIDDEN_ANCHOR_KINDS = frozenset({"elven_village", "dungeon"})
 #: The non-hidden settlement kinds the silhouette policy must cover. It is the
 #: published anchor vocabulary minus :data:`HIDDEN_ANCHOR_KINDS`; a dungeon is
 #: not a settlement and is never an automatic source.
-SUPPORTED_SETTLEMENT_KINDS = ("capital",)
+SUPPORTED_SETTLEMENT_KINDS = ("capital", "city", "town", "port")
 
 #: Authored silhouette length bound, counted in Unicode code points.
 SILHOUETTE_MAX_CODE_POINTS = 256

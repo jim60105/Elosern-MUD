@@ -1,0 +1,180 @@
+version: 1
+kind: settlement
+id: city_wheatwave
+location_ref: city_wheatwave
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 595
+    y_m: 595
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 麥浪城的中央廣場，四周的糧倉比屋舍還高。風從田裡吹過來，帶著曬穀的味道，連廣場上的麻雀都肥了一圈。
+    anchor_key: city_wheatwave
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 西南門
+    desc: 西南門外的官道直往輝煌帝都，糧車一列接著一列。車伕在這一段會把速度放慢，讓牲口先在門外喝飽水。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northwest_gate:
+    x_m: 100
+    y_m: 1090
+    prototype_parent: grid_room
+    key: 西北門
+    desc: 西北門通往魔晶鎮，礦石與糧食在此對開。回程的車斗裡裝著磨過的原礦，一路上壓出細白的粉。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 408
+    y_m: 493
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街在廣場西南，郡內的糧價在此定下。開市的鑼一響，攤位後的價牌同時翻面，晚一步的買家只能照新價付錢。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 669
+    y_m: 819
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前在廣場北側，分會的委託多與田租、走失的牲口有關。農閒時這裡最熱鬧，連樑上都坐著人。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  temple_forecourt:
+    x_m: 1010
+    y_m: 1023
+    prototype_parent: grid_room
+    key: 神殿前
+    desc: 神殿前在東北，秋收之後的謝神禮在此舉行。廣場上臨時搭起的棚子，要留到麥子全部入倉才拆。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  inn_lane:
+    x_m: 804
+    y_m: 460
+    prototype_parent: grid_room
+    key: 客棧巷
+    desc: 客棧巷在東南，趕集的農家與糧商在此過夜。院子裡拴著車馬，半夜還有人在燈下算帳，算盤珠子響得比蟲鳴還密。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  craft_alley:
+    x_m: 1305
+    y_m: 928
+    prototype_parent: grid_room
+    key: 工匠巷
+    desc: 工匠巷在東北，修農具的鐵匠與製繩的人家比鄰。春耕前後，鐮刀與犁頭在這裡排著隊等修。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  manor_gate:
+    x_m: 429
+    y_m: 1007
+    prototype_parent: grid_room
+    key: 領主宅邸前
+    desc: 領主宅邸前在城北，郡守在此處理田賦。門前的石階被車輪磨出淺槽，收租的季節總有車停在階下。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  lane_01:
+    x_m: 1333
+    y_m: 429
+    prototype_parent: grid_room
+    key: 磨坊巷
+    desc: 磨坊巷在城東，風車的影子從街口一路掃過去。磨坊的石輪日夜轉，麵粉的細塵落在屋簷上像是薄雪。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: southwest_gate
+  direction: sw
+- source: central_plaza
+  destination: northwest_gate
+  direction: nw
+- source: central_plaza
+  destination: market_street
+  direction: w
+- source: central_plaza
+  destination: guild_forecourt
+  direction: n
+- source: central_plaza
+  destination: inn_lane
+  direction: se
+- source: southwest_gate
+  destination: central_plaza
+  direction: ne
+- source: southwest_gate
+  destination: market_street
+  direction: n
+- source: northwest_gate
+  destination: central_plaza
+  direction: se
+- source: northwest_gate
+  destination: manor_gate
+  direction: e
+- source: market_street
+  destination: central_plaza
+  direction: ne
+- source: market_street
+  destination: southwest_gate
+  direction: sw
+- source: guild_forecourt
+  destination: central_plaza
+  direction: s
+- source: guild_forecourt
+  destination: temple_forecourt
+  direction: ne
+- source: guild_forecourt
+  destination: manor_gate
+  direction: nw
+- source: temple_forecourt
+  destination: guild_forecourt
+  direction: sw
+- source: temple_forecourt
+  destination: craft_alley
+  direction: e
+- source: inn_lane
+  destination: central_plaza
+  direction: nw
+- source: craft_alley
+  destination: temple_forecourt
+  direction: w
+- source: craft_alley
+  destination: lane_01
+  direction: s
+- source: manor_gate
+  destination: northwest_gate
+  direction: w
+- source: manor_gate
+  destination: guild_forecourt
+  direction: se
+- source: lane_01
+  destination: craft_alley
+  direction: n
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: ne
+    destination_node: southwest_gate
+  - return_direction: se
+    destination_node: northwest_gate
+city_gate:

@@ -35,20 +35,27 @@ def live_region_registry():
 
 
 def live_gateway_entry():
-    """The settlement entry authoring both gateway faces (north + west)."""
+    """The settlement entry authoring both gateway faces (north + west).
+
+    Several settlements can author both faces, so the pick is the lowest
+    authored anchor key: deterministic, and the same entry on every call.
+    """
     import importlib
 
     entries = getattr(
         importlib.import_module("world.lore.wilderness_entry"),
         "WILDERNESS_ENTRY" + "_REGISTRY",
     ).values()
-    candidates = [
-        entry
-        for entry in entries
-        if entry.gate_for("n") is not None and entry.gate_for("w") is not None
-    ]
-    if len(candidates) != 1:
-        raise AssertionError("exactly one wilderness entry must author both gateway faces")
+    candidates = sorted(
+        (
+            entry
+            for entry in entries
+            if entry.gate_for("n") is not None and entry.gate_for("w") is not None
+        ),
+        key=lambda entry: entry.anchor_key,
+    )
+    if not candidates:
+        raise AssertionError("no wilderness entry authors both gateway faces")
     return candidates[0]
 
 

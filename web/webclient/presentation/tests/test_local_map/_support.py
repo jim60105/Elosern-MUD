@@ -25,17 +25,24 @@ def _live(module: str, attribute: str):
 # world/maps/tests/test_limbo_room.py::_gate_row and
 # typeclasses/tests/test_exits.py::live_gateway_entry.
 def _live_gateway_entry():
-    """The settlement entry authoring both gateway faces (north + west)."""
+    """The settlement entry authoring both gateway faces (north + west).
+
+    Several settlements can author both faces, so the pick is the lowest
+    authored anchor key: deterministic, and the same entry on every call.
+    """
     entries = _live(
         "world.lore.wilderness_entry", "WILDERNESS_ENTRY" + "_REGISTRY"
     ).values()
-    candidates = [
-        entry
-        for entry in entries
-        if entry.gate_for("n") is not None and entry.gate_for("w") is not None
-    ]
-    if len(candidates) != 1:
-        raise AssertionError("exactly one wilderness entry must author both gateway faces")
+    candidates = sorted(
+        (
+            entry
+            for entry in entries
+            if entry.gate_for("n") is not None and entry.gate_for("w") is not None
+        ),
+        key=lambda entry: entry.anchor_key,
+    )
+    if not candidates:
+        raise AssertionError("no wilderness entry authors both gateway faces")
     return candidates[0]
 
 

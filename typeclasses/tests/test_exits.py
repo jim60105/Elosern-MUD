@@ -41,19 +41,21 @@ def live_entry_registry():
 def live_gateway_entry():
     """The settlement entry supplying the anchor and both gate approaches.
 
-    Selection is atomic (ONE entry authors both a north-facing and a
-    west-facing gate) and fails loudly if that invariant disappears.
+    Several settlements can author both a north-facing and a west-facing
+    gate, so the pick is the lowest authored anchor key: deterministic, and
+    the same entry on every call. It fails loudly when no entry has both.
     """
     entries = live_entry_registry()
-    candidates = [
-        entry
-        for entry in entries.values()
-        if entry.gate_for("n") is not None and entry.gate_for("w") is not None
-    ]
-    if len(candidates) != 1:
-        raise AssertionError(
-            "exactly one wilderness entry must author both gateway faces"
-        )
+    candidates = sorted(
+        (
+            entry
+            for entry in entries.values()
+            if entry.gate_for("n") is not None and entry.gate_for("w") is not None
+        ),
+        key=lambda entry: entry.anchor_key,
+    )
+    if not candidates:
+        raise AssertionError("no wilderness entry authors both gateway faces")
     return candidates[0]
 
 

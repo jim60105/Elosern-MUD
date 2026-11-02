@@ -30,6 +30,7 @@ from world.rules.sight import (
     MARKER_KEYS,
     MAX_GROUND_SIGHT_RADIUS,
     SILHOUETTE_MAX_CODE_POINTS,
+    SUPPORTED_SETTLEMENT_KINDS,
     GroundSightInputs,
     LandmarkSighting,
     SettlementFootprint,
@@ -82,8 +83,15 @@ def _document(**overrides):
         "vantage_radius": {"day": 6, "twilight": 4, "night": 2},
         "twilight_factor": 0.5,
         "settlement_footprint_factor": {"day": 3, "night": 1},
+        # The row set copies the closed vocabulary, so it is derived from it:
+        # the capital keeps its distinctive words for the source assertions.
         "settlement_silhouettes": {
-            "capital": {"day": "合成城牆側影", "night": "合成城鎮燈火"}
+            kind: (
+                {"day": "合成城牆側影", "night": "合成城鎮燈火"}
+                if kind == "capital"
+                else {"day": f"合成{kind}白日", "night": f"合成{kind}夜色"}
+            )
+            for kind in SUPPORTED_SETTLEMENT_KINDS
         },
     }
     document.update(overrides)

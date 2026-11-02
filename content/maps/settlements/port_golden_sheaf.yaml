@@ -1,0 +1,321 @@
+version: 1
+kind: settlement
+id: port_golden_sheaf
+location_ref: port_golden_sheaf
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 600
+    y_m: 1550
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 金穗港的中央廣場，糧行與商號的招牌圍成一圈。往東南去是碼頭的方向，海風帶著鹹味穿過市街，連石縫裡都結著鹽霜。
+    anchor_key: port_golden_sheaf
+    typeclass:
+    scene_archetype: city_street
+  north_gate:
+    x_m: 600
+    y_m: 2025
+    prototype_parent: grid_room
+    key: 北門
+    desc: 北門外的官道通往香道城，滿載穀物的車隊從這扇門進港。門洞上方的石匾刻著港口落成那年的稅額。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northwest_gate:
+    x_m: 105
+    y_m: 2045
+    prototype_parent: grid_room
+    key: 西北門
+    desc: 西北門朝著橙花鎮的路，果園的筐子與蜜漬果乾由此進城。門口的守衛認得每一家果行的記號。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  west_gate:
+    x_m: 100
+    y_m: 1550
+    prototype_parent: grid_room
+    key: 西門
+    desc: 西門外的海岸道路一直通到南岬港，鹽船與漁獲沿海岸往來。風大時，門樓上的鈴響得比神殿的鐘還急。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  quay:
+    x_m: 3050
+    y_m: 100
+    prototype_parent: grid_room
+    key: 碼頭
+    desc: 碼頭在城東南的海岸上，石砌的突堤伸進深水。帝國的糧船與法術材料在此裝艙出港，桅杆排得像一片林子。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 350
+    y_m: 1728
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街在廣場西北，糧價一天議兩回。散市之後，地上還留著一層麥殼，掃街的人推著車一路刮過去。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 372
+    y_m: 1325
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前是冒險者分會的門前，卸貨與護船的委託常年貼滿任務板。外地來的隊伍先在這裡問一句最近的海況。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  temple_forecourt:
+    x_m: 1027
+    y_m: 1976
+    prototype_parent: grid_room
+    key: 神殿前
+    desc: 神殿前在東北的高地上，海員出海前會上來點一盞燈。台階兩側的還願牌掛得看不見牆面，多半寫著平安回港。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  inn_lane:
+    x_m: 954
+    y_m: 1613
+    prototype_parent: grid_room
+    key: 客棧巷
+    desc: 客棧巷在城東，水手與押船的護衛在此過夜。樓上房間的窗正對著港灣，整夜都聽得見纜繩摩擦的聲音。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  exchange_forecourt:
+    x_m: 734
+    y_m: 1149
+    prototype_parent: grid_room
+    key: 商會前
+    desc: 商會前在南邊靠海的一側，遠洋的艙單在此核對。港口一半的生意靠這裡的一枚印章，桌邊總有人等著。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  bath_forecourt:
+    x_m: 975
+    y_m: 1288
+    prototype_parent: grid_room
+    key: 浴場前
+    desc: 浴場前在東南近海處，浴池的水直接引自海灣。鹹水洗過的人皮膚發亮，走進市街時還帶著一股潮味。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  lane_01:
+    x_m: 340
+    y_m: 104
+    prototype_parent: grid_room
+    key: 鹽倉巷
+    desc: 鹽倉巷南段排著加蓋的鹽倉，地板終年潮濕。晴天時倉門全開，鹽堆白得刺眼，搬運的人赤腳踩過都要沖洗。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  lane_02:
+    x_m: 2066
+    y_m: 1498
+    prototype_parent: grid_room
+    key: 帆匠巷
+    desc: 帆匠巷在城東，帆布攤在整條街上晾曬。風一起，頭頂的布面鼓成一片起伏的浪，孩子追著影子跑。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  lane_03:
+    x_m: 1158
+    y_m: 468
+    prototype_parent: grid_room
+    key: 繩索巷
+    desc: 繩索巷靠海，麻繩絞盤在門口轉個不停。絞好的繩在牆上盤成一捲捲，走近就聞到焦油味。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  lane_04:
+    x_m: 1566
+    y_m: 958
+    prototype_parent: grid_room
+    key: 燈塔巷
+    desc: 燈塔巷往東南直下海岸，夜裡看得見引航的燈。巷子盡頭有一道石階，漲潮時海水會打上第三級。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  lane_05:
+    x_m: 1643
+    y_m: 1962
+    prototype_parent: grid_room
+    key: 魚市巷
+    desc: 魚市巷在城東，天未亮就開市，日中便散去。收攤後沖洗的水沿著石縫流，一路帶走整條街的腥氣。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  lane_06:
+    x_m: 375
+    y_m: 695
+    prototype_parent: grid_room
+    key: 車板巷
+    desc: 車板巷南接糧行，車伕在此修板換軸。巷裡堆的舊輪比人還高，木匠的刨花掃不完，走一趟鞋底全是木屑。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  lane_07:
+    x_m: 1607
+    y_m: 1508
+    prototype_parent: grid_room
+    key: 錨鏈巷
+    desc: 錨鏈巷的鐵匠專打船用錨鏈，爐子就架在街邊。火星濺到石板上，路人早就習慣繞著走，只有外地人會被那聲脆響嚇到。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: north_gate
+  direction: ne
+- source: central_plaza
+  destination: northwest_gate
+  direction: n
+- source: central_plaza
+  destination: west_gate
+  direction: w
+- source: central_plaza
+  destination: market_street
+  direction: nw
+- source: central_plaza
+  destination: guild_forecourt
+  direction: sw
+- source: central_plaza
+  destination: inn_lane
+  direction: e
+- source: north_gate
+  destination: central_plaza
+  direction: s
+- source: north_gate
+  destination: market_street
+  direction: sw
+- source: northwest_gate
+  destination: central_plaza
+  direction: se
+- source: northwest_gate
+  destination: market_street
+  direction: s
+- source: west_gate
+  destination: central_plaza
+  direction: e
+- source: west_gate
+  destination: market_street
+  direction: ne
+- source: west_gate
+  destination: guild_forecourt
+  direction: se
+- source: quay
+  destination: lane_02
+  direction: nw
+- source: market_street
+  destination: central_plaza
+  direction: se
+- source: market_street
+  destination: north_gate
+  direction: ne
+- source: market_street
+  destination: northwest_gate
+  direction: nw
+- source: market_street
+  destination: west_gate
+  direction: sw
+- source: guild_forecourt
+  destination: central_plaza
+  direction: ne
+- source: guild_forecourt
+  destination: west_gate
+  direction: nw
+- source: guild_forecourt
+  destination: exchange_forecourt
+  direction: se
+- source: temple_forecourt
+  destination: inn_lane
+  direction: s
+- source: temple_forecourt
+  destination: lane_05
+  direction: e
+- source: inn_lane
+  destination: central_plaza
+  direction: w
+- source: inn_lane
+  destination: temple_forecourt
+  direction: n
+- source: inn_lane
+  destination: bath_forecourt
+  direction: s
+- source: exchange_forecourt
+  destination: guild_forecourt
+  direction: nw
+- source: exchange_forecourt
+  destination: bath_forecourt
+  direction: ne
+- source: exchange_forecourt
+  destination: lane_06
+  direction: sw
+- source: bath_forecourt
+  destination: inn_lane
+  direction: n
+- source: bath_forecourt
+  destination: exchange_forecourt
+  direction: sw
+- source: lane_01
+  destination: lane_06
+  direction: n
+- source: lane_02
+  destination: quay
+  direction: se
+- source: lane_02
+  destination: lane_07
+  direction: w
+- source: lane_03
+  destination: lane_04
+  direction: ne
+- source: lane_04
+  destination: lane_03
+  direction: sw
+- source: lane_04
+  destination: lane_07
+  direction: n
+- source: lane_05
+  destination: temple_forecourt
+  direction: w
+- source: lane_05
+  destination: lane_07
+  direction: s
+- source: lane_06
+  destination: exchange_forecourt
+  direction: ne
+- source: lane_06
+  destination: lane_01
+  direction: s
+- source: lane_07
+  destination: lane_02
+  direction: e
+- source: lane_07
+  destination: lane_04
+  direction: s
+- source: lane_07
+  destination: lane_05
+  direction: n
+wilderness_entry:
+  shape:
+  - '###'
+  - '###'
+  offset:
+    dx: 0
+    dy: -1
+  gates:
+  - return_direction: s
+    destination_node: north_gate
+  - return_direction: se
+    destination_node: northwest_gate
+  - return_direction: e
+    destination_node: west_gate
+city_gate:

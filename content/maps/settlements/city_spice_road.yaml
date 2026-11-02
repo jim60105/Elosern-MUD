@@ -1,0 +1,180 @@
+version: 1
+kind: settlement
+id: city_spice_road
+location_ref: city_spice_road
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 600
+    y_m: 599
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 香道城的中央廣場，商道從這裡分出去。空氣裡總混著胡椒與乾果的味道，連雨後都散不掉。
+    anchor_key: city_spice_road
+    typeclass:
+    scene_archetype: city_street
+  north_gate:
+    x_m: 600
+    y_m: 1074
+    prototype_parent: grid_room
+    key: 北門
+    desc: 北門朝著雙流城與翠湖鎮的方向，內陸的糧與布由此進來。門外的里程石被摸得光滑，商隊習慣在此對照方向。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  west_gate:
+    x_m: 100
+    y_m: 599
+    prototype_parent: grid_room
+    key: 西門
+    desc: 西門往橙花鎮的路兩旁是果園，春天整條路都是花香。秋天車斗裡裝滿落果，路上黏得走不快。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 423
+    y_m: 531
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街在廣場西側，香料與藥材的攤子一路擺到城門。秤盤上墊著紙，怕香料沾上上一筆的氣味。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 675
+    y_m: 380
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前在廣場南側，分會接的多是隨商隊護貨的委託。任務板上註明路線與天數，字寫得又小又密。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  temple_forecourt:
+    x_m: 224
+    y_m: 100
+    prototype_parent: grid_room
+    key: 神殿前
+    desc: 神殿前在西南，商隊出發前會來此求個平安。香灰落在石階上，被來往的鞋底一路帶進廣場。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  inn_lane:
+    x_m: 842
+    y_m: 562
+    prototype_parent: grid_room
+    key: 客棧巷
+    desc: 客棧巷在城東，往金穗港的車隊在此過夜。馬廄比客房還大，半夜總有人提著燈起來看牲口。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  craft_alley:
+    x_m: 1057
+    y_m: 207
+    prototype_parent: grid_room
+    key: 工匠巷
+    desc: 工匠巷在東南，製香與鞣皮的手藝都集中在這一段。曬架上的香料一排排鋪開，顏色從深褐到淺黃。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  manor_gate:
+    x_m: 107
+    y_m: 375
+    prototype_parent: grid_room
+    key: 領主宅邸前
+    desc: 領主宅邸前在西南，城主在此核對商稅。門房手邊擱著一本貨單，來人報上商號，對上了才放行。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  lane_01:
+    x_m: 108
+    y_m: 1028
+    prototype_parent: grid_room
+    key: 井欄巷
+    desc: 井欄巷在西北，巷底的石井供著半條街的水。井欄上的繩痕一圈圈深下去，像刻上去的年輪。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: north_gate
+  direction: n
+- source: central_plaza
+  destination: west_gate
+  direction: w
+- source: central_plaza
+  destination: market_street
+  direction: sw
+- source: central_plaza
+  destination: guild_forecourt
+  direction: s
+- source: central_plaza
+  destination: inn_lane
+  direction: e
+- source: north_gate
+  destination: central_plaza
+  direction: s
+- source: west_gate
+  destination: central_plaza
+  direction: e
+- source: west_gate
+  destination: manor_gate
+  direction: s
+- source: west_gate
+  destination: lane_01
+  direction: n
+- source: market_street
+  destination: central_plaza
+  direction: e
+- source: market_street
+  destination: guild_forecourt
+  direction: se
+- source: guild_forecourt
+  destination: central_plaza
+  direction: n
+- source: guild_forecourt
+  destination: market_street
+  direction: nw
+- source: guild_forecourt
+  destination: inn_lane
+  direction: ne
+- source: temple_forecourt
+  destination: manor_gate
+  direction: nw
+- source: inn_lane
+  destination: central_plaza
+  direction: w
+- source: inn_lane
+  destination: guild_forecourt
+  direction: sw
+- source: inn_lane
+  destination: craft_alley
+  direction: se
+- source: craft_alley
+  destination: inn_lane
+  direction: nw
+- source: manor_gate
+  destination: west_gate
+  direction: n
+- source: manor_gate
+  destination: temple_forecourt
+  direction: se
+- source: lane_01
+  destination: west_gate
+  direction: s
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: s
+    destination_node: north_gate
+  - return_direction: e
+    destination_node: west_gate
+city_gate:

@@ -1,0 +1,144 @@
+version: 1
+kind: settlement
+id: town_sunrise
+location_ref: town_sunrise
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 577
+    y_m: 577
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 日出鎮的中央廣場，東邊的地平線一路平到海邊。天一亮，廣場上就擺滿了攤子，連石階都被占去一半。
+    anchor_key: town_sunrise
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 西南門
+    desc: 西南門外的路往潮風鎮去，沿海的商販由此往來。車上蓋著油布，海風再大也吹不掀，繩結打得死緊。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northeast_gate:
+    x_m: 1054
+    y_m: 1054
+    prototype_parent: grid_room
+    key: 東北門
+    desc: 東北門朝著朝陽港，漁獲與鹽由此進鎮。清晨的門洞裡總有一股鹹味，比鎮裡任何一處都重。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate_road_1:
+    x_m: 295
+    y_m: 283
+    prototype_parent: grid_room
+    key: 西南大街
+    desc: 西南大街是進鎮的一段，兩旁是糧行與車店。車店門口擱著換下來的輪子，層層疊成半人高。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 448
+    y_m: 632
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街在廣場西北，穀物與海貨在此交換。麥袋旁擺著魚簍，兩種味道混在一起成了這鎮的氣味。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 566
+    y_m: 422
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前在廣場南側，分會的委託多與沿海的商隊有關。出任務的人在此對照路線，順便問一句潮水。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  temple_forecourt:
+    x_m: 179
+    y_m: 423
+    prototype_parent: grid_room
+    key: 神殿前
+    desc: 神殿前在鎮西，日出時的祭禮在此舉行。祭司面向東方，第一道光落在階前就開始唱，聲音傳得很遠。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  inn_lane:
+    x_m: 750
+    y_m: 565
+    prototype_parent: grid_room
+    key: 客棧巷
+    desc: 客棧巷在鎮東，趕早市的販子在這裡過夜。天還沒亮，走廊上已經有人在整理擔子，繩子勒得吱吱響。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: northeast_gate
+  direction: ne
+- source: central_plaza
+  destination: southwest_gate_road_1
+  direction: sw
+- source: central_plaza
+  destination: market_street
+  direction: nw
+- source: central_plaza
+  destination: guild_forecourt
+  direction: s
+- source: central_plaza
+  destination: inn_lane
+  direction: e
+- source: southwest_gate
+  destination: southwest_gate_road_1
+  direction: ne
+- source: northeast_gate
+  destination: central_plaza
+  direction: sw
+- source: southwest_gate_road_1
+  destination: central_plaza
+  direction: ne
+- source: southwest_gate_road_1
+  destination: southwest_gate
+  direction: sw
+- source: southwest_gate_road_1
+  destination: temple_forecourt
+  direction: nw
+- source: market_street
+  destination: central_plaza
+  direction: se
+- source: guild_forecourt
+  destination: central_plaza
+  direction: n
+- source: guild_forecourt
+  destination: inn_lane
+  direction: ne
+- source: temple_forecourt
+  destination: southwest_gate_road_1
+  direction: se
+- source: inn_lane
+  destination: central_plaza
+  direction: w
+- source: inn_lane
+  destination: guild_forecourt
+  direction: sw
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: ne
+    destination_node: southwest_gate
+  - return_direction: sw
+    destination_node: northeast_gate
+city_gate:

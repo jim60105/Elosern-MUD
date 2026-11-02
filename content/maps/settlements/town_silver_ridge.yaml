@@ -1,0 +1,144 @@
+version: 1
+kind: settlement
+id: town_silver_ridge
+location_ref: town_silver_ridge
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 600
+    y_m: 337
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 銀嶺鎮的中央廣場，山就在鎮子背後立著。運礦的騾隊從東北的坡上下來，鈴聲比人先到。
+    anchor_key: town_silver_ridge
+    typeclass:
+    scene_archetype: city_street
+  northeast_gate:
+    x_m: 1095
+    y_m: 832
+    prototype_parent: grid_room
+    key: 東北門
+    desc: 東北門通往駿原鎮，山道在門外繞著岩壁走。冬天風從山口灌進來，門洞裡積著吹不走的細石。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  west_gate:
+    x_m: 100
+    y_m: 337
+    prototype_parent: grid_room
+    key: 西門
+    desc: 西門朝著斷崖鎮，越過山脊的路只容得下小車。車伕在山口會先卸下一半貨，回頭再來載。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northeast_gate_road_1:
+    x_m: 780
+    y_m: 634
+    prototype_parent: grid_room
+    key: 東北街
+    desc: 東北街是礦石進鎮的一段，路面被車輪磨出兩道深槽。下雨時槽裡積水，只有走在中間的人不會濕鞋。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 759
+    y_m: 258
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街在廣場東南，祕銀的粗料在此估價。買家的手邊擺著小天平，稱完還要再對一次眼色。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 511
+    y_m: 538
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前在西北，分會的委託多與礦道上的野獸有關。任務板上的爪痕圖樣畫得格外仔細，連齒距都標了。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  temple_forecourt:
+    x_m: 1022
+    y_m: 654
+    prototype_parent: grid_room
+    key: 神殿前
+    desc: 神殿前在東北，礦工下坑前會來此上香。廟裡的燈油由礦上按季送來，無論如何都沒有斷過。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  inn_lane:
+    x_m: 609
+    y_m: 100
+    prototype_parent: grid_room
+    key: 客棧巷
+    desc: 客棧巷在鎮南，等礦車的商人在此過夜。房裡的桌面留著前一位客人刻下的里程，字跡深淺不一。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: west_gate
+  direction: w
+- source: central_plaza
+  destination: northeast_gate_road_1
+  direction: ne
+- source: central_plaza
+  destination: market_street
+  direction: se
+- source: central_plaza
+  destination: guild_forecourt
+  direction: nw
+- source: central_plaza
+  destination: inn_lane
+  direction: s
+- source: northeast_gate
+  destination: northeast_gate_road_1
+  direction: sw
+- source: northeast_gate
+  destination: temple_forecourt
+  direction: s
+- source: west_gate
+  destination: central_plaza
+  direction: e
+- source: northeast_gate_road_1
+  destination: central_plaza
+  direction: sw
+- source: northeast_gate_road_1
+  destination: northeast_gate
+  direction: ne
+- source: market_street
+  destination: central_plaza
+  direction: nw
+- source: market_street
+  destination: inn_lane
+  direction: sw
+- source: guild_forecourt
+  destination: central_plaza
+  direction: se
+- source: temple_forecourt
+  destination: northeast_gate
+  direction: n
+- source: inn_lane
+  destination: central_plaza
+  direction: n
+- source: inn_lane
+  destination: market_street
+  direction: ne
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: sw
+    destination_node: northeast_gate
+  - return_direction: e
+    destination_node: west_gate
+city_gate:

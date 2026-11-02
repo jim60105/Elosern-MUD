@@ -1,0 +1,218 @@
+version: 1
+kind: settlement
+id: port_east_bay
+location_ref: port_east_bay
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 595
+    y_m: 1550
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 東灣港的中央廣場，海在東邊，帝河東支在西南匯進海灣。廣場的石板被鹽風磨得發白，正午時連影子都短。
+    anchor_key: port_east_bay
+    typeclass:
+    scene_archetype: city_street
+  northwest_gate:
+    x_m: 100
+    y_m: 2045
+    prototype_parent: grid_room
+    key: 西北門
+    desc: 西北門外的路通往雙流城，內陸的糧車與布商由此進港。門洞兩側堆著待運的木箱，箱角都包了鐵皮。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate:
+    x_m: 100
+    y_m: 1055
+    prototype_parent: grid_room
+    key: 西南門
+    desc: 西南門朝著金穗港的方向，沿海的商販沿著岸邊往來。門外的路在雨後積水，車伕會先探一段深淺才過。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northwest_gate_road_1:
+    x_m: 480
+    y_m: 1796
+    prototype_parent: grid_room
+    key: 西北大街
+    desc: 西北大街是進港的第一段路，兩旁是糧行與船具鋪。鋪子把錨與繩掛在簷下，走過去要低頭。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate_road_1:
+    x_m: 300
+    y_m: 1309
+    prototype_parent: grid_room
+    key: 西南大街
+    desc: 西南大街連著中央廣場，海風從街尾一路灌進來。挑夫在這段路上換肩，鹽粒從擔子縫裡漏下來。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  quay:
+    x_m: 595
+    y_m: 100
+    prototype_parent: grid_room
+    key: 碼頭
+    desc: 碼頭在城的南面，石砌的岸線沿著海灣鋪開。帝河東支的淡水從西南注進來，錨地因此比外海安靜。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 647
+    y_m: 1317
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街在廣場南側，離碼頭只剩幾步路。魚貨與穀物在同一排攤子上換手，議價的人聲順著坡道往下傳。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  harbour_office:
+    x_m: 145
+    y_m: 100
+    prototype_parent: grid_room
+    key: 港務總管府前
+    desc: 港務總管府前在城南，正對著進出的水道。辦事的人把船名與貨色寫進冊子，筆尖沾的是同一個墨盤。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 765
+    y_m: 1764
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前在廣場東北，分會的任務板朝著海的方向。押貨與護船的委託最多，紙邊總被海風掀起。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  temple_forecourt:
+    x_m: 226
+    y_m: 1794
+    prototype_parent: grid_room
+    key: 神殿前
+    desc: 神殿前在西北，屋脊正對著河海交會的那一片水。船家出海前會來上香，爐灰裡混著細沙。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  inn_lane:
+    x_m: 312
+    y_m: 1580
+    prototype_parent: grid_room
+    key: 客棧巷
+    desc: 客棧巷在城西，離碼頭不遠卻安靜得多。等著裝船的船伕在此過夜，夜裡聽得見遠處的拍岸聲。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  exchange_forecourt:
+    x_m: 975
+    y_m: 1599
+    prototype_parent: grid_room
+    key: 商會前
+    desc: 商會前在廣場東側，臨海的窗子終年不關。艙單與糧價在此對上，書記官的桌面壓著一塊擋風的石頭。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: northwest_gate_road_1
+  direction: nw
+- source: central_plaza
+  destination: southwest_gate_road_1
+  direction: sw
+- source: central_plaza
+  destination: market_street
+  direction: s
+- source: central_plaza
+  destination: guild_forecourt
+  direction: ne
+- source: northwest_gate
+  destination: northwest_gate_road_1
+  direction: se
+- source: northwest_gate
+  destination: temple_forecourt
+  direction: s
+- source: southwest_gate
+  destination: southwest_gate_road_1
+  direction: ne
+- source: southwest_gate
+  destination: harbour_office
+  direction: s
+- source: northwest_gate_road_1
+  destination: central_plaza
+  direction: se
+- source: northwest_gate_road_1
+  destination: northwest_gate
+  direction: nw
+- source: northwest_gate_road_1
+  destination: temple_forecourt
+  direction: w
+- source: northwest_gate_road_1
+  destination: inn_lane
+  direction: sw
+- source: southwest_gate_road_1
+  destination: central_plaza
+  direction: ne
+- source: southwest_gate_road_1
+  destination: southwest_gate
+  direction: sw
+- source: southwest_gate_road_1
+  destination: inn_lane
+  direction: n
+- source: quay
+  destination: harbour_office
+  direction: w
+- source: market_street
+  destination: central_plaza
+  direction: n
+- source: harbour_office
+  destination: southwest_gate
+  direction: n
+- source: harbour_office
+  destination: quay
+  direction: e
+- source: guild_forecourt
+  destination: central_plaza
+  direction: sw
+- source: guild_forecourt
+  destination: exchange_forecourt
+  direction: se
+- source: temple_forecourt
+  destination: northwest_gate
+  direction: nw
+- source: temple_forecourt
+  destination: northwest_gate_road_1
+  direction: e
+- source: temple_forecourt
+  destination: inn_lane
+  direction: s
+- source: inn_lane
+  destination: northwest_gate_road_1
+  direction: ne
+- source: inn_lane
+  destination: southwest_gate_road_1
+  direction: s
+- source: inn_lane
+  destination: temple_forecourt
+  direction: n
+- source: exchange_forecourt
+  destination: guild_forecourt
+  direction: nw
+wilderness_entry:
+  shape:
+  - '#'
+  - '#'
+  - '#'
+  offset:
+    dx: 0
+    dy: -1
+  gates:
+  - return_direction: se
+    destination_node: northwest_gate
+  - return_direction: ne
+    destination_node: southwest_gate
+city_gate:

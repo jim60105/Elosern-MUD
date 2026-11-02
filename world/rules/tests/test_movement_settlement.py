@@ -45,18 +45,25 @@ def _gate_anchor_entry():
     of being named. Uniqueness is asserted, so a catalog reorder cannot
     silently swap the row. All assertions below are rollback/bookkeeping
     mechanics, never shipped-content quantities.
+
+    More than one settlement now authors both gateway faces, so the pick is
+    the lowest authored anchor key: deterministic, and the capital row the
+    production east gate belongs to.
     """
     registry = getattr(
         importlib.import_module("world.lore.wilderness_entry"),
         "WILDERNESS_ENTRY" + "_REGISTRY",
     )
-    matches = [
-        entry
-        for entry in registry.values()
-        if entry.gate_for("w") is not None
-        and entry.gate_for("n") is not None
-    ]
-    assert len(matches) == 1, matches
+    matches = sorted(
+        (
+            entry
+            for entry in registry.values()
+            if entry.gate_for("w") is not None
+            and entry.gate_for("n") is not None
+        ),
+        key=lambda entry: entry.anchor_key,
+    )
+    assert matches, "no wilderness entry authors both gateway faces"
     return matches[0]
 
 

@@ -148,13 +148,18 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         create_object(Room, key=LIMBO_KEY, location=None)
         sync_grid()
 
-        south_gate = GridRoom.objects.get(db_key="南門")
         # zhtw-room-prose: the spawn pin asserts the mechanism (the room's desc
         # equals its authored prototype), not the sentence — the prototype's
         # prose is Traditional Chinese like every other shipped room text.
         from world.maps.map_data import current
 
         declared = current().settlements["capital_altoria"].nodes["south_gate"]
+        # A node key is unique inside one map, never across the settled world:
+        # several settlements have their own 南門. Resolve the room by the
+        # authored coordinate that identifies it.
+        xyz = (*declared.coordinate, "capital_altoria")
+        south_gate = GridRoom.objects.filter_xyz(xyz=xyz).first()
+        self.assertIsNotNone(south_gate)
         self.assertEqual(south_gate.xyz, (*declared.coordinate, "capital_altoria"))
         self.assertEqual(south_gate.db.desc, declared.desc)
 
@@ -185,7 +190,8 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
             sync_grid()
 
         self.assertEqual(self._count_grid_rooms(), _declared_node_count())
-        south_gate = GridRoom.objects.get(db_key="南門")
+        south_gate = GridRoom.objects.filter_xyz(xyz=xyz).first()
+        self.assertIsNotNone(south_gate)
         self.assertEqual(south_gate.db.desc, "A rebuilt southern gate.")
 
     @covers_requirement("scene-archetype-mixin::gridroom-is-retrofitted-onto-scenearchetypemixin-without-changing-its-contract")
