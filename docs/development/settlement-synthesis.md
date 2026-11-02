@@ -1,6 +1,6 @@
 # Settlement synthesis
 
-`tools/settlement_synthesis/` answers four questions about a settlement:
+`tools/settlement_synthesis/` answers these questions about a settlement:
 
 - **Where does it sit?** `site` derives the rivers, sea, fords, harbour sites,
   relief and neighbour bearings around one location.
@@ -10,12 +10,20 @@
   against the terrain in world metres.
 - **What is the coarse street graph?** `generate` grows a footprint, places the
   role nodes and connects them with directed roads, then writes the document.
+- **How does an existing map change without losing identity?** `generate
+  --replace --bind` regenerates the graph around the node ids that other
+  documents still name.
+- **What should the prose say, and where is it safe to write?** `brief` prints
+  the machine-readable site and node brief, and `prose` applies node names and
+  descriptions only.
 
-`site`, `budget` and `lint` are read-only. `generate` is the one writing
-command, and it only creates a settlement source that does not exist yet. They
-live in the game environment because they join `world.lore.anchors.ANCHOR_LORE`
-for nation and population; they need no Django setup. `--lore FILE` replaces
-that join with a JSON override, which is how the tests stay off shipped lore.
+`site`, `budget`, `lint` and `brief` are read-only. `generate` creates a
+settlement source that does not exist yet, or replaces one when every protected
+node is bound. `prose` is the second writing command, and it changes only a
+node's `key` and `desc`. They live in the game environment because they join
+`world.lore.anchors.ANCHOR_LORE` for nation and population; they need no Django
+setup. `--lore FILE` replaces that join with a JSON override, which is how the
+tests stay off shipped lore.
 
 ## Scales
 
@@ -167,6 +175,9 @@ uv run --locked python -m tools.settlement_synthesis budget LOCATION_ID [--root 
 uv run --locked python -m tools.settlement_synthesis lint [MAP_ID ...] [--root DIR]
 uv run --locked python -m tools.settlement_synthesis generate LOCATION_ID [--root DIR] [--lore FILE] [--gates OCTANT[,OCTANT...]] [--plan-only]
 uv run --locked python -m tools.settlement_synthesis generate --missing --nation NATION [--root DIR] [--lore FILE] [--plan-only]
+uv run --locked python -m tools.settlement_synthesis generate LOCATION_ID --replace --bind FILE [--root DIR] [--lore FILE] [--gates OCTANT[,OCTANT...]] [--plan-only]
+uv run --locked python -m tools.settlement_synthesis brief MAP_ID [--root DIR] [--lore FILE]
+uv run --locked python -m tools.settlement_synthesis prose MAP_ID FILE [--root DIR]
 ```
 
 - `site` prints the `SiteContext` as JSON and exits 0. `--radius` is the water
@@ -188,9 +199,21 @@ uv run --locked python -m tools.settlement_synthesis generate --missing --nation
   that are national kinds without a settlement source, largest population
   first, reloading the workspace before each map so later footprints see the
   earlier ones; per-location errors do not stop the batch.
+- `generate --replace` rewrites the settlement already bound to `LOCATION_ID`
+  and prints the same report plus `bound`, `dropped`, `renamed_slots` and
+  `index_present`. `--bind FILE` is required and `--missing` is refused. A
+  missing source prints `missing: <relative path>` and exits 1; a refused
+  binding prints every problem and exits 1. `--plan-only` prints the report and
+  writes nothing.
+- `brief` prints one settlement's prose brief as JSON, described below, and
+  exits 0. It exits 2 when the workspace does not load or the map is unknown.
+- `prose` applies a JSON object of `{"<node_id>": {"key", "desc"}}` and prints
+  `prose: N nodes updated`. An unknown node, an empty key or description, or a
+  field other than `key` and `desc` is collected, printed and exits 1 with no
+  write. An unreadable file exits 1, and an unknown map exits 2.
 - `--root` defaults to the current directory. Nothing is written, so a run can
-  never change the sources it inspects; `generate` is the one exception and it
-  refuses an existing file.
+  never change the sources it inspects; `generate` and `prose` are the writing
+  exceptions, and `generate` refuses an existing file without `--replace`.
 
 The lint is a workflow tool, not a CI gate over shipped data. It currently
 reports `capital_altoria`'s dry `quay` and `riverbank_road` nodes, four of its
@@ -294,6 +317,99 @@ terrain-fit lint error; none of them writes a file. An existing settlement is
 never overwritten, and a run that finds one exits with `exists: <relative path>`
 and changes nothing.
 
+## Rework with bindings
+
+`--replace` regenerates the graph of one existing settlement without losing a
+node id that something else joins on. The command finds the document bound to
+`LOCATION_ID` by its `location_ref`, not by its file name, and generates the
+new plan under that document's own identity. The seed, the document `id` and
+the exclusion of the map's own footprint therefore stay stable.
+
+The bind file is JSON whose object order is the resolution order:
+
+```json
+{
+  "bindings": {
+    "gate": "central_plaza",
+    "yard": "nearest:central_plaza"
+  }
+}
+```
+
+- A direct value names one plan slot id.
+- `nearest:<slot>` takes the closest **unbound** `approach` or `filler` slot to
+  `<slot>`, measured in local metres. Ties resolve by plan order.
+
+**Protected nodes.** A replace requires a binding for every node that another
+source names:
+
+- an interior `exterior.node` whose `exterior.settlement` is this map;
+- a district landmark with `domain: settlement_node` and this `map_id`;
+- an incoming external reference keyed `settlement_node:<map>:<node>` in
+  `content/map-reference-context.json`;
+- the map's `city_gate.node`;
+- the anchor node.
+
+When the reference index is absent, every existing node is protected, because
+an absent index cannot prove that an external declaration does not name one.
+An index that is stale or incompatible with the current external sources proves
+no more, so it is treated the same way: every existing node is protected and
+the report says `index_present` is false.
+
+**Refusals.** Every problem is collected before one error is raised, and a
+refused run writes nothing:
+
+| Problem | Meaning |
+| --- | --- |
+| `unknown_node:<id>` | The bind file names a node the document does not have. |
+| `unknown_slot:<id>-><slot>` | The slot does not exist in the generated plan. |
+| `duplicate_slot:<slot>` | Two existing nodes resolve to one slot. |
+| `no_nearest:<id>` | No unbound approach or filler slot is left to take. |
+| `anchor_mismatch:<slot>` | The existing anchor is bound to something other than `central_plaza`. |
+| `unbound_protected:<id>` | A protected node has no binding. |
+
+**The emitted document.** A bound node keeps its id, `key`, `desc`,
+`typeclass` and `scene_archetype`. Its position and `prototype_parent` come
+from the plan, and every road and wilderness gate that named it follows the
+keep. An unbound slot keeps its generated id; when that id collides with a
+final id it takes the first free `_2`, `_3`, … suffix, recorded in
+`renamed_slots`. An existing node that is neither bound nor protected is
+dropped and listed in `dropped`. `options`, `exit_prototype` and `city_gate`
+come from the existing document; nodes and roads follow plan order. The write
+uses the parsed retained tree, so the file's header comments survive.
+
+**Worked synthetic example.** The test workspace has `synthetic_town` bound to
+`synthetic_place`, with the anchor `gate`, the node `yard`, an interior doorway
+on `yard` and a district landmark on `yard`. The plan has 28 slots. The
+bindings above make `gate` the anchor slot and resolve `yard` to the closest
+unbound approach or filler slot; `gate` and `yard` keep their names and
+descriptions, and the interior doorway and district landmark still resolve.
+A third existing node named by nothing is dropped and appears in `dropped`.
+Deleting the reference index protects that node too, so the same binding then
+fails with `unbound_protected:<node>` until it is bound.
+
+## Prose pass
+
+Agent writers follow these rules. They are human-reviewed, never tested.
+
+- Write in Traditional Chinese for Taiwan readers, with full-width punctuation. Follow `.agents/skills/chinese-content-writing-guideline`. The setting is JRPG sword and magic. Never use 武俠 vocabulary.
+- `key` is 2–8 characters and unique within the map. It names the place a traveller stands in, such as 南門, 河港碼頭 or 鐵砧巷. It does not repeat the settlement's name.
+- `desc` is 1–3 sentences and 40–140 characters. It must include one concrete site cue taken from the brief, for example the river side, the uphill direction, the gate's road toward a named neighbour, or the market where approach roads meet. The settlement's `display_name_zh` may appear at most once.
+- Write in-world only. Never mention a command, a game mechanic, a UI element, coordinates or an id.
+- Follow the archetype's place matrix in `docs/lore/settlement-locations.md`:
+  - a beast settlement has no academy, alchemist or church temple; it has a tribal hall and an ancestral altar;
+  - only a port has a sea quay;
+  - shops stay narrative mentions, because interiors are out of scope.
+- For a bound node that already has prose, leave it untouched unless the brief shows that its site cue is now false. An example is a riverbank description on a node that moved away from the river. In that case rewrite only the false clause.
+
+`brief` prints the material those rules need: the settlement's display name,
+kind, nation, population, geographic constraint, class, morphology, water
+within the generator's reach, uphill bearing, the nearest national neighbours,
+and one row per node with its id, current key, role, bearing and distance from
+the anchor, whether its description is empty, and its gate return direction.
+The role is `anchor`, `gate`, `crossing`, `approach`, `filler`, a catalogue slot
+id, or `authored`. Nothing is written.
+
 ## Human review
 
 These qualities are reviewed by a person against this page, not tested:
@@ -310,3 +426,37 @@ These qualities are reviewed by a person against this page, not tested:
 - Do the approach streets converge on the plaza?
 - Is the quay on the water side, the temple uphill and the crafts downstream?
 - Are the gates plausible toward their neighbours?
+- Does the prose read as in-world Traditional Chinese in the settlement's
+  register, and does it fit the settlement's archetype and lore?
+- After a replace moves a node, does every description whose site cue changed
+  still tell the truth?
+
+## Settlement-sensitive test modules
+
+These are the test modules to rerun after any settlement data change. Later
+changes reference this section instead of an archived task list. The set was
+established by matching
+`capital_altoria|south_gate|east_gate|central_plaza|SETTLEMENT_GRAPHS|WILDERNESS_ENTRY_REGISTRY|ANCHOR_PLACEMENT_REGISTRY`,
+across the authored-data tree, with browser tests excluded. A module that uses
+`central_plaza` or `south_gate` only as a synthetic generator slot constant
+does not read authored settlement data and is not a data pin.
+
+```console
+commands.tests.test_localized.test_xyz_grid_and_help tests.test_map_core_contract typeclasses.tests.test_exit_movement_cost typeclasses.tests.test_exits typeclasses.tests.test_map_discovery typeclasses.tests.test_npc_dialogue web.webclient.actions.tests.test_exploration_actions.test_move_and_look web.webclient.actions.tests.test_node_ids web.webclient.actions.tests.test_travel_actions web.webclient.presentation.tests.test_area_map web.webclient.presentation.tests.test_exploration_panel.test_presenter web.webclient.presentation.tests.test_exploration_panel.test_wilderness_and_npc_titles web.webclient.presentation.tests.test_local_map.test_gate_capacity web.webclient.presentation.tests.test_local_map.test_gateway_resolution web.webclient.presentation.tests.test_local_map.test_grid_gateways web.webclient.presentation.tests.test_local_map.test_grid_helpers web.webclient.presentation.tests.test_local_map.test_per_gate_footprint web.webclient.presentation.tests.test_local_map.test_presenter web.webclient.presentation.tests.test_local_map.test_wilderness web.webclient.presentation.tests.test_map_quest_destinations web.webclient.presentation.tests.test_world_map world.lore.tests.test_anchor_placement world.lore.tests.test_map_district_content world.lore.tests.test_nations world.lore.tests.test_settlements world.lore.tests.test_sync world.lore.tests.test_wilderness_entry world.maps.tests.test_altoria_capital world.maps.tests.test_bootstrap world.maps.tests.test_city_movement_cost world.maps.tests.test_city_walkthrough world.maps.tests.test_city_wilderness_roundtrip world.maps.tests.test_editor_final_yaml_adoption world.maps.tests.test_geography_source world.maps.tests.test_limbo_room world.maps.tests.test_movement_roundtrip world.maps.tests.test_runtime_adoption world.maps.tests.test_settlement_reload world.maps.tests.test_sparse_graph world.maps.tests.test_static_map_references world.maps.tests.test_village_ciaran world.maps.tests.test_wilderness_destination world.maps.tests.test_wilderness_geography_contract world.maps.tests.test_wilderness_population world.maps.tests.test_wilderness_provider world.quests.tests.test_compile_blueprint world.quests.tests.test_compile_offline world.quests.tests.test_compile_registration world.quests.tests.test_definitions world.quests.tests.test_encounter_activation world.quests.tests.test_encounter_dispatch world.quests.tests.test_generated_dialogue_scenes world.quests.tests.test_package_proposal world.quests.tests.test_quests_observability world.quests.tests.test_room_observation world.quests.tests.test_scene_builder_offline world.quests.tests.test_scene_smoke world.quests.tests.test_story_dialogue world.quests.tests.test_story_effects world.rules.tests.test_dialogue_refresh_lifecycle world.rules.tests.test_guild_config.test_price_scaling world.rules.tests.test_guild_config.test_service_host_roster world.rules.tests.test_map_knowledge_integration world.rules.tests.test_movement world.rules.tests.test_movement_settlement world.rules.tests.test_party_follow world.rules.tests.test_party_follow_possession world.rules.tests.test_party_time_settlement world.rules.tests.test_sight world.rules.tests.test_travel_plan
+```
+
+The `tests.` module runs under `uv run --locked python -m unittest`. All others
+run under `evennia test --settings settings.py`.
+
+`world.maps.tests.test_editor_final_yaml_adoption` runs with
+`--settings test_settings.py` and an env file that contains `MUD_TEST_SETTINGS=1`.
+
+### Residual pin rule
+
+> A failure is a residual pin when the module passes on the pre-change tree (`git stash`, rerun, `git stash pop`) and the cause is a copied settlement value: a literal coordinate, count, duration, node key, cell, roster or gate direction. To fix it:
+> - rewrite only that assertion;
+> - derive the expected value from `world.maps.map_data.current().settlements[...]`, `world.maps.geography.current().locations` or `elosern_map_core.authoring.gate_approach_cell`, never from a literal;
+> - keep the module's `@covers_requirement` IDs and its `Data-contract test:` docstring line;
+> - for durations, assert that the charged tick delta `d` satisfies `(d - 1) * 1.25 < metres <= d * 1.25`, where `metres` is the authored polyline length. Never recompute seconds.
+>
+> Any other failure stops the change.

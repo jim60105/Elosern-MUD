@@ -9,6 +9,7 @@ windowed terrain view per check. It reads only; nothing here writes a file.
 from __future__ import annotations
 
 import json
+import math
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -22,6 +23,11 @@ from elosern_map_core import (
 )
 from elosern_map_core.authoring import gate_approach_cell, terrain_definition
 from elosern_map_core.elevation_codec import decode_tile
+from elosern_map_core.reference_context import (
+    ReferenceContextError,
+    check_workspace_freshness,
+    decode_reference_context,
+)
 from elosern_map_core.terrain import (
     is_inland_water_cell,
     is_land_cell,
@@ -29,12 +35,21 @@ from elosern_map_core.terrain import (
     rasterize_routes,
 )
 
+from tools.settlement_synthesis.budget import size_budget
+from tools.settlement_synthesis.generate import (
+    GenerationConfig,
+    GenerationInput,
+)
 from tools.settlement_synthesis.geometry import Cell
-from tools.settlement_synthesis.site import SettlementRef
+from tools.settlement_synthesis.roles import DEFAULT_CATALOGUE
+from tools.settlement_synthesis.site import SettlementRef, analyse_site
 from tools.settlement_synthesis.terrain_view import GridTerrain
 
 #: The committed elevation tile bundle, relative to the workspace root.
 ELEVATION_PATH = Path("content") / "maps" / "wilderness_elevation.json"
+
+#: The committed external reference index, relative to the workspace root.
+REFERENCE_CONTEXT_PATH = Path("content") / "map-reference-context.json"
 
 #: One 64x64 elevation tile edge, matching the map core's tile format.
 TILE_CELLS = 64
@@ -280,6 +295,58 @@ def _roster(
             )
         )
     return tuple(rows)
+
+
+def incoming_reference_keys(root: Path) -> frozenset[str] | None:
+    """The qualified ids a current reference index names, or ``None``.
+
+    ``None`` means no index is present, or the present one cannot prove which
+    external declarations exist: it is stale or incompatible with the current
+    external sources. The caller must then protect every existing identity.
+    """
+
+    path = Path(root) / REFERENCE_CONTEXT_PATH
+    if not path.is_file():
+        return None
+    try:
+        document = decode_reference_context(path.read_text(encoding="utf-8"))
+    except (OSError, ReferenceContextError) as error:
+        raise WorkspaceError(f"{path}: {error}") from error
+    if not check_workspace_freshness(document, root).current:
+        return None
+    return frozenset(document.incoming_references)
+
+
+def analysis_input(
+    view: WorkspaceView,
+    location: SettlementRef,
+    *,
+    forced_gates: tuple[str, ...] = (),
+    map_id: str | None = None,
+) -> GenerationInput:
+    """The generator input one view yields for one roster row."""
+
+    budget = size_budget(location)
+    reach = math.ceil(math.sqrt(budget.footprint_cells) / 2) + 1
+    radius = max(
+        reach + 6,
+        math.ceil(1.5 * budget.envelope_radius_m / 1000) + 6,
+        10,
+    )
+    terrain = view.terrain_window(location.cell, radius)
+    site = analyse_site(location, terrain, view.roster)
+    identity = location.location_id if map_id is None else map_id
+    return GenerationInput(
+        map_id=identity,
+        location=location,
+        site=site,
+        budget=budget,
+        terrain=terrain,
+        blocked=view.blocked_cells(identity),
+        catalogue=DEFAULT_CATALOGUE,
+        forced_gates=forced_gates,
+        config=GenerationConfig(),
+    )
 
 
 def load_workspace(root: Path, lore: Path | None = None) -> WorkspaceView:

@@ -218,6 +218,60 @@ The editor refuses a node delete while any of these still names the node:
 Remove those first, as separate deliberate steps. Search the interiors with
 `grep -rn "node: <node_id>" content/maps/interiors/`.
 
+## Rework or name an existing local map
+
+`generate` never overwrites a settlement. To rework one, bind every node that
+other sources still name, then write its prose with the prose command.
+
+1. Get the brief. It lists each node's id, key, role, bearing and distance from
+   the anchor, whether its `desc` is empty, and the settlement's site. It
+   writes nothing.
+
+   ```console
+   uv run --locked python -m tools.settlement_synthesis brief <map_id>
+   ```
+
+2. Write the bind file in the scratchpad, for example
+   `{"bindings": {"gate": "central_plaza", "yard": "nearest:central_plaza"}}`.
+   A direct value names a plan slot; `nearest:<slot>` takes the closest unbound
+   approach or filler slot. `--replace` needs a binding for every protected
+   node: an interior `exterior.node`, a district landmark, an incoming
+   `settlement_node:<map>:<node>` reference, the city gate and the anchor. With
+   no reference index, every existing node is protected. A refused run names
+   the problem and writes nothing.
+
+3. Replace the graph. Run it with `--plan-only` first and read the report.
+
+   ```console
+   uv run --locked python -m tools.settlement_synthesis generate <location_id> --replace --bind <bind.json> --plan-only
+   uv run --locked python -m tools.settlement_synthesis generate <location_id> --replace --bind <bind.json>
+   ```
+
+   The command rewrites the document bound to the location, keeps the bound
+   ids, keys and descriptions, and reports the bound, dropped and renamed
+   slots.
+
+4. Write the prose JSON in the scratchpad as
+   `{"<node_id>": {"key": "…", "desc": "…"}}`, following § Prose pass in
+   `docs/development/settlement-synthesis.md`. Apply it:
+
+   ```console
+   uv run --locked python -m tools.settlement_synthesis prose <map_id> <prose.json>
+   ```
+
+   Unknown ids, empty text and fields other than `key` and `desc` are refused
+   atomically. Never hand-edit prose into the YAML when the prose command can do
+   it. The command keeps the codec, the file's comments and the atomic write.
+
+5. Verify and regenerate. Run the terrain-fit lint, the check script and the
+   partition regeneration, in that order.
+
+   ```console
+   uv run --locked python -m tools.settlement_synthesis lint <map_id>
+   uv run --locked --project packages/map-core python .agents/skills/map-data-authoring/scripts/check_map_sources.py
+   uv run --locked --project tools/map-editor python .agents/skills/map-data-authoring/scripts/regenerate_partition.py
+   ```
+
 ## Editor equivalents
 
 The editor provides these commands:

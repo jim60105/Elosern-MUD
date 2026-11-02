@@ -43,7 +43,8 @@
     "tests.test_converted_stream_contract",
     "tests.test_elevation_contract",
     "tests.test_settlement_terrain_fit",
-    "tests.test_settlement_graph_generation"
+    "tests.test_settlement_graph_generation",
+    "tests.test_settlement_map_rework"
    ]
   },
   {

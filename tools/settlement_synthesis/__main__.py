@@ -1,8 +1,10 @@
-"""Command line for the settlement site, budget, fit and generation tools.
+"""Command line for the settlement site, budget, fit, generation and prose tools.
 
-``site``, ``budget`` and ``lint`` read a workspace and print to stdout; none of
-them writes a file. ``generate`` is the one writing command, and it only ever
-creates a settlement source that does not exist yet.
+``site``, ``budget``, ``lint`` and ``brief`` read a workspace and print to
+stdout; none of them writes a file. ``generate`` creates a settlement source
+that does not exist yet, or replaces an existing one when every protected node
+is bound. ``prose`` is the second writing command, and it changes only a node's
+``key`` and ``desc``.
 """
 
 from __future__ import annotations
@@ -10,13 +12,16 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import json
-import math
 import sys
 from pathlib import Path
 from typing import Any
 
 from elosern_map_core.authoring import gate_approach_cell
-from elosern_map_core.codec import document_from_data, serialize_document
+from elosern_map_core.codec import (
+    document_from_data,
+    parse_document,
+    serialize_document,
+)
 from elosern_map_core.diagnostics import AuthoringError
 
 from tools.settlement_synthesis.budget import (
@@ -27,18 +32,24 @@ from tools.settlement_synthesis.budget import (
 from tools.settlement_synthesis.fit_lint import lint_settlement
 from tools.settlement_synthesis.generate import (
     OCTANT_WORDS,
-    GenerationConfig,
     GenerationError,
-    GenerationInput,
     GenerationResult,
     generate_settlement,
 )
 from tools.settlement_synthesis.geometry import cell_of, world_position
-from tools.settlement_synthesis.roles import DEFAULT_CATALOGUE
+from tools.settlement_synthesis.prose import apply_prose, build_brief
+from tools.settlement_synthesis.rework import (
+    ReworkError,
+    ReworkPlan,
+    apply_bindings,
+    ordered_retained_tree,
+    protected_nodes,
+)
 from tools.settlement_synthesis.site import analyse_site
 from tools.settlement_synthesis.workspace import (
     WorkspaceError,
     WorkspaceView,
+    analysis_input,
     load_workspace,
     settlement_path,
     write_atomic,
@@ -164,6 +175,48 @@ def _lint(args: argparse.Namespace) -> int:
     return 1 if errors else 0
 
 
+def _brief(args: argparse.Namespace) -> int:
+    try:
+        view = _workspace(args)
+        payload = build_brief(view, args.map_id)
+    except (WorkspaceError, BudgetError) as error:
+        print(f"settlement_synthesis: {error}", file=sys.stderr)
+        return 2
+    except GenerationError as error:
+        print(f"settlement_synthesis: {error}", file=sys.stderr)
+        return 1
+    print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
+def _prose(args: argparse.Namespace) -> int:
+    try:
+        payload = json.loads(Path(args.file).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        print(f"settlement_synthesis: {error}", file=sys.stderr)
+        return 1
+    if not isinstance(payload, dict):
+        print(
+            "settlement_synthesis: the prose file must be a JSON object",
+            file=sys.stderr,
+        )
+        return 1
+    try:
+        view = _workspace(args)
+        count = apply_prose(view, args.map_id, payload)
+    except WorkspaceError as error:
+        print(f"settlement_synthesis: {error}", file=sys.stderr)
+        return 2
+    except ReworkError as error:
+        print(f"settlement_synthesis: {error}", file=sys.stderr)
+        return 1
+    except (ValueError, AuthoringError) as error:
+        print(f"settlement_synthesis: {error}", file=sys.stderr)
+        return 1
+    print(f"prose: {count} nodes updated")
+    return 0
+
+
 def _forced_gates(value: str) -> tuple[str, ...] | None:
     bearings = tuple(item.strip() for item in value.split(",") if item.strip())
     for bearing in bearings:
@@ -210,28 +263,95 @@ def _existing_document(view: WorkspaceView, location_id: str) -> str | None:
     return None
 
 
+def _replace_target(
+    view: WorkspaceView, location_id: str
+) -> tuple[Path, str] | None:
+    """The existing source a replace rewrites, resolved by its location binding.
+
+    A settlement's identity and its location's identity are independent, so the
+    binding decides the target; the canonical path is only the fallback name a
+    refusal reports.
+    """
+
+    for document in view.world.settlements.values():
+        if document.location_ref != location_id:
+            continue
+        path = settlement_path(view.root, document.identity)
+        if path.is_file():
+            return path, document.identity
+    return None
+
+
+def _read_bindings(path: str) -> tuple[tuple[str, str], ...] | None:
+    """One bind file as ordered ``(existing_id, slot)`` rows."""
+
+    try:
+        document = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        print(f"settlement_synthesis: {path}: {error}", file=sys.stderr)
+        return None
+    rows = document.get("bindings") if isinstance(document, dict) else None
+    if not isinstance(rows, dict):
+        print(
+            f"settlement_synthesis: {path}: bindings must be a JSON object",
+            file=sys.stderr,
+        )
+        return None
+    bindings: list[tuple[str, str]] = []
+    for existing_id, slot_id in rows.items():
+        if not isinstance(existing_id, str) or not isinstance(slot_id, str):
+            print(
+                f"settlement_synthesis: {path}: every binding must be a string pair",
+                file=sys.stderr,
+            )
+            return None
+        bindings.append((existing_id, slot_id))
+    return tuple(bindings)
+
+
+def _rework_report(
+    result: GenerationResult, plan: ReworkPlan, index_present: bool
+) -> dict[str, Any]:
+    bound_slots = {slot_id: existing_id for existing_id, slot_id in plan.bound.items()}
+    nodes = plan.data["nodes"]
+    rows = []
+    for slot in result.slots:
+        if slot.slot_id in bound_slots:
+            node_id = bound_slots[slot.slot_id]
+        else:
+            node_id = plan.renamed_slots.get(slot.slot_id, slot.slot_id)
+        node = nodes[node_id]
+        rows.append(
+            {
+                "id": node_id,
+                "role": slot.role,
+                "key": node["key"],
+                "x_m": node["x_m"],
+                "y_m": node["y_m"],
+            }
+        )
+    return {
+        "map_id": result.map_id,
+        "settlement_class": result.settlement_class,
+        "morphology": result.morphology,
+        "footprint_cells": len(result.footprint),
+        "warnings": list(plan.warnings),
+        "slots": rows,
+        "bound": dict(plan.bound),
+        "dropped": list(plan.dropped),
+        "renamed_slots": dict(plan.renamed_slots),
+        "index_present": index_present,
+    }
+
+
 def _generation_input(
-    view: WorkspaceView, location: Any, forced_gates: tuple[str, ...]
-) -> GenerationInput:
-    budget = size_budget(location)
-    reach = math.ceil(math.sqrt(budget.footprint_cells) / 2) + 1
-    radius = max(
-        reach + 6,
-        math.ceil(1.5 * budget.envelope_radius_m / 1000) + 6,
-        10,
-    )
-    terrain = view.terrain_window(location.cell, radius)
-    site = analyse_site(location, terrain, view.roster)
-    return GenerationInput(
-        map_id=location.location_id,
-        location=location,
-        site=site,
-        budget=budget,
-        terrain=terrain,
-        blocked=view.blocked_cells(location.location_id),
-        catalogue=DEFAULT_CATALOGUE,
-        forced_gates=forced_gates,
-        config=GenerationConfig(),
+    view: WorkspaceView,
+    location: Any,
+    forced_gates: tuple[str, ...],
+    map_id: str | None = None,
+) -> Any:
+    return analysis_input(
+        view, location, forced_gates=forced_gates, map_id=map_id
     )
 
 
@@ -241,6 +361,8 @@ def _generate_one(
     *,
     plan_only: bool,
     forced_gates: tuple[str, ...],
+    replace: bool = False,
+    bindings: tuple[tuple[str, str], ...] = (),
 ) -> int:
     if location.kind not in NATIONAL_KINDS:
         print(
@@ -249,21 +371,90 @@ def _generate_one(
             file=sys.stderr,
         )
         return 1
-    existing = _existing_document(view, location.location_id)
-    if existing is not None:
-        print(f"exists: {existing}")
-        return 1
+
+    if replace:
+        target = _replace_target(view, location.location_id)
+        if target is None:
+            missing = settlement_path(view.root, location.location_id)
+            print(f"missing: {missing.relative_to(view.root).as_posix()}")
+            return 1
+        path, map_id = target
+        relative_path = path.relative_to(view.root).as_posix()
+        try:
+            parsed = parse_document(relative_path, path.read_text(encoding="utf-8"))
+        except (OSError, AuthoringError) as error:
+            print(f"settlement_synthesis: {error}", file=sys.stderr)
+            return 1
+    else:
+        existing = _existing_document(view, location.location_id)
+        if existing is not None:
+            print(f"exists: {existing}")
+            return 1
+        map_id = location.location_id
+        relative_path = f"content/maps/settlements/{map_id}.yaml"
+        parsed = None
+
     try:
         result = generate_settlement(
-            _generation_input(view, location, forced_gates)
+            _generation_input(view, location, forced_gates, map_id=map_id)
         )
     except (BudgetError, GenerationError) as error:
         print(f"settlement_synthesis: {error}", file=sys.stderr)
         return 1
+
+    if replace:
+        assert parsed is not None
+        protected, index_present = protected_nodes(view, map_id)
+        try:
+            plan = apply_bindings(
+                parsed.document, result, bindings, protected
+            )
+        except ReworkError as error:
+            print(f"settlement_synthesis: {error}", file=sys.stderr)
+            return 1
+        try:
+            document = document_from_data(relative_path, plan.data)
+        except AuthoringError as error:
+            print(f"settlement_synthesis: {error}", file=sys.stderr)
+            return 1
+        terrain = view.terrain_window(
+            location.cell, _lint_radius(document, location.cell)
+        )
+        errors = sorted(
+            {
+                finding.code
+                for finding in lint_settlement(document, location.cell, terrain)
+                if finding.severity == "error"
+            }
+        )
+        if errors:
+            print(
+                f"settlement_synthesis: {map_id}: lint_error: {', '.join(errors)}",
+                file=sys.stderr,
+            )
+            return 1
+        print(
+            json.dumps(
+                _rework_report(result, plan, index_present),
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        if plan_only:
+            return 0
+        write_atomic(
+            path,
+            serialize_document(
+                document,
+                ordered_retained_tree(parsed.round_trip, plan.data),
+            ),
+        )
+        return 0
+
     print(json.dumps(_report(result), ensure_ascii=False, indent=2, sort_keys=True))
     if plan_only:
         return 0
-    relative_path = f"content/maps/settlements/{result.map_id}.yaml"
     try:
         text = serialize_document(
             document_from_data(relative_path, result.data), None
@@ -278,6 +469,22 @@ def _generate_one(
 def _generate(args: argparse.Namespace) -> int:
     forced_gates = _forced_gates(args.gates)
     if forced_gates is None:
+        return 2
+    if args.replace:
+        if args.missing:
+            print(
+                "settlement_synthesis: --replace cannot be combined with --missing",
+                file=sys.stderr,
+            )
+            return 2
+        if not args.bind:
+            print(
+                "settlement_synthesis: --replace requires --bind",
+                file=sys.stderr,
+            )
+            return 2
+    elif args.bind:
+        print("settlement_synthesis: --bind requires --replace", file=sys.stderr)
         return 2
     if args.missing:
         if args.location is not None:
@@ -296,6 +503,13 @@ def _generate(args: argparse.Namespace) -> int:
         print("settlement_synthesis: a LOCATION_ID is required", file=sys.stderr)
         return 2
 
+    bindings: tuple[tuple[str, str], ...] = ()
+    if args.replace:
+        loaded = _read_bindings(args.bind)
+        if loaded is None:
+            return 1
+        bindings = loaded
+
     try:
         view = _workspace(args)
     except WorkspaceError as error:
@@ -309,7 +523,12 @@ def _generate(args: argparse.Namespace) -> int:
             print(f"settlement_synthesis: {error}", file=sys.stderr)
             return 2
         return _generate_one(
-            view, location, plan_only=args.plan_only, forced_gates=forced_gates
+            view,
+            location,
+            plan_only=args.plan_only,
+            forced_gates=forced_gates,
+            replace=args.replace,
+            bindings=bindings,
         )
 
     targets = [
@@ -430,7 +649,39 @@ def build_parser() -> argparse.ArgumentParser:
     generate.add_argument(
         "--nation", default=None, help="nation key for --missing"
     )
+    generate.add_argument(
+        "--replace",
+        action="store_true",
+        help="replace the existing settlement bound to LOCATION_ID",
+    )
+    generate.add_argument(
+        "--bind",
+        default=None,
+        metavar="FILE",
+        help="JSON bind file required by --replace",
+    )
     generate.set_defaults(handler=_generate)
+
+    brief = commands.add_parser(
+        "brief", help="print one settlement map's prose brief as JSON"
+    )
+    brief.add_argument("map_id", metavar="MAP_ID")
+    brief.add_argument(
+        "--root", default=".", help="workspace root (default: the current directory)"
+    )
+    brief.add_argument("--lore", default=None, help="JSON lore override file")
+    brief.set_defaults(handler=_brief)
+
+    prose = commands.add_parser(
+        "prose",
+        help="apply zh-TW node names and descriptions to one settlement map",
+    )
+    prose.add_argument("map_id", metavar="MAP_ID")
+    prose.add_argument("file", metavar="FILE")
+    prose.add_argument(
+        "--root", default=".", help="workspace root (default: the current directory)"
+    )
+    prose.set_defaults(handler=_prose)
 
     return parser
 

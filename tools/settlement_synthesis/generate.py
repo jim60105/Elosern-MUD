@@ -241,6 +241,19 @@ def _morphology(inp: GenerationInput, reach: int) -> tuple[str, Any]:
     return "crossroads", None
 
 
+def settlement_class_of(inp: GenerationInput) -> str:
+    """The settlement class the generator derives from one input."""
+
+    return _settlement_class(inp)
+
+
+def morphology_of(inp: GenerationInput) -> str:
+    """The morphology the generator derives from one input and its reach."""
+
+    reach = math.ceil(math.sqrt(inp.budget.footprint_cells) / 2) + 1
+    return _morphology(inp, reach)[0]
+
+
 def _water_vector(morphology: str, target: Any) -> tuple[float, float] | None:
     """The unit vector toward the water a morphology leans on, if it has one."""
 
@@ -1419,5 +1432,7 @@ __all__ = [
     "SETTLEMENT_CLASSES",
     "Slot",
     "generate_settlement",
+    "morphology_of",
     "seed_for",
+    "settlement_class_of",
 ]
