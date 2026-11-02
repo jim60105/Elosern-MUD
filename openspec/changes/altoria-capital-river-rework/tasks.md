@@ -39,16 +39,16 @@ Ground rules:
 ## 4. Verification
 
 - [x] 4.1 Regenerate the partition with `uv run --locked --project tools/map-editor python .agents/skills/map-data-authoring/scripts/regenerate_partition.py`, then run `check_map_sources.py`. Check: exit 0, `district partition: current`, `reference context: current`.
-- [ ] 4.2 Run every module in the list in `docs/development/settlement-synthesis.md` § "Settlement-sensitive test modules" on this real data, one module per command. That section was written by `settlement-rework-and-prose`. Check: each module passes.
+- [x] 4.2 Run every module in the list in `docs/development/settlement-synthesis.md` § "Settlement-sensitive test modules" on this real data, one module per command. That section was written by `settlement-rework-and-prose`. Check: each module passes.
   - A failure is a residual pin when two things hold: the module passes on the pre-change tree (`git stash`, rerun, `git stash pop`), and the cause is a copied settlement value such as a literal coordinate, count, duration, node key, cell or gate direction. Rewrite a residual pin in place:
     - derive the expected value from `world.maps.map_data.current().settlements[...]`, `world.maps.geography.current().locations` or `elosern_map_core.authoring.gate_approach_cell`;
     - keep the module's `@covers_requirement` IDs and its `Data-contract test:` docstring line;
     - change nothing else in the test.
   - Any other failure stops the change: report it and do not commit.
   - List every rewritten test in the hand-off.
-- [ ] 4.3 Run `uv run --locked --env-file=<file containing MUD_TEST_SETTINGS=1> evennia test --settings test_settings.py --keepdb world.maps.tests.test_editor_final_yaml_adoption`. Check: it passes.
-- [ ] 4.4 Capture `--view settlement --map capital_altoria --format png`, and a continent crop `--bounds 840 1025 885 1060 --hide partition --format png`, with `capture_map.py` (see skill "Seeing a map"). Read both images. Check: the hand-off describes where the quay, riverbank, ford and gates sit relative to the river.
-- [ ] 4.5 Run `uv run --locked python -m tools.contract_gate` and `openspec validate altoria-capital-river-rework --strict`. Check: both succeed.
+- [x] 4.3 Run `uv run --locked --env-file=<file containing MUD_TEST_SETTINGS=1> evennia test --settings test_settings.py --keepdb world.maps.tests.test_editor_final_yaml_adoption`. Check: it passes.
+- [x] 4.4 Capture `--view settlement --map capital_altoria --format png`, and a continent crop `--bounds 840 1025 885 1060 --hide partition --format png`, with `capture_map.py` (see skill "Seeing a map"). Read both images. Check: the hand-off describes where the quay, riverbank, ford and gates sit relative to the river.
+- [x] 4.5 Run `uv run --locked python -m tools.contract_gate` and `openspec validate altoria-capital-river-rework --strict`. Check: both succeed.
 
 ## Workflow follow-up
 
