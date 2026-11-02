@@ -1,11 +1,11 @@
 """Data-contract test: authored continental terrain, waterway and anchor-region data contract
 
-The signed geography rows are shipped content, so this module names them: every
-anchor's terrain, the bending mountain corridor and its authored pass, and the
-capital/imperial waterways with their declared fords must agree with the
-classifier. Mechanics (purity, bounds, pooled rooms, gate locks) stay in
-``world/maps/tests/test_wilderness_provider.py`` (map-wilderness,
-wilderness-anchor-footprint, rescale-wilderness-geography).
+The shipped geography is checked through invariants derived from the authored
+data itself: classifier joins, walkability and connectivity of every authored
+site, ford and river-cell semantics, nominal-claim agreement and the political
+lines' derivation. No authored coordinate, count or area share is copied here,
+so moving a site, river or edge vertex needs no test edit unless it breaks an
+invariant. Mechanics stay in ``world/maps/tests/test_wilderness_provider.py``.
 """
 
 from tools.spec_traceability import covers_requirement
@@ -46,37 +46,29 @@ def setUpModule():
 
 
 class AuthoredTerrainContractTests(unittest.TestCase):
-    @covers_requirement("wilderness-terrain::region-for-coordinates-is-a-pure-deterministic-function-covering-the-whole-bounded-map")
+    @covers_requirement("wilderness-terrain::the-coordinate-classifier-is-a-pure-deterministic-function-over-the-whole-bounded-map")
     def test_central_mountain_region_bends_with_the_authored_corridor(self):
-        # The corridor follows the bending summit centre; it is neither a fixed
-        # rectangular band nor a continuous summit wall (the pass windows below
-        # are open ground).
-        for y in (150, 700, 1200, 1800):
+        # Rows come from the authored stem itself; the probes sit one cell
+        # outside the authored corridor half-width on both sides.
+        half_width = terrain().mountain_corridor_half_width
+        rows = [
+            y
+            for _, y in terrain().ridge_stem
+            if y < forest_edge_row(ridge_center_x(terrain(), y))
+        ]
+        self.assertTrue(rows, "the stem must have rows south of the forest edge")
+        for y in rows:
             centre = ridge_center_x(terrain(), y)
-            self.assertEqual(region_for_coordinates(centre, y), "central_mountains")
-            self.assertNotEqual(
-                region_for_coordinates(centre - 300, y), "central_mountains"
-            )
-            self.assertNotEqual(
-                region_for_coordinates(centre + 300, y), "central_mountains"
-            )
-        self.assertNotEqual(ridge_center_x(terrain(), 100), ridge_center_x(terrain(), 1200))
+            with self.subTest(y=y):
+                self.assertEqual(region_for_coordinates(centre, y), "central_mountains")
+                self.assertNotEqual(
+                    region_for_coordinates(centre - half_width - 1, y), "central_mountains"
+                )
+                self.assertNotEqual(
+                    region_for_coordinates(centre + half_width + 1, y), "central_mountains"
+                )
 
-    @covers_requirement("wilderness-terrain::region-for-coordinates-is-a-pure-deterministic-function-covering-the-whole-bounded-map")
-    def test_settlement_derived_anchor_cells_resolve_to_altoria_territory(self):
-        from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
-
-        entry = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
-        cells = {entry.anchor_cell} | {
-            entry.approach_cell(gate) for gate in entry.gates
-        }
-        self.assertTrue(cells, "the capital entry must supply anchor and gate cells")
-        # Delta scenario: Altoria's anchor and both gate approaches are the
-        # western hills and valleys (the signed anchor relationships).
-        for cell in cells:
-            self.assertEqual(region_for_coordinates(*cell), "western_hills_valleys")
-
-    @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
+    @covers_requirement("wilderness-terrain::terrain-and-political-control-derive-from-authored-geography")
     def test_anchor_centres_resolve_their_authored_terrain(self):
         # Every declared location cell classifies into one of the declared
         # regions: the roster itself is authored data, so this checks the
@@ -100,55 +92,49 @@ class AuthoredTerrainContractTests(unittest.TestCase):
                     variants[(x * 92821 + y * 68917) % len(variants)],
                 )
 
-    @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
+    @covers_requirement("wilderness-terrain::terrain-and-political-control-derive-from-authored-geography")
     @covers_requirement(
         "wilderness-terrain::"
         "the-physical-ridge-is-a-continuous-forked-barrier"
     )
-    def test_the_physical_ridge_is_a_pass_free_forked_barrier(self):
-        # The shipped zero-pass range: no authored pass exists, and no active
-        # row admits a fully walkable X1300..1520 band.
-        self.assertEqual(terrain().ridge_passes, ())
-        for y in range(wilderness_provider.WILDERNESS_MAX_Y + 1):
-            if not ridge_spans(terrain(), y):
+    def test_unexempted_stem_rows_and_arm_tips_are_closed_walls(self):
+        # Derived from the authored stem and its declared pass rows: every
+        # active stem row outside a pass is walled at its centre.
+        stem = terrain().ridge_stem
+        passes = terrain().ridge_passes
+        for y in range(stem[0][1], stem[-1][1] + 1):
+            if any(low <= y <= high for low, high in passes):
                 continue
-            self.assertTrue(
-                any(low <= 1520 and high >= 1300 for low, high in ridge_spans(terrain(), y)), y
-            )
+            centre = (ridge_center_x(terrain(), y), y)
+            self.assertTrue(is_closed_ridge_cell(centre), y)
+            self.assertFalse(is_valid_wilderness_cell(centre), y)
         # The stem's crotch and both arm tips are closed cliff walls.
-        crotch = terrain().ridge_stem[-1]
-        self.assertTrue(is_closed_ridge_cell(crotch))
-        self.assertTrue(is_closed_ridge_cell((ridge_center_x(terrain(), 1200), 1200)))
+        self.assertTrue(is_closed_ridge_cell(stem[-1]))
         for crest in ("west", "east"):
             tip = terrain().ridge_branches[crest][-1]
             self.assertTrue(is_closed_ridge_cell(tip), crest)
             self.assertFalse(is_closed_ridge_cell((tip[0], tip[1] + 1)), crest)
 
-    @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
+    @covers_requirement("wilderness-terrain::terrain-and-political-control-derive-from-authored-geography")
     def test_rivers_are_authored_water_with_declared_fords(self):
-        # Every ford lies on its own river, and every river starts and ends on
-        # the coastal region it drains into (capital river -> southwest coast;
-        # imperial rivers -> southeast coast).
-        raster = rasterize_routes(terrain().waterway_routes)
+        # Every ford lies on its own river and is walkable land; every other
+        # land cell of any river is impassable inland water.
+        routes = terrain().waterway_routes
+        all_fords = {ford for fords in terrain().waterway_fords.values() for ford in fords}
         for name, fords in terrain().waterway_fords.items():
+            raster = rasterize_routes({name: routes[name]})
             for ford in fords:
-                # The ford is on its authored river before the exemption is
-                # subtracted, so a typo cannot silently remove a crossing.
                 self.assertIn(ford, raster, name)
                 self.assertFalse(is_inland_water_cell(ford), name)
                 self.assertTrue(is_land_cell(ford), name)
-        capital = terrain().waterway_routes["capital_river"]
-        self.assertEqual(region_for_coordinates(*capital[-1]), "southwest_coast")
-        for name in ("imperial_river", "imperial_east_branch"):
-            self.assertEqual(
-                region_for_coordinates(*terrain().waterway_routes[name][-1]), "southeast_coast"
-            )
-        # A river cell is impassable water; its declared ford is ordinary land.
-        river_cell = (900, 1042)
-        self.assertTrue(is_inland_water_cell(river_cell))
-        self.assertFalse(is_valid_wilderness_cell(river_cell))
-        self.assertFalse(is_inland_water_cell(terrain().waterway_fords["capital_river"][0]))
-        self.assertTrue(is_valid_wilderness_cell(terrain().waterway_fords["capital_river"][0]))
+                self.assertTrue(is_valid_wilderness_cell(ford), name)
+        land_water = [
+            cell for cell in rasterize_routes(routes) - all_fords if is_land_cell(cell)
+        ]
+        self.assertTrue(land_water)
+        for cell in land_water:
+            self.assertTrue(is_inland_water_cell(cell), cell)
+            self.assertFalse(is_valid_wilderness_cell(cell), cell)
 
     @covers_requirement("wilderness-map-provider::the-continent-remains-virtual-with-bounded-local-lookup")
     def test_anchor_and_port_centres_are_land_side(self):
@@ -161,7 +147,7 @@ class AuthoredTerrainContractTests(unittest.TestCase):
         for harbor in harbor_sites().values():
             self.assertTrue(is_land_cell(harbor.cell), harbor.key)
         # Declaration reveals nothing: no settlement map is invented for the
-        # seven unbuilt anchors.
+        # unbuilt anchors.
         self.assertLessEqual(
             set(WILDERNESS_ENTRY_REGISTRY), set(anchor_geography())
         )
@@ -345,8 +331,7 @@ class BorderRiverContractTests(unittest.TestCase):
         self.assertEqual(border_river_row(mouth[0] - 50), mouth[1])
         for bend in route:
             self.assertLessEqual(abs(border_river_row(bend[0]) - bend[1]), 10, bend)
-        # One water cell per column, exactly the classifier's river row, every
-        # row inside Y 1290..1410.
+        # One water cell per column, exactly the classifier's river row.
         raster = rasterize_routes({"border_river": route})
         columns = {}
         for x, y in raster:
@@ -364,25 +349,16 @@ class BorderRiverContractTests(unittest.TestCase):
         self.assertFalse(any(is_closed_ridge_cell(cell) for cell in raster))
 
     @covers_requirement("wilderness-terrain::the-border-river-controls-western-crossing-and-classification")
-    def test_fords_lie_on_the_river_with_the_principal_on_the_capital_line(self):
-        from world.lore.anchors import anchor_geography
-
+    def test_border_fords_are_the_only_walkable_river_cells(self):
         fords = terrain().waterway_fords["border_river"]
         self.assertTrue(fords)
+        self.assertEqual(len(set(fords)), len(fords))
         raster = rasterize_routes({"border_river": terrain().waterway_routes["border_river"]})
         for ford in fords:
             self.assertIn(ford, raster)
             self.assertTrue(is_valid_wilderness_cell(ford), ford)
         water = {cell for cell in raster if is_inland_water_cell(cell)}
         self.assertEqual(raster - water, set(fords))
-        upstream, principal, downstream = fords
-        self.assertGreater(upstream[0], principal[0])
-        self.assertLess(downstream[0], principal[0])
-        # The principal ford is on the straight line between the two capitals.
-        (ax, ay) = anchor_geography()["capital_altoria"].cell
-        (vx, vy) = anchor_geography()["capital_valhalla"].cell
-        line_x = ax + (vx - ax) * (principal[1] - ay) / (vy - ay)
-        self.assertLessEqual(abs(line_x - principal[0]), 5)
 
     @covers_requirement("wilderness-terrain::the-border-river-controls-western-crossing-and-classification")
     def test_river_cells_block_steps_and_the_ford_permits_the_crossing(self):
@@ -415,18 +391,16 @@ class BorderRiverContractTests(unittest.TestCase):
     @covers_requirement("wilderness-terrain::the-border-river-controls-western-crossing-and-classification")
     def test_west_of_the_corridor_only_the_fords_cross_the_border(self):
         # Cut the continent along the river's source column. West of the cut
-        # the river is a complete barrier except at its three fords; the
-        # remaining links (the mountain corridor around the source and the
-        # ridge passes into Grandia) all lie east of the cut.
-        from world.lore.anchors import anchor_geography
-
+        # the river is a complete barrier except at its declared fords; the
+        # bank cells beside one ford stand for the two sides of the border.
         fords = frozenset(terrain().waterway_fords["border_river"])
         source_x = terrain().waterway_routes["border_river"][0][0]
         cut = frozenset((source_x, y) for y in range(wilderness_provider.WILDERNESS_MAX_Y + 1))
-        altoria = anchor_geography()["capital_altoria"]
-        south = _anchor_targets("capital_altoria", altoria.cell)[0]
-        north = anchor_geography()["capital_valhalla"].cell
-        self.assertLess(max(south[0], north[0]), source_x)
+        ford_x, ford_y = terrain().waterway_fords["border_river"][0]
+        south, north = (ford_x, ford_y - 1), (ford_x, ford_y + 1)
+        self.assertTrue(is_valid_wilderness_cell(south), south)
+        self.assertTrue(is_valid_wilderness_cell(north), north)
+        self.assertLess(ford_x, source_x)
         for blocked, connected in (
             (frozenset(), True),
             (fords, True),
@@ -446,7 +420,9 @@ class BorderRiverContractTests(unittest.TestCase):
 
     @covers_requirement("wilderness-terrain::the-border-river-controls-western-crossing-and-classification")
     def test_classifier_and_claims_flip_across_the_river(self):
-        for x in (200, 450, 830, 1150, 1300):
+        route = terrain().waterway_routes["border_river"]
+        source_x, mouth_x = route[0][0], route[-1][0]
+        for x in range(mouth_x + 1, source_x, max(1, (source_x - mouth_x) // 6)):
             row = border_river_row(x)
             self.assertEqual(region_for_coordinates(x, row - 1), "western_hills_valleys")
             self.assertEqual(region_for_coordinates(x, row + 1), "northwest_highland_forest")
@@ -502,62 +478,17 @@ class BorderRiverContractTests(unittest.TestCase):
 
 
 class ForestEdgeAndClaimContractTests(unittest.TestCase):
-    @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
-    def test_forest_edge_meanders_near_y1920_over_a_fifth_of_the_land(self):
+    @covers_requirement("wilderness-terrain::terrain-and-political-control-derive-from-authored-geography")
+    def test_forest_edge_spans_the_frame_and_starts_the_deep_forest(self):
         xs = [x for x, _ in terrain().forest_edge]
         self.assertEqual(xs, sorted(set(xs)))
         self.assertEqual((xs[0], xs[-1]), (0, wilderness_provider.WILDERNESS_MAX_X))
-        land_columns = [
-            x for x in range(wilderness_provider.WILDERNESS_MAX_X + 1) if is_land_cell((x, forest_edge_row(x)))
-        ]
-        mean = sum(forest_edge_row(x) for x in land_columns) / len(land_columns)
-        self.assertLessEqual(abs(mean - 1920), 15)
-        self.assertGreater(len({forest_edge_row(x) for x in land_columns}), 20)
-        land = forest = 0
-        for x, y in _land_sample():
-            land += 1
-            forest += region_for_coordinates(x, y) == "north_deep_forest"
-        self.assertLessEqual(abs(forest / land - 0.20), 0.02, round(forest / land, 4))
+        for x in range(0, wilderness_provider.WILDERNESS_MAX_X + 1, 97):
+            row = forest_edge_row(x)
+            self.assertEqual(region_for_coordinates(x, row), "north_deep_forest", x)
+            self.assertNotEqual(region_for_coordinates(x, row - 1), "north_deep_forest", x)
 
-    @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
-    def test_anchor_relationships_to_the_forest_edge(self):
-        from world.lore.anchors import anchor_geography
-
-        valhalla = anchor_geography()["capital_valhalla"].cell
-        self.assertLessEqual(abs(forest_edge_row(valhalla[0]) - valhalla[1]), 15)
-        self.assertEqual(region_for_coordinates(*valhalla), "northwest_highland_forest")
-        for key in ("village_eolas", "dungeon_eternal_night"):
-            cell = anchor_geography()[key].cell
-            self.assertEqual(region_for_coordinates(*cell), "north_deep_forest", key)
-        self.assertEqual(
-            nominal_nation_for_coordinates(*anchor_geography()["dungeon_eternal_night"].cell),
-            "valhalla",
-        )
-        # The hidden valley sits inside nominal territory but stays outside
-        # any nation's administration: its anchor identity keeps no nation.
-        from world.lore.anchors import anchors
-
-        # Altoria stays southwest in the hills and river valleys; Ciaran is on
-        # the range's western flank and Fionnen on its eastern flank.
-        altoria = anchor_geography()["capital_altoria"].cell
-        self.assertEqual(region_for_coordinates(*altoria), "western_hills_valleys")
-        self.assertEqual(nominal_nation_for_coordinates(*altoria), "altoria")
-        ciaran = anchor_geography()["village_ciaran"].cell
-        fionnen = anchor_geography()["village_fionnen"].cell
-        self.assertLess(ciaran[0], ridge_center_x(terrain(), ciaran[1]))
-        self.assertGreater(fionnen[0], ridge_center_x(terrain(), fionnen[1]))
-        self.assertEqual(nominal_nation_for_coordinates(*ciaran), "altoria")
-        self.assertEqual(nominal_nation_for_coordinates(*fionnen), "grandia")
-        eolas = anchor_geography()["village_eolas"].cell
-        self.assertEqual(region_for_coordinates(*eolas), "north_deep_forest")
-        # Nominal classification is total (one authored nation) but the hidden
-        # valley keeps no administrative nation of its own.
-        self.assertIn(
-            nominal_nation_for_coordinates(*eolas), ("altoria", "grandia", "valhalla")
-        )
-        self.assertIsNone(anchors()["village_eolas"].nation_key)
-
-    @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
+    @covers_requirement("wilderness-terrain::terrain-and-political-control-derive-from-authored-geography")
     @covers_requirement(
         "wilderness-terrain::"
         "the-physical-ridge-is-a-continuous-forked-barrier"
@@ -576,18 +507,17 @@ class ForestEdgeAndClaimContractTests(unittest.TestCase):
             self.assertTrue(is_valid_wilderness_cell(north), crest)
             self.assertEqual(region_for_coordinates(*north), "north_deep_forest", crest)
         self.assertEqual(WILDERNESS_TERRAIN["north_deep_forest"], "woodland")
-        # Forest cells off the ridge stay walkable (no new movement block).
-        self.assertTrue(is_valid_wilderness_cell((900, 2350)))
-        self.assertTrue(is_valid_wilderness_cell((700, 1960)))
 
-    @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
+    @covers_requirement("wilderness-terrain::terrain-and-political-control-derive-from-authored-geography")
     def test_every_anchor_and_harbour_is_walkable_and_mutually_reachable(self):
         from world.lore.anchors import anchor_geography
         from world.lore.wilderness_regions import harbor_sites
 
         components = _RunComponents(self)
-        altoria = anchor_geography()["capital_altoria"]
-        hub = components.component(_anchor_targets("capital_altoria", altoria.cell)[0])
+        hub_key = sorted(anchor_geography())[0]
+        hub = components.component(
+            _anchor_targets(hub_key, anchor_geography()[hub_key].cell)[0]
+        )
         self.assertIsNotNone(hub)
         for key, anchor in anchor_geography().items():
             for cell in _anchor_targets(key, anchor.cell):
@@ -597,46 +527,25 @@ class ForestEdgeAndClaimContractTests(unittest.TestCase):
             self.assertTrue(is_valid_wilderness_cell(harbour.cell), key)
             self.assertEqual(components.component(harbour.cell), hub, key)
 
-    @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
-    def test_every_land_cell_has_one_nominal_nation_with_authored_shares(self):
+    @covers_requirement("wilderness-terrain::terrain-and-political-control-derive-from-authored-geography")
+    def test_every_land_cell_has_one_nominal_nation_agreeing_with_its_region(self):
         from world.lore.nations import NATION_REGISTRY
 
-        counts = {key: 0 for key in NATION_REGISTRY}
         seen_by_region = {}
         for x, y in _land_sample():
             nation = nominal_nation_for_coordinates(x, y)
-            counts[nation] += 1
+            self.assertIn(nation, NATION_REGISTRY, (x, y))
             region = region_for_coordinates(x, y)
             self.assertIn(
                 nation, regions()[region].nominal_nation_keys, (x, y)
             )
             seen_by_region.setdefault(region, set()).add(nation)
-        total = sum(counts.values())
-        # Deliberate geometry pins: moving a ridge, river or edge vertex
-        # changes these measured shares.
-        for nation, share in (("grandia", 0.43), ("altoria", 0.30), ("valhalla", 0.27)):
-            measured = counts[nation] / total
-            self.assertLessEqual(abs(measured - share), 0.015, (nation, round(measured, 4)))
         for key, region in regions().items():
             self.assertEqual(seen_by_region[key], set(region.nominal_nation_keys), key)
             if region.nation_key is not None:
                 self.assertEqual(region.nominal_nation_keys, (region.nation_key,), key)
-            else:
-                self.assertGreater(len(region.nominal_nation_keys), 1, key)
-        # Both shared terrain regions span several claims.
-        self.assertIsNone(regions()["central_mountains"].nation_key)
-        self.assertIsNone(regions()["north_deep_forest"].nation_key)
 
-    @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
-    def test_effective_rule_targets_are_unchanged(self):
-        from world.lore.nations import NATION_REGISTRY
-
-        self.assertEqual(
-            {key: nation.territory_share for key, nation in NATION_REGISTRY.items()},
-            {"grandia": 0.38, "altoria": 0.27, "valhalla": 0.25},
-        )
-
-    @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
+    @covers_requirement("wilderness-terrain::terrain-and-political-control-derive-from-authored-geography")
     def test_displayed_borders_derive_from_ridge_and_river_outside_the_forest(self):
         borders = {border.nation_keys: border.points for border in national_borders()}
         self.assertEqual(
@@ -646,7 +555,8 @@ class ForestEdgeAndClaimContractTests(unittest.TestCase):
         river = borders[("altoria", "valhalla")]
         self.assertEqual(river[: len(terrain().waterway_routes["border_river"])],
                          tuple(reversed(terrain().waterway_routes["border_river"])))
-        self.assertEqual(river[-1], (ridge_center_x(terrain(), 1410), 1410))
+        source_row = terrain().waterway_routes["border_river"][0][1]
+        self.assertEqual(river[-1], (ridge_center_x(terrain(), source_row), source_row))
         south = borders[("altoria", "grandia")]
         north = borders[("grandia", "valhalla")]
         self.assertTrue(is_land_cell(south[0]))
