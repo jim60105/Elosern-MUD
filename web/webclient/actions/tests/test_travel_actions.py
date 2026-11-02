@@ -59,12 +59,18 @@ def _gate_anchor_entry():
         importlib.import_module("world.lore.wilderness_entry"),
         "WILDERNESS_ENTRY" + "_REGISTRY",
     )
-    matches = [
-        entry
-        for entry in registry.values()
-        if entry.gate_for("w") is not None and entry.gate_for("n") is not None
-    ]
-    assert len(matches) == 1, matches
+    # More than one settlement authors both gateway faces now, so the pick is
+    # the lowest authored anchor key: deterministic, and the capital row the
+    # production east gate belongs to.
+    matches = sorted(
+        (
+            entry
+            for entry in registry.values()
+            if entry.gate_for("w") is not None and entry.gate_for("n") is not None
+        ),
+        key=lambda entry: entry.anchor_key,
+    )
+    assert matches, "no wilderness entry authors both gateway faces"
     return matches[0]
 
 
