@@ -154,6 +154,9 @@ is not game-ready until you regenerate the partition.
    Exit code 0 means the edit is game-ready as far as static checks can tell. A
    loadable work-in-progress result (exit 1) is acceptable mid-task, but say
    so.
+   - After any settlement edit, also run
+     `uv run --locked python -m tools.settlement_synthesis lint <map_id>` and
+     fix its errors (warnings are review prompts).
 4. **Regenerate derived output** only when the check asks for it, and tell the
    user. For the partition, no game environment is needed:
 

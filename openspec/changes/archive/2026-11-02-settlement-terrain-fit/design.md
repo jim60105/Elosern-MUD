@@ -324,10 +324,13 @@ def load_workspace(root: Path, lore: Path | None = None) -> WorkspaceView   # Au
 - `bands` come from `content/maps/wilderness_elevation.json`. A missing file gives `{}`; decode each tile once and cache it.
 - `harbours` come from `world.continent.harbor_sites` (`.cell`).
 
-The lint window for one map:
+The lint window for one map. It is sized from every cell the lint reads, so the
+whole of each road polyline stays inside the window (the window is a convex
+square, so any sampled point of a segment whose endpoints are inside is inside
+too):
 
 ```
-radius = max(8, 3 + max Chebyshev distance from the location cell to any node cell, footprint cell or gate approach cell)
+radius = max(8, 3 + max Chebyshev distance from the location cell to any node cell, road bend cell, footprint cell or gate approach cell)
 ```
 
 CLI (`python -m tools.settlement_synthesis`):

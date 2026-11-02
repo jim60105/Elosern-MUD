@@ -35,10 +35,24 @@ uv run --locked --project tools/map-editor python .agents/skills/map-data-author
 uv run --locked python -m tools.map_district_partition [--check]
 uv run --locked python -m tools.map_reference_context [--check]
 
+# Settlement site context, size budget and terrain fit (read-only)
+uv run --locked python -m tools.settlement_synthesis site <location_id>
+uv run --locked python -m tools.settlement_synthesis budget <location_id>
+uv run --locked python -m tools.settlement_synthesis lint [<map_id> ...]
+
 # Focused repository checks after a larger change
 uv run --locked python -m unittest tests.test_map_authoring_contract
 uv run --locked python -m tools.contract_gate
 ```
+
+The three `settlement_synthesis` commands read the workspace and write nothing.
+`site` and `budget` print JSON. `lint` prints one line per finding and then a
+summary; it exits 0 when no error-severity finding exists, 1 when any does, and
+2 when the map sources do not load or a requested map id is unknown, so warnings
+alone still exit 0. `capital_altoria` fails the lint today
+(`fit_water_role_dry` on `quay` and `riverbank_road`, and four nodes outside its
+authored footprint mask) until `altoria-capital-river-rework` lands; that is the
+known mismatch, not a new regression.
 
 `check_map_sources.py` exits `0` when the static checks find nothing that
 blocks game adoption. It exits `1` for loadable work in progress or a stale
