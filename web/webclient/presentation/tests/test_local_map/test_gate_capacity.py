@@ -87,9 +87,10 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         "webclient-local-map::the-minimap-gate-nodes-match-traversal-in-both-directions"
     )
     def test_capacity_trim_keeps_the_gate_and_farthers_first(self):
-        # At the real east gate: in-range within 2 hops is the gate plus
-        # 東市 / 公會前 / 大神殿前. A cap of 3 reserves one slot for the gate,
-        # so the farthest in-range node (公會前) is dropped first.
+        # A cap of 3 reserves one slot for the gateway row, so the real east
+        # gate keeps its current node and its nearest in-range neighbour and
+        # drops the farthest in-range node first. The in-range set and its
+        # order come from the published graph, never from a copied mask.
         self.char1.location = self.east_gate
         record_arrival(self.char1)
         with patch(
@@ -102,12 +103,27 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         from world.maps.map_data import SETTLEMENT_GRAPHS
 
         graph = SETTLEMENT_GRAPHS[_T_MAP_KEY]
-        east_market = graph.node("east_market").coordinate
-        guild_forecourt = graph.node("guild_forecourt").coordinate
+        gate_xy = EAST_GATE_XYZ[:2]
+        current = graph.node_at(gate_xy)
+
+        def order(node_id):
+            """The design D2 drop order: Chebyshev, then Y, then X."""
+
+            x, y = graph.node(node_id).coordinate
+            return (max(abs(x - gate_xy[0]), abs(y - gate_xy[1])), y, x)
+
+        in_range = [
+            node_id
+            for node_id in graph.nodes
+            if node_id != current.node_id
+            and len(graph.route(current.node_id, node_id) or ()) <= 2
+        ]
+        self.assertGreater(len(in_range), 1)
+        nearest, farthest = min(in_range, key=order), max(in_range, key=order)
         self.assertIn(self.ENTRY_ID, ids)
-        self.assertNotIn(_t_grid_id(*guild_forecourt), ids)
-        self.assertIn(_t_grid_id(*EAST_GATE_XYZ[:2]), ids)
-        self.assertIn(_t_grid_id(*east_market), ids)
+        self.assertIn(_t_grid_id(*gate_xy), ids)
+        self.assertIn(_t_grid_id(*graph.node(nearest).coordinate), ids)
+        self.assertNotIn(_t_grid_id(*graph.node(farthest).coordinate), ids)
         gate_node = next(n for n in payload["nodes"] if n["id"] == self.ENTRY_ID)
         divisor = _payload_cell_divisor(payload, exclude=self.ENTRY_ID)
         self.assertEqual(_payload_cell_divisor(payload), divisor)

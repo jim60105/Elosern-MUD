@@ -82,6 +82,22 @@ SEA = (0, 0)
 SOUTH_APPROACH = CAPITAL.approach_cell(CAPITAL.gate_for("n"))
 EAST_APPROACH = CAPITAL.approach_cell(CAPITAL.gate_for("w"))
 
+
+def west_of_the_mask(entry):
+    """A provider-valid cell just west of ``entry``'s own mask.
+
+    Derived from the authored mask, so a footprint rework moves the cell
+    instead of leaving a copied offset pointing at open ground.
+    """
+    from world.maps.wilderness_provider import is_valid_wilderness_cell
+
+    footprint = entry.footprint_cells
+    return next(
+        (x - 1, y)
+        for (x, y) in sorted(footprint, key=lambda cell: (cell[1], cell[0]))
+        if (x - 1, y) not in footprint and is_valid_wilderness_cell((x - 1, y))
+    )
+
 from world.maps.static_references import settlement_node_xy, settlement_node_xyz
 from world.tests.geography_fixture import (publish_settlements, publish_shipped_geography)
 
@@ -229,14 +245,29 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
     def test_a_step_into_an_anchor_footprint_resolves_to_none(self):
         # Delta scenario: cells just outside the footprint's west/east edges
         # face footprint cells that are no gate's approach. Offsets derive
-        # from the entry's own 5x5 block around its anchor cell.
-        ax, ay = CAPITAL.anchor_cell
-        self.assertIsNone(resolve_wilderness_destination(self._terrain(ax - 4, ay), "e"))
+        # from the entry's own authored mask.
+        self.assertIsNone(
+            resolve_wilderness_destination(self._terrain(*west_of_the_mask(CAPITAL)), "e")
+        )
         # One row off the east gate's own approach row: still a footprint
         # cell, but not the registered (approach_cell, "w") gateway pair.
-        self.assertIsNone(resolve_wilderness_destination(self._terrain(ax + 4, ay + 1), "w"))
+        footprint = CAPITAL.footprint_cells
+        off_row = next(
+            (EAST_APPROACH[0], y)
+            for y in sorted({cell[1] for cell in footprint})
+            if (EAST_APPROACH[0], y) not in footprint
+            and (EAST_APPROACH[0] - 1, y) in footprint
+            and y != EAST_APPROACH[1]
+        )
+        self.assertIsNone(resolve_wilderness_destination(self._terrain(*off_row), "w"))
         # The diagonal ray toward a mask corner is refused the same way.
-        self.assertIsNone(resolve_wilderness_destination(self._terrain(ax - 4, ay - 4), "ne"))
+        corner = next(
+            (x - 1, y - 1)
+            for (x, y) in sorted(footprint, key=lambda cell: (cell[1], cell[0]))
+            if (x - 1, y - 1) not in footprint
+            and wilderness_provider.is_valid_wilderness_cell((x - 1, y - 1))
+        )
+        self.assertIsNone(resolve_wilderness_destination(self._terrain(*corner), "ne"))
 
     @covers_requirement("canonical-wilderness-destination::wilderness-destination-resolution-is-canonical-shared-and-registry-driven")
     def test_a_diagonal_step_never_cuts_an_impassable_corner(self):
@@ -371,8 +402,7 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
             )
         # Footprint exclusion: the cell just west of the capital's mask cannot
         # step east into it.
-        ax, ay = CAPITAL.anchor_cell
-        self.assertIsNone(wilderness_neighbor(ax - 4, ay, "e"))
+        self.assertIsNone(wilderness_neighbor(*west_of_the_mask(CAPITAL), "e"))
         self.assertEqual(
             wilderness_neighbor(SOUTH_APPROACH[0], SOUTH_APPROACH[1] - 1, "n"),
             SOUTH_APPROACH,

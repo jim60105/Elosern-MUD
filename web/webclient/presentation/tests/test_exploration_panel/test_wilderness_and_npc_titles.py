@@ -46,9 +46,9 @@ class WildernessExplorationPresenterTests(EvenniaTestCase):
             importlib.import_module("world.lore.wilderness_entry"),
             "WILDERNESS_ENTRY" + "_REGISTRY",
         ).values()
-        gate = next(
-            entry.gate_for("w") for entry in entries if entry.gate_for("w") is not None
-        )
+        found = next(entry for entry in entries if entry.gate_for("w") is not None)
+        gate = found.gate_for("w")
+        cls._entry = found
         from world.maps.static_references import settlement_node_xyz
 
         cls._east_gate = GridRoom.objects.filter_xyz(
@@ -121,26 +121,46 @@ class WildernessExplorationPresenterTests(EvenniaTestCase):
                 self.assertIsNone(row["disabled_reason"])
         return payload, withheld
 
+    def _advertised_labels(self):
+        """The labels this approach can step to, derived from its authored entry.
+
+        The ordinary steps are the shared direction-geometry rule's answer for
+        the entry's own approach cell, so a footprint edit moves this
+        expectation instead of contradicting it. The gateway direction is
+        advertised on top of them even though its cell belongs to the mask:
+        that row resolves to the grid node, which
+        ``test_wilderness_move_rows_advertise_canonical_destinations`` checks.
+        """
+        from world.lore.wilderness_entry import DIRECTION_DELTAS
+        from world.maps.wilderness_destination import wilderness_neighbor
+        from world.rules.wilderness_disclosure import DIRECTION_LABELS
+
+        gate = self._entry.gate_for("w")
+        approach = self._entry.approach_cell(gate)
+        self.assertIsNotNone(approach)
+        ordinary = {
+            DIRECTION_LABELS[short]
+            for short in DIRECTION_DELTAS
+            if wilderness_neighbor(approach[0], approach[1], short) is not None
+        }
+        return ordinary | {DIRECTION_LABELS[gate.return_direction]}
+
     @covers_requirement("webclient-exploration-menu::exploration-move-rows-advertise-canonical-destinations")
     @covers_requirement(
         "wilderness-map-disclosure::all-wilderness-map-publishers-enforce-reveal-boundaries"
     )
     def test_a_withheld_direction_keeps_an_opaque_enabled_row(self):
-        from world.rules.wilderness_disclosure import DIRECTION_LABELS
-
         payload, withheld = self._withheld_rows()
+        advertised = self._advertised_labels()
         # The registered gateway the player stands on stays disclosed; every
         # ordinary step whose cell is unrevealed publishes a null target and
         # only the generic direction word -- no terrain, region or settlement.
         disclosed = [row for row in payload["move"] if row["destination"] is not None]
         self.assertEqual(len(disclosed), 1)
         self.assertEqual(disclosed[0]["label"], "west")
-        self.assertEqual(len(withheld), 5)
+        self.assertEqual(len(withheld), len(advertised) - 1)
         withheld_labels = {row["label"] for row in withheld}
-        self.assertEqual(
-            withheld_labels,
-            set(DIRECTION_LABELS.values()) - {"northwest", "southwest"} - {"west"},
-        )
+        self.assertEqual(withheld_labels, advertised - {"west"})
 
     @covers_requirement("webclient-exploration-menu::exploration-move-rows-advertise-canonical-destinations")
     def test_a_locked_withheld_direction_keeps_its_server_reason(self):
@@ -211,13 +231,11 @@ class WildernessExplorationPresenterTests(EvenniaTestCase):
         self.assertTrue(payload["available"])
         rows = {row["label"]: row for row in payload["move"]}
         # Every provider-valid direction routes through the resolver. At the
-        # east-gate approach the two diagonals facing the anchor footprint
-        # (northwest/southwest) are refused steps and advertise no
-        # row (wilderness-anchor-footprint).
-        self.assertEqual(
-            set(rows),
-            {"north", "northeast", "east", "southeast", "south", "west"},
-        )
+        # east-gate approach the steps into the anchor footprint, and the
+        # diagonals whose orthogonal neighbour is one of them, are refused and
+        # advertise no row (wilderness-anchor-footprint). The expected set is
+        # derived from the authored entry, never from a copied mask.
+        self.assertEqual(set(rows), self._advertised_labels())
         for direction, row in rows.items():
             expected = resolve_wilderness_destination(room, direction)
             self.assertIsNotNone(expected)

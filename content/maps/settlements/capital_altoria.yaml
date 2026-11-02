@@ -15,371 +15,511 @@ exit_prototype:
   prototype_parent: xyz_exit
   typeclass: typeclasses.exits.CostedXYZExit
 nodes:
+  central_plaza:
+    x_m: 1566
+    y_m: 2600
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 
+      聖潔王都的中央廣場，這座城市敞開的樞紐。朝聖之路從它中間穿過，舊城牆的市集帶在它下方橫切而過，聖階則從它遠端拔起，通往上方的台地。王都的地圖從這個廣場畫出去，多數日子，吵架也是。
+    anchor_key: capital_altoria
+    typeclass:
+    scene_archetype: city_street
+  ford_crossing:
+    x_m: 1566
+    y_m: 600
+    prototype_parent: grid_room
+    key: 渡口
+    desc: 聖潔王都的渡口，就在南門進城後的淺灘上，河水在這段收得極窄，石面被往來的車輪磨得發亮。過了門的人在此涉水，再順著南大道往上走。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
   south_gate:
-    x_m: 3050
-    y_m: 150
+    x_m: 1566
+    y_m: 100
     prototype_parent: grid_room
     key: 南門
-    desc: 聖潔王都的南門，一道寬拱，朝聖之路在這裡離開郊野走進下城。這座王都後來長成的一切，都是從這裡開始，一處渡口、然後一座鎮子、然後一座沿著身後岩壁向上攀爬的王城。
+    desc: 
+      聖潔王都的南門，一道寬拱，朝聖之路在這裡離開郊野走進下城。這座王都後來長成的一切，都是從這裡開始，一處渡口、然後一座鎮子、然後一座沿著身後岩壁向上攀爬的王城。
     anchor_key:
     typeclass:
     scene_archetype: city_street
-  quay:
-    x_m: 1250
-    y_m: 760
+  east_gate:
+    x_m: 3041
+    y_m: 2600
     prototype_parent: grid_room
-    key: 碼頭埠
-    desc: 聖潔王都的碼頭，上游來的駁船繫繩在被幾百年纜繩磨黑的石緣上。下城是王城最老的部分，而這裡是下城裡最老的一段，一座仍在營運的河港，叫賣、水鳥與貨件吵成一片。
+    key: 東門
+    desc: 
+      聖潔王都的東門，在市集帶的最遠端，正是東方來的道路會與河鎮主街合理相接的位置。它來得晚，它所立身的那道牆，比廣場南邊那處遺跡還新，王都以東的買賣、以及多半的麻煩，都從這扇門進來。
     anchor_key:
     typeclass:
     scene_archetype: city_street
-  riverbank_road:
-    x_m: 2150
-    y_m: 920
+  northeast_gate:
+    x_m: 3051
+    y_m: 4085
     prototype_parent: grid_room
-    key: 河岸道
-    desc: 聖潔王都的河岸道，從碼頭沿著北岸向東而去。屋舍在這裡肩並著肩擠成一排，離水最近的土地最先被認領，而且從不肯讓出一寸。
+    key: 東北門
+    desc: 聖潔王都的東北門，朝葡萄鎮的方向敞開，門外的道路沿著丘陵邊緣繞行。守門人認得每一輛從東北來的酒車。
     anchor_key:
     typeclass:
     scene_archetype: city_street
-  bath_forecourt:
-    x_m: 4830
-    y_m: 970
+  north_gate:
+    x_m: 1566
+    y_m: 5075
     prototype_parent: grid_room
-    key: 浴場前
-    desc: 王都公共浴場門前，蒸氣與河水的氣味在路緣攪在一起。河鎮總是先有了浴池，才談得上別的排場；而這一間浴場，比這座城市興築又捨棄的每一道牆都活得久。
+    key: 北門
+    desc: 聖潔王都的北門，門外的大道翻過北面的台地，直往界橋城去。清晨的霧從坡下漫上來，門樓的火把是城牆上最後熄滅的一盞。
     anchor_key:
     typeclass:
     scene_archetype: city_street
   south_avenue:
-    x_m: 3140
-    y_m: 1050
+    x_m: 1668
+    y_m: 925
     prototype_parent: grid_room
     key: 南大道
     desc: 聖潔王都的南大道，朝聖之路的第一段。從南門沿著它直直向上，整座城市就在前方攤開來，市集、廣場、階梯、大教堂。
     anchor_key:
     typeclass:
     scene_archetype: city_street
-  inn_lane:
-    x_m: 3970
-    y_m: 1120
+  old_wall_ruins:
+    x_m: 1603
+    y_m: 1888
     prototype_parent: grid_room
-    key: 客棧巷
-    desc: 聖潔王都的客棧巷。趕在上方台地關閉之後才到王都的旅人，向來都在下面一帶過夜；巷子裡的旅店、馬廄與打烊遲的酒館，就在同一片擁擠的地面上招呼他們。
+    key: 舊城牆遺跡
+    desc: 
+      聖潔王都的舊城牆遺跡。這截剩下的基腳，是曾經圈住下城的那道牆僅存的東西。王都長過了它的範圍之後，牆被拆了下來，沿牆線清出的帶狀空地成了這座城市最寬敞的空地，市集街正是因此在這裡。對著這處遺跡讀地圖吧，它上方那條市集帶，就是那道牆變成的墳。
     anchor_key:
     typeclass:
     scene_archetype: city_street
-  old_wall_ruins:
-    x_m: 2350
-    y_m: 1900
+  east_gate_road_1:
+    x_m: 2241
+    y_m: 2813
     prototype_parent: grid_room
-    key: 舊城牆遺跡
-    desc: 聖潔王都的舊城牆遺跡。這截剩下的基腳，是曾經圈住下城的那道牆僅存的東西。王都長過了它的範圍之後，牆被拆了下來，沿牆線清出的帶狀空地成了這座城市最寬敞的空地，市集街正是因此在這裡。對著這處遺跡讀地圖吧，它上方那條市集帶，就是那道牆變成的墳。
+    key: 東門大街
+    desc: 聖潔王都的東門大街，從中央廣場一路向東，直抵東門。兩側是車馬行的棚架與鐵匠鋪的煙，往東去的商隊都在這裡整隊。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northeast_gate_road_1:
+    x_m: 2157
+    y_m: 3247
+    prototype_parent: grid_room
+    key: 東北大街
+    desc: 聖潔王都的東北大街，從廣場的東北角一路爬向東北門。坡勢平緩，沿街多是要往葡萄鎮去的車伕歇腳的院子。
     anchor_key:
     typeclass:
     scene_archetype: city_street
   north_avenue:
-    x_m: 3350
-    y_m: 1980
+    x_m: 1602
+    y_m: 3293
     prototype_parent: grid_room
     key: 大道北段
-    desc: 朝聖之路的北段，南大道持續朝廣場攀升的地方。它把下城的擁擠拋在身後，沿著一段刻意留寬的路走，獻禮的車隊與朝聖者的腳，早把鋪石磨得平滑。
-    anchor_key:
-    typeclass:
-    scene_archetype: city_street
-  craft_alley:
-    x_m: 1300
-    y_m: 2600
-    prototype_parent: grid_room
-    key: 工匠巷
-    desc: 聖潔王都的工匠巷，在舊牆線的最西端。當市集取得了那條帶狀地，吵鬧的手藝就被擠到這裡來，鍛造鋪的錘聲如歌、裁縫坊的粉筆灰與布疋，還有一條斜斜切往校場的磨舊小徑，學徒們帶著貨物跑的就是這條。
+    desc: 朝聖之路出了廣場再往北去的一段。它把下城的擁擠拋在身後，沿著一段刻意留寬的路走，獻禮的車隊與朝聖者的腳，早把鋪石磨得平滑。
     anchor_key:
     typeclass:
     scene_archetype: city_street
   market_street:
-    x_m: 2420
-    y_m: 2700
+    x_m: 1684
+    y_m: 2266
     prototype_parent: grid_room
     key: 市場街
-    desc: 聖潔王都的市場街，全王都最長的一條連續街道。它之所以長，是因為它正是那道倒下的牆清出來的牆線，街西頭的遺跡解釋了這條街的由來；而街上的攤位，就是王都的貿易為什麼向東流的原因。
-    anchor_key:
-    typeclass:
-    scene_archetype: city_street
-  central_plaza:
-    x_m: 3500
-    y_m: 2850
-    prototype_parent: anchor_room
-    key: 中央廣場
-    desc: 聖潔王都的中央廣場，這座城市敞開的樞紐。朝聖之路從它中間穿過，舊城牆的市集帶在它下方橫切而過，聖階則從它遠端拔起，通往上方的台地。王都的地圖從這個廣場畫出去，多數日子，吵架也是。
-    anchor_key: capital_altoria
-    typeclass:
-    scene_archetype: city_street
-  east_market:
-    x_m: 5380
-    y_m: 2850
-    prototype_parent: grid_room
-    key: 東市
-    desc: 聖潔王都的東市，舊牆線上的貿易與出東門的道路交會的地方。穀物、玻璃與外國硬幣都經過它；道旁一條磨舊的斜坡抄近直通向大教堂，專走給不肯繞廣場和聖階的朝聖者。
-    anchor_key:
-    typeclass:
-    scene_archetype: city_street
-  guild_forecourt:
-    x_m: 4380
-    y_m: 3000
-    prototype_parent: grid_room
-    key: 公會前
-    desc: 聖潔王都冒險者公會門前的廣場，在市集帶上、廣場以東一格。契約在它告示板的蔭下就交接了，筆還沒進門檻，條件早已拍定；公會的搬運工也在這裡裝貨，雇來的刀客與木箱一齊上車。
-    anchor_key:
-    typeclass:
-    scene_archetype: city_street
-  east_gate:
-    x_m: 6500
-    y_m: 3010
-    prototype_parent: grid_room
-    key: 東門
-    desc: 聖潔王都的東門，在市集帶的最遠端，正是東方來的道路會與河鎮主街合理相接的位置。它來得晚，它所立身的那道牆，比廣場西邊那處遺跡還新，王都以東的買賣、以及多半的麻煩，都從這扇門進來。
-    anchor_key:
-    typeclass:
-    scene_archetype: city_street
-  holy_steps:
-    x_m: 3480
-    y_m: 3700
-    prototype_parent: grid_room
-    key: 聖階
-    desc: 聖潔王都的聖階，朝聖之路的最後一段，也是上城始終是上城的原因。每一位在此加冕的王都把它們拓寬過，每一位跪著爬上來的懺悔者，都用石階量過這座王都的野心。階頂之上是那片想要高度的地，教會、學院、王宮。
-    anchor_key:
-    typeclass:
-    scene_archetype: city_street
-  training_ground:
-    x_m: 2300
-    y_m: 3820
-    prototype_parent: grid_room
-    key: 校場外
-    desc: 王都上方台地之下的校場外，徵兵與公會護衛在這裡學著站進陣形。地面被踩得堅硬，軍官的嗓子一路傳得進工匠巷，從工匠巷斜斜上來的學徒小徑在坡上磨出一道草綠的縫。
-    anchor_key:
-    typeclass:
-    scene_archetype: city_street
-  great_temple:
-    x_m: 4560
-    y_m: 3920
-    prototype_parent: grid_room
-    key: 大神殿前
-    desc: 聖潔王都大神殿前的前庭，正面對著聖階的頂端。光明教會先取走了這層台地，王冠才取了它上面那一層；兩者的次序是這整座城市被蓋出來反覆宣示的一句話，神在前，王冠在更高的地方俯視。
-    anchor_key:
-    typeclass:
-    scene_archetype: city_street
-  noble_quarter:
-    x_m: 3500
-    y_m: 4850
-    prototype_parent: grid_room
-    key: 貴族區前
-    desc: 聖潔王都貴族區前的通道，在校場的後上方。當年握著下城渡口的那些家族，是一層台地一層台地買上岩壁的；他們的門、點燈人與拴著的狗，都寫著這一段攀爬走了多久。
-    anchor_key:
-    typeclass:
-    scene_archetype: city_street
-  upper_gate:
-    x_m: 4690
-    y_m: 5010
-    prototype_parent: grid_room
-    key: 上城門
-    desc: 聖潔王都的上城門，嵌在圍起機構台地的那道牆裡。它還有門樓與守門誓約，不過如今它存在，主要是為了讓上城能在節日裡把自己關起來，以及在它不想被市集帶看見的那些日子。
-    anchor_key:
-    typeclass:
-    scene_archetype: city_street
-  academy:
-    x_m: 5650
-    y_m: 5200
-    prototype_parent: grid_room
-    key: 學院前
-    desc: 王立魔法學院門前的廣場，在攀爬東側的肩頭。學生在它的階上爭辯，賣墨水與二手論文的販子圍著他們打轉，而下到東市的那條斜坡，是理論到晚餐之間最短的距離。
+    desc: 
+      聖潔王都的市場街，全王都最長的一條連續街道。它之所以長，是因為它正是那道倒下的牆清出來的牆線，街南端的遺跡解釋了這條街的由來；而街上的攤位，就是王都的貿易為什麼向東流的原因。
     anchor_key:
     typeclass:
     scene_archetype: city_street
   palace_forecourt:
-    x_m: 4500
-    y_m: 6350
+    x_m: 100
+    y_m: 2426
     prototype_parent: grid_room
     key: 王宮前庭
-    desc: 聖潔王都的王宮前庭，攀登上的最後一格，也是王都裡最高的地面。從這裡看下去，整座城市像一滴淚攤在腳下，河、碼頭、倒下的牆、市集帶、階與教堂，一塊河鎮的岩石，握在一個刻意把宮殿蓋在教堂之上的王冠手裡。
+    desc: 
+      聖潔王都的王宮前庭，攀登上的最後一格，也是王都裡最高的地面。從這裡看下去，整座城市像一滴淚攤在腳下，河、碼頭、倒下的牆、市集帶、階與教堂，一塊河鎮的岩石，握在一個刻意把宮殿蓋在教堂之上的王冠手裡。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 1907
+    y_m: 2733
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 
+      聖潔王都冒險者公會門前的廣場，在市集帶上、廣場以東一格。契約在它告示板的蔭下就交接了，筆還沒進門檻，條件早已拍定；公會的搬運工也在這裡裝貨，雇來的刀客與木箱一齊上車。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  quay:
+    x_m: 2016
+    y_m: 1150
+    prototype_parent: grid_room
+    key: 碼頭埠
+    desc: 
+      聖潔王都的碼頭，上游來的駁船繫繩在被幾百年纜繩磨黑的石緣上。下城是王城最老的部分，而這裡是下城裡最老的一段，一座仍在營運的河港，叫賣、水鳥與貨件吵成一片。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  great_temple:
+    x_m: 270
+    y_m: 939
+    prototype_parent: grid_room
+    key: 大神殿前
+    desc: 
+      聖潔王都大神殿前的前庭，正面對著聖階的頂端。光明教會先取走了這層台地，王冠才取了它上面那一層；兩者的次序是這整座城市被蓋出來反覆宣示的一句話，神在前，王冠在更高的地方俯視。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  noble_quarter:
+    x_m: 279
+    y_m: 2988
+    prototype_parent: grid_room
+    key: 貴族區前
+    desc: 
+      聖潔王都貴族區前的通道，在王宮前庭與上城門之間。當年握著下城渡口的那些家族，是一層台地一層台地買上岩壁的；他們的門、點燈人與拴著的狗，都寫著這一段攀爬走了多久。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  inn_lane:
+    x_m: 1593
+    y_m: 2970
+    prototype_parent: grid_room
+    key: 客棧巷
+    desc: 
+      聖潔王都的客棧巷。趕在上方台地關閉之後才到王都的旅人，向來都在下面一帶過夜；巷子裡的旅店、馬廄與打烊遲的酒館，就在同一片擁擠的地面上招呼他們。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  east_market:
+    x_m: 1159
+    y_m: 2462
+    prototype_parent: grid_room
+    key: 東市
+    desc: 聖潔王都的東市，開在中央廣場邊上，穀物、玻璃與外國硬幣都在這裡最先易手。市集的棚架一路排到廣場的石緣，往來的人不必再繞進王宮那側的坡道。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  riverbank_road:
+    x_m: 2566
+    y_m: 1150
+    prototype_parent: grid_room
+    key: 河岸道
+    desc: 聖潔王都的河岸道，從碼頭沿著北岸向東而去。屋舍在這裡肩並著肩擠成一排，離水最近的土地最先被認領，而且從不肯讓出一寸。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  craft_alley:
+    x_m: 116
+    y_m: 150
+    prototype_parent: grid_room
+    key: 工匠巷
+    desc: 
+      聖潔王都的工匠巷，在舊牆線的最西端。當市集取得了那條帶狀地，吵鬧的手藝就被擠到這裡來，鍛造鋪的錘聲如歌、裁縫坊的粉筆灰與布疋，還有一條斜斜切往大神殿的磨舊小徑，學徒們帶著貨物跑的就是這條。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  academy:
+    x_m: 370
+    y_m: 2247
+    prototype_parent: grid_room
+    key: 學院前
+    desc: 
+      王立魔法學院門前的廣場，在王宮台地的東南肩頭。學生在它的階上爭辯，賣墨水與二手論文的販子圍著他們打轉，而通往王宮前庭的那條坡道，是理論到晚餐之間最短的距離。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  training_ground:
+    x_m: 2681
+    y_m: 3369
+    prototype_parent: grid_room
+    key: 校場外
+    desc: 
+      王都東北隅的校場外，徵兵與公會護衛在這裡學著站進陣形。地面被踩得堅硬，軍官的嗓子一路傳得進東北門，從東北大街斜斜上來的學徒小徑在坡上磨出一道草綠的縫。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  bath_forecourt:
+    x_m: 2146
+    y_m: 2269
+    prototype_parent: grid_room
+    key: 浴場前
+    desc: 
+      王都公共浴場門前，蒸氣與河水的氣味在路緣攪在一起。河鎮總是先有了浴池，才談得上別的排場；而這一間浴場，比這座城市興築又捨棄的每一道牆都活得久。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  lane_01:
+    x_m: 3781
+    y_m: 1433
+    prototype_parent: grid_room
+    key: 磨坊巷
+    desc: 聖潔王都東南隅的巷弄，夾在河岸坡與城牆之間。巷底的水溝把雨水送回河裡，孩子們在石板上追著紙船跑。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  holy_steps:
+    x_m: 842
+    y_m: 1499
+    prototype_parent: grid_room
+    key: 聖階
+    desc: 
+      聖潔王都的聖階，朝聖之路的最後一段，也是上城始終是上城的原因。每一位在此加冕的王都把它們拓寬過，每一位跪著爬上來的懺悔者，都用石階量過這座王都的野心。階頂之上是那片想要高度的地，教會、學院、王宮。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  lane_03:
+    x_m: 3232
+    y_m: 1894
+    prototype_parent: grid_room
+    key: 燈籠巷
+    desc: 聖潔王都東門內的一條巷弄，從東門拐進城裡，與東南邊的巷子相接。牆頭掛著一盞公用燈籠，夜裡為晚歸的人照路。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  upper_gate:
+    x_m: 916
+    y_m: 3329
+    prototype_parent: grid_room
+    key: 上城門
+    desc: 
+      聖潔王都的上城門，嵌在圍起機構台地的那道牆裡。它還有門樓與守門誓約，不過如今它存在，主要是為了讓上城能在節日裡把自己關起來，以及在它不想被市集帶看見的那些日子。
     anchor_key:
     typeclass:
     scene_archetype: city_street
 roads:
-  - source: south_gate
-    destination: south_avenue
-    direction: n
-  - source: south_avenue
-    destination: south_gate
-    direction: s
-  - source: south_avenue
-    destination: north_avenue
-    direction: n
-  - source: north_avenue
-    destination: south_avenue
-    direction: s
-  - source: north_avenue
-    destination: central_plaza
-    direction: n
-  - source: central_plaza
-    destination: north_avenue
-    direction: s
-  - source: south_avenue
-    destination: riverbank_road
-    direction: w
-  - source: riverbank_road
-    destination: south_avenue
-    direction: e
-  - source: south_avenue
-    destination: inn_lane
-    direction: e
-  - source: inn_lane
-    destination: south_avenue
-    direction: w
-  - source: riverbank_road
-    destination: quay
-    direction: w
-  - source: quay
-    destination: riverbank_road
-    direction: e
-  - source: riverbank_road
-    destination: old_wall_ruins
-    direction: n
-  - source: old_wall_ruins
-    destination: riverbank_road
-    direction: s
-  - source: old_wall_ruins
-    destination: market_street
-    direction: n
-  - source: market_street
-    destination: old_wall_ruins
-    direction: s
-  - source: old_wall_ruins
-    destination: north_avenue
-    direction: e
-  - source: north_avenue
-    destination: old_wall_ruins
-    direction: w
-  - source: inn_lane
-    destination: bath_forecourt
-    direction: e
-  - source: bath_forecourt
-    destination: inn_lane
-    direction: w
-  - source: market_street
-    destination: craft_alley
-    direction: w
-  - source: craft_alley
-    destination: market_street
-    direction: e
-  - source: craft_alley
-    destination: training_ground
-    direction: ne
-  - source: training_ground
-    destination: craft_alley
-    direction: sw
-  - source: market_street
-    destination: central_plaza
-    direction: e
-  - source: central_plaza
-    destination: market_street
-    direction: w
-  - source: central_plaza
-    destination: holy_steps
-    direction: n
-  - source: holy_steps
-    destination: central_plaza
-    direction: s
-  - source: central_plaza
-    destination: guild_forecourt
-    direction: e
-  - source: guild_forecourt
-    destination: central_plaza
-    direction: w
-  - source: holy_steps
-    destination: training_ground
-    direction: w
-  - source: training_ground
-    destination: holy_steps
-    direction: e
-  - source: holy_steps
-    destination: noble_quarter
-    direction: n
-  - source: noble_quarter
-    destination: holy_steps
-    direction: s
-  - source: holy_steps
-    destination: great_temple
-    direction: e
-  - source: great_temple
-    destination: holy_steps
-    direction: w
-  - source: guild_forecourt
-    destination: great_temple
-    direction: n
-  - source: great_temple
-    destination: guild_forecourt
-    direction: s
-  - source: guild_forecourt
-    destination: east_market
-    direction: e
-  - source: east_market
-    destination: guild_forecourt
-    direction: w
-  - source: great_temple
-    destination: upper_gate
-    direction: n
-  - source: upper_gate
-    destination: great_temple
-    direction: s
-  - source: great_temple
-    destination: east_market
-    direction: se
-  - source: east_market
-    destination: great_temple
-    direction: nw
-  - source: noble_quarter
-    destination: upper_gate
-    direction: e
-  - source: upper_gate
-    destination: noble_quarter
-    direction: w
-  - source: upper_gate
-    destination: palace_forecourt
-    direction: n
-  - source: palace_forecourt
-    destination: upper_gate
-    direction: s
-  - source: upper_gate
-    destination: academy
-    direction: e
-  - source: academy
-    destination: upper_gate
-    direction: w
-  - source: east_market
-    destination: east_gate
-    direction: e
-  - source: east_gate
-    destination: east_market
-    direction: w
+- source: central_plaza
+  destination: old_wall_ruins
+  direction: s
+- source: central_plaza
+  destination: east_gate_road_1
+  direction: e
+- source: central_plaza
+  destination: northeast_gate_road_1
+  direction: ne
+- source: central_plaza
+  destination: north_avenue
+  direction: n
+- source: central_plaza
+  destination: market_street
+  direction: se
+- source: central_plaza
+  destination: east_market
+  direction: w
+- source: ford_crossing
+  destination: south_gate
+  direction: s
+- source: ford_crossing
+  destination: south_avenue
+  direction: n
+- source: south_gate
+  destination: ford_crossing
+  direction: n
+- source: south_gate
+  destination: south_avenue
+  direction: ne
+- source: east_gate
+  destination: east_gate_road_1
+  direction: w
+- source: east_gate
+  destination: lane_03
+  direction: s
+- source: northeast_gate
+  destination: northeast_gate_road_1
+  direction: sw
+- source: northeast_gate
+  destination: training_ground
+  direction: s
+- source: north_gate
+  destination: north_avenue
+  direction: s
+- source: south_avenue
+  destination: ford_crossing
+  direction: sw
+- source: south_avenue
+  destination: south_gate
+  direction: s
+- source: south_avenue
+  destination: old_wall_ruins
+  direction: n
+- source: south_avenue
+  destination: quay
+  direction: ne
+- source: old_wall_ruins
+  destination: central_plaza
+  direction: n
+- source: old_wall_ruins
+  destination: south_avenue
+  direction: s
+- source: old_wall_ruins
+  destination: market_street
+  direction: ne
+- source: old_wall_ruins
+  destination: holy_steps
+  direction: sw
+- source: east_gate_road_1
+  destination: central_plaza
+  direction: sw
+- source: east_gate_road_1
+  destination: east_gate
+  direction: e
+- source: east_gate_road_1
+  destination: northeast_gate_road_1
+  direction: n
+- source: east_gate_road_1
+  destination: guild_forecourt
+  direction: w
+- source: east_gate_road_1
+  destination: bath_forecourt
+  direction: s
+- source: northeast_gate_road_1
+  destination: central_plaza
+  direction: sw
+- source: northeast_gate_road_1
+  destination: northeast_gate
+  direction: ne
+- source: northeast_gate_road_1
+  destination: east_gate_road_1
+  direction: s
+- source: northeast_gate_road_1
+  destination: north_avenue
+  direction: nw
+- source: northeast_gate_road_1
+  destination: inn_lane
+  direction: w
+- source: northeast_gate_road_1
+  destination: training_ground
+  direction: e
+- source: north_avenue
+  destination: central_plaza
+  direction: sw
+- source: north_avenue
+  destination: north_gate
+  direction: n
+- source: north_avenue
+  destination: northeast_gate_road_1
+  direction: e
+- source: north_avenue
+  destination: inn_lane
+  direction: s
+- source: north_avenue
+  destination: upper_gate
+  direction: w
+- source: market_street
+  destination: central_plaza
+  direction: n
+- source: market_street
+  destination: old_wall_ruins
+  direction: s
+- source: market_street
+  destination: bath_forecourt
+  direction: e
+- source: palace_forecourt
+  destination: noble_quarter
+  direction: n
+- source: palace_forecourt
+  destination: academy
+  direction: se
+- source: guild_forecourt
+  destination: east_gate_road_1
+  direction: e
+- source: guild_forecourt
+  destination: inn_lane
+  direction: nw
+- source: guild_forecourt
+  destination: bath_forecourt
+  direction: se
+- source: quay
+  destination: south_avenue
+  direction: sw
+- source: quay
+  destination: riverbank_road
+  direction: e
+- source: great_temple
+  destination: craft_alley
+  direction: s
+- source: great_temple
+  destination: holy_steps
+  direction: ne
+- source: noble_quarter
+  destination: palace_forecourt
+  direction: s
+- source: noble_quarter
+  destination: upper_gate
+  direction: ne
+- source: inn_lane
+  destination: northeast_gate_road_1
+  direction: ne
+- source: inn_lane
+  destination: north_avenue
+  direction: n
+- source: inn_lane
+  destination: guild_forecourt
+  direction: se
+- source: east_market
+  destination: central_plaza
+  direction: e
+- source: riverbank_road
+  destination: quay
+  direction: w
+- source: craft_alley
+  destination: great_temple
+  direction: n
+- source: academy
+  destination: palace_forecourt
+  direction: nw
+- source: training_ground
+  destination: northeast_gate
+  direction: ne
+- source: training_ground
+  destination: northeast_gate_road_1
+  direction: w
+- source: bath_forecourt
+  destination: east_gate_road_1
+  direction: n
+- source: bath_forecourt
+  destination: market_street
+  direction: w
+- source: bath_forecourt
+  destination: guild_forecourt
+  direction: nw
+- source: lane_01
+  destination: lane_03
+  direction: nw
+- source: holy_steps
+  destination: old_wall_ruins
+  direction: ne
+- source: holy_steps
+  destination: great_temple
+  direction: sw
+- source: lane_03
+  destination: east_gate
+  direction: n
+- source: lane_03
+  destination: lane_01
+  direction: se
+- source: upper_gate
+  destination: north_avenue
+  direction: e
+- source: upper_gate
+  destination: noble_quarter
+  direction: sw
 wilderness_entry:
   shape:
-    - "#.....#"
-    - "##...##"
-    - ".#####."
-    - "#######"
-    - "#######"
-    - "####..#"
-    - "#..#.##"
-    - "####..."
-    - "..##..."
+  - '##..'
+  - '####'
+  - '###.'
+  - '###.'
+  - .#..
   offset:
-    dx: -3
-    dy: -4
+    dx: -1
+    dy: -2
   gates:
-    - return_direction: n
-      destination_node: south_gate
-    - return_direction: w
-      destination_node: east_gate
+  - return_direction: n
+    destination_node: south_gate
+  - return_direction: w
+    destination_node: east_gate
+  - return_direction: sw
+    destination_node: northeast_gate
+  - return_direction: s
+    destination_node: north_gate
 city_gate:
   node: south_gate
   exit_key: 南門

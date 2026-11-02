@@ -285,7 +285,25 @@ class WildernessEntryValidationTests(unittest.TestCase):
             malformed_sources = []
             for src in sources:
                 if src.relative_path.endswith("capital_altoria.yaml"):
-                    text = src.text.replace('    - "#######"\n    - "#######"', '    - "......."\n    - "......."')
+                    # Break the authored mask by blanking two of its own
+                    # interior rows, so the core's 4-connectivity rule must
+                    # refuse the result. The rows come from the file, never
+                    # from a copied mask.
+                    lines = src.text.splitlines(keepends=True)
+                    start = next(
+                        index
+                        for index, line in enumerate(lines)
+                        if line.strip() == "shape:"
+                    )
+                    rows = []
+                    for index in range(start + 1, len(lines)):
+                        if not lines[index].strip().startswith("- "):
+                            break
+                        rows.append(index)
+                    self.assertGreaterEqual(len(rows), 3)
+                    for index in rows[1:3]:
+                        lines[index] = lines[index].replace("#", ".")
+                    text = "".join(lines)
                     malformed_sources.append(make_source_document(src.relative_path, text))
                 else:
                     malformed_sources.append(src)
