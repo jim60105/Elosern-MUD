@@ -33,6 +33,7 @@ from tools.settlement_synthesis.fit_lint import (
 )
 from tools.settlement_synthesis.site import SettlementRef, analyse_site
 from tools.settlement_synthesis.terrain_view import GridTerrain
+from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EDITOR_TESTS = REPO_ROOT / "tools" / "map-editor" / "tests"
@@ -162,6 +163,9 @@ def _ref(
 
 
 class SiteContextTests(unittest.TestCase):
+    @covers_requirement(
+        "settlement-terrain-fit::site-context-derives-water-relief-and-neighbour-bearings-from-terrain"
+    )
     def test_river_contact_with_flow(self) -> None:
         cells = frozenset((13, y) for y in range(0, 21))
         terrain = _terrain(
@@ -180,6 +184,9 @@ class SiteContextTests(unittest.TestCase):
         self.assertEqual(contact.bearing, "e")
         self.assertEqual(contact.downstream, "s")
 
+    @covers_requirement(
+        "settlement-terrain-fit::site-context-derives-water-relief-and-neighbour-bearings-from-terrain"
+    )
     def test_sea_contact_and_absent_water(self) -> None:
         coast = _terrain(
             land=frozenset(cell for cell in _window_cells() if cell[0] >= 7)
@@ -202,6 +209,9 @@ class SiteContextTests(unittest.TestCase):
         self.assertEqual(inland.rivers, ())
         self.assertIsNone(inland.sea)
 
+    @covers_requirement(
+        "settlement-terrain-fit::site-context-derives-water-relief-and-neighbour-bearings-from-terrain"
+    )
     def test_uphill_bearing_and_flat_ground(self) -> None:
         rising = _terrain(bands={(x, y): y for x, y in _window_cells()})
 
@@ -216,6 +226,9 @@ class SiteContextTests(unittest.TestCase):
         self.assertEqual(flat_context.relief, 0)
         self.assertIsNone(flat_context.uphill)
 
+    @covers_requirement(
+        "settlement-terrain-fit::site-context-derives-water-relief-and-neighbour-bearings-from-terrain"
+    )
     def test_neighbours_and_capital_bearing(self) -> None:
         site = _ref("site_a")
         capital = _ref("cap_x", "capital", "nat_a", 90_000, (10, 16))
@@ -236,6 +249,9 @@ class SiteContextTests(unittest.TestCase):
 
         self.assertIsNone(capital_context.capital_bearing)
 
+    @covers_requirement(
+        "settlement-terrain-fit::site-context-derives-water-relief-and-neighbour-bearings-from-terrain"
+    )
     def test_fords_and_harbours_report_distance_and_bearing(self) -> None:
         terrain = _terrain(
             inland_water=frozenset({(13, 10)}),
@@ -279,6 +295,9 @@ class SizeBudgetTests(unittest.TestCase):
         values.update(overrides)
         return BudgetConfig(**values)
 
+    @covers_requirement(
+        "settlement-terrain-fit::size-budget-follows-the-population-area-relation-with-a-multi-cell-floor"
+    )
     def test_area_scales_by_the_configured_exponent(self) -> None:
         config = self._config(
             reference_density_per_ha=100.0, area_exponent=0.5
@@ -292,6 +311,9 @@ class SizeBudgetTests(unittest.TestCase):
             budget.envelope_radius_m, round(1000 * math.sqrt(2 / math.pi))
         )
 
+    @covers_requirement(
+        "settlement-terrain-fit::size-budget-follows-the-population-area-relation-with-a-multi-cell-floor"
+    )
     def test_multi_cell_floor(self) -> None:
         config = self._config(
             reference_population=1_000,
@@ -307,6 +329,9 @@ class SizeBudgetTests(unittest.TestCase):
         self.assertAlmostEqual(large.built_area_km2, 3.2)
         self.assertEqual(large.footprint_cells, 4)
 
+    @covers_requirement(
+        "settlement-terrain-fit::size-budget-follows-the-population-area-relation-with-a-multi-cell-floor"
+    )
     def test_tier_tables(self) -> None:
         config = self._config(
             tiers=(Tier(100, 5, 3, 0.5), Tier(0, 3, 2, 0.1)),
@@ -324,6 +349,9 @@ class SizeBudgetTests(unittest.TestCase):
             (9, 4, 0.4),
         )
 
+    @covers_requirement(
+        "settlement-terrain-fit::size-budget-follows-the-population-area-relation-with-a-multi-cell-floor"
+    )
     def test_rejected_inputs(self) -> None:
         config = self._config()
         cases = (
@@ -341,12 +369,18 @@ class SizeBudgetTests(unittest.TestCase):
                     )
                 self.assertIn("site_z", str(caught.exception))
 
+    @covers_requirement(
+        "settlement-terrain-fit::size-budget-follows-the-population-area-relation-with-a-multi-cell-floor"
+    )
     def test_config_validation(self) -> None:
         with self.assertRaises(ValueError):
             self._config(min_footprint_cells=1)
 
 
 class WaterAndCrossingLintTests(unittest.TestCase):
+    @covers_requirement(
+        "settlement-terrain-fit::terrain-fit-lint-flags-dry-water-edge-roles-and-unbridged-crossings"
+    )
     def test_water_edge_distance(self) -> None:
         nodes = {
             "inn": _node(*ANCHOR_LOCAL, anchor=True),
@@ -365,6 +399,9 @@ class WaterAndCrossingLintTests(unittest.TestCase):
         }
         self.assertEqual(dry, {"riverbank_road"})
 
+    @covers_requirement(
+        "settlement-terrain-fit::terrain-fit-lint-flags-dry-water-edge-roles-and-unbridged-crossings"
+    )
     def test_crossing_words(self) -> None:
         nodes = {
             "inn": _node(*ANCHOR_LOCAL, anchor=True),
@@ -392,6 +429,9 @@ class WaterAndCrossingLintTests(unittest.TestCase):
         }
         self.assertEqual(crossings, {"plain_a>plain_b"})
 
+    @covers_requirement(
+        "settlement-terrain-fit::terrain-fit-lint-flags-dry-water-edge-roles-and-unbridged-crossings"
+    )
     def test_whole_word_tokens(self) -> None:
         self.assertEqual(words("quayside") & WATER_EDGE_WORDS, frozenset())
         self.assertNotIn("quay", words("quayside"))
@@ -400,6 +440,9 @@ class WaterAndCrossingLintTests(unittest.TestCase):
 
 
 class FootprintAndGateLintTests(unittest.TestCase):
+    @covers_requirement(
+        "settlement-terrain-fit::terrain-fit-lint-checks-footprint-water-gate-side-and-gate-approach"
+    )
     def test_multi_cell_containment_and_water(self) -> None:
         nodes = {
             "inn": _node(*ANCHOR_LOCAL, anchor=True),
@@ -429,6 +472,9 @@ class FootprintAndGateLintTests(unittest.TestCase):
         }
         self.assertEqual(in_water, {"water_node"})
 
+    @covers_requirement(
+        "settlement-terrain-fit::terrain-fit-lint-checks-footprint-water-gate-side-and-gate-approach"
+    )
     def test_gate_side_and_approach(self) -> None:
         nodes = {
             "inn": _node(*ANCHOR_LOCAL, anchor=True),
@@ -462,6 +508,9 @@ class FootprintAndGateLintTests(unittest.TestCase):
         self.assertNotIn(("fit_gate_side", "gate:n"), warnings)
         self.assertNotIn(("fit_gate_approach_blocked", "gate:w"), errors)
 
+    @covers_requirement(
+        "settlement-terrain-fit::terrain-fit-lint-checks-footprint-water-gate-side-and-gate-approach"
+    )
     def test_concealed_point_entry(self) -> None:
         nodes = {
             "inn": _node(*ANCHOR_LOCAL, anchor=True),
@@ -488,6 +537,9 @@ class FootprintAndGateLintTests(unittest.TestCase):
 
 
 class DirectionDriftLintTests(unittest.TestCase):
+    @covers_requirement(
+        "settlement-terrain-fit::road-direction-drift-is-a-warning"
+    )
     def test_drifted_and_adjacent_directions(self) -> None:
         nodes = {
             "inn": _node(*ANCHOR_LOCAL, anchor=True),
@@ -550,6 +602,9 @@ class CommandTests(unittest.TestCase):
             text=True,
         )
 
+    @covers_requirement(
+        "settlement-terrain-fit::the-fit-commands-are-read-only-and-report-by-exit-status"
+    )
     def test_clean_workspace_lints_with_no_finding(self) -> None:
         result = self._run("lint")
 
@@ -557,6 +612,9 @@ class CommandTests(unittest.TestCase):
         self.assertIn("fit: 0 errors, 0 warnings", result.stdout)
         self.assertEqual(synthetic.tree_digest(self.root), self.digest)
 
+    @covers_requirement(
+        "settlement-terrain-fit::the-fit-commands-are-read-only-and-report-by-exit-status"
+    )
     def test_dry_water_edge_node_fails_the_lint(self) -> None:
         data = synthetic.settlement_data()
         data["nodes"]["quay"] = _node(300, 0)
@@ -574,6 +632,9 @@ class CommandTests(unittest.TestCase):
         )
         self.assertEqual(synthetic.tree_digest(self.root), digest)
 
+    @covers_requirement(
+        "settlement-terrain-fit::the-fit-commands-are-read-only-and-report-by-exit-status"
+    )
     def test_duplicate_key_fails_to_load(self) -> None:
         path = self.root / "content" / "maps" / "settlements" / "synthetic_town.yaml"
         path.write_text(
@@ -587,6 +648,9 @@ class CommandTests(unittest.TestCase):
         self.assertIn("synthetic_town.yaml", result.stderr)
         self.assertEqual(synthetic.tree_digest(self.root), digest)
 
+    @covers_requirement(
+        "settlement-terrain-fit::the-fit-commands-are-read-only-and-report-by-exit-status"
+    )
     def test_warning_only_still_exits_zero(self) -> None:
         data = synthetic.settlement_data()
         data["nodes"]["walk_a"] = _node(500, 0)
@@ -605,6 +669,9 @@ class CommandTests(unittest.TestCase):
         self.assertIn("fit: 0 errors, 1 warnings", result.stdout)
         self.assertEqual(synthetic.tree_digest(self.root), digest)
 
+    @covers_requirement(
+        "settlement-terrain-fit::the-fit-commands-are-read-only-and-report-by-exit-status"
+    )
     def test_bent_road_crossing_outside_the_node_window_is_reported(self) -> None:
         data = synthetic.settlement_data()
         data["nodes"]["walk_b"] = _node(300, 0)
@@ -628,6 +695,9 @@ class CommandTests(unittest.TestCase):
         )
         self.assertEqual(synthetic.tree_digest(self.root), digest)
 
+    @covers_requirement(
+        "settlement-terrain-fit::the-fit-commands-are-read-only-and-report-by-exit-status"
+    )
     def test_lore_override_drives_the_site_and_budget_commands(self) -> None:
         lore = Path(self._lore_dir.name) / "lore.json"
         lore.write_text(
