@@ -257,12 +257,13 @@ nw` — and a bearing is accepted only when its approach cell (walking from the
 footprint midpoint until the mask ends) is walkable, unblocked and unused. Fewer
 gates than the tier allows reports `gate_shortfall:<missing>`; none is refused
 (`no_gate`). Approach streets step from each gate toward the plaza, capped by the
-tier and by a third of the remaining nodes, and report a `role_unplaced` warning
-when no candidate fits. Catalogue roles are taken by class, minimum node count
-and water requirement, in priority order: `near_anchor`, `high_ground`
-(elevation band, then uphill), `periphery`, `ring`, `water_edge` and
-`water_downstream` (the most downstream water position). Fillers are lane slots
-that maximise their distance from every placed node.
+tier and by a third of the remaining nodes; a target with no fitting candidate is
+skipped. Catalogue roles are taken by class, minimum node count and water
+requirement, in priority order: `near_anchor`, `high_ground` (elevation band,
+then uphill), `periphery`, `ring`, `water_edge` and `water_downstream` (the most
+downstream water position); a role with no fitting candidate reports
+`role_unplaced:<slot>`. Fillers are lane slots that maximise their distance from
+every placed node.
 
 **Roads and directions.** The undirected candidates are the Gabriel graph over
 the placed nodes, minus any edge whose sampled polyline enters water unless one
@@ -276,18 +277,22 @@ roads, and a shortfall reports `loop_shortfall:<deficit>`.
 
 Each node's incident roads are assigned to distinct compass directions by
 minimising the total octant deviation; a road that still deviates by more than
-three octants costs the longest removable loop edge, and a node with no removable
-edge reports `direction_deviation:<node>`. A road `A → B` carries A's direction
-and `B → A` carries B's.
+67.5° costs the longest removable loop edge, and a node with no removable edge
+reports `direction_deviation:<node>`. A road `A → B` carries A's direction and
+`B → A` carries B's. Directions are assigned from the emitted integer
+coordinates, so rounding or a collision shift cannot leave a road pointing away
+from its drawn segment.
 
 **Warnings.** Every warning is a review prompt, never a silent change:
 `footprint_reach_overflow`, `footprint_location_offset`, `gate_shortfall`,
 `role_unplaced`, `loop_shortfall` and `direction_deviation`, reported sorted and
 deduplicated. Refusals are `water_gap`, `footprint_short`,
 `anchor_outside_footprint`, `no_gate`, `envelope_full`, `graph_disconnected`,
-`degree_overflow` and any terrain-fit lint error; none of them writes a file.
-An existing settlement is never overwritten, and a run that finds one exits
-with `exists: <relative path>` and changes nothing.
+`degree_overflow`, `water_unreachable` (a waterside, harbour or crossing layout
+whose water lies within reach but no walkable path reaches it) and any
+terrain-fit lint error; none of them writes a file. An existing settlement is
+never overwritten, and a run that finds one exits with `exists: <relative path>`
+and changes nothing.
 
 ## Human review
 

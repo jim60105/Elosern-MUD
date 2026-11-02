@@ -46,6 +46,7 @@ from tools.settlement_synthesis.geometry import (
 from tools.settlement_synthesis.roles import RoleEntry
 from tools.settlement_synthesis.site import SettlementRef, analyse_site
 from tools.settlement_synthesis.terrain_view import GridTerrain
+from tools.settlement_synthesis.workspace import load_workspace
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EDITOR_TESTS = REPO_ROOT / "tools" / "map-editor" / "tests"
@@ -254,6 +255,25 @@ def _is_connected(cells: set[tuple[int, int]]) -> bool:
     return seen == cells
 
 
+def _assert_direction_geometry(test: unittest.TestCase, result) -> None:
+    """Every direction matches its emitted segment, or a warning names it."""
+
+    nodes = result.data["nodes"]
+    for road in result.data["roads"]:
+        source = nodes[road["source"]]
+        destination = nodes[road["destination"]]
+        direction = bearing(
+            destination["x_m"] - source["x_m"],
+            destination["y_m"] - source["y_m"],
+        )
+        if direction is None:
+            continue
+        if octant_distance(road["direction"], direction) > 2:
+            test.assertIn(
+                f"direction_deviation:{road['source']}", result.warnings
+            )
+
+
 class DeterminismTests(unittest.TestCase):
     def test_repeat_runs_are_byte_identical(self) -> None:
         terrain = _open_terrain()
@@ -350,7 +370,9 @@ class FootprintTests(unittest.TestCase):
         ref = _ref()
         terrain = _river_terrain()
         budget = _budget(5, nodes=10, radius=500)
-        blocked = frozenset({(18, 18), (19, 19), (20, 20)})
+        # Both cells belong to the unblocked footprint, so ignoring `blocked`
+        # would put them back.
+        blocked = frozenset({(14, 15), (15, 16)})
 
         result = generate_settlement(
             _input(ref, terrain, budget=budget, blocked=blocked)
@@ -365,6 +387,33 @@ class FootprintTests(unittest.TestCase):
             for dy in (-1, 0, 1)
         )
         self.assertTrue(touching)
+
+    def test_unreachable_water_is_refused(self) -> None:
+        ref = _ref()
+        neighbours = {
+            (17 + dx, 15 + dy)
+            for dx in (-1, 0, 1)
+            for dy in (-1, 0, 1)
+            if (dx, dy) != (0, 0)
+        }
+        terrain = _terrain(
+            inland_water=frozenset({(17, 15)}),
+            routes={"synthetic_river": ((17, 20), (17, 0))},
+            waterway_cells={"synthetic_river": frozenset({(17, 15)})},
+        )
+
+        with self.assertRaises(GenerationError) as caught:
+            generate_settlement(
+                _input(
+                    ref,
+                    terrain,
+                    budget=_budget(2, nodes=10, radius=300),
+                    blocked=frozenset(neighbours),
+                )
+            )
+
+        self.assertIn("site_a", str(caught.exception))
+        self.assertIn("water_unreachable", str(caught.exception))
 
     def test_corridor_reports_the_offset(self) -> None:
         ref = _ref()
@@ -405,6 +454,10 @@ class FootprintTests(unittest.TestCase):
 
 
 class StructureTests(unittest.TestCase):
+    def test_degree_cap_cannot_be_raised_above_six(self) -> None:
+        with self.assertRaises(ValueError):
+            GenerationConfig(max_degree=7)
+
     def _assert_structure(self, ref: SettlementRef, terrain: GridTerrain, result) -> None:
         nodes = result.data["nodes"]
         roads = result.data["roads"]
@@ -449,19 +502,7 @@ class StructureTests(unittest.TestCase):
             [finding for finding in findings if finding.severity == "error"], []
         )
 
-        for road in roads:
-            source = nodes[road["source"]]
-            destination = nodes[road["destination"]]
-            direction = bearing(
-                destination["x_m"] - source["x_m"],
-                destination["y_m"] - source["y_m"],
-            )
-            if direction is None:
-                continue
-            if octant_distance(road["direction"], direction) > 2:
-                self.assertIn(
-                    f"direction_deviation:{road['source']}", result.warnings
-                )
+        _assert_direction_geometry(self, result)
 
     def test_open_riverside_and_coastal_layouts(self) -> None:
         cases = (
@@ -487,6 +528,35 @@ class StructureTests(unittest.TestCase):
                 self.assertEqual(len(result.data["nodes"]), 10)
                 self.assertEqual(result.morphology, morphology)
                 self._assert_structure(ref, terrain, result)
+
+    def test_collision_repaired_crossing_keeps_its_directions(self) -> None:
+        # A ford on the location cell puts the plaza and the crossing on one
+        # point; the document separates them by a metre, and the directions
+        # must follow the emitted coordinates.
+        water = frozenset((15, y) for y in range(0, 31) if y != 15)
+        terrain = _terrain(
+            inland_water=water,
+            routes={"synthetic_river": ((15, 30), (15, 0))},
+            waterway_cells={"synthetic_river": water},
+            fords={"synthetic_river": ((15, 15),)},
+        )
+        result = generate_settlement(
+            _input(
+                _ref("site_ford"),
+                terrain,
+                budget=_budget(5, nodes=10, radius=500),
+            )
+        )
+
+        self.assertEqual(result.morphology, "river_crossing")
+        nodes = result.data["nodes"]
+        self.assertEqual(
+            nodes["ford_crossing"]["x_m"], nodes["central_plaza"]["x_m"] + 1
+        )
+        self.assertEqual(
+            nodes["ford_crossing"]["y_m"], nodes["central_plaza"]["y_m"]
+        )
+        _assert_direction_geometry(self, result)
 
 
 class GateTests(unittest.TestCase):
@@ -644,37 +714,38 @@ class CommandTests(unittest.TestCase):
         self._lore_dir = tempfile.TemporaryDirectory()
         self.root = Path(self._workspace_dir.name)
         synthetic.write_workspace(self.root)
+        self.towns: dict[str, tuple[int, int, int]] = {}
+        self.lore_rows: dict[str, dict] = {
+            "synthetic_place": {"nation": None, "population": 900_000}
+        }
+        self.lore = Path(self._lore_dir.name) / "lore.json"
+        self._add_towns(
+            {
+                "synthetic_burg": (34, 8, 60_000),
+                "synthetic_hamlet": (34, 14, 20_000),
+            }
+        )
+
+    def _add_towns(self, towns: dict[str, tuple[int, int, int]]) -> None:
+        self.towns.update(towns)
         locations = synthetic.locations_data()
-        locations["locations"]["synthetic_burg"] = {
-            "kind": "town",
-            "display_name_zh": "合成堡",
-            "description": "A synthetic larger town.",
-            "cell": {"cell_x": 34, "cell_y": 8},
-            "geographic_constraint": "synthetic",
-            "scene_archetype": None,
-        }
-        locations["locations"]["synthetic_hamlet"] = {
-            "kind": "town",
-            "display_name_zh": "合成村",
-            "description": "A synthetic smaller town.",
-            "cell": {"cell_x": 34, "cell_y": 14},
-            "geographic_constraint": "synthetic",
-            "scene_archetype": None,
-        }
+        for location_id, (cell_x, cell_y, population) in self.towns.items():
+            locations["locations"][location_id] = {
+                "kind": "town",
+                "display_name_zh": "合成城",
+                "description": "A synthetic town.",
+                "cell": {"cell_x": cell_x, "cell_y": cell_y},
+                "geographic_constraint": "synthetic",
+                "scene_archetype": None,
+            }
+            self.lore_rows[location_id] = {
+                "nation": "nat_a",
+                "population": population,
+            }
         (self.root / "content" / "maps" / "locations.yaml").write_text(
             synthetic.yaml_text(locations), encoding="utf-8"
         )
-        self.lore = Path(self._lore_dir.name) / "lore.json"
-        self.lore.write_text(
-            json.dumps(
-                {
-                    "synthetic_place": {"nation": None, "population": 900_000},
-                    "synthetic_burg": {"nation": "nat_a", "population": 60_000},
-                    "synthetic_hamlet": {"nation": "nat_a", "population": 20_000},
-                }
-            ),
-            encoding="utf-8",
-        )
+        self.lore.write_text(json.dumps(self.lore_rows), encoding="utf-8")
         self.digest = synthetic.tree_digest(self.root)
 
     def tearDown(self) -> None:
@@ -765,8 +836,57 @@ class CommandTests(unittest.TestCase):
             footprints.append(geometry.footprint_cells)
         self.assertFalse(footprints[0] & footprints[1])
 
+        # The reload each batch step performs must see the earlier footprint.
+        blocked = load_workspace(self.root, self.lore).blocked_cells("synthetic_hamlet")
+        for cell in footprints[0]:
+            self.assertIn(cell, blocked)
+
         lint = self._run("lint")
         self.assertEqual(lint.returncode, 0, lint.stdout + lint.stderr)
+
+    def test_blocked_cells_reserves_other_sources_and_excludes_own_location(self) -> None:
+        blocked = load_workspace(self.root, self.lore).blocked_cells("synthetic_burg")
+
+        # synthetic_town's point mask, its gate approach and its location cell.
+        self.assertIn((5, 5), blocked)
+        # Another town's location cell is reserved.
+        self.assertIn((34, 14), blocked)
+        # This map's own location row is not.
+        self.assertNotIn((34, 8), blocked)
+
+    def test_later_batch_map_avoids_the_earlier_mask(self) -> None:
+        # synthetic_edge sits two cells west of synthetic_burg; on its own its
+        # footprint reaches into burg's mask, so the batch must reserve it.
+        self._add_towns({"synthetic_edge": (32, 8, 20_000)})
+
+        batch = self._run(
+            "generate", "--missing", "--nation", "nat_a", "--lore", str(self.lore)
+        )
+
+        self.assertEqual(batch.returncode, 0, batch.stderr)
+        self.assertEqual(
+            [report["map_id"] for report in _reports(batch.stdout)],
+            ["synthetic_burg", "synthetic_edge", "synthetic_hamlet"],
+        )
+        settlements = self.root / "content" / "maps" / "settlements"
+        footprints = {}
+        for map_id, cell in (
+            ("synthetic_burg", (34, 8)),
+            ("synthetic_edge", (32, 8)),
+        ):
+            text = (settlements / f"{map_id}.yaml").read_text(encoding="utf-8")
+            document = parse_document(
+                f"content/maps/settlements/{map_id}.yaml", text
+            ).document
+            geometry = document.wilderness_geometry(cell)
+            assert geometry is not None
+            footprints[map_id] = geometry.footprint_cells
+
+        self.assertIn((33, 8), footprints["synthetic_burg"])
+        self.assertNotIn((33, 8), footprints["synthetic_edge"])
+        self.assertFalse(
+            footprints["synthetic_burg"] & footprints["synthetic_edge"]
+        )
 
 
 def _reports(text: str) -> list[dict]:

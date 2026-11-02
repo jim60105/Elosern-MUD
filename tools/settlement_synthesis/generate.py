@@ -73,6 +73,13 @@ class GenerationConfig:
     margin_m: int = 100
     max_degree: int = 6
 
+    def __post_init__(self) -> None:
+        if not 1 <= self.max_degree <= 6:
+            raise ValueError(
+                "max_degree must be between 1 and 6: the settlement schema allows "
+                "at most six roads at one node"
+            )
+
 
 @dataclass(frozen=True)
 class GenerationInput:
@@ -963,8 +970,13 @@ def _build_roads(
     inp: GenerationInput,
     slots: list[Slot],
     gate_octants: dict[str, str],
+    coordinates: list[tuple[int, int]],
 ) -> tuple[list[tuple[int, int, int]], list[str]]:
     positions = [slot.rel_m for slot in slots]
+    # Directions are assigned from the emitted integer coordinates, so a rounded
+    # or collision-shifted node cannot leave a road pointing somewhere else
+    # than its document segment.
+    direction_positions = [(float(x), float(y)) for x, y in coordinates]
     orders = {slot.slot_id: index for index, slot in enumerate(slots)}
     warnings: list[str] = []
     crossing_safe = [_is_crossing(slot.slot_id) for slot in slots]
@@ -1105,7 +1117,7 @@ def _build_roads(
     edges = list(unique_edges.values())
 
     directions, direction_warnings = _assign_directions(
-        slots, positions, edges, tree_keys, forced_keys
+        slots, direction_positions, edges, tree_keys, forced_keys
     )
     warnings.extend(direction_warnings)
 
@@ -1228,20 +1240,12 @@ def _assign_directions(
 # -- document data (D8) -----------------------------------------------------------
 
 
-def _document_data(
-    inp: GenerationInput,
-    slots: list[Slot],
-    roads: list[tuple[int, int, int]],
-    gate_octants: dict[str, str],
-    footprint: frozenset[Cell],
-) -> dict[str, Any]:
-    offset_x = inp.config.margin_m - min(
-        int(round(slot.rel_m[0])) for slot in slots
-    )
-    offset_y = inp.config.margin_m - min(
-        int(round(slot.rel_m[1])) for slot in slots
-    )
-    nodes: dict[str, dict[str, Any]] = {}
+def _node_coordinates(slots: list[Slot], margin: int) -> list[tuple[int, int]]:
+    """The emitted integer coordinate of every slot, collisions repaired."""
+
+    offset_x = margin - min(int(round(slot.rel_m[0])) for slot in slots)
+    offset_y = margin - min(int(round(slot.rel_m[1])) for slot in slots)
+    coordinates: list[tuple[int, int]] = []
     used: set[tuple[int, int]] = set()
     for slot in slots:
         x = int(round(slot.rel_m[0])) + offset_x
@@ -1249,6 +1253,20 @@ def _document_data(
         while (x, y) in used:
             x += 1
         used.add((x, y))
+        coordinates.append((x, y))
+    return coordinates
+
+
+def _document_data(
+    inp: GenerationInput,
+    slots: list[Slot],
+    roads: list[tuple[int, int, int]],
+    gate_octants: dict[str, str],
+    footprint: frozenset[Cell],
+    coordinates: list[tuple[int, int]],
+) -> dict[str, Any]:
+    nodes: dict[str, dict[str, Any]] = {}
+    for slot, (x, y) in zip(slots, coordinates):
         anchor = slot.role == "anchor"
         nodes[slot.slot_id] = {
             "x_m": x,
@@ -1327,6 +1345,21 @@ def generate_settlement(inp: GenerationInput) -> GenerationResult:
     footprint, water_contact, river_contact, warnings = _grow_footprint(
         inp, morphology, target, reach
     )
+    sea_contact = any(
+        inp.terrain.is_sea(neighbour)
+        for cell in footprint
+        for neighbour in _neighbours8(cell)
+    )
+    if morphology == "harbour_crescent" and not sea_contact:
+        raise GenerationError(
+            f"{inp.map_id}: water_unreachable: the sea is within reach but no "
+            "walkable path reaches it"
+        )
+    if morphology in ("waterside_linear", "river_crossing") and not river_contact:
+        raise GenerationError(
+            f"{inp.map_id}: water_unreachable: the river is within reach but no "
+            "walkable path reaches it"
+        )
     water_vec = _water_vector(morphology, target)
     uphill_vec = _octant_unit(inp.site.uphill) if inp.site.uphill else None
     slots, placement_warnings, gate_octants = _place_nodes(
@@ -1342,9 +1375,12 @@ def generate_settlement(inp: GenerationInput) -> GenerationResult:
         _downstream(inp, target),
     )
     warnings.extend(placement_warnings)
-    roads, road_warnings = _build_roads(inp, slots, gate_octants)
+    coordinates = _node_coordinates(slots, inp.config.margin_m)
+    roads, road_warnings = _build_roads(inp, slots, gate_octants, coordinates)
     warnings.extend(road_warnings)
-    data = _document_data(inp, slots, roads, gate_octants, footprint)
+    data = _document_data(
+        inp, slots, roads, gate_octants, footprint, coordinates
+    )
 
     relative_path = f"content/maps/settlements/{inp.map_id}.yaml"
     try:
