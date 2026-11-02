@@ -74,3 +74,12 @@ settlement_silhouettes:
   capital:
     day: 遠方平原上展開的城牆與層疊高塔
     night: 地平線上連成一片的城鎮燈火
+  city:
+    day: 遠方城郭的牆影與成排的屋脊
+    night: 一整片稠密的窗火沿著街廓鋪開
+  town:
+    day: 低矮屋群連著風車與穀倉的剪影
+    night: 零散而溫熱的燈點
+  port:
+    day: 港口桅杆與倉庫連成的長條剪影
+    night: 碼頭水面上晃動的一線燈火

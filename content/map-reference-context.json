@@ -176,7 +176,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "302eacdb87dea242bc657855fa1bf14b21a8fff4f35d86673156291a800d6d08",
+  "fingerprint": "4f405d845df2051c26aa34000a986f7c582cd83f2a64650e6e8c48fb0fcdd92f",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -1226,7 +1226,7 @@
     "world/rules/rulebook/sexual_act_effects.yaml": "d244cb388edf3b2dc76b498fe87e211655d68b0caf93651ed898d86440a983b8",
     "world/rules/rulebook/sexual_pleasure.yaml": "80dde75dfcb4d77b0dca20491f29de3fe34bfcaccb40072640311932153d0eb4",
     "world/rules/rulebook/sexual_resist.yaml": "a7146fe53b3e7e13e37691cdd5f2a47f0bc92ceb933beeff07d75b0a4da6237c",
-    "world/rules/rulebook/sight.yaml": "781dc0cac577e4f5fc3ca05a0bb72086d9e4c6d406af7c5f23c83448d688df80",
+    "world/rules/rulebook/sight.yaml": "3940feeb9f8b9dd419ed09df742126c3bf7276c0c9b18ac00568e5eb2c1cfe49",
     "world/rules/rulebook/state_reactions.yaml": "49c0953d2fc03d60dcf065530c9b01d0127661018a4727379208a62f351667b1",
     "world/rules/rulebook/status_display.yaml": "e138c61d9972dc91dee1ef06ab5508ce5d7f9fc46f34295480eb8a3a71434c8a",
     "world/rules/service_gate.py": "8c9584aa8ddbcff0d6a83c7cc461a2674035f4a464c5d3ef7ff1ffe66f56fdfb",
@@ -1244,7 +1244,7 @@
     "world/rules/sexual_state/traits.py": "eb0b8495f68f47fb8b51654821200f22bfe7f008f1241ebc84e284833bf14f91",
     "world/rules/sexual_transitions.py": "69cf32779cfd749d35a7c6ffa62f1067698f3f30df04821b2efcccb98de67c87",
     "world/rules/shop_hours.py": "676d1dd1353d6758068c0b1c9d40e2f3db986cd97d1507a025982d124e04b366",
-    "world/rules/sight.py": "c9d76d662df6f247a9b5a4c47b5d1c97e9b66a45c00e198eefe749402d7fa0d9",
+    "world/rules/sight.py": "4b660bda3f67de4c9e6420d8bf5ad81e87bbc38df540cbb32c87bc1278b55eef",
     "world/rules/skill_effects.py": "6fdffeed7109222c2d762b7784cb513631db43d5e1d8d8b7383a29d8e18a0856",
     "world/rules/skill_ownership.py": "a028bd224eb349c98ee829986dcdc9bdc518470ccf86ef719aba4ef8f0087205",
     "world/rules/skip_safety.py": "72088a1fd2bb12f9bf777805740ada42da4c5689c30e7cbfa94bd752fd4ff255",

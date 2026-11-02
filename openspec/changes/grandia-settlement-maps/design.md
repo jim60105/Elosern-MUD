@@ -67,6 +67,19 @@ If no `k ≤ 3` is accepted, restore the cell. Then:
 
 Record every accepted move as `id: old → new` in the hand-off.
 
+**Generator precondition: a town's own wilderness landmark must not sit on
+its location cell.** `tools/settlement_synthesis/workspace.py::blocked_cells`
+reserves every `wilderness_cell` district landmark, so a landmark on the
+settlement's own cell blocks the mandatory anchor cell and `generate` refuses
+with `location cell not walkable`. Rebinding is not the remedy: the shipped
+contract (`world/lore/tests/test_map_district_content.py`) requires a
+wilderness landmark cell to stay valid wilderness, which a settlement
+footprint destroys. Nine Grandia Voronoi landmarks collided this way; each
+moved three cells north to a walkable, dry, same-region cell, and the
+partition was regenerated. Nine further locations collide the same way and
+belong to the later `altoria-settlement-maps` and `valhalla-settlement-maps`
+changes, which must move their own markers before generating.
+
 ### D3. Prose
 
 Follow `docs/development/settlement-synthesis.md` § Prose pass for every node of every generated map. Grandia flavour comes from `docs/lore/settlement-locations.md`:
@@ -90,6 +103,11 @@ About 230 new rooms spawn in every `sync_grid()` test. Record the `Ran N tests i
 - [A batch member fails generation for a reason other than a water gap, such as `footprint_short` or `envelope_full`] → Report it and leave it ungenerated. Do not hand-author a replacement in this change.
 - [A relocation crosses a district boundary] → Accepted. The partition is regenerated, and the hand-off lists the move for user review.
 - [Monster sites or quest anchors near a moved cell] → `check_map_sources.py` and the adoption test run in task 4. A failure there blocks the commit.
+- [`port_east_bay` plans `anchor_outside_footprint`, which D2 does not cover]
+  → approved by the user as a one-cell eastward move, 2400,461 → 2401,461.
+  Its plan then reports `harbour_crescent` with a balanced three-cell
+  footprint. `port_south_cape` stays unmapped: the sea is five cells out, the
+  reach is two, and the third D2 step is the reserved harbour cell.
 
 ## Migration Plan
 

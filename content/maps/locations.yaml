@@ -132,7 +132,7 @@ locations:
     description: Eastern collection port at the mouth of the imperial river's 
       eastern branch.
     cell:
-      cell_x: 2400
+      cell_x: 2401
       cell_y: 461
     geographic_constraint: Mouth of the imperial eastern branch beside the 
       secondary southeastern harbour site

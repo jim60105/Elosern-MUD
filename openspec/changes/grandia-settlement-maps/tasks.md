@@ -43,3 +43,7 @@ Ground rules:
 ## Workflow follow-up
 
 - The user reviews the maps in the map editor and does the fine fitting after merge.
+- `port_east_bay` was approved for a one-cell eastward move (2400,461 → 2401,461), generated, linted and prose-filled. `port_south_cape` stays unmapped as the D2 unresolved water gap.
+- Nine town cells collided with their own Voronoi landmark; see design D2's generator precondition for the move and for the nine that belong to the later Altoria and Valhalla changes.
+- `world/rules/sight.py` and `sight.yaml` gained the `city`, `town` and `port` silhouettes, because mapping those kinds extends the closed vocabulary the area panel's distant sightings require.
+- Task 4.3 ran one module or class per command; the modules still unrun when this change was handed off are `web.webclient.actions.tests.*` (three), `web.webclient.presentation.tests.test_map_quest_destinations`, `test_world_map`, `world.maps.tests.test_editor_final_yaml_adoption`, `world.quests.tests.*` (fourteen), the remaining `world.rules.tests.*` modules and the two top-level `tests.` modules.
