@@ -58,16 +58,39 @@ EAST_GATE_XYZ = settlement_node_xyz(_EAST_GATE.destination)
 EAST_APPROACH = _ENTRY.approach_cell(_EAST_GATE)
 SOUTH_GATE_XYZ = settlement_node_xyz(_ENTRY.gate_for("n").destination)
 
-#: Physical durations at the one-kilometre wilderness cell span, from the
-#: authored meter positions (world-map-scale §8):
-#:   east gate local (6500,3010) -> absolute (853500,1024660); approach cell
-#:   (854,1024) center (854500,1024500): 1,012.72 m costs 811 s at 1.25 m/s.
-#:   one 1 km cardinal wilderness step over open ground (3 km/h) = 1,200 s.
-GATE_APPROACH_SECONDS = 811
+#: One 1 km cardinal wilderness step over open ground (3 km/h) = 1,200 s.
 WILDERNESS_STEP_SECONDS = 1200
 
 
-class CityWildernessRoundTripTests(EvenniaTest):
+def _polyline_metres(points):
+    """Authored length only; the charged seconds come from the clock, never from here."""
+    import math
+
+    return sum(math.dist(a, b) for a, b in zip(points, points[1:]))
+
+
+class _ChargeAssertions:
+    def assertChargedFor(self, delta, metres):
+        """The spec's healthy settlement speed is 1.25 m/s with one upward rounding."""
+        self.assertGreater(delta, 0)
+        self.assertLess((delta - 1) * 1.25, metres)
+        self.assertLessEqual(metres, delta * 1.25)
+
+
+def _gate_approach_metres():
+    from world.maps import geography
+    from world.maps.map_data import current
+
+    document = current().settlements["capital_altoria"]
+    cell_x, cell_y = geography.current().locations.locations[document.location_ref].cell
+    anchor_x, anchor_y = document.local_anchor_m
+    gate_x, gate_y = document.nodes[_EAST_GATE.destination.object_id].coordinate
+    gate_world = (1000 * cell_x + 500 + gate_x - anchor_x, 1000 * cell_y + 500 + gate_y - anchor_y)
+    approach_world = (1000 * EAST_APPROACH[0] + 500, 1000 * EAST_APPROACH[1] + 500)
+    return _polyline_metres([gate_world, approach_world])
+
+
+class CityWildernessRoundTripTests(_ChargeAssertions, EvenniaTest):
     def setUp(self):
         super().setUp()
         self.room1.key = "Room1"
@@ -123,19 +146,11 @@ class CityWildernessRoundTripTests(EvenniaTest):
 
         # 1 entry + 1 east + 1 west + 1 return = 4 legs, each its own physical
         # segment; the crossing is charged once in either direction.
-        self.assertEqual(
-            advances,
-            [
-                GATE_APPROACH_SECONDS,
-                WILDERNESS_STEP_SECONDS,
-                WILDERNESS_STEP_SECONDS,
-                GATE_APPROACH_SECONDS,
-            ],
-        )
-        self.assertEqual(
-            get_world_clock().tick,
-            before + 2 * GATE_APPROACH_SECONDS + 2 * WILDERNESS_STEP_SECONDS,
-        )
+        self.assertEqual(advances[1], WILDERNESS_STEP_SECONDS)
+        self.assertEqual(advances[2], WILDERNESS_STEP_SECONDS)
+        self.assertEqual(advances[0], advances[3])
+        self.assertChargedFor(advances[0], _gate_approach_metres())
+        self.assertEqual(get_world_clock().tick, before + sum(advances))
         # The player's own bookkeeping is cleaned up on the return exit, but a
         # persistent population monster stays registered at the entry
         # coordinate -- the wilderness is no longer empty (wilderness-
@@ -173,16 +188,27 @@ class CityWildernessRoundTripTests(EvenniaTest):
         # Intra-city exits are CostedXYZExit and each successful step charges
         # its authored physical edge duration.
         from typeclasses.exits import CostedXYZExit
+        from world.maps.map_data import current
 
         south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
         self.char1.location = south_gate
-        city_exit = [e for e in south_gate.exits if e.destination.key == "南大道"][0]
+        city_exit = next(e for e in south_gate.exits if isinstance(e, CostedXYZExit))
         self.assertIsInstance(city_exit, CostedXYZExit)
+        document = current().settlements["capital_altoria"]
+        road = next(
+            road
+            for road in document.roads
+            if road.source == south_gate.sparse_node_id
+            and road.destination == city_exit.destination.sparse_node_id
+        )
+        points = [
+            document.nodes[road.source].coordinate,
+            *[(bend.x_m, bend.y_m) for bend in road.bends],
+            document.nodes[road.destination].coordinate,
+        ]
         before = get_world_clock().tick
         city_exit.at_traverse(self.char1, city_exit.destination)
-        self.assertEqual(self.char1.location.key, "南大道")
-        self.assertEqual(
-            get_world_clock().tick,
-            # 南門 (3050,150) -> 南大道 (3140,1050) = 904.49 m -> 724 s.
-            before + 724,
+        self.assertEqual(self.char1.location, city_exit.destination)
+        self.assertChargedFor(
+            get_world_clock().tick - before, _polyline_metres(points)
         )

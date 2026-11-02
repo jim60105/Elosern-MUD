@@ -28,20 +28,23 @@ def setUpModule():
 class AnchorPlacementRegistryTests(unittest.TestCase):
     @covers_requirement("anchor-placement::anchor-placement-registry-is-intentionally-partial")
     def test_registry_has_one_entry_per_built_settlement(self):
+        from world.maps.map_data import current
+
+        documents = current().settlements
         self.assertEqual(
-            list(ANCHOR_PLACEMENT_REGISTRY),
-            ["capital_altoria", "village_ciaran"],
+            set(ANCHOR_PLACEMENT_REGISTRY),
+            {document.location_ref for document in documents.values()},
         )
-        capital = ANCHOR_PLACEMENT_REGISTRY["capital_altoria"]
-        self.assertEqual(capital.anchor_key, "capital_altoria")
-        self.assertEqual(capital.zcoord, "capital_altoria")
-        self.assertEqual(anchor_entrance_xyz(capital), (3500, 2850, "capital_altoria"))
-        self.assertEqual(capital.node.object_id, "central_plaza")
-        village = ANCHOR_PLACEMENT_REGISTRY["village_ciaran"]
-        self.assertEqual(village.anchor_key, "village_ciaran")
-        self.assertEqual(village.zcoord, "village_ciaran")
-        self.assertEqual(anchor_entrance_xyz(village), (479, 305, "village_ciaran"))
-        self.assertEqual(village.node.object_id, "village_plaza")
+        for map_id, document in documents.items():
+            with self.subTest(map_id=map_id):
+                placement = ANCHOR_PLACEMENT_REGISTRY[document.location_ref]
+                self.assertEqual(placement.anchor_key, document.location_ref)
+                self.assertEqual(placement.zcoord, map_id)
+                self.assertEqual(placement.node.object_id, document.anchor_node.node_id)
+                self.assertEqual(
+                    anchor_entrance_xyz(placement),
+                    (*document.anchor_node.coordinate, map_id),
+                )
 
     @covers_requirement("anchor-placement::every-placement-s-anchor-key-resolves-against-anchor-registry")
     def test_every_entrys_anchor_key_exists_in_anchor_registry(self):
@@ -68,9 +71,11 @@ class AnchorPlacementRegistryTests(unittest.TestCase):
     )
     def test_geographic_declarations_do_not_extend_grid_placement(self):
         self.assertTrue(anchor_geography())
+        from world.maps.map_data import current
+
         self.assertEqual(
-            list(ANCHOR_PLACEMENT_REGISTRY),
-            ["capital_altoria", "village_ciaran"],
+            set(ANCHOR_PLACEMENT_REGISTRY),
+            {document.location_ref for document in current().settlements.values()},
         )
         self.assertLessEqual(set(ANCHOR_PLACEMENT_REGISTRY), set(anchor_geography()))
         self.assertEqual(
@@ -95,30 +100,31 @@ class AnchorPlacementRegistryTests(unittest.TestCase):
         "continental-geography::coordinate-frames-have-explicit-physical-units"
     )
     def test_local_anchor_bindings_transform_to_absolute_metre_positions(self):
+        from world.maps.map_data import current
+
         self.assertEqual(
             {
                 key: frame.local_anchor_m
                 for key, frame in LOCAL_FRAME_ANCHOR_REGISTRY.items()
             },
             {
-                "capital_altoria": (3500, 2850),
-                "village_ciaran": (479, 305),
+                document.location_ref: document.local_anchor_m
+                for document in current().settlements.values()
             },
         )
         self.assertTrue(LocalFrameAnchor.__dataclass_params__.frozen)
-        self.assertEqual(
-            world_position_m("capital_altoria", (3500, 2850)),
-            (850_500, 1_024_500),
-        )
-        self.assertEqual(
-            world_position_m("village_ciaran", (479, 305)),
-            (1_366_500, 554_500),
-        )
-        # Altoria's south gate sits 450 m west and 2,700 m south of the plaza.
-        self.assertEqual(
-            world_position_m("capital_altoria", (3050, 150)),
-            (850_500 - 450, 1_024_500 - 2700),
-        )
+        from world.maps import geography
+
+        for document in current().settlements.values():
+            cell_x, cell_y = geography.current().locations.locations[document.location_ref].cell
+            anchor_x, anchor_y = document.local_anchor_m
+            for node in document.nodes.values():
+                with self.subTest(map=document.location_ref, node=node.node_id):
+                    x, y = node.coordinate
+                    self.assertEqual(
+                        world_position_m(document.location_ref, (x, y)),
+                        (1000 * cell_x + 500 + x - anchor_x, 1000 * cell_y + 500 + y - anchor_y),
+                    )
 
     @covers_requirement(
         "continental-geography::coordinate-frames-have-explicit-physical-units"
@@ -147,7 +153,7 @@ class AnchorPlacementRegistryTests(unittest.TestCase):
         try:
             self.assertEqual(
                 world_position_m("t_frame_anchor", (150, 260)),
-                (2500 + 50, 3500 + 60),
+                (2 * 1000 + 500 + 50, 3 * 1000 + 500 + 60),
             )
         finally:
             publish_settlements(previous_settlements)

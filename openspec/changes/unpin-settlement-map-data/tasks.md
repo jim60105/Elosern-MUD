@@ -9,7 +9,7 @@ Ground rules for every task:
 
 ## 1. Baseline
 
-- [ ] 1.1 Run each module below once on the clean tree. Record pass or fail in a scratch note.
+- [x] 1.1 Run each module below once on the clean tree. Record pass or fail in a scratch note.
   - `world.lore.tests.test_anchor_placement`
   - `world.lore.tests.test_wilderness_entry`
   - `world.maps.tests.test_bootstrap`
@@ -22,7 +22,7 @@ Ground rules for every task:
 
 ## 2. Anchor placement registry (`world/lore/tests/test_anchor_placement.py`)
 
-- [ ] 2.1 In `test_registry_has_one_entry_per_built_settlement`, replace the method body (keep the decorator and `def` line) with:
+- [x] 2.1 In `test_registry_has_one_entry_per_built_settlement`, replace the method body (keep the decorator and `def` line) with:
   ```python
           from world.maps.map_data import current
 
@@ -42,7 +42,7 @@ Ground rules for every task:
                       (*document.anchor_node.coordinate, map_id),
                   )
   ```
-- [ ] 2.2 In `test_geographic_declarations_do_not_extend_grid_placement`, replace the statement `self.assertEqual(list(ANCHOR_PLACEMENT_REGISTRY), ["capital_altoria", "village_ciaran"],)` with:
+- [x] 2.2 In `test_geographic_declarations_do_not_extend_grid_placement`, replace the statement `self.assertEqual(list(ANCHOR_PLACEMENT_REGISTRY), ["capital_altoria", "village_ciaran"],)` with:
   ```python
           from world.maps.map_data import current
 
@@ -51,7 +51,7 @@ Ground rules for every task:
               {document.location_ref for document in current().settlements.values()},
           )
   ```
-- [ ] 2.3 In `test_local_anchor_bindings_transform_to_absolute_metre_positions`:
+- [x] 2.3 In `test_local_anchor_bindings_transform_to_absolute_metre_positions`:
   - Replace the literal dict `{"capital_altoria": (3500, 2850), "village_ciaran": (479, 305)}` with `{document.location_ref: document.local_anchor_m for document in current().settlements.values()}`. Add `from world.maps.map_data import current` as the first line of the method body.
   - Replace the three literal `world_position_m(...)` assertions, including the "south gate sits 450 m west" comment, with a loop over every document and every node:
     ```python
@@ -74,14 +74,14 @@ Ground rules for every task:
 
 ## 3. Wilderness entry registry (`world/lore/tests/test_wilderness_entry.py`)
 
-- [ ] 3.1 In `test_registry_has_two_v2_entries_keyed_by_settlement`, make these replacements and keep the method name and decorators:
+- [x] 3.1 In `test_registry_has_two_v2_entries_keyed_by_settlement`, make these replacements and keep the method name and decorators:
   - The `list(WILDERNESS_ENTRY_REGISTRY) == [...]` assertion → `self.assertEqual(set(WILDERNESS_ENTRY_REGISTRY), {d.location_ref for d in current().settlements.values() if d.wilderness_entry is not None})`. Import `current` from `world.maps.map_data` inside the method.
   - `self.assertEqual(_capital().hash_cell_count, 40)` → `self.assertEqual(_capital().hash_cell_count, sum(row.count("#") for row in document.wilderness_entry.shape))`, where `document = current().settlements["capital_altoria"]`.
   - `self.assertEqual(_capital().origin_xy, (847, 1020))` → compute `cell_x, cell_y = geography.current().locations.locations["capital_altoria"].cell` and `dx, dy = document.wilderness_entry.offset`, then assert `origin_xy == (cell_x + dx, cell_y + dy)`. Use `from world.maps import geography`.
   - The capital gate list literal `[("n", "capital_altoria", "south_gate"), ("w", "capital_altoria", "east_gate")]` → `[(g.return_direction, "capital_altoria", g.destination_node) for g in document.wilderness_entry.gates]`.
   - Leave the village assertions unchanged.
 
-- [ ] 3.2 In `test_derived_geometry_matches_the_authored_mask`, keep the footprint-cells comprehension, the point-shape check and the 4-connectivity walk. Replace the literal assertions as follows, with these definitions at the top of the method:
+- [x] 3.2 In `test_derived_geometry_matches_the_authored_mask`, keep the footprint-cells comprehension, the point-shape check and the 4-connectivity walk. Replace the literal assertions as follows, with these definitions at the top of the method:
 
   ```python
   document = current().settlements["capital_altoria"]
@@ -95,7 +95,7 @@ Ground rules for every task:
   - `anchor_cell == (850, 1024)` → `== geometry.anchor_cell`.
   - The two `approach_cell(...)` literals `(850, 1021)` and `(854, 1024)` become a loop over `document.wilderness_entry.gates`. For each gate, assert `_capital().approach_cell(_capital().gate_for(g.return_direction)) == gate_approach_cell(geometry, g.return_direction)`.
   - Rewrite the leading comment so that it no longer states "40 km²" or "7x9".
-- [ ] 3.3 In `test_gate_lookup_by_return_direction`:
+- [x] 3.3 In `test_gate_lookup_by_return_direction`:
   - Keep the `gate_for("n")` and `gate_for("w")` destination assertions.
   - Replace the two `assertIsNone(...gate_for("s"/"e"))` lines and their comment with:
 
@@ -115,8 +115,8 @@ Ground rules for every task:
 
 ## 4. Bootstrap sync (`world/maps/tests/test_bootstrap.py`)
 
-- [ ] 4.1 Rename `test_capital_sparse_graph_spawns_twenty_one_rooms_and_fifty_two_exits` to `test_capital_sparse_graph_spawns_one_room_per_node_and_one_exit_per_road`. Keep its decorator. Replace the literals `21` and `52` with `len(current().settlements["capital_altoria"].nodes)` and `len(current().settlements["capital_altoria"].roads)`, importing `from world.maps.map_data import current` inside the method.
-- [ ] 4.2 In `MetricCutoverTests._seed_precutover_rooms`, replace the two loop header lines `for map_id, graph in SETTLEMENT_GRAPHS.items():` and `for node_id in graph.nodes:` with the lines below, and keep the loop body unchanged:
+- [x] 4.1 Rename `test_capital_sparse_graph_spawns_twenty_one_rooms_and_fifty_two_exits` to `test_capital_sparse_graph_spawns_one_room_per_node_and_one_exit_per_road`. Keep its decorator. Replace the literals `21` and `52` with `len(current().settlements["capital_altoria"].nodes)` and `len(current().settlements["capital_altoria"].roads)`, importing `from world.maps.map_data import current` inside the method.
+- [x] 4.2 In `MetricCutoverTests._seed_precutover_rooms`, replace the two loop header lines `for map_id, graph in SETTLEMENT_GRAPHS.items():` and `for node_id in graph.nodes:` with the lines below, and keep the loop body unchanged:
   ```python
           for map_id, old_coordinates in OLD_COORDINATES.items():
               ids[map_id] = {}
@@ -126,7 +126,7 @@ Ground rules for every task:
                   coordinate = old_coordinates[node_id]
   ```
   Delete the original `ids[map_id] = {}` and `coordinate = OLD_COORDINATES[map_id][node_id]` lines that these new lines replace. The cutover still has to converge every declared node: the existing `_declared_node_count()` assertions stay unchanged.
-- [ ] 4.3 Replace each of the three string keys `"grid:capital_altoria:3500:2850"` in `test_cutover_preserves_identity_references_and_knowledge` (two occurrences) and in `test_real_startup_converges_places_scene_art_and_quest_targets` (one occurrence). Replace each one with a call to `_plaza_key()`. Add this function once at module level, directly below `OLD_COORDINATES`:
+- [x] 4.3 Replace each of the three string keys `"grid:capital_altoria:3500:2850"` in `test_cutover_preserves_identity_references_and_knowledge` (two occurrences) and in `test_real_startup_converges_places_scene_art_and_quest_targets` (one occurrence). Replace each one with a call to `_plaza_key()`. Add this function once at module level, directly below `OLD_COORDINATES`:
   ```python
   def _plaza_key():
       x, y = SETTLEMENT_GRAPHS["capital_altoria"].node("central_plaza").coordinate
@@ -134,7 +134,7 @@ Ground rules for every task:
   ```
   Call `_plaza_key()` at each use site. A module-level constant would read the published view at import time, so use the function. Leave the compact keys `"grid:capital_altoria:3:3"`, `"grid:capital_altoria:3:0"` and `"grid:village_ciaran:1:1"` unchanged.
 
-- [ ] 4.4 In `WildernessBootstrapTests`:
+- [x] 4.4 In `WildernessBootstrapTests`:
   - In `test_sync_wilderness_provisions_one_gate_exit_per_authored_gate` and `test_sync_wilderness_is_idempotent`, replace `WildernessGateExit.objects.all().count(), 3` with:
 
     ```python
@@ -163,7 +163,7 @@ Ground rules for every task:
 
 ## 5. City walkthrough (`world/maps/tests/test_city_walkthrough.py`)
 
-- [ ] 5.1 In `test_walk_from_limbo_to_central_plaza_and_render`, replace the three `next(...)` lookups by key (南大道, 大道北段, 中央廣場) with a breadth-first walk over spawned exits from `south_gate` that stops at the first `AnchorRoom`:
+- [x] 5.1 In `test_walk_from_limbo_to_central_plaza_and_render`, replace the three `next(...)` lookups by key (南大道, 大道北段, 中央廣場) with a breadth-first walk over spawned exits from `south_gate` that stops at the first `AnchorRoom`:
   ```python
           plaza = None
           seen, frontier = {south_gate}, [south_gate]
@@ -179,14 +179,14 @@ Ground rules for every task:
                       frontier.append(nxt)
   ```
   Keep the following assertions (`assertIsInstance(plaza, AnchorRoom)`, the `anchor_key` check, the render).
-- [ ] 5.2 In `test_every_room_is_reachable_from_south_gate`, replace `21` with `len(current().settlements["capital_altoria"].nodes)` and import `current` from `world.maps.map_data`.
+- [x] 5.2 In `test_every_room_is_reachable_from_south_gate`, replace `21` with `len(current().settlements["capital_altoria"].nodes)` and import `current` from `world.maps.map_data`.
 
   Check: `grep -n "南大道\|大道北段\|, 21)" world/maps/tests/test_city_walkthrough.py` prints nothing, and the module passes.
 
 ## 6. City movement cost (`world/maps/tests/test_city_movement_cost.py`)
 
-- [ ] 6.1 Add `_polyline_metres` and the `assertChargedFor` mixin method from design D2. The mixin is a small class `_ChargeAssertions` that the test class also inherits. Delete `SOUTH_GATE_TO_AVENUE_SECONDS` and its comment line (`南門 (3050,150) -> ...`), and keep `HIDDEN_PATH_TO_PLAZA_SECONDS`.
-- [ ] 6.2 In `test_fresh_intra_city_traversal_advances_clock_by_move`:
+- [x] 6.1 Add `_polyline_metres` and the `assertChargedFor` mixin method from design D2. The mixin is a small class `_ChargeAssertions` that the test class also inherits. Delete `SOUTH_GATE_TO_AVENUE_SECONDS` and its comment line (`南門 (3050,150) -> ...`), and keep `HIDDEN_PATH_TO_PLAZA_SECONDS`.
+- [x] 6.2 In `test_fresh_intra_city_traversal_advances_clock_by_move`:
   - Replace the `"南大道"` lookup with `city_exit = next(e for e in south_gate.exits if isinstance(e, CostedXYZExit))`.
   - Compute `document = current().settlements["capital_altoria"]`.
   - Find the road: `road = next(r for r in document.roads if r.source == south_gate.sparse_node_id and r.destination == city_exit.destination.sparse_node_id)`.
@@ -198,7 +198,7 @@ Ground rules for every task:
 
 ## 7. City–wilderness roundtrip (`world/maps/tests/test_city_wilderness_roundtrip.py`)
 
-- [ ] 7.1 Add `_polyline_metres` and the `_ChargeAssertions` mixin (design D2), and make `CityWildernessRoundTripTests` inherit the mixin. Replace the constant `GATE_APPROACH_SECONDS = 811` and its comment with a function:
+- [x] 7.1 Add `_polyline_metres` and the `_ChargeAssertions` mixin (design D2), and make `CityWildernessRoundTripTests` inherit the mixin. Replace the constant `GATE_APPROACH_SECONDS = 811` and its comment with a function:
   ```python
   def _gate_approach_metres():
       from world.maps import geography
@@ -220,13 +220,13 @@ Ground rules for every task:
   - `get_world_clock().tick == before + sum(advances)`.
 
   Apply the same pattern to every other use of `GATE_APPROACH_SECONDS`: the charged delta of a gate crossing must satisfy `assertChargedFor(delta, _gate_approach_metres())`. Keep `WILDERNESS_STEP_SECONDS`.
-- [ ] 7.2 In `test_intra_city_grid_traversal_advances_clock_by_move`, apply the same rewrite as task 6.2: any `CostedXYZExit` of the south gate, checked with `assertChargedFor` against the document road's polyline metres. This replaces the `"南大道"` lookups and `before + 724`.
+- [x] 7.2 In `test_intra_city_grid_traversal_advances_clock_by_move`, apply the same rewrite as task 6.2: any `CostedXYZExit` of the south gate, checked with `assertChargedFor` against the document road's polyline metres. This replaces the `"南大道"` lookups and `before + 724`.
 
   Check: `grep -nE "811|724|6500,3010|南大道" world/maps/tests/test_city_wilderness_roundtrip.py` prints nothing, and the module passes.
 
 ## 8. Geography source (`world/maps/tests/test_geography_source.py`)
 
-- [ ] 8.1 In `test_retained_adapter_keeps_its_snapshot_coordinates`, replace the three `(3500, 2850)` arguments with `anchor_xy`. Define it at the top of the method as `anchor_xy = map_data.current().settlements["capital_altoria"].local_anchor_m`, using `from world.maps import map_data`. Check: the module passes.
+- [x] 8.1 In `test_retained_adapter_keeps_its_snapshot_coordinates`, replace the three `(3500, 2850)` arguments with `anchor_xy`. Define it at the top of the method as `anchor_xy = map_data.current().settlements["capital_altoria"].local_anchor_m`, using `from world.maps import map_data`. Check: the module passes.
 
 ## 9. Canary proof (temporary data, never committed)
 
