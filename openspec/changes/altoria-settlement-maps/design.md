@@ -41,7 +41,7 @@ For `k = 1, 2, 3`:
 
 1. Compute `c_k = L.cell + round_away(k * (T - L.cell) / max(|T.x - L.x|, |T.y - L.y|))`.
 2. Reject `c_k` in any of these cases:
-   - `place_sites.py` reports `walkable=False` or `water_cell=True` for it;
+   - `place_sites.py`, run on a candidate file `[{"id": "<L>", "cell": [c_k.x, c_k.y]}]` (the cell is a two-item JSON list), reports `walkable=False` or `water_cell=True` for it;
    - its region or nation differs from `L`'s;
    - it equals any location cell or harbour cell.
 3. Otherwise set the cell and rerun `generate L --plan-only`. Accept `c_k` once the plan succeeds. If it still fails, restore the cell and try the next `k`.

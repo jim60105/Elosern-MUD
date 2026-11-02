@@ -30,6 +30,7 @@ None. `skip_specs: true` is set.
 
 ## Batch:
 
+- depends-on: settlement-sync-cost-probe
 - depends-on: grandia-settlement-maps
 - depends-on: altoria-capital-river-rework
 - depends-on: settlement-rework-and-prose
