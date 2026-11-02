@@ -5,6 +5,8 @@ This page records the unit and ownership contract introduced by
 reference for changing settlement maps, route finding, or the grid bootstrap.
 The metric cutover (`activate-metric-settlements`) landed on top of it: the
 authored coordinates are now integer metres and there is no ASCII map.
+Coordinates quoted here are historical design examples; the current Altoria
+graph lives in `content/maps/settlements/capital_altoria.yaml`.
 
 ## Ownership
 
