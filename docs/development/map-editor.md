@@ -39,9 +39,10 @@ uv run --locked --project tools/map-editor python -m elosern_map_editor --worksp
 
 Open `http://127.0.0.1:8765/`. The service serves `frontend/dist/` itself. If
 the build is missing at startup, `/` answers 503 with the build command and the
-API keeps working (restart the service after building). Only loopback
-addresses are accepted for `--host`, and `--port` must be an explicit port: an
-ephemeral `0` is refused because the Host/Origin allowlist names the port.
+API keeps working (restart the service after building). `--host` takes an IP
+address or `localhost` and defaults to `127.0.0.1`; `0.0.0.0` binds every host
+interface. `--port` must be an explicit port: an ephemeral `0` is refused
+because the Host/Origin allowlist names the port.
 
 ### 1.1 Container launch (Podman)
 
@@ -51,6 +52,7 @@ Node and pnpm stay inside the build stage, so the host needs only Podman:
 
 ```console
 ./scripts/podman-map-editor.sh                 # build, then serve on 127.0.0.1:8765
+./scripts/podman-map-editor.sh --host 0.0.0.0  # serve every host interface
 ./scripts/podman-map-editor.sh --no-build      # reuse the existing local image
 ./scripts/podman-map-editor.sh --port 9000     # another port
 ./scripts/podman-map-editor.sh --workspace /path/to/repo
@@ -58,12 +60,13 @@ Node and pnpm stay inside the build stage, so the host needs only Podman:
 
 The image carries the service environment and the built workspace; the checkout
 itself is mounted read-write at `/workspace`, so autosaved YAML lands in the
-working tree. The container shares the host network namespace because the
-service binds loopback only and its Host/Origin allowlist names
-`127.0.0.1:<port>`; a published port could never reach it. It runs with
-`--userns=keep-id` so saved files stay owned by the invoking user, and it is
-independent of the game container. Logs: `podman logs -f elosern-map-editor`;
-stop: `podman stop elosern-map-editor`.
+working tree. The container shares the host network namespace and binds
+`--host` there, so the default `127.0.0.1` keeps the editor local and an
+explicit `--host 0.0.0.0` serves every host interface (another machine then
+opens `http://<this-host-ip>:<port>/`). It runs with `--userns=keep-id` so saved
+files stay owned by the invoking user, and it is independent of the game
+container. Logs: `podman logs -f elosern-map-editor`; stop:
+`podman stop elosern-map-editor`.
 
 Checks:
 
@@ -985,13 +988,19 @@ vocabulary, bounds, sizes and output format.
 
 ## 4. Security Model and Limitations
 
-- **Loopback only.** The service binds a loopback address and answers only
-  requests whose `Host` is exactly `127.0.0.1:<port>`, `localhost:<port>` or
-  `[::1]:<port>`, which defeats DNS rebinding.
+- **Bind address and Host.** `--host` takes an IP address or `localhost` and
+  defaults to `127.0.0.1`; the Podman script passes it through with the same
+  default. The service answers `Host` values of exactly `127.0.0.1:<port>`,
+  `localhost:<port>` or `[::1]:<port>`, plus the concrete bind address when it
+  is not a wildcard. Under an explicit wildcard bind (`0.0.0.0`/`::`) any IP
+  literal carrying the port is answered, because the address a client dialled
+  cannot be enumerated; a DNS name is refused in both cases, which defeats DNS
+  rebinding.
 - **Same origin only.** A request that sends `Origin` must send this service's
-  own origin. `null` and every other origin, including other localhost ports,
-  are refused, and `Sec-Fetch-Site` must be `same-origin` or `none` when sent.
-  No CORS header is ever emitted.
+  own origin -- under a wildcard bind, the origin of the `Host` the request
+  named. `null` and every other origin, including other localhost ports, are
+  refused, and `Sec-Fetch-Site` must be `same-origin` or `none` when sent. No
+  CORS header is ever emitted.
 - **Mutations.** Every `POST` must carry the matching `Origin`, the launch
   token in `X-Map-Editor-Token`, `Content-Type: application/json` and a body of
   at most 64 KiB, checked from `Content-Length` before reading and counted for
@@ -1001,9 +1010,12 @@ vocabulary, bounds, sizes and output format.
   The page fetches it from `GET /api/session` and keeps it in memory only: never
   in a URL, the clipboard, browser storage or a log (the access log is off). It
   defends against pages on other browser origins (CSRF) and detects stale
-  sessions. It does not authenticate local processes: anything that can open a
-  loopback connection with the right `Host` can read it. Local malicious
-  processes, remote access, accounts and multiple users are out of scope.
+  sessions. It does not authenticate anyone else: anything that can reach the
+  service and send an admitted `Host` can read the workspace, and can fetch the
+  token from `GET /api/session` to mutate it. Choosing `--host 0.0.0.0`
+  therefore exposes the editor to every host that can reach the port, so keep
+  the loopback default on an untrusted network. Accounts, per-user
+  authorization and local malicious processes are out of scope.
 - **Confinement.** Document identities resolve only to the allowlisted
   sources (`content/maps/...`), layouts (`content/map-editor-layouts/...`) and
   the two generated artifacts; only the partition job publishes the

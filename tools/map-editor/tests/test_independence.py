@@ -64,12 +64,26 @@ def test_confined_discovery_finds_the_same_plain_source_set_as_the_core(workspac
     assert tuple(path for path, _ in rows) == discover_source_paths(workspace)
 
 
-@pytest.mark.parametrize("host", ["0.0.0.0", "192.0.2.10", "example.invalid", "::"])
-def test_the_launcher_refuses_a_non_loopback_bind(workspace, host, capsys):
+@pytest.mark.parametrize("host", ["0.0.0.0", "::", "192.0.2.10"])
+def test_the_launcher_accepts_a_concrete_bind_address(workspace, host):
+    config = parse_config(["--workspace", str(workspace), "--host", host, "--port", "9100"])
+    assert config.host == host
+    assert {"127.0.0.1:9100", "localhost:9100", "[::1]:9100"} <= config.allowed_hosts
+
+
+@pytest.mark.parametrize("host", ["example.invalid", "localhost.", "192.0.2.10:9100"])
+def test_the_launcher_refuses_a_bind_that_is_not_an_ip_address(workspace, host, capsys):
     with pytest.raises(SystemExit) as raised:
         parse_config(["--workspace", str(workspace), "--host", host])
     assert raised.value.code == 2
-    assert "loopback" in capsys.readouterr().err
+    assert "IP address" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("host", ["0.0.0.0", "::"])
+def test_a_wildcard_bind_answers_ip_literals_instead_of_naming_itself(workspace, host):
+    config = parse_config(["--workspace", str(workspace), "--host", host, "--port", "9100"])
+    assert config.binds_every_interface
+    assert config.allowed_hosts == {"127.0.0.1:9100", "localhost:9100", "[::1]:9100"}
 
 
 def test_the_launcher_refuses_an_ephemeral_port(workspace):
@@ -81,4 +95,5 @@ def test_the_launcher_accepts_loopback_addresses(workspace):
     for host in ("127.0.0.1", "localhost", "::1"):
         config = parse_config(["--workspace", str(workspace), "--host", host, "--port", "9100"])
         assert config.host == host
-        assert f"[::1]:9100" in config.allowed_hosts
+        assert not config.binds_every_interface
+        assert config.allowed_hosts == {"127.0.0.1:9100", "localhost:9100", "[::1]:9100"}

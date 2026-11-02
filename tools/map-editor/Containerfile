@@ -164,14 +164,15 @@ USER $UID
 # the process quietly. `podman stop` therefore maps to a clean stop.
 STOPSIGNAL SIGTERM
 
-# Only loopback binds are accepted, so the container must share the host network
-# namespace for http://127.0.0.1:8765 to be reachable (scripts/podman-map-editor.sh).
+# The bind address is an IP literal or `localhost` (`--host`), so the container
+# shares the host network namespace to serve one host interface or, with an
+# explicit `--host 0.0.0.0`, all of them (scripts/podman-map-editor.sh).
 #
 # The editor creates map directories at run time (os.mkdir with 0o777), so
 # umask 0002 keeps GID-0 group-write on what it creates. `exec` replaces the
 # shell, leaving python as dumb-init's direct child for signal forwarding.
 # Fixed arguments stay in ENTRYPOINT; "$@" carries CMD, so appending
-# `--port N` still overrides the default.
+# `--host H`/`--port N` still overrides the defaults.
 ENTRYPOINT ["dumb-init", "--", "sh", "-c", \
             "umask 0002 && exec python -m elosern_map_editor --workspace /workspace --frontend-dist /app/frontend/dist \"$@\"", \
             "elosern-map-editor"]

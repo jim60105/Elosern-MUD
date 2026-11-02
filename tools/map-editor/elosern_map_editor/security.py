@@ -4,9 +4,13 @@ Order, for every HTTP request, before any route runs, lock is taken or file is
 read:
 
 1. ``Host`` must be one of the exact loopback ``host:port`` values the service
-   was started for (blocks DNS rebinding).
+   was started for, or ``<bind address>:<port>`` when it binds one interface.
+   When the bind is a wildcard address the request may name any interface, so
+   ``Host`` must be an IP literal (or a loopback name) carrying the port and a
+   DNS name is refused (both forms block DNS rebinding).
 2. ``Origin``, when sent, must be this service's own origin (``null`` and every
-   other origin, including other localhost ports, are foreign).
+   other origin, including other localhost ports, are foreign) -- under a
+   wildcard bind that is the origin matching the ``Host`` the request sent.
    ``Sec-Fetch-Site``, when sent, must be ``same-origin`` or ``none``.
 3. Only ``GET``/``HEAD``/``POST`` are served.
 4. A ``POST`` additionally requires a matching ``Origin``, the current launch
@@ -21,6 +25,7 @@ Security Policy, so the page can load nothing but this origin's own assets.
 from __future__ import annotations
 
 import hmac
+import ipaddress
 import json
 from collections.abc import Callable
 
@@ -46,6 +51,25 @@ def error_body(code: str, message: str) -> bytes:
     return json.dumps({"error": {"code": code, "message": message}}).encode("utf-8")
 
 
+def _is_ip_literal_host(host: str, port: int) -> bool:
+    """True when ``host`` names ``port`` on an IPv4/IPv6 literal, never a name."""
+
+    if host.startswith("["):
+        name, separator, suffix = host[1:].partition("]")
+        if not separator or suffix != f":{port}":
+            return False
+        version = 6
+    else:
+        name, separator, suffix = host.rpartition(":")
+        if not separator or suffix != str(port):
+            return False
+        version = 4
+    try:
+        return ipaddress.ip_address(name).version == version
+    except ValueError:
+        return False
+
+
 class AdmissionMiddleware:
     """Reject foreign, unauthenticated or oversized requests up front."""
 
@@ -55,12 +79,18 @@ class AdmissionMiddleware:
         *,
         allowed_hosts: frozenset[str],
         allowed_origins: frozenset[str],
+        port: int,
+        wildcard_bind: bool = False,
         token: Callable[[], str],
         max_body_bytes: int,
     ) -> None:
         self.app = app
         self.allowed_hosts = allowed_hosts
         self.allowed_origins = allowed_origins
+        self.port = port
+        #: A wildcard bind accepts a connection on every interface, so the
+        #: exact allowlist cannot name the address the client dialled.
+        self.wildcard_bind = wildcard_bind
         self.token = token
         self.max_body_bytes = max_body_bytes
 
@@ -132,10 +162,11 @@ class AdmissionMiddleware:
 
         host = single("host")
         # Host names are case-insensitive; the allowlist is lower-case.
-        if host is None or host.lower() not in self.allowed_hosts:
+        host_lower = None if host is None else host.lower()
+        if host_lower is None or not self._admit_host(host_lower):
             return 403, "forbidden_host", "the Host header is not this local service"
         origin = single("origin")
-        if origin is not None and origin not in self.allowed_origins:
+        if origin is not None and not self._admit_origin(origin, host_lower):
             return 403, "forbidden_origin", "requests from another origin are refused"
         fetch_site = single("sec-fetch-site")
         if fetch_site is not None and fetch_site not in SAFE_FETCH_SITES:
@@ -160,6 +191,19 @@ class AdmissionMiddleware:
             if int(length) > self.max_body_bytes:
                 return 413, "body_too_large", "the request body exceeds the limit"
         return None
+
+    def _admit_host(self, host: str) -> bool:
+        if host in self.allowed_hosts:
+            return True
+        return self.wildcard_bind and _is_ip_literal_host(host, self.port)
+
+    def _admit_origin(self, origin: str, host: str) -> bool:
+        if origin in self.allowed_origins:
+            return True
+        # "Same origin" under a wildcard bind means the origin of the Host the
+        # request actually named, which is the one the browser loaded the page
+        # from; any other origin stays foreign.
+        return self.wildcard_bind and origin == f"http://{host}"
 
     @staticmethod
     async def _reject(send, status: int, code: str, message: str) -> None:

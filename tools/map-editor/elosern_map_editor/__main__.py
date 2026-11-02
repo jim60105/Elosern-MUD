@@ -11,22 +11,29 @@ from pathlib import Path
 from .config import DEFAULT_FRONTEND_DIST, DEFAULT_HOST, DEFAULT_PORT, DEFAULT_WORKSPACE, EditorConfig
 
 
-def _is_loopback(host: str) -> bool:
+def _is_bind_address(host: str) -> bool:
+    """A bind target is an IP literal or the loopback name, never a DNS name."""
+
     if host == "localhost":
         return True
     try:
-        return ipaddress.ip_address(host).is_loopback
+        ipaddress.ip_address(host)
     except ValueError:
         return False
+    return True
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="elosern-map-editor",
-        description="Serve the standalone map editor for one workspace on a loopback address.",
+        description="Serve the standalone map editor for one workspace on one bind address.",
     )
     parser.add_argument("--workspace", type=Path, default=DEFAULT_WORKSPACE, help="workspace (repository) root")
-    parser.add_argument("--host", default=DEFAULT_HOST, help="loopback address to bind (default 127.0.0.1)")
+    parser.add_argument(
+        "--host",
+        default=DEFAULT_HOST,
+        help="IP address or 'localhost' to bind (default 127.0.0.1; 0.0.0.0 binds every interface)",
+    )
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="TCP port (1-65535; 0 is refused)")
     parser.add_argument("--frontend-dist", type=Path, default=DEFAULT_FRONTEND_DIST, help="built frontend directory")
     return parser
@@ -35,8 +42,8 @@ def build_parser() -> argparse.ArgumentParser:
 def parse_config(argv: Sequence[str] | None = None) -> EditorConfig:
     parser = build_parser()
     arguments = parser.parse_args(argv)
-    if not _is_loopback(arguments.host):
-        parser.error(f"--host {arguments.host!r} is not a loopback address; the editor is local-only")
+    if not _is_bind_address(arguments.host):
+        parser.error(f"--host {arguments.host!r} is not an IP address or 'localhost'")
     if not 1 <= arguments.port <= 65535:
         parser.error("--port must be between 1 and 65535 (an ephemeral port 0 is refused)")
     if not arguments.workspace.is_dir():

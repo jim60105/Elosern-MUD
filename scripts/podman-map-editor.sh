@@ -10,16 +10,19 @@
 #   podman-map-editor.sh [options]
 #
 # Options:
+#   --host HOST       Host address to bind (default: 127.0.0.1, loopback only)
 #   --port PORT       Host port to serve on (default: 8765)
 #   --workspace DIR   Checkout the editor reads and writes (default: this repo)
 #   --no-build        Reuse the local image instead of rebuilding it
 #   -h, --help        Show this help
 #
-# The container shares the host network namespace: the service binds loopback
-# only, and its Host/Origin allowlist names 127.0.0.1:<port>, so a published
-# port would never reach it. The checkout is mounted read-write at /workspace
-# and is owned by the invoking user (--userns=keep-id), because every editor
-# command autosaves one source document.
+# The container shares the host network namespace and the service binds HOST
+# there, so the default 127.0.0.1 keeps the editor loopback only and
+# --host 0.0.0.0 serves every interface of this host. A request must still name
+# an IP address (or localhost) carrying the port in Host, and a mutating request
+# must match that origin and carry the launch token. The checkout is mounted
+# read-write at /workspace and is owned by the invoking user (--userns=keep-id),
+# because every editor command autosaves one source document.
 
 set -Eeuo pipefail
 
@@ -33,6 +36,7 @@ readonly IGNOREFILE="tools/map-editor/.containerignore"
 readonly READY_TIMEOUT_SECONDS=90
 
 PORT=8765
+HOST=127.0.0.1
 WORKSPACE="$PROJECT_DIR"
 BUILD=1
 
@@ -44,16 +48,19 @@ Usage:
   podman-map-editor.sh [options]
 
 Options:
+  --host HOST       Host address to bind (default: 127.0.0.1, loopback only)
   --port PORT       Host port to serve on (default: 8765)
   --workspace DIR   Checkout the editor reads and writes (default: this repo)
   --no-build        Reuse the local image instead of rebuilding it
   -h, --help        Show this help
 
-The container shares the host network namespace: the service binds loopback
-only, and its Host/Origin allowlist names 127.0.0.1:<port>, so a published
-port would never reach it. The checkout is mounted read-write at /workspace
-and is owned by the invoking user (--userns=keep-id), because every editor
-command autosaves one source document.
+The container shares the host network namespace and the service binds HOST
+there, so the default 127.0.0.1 keeps the editor loopback only and
+--host 0.0.0.0 serves every interface of this host. A request must still name
+an IP address (or localhost) carrying the port in Host, and a mutating request
+must match that origin and carry the launch token. The checkout is mounted
+read-write at /workspace and is owned by the invoking user (--userns=keep-id),
+because every editor command autosaves one source document.
 EOF
 }
 
@@ -71,6 +78,15 @@ require_podman() {
 parse_args() {
     while (( $# )); do
         case "$1" in
+            --host)
+                [[ $# -ge 2 ]] || die "--host needs a value"
+                HOST="$2"
+                shift 2
+                ;;
+            --host=*)
+                HOST="${1#*=}"
+                shift
+                ;;
             --port)
                 [[ $# -ge 2 ]] || die "--port needs a value"
                 PORT="$2"
@@ -106,10 +122,25 @@ parse_args() {
 
     [[ "$PORT" =~ ^[0-9]+$ ]] || die "--port must be a TCP port number, got: $PORT"
     (( PORT >= 1 && PORT <= 65535 )) || die "--port must be between 1 and 65535, got: $PORT"
+    [[ -n "$HOST" && "$HOST" != *[[:space:]]* ]] ||
+        die "--host must be an address without whitespace, got: $HOST"
     [[ -d "$WORKSPACE" ]] || die "--workspace is not a directory: $WORKSPACE"
     WORKSPACE="$(cd -- "$WORKSPACE" &> /dev/null && pwd)"
     [[ -d "$WORKSPACE/content" ]] ||
         die "$WORKSPACE does not look like the Elosern checkout (no content/ directory)"
+}
+
+binds_every_interface() {
+    [[ "$HOST" == "0.0.0.0" || "$HOST" == "::" ]]
+}
+
+#: The URL to check from this host; a wildcard bind answers loopback too.
+local_url() {
+    case "$HOST" in
+        0.0.0.0 | ::) echo "http://127.0.0.1:$PORT" ;;
+        *:*) echo "http://[$HOST]:$PORT" ;;
+        *) echo "http://$HOST:$PORT" ;;
+    esac
 }
 
 port_in_use() {
@@ -149,21 +180,21 @@ start_container() {
 
     echo ""
     echo "=== Starting the editor in the background ==="
-    podman run "${args[@]}" "$IMAGE" --port "$PORT" > /dev/null
+    podman run "${args[@]}" "$IMAGE" --host "$HOST" --port "$PORT" > /dev/null
 }
 
 wait_until_ready() {
     local deadline=$((SECONDS + READY_TIMEOUT_SECONDS))
 
     echo ""
-    echo "=== Waiting for the editor to answer on 127.0.0.1:$PORT ==="
+    echo "=== Waiting for the editor to answer on $(local_url) ==="
     while (( SECONDS < deadline )); do
         if ! podman container exists "$CONTAINER" 2> /dev/null; then
             podman logs "$CONTAINER" 2>&1 || true
             die "the editor container exited during startup"
         fi
         if curl --fail --silent --show-error --output /dev/null \
-            "http://127.0.0.1:$PORT/api/workspace" 2> /dev/null; then
+            "$(local_url)/api/workspace" 2> /dev/null; then
             return 0
         fi
         sleep 0.5
@@ -174,11 +205,15 @@ wait_until_ready() {
 
 report() {
     echo ""
-    if curl --fail --silent --output /dev/null "http://127.0.0.1:$PORT/" 2> /dev/null; then
-        echo "✅ Map editor running — open http://127.0.0.1:$PORT/"
+    if curl --fail --silent --output /dev/null "$(local_url)/" 2> /dev/null; then
+        echo "✅ Map editor running — open $(local_url)/"
     else
         echo "⚠️  Editor service is up but the browser workspace is missing from the image."
         echo "   Rebuild without --no-build; the frontend build lives in the image."
+    fi
+    echo "   Bind: ${HOST} (port ${PORT})"
+    if binds_every_interface; then
+        echo "   Serves every interface: open http://<this-host-ip>:$PORT/ from another machine"
     fi
     echo "   Workspace (read/write): $WORKSPACE"
     echo "   Logs:  podman logs --follow $CONTAINER"

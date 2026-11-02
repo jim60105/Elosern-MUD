@@ -17,6 +17,9 @@ DEFAULT_FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+#: Bind addresses that accept a connection on every host interface. No request
+#: can name them in ``Host``, so such a bind answers IP literals instead.
+WILDCARD_HOSTS = frozenset({"0.0.0.0", "::"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,11 +74,21 @@ class EditorConfig:
         object.__setattr__(self, "frontend_dist", Path(self.frontend_dist))
 
     @property
+    def binds_every_interface(self) -> bool:
+        """True when ``--host`` is a wildcard address rather than one interface."""
+
+        return self.host in WILDCARD_HOSTS
+
+    @property
     def allowed_hosts(self) -> frozenset[str]:
-        """Exact ``Host`` header values this service answers."""
+        """Exact ``Host`` header values this service answers.
+
+        A wildcard bind answers every IP literal that carries this port instead
+        (``AdmissionMiddleware``), so only the loopback names are exact here.
+        """
 
         hosts = {f"127.0.0.1:{self.port}", f"localhost:{self.port}", f"[::1]:{self.port}"}
-        if self.host not in LOOPBACK_HOSTS:
+        if self.host not in LOOPBACK_HOSTS and not self.binds_every_interface:
             bracketed = f"[{self.host}]" if ":" in self.host else self.host
             hosts.add(f"{bracketed}:{self.port}")
         return frozenset(hosts)

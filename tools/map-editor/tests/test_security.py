@@ -13,6 +13,10 @@ from conftest import ORIGIN, PORT, make_config
 from elosern_map_editor import app as app_module
 from elosern_map_editor.app import create_app, service_of
 
+#: Another interface a wildcard-bound service must answer; TEST-NET-1, never
+#: routed, so nothing here depends on a real address of this machine.
+LAN = "192.0.2.10"
+
 
 @pytest.fixture
 def harness(workspace, dist, monkeypatch):
@@ -70,7 +74,10 @@ def test_foreign_or_unauthenticated_mutations_are_rejected_before_any_read(harne
     assert (service.snapshot_revision, fixture.tree_digest(workspace)) == before
 
 
-@pytest.mark.parametrize("host", ["evil.example.invalid", f"127.0.0.1:{PORT + 1}", "127.0.0.1", f"localhost.:{PORT}"])
+@pytest.mark.parametrize(
+    "host",
+    ["evil.example.invalid", f"127.0.0.1:{PORT + 1}", "127.0.0.1", f"localhost.:{PORT}", f"{LAN}:{PORT}"],
+)
 def test_a_foreign_host_is_rejected_on_every_route(harness, host):
     client, service, reads, _ = harness
     for path in ("/", "/api/session", "/api/workspace", "/api/events"):
@@ -78,6 +85,32 @@ def test_a_foreign_host_is_rejected_on_every_route(harness, host):
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "forbidden_host"
     assert reads == []
+
+
+def test_a_wildcard_bind_answers_another_interfaces_host_and_its_own_origin(workspace, dist):
+    client = TestClient(create_app(make_config(workspace, dist, host="0.0.0.0")), base_url=f"http://{LAN}:{PORT}")
+    session = client.get("/api/session", headers={"Host": f"{LAN}:{PORT}"}).json()
+    response = client.post(
+        "/api/reload",
+        headers={
+            "Host": f"{LAN}:{PORT}",
+            "Origin": f"http://{LAN}:{PORT}",
+            "X-Map-Editor-Token": session["token"],
+            "Content-Type": "application/json",
+        },
+        content=json.dumps({"session_generation": session["session_generation"]}),
+    )
+    assert response.status_code == 200
+
+
+def test_a_wildcard_bind_refuses_a_host_name_a_wrong_port_and_a_foreign_origin(workspace, dist):
+    client = TestClient(create_app(make_config(workspace, dist, host="0.0.0.0")), base_url=f"http://{LAN}:{PORT}")
+    rebound = client.get("/api/workspace", headers={"Host": f"rebind.example.invalid:{PORT}"})
+    assert (rebound.status_code, rebound.json()["error"]["code"]) == (403, "forbidden_host")
+    wrong_port = client.get("/api/workspace", headers={"Host": f"{LAN}:{PORT + 1}"})
+    assert (wrong_port.status_code, wrong_port.json()["error"]["code"]) == (403, "forbidden_host")
+    foreign = client.get("/api/workspace", headers={"Host": f"{LAN}:{PORT}", "Origin": f"http://192.0.2.11:{PORT}"})
+    assert (foreign.status_code, foreign.json()["error"]["code"]) == (403, "forbidden_origin")
 
 
 def test_the_token_bootstrap_refuses_other_origins(harness):

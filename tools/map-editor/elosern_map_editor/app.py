@@ -961,6 +961,8 @@ def create_app(config: EditorConfig, *, fault=None, partition_hook=None) -> Star
         app,
         allowed_hosts=config.allowed_hosts,
         allowed_origins=config.allowed_origins,
+        port=config.port,
+        wildcard_bind=config.binds_every_interface,
         token=lambda: service.session.token,
         max_body_bytes=config.limits.max_body_bytes,
     )
