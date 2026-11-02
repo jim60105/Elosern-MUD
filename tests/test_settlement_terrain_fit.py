@@ -236,6 +236,34 @@ class SiteContextTests(unittest.TestCase):
 
         self.assertIsNone(capital_context.capital_bearing)
 
+    def test_fords_and_harbours_report_distance_and_bearing(self) -> None:
+        terrain = _terrain(
+            inland_water=frozenset({(13, 10)}),
+            routes={"r": ((13, 20), (13, 0))},
+            waterway_cells={"r": frozenset({(13, 10)})},
+            fords={"r": ((12, 12), (12, 20))},
+            harbours={"harbour_near": (10, 13), "harbour_far": (10, 30)},
+        )
+
+        context = analyse_site(
+            _ref(), terrain, (_ref(),), radius=8, harbour_radius=5
+        )
+
+        self.assertEqual([ford.cell for ford in context.fords], [(12, 12)])
+        ford = context.fords[0]
+        self.assertEqual(ford.feature_id, "r")
+        self.assertAlmostEqual(ford.distance_cells, math.hypot(2, 2))
+        self.assertEqual(ford.bearing, "ne")
+
+        self.assertEqual(
+            [harbour.feature_id for harbour in context.harbours],
+            ["harbour_near"],
+        )
+        harbour = context.harbours[0]
+        self.assertEqual(harbour.cell, (10, 13))
+        self.assertAlmostEqual(harbour.distance_cells, 3.0)
+        self.assertEqual(harbour.bearing, "n")
+
 
 class SizeBudgetTests(unittest.TestCase):
     @staticmethod
@@ -551,11 +579,54 @@ class CommandTests(unittest.TestCase):
         path.write_text(
             path.read_text(encoding="utf-8") + "\nnodes: {}\n", encoding="utf-8"
         )
+        digest = synthetic.tree_digest(self.root)
 
         result = self._run("lint")
 
         self.assertEqual(result.returncode, 2, result.stdout)
         self.assertIn("synthetic_town.yaml", result.stderr)
+        self.assertEqual(synthetic.tree_digest(self.root), digest)
+
+    def test_warning_only_still_exits_zero(self) -> None:
+        data = synthetic.settlement_data()
+        data["nodes"]["walk_a"] = _node(500, 0)
+        data["nodes"]["walk_b"] = _node(800, 0)
+        data["roads"].append(_road("walk_a", "walk_b", "n"))
+        path = self.root / "content" / "maps" / "settlements" / "synthetic_town.yaml"
+        path.write_text(synthetic.yaml_text(data), encoding="utf-8")
+        digest = synthetic.tree_digest(self.root)
+
+        result = self._run("lint")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(
+            "fit_direction_drift synthetic_town walk_a>walk_b", result.stdout
+        )
+        self.assertIn("fit: 0 errors, 1 warnings", result.stdout)
+        self.assertEqual(synthetic.tree_digest(self.root), digest)
+
+    def test_bent_road_crossing_outside_the_node_window_is_reported(self) -> None:
+        data = synthetic.settlement_data()
+        data["nodes"]["walk_b"] = _node(300, 0)
+        data["roads"].append(
+            {
+                "source": "gate",
+                "destination": "walk_b",
+                "direction": "n",
+                "bends": [{"x_m": 0, "y_m": 15000}],
+            }
+        )
+        path = self.root / "content" / "maps" / "settlements" / "synthetic_town.yaml"
+        path.write_text(synthetic.yaml_text(data), encoding="utf-8")
+        digest = synthetic.tree_digest(self.root)
+
+        result = self._run("lint")
+
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn(
+            "fit_unbridged_crossing synthetic_town gate>walk_b", result.stdout
+        )
+        self.assertEqual(synthetic.tree_digest(self.root), digest)
 
     def test_lore_override_drives_the_site_and_budget_commands(self) -> None:
         lore = Path(self._lore_dir.name) / "lore.json"
@@ -567,6 +638,7 @@ class CommandTests(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        lore_before = lore.read_bytes()
 
         budget = self._run(
             "budget", "synthetic_place", "--lore", str(lore)
@@ -586,6 +658,7 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(unknown.returncode, 2)
 
         self.assertEqual(synthetic.tree_digest(self.root), self.digest)
+        self.assertEqual(lore.read_bytes(), lore_before)
 
 
 if __name__ == "__main__":
