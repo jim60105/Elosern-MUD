@@ -23,6 +23,11 @@ from elosern_map_core import (
 )
 from elosern_map_core.authoring import gate_approach_cell, terrain_definition
 from elosern_map_core.elevation_codec import decode_tile
+from elosern_map_core.reference_context import (
+    ReferenceContextError,
+    check_workspace_freshness,
+    decode_reference_context,
+)
 from elosern_map_core.terrain import (
     is_inland_water_cell,
     is_land_cell,
@@ -293,19 +298,23 @@ def _roster(
 
 
 def incoming_reference_keys(root: Path) -> frozenset[str] | None:
-    """The qualified ids the reference index names, or ``None`` when it is absent."""
+    """The qualified ids a current reference index names, or ``None``.
+
+    ``None`` means no index is present, or the present one cannot prove which
+    external declarations exist: it is stale or incompatible with the current
+    external sources. The caller must then protect every existing identity.
+    """
 
     path = Path(root) / REFERENCE_CONTEXT_PATH
     if not path.is_file():
         return None
     try:
-        document = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
+        document = decode_reference_context(path.read_text(encoding="utf-8"))
+    except (OSError, ReferenceContextError) as error:
         raise WorkspaceError(f"{path}: {error}") from error
-    incoming = document.get("incoming_references") if isinstance(document, dict) else None
-    if not isinstance(incoming, dict):
-        raise WorkspaceError(f"{path}: incoming_references must be a mapping")
-    return frozenset(str(key) for key in incoming)
+    if not check_workspace_freshness(document, root).current:
+        return None
+    return frozenset(document.incoming_references)
 
 
 def analysis_input(

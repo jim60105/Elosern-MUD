@@ -352,6 +352,9 @@ source names:
 
 When the reference index is absent, every existing node is protected, because
 an absent index cannot prove that an external declaration does not name one.
+An index that is stale or incompatible with the current external sources proves
+no more, so it is treated the same way: every existing node is protected and
+the report says `index_present` is false.
 
 **Refusals.** Every problem is collected before one error is raised, and a
 refused run writes nothing:

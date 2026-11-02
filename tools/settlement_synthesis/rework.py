@@ -271,8 +271,11 @@ def _rebuild_data(
             ],
         }
 
-    data["options"] = copy.deepcopy(dict(existing.options))
-    data["exit_prototype"] = copy.deepcopy(dict(existing.exit_prototype))
+    for field in ("options", "exit_prototype"):
+        if field in existing.data:
+            data[field] = copy.deepcopy(dict(existing.data[field]))
+        else:
+            data.pop(field, None)
     gate = existing.city_gate
     data["city_gate"] = (
         None

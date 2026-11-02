@@ -92,13 +92,15 @@ def build_brief(view: WorkspaceView, map_id: str) -> dict[str, Any]:
 
     neighbours: list[dict[str, Any]] = []
     for neighbour in site.neighbours:
-        declaration = view.world.locations.locations.get(neighbour.feature_id)
-        if declaration is None:
+        neighbour_declaration = view.world.locations.locations.get(
+            neighbour.feature_id
+        )
+        if neighbour_declaration is None:
             continue
         neighbours.append(
             {
                 "id": neighbour.feature_id,
-                "display_name_zh": declaration.display_name_zh,
+                "display_name_zh": neighbour_declaration.display_name_zh,
                 "bearing": neighbour.bearing,
                 "distance_cells": neighbour.distance_cells,
             }

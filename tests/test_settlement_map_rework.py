@@ -159,6 +159,53 @@ class _Workspace(unittest.TestCase):
             encoding="utf-8",
         )
 
+    def _remove_field(self, field: str) -> None:
+        relative_path = f"content/maps/settlements/{SETTLEMENT}.yaml"
+        parsed = parse_document(
+            relative_path, self._settlement_path().read_text(encoding="utf-8")
+        )
+        data = dict(parsed.document.data)
+        data.pop(field, None)
+        self._settlement_path().write_text(
+            serialize_document(
+                document_from_data(relative_path, data), parsed.round_trip
+            ),
+            encoding="utf-8",
+        )
+
+    def _add_location(
+        self,
+        location_id: str,
+        *,
+        display_name_zh: str,
+        geographic_constraint: str,
+        cell: tuple[int, int],
+    ) -> None:
+        relative_path = "content/maps/locations.yaml"
+        path = self.root / relative_path
+        parsed = parse_document(relative_path, path.read_text(encoding="utf-8"))
+        data = dict(parsed.document.data)
+        data["locations"] = {
+            key: dict(value) for key, value in data["locations"].items()
+        }
+        data["locations"][location_id] = {
+            "kind": "town",
+            "display_name_zh": display_name_zh,
+            "description": "A synthetic neighbour.",
+            "cell": {"cell_x": cell[0], "cell_y": cell[1]},
+            "geographic_constraint": geographic_constraint,
+            "scene_archetype": None,
+        }
+        path.write_text(
+            serialize_document(
+                document_from_data(relative_path, data), parsed.round_trip
+            ),
+            encoding="utf-8",
+        )
+        lore = json.loads(self.lore.read_text(encoding="utf-8"))
+        lore[location_id] = {"nation": None, "population": 5_000}
+        self.lore.write_text(json.dumps(lore), encoding="utf-8")
+
 
 class ReplaceTests(_Workspace):
     def test_missing_protected_binding_is_refused(self) -> None:
@@ -289,6 +336,40 @@ class ReplaceTests(_Workspace):
         self.assertIn("unbound_protected:stray", result.stderr)
         self.assertEqual(self._digest(), before)
 
+    def test_stale_index_protects_every_existing_node(self) -> None:
+        self._add_node("stray")
+        (self.root / "external" / "declarations.txt").write_text(
+            "changed after the index was exported\n", encoding="utf-8"
+        )
+        before = self._digest()
+
+        result = self._replace(
+            {"gate": "central_plaza", "yard": "nearest:central_plaza"}
+        )
+
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("unbound_protected:stray", result.stderr)
+        self.assertEqual(self._digest(), before)
+
+    def test_optional_fields_follow_the_existing_document(self) -> None:
+        self._remove_field("exit_prototype")
+        first = self._replace(
+            {"gate": "central_plaza", "yard": "nearest:central_plaza"}
+        )
+        self.assertEqual(first.returncode, 0, first.stderr)
+        data = self._document().data
+        self.assertNotIn("exit_prototype", data)
+        self.assertIn("options", data)
+
+        self._remove_field("options")
+        second = self._replace(
+            {"gate": "central_plaza", "yard": "nearest:central_plaza"}
+        )
+        self.assertEqual(second.returncode, 0, second.stderr)
+        data = self._document().data
+        self.assertNotIn("options", data)
+        self.assertNotIn("exit_prototype", data)
+
 
 class NearestBindingTests(_Workspace):
     def _nearest_rows(self) -> dict[str, str]:
@@ -369,6 +450,12 @@ class ProseTests(_Workspace):
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_brief_is_read_only(self) -> None:
+        self._add_location(
+            "synthetic_neighbour",
+            display_name_zh="鄰鎮",
+            geographic_constraint="neighbour-constraint",
+            cell=(6, 5),
+        )
         before = self._digest()
 
         result = self._run("brief", SETTLEMENT, "--lore", str(self.lore))
@@ -396,6 +483,12 @@ class ProseTests(_Workspace):
         self.assertIn("morphology", payload)
         self.assertEqual(payload["map_id"], SETTLEMENT)
         self.assertEqual(payload["location_id"], LOCATION)
+        self.assertEqual(payload["display_name_zh"], "合成城")
+        self.assertEqual(payload["geographic_constraint"], "synthetic")
+        neighbour = next(
+            row for row in payload["neighbours"] if row["id"] == "synthetic_neighbour"
+        )
+        self.assertEqual(neighbour["display_name_zh"], "鄰鎮")
         self.assertEqual(self._digest(), before)
 
     def test_prose_changes_only_the_listed_names_and_descriptions(self) -> None:
