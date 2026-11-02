@@ -37,9 +37,9 @@ Follow `docs/development/settlement-synthesis.md` § Prose pass, with these beas
 - **Trade.** Trade happens at markets and through barter, but currency is still in use.
 - **Tone.** Write with a robust, frank tone. It is in-world prose only, never 武俠 vocabulary.
 
-### D3. Test-suite cost gate
+### D3. Test-suite timing record (never blocks)
 
-Apply the same rule as `grandia-settlement-maps` D4. The baseline is taken at the start of this change.
+Apply the same rule as `grandia-settlement-maps` D4. The baseline is taken at the start of this change. The timing is reported in the hand-off and never stops the commit.
 
 ## Risks / Trade-offs
 

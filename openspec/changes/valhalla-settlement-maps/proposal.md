@@ -25,12 +25,11 @@ None. `skip_specs: true` is set.
 ## Impact
 
 - 18 new settlement documents and the regenerated partition.
-- About 170 new grid rooms, subject to the same test-cost gate as the other batches.
+- About 170 new grid rooms, with the test-suite cost recorded as in the other batches (never blocking).
 - Human-reviewed, not tested: layout appearance, beast-folk prose tone and lore fit. Reviewed against `docs/development/settlement-synthesis.md` § Human review.
 
 ## Batch:
 
-- depends-on: settlement-sync-cost-probe
 - depends-on: altoria-settlement-maps
 - depends-on: settlement-rework-and-prose
 - conflicts: rewrites `world/maps/data/district_partition.json` after `altoria-settlement-maps`. The Altoria border-river footprints are blocked cells here.

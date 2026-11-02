@@ -25,6 +25,7 @@ The generator from `settlement-graph-generator` refuses to touch an existing set
 - Add `prose MAP_ID FILE`. It applies `{"<node_id>": {"key": "...", "desc": "..."}}` and changes only those fields. Unknown ids and empty strings are rejected atomically. It writes through the codec.
 - Add a prose standard for agent writers in `docs/development/settlement-synthesis.md` § Prose pass: zh-TW, JRPG sword-and-magic setting, in-world only, consistent with the settlement archetype.
 - Update the skill docs: rework recipe, brief, prose and a "never edit generated YAML by hand for prose" note.
+- Add `docs/development/settlement-synthesis.md` § "Settlement-sensitive test modules": the canonical list of test modules to rerun after any settlement data change, plus the "Residual pin rule" for fixing copied settlement values left in tests (design D5).
 
 ## Capabilities
 

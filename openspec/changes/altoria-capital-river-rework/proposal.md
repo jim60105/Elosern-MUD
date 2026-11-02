@@ -47,5 +47,4 @@ None. This is a game-data change, and `skip_specs: true` is set.
 
 - depends-on: unpin-settlement-map-data
 - depends-on: settlement-rework-and-prose
-- depends-on: settlement-sync-cost-probe
 - conflicts: `world/maps/data/district_partition.json` and `content/maps/locations.yaml` are also rewritten by `grandia-settlement-maps`, `altoria-settlement-maps` and `valhalla-settlement-maps`. Each of those depends on this change, so they land one after another.

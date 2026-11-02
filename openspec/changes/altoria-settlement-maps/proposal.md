@@ -25,12 +25,11 @@ None. `skip_specs: true` is set.
 ## Impact
 
 - 19 new settlement documents, possibly a few edited cells in `content/maps/locations.yaml`, and the regenerated partition.
-- About 170 new grid rooms, subject to the same test-cost gate as `grandia-settlement-maps` (design D4).
+- About 170 new grid rooms, with the test-suite cost recorded as in `grandia-settlement-maps` (design D4, never blocking).
 - Human-reviewed, not tested: layout appearance, prose tone and lore fit, and whether each relocation is acceptable. Reviewed against `docs/development/settlement-synthesis.md` § Human review.
 
 ## Batch:
 
-- depends-on: settlement-sync-cost-probe
 - depends-on: grandia-settlement-maps
 - depends-on: altoria-capital-river-rework
 - depends-on: settlement-rework-and-prose

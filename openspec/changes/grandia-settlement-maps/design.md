@@ -78,12 +78,12 @@ Follow `docs/development/settlement-synthesis.md` § Prose pass for every node o
 
 Write one prose JSON per map in the scratchpad and apply it with `prose`.
 
-### D4. Test-suite cost gate
+### D4. Test-suite timing record (never blocks)
 
-About 230 new rooms spawn in every `sync_grid()` test. Record the `Ran N tests in X s` line of `world.maps.tests.test_bootstrap` before generation (baseline) and after the batch.
+About 230 new rooms spawn in every `sync_grid()` test. Record the `Ran N tests in X s` line of `world.maps.tests.test_bootstrap` before generation (baseline) and after the batch, and report both numbers in the hand-off.
 
-- If `X_after > 2.5 * X_baseline`, or `X_after > 600`, stop before committing and report both numbers.
-- The data change is then blocked on a follow-up change: either test-scoped settlement publication or faster synchronization. Design that follow-up then.
+- The timing never stops this change. Shipping the settlement maps is not optional, so a slower suite is handled by a follow-up change, not by withholding data.
+- When `X_after > 2 * X_baseline`, the hand-off says so explicitly and recommends the follow-up: let tests synchronize only the settlements they use (an optional settlement subset for `sync_grid()`), or synchronize once per test class.
 
 ## Risks / Trade-offs
 

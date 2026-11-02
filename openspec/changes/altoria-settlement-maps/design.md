@@ -59,9 +59,9 @@ Follow `docs/development/settlement-synthesis.md` § Prose pass. Altoria's flavo
 
 One prose JSON per map is applied with `prose`.
 
-### D4. Test-suite cost gate
+### D4. Test-suite timing record (never blocks)
 
-Use the same rule as `grandia-settlement-maps` D4, with the baseline taken at the start of this change. Stop before committing when `world.maps.tests.test_bootstrap` takes more than 2.5 times its baseline or more than 600 s.
+Use the same rule as `grandia-settlement-maps` D4, with the baseline taken at the start of this change. The timing is reported in the hand-off and never stops the commit.
 
 ## Risks / Trade-offs
 

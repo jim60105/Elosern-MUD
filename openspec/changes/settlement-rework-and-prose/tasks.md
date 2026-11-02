@@ -46,6 +46,8 @@ Ground rules:
 - [ ] 4.1 In `docs/development/settlement-synthesis.md`, add these sections: "Rework with bindings" (D1, with a worked synthetic example), "Prose pass" (D3, verbatim rules) and the D2 command reference. Append to "Human review": prose tone and lore fit, and descriptions whose site cue changed after a move.
 - [ ] 4.2 In `.agents/skills/map-data-authoring/references/settlements.md`, add a recipe "Rework or name an existing local map". It covers `brief`, writing a prose JSON in the scratchpad, `prose`, then `lint`, `check_map_sources.py` and partition regeneration. It also states that `--replace` needs a bind file covering every protected node, and that prose is never hand-edited into YAML when the `prose` command can do it. Use the Edit tool. Check: `grep -n "settlement_synthesis prose" .agents/skills/map-data-authoring/references/settlements.md` prints a line.
 
+- [ ] 4.3 In `docs/development/settlement-synthesis.md`, add § "Settlement-sensitive test modules" with the design D5 list, its runner notes and the "Residual pin rule", verbatim. Check: `grep -c "test_travel_plan" docs/development/settlement-synthesis.md` prints at least 1, and `grep -c "Residual pin rule" docs/development/settlement-synthesis.md` prints at least 1.
+
 ## 5. Gates
 
 - [ ] 5.1 Run `tools.test_data_lint check`, `tools.spec_traceability check`, `tools.contract_gate` and `openspec validate settlement-rework-and-prose --strict`. Check: all succeed.

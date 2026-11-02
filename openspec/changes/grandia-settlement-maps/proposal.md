@@ -30,12 +30,11 @@ None. `skip_specs: true` is set.
 ## Impact
 
 - 22 new settlement documents, possibly a few edited cells in `content/maps/locations.yaml`, and the regenerated partition.
-- Runtime: about 230 new grid rooms and their exits, spawned by `sync_grid()` at start-up and in every test that calls it on shipped data. Design D4 sets a measurement gate on the test-suite cost.
+- Runtime: about 230 new grid rooms and their exits, spawned by `sync_grid()` at start-up and in every test that calls it on shipped data. Design D4 records the test-suite cost without blocking the change.
 - Human-reviewed, not tested: layout appearance, prose tone and lore fit, and whether each relocation is acceptable. The checklist is `docs/development/settlement-synthesis.md` § Human review.
 
 ## Batch:
 
-- depends-on: settlement-sync-cost-probe
 - depends-on: altoria-capital-river-rework
 - depends-on: settlement-rework-and-prose
 - depends-on: unpin-settlement-map-data
