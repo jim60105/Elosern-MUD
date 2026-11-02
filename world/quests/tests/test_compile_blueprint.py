@@ -37,6 +37,36 @@ from world.quests.tests._compile_helpers import (
 from tools.spec_traceability import covers_requirement
 from world.quests.tests._card_fixtures import occupant_card_record
 
+
+def _unplaced_anchor_key() -> str:
+    """An authored location that no settlement places.
+
+    The negative cases below need one anchor the placement registry does not
+    know, so the id is derived from the authored sources instead of naming a
+    location that a later settlement map may place.
+    """
+
+    from world.maps.map_data import current
+
+    placed = {
+        document.location_ref for document in current().settlements.values()
+    }
+    candidates = sorted(
+        location_id
+        for location_id in _authored_location_ids()
+        if location_id not in placed
+    )
+    if not candidates:
+        raise AssertionError("every authored location is a placed anchor")
+    return candidates[0]
+
+
+def _authored_location_ids():
+    from world.maps.geography import current as current_geography
+
+    return current_geography().locations.locations
+
+
 class CompileQuestBlueprintTests(CompileRegistryIsolation, unittest.TestCase):
     @covers_requirement("quest-blueprint::questdefinition-is-the-immutable-deterministic-input-to-quest-runtime")
     @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
@@ -256,7 +286,7 @@ class CompileQuestBlueprintTests(CompileRegistryIsolation, unittest.TestCase):
 
     def test_unplaced_anchor_is_rejected_by_compiler(self):
         bad = _defeat_payload()
-        bad["stages"][0]["location_req"]["anchor_key"] = "capital_grandia"
+        bad["stages"][0]["location_req"]["anchor_key"] = _unplaced_anchor_key()
         with self.assertRaises(QuestCompileError):
             compile_quest_blueprint(bad)
 
@@ -493,7 +523,7 @@ class SceneBoundCompileTests(CompileRegistryIsolation, unittest.TestCase):
     @covers_requirement("scenario-director::scene-bound-proposal-stages-are-validated-before-publication")
     def test_unknown_anchor_near_is_rejected_by_the_compiler(self):
         payload = _defeat_payload()
-        payload["stages"][0]["location_req"]["anchor_near"] = "capital_grandia"
+        payload["stages"][0]["location_req"]["anchor_near"] = _unplaced_anchor_key()
         with self.assertRaises(QuestCompileError):
             compile_quest_blueprint(payload)
 

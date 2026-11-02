@@ -36,7 +36,7 @@ Ground rules:
 
 - [x] 4.1 Regenerate the partition, then run `check_map_sources.py`. Check: exit 0, with partition, elevation and reference context all `current`.
 - [x] 4.2 Rerun `world.maps.tests.test_bootstrap` as in 1.2. Check: record `X_after` for the D4 hand-off. The timing never blocks the commit.
-- [ ] 4.3 Run every module in `docs/development/settlement-synthesis.md` § Settlement-sensitive test modules, one per command, and also `uv run --locked python -m unittest tests.test_map_authoring_contract tests.test_map_partition_independence`. Check: all pass. Handle a failure with the "Residual pin rule" in that same doc section, and list every rewritten test in the hand-off. Any other failure stops the change without a commit.
+- [x] 4.3 Run every module in `docs/development/settlement-synthesis.md` § Settlement-sensitive test modules, one per command, and also `uv run --locked python -m unittest tests.test_map_authoring_contract tests.test_map_partition_independence`. Check: all pass. Handle a failure with the "Residual pin rule" in that same doc section, and list every rewritten test in the hand-off. Any other failure stops the change without a commit.
 - [x] 4.4 Capture a continent overview with `--hide partition` and the settlement views of `capital_grandia`, `port_golden_sheaf` and one town. Read the images. Check: the hand-off describes each map's water side and gates.
 - [x] 4.5 Run `uv run --locked python -m tools.contract_gate` and `openspec validate grandia-settlement-maps --strict`. Check: both succeed. The hand-off lists every relocation, every unresolved location and the D4 numbers.
 
@@ -46,4 +46,4 @@ Ground rules:
 - `port_east_bay` was approved for a one-cell eastward move (2400,461 → 2401,461), generated, linted and prose-filled. `port_south_cape` stays unmapped as the D2 unresolved water gap.
 - Nine town cells collided with their own Voronoi landmark; see design D2's generator precondition for the move and for the nine that belong to the later Altoria and Valhalla changes.
 - `world/rules/sight.py` and `sight.yaml` gained the `city`, `town` and `port` silhouettes, because mapping those kinds extends the closed vocabulary the area panel's distant sightings require.
-- Task 4.3 ran one module or class per command; the modules still unrun when this change was handed off are `web.webclient.actions.tests.*` (three), `web.webclient.presentation.tests.test_map_quest_destinations`, `test_world_map`, `world.maps.tests.test_editor_final_yaml_adoption`, `world.quests.tests.*` (fourteen), the remaining `world.rules.tests.*` modules and the two top-level `tests.` modules.
+- Task 4.3 is complete: every settlement-sensitive module passed, run one module or class per command and batched only where the 100-test guard required it, with `world.maps.tests.test_altoria_capital` as the publishing primer and `MUD_TEST_SETTINGS=1` for the editor adoption module.
