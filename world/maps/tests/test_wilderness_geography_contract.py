@@ -130,6 +130,9 @@ class AuthoredTerrainContractTests(unittest.TestCase):
                 self.assertIn(ford, raster, name)
                 self.assertFalse(is_inland_water_cell(ford), name)
                 self.assertTrue(is_land_cell(ford), name)
+                # Walkable land is the requirement's own claim: in frame, on
+                # the mainland and free of a closed ridge wall.
+                self.assertTrue(wilderness_provider.is_walkable_cell(ford), name)
                 if any(ford in entry.footprint_cells for entry in entries):
                     # A settlement may own its ford as the gateway cell the
                     # town grew at: the footprint then covers the crossing and

@@ -30,7 +30,7 @@ nodes:
     y_m: 600
     prototype_parent: grid_room
     key: 渡口
-    desc: 聖潔王都南面的渡口，河水在這段收得極窄，淺灘上的石面被車輪磨得發亮。由南岸進城的人先在此涉水，再順著坡道走進南門。
+    desc: 聖潔王都的渡口，就在南門進城後的淺灘上，河水在這段收得極窄，石面被往來的車輪磨得發亮。過了門的人在此涉水，再順著南大道往上走。
     anchor_key:
     typeclass:
     scene_archetype: city_street

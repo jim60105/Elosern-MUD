@@ -378,29 +378,49 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
 
     @covers_requirement("webclient-local-map::the-map-surfaces-state-a-place-name-only-where-it-adds-information")
     def test_a_cell_in_a_different_region_still_says_so(self):
-        # A same-region in-view neighbour still gets the plain region label
-        # (only registered gate approach cells get the far-side name).
-        from world.maps.wilderness_provider import (
-            WILDERNESS_NAME,
-            is_valid_wilderness_cell,
-        )
+        # An in-view neighbour across a region edge gets its own plain region
+        # label (only registered gate approach cells get the far-side name).
+        # The live terrain has no region edge near the capital, so the edge is
+        # synthetic: one neighbour cell is classified into another region and
+        # the presenter must label each cell from its own classification.
+        from world.lore.wilderness_regions import regions
+        from world.maps import wilderness_provider
+        from world.maps.wilderness_provider import WILDERNESS_NAME
 
         ex, ey = EAST_APPROACH
-        # Stand where an in-view east neighbour is itself a provider-valid
-        # cell, derived from the live validity rule rather than a copied offset.
-        step = next(
-            candidate
-            for candidate in range(1, 33)
-            if is_valid_wilderness_cell((ex + candidate, ey))
-            and is_valid_wilderness_cell((ex + candidate + 1, ey))
+        here, neighbour = (ex + 1, ey), (ex + 2, ey)
+        self.assertTrue(wilderness_provider.is_valid_wilderness_cell(here))
+        self.assertTrue(wilderness_provider.is_valid_wilderness_cell(neighbour))
+        here_label = _t_region_display_for(*here)
+        other_region = next(
+            key
+            for key, region in regions().items()
+            if region.display_name_zh != here_label
         )
-        self._at_wild((ex + step, ey))
+        original = wilderness_provider.region_for_coordinates
+        wilderness_provider.region_for_coordinates = (
+            lambda x, y: other_region if (x, y) == neighbour else original(x, y)
+        )
+        self.addCleanup(
+            setattr, wilderness_provider, "region_for_coordinates", original
+        )
+        self._at_wild(here)
         payload = self._registry().render("local_map", _context(self.char1))
-        neighbor_id = f"wild:{WILDERNESS_NAME}:{ex + step + 1}:{ey}"
-        neighbor = next(
-            node for node in payload["nodes"] if node["id"] == neighbor_id
+        current = next(
+            node
+            for node in payload["nodes"]
+            if node["id"] == payload["current_node"]
         )
-        self.assertEqual(neighbor["label"], _t_region_display_for(ex + step + 1, ey))
+        self.assertEqual(current["label"], here_label)
+        neighbor = next(
+            node
+            for node in payload["nodes"]
+            if node["id"] == f"wild:{WILDERNESS_NAME}:{neighbour[0]}:{neighbour[1]}"
+        )
+        self.assertEqual(
+            neighbor["label"], regions()[other_region].display_name_zh
+        )
+        self.assertNotEqual(neighbor["label"], current["label"])
 
     @covers_requirement("webclient-local-map::visibility-states-are-current-visible-unvisited-visible-visited-and-remembered")
     def test_two_wilderness_gateways_of_one_anchor_stay_distinguishable(self):
