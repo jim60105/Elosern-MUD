@@ -19,7 +19,9 @@ class SparseDisplayProjectionTests(unittest.TestCase):
 
     def test_projection_carries_every_node_and_linked_neighbour(self):
         self.assertEqual(self.projection.Z, _T_MAP_KEY)
-        self.assertEqual(len(self.projection.node_index_map), 21)
+        self.assertEqual(
+            len(self.projection.node_index_map), len(self.graph.nodes)
+        )
         self.assertEqual(
             self.projection.max_X,
             max(node.x for node in self.graph.nodes.values()),

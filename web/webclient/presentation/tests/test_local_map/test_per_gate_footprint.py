@@ -87,30 +87,31 @@ class LocalMapPerGateFootprintTests(EvenniaTest):
         # ground: no footprint wild node anywhere in the payload and no edge
         # for the footprint-facing direction (delta scenario, vantages off
         # the two gate approach cells).
-        # The east gate's own approach cell sits immediately east of the
-        # footprint's middle row, so the east-side vantage moves one cell
-        # north of it.
-        ex, ey = EAST_APPROACH
-        sx, sy = SOUTH_APPROACH
-        minx, maxx = min(self.FOOTPRINT_X), max(self.FOOTPRINT_X)
-        miny, maxy = min(self.FOOTPRINT_Y), max(self.FOOTPRINT_Y)
-        # The top row faces the capital's own river on one column, so the
-        # north-facing vantage is the top-row cell whose neighbour is walkable
-        # ground -- never a fixed offset into the mask.
-        north_vantages = [
-            (x, maxy + 1)
-            for x, y in sorted(self._CELLS)
-            if y == maxy and is_valid_wilderness_cell((x, maxy + 1))
-        ]
-        self.assertTrue(
-            north_vantages, "the footprint keeps one walkable north-facing vantage"
+        # Every exterior cell that faces a footprint cell on a non-gate face:
+        # derive the vantage set from the authored mask instead of assuming a
+        # fixed offset, and never test a cell a registered gate already owns.
+        from world.lore.wilderness_entry import (
+            DIRECTION_DELTAS as WILD_DELTAS,
+            OPPOSITE_DIRECTION,
         )
-        vantages = [
-            ((minx - 1, sy + 3), "e"),  # west of the mask -> footprint face
-            ((maxx + 1, sy), "w"),      # east of the mask -> footprint face
-            ((minx, miny - 1), "n"),    # south of the mask -> footprint face
-            *((cell, "s") for cell in north_vantages),  # north of the mask -> footprint face
-        ]
+
+        gate_approaches = {
+            self._ENTRY.approach_cell(gate) for gate in self._ENTRY.gates
+        }
+        vantages = []
+        for cell_x, cell_y in sorted(self._CELLS):
+            for direction, (dx, dy) in WILD_DELTAS.items():
+                if (dx and dy) or direction not in ("n", "e", "s", "w"):
+                    continue
+                vantage = (cell_x + dx, cell_y + dy)
+                if vantage in self._CELLS or vantage in gate_approaches:
+                    continue
+                if not is_valid_wilderness_cell(vantage):
+                    continue
+                vantages.append((vantage, OPPOSITE_DIRECTION[direction]))
+        self.assertTrue(
+            vantages, "the footprint keeps at least one walkable non-gate face"
+        )
         for coordinates, blocked in vantages:
             with self.subTest(vantage=coordinates, direction=blocked):
                 self._at_wild(coordinates)
