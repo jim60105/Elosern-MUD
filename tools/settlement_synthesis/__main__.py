@@ -1,7 +1,8 @@
-"""Read-only command line for the settlement site, budget and fit tools.
+"""Command line for the settlement site, budget, fit and generation tools.
 
-All three commands read a workspace and print to stdout. None of them writes a
-file, so a run can never change the sources it inspects.
+``site``, ``budget`` and ``lint`` read a workspace and print to stdout; none of
+them writes a file. ``generate`` is the one writing command, and it only ever
+creates a settlement source that does not exist yet.
 """
 
 from __future__ import annotations
@@ -9,20 +10,38 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import json
+import math
 import sys
 from pathlib import Path
 from typing import Any
 
 from elosern_map_core.authoring import gate_approach_cell
+from elosern_map_core.codec import document_from_data, serialize_document
+from elosern_map_core.diagnostics import AuthoringError
 
-from tools.settlement_synthesis.budget import BudgetError, size_budget
+from tools.settlement_synthesis.budget import (
+    NATIONAL_KINDS,
+    BudgetError,
+    size_budget,
+)
 from tools.settlement_synthesis.fit_lint import lint_settlement
+from tools.settlement_synthesis.generate import (
+    OCTANT_WORDS,
+    GenerationConfig,
+    GenerationError,
+    GenerationInput,
+    GenerationResult,
+    generate_settlement,
+)
 from tools.settlement_synthesis.geometry import cell_of, world_position
+from tools.settlement_synthesis.roles import DEFAULT_CATALOGUE
 from tools.settlement_synthesis.site import analyse_site
 from tools.settlement_synthesis.workspace import (
     WorkspaceError,
     WorkspaceView,
     load_workspace,
+    settlement_path,
+    write_atomic,
 )
 
 #: The lint window never shrinks below this many cells.
@@ -145,11 +164,194 @@ def _lint(args: argparse.Namespace) -> int:
     return 1 if errors else 0
 
 
+def _forced_gates(value: str) -> tuple[str, ...] | None:
+    bearings = tuple(item.strip() for item in value.split(",") if item.strip())
+    for bearing in bearings:
+        if bearing not in OCTANT_WORDS:
+            print(
+                f"settlement_synthesis: unknown octant {bearing!r}; choose from "
+                f"{', '.join(OCTANT_WORDS)}",
+                file=sys.stderr,
+            )
+            return None
+    return bearings
+
+
+def _report(result: GenerationResult) -> dict[str, Any]:
+    nodes = result.data["nodes"]
+    return {
+        "map_id": result.map_id,
+        "settlement_class": result.settlement_class,
+        "morphology": result.morphology,
+        "footprint_cells": len(result.footprint),
+        "warnings": list(result.warnings),
+        "slots": [
+            {
+                "id": slot.slot_id,
+                "role": slot.role,
+                "key": slot.key_zh,
+                "x_m": nodes[slot.slot_id]["x_m"],
+                "y_m": nodes[slot.slot_id]["y_m"],
+            }
+            for slot in result.slots
+        ],
+    }
+
+
+def _existing_document(view: WorkspaceView, location_id: str) -> str | None:
+    """The relative path of a settlement already bound to one location."""
+
+    path = settlement_path(view.root, location_id)
+    if path.is_file():
+        return path.relative_to(view.root).as_posix()
+    for document in view.world.settlements.values():
+        if document.location_ref == location_id:
+            return document.relative_path
+    return None
+
+
+def _generation_input(
+    view: WorkspaceView, location: Any, forced_gates: tuple[str, ...]
+) -> GenerationInput:
+    budget = size_budget(location)
+    reach = math.ceil(math.sqrt(budget.footprint_cells) / 2) + 1
+    radius = max(
+        reach + 6,
+        math.ceil(1.5 * budget.envelope_radius_m / 1000) + 6,
+        10,
+    )
+    terrain = view.terrain_window(location.cell, radius)
+    site = analyse_site(location, terrain, view.roster)
+    return GenerationInput(
+        map_id=location.location_id,
+        location=location,
+        site=site,
+        budget=budget,
+        terrain=terrain,
+        blocked=view.blocked_cells(location.location_id),
+        catalogue=DEFAULT_CATALOGUE,
+        forced_gates=forced_gates,
+        config=GenerationConfig(),
+    )
+
+
+def _generate_one(
+    view: WorkspaceView,
+    location: Any,
+    *,
+    plan_only: bool,
+    forced_gates: tuple[str, ...],
+) -> int:
+    if location.kind not in NATIONAL_KINDS:
+        print(
+            f"settlement_synthesis: {location.location_id}: kind "
+            f"{location.kind!r} has no size budget",
+            file=sys.stderr,
+        )
+        return 1
+    existing = _existing_document(view, location.location_id)
+    if existing is not None:
+        print(f"exists: {existing}")
+        return 1
+    try:
+        result = generate_settlement(
+            _generation_input(view, location, forced_gates)
+        )
+    except (BudgetError, GenerationError) as error:
+        print(f"settlement_synthesis: {error}", file=sys.stderr)
+        return 1
+    print(json.dumps(_report(result), ensure_ascii=False, indent=2, sort_keys=True))
+    if plan_only:
+        return 0
+    relative_path = f"content/maps/settlements/{result.map_id}.yaml"
+    try:
+        text = serialize_document(
+            document_from_data(relative_path, result.data), None
+        )
+    except AuthoringError as error:
+        print(f"settlement_synthesis: {error}", file=sys.stderr)
+        return 1
+    write_atomic(settlement_path(view.root, result.map_id), text)
+    return 0
+
+
+def _generate(args: argparse.Namespace) -> int:
+    forced_gates = _forced_gates(args.gates)
+    if forced_gates is None:
+        return 2
+    if args.missing:
+        if args.location is not None:
+            print(
+                "settlement_synthesis: --missing takes no LOCATION_ID",
+                file=sys.stderr,
+            )
+            return 2
+        if not args.nation:
+            print(
+                "settlement_synthesis: --missing requires --nation",
+                file=sys.stderr,
+            )
+            return 2
+    elif args.location is None:
+        print("settlement_synthesis: a LOCATION_ID is required", file=sys.stderr)
+        return 2
+
+    try:
+        view = _workspace(args)
+    except WorkspaceError as error:
+        print(f"settlement_synthesis: {error}", file=sys.stderr)
+        return 2
+
+    if not args.missing:
+        try:
+            location = view.location(args.location)
+        except WorkspaceError as error:
+            print(f"settlement_synthesis: {error}", file=sys.stderr)
+            return 2
+        return _generate_one(
+            view, location, plan_only=args.plan_only, forced_gates=forced_gates
+        )
+
+    targets = [
+        ref
+        for ref in view.roster
+        if ref.nation == args.nation
+        and ref.kind in NATIONAL_KINDS
+        and _existing_document(view, ref.location_id) is None
+    ]
+    targets.sort(key=lambda ref: (-(ref.population or 0), ref.location_id))
+    status = 0
+    for ref in targets:
+        try:
+            current = _workspace(args)
+        except WorkspaceError as error:
+            print(f"settlement_synthesis: {error}", file=sys.stderr)
+            return 2
+        try:
+            location = current.location(ref.location_id)
+        except WorkspaceError as error:
+            print(f"settlement_synthesis: {error}", file=sys.stderr)
+            status = 1
+            continue
+        if (
+            _generate_one(
+                current,
+                location,
+                plan_only=args.plan_only,
+                forced_gates=forced_gates,
+            )
+            != 0
+        ):
+            status = 1
+    return status
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m tools.settlement_synthesis",
         description=(
-            "Read-only settlement site analysis, size budget and terrain-fit lint."
+            "Settlement site analysis, size budget, terrain-fit lint and street-"
+            "graph generation."
         ),
     )
     commands = parser.add_subparsers(dest="command", required=True)
@@ -196,6 +398,39 @@ def build_parser() -> argparse.ArgumentParser:
         "--root", default=".", help="workspace root (default: the current directory)"
     )
     lint.set_defaults(handler=_lint)
+
+    generate = commands.add_parser(
+        "generate",
+        help="generate one settlement street graph from its site and budget",
+    )
+    generate.add_argument("location", nargs="?", metavar="LOCATION_ID")
+    generate.add_argument(
+        "--root", default=".", help="workspace root (default: the current directory)"
+    )
+    generate.add_argument("--lore", default=None, help="JSON lore override file")
+    generate.add_argument(
+        "--gates",
+        default="",
+        metavar="OCTANT[,OCTANT...]",
+        help="forced gate bearings, highest priority first",
+    )
+    generate.add_argument(
+        "--plan-only",
+        action="store_true",
+        help="print the report and write nothing",
+    )
+    generate.add_argument(
+        "--missing",
+        action="store_true",
+        help=(
+            "generate every national settlement of --nation that has no "
+            "settlement source yet"
+        ),
+    )
+    generate.add_argument(
+        "--nation", default=None, help="nation key for --missing"
+    )
+    generate.set_defaults(handler=_generate)
 
     return parser
 
