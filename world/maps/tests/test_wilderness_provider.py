@@ -110,7 +110,7 @@ class TerrainModelTests(unittest.TestCase):
             self.assertEqual(region_for_coordinates(*cell), region_for_coordinates(*cell))
             self.assertEqual(terrain_description(*cell), terrain_description(*cell))
 
-    @covers_requirement("wilderness-terrain::region-for-coordinates-is-a-pure-deterministic-function-covering-the-whole-bounded-map")
+    @covers_requirement("wilderness-terrain::the-coordinate-classifier-is-a-pure-deterministic-function-over-the-whole-bounded-map")
     def test_every_registered_region_key_is_reachable(self):
         # A coarse stride over the whole frame plus the frame edges: every
         # region is hundreds of kilometres across, so a 60-cell lattice cannot
@@ -129,7 +129,7 @@ class TerrainModelTests(unittest.TestCase):
         }
         self.assertEqual(reached, set(live_region_registry()))
 
-    @covers_requirement("wilderness-terrain::region-for-coordinates-is-a-pure-deterministic-function-covering-the-whole-bounded-map")
+    @covers_requirement("wilderness-terrain::the-coordinate-classifier-is-a-pure-deterministic-function-over-the-whole-bounded-map")
     def test_central_mountain_region_follows_the_bending_corridor(self):
         # The corridor follows the bending summit centre and stays ONE region
         # along its whole length; its both flanks resolve elsewhere. Which

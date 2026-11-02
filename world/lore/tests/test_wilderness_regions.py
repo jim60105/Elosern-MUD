@@ -86,7 +86,7 @@ class WildernessRegionRegistryTests(unittest.TestCase):
             self.assertEqual(region.key, key)
 
     @covers_requirement(
-        "continental-geography::the-known-continent-has-frozen-geographic-declarations"
+        "continental-geography::known-continent-geographic-declarations-are-frozen"
     )
     def test_mainland_boundary_is_a_closed_five_million_square_kilometre_polygon(self):
         boundary = mainland_boundary_km()
@@ -115,7 +115,7 @@ class WildernessRegionRegistryTests(unittest.TestCase):
         self.assertFalse(is_wilderness_cell((-1, 0)))
 
     @covers_requirement(
-        "continental-geography::the-known-continent-has-frozen-geographic-declarations"
+        "continental-geography::known-continent-geographic-declarations-are-frozen"
     )
     def test_every_location_and_harbor_cell_center_lies_on_the_mainland(self):
         cells = {
@@ -133,7 +133,7 @@ class WildernessRegionRegistryTests(unittest.TestCase):
                 self.assertTrue(is_on_mainland(east_m / 1000, north_m / 1000))
 
     @covers_requirement(
-        "continental-geography::the-known-continent-has-frozen-geographic-declarations"
+        "continental-geography::known-continent-geographic-declarations-are-frozen"
     )
     def test_reserved_harbor_sites_are_geography_only_and_disjoint(self):
         for key, site in harbor_sites().items():

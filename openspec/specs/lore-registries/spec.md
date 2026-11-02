@@ -334,29 +334,6 @@ High and calamity tiers have no approved existing species in this roster. Their 
 - **WHEN** an authored monster HP is compared with its independent physical axes
 - **THEN** the superseded fixed-ratio rule is not enforced; independent endurance and resolver encounter evidence govern authoring
 
-### Requirement: Anchor registry covers capitals, elven villages, and known dungeons
-The game SHALL compose immutable location views from map-owned identity/kind/name/prose and separate non-map lore keyed by the same identity, without a fixed roster count.
-
-#### Scenario: Location kind and lore
-- **WHEN** synthetic capital, village and dungeon locations join nation/population/floor metadata
-- **THEN** map-facing fields come from YAML, non-map values remain their authored lore values and unknown joins are diagnosed
-
-#### Scenario: No invented local content
-- **WHEN** a new geographic location has no settlement or interior document
-- **THEN** it remains readable without generating rooms, dungeon floors, instances or population
-
-#### Scenario: Registry has exactly nine anchors of the right kinds
-- **WHEN** a synthetic source contains locations of each supported kind
-- **THEN** the composed registry includes those identities with their declared kinds and no duplicates; the inherited scenario title does not impose a fixed production roster size
-
-#### Scenario: Dungeon floor counts match world_info.md
-- **WHEN** a dungeon's map-facing location fields change while its separate floor lore remains unchanged
-- **THEN** the composed view retains the existing authored floor value without deriving it from geometry or copying a floor approval table into map tests
-
-#### Scenario: Elven villages are not assigned to a nation
-- **WHEN** a location joins non-map lore with a nullable political affiliation
-- **THEN** an absent nation stays absent regardless of the location's geometric nominal claim
-
 ### Requirement: Currency is an integer count of 銅 with no floats in the money path
 `world/lore/economy.py` SHALL define `COPPER_PER_SILVER = 100` and `COPPER_PER_GOLD = 10000` as integer constants, a `to_copper(gold: int = 0, silver: int = 0, copper: int = 0) -> int` helper that returns an `int`, and a frozen `PriceEntry` dataclass with integer `min_copper` and `max_copper: int | None` fields.
 
@@ -515,3 +492,30 @@ Every `Subrace.specialty` value in `SUBRACE_REGISTRY` SHALL be Traditional Chine
 #### Scenario: The registries expose no placement execution
 - **WHEN** the registries' public surface is inspected
 - **THEN** they SHALL expose no spawn, place, reconcile, or recovery callable: placement execution belongs to `world/maps/`, which reads these registries
+
+### Requirement: Anchor registry composes every declared location kind
+The game SHALL compose immutable location views from map-owned identity/kind/name/prose and separate non-map lore keyed by the same identity, over one closed location-kind vocabulary shared with the map schema, without a fixed roster count.
+
+#### Scenario: Location kind and lore
+- **WHEN** synthetic capital, village and dungeon locations join nation/population/floor metadata
+- **THEN** map-facing fields come from YAML, non-map values remain their authored lore values and unknown joins are diagnosed
+
+#### Scenario: National settlement lore joins
+- **WHEN** every shipped city, town or port location joins its non-map lore
+- **THEN** each carries a registered nation, a positive population and no floor count, without comparing authored magnitudes between locations
+
+#### Scenario: No invented local content
+- **WHEN** a new geographic location has no settlement or interior document
+- **THEN** it remains readable without generating rooms, dungeon floors, instances or population
+
+#### Scenario: The location kind vocabulary is closed and shared
+- **WHEN** the map schema's location kinds are compared with the game's anchor kinds and a synthetic source declares one location of each kind
+- **THEN** both vocabularies are the same set and each synthetic identity composes exactly once with its declared kind; shipped content need not use every kind and no production roster size is imposed
+
+#### Scenario: Dungeon floor counts match world_info.md
+- **WHEN** a dungeon's map-facing location fields change while its separate floor lore remains unchanged
+- **THEN** the composed view retains the existing authored floor value without deriving it from geometry or copying a floor approval table into map tests
+
+#### Scenario: Elven villages are not assigned to a nation
+- **WHEN** a location joins non-map lore with a nullable political affiliation
+- **THEN** an absent nation stays absent regardless of the location's geometric nominal claim

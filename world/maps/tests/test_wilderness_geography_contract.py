@@ -46,7 +46,7 @@ def setUpModule():
 
 
 class AuthoredTerrainContractTests(unittest.TestCase):
-    @covers_requirement("wilderness-terrain::region-for-coordinates-is-a-pure-deterministic-function-covering-the-whole-bounded-map")
+    @covers_requirement("wilderness-terrain::the-coordinate-classifier-is-a-pure-deterministic-function-over-the-whole-bounded-map")
     def test_central_mountain_region_bends_with_the_authored_corridor(self):
         # Rows come from the authored stem itself; the probes sit one cell
         # outside the authored corridor half-width on both sides.
@@ -68,7 +68,7 @@ class AuthoredTerrainContractTests(unittest.TestCase):
                     region_for_coordinates(centre + half_width + 1, y), "central_mountains"
                 )
 
-    @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
+    @covers_requirement("wilderness-terrain::terrain-and-political-control-derive-from-authored-geography")
     def test_anchor_centres_resolve_their_authored_terrain(self):
         # Every declared location cell classifies into one of the declared
         # regions: the roster itself is authored data, so this checks the
@@ -92,7 +92,7 @@ class AuthoredTerrainContractTests(unittest.TestCase):
                     variants[(x * 92821 + y * 68917) % len(variants)],
                 )
 
-    @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
+    @covers_requirement("wilderness-terrain::terrain-and-political-control-derive-from-authored-geography")
     @covers_requirement(
         "wilderness-terrain::"
         "the-physical-ridge-is-a-continuous-forked-barrier"
@@ -115,7 +115,7 @@ class AuthoredTerrainContractTests(unittest.TestCase):
             self.assertTrue(is_closed_ridge_cell(tip), crest)
             self.assertFalse(is_closed_ridge_cell((tip[0], tip[1] + 1)), crest)
 
-    @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
+    @covers_requirement("wilderness-terrain::terrain-and-political-control-derive-from-authored-geography")
     def test_rivers_are_authored_water_with_declared_fords(self):
         # Every ford lies on its own river and is walkable land; every other
         # land cell of any river is impassable inland water.
@@ -478,7 +478,7 @@ class BorderRiverContractTests(unittest.TestCase):
 
 
 class ForestEdgeAndClaimContractTests(unittest.TestCase):
-    @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
+    @covers_requirement("wilderness-terrain::terrain-and-political-control-derive-from-authored-geography")
     def test_forest_edge_spans_the_frame_and_starts_the_deep_forest(self):
         xs = [x for x, _ in terrain().forest_edge]
         self.assertEqual(xs, sorted(set(xs)))
@@ -488,7 +488,7 @@ class ForestEdgeAndClaimContractTests(unittest.TestCase):
             self.assertEqual(region_for_coordinates(x, row), "north_deep_forest", x)
             self.assertNotEqual(region_for_coordinates(x, row - 1), "north_deep_forest", x)
 
-    @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
+    @covers_requirement("wilderness-terrain::terrain-and-political-control-derive-from-authored-geography")
     @covers_requirement(
         "wilderness-terrain::"
         "the-physical-ridge-is-a-continuous-forked-barrier"
@@ -508,7 +508,7 @@ class ForestEdgeAndClaimContractTests(unittest.TestCase):
             self.assertEqual(region_for_coordinates(*north), "north_deep_forest", crest)
         self.assertEqual(WILDERNESS_TERRAIN["north_deep_forest"], "woodland")
 
-    @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
+    @covers_requirement("wilderness-terrain::terrain-and-political-control-derive-from-authored-geography")
     def test_every_anchor_and_harbour_is_walkable_and_mutually_reachable(self):
         from world.lore.anchors import anchor_geography
         from world.lore.wilderness_regions import harbor_sites
@@ -527,7 +527,7 @@ class ForestEdgeAndClaimContractTests(unittest.TestCase):
             self.assertTrue(is_valid_wilderness_cell(harbour.cell), key)
             self.assertEqual(components.component(harbour.cell), hub, key)
 
-    @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
+    @covers_requirement("wilderness-terrain::terrain-and-political-control-derive-from-authored-geography")
     def test_every_land_cell_has_one_nominal_nation_agreeing_with_its_region(self):
         from world.lore.nations import NATION_REGISTRY
 
@@ -545,7 +545,7 @@ class ForestEdgeAndClaimContractTests(unittest.TestCase):
             if region.nation_key is not None:
                 self.assertEqual(region.nominal_nation_keys, (region.nation_key,), key)
 
-    @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
+    @covers_requirement("wilderness-terrain::terrain-and-political-control-derive-from-authored-geography")
     def test_displayed_borders_derive_from_ridge_and_river_outside_the_forest(self):
         borders = {border.nation_keys: border.points for border in national_borders()}
         self.assertEqual(

@@ -64,7 +64,7 @@ class AnchorPlacementRegistryTests(unittest.TestCase):
         )
 
     @covers_requirement(
-        "continental-geography::the-known-continent-has-frozen-geographic-declarations"
+        "continental-geography::known-continent-geographic-declarations-are-frozen"
     )
     def test_geographic_declarations_do_not_extend_grid_placement(self):
         self.assertTrue(anchor_geography())

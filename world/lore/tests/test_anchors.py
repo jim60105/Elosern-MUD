@@ -27,7 +27,7 @@ def setUpModule():
 
 
 class AnchorRegistryTests(unittest.TestCase):
-    @covers_requirement("lore-registries::anchor-registry-covers-capitals-elven-villages-and-known-dungeons")
+    @covers_requirement("lore-registries::anchor-registry-composes-every-declared-location-kind")
     def test_every_declared_location_composes_with_its_non_map_lore(self):
         composed = anchors()
         self.assertTrue(composed)
@@ -43,7 +43,7 @@ class AnchorRegistryTests(unittest.TestCase):
                 self.assertEqual(anchor.population, lore.population)
                 self.assertEqual(anchor.floors, lore.floors)
 
-    @covers_requirement("lore-registries::anchor-registry-covers-capitals-elven-villages-and-known-dungeons")
+    @covers_requirement("lore-registries::anchor-registry-composes-every-declared-location-kind")
     def test_anchor_kinds_match_the_schema_location_kinds(self):
         from elosern_map_core.codec import document_from_data
         from elosern_map_core.schema import LOCATION_KINDS
@@ -76,7 +76,7 @@ class AnchorRegistryTests(unittest.TestCase):
                 self.assertEqual(snapshot.anchors[key].kind, AnchorKind(declaration["kind"]))
         self.assertEqual(set(snapshot.anchors), set(data["locations"]))
 
-    @covers_requirement("lore-registries::anchor-registry-covers-capitals-elven-villages-and-known-dungeons")
+    @covers_requirement("lore-registries::anchor-registry-composes-every-declared-location-kind")
     def test_national_settlements_carry_nation_and_population(self):
         from world.lore.nations import NATION_REGISTRY
 
@@ -90,7 +90,7 @@ class AnchorRegistryTests(unittest.TestCase):
                 self.assertIsInstance(anchor.population, int)
                 self.assertGreater(anchor.population, 0)
 
-    @covers_requirement("lore-registries::anchor-registry-covers-capitals-elven-villages-and-known-dungeons")
+    @covers_requirement("lore-registries::anchor-registry-composes-every-declared-location-kind")
     def test_dungeon_floor_counts_follow_their_own_lore_owner(self):
         dungeons = {
             key: anchor
@@ -109,7 +109,7 @@ class AnchorRegistryTests(unittest.TestCase):
                 self.assertIsNone(anchor.nation_key)
 
     @covers_requirement(
-        "continental-geography::the-known-continent-has-frozen-geographic-declarations"
+        "continental-geography::known-continent-geographic-declarations-are-frozen"
     )
     def test_every_location_cell_is_available_without_a_fixed_roster_count(self):
         self.assertTrue(GeographicAnchor.__dataclass_params__.frozen)

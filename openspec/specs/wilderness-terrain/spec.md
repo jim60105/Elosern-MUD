@@ -26,29 +26,6 @@ Game terrain views SHALL expose immutable schema-valid region values loaded from
 - **WHEN** a region has fewer than two typed nonblank description variants
 - **THEN** authoring validation rejects that region rather than coercing or fabricating prose
 
-### Requirement: region_for_coordinates is a pure, deterministic function covering the whole bounded map
-The coordinate classifier SHALL return a declared region for every bounded coordinate using only its immutable terrain snapshot, with deterministic results and the mountain corridor derived from the authored stem route without arm corridors.
-
-#### Scenario: Same input always returns the same output
-- **WHEN** the classifier is called twice with the same coordinate and snapshot
-- **THEN** both calls return the identical declared region key without database, network, random or clock input
-
-#### Scenario: Every region key is reachable
-- **WHEN** the classifier is evaluated across the valid coordinate range
-- **THEN** every declared region key is returned by at least one coordinate
-
-#### Scenario: The central mountain band spans the full valid Y range
-- **WHEN** cells around the authored stem corridor below the forest are classified
-- **THEN** the mountain region follows the stem's per-row centre and authored half-width, while physical passability remains a separate cell property
-
-#### Scenario: capital_altoria's derived anchor cells resolve to Altoria's own territory
-- **WHEN** the capital's authored cell and all derived gateway approaches are classified
-- **THEN** each remains western_hills_valleys
-
-#### Scenario: Branches leave regions unchanged
-- **WHEN** synthetic terrain definitions retain their authored stem and differ only in paired arm routes
-- **THEN** every frame cell keeps its region and the region search windows are identical; branch cells in the deep forest remain north_deep_forest
-
 ### Requirement: terrain_description is a pure, deterministic function with no LLM or randomness
 `world/maps/wilderness_provider.py` SHALL define `terrain_description(x: int, y: int) -> str`,
 selecting one of `region_for_coordinates(x, y)`'s region's declared `terrain_flavor_zh` variants via
@@ -97,43 +74,12 @@ it follows every other lore registry, including idempotency across repeated call
 - **THEN** exactly one `LoreRecord` Script per published region key exists under the
   `"wilderness_regions"` category after the second call
 
-### Requirement: Terrain and political control follow authored geography
-Terrain, nominal claims and effective control SHALL remain distinct, with corridor, nominal nation splits and political lines derived from the same authored stem, a walkable deep forest, and a pass-free forked shipped ridge enclosing the independent hidden valley within declared geographic outcome bounds.
-
-#### Scenario: Anchor relationships
-- **WHEN** the shipped terrain is evaluated through its authored location identities
-- **THEN** Valhalla remains south of the forest edge, Eolas and Eternal Night remain in deep forest, Ciaran and Fionnen remain on the stem's west/east flanks, and all anchors and harbours remain land-side and reachable
-
-#### Scenario: Nominal claims include previously neutral terrain
-- **WHEN** land is classified across the stem and border river
-- **THEN** each cell has one nominal nation; sampled shares remain Grandia 0.43, Altoria 0.30 and Valhalla 0.27 within 0.015, with effective-rule targets unchanged and shared regions keeping no administrative nation
-
-#### Scenario: Pass and river constraints
-- **WHEN** the shipped ridge and waterway declarations are consumed
-- **THEN** no pass exemption exists on the physical range, waterways and their fords remain unchanged, and no movement, elevation-dependent gameplay or shipping rule is introduced
-
-#### Scenario: Hidden valley clearance
-- **WHEN** the shipped Eolas location is compared with the physical crest
-- **THEN** its row lies between the arms at least 30 km from each inner wall edge, no wall lies within a 20 km Euclidean radius, and Eolas remains north_deep_forest with no administrative nation
-
-#### Scenario: Forest detour and preserved shares
-- **WHEN** four-connected walkability excludes sea, complete ridge walls, non-ford water and anchor footprints
-- **THEN** all 9 location targets and 6 harbours share one component through forest around the inland tips; footprinted anchors use legal gateway approaches, ordinary forest stays walkable and sampled forest share remains 0.20 within 0.02
-
-#### Scenario: Political lines remain on the stem
-- **WHEN** a synthetic stem route changes and paired arms are consumed
-- **THEN** the corridor and nominal nation flip follow its row centres, political borders equal its clipped authored polyline and river-source junction, and neither arm nor deep-forest political segments appear
-
-#### Scenario: River-source junction agrees with nominal claims
-- **WHEN** a candidate's border river starts at its easternmost vertex and its active stem stays strictly east of that source
-- **THEN** the source-row political junction agrees with the nominal west-neighbour nation transition; candidates violating either relation reject semantically instead of displaying contradictory political labels
-
 ### Requirement: The border river controls western crossing and classification
 A border river SHALL follow `WATERWAY_ROUTES["border_river"]` from the central range's west flank to the west coast. It SHALL separate western hills/valleys from northwest highland forest and SHALL be impassable on foot except at the fords declared in `WATERWAY_FORDS["border_river"]`.
 
 #### Scenario: Fords permit travel across the new border
 - **WHEN** ordinary foot movement crosses a river cell and then a declared ford
-- **THEN** the river cell blocks traversal and the ford permits it, with a route from Altoria's capital to Valhalla's capital remaining possible
+- **THEN** the river cell blocks traversal and the ford permits it; west of the river source the two banks beside a declared ford connect only through declared fords, and any single declared ford suffices
 
 #### Scenario: Region consumers follow the amended boundaries
 - **WHEN** region-keyed monster placement and species-hunt destination resolution consume cells on either side of the new river and forest edge
@@ -159,9 +105,55 @@ The physical ridge SHALL derive from arbitrary authored stem and arm routes join
 - **THEN** complete wall spans block validity/components/partition and appear in previews regardless of the stem's X extent; elevation uses all active crest-centre profiles and maximum overlapping rise before unchanged sea/river clamps and ordered shapes
 
 #### Scenario: No direct cross-range land route
-- **WHEN** the shipped zero-pass ridge is probed across X1300 through X1520
-- **THEN** no active row admits a horizontal land crossing, and no four-connected route joins the band edges while restricted to rows at or south of the highest tip; unrestricted travel can detour north through walkable forest
+- **WHEN** every active stem row of the shipped ridge outside its declared pass rows is probed at the stem centre, and each arm tip and the cell north of it are probed
+- **THEN** each probed centre is a closed wall cell that the game's validity rule rejects, and each tip is closed while the cell north of it is open
 
 #### Scenario: Terminal rows and optional passes
 - **WHEN** a synthetic stem pass is added below the crotch or a crest endpoint is queried
 - **THEN** the pass exempts only its stem rows, both arms remain blocked, the last crest row is included and the following row has no wall from that crest
+
+### Requirement: The coordinate classifier is a pure deterministic function over the whole bounded map
+The coordinate classifier SHALL return a declared region for every bounded coordinate using only its immutable terrain snapshot, with deterministic results and the mountain corridor derived from the authored stem route without arm corridors.
+
+#### Scenario: Same input always returns the same output
+- **WHEN** the classifier is called twice with the same coordinate and snapshot
+- **THEN** both calls return the identical declared region key without database, network, random or clock input
+
+#### Scenario: Every region key is reachable
+- **WHEN** the classifier is evaluated across the valid coordinate range
+- **THEN** every declared region key is returned by at least one coordinate
+
+#### Scenario: The central mountain band spans the full valid Y range
+- **WHEN** cells around the authored stem corridor below the forest are classified
+- **THEN** the mountain region follows the stem's per-row centre and authored half-width, while physical passability remains a separate cell property
+
+#### Scenario: Branches leave regions unchanged
+- **WHEN** synthetic terrain definitions retain their authored stem and differ only in paired arm routes
+- **THEN** every frame cell keeps its region and the region search windows are identical; branch cells in the deep forest remain north_deep_forest
+
+### Requirement: Terrain and political control derive from authored geography
+Terrain, nominal claims and effective control SHALL remain distinct, with the corridor, nominal nation splits and political lines derived from the same authored stem, walkable deep forest beyond the arm tips, and every authored location and harbour on walkable land in one connected component; no individual site's position, region or nation and no measured area share is contract.
+
+#### Scenario: Authored sites stay classified, walkable and connected
+- **WHEN** the shipped terrain is evaluated through every authored location and harbour identity
+- **THEN** each location cell classifies into a declared region, and each location target (legal gateway approaches for footprinted anchors) and each harbour is walkable land in one four-connected component, whatever the roster size or positions
+
+#### Scenario: Nominal claims agree with region declarations
+- **WHEN** land is sampled across the stem and border river
+- **THEN** each cell has exactly one nominal nation drawn from its region's declared nominal nations, every declared nominal nation of a region occurs in that region, and a region with an administrative nation claims only that nation; measured shares are authored outcomes, not contract
+
+#### Scenario: Declared fords are land on their own waterway
+- **WHEN** every waterway's declared fords and rasterized route cells are consumed
+- **THEN** each ford lies on its own route and is walkable land, and every other land cell of any route is impassable inland water
+
+#### Scenario: Forest beyond the arm tips stays walkable
+- **WHEN** the row past the stem's crotch and the row north of each authored arm tip are evaluated
+- **THEN** the stem has no span past its crotch, and each cell north of a tip is walkable north_deep_forest with no closed wall
+
+#### Scenario: Political lines remain on the stem
+- **WHEN** a synthetic stem route changes and paired arms are consumed
+- **THEN** the corridor and nominal nation flip follow its row centres, political borders equal its clipped authored polyline and river-source junction, and neither arm nor deep-forest political segments appear
+
+#### Scenario: River-source junction agrees with nominal claims
+- **WHEN** a candidate's border river starts at its easternmost vertex and its active stem stays strictly east of that source
+- **THEN** the source-row political junction agrees with the nominal west-neighbour nation transition; candidates violating either relation reject semantically instead of displaying contradictory political labels
