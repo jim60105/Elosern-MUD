@@ -272,16 +272,35 @@ class SnapshotIsolationTests(unittest.TestCase):
             wilderness_reachability.walkable_components = original
 
     def test_retained_adapter_keeps_its_snapshot_coordinates(self):
+        from elosern_map_core.authoring import is_walkable_cell, terrain_definition
         from world.lore.map_districts import _ProductionTerrain
 
-        anchor_xy = map_data.current().settlements["capital_altoria"].local_anchor_m
+        settlement = map_data.current().settlements["capital_altoria"]
+        anchor_xy = settlement.local_anchor_m
         first = geography.current()
         retained = _ProductionTerrain(first)
         before = retained.grid_site("capital_altoria", anchor_xy)
         self.assertIsNotNone(before)
         data = _plain(first.locations.data)
         cell = data["locations"]["capital_altoria"]["cell"]
-        cell["cell_x"] += 1
+        base = (int(cell["cell_x"]), int(cell["cell_y"]))
+        terrain = terrain_definition(first.continent)
+        # Move the anchor one cell along the first cardinal direction whose
+        # shifted footprint is still walkable land. The approved north-bank
+        # cell sits against the river, so the legal direction is read from the
+        # authored terrain instead of a copied offset.
+        dx, dy = next(
+            (dx, dy)
+            for dx, dy in ((0, 1), (1, 0), (-1, 0), (0, -1))
+            if all(
+                is_walkable_cell(terrain, point)
+                for point in settlement.wilderness_geometry(
+                    (base[0] + dx, base[1] + dy)
+                ).footprint_cells
+            )
+        )
+        cell["cell_x"] = base[0] + dx
+        cell["cell_y"] = base[1] + dy
         moved = document_from_data(geography.LOCATIONS_PATH, data)
         second = geography.build_geography(
             first.continent,
@@ -293,7 +312,13 @@ class SnapshotIsolationTests(unittest.TestCase):
         after = retained.grid_site("capital_altoria", anchor_xy)
         self.assertEqual(after.position_m, before.position_m)
         fresh = _ProductionTerrain(second).grid_site("capital_altoria", anchor_xy)
-        self.assertEqual(fresh.position_m[0] - before.position_m[0], 1000)
+        self.assertEqual(
+            (
+                fresh.position_m[0] - before.position_m[0],
+                fresh.position_m[1] - before.position_m[1],
+            ),
+            (dx * 1000, dy * 1000),
+        )
 
     def test_candidate_without_a_classifier_region_is_rejected(self):
         data = _plain(self._shipped.continent.data)

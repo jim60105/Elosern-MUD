@@ -119,6 +119,9 @@ class AuthoredTerrainContractTests(unittest.TestCase):
     def test_rivers_are_authored_water_with_declared_fords(self):
         # Every ford lies on its own river and is walkable land; every other
         # land cell of any river is impassable inland water.
+        from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+
+        entries = list(WILDERNESS_ENTRY_REGISTRY.values())
         routes = terrain().waterway_routes
         all_fords = {ford for fords in terrain().waterway_fords.values() for ford in fords}
         for name, fords in terrain().waterway_fords.items():
@@ -127,7 +130,15 @@ class AuthoredTerrainContractTests(unittest.TestCase):
                 self.assertIn(ford, raster, name)
                 self.assertFalse(is_inland_water_cell(ford), name)
                 self.assertTrue(is_land_cell(ford), name)
-                self.assertTrue(is_valid_wilderness_cell(ford), name)
+                if any(ford in entry.footprint_cells for entry in entries):
+                    # A settlement may own its ford as the gateway cell the
+                    # town grew at: the footprint then covers the crossing and
+                    # travellers enter through the gate. The cell is claimed,
+                    # never silently reclassified, so it must be invalid for
+                    # ordinary wilderness steps.
+                    self.assertFalse(is_valid_wilderness_cell(ford), name)
+                else:
+                    self.assertTrue(is_valid_wilderness_cell(ford), name)
         land_water = [
             cell for cell in rasterize_routes(routes) - all_fords if is_land_cell(cell)
         ]
