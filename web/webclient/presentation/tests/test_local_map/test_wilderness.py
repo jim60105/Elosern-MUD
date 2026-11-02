@@ -50,6 +50,29 @@ class LocalMapWildernessTests(EvenniaTestCase):
     def _registry(self):
         return build_production_registry()
 
+    def _actionable_directions(self) -> set[str]:
+        """The short directions this approach advertises, from its authored entry.
+
+        Ordinary steps are the shared provider-valid geometry's answer for the
+        entry's own approach cell, so a footprint edit moves this expectation
+        instead of contradicting it. The gateway direction is advertised on
+        top of them even though its cell belongs to the mask: that row resolves
+        to the grid node.
+        """
+        from world.lore.wilderness_entry import DIRECTION_DELTAS
+        from world.maps.wilderness_destination import wilderness_neighbor
+
+        entry = _live_gateway_entry()
+        gate = entry.gate_for("w")
+        approach = entry.approach_cell(gate)
+        self.assertIsNotNone(approach)
+        ordinary = {
+            short
+            for short in DIRECTION_DELTAS
+            if wilderness_neighbor(approach[0], approach[1], short) is not None
+        }
+        return ordinary | {gate.return_direction}
+
     @covers_requirement("webclient-local-map::local-map-is-a-read-only-version-1-presentation-panel")
     def test_wilderness_payload_uses_provider_bounds_and_terrain_labels(self):
         from typeclasses.rooms import TerrainRoom
@@ -136,11 +159,13 @@ class LocalMapWildernessTests(EvenniaTestCase):
         self.assertEqual(payload["layer"], "wilderness")
         current = payload["current_node"]
         moves = [node for node in payload["nodes"] if node["action"] is not None]
-        # At the east gate's approach cell six directions are actionable:
-        # the gate (w) plus five ordinary steps. The two diagonals facing the
-        # anchor footprint (nw, sw) are refused by the provider and render
-        # nothing (wilderness-anchor-footprint).
-        self.assertEqual(len(moves), 6)
+        # At the east gate's approach cell the actionable directions are the
+        # gateway row plus every ordinary step the provider-valid geometry
+        # allows; the steps into the anchor footprint, and the diagonals whose
+        # orthogonal neighbour is one of them, render nothing
+        # (wilderness-anchor-footprint).
+        expected = self._actionable_directions()
+        self.assertEqual(len(moves), len(expected))
         for move in moves:
             self.assertEqual(move["action"]["kind"], "move")
             self.assertTrue(move["action"]["exit_ref"].isascii())
@@ -149,9 +174,7 @@ class LocalMapWildernessTests(EvenniaTestCase):
             for edge in payload["edges"]
             if edge["source"] == current
         }
-        self.assertEqual(len(directions), 6)
-        self.assertNotIn("nw", directions)
-        self.assertNotIn("sw", directions)
+        self.assertEqual(set(directions), expected)
         for direction, node_id in directions.items():
             node = next(node for node in payload["nodes"] if node["id"] == node_id)
             expected = resolve_wilderness_destination(room, direction)
@@ -184,10 +207,10 @@ class LocalMapWildernessTests(EvenniaTestCase):
         node = next(node for node in payload["nodes"] if node["id"] == edge["destination"])
         self.assertIsNone(node["action"])
         self.assertFalse(edge["traversable"])
-        # The other five actionable directions still carry move actions.
+        # Every other actionable direction still carries a move action.
         self.assertEqual(
             len([node for node in payload["nodes"] if node["action"] is not None]),
-            5,
+            len(self._actionable_directions()) - 1,
         )
 
     def test_aliased_unrelated_exit_does_not_hijack_the_west_action(self):
@@ -357,16 +380,27 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
     def test_a_cell_in_a_different_region_still_says_so(self):
         # A same-region in-view neighbour still gets the plain region label
         # (only registered gate approach cells get the far-side name).
-        from world.maps.wilderness_provider import WILDERNESS_NAME
+        from world.maps.wilderness_provider import (
+            WILDERNESS_NAME,
+            is_valid_wilderness_cell,
+        )
 
         ex, ey = EAST_APPROACH
-        self._at_wild((ex + 10, ey))
+        # Stand where an in-view east neighbour is itself a provider-valid
+        # cell, derived from the live validity rule rather than a copied offset.
+        step = next(
+            candidate
+            for candidate in range(1, 33)
+            if is_valid_wilderness_cell((ex + candidate, ey))
+            and is_valid_wilderness_cell((ex + candidate + 1, ey))
+        )
+        self._at_wild((ex + step, ey))
         payload = self._registry().render("local_map", _context(self.char1))
-        neighbor_id = f"wild:{WILDERNESS_NAME}:{ex + 11}:{ey}"
+        neighbor_id = f"wild:{WILDERNESS_NAME}:{ex + step + 1}:{ey}"
         neighbor = next(
             node for node in payload["nodes"] if node["id"] == neighbor_id
         )
-        self.assertEqual(neighbor["label"], _t_region_display_for(ex + 11, ey))
+        self.assertEqual(neighbor["label"], _t_region_display_for(ex + step + 1, ey))
 
     @covers_requirement("webclient-local-map::visibility-states-are-current-visible-unvisited-visible-visited-and-remembered")
     def test_two_wilderness_gateways_of_one_anchor_stay_distinguishable(self):
