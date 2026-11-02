@@ -196,6 +196,7 @@ class WorldMapPrivacyTests(TestCase):
                 self.assertTrue(all(m["approximate"] for m in markers.values()))
                 self.assertNotIn(SECRET, json.dumps(body))
 
+    @covers_requirement("webclient-world-map::world-scope-reveals-only-common-geography-and-permitted-district-knowledge")
     def test_anchor_classification_keeps_villages_and_dungeons_visit_only(self):
         from dataclasses import replace
         from types import MappingProxyType
@@ -203,14 +204,23 @@ class WorldMapPrivacyTests(TestCase):
         from world.lore.anchors import AnchorKind
         from world.maps import geography
 
+        expected={
+            AnchorKind.CAPITAL:("capital",False),
+            AnchorKind.CITY:("settlement",False),
+            AnchorKind.TOWN:("settlement",False),
+            AnchorKind.PORT:("settlement",False),
+            AnchorKind.ELVEN_VILLAGE:("hidden",True),
+            AnchorKind.DUNGEON:("hidden",True),
+        }
+        self.assertEqual(set(expected),set(AnchorKind))
         anchors={
-            "t_village":NS(kind=AnchorKind.ELVEN_VILLAGE,display_name_zh=VILLAGE),
-            "t_dungeon":NS(kind=AnchorKind.DUNGEON,display_name_zh=DUNGEON),
-            "t_capital":NS(kind=AnchorKind.CAPITAL,display_name_zh=PUBLIC),
+            f"t_{kind.value}":NS(kind=kind,display_name_zh=f"T_PLACE_{kind.value.upper()}")
+            for kind in expected
         }
         geography_views={
             key:NS(anchor_key=key,cell=(100+i,200)) for i,key in enumerate(anchors)
         }
+        harbours={"t_harbour":NS(key="t_harbour",cell=(90,200),display_name="T_PLACE_HARBOUR")}
 
         publish_shipped_geography()
         previous = geography.current()
@@ -219,17 +229,17 @@ class WorldMapPrivacyTests(TestCase):
                 previous,
                 anchors=MappingProxyType(anchors),
                 anchor_geography=MappingProxyType(geography_views),
-                harbor_sites=MappingProxyType({}),
+                harbor_sites=MappingProxyType(harbours),
             )
         )
         self.addCleanup(publish_geography, previous)
         with patch("world.lore.anchor_placement.ANCHOR_PLACEMENT_REGISTRY",{}), \
              patch("world.maps.district_partition.district_at",return_value=SECRET):
             records=panel.geometry._place_geometry("uncached-probe")
-        policy={row["name"]:hidden for _,row,hidden,_ in records}
-        self.assertTrue(policy[VILLAGE])
-        self.assertTrue(policy[DUNGEON])
-        self.assertFalse(policy[PUBLIC])
+        rows={row["id"]:(row["kind"],hidden) for _,row,hidden,_ in records}
+        for kind,outcome in expected.items():
+            self.assertEqual(rows[f"t_{kind.value}"],outcome,kind)
+        self.assertEqual(rows["t_harbour"],("harbour",False))
 
 
 class WorldMapTrailTests(TestCase):

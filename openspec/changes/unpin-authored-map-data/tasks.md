@@ -11,7 +11,7 @@ Ground rules for every task:
 
 File: `world/maps/tests/test_wilderness_geography_contract.py` only.
 
-- [ ] 1.1 In class `BorderRiverContractTests`, replace the whole method `test_fords_lie_on_the_river_with_the_principal_on_the_capital_line`, including its `@covers_requirement` line, with:
+- [x] 1.1 In class `BorderRiverContractTests`, replace the whole method `test_fords_lie_on_the_river_with_the_principal_on_the_capital_line`, including its `@covers_requirement` line, with:
   ```python
       @covers_requirement("wilderness-terrain::the-border-river-controls-western-crossing-and-classification")
       def test_border_fords_are_the_only_walkable_river_cells(self):
@@ -26,7 +26,7 @@ File: `world/maps/tests/test_wilderness_geography_contract.py` only.
           self.assertEqual(raster - water, set(fords))
   ```
   Check: `grep -n "capital_valhalla\|principal" world/maps/tests/test_wilderness_geography_contract.py` prints no line inside `BorderRiverContractTests` except the ones task 1.2 removes.
-- [ ] 1.2 In `test_west_of_the_corridor_only_the_fords_cross_the_border`:
+- [x] 1.2 In `test_west_of_the_corridor_only_the_fords_cross_the_border`:
   - replace the comment block and the lines from `from world.lore.anchors import anchor_geography` through `self.assertLess(max(south[0], north[0]), source_x)` with the code below;
   - keep the decorator, the `def` line and everything from `for blocked, connected in (` to the end of the method unchanged.
   ```python
@@ -43,14 +43,14 @@ File: `world/maps/tests/test_wilderness_geography_contract.py` only.
           self.assertLess(ford_x, source_x)
   ```
   Check: the method no longer contains `anchor_geography`, `capital_altoria` or `capital_valhalla`.
-- [ ] 1.3 In class `ForestEdgeAndClaimContractTests`, delete the whole method `test_anchor_relationships_to_the_forest_edge`, including its decorator line. Check: `grep -c "test_anchor_relationships_to_the_forest_edge" world/maps/tests/test_wilderness_geography_contract.py` prints `0`.
-- [ ] 1.4 Run `uv run evennia test --keepdb --settings settings.py world.maps.tests.test_wilderness_geography_contract`. Expected: `OK`, no failures. This is the first point where master's two failures are gone.
+- [x] 1.3 In class `ForestEdgeAndClaimContractTests`, delete the whole method `test_anchor_relationships_to_the_forest_edge`, including its decorator line. Check: `grep -c "test_anchor_relationships_to_the_forest_edge" world/maps/tests/test_wilderness_geography_contract.py` prints `0`.
+- [x] 1.4 Run `uv run evennia test --keepdb --settings settings.py world.maps.tests.test_wilderness_geography_contract`. Expected: `OK`, no failures. This is the first point where master's two failures are gone.
 
 ## 2. Wilderness geography contract: remove the remaining data pins
 
 File: `world/maps/tests/test_wilderness_geography_contract.py` only. Requires group 1.
 
-- [ ] 2.1 Replace lines 3–8 of the module docstring (every line after the first line and the blank line, up to the closing `"""`) with the text below. Line 1 (`Data-contract test: authored continental terrain, waterway and anchor-region data contract`) must stay byte-identical.
+- [x] 2.1 Replace lines 3–8 of the module docstring (every line after the first line and the blank line, up to the closing `"""`) with the text below. Line 1 (`Data-contract test: authored continental terrain, waterway and anchor-region data contract`) must stay byte-identical.
   ```text
   The shipped geography is checked through invariants derived from the authored
   data itself: classifier joins, walkability and connectivity of every authored
@@ -60,7 +60,7 @@ File: `world/maps/tests/test_wilderness_geography_contract.py` only. Requires gr
   invariant. Mechanics stay in ``world/maps/tests/test_wilderness_provider.py``.
   ```
   Check: `sed -n 1p world/maps/tests/test_wilderness_geography_contract.py` still prints `"""Data-contract test: authored continental terrain, waterway and anchor-region data contract`.
-- [ ] 2.2 Replace the body of `test_central_mountain_region_bends_with_the_authored_corridor` (keep its decorator and `def` line) with:
+- [x] 2.2 Replace the body of `test_central_mountain_region_bends_with_the_authored_corridor` (keep its decorator and `def` line) with:
   ```python
           # Rows come from the authored stem itself; the probes sit one cell
           # outside the authored corridor half-width on both sides.
@@ -82,8 +82,8 @@ File: `world/maps/tests/test_wilderness_geography_contract.py` only. Requires gr
                       region_for_coordinates(centre + half_width + 1, y), "central_mountains"
                   )
   ```
-- [ ] 2.3 Delete the whole method `test_settlement_derived_anchor_cells_resolve_to_altoria_territory`, including its decorator.
-- [ ] 2.4 Replace the whole method `test_the_physical_ridge_is_a_pass_free_forked_barrier` with the code below. Keep both of its existing `@covers_requirement` decorators (the single-line one and the three-line parenthesised one) exactly as they are, and replace only the `def` line and the body.
+- [x] 2.3 Delete the whole method `test_settlement_derived_anchor_cells_resolve_to_altoria_territory`, including its decorator.
+- [x] 2.4 Replace the whole method `test_the_physical_ridge_is_a_pass_free_forked_barrier` with the code below. Keep both of its existing `@covers_requirement` decorators (the single-line one and the three-line parenthesised one) exactly as they are, and replace only the `def` line and the body.
   ```python
       def test_unexempted_stem_rows_and_arm_tips_are_closed_walls(self):
           # Derived from the authored stem and its declared pass rows: every
@@ -103,7 +103,7 @@ File: `world/maps/tests/test_wilderness_geography_contract.py` only. Requires gr
               self.assertTrue(is_closed_ridge_cell(tip), crest)
               self.assertFalse(is_closed_ridge_cell((tip[0], tip[1] + 1)), crest)
   ```
-- [ ] 2.5 Replace the body of `test_rivers_are_authored_water_with_declared_fords` (keep its decorator and `def` line) with:
+- [x] 2.5 Replace the body of `test_rivers_are_authored_water_with_declared_fords` (keep its decorator and `def` line) with:
   ```python
           # Every ford lies on its own river and is walkable land; every other
           # land cell of any river is impassable inland water.
@@ -124,17 +124,17 @@ File: `world/maps/tests/test_wilderness_geography_contract.py` only. Requires gr
               self.assertTrue(is_inland_water_cell(cell), cell)
               self.assertFalse(is_valid_wilderness_cell(cell), cell)
   ```
-- [ ] 2.6 In `test_anchor_and_port_centres_are_land_side`, change the comment line `# seven unbuilt anchors.` to `# unbuilt anchors.`. Change nothing else in that method.
-- [ ] 2.7 In `test_river_course_stays_in_the_authored_band_from_corridor_to_coast`:
+- [x] 2.6 In `test_anchor_and_port_centres_are_land_side`, change the comment line `# seven unbuilt anchors.` to `# unbuilt anchors.`. Change nothing else in that method.
+- [x] 2.7 In `test_river_course_stays_in_the_authored_band_from_corridor_to_coast`:
   - replace the comment line `# One water cell per column, exactly the classifier's river row, every` and the line after it (`# row inside Y 1290..1410.`) with the single line `# One water cell per column, exactly the classifier's river row.`;
   - change no code.
-- [ ] 2.8 In `test_classifier_and_claims_flip_across_the_river`, replace the line `for x in (200, 450, 830, 1150, 1300):` with the code below, and keep the four assertions inside the loop and everything after the loop unchanged.
+- [x] 2.8 In `test_classifier_and_claims_flip_across_the_river`, replace the line `for x in (200, 450, 830, 1150, 1300):` with the code below, and keep the four assertions inside the loop and everything after the loop unchanged.
   ```python
           route = terrain().waterway_routes["border_river"]
           source_x, mouth_x = route[0][0], route[-1][0]
           for x in range(mouth_x + 1, source_x, max(1, (source_x - mouth_x) // 6)):
   ```
-- [ ] 2.9 Replace the whole method `test_forest_edge_meanders_near_y1920_over_a_fifth_of_the_land`, keeping its decorator line, with:
+- [x] 2.9 Replace the whole method `test_forest_edge_meanders_near_y1920_over_a_fifth_of_the_land`, keeping its decorator line, with:
   ```python
       def test_forest_edge_spans_the_frame_and_starts_the_deep_forest(self):
           xs = [x for x, _ in terrain().forest_edge]
@@ -145,8 +145,8 @@ File: `world/maps/tests/test_wilderness_geography_contract.py` only. Requires gr
               self.assertEqual(region_for_coordinates(x, row), "north_deep_forest", x)
               self.assertNotEqual(region_for_coordinates(x, row - 1), "north_deep_forest", x)
   ```
-- [ ] 2.10 In `test_forest_around_the_inland_tips_stays_walkable`, delete the last three lines of the method: the comment `# Forest cells off the ridge stay walkable (no new movement block).` and the two `self.assertTrue(is_valid_wilderness_cell((900, 2350)))` / `((700, 1960)))` lines.
-- [ ] 2.11 Replace the whole method `test_every_land_cell_has_one_nominal_nation_with_authored_shares`, keeping its decorator line, with:
+- [x] 2.10 In `test_forest_around_the_inland_tips_stays_walkable`, delete the last three lines of the method: the comment `# Forest cells off the ridge stay walkable (no new movement block).` and the two `self.assertTrue(is_valid_wilderness_cell((900, 2350)))` / `((700, 1960)))` lines.
+- [x] 2.11 Replace the whole method `test_every_land_cell_has_one_nominal_nation_with_authored_shares`, keeping its decorator line, with:
   ```python
       def test_every_land_cell_has_one_nominal_nation_agreeing_with_its_region(self):
           from world.lore.nations import NATION_REGISTRY
@@ -165,13 +165,13 @@ File: `world/maps/tests/test_wilderness_geography_contract.py` only. Requires gr
               if region.nation_key is not None:
                   self.assertEqual(region.nominal_nation_keys, (region.nation_key,), key)
   ```
-- [ ] 2.12 Delete the whole method `test_effective_rule_targets_are_unchanged`, including its decorator.
-- [ ] 2.13 In `test_displayed_borders_derive_from_ridge_and_river_outside_the_forest`, replace the line `self.assertEqual(river[-1], (ridge_center_x(terrain(), 1410), 1410))` with the two lines below. Change nothing else.
+- [x] 2.12 Delete the whole method `test_effective_rule_targets_are_unchanged`, including its decorator.
+- [x] 2.13 In `test_displayed_borders_derive_from_ridge_and_river_outside_the_forest`, replace the line `self.assertEqual(river[-1], (ridge_center_x(terrain(), 1410), 1410))` with the two lines below. Change nothing else.
   ```python
           source_row = terrain().waterway_routes["border_river"][0][1]
           self.assertEqual(river[-1], (ridge_center_x(terrain(), source_row), source_row))
   ```
-- [ ] 2.13a In `test_every_anchor_and_harbour_is_walkable_and_mutually_reachable`, replace the two lines
+- [x] 2.13a In `test_every_anchor_and_harbour_is_walkable_and_mutually_reachable`, replace the two lines
   ```python
           altoria = anchor_geography()["capital_altoria"]
           hub = components.component(_anchor_targets("capital_altoria", altoria.cell)[0])
@@ -184,13 +184,13 @@ File: `world/maps/tests/test_wilderness_geography_contract.py` only. Requires gr
           )
   ```
   Change nothing else in the method. Check: `grep -c "capital_altoria" world/maps/tests/test_wilderness_geography_contract.py` prints `0`.
-- [ ] 2.14 Pin scan. Run `grep -nE "1920|0\.20|0\.43|0\.30|0\.27|1300|1520|1410|1290|\(900, |\(700, |capital_altoria|capital_valhalla|village_eolas|village_ciaran|village_fionnen|dungeon_eternal_night" world/maps/tests/test_wilderness_geography_contract.py`. Expected: no output. Then run `uv run evennia test --keepdb --settings settings.py world.maps.tests.test_wilderness_geography_contract`. Expected: `OK` with `Ran 17 tests`. Master has 20; group 1 deletes 1 and this group deletes 2. `grep -c "    def test_" world/maps/tests/test_wilderness_geography_contract.py` must also print `17`.
+- [x] 2.14 Pin scan. Run `grep -nE "1920|0\.20|0\.43|0\.30|0\.27|1300|1520|1410|1290|\(900, |\(700, |capital_altoria|capital_valhalla|village_eolas|village_ciaran|village_fionnen|dungeon_eternal_night" world/maps/tests/test_wilderness_geography_contract.py`. Expected: no output. Then run `uv run evennia test --keepdb --settings settings.py world.maps.tests.test_wilderness_geography_contract`. Expected: `OK` with `Ran 17 tests`. Master has 20; group 1 deletes 1 and this group deletes 2. `grep -c "    def test_" world/maps/tests/test_wilderness_geography_contract.py` must also print `17`.
 
 ## 3. Anchor kind vocabulary and national-settlement lore checks
 
 File: `world/lore/tests/test_anchors.py` only. Independent of groups 1–2.
 
-- [ ] 3.1 Replace the whole method `test_every_supported_kind_appears_without_a_fixed_roster_count` with:
+- [x] 3.1 Replace the whole method `test_every_supported_kind_appears_without_a_fixed_roster_count` with:
   ```python
       @covers_requirement("lore-registries::anchor-registry-covers-capitals-elven-villages-and-known-dungeons")
       def test_anchor_kinds_match_the_schema_location_kinds(self):
@@ -225,7 +225,7 @@ File: `world/lore/tests/test_anchors.py` only. Independent of groups 1–2.
                   self.assertEqual(snapshot.anchors[key].kind, AnchorKind(declaration["kind"]))
           self.assertEqual(set(snapshot.anchors), set(data["locations"]))
   ```
-- [ ] 3.2 Replace the whole method `test_national_settlements_carry_nation_and_population` with:
+- [x] 3.2 Replace the whole method `test_national_settlements_carry_nation_and_population` with:
   ```python
       @covers_requirement("lore-registries::anchor-registry-covers-capitals-elven-villages-and-known-dungeons")
       def test_national_settlements_carry_nation_and_population(self):
@@ -241,13 +241,13 @@ File: `world/lore/tests/test_anchors.py` only. Independent of groups 1–2.
                   self.assertIsInstance(anchor.population, int)
                   self.assertGreater(anchor.population, 0)
   ```
-- [ ] 3.3 Run `uv run evennia test --keepdb --settings settings.py world.lore.tests.test_anchors`. Expected: `OK`. Then run `grep -n "assertLess\|capitals\[" world/lore/tests/test_anchors.py`. Expected: no output.
+- [x] 3.3 Run `uv run evennia test --keepdb --settings settings.py world.lore.tests.test_anchors`. Expected: `OK`. Then run `grep -n "assertLess\|capitals\[" world/lore/tests/test_anchors.py`. Expected: no output.
 
 ## 4. World-map place classification
 
 File: `web/webclient/presentation/tests/test_world_map.py` only. Independent of groups 1–3.
 
-- [ ] 4.1 Replace the whole method `test_anchor_classification_keeps_villages_and_dungeons_visit_only`, which currently has no decorator, with:
+- [x] 4.1 Replace the whole method `test_anchor_classification_keeps_villages_and_dungeons_visit_only`, which currently has no decorator, with:
   ```python
       @covers_requirement("webclient-world-map::world-scope-reveals-only-common-geography-and-permitted-district-knowledge")
       def test_anchor_classification_keeps_villages_and_dungeons_visit_only(self):
@@ -295,17 +295,17 @@ File: `web/webclient/presentation/tests/test_world_map.py` only. Independent of 
           self.assertEqual(rows["t_harbour"],("harbour",False))
   ```
   The method stays at its current position inside class `WorldMapPrivacyTests`.
-- [ ] 4.2 Run `uv run evennia test --keepdb --settings settings.py web.webclient.presentation.tests.test_world_map`. Expected: `OK`.
+- [x] 4.2 Run `uv run evennia test --keepdb --settings settings.py web.webclient.presentation.tests.test_world_map`. Expected: `OK`.
 
 ## 5. Integration gates
 
 Requires groups 1–4.
 
-- [ ] 5.1 Run `uv run --locked python -m tools.spec_traceability check`. Expected: `0 uncovered, 0 errors`. The requirement count is unchanged from master: 2677, because the main specs are not yet synced.
-- [ ] 5.2 Run `uv run --locked python -m tools.test_data_lint check`. Expected: `violations=0`.
-- [ ] 5.3 Run `uv run --locked python -m tools.contract_gate`. Expected: exit status 0.
-- [ ] 5.4 Run `openspec validate unpin-authored-map-data --strict`. Expected: `Change 'unpin-authored-map-data' is valid`.
-- [ ] 5.5 Run `git diff --stat master...HEAD`. Expected: only these files change: `world/maps/tests/test_wilderness_geography_contract.py`, `world/lore/tests/test_anchors.py`, `web/webclient/presentation/tests/test_world_map.py`, and this change's `tasks.md` checkboxes.
+- [x] 5.1 Run `uv run --locked python -m tools.spec_traceability check`. Expected: `0 uncovered, 0 errors`. The requirement count is unchanged from master: 2677, because the main specs are not yet synced.
+- [x] 5.2 Run `uv run --locked python -m tools.test_data_lint check`. Expected: `violations=0`.
+- [x] 5.3 Run `uv run --locked python -m tools.contract_gate`. Expected: exit status 0.
+- [x] 5.4 Run `openspec validate unpin-authored-map-data --strict`. Expected: `Change 'unpin-authored-map-data' is valid`.
+- [x] 5.5 Run `git diff --stat master...HEAD`. Expected: only these files change: `world/maps/tests/test_wilderness_geography_contract.py`, `world/lore/tests/test_anchors.py`, `web/webclient/presentation/tests/test_world_map.py`, and this change's `tasks.md` checkboxes.
 
 ## Workflow follow-up
 

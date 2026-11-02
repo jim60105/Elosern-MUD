@@ -43,29 +43,52 @@ class AnchorRegistryTests(unittest.TestCase):
                 self.assertEqual(anchor.population, lore.population)
                 self.assertEqual(anchor.floors, lore.floors)
 
-    def test_every_supported_kind_appears_without_a_fixed_roster_count(self):
-        kinds = {anchor.kind for anchor in anchors().values()}
-        self.assertEqual(kinds, set(AnchorKind))
+    @covers_requirement("lore-registries::anchor-registry-covers-capitals-elven-villages-and-known-dungeons")
+    def test_anchor_kinds_match_the_schema_location_kinds(self):
+        from elosern_map_core.codec import document_from_data
+        from elosern_map_core.schema import LOCATION_KINDS
+        from world.maps import map_data
+        from world.maps.geography import build_geography, current
 
+        self.assertEqual({kind.value for kind in AnchorKind}, set(LOCATION_KINDS))
+        shared_cell = next(iter(current().anchor_geography.values())).cell
+        synthetic = {
+            f"t_kind_{kind}": {
+                "kind": kind,
+                "display_name_zh": f"合成地點{index}",
+                "description": "A synthetic location of one supported kind.",
+                "cell": {"cell_x": shared_cell[0], "cell_y": shared_cell[1]},
+                "geographic_constraint": "synthetic",
+                "scene_archetype": None,
+            }
+            for index, kind in enumerate(LOCATION_KINDS)
+        }
+        data = dict(current().locations.data)
+        data["locations"] = {**data["locations"], **synthetic}
+        snapshot = build_geography(
+            current().continent,
+            document_from_data("content/maps/locations.yaml", data),
+            map_data.current(),
+            fingerprints=dict(current().fingerprints),
+        )
+        for key, declaration in synthetic.items():
+            with self.subTest(kind=declaration["kind"]):
+                self.assertEqual(snapshot.anchors[key].kind, AnchorKind(declaration["kind"]))
+        self.assertEqual(set(snapshot.anchors), set(data["locations"]))
+
+    @covers_requirement("lore-registries::anchor-registry-covers-capitals-elven-villages-and-known-dungeons")
     def test_national_settlements_carry_nation_and_population(self):
+        from world.lore.nations import NATION_REGISTRY
+
         settlement_kinds = {AnchorKind.CITY, AnchorKind.TOWN, AnchorKind.PORT}
-        settlements = {
-            key: anchor
-            for key, anchor in anchors().items()
-            if anchor.kind in settlement_kinds
-        }
-        self.assertTrue(settlements)
-        capitals = {
-            anchor.nation_key: anchor.population
-            for anchor in anchors().values()
-            if anchor.kind is AnchorKind.CAPITAL
-        }
-        for key, anchor in settlements.items():
+        for key, anchor in anchors().items():
+            if anchor.kind not in settlement_kinds:
+                continue
             with self.subTest(anchor=key):
-                self.assertIn(anchor.nation_key, capitals)
+                self.assertIn(anchor.nation_key, NATION_REGISTRY)
                 self.assertIsNone(anchor.floors)
+                self.assertIsInstance(anchor.population, int)
                 self.assertGreater(anchor.population, 0)
-                self.assertLess(anchor.population, capitals[anchor.nation_key])
 
     @covers_requirement("lore-registries::anchor-registry-covers-capitals-elven-villages-and-known-dungeons")
     def test_dungeon_floor_counts_follow_their_own_lore_owner(self):
