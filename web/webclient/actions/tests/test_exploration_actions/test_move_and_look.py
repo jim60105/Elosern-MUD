@@ -1029,13 +1029,19 @@ def _east_gate_xyz():
         importlib.import_module("world.lore.wilderness_entry"),
         "WILDERNESS_ENTRY" + "_REGISTRY",
     )
-    entries = [
-        entry
-        for entry in registry.values()
-        if entry.gate_for("w") is not None and entry.gate_for("n") is not None
-    ]
-    if len(entries) != 1:
-        raise AssertionError(entries)
+    # More than one settlement authors both gateway faces now, so the pick is
+    # the lowest authored anchor key: deterministic, and the capital row the
+    # production east gate belongs to.
+    entries = sorted(
+        (
+            entry
+            for entry in registry.values()
+            if entry.gate_for("w") is not None and entry.gate_for("n") is not None
+        ),
+        key=lambda entry: entry.anchor_key,
+    )
+    if not entries:
+        raise AssertionError("no wilderness entry authors both gateway faces")
     from world.maps.static_references import settlement_node_xyz
 
     return settlement_node_xyz(entries[0].gate_for("w").destination)
