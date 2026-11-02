@@ -9,6 +9,7 @@ windowed terrain view per check. It reads only; nothing here writes a file.
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -19,7 +20,7 @@ from elosern_map_core import (
     discover_source_documents,
     load_authoring_world,
 )
-from elosern_map_core.authoring import terrain_definition
+from elosern_map_core.authoring import gate_approach_cell, terrain_definition
 from elosern_map_core.elevation_codec import decode_tile
 from elosern_map_core.terrain import (
     is_inland_water_cell,
@@ -41,6 +42,21 @@ TILE_CELLS = 64
 
 class WorkspaceError(Exception):
     """The workspace or one requested identity cannot be read."""
+
+
+def settlement_path(root: Path, map_id: str) -> Path:
+    """The settlement source a generator writes for one map identity."""
+
+    return Path(root) / "content" / "maps" / "settlements" / f"{map_id}.yaml"
+
+
+def write_atomic(path: Path, text: str) -> None:
+    """Write one source atomically: a sibling temporary file, then a replace."""
+
+    path = Path(path)
+    temporary = path.with_suffix(".yaml.tmp")
+    temporary.write_text(text, encoding="utf-8", newline="\n")
+    os.replace(temporary, path)
 
 
 def load_lore(path: Path | None) -> Mapping[str, tuple[str | None, int | None]]:
@@ -201,6 +217,51 @@ class WorkspaceView:
                 for site_id, site in self.world.continent.harbor_sites.items()
             },
         )
+
+    def blocked_cells(self, map_id: str) -> frozenset[Cell]:
+        """Cells no generated footprint of ``map_id`` may use.
+
+        The union holds every other settlement's mask and gate approaches, every
+        location cell that is not this map's own, every harbour site and every
+        wilderness district landmark. The own location row is excluded by
+        identity, never by subtracting its coordinate afterwards: another source
+        may legitimately reserve the same cell.
+        """
+
+        locations = self.world.locations.locations
+        document = self.world.settlements.get(map_id)
+        own_location: str | None = None
+        if document is not None:
+            own_location = document.location_ref
+        elif map_id in locations:
+            own_location = map_id
+
+        blocked: set[Cell] = set()
+        for location_id, declaration in locations.items():
+            if location_id == own_location:
+                continue
+            blocked.add(tuple(declaration.cell))
+        for site in self.world.continent.harbor_sites.values():
+            blocked.add(tuple(site.cell))
+        for district in self.world.districts.districts.values():
+            landmark = district.landmark
+            if landmark.domain == "wilderness_cell" and landmark.cell is not None:
+                blocked.add(tuple(landmark.cell))
+        for settlement_id, other in self.world.settlements.items():
+            if settlement_id == map_id:
+                continue
+            location = locations.get(other.location_ref)
+            if location is None:
+                continue
+            geometry = other.wilderness_geometry(tuple(location.cell))
+            if geometry is None:
+                continue
+            blocked.update(geometry.mask_cells)
+            for gate in geometry.gates:
+                approach = gate_approach_cell(geometry, gate.return_direction)
+                if approach is not None:
+                    blocked.add(approach)
+        return frozenset(blocked)
 
 
 def _roster(
