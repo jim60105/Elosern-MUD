@@ -172,7 +172,7 @@ Let `ok(c)` be `terrain.walkable(c) and c not in blocked and c not in F`.
    - Score each with `(0 if midpoint(F|{c}) == location.cell else 1, (cx-gx)**2 + (cy-gy)**2, cy, cx)`. The growth centre `g` is `location.cell + 0.5*water_vec` for a water target, and `location.cell` otherwise.
    - Add the candidate with the minimal score. When there is no candidate, raise `GenerationError(f"{map_id}: footprint_short")`.
    - `midpoint(S) = ((min x + max x) // 2, (min y + max y) // 2)`.
-4. If `midpoint(F) != location.cell`, add the warning `footprint_location_offset`.
+4. If `midpoint(F) not in F`, raise `GenerationError(f"{map_id}: anchor_outside_footprint")`. The game's gate-approach rule and the core diagnostic `invalid_footprint_anchor` both require the mask anchor to be a footprint cell. Otherwise, if `midpoint(F) != location.cell`, add the warning `footprint_location_offset`, and emit it only in that case.
 5. **Contact:** `water_contact` is true when some cell of `F` is 8-adjacent to a water cell (`terrain.is_water`), or when the ford cell is in `F`. `river_contact` is true when some cell of `F` is 8-adjacent to a cell of the target river.
 
 ### D5. Metre frame, envelope and candidates
@@ -207,7 +207,7 @@ The steps run in this order. `nodes` is the list of placed slots.
      - the bearing from the location to each ford;
      - `FALLBACK_BEARINGS`.
    - For each bearing `o`, until `budget.gate_count` gates are accepted:
-     1. Walk from the mask anchor cell `midpoint(F)` along `OCTANT_VECTORS[o]` while the cell is in `F`. The first cell outside is `a`.
+     1. Walk from the mask anchor cell `midpoint(F)`, which D4 step 4 guarantees is in `F`, along `OCTANT_VECTORS[o]` while the cell is in `F`. The first cell outside is `a`.
      2. Accept `o` only when `terrain.walkable(a)`, `a not in blocked`, and `(a, OPPOSITE[o])` is unused.
      3. For an accepted `o`, march `t = 25, 50, …` up to `1.5*R` along `unit(OCTANT_VECTORS[o])` from `(0,0)`. Keep the last `t` where `in_town(p)` holds and `p` is at least `0.6*s` from every placed node.
      4. No such `t` rejects `o`. Otherwise emit `Slot(f"{OCTANT_WORDS[o]}_gate", "gate", f"{OCTANT_ZH[o]}門", p)`.

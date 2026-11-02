@@ -27,7 +27,7 @@ The generator SHALL select a beast-nation ring for beast nations. A port SHALL g
 - **THEN** generation fails with an error naming the location and the water gap, and nothing is produced
 
 ### Requirement: Generated footprints are connected walkable masks centred on the location
-A generated footprint SHALL contain the location cell and SHALL be 4-connected and walkable. It SHALL contain no blocked cell and SHALL hold the budgeted cell count plus any water-reach cells. For a waterside, harbour or crossing layout it SHALL touch its water. It SHALL keep its bounding-box midpoint on the location cell whenever such growth exists, and report an offset warning otherwise.
+A generated footprint SHALL contain the location cell and SHALL be 4-connected and walkable. It SHALL contain no blocked cell and SHALL hold the budgeted cell count plus any water-reach cells. For a waterside, harbour or crossing layout it SHALL touch its water. Its bounding-box midpoint SHALL be a footprint cell, or generation is refused. An offset warning SHALL be reported exactly when that midpoint differs from the location cell.
 
 #### Scenario: Open ground
 - **WHEN** a synthetic town with a 5-cell budget is generated on open walkable ground
@@ -38,8 +38,12 @@ A generated footprint SHALL contain the location cell and SHALL be 4-connected a
 - **THEN** no blocked cell is in the footprint and at least one footprint cell is 8-adjacent to a river cell
 
 #### Scenario: Unbalanced corridor
-- **WHEN** walkable ground around the location allows growth on one side only
-- **THEN** the footprint is still generated and the result carries the offset warning
+- **WHEN** walkable ground around the location allows growth on one side only, in a straight corridor
+- **THEN** the footprint is still generated, its midpoint is one of its cells, and the result carries the offset warning
+
+#### Scenario: Midpoint outside the footprint
+- **WHEN** the only reachable water lies at the end of an L-shaped corridor, so that the grown mask's bounding-box midpoint falls on an unwalkable cell
+- **THEN** generation fails with an error naming the location and `anchor_outside_footprint`, and nothing is produced
 
 ### Requirement: Generated graphs satisfy the structure rules and the terrain-fit lint
 A generated map SHALL have the budgeted node count and exactly one anchor node at the location cell. Its coordinates SHALL be unique non-negative integers. Every road SHALL be paired with its reverse. No node SHALL have two outgoing roads in one direction or more than six roads. The graph SHALL be connected, with loops up to the tier target, and SHALL pass the terrain-fit lint with no error.

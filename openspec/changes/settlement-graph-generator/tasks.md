@@ -28,7 +28,7 @@ Ground rules:
   - serialise twice with `serialize_document(document_from_data(path, data), None)`, compare the bytes, then re-parse with `parse_document` and serialise again for the same bytes;
   - the ids `site_a` and `site_b` produce different coordinate sets.
 - [ ] 3.3 `MorphologyTests` covers the six-site selection order and the dry port. The dry port's error message contains the map id and `water_gap`.
-- [ ] 3.4 `FootprintTests` covers open ground (5 cells, 4-connected by BFS, midpoint equal to the location), blocked cells with river reach (no blocked cell in the footprint; some footprint cell is 8-adjacent to a river cell) and the corridor (all cells west of the location walkable, east blocked; the warning `footprint_location_offset` is present).
+- [ ] 3.4 `FootprintTests` covers open ground (5 cells, 4-connected by BFS, midpoint equal to the location), blocked cells with river reach (no blocked cell in the footprint; some footprint cell is 8-adjacent to a river cell) and the corridor (a 1-cell-high straight corridor of walkable cells running west of the location, everything else blocked; the midpoint is in the footprint and the warning `footprint_location_offset` is present), and the midpoint outside the footprint (an L-shaped walkable corridor that leads to the only river, with all other cells blocked; generation raises `GenerationError` containing `anchor_outside_footprint`).
 - [ ] 3.5 `StructureTests`: for the open, river and coast sites, assert:
   - node count;
   - exactly one `anchor_room`, whose `anchor_key` is the location id;
@@ -42,7 +42,7 @@ Ground rules:
   - no `lint_settlement` error;
   - every direction within 2 octants (`octant_distance`) of its segment bearing, or a `direction_deviation` warning.
 - [ ] 3.6 `GateTests` covers the forced `s`, the capital to the north, the blocked eastern approach and the gate budget 3, expecting bearings `s`, `n`, `w`. It also checks the gate-node dot product with the bearing vector is ≥ 0.
-- [ ] 3.7 `RoleTests` covers the class and budget filter, the dry versus river site for a `requires: "river"` entry (with the 600 m check through `point_to_cell_distance`), uphill (a `high_ground` slot with `rel_m.y > 0`) and the downstream river flowing east (the `water_downstream` slot has the maximum `x` among that site's water candidates; recompute the candidates in the test from D5 independently).
+- [ ] 3.7 `RoleTests` covers the class and budget filter, the dry versus river site for a `requires: "river"` entry (with the 600 m check through `point_to_cell_distance`), uphill (a `high_ground` slot with `rel_m.y > 0`) and the downstream river flowing east. For the downstream case, hand-build a terrain whose river runs along one row south of a 1-row footprint strip, with the route from west to east. The `water_downstream` slot must lie in the easternmost footprint cell of that strip. Assert the expected cell directly; do not reimplement D5.
 
   Check: the module passes in under 60 seconds.
 
