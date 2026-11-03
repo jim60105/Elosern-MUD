@@ -370,6 +370,17 @@ select {
   stroke-width: 1.5;
 }
 
+.map-mark__landmark {
+  fill: var(--gold-300);
+  stroke: var(--ink-820);
+  stroke-width: 1.5;
+}
+
+.map-mark--landmark-linked .map-mark__landmark {
+  fill: none;
+  stroke: var(--gold-300);
+}
+
 .map-mark__ring {
   fill: none;
   stroke: var(--map-view-selection);

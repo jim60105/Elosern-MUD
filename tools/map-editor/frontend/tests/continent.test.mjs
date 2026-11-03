@@ -11,6 +11,7 @@ import {
   MAINLAND,
   cellOfMetres,
   commandFeature,
+  districtField,
   documentCommand,
   featurePoints,
   footprintGrid,
@@ -25,6 +26,7 @@ import {
   removalOf,
   storedFromMetres,
   waterwayRef,
+  wildernessLandmark,
 } from "../src/lib/continent.js";
 import { continentScene } from "../src/lib/map_scene.js";
 import { visibleScene } from "../src/lib/layers.js";
@@ -249,4 +251,47 @@ test("the footprint grid has a one-cell margin, north row first", () => {
   assert.equal(grid.rows.at(-1).y, 9);
   const row11 = grid.rows.find((row) => row.y === 11);
   assert.deepEqual(row11.cells.filter((cell) => cell.filled).map((cell) => cell.x), [10, 11]);
+});
+
+test("district landmarks draw on the locations layer and only wilderness cells drag", () => {
+  const w = world();
+  const row = (id, landmark, centre) => ({
+    id,
+    relative_path: "content/maps/districts.yaml",
+    district_name_zh: `區 ${id}`,
+    landmark_name_zh: `地標 ${id}`,
+    kind: "voronoi",
+    region_key: null,
+    landmark,
+    landmark_centre_m: centre,
+  });
+  w.districts = [
+    row("d1", { domain: "location", map_id: null, object_id: "wilds", cell: null }, [30500, 12500]),
+    row("d2", { domain: "wilderness_cell", map_id: null, object_id: null, cell: [3, 25] }, [3500, 25500]),
+    row("d3", { domain: "interior_room", map_id: "hall", object_id: "front", cell: null }, null),
+  ];
+  const scene = continentScene(w);
+  const landmarks = scene.marks.filter((mark) => mark.kind === "landmark");
+  assert.deepEqual(landmarks.map((mark) => mark.id).sort(), ["district:d1", "district:d2"]);
+  const indexOf = (kind) => scene.marks.flatMap((mark, index) => (mark.kind === kind ? [index] : []));
+  assert.ok(Math.max(...indexOf("landmark")) < Math.min(...indexOf("location")), "landmarks draw underneath locations");
+  const wild = landmarks.find((mark) => mark.id === "district:d2");
+  assert.equal(wild.draggable, true);
+  assert.equal(wild.role, "landmark");
+  assert.equal(wild.layer, "locations");
+  assert.equal(wild.x, 3500);
+  assert.equal(wild.y, 25500);
+  const linked = landmarks.find((mark) => mark.id === "district:d1");
+  assert.equal(linked.draggable, false);
+  assert.equal(linked.role, "landmark-linked");
+  assert.equal(scene.items.filter((item) => item.id === "district:d2").length, 1);
+  assert.deepEqual(districtField("d2", "landmark", wildernessLandmark([4, 26])), {
+    name: "set_district_field",
+    documentId: "content/maps/districts.yaml",
+    arguments: {
+      district_id: "d2",
+      field: "landmark",
+      value: { domain: "wilderness_cell", map_id: null, object_id: null, cell: [4, 26] },
+    },
+  });
 });

@@ -240,6 +240,7 @@ export const districtField = (id, field, value) => ({
   documentId: DISTRICTS_DOCUMENT,
   arguments: { district_id: id, field, value },
 });
+export const wildernessLandmark = (cell) => ({ domain: "wilderness_cell", map_id: null, object_id: null, cell });
 
 export const footprintCell = (world, settlementId, cell, filled) => ({
   name: "set_footprint_cell",
