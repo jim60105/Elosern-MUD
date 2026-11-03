@@ -35,7 +35,7 @@ Plan, relocate, generate, write prose, verify. This is the same order as `grandi
 
 ### D2. Relocation rule (explicit; no other location edit is allowed)
 
-There are two triggers:
+There are three triggers:
 
 - (a) `generate <id> --plan-only` fails with `water_gap` for a port;
 - (b) `generate <id> --plan-only` fails with `anchor_outside_footprint`. A
@@ -60,16 +60,16 @@ Reject any candidate cell that:
   `water_cell=True` for;
 - has a region or nation different from `L`'s;
 - equals any location cell or harbour cell;
-- under trigger (b), would put an authored ford inside its generated footprint,
-  because the district contract requires the principal border ford to stay
-  reachable wilderness that joins the banks.
+- under trigger (b) or (c), would put an authored ford inside its generated
+  footprint, because the district contract requires the principal border ford
+  to stay reachable wilderness that joins the banks.
 
 Try candidates in this order, and accept the first whose rerun of
 `generate L --plan-only` no longer fails the trigger:
 
 1. For `k = 1, 2, 3`, the ray candidate
    `c_k = L.cell + round_away(k * (T - L.cell) / max(|T.x - L.x|, |T.y - L.y|))`.
-2. If the ray is exhausted under trigger (b), every other cell within
+2. If the ray is exhausted under trigger (b) or (c), every other cell within
    Chebyshev 3 of `L.cell` that passes the rejections, ordered by displacement
    then `y` then `x`. For a border-river town the cell must stay on the
    Altoria (south) bank; a candidate that crosses the border river is rejected
