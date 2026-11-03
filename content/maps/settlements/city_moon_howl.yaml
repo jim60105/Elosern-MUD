@@ -1,0 +1,180 @@
+version: 1
+kind: settlement
+id: city_moon_howl
+location_ref: city_moon_howl
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 595
+    y_m: 595
+    prototype_parent: anchor_room
+    key: 嚎月石坪
+    desc: 石坪四周立著鹿角造型的木架，風穿過去便發出低長的鳴聲。傳說昔年鹿鳴部族就是循著這聲音，找到這片高地落腳。
+    anchor_key: city_moon_howl
+    typeclass:
+    scene_archetype: city_street
+  southeast_gate:
+    x_m: 1090
+    y_m: 100
+    prototype_parent: grid_room
+    key: 東南柵門
+    desc: 東南門往咆哮王城的方向敞開，是這座城最寬的一道門。每逢王城傳令，信使的獸蹄聲會先一步驚動守門的人。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 西南關門
+    desc: 西南門對著鹿鳴渡的方向，門板外側釘著一整排鹿角。出城的人習慣在此摸一下角尖，算是討個好兆頭。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southeast_gate_road_1:
+    x_m: 879
+    y_m: 250
+    prototype_parent: grid_room
+    key: 東南大街
+    desc: 大街往東南斜下，兩旁是低矮的石屋，屋頂壓著苔蘚。路面乾淨得出奇，據說是因為鹿群不喜歡在碎石上停步。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate_road_1:
+    x_m: 356
+    y_m: 389
+    prototype_parent: grid_room
+    key: 西南大街
+    desc: 西南這條大街通往渡口，來往的多是載貨的車隊。路邊每隔一段就有水槽，供牲口飲用，槽邊總圍著幾隻不肯走開的鹿。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 709
+    y_m: 413
+    prototype_parent: grid_room
+    key: 鹿角市街
+    desc: 市街口掛著成串的鹿角與骨飾，居民相信這樣能讓獵運順遂。攤上賣的多是草藥與鹿皮製品，價錢談得慢，話卻說得長。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  tribal_hall:
+    x_m: 1006
+    y_m: 412
+    prototype_parent: grid_room
+    key: 議事廳前庭
+    desc: 前庭的長凳圍成一圈，議事時各族長者按輩分入座。屋內那面用鹿皮繃成的鼓，只在族人齊聚時才被抬出來。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  assembly_ground:
+    x_m: 696
+    y_m: 816
+    prototype_parent: grid_room
+    key: 集會石場
+    desc: 東北角的石場邊緣種著一圈矮灌木，用來擋風。集會的日子，場中央會升起三堆火，象徵三個部族共守這片高地。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  training_ground:
+    x_m: 265
+    y_m: 837
+    prototype_parent: grid_room
+    key: 成年獵場
+    desc: 西北的空場被杉木圍住，地上留著歷年踩踏出的圓形路徑。年輕人天未亮就在此練追蹤與潛行，為成年禮的追獵養腳力。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 895
+    y_m: 690
+    prototype_parent: grid_room
+    key: 公會前庭
+    desc: 公會前庭東側的布告板寫著林線邊緣的動靜，深林裡出來的東西最教人警惕。接任務的隊伍在此確認路線，多半會多帶一壺水。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: southeast_gate_road_1
+  direction: se
+- source: central_plaza
+  destination: southwest_gate_road_1
+  direction: sw
+- source: central_plaza
+  destination: market_street
+  direction: s
+- source: central_plaza
+  destination: assembly_ground
+  direction: ne
+- source: central_plaza
+  destination: training_ground
+  direction: nw
+- source: southeast_gate
+  destination: southeast_gate_road_1
+  direction: nw
+- source: southwest_gate
+  destination: southwest_gate_road_1
+  direction: ne
+- source: southeast_gate_road_1
+  destination: central_plaza
+  direction: n
+- source: southeast_gate_road_1
+  destination: southeast_gate
+  direction: se
+- source: southeast_gate_road_1
+  destination: market_street
+  direction: nw
+- source: southeast_gate_road_1
+  destination: tribal_hall
+  direction: ne
+- source: southwest_gate_road_1
+  destination: central_plaza
+  direction: ne
+- source: southwest_gate_road_1
+  destination: southwest_gate
+  direction: sw
+- source: market_street
+  destination: central_plaza
+  direction: nw
+- source: market_street
+  destination: southeast_gate_road_1
+  direction: se
+- source: market_street
+  destination: tribal_hall
+  direction: e
+- source: tribal_hall
+  destination: southeast_gate_road_1
+  direction: sw
+- source: tribal_hall
+  destination: market_street
+  direction: w
+- source: assembly_ground
+  destination: central_plaza
+  direction: sw
+- source: assembly_ground
+  destination: guild_forecourt
+  direction: se
+- source: training_ground
+  destination: central_plaza
+  direction: se
+- source: guild_forecourt
+  destination: assembly_ground
+  direction: nw
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: nw
+    destination_node: southeast_gate
+  - return_direction: ne
+    destination_node: southwest_gate
+city_gate:

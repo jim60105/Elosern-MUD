@@ -1,0 +1,114 @@
+version: 1
+kind: settlement
+id: town_shaman_cave
+location_ref: town_shaman_cave
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 600
+    y_m: 542
+    prototype_parent: anchor_room
+    key: 藥煙石坪
+    desc: 石坪上常年飄著熬藥的煙，氣味苦中帶甘，連石縫都染成一種暗褐色。往南的坡地漸高，林地裡藏著幾處採藥的小徑。
+    anchor_key: town_shaman_cave
+    typeclass:
+    scene_archetype: city_street
+  west_gate:
+    x_m: 100
+    y_m: 542
+    prototype_parent: grid_room
+    key: 西面柵門
+    desc: 西門朝虎嘯城的方向開，門外是林間較寬的一條路。採藥人與獵戶由此進出，門邊總晾著一串串待乾的根莖。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate:
+    x_m: 158
+    y_m: 100
+    prototype_parent: grid_room
+    key: 西南關門
+    desc: 西南門外通往松濤渡，路旁長滿帶刺的灌木。往來的人多會在這裡檢查鞋襪，免得帶回一褲子的刺。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  west_gate_road_1:
+    x_m: 340
+    y_m: 527
+    prototype_parent: grid_room
+    key: 西門大街
+    desc: 大街往西延伸，兩旁是低矮的藥棚，棚下架著煎藥的石爐。煙從屋簷底下漫出來，把整條路罩得半透。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 729
+    y_m: 636
+    prototype_parent: grid_room
+    key: 藥材市街
+    desc: 市街東北角擺著一籃籃乾草與獸骨，買家會湊近聞一聞再問價。誰家的藥效如何，在這裡是公開的閒談話題。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  tribal_hall:
+    x_m: 715
+    y_m: 795
+    prototype_parent: grid_room
+    key: 議事廳前庭
+    desc: 前庭東北側的牆上釘著一整排標本，是歷年採到的藥材。族人議事時，薩滿總坐在最靠近煙爐的位置。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: southwest_gate
+  direction: sw
+- source: central_plaza
+  destination: west_gate_road_1
+  direction: w
+- source: central_plaza
+  destination: market_street
+  direction: ne
+- source: west_gate
+  destination: southwest_gate
+  direction: s
+- source: west_gate
+  destination: west_gate_road_1
+  direction: e
+- source: southwest_gate
+  destination: central_plaza
+  direction: ne
+- source: southwest_gate
+  destination: west_gate
+  direction: n
+- source: west_gate_road_1
+  destination: central_plaza
+  direction: e
+- source: west_gate_road_1
+  destination: west_gate
+  direction: w
+- source: market_street
+  destination: central_plaza
+  direction: sw
+- source: market_street
+  destination: tribal_hall
+  direction: n
+- source: tribal_hall
+  destination: market_street
+  direction: s
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: e
+    destination_node: west_gate
+  - return_direction: ne
+    destination_node: southwest_gate
+city_gate:

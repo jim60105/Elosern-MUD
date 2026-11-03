@@ -1,0 +1,114 @@
+version: 1
+kind: settlement
+id: town_east_ford_camp
+location_ref: town_east_ford_camp
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 507
+    y_m: 600
+    prototype_parent: anchor_room
+    key: 東渡石坪
+    desc: 石坪不大，中央立著一根綁滿布條的渡樁，是這座營地最早留下的東西。往南幾里便是邊界河的渡口，對岸就是東渡鎮。
+    anchor_key: town_east_ford_camp
+    typeclass:
+    scene_archetype: city_street
+  northwest_gate:
+    x_m: 100
+    y_m: 1007
+    prototype_parent: grid_room
+    key: 西北柵門
+    desc: 西北門朝獵鷹鎮的方向開，門外是一段貼著坡緣的窄路。守門人會提醒來人靠內側走，外側的土石鬆得很。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  south_gate:
+    x_m: 507
+    y_m: 100
+    prototype_parent: grid_room
+    key: 南面關門
+    desc: 南門正對渡口的方向，出門是往下的長坡，坡底才接到河灘。載貨的人在半途的平石上歇腳，順便打量水勢。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northwest_gate_road_1:
+    x_m: 249
+    y_m: 759
+    prototype_parent: grid_room
+    key: 西北大街
+    desc: 大街往西北延伸，兩旁是替渡口備貨的矮棚，堆著繩索與空桶。路面狹窄，兩輛車相遇時得有一輛先退。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 648
+    y_m: 636
+    prototype_parent: grid_room
+    key: 渡營市街
+    desc: 市街東側的攤子擺著渡資換來的雜貨與乾糧，貨色不多卻樣樣實用。攤主認得每位常客的口味，會先留一份。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  tribal_hall:
+    x_m: 561
+    y_m: 435
+    prototype_parent: grid_room
+    key: 議事廳前庭
+    desc: 前庭南側靠著渡口，牆上釘著這一段河面的水勢記錄。族人議事時，最先談的總是如何讓兩岸的人都能平安過河。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: south_gate
+  direction: s
+- source: central_plaza
+  destination: northwest_gate_road_1
+  direction: nw
+- source: central_plaza
+  destination: market_street
+  direction: e
+- source: central_plaza
+  destination: tribal_hall
+  direction: se
+- source: northwest_gate
+  destination: northwest_gate_road_1
+  direction: se
+- source: south_gate
+  destination: central_plaza
+  direction: n
+- source: northwest_gate_road_1
+  destination: central_plaza
+  direction: se
+- source: northwest_gate_road_1
+  destination: northwest_gate
+  direction: nw
+- source: market_street
+  destination: central_plaza
+  direction: w
+- source: market_street
+  destination: tribal_hall
+  direction: sw
+- source: tribal_hall
+  destination: central_plaza
+  direction: n
+- source: tribal_hall
+  destination: market_street
+  direction: ne
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: se
+    destination_node: northwest_gate
+  - return_direction: n
+    destination_node: south_gate
+city_gate:

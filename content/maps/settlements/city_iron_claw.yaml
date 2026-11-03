@@ -1,0 +1,180 @@
+version: 1
+kind: settlement
+id: city_iron_claw
+location_ref: city_iron_claw
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 600
+    y_m: 479
+    prototype_parent: anchor_room
+    key: 鐵砧石坪
+    desc: 石坪中央嵌著一塊平坦的赤鐵岩，各部族的礦工都習慣在這裡攤開自己的收穫。北面坡地一路往上，風裡帶著爐渣與鐵鏽的氣味。
+    anchor_key: city_iron_claw
+    typeclass:
+    scene_archetype: city_street
+  west_gate:
+    x_m: 100
+    y_m: 479
+    prototype_parent: grid_room
+    key: 西面柵門
+    desc: 朝西的柵門外是一段下坡的舊礦道，車轍被雨水沖得發亮。守門人腰間掛著記數的木牌，一天來回幾趟都記在上頭。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northeast_gate:
+    x_m: 1095
+    y_m: 974
+    prototype_parent: grid_room
+    key: 東北關門
+    desc: 這道門朝著狐火城的方向，門楣釘著獸牙串成的避邪飾。往北的坡道從門邊岔上去，載礦的騾隊總在那裡排成一列。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northeast_gate_road_1:
+    x_m: 730
+    y_m: 818
+    prototype_parent: grid_room
+    key: 北向大街
+    desc: 大街從城心一路爬向北面高地，路面鋪著敲碎的礦石，踩起來格外扎腳。路旁的排水溝裡流著帶鐵色的水，最後匯進山下的溪。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 392
+    y_m: 689
+    prototype_parent: grid_room
+    key: 礦石市街
+    desc: 市街上堆著一筐筐原礦與粗鐵，行家拿起石頭對著光翻看，用手背敲兩下便出價。成交之後，買賣雙方會一起把礦石抬上木架稱重。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  tribal_hall:
+    x_m: 962
+    y_m: 698
+    prototype_parent: grid_room
+    key: 議事廳前庭
+    desc: 前庭的立柱綁著各族族徽，門口那張長桌是議事時擺圖用的。平日裡，長老們坐在階上修整皮甲，順便聽過路旅人帶來的消息。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  assembly_ground:
+    x_m: 826
+    y_m: 270
+    prototype_parent: grid_room
+    key: 集會石場
+    desc: 石場邊緣圍著一圈可以坐人的礦石塊，鼓聲一起，各族便帶著圖騰前來。場邊還留著上次祭典燒剩的柴堆，炭上蓋著一層薄灰。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  training_ground:
+    x_m: 583
+    y_m: 100
+    prototype_parent: grid_room
+    key: 成年獵場
+    desc: 南邊這塊空場立滿木樁，年輕獸人在此練習撲擊與投擲。場緣的獸骨架上掛著歷年成年禮留下的記名骨片，風一吹互相敲響。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 915
+    y_m: 491
+    prototype_parent: grid_room
+    key: 公會前庭
+    desc: 公會前庭的告示板換得勤，礦道塌方的消息總是寫在最上面。等著接任務的隊伍蹲在牆邊分乾糧，順便打聽山裡還剩多少好礦。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  ancestral_altar:
+    x_m: 1283
+    y_m: 652
+    prototype_parent: grid_room
+    key: 祖靈祭壇
+    desc: 祭壇建在城東的岩台上，以整塊鐵灰色的石料鑿成。壇前常年擺著礦工從最深處敲下的第一塊礦石，算是獻給祖靈的心意。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: west_gate
+  direction: w
+- source: central_plaza
+  destination: northeast_gate_road_1
+  direction: n
+- source: central_plaza
+  destination: market_street
+  direction: nw
+- source: central_plaza
+  destination: assembly_ground
+  direction: se
+- source: west_gate
+  destination: central_plaza
+  direction: e
+- source: northeast_gate
+  destination: northeast_gate_road_1
+  direction: w
+- source: northeast_gate
+  destination: tribal_hall
+  direction: sw
+- source: northeast_gate_road_1
+  destination: central_plaza
+  direction: s
+- source: northeast_gate_road_1
+  destination: northeast_gate
+  direction: ne
+- source: northeast_gate_road_1
+  destination: tribal_hall
+  direction: se
+- source: market_street
+  destination: central_plaza
+  direction: se
+- source: tribal_hall
+  destination: northeast_gate
+  direction: ne
+- source: tribal_hall
+  destination: northeast_gate_road_1
+  direction: nw
+- source: tribal_hall
+  destination: guild_forecourt
+  direction: s
+- source: tribal_hall
+  destination: ancestral_altar
+  direction: e
+- source: assembly_ground
+  destination: central_plaza
+  direction: nw
+- source: assembly_ground
+  destination: training_ground
+  direction: sw
+- source: assembly_ground
+  destination: guild_forecourt
+  direction: n
+- source: training_ground
+  destination: assembly_ground
+  direction: ne
+- source: guild_forecourt
+  destination: tribal_hall
+  direction: n
+- source: guild_forecourt
+  destination: assembly_ground
+  direction: s
+- source: ancestral_altar
+  destination: tribal_hall
+  direction: w
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: e
+    destination_node: west_gate
+  - return_direction: sw
+    destination_node: northeast_gate
+city_gate:

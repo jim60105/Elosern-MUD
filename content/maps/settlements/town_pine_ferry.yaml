@@ -1,0 +1,144 @@
+version: 1
+kind: settlement
+id: town_pine_ferry
+location_ref: town_pine_ferry
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 600
+    y_m: 228
+    prototype_parent: anchor_room
+    key: 松風石坪
+    desc: 石坪四周種著一圈老松，風一過便整片嘩然，像遠處有河在流。往西北的坡地較高，冬日的積雪總是最後才化。
+    anchor_key: town_pine_ferry
+    typeclass:
+    scene_archetype: city_street
+  west_gate:
+    x_m: 100
+    y_m: 228
+    prototype_parent: grid_room
+    key: 西面柵門
+    desc: 西門外是通往鐵爪城的舊道，路面鋪著從河床撿來的圓石。守門人在門邊擱著一桶清水，讓趕路的人先喝一口。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northeast_gate:
+    x_m: 1095
+    y_m: 723
+    prototype_parent: grid_room
+    key: 東北關門
+    desc: 東北門朝巫醫窟的方向開，門外小徑兩旁長滿藥用苔草。採藥的人由此進出，籃子裡總蓋著葉子保鮮。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northeast_gate_road_1:
+    x_m: 879
+    y_m: 523
+    prototype_parent: grid_room
+    key: 東北大街
+    desc: 大街往東北斜上，兩旁是低矮的木屋與曬藥的架子。空氣裡混著松脂與草藥的氣味，走一趟衣服上便留著味道。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 758
+    y_m: 271
+    prototype_parent: grid_room
+    key: 渡口市街
+    desc: 市街東側最靠近往渡口的路，攤上擺著繩索、木筏零件與乾糧。船伕與挑夫在此議價，談的多是今天的水勢與載重。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  tribal_hall:
+    x_m: 911
+    y_m: 119
+    prototype_parent: grid_room
+    key: 議事廳前庭
+    desc: 前庭東側的長桌上鋪著一張手繪的水路圖，邊角已被摸得發亮。族人議事時，最先討論的總是渡口與橋樑的修繕。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  assembly_ground:
+    x_m: 482
+    y_m: 100
+    prototype_parent: grid_room
+    key: 集會石場
+    desc: 西南角的石場圍著一圈松木樁，樁上刻著歷年水患的記號。集會時鼓聲沉穩，像是刻意壓著不讓它傳得太遠。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  training_ground:
+    x_m: 258
+    y_m: 264
+    prototype_parent: grid_room
+    key: 成年獵場
+    desc: 西側的空場靠近坡地邊緣，地上鋪著厚松針，腳步聲聽不真切。年輕人得在林子裡辨位追蹤，練的是眼力與耐性。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: west_gate
+  direction: w
+- source: central_plaza
+  destination: northeast_gate_road_1
+  direction: ne
+- source: central_plaza
+  destination: market_street
+  direction: e
+- source: central_plaza
+  destination: assembly_ground
+  direction: sw
+- source: west_gate
+  destination: central_plaza
+  direction: e
+- source: west_gate
+  destination: training_ground
+  direction: ne
+- source: northeast_gate
+  destination: northeast_gate_road_1
+  direction: sw
+- source: northeast_gate_road_1
+  destination: central_plaza
+  direction: sw
+- source: northeast_gate_road_1
+  destination: northeast_gate
+  direction: ne
+- source: market_street
+  destination: central_plaza
+  direction: w
+- source: market_street
+  destination: tribal_hall
+  direction: se
+- source: tribal_hall
+  destination: market_street
+  direction: nw
+- source: assembly_ground
+  destination: central_plaza
+  direction: ne
+- source: assembly_ground
+  destination: training_ground
+  direction: nw
+- source: training_ground
+  destination: west_gate
+  direction: w
+- source: training_ground
+  destination: assembly_ground
+  direction: se
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: e
+    destination_node: west_gate
+  - return_direction: sw
+    destination_node: northeast_gate
+city_gate:

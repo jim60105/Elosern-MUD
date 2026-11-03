@@ -1,0 +1,180 @@
+version: 1
+kind: settlement
+id: city_tiger_roar
+location_ref: city_tiger_roar
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 595
+    y_m: 600
+    prototype_parent: anchor_room
+    key: 虎嘯石坪
+    desc: 石坪中央刻著一道深深的虎爪痕，據說是建城時留下的。城北不遠處便是深林的邊緣，夜裡傳來的獸吼能震得陶罐輕響。
+    anchor_key: city_tiger_roar
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate:
+    x_m: 100
+    y_m: 105
+    prototype_parent: grid_room
+    key: 西南柵門
+    desc: 西南門朝著咆哮王城的方向，是這座城最繁忙的一道門。信使與運糧隊在此交會，門邊的石階被踩得圓滑。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  south_gate:
+    x_m: 595
+    y_m: 100
+    prototype_parent: grid_room
+    key: 南面關門
+    desc: 南門外通往松濤渡，路上的松針厚得能陷住腳踝。守門人在門楣掛著一串虎牙，說是能讓夜行的旅人安心。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate_road_1:
+    x_m: 347
+    y_m: 401
+    prototype_parent: grid_room
+    key: 西南大街
+    desc: 大街一路往西南鋪去，兩旁是獵戶與匠人的住屋。屋簷下掛著風乾的獸腿，氣味濃烈，走過的人都會下意識加快腳步。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 706
+    y_m: 786
+    prototype_parent: grid_room
+    key: 虎皮市街
+    desc: 市街東北側擺著整排的皮貨與骨器，買家多是往王城去的行商。攤主喜歡先講一段獵虎的經過，再開口談價。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  tribal_hall:
+    x_m: 844
+    y_m: 950
+    prototype_parent: grid_room
+    key: 議事廳前庭
+    desc: 前庭東北角的柱子上釘著歷代族長的爪印木牌，議事時誰坐在哪一側都有講究。屋內掛著一面虎皮鼓，只在重大集會時敲響。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  assembly_ground:
+    x_m: 810
+    y_m: 544
+    prototype_parent: grid_room
+    key: 集會石場
+    desc: 東側的石場邊緣圍著一圈削尖的木樁，是各部族立旗的位置。集會時火堆燒得極旺，照亮整片林線。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  training_ground:
+    x_m: 536
+    y_m: 352
+    prototype_parent: grid_room
+    key: 成年獵場
+    desc: 南面的空場靠近林緣，地上留著許多爪痕與腳印。年輕人得獨自走進深林邊緣帶回獵物，這座城因此從不缺好獵手。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 375
+    y_m: 657
+    prototype_parent: grid_room
+    key: 公會前庭
+    desc: 公會前庭西側的告示板記著深林邊緣的魔物動向，字跡常被雨水暈開。接任務的隊伍會在此核對裝備，再一起出發。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  ancestral_altar:
+    x_m: 265
+    y_m: 933
+    prototype_parent: grid_room
+    key: 祖靈祭壇
+    desc: 祭壇在西北的林間高地上，以虎骨與黑石壘成。族人相信祖靈就守在深林那一側，因此祭品總朝著林線方向擺放。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: south_gate
+  direction: se
+- source: central_plaza
+  destination: southwest_gate_road_1
+  direction: sw
+- source: central_plaza
+  destination: market_street
+  direction: ne
+- source: central_plaza
+  destination: assembly_ground
+  direction: e
+- source: central_plaza
+  destination: training_ground
+  direction: s
+- source: central_plaza
+  destination: guild_forecourt
+  direction: w
+- source: southwest_gate
+  destination: southwest_gate_road_1
+  direction: ne
+- source: south_gate
+  destination: central_plaza
+  direction: n
+- source: southwest_gate_road_1
+  destination: central_plaza
+  direction: ne
+- source: southwest_gate_road_1
+  destination: southwest_gate
+  direction: sw
+- source: southwest_gate_road_1
+  destination: training_ground
+  direction: e
+- source: southwest_gate_road_1
+  destination: guild_forecourt
+  direction: n
+- source: market_street
+  destination: central_plaza
+  direction: sw
+- source: market_street
+  destination: tribal_hall
+  direction: ne
+- source: tribal_hall
+  destination: market_street
+  direction: sw
+- source: assembly_ground
+  destination: central_plaza
+  direction: w
+- source: training_ground
+  destination: central_plaza
+  direction: n
+- source: training_ground
+  destination: southwest_gate_road_1
+  direction: w
+- source: guild_forecourt
+  destination: central_plaza
+  direction: e
+- source: guild_forecourt
+  destination: southwest_gate_road_1
+  direction: s
+- source: guild_forecourt
+  destination: ancestral_altar
+  direction: n
+- source: ancestral_altar
+  destination: guild_forecourt
+  direction: s
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: ne
+    destination_node: southwest_gate
+  - return_direction: n
+    destination_node: south_gate
+city_gate:

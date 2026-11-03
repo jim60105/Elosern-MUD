@@ -1,0 +1,180 @@
+version: 1
+kind: settlement
+id: city_mutual_market
+location_ref: city_mutual_market
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 595
+    y_m: 595
+    prototype_parent: anchor_room
+    key: 互市石坪
+    desc: 石坪上立著各族共用的市鼓，敲一次是開市，敲兩次是收攤。往西南去的坡道盡頭便是界橋城與渡口，人聲與車聲整天不斷。
+    anchor_key: city_mutual_market
+    typeclass:
+    scene_archetype: city_street
+  north_gate:
+    x_m: 595
+    y_m: 1070
+    prototype_parent: grid_room
+    key: 北面柵門
+    desc: 北門朝內陸的丘陵敞開，門邊掛著一塊寫滿各族語言的木板。往來的行商在此換過通行木牌，才被放進城裡。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 西南關門
+    desc: 這道門正對著界橋城的方向，出門是沿著坡勢往河邊去的長路。守門的獸人會提醒初到的人，過了河便是別國的規矩。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate_road_1:
+    x_m: 309
+    y_m: 258
+    prototype_parent: grid_room
+    key: 西南大街
+    desc: 大街順著坡勢向下走到河邊，兩旁是客商寄存貨物的棚屋。推車與挑擔在此交錯，路面被車輪壓出兩道明顯的轍痕。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 639
+    y_m: 394
+    prototype_parent: grid_room
+    key: 諸族市街
+    desc: 市街南側擺的是各族混雜的貨攤，獸皮、鐵器、鹽與草藥擠在同一排。講價的人常常換上對方的語言，講到最後乾脆用手勢成交。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  tribal_hall:
+    x_m: 786
+    y_m: 963
+    prototype_parent: grid_room
+    key: 議事廳前庭
+    desc: 前庭的廊柱刻著不同部族的狩獵記號，議事時各族的座位按圖騰排列。外人若被請進前庭，多半是為了談一筆跨族的買賣。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  assembly_ground:
+    x_m: 818
+    y_m: 590
+    prototype_parent: grid_room
+    key: 集會石場
+    desc: 石場東側堆著一列石凳，節慶時這裡擠得水洩不通。鼓聲一起，各族便帶著自己的旗幟繞場一圈，順便展示今年新打的獵物。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  training_ground:
+    x_m: 732
+    y_m: 139
+    prototype_parent: grid_room
+    key: 操練空場
+    desc: 南面的空場是共用的操練地，木樁上綁著草束供人練習。清晨常有年輕獸人在此對練，掌聲與吆喝一路傳回石坪。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 405
+    y_m: 454
+    prototype_parent: grid_room
+    key: 公會前庭
+    desc: 公會前庭的布告牆貼滿往來商路的消息，河對岸的動靜也在上頭。接任務的隊伍會先在此核對貨單，再決定往哪一岸走。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  ancestral_altar:
+    x_m: 112
+    y_m: 396
+    prototype_parent: grid_room
+    key: 祖靈祭壇
+    desc: 祭壇在城西的一處凹地，四周立著各族共獻的石柱。每逢換季，各族會輪流前來添火，把這一年的第一份收成放在壇前。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: north_gate
+  direction: n
+- source: central_plaza
+  destination: southwest_gate_road_1
+  direction: sw
+- source: central_plaza
+  destination: market_street
+  direction: s
+- source: central_plaza
+  destination: assembly_ground
+  direction: e
+- source: central_plaza
+  destination: guild_forecourt
+  direction: w
+- source: north_gate
+  destination: central_plaza
+  direction: s
+- source: north_gate
+  destination: tribal_hall
+  direction: se
+- source: southwest_gate
+  destination: southwest_gate_road_1
+  direction: ne
+- source: southwest_gate_road_1
+  destination: central_plaza
+  direction: ne
+- source: southwest_gate_road_1
+  destination: southwest_gate
+  direction: sw
+- source: southwest_gate_road_1
+  destination: guild_forecourt
+  direction: n
+- source: southwest_gate_road_1
+  destination: ancestral_altar
+  direction: nw
+- source: market_street
+  destination: central_plaza
+  direction: n
+- source: market_street
+  destination: training_ground
+  direction: s
+- source: market_street
+  destination: guild_forecourt
+  direction: w
+- source: tribal_hall
+  destination: north_gate
+  direction: nw
+- source: assembly_ground
+  destination: central_plaza
+  direction: w
+- source: training_ground
+  destination: market_street
+  direction: n
+- source: guild_forecourt
+  destination: central_plaza
+  direction: ne
+- source: guild_forecourt
+  destination: southwest_gate_road_1
+  direction: sw
+- source: guild_forecourt
+  destination: market_street
+  direction: e
+- source: ancestral_altar
+  destination: southwest_gate_road_1
+  direction: se
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: s
+    destination_node: north_gate
+  - return_direction: ne
+    destination_node: southwest_gate
+city_gate:

@@ -1,0 +1,145 @@
+version: 1
+kind: settlement
+id: town_stag_ferry
+location_ref: town_stag_ferry
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 193
+    y_m: 825
+    prototype_parent: anchor_room
+    key: 鹿鳴石坪
+    desc: 石坪中央立著一根刻滿鹿角的木柱，是這座渡口聚落最早的地標。往南兩里多便是高地河的渡口，水聲在夜裡格外清楚。
+    anchor_key: town_stag_ferry
+    typeclass:
+    scene_archetype: city_street
+  east_gate:
+    x_m: 668
+    y_m: 825
+    prototype_parent: grid_room
+    key: 東面柵門
+    desc: 東門外是一段緩升的草坡，路邊留著供牲口飲水的石槽。往來的牧隊多半在此分手，各自趕往自己的草場。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  south_gate:
+    x_m: 193
+    y_m: 100
+    prototype_parent: grid_room
+    key: 南面關門
+    desc: 南門朝著高地河的渡口，出門是往下的長石階。渡船靠岸時，繩索摩擦木樁的聲音會順著坡一路上傳。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  south_gate_road_1:
+    x_m: 177
+    y_m: 458
+    prototype_parent: grid_room
+    key: 南門大街
+    desc: 大街往南斜下，路面鋪著防滑的河石，雨天也不泥濘。兩旁堆著待運的貨物，繩結打得比別處整齊。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 100
+    y_m: 679
+    prototype_parent: grid_room
+    key: 渡市石街
+    desc: 市街西南側離渡口最近，擺的多是繩具、木桶與渡資換來的雜貨。船伕與商販講價時，總會抬頭看一眼水位。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  tribal_hall:
+    x_m: 160
+    y_m: 1069
+    prototype_parent: grid_room
+    key: 議事廳前庭
+    desc: 前庭北側的牆上釘著渡口的排班木牌，誰家出船、誰家守夜都寫得明白。族人議事時，坐得最近的多半是船伕的家人。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  assembly_ground:
+    x_m: 343
+    y_m: 913
+    prototype_parent: grid_room
+    key: 集會石場
+    desc: 東北角的石場邊緣擺著幾條翻修過的舊船板，當成長凳使用。集會的日子，鼓聲與水聲會混在一起，聽久了分不清。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  training_ground:
+    x_m: 333
+    y_m: 528
+    prototype_parent: grid_room
+    key: 成年獵場
+    desc: 東南的空場靠近河岸高處，地面被踩得結實。年輕人得在急流邊緣練撐筏往返，這是成年禮追獵之前的水性功課。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: east_gate
+  direction: e
+- source: central_plaza
+  destination: south_gate_road_1
+  direction: s
+- source: central_plaza
+  destination: market_street
+  direction: sw
+- source: central_plaza
+  destination: assembly_ground
+  direction: ne
+- source: east_gate
+  destination: central_plaza
+  direction: w
+- source: south_gate
+  destination: south_gate_road_1
+  direction: n
+- source: south_gate_road_1
+  destination: central_plaza
+  direction: n
+- source: south_gate_road_1
+  destination: south_gate
+  direction: s
+- source: south_gate_road_1
+  destination: market_street
+  direction: nw
+- source: south_gate_road_1
+  destination: training_ground
+  direction: ne
+- source: market_street
+  destination: central_plaza
+  direction: ne
+- source: market_street
+  destination: south_gate_road_1
+  direction: s
+- source: tribal_hall
+  destination: assembly_ground
+  direction: se
+- source: assembly_ground
+  destination: central_plaza
+  direction: sw
+- source: assembly_ground
+  destination: tribal_hall
+  direction: nw
+- source: training_ground
+  destination: south_gate_road_1
+  direction: sw
+wilderness_entry:
+  shape:
+  - '#'
+  - '#'
+  offset:
+    dx: 0
+    dy: -1
+  gates:
+  - return_direction: w
+    destination_node: east_gate
+  - return_direction: n
+    destination_node: south_gate
+city_gate:

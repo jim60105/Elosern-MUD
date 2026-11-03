@@ -1,0 +1,180 @@
+version: 1
+kind: settlement
+id: city_shadow_wood
+location_ref: city_shadow_wood
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 332
+    y_m: 432
+    prototype_parent: anchor_room
+    key: 苔石坪
+    desc: 石坪的縫隙裡長著厚厚的苔，踩上去有一種潮濕的彈性。往西兩里便是海岸，海霧常在傍晚順著樹根爬進城裡。
+    anchor_key: city_shadow_wood
+    typeclass:
+    scene_archetype: city_street
+  east_gate:
+    x_m: 1332
+    y_m: 432
+    prototype_parent: grid_room
+    key: 東面柵門
+    desc: 東門外的路通往角原城，沿途全是高大的針葉木。守門人習慣在門柱上刻記進出人數，木頭已被刻得坑坑窪窪。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  north_gate:
+    x_m: 332
+    y_m: 907
+    prototype_parent: grid_room
+    key: 北面關門
+    desc: 北門朝霜風鎮的方向開著，門外的地面常年結著薄霜。往來的旅人會在這裡把毛披裹緊，再踏上那條靠海的小徑。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  east_gate_road_1:
+    x_m: 867
+    y_m: 426
+    prototype_parent: grid_room
+    key: 東門大街
+    desc: 大街從東門一路鋪進城心，兩側的木屋屋簷壓得極低，好擋住海風帶來的雨。路面濕潤，長年不乾。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 117
+    y_m: 348
+    prototype_parent: grid_room
+    key: 濕木市街
+    desc: 市街西側的攤架都用防潮的高架，底下墊著石頭。賣的多是海邊撿來的貝殼、曬乾的海藻與林間採來的菌子。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  tribal_hall:
+    x_m: 127
+    y_m: 100
+    prototype_parent: grid_room
+    key: 議事廳前庭
+    desc: 前庭西南角有一株老苔木，樹蔭幾乎蓋住半個院子。族人議事時就坐在樹下，讓落下的苔絮沾在肩上也不拍掉。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  assembly_ground:
+    x_m: 483
+    y_m: 229
+    prototype_parent: grid_room
+    key: 集會石場
+    desc: 石場東南側靠著一道矮石牆，牆上嵌著各部族的骨牌。集會時鼓聲一起，海霧裡的鳥群會被驚得整片飛起。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  training_ground:
+    x_m: 568
+    y_m: 728
+    prototype_parent: grid_room
+    key: 成年獵場
+    desc: 東北的空場被林木半圍著，地面鋪著厚苔，腳步聲全被吸掉。年輕人在霧裡練聽聲辨位，這是成年禮追獵前的必經功課。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 100
+    y_m: 537
+    prototype_parent: grid_room
+    key: 公會前庭
+    desc: 公會前庭的告示板外頭罩著一層油布，免得被海霧浸爛。上頭寫的多是林線與海岸一帶的消息，接任務的人總要看得仔細。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  ancestral_altar:
+    x_m: 750
+    y_m: 879
+    prototype_parent: grid_room
+    key: 祖靈祭壇
+    desc: 祭壇在東北的林間空地，以苔石與漂流木堆成。族人相信海與林是同一批祖靈的居所，因此祭品總是一半來自岸邊、一半來自林裡。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: north_gate
+  direction: n
+- source: central_plaza
+  destination: east_gate_road_1
+  direction: e
+- source: central_plaza
+  destination: market_street
+  direction: w
+- source: central_plaza
+  destination: assembly_ground
+  direction: se
+- source: central_plaza
+  destination: guild_forecourt
+  direction: nw
+- source: east_gate
+  destination: east_gate_road_1
+  direction: w
+- source: north_gate
+  destination: central_plaza
+  direction: s
+- source: north_gate
+  destination: training_ground
+  direction: se
+- source: east_gate_road_1
+  destination: central_plaza
+  direction: w
+- source: east_gate_road_1
+  destination: east_gate
+  direction: e
+- source: market_street
+  destination: central_plaza
+  direction: e
+- source: market_street
+  destination: tribal_hall
+  direction: s
+- source: market_street
+  destination: guild_forecourt
+  direction: n
+- source: tribal_hall
+  destination: market_street
+  direction: n
+- source: tribal_hall
+  destination: assembly_ground
+  direction: e
+- source: assembly_ground
+  destination: central_plaza
+  direction: nw
+- source: assembly_ground
+  destination: tribal_hall
+  direction: w
+- source: training_ground
+  destination: north_gate
+  direction: nw
+- source: training_ground
+  destination: ancestral_altar
+  direction: ne
+- source: guild_forecourt
+  destination: central_plaza
+  direction: se
+- source: guild_forecourt
+  destination: market_street
+  direction: s
+- source: ancestral_altar
+  destination: training_ground
+  direction: sw
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: w
+    destination_node: east_gate
+  - return_direction: s
+    destination_node: north_gate
+city_gate:

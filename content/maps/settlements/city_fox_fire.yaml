@@ -1,0 +1,181 @@
+version: 1
+kind: settlement
+id: city_fox_fire
+location_ref: city_fox_fire
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 600
+    y_m: 495
+    prototype_parent: anchor_room
+    key: 狐火石坪
+    desc: 石坪邊緣插著幾盞陶燈，夜裡點起來像一簇簇不肯熄的狐火。往東北的坡地冒著熱氣，溫泉的水聲在石縫間持續作響。
+    anchor_key: city_fox_fire
+    typeclass:
+    scene_archetype: city_street
+  west_gate:
+    x_m: 100
+    y_m: 495
+    prototype_parent: grid_room
+    key: 西面柵門
+    desc: 西門外是通往松濤渡的舊路，車轍深得能盛住雨水。守門人把一桶溫泉水擱在門邊，讓回城的人先暖一暖手。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northwest_gate:
+    x_m: 105
+    y_m: 990
+    prototype_parent: grid_room
+    key: 西北關門
+    desc: 西北門朝巫醫窟的方向開，門外的石階一路爬向林線。獸醫與採藥人常由此進出，門邊總晾著一束束剛洗過的藥草。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northwest_gate_road_1:
+    x_m: 392
+    y_m: 719
+    prototype_parent: grid_room
+    key: 西北大街
+    desc: 大街往西北斜上，路面鋪著火山石，踩起來溫熱。兩旁的水溝冒著白煙，冬天也從不結冰。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 412
+    y_m: 528
+    prototype_parent: grid_room
+    key: 溫泉市街
+    desc: 市街的攤位多半架在石槽上，靠地底的熱氣保溫。賣的是溫泉煮熟的蛋、藥膏與曬乾的草根，氣味混在一起卻不難聞。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  tribal_hall:
+    x_m: 493
+    y_m: 100
+    prototype_parent: grid_room
+    key: 議事廳前庭
+    desc: 前庭南側的牆上掛著歷年溫泉水位刻痕，族裡靠它判斷地底是否安穩。議事時長者坐在熱石上，說話的語氣比別處慢。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  assembly_ground:
+    x_m: 787
+    y_m: 453
+    prototype_parent: grid_room
+    key: 集會石場
+    desc: 東側的石場中央有一口冒著熱氣的小池，集會時用來暖酒。鼓聲一響，四散的族人便沿著石階陸續回來。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  training_ground:
+    x_m: 809
+    y_m: 855
+    prototype_parent: grid_room
+    key: 成年獵場
+    desc: 東北的空場靠近林線，地面被蒸氣熏得柔軟。年輕人要在熱霧裡追蹤獵物，靠的是耳朵與耐心，不是腳程。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 645
+    y_m: 296
+    prototype_parent: grid_room
+    key: 公會前庭
+    desc: 公會前庭的布告板貼著林線與溫泉一帶的消息，山裡的魔物也記在上頭。接任務的隊伍會先泡過腳再出發，說是能走得更久。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  ancestral_altar:
+    x_m: 998
+    y_m: 976
+    prototype_parent: grid_room
+    key: 祖靈祭壇
+    desc: 祭壇立在東北的熱石台上，以黑石與狐骨堆成。族人認為地底的熱氣是祖靈的呼吸，因此祭壇的火從不由人手點燃。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: west_gate
+  direction: w
+- source: central_plaza
+  destination: northwest_gate_road_1
+  direction: nw
+- source: central_plaza
+  destination: market_street
+  direction: sw
+- source: central_plaza
+  destination: assembly_ground
+  direction: e
+- source: central_plaza
+  destination: guild_forecourt
+  direction: s
+- source: west_gate
+  destination: central_plaza
+  direction: e
+- source: northwest_gate
+  destination: northwest_gate_road_1
+  direction: se
+- source: northwest_gate_road_1
+  destination: central_plaza
+  direction: se
+- source: northwest_gate_road_1
+  destination: northwest_gate
+  direction: nw
+- source: northwest_gate_road_1
+  destination: market_street
+  direction: s
+- source: market_street
+  destination: central_plaza
+  direction: e
+- source: market_street
+  destination: northwest_gate_road_1
+  direction: n
+- source: tribal_hall
+  destination: guild_forecourt
+  direction: ne
+- source: assembly_ground
+  destination: central_plaza
+  direction: w
+- source: assembly_ground
+  destination: training_ground
+  direction: n
+- source: assembly_ground
+  destination: guild_forecourt
+  direction: sw
+- source: training_ground
+  destination: assembly_ground
+  direction: s
+- source: training_ground
+  destination: ancestral_altar
+  direction: ne
+- source: guild_forecourt
+  destination: central_plaza
+  direction: n
+- source: guild_forecourt
+  destination: tribal_hall
+  direction: sw
+- source: guild_forecourt
+  destination: assembly_ground
+  direction: ne
+- source: ancestral_altar
+  destination: training_ground
+  direction: sw
+wilderness_entry:
+  shape:
+  - '#'
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: e
+    destination_node: west_gate
+  - return_direction: se
+    destination_node: northwest_gate
+city_gate:
