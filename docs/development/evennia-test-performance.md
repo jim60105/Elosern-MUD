@@ -495,10 +495,13 @@ Evennia import 與該 class 競爭 CPU。
 （runtime adoption rollback）366 秒。兩者的 `workers` 都降為 1（單一 class
 不需要平行 worker，少掉 DB clone 與重複 import 對完整世界收斂的競爭）。
 
+第六次推送（run 41687556193）是驗收：46 個 evennia 分片全部成功，最慢的
+`commands-19` 為 351 秒、其次 `webclient-40` 347 秒，**0 個分片超過 360 秒**。
+
 最終 46 個分片，仍是「只切不混」。editor 的 moved 案例、runtime 的 rollback
-案例與 world-map measurement 是已知的不可再分割下限：若後續 CI 仍超過
-360 秒，只能從 `sync_grid` 的 ORM 成本或 world-map payload 的組裝成本下手，
-而不是再切分片。`test_world_map_measurement` 的 57 秒本機成本來自
+案例與 world-map measurement 是已知的不可再分割下限：若後續 CI 的慢 runner
+仍讓它們逼近上限，只能從 `sync_grid` 的 ORM 成本或 world-map payload 的
+組裝成本下手，而不是再切分片。`test_world_map_measurement` 的 57 秒本機成本來自
 `representative_payload()` 第一次組裝真實大陸／district 世界（`one_km` 與
 `worst` 各不到 1 秒）。
 
