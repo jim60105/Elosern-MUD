@@ -313,6 +313,9 @@ class MapEditorGeographyBrowserTest(unittest.TestCase):
         page = self.open()
         north = '[data-qualified-ref="district:synthetic_north"][data-kind="landmark"]'
         linked = '[data-qualified-ref="district:synthetic_district"][data-kind="landmark"]'
+        # The landmark layer starts hidden; showing it is a view preference.
+        self.assertEqual(page.locator('[data-kind="landmark"]').count(), 0)
+        page.click('[data-layer="landmarks"]')
         mark = page.locator(north)
         mark.wait_for()
         self.assertEqual(mark.get_attribute("data-draggable"), "true")
@@ -363,6 +366,7 @@ class MapEditorGeographyBrowserTest(unittest.TestCase):
 
         page.reload()
         page.wait_for_selector('[data-preview-state="current"]', timeout=15000)
+        page.click('[data-layer="landmarks"]')
         mark = page.locator(north)
         hit = mark.locator("circle.map-mark__hit")
         hit.click()
@@ -407,6 +411,20 @@ class MapEditorGeographyBrowserTest(unittest.TestCase):
             return all(abs(actual[axis] - expected[axis]) <= 1.0 for axis in (0, 1))
 
         self.wait_for(at_saved_position, "the refused landmark did not return to its saved position")
+
+        # Hiding the landmark layer keeps the district selected while its
+        # object-list entry stays visible on the partition layer; hiding that
+        # layer as well leaves the district reachable nowhere, so it drops.
+        page.click('[data-layer="landmarks"]')
+        self.wait_for(lambda: page.locator('[data-kind="landmark"]').count() == 0, "the landmark layer did not hide")
+        self.assertEqual(page.locator("[data-inspector-ref]").inner_text(), "district:synthetic_north")
+        page.click('[data-layer="partition"]')
+        inspected = page.locator("[data-inspector-ref]")
+        self.wait_for(
+            lambda: inspected.count() == 0 or inspected.inner_text() != "district:synthetic_north",
+            "the district stayed selected with neither of its layers visible",
+        )
+        self.assertEqual(self.changed(), set())
 
     def test_clicking_a_feature_shape_selects_it_and_shows_its_handles(self):
         self.start()

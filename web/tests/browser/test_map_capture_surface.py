@@ -49,7 +49,7 @@ FRONTEND = REPO_ROOT / "tools" / "map-editor" / "frontend"
 CAPTURE_DIST = FRONTEND / "capture-dist"
 SETTLEMENT_LAYERS = ["nodes", "roads", "labels"]
 INTERIOR_LAYERS = ["rooms", "connections", "exterior", "labels"]
-CONTINENT_LAYERS = ["terrain", "water", "ridge", "locations", "footprint", "partition", "labels"]
+CONTINENT_LAYERS = ["terrain", "water", "ridge", "locations", "landmarks", "footprint", "partition", "labels"]
 
 
 def _load(name: str):

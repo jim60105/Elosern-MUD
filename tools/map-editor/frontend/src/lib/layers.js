@@ -8,6 +8,7 @@ export const CONTINENT_LAYERS = Object.freeze([
   { key: "water", label: "水系", visible: true },
   { key: "ridge", label: "山脊・隘口・渡口", visible: true },
   { key: "locations", label: "地點", visible: true },
+  { key: "landmarks", label: "地標", visible: false },
   { key: "footprint", label: "據點佔地", visible: false },
   { key: "partition", label: "分區（衍生・唯讀）", visible: true },
 ]);

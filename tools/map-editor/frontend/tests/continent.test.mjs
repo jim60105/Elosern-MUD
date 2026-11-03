@@ -253,7 +253,7 @@ test("the footprint grid has a one-cell margin, north row first", () => {
   assert.deepEqual(row11.cells.filter((cell) => cell.filled).map((cell) => cell.x), [10, 11]);
 });
 
-test("district landmarks draw on the locations layer and only wilderness cells drag", () => {
+test("district landmarks draw on their own layer and only wilderness cells drag", () => {
   const w = world();
   const row = (id, landmark, centre) => ({
     id,
@@ -278,13 +278,21 @@ test("district landmarks draw on the locations layer and only wilderness cells d
   const wild = landmarks.find((mark) => mark.id === "district:d2");
   assert.equal(wild.draggable, true);
   assert.equal(wild.role, "landmark");
-  assert.equal(wild.layer, "locations");
+  assert.equal(wild.layer, "landmarks");
   assert.equal(wild.x, 3500);
   assert.equal(wild.y, 25500);
   const linked = landmarks.find((mark) => mark.id === "district:d1");
   assert.equal(linked.draggable, false);
   assert.equal(linked.role, "landmark-linked");
   assert.equal(scene.items.filter((item) => item.id === "district:d2").length, 1);
+  // Hiding the landmark layer removes exactly the landmark marks; the
+  // districts stay listed on their own layer.
+  const hidden = visibleScene(scene, ["landmarks"]);
+  assert.deepEqual(
+    hidden.marks.map((mark) => mark.id),
+    scene.marks.filter((mark) => mark.kind !== "landmark").map((mark) => mark.id),
+  );
+  assert.deepEqual(hidden.items, scene.items);
   assert.deepEqual(districtField("d2", "landmark", wildernessLandmark([4, 26])), {
     name: "set_district_field",
     documentId: "content/maps/districts.yaml",

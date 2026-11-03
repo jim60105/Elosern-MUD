@@ -374,7 +374,7 @@ class CaptureInvocationTests(_CaptureCase):
     @covers_requirement("map-image-capture::capture-invocation-selects-exactly-one-validated-map-view")
     def test_every_layer_can_be_hidden_and_the_camera_does_not_move(self):
         cases = (
-            ("continent", None, ("terrain", "water", "ridge", "locations", "footprint", "partition", "labels")),
+            ("continent", None, ("terrain", "water", "ridge", "locations", "landmarks", "footprint", "partition", "labels")),
             ("settlement", synthetic.SETTLEMENT_ID, ("nodes", "roads", "labels")),
             ("interior", synthetic.INTERIOR_ID, ("rooms", "connections", "exterior", "labels")),
         )

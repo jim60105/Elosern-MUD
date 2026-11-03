@@ -138,7 +138,7 @@ export function continentScene(world, selection = [], partition = null) {
         kind: "landmark",
         label: district.landmark_name_zh,
         role: district.landmark?.domain === "wilderness_cell" ? "landmark" : "landmark-linked",
-        layer: "locations",
+        layer: "landmarks",
         draggable: district.landmark?.domain === "wilderness_cell",
         ...point(district.landmark_centre_m),
       })),
