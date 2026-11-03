@@ -8,7 +8,7 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.exits import WildernessGateExit
 from typeclasses.rooms import GridRoom, Room, TerrainRoom
 from world.lore.sync import sync_all
-from world.maps.bootstrap import sync_grid, sync_wilderness
+from world.tests.geography_fixture import sync_test_settlements, sync_test_wilderness
 from world.maps.static_references import settlement_node_xyz
 from world.maps.wilderness_provider import (
     WILDERNESS_NAME,
@@ -106,8 +106,9 @@ class CityWildernessRoundTripTests(_ChargeAssertions, EvenniaTest):
         self.room2.save()
         create_object(Room, key="虛境", location=None)
         sync_all()
-        sync_grid()
-        sync_wilderness()
+        declared = (_EAST_GATE.destination.map_id,)
+        sync_test_settlements(declared)
+        sync_test_wilderness(declared)
         self.east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
         self.gate = [e for e in self.east_gate.exits if isinstance(e, WildernessGateExit)][0]
 

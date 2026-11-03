@@ -74,7 +74,11 @@ class MapWorldAdoptionTests(EvenniaTestCase):
         super().setUp()
         create_object(Room, key="虛境", location=None)
         self.baseline = runtime.adopt()
-        bootstrap.sync_grid()
+        from world.tests.geography_fixture import sync_test_settlements
+
+        # This class intentionally adopts and materializes the complete
+        # candidate; it is an explicit full-candidate contract case.
+        sync_test_settlements(tuple(self.baseline.settlements.graphs))
         bootstrap.sync_interiors()
         # Startup settles the adoption once the persistent world converged.
         runtime.commit_adoption()

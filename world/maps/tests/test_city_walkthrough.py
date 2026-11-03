@@ -7,11 +7,10 @@ from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.rooms import AnchorRoom, GridRoom, Room
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
-from world.maps.bootstrap import sync_grid
 from world.maps.limbo import LIMBO_KEY
 from world.maps.static_references import settlement_node_xyz
 from world.lore.sync import sync_all
-from world.tests.geography_fixture import publish_shipped_geography
+from world.tests.geography_fixture import publish_shipped_geography, sync_test_settlements
 
 publish_shipped_geography()
 
@@ -26,7 +25,7 @@ class SampleCityWalkthroughTests(EvenniaTest):
         self.room2.key = LIMBO_KEY
         self.room2.save()
         sync_all()
-        sync_grid()
+        sync_test_settlements((SOUTH_GATE_XYZ[2],))
 
     def test_walk_from_limbo_to_central_plaza_and_render(self):
         limbo = self.room2

@@ -72,7 +72,19 @@ class Phase4Isolation(QuestRegistryIsolation):
 
         sync_quest_runtime()
         create_object(Room, key="虛境", location=None)
-        sync_grid()
+        from world.maps import interiors
+        from world.tests.geography_fixture import sync_test_settlements
+
+        sync_test_settlements(
+            tuple(
+                sorted(
+                    {
+                        exterior.settlement
+                        for exterior in interiors.current().exteriors.values()
+                    }
+                )
+            )
+        )
         sync_interiors()
         self._previous_catalog = CATALOG
         self._previous_offers = list(GUILD_OFFER_REGISTRY.items())

@@ -19,7 +19,7 @@ from web.webclient.actions.exploration_actions import (
     _move_adapter,
 )
 from web.webclient.actions.node_ids import node_id_for_location
-from world.maps.bootstrap import sync_grid
+from world.tests.geography_fixture import sync_test_settlements
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.map_knowledge import encode_grid, encode_room, encode_wild
 
@@ -45,7 +45,7 @@ class NodeIdEncoderTests(EvenniaTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        sync_grid()
+        sync_test_settlements((_south_gate_xyz()[2],))
 
     def setUp(self):
         self.player = create_object(PlayerCharacter, key="節點測試")

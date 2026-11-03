@@ -200,7 +200,7 @@ class SettlementReloadTests(EvenniaTestCase):
 
         from typeclasses.exits import WildernessGateExit
         from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
-        from world.maps.bootstrap import sync_wilderness
+        from world.tests.geography_fixture import sync_test_wilderness
 
         self._sync(_DOCUMENT)
         snapshot = map_data.current()
@@ -208,13 +208,18 @@ class SettlementReloadTests(EvenniaTestCase):
         entry = WILDERNESS_ENTRY_REGISTRY["village_eolas"]
         self.assertEqual(entry.gate_for("n").destination.map_id, "t_reload")
 
-        # The synthetic world is the whole published world here, so the
-        # shipped-reference preflight (which guards the shipped declarations)
-        # is out of scope for this provisioning check.
-        with patch(
-            "world.maps.bootstrap.validate_static_references", return_value=None
+        # Explicitly declare the synthetic map: its id intentionally differs
+        # from the entry's location id, which is the identity rule under test.
+        with (
+            patch(
+                "world.maps.bootstrap.SETTLEMENT_GRAPHS",
+                snapshot.graphs,
+            ),
+            patch(
+                "world.maps.bootstrap.validate_static_references", return_value=None
+            ),
         ):
-            sync_wilderness()
+            sync_test_wilderness(("t_reload",))
 
         gate_room = GridRoom.objects.filter_xyz(xyz=(100, 100, "t_reload")).first()
         gates = [

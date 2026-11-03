@@ -18,7 +18,7 @@ from typeclasses.npcs import LLMNPC, NPC
 from typeclasses.rooms import GridRoom, Room
 from web.webclient.presentation.exploration import ACTION_IDS
 from web.webclient.presentation.registry import build_production_registry
-from world.maps.bootstrap import sync_grid, sync_wilderness
+from world.tests.geography_fixture import sync_test_settlements
 from world.art import official, official_refs
 from world.art.gallery import append_card, record_for
 from world.art.official import load_catalog, reset_catalog
@@ -33,6 +33,18 @@ from world.rules.tests._combat_session_helpers import open_synthetic_scope
 from world.tests.synthetic_data import SYNTH_DIALOGUE, SYNTH_GUILD_BRANCH_KEY
 
 from ._support import T_DIALOGUE_KEY, _context
+
+
+def _declared_map_id():
+    from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+    from world.tests.geography_fixture import publish_shipped_map_world
+
+    publish_shipped_map_world()
+    return next(
+        entry.gate_for("w").destination.map_id
+        for entry in WILDERNESS_ENTRY_REGISTRY.values()
+        if entry.gate_for("w") is not None
+    )
 
 
 
@@ -114,7 +126,7 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
     def setUpClass(cls):
         super().setUpClass()
         get_world_clock()
-        sync_grid()
+        sync_test_settlements((_declared_map_id(),))
 
     def setUp(self):
         from world.quests.catalog import register_catalog
@@ -792,7 +804,7 @@ class ExplorationPortraitRefTests(BattlefieldIsolation, EvenniaTestCase):
     def setUpClass(cls):
         super().setUpClass()
         get_world_clock()
-        sync_grid()
+        sync_test_settlements((_declared_map_id(),))
 
     def setUp(self):
         self.south_gate = create_object(Room, key="肖像大廳")

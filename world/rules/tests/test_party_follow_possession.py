@@ -25,7 +25,6 @@ from typeclasses.exits import Exit, WildernessGateExit
 from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom, Room
 from world.lore.sync import sync_all
-from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.maps.static_references import settlement_node_xyz
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.clock import CLOCK_YAML, WorldClock, get_world_clock
@@ -352,8 +351,13 @@ class PossessedWildernessFollowTests(PossessedFollowTestCase):
         super().setUp()
         create_object(Room, key="虛境", location=None)
         sync_all()
-        sync_grid()
-        sync_wilderness()
+        from world.tests.geography_fixture import (
+            sync_test_settlements,
+            sync_test_wilderness,
+        )
+
+        sync_test_settlements((EAST_GATE_XYZ[2],))
+        sync_test_wilderness((EAST_GATE_XYZ[2],))
         self.east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
         self.gate = [e for e in self.east_gate.exits if isinstance(e, WildernessGateExit)][0]
         self.char1.location = self.east_gate
@@ -654,8 +658,13 @@ class PossessedWildernessSettlementTests(PossessedFollowTestCase):
         super().setUp()
         create_object(Room, key="虛境", location=None)
         sync_all()
-        sync_grid()
-        sync_wilderness()
+        from world.tests.geography_fixture import (
+            sync_test_settlements,
+            sync_test_wilderness,
+        )
+
+        sync_test_settlements((EAST_GATE_XYZ[2],))
+        sync_test_wilderness((EAST_GATE_XYZ[2],))
         self.east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
         self.gate = [e for e in self.east_gate.exits if isinstance(e, WildernessGateExit)][0]
         self.char1.location = self.east_gate

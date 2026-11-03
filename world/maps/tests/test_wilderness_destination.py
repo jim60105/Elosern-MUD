@@ -28,7 +28,6 @@ from elosern_map_core.terrain import ridge_center_x
 
 from typeclasses.rooms import Room, TerrainRoom
 from world.lore.sync import sync_all
-from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.maps.wilderness_destination import (
     find_gateway,
     normalize_wilderness_direction,
@@ -46,6 +45,8 @@ from world.tests.synthetic_data import SYNTH_WILDERNESS_ENTRIES, synthetic_regis
 from world.tests.geography_fixture import (
     publish_settlements,
     publish_shipped_geography,
+    sync_test_settlements,
+    sync_test_wilderness,
 )
 
 
@@ -439,8 +440,9 @@ class WildernessDestinationTraversalPinTests(EvenniaTest):
         super().setUp()
         create_object(Room, key="虛境", location=None)
         sync_all()
-        sync_grid()
-        sync_wilderness()
+        declared = (EAST_GATE_XYZ[2],)
+        sync_test_settlements(declared)
+        sync_test_wilderness(declared)
         from typeclasses.exits import WildernessGateExit
         from typeclasses.rooms import GridRoom
 

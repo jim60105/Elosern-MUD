@@ -355,10 +355,21 @@ class GuildStaffSyncDialogueTests(EvenniaCommandTestMixin, EvenniaTest):
         create_object(NPC, key="placeholder")
         from evennia.utils.create import create_object as co
         from typeclasses.rooms import Room
-        from world.maps.bootstrap import sync_grid, sync_interiors
+        from world.maps import interiors
+        from world.maps.bootstrap import sync_interiors
+        from world.tests.geography_fixture import sync_test_settlements
 
         self.hall_room = co(Room, key="虛境", location=None)
-        sync_grid()
+        sync_test_settlements(
+            tuple(
+                sorted(
+                    {
+                        exterior.settlement
+                        for exterior in interiors.current().exteriors.values()
+                    }
+                )
+            )
+        )
         sync_interiors()
         from world.quests.catalog import register_catalog
         from world.quests.definitions import QUEST_DEFINITION_REGISTRY

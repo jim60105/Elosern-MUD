@@ -8,7 +8,7 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.exits import Exit, WildernessGateExit
 from typeclasses.rooms import GridRoom, Room, TerrainRoom
 from world.lore.sync import sync_all
-from world.maps.bootstrap import sync_grid, sync_wilderness
+from world.tests.geography_fixture import sync_test_settlements, sync_test_wilderness
 from world.maps.limbo import LIMBO_KEY
 from world.maps.static_references import settlement_node_xyz
 from world.maps.wilderness_provider import WILDERNESS_NAME
@@ -97,8 +97,9 @@ class MovementLineageRoundTripTests(_ChargeAssertions, EvenniaTest):
         self.room2.save()
         create_object(Room, key=LIMBO_KEY, location=None)
         sync_all()
-        sync_grid()
-        sync_wilderness()
+        declared = (_EAST_GATE.destination.map_id,)
+        sync_test_settlements(declared)
+        sync_test_wilderness(declared)
         self.limbo = search_object(LIMBO_KEY, exact=True)[0]
         self.south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
         self.east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()

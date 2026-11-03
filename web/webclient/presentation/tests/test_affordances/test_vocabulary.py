@@ -117,7 +117,7 @@ class AffordanceVocabularyTests(VocabularyTestCase):
         from typeclasses.rooms import GridRoom, TerrainRoom
         from web.webclient.actions.node_ids import node_id_for_location
         from web.webclient.presentation import affordances as module
-        from world.maps.bootstrap import sync_grid
+        from world.tests.geography_fixture import sync_test_settlements
 
         # The capital's city-gate row coordinate, probed from the live
         # registry (test-data gate: mirrors test_limbo_room.py::_gate_row).
@@ -131,7 +131,7 @@ class AffordanceVocabularyTests(VocabularyTestCase):
 
         gate_xyz = settlement_node_xyz(registry[sorted(registry)[0]].gate)
 
-        sync_grid()
+        sync_test_settlements((gate_xyz[2],))
         grid = GridRoom.objects.filter_xyz(xyz=gate_xyz).first()
         self.assertIsNotNone(grid)
         plain = create_object(Room, key="普通目的地", location=None)

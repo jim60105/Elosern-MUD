@@ -40,7 +40,7 @@ from web.webclient.presentation.protocol import (
     ProtocolValidationError,
     validate_ui_action_result,
 )
-from world.maps.bootstrap import sync_grid, sync_wilderness
+from world.tests.geography_fixture import sync_test_settlements, sync_test_wilderness
 from world.maps.static_references import settlement_node_xyz
 from world.rules.clock import get_world_clock
 from world.rules.map_knowledge import KNOWLEDGE_ATTR
@@ -168,11 +168,10 @@ class TravelPlanWildernessTests(EvenniaTest):
         self.room1.key = "Room1"
         self.room1.save()
         create_object(Room, key="虛境", location=None)
-        sync_grid()
-        sync_wilderness()
-        east_gate_xyz = settlement_node_xyz(
-            _gate_anchor_entry().gate_for("w").destination
-        )
+        entry = _gate_anchor_entry()
+        sync_test_settlements((entry.gate_for("w").destination.map_id,))
+        sync_test_wilderness((entry.gate_for("w").destination.map_id,))
+        east_gate_xyz = settlement_node_xyz(entry.gate_for("w").destination)
         self.east_gate = GridRoom.objects.filter_xyz(xyz=east_gate_xyz).first()
         self.gate = [
             exit_obj

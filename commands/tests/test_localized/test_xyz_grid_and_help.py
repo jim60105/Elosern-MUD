@@ -75,15 +75,15 @@ def _gate_row():
 class LocalizedXyzGridCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     def setUp(self):
         super().setUp()
-        from world.maps.bootstrap import sync_grid
         from world.maps.limbo import LIMBO_KEY
+        from world.tests.geography_fixture import sync_test_settlements
 
         self.room1.key = "Room1"
         self.room2.key = "Room2"
         self.room1.save()
         self.room2.save()
         create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
+        sync_test_settlements((_gate_row().gate.map_id,))
         from typeclasses.rooms import GridRoom
 
         from world.maps.static_references import settlement_node_xyz

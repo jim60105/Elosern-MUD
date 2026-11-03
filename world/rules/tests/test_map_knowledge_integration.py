@@ -17,7 +17,10 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.exits import Exit, WildernessGateExit, WildernessReturnExit
 from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom, InstanceRoom, Room, TerrainRoom
-from world.maps.bootstrap import sync_grid, sync_wilderness
+from world.tests.geography_fixture import (
+    sync_test_settlements,
+    sync_test_wilderness,
+)
 from world.maps import wilderness_provider
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.maps.static_references import settlement_node_xyz
@@ -74,8 +77,24 @@ class MapKnowledgeSeamTests(EvenniaTest):
         self.room1.save()
         self.room2.save()
         create_object(Room, key="虛境", location=None)
-        sync_grid()
-        sync_wilderness()
+        sync_test_settlements(
+            tuple(
+                sorted(
+                    {row.gate.map_id for row in live_city_gate_registry().values()}
+                )
+            )
+        )
+        sync_test_wilderness(
+            tuple(
+                sorted(
+                    {
+                        gate.destination.map_id
+                        for entry in live_wilderness_entry_registry().values()
+                        for gate in entry.gates
+                    }
+                )
+            )
+        )
         # Resolve the map vocabulary only after the grid bootstraps.
         self.map = live_map_key()
         self.gate_row = live_city_gate_registry()[self.map]

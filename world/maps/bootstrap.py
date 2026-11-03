@@ -10,6 +10,7 @@ The ASCII map data is only registered for the contrib's display/builder
 surfaces; it is never the spawn input."""
 
 import hashlib
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 
 from django.db import transaction
@@ -1158,8 +1159,39 @@ def sync_settlement_graph(graph: SparseSettlementGraph) -> SyncReport:
     return report
 
 
-def _clear_grid_display_maps() -> None:
-    """Drop the retired ASCII registrations of every declared settlement.
+def _selected_settlement_graphs(
+    settlement_ids: Iterable[str] | None,
+) -> tuple[SparseSettlementGraph, ...]:
+    """Resolve one synchronization's graph inputs.
+
+    ``None`` means every graph in the registry's existing iteration order, so
+    production and any legacy caller keep full-world convergence. An explicit
+    iterable is consumed once, deduplicated and sorted by map id; a bare string
+    or a non-string member is malformed, and every id is resolved against the
+    current registry before any caller can plan or write.
+    """
+
+    if settlement_ids is None:
+        return tuple(SETTLEMENT_GRAPHS.values())
+    if isinstance(settlement_ids, str):
+        raise TypeError("settlement_ids must be an iterable of map ids, not a string")
+
+    selected: set[str] = set()
+    for map_id in settlement_ids:
+        if not isinstance(map_id, str):
+            raise TypeError(
+                f"settlement id {map_id!r} is not a string map id"
+            )
+        selected.add(map_id)
+
+    unknown = sorted(map_id for map_id in selected if map_id not in SETTLEMENT_GRAPHS)
+    if unknown:
+        raise KeyError(f"unknown settlement map id: {unknown[0]}")
+    return tuple(SETTLEMENT_GRAPHS[map_id] for map_id in sorted(selected))
+
+
+def _clear_grid_display_maps(*, settlement_ids: frozenset[str]) -> None:
+    """Drop the retired ASCII registrations of the selected settlements.
 
     The meter cutover removed the ASCII authoring/display source. A database
     that booted an older version still carries those declarations in the
@@ -1172,7 +1204,7 @@ def _clear_grid_display_maps() -> None:
     if grid is None:
         return
     stored = grid.db.map_data or {}
-    stale = [zcoord for zcoord in stored if zcoord in SETTLEMENT_GRAPHS]
+    stale = [zcoord for zcoord in stored if zcoord in settlement_ids]
     if not stale:
         return
     for zcoord in stale:
@@ -1188,8 +1220,8 @@ def _clear_grid_display_maps() -> None:
     )
 
 
-def sync_grid() -> SyncReport:
-    """Converge every declared sparse settlement and bridge Limbo to its gates.
+def sync_grid(*, settlement_ids: Iterable[str] | None = None) -> SyncReport:
+    """Converge the declared sparse settlements and bridge Limbo to their gates.
 
     Every graph is planned read-only before the first write, so a conflicting
     binding refuses with no room, tag, reference or cached coordinate changed.
@@ -1198,10 +1230,16 @@ def sync_grid() -> SyncReport:
     coordinate change, and a second run over unchanged authored data performs
     no managed writes.
 
-    The bridge is one-way (limbo-one-way-gates): one forward exit per
+    The bridge is one-way (limbo-one-way-gates): one forward exit per selected
     ``CITY_GATE_REGISTRY`` row, then a prune pass deleting every persisted
     exit that points back into the starting room. A registry row whose gate
     room is missing warns and is skipped; other rows still converge.
+
+    ``settlement_ids`` is an explicit test-facing selection. Omitted, every
+    declared graph converges in registry order and production behavior is
+    unchanged. Explicit ids are resolved, deduplicated and sorted before the
+    first planner call; an empty selection performs no persistent work. The
+    complete bundle publication and static-reference validation still run.
     """
 
     from world.maps import runtime
@@ -1211,17 +1249,22 @@ def sync_grid() -> SyncReport:
     runtime.ensure_published()
     validate_static_references()
 
-    graphs = tuple(SETTLEMENT_GRAPHS.values())
+    graphs = _selected_settlement_graphs(settlement_ids)
+    settlement_id_set = frozenset(graph.map_id for graph in graphs)
+
+    if not graphs:
+        return SyncReport()
+
     plans = tuple(_plan_settlement_graph(graph) for graph in graphs)
     report = SyncReport()
     knowledge_journal: list = []
     try:
         with transaction.atomic():
-            _clear_grid_display_maps()
+            _clear_grid_display_maps(settlement_ids=settlement_id_set)
             for plan in plans:
                 report += _apply_graph_plan(plan, knowledge_journal)
 
-            _sync_grid_room_art()
+            _sync_grid_room_art(settlement_ids=settlement_id_set)
 
             register_instance_reclamation()
 
@@ -1235,6 +1278,8 @@ def sync_grid() -> SyncReport:
             limbo = limbo[0]
 
             for row in CITY_GATE_REGISTRY.values():
+                if row.gate.map_id not in settlement_id_set:
+                    continue
                 try:
                     gate_xyz = settlement_node_xyz(row.gate, source="city gate")
                 except Exception as error:
@@ -1277,8 +1322,8 @@ def sync_grid() -> SyncReport:
     return report
 
 
-def _sync_grid_room_art() -> None:
-    """Converge every authored grid node onto its declared scene facts.
+def _sync_grid_room_art(*, settlement_ids: frozenset[str]) -> None:
+    """Converge the selected authored grid nodes onto their declared scene facts.
 
     A boot re-applies the authored table to the real rooms (an already-spawned
     node is never re-created by the contrib), so startup is idempotent. A node
@@ -1293,6 +1338,8 @@ def _sync_grid_room_art() -> None:
 
     index = settlement_reference_index()
     for reference, scene_archetype in GRID_NODE_SCENE_ARCHETYPES.items():
+        if reference.map_id not in settlement_ids:
+            continue
         try:
             x, y, map_key = settlement_node_xyz(reference, index=index, source="grid art")
         except ReferenceError as error:
@@ -1359,8 +1406,8 @@ def _prune_exits_into(limbo) -> None:
 GATE_EXIT_KEY = "荒野"
 
 
-def sync_wilderness() -> None:
-    """Provision the wilderness map and one grid-side gate per registered gate.
+def sync_wilderness(*, settlement_ids: Iterable[str] | None = None) -> None:
+    """Provision the wilderness map and one grid-side gate per selected gate.
 
     ``create_wilderness()`` is itself a no-op if a ``WildernessScript`` keyed
     ``WILDERNESS_NAME`` already exists, so no extra guard is needed there. For
@@ -1370,6 +1417,11 @@ def sync_wilderness() -> None:
     unusable (fails closed) without them, so they are part of provisioning,
     not decoration. A gate whose destination room is missing logs a warning
     and is skipped; other gates still provision.
+
+    ``settlement_ids`` filters gates by ``gate.destination.map_id``; an omitted
+    selection provisions every registered gate. The wilderness map itself is
+    provisioned for any nonempty selection; an explicit empty selection adds
+    no gate and creates no script.
 
     On every call we also re-run ``at_prepare_room()`` for each room already
     registered in the script's ``db.rooms``. This restores the deterministic
@@ -1389,6 +1441,12 @@ def sync_wilderness() -> None:
     runtime.ensure_published()
     validate_static_references()
 
+    graphs = _selected_settlement_graphs(settlement_ids)
+    settlement_id_set = frozenset(graph.map_id for graph in graphs)
+
+    if not graphs:
+        return
+
     create_wilderness(name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider())
 
     script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
@@ -1397,6 +1455,8 @@ def sync_wilderness() -> None:
 
     for entry in WILDERNESS_ENTRY_REGISTRY.values():
         for gate in entry.gates:
+            if gate.destination.map_id not in settlement_id_set:
+                continue
             _provision_gate_exit(entry.anchor_key, gate)
 
 

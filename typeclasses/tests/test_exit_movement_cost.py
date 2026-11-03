@@ -132,12 +132,12 @@ class PhysicalEdgeExitTests(EvenniaTest):
         super().setUp()
         from math import ceil
 
-        from world.maps.bootstrap import sync_grid
         from world.maps.map_data import SETTLEMENT_GRAPHS
         from world.rules.travel_cost import TERRAIN_SPEEDS
+        from world.tests.geography_fixture import sync_test_settlements
 
-        sync_grid()
         graph = next(iter(SETTLEMENT_GRAPHS.values()))
+        sync_test_settlements((graph.map_id,))
         edge = next(iter(graph.edges))
         self.source = GridRoom.objects.filter_xyz(
             (edge.source.x, edge.source.y, graph.map_id)

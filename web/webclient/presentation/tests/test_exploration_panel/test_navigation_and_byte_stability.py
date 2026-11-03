@@ -9,7 +9,7 @@ from typeclasses.monsters import Monster
 from typeclasses.npcs import LLMNPC, NPC
 from typeclasses.rooms import GridRoom, Room
 from web.webclient.presentation.registry import build_production_registry
-from world.maps.bootstrap import sync_grid, sync_wilderness
+from world.tests.geography_fixture import sync_test_settlements
 from world.rules.clock import get_world_clock
 from world.rules.map_knowledge import record_arrival
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
@@ -18,6 +18,18 @@ from world.tests.synthetic_data import SYNTH_GUILD_BRANCH_KEY
 from world.rules.art_view import portrait_catalog_key
 
 from ._support import T_DIALOGUE_KEY, _context
+
+
+def _declared_map_id():
+    from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+    from world.tests.geography_fixture import publish_shipped_map_world
+
+    publish_shipped_map_world()
+    return next(
+        entry.gate_for("w").destination.map_id
+        for entry in WILDERNESS_ENTRY_REGISTRY.values()
+        if entry.gate_for("w") is not None
+    )
 
 
 def _without_reason_copy(payload, identity):
@@ -140,7 +152,7 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
 
         cls._registry_items = None
         get_world_clock()
-        sync_grid()
+        sync_test_settlements((_declared_map_id(),))
         register_catalog()
         catalog = load_catalog_into_cache()
         register_catalog_offers(catalog)

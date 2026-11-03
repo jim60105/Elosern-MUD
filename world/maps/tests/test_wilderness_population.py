@@ -24,14 +24,17 @@ from typeclasses.monsters import Monster
 from typeclasses.rooms import GridRoom, Room, TerrainRoom
 from typeclasses.exits import WildernessGateExit
 from world.lore.sync import sync_all
-from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.maps.static_references import settlement_node_xyz
 from world.maps.wilderness_population import (
     ensure_population,
     population_for_coordinates,
 )
 from world.maps import wilderness_provider
-from world.tests.geography_fixture import publish_shipped_geography
+from world.tests.geography_fixture import (
+    publish_shipped_geography,
+    sync_test_settlements,
+    sync_test_wilderness,
+)
 from world.maps.wilderness_provider import (
     WILDERNESS_NAME,
     ElosernWildernessMapProvider,
@@ -482,8 +485,6 @@ class WildernessPopulationSpawnTests(EvenniaTest):
 
     @covers_requirement("wilderness-monster-population::a-registered-wilderness-monster-survives-room-recycling")
     def test_sync_wilderness_rerun_does_not_duplicate_or_replace(self):
-        from world.maps.bootstrap import sync_wilderness
-
         monsters = [
             obj for obj in self._monsters_at(ENTRY_XY) if isinstance(obj, Monster)
         ]
@@ -492,7 +493,7 @@ class WildernessPopulationSpawnTests(EvenniaTest):
 
         # The startup sync path re-runs at_prepare_room for retained rooms; the
         # living population monster must survive unchanged.
-        sync_wilderness()
+        sync_test_wilderness((_EAST_GATE.destination.map_id,))
         monsters = [
             obj for obj in self._monsters_at(ENTRY_XY) if isinstance(obj, Monster)
         ]
@@ -515,8 +516,18 @@ class OnboardingHuntIntegrationTests(BattlefieldIsolation, RegistryIsolationMixi
         super().setUp()
         create_object(Room, key="虛境", location=None)
         sync_all()
-        sync_grid()
-        sync_wilderness()
+        from world.maps import interiors
+
+        declared = tuple(
+            sorted(
+                {
+                    exterior.settlement
+                    for exterior in interiors.current().exteriors.values()
+                }
+            )
+        )
+        sync_test_settlements(declared)
+        sync_test_wilderness(declared)
         register_catalog()
         sync_quest_runtime()
         sync_guild_economy()
@@ -648,7 +659,7 @@ class StartupSessionRestoreOrderTests(BattlefieldIsolation, EvenniaTest):
         # Even in the worst case (reconciliation running first, as a startup
         # ordering regression), the defeated participant survives because the
         # persisted session still references it.
-        sync_wilderness()
+        sync_test_wilderness((_EAST_GATE.destination.map_id,))
         surviving = [
             obj
             for obj in self.script.get_objs_at_coordinates(ENTRY_XY)
@@ -672,7 +683,7 @@ class StartupSessionRestoreOrderTests(BattlefieldIsolation, EvenniaTest):
         self.assertIsNone(self.player.db.active_combat)
 
         # Only afterwards does reconciliation respawn the defeated monster.
-        sync_wilderness()
+        sync_test_wilderness((_EAST_GATE.destination.map_id,))
         respawned = [
             obj
             for obj in self.script.get_objs_at_coordinates(ENTRY_XY)

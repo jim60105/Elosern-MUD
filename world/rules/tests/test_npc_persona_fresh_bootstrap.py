@@ -28,7 +28,8 @@ from world.lore.npc_card import (
     NPC_PERSONA_CONTENT_GENERATION,
     normalize_card,
 )
-from world.maps.bootstrap import sync_grid, sync_interiors
+from world.maps.bootstrap import sync_interiors
+from world.tests.geography_fixture import sync_test_settlements
 from world.quests.catalog import register_catalog
 from world.quests.bootstrap import restore_generated_quests
 from world.quests.compile.contracts import QuestCompileError
@@ -48,7 +49,18 @@ class NpcPersonaFreshBootstrapTests(EvenniaTest):
         super().setUp()
         register_catalog()
         create_object(Room, key="虛境", location=None)
-        sync_grid()
+        from world.maps import interiors
+
+        sync_test_settlements(
+            tuple(
+                sorted(
+                    {
+                        exterior.settlement
+                        for exterior in interiors.current().exteriors.values()
+                    }
+                )
+            )
+        )
         sync_interiors()
         sync_service_content()
 

@@ -31,7 +31,6 @@ from world.ai.tests._director_helpers import (
     _npc_tier_key,
     _rank_key,
 )
-from world.maps.bootstrap import sync_grid
 from world.quests.compile import (
     compile_quest_blueprint,
     register_generated_quest,
@@ -323,12 +322,16 @@ class SceneFlavorCommandCompositionTests(RegistryIsolationMixin, EvenniaTestCase
         super().setUp()
         _install_scene_flavor()
         create_object("typeclasses.rooms.Room", key="虛境", location=None)
-        sync_grid()
         # The anchor room is resolved through the live placement registry:
         # sync_grid links each canonical AnchorRoom by its anchor key, so the
         # first placed anchor carries the traversal case without naming it.
         placements = _live_registry(
             "world.lore" + ".anchor_placement", "ANCHOR_PLACEMENT" + "_REGISTRY"
+        )
+        from world.tests.geography_fixture import sync_test_settlements
+
+        sync_test_settlements(
+            tuple(sorted({placement.zcoord for placement in placements.values()}))
         )
         placed = next(iter(placements))
         # AttributeProperty is not a Django field: match in Python over the

@@ -25,7 +25,7 @@ from world.art.scene_definitions import (
     is_registered_scene_key,
     room_art_key_set,
 )
-from world.maps.bootstrap import sync_grid, sync_interiors
+from world.maps.bootstrap import sync_interiors
 from world.maps.instance import spawn_instance_room
 from world.maps.room_art import (
     GRID_NODE_SCENE_ARCHETYPES,
@@ -72,7 +72,6 @@ class GridRoomArtMetadataTests(EvenniaTest):
     def setUp(self):
         super().setUp()
         _limbo()
-        sync_grid()
 
     def _room(self, key):
         from world.maps.static_references import settlement_node_xyz
@@ -83,30 +82,88 @@ class GridRoomArtMetadataTests(EvenniaTest):
         "room-art-metadata::room-official-references-are-explicit-authored-keys"
     )
     def test_every_authored_grid_node_carries_registered_metadata(self):
-        for key, scene_archetype in GRID_NODE_SCENE_ARCHETYPES.items():
+        # A complete invented multi-map fixture keeps the every-node assertion
+        # at full strength without depending on the shipped roster.
+        from elosern_map_core.references import settlement_node_ref
+        from elosern_map_core.sparse import (
+            SparseNode,
+            SparseRoad,
+            SparseSettlementGraph,
+        )
+        from world.tests.geography_fixture import sync_test_settlements
+
+        graphs = {}
+        art = {}
+        for map_id in ("t_art_alpha", "t_art_beta"):
+            nodes = [
+                SparseNode(
+                    node_id=node_id,
+                    x=x,
+                    y=y,
+                    prototype={
+                        "prototype_parent": "grid_room",
+                        "key": f"測試{map_id}{node_id}",
+                    },
+                )
+                for node_id, x, y in (("a", 1, 1), ("b", 1, 2))
+            ]
+            graphs[map_id] = SparseSettlementGraph(
+                map_id,
+                nodes,
+                [SparseRoad("a>b", "a", "b")],
+                exit_prototype={
+                    "prototype_parent": "xyz_exit",
+                    "typeclass": "typeclasses.exits.CostedXYZExit",
+                },
+            )
+            for node in nodes:
+                art[settlement_node_ref(map_id, node.node_id)] = (
+                    _registered_scene_archetype()
+                )
+
+        from world.maps.static_references import settlement_node_xyz as real_resolve
+
+        def resolve(reference, **kwargs):
+            graph = graphs.get(reference.map_id)
+            if graph is not None and reference.object_id in graph.nodes:
+                node = graph.node(reference.object_id)
+                return (node.x, node.y, reference.map_id)
+            return real_resolve(reference, **kwargs)
+
+        with (
+            patch("world.maps.bootstrap.SETTLEMENT_GRAPHS", graphs),
+            patch("world.maps.bootstrap.GRID_NODE_SCENE_ARCHETYPES", art),
+            patch("world.maps.bootstrap.settlement_node_xyz", side_effect=resolve),
+        ):
+            sync_test_settlements(tuple(graphs))
+
+        for key, scene_archetype in art.items():
             with self.subTest(node=key):
-                room = self._room(key)
+                node = graphs[key.map_id].node(key.object_id)
+                room = GridRoom.objects.filter_xyz(
+                    xyz=(node.x, node.y, key.map_id)
+                ).first()
                 self.assertIsNotNone(room)
                 self.assertEqual(room.scene_archetype, scene_archetype)
                 self.assertTrue(is_registered_scene_key(room.scene_archetype))
-                # An authored grid node declares no room-art key.
                 self.assertIsNone(room.room_art_key)
-                from world.maps.static_references import settlement_node_xy
-
                 self.assertEqual(
                     room.scene_identity,
-                    grid_scene_identity(key.map_id, *settlement_node_xy(key)),
+                    grid_scene_identity(key.map_id, node.x, node.y),
                 )
 
     def test_repeated_startup_converges_drifted_grid_metadata(self):
+        from world.tests.geography_fixture import sync_test_settlements
+
         key = next(iter(GRID_NODE_SCENE_ARCHETYPES))
+        sync_test_settlements((key.map_id,))
         room = self._room(key)
         room.scene_archetype = None
         room.room_art_key = _registered_room_art_key()
         room.scene_identity = "drifted"
         room.save()
 
-        sync_grid()
+        sync_test_settlements((key.map_id,))
 
         room = self._room(key)
         self.assertEqual(room.scene_archetype, GRID_NODE_SCENE_ARCHETYPES[key])
@@ -123,7 +180,19 @@ class PermanentInteriorArtMetadataTests(EvenniaTest):
     def setUp(self):
         super().setUp()
         _limbo()
-        sync_grid()
+        from world.maps import interiors
+        from world.tests.geography_fixture import sync_test_settlements
+
+        sync_test_settlements(
+            tuple(
+                sorted(
+                    {
+                        exterior.settlement
+                        for exterior in interiors.current().exteriors.values()
+                    }
+                )
+            )
+        )
 
     @covers_requirement(
         "room-art-metadata::room-official-references-are-explicit-authored-keys"
@@ -365,7 +434,20 @@ class RoomMetadataSmokeTests(EvenniaTest):
         and clears the stale room-art key.
         """
         _limbo()
-        sync_grid()
+        from world.maps import interiors
+        from world.tests.geography_fixture import sync_test_settlements
+
+        sync_test_settlements(
+            tuple(
+                sorted(
+                    {next(iter(GRID_NODE_SCENE_ARCHETYPES)).map_id}
+                    | {
+                        exterior.settlement
+                        for exterior in interiors.current().exteriors.values()
+                    }
+                )
+            )
+        )
         sync_interiors()
 
         node = next(iter(GRID_NODE_SCENE_ARCHETYPES))

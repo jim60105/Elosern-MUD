@@ -23,7 +23,6 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.exits import Exit, WildernessGateExit
 from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom, InstanceRoom, Room, TerrainRoom
-from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.maps.static_references import settlement_node_xyz
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.clock import CLOCK_YAML, WorldClock, get_world_clock
@@ -403,8 +402,13 @@ class MovementSettlementWildernessTests(EvenniaTest):
         self.room1.save()
         self.room2.save()
         create_object(Room, key="虛境", location=None)
-        sync_grid()
-        sync_wilderness()
+        from world.tests.geography_fixture import (
+            sync_test_settlements,
+            sync_test_wilderness,
+        )
+
+        sync_test_settlements((_EAST_GATE.destination.map_id,))
+        sync_test_wilderness((_EAST_GATE.destination.map_id,))
         self.east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
         self.gate = [e for e in self.east_gate.exits if isinstance(e, WildernessGateExit)][0]
 

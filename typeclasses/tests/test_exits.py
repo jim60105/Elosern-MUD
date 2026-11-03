@@ -15,7 +15,7 @@ from typeclasses.exits import (
     after_successful_movement,
 )
 from typeclasses.rooms import GridRoom, Room
-from world.maps.bootstrap import sync_grid, sync_wilderness
+from world.tests.geography_fixture import sync_test_settlements, sync_test_wilderness
 from world.maps.static_references import settlement_node_xyz
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.clock import get_world_clock
@@ -110,8 +110,9 @@ class WildernessGatewayExitTests(_ChargeAssertions, EvenniaTest):
         self.room1.save()
         self.room2.save()
         create_object(Room, key="虛境", location=None)
-        sync_grid()
-        sync_wilderness()
+        declared = (_CAPITAL.gate_for("w").destination.map_id,)
+        sync_test_settlements(declared)
+        sync_test_wilderness(declared)
         self.east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
         self.gate = [e for e in self.east_gate.exits if isinstance(e, WildernessGateExit)][0]
         self.south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()

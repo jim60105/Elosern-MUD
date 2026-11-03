@@ -17,7 +17,7 @@ from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 from world.quests.tests._fixtures import RegistryIsolationMixin
 from world.maps.city_gates import CITY_GATE_REGISTRY, CityGateDef
-from world.maps.bootstrap import sync_grid, sync_limbo, sync_wilderness
+from world.maps.bootstrap import SyncReport, sync_grid, sync_limbo, sync_wilderness
 from world.maps.limbo import LIMBO_ALIAS, LIMBO_DESC, LIMBO_KEY, LIMBO_LEGACY_KEY
 from world.maps.map_data import SETTLEMENT_GRAPHS
 from world.maps.static_references import (
@@ -29,26 +29,61 @@ from world.maps.static_references import (
 from elosern_map_core.references import settlement_node_ref
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
-from world.tests.geography_fixture import publish_shipped_geography
+from world.tests.geography_fixture import (
+    publish_shipped_geography,
+    selected_startup_settlements,
+    sync_test_settlements,
+    sync_test_wilderness,
+)
 
 
 publish_shipped_geography()
 
 _CAPITAL_ENTRY = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
+_VILLAGE_ENTRY = WILDERNESS_ENTRY_REGISTRY["village_ciaran"]
 SOUTH_GATE_XYZ = settlement_node_xyz(_CAPITAL_ENTRY.gate_for("n").destination)
 EAST_GATE_XYZ = settlement_node_xyz(_CAPITAL_ENTRY.gate_for("w").destination)
 
+#: The capital/village pair every cross-settlement fixture in this module needs.
+#: Selector ids are settlement map ids, never entry anchor/location identities.
+CAPITAL_MAP_IDS = (_CAPITAL_ENTRY.gate_for("w").destination.map_id,)
+VILLAGE_MAP_IDS = (_VILLAGE_ENTRY.gate_for("n").destination.map_id,)
+CAPITAL_VILLAGE_MAP_IDS = tuple(sorted({*CAPITAL_MAP_IDS, *VILLAGE_MAP_IDS}))
+SELECTED_GATE_ROW_COUNT = sum(
+    1
+    for row in CITY_GATE_REGISTRY.values()
+    if row.gate.map_id in CAPITAL_VILLAGE_MAP_IDS
+)
+#: The map ids the starting-room bridge rows would materialize.
+CITY_GATE_MAP_IDS = tuple(
+    sorted({row.gate.map_id for row in CITY_GATE_REGISTRY.values()})
+)
+#: The destination maps of every registered wilderness gate.
+WILDERNESS_GATE_MAP_IDS = tuple(
+    sorted(
+        {
+            gate.destination.map_id
+            for entry in WILDERNESS_ENTRY_REGISTRY.values()
+            for gate in entry.gates
+        }
+    )
+)
+#: The maps carrying an authored anchor placement.
+ANCHOR_PLACEMENT_MAP_IDS = tuple(
+    sorted({placement.zcoord for placement in ANCHOR_PLACEMENT_REGISTRY.values()})
+)
 
-def _declared_road_count():
-    """The authored directed-road count of every published settlement."""
 
-    return sum(len(graph.edges) for graph in SETTLEMENT_GRAPHS.values())
+def _declared_road_count(settlement_ids):
+    """The authored directed-road count of the declared settlements."""
+
+    return sum(len(SETTLEMENT_GRAPHS[map_id].edges) for map_id in settlement_ids)
 
 
-def _declared_node_count():
-    """The authored node count of every published settlement."""
+def _declared_node_count(settlement_ids):
+    """The authored node count of the declared settlements."""
 
-    return sum(len(graph.nodes) for graph in SETTLEMENT_GRAPHS.values())
+    return sum(len(SETTLEMENT_GRAPHS[map_id].nodes) for map_id in settlement_ids)
 
 
 def _approach(return_direction):
@@ -105,48 +140,57 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
     @covers_requirement("grid-room-sync::a-single-authored-idempotent-exit-bridges-limbo-and-the-sample-city")
     def test_sync_grid_spawns_both_settlements_rooms_and_exits(self):
         create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
+        sync_test_settlements(CAPITAL_VILLAGE_MAP_IDS)
 
-        # Two settlements: the capital's twenty-one rooms and the village's
-        # ten (ciaran-village-crafts grew 暗影谷村 from six nodes to ten).
-        self.assertEqual(self._count_grid_rooms(), _declared_node_count())
-        self.assertEqual(self._count_city_exits(), _declared_road_count())
+        # The declared pair's authored topology, with no unrelated graph work.
+        self.assertEqual(
+            self._count_grid_rooms(), _declared_node_count(CAPITAL_VILLAGE_MAP_IDS)
+        )
+        self.assertEqual(
+            self._count_city_exits(), _declared_road_count(CAPITAL_VILLAGE_MAP_IDS)
+        )
         # One forward Limbo bridge per CITY_GATE_REGISTRY row.
         self.assertEqual(len(self._bridging_exits()), 2)
         self.assertEqual(
             len(self._bridging_exits()) + self._count_city_exits(),
-            _declared_road_count() + len(CITY_GATE_REGISTRY),
+            _declared_road_count(CAPITAL_VILLAGE_MAP_IDS) + SELECTED_GATE_ROW_COUNT,
         )
 
     def test_sync_grid_is_idempotent_and_preserves_dbid(self):
         create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
+        sync_test_settlements(CAPITAL_VILLAGE_MAP_IDS)
         first_ids = {
             room.xyz: room.id
             for room in GridRoom.objects.all_family()
         }
 
-        sync_grid()
+        sync_test_settlements(CAPITAL_VILLAGE_MAP_IDS)
         second_ids = {
             room.xyz: room.id
             for room in GridRoom.objects.all_family()
         }
 
-        self.assertEqual(self._count_grid_rooms(), _declared_node_count())
-        self.assertEqual(self._count_city_exits(), _declared_road_count())
+        self.assertEqual(
+            self._count_grid_rooms(), _declared_node_count(CAPITAL_VILLAGE_MAP_IDS)
+        )
+        self.assertEqual(
+            self._count_city_exits(), _declared_road_count(CAPITAL_VILLAGE_MAP_IDS)
+        )
         self.assertEqual(len(self._bridging_exits()), 2)
         self.assertEqual(first_ids, second_ids)
 
-    def test_single_call_on_fresh_grid_spawns_all_thirty_one_rooms(self):
+    def test_single_call_on_fresh_grid_spawns_every_declared_room(self):
         from evennia.contrib.grid.xyzgrid.xyzgrid import XYZGrid
 
         self.assertEqual(XYZGrid.objects.all().count(), 0)
-        sync_grid()
-        self.assertEqual(self._count_grid_rooms(), _declared_node_count())
+        sync_test_settlements(CAPITAL_VILLAGE_MAP_IDS)
+        self.assertEqual(
+            self._count_grid_rooms(), _declared_node_count(CAPITAL_VILLAGE_MAP_IDS)
+        )
 
     def test_in_place_update_changes_desc_without_new_room(self):
         create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
+        sync_test_settlements(CAPITAL_MAP_IDS)
 
         # zhtw-room-prose: the spawn pin asserts the mechanism (the room's desc
         # equals its authored prototype), not the sentence — the prototype's
@@ -187,9 +231,9 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         changed = dict(SETTLEMENT_GRAPHS)
         changed["capital_altoria"] = changed_graph
         with patch("world.maps.bootstrap.SETTLEMENT_GRAPHS", changed):
-            sync_grid()
+            sync_test_settlements(CAPITAL_MAP_IDS)
 
-        self.assertEqual(self._count_grid_rooms(), _declared_node_count())
+        self.assertEqual(self._count_grid_rooms(), _declared_node_count(CAPITAL_MAP_IDS))
         south_gate = GridRoom.objects.filter_xyz(xyz=xyz).first()
         self.assertIsNotNone(south_gate)
         self.assertEqual(south_gate.db.desc, "A rebuilt southern gate.")
@@ -197,7 +241,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
     @covers_requirement("scene-archetype-mixin::gridroom-is-retrofitted-onto-scenearchetypemixin-without-changing-its-contract")
     def test_anchor_room_matches_placement_registry_after_sync(self):
         create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
+        sync_test_settlements(ANCHOR_PLACEMENT_MAP_IDS)
 
         # Every placement row matches its settlement's spawned AnchorRoom:
         # zcoord and the resolved entrance equal the room's coordinates, and no two
@@ -216,7 +260,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
 
     def test_bridging_exits_bind_limbo_and_south_gate_idempotently(self):
         limbo = create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
+        sync_test_settlements(CAPITAL_VILLAGE_MAP_IDS)
 
         south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
         # One forward exit per registry row: the capital's 南門 and the
@@ -230,7 +274,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
             [],
         )
 
-        sync_grid()
+        sync_test_settlements(CAPITAL_VILLAGE_MAP_IDS)
         self.assertEqual(
             sorted(exit_obj.key for exit_obj in limbo.exits),
             ["南門", "隱密小徑"],
@@ -242,7 +286,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
 
     def test_bridging_lookup_is_by_key_not_dbref(self):
         limbo = create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
+        sync_test_settlements(CITY_GATE_MAP_IDS)
 
         dbref2 = self.room2
         self.assertEqual(dbref2.id, 2)
@@ -257,7 +301,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         # authored road leaving the node; the wilderness gate exit it later
         # carries is provisioned per-gate (wilderness-anchor-footprint).
         create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
+        sync_test_settlements(CAPITAL_MAP_IDS)
         from world.maps.map_data import current
 
         east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
@@ -279,16 +323,20 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         )
 
     def test_absent_limbo_degrades_without_raising(self):
-        sync_grid()
+        sync_test_settlements(CAPITAL_VILLAGE_MAP_IDS)
 
-        self.assertEqual(self._count_grid_rooms(), _declared_node_count())
-        self.assertEqual(self._count_city_exits(), _declared_road_count())
+        self.assertEqual(
+            self._count_grid_rooms(), _declared_node_count(CAPITAL_VILLAGE_MAP_IDS)
+        )
+        self.assertEqual(
+            self._count_city_exits(), _declared_road_count(CAPITAL_VILLAGE_MAP_IDS)
+        )
         self.assertEqual(len(self._bridging_exits()), 0)
 
     @covers_requirement("limbo-one-way-gates::sync-grid-creates-exactly-one-forward-gate-exit-per-registry-row-and-converges-it-idempotently")
     def test_forward_gate_exit_converges_from_legacy_aliases_in_place(self):
         limbo = create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
+        sync_test_settlements(CAPITAL_MAP_IDS)
         south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
         forward = [exit_obj for exit_obj in limbo.exits if exit_obj.destination == south_gate][0]
         forward_id = forward.id
@@ -296,7 +344,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         forward.aliases.clear()
         forward.aliases.add("south gate", "altoria")
 
-        sync_grid()
+        sync_test_settlements(CAPITAL_MAP_IDS)
 
         forwards = [exit_obj for exit_obj in limbo.exits if exit_obj.destination == south_gate]
         self.assertEqual(len(forwards), 1)
@@ -349,7 +397,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
     @covers_requirement("limbo-one-way-gates::sync-grid-creates-exactly-one-forward-gate-exit-per-registry-row-and-converges-it-idempotently")
     def test_duplicate_forward_exits_collapse_to_the_single_authored_exit(self):
         limbo = create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
+        sync_test_settlements(CAPITAL_MAP_IDS)
         south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
         # Seed a second forward exit toward the same gate (database history).
         duplicate = create_object(Exit, key="重複門", location=limbo, destination=south_gate)
@@ -357,7 +405,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
             exit_obj.id for exit_obj in limbo.exits if exit_obj.destination == south_gate
         )
 
-        sync_grid()
+        sync_test_settlements(CAPITAL_MAP_IDS)
 
         forwards = [exit_obj for exit_obj in limbo.exits if exit_obj.destination == south_gate]
         self.assertEqual(len(forwards), 1)
@@ -368,7 +416,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
     @covers_requirement("limbo-one-way-gates::every-sync-prunes-every-exit-whose-destination-is-the-starting-room")
     def test_reverse_exit_is_pruned_once_with_event(self):
         limbo = create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
+        sync_test_settlements(CAPITAL_MAP_IDS)
         south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
         # Seed the pre-change return exit the way an existing database has it.
         create_object(
@@ -380,7 +428,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         )
 
         with patch("world.maps.bootstrap.log_info") as info:
-            sync_grid()
+            sync_test_settlements(CAPITAL_MAP_IDS)
         prunes = [
             call
             for call in info.call_args_list
@@ -397,7 +445,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
 
         # A converged database prunes and logs nothing.
         with patch("world.maps.bootstrap.log_info") as info:
-            sync_grid()
+            sync_test_settlements(CAPITAL_MAP_IDS)
         self.assertEqual(
             [
                 call
@@ -410,7 +458,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
     @covers_requirement("limbo-one-way-gates::the-city-gate-registry-is-the-sole-authored-source-of-虛境-city-gates")
     def test_limbo_exit_set_equals_registry_rows(self):
         limbo = create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
+        sync_test_settlements(CITY_GATE_MAP_IDS)
 
         expected = {
             row.exit_key: settlement_node_xyz(row.gate)
@@ -424,7 +472,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
     @covers_requirement("limbo-one-way-gates::sync-grid-creates-exactly-one-forward-gate-exit-per-registry-row-and-converges-it-idempotently")
     def test_starting_room_gains_exactly_one_forward_exit_per_registry_row(self):
         create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
+        sync_test_settlements(CITY_GATE_MAP_IDS)
         south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
         limbo = next(
             exit_obj.location
@@ -445,7 +493,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
     @covers_requirement("limbo-one-way-gates::every-sync-prunes-every-exit-whose-destination-is-the-starting-room")
     def test_no_village_room_holds_an_exit_back_to_the_starting_room(self):
         create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
+        sync_test_settlements(CAPITAL_VILLAGE_MAP_IDS)
         south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
         limbo = next(
             exit_obj.location
@@ -462,7 +510,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
     @covers_requirement("grid-room-sync::sync-grid-is-distinct-from-sync-all-and-instantiates-real-rooms-and-exits")
     def test_each_settlement_keeps_its_own_coordinate_space(self):
         create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
+        sync_test_settlements(CAPITAL_VILLAGE_MAP_IDS)
         # The metre frames are disjoint: each settlement's coordinates resolve
         # only inside its own map key, never into the other's rooms.
         for map_key, node_id, key in (
@@ -496,7 +544,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
             patch("world.maps.bootstrap.CITY_GATE_REGISTRY", rebound),
         ):
             with self.assertRaises(StaticReferenceError):
-                sync_grid()
+                sync_test_settlements(CITY_GATE_MAP_IDS)
         self.assertEqual(list(limbo.exits), [])
 
     @covers_requirement("limbo-one-way-gates::a-registry-row-whose-gate-room-is-missing-warns-and-is-skipped-without-blocking-other-rows")
@@ -524,7 +572,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
             patch("world.maps.bootstrap.settlement_node_xyz", side_effect=resolve),
             patch("world.maps.bootstrap.log_warn") as warn,
         ):
-            sync_grid()
+            sync_test_settlements(CITY_GATE_MAP_IDS)
 
         missing = [
             call
@@ -552,7 +600,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         rebound["capital_altoria_north"] = second_row
 
         with patch("world.maps.bootstrap.CITY_GATE_REGISTRY", rebound):
-            sync_grid()
+            sync_test_settlements(CITY_GATE_MAP_IDS)
 
         second_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
         keys = sorted(exit_obj.key for exit_obj in limbo.exits)
@@ -567,9 +615,9 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         )
         # And a seeded reverse exit for the NEW gate prunes the same way.
         create_object(Exit, key="回虛境二", location=second_gate, destination=limbo)
-        sync_grid()
+        sync_test_settlements(CITY_GATE_MAP_IDS)
         self.assertEqual([exit_obj for exit_obj in second_gate.exits if exit_obj.destination == limbo], [])
-        sync_grid()
+        sync_test_settlements(CITY_GATE_MAP_IDS)
         self.assertEqual(len(limbo.exits), len(rebound))
 
     @covers_requirement("grid-room-sync::sync-grid-runs-automatically-at-server-start-after-sync-all")
@@ -585,10 +633,15 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         )
 
     def test_at_server_start_without_limbo_syncs_lore_and_grid(self):
-        at_server_start()
+        with selected_startup_settlements(CAPITAL_VILLAGE_MAP_IDS):
+            at_server_start()
 
-        self.assertEqual(self._count_grid_rooms(), _declared_node_count())
-        self.assertEqual(self._count_city_exits(), _declared_road_count())
+        self.assertEqual(
+            self._count_grid_rooms(), _declared_node_count(CAPITAL_VILLAGE_MAP_IDS)
+        )
+        self.assertEqual(
+            self._count_city_exits(), _declared_road_count(CAPITAL_VILLAGE_MAP_IDS)
+        )
         self.assertEqual(len(self._bridging_exits()), 0)
         from evennia.utils.search import search_script
 
@@ -596,11 +649,16 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
 
     def test_at_server_start_with_limbo_creates_bridging_exits(self):
         create_object(Room, key=LIMBO_KEY, location=None)
-        at_server_start()
+        with selected_startup_settlements(CAPITAL_VILLAGE_MAP_IDS):
+            at_server_start()
 
-        self.assertEqual(self._count_grid_rooms(), _declared_node_count())
-        self.assertEqual(self._count_city_exits(), _declared_road_count())
-        self.assertEqual(len(self._bridging_exits()), len(CITY_GATE_REGISTRY))
+        self.assertEqual(
+            self._count_grid_rooms(), _declared_node_count(CAPITAL_VILLAGE_MAP_IDS)
+        )
+        self.assertEqual(
+            self._count_city_exits(), _declared_road_count(CAPITAL_VILLAGE_MAP_IDS)
+        )
+        self.assertEqual(len(self._bridging_exits()), SELECTED_GATE_ROW_COUNT)
 
 
 class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
@@ -636,8 +694,8 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         from world.maps.map_data import current
 
         create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
-        sync_wilderness()
+        sync_test_settlements(WILDERNESS_GATE_MAP_IDS)
+        sync_test_wilderness(WILDERNESS_GATE_MAP_IDS)
 
         script, gates = self._gate_exits()
         self.assertIsNotNone(script)
@@ -688,8 +746,8 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         # freshly provisioned rooms land deterministically on their approach
         # cells.
         create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
-        sync_wilderness()
+        sync_test_settlements(CAPITAL_MAP_IDS)
+        sync_test_wilderness(CAPITAL_MAP_IDS)
         east_gate = next(
             e for e in self._gate_exits()[1] if e.db.gate_direction == "w"
         )
@@ -706,9 +764,9 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         from world.maps.map_data import current
 
         create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
-        sync_wilderness()
-        sync_wilderness()
+        sync_test_settlements(WILDERNESS_GATE_MAP_IDS)
+        sync_test_wilderness(WILDERNESS_GATE_MAP_IDS)
+        sync_test_wilderness(WILDERNESS_GATE_MAP_IDS)
 
         script, gates = self._gate_exits()
         from evennia.contrib.grid.wilderness.wilderness import WildernessScript
@@ -731,8 +789,8 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         from typeclasses.rooms import TerrainRoom
 
         create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
-        sync_wilderness()
+        sync_test_settlements(CAPITAL_MAP_IDS)
+        sync_test_wilderness(CAPITAL_MAP_IDS)
 
         script, _ = self._gate_exits()
         self.assertEqual(TerrainRoom.objects.count(), 0)
@@ -798,8 +856,8 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         )
 
         create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
-        sync_wilderness()
+        sync_test_settlements(VILLAGE_MAP_IDS)
+        sync_test_wilderness(VILLAGE_MAP_IDS)
         provider = __import__(
             "world.maps.wilderness_provider", fromlist=["ElosernWildernessMapProvider"]
         ).ElosernWildernessMapProvider()
@@ -809,7 +867,7 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         )
 
     def test_sync_wilderness_without_east_gate_degrades_gracefully(self):
-        sync_wilderness()
+        sync_test_wilderness(CAPITAL_VILLAGE_MAP_IDS)
 
         from evennia.contrib.grid.wilderness.wilderness import WildernessScript
 
@@ -836,9 +894,12 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         )
 
     def test_at_server_start_provisions_wilderness_too(self):
-        at_server_start()
+        with selected_startup_settlements(CAPITAL_VILLAGE_MAP_IDS):
+            at_server_start()
 
-        self.assertEqual(self._count_grid_rooms(), _declared_node_count())
+        self.assertEqual(
+            self._count_grid_rooms(), _declared_node_count(CAPITAL_VILLAGE_MAP_IDS)
+        )
         from evennia.contrib.grid.wilderness.wilderness import WildernessScript
 
         scripts = WildernessScript.objects.filter(db_key=WILDERNESS_NAME)
@@ -852,8 +913,8 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         # approach cell, and a traveler standing there and moving in the
         # gate's return direction ("n") arrives back at 隱密小徑 (task 3.3).
         create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
-        sync_wilderness()
+        sync_test_settlements(VILLAGE_MAP_IDS)
+        sync_test_wilderness(VILLAGE_MAP_IDS)
 
         entrance_room = GridRoom.objects.filter_xyz(
             xyz=(
@@ -879,8 +940,8 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         # restart does -- ndb values are not stored), then re-run
         # sync_wilderness() and confirm the deterministic description returns.
         create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
-        sync_wilderness()
+        sync_test_settlements(CAPITAL_MAP_IDS)
+        sync_test_wilderness(CAPITAL_MAP_IDS)
         from evennia.contrib.grid.wilderness.wilderness import (  # noqa: F811
             WildernessScript,
             enter_wilderness,
@@ -903,7 +964,7 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         room.ndb.someother = 1
         # The returned room is retained (account still present); re-running
         # sync_wilderness must re-prepare it.
-        sync_wilderness()
+        sync_test_wilderness(CAPITAL_MAP_IDS)
         self.assertEqual(room.ndb.active_desc, terrain_description(x, y))
         self.assertEqual(
             room.scene_archetype,
@@ -916,14 +977,14 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
 
     def test_sync_wilderness_heals_miskeyed_gate(self):
         create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
-        sync_wilderness()
+        sync_test_settlements(CAPITAL_MAP_IDS)
+        sync_test_wilderness(CAPITAL_MAP_IDS)
         # Misconfigure the gate's anchor_key, then re-run and confirm it heals.
         script, gates = self._gate_exits()
         self.assertEqual(len(gates), 1)
         gate = gates[0]
         gate.db.anchor_key = "wrong_anchor"
-        sync_wilderness()
+        sync_test_wilderness(CAPITAL_MAP_IDS)
         script, gates = self._gate_exits()
         self.assertEqual(len(gates), 1)
         self.assertEqual(gates[0].db.anchor_key, "capital_altoria")
@@ -931,11 +992,11 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
 
     def test_sync_wilderness_heals_misdirected_gate(self):
         create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
-        sync_wilderness()
+        sync_test_settlements(CAPITAL_MAP_IDS)
+        sync_test_wilderness(CAPITAL_MAP_IDS)
         gate = self._gate_exits()[1][0]
         gate.db.gate_direction = "e"
-        sync_wilderness()
+        sync_test_wilderness(CAPITAL_MAP_IDS)
         gates = self._gate_exits()[1]
         self.assertEqual(len(gates), 1)
         self.assertEqual(gates[0].db.gate_direction, "w")
@@ -946,7 +1007,7 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         # than stacking a second gate (spec scenario "a mis-provisioned gate
         # is healed").
         create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
+        sync_test_settlements(CAPITAL_MAP_IDS)
         foreign = create_object(
             WildernessGateExit,
             key="荒野",
@@ -955,7 +1016,7 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         )
         foreign.db.anchor_key = "wrong_anchor"
         foreign.db.gate_direction = "w"
-        sync_wilderness()
+        sync_test_wilderness(CAPITAL_MAP_IDS)
         south_gates = self._gate_exits(self._south_gate())[1]
         self.assertEqual(len(south_gates), 1)
         self.assertIs(south_gates[0], foreign)
@@ -966,11 +1027,11 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         # Two WildernessGateExit rows on one room are ambiguous: sync warns and
         # provisions nothing there, but still heals/provisions the other gate.
         create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
+        sync_test_settlements(CAPITAL_MAP_IDS)
         south_gate = self._south_gate()
         create_object(WildernessGateExit, key="荒野", location=south_gate, destination=south_gate)
         create_object(WildernessGateExit, key="荒野二", location=south_gate, destination=south_gate)
-        sync_wilderness()
+        sync_test_wilderness(CAPITAL_MAP_IDS)
         self.assertEqual(len(self._gate_exits(south_gate)[1]), 2)
         # The unaffected east gate provisions to exactly one exit.
         self.assertEqual(len(self._gate_exits()[1]), 1)
@@ -979,8 +1040,8 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         from typeclasses.exits import Exit
 
         create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
-        sync_wilderness()
+        sync_test_settlements(CAPITAL_MAP_IDS)
+        sync_test_wilderness(CAPITAL_MAP_IDS)
         # Plant a plain Exit that occupies the gate key.
         east_gate = self._east_gate()
         create_object(
@@ -989,7 +1050,7 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
             location=east_gate,
             destination=east_gate,
         )
-        sync_wilderness()
+        sync_test_wilderness(CAPITAL_MAP_IDS)
         script, gates = self._gate_exits()
         self.assertEqual(len(gates), 1)
         self.assertEqual(gates[0].db.anchor_key, "capital_altoria")
@@ -1032,6 +1093,64 @@ def _synthetic_graph(start_coordinate, north_coordinate):
             "typeclass": "typeclasses.exits.CostedXYZExit",
         },
     )
+
+
+def _synthetic_graph_for(map_id, start_coordinate, north_coordinate):
+    """One invented sparse graph in its own map coordinate space."""
+
+    from elosern_map_core.sparse import SparseRoad, SparseSettlementGraph
+
+    return SparseSettlementGraph(
+        map_id,
+        [
+            _synthetic_node("start", start_coordinate, f"測試{map_id}起點"),
+            _synthetic_node("north", north_coordinate, f"測試{map_id}北端"),
+        ],
+        [
+            SparseRoad("start>north", "start", "north"),
+            SparseRoad("north>start", "north", "start"),
+        ],
+        exit_prototype={
+            "prototype_parent": "xyz_exit",
+            "typeclass": "typeclasses.exits.CostedXYZExit",
+        },
+    )
+
+
+class _SynchronizerSpy:
+    """Record which graphs reach the real planner and writer, keeping them real."""
+
+    def __enter__(self):
+        from world.maps import bootstrap
+
+        self._bootstrap = bootstrap
+        self._real_plan = bootstrap._plan_settlement_graph
+        self._real_apply = bootstrap._apply_graph_plan
+        self.planned = []
+        self.applied = []
+
+        def plan(graph):
+            self.planned.append(graph.map_id)
+            return self._real_plan(graph)
+
+        def apply(plan, knowledge_journal=None):
+            self.applied.append(plan.graph.map_id)
+            return self._real_apply(plan, knowledge_journal)
+
+        self._plan_patch = patch.object(
+            bootstrap, "_plan_settlement_graph", side_effect=plan
+        )
+        self._apply_patch = patch.object(
+            bootstrap, "_apply_graph_plan", side_effect=apply
+        )
+        self._plan_patch.start()
+        self._apply_patch.start()
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        self._apply_patch.stop()
+        self._plan_patch.stop()
+        return False
 
 
 class SparseSettlementSyncTests(EvenniaTest):
@@ -1173,7 +1292,7 @@ class SparseSettlementSyncTests(EvenniaTest):
         from evennia.contrib.grid.xyzgrid.xyzroom import XYZExit
         from world.maps.map_data import current
 
-        sync_grid()
+        sync_test_settlements(CAPITAL_MAP_IDS)
         self.assertEqual(
             GridRoom.objects.filter_xyz(xyz=("*", "*", "capital_altoria")).count(),
             len(current().settlements["capital_altoria"].nodes),
@@ -1309,10 +1428,14 @@ class MetricCutoverTests(EvenniaTest):
             },
         )
 
-        report = sync_grid()
+        report = sync_test_settlements(CAPITAL_VILLAGE_MAP_IDS)
 
-        self.assertEqual(self._count_grid_rooms(), _declared_node_count())
-        self.assertEqual(self._count_city_exits(), _declared_road_count())
+        self.assertEqual(
+            self._count_grid_rooms(), _declared_node_count(CAPITAL_VILLAGE_MAP_IDS)
+        )
+        self.assertEqual(
+            self._count_city_exits(), _declared_road_count(CAPITAL_VILLAGE_MAP_IDS)
+        )
         self.assertGreater(report.updated + report.created, 0)
         moved = self._object(plaza_id)
         self.assertEqual(
@@ -1346,7 +1469,7 @@ class MetricCutoverTests(EvenniaTest):
             for map_id, nodes in ids.items()
             for node_id, pk in nodes.items()
         }
-        second = sync_grid()
+        second = sync_test_settlements(CAPITAL_VILLAGE_MAP_IDS)
         self.assertEqual(second, SyncReport())
         self.assertEqual(
             before,
@@ -1399,7 +1522,7 @@ class MetricCutoverTests(EvenniaTest):
 
         with patch.object(knowledge, "_write_knowledge", side_effect=fail_second):
             with self.assertRaises(RuntimeError):
-                sync_grid()
+                sync_test_settlements(CAPITAL_VILLAGE_MAP_IDS)
 
         self.assertEqual(self._object(south_id).xyz, old_xyz)
         self.assertEqual(
@@ -1454,7 +1577,7 @@ class MetricCutoverTests(EvenniaTest):
             knowledge, "_write_knowledge", side_effect=fail_second_settlement
         ):
             with self.assertRaises(RuntimeError):
-                sync_grid()
+                sync_test_settlements(CAPITAL_VILLAGE_MAP_IDS)
 
         self.assertEqual(observer.attributes.get(KNOWLEDGE_ATTR), original)
 
@@ -1481,12 +1604,16 @@ class MetricCutoverTests(EvenniaTest):
         }
         grid.save()
 
-        sync_grid()
+        sync_test_settlements(CAPITAL_VILLAGE_MAP_IDS)
 
         self.assertNotIn("capital_altoria", grid.db.map_data)
         self.assertIn("synthetic_keep", grid.db.map_data)
-        self.assertEqual(self._count_grid_rooms(), _declared_node_count())
-        self.assertEqual(self._count_city_exits(), _declared_road_count())
+        self.assertEqual(
+            self._count_grid_rooms(), _declared_node_count(CAPITAL_VILLAGE_MAP_IDS)
+        )
+        self.assertEqual(
+            self._count_city_exits(), _declared_road_count(CAPITAL_VILLAGE_MAP_IDS)
+        )
 
     @covers_requirement(
         "grid-room-sync::sync-grid-runs-automatically-at-server-start-after-sync-all"
@@ -1521,9 +1648,12 @@ class MetricCutoverTests(EvenniaTest):
             },
         )
 
-        at_server_start()
+        with selected_startup_settlements(CAPITAL_VILLAGE_MAP_IDS):
+            at_server_start()
 
-        self.assertEqual(self._count_grid_rooms(), _declared_node_count())
+        self.assertEqual(
+            self._count_grid_rooms(), _declared_node_count(CAPITAL_VILLAGE_MAP_IDS)
+        )
         self.assertEqual(self._object(plaza_id).sparse_node_id, "central_plaza")
         self.assertEqual(
             observer.attributes.get(KNOWLEDGE_ATTR)["visited"],
@@ -1562,3 +1692,562 @@ class MetricCutoverTests(EvenniaTest):
                         for exit_obj in interior[0].exits
                     )
                 )
+
+
+#: Invented map identities for the selection evidence. None of these exist in
+#: the authored world; the tests patch only the synchronizer's graph registry.
+ALPHA = "t_selected_alpha"
+BETA = "t_selected_beta"
+GAMMA = "t_selected_gamma"
+DELTA = "t_selected_delta"
+
+
+def _synthetic_registry(*graphs):
+    return {graph.map_id: graph for graph in graphs}
+
+
+class SelectedSettlementSyncTests(EvenniaTest):
+    """Explicit settlement selection through the real planner and writer."""
+
+    def _rooms(self, map_id):
+        return list(GridRoom.objects.filter_xyz(xyz=("*", "*", map_id)))
+
+    def _room(self, xyz):
+        return GridRoom.objects.filter_xyz(xyz=xyz).first()
+
+    def _alpha(self, start=(1, 1), north=(1, 2)):
+        return _synthetic_graph_for(ALPHA, start, north)
+
+    def _beta(self, start=(1, 1), north=(1, 2)):
+        return _synthetic_graph_for(BETA, start, north)
+
+    @covers_requirement(
+        "grid-room-sync::explicit-settlement-selection-bounds-test-synchronization"
+    )
+    def test_selected_work_is_bounded_and_unrelated_growth_adds_nothing(self):
+        alpha = self._alpha()
+        beta = self._beta()
+        with (
+            patch(
+                "world.maps.bootstrap.SETTLEMENT_GRAPHS",
+                _synthetic_registry(alpha, beta),
+            ),
+            _SynchronizerSpy() as spy,
+        ):
+            report = sync_test_settlements((ALPHA,))
+
+        self.assertEqual(spy.planned, [ALPHA])
+        self.assertEqual(spy.applied, [ALPHA])
+        self.assertGreater(report.created, 0)
+        self.assertEqual(len(self._rooms(ALPHA)), 2)
+        self.assertEqual(self._rooms(BETA), [])
+        alpha_ids = {room.xyz: room.id for room in self._rooms(ALPHA)}
+
+        gamma = _synthetic_graph_for(GAMMA, (7, 7), (7, 8))
+        delta = _synthetic_graph_for(DELTA, (9, 9), (9, 10))
+        with (
+            patch(
+                "world.maps.bootstrap.SETTLEMENT_GRAPHS",
+                _synthetic_registry(alpha, beta, gamma, delta),
+            ),
+            _SynchronizerSpy() as spy,
+        ):
+            repeat = sync_test_settlements((ALPHA,))
+
+        self.assertEqual(spy.planned, [ALPHA])
+        self.assertEqual(spy.applied, [ALPHA])
+        self.assertEqual(repeat, SyncReport())
+        self.assertEqual(
+            {room.xyz: room.id for room in self._rooms(ALPHA)}, alpha_ids
+        )
+        self.assertEqual(self._rooms(GAMMA), [])
+        self.assertEqual(self._rooms(DELTA), [])
+
+    @covers_requirement(
+        "grid-room-sync::explicit-settlement-selection-bounds-test-synchronization"
+    )
+    def test_unknown_and_malformed_selections_reject_before_planning(self):
+        alpha = self._alpha()
+        registry = _synthetic_registry(alpha)
+        with patch("world.maps.bootstrap.SETTLEMENT_GRAPHS", registry):
+            sync_test_settlements((ALPHA,))
+            before_rooms = {
+                (room.id, tuple(room.xyz)) for room in GridRoom.objects.all_family()
+            }
+            before_exits = {exit_obj.id for exit_obj in Exit.objects.all()}
+            before_tags = set(
+                self._room((1, 1, ALPHA)).tags.all()
+            )
+
+            with _SynchronizerSpy() as spy:
+                with self.assertRaises(KeyError) as unknown:
+                    sync_test_settlements((ALPHA, "t_missing_map"))
+                self.assertIn("t_missing_map", str(unknown.exception))
+                for malformed in ("t_selected_alpha", (ALPHA, 7)):
+                    with self.assertRaises(TypeError):
+                        sync_test_settlements(malformed)
+
+            self.assertEqual(spy.planned, [])
+            self.assertEqual(spy.applied, [])
+
+        self.assertEqual(
+            {(room.id, tuple(room.xyz)) for room in GridRoom.objects.all_family()},
+            before_rooms,
+        )
+        self.assertEqual({exit_obj.id for exit_obj in Exit.objects.all()}, before_exits)
+        self.assertEqual(set(self._room((1, 1, ALPHA)).tags.all()), before_tags)
+
+    @covers_requirement(
+        "grid-room-sync::explicit-settlement-selection-bounds-test-synchronization"
+    )
+    def test_selection_is_deduplicated_sorted_and_one_shot(self):
+        alpha = self._alpha()
+        beta = self._beta()
+        with (
+            patch(
+                "world.maps.bootstrap.SETTLEMENT_GRAPHS",
+                _synthetic_registry(alpha, beta),
+            ),
+            _SynchronizerSpy() as spy,
+        ):
+            one_shot = (map_id for map_id in (BETA, ALPHA, BETA))
+            sync_test_settlements(one_shot)
+
+        self.assertEqual(spy.planned, [ALPHA, BETA])
+        self.assertEqual(spy.applied, [ALPHA, BETA])
+        self.assertEqual(len(self._rooms(ALPHA)), 2)
+        self.assertEqual(len(self._rooms(BETA)), 2)
+
+    @covers_requirement(
+        "grid-room-sync::explicit-settlement-selection-bounds-test-synchronization"
+    )
+    def test_explicit_empty_selection_performs_no_persistent_work(self):
+        from evennia.contrib.grid.wilderness.wilderness import WildernessScript
+        from evennia.contrib.grid.xyzgrid.xyzgrid import XYZGrid
+
+        limbo = create_object(Room, key=LIMBO_KEY, location=None)
+        unrelated = create_object(Room, key="測試無關房", location=None)
+        reverse = create_object(
+            Exit, key="測試回虛境", location=unrelated, destination=limbo
+        )
+        grid, errors = XYZGrid.create("XYZGrid")
+        self.assertFalse(errors, errors)
+        grid.db.map_data = {
+            ALPHA: {
+                "zcoord": ALPHA,
+                "map": "+ 0\n0 #\n+ 0\n",
+                "prototypes": {},
+            }
+        }
+        grid.save()
+
+        sync_test_settlements(())
+        sync_test_wilderness(())
+
+        self.assertEqual(GridRoom.objects.all_family().count(), 0)
+        self.assertEqual(list(limbo.exits), [])
+        self.assertTrue(Exit.objects.filter(id=reverse.id).exists())
+        self.assertIn(ALPHA, grid.db.map_data)
+        self.assertEqual(
+            WildernessScript.objects.filter(db_key=WILDERNESS_NAME).count(), 0
+        )
+
+    @covers_requirement(
+        "grid-room-sync::explicit-settlement-selection-bounds-test-synchronization"
+    )
+    def test_selected_batch_failure_rolls_back_both_settlements(self):
+        from typeclasses.characters import PlayerCharacter
+        from typeclasses.npcs import NPC
+        from world.maps import bootstrap
+        from world.rules.map_knowledge import KNOWLEDGE_ATTR
+
+        baseline_alpha = self._alpha()
+        baseline_beta = self._beta()
+        with patch(
+            "world.maps.bootstrap.SETTLEMENT_GRAPHS",
+            _synthetic_registry(baseline_alpha, baseline_beta),
+        ):
+            sync_test_settlements((ALPHA, BETA))
+
+        alpha_room = self._room((1, 1, ALPHA))
+        beta_room = self._room((1, 1, BETA))
+        alpha_room_id = alpha_room.id
+        beta_room_id = beta_room.id
+        occupant = create_object(NPC, key="測試居民", location=alpha_room)
+        native = create_object(PlayerCharacter, key="測試歸鄉者", location=alpha_room)
+        native.home = alpha_room
+        native.save()
+        external = create_object(Room, key="測試外部", location=None)
+        inbound = create_object(
+            Exit, key="測試入境", location=external, destination=alpha_room
+        )
+        original_knowledge = {
+            "schema_version": 2,
+            "visited": {
+                f"grid:{ALPHA}:1:1": {
+                    "first_seen_tick": 5,
+                    "last_seen_tick": 9,
+                }
+            },
+            "wilderness": {},
+        }
+        native.attributes.add(KNOWLEDGE_ATTR, original_knowledge)
+
+        moved_alpha = self._alpha(start=(2, 1), north=(2, 2))
+        moved_beta = self._beta(start=(2, 1), north=(2, 2))
+        real_apply = bootstrap._apply_graph_plan
+
+        def fail_on_second(plan, knowledge_journal=None):
+            if plan.graph.map_id == BETA:
+                raise RuntimeError("injected late write fault")
+            return real_apply(plan, knowledge_journal)
+
+        with (
+            patch(
+                "world.maps.bootstrap.SETTLEMENT_GRAPHS",
+                _synthetic_registry(moved_alpha, moved_beta),
+            ),
+            patch.object(
+                bootstrap, "_apply_graph_plan", side_effect=fail_on_second
+            ),
+        ):
+            with self.assertRaises(RuntimeError):
+                sync_test_settlements((ALPHA, BETA))
+
+        self.assertEqual(self._object(alpha_room_id).xyz, (1, 1, ALPHA))
+        self.assertEqual(self._object(beta_room_id).xyz, (1, 1, BETA))
+        self.assertEqual(occupant.db_location_id, alpha_room_id)
+        self.assertEqual(native.db_location_id, alpha_room_id)
+        self.assertEqual(native.db_home_id, alpha_room_id)
+        self.assertEqual(inbound.db_destination_id, alpha_room_id)
+        self.assertEqual(
+            native.attributes.get(KNOWLEDGE_ATTR), original_knowledge
+        )
+
+    def _object(self, pk):
+        from evennia.objects.models import ObjectDB
+
+        return ObjectDB.objects.get(pk=pk)
+
+    @covers_requirement(
+        "grid-room-sync::explicit-settlement-selection-bounds-test-synchronization"
+    )
+    def test_ancillary_work_respects_the_selection_and_global_prune_stays(self):
+        from evennia.contrib.grid.xyzgrid.xyzgrid import XYZGrid
+        from world.maps import bootstrap
+        from world.maps.room_art import GRID_NODE_SCENE_ARCHETYPES
+
+        capital = CAPITAL_MAP_IDS[0]
+        village = VILLAGE_MAP_IDS[0]
+        limbo = create_object(Room, key=LIMBO_KEY, location=None)
+        sync_test_settlements(CAPITAL_VILLAGE_MAP_IDS)
+
+        capital_row = next(
+            row for row in CITY_GATE_REGISTRY.values() if row.gate.map_id == capital
+        )
+        village_row = next(
+            row for row in CITY_GATE_REGISTRY.values() if row.gate.map_id == village
+        )
+        capital_forward = next(
+            exit_obj for exit_obj in limbo.exits if exit_obj.key == capital_row.exit_key
+        )
+        village_forward = next(
+            exit_obj for exit_obj in limbo.exits if exit_obj.key == village_row.exit_key
+        )
+        capital_forward.key = "drifted capital"
+        capital_forward.save()
+        village_forward.key = "drifted village"
+        village_forward.save()
+
+        capital_reference, capital_scene = next(
+            (reference, scene)
+            for reference, scene in GRID_NODE_SCENE_ARCHETYPES.items()
+            if reference.map_id == capital
+        )
+        village_reference, village_scene = next(
+            (reference, scene)
+            for reference, scene in GRID_NODE_SCENE_ARCHETYPES.items()
+            if reference.map_id == village
+        )
+        capital_art_room = self._room(
+            (*settlement_node_xyz(capital_reference),)
+        )
+        village_art_room = self._room(
+            (*settlement_node_xyz(village_reference),)
+        )
+        capital_art_room.scene_archetype = "drifted capital art"
+        capital_art_room.save()
+        village_art_room.scene_archetype = "drifted village art"
+        village_art_room.save()
+        village_art_room.db.desc = "drifted village prose"
+        village_art_room.save()
+        village_exit = list(village_art_room.exits)[0]
+        village_exit.key = "drifted village road"
+        village_exit.save()
+
+        grid, errors = XYZGrid.create("XYZGrid")
+        self.assertFalse(errors, errors)
+        grid.db.map_data = {
+            capital: {
+                "zcoord": capital,
+                "map": "+ 0\n0 #\n+ 0\n",
+                "prototypes": {},
+            },
+            village: {
+                "zcoord": village,
+                "map": "+ 0\n0 #\n+ 0\n",
+                "prototypes": {},
+            },
+        }
+        grid.save()
+
+        reverse = create_object(
+            Exit, key="測試村回虛境", location=village_art_room, destination=limbo
+        )
+        reverse_id = reverse.id
+        unmaterialized = CityGateDef(
+            gate=settlement_node_ref(village, "hidden_path"),
+            exit_key="測試未佈建門",
+            exit_aliases=("未佈建",),
+        )
+        rebound = dict(CITY_GATE_REGISTRY)
+        rebound["unmaterialized"] = unmaterialized
+        real_resolve = settlement_node_xyz
+
+        def resolve(reference, **kwargs):
+            if reference == unmaterialized.gate:
+                return (999, 999, village)
+            return real_resolve(reference, **kwargs)
+
+        with (
+            patch("world.maps.bootstrap.CITY_GATE_REGISTRY", rebound),
+            patch("world.maps.bootstrap.settlement_node_xyz", side_effect=resolve),
+            patch("world.maps.bootstrap.log_warn") as warn,
+            patch("world.maps.bootstrap.log_info") as info,
+        ):
+            sync_test_settlements(CAPITAL_MAP_IDS)
+
+        missing = [
+            call
+            for call in warn.call_args_list
+            if call.args and call.args[0] == "bootstrap_grid_gate_missing"
+        ]
+        self.assertEqual(missing, [])
+        self.assertNotIn(capital, grid.db.map_data)
+        self.assertIn(village, grid.db.map_data)
+        self.assertEqual(capital_art_room.scene_archetype, capital_scene)
+        self.assertEqual(village_art_room.scene_archetype, "drifted village art")
+        self.assertEqual(village_art_room.db.desc, "drifted village prose")
+        self.assertEqual(village_exit.key, "drifted village road")
+        self.assertTrue(Exit.objects.filter(id=village_forward.id).exists())
+        self.assertEqual(
+            Exit.objects.get(id=village_forward.id).key, "drifted village"
+        )
+        self.assertEqual(
+            next(
+                exit_obj.key
+                for exit_obj in limbo.exits
+                if exit_obj.destination == capital_forward.destination
+            ),
+            capital_row.exit_key,
+        )
+        self.assertFalse(Exit.objects.filter(id=reverse_id).exists())
+        prunes = [
+            call
+            for call in info.call_args_list
+            if call.args and call.args[0] == "bootstrap_grid_exit_pruned"
+        ]
+        self.assertEqual(len(prunes), 1)
+        self.assertEqual(prunes[0].kwargs["context"]["source_room_key"], village_art_room.key)
+
+    @covers_requirement(
+        "grid-room-sync::sync-grid-is-distinct-from-sync-all-and-instantiates-real-rooms-and-exits"
+    )
+    def test_default_selection_materializes_every_graph_and_runtime_stays_selector_free(self):
+        from world.maps import bootstrap, runtime
+
+        alpha = self._alpha()
+        beta = self._beta()
+        with (
+            patch(
+                "world.maps.bootstrap.SETTLEMENT_GRAPHS",
+                _synthetic_registry(alpha, beta),
+            ),
+            _SynchronizerSpy() as spy,
+        ):
+            sync_grid()
+
+        self.assertEqual(spy.planned, [ALPHA, BETA])
+        self.assertEqual(spy.applied, [ALPHA, BETA])
+        self.assertEqual(len(self._rooms(ALPHA)), 2)
+        self.assertEqual(len(self._rooms(BETA)), 2)
+
+        with (
+            patch.object(bootstrap, "sync_limbo"),
+            patch.object(bootstrap, "sync_grid") as grid_call,
+            patch.object(bootstrap, "sync_interiors"),
+            patch.object(runtime, "ensure_published", return_value=object()),
+            patch.object(runtime, "commit_adoption"),
+        ):
+            runtime.synchronize()
+        grid_call.assert_called_once_with()
+
+    @covers_requirement(
+        "grid-room-sync::sync-grid-is-distinct-from-sync-all-and-instantiates-real-rooms-and-exits"
+    )
+    def test_cold_process_default_sync_publishes_before_reading_the_registry(self):
+        from world.maps import runtime
+
+        runtime.clear_published_world()
+        self.addCleanup(runtime.ensure_published)
+        alpha = self._alpha()
+        with patch(
+            "world.maps.bootstrap.SETTLEMENT_GRAPHS",
+            _synthetic_registry(alpha),
+        ):
+            sync_grid()
+        self.assertTrue(runtime.is_published())
+        self.assertEqual(len(self._rooms(ALPHA)), 2)
+
+    @covers_requirement(
+        "grid-room-sync::explicit-settlement-selection-bounds-test-synchronization"
+    )
+    def test_wilderness_selection_uses_destination_map_identity(self):
+        from evennia.contrib.grid.wilderness.wilderness import WildernessScript
+        from world.lore.wilderness_entry import WildernessEntryPoint, WildernessGate
+        from world.maps import bootstrap
+
+        alpha = self._alpha()
+        beta = self._beta()
+        entries = {
+            "t_anchor_alpha": WildernessEntryPoint(
+                anchor_key="t_anchor_alpha",
+                shape=("#",),
+                origin_xy=(500, 500),
+                gates=(
+                    WildernessGate("w", settlement_node_ref(ALPHA, "start")),
+                ),
+            ),
+            "t_anchor_beta": WildernessEntryPoint(
+                anchor_key="t_anchor_beta",
+                shape=("#",),
+                origin_xy=(700, 700),
+                gates=(
+                    WildernessGate("w", settlement_node_ref(BETA, "start")),
+                ),
+            ),
+        }
+        graphs = _synthetic_registry(alpha, beta)
+        coordinates = {
+            ALPHA: settlement_node_ref(ALPHA, "start"),
+            BETA: settlement_node_ref(BETA, "start"),
+        }
+
+        def resolve(reference, **kwargs):
+            if reference in coordinates.values():
+                graph = alpha if reference.map_id == ALPHA else beta
+                x, y = graph.node("start").coordinate
+                return (x, y, reference.map_id)
+            from world.maps.static_references import settlement_node_xyz as real
+
+            return real(reference, **kwargs)
+
+        with (
+            patch("world.maps.bootstrap.SETTLEMENT_GRAPHS", graphs),
+            patch("world.maps.bootstrap.WILDERNESS_ENTRY_REGISTRY", entries),
+            patch("world.maps.bootstrap.settlement_node_xyz", side_effect=resolve),
+        ):
+            sync_test_settlements((ALPHA, BETA))
+            sync_test_wilderness((ALPHA,))
+
+            alpha_gate = self._room((1, 1, ALPHA))
+            alpha_exits = [
+                exit_obj
+                for exit_obj in alpha_gate.exits
+                if isinstance(exit_obj, WildernessGateExit)
+            ]
+            self.assertEqual(len(alpha_exits), 1)
+            self.assertEqual(alpha_exits[0].db.anchor_key, "t_anchor_alpha")
+            self.assertEqual(
+                [
+                    exit_obj
+                    for exit_obj in self._room((1, 1, BETA)).exits
+                    if isinstance(exit_obj, WildernessGateExit)
+                ],
+                [],
+            )
+
+            sync_wilderness()
+            for map_id in (ALPHA, BETA):
+                gate_room = self._room((1, 1, map_id))
+                self.assertEqual(
+                    len(
+                        [
+                            exit_obj
+                            for exit_obj in gate_room.exits
+                            if isinstance(exit_obj, WildernessGateExit)
+                        ]
+                    ),
+                    1,
+                )
+        self.assertEqual(
+            WildernessScript.objects.filter(db_key=WILDERNESS_NAME).count(), 1
+        )
+        self.assertIs(
+            bootstrap.WILDERNESS_ENTRY_REGISTRY, WILDERNESS_ENTRY_REGISTRY
+        )
+
+    @covers_requirement(
+        "grid-room-sync::explicit-settlement-selection-bounds-test-synchronization"
+    )
+    def test_adapter_forwards_a_frozen_declaration_and_restores_bindings(self):
+        from world.maps import bootstrap
+
+        alpha = self._alpha()
+        beta = self._beta()
+        real_grid = bootstrap.sync_grid
+        real_wilderness = bootstrap.sync_wilderness
+        with patch(
+            "world.maps.bootstrap.SETTLEMENT_GRAPHS",
+            _synthetic_registry(alpha, beta),
+        ):
+            with selected_startup_settlements(
+                map_id for map_id in (BETA, ALPHA, BETA)
+            ):
+                with _SynchronizerSpy() as spy:
+                    bootstrap.sync_grid()
+                bootstrap.sync_wilderness()
+        self.assertEqual(spy.planned, [ALPHA, BETA])
+        self.assertEqual(spy.applied, [ALPHA, BETA])
+        self.assertIs(bootstrap.sync_grid, real_grid)
+        self.assertIs(bootstrap.sync_wilderness, real_wilderness)
+
+        try:
+            with selected_startup_settlements((next(iter(SETTLEMENT_GRAPHS)),)):
+                raise RuntimeError("injected startup failure")
+        except RuntimeError:
+            pass
+        self.assertIs(bootstrap.sync_grid, real_grid)
+        self.assertIs(bootstrap.sync_wilderness, real_wilderness)
+
+    @covers_requirement(
+        "grid-room-sync::explicit-settlement-selection-bounds-test-synchronization"
+    )
+    def test_adapter_requires_an_argument_and_preserves_the_published_bundle(self):
+        from world.maps import runtime
+
+        with self.assertRaises(TypeError):
+            sync_test_settlements()
+        with self.assertRaises(TypeError):
+            sync_test_wilderness()
+        with self.assertRaises(TypeError):
+            selected_startup_settlements()
+
+        before = runtime.current()
+        alpha = self._alpha()
+        with patch(
+            "world.maps.bootstrap.SETTLEMENT_GRAPHS",
+            _synthetic_registry(alpha),
+        ):
+            sync_test_settlements((ALPHA,))
+        self.assertIs(runtime.current(), before)

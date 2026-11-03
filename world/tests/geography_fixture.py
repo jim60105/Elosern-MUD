@@ -14,6 +14,14 @@ materialized world runs the map synchronization itself.
 
 from __future__ import annotations
 
+from contextlib import ExitStack, contextmanager
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator
+
+    from world.maps.bootstrap import SyncReport
+
 
 def publish_shipped_map_world():
     """Adopt the repository's authored map world when nothing is published."""
@@ -132,6 +140,72 @@ def publish_shipped_interiors():
     return interiors.current()
 
 
+def sync_test_settlements(settlement_ids: Iterable[str]) -> SyncReport:
+    """Materialize exactly the declared settlements through the real synchronizer.
+
+    The declaration is frozen once so a one-shot iterable reaches the
+    synchronizer as a stable tuple. Publication of the complete map world is
+    still required; only the persistent convergence is bounded.
+    """
+
+    from world.maps.bootstrap import sync_grid
+
+    if isinstance(settlement_ids, str):
+        raise TypeError("settlement_ids must be an iterable of map ids, not a string")
+    ids = tuple(settlement_ids)
+    publish_shipped_map_world()
+    return sync_grid(settlement_ids=ids)
+
+
+def sync_test_wilderness(settlement_ids: Iterable[str]) -> None:
+    """Provision wilderness gates for exactly the declared settlements."""
+
+    from world.maps.bootstrap import sync_wilderness
+
+    if isinstance(settlement_ids, str):
+        raise TypeError("settlement_ids must be an iterable of map ids, not a string")
+    ids = tuple(settlement_ids)
+    publish_shipped_map_world()
+    sync_wilderness(settlement_ids=ids)
+
+
+@contextmanager
+def selected_startup_settlements(settlement_ids: Iterable[str]) -> Iterator[None]:
+    """Run real startup code with the two synchronizers bound to one declaration.
+
+    The real ``bootstrap.sync_grid``/``sync_wilderness`` bindings are captured
+    before replacement, so startup still executes the production planner,
+    writer and rollback journal with the fixed selection. Only those two
+    bindings are patched; both are restored on every exit path.
+    """
+
+    from unittest.mock import patch
+
+    from world.maps import bootstrap
+
+    if isinstance(settlement_ids, str):
+        raise TypeError("settlement_ids must be an iterable of map ids, not a string")
+    ids = tuple(settlement_ids)
+    # Publish and validate/freeze the declaration before anything is patched.
+    publish_shipped_map_world()
+    bootstrap._selected_settlement_graphs(ids)
+    real_sync_grid = bootstrap.sync_grid
+    real_sync_wilderness = bootstrap.sync_wilderness
+
+    def startup_sync_grid(*args, **kwargs):
+        return real_sync_grid(*args, settlement_ids=ids, **kwargs)
+
+    def startup_sync_wilderness(*args, **kwargs):
+        return real_sync_wilderness(*args, settlement_ids=ids, **kwargs)
+
+    with ExitStack() as stack:
+        stack.enter_context(patch.object(bootstrap, "sync_grid", startup_sync_grid))
+        stack.enter_context(
+            patch.object(bootstrap, "sync_wilderness", startup_sync_wilderness)
+        )
+        yield
+
+
 class GeographyPublicationMixin:
     """Publish the shipped map world once per test class.
 
@@ -152,6 +226,9 @@ __all__ = [
     "publish_geography",
     "publish_interiors",
     "restore_published_map_world",
+    "selected_startup_settlements",
+    "sync_test_settlements",
+    "sync_test_wilderness",
     "publish_shipped_districts",
     "publish_shipped_geography",
     "publish_shipped_interiors",

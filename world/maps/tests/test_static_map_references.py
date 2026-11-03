@@ -37,7 +37,6 @@ from world.lore.map_districts import landmark_node_id, landmark_node_ids
 from world.lore.settlements.places import PlaceDefinition, PlaceKind
 from world.maps import map_data
 from world.maps.bootstrap import (
-    sync_grid,
     sync_interiors,
     sync_settlement_graph,
 )
@@ -53,7 +52,10 @@ from world.maps.static_references import (
 )
 from world.rules.map_district_lighting import lit_district_keys
 from world.rules.map_knowledge import KNOWLEDGE_ATTR, encode_grid, parse_knowledge
-from world.tests.geography_fixture import publish_shipped_map_world
+from world.tests.geography_fixture import (
+    publish_shipped_map_world,
+    sync_test_settlements,
+)
 from world.tests.interior_fixture import (
     build_synthetic_interiors,
     interior_document,
@@ -486,7 +488,7 @@ class IntegratedMovedNodeTests(EvenniaTest):
         )
 
         with self._apply(_graph(10, 10), place, district):
-            sync_grid()
+            sync_test_settlements((MAP,))
             sync_interiors()
             anchor = GridRoom.objects.filter_xyz(xyz=(10, 10, MAP)).first()
             shop = GridRoom.objects.filter_xyz(xyz=(20, 10, MAP)).first()
@@ -513,7 +515,7 @@ class IntegratedMovedNodeTests(EvenniaTest):
 
             moved = _graph(40, 40)
             with self._apply(moved, place, district):
-                sync_grid()
+                sync_test_settlements((MAP,))
                 sync_interiors()
                 # The declarations never changed; every consumer followed the
                 # same stable node to its new binding.
