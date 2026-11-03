@@ -147,6 +147,38 @@ Candidate-wide `runtime.synchronize()` calls in the two adoption modules remain 
 
 For any companion `sync_wilderness()` in the migrated fixture, pass the same declared map IDs through `sync_test_wilderness`, preserving the real wilderness implementation. No browser file is changed. No new module is required; if a worker introduces or renames one, register its exact module label in `.github/evennia-shards.json` in the same commit.
 
+### 3a. Whole-roster materialization assertions keep their claims
+
+Six existing assertions require a persistent object for every published registry row. A bounded declaration would falsify them, so each is classified before implementation; none may be filtered down to match a smaller fixture.
+
+| Site | What it requires | Disposition |
+|---|---|---|
+| `world/maps/tests/test_bootstrap.py:209-215` anchor placements | a materialized `AnchorRoom` at every `ANCHOR_PLACEMENT_REGISTRY` entrance | whole-roster contract: declare `tuple(ANCHOR_PLACEMENT_REGISTRY[....map_id])` and keep the loop complete |
+| `…/test_bootstrap.py:415-420` Limbo exit set equals registry rows | one Limbo exit per `CITY_GATE_REGISTRY` row | whole-roster contract: declare the registry's map ids |
+| `…/test_bootstrap.py:435-440` forward exit per registry row | one forward bridge per `CITY_GATE_REGISTRY` row | whole-roster contract: same declaration |
+| `…/test_bootstrap.py:677-683` and `718-724` wilderness gate counts | gate-exit count equals the sum over every published settlement's `wilderness_entry.gates` | whole-roster contract for the count; a second single-map case covers the selection mechanics |
+| `world/maps/tests/test_room_art_metadata.py:85-89` authored grid node metadata | a room for every `GRID_NODE_SCENE_ARCHETYPES` key | move to the synthetic multi-map fixture with invented keys, preserving both assertions; keep one shipped row only if a data-contract role needs it |
+| `world/maps/tests/test_city_movement_cost.py:70-72` exit count per graph | the costed-exit count equals `sum(len(graph.edges))` over `SETTLEMENT_GRAPHS` | move to the synthetic multi-map fixture with invented graphs and independently known road counts |
+
+Rules:
+
+- A test whose subject is whole-roster convergence keeps a full-roster declaration and is listed in the module as a documented exception. Its declaration is derived from the registry it already reads, never from a copied id list.
+- A test that uses the roster only as a convenient source of many rows moves to a complete synthetic multi-map fixture whose expected effects are independently known.
+- No expectation, loop bound or count may be edited down merely to match a smaller fixture. That is assertion weakening and a blocking review finding.
+- `_declared_node_count` and `_declared_road_count` extend to every derived count the migrated fixtures assert — bridge, placement, wilderness-gate and art expectations included — so each count follows the declared scope instead of a module constant.
+
+### 3b. Indirect execution surface
+
+`runtime.synchronize()` calls `bootstrap.sync_grid()` with no selector (`world/maps/runtime.py:551-554`), and `at_server_start()` drives it. Three tests therefore execute full-grid work without a direct call, and the direct-call census does not reach them:
+
+| Site | Execution boundary | Classification |
+|---|---|---|
+| `world/maps/tests/test_limbo_room.py:144-150` | real `runtime.synchronize()` behind a recording wrapper | selected orchestration: enter `selected_startup_settlements(required_map_ids)` first, then install the recording wrapper over the adapted binding so the ordering observation and the selection both hold |
+| `world/maps/tests/test_limbo_room.py:160-169` | real `at_server_start()` | selected orchestration: the test's subject is Limbo convergence, not roster materialization |
+| `world/maps/tests/test_instance_stage_wiring.py:75-80` | real `at_server_start()` for reclamation registration | selected orchestration: declare only the maps this test touches |
+
+These three files join the permitted edit surface. Any other caller found by the implementation census is classified the same way — selected orchestration, intentional full-world evidence, or a case that never reaches the writer — and recorded before editing, not silently left full-roster.
+
 ### 4. Discoverable evidence, without timing gates
 
 Add `SelectedSettlementSyncTests` to existing registered `world/maps/tests/test_bootstrap.py`. Reuse its `_synthetic_graph` construction pattern with invented map IDs, node identities and explicit roads. Publish complete readable fixture views through existing publication helpers and restore them with `addCleanup`; keep static-reference validation real. Where a synthetic graph is inserted into the bootstrap graph mapping for a default-roster test, preserve the original world's valid static-reference bindings and never assert that a partial snapshot is an adopted world.
@@ -154,15 +186,21 @@ Add `SelectedSettlementSyncTests` to existing registered `world/maps/tests/test_
 The tests establish the following observable outcomes:
 
 1. Selected A materializes, B does not, and spies wrapping the real planner/writer see only A. Add unrelated synthetic C/D and repeat; planner/writer membership remains A. Check persistent A rooms/roads, stable dbids and empty second report, not just mocks.
-2. Request A plus an unknown ID; planner/writer calls remain empty and room/exit/tag state is unchanged. Repeated IDs apply A once. Explicit empty selection creates no rooms, art writes, forward bridges, script or reverse prune. A one-shot iterable has the same effect as its tuple.
+2. Request A plus an unknown ID; planner/writer calls remain empty and room/exit/tag state is unchanged. Repeated IDs apply A once. Explicit empty selection creates no rooms, art writes, forward bridges, script or reverse prune. A one-shot iterable has the same effect as its tuple. A bare string and a non-string member are rejected before planning. Deterministic order is established separately: declare a one-shot iterable holding two distinct synthetic ids in reverse order with duplicates and assert the ordered real planner and apply call sequence is map-id sorted, so deduplication that preserved input order would fail.
 3. After two selected maps are seeded, change A and inject failure in B's real apply path. Both database and cached coordinates, occupant/home/inbound reference and knowledge state retain the baseline. Reuse the existing sparse rollback assertions and knowledge-journal patterns.
-4. Seed unselected B room/road/art/display/forward-bridge drift, then select A. B's ordinary managed state remains unchanged and no unselected-gate missing warning is emitted. Separately seed a reverse B-to-Limbo exit and verify global pruning still removes it, preserving the existing invariant.
+4. Seed drift on both sides: selected A's art, legacy display registration and forward bridge, and unselected B's rooms, roads, art, display and forward bridge. Select A and assert A converges while B keeps every drifted value; include a state where an unselected destination has no gate materialized and assert no missing-gate warning is emitted. Separately seed a reverse B-to-Limbo exit and verify global pruning still removes it, preserving the existing invariant. Omitting the ancillary pass entirely must fail this case.
 5. Call no-argument `sync_grid()` against a small synthetic graph registry and verify every graph materializes through the same real planner/writer. Verify the unchanged production `runtime.synchronize()` invokes `sync_grid()` without a selector, and use existing startup boundary tests for orchestration. Do not run the startup adapter in this evidence case.
 6. Select a synthetic wilderness gate whose anchor/registry key differs from `destination.map_id`; the selected destination is provisioned, the unselected one is untouched, and production no-argument provisioning still visits every declared gate.
 
 Place fixture-adapter tests in `SelectedSettlementSyncTests` in the existing bootstrap module. Assert required-argument behavior, preservation of the published bundle, forwarding of a frozen declaration and binding restoration after injected startup failure. The production synchronizer tests above execute real writers; adapter wiring tests may spy/mock their boundary calls.
 
-Obtain new canonical IDs from `tools.spec_traceability list` on an equivalent main-spec tree containing the delta. Before archive, temporarily map the new behavior tests to the existing `grid-room-sync` real-room requirement according to the traceability guide, then rebind to the tool-derived new ID when main specs are synchronized. Do not guess an ID or use a waiver. Existing requirement annotations remain on tests whose assertions still establish their claims.
+Obtain new canonical IDs from `tools.spec_traceability list` on an equivalent main-spec tree containing the delta. Do not guess an ID or use a waiver. Existing requirement annotations remain on tests whose assertions still establish their claims.
+
+Annotation mapping before synchronization is per test, recorded in `tasks.md` with its rationale, and never blanket:
+
+- selected-materialization, selection-isolation, ancillary-symmetry, ordering and rollback tests annotate the current requirement whose body they substantively establish where one fits (for example the real-room requirement only when the test asserts real room and exit materialization through the planner and writer);
+- adapter wiring tests that mock boundary calls stay unannotated until the new ID exists, because they establish the mechanism's forwarding, not materialization;
+- unknown-selection rejection and empty-selection tests annotate the new delta requirement after synchronization, and are left without an annotation before it — a syntactically valid but substantively false association is the failure this rule exists to prevent.
 
 ## Rejected Alternatives
 
@@ -173,6 +211,8 @@ Obtain new canonical IDs from `tools.spec_traceability list` on an equivalent ma
 | Publish a partial map world | It breaks complete bundle and cross-domain reference contracts, including permanent interiors and external service/quest joins. |
 | Loop over `sync_settlement_graph` in a test helper | It omits grid art/bridges and loses one transaction plus all-plans-before-write across selected maps. |
 | Patch `SETTLEMENT_GRAPHS` down to two shipped maps for the whole suite | Other readers still see complete-world references and consumer bindings; a hidden global override conceals dependencies and can leak between classes. |
+| Narrow the whole-roster assertions to the smaller declaration | It rewrites a complete-registry claim into a partial claim to make a fixture fit; the test would stop detecting an omitted settlement. Decision 3a keeps those claims whole or moves them to a complete synthetic fixture. |
+| Leave the indirect `runtime.synchronize()` and `at_server_start()` tests full-roster | They still apply all 60 graphs in ordinary non-browser tests, so the measured cost stays in the suite. Decision 3b classifies and converts them. |
 | Add selector parameters/environment configuration to production startup/runtime | Test setup should declare its inputs without introducing a production partial-startup mode. |
 | More workers, timing assertions or a special test writer | They do not remove unrelated convergence; timing assertions are contrary to the approved batch decision, and a second writer loses production-path evidence. |
 

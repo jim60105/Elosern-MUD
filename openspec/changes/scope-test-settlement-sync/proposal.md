@@ -8,8 +8,8 @@ The approved settlement-synthesis batch requires this follow-up once `world.maps
 
 - Add an explicit settlement selector to the existing grid synchronizer and its wilderness gate companion. Omitted selection retains full production convergence. Selection changes the inputs to the existing read-only planning and transactional writing implementation, with no second writer.
 - Add test helpers requiring a declaration of map IDs. Keep complete immutable map-world publication and authoritative reference validation intact. Add a narrowly scoped startup-test adapter that invokes the real synchronizers with those declarations and restores its patches on every exit.
-- Cut over non-browser settlement consumers to declared selections, including class fixtures and the startup calls in `test_bootstrap`. World-adoption contract cases explicitly declare their full candidate because candidate-wide synchronization is their subject. Browser seeds and production entry points keep their full-world behavior.
-- Add synthetic behavior tests for selected work, rollback, omitted selection and isolation. Compare planner/writer call membership as unrelated graphs are added; do not add a timing gate or pin authored data.
+- Cut over non-browser settlement consumers to declared selections, including class fixtures and the startup calls in `test_bootstrap`. World-adoption contract cases explicitly declare their full candidate because candidate-wide synchronization is their subject. Tests whose subject is whole-roster convergence keep a documented full-roster declaration instead of being narrowed, and the tests that reach the synchronizer through `runtime.synchronize()` or `at_server_start()` move under the startup adapter. Browser seeds and production entry points keep their full-world behavior.
+- Add synthetic behavior tests for selected work, rollback, omitted selection, deterministic order and two-sided isolation. Compare planner/writer call membership as unrelated graphs are added; do not add a timing gate or pin authored data.
 - Update the existing development testing guide with the declaration contract and measured diagnosis. No migrations, compatibility shims, dependency changes or authored-map edits.
 
 ## Capabilities
@@ -24,7 +24,7 @@ None.
 
 ## Impact
 
-Implementation touches `world/maps/bootstrap.py`, `world/tests/geography_fixture.py`, the non-browser callers enumerated in `design.md`, existing test modules for behavioral evidence and `docs/development/evennia-testing-guide.md`. `world/maps/runtime.py::synchronize` and production startup remain selector-free and continue to call the complete synchronizer. New or renamed non-browser test modules, if needed, must be registered in `.github/evennia-shards.json`; reusing existing registered modules is preferred.
+Implementation touches `world/maps/bootstrap.py`, `world/tests/geography_fixture.py`, the non-browser callers enumerated in `design.md` — direct callers, the indirect startup/runtime boundary and the two whole-roster assertion modules — existing test modules for behavioral evidence and `docs/development/evennia-testing-guide.md`. `world/maps/runtime.py::synchronize` and production startup remain selector-free and continue to call the complete synchronizer. New or renamed non-browser test modules, if needed, must be registered in `.github/evennia-shards.json`; reusing existing registered modules is preferred.
 
 The target is about one engineer-day, including the mechanical caller cutover. Scope is bounded to settlement synchronization inputs and fixture declarations; it excludes a new publication cache, test-runner redesign, interior subset selection and timing-based CI enforcement. Existing gates remain mandatory: `tools.contract_gate`, `tools.observability_lint check`, `tools.test_data_lint check` and `tools.spec_traceability check`.
 
@@ -48,4 +48,4 @@ Code-conflict notes: `unpin-settlement-map-data` overlaps bootstrap and movement
 
 ## Requirement Shape
 
-One added mechanism requirement covers explicit selection, rejection and the default full-roster behavior. Its evidence uses synthetic graphs and observed persistent effects or selected planner/writer calls. Runtime targets, human-reviewed prose quality and a wall-clock speed threshold are not new requirements. Existing production requirement names and canonical IDs remain unchanged; new annotations must use tool-derived IDs as described in `tasks.md`.
+One added mechanism requirement covers explicit selection, rejection and the default full-roster behavior. Its evidence uses synthetic graphs and observed persistent effects or selected planner/writer calls. Runtime targets, human-reviewed prose quality and a wall-clock speed threshold are not new requirements. Existing production requirement names and canonical IDs remain unchanged; pre-synchronization annotations follow the per-test rule in `design.md` (materialization evidence only where the test asserts real materialization), and new annotations use tool-derived IDs as described in `tasks.md`.

@@ -18,7 +18,7 @@ Without an explicit settlement selection, grid synchronization SHALL instantiate
 ## ADDED Requirements
 
 ### Requirement: Explicit settlement selection bounds test synchronization
-Explicitly selected settlement synchronization SHALL use the shared validated planning and transactional writing path for the declared maps, reject unknown selections before mutation, and leave unselected managed settlement state unchanged except for the existing global reverse-starting-room exit prune.
+Explicitly selected settlement synchronization SHALL use the shared validated planning and transactional writing path for the declared maps, reject unknown or malformed selections before mutation, and leave unselected managed settlement state unchanged except for the existing global reverse-starting-room exit prune.
 
 #### Scenario: Unrelated roster growth does not add selected graph work
 - **GIVEN** synthetic settlements A and B and a test declaration selecting A
@@ -28,9 +28,15 @@ Explicitly selected settlement synchronization SHALL use the shared validated pl
 - **AND** B and the added graphs gain no rooms, roads or forward starting-room bridges
 
 #### Scenario: Selection is explicit and deterministic
-- **WHEN** a test declares a one-shot iterable containing repeated valid settlement IDs
+- **GIVEN** synthetic settlements A and B declared in a one-shot iterable in reverse order and with duplicates
+- **WHEN** selected grid synchronization runs
 - **THEN** each selected graph is planned and applied once in deterministic map-ID order
 - **AND** the published complete map-world bundle is unchanged
+
+#### Scenario: Malformed selection rejects before planning
+- **WHEN** a declaration is a bare string or contains a non-string member
+- **THEN** it is rejected as malformed before any planner or persistent writer runs
+- **AND** rooms, exits, tags and cached coordinates retain their prior state
 
 #### Scenario: Unknown selection rejects atomically
 - **WHEN** a declaration contains both a valid map and an unknown map
@@ -47,9 +53,10 @@ Explicitly selected settlement synchronization SHALL use the shared validated pl
 - **THEN** the entire selected batch rolls back durable and cached coordinates, occupant locations, homes, inbound references and knowledge state
 
 #### Scenario: Ancillary settlement work respects the selection
-- **GIVEN** selected A and materialized unselected B with drifted ordinary managed state
+- **GIVEN** selected A and materialized unselected B, each carrying drifted ordinary managed state on its art, legacy display registration and forward starting-room bridge
 - **WHEN** selected synchronization runs
 - **THEN** only selected maps receive art convergence, legacy display cleanup, forward starting-room bridges and wilderness gate provisioning
+- **AND** A's drifted ancillary state converges
 - **AND** B's rooms, directed roads, art, display registration and forward bridge remain unchanged
 - **AND** omitted maps produce no missing-gate warning merely because they were not materialized
 
