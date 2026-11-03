@@ -395,7 +395,7 @@ class MapEditorGeographyBrowserTest(unittest.TestCase):
             return float(x), float(y)
 
         def at_saved_position():
-            if page.locator('[data-draft="true"]').count():
+            if page.locator(north).get_attribute("data-draft") is not None:
                 return False
             a = screen(f'[data-qualified-ref="location:{synthetic.LOCATION_ID}"]')
             b = screen(f'[data-qualified-ref="location:{synthetic.BARE_LOCATION_ID}"]')
