@@ -1,7 +1,7 @@
 # Regional Monster Population and Encounter Configuration
 
 **Date:** 2026-11-03  
-**Status:** Design sections approved in conversation; written-spec review required before implementation planning.  
+**Status:** Design sections and this written specification reviewed. The nine proposals in §14 are committed as `proposed`, none is applied, and implementation requires separate authorization.  
 **Scope:** The first of three approved monster-world redesigns. This document approves behavior and ownership, not an implementation or individual new species.
 
 ## 1. Approved project decomposition
@@ -183,7 +183,7 @@ Use the existing `world.observability` facade with named imports. Committed popu
 
 ## 11. Specification and consumer impact
 
-This design does not edit current main specifications. The implementation plan must use the repository OpenSpec workflow, with individually executable changes and explicit dependencies for the identity prerequisite, population owner, and consumer cutover. The existing active change `scope-test-settlement-sync` is outside this design's edit scope.
+This design does not edit current main specifications. The OpenSpec proposals in §14 carry the individually executable changes and their explicit dependencies; applying any of them requires separate authorization. The existing active change `scope-test-settlement-sync` is outside this design's edit scope.
 
 Amend or replace the relevant contracts in `wilderness-monster-population`, `monster-site-placement`, `field-combat-initiation`, `player-combat-session`, `quest-blueprint`, `quest-lifecycle`, `guild-quest-board`, and affected population-view, travel, and map capabilities. Update the approved monster data model's former acceptance-time supply guarantee through explicit design amendment when that behavior is implemented. Do not leave contradictory guarantees in authoritative documentation.
 
@@ -216,3 +216,31 @@ Implementation smoke must exercise real construction, placement, map/view consum
 ## 13. Written-spec review gate
 
 All five design sections were approved in conversation. This written document must be committed and explicitly reviewed by the user before invoking `writing-plans`. That transition creates a plan for this first subproject only. Neither design approval nor plan creation authorizes feature implementation.
+
+## 14. Proposal set and parallel implementation batches
+
+Nine OpenSpec changes implement this design, each change is independently executable and sized to one workday, all nine are `proposed`, and none is applied.
+
+| Change | Scope | Depends on | Batch |
+| --- | --- | --- | --- |
+| A. `combat-individual-identity` | Persistent individual identity, same-name participants, and every affected combat consumer. | None | 1 |
+| B. `whole-cell-field-engagement` | Encounter enemy roster separated from the opening effect recipients. | A | 2 |
+| C. `regional-ecology-authoring` | Bounded sparse habitats, complete compositions, settlement birth exclusion, and integer density validation. | None | 1 |
+| D. `regional-population-owner` | Persistent seed, individual and home-owned caps, atomic births, and explicit placement registration. | C | 2 |
+| E. `regional-population-recovery` | Delayed recovery, historical events, combat protection, and site/zone timing coordination. | D, A, F | 4 |
+| F. `manual-monster-compositions` | Explicit mixed and group compositions, site member identity, and lifecycle. | C, D, B | 3 |
+| G. `regional-hunt-supply-cutover` | Removal of acceptance-time provisioning and single-cell supply, with truthful habitat guidance retained. | C, F | 4 |
+| H. `actual-live-population-view` | Projection of only actual living individuals across map, travel, and GM reads. | D | 3 |
+| I. `regional-population-runtime-cutover` | Activation of the new flow, deletion of legacy generation paths and the capital guarantee, and integration evidence. | B, E, F, G, H | 5 |
+
+Batches run serially, and the changes inside one batch run in parallel.
+
+- **Batch 1, A and C.** There is no prior batch and neither change has a prerequisite. Their surfaces are disjoint, combat core against lore authoring, so neither reads another's edits.
+- **Batch 2, B and D.** Each waits for its single batch 1 prerequisite, A and C respectively. B edits combat session admission while D edits the population owner, so the two changes keep separate files.
+- **Batch 3, F and H.** F requires C, D, and B, two of them from batch 2; H requires only D. H precedes G in a later batch so G's presentation expectations apply last.
+- **Batch 4, E and G.** E requires F from batch 3 together with A and D; G requires C and F. E edits recovery timing while G edits hunt acceptance and habitat presentation, and both need F's composition ownership in place.
+- **Batch 5, I.** The cutover requires B, E, F, G, and H, so it cannot start before batch 4 closes, and it takes exclusive ownership of placement, bootstrap, and startup while it lands. No other change may edit those paths in parallel.
+
+Serialization follows shared ownership. A and B both edit `combat_session` and `combat_initiation`, with A first. B and E both edit `combat_session/rounds.py`, with B first through F. C, D, and I share `world/lore/monster_placement.py`, with C first and I last. D and E extend the same owner module, with D first. F and G share site and clear-out tests, so F lands first. G owns `map_quest_destinations` and habitat-marker presentation, which makes H precede G and leaves G's presentation expectations authoritative. Shared shard manifests and command documentation serialize in the same batch order.
+
+Wandering, monster-initiated combat, enemy escape relocation, player retreat relocation, new weak species, and high-tier boss content are outside this design and outside these batches. [The field-behaviour design](2026-11-03-monster-field-behaviour-and-escape-design.md) owns movement, aggression, and escape. [The content-expansion design](2026-11-03-monster-content-expansion-design.md) owns new weak-species and boss definitions. Those items enter implementation only through their own approval, except where a table entry above names a prerequisite.
