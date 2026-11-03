@@ -101,6 +101,8 @@ Require `0 < lower_density <= upper_density < 100`. Thus automatic population ca
 
 Count living monster individuals inside the zone, including ambient, manual, site, and quest individuals, against available ordinary birth headroom. One group of five contributes five. A separate per-cell check counts all living occupants at the candidate birth cell. An explicit placement can exceed either ordinary limit; such excess blocks further ordinary births and never authorizes removal of living entities.
 
+The approved [field-behaviour design](2026-11-03-monster-field-behaviour-and-escape-design.md) adds an independent home-owned ceiling. Every living ordinary individual owned by this zone counts against its upper bound even when outside the zone, detached from a group, or in transit. A birth must fit both local-density headroom and home-owned headroom. Visitors count locally without changing ownership; departure alone never frees a home-owned slot or justifies unlimited replacements. Neither count double-counts an individual within its own measure.
+
 The upper bound is an automatic-birth ceiling. Falling below the lower bound requests recovery. Reaching the lower bound ends that recovery episode; a final complete composition may place the population anywhere up to the upper bound. Do not require an exact population that forces group splitting or arbitrary deletion.
 
 Authoring validation must establish that legal complete compositions can recover an otherwise unobstructed zone to its density interval. Headroom, wave budget, and cell capacity must permit a composition when below the lower bound. If a composition does not fit the remaining headroom, select among legal fitting outcomes; do not truncate it below its declared count minima.
@@ -113,7 +115,7 @@ At a due time, recompute the living population first. If it has already reached 
 
 Use the game-time occurrence of a combat loss, including its recorded round offset, rather than backdating it to the pre-combat clock tick. Earlier rounds must not accidentally satisfy a delay for a monster defeated in a later round. Births cannot enter an active combat cell, replace session participants, or append enemies to an already persisted encounter.
 
-If terrain, manual occupancy, session protection, or another lawful constraint leaves no birth candidate, create nothing and retry at the next replenishment interval. Do not put creatures outside the zone, against a wall, or over capacity to satisfy a target. Recovery is eventual when lawful space is available and the player is not continuing to deplete the population.
+If terrain, manual occupancy, session protection, the home-owned ceiling, or another lawful constraint leaves no birth candidate, create nothing and retry at the next replenishment interval. Do not put creatures outside the zone, against a wall, or over capacity to satisfy a target. Recovery is eventual when lawful space and home-owned headroom are available and the player is not continuing to deplete the population. Returning living members can also restore local density; their absence does not authorize bypassing the home-owned ceiling.
 
 World time advances only through existing player-driven clock mechanisms. Long advances process due waves chronologically under the same rollback boundary; splitting an equal time interval across calls must not change the result when all other events and state are equal. No wall-clock worker runs the population.
 
@@ -124,6 +126,8 @@ Persist initialized state, the seed used by population selection, generation seq
 Initial world population is a one-time owner operation using the same placement and density constraints. It records initialization with the created individuals. Restart, source reread, room preparation, and player arrival must not repeat initial filling. In a world initialized under this contract, existing valid individuals retain identity, consumed resources, and state; this does not promise conversion of an older coordinate-slot save.
 
 Each ordinary individual carries its home ecology-zone ownership separately from its current coordinate. No identity or ownership marker encodes a cell as a permanent generation slot. Wilderness registration remains authoritative when no room is materialized; activation only attaches existing individuals.
+
+When field movement is enabled, a journey temporarily replaces cell presence without ending home ownership. A detached or travelling individual is not a defeated individual, and clearing its former cell does not establish a bound site's clear-out condition.
 
 Retire unsupported ambient-example creation and its source contracts. No automatic broad save reset, online data migration, or backward-compatible slot reader is approved. Never delete or reinterpret foreign-owned entities during the cutover. Existing development data requiring repair must use the project's explicit GM repair/reset procedures rather than hidden startup mutation.
 
