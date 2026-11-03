@@ -41,11 +41,13 @@ Ground rules:
 
   Check: every `brief` shows no empty description and no duplicate key.
   All 18 briefs show `desc_empty: true` before the pass, as generated. 174 nodes carry prose afterwards, every description non-empty and every key unique within its map; keys are 2-8 characters and no description names the settlement more than once.
+  The post-implementation review then found three prose defect classes the lint cannot see: six gates naming a destination whose bearing does not fit, four crossing descriptions placing water immediately outside a gate whose authored ford is two to four cells away, and six training grounds replacing the canonical magical-beast coming-of-age hunt with another qualifying rite (plus one town described as an island). Twenty nodes were corrected through `prose` in commit `9b6e137a`, reusing the existing keys, so no generated coordinate or authored gate direction changed.
 
 ## 3. Verification
 
 - [x] 3.1 Regenerate the partition, then run `check_map_sources.py`. Check: exit 0, and partition, elevation and reference context are all current.
   `check_map_sources.py` exited 0 with "district partition: current", "wilderness elevation: current", "reference context: current", 0 cross-file problems and 15 advisories (the 14 inherited plus `town_stag_ferry`'s generated footprint offset).
+  The partition was regenerated again after the prose corrections (`9b6e137a`), and the same check repeated clean; `test_editor_final_yaml_adoption` (4), `test_static_map_references`, `test_settlements`, `test_map_district_content` and `test_sparse_graph` were then rerun on that final tree (70 tests, OK).
 - [x] 3.2 Rerun `world.maps.tests.test_bootstrap`. Check: record `X_after` for the D3 hand-off. The timing never blocks the commit.
   `Ran 50 tests in 1868.346s`, OK, on the final tree.
 - [x] 3.3 Run every module in `docs/development/settlement-synthesis.md` § Settlement-sensitive test modules, one per command. Check: all pass. Handle a failure with that doc section's "Residual pin rule", and list every rewritten test in the hand-off. Any other failure stops the change without a commit.
