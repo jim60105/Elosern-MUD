@@ -1,8 +1,15 @@
 # Spec Delta
 
-## MODIFIED Requirements
+## REMOVED Requirements
 
 ### Requirement: accept_quest creates one deterministic active record
+**Reason**: Regional acceptance supply guarantees are deliberately retired; preserved issuance, escort, binding, deadline and atomicity scenarios remain in the replacement contract.
+
+**Migration**: Cut all callers and substantively matching test annotations to the replacement contract using tool-generated canonical IDs; retain no legacy behavior, alias or data migration.
+
+## ADDED Requirements
+
+### Requirement: Quest acceptance persists validated records without ordinary provisioning
 Acceptance SHALL validate issuance, lawful hunt sources and exact standing site or escort bindings, then atomically persist deterministic quest metadata and owned binding, membership and knowledge effects without ordinary target provisioning.
 
 #### Scenario: Acceptance returns the committed bound record

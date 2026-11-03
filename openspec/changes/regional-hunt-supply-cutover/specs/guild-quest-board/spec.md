@@ -61,7 +61,7 @@ The guild layer SHALL NOT construct, mutate, or reinterpret quest-record dicts i
 - **WHEN** an offered quest is abandoned through the guild layer
 - **THEN** no affinity is granted
 
-#### Scenario: A bound clear-out refusal is surfaced by name with nothing left behind
+#### Scenario: An unsatisfiable hunt refusal is surfaced by name with nothing left behind
 - **WHEN** `accept_quest()` refuses an offer because a bound clear-out's site cannot supply its standing bound individuals
 - **THEN** the board path surfaces that named refusal as an ordinary rejection: no quest record, no affinity gain, and no partial provisioning, population, or binding left behind
 
@@ -72,4 +72,8 @@ The guild layer SHALL NOT construct, mutate, or reinterpret quest-record dicts i
 #### Scenario: Regional shortage is not a board refusal
 - **WHEN** a rank-eligible member accepts a valid source-backed regional hunt at zero living supply
 - **THEN** the quest and normal affinity gain commit without creating targets, changing population state or hiding habitat guidance
+
+#### Scenario: A legally unsatisfiable hunt offer is refused cleanly
+- **WHEN** acceptance validation encounters an invalid regional selector with no lawful authored source
+- **THEN** the named definition/source refusal leaves no quest record, affinity gain or population write; a valid source with too few living targets still accepts
 

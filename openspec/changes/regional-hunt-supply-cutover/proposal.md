@@ -31,6 +31,7 @@ Planning only for `docs/superpowers/specs/2026-11-03-regional-monster-population
 ## Batch:
 
 depends-on: regional-ecology-authoring
+depends-on: manual-monster-compositions
 
 Code conflicts:
 - manual-monster-compositions changes site declarations and acceptance tests; these slices share clear-out tests and must serialize shared edits.
