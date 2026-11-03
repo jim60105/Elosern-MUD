@@ -357,7 +357,7 @@ makespan 200 秒、top-level 分片 170 秒。這讓兩種池都能落在 6 分�
 preflight 後的驗收：`map-editor` 自成一個工作（105 秒，遠低於 6 分鐘預算），
 而所有分片都在等的 `preflight` 由 122 秒縮到 58 秒。
 
-### 2026-11-03：逐格幾何成本與每測試世界收斂，37 → 42 個 Evennia 分片
+### 2026-11-03：逐格幾何成本與每測試世界收斂，37 → 43 個 Evennia 分片
 
 CI run 41605121589 的 37 個 evennia 分片工作有 8 個超過 6 分鐘（其餘皆在
 360 秒內，最接近者為 shard 9 的 357 秒）：
@@ -417,7 +417,7 @@ CI run 41605121589 的 37 個 evennia 分片工作有 8 個超過 6 分鐘（其
 |---|---|---|
 | `maps-28` | `maps-28` / `maps-29` / `maps-30` | `altoria_capital`+輕量 bootstrap ／ 新增 `test_bootstrap_sync`（四個整世界 class）／ `city_*`+`editor_final_yaml_adoption`；`geography_source`…`interior_sources` 移到 `maps-31` |
 | `maps-30` | `maps-33` / `maps-34` | `monster_provisioning`…`room_art_metadata` ／ `runtime_adoption` |
-| `webclient-38`（舊 `webclient-35`） | `webclient-39` / `webclient-40` | `test_area_map` ／ 其餘 15 個 presentation 模組 |
+| `webclient-38`（舊 `webclient-35`） | `webclient-39` / `webclient-40` / `webclient-41` | `test_area_map` ／ 三個 `test_world_map*` ／ 其餘 12 個 presentation 模組 |
 | 其餘 | 內容不變 | 僅重新編號 |
 
 本機驗收（24 核心參考機，`--parallel 4`，`--keepdb`）：
@@ -447,12 +447,19 @@ CI run 41605121589 的 37 個 evennia 分片工作有 8 個超過 6 分鐘（其
 | `maps-28` | 435 s | 405 s | `test_bootstrap` 內四個「整世界」class 因 discovery 順序被排在同一批 worker，出現序列化 |
 | `webclient-38`（舊 `webclient-35`） | 385 s | 355 s | `test_area_map` 與 15 個 presentation 模組共用一個 job |
 
-因此再切兩刀：把 `test_bootstrap` 的整世界 class 抽成獨立模組
+因此再切：把 `test_bootstrap` 的整世界 class 抽成獨立模組
 `world/maps/tests/test_bootstrap_sync.py`（共用的推導常數與 cooperative base
 放進不參與 discovery 的 `_bootstrap_fixtures` 模組），讓四個 45 秒級 class 在
 同一個 job 的四個 worker 上並行；再把 `webclient-38` 切成 `test_area_map`
-單獨一個分片與其餘 15 個模組一個分片。最終 42 個分片，仍是「只切不混」；
-`test_bootstrap_sync` 的本機 wall 為 20 tests 46.3 秒（最慢 44.2 秒）。
+單獨一個分片與其餘 15 個模組一個分片。`test_bootstrap_sync` 的本機 wall 為
+20 tests 46.3 秒（最慢 44.2 秒）。
+
+第二次推送（run 41673963246，42 個分片）全綠，只剩 `webclient-40`（15 個
+presentation 模組）449 秒；同一輪的 `maps-35` 352 秒、`webclient-38` 340 秒
+都在預算內。該 15 個模組的本機 wall 只有約 90 秒，其中三個 `test_world_map*`
+模組單獨執行就要 58.7 秒（22 tests；主要是每個 class 的 shipped geography
+publication 與 Node 子行程），因此把它們單獨切成 `webclient-40`，其餘 12 個
+模組為 `webclient-41`。最終 43 個分片，仍是「只切不混」。
 
 editor 的完整世界契約維持不變：兩個 moved-node method 仍各自在完整世界上
 做一次真實收斂（本機 4 tests 78.6 秒），不靠縮小 fixture 換時間。
