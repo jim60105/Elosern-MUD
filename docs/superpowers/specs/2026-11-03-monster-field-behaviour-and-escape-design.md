@@ -100,6 +100,8 @@ At the same tick, apply lawful completed arrivals and committed births before co
 
 Active combat participants do not wander. Other groups cannot begin a route into a cell occupied by an active encounter; arrivals revalidate protection rather than adding reinforcements. An arrival blocked by a newly active encounter waits in its journey without becoming present in that cell, then revalidates at a later positive activity interval. It remains alive and home-owned throughout the wait.
 
+Waiting after the priced route completes does not charge that route again. Settle the wait under the creature's applicable ordinary posture/activity policy, preserving its original journey identity and actual elapsed progress.
+
 Deferred combat-time settlement must carry the relevant historical encounter-protection intervals and each flee/departure occurrence time. Closing the session before clock catch-up must not permit creatures to wander retroactively into its battlefield during earlier combat rounds. A legitimate escaped individual's own protection ends at its departure time.
 
 ### 5.3 Interactive boundaries
@@ -127,6 +129,8 @@ Designated guild examinations and explicitly staged non-field encounters retain 
 A hostile interruption ends voluntary sleep through the existing sleep owner and receipt transition, retaining the actual recovered reserve. It does not refill reserve or silently retain a completed sleep continuation.
 
 Forced sleep keeps its wake threshold and receipt. Do not wake a forced sleeper merely to satisfy encounter admission. Awake companions can act under existing control rules. If nobody in the party can act but the ordinary combat outcome is not terminal, execute enemy-only rounds through the normal resolver and clock/physiology path until a party member can act or the battle ends. Sleep alone is not an automatic defeat or a protection from hostile actions.
+
+These are separately accounted combat rounds after the interrupted interval ends. They do not consume the unused remainder of the original wait or sleep request, and automatic continuation stops as soon as a party member can act.
 
 This hostile-admission authority is distinct from a sleeping player's attempt to initiate voluntary combat. It must not weaken existing voluntary-action or movement sleep gates.
 
@@ -164,11 +168,15 @@ Retain current movement-cost waivers only when the normal execution travel rules
 
 If a legal affordable route exists, retain the current agility contest against the fastest eligible pursuer, using the slowest eligible allied actor. No pursuer still removes the dice contest, but does not make an impossible or unaffordable route succeed. No actionable ally retains the existing no-acting-ally terminal policy for a requested retreat.
 
+When no lawful adjacent route exists, use the same ordinary failed-attempt branch as insufficient reserve; this is not a free confirmation cancellation. A corrupt route or physiology record remains an operational refusal/error rather than being disguised as this legitimate gameplay failure.
+
 An ordinary failure consumes one existing combat round and executes the existing enemy-only failure actions. The party stays entirely at its original logical position. Add no traversal time or movement-reserve charge. Do not roll and report success before discovering that the route cannot be paid.
 
 A success consumes one attempt round, marks the complete departing party out of the old encounter, and completes the selected normal traversal. Charge the attempt round once and the normal movement plan once, including its distance, terrain, fatigue, and authorized waivers. Do not combine the new traversal charge with an unchanged second copy of the old terminal clock charge.
 
 The old encounter's exit, confirmation receipt, movement, party following/carry-out, clock settlement, and final arrival history share one atomic durable operation. The party may not be marked fled with a committed source position, or moved with a still-active old session. Old combat participants are excluded from that encounter's regeneration exactly as under existing retreat; successful departure does not grant free healing or revival.
+
+The subsequent paid traversal receives its normal elapsed-time physiology and gauge settlement. Do not extend the combat-round regeneration exclusion over that whole traversal or invent a separate escape-time heal. Any recovery during actual travel follows the existing owners' rules.
 
 Guild-exam retreat still records examination failure. Use a lawful actual retreat edge from the examination location; never invent a wilderness position. Preserve existing examination opponent cleanup and receipt authority.
 
@@ -221,7 +229,7 @@ Update command documentation when movement, retreat availability, or encounter c
 | Previous location | Pooled-room recycling, possession, gate crossings, failed movement, teleport, and reload cannot redirect retreat to an unrelated earlier location. |
 | Reserve boundaries | Insufficient post-attempt reserve fails without relocation; a sufficient alternative neighbor can replace an unaffordable previous edge; exact arrival depletion succeeds and applies its real posture. |
 | Failed retreat | One failure round and normal enemy actions occur, with no traversal time, movement payment, or partial party movement. |
-| Successful retreat | One attempt round plus the exact normal traversal cost is committed once; knocked-out companions arrive with the party, without healing or receiving an invented walking state. |
+| Successful retreat | One attempt round plus the exact normal traversal cost is committed once; knocked-out companions arrive with the party without an exit-time heal or invented walking state. Actual travel physiology follows its ordinary rules. |
 | Individual flee | A real monster departs its old battle and later arrives at a legal neighbor with preserved identity/resources; remaining enemies continue their original encounter. |
 | Re-engagement | The player reaches a fled monster and can initiate again; an aggressive arrival after party retreat can immediately create a new encounter with no immunity bypass needed. |
 | Failure and replay | Inject failure after actual departure, physiology, or session writes; reload and live caches restore the source state. Retry/replay creates no duplicate journey, payment, group split, or session. |
