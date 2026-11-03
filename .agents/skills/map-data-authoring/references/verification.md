@@ -304,7 +304,8 @@ preferences. `--hide` removes a layer for this one image only.
 | `continent` | `terrain` | mainland, terrain/passability raster, forest edge |
 | `continent` | `water` | waterways |
 | `continent` | `ridge` | ridge walls, passes, fords |
-| `continent` | `locations` | locations, reserved harbour sites and district landmarks |
+| `continent` | `locations` | locations and reserved harbour sites |
+| `continent` | `landmarks` | district landmark marks |
 | `continent` | `footprint` | settlement wilderness footprints |
 | `continent` | `partition` | derived national boundaries and district outlines |
 | `settlement` | `nodes` | street nodes, including gate glyphs |

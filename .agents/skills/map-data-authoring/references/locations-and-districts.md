@@ -187,7 +187,9 @@ district delete command. Removing a district is a deliberate hand edit: ask
 first, then regenerate the partition.
 
 Every district landmark with a continental position is drawn as a diamond on
-the continent canvas (地點 layer); clicking it selects the district. Only a
+the continent canvas, on the 地標 layer. That layer is hidden by default
+because the labels crowd the whole-continent view, so turn 地標 on to see or
+drag landmarks; clicking one selects the district. Only a
 `wilderness_cell` landmark drags. The release saves one `set_district_field`
 command with `field: landmark` and the full four-key value
 `{domain: wilderness_cell, map_id: null, object_id: null, cell: [x, y]}`, which

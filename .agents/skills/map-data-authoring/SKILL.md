@@ -211,7 +211,7 @@ uv run --locked --no-sync --project tools/map-editor --group capture python \
 ```
 
 Every layer is on unless you pass `--hide` (`terrain`, `water`, `ridge`,
-`locations`, `footprint`, `partition`, `labels` for the continent; `nodes`,
+`locations`, `landmarks`, `footprint`, `partition`, `labels` for the continent; `nodes`,
 `roads`, `labels` for a settlement; `rooms`, `connections`, `exterior`,
 `labels` for an interior). `--bounds` is in that view's own frame — kilometres,
 authored metres, or layout units — and `--format png` is available when your
@@ -334,8 +334,9 @@ These are short recipes. Each reference file has the details.
   or leave a river port dry. Regenerate the partition and the elevation.
 - **Add or move a district.** Edit `districts.yaml`. The landmark is a
   qualified reference, never a coordinate, unless its domain is
-  `wilderness_cell`. In the editor, a `wilderness_cell` landmark is the gold
-  diamond on the continent canvas (地點 layer); dragging it is one
+  `wilderness_cell`. In the editor, turn on the 地標 layer (hidden by
+  default) to see landmarks: a `wilderness_cell` landmark is the gold
+  diamond on the continent canvas, and dragging it is one
   `set_district_field` landmark command that writes only `districts.yaml`.
   Referenced landmarks (hollow diamond) follow their referent and do not
   drag. Afterwards run the check, run `place_sites.py --landmarks --min-km 100`

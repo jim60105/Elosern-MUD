@@ -3,11 +3,15 @@
 ## ADDED Requirements
 
 ### Requirement: District landmark positions are placed on the continent canvas
-The editor SHALL project each district landmark's authored cell as a pair and its referent-derived continental centre, draw a district-selecting mark at that centre, and save a drag of a wilderness-cell landmark as exactly one owner-only landmark command; a landmark that references another object SHALL follow its referent and not be draggable.
+The editor SHALL project each district landmark's authored cell as a pair and its referent-derived continental centre, draw a district-selecting mark at that centre on a dedicated landmark layer that is hidden by default, and save a drag of a wilderness-cell landmark as exactly one owner-only landmark command; a landmark that references another object SHALL follow its referent and not be draggable.
 
 #### Scenario: Landmark projection resolves through its referent
 - **WHEN** the workspace projection is read for districts whose landmarks are a wilderness cell, a location, a settlement node with a resolvable frame, and an interior room
 - **THEN** each row's landmark cell is an `[x, y]` pair or null, and its centre is the wilderness cell's centre, the location cell's centre, the node's world position, and null respectively
+
+#### Scenario: Landmark layer is hidden by default
+- **WHEN** the continent canvas opens and the author then shows or hides the landmark layer
+- **THEN** no landmark mark is drawn until the landmark layer is shown, toggling it shows or hides only landmark marks, and a district selected through its mark stays selected while its district list entry remains visible
 
 #### Scenario: Wilderness landmark drag writes one district command
 - **WHEN** a wilderness-cell landmark mark is dragged on the continent and released on a different non-negative cell
