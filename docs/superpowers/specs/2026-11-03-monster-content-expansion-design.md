@@ -144,7 +144,7 @@ The parent species remains `tide_devouring_crocodile`, including its approved cl
 
 **Public appearance**
 
-> 厚實肩背披著粗硬鬃毛，短獠牙從寬吻兩側向外彎出。鬃尖積著暗紅熱光，轉身時，乾燥根皮與土屑沿著背側抖落。
+> 厚實肩背披著粗硬鬃毛，短獠牙從寬吻兩側向外彎出。發熱時，鬃尖透出暗紅光；轉身時，乾燥根皮與土屑沿著背側抖落。
 
 **Public ecology and local relationship**
 
