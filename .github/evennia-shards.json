@@ -1011,6 +1011,14 @@
    "name": "maps-36",
    "workers": 4,
    "labels": [
+    "world.maps.tests.test_runtime_adoption_rollback"
+   ],
+   "index": 36
+  },
+  {
+   "name": "maps-37",
+   "workers": 4,
+   "labels": [
     "world.maps.tests.test_service_interiors",
     "world.maps.tests.test_settlement_reload",
     "world.maps.tests.test_settlement_sources",
@@ -1022,18 +1030,18 @@
     "world.maps.tests.test_wilderness_geography_contract",
     "world.maps.tests.test_wilderness_population"
    ],
-   "index": 36
-  },
-  {
-   "name": "maps-37",
-   "workers": 4,
-   "labels": [
-    "world.maps.tests.test_wilderness_population_species"
-   ],
    "index": 37
   },
   {
    "name": "maps-38",
+   "workers": 4,
+   "labels": [
+    "world.maps.tests.test_wilderness_population_species"
+   ],
+   "index": 38
+  },
+  {
+   "name": "maps-39",
    "workers": 4,
    "labels": [
     "world.maps.tests.test_wilderness_provider",
@@ -1061,10 +1069,10 @@
     "world.observability.tests.test_sanitize",
     "world.observability.tests.test_transcript"
    ],
-   "index": 38
+   "index": 39
   },
   {
-   "name": "webclient-39",
+   "name": "webclient-40",
    "workers": 4,
    "labels": [
     "web.webclient.presentation.tests.test_affordances.test_contract",
@@ -1102,35 +1110,35 @@
     "web.webclient.presentation.tests.test_map_panel_protocol",
     "web.webclient.presentation.tests.test_publication_parts"
    ],
-   "index": 39
-  },
-  {
-   "name": "webclient-40",
-   "workers": 4,
-   "labels": [
-    "web.webclient.presentation.tests.test_area_map"
-   ],
    "index": 40
   },
   {
    "name": "webclient-41",
    "workers": 4,
    "labels": [
-    "web.webclient.presentation.tests.test_world_map_measurement"
+    "web.webclient.presentation.tests.test_area_map"
    ],
    "index": 41
   },
   {
    "name": "webclient-42",
-   "workers": 4,
+   "workers": 1,
    "labels": [
-    "web.webclient.presentation.tests.test_world_map_transport",
-    "web.webclient.presentation.tests.test_world_map"
+    "web.webclient.presentation.tests.test_world_map_measurement"
    ],
    "index": 42
   },
   {
    "name": "webclient-43",
+   "workers": 4,
+   "labels": [
+    "web.webclient.presentation.tests.test_world_map_transport",
+    "web.webclient.presentation.tests.test_world_map"
+   ],
+   "index": 43
+  },
+  {
+   "name": "webclient-44",
    "workers": 4,
    "labels": [
     "web.webclient.presentation.tests.test_party_inventory_panel",
@@ -1146,10 +1154,10 @@
     "web.webclient.presentation.tests.test_title_codex_panel",
     "web.webclient.presentation.tests.test_dialogue_reading_projection"
    ],
-   "index": 43
+   "index": 44
   },
   {
-   "name": "webclient-44",
+   "name": "webclient-45",
    "workers": 4,
    "labels": [
     "web.webclient.presentation.tests.test_art_panel",
@@ -1186,7 +1194,7 @@
     "web.webclient.presentation.tests.test_title_ballot_panel",
     "web.webclient.presentation.tests.test_watchers"
    ],
-   "index": 44
+   "index": 45
   }
  ]
 }

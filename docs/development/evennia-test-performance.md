@@ -357,7 +357,7 @@ makespan 200 秒、top-level 分片 170 秒。這讓兩種池都能落在 6 分�
 preflight 後的驗收：`map-editor` 自成一個工作（105 秒，遠低於 6 分鐘預算），
 而所有分片都在等的 `preflight` 由 122 秒縮到 58 秒。
 
-### 2026-11-03：逐格幾何成本與每測試世界收斂，37 → 45 個 Evennia 分片
+### 2026-11-03：逐格幾何成本與每測試世界收斂，37 → 46 個 Evennia 分片
 
 CI run 41605121589 的 37 個 evennia 分片工作有 8 個超過 6 分鐘（其餘皆在
 360 秒內，最接近者為 shard 9 的 357 秒）：
@@ -482,9 +482,19 @@ presentation 模組）449 秒；同一輪的 `maps-35` 352 秒、`webclient-38` 
 - `webclient-40` 只留 `test_world_map_measurement`；它單一 class 的
   `setUpClass` 就是 58.7 秒本機成本，拆無可拆。
 
-最終 45 個分片，仍是「只切不混」。editor 的 moved 案例與 world-map
+第四次推送（run 41682627873，45 個分片）全綠，`maps-31`（editor moved
+cases）降到 356 秒，但仍有 `maps-35`（runtime adoption）與 `webclient-41`
+（world-map measurement）388 秒。前者是兩個 class 各自付一次完整世界 fixture
+（同一台 runner 上兩次冷啟動互相拖慢），因此把 `MapWorldAdoptionTests` 與
+`MapWorldSynchronizationRollbackTests` 拆成兩個模組、各自一個分片；後者是
+單一 class 的 `setUpClass` 成本，`workers` 降為 1，避免 4 份 DB clone 與
+Evennia import 與該 class 競爭 CPU。
+
+最終 46 個分片，仍是「只切不混」。editor 的 moved 案例與 world-map
 measurement 是已知的不可再分割下限：若後續 CI 仍超過 360 秒，只能從
 `sync_grid` 的 ORM 成本或 world-map payload 的組裝成本下手，而不是再切分片。
+`test_world_map_measurement` 的 57 秒本機成本來自 `representative_payload()`
+第一次組裝真實大陸／district 世界（`one_km` 與 `worst` 各不到 1 秒）。
 
 editor 的完整世界契約維持不變：兩個 moved-node method 仍各自在完整世界上
 做一次真實收斂（本機 4 tests 78.6 秒），不靠縮小 fixture 換時間。

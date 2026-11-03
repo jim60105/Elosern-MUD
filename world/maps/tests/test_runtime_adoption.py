@@ -1,11 +1,7 @@
-"""Adoption and persistent-synchronization tests for the permanent map world.
+"""Adoption and persistent synchronization of the permanent map world.
 
-The map world is one bundle: adoption validates the complete candidate, then
-installs the four domain views together; persistent synchronization converges
-the interiors and commits the adoption. These tests exercise that operation
-with real map construction, and assert the prior baseline survives every
-rejection — a bad external reference, a stale partition artifact and a
-persistent synchronization failure injected after writes have begun.
+The publish/reject side: one complete validated bundle, interiors owned
+independently of services, and reuse on repeated synchronization.
 """
 
 from __future__ import annotations
@@ -29,70 +25,16 @@ from typeclasses.rooms import Room
 from world.maps import bootstrap, runtime
 from world.maps.static_references import binding_signature
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-
-
-def _places():
-    """The CURRENT place-registry mapping (binding-safe, never a name literal)."""
-
-    import importlib
-
-    module = importlib.import_module("world.lore.settlements.places")
-    return getattr(module, "PLACE" + "_REGISTRY")
-
-
-def _copy_map_sources(target: Path) -> Path:
-    """A writable copy of the authored map sources under ``target``."""
-
-    shutil.copytree(REPOSITORY_ROOT / "content/maps", target / "content/maps")
-    return target
-
-
-def _extra_interior_document() -> str:
-    return """version: 1
-kind: interior
-id: t_adoption_study
-rooms:
-  t_adoption_study:
-    name_zh: 合成書房
-    desc_zh: A synthetic study the shipped world does not author.
-    scene_archetype: tavern_interior
-    art_key: t_adoption_study
-connections: []
-exterior:
-  settlement: capital_altoria
-  node: market_street
-  room: t_adoption_study
-  doorway_key: 合成書房門
-  doorway_aliases:
-  - study
-"""
-
-
-class _MapWorldAdoptionCase(EvenniaTestCase):
-    @classmethod
-    def setUpTestData(cls):
-        # This case intentionally adopts and materializes the complete
-        # candidate; it is an explicit full-candidate contract case, so the
-        # world is built once per class. Each method's writes still roll back
-        # with its own transaction, and the bundle is republished per test.
-        super().setUpTestData()
-        create_object(Room, key="虛境", location=None)
-        cls.baseline = runtime.adopt()
-        from world.tests.geography_fixture import sync_test_settlements
-
-        sync_test_settlements(tuple(cls.baseline.settlements.graphs))
-        bootstrap.sync_interiors()
-        # Startup settles the adoption once the persistent world converged.
-        runtime.commit_adoption()
-
-    def setUp(self):
-        super().setUp()
-        self.baseline = type(self).baseline
-
-    def tearDown(self):
-        runtime.publish(type(self).baseline)
-        super().tearDown()
+from world.maps.tests._runtime_adoption_fixtures import (
+    REPOSITORY_ROOT,
+    _MapWorldAdoptionCase,
+    _copy_map_sources,
+    _extra_interior_document,
+    _frozen,
+    _npcs_state,
+    _places,
+    _stale_freshness,
+)
 
 
 class MapWorldAdoptionTests(_MapWorldAdoptionCase):
@@ -246,172 +188,3 @@ class MapWorldAdoptionTests(_MapWorldAdoptionCase):
         self.assertEqual(binding_signature(), baseline_signature)
         self.assertEqual(Room.objects.all_family().count(), rooms_before)
 
-
-class MapWorldSynchronizationRollbackTests(_MapWorldAdoptionCase):
-    """A synchronization failure restores the prior bundle and persistent world."""
-
-    def test_a_second_adoption_keeps_the_last_synchronized_rollback_baseline(self):
-        baseline = runtime.current()
-        baseline_signature = binding_signature()
-
-        with tempfile.TemporaryDirectory() as directory:
-            root = _copy_map_sources(Path(directory))
-            (root / "content/maps/interiors/t_adoption_study.yaml").write_text(
-                _extra_interior_document(), encoding="utf-8"
-            )
-            (root / "content/maps/interiors/t_adoption_study_two.yaml").write_text(
-                _extra_interior_document()
-                .replace("t_adoption_study", "t_adoption_study_two")
-                .replace("合成書房門", "合成第二書房門"),
-                encoding="utf-8",
-            )
-            with patch.object(
-                runtime,
-                "partition_freshness_for",
-                side_effect=lambda world: PartitionFreshness(
-                    algorithm_version=PARTITION_ALGORITHM_VERSION,
-                    input_signature=world.partition_signature,
-                    current=True,
-                ),
-            ):
-                runtime.adopt(root)
-                runtime.adopt()
-            self.assertIsNot(runtime.current(), baseline)
-
-            calls = {"count": 0}
-            real = bootstrap._ensure_owned_exit
-
-            def fail_after_writes(*args, **kwargs):
-                calls["count"] += 1
-                created = real(*args, **kwargs)
-                if calls["count"] > 2:
-                    raise RuntimeError("injected interior edge failure")
-                return created
-
-            with patch.object(
-                bootstrap, "_ensure_owned_exit", side_effect=fail_after_writes
-            ):
-                with self.assertRaises(RuntimeError):
-                    runtime.synchronize()
-
-        # The failed synchronization restores the last SYNCHRONIZED world, not
-        # the intermediate unsynchronized adoption.
-        self.assertIs(runtime.current(), baseline)
-        self.assertEqual(binding_signature(), baseline_signature)
-
-    @covers_requirement(
-        "map-runtime-adoption::runtime-adoption-publishes-one-complete-validated-world"
-    )
-    def test_a_stale_partition_rejects_the_candidate(self):
-        baseline = runtime.current()
-        signature = binding_signature()
-
-        with patch.object(
-            runtime, "partition_freshness_for", return_value=_stale_freshness()
-        ):
-            with self.assertRaises(runtime.MapWorldError) as caught:
-                runtime.adopt()
-
-        self.assertIn("partition", str(caught.exception).lower())
-        self.assertIs(runtime.current(), baseline)
-        self.assertEqual(binding_signature(), signature)
-
-    @covers_requirement(
-        "map-runtime-adoption::runtime-adoption-publishes-one-complete-validated-world"
-    )
-    def test_a_failed_synchronization_restores_the_prior_bundle_and_world(self):
-        baseline = runtime.current()
-        baseline_signature = binding_signature()
-        rooms_before = Room.objects.all_family().count()
-        baseline_rooms = {
-            obj.pk
-            for obj in ObjectDB.objects.all()
-            if isinstance(obj, Room)
-        }
-
-        calls = {"count": 0}
-        real = bootstrap._ensure_owned_exit
-
-        def fail_after_writes(*args, **kwargs):
-            calls["count"] += 1
-            created = real(*args, **kwargs)
-            if calls["count"] > 4:
-                raise RuntimeError("injected interior edge failure")
-            return created
-
-        with tempfile.TemporaryDirectory() as directory:
-            root = _copy_map_sources(Path(directory))
-            extra = root / "content/maps/interiors/t_adoption_study.yaml"
-            extra.write_text(_extra_interior_document(), encoding="utf-8")
-            with patch.object(
-                runtime,
-                "partition_freshness_for",
-                side_effect=lambda world: PartitionFreshness(
-                    algorithm_version=PARTITION_ALGORITHM_VERSION,
-                    input_signature=world.partition_signature,
-                    current=True,
-                ),
-            ):
-                adopted = runtime.adopt(root)
-            self.assertIs(runtime.current(), adopted)
-
-            with patch.object(
-                bootstrap, "_ensure_owned_exit", side_effect=fail_after_writes
-            ):
-                with self.assertRaises(RuntimeError):
-                    runtime.synchronize()
-
-        self.assertIs(runtime.current(), baseline)
-        self.assertEqual(binding_signature(), baseline_signature)
-        self.assertEqual(
-            Room.objects.all_family().count(),
-            rooms_before,
-            "a failed synchronization must leave no created room behind",
-        )
-        remaining = {
-            obj.pk for obj in ObjectDB.objects.all() if isinstance(obj, Room)
-        }
-        self.assertEqual(remaining, baseline_rooms)
-        self.assertFalse(
-            [
-                obj
-                for obj in ObjectDB.objects.filter(db_key="合成書房")
-                if isinstance(obj, Room)
-            ],
-            "the rolled-back candidate's room is still materialized",
-        )
-
-
-def _frozen(mapping):
-    from types import MappingProxyType
-
-    return MappingProxyType(dict(mapping))
-
-
-def _stale_freshness() -> PartitionFreshness:
-    return PartitionFreshness(
-        algorithm_version=PARTITION_ALGORITHM_VERSION,
-        input_signature="stale-signature",
-        current=True,
-    )
-
-
-def _npcs_state():
-    """Every persistent host's components and stored attributes."""
-
-    from typeclasses.npcs import NPC
-
-    state = []
-    for npc in NPC.objects.all_family():
-        components = sorted(
-            (npc.components.get(slot).__class__.__name__, repr(npc.components.get(slot).__dict__))
-            for slot in npc.components.all()
-        )
-        state.append(
-            (npc.pk, components, sorted((a.key, repr(a.value)) for a in npc.attributes.all()))
-        )
-    return sorted(state)
-
-
-if __name__ == "__main__":
-    unittest.main()
