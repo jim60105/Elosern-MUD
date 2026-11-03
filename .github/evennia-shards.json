@@ -958,6 +958,15 @@
    "name": "maps-31",
    "workers": 4,
    "labels": [
+    "world.maps.tests.test_editor_final_yaml_moved_location",
+    "world.maps.tests.test_editor_final_yaml_rejection"
+   ],
+   "index": 31
+  },
+  {
+   "name": "maps-32",
+   "workers": 4,
+   "labels": [
     "world.maps.tests.test_geography_source",
     "world.maps.tests.test_gm",
     "world.maps.tests.test_instance_integration",
@@ -966,20 +975,20 @@
     "world.maps.tests.test_instance_stage_wiring",
     "world.maps.tests.test_interior_sources"
    ],
-   "index": 31
+   "index": 32
   },
   {
-   "name": "maps-32",
+   "name": "maps-33",
    "workers": 4,
    "labels": [
     "world.maps.tests.test_limbo_room",
     "world.maps.tests.test_map_district_partition",
     "world.maps.tests.test_map_elevation"
    ],
-   "index": 32
+   "index": 33
   },
   {
-   "name": "maps-33",
+   "name": "maps-34",
    "workers": 4,
    "labels": [
     "world.maps.tests.test_monster_provisioning",
@@ -988,18 +997,18 @@
     "world.maps.tests.test_retention_reclamation",
     "world.maps.tests.test_room_art_metadata"
    ],
-   "index": 33
-  },
-  {
-   "name": "maps-34",
-   "workers": 4,
-   "labels": [
-    "world.maps.tests.test_runtime_adoption"
-   ],
    "index": 34
   },
   {
    "name": "maps-35",
+   "workers": 4,
+   "labels": [
+    "world.maps.tests.test_runtime_adoption"
+   ],
+   "index": 35
+  },
+  {
+   "name": "maps-36",
    "workers": 4,
    "labels": [
     "world.maps.tests.test_service_interiors",
@@ -1013,18 +1022,18 @@
     "world.maps.tests.test_wilderness_geography_contract",
     "world.maps.tests.test_wilderness_population"
    ],
-   "index": 35
-  },
-  {
-   "name": "maps-36",
-   "workers": 4,
-   "labels": [
-    "world.maps.tests.test_wilderness_population_species"
-   ],
    "index": 36
   },
   {
    "name": "maps-37",
+   "workers": 4,
+   "labels": [
+    "world.maps.tests.test_wilderness_population_species"
+   ],
+   "index": 37
+  },
+  {
+   "name": "maps-38",
    "workers": 4,
    "labels": [
     "world.maps.tests.test_wilderness_provider",
@@ -1052,10 +1061,10 @@
     "world.observability.tests.test_sanitize",
     "world.observability.tests.test_transcript"
    ],
-   "index": 37
+   "index": 38
   },
   {
-   "name": "webclient-38",
+   "name": "webclient-39",
    "workers": 4,
    "labels": [
     "web.webclient.presentation.tests.test_affordances.test_contract",
@@ -1093,21 +1102,13 @@
     "web.webclient.presentation.tests.test_map_panel_protocol",
     "web.webclient.presentation.tests.test_publication_parts"
    ],
-   "index": 38
-  },
-  {
-   "name": "webclient-39",
-   "workers": 4,
-   "labels": [
-    "web.webclient.presentation.tests.test_area_map"
-   ],
    "index": 39
   },
   {
    "name": "webclient-40",
    "workers": 4,
    "labels": [
-    "web.webclient.presentation.tests.test_world_map_measurement"
+    "web.webclient.presentation.tests.test_area_map"
    ],
    "index": 40
   },
@@ -1115,13 +1116,21 @@
    "name": "webclient-41",
    "workers": 4,
    "labels": [
-    "web.webclient.presentation.tests.test_world_map_transport",
-    "web.webclient.presentation.tests.test_world_map"
+    "web.webclient.presentation.tests.test_world_map_measurement"
    ],
    "index": 41
   },
   {
    "name": "webclient-42",
+   "workers": 4,
+   "labels": [
+    "web.webclient.presentation.tests.test_world_map_transport",
+    "web.webclient.presentation.tests.test_world_map"
+   ],
+   "index": 42
+  },
+  {
+   "name": "webclient-43",
    "workers": 4,
    "labels": [
     "web.webclient.presentation.tests.test_party_inventory_panel",
@@ -1137,10 +1146,10 @@
     "web.webclient.presentation.tests.test_title_codex_panel",
     "web.webclient.presentation.tests.test_dialogue_reading_projection"
    ],
-   "index": 42
+   "index": 43
   },
   {
-   "name": "webclient-43",
+   "name": "webclient-44",
    "workers": 4,
    "labels": [
     "web.webclient.presentation.tests.test_art_panel",
@@ -1177,7 +1186,7 @@
     "web.webclient.presentation.tests.test_title_ballot_panel",
     "web.webclient.presentation.tests.test_watchers"
    ],
-   "index": 43
+   "index": 44
   }
  ]
 }

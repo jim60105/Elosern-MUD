@@ -357,7 +357,7 @@ makespan 200 秒、top-level 分片 170 秒。這讓兩種池都能落在 6 分�
 preflight 後的驗收：`map-editor` 自成一個工作（105 秒，遠低於 6 分鐘預算），
 而所有分片都在等的 `preflight` 由 122 秒縮到 58 秒。
 
-### 2026-11-03：逐格幾何成本與每測試世界收斂，37 → 44 個 Evennia 分片
+### 2026-11-03：逐格幾何成本與每測試世界收斂，37 → 45 個 Evennia 分片
 
 CI run 41605121589 的 37 個 evennia 分片工作有 8 個超過 6 分鐘（其餘皆在
 360 秒內，最接近者為 shard 9 的 357 秒）：
@@ -418,6 +418,7 @@ CI run 41605121589 的 37 個 evennia 分片工作有 8 個超過 6 分鐘（其
 | `maps-28` | `maps-28` / `maps-29` / `maps-30` | `altoria_capital`+輕量 bootstrap ／ 新增 `test_bootstrap_sync`（四個整世界 class）／ `city_*`+`editor_final_yaml_adoption`；`geography_source`…`interior_sources` 移到 `maps-31` |
 | `maps-30` | `maps-33` / `maps-34` | `monster_provisioning`…`room_art_metadata` ／ `runtime_adoption` |
 | `webclient-38`（舊 `webclient-35`） | `webclient-39` / `webclient-40` / `webclient-41` / `webclient-42` | `test_area_map` ／ `test_world_map_measurement` ／ `test_world_map_transport`+`test_world_map` ／ 其餘 12 個 presentation 模組 |
+| `maps-30`（editor） | `maps-30` / `maps-31` | moved-node ／ moved-location + 拒絕案例 |
 | 其餘 | 內容不變 | 僅重新編號 |
 
 本機驗收（24 核心參考機，`--parallel 4`，`--keepdb`）：
@@ -470,16 +471,20 @@ presentation 模組）449 秒；同一輪的 `maps-35` 352 秒、`webclient-38` 
 在三次執行分別是 295／352／215 秒。最終調整把兩個「單一 class 就是排程下限」
 的案例各自隔離：
 
-- `maps-30` 只留 `test_editor_final_yaml_adoption`；三個城市模組移回
-  `maps-28`。editor 的兩個 moved-node method 各自需要完整世界的一次真實
-  收斂（whole-candidate adoption 契約），無法靠 fixture 縮小或 method 拆分
-  消除；本機 4 tests 78.6 秒。
+- `maps-30` 只留 editor 的 moved-node 案例，`maps-31` 放 moved-location 與
+  拒絕案例；三個城市模組移回 `maps-28`。editor 的 fixture 只先播種
+  interiors 所在與點入口的 settlement（lookup 用），每個 moved 契約 method
+  自己在讀取 baseline **之前**以未裁切的 `runtime.synchronize()` 收斂完整
+  世界，因此「收斂後不新增／不刪除」仍是 whole-candidate 斷言，被測的
+  synchronize 也沒有被裁切。兩個 moved 案例因此不再在同一台 runner 上同時
+  跑兩次冷啟動的整世界收斂；本機三個模組合跑 4 tests 78.9 秒（moved-location
+  單獨 71.5 秒）。
 - `webclient-40` 只留 `test_world_map_measurement`；它單一 class 的
   `setUpClass` 就是 58.7 秒本機成本，拆無可拆。
 
-最終 44 個分片，仍是「只切不混」。這兩個分片是已知的不可再分割下限：若後續
-CI 仍超過 360 秒，只能從 `sync_grid` 的 ORM 成本或 world-map payload 的
-組裝成本下手，而不是再切分片。
+最終 45 個分片，仍是「只切不混」。editor 的 moved 案例與 world-map
+measurement 是已知的不可再分割下限：若後續 CI 仍超過 360 秒，只能從
+`sync_grid` 的 ORM 成本或 world-map payload 的組裝成本下手，而不是再切分片。
 
 editor 的完整世界契約維持不變：兩個 moved-node method 仍各自在完整世界上
 做一次真實收斂（本機 4 tests 78.6 秒），不靠縮小 fixture 換時間。
