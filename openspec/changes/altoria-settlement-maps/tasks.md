@@ -42,7 +42,7 @@ Ground rules:
 
 - [x] 4.1 Regenerate the partition, then run `check_map_sources.py`. Check: it exits 0 and reports partition, elevation and reference context as current.
 - [x] 4.2 Rerun `world.maps.tests.test_bootstrap`. Check: record `X_after` for the D4 hand-off. The timing never blocks the commit.
-- [ ] 4.3 Run every module in `docs/development/settlement-synthesis.md` § Settlement-sensitive test modules, one per command. Check: every one passes. Handle a failure with that doc section's "Residual pin rule", and list every rewritten test in the hand-off. Any other failure stops the change without a commit.
+- [x] 4.3 Run every module in `docs/development/settlement-synthesis.md` § Settlement-sensitive test modules, one per command. Check: every one passes. Handle a failure with that doc section's "Residual pin rule", and list every rewritten test in the hand-off. Any other failure stops the change without a commit.
 - [x] 4.4 Capture the continent with `--hide partition`, plus the settlement views of `port_white_sail`, `city_border_bridge` and one town. Read the images. Check: the hand-off describes each map's water side and gates.
 - [x] 4.5 Run `tools.contract_gate` and `openspec validate altoria-settlement-maps --strict`. Check: both succeed. The hand-off lists the relocations, the unresolved ids and the D4 numbers.
 
