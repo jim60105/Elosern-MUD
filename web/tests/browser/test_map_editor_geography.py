@@ -302,6 +302,7 @@ class MapEditorGeographyBrowserTest(unittest.TestCase):
         page.click("[data-diagnostics-toggle]")
         self.assertGreaterEqual(page.locator('[data-diagnostic="unreachable_landmark"]').count(), 1)
 
+    @covers_requirement("map-editor-geography::district-landmark-positions-are-placed-on-the-continent-canvas")
     def test_a_wilderness_landmark_drag_is_one_district_command_that_survives_reload(self):
         def prepare(workspace: Path) -> None:
             (workspace / DISTRICTS).write_text(

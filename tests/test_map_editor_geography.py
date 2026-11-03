@@ -123,6 +123,7 @@ class GeographyProcessTests(unittest.TestCase):
         status, _ = self.send(editor, "move_control_point", CONTINENT, {"feature": RIVER, "index": 0, "point": [20, 24]})
         self.assertEqual(status, 200)
 
+    @covers_requirement("map-editor-geography::district-landmark-positions-are-placed-on-the-continent-canvas")
     def test_district_landmarks_project_their_referent_centre_and_a_wilderness_move_writes_only_districts(self):
         data = synthetic.partitionable_districts_data()
         data["districts"]["synthetic_location_mark"] = {

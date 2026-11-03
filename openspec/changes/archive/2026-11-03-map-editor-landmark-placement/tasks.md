@@ -2,7 +2,7 @@
 
 All tasks are implementation work on `feat/map-editor-landmark-placement`. Copy signatures, code blocks and field shapes from design.md (D1–D6) verbatim; do not re-derive them. Run every command from the repository root unless a task says otherwise, and capture long output to a scratch file once (`$SCRATCH` is your scratchpad directory).
 
-Traceability: the ADDED requirement has no canonical ID until archive sync (`docs/development/spec-test-traceability.md`). Both new Python tests therefore carry the nearest current canonical requirement, `@covers_requirement("map-editor-geography::continental-authored-inputs-have-direct-and-explicit-editing-controls")`. Confirm the ID with `uv run --locked python -m tools.spec_traceability list --json-output "$SCRATCH/ids.json" && grep -o '"map-editor-geography::[a-z0-9-]*"' "$SCRATCH/ids.json" | sort -u`. List this provisional mapping in the apply report, test by test. After sync, re-mount both tests to the tool-generated ID (see Workflow follow-up). Never hand-type the future ID into a test before sync.
+Traceability: the ADDED requirement received the canonical ID `map-editor-geography::district-landmark-positions-are-placed-on-the-continent-canvas` at archive sync, and both new tests carry it.
 
 Files this change may touch: `tools/map-editor/elosern_map_editor/snapshot.py`, `tools/map-editor/frontend/src/lib/continent.js`, `tools/map-editor/frontend/src/lib/map_scene.js`, `tools/map-editor/frontend/src/App.vue`, `tools/map-editor/frontend/src/components/MapSurface.vue`, `tools/map-editor/frontend/src/styles/editor.css`, `tools/map-editor/frontend/tests/continent.test.mjs`, `tests/test_map_editor_geography.py`, `web/tests/browser/test_map_editor_geography.py`, `web/tests/browser/test_map_capture_surface.py` (tasks 3.2 and 7.2), `tools/map-editor/frontend/src/lib/layers.js`, `tools/map-editor/frontend/src/lib/capture.js`, `tools/map-editor/elosern_map_editor/capture.py` and `tests/test_map_image_capture.py` (task 7 only), `.github/browser-shards.json`, `.agents/skills/map-data-authoring/**`, and `docs/development/map-editor.md`.
 
@@ -90,4 +90,4 @@ About 120 landmark labels clutter the whole-continent view (task 5.2 screenshot)
 
 ## Workflow follow-up
 
-- At archive, after the delta syncs into `openspec/specs/map-editor-geography/spec.md`, run `uv run --locked python -m tools.spec_traceability list --json-output "$SCRATCH/ids.json" && grep -o '"map-editor-geography::[a-z0-9-]*"' "$SCRATCH/ids.json" | sort -u` to get the new requirement's canonical ID. Add it to the two tests from tasks 1.2 and 3.1, keeping the existing provisional annotation only if the test still establishes that requirement. Then run `uv run --locked python -m tools.spec_traceability check`.
+- Done at archive: both tests from tasks 1.2 and 3.1 carry the canonical ID assigned at sync.
