@@ -23,7 +23,7 @@ nodes:
     y_m: 401
     prototype_parent: grid_room
     key: 東面柵門
-    desc: 東門外是一片開闊的草坡，往影林城的方向去的人都從這裡出發。門邊的木架上晾著剛鞣好的厚皮，是這座城最拿得出手的貨。
+    desc: 東門外是一片開闊的草坡，路往低處繞出去，兩側留著放牧的空地。門邊的木架上晾著剛鞣好的厚皮，是這座城最拿得出手的貨。
     anchor_key:
     typeclass:
     scene_archetype: city_street

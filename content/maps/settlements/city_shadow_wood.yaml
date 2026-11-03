@@ -77,7 +77,7 @@ nodes:
     y_m: 728
     prototype_parent: grid_room
     key: 成年獵場
-    desc: 東北的空場被林木半圍著，地面鋪著厚苔，腳步聲全被吸掉。年輕人得在霧裡憑聲音判斷方向，這才是這裡的成年試煉。
+    desc: 東北的空場被林木半圍著，地面鋪著厚苔，腳步聲全被吸掉。年輕人在霧裡練聽聲辨位，這是成年禮追獵前的必經功課。
     anchor_key:
     typeclass:
     scene_archetype: city_street

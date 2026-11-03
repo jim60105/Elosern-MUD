@@ -23,7 +23,7 @@ nodes:
     y_m: 479
     prototype_parent: grid_room
     key: 西面柵門
-    desc: 朝西的柵門外是通往獵鷹鎮方向的下坡路，門軸被礦車撞出幾道凹痕。守門人腰間掛著記數的木牌，一天來回幾趟都記在上頭。
+    desc: 朝西的柵門外是一段下坡的舊礦道，車轍被雨水沖得發亮。守門人腰間掛著記數的木牌，一天來回幾趟都記在上頭。
     anchor_key:
     typeclass:
     scene_archetype: city_street

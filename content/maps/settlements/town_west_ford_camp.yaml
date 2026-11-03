@@ -32,7 +32,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 南面關門
-    desc: 南門正對渡口，出門就是往下的斜坡與河灘。渡船靠岸時，木樁被撞得悶響，聲音一路上傳到石坪。
+    desc: 南門朝著渡口的方向，出門是沿坡而下的土路，走上一段才見河灘。載貨的人在半途的石台換肩，順便看一眼水勢。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -68,7 +68,7 @@ nodes:
     y_m: 436
     prototype_parent: grid_room
     key: 集會石場
-    desc: 南側的石場離河最近，集會時能聽見水聲墊在鼓聲底下。場邊擱著幾條待修的筏子，閒著的人就順手補一補。
+    desc: 南側的石場是集會與分派工作的空地，場邊擱著幾條待修的繩具。鼓聲一起，坡下的渡口也聽得見。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -77,7 +77,7 @@ nodes:
     y_m: 334
     prototype_parent: grid_room
     key: 成年獵場
-    desc: 東南的空場靠近坡緣，地面被踩得堅硬。年輕人得背著沙袋來回渡口兩趟，這被當成最實在的成年試煉。
+    desc: 東南的空場靠近坡緣，地面被踩得堅硬。年輕人背著沙袋在場邊來回練腳力，為成年禮的追獵先把身子練實。
     anchor_key:
     typeclass:
     scene_archetype: city_street

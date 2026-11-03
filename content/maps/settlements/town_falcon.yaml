@@ -77,7 +77,7 @@ nodes:
     y_m: 399
     prototype_parent: grid_room
     key: 成年獵場
-    desc: 東南的空場靠近坡緣，地上插著供鷹俯衝的標靶。年輕人得帶著自己的鷹完成一次完整獵捕，才被視為成年。
+    desc: 東南的空場靠近坡緣，地上插著供鷹俯衝的標靶。年輕人帶著自己的鷹在此練配合，為成年禮的追獵做準備。
     anchor_key:
     typeclass:
     scene_archetype: city_street

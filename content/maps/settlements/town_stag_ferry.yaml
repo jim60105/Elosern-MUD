@@ -23,7 +23,7 @@ nodes:
     y_m: 825
     prototype_parent: grid_room
     key: 東面柵門
-    desc: 東門外通往角原城的草坡，來往的牧隊常在門邊歇腳。守門人會替他們看住牲口，順便打聽北邊草場的消息。
+    desc: 東門外是一段緩升的草坡，路邊留著供牲口飲水的石槽。往來的牧隊多半在此分手，各自趕往自己的草場。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -32,7 +32,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 南面關門
-    desc: 南門正對著高地河的渡口，出門就是往下的石階。渡船靠岸時，繩索摩擦木樁的聲音會一路傳上坡來。
+    desc: 南門朝著高地河的渡口，出門是往下的長石階。渡船靠岸時，繩索摩擦木樁的聲音會順著坡一路上傳。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -77,7 +77,7 @@ nodes:
     y_m: 528
     prototype_parent: grid_room
     key: 成年獵場
-    desc: 東南的空場靠近河岸高處，地面被踩得結實。年輕人得在急流邊緣撐筏往返一趟，才算通過這裡的成年試煉。
+    desc: 東南的空場靠近河岸高處，地面被踩得結實。年輕人得在急流邊緣練撐筏往返，這是成年禮追獵之前的水性功課。
     anchor_key:
     typeclass:
     scene_archetype: city_street

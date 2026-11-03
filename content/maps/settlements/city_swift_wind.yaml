@@ -86,7 +86,7 @@ nodes:
     y_m: 233
     prototype_parent: grid_room
     key: 成年獵場
-    desc: 南側的空場是練跑與追獵的地方，地面被踩得結實。年輕人得在逆風裡追上獵物，這被視為最公平的試煉。
+    desc: 南側的空場是練跑與追獵的地方，地面被踩得結實。年輕人常在逆風裡練追，說是這樣的腿力才撐得住成年禮那一趟。
     anchor_key:
     typeclass:
     scene_archetype: city_street

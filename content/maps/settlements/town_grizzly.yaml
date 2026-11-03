@@ -14,7 +14,7 @@ nodes:
     y_m: 577
     prototype_parent: anchor_room
     key: 熊骨石坪
-    desc: 石坪中央埋著一具巨大的熊骨，只露出半截肩胛，被當成界石。往東南的谷地勢漸高，溪水從那頭繞著坡腳流走。
+    desc: 石坪中央埋著一具巨大的熊骨，只露出半截肩胛，被當成界石。往東南的谷地勢漸窄，風從谷口灌進來，帶著草與石的味道。
     anchor_key: town_grizzly
     typeclass:
     scene_archetype: city_street
@@ -77,7 +77,7 @@ nodes:
     y_m: 407
     prototype_parent: grid_room
     key: 成年獵場
-    desc: 西南的空場靠近谷口，地面被踩出一圈深色的土痕。年輕人要在此與一頭成年熊人對練，撐過三個回合才算過關。
+    desc: 西南的空場靠近谷口，地面被踩出一圈深色的土痕。年輕人在此與成年熊人對練撲擊，練的是膽識與站穩腳步。
     anchor_key:
     typeclass:
     scene_archetype: city_street

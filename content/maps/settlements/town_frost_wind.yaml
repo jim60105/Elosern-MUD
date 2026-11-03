@@ -50,7 +50,7 @@ nodes:
     y_m: 558
     prototype_parent: grid_room
     key: 凍魚市街
-    desc: 市街東側擺著凍硬的魚與燻肉，攤主得用短斧把魚敲開分售。貨色不多，價錢卻公道，島上的規矩一向如此。
+    desc: 市街東側擺著凍硬的魚與燻肉，攤主得用短斧把魚敲開分售。貨色不多，價錢卻公道，鎮上的規矩一向如此。
     anchor_key:
     typeclass:
     scene_archetype: city_street

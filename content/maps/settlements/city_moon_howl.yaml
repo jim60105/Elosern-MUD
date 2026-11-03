@@ -32,7 +32,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 西南關門
-    desc: 西南門對著鹿鳴渡與角原城的方向，門板外側釘著一整排鹿角。出城的人習慣在此摸一下角尖，算是討個好兆頭。
+    desc: 西南門對著鹿鳴渡的方向，門板外側釘著一整排鹿角。出城的人習慣在此摸一下角尖，算是討個好兆頭。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -86,7 +86,7 @@ nodes:
     y_m: 837
     prototype_parent: grid_room
     key: 成年獵場
-    desc: 西北的空場被杉木圍住，地上留著歷年踩踏出的圓形路徑。年輕人得獨自追上一頭鹿，才算完成成年禮。
+    desc: 西北的空場被杉木圍住，地上留著歷年踩踏出的圓形路徑。年輕人天未亮就在此練追蹤與潛行，為成年禮的追獵養腳力。
     anchor_key:
     typeclass:
     scene_archetype: city_street

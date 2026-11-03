@@ -32,7 +32,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 西南關門
-    desc: 這道門正對著界橋城的方向，門外不遠處就是河岸與渡口。守門的獸人會提醒初到的人，過了河便是別國的規矩。
+    desc: 這道門正對著界橋城的方向，出門是沿著坡勢往河邊去的長路。守門的獸人會提醒初到的人，過了河便是別國的規矩。
     anchor_key:
     typeclass:
     scene_archetype: city_street

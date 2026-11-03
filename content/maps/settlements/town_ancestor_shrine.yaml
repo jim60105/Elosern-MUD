@@ -77,7 +77,7 @@ nodes:
     y_m: 797
     prototype_parent: grid_room
     key: 成年獵場
-    desc: 東北的空場是年輕族人受訓的地方，場邊擺著練習用的石錘。完成成年禮的人，得在冢前守上一整夜的燈火。
+    desc: 東北的空場是年輕族人受訓的地方，場邊擺著練習用的石錘。剛完成成年禮的人，會輪流在冢前守一整夜的燈火。
     anchor_key:
     typeclass:
     scene_archetype: city_street

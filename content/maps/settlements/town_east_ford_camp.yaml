@@ -14,7 +14,7 @@ nodes:
     y_m: 600
     prototype_parent: anchor_room
     key: 東渡石坪
-    desc: 石坪不大，中央立著一根綁滿布條的渡樁，是這座營地最早留下的東西。往南走一小段就到邊界河的渡口，對岸便是東渡鎮。
+    desc: 石坪不大，中央立著一根綁滿布條的渡樁，是這座營地最早留下的東西。往南幾里便是邊界河的渡口，對岸就是東渡鎮。
     anchor_key: town_east_ford_camp
     typeclass:
     scene_archetype: city_street
@@ -32,7 +32,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 南面關門
-    desc: 南門正對渡口，門檻被水氣浸得發黑。出門往下的石階盡頭就是河灘，漲水時會沒掉最下面三階。
+    desc: 南門正對渡口的方向，出門是往下的長坡，坡底才接到河灘。載貨的人在半途的平石上歇腳，順便打量水勢。
     anchor_key:
     typeclass:
     scene_archetype: city_street
