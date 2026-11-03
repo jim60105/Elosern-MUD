@@ -4,7 +4,7 @@ All tasks are future implementation work. Follow design.md verbatim for signatur
 
 ## 1. Cut over site declarations and callers to explicit compositions
 
-- [ ] 1.1 Change MonsterSite signature, validators, existing declarations and all variant_keys/cycling consumers to composition_key. Update `world/lore/tests/test_monster_placement.py`, site definition tests and generic registry-reference tests with synthetic exact-count/mixed/stray cases. Document the new shape and manual exception in the developer document. Check: no old site variant_keys reader remains, invalid composition/capacity/surface rejects before publication, and current sites preserve their declared owner/lifecycle relations without pinned balance tables.
+- [ ] 1.1 Change MonsterSite signature, validators, existing declarations and all variant_keys/cycling consumers to composition_key. Update `world/lore/tests/test_monster_placement.py`, site definition tests and generic registry-reference tests with synthetic exact-count/mixed/stray cases. Document the new shape and manual exception in the developer document and amend the capability Purpose during implementation; consume the already-required explicit world-seed API without a missing-seed default. Check: no old site variant_keys reader remains, invalid composition/capacity/surface rejects before publication, and current sites preserve their declared owner/lifecycle relations without pinned balance tables.
 
 ## 2. Commit and recover full owned manual groups
 

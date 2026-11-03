@@ -52,7 +52,16 @@ Ordinary individuals SHALL retain a home ecology-zone marker separately from pos
 - **WHEN** ambient maintenance runs
 - **THEN** it never resumes, respawns, clears, or otherwise stands in for a site's lifecycle
 
+## REMOVED Requirements
+
 ### Requirement: Placement honors capacity and determinism
+**Reason**: Coordinate-hash fixed species and quantity maintenance are replaced by saved occurrence-seeded complete compositions.
+
+**Migration**: Cut all callers and substantively matching test annotations to the replacement contract using tool-generated canonical IDs; retain no legacy behavior, alias or data migration.
+
+## ADDED Requirements
+
+### Requirement: Placement samples complete deterministic occurrences
 Manual site population SHALL sample complete authored compositions within site capacity using saved deterministic occurrence state, while ordinary births SHALL obey the regional population contract.
 
 #### Scenario: Capacity is a ceiling, not a reshuffle
