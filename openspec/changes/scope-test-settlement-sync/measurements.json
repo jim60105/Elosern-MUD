@@ -1,0 +1,161 @@
+{
+  "revision": "61835b0db4c3d00f3bd4ef8411246695dd5e0dba",
+  "historical_module_seconds": [
+    147.381,
+    775,
+    1306,
+    1868
+  ],
+  "historical_method_count": 50,
+  "current_roster_count": 60,
+  "current_focused_tests": 4,
+  "result": "OK",
+  "test_seconds": 141.854,
+  "database_setup_seconds": 0.687,
+  "runner_total_seconds": 150.405,
+  "inclusive_wrappers_do_not_sum_nested_functions": true,
+  "function_summary": [
+    {
+      "phase": "discovery",
+      "functions": [
+        {
+          "function": "world.maps.static_references.validate_static_references",
+          "calls": 1,
+          "seconds": 0.001382399001158774
+        },
+        {
+          "function": "world.maps.runtime.adopt",
+          "calls": 1,
+          "seconds": 6.279500840988476
+        },
+        {
+          "function": "world.tests.geography_fixture.publish_shipped_map_world",
+          "calls": 1,
+          "seconds": 6.279505164013244
+        },
+        {
+          "function": "world.tests.geography_fixture.publish_shipped_geography",
+          "calls": 1,
+          "seconds": 6.280176775006112
+        }
+      ]
+    },
+    {
+      "phase": "world.maps.tests.test_bootstrap.GridBootstrapTests.test_single_call_on_fresh_grid_spawns_all_thirty_one_rooms",
+      "functions": [
+        {
+          "function": "world.maps.runtime.ensure_published",
+          "calls": 1,
+          "seconds": 7.959897629916668e-07
+        },
+        {
+          "function": "world.maps.bootstrap._plan_settlement_graph",
+          "calls": 60,
+          "seconds": 0.037830614135600626,
+          "capital_village_seconds": 0.0015774299972690642,
+          "other_maps_seconds": 0.03625318413833156
+        },
+        {
+          "function": "world.maps.bootstrap._apply_graph_plan",
+          "calls": 60,
+          "seconds": 41.39905575988814,
+          "capital_village_seconds": 2.5906655300059356,
+          "other_maps_seconds": 38.80839022988221
+        },
+        {
+          "function": "world.maps.bootstrap._sync_grid_room_art",
+          "calls": 1,
+          "seconds": 1.3350768710370176
+        },
+        {
+          "function": "world.maps.bootstrap.sync_grid",
+          "calls": 1,
+          "seconds": 42.77441001904663,
+          "individual_seconds": [
+            42.77441001904663
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "world.maps.tests.test_bootstrap.GridBootstrapTests.test_sync_grid_is_idempotent_and_preserves_dbid",
+      "functions": [
+        {
+          "function": "world.maps.runtime.ensure_published",
+          "calls": 2,
+          "seconds": 1.8139253370463848e-06
+        },
+        {
+          "function": "world.maps.bootstrap._plan_settlement_graph",
+          "calls": 120,
+          "seconds": 1.589221834903583,
+          "capital_village_seconds": 0.10193049703957513,
+          "other_maps_seconds": 1.4872913378640078
+        },
+        {
+          "function": "world.maps.bootstrap._apply_graph_plan",
+          "calls": 120,
+          "seconds": 50.56175718677696,
+          "capital_village_seconds": 3.204218911996577,
+          "other_maps_seconds": 47.35753827478038
+        },
+        {
+          "function": "world.maps.bootstrap._sync_grid_room_art",
+          "calls": 2,
+          "seconds": 1.8058088260586374
+        },
+        {
+          "function": "world.maps.bootstrap.sync_grid",
+          "calls": 2,
+          "seconds": 53.97250053996686,
+          "individual_seconds": [
+            42.823995126003865,
+            11.148505413962994
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "world.maps.tests.test_bootstrap.WildernessBootstrapTests.test_sync_wilderness_is_idempotent",
+      "functions": [
+        {
+          "function": "world.maps.runtime.ensure_published",
+          "calls": 3,
+          "seconds": 3.218941856175661e-06
+        },
+        {
+          "function": "world.maps.bootstrap._plan_settlement_graph",
+          "calls": 60,
+          "seconds": 0.0392251048469916,
+          "capital_village_seconds": 0.0014863699907436967,
+          "other_maps_seconds": 0.0377387348562479
+        },
+        {
+          "function": "world.maps.bootstrap._apply_graph_plan",
+          "calls": 60,
+          "seconds": 41.4746514360304,
+          "capital_village_seconds": 2.60709763597697,
+          "other_maps_seconds": 38.86755380005343
+        },
+        {
+          "function": "world.maps.bootstrap._sync_grid_room_art",
+          "calls": 1,
+          "seconds": 1.334096813981887
+        },
+        {
+          "function": "world.maps.bootstrap.sync_grid",
+          "calls": 1,
+          "seconds": 42.85795400699135,
+          "individual_seconds": [
+            42.85795400699135
+          ]
+        },
+        {
+          "function": "world.maps.bootstrap.sync_wilderness",
+          "calls": 2,
+          "seconds": 0.7842808750574477
+        }
+      ]
+    }
+  ]
+}
