@@ -421,6 +421,30 @@ selected_startup_settlements(settlement_ids)  # context manager
 「測試主體是 startup orchestration」的案例使用；預設 full-roster 行為由
 不帶參數的 production 路徑與專門的 default-contract 測試覆蓋。
 
+### 受管瀏覽器 runtime 的物化宣告
+
+受管瀏覽器行程啟動的是一台真實伺服器，因此它也適用同一條邊界：發佈完整，
+物化由宣告決定。`web/tests/browser/fixtures.py` 的
+`journey_settlement_scope()` 由 live 的 `CITY_GATE_REGISTRY` 推導出宣告，
+`web/tests/browser/browser_startstop.py` 的 `apply_settlement_scope()` 只在
+啟動 hook 期間把 `bootstrap.sync_grid`／`bootstrap.sync_wilderness` 兩個
+binding 綁上這個宣告，seed 行程則在整個生命週期套用同一份宣告，兩邊因此不會
+各自物化出不同的世界。`browser_settings` 對每個受管 runtime 都掛上這個
+hook wrapper，shipped 與 synthetic 兩種 catalog 模式因此都走同一條宣告路徑；
+synthetic install 本身仍只由 `ELOSERN_BROWSER_SYNTH_CATALOGS=1` 決定。
+
+宣告推導自 registry，不是複製 roster：今日是兩個 gate map（起始城市與
+`village_ciaran`），裝上 synthetic kit 而多出一列 gate 時會自動變寬。瀏覽器
+journey 只透過 registry 的城門進入持久世界（其餘面板讀的是完整 bundle，
+不需要房間），因此這個宣告就是目前檢查過的 journey 真正需要的地圖集合。
+這不是「任何遺漏都會立刻失敗」的保證：fixture 對可選層本來就有早期返回，
+新增必經地點時必須把它加進宣告，並在 fixture 內明確斷言取得該房間。
+
+修訂前後在同一個 checkout 量到：`sync_map_world` 由 43.6 s + 13.4 s（首啟與
+initial-setup 重啟）降到 2.96 s + 1.03 s，單一行程的開機由 99.7 s 降到 45.0 s。
+這段成本原本是每個分片行程都要付一次，兩個行程同機時會把另一半的 journey 擠出
+它自己的等待上限。
+
 ### 量測診斷（僅供參考，不是門檻）
 
 歷史紀錄顯示 `world.maps.tests.test_bootstrap` 的 50 個 method 從 147.381 s

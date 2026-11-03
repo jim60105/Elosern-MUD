@@ -219,6 +219,38 @@ def create_runtime(prefix: str = "elosern-browser-") -> BrowserRuntime:
     )
 
 
+def journey_settlement_scope() -> tuple[str, ...]:
+    """Settlement map ids a browser runtime materializes.
+
+    Publication stays complete: a runtime adopts the whole authored map world,
+    so every panel a journey reads (world map, local map, travel, legibility)
+    still resolves against the full bundle. Materialization -- the persistent
+    rooms, roads, display cleanup and forward bridge that
+    ``world.maps.bootstrap`` writes -- is declared here instead of covering the
+    whole roster. A browser journey only ever enters that persistent world
+    through a registered city gate: the seeded starting city and the second
+    gate the map-knowledge fixtures record. Those are the maps that must exist
+    as rooms, and materializing the rest costs every shard process more boot
+    time than the journeys it serves.
+
+    The declaration is derived from the live gate registry, never copied from
+    the roster: it is the two shipped gate maps today, and it widens by itself
+    when the installed catalogs (the synthetic kit) register another gate. The
+    seed process and the server process both read it, so seeding and booting
+    cannot disagree, and ``sync_grid``/``sync_wilderness`` still converge these
+    maps through the real planner, transaction and rollback.
+    """
+
+    from world.maps.city_gates import CITY_GATE_REGISTRY
+    from world.maps.static_references import settlement_node_xyz
+
+    return tuple(
+        sorted(
+            {settlement_node_xyz(row.gate)[2] for row in CITY_GATE_REGISTRY.values()}
+        )
+    )
+
+
 def port_env(ports: list[int]) -> dict[str, str]:
     """The runtime env entries pinning the allocated port set."""
     return {

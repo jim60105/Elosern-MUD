@@ -555,9 +555,14 @@ if os.environ.get("ELOSERN_BROWSER_OPTIONS_SURFACE") == "1":
     # seam must be assigned there (the package attribute would be inert).
     _options_service.clients._build_action_options_client = _browser_options_client
 
-# Synthetic-catalog process install (kit design D2b): the wrapper installs at
+# Managed-runtime hook wrapper: every browser runtime installs it, so the
+# startup hook can both install the synthetic catalogs (kit design D2b, only
+# under ``ELOSERN_BROWSER_SYNTH_CATALOGS=1``: the install runs at
 # at_server_init — the first hook Evennia calls, after evennia._init() and
-# before any startup mirroring — and delegates everything else unchanged.
-# Default-off: without the flag the shipped startstop module is used verbatim.
-if os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") == "1":
-    AT_SERVER_STARTSTOP_MODULE = "web.tests.browser.browser_startstop"
+# before any startup mirroring) and converge this runtime's declared
+# settlements instead of the whole authored roster
+# (``web/tests/browser/browser_startstop`` documents both). Every other hook
+# and every shipped-mode step still delegates unchanged, so a runtime booting
+# shipped catalogs behaves exactly as before apart from the bounded
+# materialization.
+AT_SERVER_STARTSTOP_MODULE = "web.tests.browser.browser_startstop"

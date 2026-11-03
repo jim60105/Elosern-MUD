@@ -1,17 +1,22 @@
 """Browser-harness startup-hook wrapper (add-test-synthetic-data-kit, D2b).
 
-Installed as ``AT_SERVER_STARTSTOP_MODULE`` by ``browser_settings`` only when
-``ELOSERN_BROWSER_SYNTH_CATALOGS=1``. The synthetic catalogs cannot be applied
-while settings load: ``world.tests.synthetic_data`` imports Evennia contrib
-code that captures the logger at import time, and the logger only exists after
-``evennia._init()``. The first hook Evennia calls is ``at_server_init``, which
-runs after that bootstrap and before every startup mirroring step — installing
-there means the managed server's ``sync_all``/grid/clock steps all see the
-synthetic catalogs, exactly like the ``ART_SD_CLIENT`` fake-client seam. Every
-other hook delegates unchanged to the production startstop module.
+Installed as ``AT_SERVER_STARTSTOP_MODULE`` by ``browser_settings`` for every
+managed browser runtime. Two test-harness concerns live here, and both are
+gated: the synthetic-catalog install (kit design D2b, only under
+``ELOSERN_BROWSER_SYNTH_CATALOGS=1``) and the runtime's declared settlement
+materialization (:func:`apply_settlement_scope`). The synthetic catalogs cannot
+be applied while settings load: ``world.tests.synthetic_data`` imports Evennia
+contrib code that captures the logger at import time, and the logger only
+exists after ``evennia._init()``. The first hook Evennia calls is
+``at_server_init``, which runs after that bootstrap and before every startup
+mirroring step — installing there means the managed server's
+``sync_all``/grid/clock steps all see the synthetic catalogs, exactly like the
+``ART_SD_CLIENT`` fake-client seam. Every other hook and every shipped-mode
+step delegates unchanged to the production startstop module.
 """
 
 import os
+from contextlib import contextmanager
 
 _PRODUCTION_MODULE = "server.conf.at_server_startstop"
 
@@ -177,6 +182,60 @@ def _production(name):
     return hook
 
 
+def apply_settlement_scope():
+    """Bind the two synchronizers to this runtime's declared settlements.
+
+    A browser shard process boots one real server, and that boot used to
+    converge every authored settlement: with the roster at sixty maps the
+    materialization alone cost ~57 s of every process list (the first boot plus
+    its initial-setup restart), which starved the sibling process on the same
+    runner and pushed journeys past their own waits.
+
+    Only the synchronizer *bindings* are replaced: publication,
+    static-reference validation, the planner, the writer, the transaction and
+    the rollback path all stay production code, and the declaration itself
+    (``fixtures.journey_settlement_scope``) is resolved at call time because the
+    gate registry it derives from needs the world the boot publishes. The
+    returned callable restores both bindings; the one-shot seed process, which
+    exits after seeding, may simply ignore it.
+    """
+
+    from world.maps import bootstrap
+
+    from .fixtures import journey_settlement_scope
+
+    real_sync_grid = bootstrap.sync_grid
+    real_sync_wilderness = bootstrap.sync_wilderness
+
+    def scoped_sync_grid(*args, **kwargs):
+        kwargs.setdefault("settlement_ids", journey_settlement_scope())
+        return real_sync_grid(*args, **kwargs)
+
+    def scoped_sync_wilderness(*args, **kwargs):
+        kwargs.setdefault("settlement_ids", journey_settlement_scope())
+        return real_sync_wilderness(*args, **kwargs)
+
+    bootstrap.sync_grid = scoped_sync_grid
+    bootstrap.sync_wilderness = scoped_sync_wilderness
+
+    def restore() -> None:
+        bootstrap.sync_grid = real_sync_grid
+        bootstrap.sync_wilderness = real_sync_wilderness
+
+    return restore
+
+
+@contextmanager
+def _scoped_settlement_materialization():
+    """Apply :func:`apply_settlement_scope` for the duration of one hook."""
+
+    restore = apply_settlement_scope()
+    try:
+        yield
+    finally:
+        restore()
+
+
 def at_server_init():
     _install_synthetic_catalogs_if_flagged()
     hook = _production("at_server_init")
@@ -194,7 +253,8 @@ def at_server_start():
     if hook is None:
         return None
     if not synth:
-        return hook()
+        with _scoped_settlement_materialization():
+            return hook()
     # The shipped guild-catalog YAML cannot resolve against t_-only
     # registries, and its sync would reload the shipped YAML over the
     # harness catalog installed above — so under the install the step is
@@ -238,7 +298,8 @@ def at_server_start():
 
     module._startup_step = _synth_startup_step
     try:
-        return hook()
+        with _scoped_settlement_materialization():
+            return hook()
     finally:
         module._startup_step = original
 

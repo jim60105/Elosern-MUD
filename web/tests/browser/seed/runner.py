@@ -47,7 +47,10 @@ def main() -> None:
     # shipped-rulebook cross-validators BEFORE the swap, install the kit,
     # redirect the boot quest catalog, graft the entry rank, and assign the
     # shared synthetic guild-economy catalog.
-    from web.tests.browser.browser_startstop import _install_synthetic_catalogs_if_flagged
+    from web.tests.browser.browser_startstop import (
+        _install_synthetic_catalogs_if_flagged,
+        apply_settlement_scope,
+    )
 
     # A map consumer read here (the scene fixture caches the authored room-art
     # vocabulary) needs the adopted world, and the authored sources only
@@ -58,6 +61,12 @@ def main() -> None:
 
     map_runtime.ensure_published()
     _install_synthetic_catalogs_if_flagged()
+    # The fixtures below sync the maps their journeys stand in; binding the two
+    # synchronizers to this runtime's declared settlements keeps the seed and
+    # the server's own boot materializing the same world
+    # (``fixtures.journey_settlement_scope``). This process exits once the
+    # database is seeded, so the binding stays in place for its whole life.
+    apply_settlement_scope()
 
     # The dedicated party-management acceptance fixture is accepted only in
     # this isolated synthetic runtime and must reject an invalid composition
