@@ -44,6 +44,9 @@ from world.maps.tests._editor_adoption_fixtures import (
 class FinalYamlAdoptionTests(_CandidateCase):
     """A moved node keeps its rooms, exits, homes and knowledge."""
 
+    @covers_requirement(
+        "map-runtime-adoption::runtime-adoption-publishes-one-complete-validated-world"
+    )
     def test_a_moved_occupied_node_keeps_rooms_exits_homes_and_knowledge(self):
         # The no-creation assertion below is a whole-candidate claim, so the
         # complete world is converged (unscoped) before the baseline is read.
