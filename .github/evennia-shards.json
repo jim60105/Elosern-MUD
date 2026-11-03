@@ -1009,7 +1009,7 @@
   },
   {
    "name": "maps-36",
-   "workers": 4,
+   "workers": 1,
    "labels": [
     "world.maps.tests.test_runtime_adoption_rollback"
    ],

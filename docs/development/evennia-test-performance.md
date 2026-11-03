@@ -490,11 +490,17 @@ cases）降到 356 秒，但仍有 `maps-35`（runtime adoption）與 `webclient
 單一 class 的 `setUpClass` 成本，`workers` 降為 1，避免 4 份 DB clone 與
 Evennia import 與該 class 競爭 CPU。
 
-最終 46 個分片，仍是「只切不混」。editor 的 moved 案例與 world-map
-measurement 是已知的不可再分割下限：若後續 CI 仍超過 360 秒，只能從
-`sync_grid` 的 ORM 成本或 world-map payload 的組裝成本下手，而不是再切分片。
-`test_world_map_measurement` 的 57 秒本機成本來自 `representative_payload()`
-第一次組裝真實大陸／district 世界（`one_km` 與 `worst` 各不到 1 秒）。
+第五次推送（run 41685640231，46 個分片）全綠，只剩下兩個單一 class 的分片
+超過 360 秒：`webclient-42`（world-map measurement）387 秒與 `maps-36`
+（runtime adoption rollback）366 秒。兩者的 `workers` 都降為 1（單一 class
+不需要平行 worker，少掉 DB clone 與重複 import 對完整世界收斂的競爭）。
+
+最終 46 個分片，仍是「只切不混」。editor 的 moved 案例、runtime 的 rollback
+案例與 world-map measurement 是已知的不可再分割下限：若後續 CI 仍超過
+360 秒，只能從 `sync_grid` 的 ORM 成本或 world-map payload 的組裝成本下手，
+而不是再切分片。`test_world_map_measurement` 的 57 秒本機成本來自
+`representative_payload()` 第一次組裝真實大陸／district 世界（`one_km` 與
+`worst` 各不到 1 秒）。
 
 editor 的完整世界契約維持不變：兩個 moved-node method 仍各自在完整世界上
 做一次真實收斂（本機 4 tests 78.6 秒），不靠縮小 fixture 換時間。
