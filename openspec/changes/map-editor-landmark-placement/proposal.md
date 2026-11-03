@@ -28,7 +28,7 @@ None.
 
 - Service: `tools/map-editor/elosern_map_editor/snapshot.py` (`_project` district rows). Command handling in `geography.py` (`SetDistrictField`, `_landmark`) is reused unchanged.
 - Frontend: `tools/map-editor/frontend/src/lib/map_scene.js` (`continentScene`), `src/lib/continent.js` (new `wildernessLandmark` descriptor helper), `src/App.vue` (`continentMove`), `src/components/MapSurface.vue` (landmark glyph), `src/styles/editor.css` (gold-on-ink landmark styles from the existing theme tokens, no new font sizes). `ContinentInspector.vue` is fixed by the projection change alone and is not edited.
-- Tests: `tools/map-editor/frontend/tests/continent.test.mjs`, `tests/test_map_editor_geography.py` (real process), `web/tests/browser/test_map_editor_geography.py` (Playwright drag, reload and persistence).
+- Tests: `tools/map-editor/frontend/tests/continent.test.mjs`, `tests/test_map_editor_geography.py` (real process), `web/tests/browser/test_map_editor_geography.py` (Playwright drag, reload, persistence and refused drop), and `web/tests/browser/test_map_capture_surface.py` (its expected continent mark count now includes resolvable landmarks).
 - Skill and docs: `.agents/skills/map-data-authoring/**`, `docs/development/map-editor.md`.
 - Game runtime, map-core schema, the partition algorithm and authored map data are unchanged. No data migration.
 - Human-reviewed, not tested: the visual legibility of the landmark glyph and its labels against the ink/gold theme at 1451x790 and 2560x1440. This is reviewed through the agent-browser screenshots that `design.md` names. The skill's prose quality is also reviewed by a person.

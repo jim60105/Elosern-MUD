@@ -82,7 +82,7 @@ Rationale: the frontend rule is that every coordinate comes from the service (`m
 
 ### D2. Landmark marks reuse the district reference and live on the `locations` layer
 
-In `map_scene.js::continentScene`, append one mark per district with an array centre, after the `pass` marks and before the handle loop (so handles still draw above):
+In `map_scene.js::continentScene`, insert one mark per district with an array centre as the **first** spread entry of the `marks` array literal, before the `world.locations.map(...)` entry. SVG draws later marks on top. Landmarks therefore sit underneath locations, sites, fords, passes and handles, and every existing mark keeps its current hit area. This matters because a settlement-node landmark lies a few pixels from its settlement's location mark, and existing location-drag tests start their drag near that edge:
 
 ```js
 ...(world.districts ?? [])
@@ -111,6 +111,8 @@ Rationale:
 - The mark id equals `district:<id>`. A click therefore selects the district through the existing `objectCatalog`, `ContinentInspector` and OMP-context paths, with no new reference grammar.
 - `locations` is the layer for authored placement points (locations and harbour sites). `partition` is labelled 衍生・唯讀 and an existing test requires that no mark sits on it.
 
+A landmark hidden under a location mark stays selectable: pick it through the object list (`分區 …`) or the inspector, and the mark then shows `map-mark--selected`. Wilderness landmarks rarely share a pixel with another mark.
+
 Alternative rejected: a new `district_landmark:<id>` reference. It would need catalog, inspector, deletion and context-copy support for no user-visible gain.
 
 ### D3. Drag routing builds one full wilderness reference
@@ -132,7 +134,16 @@ if (parsed?.kind === "district") {
 }
 ```
 
-Import `districtField` and `wildernessLandmark` from `./lib/continent.js` if they are not already imported. A non-wilderness landmark is never draggable (D2), and this guard makes a stray event a no-op. A negative cell from dropping west or south of the frame goes to the service and is refused, and the existing `.finally(settle)` returns the mark to its saved position. This is the server-side rejection path. No client check is added.
+Import `districtField` and `wildernessLandmark` from `./lib/continent.js` if they are not already imported.
+
+Layer toggle: `App.vue::toggleLayer` prunes a selected continent ref that is missing from the visible scene's `items`. Landmark marks are not in `items` (D2), so hiding 分區 would drop a district selected through its mark even though the mark still draws on 地點. Replace its `visible` line with:
+
+```js
+const visible = new Set([...(next?.items ?? []), ...(next?.marks ?? [])].map((mark) => mark.id));
+```
+
+Every non-landmark mark id is already in `items`, so this changes nothing else.
+ A non-wilderness landmark is never draggable (D2), and this guard makes a stray event a no-op. A negative cell from dropping west or south of the frame goes to the service and is refused, and the existing `.finally(settle)` returns the mark to its saved position. This is the server-side rejection path. No client check is added.
 
 ### D4. Glyph and theme
 
@@ -174,13 +185,14 @@ Only existing tokens are used, and the label reuses `.map-mark__label` (`--text-
 
 ### D6. Verification split
 
-- Mechanism (traceable): the real-process test in `tests/test_map_editor_geography.py` checks the projection, the one-owner write and the refusal. The Playwright test in `web/tests/browser/test_map_editor_geography.py` checks the drag, undo, reload, persisted cell and non-draggable referenced mark. Until archive sync, both carry the nearest current canonical ID, `map-editor-geography::continental-authored-inputs-have-direct-and-explicit-editing-controls`, because an ADDED requirement has no canonical ID before sync. At archive they are re-mounted to the ID that `tools.spec_traceability list` generates for the new requirement.
+- Mechanism (traceable): the real-process test in `tests/test_map_editor_geography.py` checks the projection, the one-owner write and the refusal. The Playwright test in `web/tests/browser/test_map_editor_geography.py` checks mark selection, the drag, undo, reload, the persisted cell, the non-draggable referenced mark, and a refused off-frame drop that returns the mark to its saved position. Until archive sync, both carry the nearest current canonical ID, `map-editor-geography::continental-authored-inputs-have-direct-and-explicit-editing-controls`, because an ADDED requirement has no canonical ID before sync. At archive they are re-mounted to the ID that `tools.spec_traceability list` generates for the new requirement.
 - Scene logic (untraced): Node tests in `frontend/tests/continent.test.mjs`.
 - Human-reviewed (not tested): the agent-browser screenshots from task 5 at 1451x790 and 2560x1440 are the review document for glyph legibility, label clutter at overview zoom, and fidelity to the ink/gold theme. Store them under the worker's scratchpad, attach them in the apply report, and do not commit them.
 
 ## Risks / Trade-offs
 
 - [Many labels at continent overview add clutter] → Labels reuse the existing `showLabel` path. The human reviewer judges clutter from the task 5 screenshots. A follow-up may add label LOD, which is out of scope here.
-- [A landmark mark sits on the same cell as a location mark] → Landmark marks are appended after location marks, so they draw on top and win the hit test. The browser test uses the synthetic `synthetic_north` district at cell (3, 25), where no location exists.
+- [A landmark mark sits on or near a location mark] → Landmark marks draw first (D2), so existing marks keep their hit areas and the location-drag workflow test is unaffected. A covered landmark is selected through the object list. The browser test drags and clicks `synthetic_north` at cell (3, 25), where no other mark exists. It selects the covered `synthetic_district` landmark through the object list. Task 3.2 re-runs the location-drag workflow tests.
+- [The offline capture renders the same scene, so its continent mark count grows] → `web/tests/browser/test_map_capture_surface.py::continent_mark_count` adds resolvable landmarks (task 3.2).
 - [Changing the projected `landmark.cell` shape breaks a consumer] → The frontend readers (`relations.js`, `settlement.js`, `interior.js`, `diagnostics.js`) read only `domain`, `map_id` and `object_id`. `ContinentInspector.vue` expects the pair. Python tests read `landmark["object_id"]` from the projection, and `landmark["cell"]` only from the YAML file. The full `pnpm --dir tools/map-editor/frontend test` and `tools/map-editor` pytest runs in task 4 confirm this.
 - [A drag converts nothing but still triggers a partition-stale state] → Expected. Any district change stales the partition, as documented in the skill.

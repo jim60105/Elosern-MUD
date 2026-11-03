@@ -19,7 +19,11 @@ The editor SHALL project each district landmark's authored cell as a pair and it
 
 #### Scenario: Referenced landmark follows its referent
 - **WHEN** a district landmark references a location or a settlement node
-- **THEN** its mark is drawn at the referent's centre, is not draggable, and selecting it selects the district without writing any document
+- **THEN** its mark is drawn at the referent's centre and is not draggable, and selecting its district writes no document and marks that landmark selected
+
+#### Scenario: Selecting a landmark mark selects its district
+- **WHEN** a landmark mark is clicked on the continent canvas
+- **THEN** its district becomes the selection and the district inspector opens, with no command sent
 
 #### Scenario: Unfinished and refused placements
 - **WHEN** a landmark command places the cell on water or an unreachable cell, or carries a negative cell
