@@ -931,7 +931,10 @@
    "workers": 4,
    "labels": [
     "world.maps.tests.test_altoria_capital",
-    "world.maps.tests.test_bootstrap"
+    "world.maps.tests.test_bootstrap",
+    "world.maps.tests.test_city_movement_cost",
+    "world.maps.tests.test_city_walkthrough",
+    "world.maps.tests.test_city_wilderness_roundtrip"
    ],
    "index": 28
   },
@@ -947,9 +950,6 @@
    "name": "maps-30",
    "workers": 4,
    "labels": [
-    "world.maps.tests.test_city_movement_cost",
-    "world.maps.tests.test_city_walkthrough",
-    "world.maps.tests.test_city_wilderness_roundtrip",
     "world.maps.tests.test_editor_final_yaml_adoption"
    ],
    "index": 30
@@ -1107,14 +1107,21 @@
    "name": "webclient-40",
    "workers": 4,
    "labels": [
-    "web.webclient.presentation.tests.test_world_map_transport",
-    "web.webclient.presentation.tests.test_world_map_measurement",
-    "web.webclient.presentation.tests.test_world_map"
+    "web.webclient.presentation.tests.test_world_map_measurement"
    ],
    "index": 40
   },
   {
    "name": "webclient-41",
+   "workers": 4,
+   "labels": [
+    "web.webclient.presentation.tests.test_world_map_transport",
+    "web.webclient.presentation.tests.test_world_map"
+   ],
+   "index": 41
+  },
+  {
+   "name": "webclient-42",
    "workers": 4,
    "labels": [
     "web.webclient.presentation.tests.test_party_inventory_panel",
@@ -1130,10 +1137,10 @@
     "web.webclient.presentation.tests.test_title_codex_panel",
     "web.webclient.presentation.tests.test_dialogue_reading_projection"
    ],
-   "index": 41
+   "index": 42
   },
   {
-   "name": "webclient-42",
+   "name": "webclient-43",
    "workers": 4,
    "labels": [
     "web.webclient.presentation.tests.test_art_panel",
@@ -1170,7 +1177,7 @@
     "web.webclient.presentation.tests.test_title_ballot_panel",
     "web.webclient.presentation.tests.test_watchers"
    ],
-   "index": 42
+   "index": 43
   }
  ]
 }
