@@ -28,6 +28,7 @@ import {
   KM,
   cellOfMetres,
   deleteLocation,
+  districtField,
   documentCommand,
   featurePoints,
   insertPoint,
@@ -41,6 +42,7 @@ import {
   siteField,
   storedFromMetres,
   footprintCell,
+  wildernessLandmark,
 } from "./lib/continent.js";
 import {
   NUDGE_M,
@@ -513,7 +515,7 @@ async function toggleLayer(key) {
   }
   // A selected object on a now-hidden layer leaves the selection.
   const next = visibleScene(fullScene.value, hidden);
-  const visible = new Set((next?.items ?? next?.marks ?? []).map((mark) => mark.id));
+  const visible = new Set([...(next?.items ?? []), ...(next?.marks ?? [])].map((mark) => mark.id));
   const kept = selection.value.filter((ref) => catalog.value.get(ref)?.domain !== "continent" || visible.has(ref));
   if (kept.length !== selection.value.length && !(await canLeaveFields())) return;
   hiddenLayers.value = hidden;
@@ -737,6 +739,12 @@ function continentMove(id, point) {
     const site = world.value.continent.harbor_sites.find((row) => row.id === parsed.id);
     const cell = cellOfMetres(world.value, point);
     return site && !sameStored(site.cell, cell) ? siteField(parsed.id, "cell", cell) : null;
+  }
+  if (parsed?.kind === "district") {
+    const district = (world.value.districts ?? []).find((row) => row.id === parsed.id);
+    if (!district || district.landmark?.domain !== "wilderness_cell") return null;
+    const cell = cellOfMetres(world.value, point);
+    return sameStored(district.landmark.cell, cell) ? null : districtField(district.id, "landmark", wildernessLandmark(cell));
   }
   const location = world.value.locations.find((row) => row.qualified_ref === id);
   if (location) {

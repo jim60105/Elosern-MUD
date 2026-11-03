@@ -22,7 +22,7 @@ export const CAPTURE_VIEWS = Object.freeze(["continent", "settlement", "interior
 
 /** The layers each view can draw, defaults all visible. */
 export const CAPTURE_LAYERS = Object.freeze({
-  continent: Object.freeze(["terrain", "water", "ridge", "locations", "footprint", "partition", "labels"]),
+  continent: Object.freeze(["terrain", "water", "ridge", "locations", "landmarks", "footprint", "partition", "labels"]),
   settlement: Object.freeze(["nodes", "roads", "labels"]),
   interior: Object.freeze(["rooms", "connections", "exterior", "labels"]),
 });

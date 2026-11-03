@@ -43,7 +43,7 @@ DEFAULT_WIDTH = 1280
 DEFAULT_HEIGHT = 960
 #: Every layer each view paints; all of them are visible unless hidden.
 LAYERS: dict[str, tuple[str, ...]] = {
-    "continent": ("terrain", "water", "ridge", "locations", "footprint", "partition", "labels"),
+    "continent": ("terrain", "water", "ridge", "locations", "landmarks", "footprint", "partition", "labels"),
     "settlement": ("nodes", "roads", "labels"),
     "interior": ("rooms", "connections", "exterior", "labels"),
 }

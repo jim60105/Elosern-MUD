@@ -17,6 +17,8 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+
+from ruamel.yaml import YAML
 from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -120,6 +122,81 @@ class GeographyProcessTests(unittest.TestCase):
         # A second consecutive edit is still admitted while the partition is stale.
         status, _ = self.send(editor, "move_control_point", CONTINENT, {"feature": RIVER, "index": 0, "point": [20, 24]})
         self.assertEqual(status, 200)
+
+    @covers_requirement("map-editor-geography::district-landmark-positions-are-placed-on-the-continent-canvas")
+    def test_district_landmarks_project_their_referent_centre_and_a_wilderness_move_writes_only_districts(self):
+        data = synthetic.partitionable_districts_data()
+        data["districts"]["synthetic_location_mark"] = {
+            "district_name_zh": "合成地點區",
+            "landmark_name_zh": "合成地點地標",
+            "landmark": {"domain": "location", "map_id": None, "object_id": synthetic.LOCATION_ID, "cell": None},
+            "kind": "voronoi",
+            "region_key": None,
+        }
+        data["districts"]["synthetic_room_mark"] = {
+            "district_name_zh": "合成房間區",
+            "landmark_name_zh": "合成房間地標",
+            "landmark": {"domain": "interior_room", "map_id": synthetic.INTERIOR_ID, "object_id": "front",
+                         "cell": None},
+            "kind": "voronoi",
+            "region_key": None,
+        }
+        (self.workspace / DISTRICTS).write_text(synthetic.yaml_text(data), encoding="utf-8")
+        # A stale artifact makes the service report the expected signature.
+        self.workspace.joinpath(PARTITION).parent.mkdir(parents=True, exist_ok=True)
+        self.workspace.joinpath(PARTITION).write_text(
+            json.dumps({"version": 2, "algorithm_version": 1, "source_signature": "0" * 64, "fingerprint": "s"}),
+            encoding="utf-8",
+        )
+        editor = self.start()
+        state = editor.workspace_state()
+        if state["preview_state"] != "current":
+            print(state["diagnostics"])
+        self.assertEqual(state["preview_state"], "current")
+        rows = {row["id"]: row for row in state["world"]["districts"]}
+        # A settlement-node landmark sits at the node's derived world position.
+        self.assertIsNone(rows["synthetic_district"]["landmark"]["cell"])
+        self.assertEqual(rows["synthetic_district"]["landmark_centre_m"], [5800, 5900])
+        # A wilderness landmark projects its cell as a pair and its cell centre.
+        self.assertEqual(rows["synthetic_north"]["landmark"]["cell"], [3, 25])
+        self.assertEqual(rows["synthetic_north"]["landmark_centre_m"], [3500, 25500])
+        location = next(row for row in state["world"]["locations"] if row["id"] == synthetic.LOCATION_ID)
+        self.assertEqual(rows["synthetic_location_mark"]["landmark_centre_m"], location["centre_m"])
+        self.assertIsNone(rows["synthetic_room_mark"]["landmark_centre_m"])
+
+        self.sign_partition(editor)
+        before = synthetic.tree_digest(self.workspace)
+
+        def move(cell):
+            return self.send(editor, "set_district_field", DISTRICTS, {
+                "district_id": "synthetic_north",
+                "field": "landmark",
+                "value": {"domain": "wilderness_cell", "map_id": None, "object_id": None, "cell": cell},
+            })
+
+        status, body = move([4, 26])
+        self.assertEqual(status, 200, body)
+        self.assertEqual(self.changed(before), {DISTRICTS})
+        authored = YAML(typ="safe", pure=True).load((self.workspace / DISTRICTS).read_text(encoding="utf-8"))
+        self.assertEqual(authored["districts"]["synthetic_north"]["landmark"]["cell"], {"cell_x": 4, "cell_y": 26})
+        state = editor.workspace_state()
+        row = next(row for row in state["world"]["districts"] if row["id"] == "synthetic_north")
+        self.assertEqual(row["landmark"]["cell"], [4, 26])
+        self.assertEqual(row["landmark_centre_m"], [4500, 26500])
+        self.assertEqual(state["partition_status"]["status"], "stale")
+        self.assertEqual(_sha(self.workspace / PARTITION), before[PARTITION])
+
+        # A negative cell is refused and writes nothing.
+        before = synthetic.tree_digest(self.workspace)
+        status, body = move([-1, 26])
+        self.assertEqual(status, 400, body)
+        self.assertEqual(synthetic.tree_digest(self.workspace), before)
+
+        # A water cell saves as diagnosed work in progress.
+        status, body = move([20, 20])
+        self.assertEqual(status, 200, body)
+        codes = {item["code"] for item in editor.workspace_state()["diagnostics"]}
+        self.assertIn("unreachable_landmark", codes)
 
     @covers_requirement("map-editor-geography::continental-authored-inputs-have-direct-and-explicit-editing-controls")
     @covers_requirement(

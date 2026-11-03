@@ -44,7 +44,7 @@ Capture rendering SHALL default every applicable layer on and hide only explicit
 
 #### Scenario: Continent layers
 - **WHEN** each continent layer is independently hidden
-- **THEN** terrain controls mainland, terrain/passability raster and forest edge; water controls waterways; ridge controls ridge walls, passes and fords; locations controls locations and reserved harbour sites; footprint controls settlement footprints; partition controls derived national borders and district outlines; labels controls normally drawn names, IDs and connection text
+- **THEN** terrain controls mainland, terrain/passability raster and forest edge; water controls waterways; ridge controls ridge walls, passes and fords; locations controls locations and reserved harbour sites; landmarks controls district landmark marks; footprint controls settlement footprints; partition controls derived national borders and district outlines; labels controls normally drawn names, IDs and connection text
 
 #### Scenario: Settlement and interior layers
 - **WHEN** settlement nodes or roads, or interior rooms, connections or exterior are independently hidden

@@ -131,6 +131,17 @@ export function continentScene(world, selection = [], partition = null) {
     ),
   ];
   const marks = [
+    ...(world.districts ?? [])
+      .filter((district) => Array.isArray(district.landmark_centre_m))
+      .map((district) => ({
+        id: districtRef(district.id),
+        kind: "landmark",
+        label: district.landmark_name_zh,
+        role: district.landmark?.domain === "wilderness_cell" ? "landmark" : "landmark-linked",
+        layer: "landmarks",
+        draggable: district.landmark?.domain === "wilderness_cell",
+        ...point(district.landmark_centre_m),
+      })),
     ...world.locations.map((location) => ({
       id: location.qualified_ref,
       kind: "location",
@@ -198,7 +209,10 @@ export function continentScene(world, selection = [], partition = null) {
       .filter((settlement) => settlement.footprint)
       .map((settlement) => ({ id: footprintRef(settlement.id), label: `${settlement.id} 佔地`, layer: "footprint" })),
   ];
-  const items = [...listed, ...marks.map((mark) => ({ id: mark.id, label: mark.label, layer: mark.layer }))];
+  const items = [
+    ...listed,
+    ...marks.filter((mark) => mark.kind !== "landmark").map((mark) => ({ id: mark.id, label: mark.label, layer: mark.layer })),
+  ];
   const frame = continent.frame_cells * cell;
   const raster = preview
     ? { preview, west: 0, south: 0, east: preview.columns * preview.step * cell, north: preview.rows * preview.step * cell, layer: "terrain" }

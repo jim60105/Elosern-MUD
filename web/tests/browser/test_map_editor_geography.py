@@ -143,6 +143,16 @@ class MapEditorGeographyBrowserTest(unittest.TestCase):
     def route(self):
         return self.data(CONTINENT)["terrain"]["waterways"]["synthetic_river"]["route"]
 
+    def drag(self, locator, dx: float, dy: float) -> None:
+        box = locator.bounding_box()
+        x = box["x"] + box["width"] / 2
+        y = box["y"] + box["height"] / 2
+        self.page.mouse.move(x, y)
+        self.page.mouse.down()
+        for index in range(1, 6):
+            self.page.mouse.move(x + dx * index / 5, y + dy * index / 5)
+        self.page.mouse.up()
+
     # -- tests -----------------------------------------------------------
     def test_a_river_point_drag_is_one_continent_command_that_stales_the_partition(self):
         self.start(self.sign_partition)
@@ -291,6 +301,131 @@ class MapEditorGeographyBrowserTest(unittest.TestCase):
         self.assertIn("unreachable_landmark", codes)
         page.click("[data-diagnostics-toggle]")
         self.assertGreaterEqual(page.locator('[data-diagnostic="unreachable_landmark"]').count(), 1)
+
+    @covers_requirement("map-editor-geography::district-landmark-positions-are-placed-on-the-continent-canvas")
+    def test_a_wilderness_landmark_drag_is_one_district_command_that_survives_reload(self):
+        def prepare(workspace: Path) -> None:
+            (workspace / DISTRICTS).write_text(
+                synthetic.yaml_text(synthetic.partitionable_districts_data()), encoding="utf-8"
+            )
+            self.sign_partition(workspace)
+
+        self.start(prepare)
+        page = self.open()
+        north = '[data-qualified-ref="district:synthetic_north"][data-kind="landmark"]'
+        linked = '[data-qualified-ref="district:synthetic_district"][data-kind="landmark"]'
+        # The landmark layer starts hidden; showing it is a view preference.
+        self.assertEqual(page.locator('[data-kind="landmark"]').count(), 0)
+        page.click('[data-layer="landmarks"]')
+        mark = page.locator(north)
+        mark.wait_for()
+        self.assertEqual(mark.get_attribute("data-draggable"), "true")
+        self.assertIsNone(page.locator(linked).get_attribute("data-draggable"))
+
+        # A click on a landmark selects its district; the referenced landmark
+        # (drawn beneath its settlement's location mark) is selected through
+        # the object list. Neither writes anything.
+        hit = mark.locator("circle.map-mark__hit")
+        hit.click()
+        self.wait_for(
+            lambda: page.locator("[data-inspector-ref]").inner_text() == "district:synthetic_north",
+            "a click on the landmark did not select its district",
+        )
+        page.click('[data-object="district:synthetic_district"]')
+        self.wait_for(
+            lambda: page.locator("[data-inspector-ref]").inner_text() == "district:synthetic_district",
+            "the object list did not select the referenced landmark's district",
+        )
+        self.assertIn("map-mark--selected", page.locator(linked).get_attribute("class"))
+        self.assertEqual(self.names(), [])
+        self.assertEqual(self.changed(), set())
+
+        def cell():
+            return self.data(DISTRICTS)["districts"]["synthetic_north"]["landmark"]["cell"]
+
+        saved = {"cell_x": 3, "cell_y": 25}
+        self.drag(hit, 0, -60)
+        self.wait_for(lambda: cell() != saved, "the landmark drag was not saved")
+        self.settle(page)
+        self.assertEqual(self.names(), ["set_district_field"])
+        self.assertEqual(self.changed(), {DISTRICTS})
+        moved = cell()
+        self.assertGreater(moved["cell_y"], 25)
+        self.wait_for(
+            lambda: page.locator('[data-chip="partition"]').get_attribute("data-chip-state") == "stale",
+            "the partition chip did not turn stale",
+        )
+
+        page.keyboard.press("Control+z")
+        self.wait_for(lambda: cell() == saved, "undo did not restore the landmark")
+        self.settle(page)
+        self.assertEqual(self.names()[-1], "undo")
+        page.keyboard.press("Control+Shift+z")
+        self.wait_for(lambda: cell() == moved, "redo did not restore the moved landmark")
+        self.settle(page)
+        self.assertEqual(self.names()[-1], "redo")
+
+        page.reload()
+        page.wait_for_selector('[data-preview-state="current"]', timeout=15000)
+        page.click('[data-layer="landmarks"]')
+        mark = page.locator(north)
+        hit = mark.locator("circle.map-mark__hit")
+        hit.click()
+        page.locator('[data-landmark-field="x"]').wait_for()
+        self.assertEqual(page.locator('[data-landmark-field="x"]').input_value(), str(moved["cell_x"]))
+        self.assertEqual(page.locator('[data-landmark-field="y"]').input_value(), str(moved["cell_y"]))
+        row = next(
+            row for row in self.editor.workspace_state()["world"]["districts"] if row["id"] == "synthetic_north"
+        )
+        self.assertEqual(row["landmark_centre_m"], [moved["cell_x"] * 1000 + 500, moved["cell_y"] * 1000 + 500])
+
+        # A drop west of the frame is refused by the service: nothing is
+        # written and the mark returns to its saved position. The refusal
+        # banner can resize the canvas, so the saved position is checked
+        # against two location marks rather than as a raw screen transform.
+        posts = len(self.posts)
+        self.baseline = synthetic.tree_digest(self.workspace)
+        self.drag(hit, -120, 0)
+        self.wait_for(lambda: len(self.posts) == posts + 1, "the off-frame drop was not sent")
+        self.settle(page)
+        self.assertEqual(self.names()[-1], "set_district_field")
+        self.assertEqual(self.changed(), set())
+        centres = {row["id"]: row["centre_m"] for row in self.editor.workspace_state()["world"]["locations"]}
+        first, second = centres[synthetic.LOCATION_ID], centres[synthetic.BARE_LOCATION_ID]
+        saved_m = row["landmark_centre_m"]
+
+        def screen(selector):
+            transform = page.locator(selector).get_attribute("transform")
+            x, y = transform.removeprefix("translate(").removesuffix(")").split()
+            return float(x), float(y)
+
+        def at_saved_position():
+            if page.locator(north).get_attribute("data-draft") is not None:
+                return False
+            a = screen(f'[data-qualified-ref="location:{synthetic.LOCATION_ID}"]')
+            b = screen(f'[data-qualified-ref="location:{synthetic.BARE_LOCATION_ID}"]')
+            expected = [
+                a[axis] + (b[axis] - a[axis]) * (saved_m[axis] - first[axis]) / (second[axis] - first[axis])
+                for axis in (0, 1)
+            ]
+            actual = screen(north)
+            return all(abs(actual[axis] - expected[axis]) <= 1.0 for axis in (0, 1))
+
+        self.wait_for(at_saved_position, "the refused landmark did not return to its saved position")
+
+        # Hiding the landmark layer keeps the district selected while its
+        # object-list entry stays visible on the partition layer; hiding that
+        # layer as well leaves the district reachable nowhere, so it drops.
+        page.click('[data-layer="landmarks"]')
+        self.wait_for(lambda: page.locator('[data-kind="landmark"]').count() == 0, "the landmark layer did not hide")
+        self.assertEqual(page.locator("[data-inspector-ref]").inner_text(), "district:synthetic_north")
+        page.click('[data-layer="partition"]')
+        inspected = page.locator("[data-inspector-ref]")
+        self.wait_for(
+            lambda: inspected.count() == 0 or inspected.inner_text() != "district:synthetic_north",
+            "the district stayed selected with neither of its layers visible",
+        )
+        self.assertEqual(self.changed(), set())
 
     def test_clicking_a_feature_shape_selects_it_and_shows_its_handles(self):
         self.start()

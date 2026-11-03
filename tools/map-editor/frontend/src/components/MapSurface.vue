@@ -324,6 +324,12 @@ defineExpose({ element, ready });
         <rect v-else x="-5" y="-5" width="10" height="10" class="map-mark__site" />
         <text v-if="mark.showLabel !== false" y="-14" class="map-mark__label">{{ mark.label }}</text>
       </template>
+      <template v-else-if="mark.kind === 'landmark'">
+        <circle r="16" class="map-mark__hit" />
+        <circle v-if="chosen.has(mark.id)" r="14" class="map-mark__ring" />
+        <path d="M0 -7 L7 0 L0 7 L-7 0 Z" class="map-mark__landmark" />
+        <text v-if="mark.showLabel !== false" y="-14" class="map-mark__label">{{ mark.label }}</text>
+      </template>
       <template v-else>
         <circle r="16" class="map-mark__hit" />
         <template v-if="chosen.has(mark.id)">

@@ -25,7 +25,7 @@ See proposal.md (Why) for motivation. These are the facts the design depends on.
 - No new placement tool button and no click-to-place mode. Drag plus the existing numeric inspector is the whole surface.
 - No changes to the domain (reference vs. cell) by drag. Converting a referenced landmark into a wilderness cell stays a deliberate act in the inspector's 領域 selector.
 - No client-side placement validation: no spacing, sea, region or reachability checks and no disabled-drop UI. Rejection belongs to the service and diagnostics belong to the core.
-- No new continent layer, no capture CLI flag change, no partition regeneration, no map-core or game change.
+- No capture CLI flag change beyond the new `landmarks` layer name, no partition regeneration, no map-core or game change.
 - No keyboard nudge for landmarks. The inspector's numeric fields are the non-drag path the existing requirement already demands.
 
 ## Decisions
@@ -80,7 +80,7 @@ Rationale: the frontend rule is that every coordinate comes from the service (`m
 
 `district.landmark` is the core's `QualifiedRef`, and `landmark.cell` is indexable as `cell[0]`, `cell[1]`. `elosern_map_core.authoring._candidate_protected_cells` already reads it that way.
 
-### D2. Landmark marks reuse the district reference and live on the `locations` layer
+### D2. Landmark marks reuse the district reference and live on their own `landmarks` layer
 
 In `map_scene.js::continentScene`, insert one mark per district with an array centre as the **first** spread entry of the `marks` array literal, before the `world.locations.map(...)` entry. SVG draws later marks on top. Landmarks therefore sit underneath locations, sites, fords, passes and handles, and every existing mark keeps its current hit area. This matters because a settlement-node landmark lies a few pixels from its settlement's location mark, and existing location-drag tests start their drag near that edge:
 
@@ -92,7 +92,7 @@ In `map_scene.js::continentScene`, insert one mark per district with an array ce
     kind: "landmark",
     label: district.landmark_name_zh,
     role: district.landmark?.domain === "wilderness_cell" ? "landmark" : "landmark-linked",
-    layer: "locations",
+    layer: "landmarks",
     draggable: district.landmark?.domain === "wilderness_cell",
     ...point(district.landmark_centre_m),
   })),
@@ -109,7 +109,8 @@ const items = [
 
 Rationale:
 - The mark id equals `district:<id>`. A click therefore selects the district through the existing `objectCatalog`, `ContinentInspector` and OMP-context paths, with no new reference grammar.
-- `locations` is the layer for authored placement points (locations and harbour sites). `partition` is labelled 衍生・唯讀 and an existing test requires that no mark sits on it.
+- Landmarks get their own layer, 地標 (`landmarks`), placed right after 地點 in `layers.js::CONTINENT_LAYERS` with `visible: false`. About 120 landmark labels clutter the whole-continent view (task 5 screenshots), and on a shared `locations` layer the only way to hide them would also hide location marks. An author turns 地標 on to see, select or drag landmarks. `partition` is labelled 衍生・唯讀 and an existing test requires that no mark sits on it.
+- Offline capture paints every layer by default (`map-offline-rendering`), so `landmarks` joins the continent vocabulary in `capture.py::LAYERS`, `capture.js::CAPTURE_LAYERS` and the capture tests, and is painted unless hidden. The editor's hidden-by-default preference does not apply to captures.
 
 A landmark hidden under a location mark stays selectable: pick it through the object list (`分區 …`) or the inspector, and the mark then shows `map-mark--selected`. Wilderness landmarks rarely share a pixel with another mark.
 
@@ -136,13 +137,13 @@ if (parsed?.kind === "district") {
 
 Import `districtField` and `wildernessLandmark` from `./lib/continent.js` if they are not already imported.
 
-Layer toggle: `App.vue::toggleLayer` prunes a selected continent ref that is missing from the visible scene's `items`. Landmark marks are not in `items` (D2), so hiding 分區 would drop a district selected through its mark even though the mark still draws on 地點. Replace its `visible` line with:
+Layer toggle: `App.vue::toggleLayer` prunes a selected continent ref that is missing from the visible scene's `items`. Landmark marks are not in `items` (D2), so hiding 分區 would drop a district selected through its mark even though the mark still draws on 地標. Replace its `visible` line with:
 
 ```js
 const visible = new Set([...(next?.items ?? []), ...(next?.marks ?? [])].map((mark) => mark.id));
 ```
 
-Every non-landmark mark id is already in `items`, so this changes nothing else.
+Every non-landmark mark id is already in `items`, so this changes nothing else. A selected district therefore survives a layer toggle while either its 分區 list entry or its 地標 mark stays visible: hiding 地標 drops it only when 分區 is hidden too, the same rule every other layer follows.
  A non-wilderness landmark is never draggable (D2), and this guard makes a stray event a no-op. A negative cell from dropping west or south of the frame goes to the service and is refused, and the existing `.finally(settle)` returns the mark to its saved position. This is the server-side rejection path. No client check is added.
 
 ### D4. Glyph and theme
@@ -177,11 +178,11 @@ Only existing tokens are used, and the label reuses `.map-mark__label` (`--text-
 
 ### D5. Skill and docs
 
-- `.agents/skills/map-data-authoring/SKILL.md`, "Add or move a district" recipe: an author can drag a wilderness-cell landmark's gold diamond on the continent canvas (地點 layer). The drag is one `set_district_field` landmark command that writes only `districts.yaml`. Referenced landmarks (hollow diamond) follow their referent and do not drag. Afterwards, run the check, run `place_sites.py --landmarks --min-km 100` for Voronoi spacing, and regenerate the partition. The "Placing sites" section lists `--landmarks`.
+- `.agents/skills/map-data-authoring/SKILL.md`, "Add or move a district" recipe: an author can drag a wilderness-cell landmark's gold diamond on the continent canvas after turning on the 地標 layer, which is hidden by default. The drag is one `set_district_field` landmark command that writes only `districts.yaml`. Referenced landmarks (hollow diamond) follow their referent and do not drag. Afterwards, run the check, run `place_sites.py --landmarks --min-km 100` for Voronoi spacing, and regenerate the partition. The "Placing sites" section lists `--landmarks`.
 - `references/locations-and-districts.md`, "Editor equivalents": the drag path, the four-key wilderness value it writes, the non-draggable domains, the 400 refusal for negative cells, and that sea or unreachable cells save as diagnosed work in progress. Also note that the editor projection exposes `landmark.cell` as `[x, y]` and `landmark_centre_m`, while the YAML keeps `{cell_x, cell_y}`.
-- `references/verification.md`: the capture layer table row for `continent` / `locations` becomes "locations, reserved harbour sites and district landmarks".
+- `references/verification.md` and SKILL.md's `--hide` list: a capture layer row `continent` / `landmarks` for district landmarks; `locations` stays "locations and reserved harbour sites".
 - `scripts/place_sites.py`: add `--landmarks` to the mutually exclusive source group. `_authored_landmarks(root)` returns `[{"id": f"district:{key}", "cell": list(row.landmark.cell)} for key, row in sorted(world.districts.districts.items()) if row.landmark.domain == "wilderness_cell" and row.landmark.cell is not None]`. It then flows through the same `_evaluate` pool and report as `--locations`. Update the module docstring usage block and the paragraph that describes `--locations`.
-- `docs/development/map-editor.md`: in the projection paragraph, document `landmark.cell` as a pair and `landmark_centre_m`. In the continent tools paragraph, document the landmark drag and that referenced landmarks do not drag.
+- `docs/development/map-editor.md`: in the projection paragraph, document `landmark.cell` as a pair and `landmark_centre_m`. In the continent tools paragraph, document the hidden-by-default 地標 layer, the landmark drag and that referenced landmarks do not drag. The capture layer table lists `landmarks`.
 
 ### D6. Verification split
 

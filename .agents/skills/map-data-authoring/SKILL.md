@@ -211,7 +211,7 @@ uv run --locked --no-sync --project tools/map-editor --group capture python \
 ```
 
 Every layer is on unless you pass `--hide` (`terrain`, `water`, `ridge`,
-`locations`, `footprint`, `partition`, `labels` for the continent; `nodes`,
+`locations`, `landmarks`, `footprint`, `partition`, `labels` for the continent; `nodes`,
 `roads`, `labels` for a settlement; `rooms`, `connections`, `exterior`,
 `labels` for an interior). `--bounds` is in that view's own frame — kilometres,
 authored metres, or layout units — and `--format png` is available when your
@@ -246,11 +246,18 @@ uv run --locked --project packages/map-core python \
 # Re-check every authored location and harbour site after a terrain edit.
 uv run --locked --project packages/map-core python \
     .agents/skills/map-data-authoring/scripts/place_sites.py --locations
+
+# Re-check every authored wilderness-cell district landmark after a move.
+uv run --locked --project packages/map-core python \
+    .agents/skills/map-data-authoring/scripts/place_sites.py --landmarks --min-km 100
 ```
 
 It never writes map sources; copy the snapped cells into the YAML yourself,
 then run the check script. A terrain edit such as a moved river or coast can
-strand an existing location, so run `--locations` after one. Exit code 1
+strand an existing location, so run `--locations` after one. `--landmarks`
+checks the `wilderness_cell` district landmarks the same way; landmarks that
+reference a location or a settlement node follow their referent and are not
+listed. Its `--min-km` pair list is the Voronoi spacing review. Exit code 1
 means at least one site is not walkable, sits on a waterway or found no cell
 to snap to.
 
@@ -327,7 +334,13 @@ These are short recipes. Each reference file has the details.
   or leave a river port dry. Regenerate the partition and the elevation.
 - **Add or move a district.** Edit `districts.yaml`. The landmark is a
   qualified reference, never a coordinate, unless its domain is
-  `wilderness_cell`. Then regenerate the partition.
+  `wilderness_cell`. In the editor, turn on the 地標 layer (hidden by
+  default) to see landmarks: a `wilderness_cell` landmark is the gold
+  diamond on the continent canvas, and dragging it is one
+  `set_district_field` landmark command that writes only `districts.yaml`.
+  Referenced landmarks (hollow diamond) follow their referent and do not
+  drag. Afterwards run the check, run `place_sites.py --landmarks --min-km 100`
+  for Voronoi spacing, and regenerate the partition.
 
 ## When to stop and ask
 
