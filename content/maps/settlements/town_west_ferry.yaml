@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 東南門
-    desc: 東南門朝疾風城敞開，門外大道兩旁堆著待運的貨箱，守衛核對通關的木牌，車伕在牆邊歇腳。
+    desc: 東南門朝南方的遺跡鎮敞開，門外大道兩旁堆著待運的貨箱，守衛核對通關的木牌，車伕在牆邊歇腳。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -68,7 +68,7 @@ nodes:
     y_m: 2027
     prototype_parent: grid_room
     key: 河港碼頭
-    desc: 河港碼頭在北岸的蘆葦邊，平底船靠著木樁，船伕把長篙橫在船頭等客，水鳥貼著水面掠過。
+    desc: 河港碼頭在南岸的蘆葦邊，平底船靠著木樁，船伕把長篙橫在船頭等客，水鳥貼著水面掠過。
     anchor_key:
     typeclass:
     scene_archetype: city_street

@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 南門
-    desc: 南門背著界河朝內陸敞開，門外大道通往疾風城，商隊在此清點通關的貨箱，守衛逐件比對印記。
+    desc: 南門背著界河朝內陸敞開，門外大道通往西方的王國腹地，商隊在此清點通關的貨箱，守衛逐件比對印記。
     anchor_key:
     typeclass:
     scene_archetype: city_street

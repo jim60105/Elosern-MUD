@@ -50,7 +50,7 @@ nodes:
     y_m: 326
     prototype_parent: grid_room
     key: 公會前
-    desc: 公會前正對渡口下來的石階，剛交完貨的鏢師在簷下喝水，布告上貼著河運的招募，字跡被雨水暈開。
+    desc: 公會前正對渡口下來的石階，剛交完貨的商隊護衛在簷下喝水，布告上貼著河運的招募，字跡被雨水暈開。
     anchor_key:
     typeclass:
     scene_archetype: city_street

@@ -86,7 +86,7 @@ nodes:
     y_m: 1802
     prototype_parent: grid_room
     key: 客棧巷
-    desc: 客棧巷的窗朝北，夜裡能看見燈塔的光，樓下酒桌旁總有人講著遠洋的傳聞，火盆烤著濕鞋。
+    desc: 客棧巷的窗朝北，夜裡能看見港外的漁火，樓下酒桌旁總有人講著遠洋的傳聞，火盆烤著濕鞋。
     anchor_key:
     typeclass:
     scene_archetype: city_street

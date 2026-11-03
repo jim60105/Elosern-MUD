@@ -23,7 +23,7 @@ nodes:
     y_m: 187
     prototype_parent: grid_room
     key: 東門
-    desc: 東門朝灰岩城敞開，門外大道兩旁擺著收購古物的小攤，守衛盤查著來歷不明的箱籠，問話聲此起彼落。
+    desc: 東門朝荒野敞開，門外大道兩旁擺著收購古物的小攤，守衛盤查著來歷不明的箱籠，問話聲此起彼落。
     anchor_key:
     typeclass:
     scene_archetype: city_street

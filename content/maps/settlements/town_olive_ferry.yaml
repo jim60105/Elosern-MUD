@@ -32,7 +32,7 @@ nodes:
     y_m: 2575
     prototype_parent: grid_room
     key: 北門
-    desc: 北門朝鹽道城的方向敞開，門外坡地種滿橄欖，採果人背著竹簍進出，枝葉間透下細碎的光。
+    desc: 北門朝北面的丘陵敞開，門外坡地種滿橄欖，採果人背著竹簍進出，枝葉間透下細碎的光。
     anchor_key:
     typeclass:
     scene_archetype: city_street
