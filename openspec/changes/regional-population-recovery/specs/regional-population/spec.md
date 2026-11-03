@@ -40,3 +40,32 @@ Population settlement SHALL use actual committed loss occurrence times with reco
 - **WHEN** a later clock stage raises after multiple real waves
 - **THEN** the clock, pending-loss ledger, due state, all created IDs/registrations/attachments and caches roll back together and no success event survives
 
+### Requirement: Population lifecycle replays loss and site boundaries chronologically
+Population settlement SHALL merge pending presence transitions, site lifecycle boundaries and regional due waves chronologically, applying same-tick site births before ordinary births without exposing future changes to earlier waves.
+
+#### Scenario: Later loss starts a new episode
+- **WHEN** L is3, local population2 has due110, a wave restores3 at110, and a previously recorded later loss occurs118 with delay10
+- **THEN** the118 boundary creates a new due128; recording that loss while an older episode was pending cannot consume its later deficit
+
+#### Scenario: Cancellation before later loss
+- **WHEN** explicit restoration ends an older episode before a pending future loss makes local density deficient again
+- **THEN** that later occurrence starts a new delayed episode, with identical outcomes under equal interval partitioning
+
+#### Scenario: Site recovery cannot affect earlier waves
+- **WHEN** a zone has a wave due110 and an overlapping site's recovery is due140 during [100,160]
+- **THEN** births and due state equal settlement through [100,125] then [125,160], and the140 site members do not occupy the110 headroom
+
+### Requirement: Historical population evidence preserves removed ownership and cell protection
+Population history SHALL retain complete identity, before/after presence, home/site ownership and actual-coordinate encounter intervals until chronological settlement no longer needs them, with atomic restart-safe serialization.
+
+#### Scenario: Deleted away-home member
+- **WHEN** a home-owned member dies outside its home zone at118 and is deleted before settlement evaluates110
+- **THEN** its saved before facts still consume historical home headroom at110 and no object resurrection or public presence is fabricated
+
+#### Scenario: Restart during protected combat
+- **WHEN** a mapped session or terminal receipt reloads before accumulated combat time has settled
+- **THEN** its exact wilderness cell and closed historical interval remain protected independently of pooled-room IDs until settlement passes the interval
+
+#### Scenario: Explicit mutation routes join the owner
+- **WHEN** existing GM or quest placement, HP transition, deletion or lawful relocation changes mapped living population
+- **THEN** actual registration and the complete transition commit with that owner's operation; deficits use the occurrence tick and rollback restores both live and durable surfaces
