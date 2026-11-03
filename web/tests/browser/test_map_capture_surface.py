@@ -216,6 +216,7 @@ class MapCaptureSurfaceBrowserTest(unittest.TestCase):
             + len(continent.get("harbor_sites") or [])
             + sum(len(waterway.get("fords_m") or []) for waterway in continent["waterways"])
             + (len(preview.get("passes") or []) if current else 0)
+            + sum(1 for district in self.world["districts"] if isinstance(district.get("landmark_centre_m"), list))
         )
 
     # -- one page, one selected view, no service ------------------------------

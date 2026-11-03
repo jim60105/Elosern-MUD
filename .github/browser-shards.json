@@ -20,6 +20,7 @@
    "files_b": [
     "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_a_location_with_a_local_map_opens_it_and_refuses_deletion",
     "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_footprint_cells_and_a_district_landmark_by_keyboard_write_only_their_owner",
+    "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_a_wilderness_landmark_drag_is_one_district_command_that_survives_reload",
     "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_derived_borders_have_no_handles_at_the_large_viewport"
    ]
   },
