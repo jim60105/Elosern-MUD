@@ -459,8 +459,8 @@ class ConditionalDamageMechanicsTests(EvenniaTestCase):
     def _resolve_cast(self, skill_key: str, roll: int = 60, scale: float = 1.0):
         restore_gauges_to_full(self.actor)
         battlefield = Battlefield(
-            {"party": frozenset({"cond_actor"}), "foes": frozenset({"cond_target"})},
-            {"cond_actor": self.actor, "cond_target": self.target},
+            {'party': frozenset({"fixture:cond_actor"}), 'foes': frozenset({"fixture:cond_target"})},
+            {"fixture:cond_actor": self.actor, "fixture:cond_target": self.target},
         )
         request = ActionRequest(
             self.actor,
@@ -721,8 +721,8 @@ class ConditionalDamageMechanicsTests(EvenniaTestCase):
         self.actor.traits.magic_power.base = 100
 
         battlefield = Battlefield(
-            {"party": frozenset({"cond_actor"}), "foes": frozenset({"cond_target"})},
-            {"cond_actor": self.actor, "cond_target": self.target},
+            {'party': frozenset({"fixture:cond_actor"}), 'foes': frozenset({"fixture:cond_target"})},
+            {"fixture:cond_actor": self.actor, "fixture:cond_target": self.target},
         )
         request = ActionRequest(
             self.actor,
@@ -824,8 +824,8 @@ class ConditionalDamageMechanicsTests(EvenniaTestCase):
         restore_gauges_to_full(self.target)
         before_hp = _stored_hp(self.target)
         battlefield = Battlefield(
-            {"party": frozenset({"cond_actor"}), "foes": frozenset({"cond_target"})},
-            {"cond_actor": self.actor, "cond_target": self.target},
+            {'party': frozenset({"fixture:cond_actor"}), 'foes': frozenset({"fixture:cond_target"})},
+            {"fixture:cond_actor": self.actor, "fixture:cond_target": self.target},
         )
         request = ActionRequest(
             self.actor,

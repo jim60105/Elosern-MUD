@@ -62,6 +62,7 @@ from world.skills.effects import EffectPolicy
 from world.skills.registry import SkillCategory, SkillDef, SkillKind, TargetSpec
 from world.skills.sexual_acts import SexualActDef
 from world.tests.synthetic_data import make_item, make_skill
+from world.rules.combat_identity import stable_actor_id
 
 
 _T_HEAL_SKILL = make_skill(
@@ -544,8 +545,8 @@ class ActionNarrativeDeedsTests(EvenniaTestCase):
         self.assertEqual(self.target.sexual.climax_count, 0)
 
         battlefield = Battlefield(
-            {"party": frozenset({str(self.target.key)}), "foes": frozenset()},
-            {str(self.target.key): self.target},
+            {'party': frozenset({stable_actor_id(self.target)}), 'foes': frozenset()},
+            {stable_actor_id(self.target): self.target},
         )
         # Optional battlefield attributes are not an identity source: the
         # occurrence provenance is. Attaching look-alike attributes proves the
@@ -612,8 +613,8 @@ class ActionNarrativeDeedsTests(EvenniaTestCase):
             modifiers={"rate": {"target": "hp", "delta": -10}},
         )
         battlefield = Battlefield(
-            {"party": frozenset({str(self.target.key)}), "foes": frozenset()},
-            {str(self.target.key): self.target},
+            {'party': frozenset({stable_actor_id(self.target)}), 'foes': frozenset()},
+            {stable_actor_id(self.target): self.target},
         )
         first_round = CombatProvenance(
             engagement_id="hostile:upkeep-reaction:1",
@@ -726,8 +727,8 @@ class ActionNarrativeDeedsTests(EvenniaTestCase):
             modifiers={"rate": {"target": "hp", "delta": -10}},
         )
         battlefield = Battlefield(
-            {"party": frozenset({str(self.target.key)}), "foes": frozenset()},
-            {str(self.target.key): self.target},
+            {'party': frozenset({stable_actor_id(self.target)}), 'foes': frozenset()},
+            {stable_actor_id(self.target): self.target},
         )
         provenance = CombatProvenance(
             engagement_id="hostile:upkeep-settled:1",
@@ -838,8 +839,8 @@ class ActionNarrativeDeedsTests(EvenniaTestCase):
         self._grant_skills(self.actor, _T_HEAL_SKILL.key)
         combat_ctx = RoomActionContext(self.room)
         combat_ctx.battlefield = Battlefield(
-            {"party": frozenset({str(self.actor.key), str(self.target.key)}), "foes": frozenset()},
-            {str(self.actor.key): self.actor, str(self.target.key): self.target},
+            {'party': frozenset({stable_actor_id(self.actor), stable_actor_id(self.target)}), 'foes': frozenset()},
+            {stable_actor_id(self.actor): self.actor, stable_actor_id(self.target): self.target},
         )
         # Look-alike optional attributes must never become the identity: the
         # occurrence provenance is the only source.
@@ -2057,8 +2058,8 @@ class TransitionTimeMilestoneSelectionTests(EvenniaTestCase):
             modifiers={"rate": {"target": "hp", "delta": -10}},
         )
         battlefield = Battlefield(
-            {"party": frozenset({str(self.player.key)}), "foes": frozenset()},
-            {str(self.player.key): self.player},
+            {'party': frozenset({stable_actor_id(self.player)}), 'foes': frozenset()},
+            {stable_actor_id(self.player): self.player},
         )
         provenance = CombatProvenance(
             engagement_id="hostile:selection:1",

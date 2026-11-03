@@ -80,6 +80,7 @@ from world.skills.registry import (
     SkillPrerequisite,
     TargetSpec,
 )
+from world.rules.combat_identity import stable_actor_id
 
 _skills_mod = importlib.import_module("world.skills.registry")
 _SKILL_MAP = getattr(_skills_mod, "SKILL_" + "REGISTRY")
@@ -156,8 +157,8 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
         slow = _player("slow")
         slow.location = self.room
         bf = Battlefield(
-            {"team_a": frozenset({"fast"}), "team_b": frozenset({"slow"})},
-            {"fast": fast, "slow": slow},
+            {'team_a': frozenset({"fixture:fast"}), 'team_b': frozenset({"fixture:slow"})},
+            {"fixture:fast": fast, "fixture:slow": slow},
         )
 
         # 1. Mount is live: evaluate_combat_modifiers returns actions_per_turn: 2
@@ -244,8 +245,8 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
         dummy = _player("chance_dummy")
         dummy.location = self.room
         bf = Battlefield(
-            {"team_a": frozenset({str(fast.key)}), "team_b": frozenset({str(dummy.key)})},
-            {str(fast.key): fast, str(dummy.key): dummy},
+            {'team_a': frozenset({stable_actor_id(fast)}), 'team_b': frozenset({stable_actor_id(dummy)})},
+            {stable_actor_id(fast): fast, stable_actor_id(dummy): dummy},
         )
         apply_buff(fast, "static_ward_stun")
 
@@ -292,8 +293,8 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
         p4.location = self.room
 
         bf = Battlefield(
-            {"team_a": frozenset({"p1", "p2", "p4"}), "team_b": frozenset({"p3"})},
-            {"p1": p1, "p2": p2, "p3": p3, "p4": p4},
+            {'team_a': frozenset({"fixture:p1", "fixture:p2", "fixture:p4"}), 'team_b': frozenset({"fixture:p3"})},
+            {"fixture:p1": p1, "fixture:p2": p2, "fixture:p3": p3, "fixture:p4": p4},
         )
 
         # p4 carries flicker_advance (action: advance_to_head)
@@ -363,8 +364,8 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
         target.location = self.room
 
         bf = Battlefield(
-            teams={"players": frozenset({str(self.actor.key)}), "enemies": frozenset({str(target.key)})},
-            roster={str(self.actor.key): self.actor, str(target.key): target},
+            teams={'players': frozenset({stable_actor_id(self.actor)}), 'enemies': frozenset({stable_actor_id(target)})},
+            roster={stable_actor_id(self.actor): self.actor, stable_actor_id(target): target},
         )
         ctx = BattlefieldActionContext(battlefield=bf, event_context={"now": 100})
 
@@ -416,8 +417,8 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
         high_def_target.traits.defense.base = 50
 
         bf = Battlefield(
-            teams={"players": frozenset({str(self.actor.key)}), "enemies": frozenset({str(high_def_target.key)})},
-            roster={str(self.actor.key): self.actor, str(high_def_target.key): high_def_target},
+            teams={'players': frozenset({stable_actor_id(self.actor)}), 'enemies': frozenset({stable_actor_id(high_def_target)})},
+            roster={stable_actor_id(self.actor): self.actor, stable_actor_id(high_def_target): high_def_target},
         )
         ctx = BattlefieldActionContext(battlefield=bf)
 
@@ -466,8 +467,8 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
         full_hp_target = _monster("devast_target", hp=2000)
         full_hp_target.location = self.room
         bf2 = Battlefield(
-            teams={"players": frozenset({str(self.actor.key)}), "enemies": frozenset({str(full_hp_target.key)})},
-            roster={str(self.actor.key): self.actor, str(full_hp_target.key): full_hp_target},
+            teams={'players': frozenset({stable_actor_id(self.actor)}), 'enemies': frozenset({stable_actor_id(full_hp_target)})},
+            roster={stable_actor_id(self.actor): self.actor, stable_actor_id(full_hp_target): full_hp_target},
         )
         ctx2 = BattlefieldActionContext(battlefield=bf2)
 
@@ -607,8 +608,8 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
     def test_retired_dev_era_clauses_resolve_as_ordinary_rejections(self):
         """Scenario: Retired dev-era clauses resolve as ordinary rejections."""
         bf = Battlefield(
-            teams={"players": frozenset({str(self.actor.key)}), "enemies": frozenset({str(self.target.key)})},
-            roster={str(self.actor.key): self.actor, str(self.target.key): self.target},
+            teams={'players': frozenset({stable_actor_id(self.actor)}), 'enemies': frozenset({stable_actor_id(self.target)})},
+            roster={stable_actor_id(self.actor): self.actor, stable_actor_id(self.target): self.target},
         )
         ctx = BattlefieldActionContext(battlefield=bf)
 

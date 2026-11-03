@@ -81,6 +81,9 @@ class _Traits:
 class _Entity:
     def __init__(self, key, location):
         self.key = key
+        # This double's constructor key is also its explicit fixture identity;
+        # it carries no database reference.
+        self.combat_identity = key
         self.location = location
         self.traits = _Traits()
 

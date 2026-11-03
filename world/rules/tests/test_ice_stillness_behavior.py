@@ -66,6 +66,7 @@ from world.skills.registry import (
     SkillPrerequisite,
     TargetSpec,
 )
+from world.rules.combat_identity import stable_actor_id
 
 _skills_mod = importlib.import_module("world.skills.registry")
 _SKILL_MAP = getattr(_skills_mod, "SKILL_" + "REGISTRY")
@@ -269,11 +270,11 @@ class IceStillnessBehaviorTests(EvenniaTest):
 
         self.bf = Battlefield(
             teams={
-                "party": frozenset({str(self.caster.key), str(self.ally.key)}),
-                "enemy": frozenset({str(self.foe.key), str(self.foe2.key)}),
+                'party': frozenset({stable_actor_id(self.caster), stable_actor_id(self.ally)}),
+                'enemy': frozenset({stable_actor_id(self.foe), stable_actor_id(self.foe2)}),
             },
             roster={
-                str(c.key): c
+                stable_actor_id(c): c
                 for c in (self.caster, self.foe, self.foe2, self.ally)
             },
         )

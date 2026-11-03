@@ -1021,10 +1021,11 @@ class CampaignHarness:
         terminal outcome, fails rather than being reported as committed state.
         """
         written = {
-            entity.key: _durable_surface(entity) for entity in encounter.participants
+            stable_identity(entity): _durable_surface(entity)
+            for entity in encounter.participants
         }
         encounter.reload()
-        fresh = {entity.key: entity for entity in encounter.participants}
+        fresh = {stable_identity(entity): entity for entity in encounter.participants}
         for key, surface in written.items():
             if _durable_surface(fresh[key]) != surface:
                 raise CampaignFailure(
@@ -1032,7 +1033,7 @@ class CampaignHarness:
                     f"{_durable_surface(fresh[key])} from a fresh row, but the "
                     f"round wrote {surface}"
                 )
-        record = read_session(fresh[encounter.initiator.key])
+        record = read_session(fresh[stable_identity(encounter.initiator)])
         if record is None:
             if not terminal:
                 raise CampaignFailure(
@@ -1100,12 +1101,15 @@ class CampaignHarness:
             return
         battlefield = Battlefield(
             {
-                "party": frozenset(
-                    entity.key for entity in (initiator, *encounter.companions)
+                'party': frozenset(
+                    stable_identity(entity)
+                    for entity in (initiator, *encounter.companions)
                 ),
-                "foes": frozenset(monster.key for monster in encounter.monsters),
+                'foes': frozenset(
+                    stable_identity(monster) for monster in encounter.monsters
+                ),
             },
-            {entity.key: entity for entity in participants},
+            {stable_identity(entity): entity for entity in participants},
         )
         if observations_module.project_observations(
             encounter.session_id, battlefield
@@ -1700,10 +1704,15 @@ class CampaignHarness:
             for index in range(allies)
         ]
         hostiles = [self._player(f"perf-enemy-{index}", 200) for index in range(enemies)]
-        roster = {entity.key: entity for entity in (decider, *teammates, *hostiles)}
+        roster = {
+            stable_identity(entity): entity
+            for entity in (decider, *teammates, *hostiles)
+        }
         teams = {
-            "monsters": frozenset(entity.key for entity in (decider, *teammates)),
-            "party": frozenset(entity.key for entity in hostiles),
+            "monsters": frozenset(
+                stable_identity(entity) for entity in (decider, *teammates)
+            ),
+            "party": frozenset(stable_identity(entity) for entity in hostiles),
         }
         return decider, Battlefield(teams, roster)
 

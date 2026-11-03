@@ -31,6 +31,7 @@ from ._combat_session_helpers import (
     synth_innate_overlay,
 )
 from .combat_fixtures import grant_lineage
+from world.rules.combat_identity import stable_actor_id
 
 # Synthetic vehicles for the facade (test-data-independence): ANY-faction
 # single-target and AREA damage skills carry the same resolver semantics the
@@ -236,8 +237,8 @@ class SleepingRosterCases(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(record.initial_sleep_ids, (int(self.player.pk),))
         self.assertNotIn(int(self.player.pk), record.knocked_out_ids)
         field = reconstruct_battlefield(self.player, record)
-        self.assertIn(str(self.player.key), field.roster)
-        self.assertTrue(field.is_eligible(str(self.player.key)))
+        self.assertIn(stable_actor_id(self.player), field.roster)
+        self.assertTrue(field.is_eligible(stable_actor_id(self.player)))
         required = set(get_required_combat_actors(record, field))
         self.assertNotIn(int(self.player.pk), required)
         self.assertIn(int(self.companion.pk), required)
@@ -292,7 +293,7 @@ class SleepingRosterCases(BattlefieldIsolation, EvenniaTestCase):
         )
         _persist(self.player, knocked)
         knocked_field = reconstruct_battlefield(self.player, knocked)
-        self.assertFalse(knocked_field.is_eligible(str(self.companion.key)))
+        self.assertFalse(knocked_field.is_eligible(stable_actor_id(self.companion)))
         self.assertNotIn(
             int(self.companion.pk),
             get_required_combat_actors(knocked, knocked_field),
@@ -326,7 +327,7 @@ class SleepingRosterCases(BattlefieldIsolation, EvenniaTestCase):
         engage(self.player, self.monster)
         record = read_session(self.player)
         field = reconstruct_battlefield(self.player, record)
-        self.assertTrue(field.is_eligible(str(self.companion.key)))
+        self.assertTrue(field.is_eligible(stable_actor_id(self.companion)))
         self.assertNotIn(
             int(self.companion.pk),
             get_required_combat_actors(record, field),
@@ -378,4 +379,4 @@ class SleepingRosterCases(BattlefieldIsolation, EvenniaTestCase):
         }
         self.assertEqual(states[int(self.companion.pk)], "knocked_out")
         knocked_field = reconstruct_battlefield(self.player, knocked)
-        self.assertFalse(knocked_field.is_eligible(str(self.companion.key)))
+        self.assertFalse(knocked_field.is_eligible(stable_actor_id(self.companion)))

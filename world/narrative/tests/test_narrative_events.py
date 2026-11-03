@@ -22,6 +22,7 @@ from world.narrative.projector import select_and_record_protection_event
 from world.rules.combat import Battlefield
 from world.rules.combat_session.records import CombatSessionRecord
 from world.rules.combat_session.settlement import settle_session
+from world.rules.combat_identity import stable_actor_id
 
 
 class NarrativeEventsStorageTests(EvenniaTestCase):
@@ -163,10 +164,10 @@ class NarrativeEventsStorageTests(EvenniaTestCase):
             exam_id=None,
         )
         battlefield = Battlefield(
-            teams={"players": frozenset({str(self.player.key), str(self.companion.key)}), "enemies": frozenset()},
+            teams={'players': frozenset({stable_actor_id(self.player), stable_actor_id(self.companion)}), 'enemies': frozenset()},
             roster={
-                str(self.player.key): self.player,
-                str(self.companion.key): self.companion,
+                stable_actor_id(self.player): self.player,
+                stable_actor_id(self.companion): self.companion,
             },
         )
 
@@ -203,10 +204,10 @@ class NarrativeEventsStorageTests(EvenniaTestCase):
             exam_id=None,
         )
         battlefield = Battlefield(
-            teams={"players": frozenset({str(self.player.key), str(self.companion.key)}), "enemies": frozenset()},
+            teams={'players': frozenset({stable_actor_id(self.player), stable_actor_id(self.companion)}), 'enemies': frozenset()},
             roster={
-                str(self.player.key): self.player,
-                str(self.companion.key): self.companion,
+                stable_actor_id(self.player): self.player,
+                stable_actor_id(self.companion): self.companion,
             },
         )
 

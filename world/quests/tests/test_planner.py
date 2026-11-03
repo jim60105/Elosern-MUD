@@ -150,8 +150,8 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
     def _field(self, actor, targets, key_override: str | None = None):
         actor_key = key_override or actor.key
         return Battlefield(
-            {"party": frozenset({actor_key}), "foes": frozenset(t.key for t in targets)},
-            {actor_key: actor, **{t.key: t for t in targets}},
+            {'party': frozenset({actor_key}), 'foes': frozenset(stable_actor_id(t) for t in targets)},
+            {actor_key: actor, **{stable_actor_id(t): t for t in targets}},
         )
 
     def _resolve(self, actor, skill_key, targets):
@@ -441,8 +441,8 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
 
     def _field(self, actor, targets, *, knocked_out: frozenset[str] = frozenset()):
         return Battlefield(
-            {"party": frozenset({actor.key}), "foes": frozenset(t.key for t in targets)},
-            {actor.key: actor, **{t.key: t for t in targets}},
+            {'party': frozenset({stable_actor_id(actor)}), 'foes': frozenset(stable_actor_id(t) for t in targets)},
+            {stable_actor_id(actor): actor, **{stable_actor_id(t): t for t in targets}},
             knocked_out=set(knocked_out),
         )
 
@@ -947,6 +947,7 @@ _HUNT_STRONGER = next(
     key for key in _HUNT_VARIANTS if not SYNTH_MONSTER_VARIANTS[key].ordinary_variant
 )
 from world.tests.geography_fixture import publish_shipped_geography
+from world.rules.combat_identity import stable_actor_id
 
 publish_shipped_geography()
 _HUNT_REGION, _OTHER_REGION = _live_region_keys()[:2]
@@ -1021,8 +1022,8 @@ class SpeciesHuntPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
 
     def _field(self, actor, targets):
         return Battlefield(
-            {"party": frozenset({actor.key}), "foes": frozenset(t.key for t in targets)},
-            {actor.key: actor, **{t.key: t for t in targets}},
+            {'party': frozenset({stable_actor_id(actor)}), 'foes': frozenset(stable_actor_id(t) for t in targets)},
+            {stable_actor_id(actor): actor, **{stable_actor_id(t): t for t in targets}},
         )
 
     def _resolve(self, actor, skill_key, targets):

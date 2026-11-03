@@ -98,8 +98,8 @@ class DamageEffectHandlerTests(unittest.TestCase):
 
     @covers_requirement("action-resolution-pipeline::nonlethal-policy-transforms-lethal-projection-before-eventlog-planners")
     def test_physical_damage_is_staged_before_apply(self):
-        actor = FakeEntity("actor", atk_phys=20, agility=10)
-        target = FakeEntity("target", hp=100, agility=10, defense=5)
+        actor = FakeEntity("actor", combat_identity='actor', atk_phys=20, agility=10)
+        target = FakeEntity("target", combat_identity='target', hp=100, agility=10, defense=5)
         with (
             patch("world.rules.combat.damage.roll_d100", return_value=75),
             patch(
@@ -117,8 +117,8 @@ class DamageEffectHandlerTests(unittest.TestCase):
         self.assertLess(target.traits.hp.value, 100)
 
     def test_apply_closure_consumes_no_randomness(self):
-        actor = FakeEntity("actor")
-        target = FakeEntity("target")
+        actor = FakeEntity("actor", combat_identity='actor')
+        target = FakeEntity("target", combat_identity='target')
         with (
             patch("world.rules.combat.damage.roll_d100", return_value=90) as roller,
             patch(
@@ -135,8 +135,8 @@ class DamageEffectHandlerTests(unittest.TestCase):
 
     @covers_requirement("damage-effect-handlers::damage-element-school-is-the-defined-convention-for-this-prefix")
     def test_invalid_school_and_element_reject_during_staging(self):
-        actor = FakeEntity("actor")
-        target = FakeEntity("target")
+        actor = FakeEntity("actor", combat_identity='actor')
+        target = FakeEntity("target", combat_identity='target')
         with self.assertRaises(ValueError):
             _handle_damage(actor, [target], "damage:nope:magic", {}, 1.0)
         with self.assertRaises(ValueError):
@@ -144,8 +144,8 @@ class DamageEffectHandlerTests(unittest.TestCase):
 
     @covers_requirement("damage-effect-handlers::combat-modifiers-apply-uniformly-regardless-of-origin")
     def test_modifier_bundle_changes_hit_math_without_origin_branch(self):
-        actor = FakeEntity("actor", agility=10)
-        target = FakeEntity("target", agility=10)
+        actor = FakeEntity("actor", combat_identity='actor', agility=10)
+        target = FakeEntity("target", combat_identity='target', agility=10)
 
         def modifiers(entity):
             return {"accuracy": -10} if entity is actor else {}
@@ -206,8 +206,8 @@ class AdjustedStatDamageTests(unittest.TestCase):
         "combat-modifier-table::flat-defense-and-atk-phys-bundle-values-adjust-deterministic-damage-magnitude"
     )
     def test_physical_attack_gains_the_flat_atk_phys_bonus(self):
-        actor = FakeEntity("actor", atk_phys=20, agility=10)
-        target = FakeEntity("target", defense=5, agility=10)
+        actor = FakeEntity("actor", combat_identity='actor', atk_phys=20, agility=10)
+        target = FakeEntity("target", combat_identity='target', defense=5, agility=10)
         self.assertEqual(
             _staged_amount(
                 actor,
@@ -219,8 +219,8 @@ class AdjustedStatDamageTests(unittest.TestCase):
         )
 
     def test_physical_attack_without_the_bonus_is_unchanged(self):
-        actor = FakeEntity("actor", atk_phys=20, agility=10)
-        target = FakeEntity("target", defense=5, agility=10)
+        actor = FakeEntity("actor", combat_identity='actor', atk_phys=20, agility=10)
+        target = FakeEntity("target", combat_identity='target', defense=5, agility=10)
         self.assertEqual(
             _staged_amount(
                 actor,
@@ -235,8 +235,8 @@ class AdjustedStatDamageTests(unittest.TestCase):
         "combat-modifier-table::flat-defense-and-atk-phys-bundle-values-adjust-deterministic-damage-magnitude"
     )
     def test_magic_school_damage_ignores_the_atk_phys_bonus(self):
-        actor = FakeEntity("actor", magic_power=20, agility=10)
-        target = FakeEntity("target", defense=5, agility=10)
+        actor = FakeEntity("actor", combat_identity='actor', magic_power=20, agility=10)
+        target = FakeEntity("target", combat_identity='target', defense=5, agility=10)
         self.assertEqual(
             _staged_amount(
                 actor,
@@ -251,8 +251,8 @@ class AdjustedStatDamageTests(unittest.TestCase):
         "combat-modifier-table::flat-defense-and-atk-phys-bundle-values-adjust-deterministic-damage-magnitude"
     )
     def test_defense_bonus_mitigates_physical_and_magic_damage(self):
-        actor = FakeEntity("actor", atk_phys=20, magic_power=20, agility=10)
-        target = FakeEntity("target", defense=5, agility=10)
+        actor = FakeEntity("actor", combat_identity='actor', atk_phys=20, magic_power=20, agility=10)
+        target = FakeEntity("target", combat_identity='target', defense=5, agility=10)
         for effect_id in ("damage:dark:physical", "damage:fire:magic"):
             with self.subTest(effect_id=effect_id):
                 self.assertEqual(
@@ -266,8 +266,8 @@ class AdjustedStatDamageTests(unittest.TestCase):
                 )
 
     def test_damage_floor_still_clamps_after_adjustments(self):
-        actor = FakeEntity("actor", atk_phys=1, agility=10)
-        target = FakeEntity("target", defense=999, agility=10)
+        actor = FakeEntity("actor", combat_identity='actor', atk_phys=1, agility=10)
+        target = FakeEntity("target", combat_identity='target', defense=999, agility=10)
         self.assertEqual(
             _staged_amount(
                 actor,
@@ -279,8 +279,8 @@ class AdjustedStatDamageTests(unittest.TestCase):
         )
 
     def test_fractional_grant_bonus_stays_integer_in_the_staged_amount(self):
-        actor = FakeEntity("actor", atk_phys=20, agility=10)
-        target = FakeEntity("target", defense=5, agility=10)
+        actor = FakeEntity("actor", combat_identity='actor', atk_phys=20, agility=10)
+        target = FakeEntity("target", combat_identity='target', defense=5, agility=10)
         self.assertEqual(
             _staged_amount(
                 actor,
@@ -306,10 +306,10 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
         self.target.db.skills = {"active": [], "passive": []}
         battlefield = Battlefield(
             {
-                "party": frozenset({"actor"}),
-                "foes": frozenset({"target"}),
+                'party': frozenset({"fixture:actor"}),
+                'foes': frozenset({"fixture:target"}),
             },
-            {"actor": self.actor, "target": self.target},
+            {"fixture:actor": self.actor, "fixture:target": self.target},
         )
         self.request = ActionRequest(
             self.actor,
@@ -422,10 +422,10 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
         npc.traits.agility.current = 5
         battlefield = Battlefield(
             {
-                "party": frozenset({"actor"}),
-                "foes": frozenset({"orc alpha"}),
+                'party': frozenset({"fixture:actor"}),
+                'foes': frozenset({"fixture:orc alpha"}),
             },
-            {"actor": self.actor, "orc alpha": npc},
+            {"fixture:actor": self.actor, "fixture:orc alpha": npc},
         )
         request = ActionRequest(
             self.actor,

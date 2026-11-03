@@ -3,6 +3,7 @@
 from typing import Any, Iterable
 
 from world.narrative.events import build_encounter_source_id, record_narrative_event
+from world.rules.combat_identity import stable_actor_id
 from world.rules.combat_session.records import CombatSessionRecord
 
 
@@ -28,19 +29,27 @@ def select_and_record_protection_event(
 
     allied_nonlethal_keys = set()
     if battlefield is not None:
+        actor_id = stable_actor_id(actor)
         if hasattr(battlefield, "nonlethal_keys"):
             allied_nonlethal_keys = set(battlefield.nonlethal_keys)
         elif hasattr(record, "mode") and record.mode == "hostile":
             # In hostile sessions, allied non-player roster members are nonlethal protected companions
-            player_team = battlefield.team_of(str(actor.key)) if hasattr(battlefield, "team_of") else None
+            player_team = (
+                battlefield.team_of(actor_id)
+                if hasattr(battlefield, "team_of")
+                else None
+            )
             for key in battlefield.roster:
-                if key != str(actor.key) and (player_team is None or battlefield.team_of(key) == player_team):
+                if key != actor_id and (
+                    player_team is None
+                    or battlefield.team_of(key) == player_team
+                ):
                     allied_nonlethal_keys.add(key)
 
     # Collect participants that qualify for protection
     protected_keys = set()
     for key in allied_nonlethal_keys:
-        if key in battlefield.roster and key != str(actor.key):
+        if key in battlefield.roster and key != stable_actor_id(actor):
             # Check if this participant fled or was knocked out
             if key not in battlefield.fled and key not in battlefield.knocked_out:
                 protected_keys.add(key)

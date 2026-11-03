@@ -39,6 +39,7 @@ from ._fixtures import (
     QuestRegistryIsolation, bound_instance_locator, escort, quest, register,
     register_catalog_once,
 )
+from world.rules.combat_identity import stable_actor_id
 
 # The shipped affinity rulebook cross-references one catalog quest by key, so
 # the affinity-config loader needs the catalog definitions present in-process
@@ -946,10 +947,10 @@ class EscortRealOwnerSmokeTests(EscortTestBase):
 
         return Battlefield(
             {
-                "party": frozenset({actor.key}),
-                "foes": frozenset(target.key for target in targets),
+                'party': frozenset({stable_actor_id(actor)}),
+                'foes': frozenset(stable_actor_id(target) for target in targets),
             },
-            {actor.key: actor, **{target.key: target for target in targets}},
+            {stable_actor_id(actor): actor, **{stable_actor_id(target): target for target in targets}},
         )
 
     def test_task_6_1_real_owner_smoke(self):

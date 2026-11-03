@@ -55,11 +55,12 @@ def default_attack_policy(
     battlefield: Battlefield,
 ) -> ActionRequest | None:
     """Placeholder for Monster.behaviour_tree: attack the weakest enemy."""
+    actor_id = stable_actor_id(entity)
     enemy_team = next(
         (
             members
             for team, members in battlefield.teams.items()
-            if team != battlefield.team_of(entity.key)
+            if team != battlefield.team_of(actor_id)
         ),
         frozenset(),
     )
@@ -108,12 +109,12 @@ def default_attack_policy(
     # delegated policy is the non-``Monster`` enemy path; Monsters route
     # through ``monster_behaviour_policy``, which applies the same constraint
     # in its legacy and utility bodies.
-    winner = battlefield.taunt_winner(str(entity.key))
+    winner = battlefield.taunt_winner(actor_id)
     if winner is not None and any(candidate is winner for candidate in candidates):
         candidates = [winner]
     target = min(
         candidates,
-        key=lambda candidate: (_stored_hp(candidate), candidate.key),
+        key=lambda candidate: (_stored_hp(candidate), stable_actor_id(candidate)),
     )
     return ActionRequest(
         actor=entity,
@@ -129,6 +130,7 @@ def _action_skipped_event_log(
     narration_scope: str = "",
 ) -> EventLog:
     key = str(entity.key)
+    actor_id = stable_actor_id(entity)
     try:
         template = entry_line(
             "action_skipped",
@@ -145,8 +147,9 @@ def _action_skipped_event_log(
         target=None,
         data=dict(data) if data is not None else {},
         text_template=template,
+        actor_id=actor_id,
     )
-    return EventLog(key, "", (), (entry,), 0)
+    return EventLog(key, "", (), (entry,), 0, actor_id=actor_id)
 
 
 def _entity_round_order_op(entity: Any) -> str | None:

@@ -43,6 +43,7 @@ from world.rules.clock import (
     get_world_clock,
     read_world_clock,
 )
+from world.rules.combat_identity import stable_actor_id
 from world.rules.event_log import EventLog
 from world.rules.fatigue import FATIGUE_ATTRIBUTE_SURFACES
 from world.rules.party_scope import present_party_scope
@@ -370,10 +371,10 @@ def _scan_out_of_combat_sexual_coercion(
     transaction commits (the writer never notifies) and restores the returned
     surfaces when a later settlement step fails.
     """
-    player_key = str(actor.key)
-    if event_log.actor != player_key:
+    player_id = stable_actor_id(actor)
+    if event_log.actor_id != player_id:
         return (), None
-    by_key = {str(target.key): target for target in targets}
+    by_identity = {stable_actor_id(target): target for target in targets}
     forced: list[Any] = []
     for entry in event_log.entries:
         if entry.kind != "sexual_resist":
@@ -388,7 +389,7 @@ def _scan_out_of_combat_sexual_coercion(
             continue
         if entry.data.get("auto_comply") is not False:
             continue
-        target = by_key.get(entry.target)
+        target = by_identity.get(entry.target_id)
         if target is None or not isinstance(target, NPC):
             continue
         forced.append(target)
@@ -456,17 +457,16 @@ def settle_out_of_combat_cast(
     skill = SKILL_REGISTRY.get(request.skill_key)
     is_catalog_act, is_generic_resistible = resist_contest(skill)
     if is_catalog_act or is_generic_resistible:
-        target_keys = [str(target.key) for target in request.targets]
-        if len(target_keys) != len(set(target_keys)):
-            # The ``sexual_resist`` entry contract is key-keyed, so a target
-            # list containing two distinct entities with the same key would
-            # make the coercion scan resolve every entry for that key to the
-            # last list member -- double-penalizing one target and silently
-            # skipping the other. Fail closed before resolution, snapshot, or
-            # clock access; non-resistible casts are unaffected.
+        target_ids = [stable_actor_id(target) for target in request.targets]
+        if len(target_ids) != len(set(target_ids)):
+            # The ``sexual_resist`` entry contract is identity-keyed, so a
+            # target list containing the same entity twice would
+            # double-penalize it. Two distinct entities that share a display
+            # label are perfectly valid. Fail closed before resolution,
+            # snapshot, or clock access; non-resistible casts are unaffected.
             raise ValueError(
-                "settle_out_of_combat_cast requires unique entity keys in "
-                f"explicit targets, got {target_keys!r}"
+                "settle_out_of_combat_cast requires unique entity identities "
+                f"in explicit targets, got {target_ids!r}"
             )
     supplied = clock is not None
     if clock is None:

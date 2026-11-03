@@ -55,6 +55,7 @@ from ._support import (
     _ELEMENT_MAP,
     _make_synth_transfer_skill,
 )
+from world.rules.combat_identity import stable_actor_id
 
 
 class GaugeTransferDrainAndShareTests(GaugeTransferTestBase):
@@ -67,8 +68,8 @@ class GaugeTransferDrainAndShareTests(GaugeTransferTestBase):
         """Scenario: A hit-dependent drain rider skips on miss and resolves on hit."""
         from world.rules.combat import Battlefield, BattlefieldActionContext
         bf = Battlefield(
-            roster={str(self.actor.key): self.actor, str(self.target.key): self.target},
-            teams={"team_a": {str(self.actor.key)}, "team_b": {str(self.target.key)}},
+            roster={stable_actor_id(self.actor): self.actor, stable_actor_id(self.target): self.target},
+            teams={'team_a': {stable_actor_id(self.actor)}, 'team_b': {stable_actor_id(self.target)}},
         )
         ctx = BattlefieldActionContext(bf)
         skill = self._register_synth_skill(

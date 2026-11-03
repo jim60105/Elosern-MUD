@@ -6,6 +6,7 @@ from typing import Any
 
 from typeclasses.monsters import Monster
 from world.rules.combat import Battlefield, is_battle_over
+from world.rules.combat_identity import stable_actor_id
 
 
 class SkipRejectReason(StrEnum):
@@ -64,11 +65,11 @@ def _living(entity: Any) -> bool:
 def evaluate_skip_safety(actor: Any) -> SkipRejectReason | None:
     """Reject only active combat and a co-located living monster."""
     battlefield = _active_battlefield_for(actor)
-    actor_key = str(actor.key)
+    actor_id = stable_actor_id(actor)
     if (
         battlefield is not None
-        and actor_key in battlefield.roster
-        and actor_key not in battlefield.fled
+        and actor_id in battlefield.roster
+        and actor_id not in battlefield.fled
         and _living(actor)
         and not is_battle_over(battlefield)
     ):

@@ -32,6 +32,7 @@ from world.rules.overwhelm import (
 from world.tests.synthetic_data import SYNTH_SKILLS
 from world.rules.tests.combat_fixtures import grant_lineage
 
+from world.rules.combat_identity import stable_actor_id
 from ._combat_session_helpers import (
     _race_key,
     _live_registry,
@@ -64,10 +65,13 @@ class DisengageResolverIntegrationTests(EvenniaTestCase):
             entity.db.skills = {"active": [], "passive": []}
         self.field = Battlefield(
             {
-                "escaping": frozenset({"actor"}),
-                "pursuing": frozenset({"pursuer"}),
+                "escaping": frozenset({stable_actor_id(self.actor)}),
+                "pursuing": frozenset({stable_actor_id(self.pursuer)}),
             },
-            {"actor": self.actor, "pursuer": self.pursuer},
+            {
+                stable_actor_id(self.actor): self.actor,
+                stable_actor_id(self.pursuer): self.pursuer,
+            },
         )
 
     def request(self, *, event_context=True):
@@ -112,7 +116,7 @@ class DisengageResolverIntegrationTests(EvenniaTestCase):
                 RejectReason.TARGET_DEAD,
             )
         self.actor.traits.hp.current = self.actor.traits.hp.max
-        self.field.fled.add("actor")
+        self.field.fled.add(stable_actor_id(self.actor))
         with combat_provenance(engagement_provenance().at_slot(0)):
             self.assertIs(
                 ActionResolver.resolve(self.request()).reason,
@@ -128,7 +132,7 @@ class DisengageResolverIntegrationTests(EvenniaTestCase):
             result = ActionResolver.resolve(self.request())
         self.assertEqual(result.outcome, "success")
         self.assertEqual(result.time_cost_seconds, DEFAULT_CAST_SECONDS)
-        self.assertIn("actor", self.field.fled)
+        self.assertIn(stable_actor_id(self.actor), self.field.fled)
         self.assertEqual(result.event_log.entries[0].kind, "disengage_attempt")
         self.assertEqual(result.event_log.targets, ("actor",))
 
@@ -162,10 +166,10 @@ class DisengageResolverIntegrationTests(EvenniaTestCase):
             )
 
     def test_landed_combat_consumers_exclude_fled_entity(self):
-        self.field.fled.add("actor")
+        self.field.fled.add(stable_actor_id(self.actor))
         with patch(
             "world.rules.combat.rounds.roll_initiative",
-            return_value=["actor", "pursuer"],
+            return_value=[stable_actor_id(self.actor), stable_actor_id(self.pursuer)],
         ):
             acted = []
             run_round(
@@ -185,7 +189,7 @@ class DisengageResolverIntegrationTests(EvenniaTestCase):
                 self.field,
                 "disengage_attempt|actor|1|100|10|10",
                 frozenset({"battlefield"}),
-                lambda: self.field.fled.add("actor"),
+                lambda: self.field.fled.add(stable_actor_id(self.actor)),
             ),
             PendingEffect(
                 self.actor,
@@ -220,7 +224,7 @@ class DisengageResolverIntegrationTests(EvenniaTestCase):
         with (
             patch(
                 "world.rules.combat.rounds.roll_initiative",
-                return_value=["actor", "pursuer"],
+                return_value=[stable_actor_id(self.actor), stable_actor_id(self.pursuer)],
             ),
             patch("world.rules.disengage.roll_d100", return_value=1),
             patch("world.rules.combat.battlefield.roll_d100", return_value=100),
@@ -249,7 +253,7 @@ class DisengageResolverIntegrationTests(EvenniaTestCase):
         with (
             patch(
                 "world.rules.combat.rounds.roll_initiative",
-                return_value=["actor", "pursuer"],
+                return_value=[stable_actor_id(self.actor), stable_actor_id(self.pursuer)],
             ),
             patch(
                 "world.rules.disengage._attempt_flee",
@@ -268,4 +272,4 @@ class DisengageResolverIntegrationTests(EvenniaTestCase):
             )
         self.assertEqual(result.rounds_elapsed, 1)
         self.assertTrue(result.battle_over)
-        self.assertIn("actor", self.field.fled)
+        self.assertIn(stable_actor_id(self.actor), self.field.fled)

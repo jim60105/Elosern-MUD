@@ -45,6 +45,7 @@ from world.rules.surfaces import read_counter_trait
 from world.rules.tests.combat_fixtures import grant_lineage
 
 from tools.spec_traceability import covers_requirement
+from world.rules.combat_identity import stable_actor_id
 
 class OfflineDirectorEndToEndTests(CompileRegistryIsolation, EvenniaTestCase):
     """Offline loop through the template draw, compile, register, accept,
@@ -86,8 +87,8 @@ class OfflineDirectorEndToEndTests(CompileRegistryIsolation, EvenniaTestCase):
 
     def _resolve_lethal(self, monster: Monster):
         field = Battlefield(
-            {"party": frozenset({self.player.key}), "foes": frozenset({monster.key})},
-            {self.player.key: self.player, monster.key: monster},
+            {'party': frozenset({stable_actor_id(self.player)}), 'foes': frozenset({stable_actor_id(monster)})},
+            {stable_actor_id(self.player): self.player, stable_actor_id(monster): monster},
         )
         request = ActionRequest(
             self.player,

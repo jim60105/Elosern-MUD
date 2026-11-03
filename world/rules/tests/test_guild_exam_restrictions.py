@@ -174,7 +174,7 @@ class RestrictionBehaviorTests(EvenniaTest):
             self.assertEqual(adjusted_agility(self.host), 7)
         host_key, player_key = str(self.host.key), str(self.player.key)
         battlefield = Battlefield(
-            {"one": frozenset({host_key}), "two": frozenset({player_key})},
+            {'one': frozenset({host_key}), 'two': frozenset({player_key})},
             {host_key: self.host, player_key: self.player},
         )
         with patch("world.rules.combat.battlefield.roll_d100", return_value=0):

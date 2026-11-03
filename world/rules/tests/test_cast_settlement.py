@@ -50,6 +50,7 @@ from world.tests.raw_attributes import raw_attribute_value
 from world.tests.synthetic_data import make_skill
 
 from ._combat_session_helpers import live_skill_registry, open_synthetic_scope
+from world.rules.combat_identity import stable_actor_id
 
 
 def _learning_multiplier(race_key: str) -> float:
@@ -379,10 +380,10 @@ class CastSettlementRestoreTests(_CastSettlementTestCase):
         clock = WorldClock()
         field = Battlefield(
             {
-                "party": frozenset({self.char1.key}),
-                "foes": frozenset({self.char2.key}),
+                'party': frozenset({stable_actor_id(self.char1)}),
+                'foes': frozenset({stable_actor_id(self.char2)}),
             },
-            {self.char1.key: self.char1, self.char2.key: self.char2},
+            {stable_actor_id(self.char1): self.char1, stable_actor_id(self.char2): self.char2},
         )
         request = ActionRequest(
             actor=self.char1,
@@ -424,10 +425,10 @@ class CastSettlementRestoreTests(_CastSettlementTestCase):
         clock = WorldClock()
         field = Battlefield(
             {
-                "party": frozenset({self.char1.key}),
-                "foes": frozenset({self.char2.key}),
+                'party': frozenset({stable_actor_id(self.char1)}),
+                'foes': frozenset({stable_actor_id(self.char2)}),
             },
-            {self.char1.key: self.char1, self.char2.key: self.char2},
+            {stable_actor_id(self.char1): self.char1, stable_actor_id(self.char2): self.char2},
         )
         request = ActionRequest(
             actor=self.char1,

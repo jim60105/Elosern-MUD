@@ -84,7 +84,7 @@ class _FakeAttributes:
 
 def _holder(hp=100, max_hp=None, owned=(_T_RENEWAL_KEY,)):
     """A synthetic holder: combat-fake traits plus an attributes facade."""
-    entity = FakeEntity("t_heal_holder", hp=hp, max_hp=max_hp, owned=list(owned))
+    entity = FakeEntity("t_heal_holder", combat_identity='t_heal_holder', hp=hp, max_hp=max_hp, owned=list(owned))
     entity.attributes = _FakeAttributes()
     return entity
 

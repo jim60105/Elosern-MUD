@@ -29,6 +29,7 @@ from ._combat_session_helpers import (
     synth_damage_skill,
 )
 from .combat_fixtures import FakeEntity
+from world.rules.combat_identity import stable_actor_id
 
 
 # File-local registered row (data independence): the real-combat
@@ -39,7 +40,7 @@ _T_STRIKE = synth_damage_skill("t_equiv_strike", "合成打擊")
 
 def battlefield() -> Battlefield:
     attacker = FakeEntity(
-        "elf",
+        "elf", combat_identity='elf',
         hp=10000,
         max_hp=10000,
         atk_phys=88,
@@ -48,7 +49,7 @@ def battlefield() -> Battlefield:
         magic_power=250,
     )
     defender = FakeEntity(
-        "human",
+        "human", combat_identity='human',
         hp=120,
         atk_phys=8,
         agility=9,
@@ -57,10 +58,10 @@ def battlefield() -> Battlefield:
     )
     return Battlefield(
         {
-            "elves": frozenset({"elf"}),
-            "humans": frozenset({"human"}),
+            'elves': frozenset({"fixture:elf"}),
+            'humans': frozenset({"fixture:human"}),
         },
-        {"elf": attacker, "human": defender},
+        {"fixture:elf": attacker, "fixture:human": defender},
     )
 
 
@@ -146,12 +147,12 @@ class ResolutionTests(unittest.TestCase):
     def test_contested_and_finished_battles_do_not_run_round(self):
         contested = Battlefield(
             {
-                "first": frozenset({"first"}),
-                "second": frozenset({"second"}),
+                'first': frozenset({"fixture:first"}),
+                'second': frozenset({"fixture:second"}),
             },
             {
-                "first": FakeEntity("first"),
-                "second": FakeEntity("second"),
+                "fixture:first": FakeEntity("first", combat_identity='first'),
+                "fixture:second": FakeEntity("second", combat_identity='second'),
             },
         )
         finished = battlefield()
@@ -387,10 +388,10 @@ class RealCombatEquivalenceTests(EvenniaTestCase):
         second = self._entity(f"second-{suffix}", strong=not strong_first)
         return Battlefield(
             {
-                "first": frozenset({first.key}),
-                "second": frozenset({second.key}),
+                'first': frozenset({stable_actor_id(first)}),
+                'second': frozenset({stable_actor_id(second)}),
             },
-            {first.key: first, second.key: second},
+            {stable_actor_id(first): first, stable_actor_id(second): second},
         )
 
     @staticmethod
@@ -639,12 +640,12 @@ class RealCombatEquivalenceTests(EvenniaTestCase):
             monster.traits.magic_power.base = 0
         field = Battlefield(
             {
-                "elves": frozenset({elf.key}),
-                "monsters": frozenset(monster.key for monster in monsters),
+                'elves': frozenset({stable_actor_id(elf)}),
+                'monsters': frozenset(stable_actor_id(monster) for monster in monsters),
             },
             {
-                elf.key: elf,
-                **{monster.key: monster for monster in monsters},
+                stable_actor_id(elf): elf,
+                **{stable_actor_id(monster): monster for monster in monsters},
             },
         )
         random.seed(2029)

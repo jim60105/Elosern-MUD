@@ -19,13 +19,14 @@ from world.tests.synthetic_data import SYNTH_SKILLS, synthetic_registries
 
 from ._combat_session_helpers import _race_key, synth_innate_overlay
 from .combat_fixtures import FakeEntity
+from world.rules.combat_identity import stable_actor_id
 
 
 class GoldenCombatTests(unittest.TestCase):
     @covers_requirement("combat-resolution::golden-fixed-seed-tests-cover-a-normal-exchange-and-a-lopsided-exchange")
     def test_normal_exchange_has_fixed_roll_and_damage_sequence(self):
-        attacker = FakeEntity("a", atk_phys=12, agility=9)
-        defender = FakeEntity("b", hp=200, defense=7, agility=9)
+        attacker = FakeEntity("a", combat_identity='a', atk_phys=12, agility=9)
+        defender = FakeEntity("b", combat_identity='b', hp=200, defense=7, agility=9)
         random.seed(41)
         with patch(
             "world.rules.combat.rounds.evaluate_combat_modifiers",
@@ -46,11 +47,11 @@ class GoldenCombatTests(unittest.TestCase):
 
     @covers_requirement("combat-resolution::per-round-upkeep-ticks-buffs-and-advances-sexual-decay-by-the-round-duration", "combat-resolution::the-turn-loop-reports-elapsed-time-as-rounds-times-6-seconds-and-never-advances-a-clock", "single-shot-resolution::reported-time-cost-uses-the-identical-rounds-times-six-seconds-formula-unedited")
     def test_lopsided_exchange_saturates_and_time_is_round_based(self):
-        elf = FakeEntity("elf", hp=10000, agility=92)
-        human = FakeEntity("human", hp=120, agility=9)
+        elf = FakeEntity("elf", combat_identity='elf', hp=10000, agility=92)
+        human = FakeEntity("human", combat_identity='human', hp=120, agility=9)
         battlefield = Battlefield(
-            {"elves": frozenset({"elf"}), "humans": frozenset({"human"})},
-            {"elf": elf, "human": human},
+            {'elves': frozenset({"fixture:elf"}), 'humans': frozenset({"fixture:human"})},
+            {"fixture:elf": elf, "fixture:human": human},
         )
         with (
             patch(
@@ -97,10 +98,10 @@ class GoldenResolverBattleTests(EvenniaTestCase):
             entity.db.skills = {"active": [SYNTH_SKILLS["t_ember_burst"].key], "passive": []}
         return Battlefield(
             {
-                "first": frozenset({first.key}),
-                "second": frozenset({second.key}),
+                'first': frozenset({stable_actor_id(first)}),
+                'second': frozenset({stable_actor_id(second)}),
             },
-            {first.key: first, second.key: second},
+            {stable_actor_id(first): first, stable_actor_id(second): second},
         )
 
     @staticmethod

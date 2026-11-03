@@ -50,6 +50,7 @@ from world.tests.synthetic_data import (
 from ._combat_session_helpers import open_synthetic_scope, synth_damage_skill
 from .combat_fixtures import FakeEntity
 from .test_monster_behaviour_policy import FakeMonster, _field
+from world.rules.combat_identity import stable_actor_id
 
 SPECIES = "t_ai_species"
 OTHER_SPECIES = "t_ai_other_species"
@@ -267,10 +268,10 @@ class MonsterBehaviourAuthoringTests(unittest.TestCase):
         # Two enemies whose HP order is the reverse of their power order, so
         # the authored target strategy is observable in the chosen target.
         weak = FakeEntity(
-            "t_ai_weak", hp=10, atk_phys=5, agility=5, defense=5, magic_power=5
+            "t_ai_weak", combat_identity='t_ai_weak', hp=10, atk_phys=5, agility=5, defense=5, magic_power=5
         )
         strong = FakeEntity(
-            "t_ai_strong", hp=90, atk_phys=1, agility=1, defense=1, magic_power=1
+            "t_ai_strong", combat_identity='t_ai_strong', hp=90, atk_phys=1, agility=1, defense=1, magic_power=1
         )
         actor = FakeMonster("t_ai_actor", threat_tier=TIER, owned=[_CLAW.key])
         weakest_first = self._decide(_rulebook(), actor, [weak, strong])
@@ -909,12 +910,12 @@ class MonsterAISessionBoundaryTests(EvenniaTestCase):
     def _battlefield(self):
         return Battlefield(
             {
-                "monsters": frozenset({str(self.monster.key)}),
-                "party": frozenset({str(self.opponent.key)}),
+                'monsters': frozenset({stable_actor_id(self.monster)}),
+                'party': frozenset({stable_actor_id(self.opponent)}),
             },
             {
-                str(self.monster.key): self.monster,
-                str(self.opponent.key): self.opponent,
+                stable_actor_id(self.monster): self.monster,
+                stable_actor_id(self.opponent): self.opponent,
             },
         )
 

@@ -66,6 +66,7 @@ from ._combat_session_helpers import (
     synth_damage_skill,
     synth_innate_overlay,
 )
+from world.rules.combat_identity import stable_actor_id
 
 # --- locally authored rows ---------------------------------------------------
 #: The buff key one synthetic cast condition requires of its target.
@@ -335,7 +336,7 @@ def _probe_field(actor: _ProbeParticipant, *others):
     for other in others:
         roster[other.key] = other
     return Battlefield(
-        {"monsters": frozenset({actor.key}), "party": enemies}, roster
+        {'monsters': frozenset({stable_actor_id(actor)}), 'party': enemies}, roster
     )
 
 

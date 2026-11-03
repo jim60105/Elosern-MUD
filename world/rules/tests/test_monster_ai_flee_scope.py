@@ -50,6 +50,7 @@ from .test_monster_ai_selection import (
     _scope,
     _suppress_innate_skills,
 )
+from world.rules.combat_identity import stable_actor_id
 
 #: The one authored maximum both cases share, so ``50/100`` is the exact
 #: inclusive boundary in binary floats and needs no tolerance.
@@ -75,10 +76,10 @@ def _field(monster, opponent) -> Battlefield:
     """One real battlefield: the monster's team and its single living foe."""
     return Battlefield(
         {
-            "foes": frozenset({str(monster.key)}),
-            "party": frozenset({str(opponent.key)}),
+            'foes': frozenset({stable_actor_id(monster)}),
+            'party': frozenset({stable_actor_id(opponent)}),
         },
-        {str(monster.key): monster, str(opponent.key): opponent},
+        {stable_actor_id(monster): monster, stable_actor_id(opponent): opponent},
     )
 
 

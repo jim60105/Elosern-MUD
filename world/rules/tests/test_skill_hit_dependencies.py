@@ -38,6 +38,7 @@ from world.skills.registry import (
     SkillKind,
     TargetSpec,
 )
+from world.rules.combat_identity import stable_actor_id
 
 
 class SkillHitDependenciesTests(EvenniaTestCase):
@@ -61,11 +62,11 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         self.target_b.traits.defense.base = 10
         self.battlefield = Battlefield(
             roster={
-                "hit_actor": self.actor,
-                "hit_target_a": self.target_a,
-                "hit_target_b": self.target_b,
+                "fixture:hit_actor": self.actor,
+                "fixture:hit_target_a": self.target_a,
+                "fixture:hit_target_b": self.target_b,
             },
-            teams={"team_a": {"hit_actor"}, "team_b": {"hit_target_a", "hit_target_b"}},
+            teams={'team_a': {"fixture:hit_actor"}, 'team_b': {"fixture:hit_target_a", "fixture:hit_target_b"}},
         )
         self.context = BattlefieldActionContext(self.battlefield)
 
@@ -102,8 +103,8 @@ class SkillHitDependenciesTests(EvenniaTestCase):
             f.traits.agility.base = 10
             f.db.display_name = "哥布林"
         bf = Battlefield(
-            roster={"goblin_1": foe1, "goblin_2": foe2, "hit_actor": self.actor},
-            teams={"team_a": {"hit_actor"}, "team_b": {"goblin_1", "goblin_2"}},
+            roster={"fixture:goblin_1": foe1, "fixture:goblin_2": foe2, "fixture:hit_actor": self.actor},
+            teams={'team_a': {"fixture:hit_actor"}, 'team_b': {"fixture:goblin_1", "fixture:goblin_2"}},
         )
         ctx = BattlefieldActionContext(bf)
 
@@ -623,13 +624,13 @@ class SkillHitDependenciesTests(EvenniaTestCase):
                 self.target_b.traits.mp.current = 3
                 context = BattlefieldActionContext(Battlefield(
                     roster={
-                        str(actor.key): actor,
-                        "hit_target_a": self.target_a,
-                        "hit_target_b": self.target_b,
+                        stable_actor_id(actor): actor,
+                        "fixture:hit_target_a": self.target_a,
+                        "fixture:hit_target_b": self.target_b,
                     },
                     teams={
-                        "actors": {str(actor.key)},
-                        "foes": {"hit_target_a", "hit_target_b"},
+                        'actors': {stable_actor_id(actor)},
+                        'foes': {"fixture:hit_target_a", "fixture:hit_target_b"},
                     },
                 ))
                 # Swap hit/miss in the next invocation, so stale evidence fails.

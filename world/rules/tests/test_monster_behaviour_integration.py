@@ -47,6 +47,7 @@ from .test_monster_behaviour_policy import (
     _T_CLAW,
     _T_SPELL,
 )
+from world.rules.combat_identity import stable_actor_id
 
 
 def _scope_extra():
@@ -85,13 +86,13 @@ class MonsterBehaviourIntegrationTests(unittest.TestCase):
             defense=1000,
             magic_power=1000,
         )
-        self.enemy = FakeEntity("enemy", hp=100, agility=1)
+        self.enemy = FakeEntity("enemy", combat_identity='enemy', hp=100, agility=1)
         self.field = Battlefield(
             {
-                "monsters": frozenset({"monster"}),
-                "party": frozenset({"enemy"}),
+                'monsters': frozenset({"fixture:monster"}),
+                'party': frozenset({"fixture:enemy"}),
             },
-            {"monster": self.monster, "enemy": self.enemy},
+            {"fixture:monster": self.monster, "fixture:enemy": self.enemy},
         )
 
     @covers_requirement("monster-action-policy::monster-behaviour-policy-is-a-complete-drop-in-action-provider")
@@ -201,10 +202,10 @@ class MonsterBehaviourResolverIntegrationTests(EvenniaTestCase):
         target.apply_race_baseline()
         battlefield = Battlefield(
             {
-                "monsters": frozenset({monster.key}),
-                "party": frozenset({target.key}),
+                'monsters': frozenset({stable_actor_id(monster)}),
+                'party': frozenset({stable_actor_id(target)}),
             },
-            {monster.key: monster, target.key: target},
+            {stable_actor_id(monster): monster, stable_actor_id(target): target},
         )
 
         # The mid-tier pack-hunter profile picks by highest expected damage.
@@ -242,10 +243,10 @@ class MonsterFleeResolverIntegrationTests(EvenniaTestCase):
         self.target.db.skills = {"active": [], "passive": []}
         self.field = Battlefield(
             {
-                "monsters": frozenset({self.monster.key}),
-                "party": frozenset({self.target.key}),
+                'monsters': frozenset({stable_actor_id(self.monster)}),
+                'party': frozenset({stable_actor_id(self.target)}),
             },
-            {self.monster.key: self.monster, self.target.key: self.target},
+            {stable_actor_id(self.monster): self.monster, stable_actor_id(self.target): self.target},
         )
 
     def _assert_flee_preconditions(self):
@@ -399,10 +400,10 @@ class MonsterFleeResolverIntegrationTests(EvenniaTestCase):
                 target.db.skills = {"active": [], "passive": []}
                 battlefield = Battlefield(
                     {
-                        "monsters": frozenset({monster.key}),
-                        "party": frozenset({target.key}),
+                        'monsters': frozenset({stable_actor_id(monster)}),
+                        'party': frozenset({stable_actor_id(target)}),
                     },
-                    {monster.key: monster, target.key: target},
+                    {stable_actor_id(monster): monster, stable_actor_id(target): target},
                 )
                 request = monster_behaviour_policy(monster, battlefield)
                 self.assertEqual(request.skill_key, expected_skill)

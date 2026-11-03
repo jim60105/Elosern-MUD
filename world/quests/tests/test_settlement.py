@@ -85,6 +85,7 @@ from ._fixtures import (
     quest,
     register,
 )
+from world.rules.combat_identity import stable_actor_id
 
 # Settlement runs entirely on kit rows: the issuing branch, the reward/acquire
 # items, and the combat skill are synthetic. The branch/items scope is opened
@@ -476,10 +477,10 @@ class DefeatActionSettlementTests(QuestRegistryIsolation, EvenniaTestCase):
     def _resolve(self, targets):
         field = Battlefield(
             {
-                "party": frozenset({self.actor.key}),
-                "foes": frozenset({targets[0].key}),
+                'party': frozenset({stable_actor_id(self.actor)}),
+                'foes': frozenset({targets[0].key}),
             },
-            {self.actor.key: self.actor, targets[0].key: targets[0]},
+            {stable_actor_id(self.actor): self.actor, targets[0].key: targets[0]},
         )
         request = ActionRequest(
             self.actor,

@@ -47,9 +47,9 @@ class DamageBandTests(unittest.TestCase):
     )
     def test_ratio_mitigation_integration_properties(self):
         # 1. Physical and magic symmetry through _handle_damage
-        phys_actor = FakeEntity("phys_a", atk_phys=50, agility=10)
-        magic_actor = FakeEntity("mag_a", magic_power=50, agility=10)
-        target = FakeEntity("target", hp=100, defense=30, agility=10)
+        phys_actor = FakeEntity("phys_a", combat_identity='phys_a', atk_phys=50, agility=10)
+        magic_actor = FakeEntity("mag_a", combat_identity='mag_a', magic_power=50, agility=10)
+        target = FakeEntity("target", combat_identity='target', hp=100, defense=30, agility=10)
         with patch("world.rules.combat.damage.evaluate_combat_modifiers", return_value={}):
             with patch("world.rules.combat.damage.roll_d100", return_value=60):
                 phys_pending = _handle_damage(phys_actor, [target], "damage:dark:physical", {}, 1.0)[0]
@@ -99,7 +99,7 @@ class DamageBandTests(unittest.TestCase):
         )
 
         # 5. Nonlethal protection preservation with ratio mitigation
-        protected_target = FakeEntity("prot_target", hp=10, defense=0, agility=10)
+        protected_target = FakeEntity("prot_target", combat_identity='prot_target', hp=10, defense=0, agility=10)
         with patch("world.rules.combat.damage.evaluate_combat_modifiers", return_value={}):
             with patch("world.rules.combat.damage.roll_d100", return_value=60):
                 lethal_pending = _handle_damage(
@@ -142,14 +142,14 @@ class DamageBandTests(unittest.TestCase):
             exposure_bias=0,
             weapon_damage_multiplier=1.5,
         )
-        phys_actor = FakeEntity("phys_actor", atk_phys=60, magic_power=60, agility=10)
+        phys_actor = FakeEntity("phys_actor", combat_identity='phys_actor', atk_phys=60, magic_power=60, agility=10)
         phys_actor.db.equipment = {
             "weapon_main": synth_main.key,
             "weapon_off": None,
             "armor": None,
             "accessories": [],
         }
-        target = FakeEntity("target", hp=100, defense=20, agility=10)
+        target = FakeEntity("target", combat_identity='target', hp=100, defense=20, agility=10)
         with patch.dict("world.rules.equipment_effects.ITEM_REGISTRY", {synth_main.key: synth_main}):
             with patch.dict("world.rules.equipment_effects.EQUIPMENT_EFFECT_RULES", {EquipmentModifierKey.PLAIN_SWORD: rule_1_5}):
                 with patch("world.rules.combat.damage.evaluate_combat_modifiers", return_value={}):
@@ -159,7 +159,7 @@ class DamageBandTests(unittest.TestCase):
                         # Magic strike: weapon factor is NOT applied => attack=60. 60 * 40 / 60 = 40.
                         mag_pending = _handle_damage(phys_actor, [target], "damage:fire:magic", {}, 1.0)[0]
                         # Healing control: magic_power=60 * heal mult 1.0 = 60
-                        heal_target = FakeEntity("heal_target", hp=100, max_hp=100)
+                        heal_target = FakeEntity("heal_target", combat_identity='heal_target', hp=100, max_hp=100)
                         heal_target.traits.hp.current = 20
                         heal_pending = _handle_heal(phys_actor, [heal_target], "heal:single", {}, 1.0)[0]
                         self.assertEqual(int(heal_pending.description.split("|")[-1]), 60)
@@ -191,14 +191,14 @@ class DamageBandTests(unittest.TestCase):
             exposure_bias=0,
             weapon_damage_multiplier=1.5,
         )
-        phys_actor = FakeEntity("ms_actor", atk_phys=40, agility=10)
+        phys_actor = FakeEntity("ms_actor", combat_identity='ms_actor', atk_phys=40, agility=10)
         phys_actor.db.equipment = {
             "weapon_main": synth_main.key,
             "weapon_off": None,
             "armor": None,
             "accessories": [],
         }
-        target = FakeEntity("ms_target", hp=500, defense=10, agility=10)
+        target = FakeEntity("ms_target", combat_identity='ms_target', hp=500, defense=10, agility=10)
         target.db.combat_traits = ["dark"]
         policy = DamagePolicy(extra_strikes=1, predicate=("dark",), attack_multiplier=2.0)
         res_eff = ResolvedEffect(source_skill="test_ms", policy=EffectPolicy(damage=policy))
@@ -217,8 +217,8 @@ class DamageBandTests(unittest.TestCase):
 
     @covers_requirement("combat-resolution::damage-multiplier-is-banded-by-margin-of-success-with-a-magnitude-only-critical-on-a")
     def test_floor_shape_does_not_apply_to_a_miss(self):
-        actor = FakeEntity("actor", atk_phys=1, agility=10)
-        target = FakeEntity("target", hp=100, defense=99, agility=10)
+        actor = FakeEntity("actor", combat_identity='actor', atk_phys=1, agility=10)
+        target = FakeEntity("target", combat_identity='target', hp=100, defense=99, agility=10)
         with patch(
             "world.rules.combat.damage.evaluate_combat_modifiers",
             return_value={},

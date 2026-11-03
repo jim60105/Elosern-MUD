@@ -6,6 +6,7 @@ from world.maps import gm
 from world.rules.clock import read_world_clock
 from world.rules import skip_safety
 from tools.spec_traceability import covers_requirement
+from world.rules.combat_identity import stable_actor_id
 
 
 class MapConsoleTests(ConsoleOwnerTest):
@@ -154,7 +155,7 @@ class MapConsoleTests(ConsoleOwnerTest):
         # unregister_participants' dbref guard anticipates).
         ghost=create_object('typeclasses.monsters.Monster',key='t_console_ghost',location=self.room1)
         ally=create_object('typeclasses.monsters.Monster',key='t_console_ally',location=self.room1)
-        stale=Battlefield(teams={'enemies':frozenset({str(ghost.key)}),'allies':frozenset({str(ally.key)})},roster={str(ghost.key):ghost,str(ally.key):ally})
+        stale=Battlefield(teams={'enemies':frozenset({stable_actor_id(ghost)}),'allies':frozenset({stable_actor_id(ally)})},roster={stable_actor_id(ghost):ghost,stable_actor_id(ally):ally})
         skip_safety.register_active_battlefield(stale)
         ghost.delete()
         self.assertIsNone(ghost.pk)

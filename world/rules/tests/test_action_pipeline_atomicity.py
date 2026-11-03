@@ -109,8 +109,8 @@ class ActionPipelineAtomicityTests(EvenniaTestCase):
         )
         grant_lineage(actor, [skill.key])
         bf = Battlefield(
-            roster={"atomic_actor": actor, "atomic_target": target},
-            teams={"team_a": {"atomic_actor"}, "team_b": {"atomic_target"}},
+            roster={"fixture:atomic_actor": actor, "fixture:atomic_target": target},
+            teams={'team_a': {"fixture:atomic_actor"}, 'team_b': {"fixture:atomic_target"}},
         )
         ctx = BattlefieldActionContext(bf)
         req = ActionRequest(actor, skill.key, [target], ctx)
@@ -155,8 +155,8 @@ class ActionPipelineAtomicityTests(EvenniaTestCase):
         )
         grant_lineage(actor, [skill.key])
         bf = Battlefield(
-            roster={"fail_actor": actor, "fail_target": target},
-            teams={"team_a": {"fail_actor"}, "team_b": {"fail_target"}},
+            roster={"fixture:fail_actor": actor, "fixture:fail_target": target},
+            teams={'team_a': {"fixture:fail_actor"}, 'team_b': {"fixture:fail_target"}},
         )
         ctx = BattlefieldActionContext(bf)
         req = ActionRequest(actor, skill.key, [target], ctx)

@@ -50,6 +50,7 @@ from world.rules.tests._combat_session_helpers import (
 from world.rules.tests.combat_fixtures import grant_lineage
 from world.skills.registry import TargetSpec
 from world.tests.synthetic_data import SYNTH_SKILLS, make_skill
+from world.rules.combat_identity import stable_actor_id
 
 _skills_mod = importlib.import_module("world.skills.registry")
 _SKILL_MAP = getattr(_skills_mod, "SKILL_" + "REGISTRY")
@@ -262,8 +263,8 @@ class PositionalMarkerReachabilityTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertTrue(has_positional_marker(self.monster))
 
         bf = Battlefield(
-            teams={"players": frozenset({str(self.player.key)}), "enemies": frozenset({str(self.monster.key)})},
-            roster={str(self.player.key): self.player, str(self.monster.key): self.monster},
+            teams={'players': frozenset({stable_actor_id(self.player)}), 'enemies': frozenset({stable_actor_id(self.monster)})},
+            roster={stable_actor_id(self.player): self.player, stable_actor_id(self.monster): self.monster},
         )
         ctx = BattlefieldActionContext(bf)
 
@@ -303,8 +304,8 @@ class PositionalMarkerReachabilityTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertTrue(has_positional_marker(self.player))
 
         bf = Battlefield(
-            teams={"players": frozenset({str(self.player.key)}), "enemies": frozenset({str(self.monster.key)})},
-            roster={str(self.player.key): self.player, str(self.monster.key): self.monster},
+            teams={'players': frozenset({stable_actor_id(self.player)}), 'enemies': frozenset({stable_actor_id(self.monster)})},
+            roster={stable_actor_id(self.player): self.player, stable_actor_id(self.monster): self.monster},
         )
         ctx = BattlefieldActionContext(bf)
 
@@ -334,8 +335,8 @@ class PositionalMarkerReachabilityTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertTrue(has_positional_marker(self.player))
 
         bf = Battlefield(
-            teams={"players": frozenset({str(self.player.key)}), "enemies": frozenset({str(self.monster.key)})},
-            roster={str(self.player.key): self.player, str(self.monster.key): self.monster},
+            teams={'players': frozenset({stable_actor_id(self.player)}), 'enemies': frozenset({stable_actor_id(self.monster)})},
+            roster={stable_actor_id(self.player): self.player, stable_actor_id(self.monster): self.monster},
         )
         ctx = BattlefieldActionContext(bf)
 
@@ -371,11 +372,11 @@ class PositionalMarkerReachabilityTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertTrue(has_positional_marker(bystander))
 
         bf = Battlefield(
-            teams={"players": frozenset({str(self.player.key), str(bystander.key)}), "enemies": frozenset({str(self.monster.key)})},
+            teams={'players': frozenset({stable_actor_id(self.player), stable_actor_id(bystander)}), 'enemies': frozenset({stable_actor_id(self.monster)})},
             roster={
-                str(self.player.key): self.player,
-                str(bystander.key): bystander,
-                str(self.monster.key): self.monster,
+                stable_actor_id(self.player): self.player,
+                stable_actor_id(bystander): bystander,
+                stable_actor_id(self.monster): self.monster,
             },
         )
         ctx = BattlefieldActionContext(bf)
@@ -397,8 +398,8 @@ class PositionalMarkerReachabilityTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertTrue(has_positional_marker(self.monster))
 
         bf = Battlefield(
-            teams={"players": frozenset({str(self.player.key)}), "enemies": frozenset({str(self.monster.key)})},
-            roster={str(self.player.key): self.player, str(self.monster.key): self.monster},
+            teams={'players': frozenset({stable_actor_id(self.player)}), 'enemies': frozenset({stable_actor_id(self.monster)})},
+            roster={stable_actor_id(self.player): self.player, stable_actor_id(self.monster): self.monster},
         )
         ctx = BattlefieldActionContext(bf)
 
@@ -420,8 +421,8 @@ class PositionalMarkerReachabilityTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertTrue(has_positional_marker(self.player))
 
         bf = Battlefield(
-            teams={"players": frozenset({str(self.player.key)}), "enemies": frozenset({str(self.monster.key)})},
-            roster={str(self.player.key): self.player, str(self.monster.key): self.monster},
+            teams={'players': frozenset({stable_actor_id(self.player)}), 'enemies': frozenset({stable_actor_id(self.monster)})},
+            roster={stable_actor_id(self.player): self.player, stable_actor_id(self.monster): self.monster},
         )
         ctx = BattlefieldActionContext(bf)
         req = ActionRequest(self.player, _SYNTH_STRIKE_SKILL.key, [self.monster], ctx)
@@ -485,8 +486,8 @@ class PositionalMarkerLifecycleAndSynergyTests(BattlefieldIsolation, EvenniaTest
     def test_buff_cache_never_stores_battlefield_context_on_any_buff(self):
         """Unconditional pop in apply_buff ensures neither positional nor control buffs store battlefield in cache."""
         bf = Battlefield(
-            teams={"players": frozenset({str(self.player.key)}), "enemies": frozenset({str(self.monster.key)})},
-            roster={str(self.player.key): self.player, str(self.monster.key): self.monster},
+            teams={'players': frozenset({stable_actor_id(self.player)}), 'enemies': frozenset({stable_actor_id(self.monster)})},
+            roster={stable_actor_id(self.player): self.player, stable_actor_id(self.monster): self.monster},
         )
         apply_buff(self.monster, "t_control_buff", battlefield=bf, event_context={"battlefield": bf})
         cache = self.monster.buffs.all["t_control_buff"].cache
@@ -561,8 +562,8 @@ class PositionalMarkerLifecycleAndSynergyTests(BattlefieldIsolation, EvenniaTest
 
         # 2. Fled and Knocked-out in battlefield context
         bf = Battlefield(
-            teams={"players": frozenset({str(self.player.key)}), "enemies": frozenset({str(self.monster.key)})},
-            roster={str(self.player.key): self.player, str(self.monster.key): self.monster},
+            teams={'players': frozenset({stable_actor_id(self.player)}), 'enemies': frozenset({stable_actor_id(self.monster)})},
+            roster={stable_actor_id(self.player): self.player, stable_actor_id(self.monster): self.monster},
         )
         bf.fled.add(str(self.monster.key))
 
@@ -716,11 +717,11 @@ class DeterministicAttackerExclusionTests(BattlefieldIsolation, EvenniaTestCase)
     def test_basic_attack_request_skips_displaced_enemy(self):
         """_basic_attack_request excludes displaced enemies; returns None if all enemies are displaced."""
         bf = Battlefield(
-            teams={"players": frozenset({str(self.player.key)}), "enemies": frozenset({str(self.monster_a.key), str(self.monster_b.key)})},
+            teams={'players': frozenset({stable_actor_id(self.player)}), 'enemies': frozenset({stable_actor_id(self.monster_a), stable_actor_id(self.monster_b)})},
             roster={
-                str(self.player.key): self.player,
-                str(self.monster_a.key): self.monster_a,
-                str(self.monster_b.key): self.monster_b,
+                stable_actor_id(self.player): self.player,
+                stable_actor_id(self.monster_a): self.monster_a,
+                stable_actor_id(self.monster_b): self.monster_b,
             },
         )
         engage(self.player, self.monster_a)
@@ -755,11 +756,11 @@ class DeterministicAttackerExclusionTests(BattlefieldIsolation, EvenniaTestCase)
         apply_buff(self.player, "t_displaced_hazard")
 
         bf = Battlefield(
-            teams={"monsters": frozenset({str(strike_monster.key)}), "party": frozenset({str(self.player.key), str(companion.key)})},
+            teams={'monsters': frozenset({stable_actor_id(strike_monster)}), 'party': frozenset({stable_actor_id(self.player), stable_actor_id(companion)})},
             roster={
-                str(strike_monster.key): strike_monster,
-                str(self.player.key): self.player,
-                str(companion.key): companion,
+                stable_actor_id(strike_monster): strike_monster,
+                stable_actor_id(self.player): self.player,
+                stable_actor_id(companion): companion,
             },
         )
 
@@ -778,8 +779,8 @@ class DeterministicAttackerExclusionTests(BattlefieldIsolation, EvenniaTestCase)
         caster_monster.location = self.room
         grant_lineage(caster_monster, [_SYNTH_MAGIC_SINGLE_SKILL.key])
         bf_caster = Battlefield(
-            teams={"monsters": frozenset({str(caster_monster.key)}), "party": frozenset({str(self.player.key)})},
-            roster={str(caster_monster.key): caster_monster, str(self.player.key): self.player},
+            teams={'monsters': frozenset({stable_actor_id(caster_monster)}), 'party': frozenset({stable_actor_id(self.player)})},
+            roster={stable_actor_id(caster_monster): caster_monster, stable_actor_id(self.player): self.player},
         )
         req_caster = monster_behaviour_policy(caster_monster, bf_caster)
         self.assertIsNotNone(req_caster)
@@ -798,8 +799,8 @@ class DeterministicAttackerExclusionTests(BattlefieldIsolation, EvenniaTestCase)
 
         apply_buff(self.monster_a, "t_displaced_hazard")
         bf = Battlefield(
-            teams={"allies": frozenset({str(npc.key)}), "enemies": frozenset({str(self.monster_a.key)})},
-            roster={str(npc.key): npc, str(self.monster_a.key): self.monster_a},
+            teams={'allies': frozenset({stable_actor_id(npc)}), 'enemies': frozenset({stable_actor_id(self.monster_a)})},
+            roster={stable_actor_id(npc): npc, stable_actor_id(self.monster_a): self.monster_a},
         )
 
         # Strike-owning delegated NPC returns None when only enemy is displaced
@@ -812,8 +813,8 @@ class DeterministicAttackerExclusionTests(BattlefieldIsolation, EvenniaTestCase)
         npc_caster.apply_race_baseline()
         grant_lineage(npc_caster, [_SYNTH_MAGIC_SINGLE_SKILL.key])
         bf_mage = Battlefield(
-            teams={"allies": frozenset({str(npc_caster.key)}), "enemies": frozenset({str(self.monster_a.key)})},
-            roster={str(npc_caster.key): npc_caster, str(self.monster_a.key): self.monster_a},
+            teams={'allies': frozenset({stable_actor_id(npc_caster)}), 'enemies': frozenset({stable_actor_id(self.monster_a)})},
+            roster={stable_actor_id(npc_caster): npc_caster, stable_actor_id(self.monster_a): self.monster_a},
         )
         req_magic = combat.default_attack_policy(npc_caster, bf_mage)
         self.assertIsNotNone(req_magic)

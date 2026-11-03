@@ -30,6 +30,7 @@ from world.skills.registry import (
 
 from ._combat_session_helpers import live_skill_registry
 from .combat_fixtures import FakeEntity
+from world.rules.combat_identity import stable_actor_id
 
 
 def battlefield(
@@ -39,10 +40,10 @@ def battlefield(
     members = first + second
     return Battlefield(
         {
-            "first": frozenset(entity.key for entity in first),
-            "second": frozenset(entity.key for entity in second),
+            'first': frozenset(stable_actor_id(entity) for entity in first),
+            'second': frozenset(stable_actor_id(entity) for entity in second),
         },
-        {entity.key: entity for entity in members},
+        {stable_actor_id(entity): entity for entity in members},
     )
 
 
@@ -80,12 +81,12 @@ QUERY_SKILLS = {
 
 class PowerRatioTests(unittest.TestCase):
     def test_ratio_comparable_zero_and_inactive_members(self):
-        giant = FakeEntity("giant", hp=10000, max_hp=10000, defense=100)
-        small = FakeEntity("small", hp=10, max_hp=10)
+        giant = FakeEntity("giant", combat_identity='giant', hp=10000, max_hp=10000, defense=100)
+        small = FakeEntity("small", combat_identity='small', hp=10, max_hp=10)
         field = battlefield([giant], [small])
         self.assertEqual(power_ratio_verdict(field, "first", "second"), "first")
 
-        peer = FakeEntity("peer", hp=10000, max_hp=10000, defense=100)
+        peer = FakeEntity("peer", combat_identity='peer', hp=10000, max_hp=10000, defense=100)
         comparable = battlefield([giant], [peer])
         self.assertIsNone(
             power_ratio_verdict(comparable, "first", "second")
@@ -95,15 +96,15 @@ class PowerRatioTests(unittest.TestCase):
         self.assertEqual(power_ratio_verdict(field, "first", "second"), "first")
         self.assertEqual(team_effective_power(field, "second"), 0)
 
-        ally = FakeEntity("ally", hp=100, max_hp=100)
+        ally = FakeEntity("ally", combat_identity='ally', hp=100, max_hp=100)
         mixed = battlefield([giant, ally], [peer])
         giant.traits.hp.value = 0
         self.assertEqual(team_effective_power(mixed, "first"), effective_power(ally))
 
     @covers_requirement("overwhelm-threshold::classify-overwhelm-is-a-pure-query-recomputable-every-round-with-no-stale-state")
     def test_living_member_power_ignores_current_hp(self):
-        entity = FakeEntity("entity", hp=100, max_hp=100)
-        field = battlefield([entity], [FakeEntity("other")])
+        entity = FakeEntity("entity", combat_identity='entity', hp=100, max_hp=100)
+        field = battlefield([entity], [FakeEntity("other", combat_identity='other')])
         before = team_effective_power(field, "first")
         entity.traits.hp.value = 1
         self.assertEqual(team_effective_power(field, "first"), before)
@@ -111,8 +112,8 @@ class PowerRatioTests(unittest.TestCase):
 
 class HitRateTests(unittest.TestCase):
     def test_saturation_and_cross_pair_requirement(self):
-        fast = FakeEntity("fast", agility=60)
-        slow = FakeEntity("slow", agility=10)
+        fast = FakeEntity("fast", combat_identity='fast', agility=60)
+        slow = FakeEntity("slow", combat_identity='slow', agility=10)
         with patch(
             "world.rules.overwhelm.evaluate_combat_modifiers",
             return_value={},
@@ -125,7 +126,7 @@ class HitRateTests(unittest.TestCase):
                 "first",
             )
             field = battlefield(
-                [fast, FakeEntity("middling", agility=20)],
+                [fast, FakeEntity("middling", combat_identity='middling', agility=20)],
                 [slow],
             )
             self.assertIsNone(
@@ -133,8 +134,8 @@ class HitRateTests(unittest.TestCase):
             )
 
     def test_accuracy_is_evaluated_independently(self):
-        first = FakeEntity("first", agility=10)
-        second = FakeEntity("second", agility=10)
+        first = FakeEntity("first", combat_identity='first', agility=10)
+        second = FakeEntity("second", combat_identity='second', agility=10)
 
         def modifiers(entity):
             return {"accuracy": 50} if entity is first else {}
@@ -157,8 +158,8 @@ class HitRateTests(unittest.TestCase):
             )
 
     def test_fractional_modifier_matches_integer_d100_boundaries(self):
-        attacker = FakeEntity("attacker", agility=59)
-        defender = FakeEntity("defender", agility=100)
+        attacker = FakeEntity("attacker", combat_identity='attacker', agility=59)
+        defender = FakeEntity("defender", combat_identity='defender', agility=100)
 
         def modifiers(entity):
             return {"agility": "-15%"} if entity is attacker else {}
@@ -198,10 +199,10 @@ class HitRateTests(unittest.TestCase):
             ),
         ]
         attacker = FakeEntity(
-            "attacker", atk_phys=20, agility=10
+            "attacker", combat_identity='attacker', atk_phys=20, agility=10
         )
         attacker.skills._owned = ["t_drill_mastery"]
-        defender = FakeEntity("defender", defense=5, agility=10)
+        defender = FakeEntity("defender", combat_identity='defender', defense=5, agility=10)
         defender.skills._owned = ["t_shell_doctrine"]
         with patch.object(
             combat_modifiers, "_RULES", list(combat_modifiers._RULES) + rules
@@ -213,7 +214,7 @@ class HitRateTests(unittest.TestCase):
 class RoundEstimateTests(unittest.TestCase):
     def test_calibration_examples(self):
         elf = FakeEntity(
-            "elf",
+            "elf", combat_identity='elf',
             hp=10000,
             atk_phys=88,
             agility=92,
@@ -221,7 +222,7 @@ class RoundEstimateTests(unittest.TestCase):
             magic_power=250,
         )
         human = FakeEntity(
-            "human",
+            "human", combat_identity='human',
             hp=120,
             atk_phys=8,
             agility=9,
@@ -239,7 +240,7 @@ class RoundEstimateTests(unittest.TestCase):
             )
             for index in range(3)
         ]
-        apex = FakeEntity("t_apex_raider", hp=10000, atk_phys=100, agility=92)
+        apex = FakeEntity("t_apex_raider", combat_identity='t_apex_raider', hp=10000, atk_phys=100, agility=92)
         humans = [
             FakeEntity(
                 f"human-{index}",
@@ -277,9 +278,9 @@ class RoundEstimateTests(unittest.TestCase):
                 ),
                 360 / 93,
             )
-            weak = FakeEntity("weak", atk_phys=1, agility=60)
+            weak = FakeEntity("weak", combat_identity='weak', atk_phys=1, agility=60)
             wall = FakeEntity(
-                "wall",
+                "wall", combat_identity='wall',
                 hp=10000,
                 max_hp=10000,
                 agility=10,
@@ -295,8 +296,8 @@ class RoundEstimateTests(unittest.TestCase):
             )
 
     def test_estimate_uses_current_hp_and_handles_no_damage(self):
-        attacker = FakeEntity("attacker", atk_phys=20, agility=60)
-        defender = FakeEntity("defender", hp=100, max_hp=100, agility=10)
+        attacker = FakeEntity("attacker", combat_identity='attacker', atk_phys=20, agility=60)
+        defender = FakeEntity("defender", combat_identity='defender', hp=100, max_hp=100, agility=10)
         field = battlefield([attacker], [defender])
         with patch(
             "world.rules.overwhelm.evaluate_combat_modifiers",
@@ -335,14 +336,14 @@ class CombinedSignalTests(unittest.TestCase):
             ratio = battlefield(
                 [
                     FakeEntity(
-                        "large",
+                        "large", combat_identity='large',
                         hp=10000,
                         max_hp=10000,
                         atk_phys=3000,
                         agility=10,
                     )
                 ],
-                [FakeEntity("small", hp=10, agility=10)],
+                [FakeEntity("small", combat_identity='small', hp=10, agility=10)],
             )
             self.assertEqual(
                 power_ratio_verdict(ratio, "first", "second"),
@@ -354,8 +355,8 @@ class CombinedSignalTests(unittest.TestCase):
             self.assertEqual(classify_overwhelm(ratio), "first")
 
             rate = battlefield(
-                [FakeEntity("fast", atk_phys=100, agility=60)],
-                [FakeEntity("slow", hp=100, agility=10)],
+                [FakeEntity("fast", combat_identity='fast', atk_phys=100, agility=60)],
+                [FakeEntity("slow", combat_identity='slow', hp=100, agility=10)],
             )
             self.assertIsNone(
                 power_ratio_verdict(rate, "first", "second")
@@ -367,15 +368,15 @@ class CombinedSignalTests(unittest.TestCase):
             self.assertEqual(classify_overwhelm(rate), "first")
 
             contested = battlefield(
-                [FakeEntity("a")],
-                [FakeEntity("b")],
+                [FakeEntity("a", combat_identity='a')],
+                [FakeEntity("b", combat_identity='b')],
             )
             self.assertIsNone(classify_overwhelm(contested))
 
             grind = battlefield(
                 [
                     FakeEntity(
-                        "durable",
+                        "durable", combat_identity='durable',
                         hp=100000000,
                         max_hp=100000000,
                         atk_phys=1,
@@ -384,7 +385,7 @@ class CombinedSignalTests(unittest.TestCase):
                 ],
                 [
                     FakeEntity(
-                        "wall",
+                        "wall", combat_identity='wall',
                         hp=10000,
                         max_hp=10000,
                         agility=10,
@@ -399,7 +400,7 @@ class CombinedSignalTests(unittest.TestCase):
             self.assertIsNone(classify_overwhelm(grind))
 
     def test_disagreement_does_not_consult_estimate(self):
-        field = battlefield([FakeEntity("a")], [FakeEntity("b")])
+        field = battlefield([FakeEntity("a", combat_identity='a')], [FakeEntity("b", combat_identity='b')])
         with (
             patch(
                 "world.rules.overwhelm.power_ratio_verdict",
@@ -421,7 +422,7 @@ class CombinedSignalTests(unittest.TestCase):
 
     def test_classification_recomputes_without_cached_state(self):
         strong = FakeEntity(
-            "strong",
+            "strong", combat_identity='strong',
             hp=10000,
             max_hp=10000,
             atk_phys=88,
@@ -429,7 +430,7 @@ class CombinedSignalTests(unittest.TestCase):
             defense=90,
             magic_power=250,
         )
-        weak = FakeEntity("weak", hp=120, agility=9, defense=7)
+        weak = FakeEntity("weak", combat_identity='weak', hp=120, agility=9, defense=7)
         field = battlefield([strong], [weak])
         with patch(
             "world.rules.overwhelm.evaluate_combat_modifiers",
@@ -451,8 +452,8 @@ class CommandedDamageQueryTests(unittest.TestCase):
 
     def field(self) -> Battlefield:
         return battlefield(
-            [FakeEntity("actor"), FakeEntity("ally")],
-            [FakeEntity("enemy")],
+            [FakeEntity("actor", combat_identity='actor'), FakeEntity("ally", combat_identity='ally')],
+            [FakeEntity("enemy", combat_identity='enemy')],
         )
 
     def query(self, field, skill_key, target_keys):
@@ -569,8 +570,8 @@ class CommandedDamageQueryTests(unittest.TestCase):
         field = self.field()
         self.assertTrue(self.query(field, "q_damage", ["enemy"]))
         moved = battlefield(
-            [FakeEntity("actor"), FakeEntity("ally"), FakeEntity("enemy")],
-            [FakeEntity("other")],
+            [FakeEntity("actor", combat_identity='actor'), FakeEntity("ally", combat_identity='ally'), FakeEntity("enemy", combat_identity='enemy')],
+            [FakeEntity("other", combat_identity='other')],
         )
         self.assertFalse(self.query(moved, "q_damage", ["enemy"]))
         weakened = dict(QUERY_SKILLS)

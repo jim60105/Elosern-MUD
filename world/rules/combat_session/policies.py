@@ -13,6 +13,7 @@ from typing import Any
 from world.rules import combat
 from world.rules.action import ActionRequest, _stored_trait_value
 from world.rules.combat import Battlefield
+from world.rules.combat_identity import stable_actor_id
 from world.rules.combat_session.ai_tuning import record_session_ai_tuning
 from world.rules.combat_session.battlefield import _context_for
 from world.rules.combat_session.records import CombatSessionRecord
@@ -39,7 +40,7 @@ def _basic_attack_request(
         (
             members
             for team, members in battlefield.teams.items()
-            if team != battlefield.team_of(str(entity.key))
+            if team != battlefield.team_of(stable_actor_id(entity))
         ),
         frozenset(),
     )
@@ -56,7 +57,10 @@ def _basic_attack_request(
         return None
     target = min(
         candidates,
-        key=lambda enemy: (_stored_trait_value(enemy.traits.hp), str(enemy.key)),
+        key=lambda enemy: (
+            _stored_trait_value(enemy.traits.hp),
+            stable_actor_id(enemy),
+        ),
     )
     context = _context_for(battlefield, record)
     return ActionRequest(entity, BASIC_ATTACK_KEY, [target], context)
@@ -157,7 +161,7 @@ def _overwhelm_provider(actor: Any, first_request: "combat.RoundRequest", battle
 
     def provider(entity, field):
         nonlocal used
-        if entity.key == actor.key:
+        if stable_actor_id(entity) == stable_actor_id(actor):
             if not used:
                 used = True
                 return first_request

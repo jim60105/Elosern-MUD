@@ -23,29 +23,22 @@ from json import dumps
 from typing import Any
 
 from world.rules.action.contracts import RejectReason
+from world.rules.combat_identity import stable_actor_id
 from world.rules.targeting import Relation
 from world.skills.registry import FactionConstraint, SkillKind, TargetSpec
-
-#: The identity prefix of a persisted participant (see :func:`stable_identity`).
-DBREF_PREFIX = "dbref:"
-#: The identity prefix of a participant that carries no persisted identity.
-KEY_PREFIX = "key:"
 
 
 def stable_identity(entity: Any) -> str:
     """Return one participant's stable snapshot identity.
 
-    A persisted participant is identified by its database reference, which
-    never changes, never collides and is never a display label. An ephemeral
-    double without one falls back to its own key, which is the only identity it
-    has; a display name, a Python object address and the entity's ``repr`` are
-    deliberately never used, so a snapshot cannot depend on where an object
-    happens to live in memory.
+    The snapshot identity is exactly the combat core's individual identity
+    (:func:`world.rules.combat.decision_scope.stable_actor_id`): a persisted
+    participant's database reference, or a nonpersistent pure participant's
+    explicit ``combat_identity``. A display name, a Python object address and
+    the entity's ``repr`` are deliberately never used, and a participant with
+    no valid identity fails closed instead of borrowing a label.
     """
-    pk = getattr(entity, "pk", None)
-    if isinstance(pk, int) and not isinstance(pk, bool):
-        return f"{DBREF_PREFIX}{pk}"
-    return f"{KEY_PREFIX}{getattr(entity, 'key', '?')}"
+    return stable_actor_id(entity)
 
 
 @dataclass(frozen=True, slots=True)

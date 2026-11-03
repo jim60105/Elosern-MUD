@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Protocol, runtime_checkable
 
+from world.rules.combat_identity import stable_actor_id
 from world.skills.registry import FactionConstraint, SkillCategory, SkillDef, TargetSpec
 
 
@@ -431,7 +432,9 @@ def expand_target_shorthand(
     knocked_out = frozenset(getattr(battlefield, "knocked_out", ()))
     if shorthand == "all":
         return [
-            target for target in roster if str(target.key) not in knocked_out
+            target
+            for target in roster
+            if stable_actor_id(target) not in knocked_out
         ]
     wanted = (
         {Relation.ENEMY}
@@ -442,5 +445,5 @@ def expand_target_shorthand(
         target
         for target in roster
         if context.relation_to(actor, target) in wanted
-        and str(target.key) not in knocked_out
+        and stable_actor_id(target) not in knocked_out
     ]

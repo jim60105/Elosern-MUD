@@ -10,6 +10,7 @@ from typing import Any
 
 from world.rules.event_log import EventEntry, EventLog
 from world.skills.registry import SkillDef
+from world.rules.combat_identity import stable_actor_id
 from world.skills.narration import (
     FALLBACK_TEMPLATES,
     INTERNAL_KINDS,
@@ -38,12 +39,23 @@ _FALLBACK_TEMPLATES = FALLBACK_TEMPLATES
 
 def _entries_from_effect(
     actor_key: str,
+    actor_id: str,
     effect: PendingEffect,
 ) -> tuple[EventEntry, ...]:
     parts = effect.description.split("|")
     if len(parts) < 2 or parts[0] not in _FALLBACK_TEMPLATES:
         raise ValueError(f"malformed pending-effect description {effect.description!r}")
     kind, target, *values = parts
+
+    def target_identity() -> str:
+        """The stable identity behind this entry's prose target label."""
+        # A participant-bearing entry carries the stable identity behind its
+        # prose label. Disengagement describes the actor itself (its pending
+        # mutation is battlefield-shaped), every other participant effect
+        # describes its own recipient entity.
+        if kind == "disengage_attempt":
+            return actor_id
+        return stable_actor_id(effect.entity)
     if kind == "resource_spend":
         data = {
             "resource_key": values[0],
@@ -100,12 +112,15 @@ def _entries_from_effect(
                 f"malformed damage pending effect {effect.description!r}"
             )
         raw_roll, hit_flag, amount = map(int, values)
+        target_id = target_identity()
         roll_entry = EventEntry(
             kind="roll",
             actor=actor_key,
             target=target,
             data={"raw_roll": raw_roll, "hit": bool(hit_flag)},
             text_template=_FALLBACK_TEMPLATES["roll"],
+            actor_id=actor_id,
+            target_id=target_id,
         )
         if not hit_flag:
             return (roll_entry,)
@@ -117,6 +132,8 @@ def _entries_from_effect(
                 target=target,
                 data={"amount": amount},
                 text_template=_FALLBACK_TEMPLATES["damage"],
+                actor_id=actor_id,
+                target_id=target_id,
             ),
         )
     elif kind == "disengage_attempt":
@@ -163,12 +180,15 @@ def _entries_from_effect(
         }
     else:
         data = {}
+    target_id = target_identity()
     entry = EventEntry(
         kind=kind,
         actor=actor_key,
         target=target,
         data=data,
         text_template=_FALLBACK_TEMPLATES[kind],
+        actor_id=actor_id,
+        target_id=target_id,
     )
     if kind != "resource_spend":
         return (entry,)
@@ -183,12 +203,15 @@ def _entries_from_effect(
                 "delta": -data["amount"],
             },
             text_template=_FALLBACK_TEMPLATES["trait_delta"],
+            actor_id=actor_id,
+            target_id=target_id,
         ),
     )
 
 
 def _defeated_entry(
     actor_key: str,
+    actor_id: str,
     entity: Any,
     amount: int,
     projected: dict[int, float],
@@ -250,6 +273,8 @@ def _defeated_entry(
             if nonlethal
             else _FALLBACK_TEMPLATES["target_defeated"]
         ),
+        actor_id=actor_id,
+        target_id=f"dbref:{int(dbref)}",
     )
 
 
@@ -276,19 +301,16 @@ def _max_hp_value(entity: Any) -> float | None:
 
 
 def _max_hp_by_key(pending: list[PendingEffect]) -> dict[str, float]:
-    """Map participant keys to their stored maximum HP for band selection."""
+    """Map participant identities to their stored maximum HP for band selection."""
     maximums: dict[str, float] = {}
     for effect in pending:
         entity = effect.entity
-        key = getattr(entity, "key", None)
-        if key is None:
-            continue
-        key = str(key)
-        if key in maximums:
-            continue
         maximum = _max_hp_value(entity)
-        if maximum is not None:
-            maximums[key] = maximum
+        if maximum is None:
+            continue
+        identity = stable_actor_id(entity)
+        if identity not in maximums:
+            maximums[identity] = maximum
     return maximums
 
 
@@ -334,8 +356,8 @@ def _narrate_entries(
                     target=target,
                     act=act,
                     max_hp=max_hp_by_key.get(
-                        target
-                    ) or max_hp_by_key.get(entry.actor),
+                        entry.target_id
+                    ) or max_hp_by_key.get(entry.actor_id),
                 )
                 if ordinal == 0:
                     template = compose_first_line(
@@ -369,10 +391,13 @@ def _step7_build_event_log(
         nonlethal = bool(event_context.get("nonlethal", False))
         nonlethal_keys = frozenset(event_context.get("nonlethal_keys", ()))
         simulated = bool(event_context.get("simulated", False))
+        actor_key = _entity_key(request.actor)
+        actor_id = stable_actor_id(request.actor)
         for effect in pending:
             entries.extend(
                 _entries_from_effect(
-                    _entity_key(request.actor),
+                    actor_key,
+                    actor_id,
                     effect,
                 )
             )
@@ -388,7 +413,8 @@ def _step7_build_event_log(
             else:
                 continue
             defeated = _defeated_entry(
-                _entity_key(request.actor),
+                actor_key,
+                actor_id,
                 effect.entity,
                 amount,
                 projected,
@@ -405,10 +431,11 @@ def _step7_build_event_log(
             entries.append(
                 EventEntry(
                     kind="action_narration",
-                    actor=_entity_key(request.actor),
+                    actor=actor_key,
                     target=None,
                     data={},
                     text_template="",
+                    actor_id=actor_id,
                 )
             )
         scope = narration_scope or str(
@@ -425,17 +452,32 @@ def _step7_build_event_log(
             RejectReason.EVENT_LOG_CONSTRUCTION_FAILED,
             str(error),
         ) from error
+    target_labels, target_ids = _logged_recipients(pending, actor_id)
     return EventLog(
-        actor=_entity_key(request.actor),
+        actor=actor_key,
         skill_key=skill.key,
-        targets=_logged_targets(pending),
+        targets=target_labels,
         entries=tuple(entries),
         time_cost_seconds=0,
+        actor_id=actor_id,
+        target_ids=target_ids,
     )
 
 
-def _logged_targets(pending: list[PendingEffect]) -> tuple[str, ...]:
-    targets: list[str] = []
+def _logged_recipients(
+    pending: list[PendingEffect],
+    actor_id: str,
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Return the resolved recipients' prose labels and stable identities.
+
+    Both tuples are collected in resolution order from the same pending
+    effects, and identity (never the label) deduplicates them, so two
+    same-label recipients stay two entries with one label each. Disengagement's
+    pending mutation is battlefield-shaped but its event names the actor.
+    """
+    labels: list[str] = []
+    identities: list[str] = []
+    seen: set[str] = set()
     for effect in pending:
         if effect.description.startswith(
             (
@@ -447,6 +489,14 @@ def _logged_targets(pending: list[PendingEffect]) -> tuple[str, ...]:
         ):
             continue
         key = effect.description.split("|", 2)[1]
-        if key not in targets:
-            targets.append(key)
-    return tuple(targets)
+        identity = (
+            actor_id
+            if effect.description.startswith("disengage_attempt|")
+            else stable_actor_id(effect.entity)
+        )
+        if identity in seen:
+            continue
+        seen.add(identity)
+        labels.append(key)
+        identities.append(identity)
+    return tuple(labels), tuple(identities)

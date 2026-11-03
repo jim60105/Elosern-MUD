@@ -67,6 +67,7 @@ from world.ai.scenario_director import QuestBlueprint
 from tools.spec_traceability import covers_requirement
 from world.lore.npc_card import normalize_card
 from world.quests.tests._card_fixtures import occupant_card, occupant_card_record
+from world.rules.combat_identity import stable_actor_id
 
 #: Synthetic offline-loop fixtures: a placed anchor, a castable kit spell,
 #: and the defeat target item.
@@ -177,8 +178,8 @@ class SceneBuilderOfflineLoopTests(SceneBuilderIsolation, EvenniaCommandTestMixi
         from world.rules.combat import Battlefield, BattlefieldActionContext
 
         field = Battlefield(
-            {"party": frozenset({self.player.key}), "foes": frozenset({target.key})},
-            {self.player.key: self.player, target.key: target},
+            {'party': frozenset({stable_actor_id(self.player)}), 'foes': frozenset({stable_actor_id(target)})},
+            {stable_actor_id(self.player): self.player, stable_actor_id(target): target},
         )
         request = ActionRequest(
             self.player,

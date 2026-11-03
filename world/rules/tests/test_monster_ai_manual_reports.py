@@ -44,6 +44,7 @@ from world.rules.monster_ai.models import PlannedAction
 from world.rules.monster_ai.selection import select_candidate
 from world.rules.monster_ai.utility import ScoredCandidate
 from world.rules.overwhelm import classify_overwhelm, resolve_overwhelm
+from world.rules.combat_identity import stable_actor_id
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -877,8 +878,8 @@ class ScopeIdentitySmokeTests(EvenniaTestCase):
         player = harness.build_player("scope-player", player_hp)
         monster = harness.build_monster("scope-monster", hp=monster_hp, mp=60)
         battlefield = Battlefield(
-            {"monsters": frozenset({monster.key}), "party": frozenset({player.key})},
-            {monster.key: monster, player.key: player},
+            {'monsters': frozenset({stable_actor_id(monster)}), 'party': frozenset({stable_actor_id(player)})},
+            {stable_actor_id(monster): monster, stable_actor_id(player): player},
         )
         return player, monster, battlefield
 

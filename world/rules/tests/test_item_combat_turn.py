@@ -754,7 +754,7 @@ class CompressedItemTurnTests(EvenniaTestCase):
         super().setUp()
         open_synthetic_scope(self, "items")
         attacker = FakeEntity(
-            "elf",
+            "elf", combat_identity='elf',
             hp=10000,
             max_hp=10000,
             atk_phys=88,
@@ -762,12 +762,12 @@ class CompressedItemTurnTests(EvenniaTestCase):
             defense=90,
             magic_power=250,
         )
-        defender = FakeEntity("human", hp=120, atk_phys=8, agility=9, defense=7)
+        defender = FakeEntity("human", combat_identity='human', hp=120, atk_phys=8, agility=9, defense=7)
         self.attacker = attacker
         self.defender = defender
         self.field = Battlefield(
-            {"elves": frozenset({"elf"}), "humans": frozenset({"human"})},
-            {"elf": attacker, "human": defender},
+            {'elves': frozenset({"fixture:elf"}), 'humans': frozenset({"fixture:human"})},
+            {"fixture:elf": attacker, "fixture:human": defender},
         )
 
     @covers_requirement(

@@ -52,15 +52,15 @@ class HealEffectHandlerTests(unittest.TestCase):
         )
 
     def test_heal_magnitude_is_caster_stat_derived(self):
-        actor = FakeEntity("actor", magic_power=40)
+        actor = FakeEntity("actor", combat_identity='actor', magic_power=40)
         self.assertEqual(
             _heal_magnitude(actor),
             round(40 * COMBAT_YAML["heal"]["multiplier"]),
         )
 
     def test_heal_shape_is_validated_during_staging(self):
-        actor = FakeEntity("actor")
-        target = FakeEntity("target")
+        actor = FakeEntity("actor", combat_identity='actor')
+        target = FakeEntity("target", combat_identity='target')
         with self.assertRaises(ValueError):
             _parse_heal_effect("heal:everyone")
         with self.assertRaises(ValueError):
@@ -68,8 +68,8 @@ class HealEffectHandlerTests(unittest.TestCase):
 
     @covers_requirement("heal-effect-handler::heal-effect-prefix-restores-hp-capped-at-max")
     def test_heal_is_staged_before_apply_and_restores_hp(self):
-        actor = FakeEntity("actor", magic_power=20)
-        target = FakeEntity("target", hp=40, max_hp=100)
+        actor = FakeEntity("actor", combat_identity='actor', magic_power=20)
+        target = FakeEntity("target", combat_identity='target', hp=40, max_hp=100)
         pending = _handle_heal(actor, [target], "heal:single", {}, 1.0)[0]
         self.assertEqual(target.traits.hp.value, 40)
         self.assertTrue(pending.description.startswith("heal|"))
@@ -78,24 +78,24 @@ class HealEffectHandlerTests(unittest.TestCase):
 
     @covers_requirement("heal-effect-handler::heal-effect-prefix-restores-hp-capped-at-max")
     def test_healing_a_target_already_at_max_hp_is_a_noop(self):
-        actor = FakeEntity("actor", magic_power=20)
-        target = FakeEntity("target", hp=100, max_hp=100)
+        actor = FakeEntity("actor", combat_identity='actor', magic_power=20)
+        target = FakeEntity("target", combat_identity='target', hp=100, max_hp=100)
         _handle_heal(actor, [target], "heal:single", {}, 1.0)[0].apply()
         self.assertEqual(target.traits.hp.value, 100)
 
     @covers_requirement("heal-effect-handler::heal-effect-prefix-restores-hp-capped-at-max")
     def test_healing_a_near_death_target_is_capped_at_max_hp(self):
-        actor = FakeEntity("actor", magic_power=200)
-        target = FakeEntity("target", hp=1, max_hp=100)
+        actor = FakeEntity("actor", combat_identity='actor', magic_power=200)
+        target = FakeEntity("target", combat_identity='target', hp=1, max_hp=100)
         _handle_heal(actor, [target], "heal:single", {}, 1.0)[0].apply()
         self.assertEqual(target.traits.hp.value, 100)
 
     @covers_requirement("heal-effect-handler::heal-area-targets-every-valid-target-in-the-action-s-target-set")
     def test_area_heal_restores_each_target_independently(self):
-        actor = FakeEntity("actor", magic_power=30)
-        low = FakeEntity("low", hp=10, max_hp=100)
-        mid = FakeEntity("mid", hp=60, max_hp=100)
-        high = FakeEntity("high", hp=90, max_hp=100)
+        actor = FakeEntity("actor", combat_identity='actor', magic_power=30)
+        low = FakeEntity("low", combat_identity='low', hp=10, max_hp=100)
+        mid = FakeEntity("mid", combat_identity='mid', hp=60, max_hp=100)
+        high = FakeEntity("high", combat_identity='high', hp=90, max_hp=100)
         for effect in _handle_heal(actor, [low, mid, high], "heal:area", {}, 1.0):
             effect.apply()
         self.assertEqual(low.traits.hp.value, 40)
@@ -104,8 +104,8 @@ class HealEffectHandlerTests(unittest.TestCase):
 
     @covers_requirement("heal-effect-handler::self-heal-restores-the-acting-entity-s-hp-regardless-of-the-skill-s-resolved-targets")
     def test_self_heal_binds_the_actor_and_ignores_the_target_list(self):
-        actor = FakeEntity("actor", hp=30, max_hp=100, magic_power=20)
-        target = FakeEntity("target", hp=100, max_hp=100)
+        actor = FakeEntity("actor", combat_identity='actor', hp=30, max_hp=100, magic_power=20)
+        target = FakeEntity("target", combat_identity='target', hp=100, max_hp=100)
         with self.assertRaises(ValueError):
             _handle_self_heal(actor, [target], "self_heal:single", {}, 1.0)
         pending = _handle_self_heal(actor, [target], "self_heal", {}, 1.0)[0]
@@ -116,8 +116,8 @@ class HealEffectHandlerTests(unittest.TestCase):
 
     @covers_requirement("heal-effect-handler::self-heal-restores-the-acting-entity-s-hp-regardless-of-the-skill-s-resolved-targets")
     def test_self_heal_missing_fraction_reads_caster_gap_and_ignores_target(self):
-        actor = FakeEntity("actor", hp=30, max_hp=100, magic_power=20)
-        target = FakeEntity("target", hp=10, max_hp=100)
+        actor = FakeEntity("actor", combat_identity='actor', hp=30, max_hp=100, magic_power=20)
+        target = FakeEntity("target", combat_identity='target', hp=10, max_hp=100)
         pending = _handle_self_heal(
             actor, [target], "self_heal:missing_fraction:0.1", {}, 1.0
         )[0]
@@ -130,7 +130,7 @@ class HealEffectHandlerTests(unittest.TestCase):
     @covers_requirement("heal-effect-handler::self-heal-restores-the-acting-entity-s-hp-regardless-of-the-skill-s-resolved-targets")
     def test_self_heal_missing_fraction_clamped_at_max_hp_and_full_hp_stages_zero(self):
         # Full HP caster stages 0 and raises no exception
-        full_actor = FakeEntity("full", hp=100, max_hp=100)
+        full_actor = FakeEntity("full", combat_identity='full', hp=100, max_hp=100)
         pending_full = _handle_self_heal(
             full_actor, [], "self_heal:missing_fraction:0.5", {}, 1.0
         )[0]
@@ -139,7 +139,7 @@ class HealEffectHandlerTests(unittest.TestCase):
         self.assertEqual(full_actor.traits.hp.value, 100)
 
         # Near-max caster: fraction 1.0 restores missing gap, capped at max
-        near_full = FakeEntity("near", hp=95, max_hp=100)
+        near_full = FakeEntity("near", combat_identity='near', hp=95, max_hp=100)
         pending_near = _handle_self_heal(
             near_full, [], "self_heal:missing_fraction:1.0", {}, 1.0
         )[0]
@@ -149,7 +149,7 @@ class HealEffectHandlerTests(unittest.TestCase):
 
         # Over-gap scaled cast: gap is 30, fraction 1.0 -> base 30 -> scale 2.0 -> scaled 60.
         # Restored amount MUST clamp to the missing gap of 30, not 60.
-        scaled_actor = FakeEntity("scaled", hp=70, max_hp=100)
+        scaled_actor = FakeEntity("scaled", combat_identity='scaled', hp=70, max_hp=100)
         pending_over = _handle_self_heal(
             scaled_actor, [], "self_heal:missing_fraction:1.0", {}, 2.0
         )[0]
@@ -159,7 +159,7 @@ class HealEffectHandlerTests(unittest.TestCase):
 
     @covers_requirement("heal-effect-handler::neither-heal-nor-self-heal-can-revive-a-knocked-out-target")
     def test_self_heal_missing_fraction_dead_caster_never_revives(self):
-        dead_actor = FakeEntity("dead", hp=0, max_hp=100)
+        dead_actor = FakeEntity("dead", combat_identity='dead', hp=0, max_hp=100)
         pending = _handle_self_heal(
             dead_actor, [], "self_heal:missing_fraction:0.5", {}, 1.0
         )[0]
@@ -169,7 +169,7 @@ class HealEffectHandlerTests(unittest.TestCase):
 
     @covers_requirement("heal-effect-handler::self-heal-restores-the-acting-entity-s-hp-regardless-of-the-skill-s-resolved-targets")
     def test_self_heal_missing_fraction_scale_and_heal_gain_composition(self):
-        actor = FakeEntity("actor", hp=30, max_hp=100, magic_power=20)
+        actor = FakeEntity("actor", combat_identity='actor', hp=30, max_hp=100, magic_power=20)
         with patch("world.rules.combat.healing.evaluate_combat_modifiers", return_value={"heal_gain": "+50%"}), patch(
             "world.rules.combat.battlefield.evaluate_combat_modifiers",
             return_value={"heal_gain": "+50%"},
@@ -214,8 +214,8 @@ class HealEffectHandlerTests(unittest.TestCase):
         self.assertEqual(valid.effect_policies[0].coefficient, 1.5)
 
     def test_heal_entries_emit_a_heal_event_with_amount(self):
-        actor = FakeEntity("actor")
-        target = FakeEntity("target", hp=50, max_hp=100)
+        actor = FakeEntity("actor", combat_identity='actor')
+        target = FakeEntity("target", combat_identity='target', hp=50, max_hp=100)
         pending = _handle_heal(actor, [target], "heal:single", {}, 1.0)[0]
         entries = _entries_from_effect("actor", pending)
         self.assertEqual(len(entries), 1)
@@ -223,7 +223,7 @@ class HealEffectHandlerTests(unittest.TestCase):
         self.assertEqual(entries[0].data["amount"], _heal_magnitude(actor))
 
     def test_self_heal_entries_emit_a_self_heal_event_with_amount(self):
-        actor = FakeEntity("actor", hp=50, max_hp=100, magic_power=20)
+        actor = FakeEntity("actor", combat_identity='actor', hp=50, max_hp=100, magic_power=20)
         pending = _handle_self_heal(actor, [], "self_heal", {}, 1.0)[0]
         entries = _entries_from_effect("actor", pending)
         self.assertEqual(len(entries), 1)
@@ -232,9 +232,9 @@ class HealEffectHandlerTests(unittest.TestCase):
         self.assertEqual(entries[0].data["amount"], 20)
 
     def test_malformed_heal_description_is_rejected(self):
-        actor = FakeEntity("actor")
+        actor = FakeEntity("actor", combat_identity='actor')
         pending = _handle_heal(
-            actor, [FakeEntity("target")], "heal:single", {}, 1.0
+            actor, [FakeEntity("target", combat_identity='target')], "heal:single", {}, 1.0
         )[0]
         malformed = PendingEffect(
             entity=pending.entity,
@@ -246,7 +246,7 @@ class HealEffectHandlerTests(unittest.TestCase):
             _entries_from_effect("actor", malformed)
 
     def test_heal_magnitude_never_drops_below_the_floor(self):
-        actor = FakeEntity("actor", magic_power=0)
+        actor = FakeEntity("actor", combat_identity='actor', magic_power=0)
         self.assertEqual(
             _heal_magnitude(actor),
             COMBAT_YAML["heal"]["floor"],
@@ -275,14 +275,14 @@ class HealResolverIntegrationTests(EvenniaTestCase):
         self.actor.traits.magic_power.base = 20
         self.battlefield = Battlefield(
             {
-                "party": frozenset({"healer", "patient", "ally"}),
-                "foes": frozenset({"enemy"}),
+                'party': frozenset({"fixture:healer", "fixture:patient", "fixture:ally"}),
+                'foes': frozenset({"fixture:enemy"}),
             },
             {
-                "healer": self.actor,
-                "patient": self.target,
-                "ally": self.ally,
-                "enemy": enemy,
+                "fixture:healer": self.actor,
+                "fixture:patient": self.target,
+                "fixture:ally": self.ally,
+                "fixture:enemy": enemy,
             },
         )
 

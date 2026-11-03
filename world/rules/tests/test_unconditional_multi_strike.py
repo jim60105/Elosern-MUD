@@ -151,8 +151,8 @@ class UnconditionalMultiStrikeSettlementTests(EvenniaTestCase):
 
     def _make_bf(self, nonlethal: bool = False, nonlethal_keys: tuple[str, ...] = ()):
         bf = Battlefield(
-            {"party": frozenset({"multi_actor"}), "foes": frozenset({"multi_target"})},
-            {"multi_actor": self.actor, "multi_target": self.target},
+            {'party': frozenset({"fixture:multi_actor"}), 'foes': frozenset({"fixture:multi_target"})},
+            {"fixture:multi_actor": self.actor, "fixture:multi_target": self.target},
         )
         event_ctx = {"now": 100}
         if nonlethal:

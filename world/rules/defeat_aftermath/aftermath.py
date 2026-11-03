@@ -109,8 +109,9 @@ def _recovery_scope(actor: Any, battlefield: Any | None) -> list[Any]:
     """
     if battlefield is None:
         return [actor] if _stored_trait_value(actor.traits.hp) > 0 else []
-    team = battlefield.team_of(str(actor.key))
-    allies = battlefield.teams.get(team, set()) if team is not None else {str(actor.key)}
+    actor_id = stable_actor_id(actor)
+    team = battlefield.team_of(actor_id)
+    allies = battlefield.teams.get(team, set()) if team is not None else {actor_id}
     return [
         battlefield.roster[key]
         for key in allies
@@ -368,7 +369,7 @@ def _living_foes(actor: Any, session: Any, battlefield: Any | None) -> list[Any]
     still departs its resolvable population winner (review D4).
     """
     if battlefield is not None:
-        player_team = battlefield.team_of(str(actor.key))
+        player_team = battlefield.team_of(stable_actor_id(actor))
         foe_team = next(
             team for team in battlefield.teams if team != player_team
         )

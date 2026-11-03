@@ -86,8 +86,8 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
 
     def _make_bf(self, nonlethal: bool = False, nonlethal_keys: tuple[str, ...] = ()):
         bf = Battlefield(
-            {"party": frozenset({"three_actor"}), "foes": frozenset({"three_target"})},
-            {"three_actor": self.actor, "three_target": self.target},
+            {'party': frozenset({"fixture:three_actor"}), 'foes': frozenset({"fixture:three_target"})},
+            {"fixture:three_actor": self.actor, "fixture:three_target": self.target},
         )
         event_ctx = {"now": 100}
         if nonlethal:

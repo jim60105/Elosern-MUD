@@ -1402,7 +1402,7 @@ class _Decision:
         # staged damage. Both mirror settlement's damage handler exactly, and
         # an explicitly defense-bypassing occurrence skips Defend just as it
         # zeroes defense in settlement.
-        recipient_key = str(participant.entity.key)
+        recipient_key = stable_identity(participant.entity)
         # Dodge is deliberately bypass-independent (the design gives it no
         # damage-bypass exemption); only Defend below honors ``bypassing``.
         recipient_dodging = (

@@ -132,6 +132,7 @@ from .test_monster_ai_snapshots import (
     _probe_field,
     _trait_record,
 )
+from world.rules.combat_identity import stable_actor_id
 
 SPECIES = "t_sel_species"
 VARIANT = "t_sel_ordinary"
@@ -938,8 +939,8 @@ def _fake_field(actor, *others):
     roster = {str(entity.key): entity for entity in (actor, *others)}
     return Battlefield(
         {
-            "monsters": frozenset({str(actor.key)}),
-            "party": frozenset(str(entity.key) for entity in others),
+            'monsters': frozenset({stable_actor_id(actor)}),
+            'party': frozenset(stable_actor_id(entity) for entity in others),
         },
         roster,
     )
@@ -949,8 +950,8 @@ class ExecutionScopeTests(unittest.TestCase):
     """The round engine's real per-slot and per-round decision identity."""
 
     def setUp(self):
-        self.actor = FakeEntity("actor", hp=100, max_hp=100)
-        self.enemy = FakeEntity("enemy", hp=100, max_hp=100)
+        self.actor = FakeEntity("actor", combat_identity='actor', hp=100, max_hp=100)
+        self.enemy = FakeEntity("enemy", combat_identity='enemy', hp=100, max_hp=100)
         self.observed = []
 
     def _field(self):
@@ -1128,8 +1129,8 @@ class UtilityInspectionTests(SyntheticTuningMixin, EvenniaTestCase):
         roster = {str(entity.key): entity for entity, _team in entries}
         return Battlefield(
             {
-                "foes": frozenset({str(self.monster.key)}),
-                "party": frozenset(str(other.key) for other in others),
+                'foes': frozenset({stable_actor_id(self.monster)}),
+                'party': frozenset(stable_actor_id(other) for other in others),
             },
             roster,
         )
@@ -1274,8 +1275,8 @@ class UtilityAdapterTests(SyntheticTuningMixin, EvenniaTestCase):
             roster[str(player.key)] = player
         return Battlefield(
             {
-                "foes": frozenset({str(self.monster.key)}),
-                "party": frozenset(str(player.key) for player in others),
+                'foes': frozenset({stable_actor_id(self.monster)}),
+                'party': frozenset(stable_actor_id(player) for player in others),
             },
             roster,
         )
@@ -1489,10 +1490,10 @@ class InvalidStateTests(SyntheticTuningMixin, EvenniaTestCase):
     def _field(self, monster):
         return Battlefield(
             {
-                "foes": frozenset({str(monster.key)}),
-                "party": frozenset({str(self.opponent.key)}),
+                'foes': frozenset({stable_actor_id(monster)}),
+                'party': frozenset({stable_actor_id(self.opponent)}),
             },
-            {str(monster.key): monster, str(self.opponent.key): self.opponent},
+            {stable_actor_id(monster): monster, stable_actor_id(self.opponent): self.opponent},
         )
 
     @covers_requirement("monster-ai-utility-selection::invalid-state-fallback-is-narrow-and-observable")
@@ -1620,12 +1621,12 @@ class TraceTests(SyntheticTuningMixin, EvenniaTestCase):
     def _field(self):
         return Battlefield(
             {
-                "foes": frozenset({str(self.monster.key)}),
-                "party": frozenset({str(self.opponent.key)}),
+                'foes': frozenset({stable_actor_id(self.monster)}),
+                'party': frozenset({stable_actor_id(self.opponent)}),
             },
             {
-                str(self.monster.key): self.monster,
-                str(self.opponent.key): self.opponent,
+                stable_actor_id(self.monster): self.monster,
+                stable_actor_id(self.opponent): self.opponent,
             },
         )
 
@@ -1707,8 +1708,8 @@ class LegacyRetentionTests(SyntheticTuningMixin, EvenniaTestCase):
             roster[str(other.key)] = other
         return Battlefield(
             {
-                "foes": frozenset({str(self.monster.key)}),
-                "party": frozenset(str(other.key) for other in others),
+                'foes': frozenset({stable_actor_id(self.monster)}),
+                'party': frozenset(stable_actor_id(other) for other in others),
             },
             roster,
         )

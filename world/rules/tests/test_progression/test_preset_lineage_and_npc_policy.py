@@ -77,6 +77,7 @@ from ._support import (
     _T_HEAVY_SPELL,
     _scoped_setup,
 )
+from world.rules.combat_identity import stable_actor_id
 
 
 # A parity mastery: PASSIVE of the elemental-magic category whose single
@@ -205,10 +206,10 @@ class NpcPolicyAffordabilityIntegrationTests(EvenniaTestCase):
     def _battlefield(self):
         return Battlefield(
             {
-                "party": frozenset({str(self.companion.key)}),
-                "foes": frozenset({str(self.goblin.key)}),
+                'party': frozenset({stable_actor_id(self.companion)}),
+                'foes': frozenset({stable_actor_id(self.goblin)}),
             },
-            {str(self.companion.key): self.companion, str(self.goblin.key): self.goblin},
+            {stable_actor_id(self.companion): self.companion, stable_actor_id(self.goblin): self.goblin},
         )
 
     @covers_requirement("monster-action-policy::a-delegated-non-monster-entity-proposes-the-first-usable-resolver-backed-damage-skill")

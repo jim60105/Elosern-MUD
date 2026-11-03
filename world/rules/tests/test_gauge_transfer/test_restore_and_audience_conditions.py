@@ -303,8 +303,8 @@ class AudienceConditionTests(GaugeTransferTestBase):
 
         battlefield = Battlefield(
             {
-                "party": frozenset({actor_key, ally_with_mp_key, ally_zero_mp_key}),
-                "foes": frozenset({enemy_with_mp_key, enemy_zero_mp_key}),
+                'party': frozenset({actor_key, ally_with_mp_key, ally_zero_mp_key}),
+                'foes': frozenset({enemy_with_mp_key, enemy_zero_mp_key}),
             },
             {
                 actor_key: self.actor,

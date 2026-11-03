@@ -29,6 +29,7 @@ from world.rules.monster_behaviour import resolve_behaviour_profile
 from world.rules.monster_individual import construct_species_individual
 from world.rules.tests.combat_fixtures import flee_edge
 from world.skills.registry import SKILL_REGISTRY
+from world.rules.combat_identity import stable_actor_id
 
 # The representative the composition-coverage check derives for this group.
 REPRESENTATIVE_VARIANT = "bank_lurker"
@@ -69,8 +70,8 @@ class CrocodileResourceSkillSmokeTests(EvenniaTestCase):
         engage(player, crocodile)
         record = read_session(player)
         field = Battlefield(
-            {"party": frozenset({player.key}), "foes": frozenset({crocodile.key})},
-            {player.key: player, crocodile.key: crocodile},
+            {'party': frozenset({stable_actor_id(player)}), 'foes': frozenset({stable_actor_id(crocodile)})},
+            {stable_actor_id(player): player, stable_actor_id(crocodile): crocodile},
         )
         action = _enemy_policy(crocodile, field, record)
         self.assertIsNotNone(action)

@@ -23,6 +23,7 @@ from ._combat_session_helpers import (
     synth_damage_skill,
 )
 from .combat_fixtures import FakeEntity, FakeGauge
+from world.rules.combat_identity import stable_actor_id
 
 # File-local synthetic rows (data independence): a passive, a non-damage
 # active, a zero-cost physical strike, and an MP-costing magic spell. Their
@@ -63,7 +64,7 @@ class MonsterBehaviourSelectionTests(unittest.TestCase):
 
     def test_owned_damage_skills_preserve_owned_order(self):
         entity = FakeEntity(
-            "actor",
+            "actor", combat_identity='actor',
             owned=[_T_PASSIVE.key, _T_FLIGHT.key, _T_CLAW.key, _T_SPELL.key],
         )
         entity.traits.sp = FakeGauge(18, 18)
@@ -90,22 +91,22 @@ class MonsterBehaviourSelectionTests(unittest.TestCase):
             eligibility=SkillEligibility(allowed_actor_kinds=("player",))
         )
         with patch.dict("world.skills.registry.SKILL_REGISTRY", {ineligible_skill.key: ineligible_skill}):
-            entity = FakeEntity("monster_actor", owned=[ineligible_skill.key, _T_CLAW.key])
+            entity = FakeEntity("monster_actor", combat_identity='monster_actor', owned=[ineligible_skill.key, _T_CLAW.key])
             entity.traits.sp = FakeGauge(18, 18)
             entity.traits.mp = FakeGauge(20, 20)
             self.assertEqual([s.key for s in _owned_damage_skills(entity)], [_T_CLAW.key])
 
     def test_living_enemies_excludes_dead_and_fled(self):
-        actor = FakeEntity("actor")
-        alive = FakeEntity("alive")
-        dead = FakeEntity("dead", hp=0, max_hp=100)
-        fled = FakeEntity("fled")
+        actor = FakeEntity("actor", combat_identity='actor')
+        alive = FakeEntity("alive", combat_identity='alive')
+        dead = FakeEntity("dead", combat_identity='dead', hp=0, max_hp=100)
+        fled = FakeEntity("fled", combat_identity='fled')
         field = Battlefield(
             {
-                "monsters": frozenset({"actor"}),
-                "party": frozenset({"alive", "dead", "fled"}),
+                'monsters': frozenset({"fixture:actor"}),
+                'party': frozenset({"fixture:alive", "fixture:dead", "fixture:fled"}),
             },
-            {entity.key: entity for entity in (actor, alive, dead, fled)},
+            {stable_actor_id(entity): entity for entity in (actor, alive, dead, fled)},
             fled={"fled"},
         )
         self.assertEqual(_living_enemies(field, actor), [alive])
@@ -114,17 +115,17 @@ class MonsterBehaviourSelectionTests(unittest.TestCase):
 
     @covers_requirement("monster-action-policy::target-selection-differs-by-archetype-and-is-deterministic-under-a-fixed-seed")
     def test_target_strategies_and_seeded_tie_break(self):
-        actor = FakeEntity("actor")
-        weak = FakeEntity("weak", hp=20, max_hp=100, atk_phys=2)
-        strong = FakeEntity("strong", hp=80, atk_phys=30)
+        actor = FakeEntity("actor", combat_identity='actor')
+        weak = FakeEntity("weak", combat_identity='weak', hp=20, max_hp=100, atk_phys=2)
+        strong = FakeEntity("strong", combat_identity='strong', hp=80, atk_phys=30)
         enemies = [weak, strong]
         self.assertIs(_choose_target(actor, enemies, "lowest_hp"), weak)
         self.assertIs(
             _choose_target(actor, enemies, "highest_effective_power"),
             strong,
         )
-        first = FakeEntity("first")
-        second = FakeEntity("second")
+        first = FakeEntity("first", combat_identity='first')
+        second = FakeEntity("second", combat_identity='second')
         with patch(
             "world.rules.monster_behaviour.dice.roll_d100",
             return_value=1,
@@ -140,11 +141,11 @@ class MonsterBehaviourSelectionTests(unittest.TestCase):
     )
     def test_skill_strategies_and_expected_damage(self):
         entity = FakeEntity(
-            "actor",
+            "actor", combat_identity='actor',
             atk_phys=30,
             magic_power=50,
         )
-        target = FakeEntity("target", defense=12)
+        target = FakeEntity("target", combat_identity='target', defense=12)
         physical = _T_CLAW
         magic = _T_SPELL
         self.assertIs(
@@ -185,9 +186,9 @@ class MonsterBehaviourSelectionTests(unittest.TestCase):
         "combat-modifier-table::damage-estimation-surfaces-mirror-the-live-adjusted-damage-math"
     )
     def test_physical_candidate_ranks_with_its_atk_phys_bonus(self):
-        entity = FakeEntity("actor", atk_phys=30, magic_power=30)
+        entity = FakeEntity("actor", combat_identity='actor', atk_phys=30, magic_power=30)
         entity.skills._owned = [_T_BONUS_PASSIVE.key]
-        target = FakeEntity("target", defense=12)
+        target = FakeEntity("target", combat_identity='target', defense=12)
         physical = _T_CLAW
         magic = _T_SPELL
         with (

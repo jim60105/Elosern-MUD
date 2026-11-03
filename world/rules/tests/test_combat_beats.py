@@ -33,15 +33,29 @@ _HERO_DBREF = 101
 _GOBLIN_DBREF = 202
 _COMPANION_DBREF = 303
 
+_IDS = {
+    _HERO: f"dbref:{_HERO_DBREF}",
+    _GOBLIN: f"dbref:{_GOBLIN_DBREF}",
+    _COMPANION: f"dbref:{_COMPANION_DBREF}",
+}
+
 _IDENTITIES = {
-    _HERO: _HERO_DBREF,
-    _GOBLIN: _GOBLIN_DBREF,
-    _COMPANION: _COMPANION_DBREF,
+    _IDS[_HERO]: _HERO_DBREF,
+    _IDS[_GOBLIN]: _GOBLIN_DBREF,
+    _IDS[_COMPANION]: _COMPANION_DBREF,
 }
 
 
-def _entry(kind, *, actor=_HERO, target=None, data=None, template="{actor} 行動。"):
-    return EventEntry(kind, actor, target, {} if data is None else data, template)
+def _entry(kind, *, actor=_HERO, target=None, data=None, template="{actor} 行動。", target_id=None):
+    return EventEntry(
+        kind,
+        actor,
+        target,
+        {} if data is None else data,
+        template,
+        actor_id=_IDS.get(actor),
+        target_id=_IDS.get(target) if target_id is None else target_id,
+    )
 
 
 def _log(entries, *, actor=_HERO, key="t_strike"):
@@ -435,11 +449,12 @@ class CombatBeatsBuilderTests(unittest.TestCase):
                                 target=long_key,
                                 data={"amount": 5},
                                 template=template,
+                                target_id=f"dbref:{_GOBLIN_DBREF}",
                             )
                         ]
                     )
                 ],
-                identities={_HERO: _HERO_DBREF, long_key: _GOBLIN_DBREF},
+                identities={_IDS[_HERO]: _HERO_DBREF, f"dbref:{_GOBLIN_DBREF}": _GOBLIN_DBREF},
                 hp_before={_GOBLIN_DBREF: 30},
                 hp_after={_GOBLIN_DBREF: 25},
             )

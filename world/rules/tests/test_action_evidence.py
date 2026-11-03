@@ -62,6 +62,7 @@ from world.skills.sexual_acts import SexualActDef
 from world.tests.synthetic_data import make_skill, synthetic_registries
 
 from .combat_fixtures import grant_lineage
+from world.rules.combat_identity import stable_actor_id
 
 
 # Synthetic skills and acts for behavior testing
@@ -518,8 +519,8 @@ class ActionEvidenceEventLogPlannerTests(EvenniaTestCase):
         """A resistible act resolved through ActionResolver records evidence on the caster."""
         grant_lineage(self.actor, [_T_RESISTIBLE_ACT_SKILL.key])
         bf = Battlefield(
-            {"party": frozenset({str(self.actor.key)}), "foes": frozenset({str(self.target.key)})},
-            {str(self.actor.key): self.actor, str(self.target.key): self.target},
+            {'party': frozenset({stable_actor_id(self.actor)}), 'foes': frozenset({stable_actor_id(self.target)})},
+            {stable_actor_id(self.actor): self.actor, stable_actor_id(self.target): self.target},
         )
         request = ActionRequest(
             self.actor,
@@ -545,8 +546,8 @@ class ActionEvidenceEventLogPlannerTests(EvenniaTestCase):
         grant_lineage(npc, [_T_RESISTIBLE_ACT_SKILL.key])
 
         bf = Battlefield(
-            {"party": frozenset({str(npc.key)}), "foes": frozenset({str(self.target.key)})},
-            {str(npc.key): npc, str(self.target.key): self.target},
+            {'party': frozenset({stable_actor_id(npc)}), 'foes': frozenset({stable_actor_id(self.target)})},
+            {stable_actor_id(npc): npc, stable_actor_id(self.target): self.target},
         )
         request = ActionRequest(
             npc,
@@ -566,8 +567,8 @@ class ActionEvidenceEventLogPlannerTests(EvenniaTestCase):
         """A failed commit rolls back staged action evidence to pre-action state."""
         grant_lineage(self.actor, [_T_RESISTIBLE_ACT_SKILL.key])
         bf = Battlefield(
-            {"party": frozenset({str(self.actor.key)}), "foes": frozenset({str(self.target.key)})},
-            {str(self.actor.key): self.actor, str(self.target.key): self.target},
+            {'party': frozenset({stable_actor_id(self.actor)}), 'foes': frozenset({stable_actor_id(self.target)})},
+            {stable_actor_id(self.actor): self.actor, stable_actor_id(self.target): self.target},
         )
         request = ActionRequest(
             self.actor,
@@ -667,8 +668,8 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
 
     def _battlefield(self, nonlethal: bool = False, nonlethal_keys: tuple[str, ...] = ()):
         bf = Battlefield(
-            {"party": frozenset({"strike_actor"}), "foes": frozenset({"strike_target"})},
-            {"strike_actor": self.actor, "strike_target": self.target},
+            {'party': frozenset({"fixture:strike_actor"}), 'foes': frozenset({"fixture:strike_target"})},
+            {"fixture:strike_actor": self.actor, "fixture:strike_target": self.target},
         )
         event_ctx = {"now": 100}
         if nonlethal:
@@ -869,13 +870,13 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
 
         bf = Battlefield(
             {
-                "party": frozenset({"strike_actor"}),
-                "foes": frozenset({"strike_target", "target_clean"}),
+                'party': frozenset({"fixture:strike_actor"}),
+                'foes': frozenset({"fixture:strike_target", "fixture:target_clean"}),
             },
             {
-                "strike_actor": self.actor,
-                "strike_target": self.target,
-                "target_clean": target2,
+                "fixture:strike_actor": self.actor,
+                "fixture:strike_target": self.target,
+                "fixture:target_clean": target2,
             },
         )
         ctx = BattlefieldActionContext(bf, event_context={"now": 100})

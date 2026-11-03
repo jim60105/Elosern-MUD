@@ -98,14 +98,14 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
 
         self.battlefield = Battlefield(
             {
-                "party": frozenset({"caster", "companion", "bystander"}),
-                "foes": frozenset({"target"}),
+                'party': frozenset({"fixture:caster", "fixture:companion", "fixture:bystander"}),
+                'foes': frozenset({"fixture:target"}),
             },
             {
-                "caster": self.caster,
-                "target": self.target,
-                "companion": self.companion,
-                "bystander": self.bystander,
+                "fixture:caster": self.caster,
+                "fixture:target": self.target,
+                "fixture:companion": self.companion,
+                "fixture:bystander": self.bystander,
             },
         )
         self.context = BattlefieldActionContext(self.battlefield)

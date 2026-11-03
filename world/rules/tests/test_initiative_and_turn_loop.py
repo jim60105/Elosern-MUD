@@ -22,6 +22,7 @@ from world.tests.synthetic_data import SYNTH_SKILLS, synthetic_registries
 
 from ._combat_session_helpers import synth_damage_skill, synth_innate_overlay
 from .combat_fixtures import FakeEntity, FakeGauge
+from world.rules.combat_identity import stable_actor_id
 
 # Synthetic vehicles (test-data-independence): the kit's affordable spell is
 # made unaffordable by fixture MP, and a file-local deep skill carries a
@@ -41,11 +42,11 @@ _SCOPE = synthetic_registries(
 @_SCOPE
 class InitiativeAndTurnLoopTests(unittest.TestCase):
     def battlefield(self, gap: int = 10):
-        fast = FakeEntity("fast", agility=10 + gap)
-        slow = FakeEntity("slow", agility=10)
+        fast = FakeEntity("fast", combat_identity='fast', agility=10 + gap)
+        slow = FakeEntity("slow", combat_identity='slow', agility=10)
         return Battlefield(
-            {"a": frozenset({"fast"}), "b": frozenset({"slow"})},
-            {"fast": fast, "slow": slow},
+            {'a': frozenset({"fixture:fast"}), 'b': frozenset({"fixture:slow"})},
+            {"fixture:fast": fast, "fixture:slow": slow},
         )
 
     def test_ten_point_gap_dominates_every_roll_pair(self):
@@ -382,10 +383,10 @@ class DefaultAttackPolicyAffordabilityTests(unittest.TestCase):
         return actor
 
     def _field(self, actor: FakeEntity) -> Battlefield:
-        enemy = FakeEntity("enemy")
+        enemy = FakeEntity("enemy", combat_identity='enemy')
         return Battlefield(
-            {"a": frozenset({actor.key}), "b": frozenset({enemy.key})},
-            {actor.key: actor, enemy.key: enemy},
+            {'a': frozenset({stable_actor_id(actor)}), 'b': frozenset({stable_actor_id(enemy)})},
+            {stable_actor_id(actor): actor, stable_actor_id(enemy): enemy},
         )
 
     @covers_requirement("monster-action-policy::a-delegated-non-monster-entity-proposes-the-first-usable-resolver-backed-damage-skill")
@@ -434,26 +435,26 @@ class FirstActorOverrideTests(unittest.TestCase):
     def battlefield(self):
         # 100-point agility gaps (weight 10) dominate every d100 jitter, so
         # the rolled baseline order is fixed under any seeded rolls.
-        fast = FakeEntity("fast", agility=40)
-        mid = FakeEntity("mid", agility=30)
-        slow = FakeEntity("slow", agility=20)
+        fast = FakeEntity("fast", combat_identity='fast', agility=40)
+        mid = FakeEntity("mid", combat_identity='mid', agility=30)
+        slow = FakeEntity("slow", combat_identity='slow', agility=20)
         return Battlefield(
-            {"a": frozenset({"fast", "mid"}), "b": frozenset({"slow"})},
-            {"fast": fast, "mid": mid, "slow": slow},
+            {'a': frozenset({"fixture:fast", "fixture:mid"}), 'b': frozenset({"fixture:slow"})},
+            {"fixture:fast": fast, "fixture:mid": mid, "fixture:slow": slow},
         )
 
     def stale_battlefield(self):
         field = Battlefield(
             {
-                "a": frozenset({"fast", "dead", "fled", "fainted"}),
-                "b": frozenset({"slow"}),
+                'a': frozenset({"fixture:fast", "fixture:dead", "fixture:fled", "fixture:fainted"}),
+                'b': frozenset({"fixture:slow"}),
             },
             {
-                "fast": FakeEntity("fast", agility=40),
-                "dead": FakeEntity("dead", agility=40, hp=0),
-                "fled": FakeEntity("fled", agility=40),
-                "fainted": FakeEntity("fainted", agility=40),
-                "slow": FakeEntity("slow", agility=20),
+                "fixture:fast": FakeEntity("fast", combat_identity='fast', agility=40),
+                "fixture:dead": FakeEntity("dead", combat_identity='dead', agility=40, hp=0),
+                "fixture:fled": FakeEntity("fled", combat_identity='fled', agility=40),
+                "fixture:fainted": FakeEntity("fainted", combat_identity='fainted', agility=40),
+                "fixture:slow": FakeEntity("slow", combat_identity='slow', agility=20),
             },
         )
         field.fled.add("fled")

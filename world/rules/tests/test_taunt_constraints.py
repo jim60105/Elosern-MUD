@@ -68,6 +68,7 @@ from ._combat_session_helpers import (
     synth_innate_overlay,
 )
 from .combat_fixtures import FakeEntity
+from world.rules.combat_identity import stable_actor_id
 
 #: A legacy archetype that prefers an AREA action against several enemies,
 #: resolved from the live rulebook by predicate (never a shipped literal).
@@ -117,8 +118,8 @@ class TauntWinnerResolutionTests(unittest.TestCase):
         roster = {key: FakeEntity(key) for key in entity_keys}
         return Battlefield(
             {
-                "party": frozenset({"slower", "faster"}),
-                "foes": frozenset({"boss"}),
+                'party': frozenset({"fixture:slower", "fixture:faster"}),
+                'foes': frozenset({"fixture:boss"}),
             },
             roster,
         )
@@ -175,10 +176,10 @@ class TauntRoundContextTests(unittest.TestCase):
     def _field(self):
         return Battlefield(
             {
-                "party": frozenset({"winner"}),
-                "foes": frozenset({"boss"}),
+                'party': frozenset({"fixture:winner"}),
+                'foes': frozenset({"fixture:boss"}),
             },
-            {"winner": FakeEntity("winner"), "boss": FakeEntity("boss")},
+            {"fixture:winner": FakeEntity("winner", combat_identity='winner'), "fixture:boss": FakeEntity("boss", combat_identity='boss')},
         )
 
     @covers_requirement(
@@ -203,11 +204,11 @@ class TauntRoundContextTests(unittest.TestCase):
         "player-combat-session::taunt-selects-one-enemy-and-resolves-competing-declarations-by-initiative"
     )
     def test_run_round_activates_the_winner_for_the_round_then_expires(self):
-        slow = FakeEntity("slow", hp=100, agility=1)
-        boss = FakeEntity("boss", hp=100, agility=99)
+        slow = FakeEntity("slow", combat_identity='slow', hp=100, agility=1)
+        boss = FakeEntity("boss", combat_identity='boss', hp=100, agility=99)
         battlefield = Battlefield(
-            {"party": frozenset({"slow"}), "foes": frozenset({"boss"})},
-            {"slow": slow, "boss": boss},
+            {'party': frozenset({"fixture:slow"}), 'foes': frozenset({"fixture:boss"})},
+            {"fixture:slow": slow, "fixture:boss": boss},
         )
         seen: list[object] = []
 
@@ -234,11 +235,11 @@ class TauntRoundContextTests(unittest.TestCase):
         "player-combat-session::taunt-selects-one-enemy-and-resolves-competing-declarations-by-initiative"
     )
     def test_taunt_ranking_draws_no_extra_initiative_roll(self):
-        slow = FakeEntity("slow", hp=100, agility=1)
-        boss = FakeEntity("boss", hp=100, agility=99)
+        slow = FakeEntity("slow", combat_identity='slow', hp=100, agility=1)
+        boss = FakeEntity("boss", combat_identity='boss', hp=100, agility=99)
         battlefield = Battlefield(
-            {"party": frozenset({"slow"}), "foes": frozenset({"boss"})},
-            {"slow": slow, "boss": boss},
+            {'party': frozenset({"fixture:slow"}), 'foes': frozenset({"fixture:boss"})},
+            {"fixture:slow": slow, "fixture:boss": boss},
         )
         draws: list[int] = []
 
@@ -279,13 +280,13 @@ class TauntedEnemyPolicyTests(EvenniaTestCase):
     def _field(self):
         return Battlefield(
             {
-                "foes": frozenset({str(self.monster.key)}),
-                "party": frozenset({str(self.taunter.key), str(self.other.key)}),
+                'foes': frozenset({stable_actor_id(self.monster)}),
+                'party': frozenset({stable_actor_id(self.taunter), stable_actor_id(self.other)}),
             },
             {
-                str(self.monster.key): self.monster,
-                str(self.taunter.key): self.taunter,
-                str(self.other.key): self.other,
+                stable_actor_id(self.monster): self.monster,
+                stable_actor_id(self.taunter): self.taunter,
+                stable_actor_id(self.other): self.other,
             },
         )
 

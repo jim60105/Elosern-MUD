@@ -80,6 +80,7 @@ from ._support import (
     _scoped_setup,
     _tree_child_label,
 )
+from world.rules.combat_identity import stable_actor_id
 
 
 class DerivedUnlockNotificationTests(EvenniaTestCase):
@@ -103,8 +104,8 @@ class DerivedUnlockNotificationTests(EvenniaTestCase):
         )
         monster = self._monster(f"{key}-goblin")
         battlefield = Battlefield(
-            {"party": frozenset({key}), "foes": frozenset({monster.key})},
-            {key: actor, monster.key: monster},
+            {'party': frozenset({key}), 'foes': frozenset({stable_actor_id(monster)})},
+            {key: actor, stable_actor_id(monster): monster},
         )
         request = ActionRequest(
             actor,

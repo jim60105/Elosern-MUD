@@ -99,6 +99,7 @@ from world.skills.effects import (
     EffectPolicy,
     ResolvedEffect,
 )
+from world.rules.combat_identity import stable_actor_id
 
 
 @dataclass(frozen=True)
@@ -202,7 +203,7 @@ def _run_single_trial(
     roster = {str(h.key): h for h in humans}
     roster[str(monster.key)] = monster
     battlefield = Battlefield(
-        teams={"humans": frozenset(roster.keys() - {str(monster.key)}), "monsters": frozenset({str(monster.key)})},
+        teams={'humans': frozenset(roster.keys() - {stable_actor_id(monster)}), 'monsters': frozenset({stable_actor_id(monster)})},
         roster=roster,
     )
 
@@ -481,8 +482,8 @@ class HumanCombatCalibrationTests(EvenniaTest):
         }))
 
         bfield = Battlefield(
-            teams={"players": frozenset({str(player.key)}), "monsters": frozenset({str(target_dummy.key)})},
-            roster={str(player.key): player, str(target_dummy.key): target_dummy},
+            teams={'players': frozenset({stable_actor_id(player)}), 'monsters': frozenset({stable_actor_id(target_dummy)})},
+            roster={stable_actor_id(player): player, stable_actor_id(target_dummy): target_dummy},
         )
         sim_ctx = BattlefieldActionContext(bfield, event_context={"battlefield": bfield, "simulated": True})
         req = ActionRequest(player, "basic_swordplay", [target_dummy], sim_ctx)
@@ -1036,10 +1037,10 @@ class CombatFactorBudgetTests(EvenniaTest):
         if battlefield is None and tactic is not None:
             battlefield = Battlefield(
                 {
-                    "attackers": frozenset({str(attacker.key)}),
-                    "defenders": frozenset({str(defender.key)}),
+                    'attackers': frozenset({stable_actor_id(attacker)}),
+                    'defenders': frozenset({stable_actor_id(defender)}),
                 },
-                {str(attacker.key): attacker, str(defender.key): defender},
+                {stable_actor_id(attacker): attacker, stable_actor_id(defender): defender},
             )
             battlefield.tactical = RoundTactical({str(defender.key): tactic})
         if battlefield is not None:
@@ -1137,8 +1138,8 @@ class CombatFactorBudgetTests(EvenniaTest):
         # site is single-sourced.
         attacker, defender = self._pair(live_case, player_attacker=True)
         battlefield = Battlefield(
-            {"a": frozenset({str(attacker.key)}), "d": frozenset({str(defender.key)})},
-            {str(attacker.key): attacker, str(defender.key): defender},
+            {'a': frozenset({stable_actor_id(attacker)}), 'd': frozenset({stable_actor_id(defender)})},
+            {stable_actor_id(attacker): attacker, stable_actor_id(defender): defender},
         )
         battlefield.tactical = RoundTactical({"someone_else": "dodge"})
         self.assertEqual(
@@ -1153,13 +1154,13 @@ class CombatFactorBudgetTests(EvenniaTest):
         standing = self._actor(Monster, "area_standing", attack=1, agility=20, defense=20)
         area_field = Battlefield(
             {
-                "a": frozenset({str(area_attacker.key)}),
-                "d": frozenset({str(dodging.key), str(standing.key)}),
+                'a': frozenset({stable_actor_id(area_attacker)}),
+                'd': frozenset({stable_actor_id(dodging), stable_actor_id(standing)}),
             },
             {
-                str(area_attacker.key): area_attacker,
-                str(dodging.key): dodging,
-                str(standing.key): standing,
+                stable_actor_id(area_attacker): area_attacker,
+                stable_actor_id(dodging): dodging,
+                stable_actor_id(standing): standing,
             },
         )
         area_field.tactical = RoundTactical({str(dodging.key): "dodge"})
@@ -1186,8 +1187,8 @@ class CombatFactorBudgetTests(EvenniaTest):
         slow = self._actor(PlayerCharacter, "upkeep_slow", hp=100, attack=10, agility=1)
         fast = self._actor(Monster, "upkeep_fast", hp=100, attack=10, agility=99)
         upkeep_field = Battlefield(
-            {"ally": frozenset({str(slow.key)}), "enemy": frozenset({str(fast.key)})},
-            {str(slow.key): slow, str(fast.key): fast},
+            {'ally': frozenset({stable_actor_id(slow)}), 'enemy': frozenset({stable_actor_id(fast)})},
+            {stable_actor_id(slow): slow, stable_actor_id(fast): fast},
         )
         tick = TickRecord(definition_key="t_factor_dot", source_pk=7, delta=-10, hp_before=100)
 
@@ -1346,10 +1347,10 @@ class CombatFactorBudgetTests(EvenniaTest):
         context = BattlefieldActionContext(
             Battlefield(
                 {
-                    "attackers": frozenset({str(monster.key)}),
-                    "defenders": frozenset({str(target.key)}),
+                    'attackers': frozenset({stable_actor_id(monster)}),
+                    'defenders': frozenset({stable_actor_id(target)}),
                 },
-                {str(monster.key): monster, str(target.key): target},
+                {stable_actor_id(monster): monster, stable_actor_id(target): target},
             ),
             event_context={"simulated": True},
         )

@@ -193,7 +193,7 @@ class MonsterFleeProfileTests(unittest.TestCase):
             owned=[_T_STRIKE.key],
             behaviour_tree="brute",
         )
-        enemy = FakeEntity("enemy")
+        enemy = FakeEntity("enemy", combat_identity='enemy')
         default_snapshot = (
             deepcopy(default.traits.hp._data),
             deepcopy(default.skills.values),
@@ -255,7 +255,7 @@ class MonsterFleePolicyTests(unittest.TestCase):
             behaviour_tree=behaviour_tree,
             owned=[_T_STRIKE.key] if owned is None else owned,
         )
-        enemy = FakeEntity("enemy")
+        enemy = FakeEntity("enemy", combat_identity='enemy')
         battlefield = _field(monster, [enemy])
         return monster, enemy, battlefield, monster_behaviour_policy(
             monster,
@@ -307,14 +307,14 @@ class MonsterFleePolicyTests(unittest.TestCase):
         monster, _, _, _ = self._request(hp=1)
         monster.traits.hp = FakeGauge(0, 1)
         monster.traits.hp._data["base"] = 0
-        enemy = FakeEntity("enemy")
+        enemy = FakeEntity("enemy", combat_identity='enemy')
         request = monster_behaviour_policy(monster, _field(monster, [enemy]))
         self.assertEqual(request.skill_key, _T_STRIKE.key)
 
     @covers_requirement("monster-flee-policy::flee-selection-has-priority-over-attack-selection-without-consuming-decision-dice")
     def test_flee_precedes_skill_selection_and_consumes_no_policy_roll(self):
         monster = FakeMonster("monster", hp=20, max_hp=100, owned=[_T_STRIKE.key])
-        enemies = [FakeEntity("first"), FakeEntity("second")]
+        enemies = [FakeEntity("first", combat_identity='first'), FakeEntity("second", combat_identity='second')]
         battlefield = _field(monster, enemies)
         with patch("world.rules.monster_behaviour.dice.roll_d100") as roller:
             request = monster_behaviour_policy(monster, battlefield)
@@ -323,7 +323,7 @@ class MonsterFleePolicyTests(unittest.TestCase):
 
     def test_no_living_enemy_returns_none_before_flee(self):
         monster = FakeMonster("monster", hp=20, max_hp=100, owned=[])
-        enemy = FakeEntity("enemy")
+        enemy = FakeEntity("enemy", combat_identity='enemy')
         battlefield = _field(monster, [enemy])
         battlefield.fled.add(enemy.key)
         self.assertIsNone(monster_behaviour_policy(monster, battlefield))

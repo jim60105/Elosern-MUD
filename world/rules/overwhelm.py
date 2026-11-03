@@ -10,6 +10,7 @@ import yaml
 
 from world.rules import combat
 from world.rules.combat import Battlefield
+from world.rules.combat_identity import stable_actor_id
 from world.rules.combat_modifiers import adjusted_agility, evaluate_combat_modifiers
 from world.rules.event_log import EventEntry, EventLog
 from world.rules.unlock_notices import UnlockNotice
@@ -320,10 +321,12 @@ def compress_event_logs(
     (``"skill"`` or ``"item"``), ``commanded_action_key``, and
     ``commanded_window`` are provided, exactly one ``commanded_action`` entry
     is prepended to the first log within ``commanded_window``, in window
-    order, whose actor matches, whose ``skill_key`` equals the action key, and
-    whose entries agree with the action kind (item markers match an
-    ``item_used`` entry, skill markers match any skill-produced log);
-    omitting any argument, or finding no match in the window, adds no marker.
+    order, whose stable actor identity matches ``commanded_actor``, whose
+    ``skill_key`` equals the action key, and whose entries agree with the
+    action kind (item markers match an ``item_used`` entry, skill markers
+    match any skill-produced log). The marker keeps the matched log's readable
+    actor label and carries the identity beside it; omitting any argument, or
+    finding no match in the window, adds no marker.
     """
     raw = tuple(raw_logs)
     window = None if commanded_window is None else tuple(commanded_window)
@@ -341,11 +344,12 @@ def compress_event_logs(
                 for log in window
                 if id(log) in raw_by_id
                 and log.entries
-                and log.actor == commanded_actor
+                and log.actor_id == commanded_actor
                 and log.skill_key == commanded_action_key
                 and (
                     any(
-                        entry.kind == "item_used" and entry.actor == commanded_actor
+                        entry.kind == "item_used"
+                        and entry.actor_id == commanded_actor
                         for entry in log.entries
                     )
                     if commanded_action_kind == "item"
@@ -360,6 +364,7 @@ def compress_event_logs(
             continue
         entries = log.entries
         if log is marker_target:
+            actor_label = log.actor
             if commanded_action_kind == "item":
                 definition = ITEM_REGISTRY.get(commanded_action_key)
                 label = (
@@ -369,32 +374,34 @@ def compress_event_logs(
                 )
                 try:
                     marker_template = commanded_action_line(
-                        "item", actor=str(commanded_actor)
+                        "item", actor=actor_label
                     )
                 except Exception:  # observability: ignore R2: narration is presentation and degrades rather than abort a legal settlement (design D11)
                     marker_template = COMPACT_POOLS["commanded_action"]
                 marker = EventEntry(
                     kind="commanded_action",
-                    actor=commanded_actor,
+                    actor=actor_label,
                     target=None,
                     data={"item": label},
                     text_template=marker_template,
+                    actor_id=commanded_actor,
                 )
             else:
                 skill = SKILL_REGISTRY.get(commanded_action_key)
                 label = skill.label if skill is not None else commanded_action_key
                 try:
                     marker_template = commanded_action_line(
-                        "skill", actor=str(commanded_actor)
+                        "skill", actor=actor_label
                     )
                 except Exception:  # observability: ignore R2: narration is presentation and degrades rather than abort a legal settlement (design D11)
                     marker_template = COMPACT_POOLS["commanded_action"]
                 marker = EventEntry(
                     kind="commanded_action",
-                    actor=commanded_actor,
+                    actor=actor_label,
                     target=None,
                     data={"skill": label},
                     text_template=marker_template,
+                    actor_id=commanded_actor,
                 )
             entries = (marker,) + entries
         preserved.append(replace(log, entries=entries))

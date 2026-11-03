@@ -83,6 +83,7 @@ from ._combat_session_helpers import (
     synth_innate_overlay,
 )
 from world.tests.synthetic_data import SYNTH_SKILLS
+from world.rules.combat_identity import stable_actor_id
 
 # Fixture mechanics resolve through the synthetic kit: the spell and martial
 # carriers are kit rows, the delivered-cast element is the kit element, and
@@ -696,19 +697,19 @@ class MultiTargetKnockoutProjectionTests(unittest.TestCase):
 
     @covers_requirement("action-resolution-pipeline::nonlethal-policy-transforms-lethal-projection-before-eventlog-planners")
     def test_area_damage_floors_and_marks_each_protected_target_once(self):
-        actor = FakeEntity("caster", atk_phys=20)
-        first = FakeEntity("第一", hp=5)
-        second = FakeEntity("第二", hp=5)
+        actor = FakeEntity("caster", combat_identity='caster', atk_phys=20)
+        first = FakeEntity("第一", combat_identity='第一', hp=5)
+        second = FakeEntity("第二", combat_identity='第二', hp=5)
         field = Battlefield(
             {
-                "party": frozenset({"caster", "第一", "第二"}),
-                "foes": frozenset({"foe"}),
+                'party': frozenset({"fixture:caster", "fixture:第一", "fixture:第二"}),
+                'foes': frozenset({"fixture:foe"}),
             },
             {
-                "caster": actor,
-                "第一": first,
-                "第二": second,
-                "foe": FakeEntity("foe"),
+                "fixture:caster": actor,
+                "fixture:第一": first,
+                "fixture:第二": second,
+                "fixture:foe": FakeEntity("foe", combat_identity='foe'),
             },
         )
         with (
@@ -745,10 +746,10 @@ class BattlefieldCommitSurfaceTests(EvenniaTestCase):
     def _field(self, entity):
         return Battlefield(
             {
-                "party": frozenset({str(entity.key)}),
-                "foes": frozenset({"pursuer"}),
+                'party': frozenset({stable_actor_id(entity)}),
+                'foes': frozenset({"fixture:pursuer"}),
             },
-            {str(entity.key): entity, "pursuer": FakeEntity("pursuer")},
+            {stable_actor_id(entity): entity, "fixture:pursuer": FakeEntity("pursuer", combat_identity='pursuer')},
         )
 
     @covers_requirement("battlefield-commit-surface::a-battlefield-shaped-object-is-snapshotted-and-restored-by-shape-not-by-explicit")
@@ -1676,8 +1677,8 @@ class PartyRetreatContestTests(EvenniaTestCase):
         roster = {entity.key: entity for entity in (*allies, *foes)}
         return Battlefield(
             teams={
-                "party": frozenset(entity.key for entity in allies),
-                "foes": frozenset(entity.key for entity in foes),
+                'party': frozenset(stable_actor_id(entity) for entity in allies),
+                'foes': frozenset(stable_actor_id(entity) for entity in foes),
             },
             roster=roster,
         )
@@ -1686,9 +1687,9 @@ class PartyRetreatContestTests(EvenniaTestCase):
     def test_no_pursuer_escapes_without_drawing_a_roll(self):
         from world.rules.disengage import party_retreat_attempt
 
-        ally = FakeEntity("ally", agility=3)
-        fled = FakeEntity("fled foe", agility=90)
-        knocked = FakeEntity("knocked foe", agility=90, hp=0)
+        ally = FakeEntity("ally", combat_identity='ally', agility=3)
+        fled = FakeEntity("fled foe", combat_identity='fled foe', agility=90)
+        knocked = FakeEntity("knocked foe", combat_identity='knocked foe', agility=90, hp=0)
         field = self._field([ally], [fled, knocked])
         field.fled.add("fled foe")
         field.knocked_out.add("knocked foe")
@@ -1704,7 +1705,7 @@ class PartyRetreatContestTests(EvenniaTestCase):
     def test_no_acting_ally_reports_the_defeat_branch_without_a_roll(self):
         from world.rules.disengage import party_retreat_attempt
 
-        foe = FakeEntity("foe", agility=90)
+        foe = FakeEntity("foe", combat_identity='foe', agility=90)
         field = self._field([], [foe])
         with patch("world.rules.disengage.roll_d100") as roll:
             success, detail = party_retreat_attempt(field, "party", [])
@@ -1721,9 +1722,9 @@ class PartyRetreatContestTests(EvenniaTestCase):
         # or its formula.
         from world.rules.disengage import party_retreat_attempt
 
-        slow = FakeEntity("slow", agility=1)
-        fast = FakeEntity("fast", agility=200)
-        pursuer = FakeEntity("pursuer", agility=100)
+        slow = FakeEntity("slow", combat_identity='slow', agility=1)
+        fast = FakeEntity("fast", combat_identity='fast', agility=200)
+        pursuer = FakeEntity("pursuer", combat_identity='pursuer', agility=100)
         # The slowest ally can never reach this hill of a pursuer while the
         # fastest alone cannot miss it: the attempt that has both able allies
         # available must use the slower one and fail.
@@ -1741,9 +1742,9 @@ class PartyRetreatContestTests(EvenniaTestCase):
 
         # The same for the pursuer side: one puny pursuer cannot stop the
         # party, and adding a fearsome one must be the term the contest uses.
-        weak = FakeEntity("weak", agility=1)
-        fearsome = FakeEntity("fearsome", agility=200)
-        ally = FakeEntity("ally", agility=50)
+        weak = FakeEntity("weak", combat_identity='weak', agility=1)
+        fearsome = FakeEntity("fearsome", combat_identity='fearsome', agility=200)
+        ally = FakeEntity("ally", combat_identity='ally', agility=50)
         with patch("world.rules.disengage.roll_d100", return_value=100):
             escaped, weak_detail = party_retreat_attempt(
                 self._field([ally], [weak]), "party", [ally]

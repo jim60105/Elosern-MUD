@@ -95,6 +95,7 @@ from .test_monster_ai_snapshots import (
     _probe_field,
     _trait_record,
 )
+from world.rules.combat_identity import stable_actor_id
 
 SCOPE = "normal:53:0"
 ROUND = 53
@@ -505,8 +506,8 @@ class ScalarExpressionTests(unittest.TestCase):
 
     @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
     def test_the_settlement_handlers_stage_the_shared_expressions(self):
-        attacker = FakeEntity("actor", atk_phys=30, agility=0, magic_power=11)
-        defender = FakeEntity("target", defense=10, agility=0)
+        attacker = FakeEntity("actor", combat_identity='actor', atk_phys=30, agility=0, magic_power=11)
+        defender = FakeEntity("target", combat_identity='target', defense=10, agility=0)
         for face in (1, 50, 51, 91, 100):
             self.assertEqual(
                 _roll_multiplier(face, face - 51),
@@ -1246,8 +1247,8 @@ class EstimationIntegrationTests(EvenniaTestCase):
             roster[str(entity.key)] = entity
         return Battlefield(
             {
-                "monsters": frozenset({str(self.monster.key)}),
-                "party": frozenset(str(entity.key) for entity in opponents),
+                'monsters': frozenset({stable_actor_id(self.monster)}),
+                'party': frozenset(stable_actor_id(entity) for entity in opponents),
             },
             roster,
         )

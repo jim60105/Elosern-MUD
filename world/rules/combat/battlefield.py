@@ -4,6 +4,12 @@ This module owns the shipped ``combat.yaml`` rulebook and the roster surface
 every other combat module reads: the ``Battlefield``/
 ``BattlefieldActionContext`` pair, the bounded-encounter ``BattleResult``, the
 stored-hp and effective-stat readers, and the initiative/terminal predicates.
+
+Every roster key is a combatant's stable individual identity
+(:func:`world.rules.combat.decision_scope.stable_actor_id`); the display label
+stays on the entity as prose. Two same-label individuals therefore own distinct
+roster entries, fled/knockout membership, tactical declarations and power
+contributions, and a rename can never redirect a selection.
 """
 
 from collections.abc import Callable
@@ -15,6 +21,7 @@ from typing import Any
 import yaml
 
 from world.rules.action import ActionRequest, _stored_trait_value
+from world.rules.combat_identity import stable_actor_id
 from world.rules.combat_modifiers import (
     attack_with_bundle,
     defense_with_bundle,
@@ -140,11 +147,12 @@ class RoundTactical:
 class Battlefield:
     """A live, two-team combat roster.
 
-    ``fled`` and ``knocked_out`` are the battlefield's persistent in-battle
-    state sets (party-combat D-2): ``knocked_out`` holds the roster keys
-    knocked out nonlethally at damage-commit time, so initiative, action
-    provision, target selection, overwhelm classification, and terminal checks
-    share one predicate instead of re-reading raw HP.
+    ``teams``, ``roster``, ``fled`` and ``knocked_out`` are keyed by stable
+    individual identity. ``fled`` and ``knocked_out`` are the battlefield's
+    persistent in-battle state sets (party-combat D-2): ``knocked_out`` holds
+    the identities knocked out nonlethally at damage-commit time, so
+    initiative, action provision, target selection, overwhelm classification,
+    and terminal checks share one predicate instead of re-reading raw HP.
 
     ``tactical`` is the round execution context for the active round's
     round-start Defend/Dodge declarations (party-combat-defend-dodge). It is
@@ -167,10 +175,16 @@ class Battlefield:
         if set(members) != set(self.roster):
             raise ValueError("team membership must exactly match the roster")
         for key, entity in self.roster.items():
-            if key != str(entity.key):
+            identity = stable_actor_id(entity)
+            if key != identity:
                 raise ValueError(
-                    f"roster key {key!r} does not match entity key {entity.key!r}"
+                    f"roster key {key!r} does not match combatant identity "
+                    f"{identity!r}"
                 )
+        if len({stable_actor_id(entity) for entity in self.roster.values()}) != len(
+            self.roster
+        ):
+            raise ValueError("a combatant cannot occupy more than one roster entry")
 
     def team_of(self, key: str) -> str | None:
         """Return the team containing an entity key."""
@@ -246,13 +260,16 @@ class BattlefieldActionContext:
             self.event_context["nonlethal"] = True
 
     def is_present(self, actor: Any, target: Any) -> bool:
-        return target.key in self.battlefield.roster
+        identity = stable_actor_id(target)
+        return self.battlefield.roster.get(identity) is target
 
     def relation_to(self, actor: Any, target: Any) -> Relation:
-        if actor is target:
+        actor_id = stable_actor_id(actor)
+        target_id = stable_actor_id(target)
+        if actor is target or actor_id == target_id:
             return Relation.SELF
-        actor_team = self.battlefield.team_of(actor.key)
-        target_team = self.battlefield.team_of(target.key)
+        actor_team = self.battlefield.team_of(actor_id)
+        target_team = self.battlefield.team_of(target_id)
         return (
             Relation.ALLY
             if actor_team is not None and actor_team == target_team
@@ -261,7 +278,7 @@ class BattlefieldActionContext:
 
     def is_in_range(self, actor: Any, target: Any) -> bool:
         """Treat every active roster member as engaged until positions exist."""
-        return target.key not in self.battlefield.fled
+        return stable_actor_id(target) not in self.battlefield.fled
 
 
 @dataclass(frozen=True)

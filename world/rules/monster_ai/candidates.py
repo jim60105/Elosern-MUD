@@ -469,7 +469,7 @@ def enumerate_candidates(
 
     battlefield = getattr(context, "battlefield", None)
     taunter = (
-        None if battlefield is None else battlefield.taunt_winner(str(actor.key))
+        None if battlefield is None else battlefield.taunt_winner(stable_identity(actor))
     )
 
     def taunt_narrow(skill: SkillDef, base: tuple[Any, ...]) -> tuple[Any, ...]:

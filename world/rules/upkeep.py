@@ -23,6 +23,7 @@ from world.rules.action import (
 )
 from world.rules.action.event_log import _max_hp_value
 from world.rules.buffs import TickRecord
+from world.rules.combat_identity import stable_actor_id
 from world.rules.event_log import EventEntry, EventLog
 from world.skills.narration import INTERNAL_KINDS, entry_line
 
@@ -98,7 +99,16 @@ def _narrate_upkeep_entries(
                 target_key=target,
                 actor=entry.actor,
                 target=target,
-                max_hp=maximums.get(target),
+                max_hp=(
+                    maximums.get(entry.target_id)
+                    if entry.target_id is not None
+                    else None
+                )
+                or (
+                    maximums.get(entry.actor_id)
+                    if entry.actor_id is not None
+                    else None
+                ),
             )
         except Exception:  # observability: ignore R2: narration is presentation and degrades rather than reject a legal round (design D11)
             narrated.append(entry)
@@ -152,6 +162,7 @@ def _stage_casualties(
                 target=str(entity.key),
                 data=data,
                 text_template=_FALLBACK_TEMPLATES["target_defeated"],
+                target_id=f"dbref:{int(dbref)}",
             )
         )
     if not entries:
@@ -162,6 +173,7 @@ def _stage_casualties(
         targets=tuple(sorted({entry.target for entry in entries})),
         entries=tuple(entries),
         time_cost_seconds=0,
+        target_ids=tuple(sorted({entry.target_id for entry in entries})),
     )
     request = SimpleNamespace(
         actor=None,
@@ -231,23 +243,28 @@ def settle_upkeep(
             source_pk = int(source.pk)
             per_source_entity.setdefault(source_pk, source)
             per_source_key.setdefault(source_pk, str(source.key))
+            source_identity = stable_actor_id(source)
             applied = min(-record.delta, record.hp_before)
             damage_entry = EventEntry(
                 kind="damage",
                 actor=per_source_key[source_pk],
-                target=key,
+                target=str(entity.key),
                 data={"amount": int(applied)},
                 text_template=_FALLBACK_TEMPLATES["damage"],
+                actor_id=source_identity,
+                target_id=key,
             )
             per_source.setdefault(source_pk, []).append(damage_entry)
-            if key not in per_source_targets.setdefault(source_pk, []):
-                per_source_targets[source_pk].append(key)
+            per_source_target_labels = per_source_targets.setdefault(source_pk, [])
+            if str(entity.key) not in per_source_target_labels:
+                per_source_target_labels.append(str(entity.key))
             protected = key in nonlethal_keys
             if applied <= 0:
                 continue
             projected[id(entity)] = record.hp_before
             defeated = _defeated_entry(
                 per_source_key[source_pk],
+                source_identity,
                 entity,
                 int(applied),
                 projected,
@@ -293,6 +310,14 @@ def settle_upkeep(
             targets=tuple(per_source_targets[source_pk]),
             entries=tuple(entries),
             time_cost_seconds=0,
+            actor_id=stable_actor_id(per_source_entity[source_pk]),
+            target_ids=tuple(
+                dict.fromkeys(
+                    entry.target_id
+                    for entry in entries
+                    if entry.target_id is not None
+                )
+            ),
         )
         logs.append(log)
         if not any(entry.kind == "target_defeated" for entry in entries):

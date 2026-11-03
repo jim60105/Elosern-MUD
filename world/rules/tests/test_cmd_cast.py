@@ -33,6 +33,7 @@ from world.tests.synthetic_data import (
 )
 
 from ._combat_session_helpers import open_synthetic_scope, synth_innate_overlay
+from world.rules.combat_identity import stable_actor_id
 
 # A synthetic disguise caster: same registered effect prefix (set_disguise)
 # and pipeline shape as any stock self-target disguise skill.
@@ -158,10 +159,10 @@ class CmdCastTests(EvenniaCommandTestMixin, EvenniaTest):
             entity.db.skills = {"active": [], "passive": []}
         field = Battlefield(
             {
-                "party": frozenset({self.char1.key}),
-                "foes": frozenset({self.char2.key}),
+                'party': frozenset({stable_actor_id(self.char1)}),
+                'foes': frozenset({stable_actor_id(self.char2)}),
             },
-            {self.char1.key: self.char1, self.char2.key: self.char2},
+            {stable_actor_id(self.char1): self.char1, stable_actor_id(self.char2): self.char2},
         )
         self.char1.ndb.action_context = BattlefieldActionContext(field)
         output = self.call(CmdCast(), "flee")

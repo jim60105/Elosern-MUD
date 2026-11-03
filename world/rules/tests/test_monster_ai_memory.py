@@ -59,6 +59,7 @@ from ._combat_session_helpers import (
     synth_damage_skill,
 )
 from .combat_fixtures import FakeEntity
+from world.rules.combat_identity import stable_actor_id
 
 #: The single file-local synthetic damage row the integration case casts.
 MEM_STRIKE = synth_damage_skill(
@@ -99,10 +100,10 @@ def _field(actor, *others, actor_team="monsters", other_team="party") -> Battlef
     entities = (actor, *others)
     return Battlefield(
         {
-            actor_team: frozenset({actor.key}),
-            other_team: frozenset(other.key for other in others),
+            actor_team: frozenset({stable_actor_id(actor)}),
+            other_team: frozenset(stable_actor_id(other) for other in others),
         },
-        {entity.key: entity for entity in entities},
+        {stable_actor_id(entity): entity for entity in entities},
     )
 
 
@@ -184,8 +185,8 @@ class ObservationTransactionTests(EvenniaTestCase):
         super().setUp()
         clear_session_memory()
         self.addCleanup(clear_session_memory)
-        self.actor = FakeEntity("actor")
-        self.enemy = FakeEntity("enemy")
+        self.actor = FakeEntity("actor", combat_identity='actor')
+        self.enemy = FakeEntity("enemy", combat_identity='enemy')
         self.field = _field(self.actor, self.enemy)
 
     @covers_requirement(
@@ -327,8 +328,8 @@ class ObservationTerminalTests(EvenniaTestCase):
         super().setUp()
         clear_session_memory()
         self.addCleanup(clear_session_memory)
-        self.actor = FakeEntity("actor")
-        self.enemy = FakeEntity("enemy")
+        self.actor = FakeEntity("actor", combat_identity='actor')
+        self.enemy = FakeEntity("enemy", combat_identity='enemy')
         self.field = _field(self.actor, self.enemy)
 
     def _publish(self, session, action="t_action"):
@@ -468,7 +469,7 @@ class ObservationEligibilityTests(EvenniaTestCase):
     def test_reconstruction_preserves_committed_history(self):
         session = "hostile:1:0"
         self._publish(session)
-        rebuilt = _field(FakeEntity("actor"), FakeEntity("enemy"))
+        rebuilt = _field(FakeEntity("actor", combat_identity='actor'), FakeEntity("enemy", combat_identity='enemy'))
         self.assertEqual(len(project_observations(session, rebuilt)), 1)
 
     @covers_requirement(
@@ -478,24 +479,24 @@ class ObservationEligibilityTests(EvenniaTestCase):
         session = "hostile:1:0"
         self._publish(session)
         # The recipient disappeared: the fact survives, the stale target does not.
-        projected = project_observations(session, _field(FakeEntity("actor")))
+        projected = project_observations(session, _field(FakeEntity("actor", combat_identity='actor')))
         self.assertEqual(len(projected), 1)
         self.assertEqual(projected[0].recipient_ids, ())
         self.assertEqual(projected[0].magnitudes, ())
         # The source changed faction: the fact is no longer eligible.
         changed = Battlefield(
             {
-                "monsters": frozenset({"witness"}),
-                "party": frozenset({"actor"}),
+                'monsters': frozenset({"fixture:witness"}),
+                'party': frozenset({"fixture:actor"}),
             },
             {
-                "witness": FakeEntity("witness"),
-                "actor": FakeEntity("actor"),
+                "fixture:witness": FakeEntity("witness", combat_identity='witness'),
+                "fixture:actor": FakeEntity("actor", combat_identity='actor'),
             },
         )
         self.assertEqual(project_observations(session, changed), ())
         # The source vanished entirely: nothing is eligible.
-        self.assertEqual(project_observations(session, _field(FakeEntity("npc"))), ())
+        self.assertEqual(project_observations(session, _field(FakeEntity("npc", combat_identity='npc'))), ())
 
     @covers_requirement(
         "monster-ai-observation-memory::observation-access-follows-current-session-membership"
@@ -531,8 +532,8 @@ class ObservationBoundaryExtractionTests(EvenniaTestCase):
         "monster-ai-observation-memory::resolved-observations-are-compact-and-bounded"
     )
     def test_an_item_heal_is_a_positive_health_fact(self):
-        actor = FakeEntity("actor")
-        target = FakeEntity("target")
+        actor = FakeEntity("actor", combat_identity='actor')
+        target = FakeEntity("target", combat_identity='target')
         field = _field(actor, target)
         # The production item pipeline emits ``item_used`` with the signed
         # gauge delta actually applied; a restoration carries a +amount and is
@@ -561,8 +562,8 @@ class ObservationBoundaryExtractionTests(EvenniaTestCase):
         "monster-ai-observation-memory::resolved-observations-are-compact-and-bounded"
     )
     def test_an_item_status_fact_is_recorded_without_a_health_magnitude(self):
-        actor = FakeEntity("actor")
-        target = FakeEntity("target")
+        actor = FakeEntity("actor", combat_identity='actor')
+        target = FakeEntity("target", combat_identity='target')
         field = _field(actor, target)
         log = EventLog(
             actor="actor",
@@ -593,8 +594,8 @@ class ObservationBoundaryExtractionTests(EvenniaTestCase):
         "monster-ai-observation-memory::resolved-observations-are-compact-and-bounded"
     )
     def test_an_upkeep_tick_is_a_negative_health_fact(self):
-        actor = FakeEntity("actor")
-        target = FakeEntity("target")
+        actor = FakeEntity("actor", combat_identity='actor')
+        target = FakeEntity("target", combat_identity='target')
         field = _field(actor, target)
         log = EventLog(
             actor="actor",
@@ -612,7 +613,7 @@ class ObservationBoundaryExtractionTests(EvenniaTestCase):
         "monster-ai-observation-memory::resolved-observations-are-compact-and-bounded"
     )
     def test_a_large_group_is_summarized_to_bounded_recipients(self):
-        actor = FakeEntity("actor")
+        actor = FakeEntity("actor", combat_identity='actor')
         others = [FakeEntity(f"target-{index}") for index in range(12)]
         field = _field(actor, *others)
         log = EventLog(
@@ -661,10 +662,10 @@ class ObservationRoundIntegrationTests(EvenniaTestCase):
         target.apply_race_baseline()
         field = Battlefield(
             {
-                "monsters": frozenset({str(monster.key)}),
-                "party": frozenset({str(target.key)}),
+                'monsters': frozenset({stable_actor_id(monster)}),
+                'party': frozenset({stable_actor_id(target)}),
             },
-            {str(monster.key): monster, str(target.key): target},
+            {stable_actor_id(monster): monster, stable_actor_id(target): target},
         )
 
         def provider(entity, battlefield):
@@ -704,8 +705,8 @@ class ObservationRoundIntegrationTests(EvenniaTestCase):
         "monster-ai-observation-memory::same-round-observations-remain-transaction-local"
     )
     def test_a_sessionless_round_records_nothing(self):
-        actor = FakeEntity("actor")
-        enemy = FakeEntity("enemy")
+        actor = FakeEntity("actor", combat_identity='actor')
+        enemy = FakeEntity("enemy", combat_identity='enemy')
         field = _field(actor, enemy)
 
         def provider(entity, battlefield):

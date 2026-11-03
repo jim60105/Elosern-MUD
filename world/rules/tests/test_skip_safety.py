@@ -33,8 +33,8 @@ class SkipSafetyTests(BattlefieldIsolation, unittest.TestCase):
     def test_active_battlefield_rejects_but_fled_actor_does_not(self):
         first, second = actor("first", 1), actor("second", 2)
         field = Battlefield(
-            {"a": frozenset({"first"}), "b": frozenset({"second"})},
-            {"first": first, "second": second},
+            {'a': frozenset({"fixture:first"}), 'b': frozenset({"fixture:second"})},
+            {"fixture:first": first, "fixture:second": second},
         )
         register_active_battlefield(field)
         self.assertEqual(evaluate_skip_safety(first), SkipRejectReason.IN_COMBAT)
@@ -59,12 +59,12 @@ class SkipSafetyTests(BattlefieldIsolation, unittest.TestCase):
     def test_same_key_entities_in_separate_battlefields_do_not_cross_evict(self):
         first, second = actor("shared", 1), actor("shared", 2)
         field_a = Battlefield(
-            {"a": frozenset({"shared"}), "b": frozenset({"other-a"})},
-            {"shared": first, "other-a": actor("other-a", 3)},
+            {'a': frozenset({"fixture:shared"}), 'b': frozenset({"fixture:other-a"})},
+            {"fixture:shared": first, "fixture:other-a": actor("other-a", 3)},
         )
         field_b = Battlefield(
-            {"a": frozenset({"shared"}), "b": frozenset({"other-b"})},
-            {"shared": second, "other-b": actor("other-b", 4)},
+            {'a': frozenset({"fixture:shared"}), 'b': frozenset({"fixture:other-b"})},
+            {"fixture:shared": second, "fixture:other-b": actor("other-b", 4)},
         )
         register_active_battlefield(field_a)
         register_active_battlefield(field_b)
@@ -80,8 +80,8 @@ class SkipSafetyTests(BattlefieldIsolation, unittest.TestCase):
     def test_in_combat_lookup_resolves_by_actor_dbref(self):
         fighter, bystander = actor("fighter", 10), actor("bystander", 11)
         field = Battlefield(
-            {"a": frozenset({"fighter"}), "b": frozenset({"foe"})},
-            {"fighter": fighter, "foe": actor("foe", 12)},
+            {'a': frozenset({"fixture:fighter"}), 'b': frozenset({"fixture:foe"})},
+            {"fixture:fighter": fighter, "fixture:foe": actor("foe", 12)},
         )
         register_active_battlefield(field)
         self.assertEqual(

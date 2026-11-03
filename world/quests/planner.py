@@ -22,6 +22,8 @@ from typing import Any
 
 from typeclasses.characters import PlayerCharacter
 
+from world.rules.combat_identity import stable_actor_id
+
 from .definitions import ObjectiveKind
 from .runtime import (
     QuestState,
@@ -283,7 +285,7 @@ def _bound_defeat_owner(actor: Any, battlefield: Any) -> Any | None:
     # The shared knockout predicate is read duck-typed so a battlefield-shaped
     # context without the predicate still fails closed instead of raising.
     predicate = getattr(battlefield, "is_knocked_out", None)
-    if predicate is None or predicate(str(actor.key)):
+    if predicate is None or predicate(stable_actor_id(actor)):
         return None
     return owner
 

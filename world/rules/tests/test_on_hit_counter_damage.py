@@ -147,7 +147,7 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
         roster = {ent.key: ent for ent in all_entities}
         party_keys = frozenset({actor.key})
         foe_keys = frozenset(ent.key for ent in foes)
-        return Battlefield({"party": party_keys, "foes": foe_keys}, roster)
+        return Battlefield({'party': party_keys, 'foes': foe_keys}, roster)
 
     # -------------------------------------------------------------------------
     # Requirement 1: A qualifying physical strike dispatches one source-attributed on-hit event

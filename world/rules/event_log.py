@@ -1,4 +1,14 @@
-"""Serializable records emitted by deterministic action resolution."""
+"""Serializable records emitted by deterministic action resolution.
+
+``actor`` and ``target`` are the readable display labels a narration template
+fills; they are never identity. A participant-bearing record additionally
+carries the stable individual identity of each side
+(:func:`world.rules.combat.decision_scope.stable_actor_id`), so a consumer that
+attributes, credits or targets never has to parse a label and two same-label
+individuals can never be confused. A record that legitimately has no
+participant (a team summary, a source-less casualty) leaves its identity
+fields ``None``.
+"""
 
 from dataclasses import dataclass
 from typing import Any
@@ -13,6 +23,10 @@ class EventEntry:
     target: str | None
     data: dict[str, Any]
     text_template: str
+    # Stable individual identities behind the prose labels, or ``None`` for a
+    # record that names no participant on that side.
+    actor_id: str | None = None
+    target_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -24,6 +38,10 @@ class EventLog:
     targets: tuple[str, ...]
     entries: tuple[EventEntry, ...]
     time_cost_seconds: int
+    # The acting participant's stable identity (``None`` for a system/summary
+    # log) and the resolved recipients' identities in resolution order.
+    actor_id: str | None = None
+    target_ids: tuple[str, ...] = ()
 
 
 def render_entry_text(entry: EventEntry) -> str:
