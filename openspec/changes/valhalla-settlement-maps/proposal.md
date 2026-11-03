@@ -7,10 +7,11 @@ The Valhalla Beast Kingdom has 18 national settlements, the 400,000-person triba
 ## What Changes
 
 - **Data.** Generate `content/maps/settlements/<location_id>.yaml` with `generate --missing --nation valhalla`, in this order: `capital_valhalla`, `city_iron_claw`, `city_mutual_market`, `city_horn_plain`, `city_moon_howl`, `city_shadow_wood`, `city_fox_fire`, `city_swift_wind`, `city_tiger_roar`, `town_pine_ferry`, `town_stag_ferry`, `town_ancestor_shrine`, `town_falcon`, `town_grizzly`, `town_west_ford_camp`, `town_frost_wind`, `town_shaman_cave`, `town_east_ford_camp`.
-- No relocation. Valhalla has no ports, and no Valhalla settlement's lore requires a river. `capital_valhalla` stays about 13 km from `highland_river` on purpose. Its lore reads "highland forest and tribal routes", and the matrix gives beast cities only a simple ferry landing when they happen to sit on a river.
+- No `water_gap` relocation. Valhalla has no ports, and no Valhalla settlement's lore requires a river. `capital_valhalla` stays about 13 km from `highland_river` on purpose. Its lore reads "highland forest and tribal routes", and the matrix gives beast cities only a simple ferry landing when they happen to sit on a river.
+- **Data.** Seven towns' own `wilderness_cell` district landmarks sit on their location cells and reserve the mandatory anchor cell; each landmark moves three cells north (design D4). Three border-river towns refuse with `anchor_outside_footprint` on a two-cell footprint and take a one-cell westward move (design D4).
 - **Data.** Write zh-TW prose for every generated node.
 - **Regenerated.** `world/maps/data/district_partition.json`.
-- No `content/maps/locations.yaml` edit. The change is spec-less.
+- `content/maps/locations.yaml` changes only the three cells design D4 accepts. The change is spec-less.
 
 ## Capabilities
 

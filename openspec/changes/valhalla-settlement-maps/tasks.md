@@ -1,10 +1,14 @@
 # Tasks
 
 Ground rules:
-- Change only two kinds of files:
+- Change only these files, plus residual-pin test rewrites under the doc's "Residual pin rule":
   - new `content/maps/settlements/<id>.yaml` files for the 18 roster ids;
+  - `content/maps/districts.yaml` landmark cells that design D4's generator
+    precondition accepts;
+  - `content/maps/locations.yaml` cells that design D4 accepts;
+  - current-tense documentation statements that count the mapped settlements;
   - `world/maps/data/district_partition.json`.
-- Do not edit `content/maps/locations.yaml`.
+- Do not edit any other `content/maps/locations.yaml` cell.
 - Keep scratch files in the scratchpad.
 - Never hand-edit generated YAML.
 - If the map editor has one of these documents open, ask before writing.
