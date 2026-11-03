@@ -71,7 +71,7 @@ An ecology zone has a stable key, a parent geographic region, explicit bounded g
 
 The declaration carries lower and upper individual-density values, a per-cell automatic-birth capacity, a recovery delay, a replenishment interval, and a maximum number of individuals born in one wave. Density values use integer individuals per one hundred eligible birth cells. Their source declarations are the balance authority; documentation and tests must not maintain a duplicate approval table.
 
-A composition contains weighted, explicit variant references and inclusive count ranges. It may describe one solitary individual, a same-species group, or several species in one group. Every sampled composition is placed together in one cell. Group ranges must reflect approved ecology; a prose mention of flocking never becomes a runtime count by inference.
+Each pool entry weights a complete composition. Inside that composition, each row names an explicit variant and an inclusive count range. A composition may describe one solitary individual, a same-species group, or several species in one group. Every sampled composition is placed together in one cell. Group ranges must reflect approved ecology; a prose mention of flocking never becomes a runtime count by inference.
 
 Composition weights and ranges determine births within the authored pool. An occurrence selects its position, composition, and counts anew. Coordinates alone do not permanently select a species. A later birth can select the same species again, but is not required to do so. Living individuals are never replaced merely to realize a new random selection.
 
@@ -97,6 +97,8 @@ Explicit manual and quest placement bypasses the automatic birth-exclusion and a
 
 For an eligible birth-cell count `E`, derive the lower population bound by rounding `E * lower_density / 100` upward and the upper bound by rounding `E * upper_density / 100` downward. Require a positive usable interval for each enabled, nonempty ecology zone. Use integer arithmetic.
 
+Require `0 < lower_density <= upper_density < 100`. Thus automatic population cannot occupy every eligible cell even if every composition is solitary. Production authoring must select sparse values appropriate to local ecology; the upper validation limit is not a recommended density. Explicit manual exceptions are outside this ordinary sparse-occupancy guarantee.
+
 Count living monster individuals inside the zone, including ambient, manual, site, and quest individuals, against available ordinary birth headroom. One group of five contributes five. A separate per-cell check counts all living occupants at the candidate birth cell. An explicit placement can exceed either ordinary limit; such excess blocks further ordinary births and never authorizes removal of living entities.
 
 The upper bound is an automatic-birth ceiling. Falling below the lower bound requests recovery. Reaching the lower bound ends that recovery episode; a final complete composition may place the population anywhere up to the upper bound. Do not require an exact population that forces group splitting or arbitrary deletion.
@@ -107,7 +109,7 @@ Authoring validation must establish that legal complete compositions can recover
 
 On the first committed deficit below the lower bound, record a recovery time no earlier than the deficit occurrence plus the zone's recovery delay. Further losses do not trigger immediate births and do not continually restart an already pending recovery episode. This is regional recovery, not a one-kill/one-replacement queue.
 
-Once due, a wave samples complete legal compositions within the current density, per-cell, and wave limits. It creates at most the authored wave budget and schedules another wave after the positive replenishment interval if the population remains below the lower bound. A kill itself is never a spawn trigger.
+At a due time, recompute the living population first. If it has already reached the lower bound, cancel that recovery episode without a birth or generation-sequence change. Otherwise a wave samples complete legal compositions within the current density, per-cell, and wave limits. It creates at most the authored wave budget and schedules another wave after the positive replenishment interval if the population remains below the lower bound. A kill itself is never a spawn trigger.
 
 Use the game-time occurrence of a combat loss, including its recorded round offset, rather than backdating it to the pre-combat clock tick. Earlier rounds must not accidentally satisfy a delay for a monster defeated in a later round. Births cannot enter an active combat cell, replace session participants, or append enemies to an already persisted encounter.
 
@@ -119,7 +121,7 @@ World time advances only through existing player-driven clock mechanisms. Long a
 
 Persist initialized state, the seed used by population selection, generation sequence, recovery due time, and settlement progress through the population owner. Use a stable seeded selection discipline with distinct draw purposes, not process-randomized Python hashes or global unrecorded randomness.
 
-Initial world population is a one-time owner operation using the same placement and density constraints. It records initialization with the created individuals. Restart, source reread, room preparation, and player arrival must not repeat initial filling. Existing valid individuals retain identity, consumed resources, and state.
+Initial world population is a one-time owner operation using the same placement and density constraints. It records initialization with the created individuals. Restart, source reread, room preparation, and player arrival must not repeat initial filling. In a world initialized under this contract, existing valid individuals retain identity, consumed resources, and state; this does not promise conversion of an older coordinate-slot save.
 
 Each ordinary individual carries its home ecology-zone ownership separately from its current coordinate. No identity or ownership marker encodes a cell as a permanent generation slot. Wilderness registration remains authoritative when no room is materialized; activation only attaches existing individuals.
 
@@ -165,7 +167,9 @@ No tier example, visual-only species declaration, untranslated example name, or 
 
 ## 10. Presentation, failure boundaries, and observability
 
-`population_view`, local/area maps, sight-change observations, travel interruption, quest destinations, and GM population inspection read actual living individuals. Remove prospective coordinate-slot monsters from population facts. A scheduled future birth is not a visible entity or an immediate encounter. Threat and grade remain registry-derived.
+`population_view`, local/area maps, sight-change observations, travel interruption, and GM population inspection read actual living individuals whenever they claim an entity is present. Remove prospective coordinate-slot monsters from population facts. A scheduled future birth is not a visible entity or an immediate encounter. Threat and grade remain registry-derived.
+
+A regional hunt may still identify its authored hunting region or ecology zone as a destination when it has no living target. Present that as a habitat destination, not a live-monster observation. Exact entity destinations and hostile travel interruptions require actual present individuals. Quest acceptance must not lose legitimate habitat guidance merely because the hunt is currently undersupplied.
 
 A wave is one all-or-nothing write. If construction, registration, scheduling, or a later write fails, restore the complete wave, counters, due state, world-coordinate registry, room attachments, relevant caches, and the surrounding clock transaction. Snapshot mutable Evennia surfaces because a database rollback alone does not restore their in-process values. Retrying the same failed wave must make the same selection and leave no duplicate or half-group.
 
@@ -197,9 +201,10 @@ Use synthetic species, variants, zones, and settlement geometry for mechanism te
 | Recovery | Killing creates no immediate replacement. Re-entry, map reads, and accepting an undersupplied hunt create nothing. Before/at-due boundaries and consecutive waves establish delay, per-wave bounds, and eventual density recovery. |
 | State reuse | Room recycling and reload retain the same living IDs, current resources, birth sequence, and due time. Initialization does not run again. |
 | Capacity and ownership | Manual overpopulation prevents additional automatic births without deleting or modifying foreign individuals. One-shot and not-yet-due sites stay cleared. |
+| Obsolete recovery | Explicit placement brings a pending recovery episode back into its target band before its due time; settlement cancels it without an extra birth or sequence increment. |
 | Failure | Inject a failure after an actual individual and registration write; reload and live caches match the pre-wave state. A retry yields the same legal selection without a duplicate. |
 | Timing | Combat loss timestamps do not borrow earlier-round time; equal clock advancement partitions preserve due-wave outcomes when external events are unchanged. |
-| Quest behavior | An undersupplied legitimate regional hunt accepts without creating an individual; bound clear-outs retain identity and recovery restrictions. |
+| Quest behavior | An undersupplied legitimate regional hunt accepts without creating an individual and retains truthful habitat guidance without a fabricated target; bound clear-outs retain identity and recovery restrictions. |
 | Unknown content | Undefined tier examples never reach automatic construction; current valid construction still uses the approved registry and literal stats. |
 
 Implementation smoke must exercise real construction, placement, map/view consumption, encounter selection, committed defeat, clock-driven recovery, and reload. Tests alone are insufficient evidence. Use the smallest relevant Evennia, command, presentation, or browser labels; register any new test modules or browser methods in their owning manifests. Run observability lint with focused tests whenever a logging path changes, plus `uv run --locked python -m tools.contract_gate` before handoff. Full managed browser and complete evidence verification remain CI-owned.
