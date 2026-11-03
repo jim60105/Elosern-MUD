@@ -827,12 +827,31 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
         # A read command may refresh a derived panel; what it must never do is
         # cost a complete checkpoint or fragment. The unchanged-publication
         # skip is proven through the coordinator itself below.
-        narrative = narrative_log_text(page)
+        # The look's own output is the room description, which repeats the
+        # room's display name; the client echoes the typed line before the
+        # server answers, so the echo alone says nothing about the round trip.
+        # Waiting for the name to appear again is what makes the following
+        # window the settled one.
+        room_name = store_state(page)["panels"]["exploration"]["look"]["room"][
+            "display_name"
+        ]
+        seen_names = narrative_log_text(page).count(room_name)
         mark = len(frames)
         self._send_text(page, "look")
         wait_for_store_state(
             page,
-            lambda s: len(narrative_log_text(page)) > len(narrative),
+            lambda s: narrative_log_text(page).count(room_name) > seen_names,
+            timeout=30000,
+        )
+        # The command's own presentation refresh is enqueued after its output
+        # settles, and the situation-driven options publication follows it.
+        # Waiting for the window's first presentation frame is what makes the
+        # following assertions read a settled window; a bounded wait keeps a
+        # genuinely silent read (the unchanged-publication skip proven below)
+        # a named failure instead of an empty set.
+        wait_for_store_state(
+            page,
+            lambda s: bool(_presentation(frames, mark)),
             timeout=30000,
         )
         wait_for_presentation_settled(page)
@@ -1184,7 +1203,19 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
         # checkpoint. It is verified independently: its own committed record
         # must carry the canonical value and the registry's whole eager set.
         page.evaluate("() => Elosern.actions.client.sync()")
-        wait_for_store_state(page, lambda s: s["revision"] > omit_revision, timeout=90000)
+        # A later ordinary delta also lifts the revision, so the predicate is
+        # the requested checkpoint itself: one captured snapshot past the
+        # omission revision. Waiting for its own frame keeps a slow checkpoint
+        # from being reported as a missing one.
+        wait_for_store_state(
+            page,
+            lambda s: any(
+                frame["name"] == SNAPSHOT
+                and (_revision_of(frame) or 0) > omit_revision
+                for frame in _presentation(frames, mark)
+            ),
+            timeout=90000,
+        )
         wait_for_presentation_settled(page)
         checkpoints = [
             frame
