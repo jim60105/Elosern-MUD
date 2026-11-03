@@ -11,6 +11,9 @@ Django or database is needed):
         .agents/skills/map-data-authoring/scripts/place_sites.py --locations
 
     uv run --locked --project packages/map-core python \
+        .agents/skills/map-data-authoring/scripts/place_sites.py --landmarks --min-km 100
+
+    uv run --locked --project packages/map-core python \
         .agents/skills/map-data-authoring/scripts/place_sites.py --rivers
 
 CANDIDATES.json is a list of objects:
@@ -22,7 +25,10 @@ CANDIDATES.json is a list of objects:
 nearest walkable, non-water cell that satisfies the condition, searched up to
 ``--snap-radius`` cells away. Every other key is passed through untouched.
 ``--locations`` validates the authored ``locations.yaml`` cells and harbour
-sites instead of a candidate file. ``--rivers`` checks every waterway's
+sites instead of a candidate file. ``--landmarks`` does the same for every
+authored ``wilderness_cell`` district landmark in ``districts.yaml`` (for
+example after a landmark drag in the editor); landmarks that reference a
+location or a settlement node follow their referent and are not listed. ``--rivers`` checks every waterway's
 mouth (its last route vertex) instead: a river must end in the sea or join
 another waterway, within 2 cells. A mouth that stops inland is easy to miss on
 the editor canvas and leaves its "river mouth" ports with no water.
@@ -217,11 +223,21 @@ def _authored_sites(root: Path) -> list[dict]:
     return sites
 
 
+def _authored_landmarks(root: Path) -> list[dict]:
+    world = _load_world(root)
+    return [
+        {"id": f"district:{key}", "cell": list(row.landmark.cell)}
+        for key, row in sorted(world.districts.districts.items())
+        if row.landmark.domain == "wilderness_cell" and row.landmark.cell is not None
+    ]
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("candidates", nargs="?", type=Path)
     source.add_argument("--locations", action="store_true")
+    source.add_argument("--landmarks", action="store_true")
     source.add_argument("--rivers", action="store_true")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--root", type=Path, default=Path("."))
@@ -239,11 +255,12 @@ def main(argv: list[str]) -> int:
             print(f"cannot check waterways: {error}", file=sys.stderr)
             return 2
     try:
-        sites = (
-            _authored_sites(root)
-            if args.locations
-            else json.loads(args.candidates.read_text(encoding="utf-8"))
-        )
+        if args.locations:
+            sites = _authored_sites(root)
+        elif args.landmarks:
+            sites = _authored_landmarks(root)
+        else:
+            sites = json.loads(args.candidates.read_text(encoding="utf-8"))
     except Exception as error:  # noqa: BLE001 - report any load failure plainly
         print(f"cannot load sites: {error}", file=sys.stderr)
         return 2

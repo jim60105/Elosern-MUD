@@ -520,7 +520,13 @@ border-river fields, full region fields, ford centres and each settlement's
 `footprint` (`shape`, the authored `offset`, and the derived absolute `origin`
 and `cells`), plus each settlement's derived `world_frame`
 (`anchor_cell`, `local_anchor_m`) and node `world_m` — `null` while the frame is
-unavailable (no anchor room yet). Inconsistent terrain inputs save as
+unavailable (no anchor room yet). Each district row's `landmark` is the
+qualified reference `{domain, map_id, object_id, cell}` with `cell` as an
+`[x, y]` pair (or `null`; the YAML keeps `{cell_x, cell_y}`), and
+`landmark_centre_m` is its referent-derived continental centre in metres: a
+wilderness cell's centre, a location's cell centre or a settlement node's
+`world_m`, and `null` for an interior room or an unresolved referent.
+Inconsistent terrain inputs save as
 diagnosed work in progress with `terrain_preview.status: unavailable`.
 
 Derived output is never written and never handled: a committed change to a
@@ -537,7 +543,13 @@ form), 山脊 (a pass creation form at the clicked row), 地點 (a location or
 reserved-site creation form at the clicked cell) and 佔地 (toggle cells of the
 selected footprint). Selecting a feature (by click or in the object list)
 shows its control-point diamonds; a drag is one command on release and Escape
-cancels it. The inspector gives every essential edit a non-drag path:
+cancels it. Each district landmark with a `landmark_centre_m` is a diamond
+mark on the 地點 layer, drawn beneath the other marks, whose click selects the
+district. A `wilderness_cell` landmark drags: the release is one
+`set_district_field` landmark command with the full four-key wilderness value,
+writing only `districts.yaml`; a refused cell (such as a negative one) settles
+back to the saved position. Referenced landmarks (`location`,
+`settlement_node`) follow their referent and do not drag. The inspector gives every essential edit a non-drag path:
 frame-labelled numeric fields, 前方插入/後方插入/移除控制點, the footprint
 `#`/`.` grid (arrow keys and Space), the structured landmark selector, and a
 衍生結果 section with the terrain preview state, the partition's input
@@ -1248,7 +1260,7 @@ preferences and without writing or reading them.
 
 | `view` | Geometry layers | Labels |
 | --- | --- | --- |
-| `continent` | `terrain` (mainland, terrain/passability raster, forest edge), `water` (waterways), `ridge` (authored stem/arm routes, complete wall runs, passes, fords), `locations` (locations and reserved harbour sites), `footprint` (settlement footprints), `partition` (derived national borders and district outlines) | `labels` |
+| `continent` | `terrain` (mainland, terrain/passability raster, forest edge), `water` (waterways), `ridge` (authored stem/arm routes, complete wall runs, passes, fords), `locations` (locations, reserved harbour sites and district landmarks), `footprint` (settlement footprints), `partition` (derived national borders and district outlines) | `labels` |
 | `settlement` | `nodes` (node marks including gate glyphs), `roads` (authored directed bent links) | `labels` |
 | `interior` | `rooms` (room cards), `connections` (within-interior links and their direction chevrons), `exterior` (the doorway card and its dashed link) | `labels` |
 

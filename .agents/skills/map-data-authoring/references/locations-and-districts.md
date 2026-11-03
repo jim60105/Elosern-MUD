@@ -185,3 +185,21 @@ generator rejects an `interior_room` seed.
 (`kind` and `region_key`, set together) and the landmark. There is no
 district delete command. Removing a district is a deliberate hand edit: ask
 first, then regenerate the partition.
+
+Every district landmark with a continental position is drawn as a diamond on
+the continent canvas (地點 layer); clicking it selects the district. Only a
+`wilderness_cell` landmark drags. The release saves one `set_district_field`
+command with `field: landmark` and the full four-key value
+`{domain: wilderness_cell, map_id: null, object_id: null, cell: [x, y]}`, which
+writes only `districts.yaml` and leaves the partition stale. Landmarks in the
+`location` and `settlement_node` domains follow their referent and do not
+drag; an `interior_room` landmark has no continental position and is not
+drawn. The drag never turns a reference into a cell: switching domains stays a
+deliberate choice in the inspector's 領域 selector. A negative cell (a drop
+west or south of the frame) is refused with 400 and nothing is written; a sea
+or unreachable cell saves as diagnosed work in progress
+(`unreachable_landmark`).
+
+The editor projection exposes `landmark.cell` as an `[x, y]` pair (or null)
+and a derived `landmark_centre_m` (the referent's centre in metres, or null),
+while the YAML keeps `{cell_x, cell_y}`.
