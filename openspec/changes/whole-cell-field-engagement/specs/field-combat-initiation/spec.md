@@ -1,8 +1,15 @@
 # Spec Delta
 
-## MODIFIED Requirements
+## REMOVED Requirements
 
 ### Requirement: A SINGLE skill opens against the named monster and an AREA skill opens against every living hostile monster in the room
+**Reason**: The former single-target-only roster is deliberately superseded; its old scenarios cannot remain authoritative under whole-cell admission.
+
+**Migration**: Cut all callers and substantively matching test annotations to the replacement contract using tool-generated canonical IDs; retain no legacy behavior, alias or data migration.
+
+## ADDED Requirements
+
+### Requirement: Whole-cell field membership is independent of opening recipients
 Ordinary field openings SHALL admit every living co-located monster in persistent-ID order while resolving opening recipients independently through the selected action's existing targeting rules.
 
 #### Scenario: Single recipient in mixed cell
