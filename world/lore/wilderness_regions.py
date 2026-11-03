@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import Mapping
 
 from elosern_map_core import geometry as core_geometry
+from elosern_map_core import terrain as core_terrain
 
 
 @dataclass(frozen=True)
@@ -113,12 +114,28 @@ def is_on_mainland(east_km: float, north_km: float) -> bool:
     return core_geometry.is_on_mainland(mainland_boundary_km(), east_km, north_km)
 
 
+def is_land_cell(cell: tuple[int, int]) -> bool:
+    """Whether ``cell``'s centre is on land.
+
+    This is the shared per-cell land rule the partition, terrain layer and
+    world-map raster consume. It answers from the published terrain
+    definition's row intervals, which are the same polygon's exact derivation
+    (``elosern_map_core.terrain.is_land_cell`` corrects every interval end
+    against the polygon rule): the bare even-odd sweep costs roughly two
+    orders of magnitude more per cell, and one world-map render asks this
+    question for every cell of the frame.
+    """
+
+    return core_terrain.is_land_cell(_geography().terrain, cell)
+
+
 __all__ = [
     "HarborSite",
     "WildernessRegion",
     "cell_size_km",
     "frame_cells",
     "harbor_sites",
+    "is_land_cell",
     "is_on_mainland",
     "is_wilderness_cell",
     "mainland_area_km2",

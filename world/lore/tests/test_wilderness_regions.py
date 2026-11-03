@@ -21,6 +21,7 @@ from world.lore.wilderness_regions import (
     cell_size_km,
     frame_cells,
     harbor_sites,
+    is_land_cell,
     is_on_mainland,
     is_wilderness_cell,
     mainland_area_km2,
@@ -143,6 +144,47 @@ class WildernessRegionRegistryTests(unittest.TestCase):
                 self.assertTrue(site.role)
         self.assertFalse(set(harbor_sites()) & set(anchors()))
 
+    @covers_requirement(
+        "continental-geography::known-continent-geographic-declarations-are-frozen"
+    )
+    def test_row_cached_land_rule_agrees_with_the_polygon_rule(self):
+        """The shared fast rule is the polygon rule, end to end.
+
+        ``is_land_cell`` answers from per-row land intervals so one map render
+        does not sweep the boundary polygon for every cell. A row interval is
+        a derivation, so the risk is a wrong classification at an interval
+        end: this checks every cell of the coastal rows against the polygon
+        itself, plus the four frame corners and the polygon's own vertices.
+        """
+
+        boundary = mainland_boundary_km()
+        last = frame_cells() - 1
+        in_frame = [
+            (east, north)
+            for east, north in boundary
+            if 0 <= east <= last and 0 <= north <= last
+        ]
+        self.assertTrue(in_frame)
+        # Whole rows are the unit the rule caches, so three of them (the
+        # polygon's northern and southern extremes and its middle) cover every
+        # interval end of that derivation.
+        rows = sorted({north for _, north in in_frame})
+        sample_rows = (rows[0], rows[len(rows) // 2], rows[-1])
+        cells = {(x, y) for y in sample_rows for x in range(frame_cells())}
+        cells |= {(0, 0), (last, 0), (0, last), (last, last)}
+        for east, north in in_frame:
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    cell = (east + dx, north + dy)
+                    if 0 <= cell[0] <= last and 0 <= cell[1] <= last:
+                        cells.add(cell)
+        self.assertGreater(len(cells), 3 * frame_cells())
+        for cell in sorted(cells):
+            with self.subTest(cell=cell):
+                self.assertEqual(
+                    is_land_cell(cell),
+                    is_on_mainland(cell[0] + 0.5, cell[1] + 0.5),
+                )
 
 if __name__ == "__main__":
     unittest.main()

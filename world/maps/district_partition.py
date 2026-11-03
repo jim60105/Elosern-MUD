@@ -31,7 +31,7 @@ from elosern_map_core.partition_codec import (
     read_partition_metadata,
 )
 from elosern_map_core.sources import discover_source_documents
-from world.lore.wilderness_regions import is_on_mainland
+from world.lore.wilderness_regions import is_land_cell
 
 #: The repository root the authored sources are discovered from.
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -40,8 +40,12 @@ DATA_PATH = Path(__file__).resolve().parent / "data" / "district_partition.json"
 
 
 def _mainland_cell(cell: tuple[int, int]) -> bool:
-    """The shared land rule: the cell's centre lies inside the mainland."""
-    return is_on_mainland(cell[0] + 0.5, cell[1] + 0.5)
+    """The shared land rule: the cell's centre lies inside the mainland.
+
+    ``district_at`` asks this for every cell of a rendered frame, so it reads
+    the row-cached rule instead of sweeping the boundary polygon per cell.
+    """
+    return is_land_cell(cell)
 
 
 def decode_partition(
