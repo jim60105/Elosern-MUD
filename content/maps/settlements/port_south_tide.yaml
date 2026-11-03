@@ -1,0 +1,217 @@
+version: 1
+kind: settlement
+id: port_south_tide
+location_ref: port_south_tide
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 600
+    y_m: 1550
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 廣場離海還有一段路，南風把鹽味送進街心，東邊的市場與西邊的公會隔著石板地相望，海鳥偶爾落在鋪面上。
+    anchor_key: port_south_tide
+    typeclass:
+    scene_archetype: city_street
+  north_gate:
+    x_m: 600
+    y_m: 2025
+    prototype_parent: grid_room
+    key: 北門
+    desc: 北門朝內陸敞開，門外大道通往橄欖津，車夫在門蔭下替騾子餵水，牆邊堆著從海邊運回的鹽袋。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  west_gate:
+    x_m: 100
+    y_m: 1550
+    prototype_parent: grid_room
+    key: 西門
+    desc: 西門面向漁灣鎮的沙路，門邊的守望塔掛著示警的銅鑼，海霧濃時會敲響，塔下的守衛輪流張望。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  quay:
+    x_m: 600
+    y_m: 100
+    prototype_parent: grid_room
+    key: 碼頭
+    desc: 碼頭伸進南面的深水，潮水拍著石砌的堤岸，漁船與沿岸商船在樁間擠成一排，起重架吱呀作響。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 812
+    y_m: 1483
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街往東伸展，攤上堆著當日上岸的魚獲與曬乾的海帶，蒼蠅在竹簍邊打轉，買主蹲著翻看魚鰓。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  harbour_office:
+    x_m: 150
+    y_m: 100
+    prototype_parent: grid_room
+    key: 港務府前
+    desc: 港務總管府前豎著潮汐石表，船主在廊下等候查驗，牆上釘著來往船隻的木牌，書記把進出記進厚冊。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 361
+    y_m: 1599
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前的石牆爬滿藤蔓，幾名冒險者正把護衛委託的細節寫在隨身的皮本上，腰間武器還帶著海氣。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  temple_forecourt:
+    x_m: 811
+    y_m: 1806
+    prototype_parent: grid_room
+    key: 神殿前
+    desc: 神殿前可以望見東北的坡地，鐘聲隨潮風散開，出海人家在階前留下鹽粒捏成的小雕像，祈求順風歸港。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  inn_lane:
+    x_m: 531
+    y_m: 1802
+    prototype_parent: grid_room
+    key: 客棧巷
+    desc: 客棧巷的窗朝北，夜裡能看見港外的漁火，樓下酒桌旁總有人講著遠洋的傳聞，火盆烤著濕鞋。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  exchange_forecourt:
+    x_m: 693
+    y_m: 1300
+    prototype_parent: grid_room
+    key: 商會前
+    desc: 商會前排著一列運鹽的板車，會計在門廊下核對提單，空氣裡滿是繩索與麻袋的味道，價牌隨風翻動。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  craft_alley:
+    x_m: 1050
+    y_m: 100
+    prototype_parent: grid_room
+    key: 工匠巷
+    desc: 工匠巷靠近南邊的船塢，木屑鋪了一地，修槳的師傅把刨花掃成一小堆，牆上掛著新上桐油的船板。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  bath_forecourt:
+    x_m: 274
+    y_m: 1398
+    prototype_parent: grid_room
+    key: 浴場前
+    desc: 浴場前的水池映著西南的日光，漁婦提著換洗衣物進出，門邊晾著一排粗布巾，皂角味順風飄散。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: north_gate
+  direction: n
+- source: central_plaza
+  destination: west_gate
+  direction: w
+- source: central_plaza
+  destination: market_street
+  direction: e
+- source: central_plaza
+  destination: guild_forecourt
+  direction: sw
+- source: central_plaza
+  destination: inn_lane
+  direction: nw
+- source: north_gate
+  destination: central_plaza
+  direction: s
+- source: north_gate
+  destination: inn_lane
+  direction: sw
+- source: west_gate
+  destination: central_plaza
+  direction: e
+- source: west_gate
+  destination: bath_forecourt
+  direction: se
+- source: quay
+  destination: harbour_office
+  direction: w
+- source: quay
+  destination: exchange_forecourt
+  direction: n
+- source: quay
+  destination: craft_alley
+  direction: e
+- source: market_street
+  destination: central_plaza
+  direction: w
+- source: market_street
+  destination: exchange_forecourt
+  direction: sw
+- source: harbour_office
+  destination: quay
+  direction: e
+- source: guild_forecourt
+  destination: central_plaza
+  direction: e
+- source: guild_forecourt
+  destination: inn_lane
+  direction: ne
+- source: guild_forecourt
+  destination: bath_forecourt
+  direction: sw
+- source: temple_forecourt
+  destination: inn_lane
+  direction: w
+- source: inn_lane
+  destination: central_plaza
+  direction: s
+- source: inn_lane
+  destination: north_gate
+  direction: n
+- source: inn_lane
+  destination: guild_forecourt
+  direction: sw
+- source: inn_lane
+  destination: temple_forecourt
+  direction: e
+- source: exchange_forecourt
+  destination: quay
+  direction: s
+- source: exchange_forecourt
+  destination: market_street
+  direction: ne
+- source: craft_alley
+  destination: quay
+  direction: w
+- source: bath_forecourt
+  destination: west_gate
+  direction: nw
+- source: bath_forecourt
+  destination: guild_forecourt
+  direction: ne
+wilderness_entry:
+  shape:
+  - '##'
+  - .#
+  offset:
+    dx: -1
+    dy: -1
+  gates:
+  - return_direction: s
+    destination_node: north_gate
+  - return_direction: e
+    destination_node: west_gate
+city_gate:

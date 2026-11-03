@@ -1,0 +1,144 @@
+version: 1
+kind: settlement
+id: town_vineyard
+location_ref: town_vineyard
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 577
+    y_m: 577
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 廣場被葡萄園環抱，東南的坡地日照最足，西邊的大道通往聖潔王都，採收的籃子沿著石階排開。
+    anchor_key: town_vineyard
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 西南門
+    desc: 西南門朝王都的方向敞開，門外大道兩旁架著葡萄藤，採收的籃子堆在路邊，守衛在門蔭下乘涼。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southeast_gate:
+    x_m: 1054
+    y_m: 100
+    prototype_parent: grid_room
+    key: 東南門
+    desc: 東南門通往東河城，門洞裡飄進河風，酒桶在門邊排成一列，夥計忙著替桶箍敲上木楔，木香從門裡透出來。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate_road_1:
+    x_m: 317
+    y_m: 328
+    prototype_parent: grid_room
+    key: 酒農大街
+    desc: 酒農大街從西南門通到廣場，兩旁酒坊把橡木桶滾到門口，空氣裡滿是發酵的酸甜，地上留著紫黑的果漬。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 422
+    y_m: 510
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街朝西南延伸，攤上賣著葡萄、乾果與新釀的酒，酒農忙著替客人斟一小杯，笑聲順著藤架散開。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 674
+    y_m: 432
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前朝東南，牆上貼著看守酒窖的委託，幾名冒險者在藤架下歇腳，腳邊擺著空酒甕，藤葉的影子落在石階上。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  temple_forecourt:
+    x_m: 864
+    y_m: 286
+    prototype_parent: grid_room
+    key: 神殿前
+    desc: 神殿前在東南的坡頂，鐘聲順著葡萄園傳開，酒農在階前獻上新摘的果串，石階上留著踩碎的果皮。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  inn_lane:
+    x_m: 749
+    y_m: 635
+    prototype_parent: grid_room
+    key: 客棧巷
+    desc: 客棧巷朝東，屋裡擺著長桌，酒農與車伕圍坐著分食麵包與乳酪，牆邊靠著沾泥的酒杓，酒香從門縫裡透出來。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: southeast_gate
+  direction: se
+- source: central_plaza
+  destination: southwest_gate_road_1
+  direction: sw
+- source: central_plaza
+  destination: market_street
+  direction: w
+- source: central_plaza
+  destination: guild_forecourt
+  direction: s
+- source: central_plaza
+  destination: inn_lane
+  direction: e
+- source: southwest_gate
+  destination: southwest_gate_road_1
+  direction: ne
+- source: southeast_gate
+  destination: central_plaza
+  direction: nw
+- source: southwest_gate_road_1
+  destination: central_plaza
+  direction: ne
+- source: southwest_gate_road_1
+  destination: southwest_gate
+  direction: sw
+- source: southwest_gate_road_1
+  destination: market_street
+  direction: n
+- source: market_street
+  destination: central_plaza
+  direction: ne
+- source: market_street
+  destination: southwest_gate_road_1
+  direction: sw
+- source: guild_forecourt
+  destination: central_plaza
+  direction: nw
+- source: guild_forecourt
+  destination: temple_forecourt
+  direction: se
+- source: temple_forecourt
+  destination: guild_forecourt
+  direction: nw
+- source: inn_lane
+  destination: central_plaza
+  direction: w
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: ne
+    destination_node: southwest_gate
+  - return_direction: nw
+    destination_node: southeast_gate
+city_gate:

@@ -216,7 +216,7 @@ uv run --locked python -m tools.settlement_synthesis prose MAP_ID FILE [--root D
   exceptions, and `generate` refuses an existing file without `--replace`.
 
 The lint is a workflow tool, not a CI gate over shipped data. Every authored
-settlement lints clean as of `grandia-settlement-maps`, so a new finding names
+settlement lints clean as of `altoria-settlement-maps`, so a new finding names
 the map and the object that contradicts its terrain.
 
 ## Generation

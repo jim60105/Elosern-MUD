@@ -1,0 +1,115 @@
+version: 1
+kind: settlement
+id: port_westwind
+location_ref: port_westwind
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 1550
+    y_m: 1550
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 廣場面向西邊的海，風從灘頭一路吹上石階，曬漁網的架子沿牆排開，鹹味整天不散，鷗鳥在灘上啄食。
+    anchor_key: port_westwind
+    typeclass:
+    scene_archetype: city_street
+  east_gate:
+    x_m: 2025
+    y_m: 1550
+    prototype_parent: grid_room
+    key: 東門
+    desc: 東門通往灰岩城，門外坡道兩旁是石砌的羊圈，牧人趕著羊群進出，風把羊毛的氣味吹進城裡。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  south_gate:
+    x_m: 1550
+    y_m: 1050
+    prototype_parent: grid_room
+    key: 南門
+    desc: 南門朝丘河鎮敞開，門洞裡可聞河口的腥味，漁車在門邊卸下魚簍，守衛替車伕指路，車輪在碎石上嘎吱作響。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  south_gate_road_1:
+    x_m: 1490
+    y_m: 1280
+    prototype_parent: grid_room
+    key: 海風大街
+    desc: 海風大街從南門通到廣場，路面鋪著防滑的碎石，兩旁屋舍把窗開得很小，牆腳壓著防風的石塊。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  quay:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 碼頭
+    desc: 碼頭在西南的海灣裡，漁船繫在木樁上，幾名漁人蹲在堤邊修補破網，浪頭接連拍上石階。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 1621
+    y_m: 1419
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街朝東南延伸，攤上擺著魚乾、海鹽與粗繩，風一吹棚布就翻動有聲，買主壓著帽沿挑貨。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: east_gate
+  direction: e
+- source: central_plaza
+  destination: south_gate_road_1
+  direction: s
+- source: central_plaza
+  destination: market_street
+  direction: se
+- source: east_gate
+  destination: central_plaza
+  direction: w
+- source: south_gate
+  destination: south_gate_road_1
+  direction: n
+- source: south_gate
+  destination: quay
+  direction: sw
+- source: south_gate_road_1
+  destination: central_plaza
+  direction: n
+- source: south_gate_road_1
+  destination: south_gate
+  direction: s
+- source: south_gate_road_1
+  destination: market_street
+  direction: ne
+- source: quay
+  destination: south_gate
+  direction: ne
+- source: market_street
+  destination: central_plaza
+  direction: nw
+- source: market_street
+  destination: south_gate_road_1
+  direction: sw
+wilderness_entry:
+  shape:
+  - '#.'
+  - '##'
+  offset:
+    dx: -1
+    dy: -1
+  gates:
+  - return_direction: w
+    destination_node: east_gate
+  - return_direction: n
+    destination_node: south_gate
+city_gate:

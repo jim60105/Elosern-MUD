@@ -1,0 +1,180 @@
+version: 1
+kind: settlement
+id: city_greyrock
+location_ref: city_greyrock
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 600
+    y_m: 558
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 廣場四周是灰岩砌成的拱廊，西邊的坡地通往礦場，東邊大道揚起的粉塵終日不散，石匠在簷下敲打門楣。
+    anchor_key: city_greyrock
+    typeclass:
+    scene_archetype: city_street
+  east_gate:
+    x_m: 1675
+    y_m: 558
+    prototype_parent: grid_room
+    key: 東門
+    desc: 東門朝遺跡鎮的方向敞開，門洞裡堆著排隊待運的石料，守衛替車伕指路，牆上釘著礦區的界碑拓片。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  west_gate:
+    x_m: 100
+    y_m: 558
+    prototype_parent: grid_room
+    key: 西門
+    desc: 西門順著礦道向下通往西風鎮，門外的鐵匠攤把風箱拉得作響，火星濺到石板上很快就熄了。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  east_gate_road_1:
+    x_m: 1073
+    y_m: 553
+    prototype_parent: grid_room
+    key: 石匠大街
+    desc: 石匠大街從東門通到廣場，兩側作坊把雕好的門楣靠在牆邊，地上滿是白色石粉，學徒忙著灑水壓塵。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 764
+    y_m: 677
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街往東北延伸，糧販與鐵器攤擠在一起，礦工家眷挑著菜籃討價還價，秤砣落下的聲音此起彼落。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 430
+    y_m: 411
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前貼著清理礦坑與護衛石車的委託，冒險者在西南的牆根下磨劍，石縫裡積著一層灰。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  temple_forecourt:
+    x_m: 122
+    y_m: 237
+    prototype_parent: grid_room
+    key: 神殿前
+    desc: 神殿前朝西南，鐘聲在灰岩的巷弄間迴響格外久，石階上坐著歇腳的礦工，牆邊擺著還願的粗蠟燭。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  inn_lane:
+    x_m: 743
+    y_m: 345
+    prototype_parent: grid_room
+    key: 客棧巷
+    desc: 客棧巷朝東南，屋裡的爐火燒著帶硫味的煤塊，旅人把沾滿石粉的外袍掛在門外，樓上傳來翻身的聲響。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  craft_alley:
+    x_m: 258
+    y_m: 877
+    prototype_parent: grid_room
+    key: 工匠巷
+    desc: 工匠巷在西北，風箱與鑿石的聲響從早到晚不停，廢石在牆角堆成小山，孩子揀著扁石打水漂。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  manor_gate:
+    x_m: 272
+    y_m: 100
+    prototype_parent: grid_room
+    key: 領主宅邸前
+    desc: 領主宅邸前守著一對石獅，家臣在門下核對礦稅的帳目，院裡拴著一匹灰馬，牆頭插著褪色的家徽旗。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: west_gate
+  direction: w
+- source: central_plaza
+  destination: east_gate_road_1
+  direction: e
+- source: central_plaza
+  destination: market_street
+  direction: ne
+- source: central_plaza
+  destination: guild_forecourt
+  direction: sw
+- source: central_plaza
+  destination: inn_lane
+  direction: se
+- source: east_gate
+  destination: east_gate_road_1
+  direction: w
+- source: west_gate
+  destination: central_plaza
+  direction: e
+- source: west_gate
+  destination: temple_forecourt
+  direction: s
+- source: west_gate
+  destination: craft_alley
+  direction: ne
+- source: east_gate_road_1
+  destination: central_plaza
+  direction: w
+- source: east_gate_road_1
+  destination: east_gate
+  direction: e
+- source: east_gate_road_1
+  destination: market_street
+  direction: nw
+- source: market_street
+  destination: central_plaza
+  direction: sw
+- source: market_street
+  destination: east_gate_road_1
+  direction: e
+- source: guild_forecourt
+  destination: central_plaza
+  direction: ne
+- source: guild_forecourt
+  destination: inn_lane
+  direction: e
+- source: temple_forecourt
+  destination: west_gate
+  direction: n
+- source: temple_forecourt
+  destination: manor_gate
+  direction: se
+- source: inn_lane
+  destination: central_plaza
+  direction: nw
+- source: inn_lane
+  destination: guild_forecourt
+  direction: w
+- source: craft_alley
+  destination: west_gate
+  direction: sw
+- source: manor_gate
+  destination: temple_forecourt
+  direction: nw
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: w
+    destination_node: east_gate
+  - return_direction: e
+    destination_node: west_gate
+city_gate:

@@ -1,0 +1,145 @@
+version: 1
+kind: settlement
+id: port_fishers_cove
+location_ref: port_fishers_cove
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 595
+    y_m: 550
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 廣場離海灣不遠，東邊是河的出口，西南方向的海面在陽光下泛著碎光，漁婦在石階上分揀當日的魚獲。
+    anchor_key: port_fishers_cove
+    typeclass:
+    scene_archetype: city_street
+  northeast_gate:
+    x_m: 1090
+    y_m: 1045
+    prototype_parent: grid_room
+    key: 東北門
+    desc: 東北門朝南潮港的方向敞開，門外沙路兩旁立著曬魚的木架，海風把魚乾的氣味送進門洞。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northwest_gate:
+    x_m: 100
+    y_m: 1045
+    prototype_parent: grid_room
+    key: 西北門
+    desc: 西北門通往白帆港，門洞裡吹進河口的風，漁網晾在門邊的矮牆上，孩子沿著網繩追逐，漁家的炊煙順著坡升起。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northwest_gate_road_1:
+    x_m: 295
+    y_m: 749
+    prototype_parent: grid_room
+    key: 漁家大街
+    desc: 漁家大街從西北門下到廣場，兩旁屋舍門口坐著補網的婦人，孩子在巷中追逐，木盆沿牆排開。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  quay:
+    x_m: 595
+    y_m: 100
+    prototype_parent: grid_room
+    key: 碼頭
+    desc: 碼頭伸進南面的小灣，漁船擠在木樁之間，船伕把當日魚獲直接抬上石階，海水順著階面流回灣裡。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 676
+    y_m: 399
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街朝東南延伸，攤上的魚還帶著海水，買主蹲下身翻看魚鰓，蒼蠅在竹簍邊打轉，討價聲順著海風散開。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  harbour_office:
+    x_m: 1045
+    y_m: 550
+    prototype_parent: grid_room
+    key: 港務府前
+    desc: 港務總管府前掛著一只舊銅鐘，船主在此登記進出，屋簷下曬著一疊潮濕的單據，墨跡被水氣暈開。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 723
+    y_m: 687
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前朝東北，牆上貼著護送漁貨的委託，幾名冒險者在簷下打磨魚叉，腳邊放著修補過的皮囊。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: northeast_gate
+  direction: ne
+- source: central_plaza
+  destination: northwest_gate_road_1
+  direction: nw
+- source: central_plaza
+  destination: market_street
+  direction: se
+- source: central_plaza
+  destination: guild_forecourt
+  direction: n
+- source: northeast_gate
+  destination: central_plaza
+  direction: sw
+- source: northwest_gate
+  destination: northwest_gate_road_1
+  direction: se
+- source: northwest_gate_road_1
+  destination: central_plaza
+  direction: se
+- source: northwest_gate_road_1
+  destination: northwest_gate
+  direction: nw
+- source: quay
+  destination: market_street
+  direction: n
+- source: market_street
+  destination: central_plaza
+  direction: nw
+- source: market_street
+  destination: quay
+  direction: s
+- source: market_street
+  destination: harbour_office
+  direction: e
+- source: harbour_office
+  destination: market_street
+  direction: w
+- source: harbour_office
+  destination: guild_forecourt
+  direction: nw
+- source: guild_forecourt
+  destination: central_plaza
+  direction: sw
+- source: guild_forecourt
+  destination: harbour_office
+  direction: se
+wilderness_entry:
+  shape:
+  - '#.'
+  - '##'
+  offset:
+    dx: -1
+    dy: -1
+  gates:
+  - return_direction: sw
+    destination_node: northeast_gate
+  - return_direction: se
+    destination_node: northwest_gate
+city_gate:

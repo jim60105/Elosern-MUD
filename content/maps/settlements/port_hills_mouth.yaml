@@ -1,0 +1,145 @@
+version: 1
+kind: settlement
+id: port_hills_mouth
+location_ref: port_hills_mouth
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 217
+    y_m: 550
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 廣場夾在河口的兩道坡之間，東邊是河，西邊越過沙丘就是海，風裡帶著兩種水氣，石階上晾著漁網。
+    anchor_key: port_hills_mouth
+    typeclass:
+    scene_archetype: city_street
+  north_gate:
+    x_m: 217
+    y_m: 1025
+    prototype_parent: grid_room
+    key: 北門
+    desc: 北門朝西風鎮敞開，門外坡道兩旁是低矮的石屋，屋頂壓著防風的石塊，牧人趕著羊群進出。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northeast_gate:
+    x_m: 694
+    y_m: 1027
+    prototype_parent: grid_room
+    key: 東北門
+    desc: 東北門通往灰岩城的礦道，門洞裡可見遠處礦場的吊架，運石車放慢下坡，守衛替車伕檢查煞木。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  north_gate_road_1:
+    x_m: 186
+    y_m: 811
+    prototype_parent: grid_room
+    key: 河口大街
+    desc: 河口大街從北門下到廣場，路面鋪著被河水沖圓的卵石，挑水人來回穿梭，桶裡晃出細碎的水花。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  quay:
+    x_m: 217
+    y_m: 100
+    prototype_parent: grid_room
+    key: 碼頭
+    desc: 碼頭在南面的河口內側，漁船與運石的小駁船共用一排木樁，海水與河水在此混成淡綠，浮著一層細沫。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 131
+    y_m: 667
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街往西北延伸，攤上擺著河魚、海貝與粗鹽，風大時棚布翻動有聲，買主壓著帽沿挑貨。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  harbour_office:
+    x_m: 667
+    y_m: 100
+    prototype_parent: grid_room
+    key: 港務府前
+    desc: 港務總管府前立著水位石柱，船主在東南的簷下等候，桌上攤著潮汐的記錄，牆邊掛著修補用的麻線。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 100
+    y_m: 404
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前朝西南，牆上貼著河口護衛與採石的委託，冒險者在石階上磨刀，海風把布告吹得翻動。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: northeast_gate
+  direction: ne
+- source: central_plaza
+  destination: north_gate_road_1
+  direction: n
+- source: central_plaza
+  destination: market_street
+  direction: nw
+- source: central_plaza
+  destination: guild_forecourt
+  direction: sw
+- source: north_gate
+  destination: north_gate_road_1
+  direction: s
+- source: northeast_gate
+  destination: central_plaza
+  direction: sw
+- source: north_gate_road_1
+  destination: central_plaza
+  direction: s
+- source: north_gate_road_1
+  destination: north_gate
+  direction: n
+- source: north_gate_road_1
+  destination: market_street
+  direction: sw
+- source: quay
+  destination: harbour_office
+  direction: e
+- source: quay
+  destination: guild_forecourt
+  direction: n
+- source: market_street
+  destination: central_plaza
+  direction: se
+- source: market_street
+  destination: north_gate_road_1
+  direction: n
+- source: harbour_office
+  destination: quay
+  direction: w
+- source: guild_forecourt
+  destination: central_plaza
+  direction: ne
+- source: guild_forecourt
+  destination: quay
+  direction: s
+wilderness_entry:
+  shape:
+  - '#.'
+  - '##'
+  offset:
+    dx: -1
+    dy: -1
+  gates:
+  - return_direction: s
+    destination_node: north_gate
+  - return_direction: sw
+    destination_node: northeast_gate
+city_gate:

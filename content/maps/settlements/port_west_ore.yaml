@@ -1,0 +1,181 @@
+version: 1
+kind: settlement
+id: port_west_ore
+location_ref: port_west_ore
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 1550
+    y_m: 1550
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 廣場鋪著摻了礦渣的碎石，西邊的海風帶來鐵鏽味，東邊的坡上可見礦場的吊架，運石車順著坡道往來。
+    anchor_key: port_west_ore
+    typeclass:
+    scene_archetype: city_street
+  northeast_gate:
+    x_m: 2045
+    y_m: 2045
+    prototype_parent: grid_room
+    key: 東北門
+    desc: 東北門通往灰岩城的礦道，門外坡地裸露著灰白的岩層，運礦的馱隊正排隊出城，守衛核對石票。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  north_gate:
+    x_m: 1550
+    y_m: 2025
+    prototype_parent: grid_room
+    key: 北門
+    desc: 北門面向丘河鎮，門房替進港的礦工登記名冊，牆上釘著磨損的礦鎬，門檻被鐵靴踩出凹痕。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northeast_gate_road_1:
+    x_m: 1707
+    y_m: 1789
+    prototype_parent: grid_room
+    key: 礦道大街
+    desc: 礦道大街從東北門直下廣場，路面被重車壓出凹槽，兩旁堆著待運的礦石筐，繩索把筐口勒出深痕。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  quay:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 深水碼頭
+    desc: 碼頭朝西南的深水灣伸出，起重架吱呀作響，礦石從坡上的滑道直接落進船艙，浪花拍著石堤。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 1444
+    y_m: 1363
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街沿著西南的坡道鋪開，攤位賣著粗鹽、纜繩與礦工用的厚布手套，風一吹棚布就翻動有聲。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 1433
+    y_m: 1762
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前的牆上貼著礦區的討伐委託，幾名冒險者在西北的簷下檢查護甲，地上擺著待修的鐵靴。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  temple_forecourt:
+    x_m: 1893
+    y_m: 1452
+    prototype_parent: grid_room
+    key: 神殿前
+    desc: 神殿前朝東，晨光先照到鐘樓，礦工下井前會在階前默禱片刻，牆邊堆著還願的碎石，香煙沿著石牆上升。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  inn_lane:
+    x_m: 1274
+    y_m: 1550
+    prototype_parent: grid_room
+    key: 客棧巷
+    desc: 客棧巷朝西，窗紙被海風吹得鼓脹，屋裡的火盆烤著濕透的外衣，礦工圍著長桌分食黑麵包。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  exchange_forecourt:
+    x_m: 1731
+    y_m: 1204
+    prototype_parent: grid_room
+    key: 商會前
+    desc: 商會前堆著蓋了印的礦石樣本，估價師蹲在東南的牆邊敲打石塊聽聲，夥計把成交寫進石板。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: north_gate
+  direction: n
+- source: central_plaza
+  destination: northeast_gate_road_1
+  direction: ne
+- source: central_plaza
+  destination: market_street
+  direction: sw
+- source: central_plaza
+  destination: guild_forecourt
+  direction: nw
+- source: northeast_gate
+  destination: northeast_gate_road_1
+  direction: sw
+- source: north_gate
+  destination: central_plaza
+  direction: s
+- source: northeast_gate_road_1
+  destination: central_plaza
+  direction: sw
+- source: northeast_gate_road_1
+  destination: northeast_gate
+  direction: ne
+- source: northeast_gate_road_1
+  destination: guild_forecourt
+  direction: w
+- source: quay
+  destination: market_street
+  direction: ne
+- source: market_street
+  destination: central_plaza
+  direction: ne
+- source: market_street
+  destination: quay
+  direction: sw
+- source: market_street
+  destination: inn_lane
+  direction: nw
+- source: market_street
+  destination: exchange_forecourt
+  direction: se
+- source: guild_forecourt
+  destination: central_plaza
+  direction: se
+- source: guild_forecourt
+  destination: northeast_gate_road_1
+  direction: e
+- source: guild_forecourt
+  destination: inn_lane
+  direction: sw
+- source: temple_forecourt
+  destination: exchange_forecourt
+  direction: sw
+- source: inn_lane
+  destination: market_street
+  direction: se
+- source: inn_lane
+  destination: guild_forecourt
+  direction: ne
+- source: exchange_forecourt
+  destination: market_street
+  direction: nw
+- source: exchange_forecourt
+  destination: temple_forecourt
+  direction: ne
+wilderness_entry:
+  shape:
+  - '#.'
+  - '##'
+  offset:
+    dx: -1
+    dy: -1
+  gates:
+  - return_direction: sw
+    destination_node: northeast_gate
+  - return_direction: s
+    destination_node: north_gate
+city_gate:

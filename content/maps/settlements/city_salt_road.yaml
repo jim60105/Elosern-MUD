@@ -1,0 +1,182 @@
+version: 1
+kind: settlement
+id: city_salt_road
+location_ref: city_salt_road
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 600
+    y_m: 2100
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 廣場位在鹽道與河道的交會處，南面是渡口的方向，北面的大道通往蜜谷鎮，鹽袋在簷下堆成矮牆。
+    anchor_key: city_salt_road
+    typeclass:
+    scene_archetype: city_street
+  ford_crossing:
+    x_m: 600
+    y_m: 100
+    prototype_parent: grid_room
+    key: 渡口
+    desc: 渡口橫在南面的淺灘，石塊排成一線，兩岸的車馬在此等候涉水而過，船伕把長篙插進河心試深。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  north_gate:
+    x_m: 600
+    y_m: 2575
+    prototype_parent: grid_room
+    key: 北門
+    desc: 北門朝蜜谷鎮敞開，門外的鹽道筆直伸向丘陵，路邊立著指路的石標，車伕在門蔭下替輪軸上油。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  west_gate:
+    x_m: 100
+    y_m: 2100
+    prototype_parent: grid_room
+    key: 西門
+    desc: 西門通往橄欖津，門洞裡飄進橄欖油的香氣，商隊在此交換鹽與油，守衛逐一核對貨單，封條在箱角壓出印子。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 425
+    y_m: 2168
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街往西鋪開，鹽袋與陶罐堆在棚下，秤砣落下的聲音此起彼落，買主蹲下身翻看鹽粒。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 667
+    y_m: 1919
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前朝南，正對渡口的路口，冒險者在簷下等候護送鹽隊的差事，牆上貼著河道圖，地圖邊角被翻得捲起。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  river_quay:
+    x_m: 1050
+    y_m: 650
+    prototype_parent: grid_room
+    key: 河港碼頭
+    desc: 河港碼頭設在南岸的平緩處，渡船與貨筏共用一列木樁，船伕用長篙撐開水草，鹽包沿跳板排開。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  temple_forecourt:
+    x_m: 662
+    y_m: 2365
+    prototype_parent: grid_room
+    key: 神殿前
+    desc: 神殿前朝北，鐘樓的影子落在鹽道上，過路的車伕會進門添一炷香，階前擺著沾泥的草鞋。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  inn_lane:
+    x_m: 785
+    y_m: 2174
+    prototype_parent: grid_room
+    key: 客棧巷
+    desc: 客棧巷朝東，屋後就是鹽倉，夜裡仍聽得見搬運的腳步聲，樓下爐灶溫著一鍋雜糧粥，牆邊靠著挑鹽的扁擔。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  riverbank:
+    x_m: 1050
+    y_m: 100
+    prototype_parent: grid_room
+    key: 河岸道
+    desc: 河岸道沿南面的堤防往東延伸，蘆葦間停著幾艘小舟，洗衣的婦人蹲在石階上，水聲蓋過談笑。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: north_gate
+  direction: n
+- source: central_plaza
+  destination: west_gate
+  direction: w
+- source: central_plaza
+  destination: market_street
+  direction: nw
+- source: central_plaza
+  destination: guild_forecourt
+  direction: s
+- source: central_plaza
+  destination: temple_forecourt
+  direction: ne
+- source: central_plaza
+  destination: inn_lane
+  direction: e
+- source: ford_crossing
+  destination: riverbank
+  direction: e
+- source: north_gate
+  destination: central_plaza
+  direction: s
+- source: north_gate
+  destination: temple_forecourt
+  direction: se
+- source: west_gate
+  destination: central_plaza
+  direction: e
+- source: market_street
+  destination: central_plaza
+  direction: e
+- source: guild_forecourt
+  destination: central_plaza
+  direction: n
+- source: guild_forecourt
+  destination: river_quay
+  direction: s
+- source: river_quay
+  destination: guild_forecourt
+  direction: n
+- source: river_quay
+  destination: riverbank
+  direction: s
+- source: temple_forecourt
+  destination: central_plaza
+  direction: s
+- source: temple_forecourt
+  destination: north_gate
+  direction: n
+- source: temple_forecourt
+  destination: inn_lane
+  direction: se
+- source: inn_lane
+  destination: central_plaza
+  direction: w
+- source: inn_lane
+  destination: temple_forecourt
+  direction: nw
+- source: riverbank
+  destination: ford_crossing
+  direction: w
+- source: riverbank
+  destination: river_quay
+  direction: n
+wilderness_entry:
+  shape:
+  - '#'
+  - '#'
+  - '#'
+  offset:
+    dx: 0
+    dy: -2
+  gates:
+  - return_direction: s
+    destination_node: north_gate
+  - return_direction: e
+    destination_node: west_gate
+city_gate:

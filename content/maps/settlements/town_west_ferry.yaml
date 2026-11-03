@@ -1,0 +1,145 @@
+version: 1
+kind: settlement
+id: town_west_ferry
+location_ref: town_west_ferry
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 583
+    y_m: 577
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 廣場離界河的南岸不遠，北面是渡口，東南的大道通往遺跡鎮，兩國商販在此擦肩，石階上混著兩種口音。
+    anchor_key: town_west_ferry
+    typeclass:
+    scene_archetype: city_street
+  southeast_gate:
+    x_m: 1060
+    y_m: 100
+    prototype_parent: grid_room
+    key: 東南門
+    desc: 東南門朝南方的遺跡鎮敞開，門外大道兩旁堆著待運的貨箱，守衛核對通關的木牌，車伕在牆邊歇腳。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northeast_gate:
+    x_m: 1060
+    y_m: 1054
+    prototype_parent: grid_room
+    key: 東北門
+    desc: 東北門面向渡口與西渡營，門洞裡擠著兩邊的商隊，口音混成一片，守衛逐一檢視貨擔，木牌互相碰撞。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southeast_gate_road_1:
+    x_m: 747
+    y_m: 395
+    prototype_parent: grid_room
+    key: 渡口大街
+    desc: 渡口大街從東南門通到廣場，路面被車輪磨得發亮，兩旁是替人看貨的棚子，地上散著稻草。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 442
+    y_m: 539
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街往西延伸，攤上同時擺著王國的布匹與獸人的皮貨，價錢用兩種算法談，笑聲與爭執交替。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 540
+    y_m: 411
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前朝南，牆上貼著護送商隊過河的委託，冒險者在簷下檢查渡河的繩具，門邊靠著包鐵的木箱。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  river_quay:
+    x_m: 583
+    y_m: 2027
+    prototype_parent: grid_room
+    key: 河港碼頭
+    desc: 河港碼頭在南岸的蘆葦邊，平底船靠著木樁，船伕把長篙橫在船頭等客，水鳥貼著水面掠過。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  temple_forecourt:
+    x_m: 100
+    y_m: 633
+    prototype_parent: grid_room
+    key: 神殿前
+    desc: 神殿前朝西，鐘樓望著界河，過路的車伕會進門添一炷香，階前擺著沾泥的草鞋與半截蠟燭。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: northeast_gate
+  direction: ne
+- source: central_plaza
+  destination: southeast_gate_road_1
+  direction: se
+- source: central_plaza
+  destination: market_street
+  direction: w
+- source: central_plaza
+  destination: guild_forecourt
+  direction: s
+- source: southeast_gate
+  destination: southeast_gate_road_1
+  direction: nw
+- source: northeast_gate
+  destination: central_plaza
+  direction: sw
+- source: northeast_gate
+  destination: river_quay
+  direction: nw
+- source: southeast_gate_road_1
+  destination: central_plaza
+  direction: nw
+- source: southeast_gate_road_1
+  destination: southeast_gate
+  direction: se
+- source: market_street
+  destination: central_plaza
+  direction: e
+- source: market_street
+  destination: guild_forecourt
+  direction: se
+- source: market_street
+  destination: temple_forecourt
+  direction: w
+- source: guild_forecourt
+  destination: central_plaza
+  direction: n
+- source: guild_forecourt
+  destination: market_street
+  direction: nw
+- source: river_quay
+  destination: northeast_gate
+  direction: se
+- source: temple_forecourt
+  destination: market_street
+  direction: e
+wilderness_entry:
+  shape:
+  - '#'
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: nw
+    destination_node: southeast_gate
+  - return_direction: sw
+    destination_node: northeast_gate
+city_gate:

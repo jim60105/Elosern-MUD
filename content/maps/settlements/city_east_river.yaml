@@ -1,0 +1,181 @@
+version: 1
+kind: settlement
+id: city_east_river
+location_ref: city_east_river
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 600
+    y_m: 600
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 廣場離上城的河岸不遠，北面的水聲終日可聞，西邊的大道通往聖潔王都，挑水人順著石階往來。
+    anchor_key: city_east_river
+    typeclass:
+    scene_archetype: city_street
+  west_gate:
+    x_m: 100
+    y_m: 600
+    prototype_parent: grid_room
+    key: 西門
+    desc: 西門朝向王都的官道，門外兩排楊樹，驛馬在門房的棚下換鞍，牆邊堆著剛送到的公文匣。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  south_gate:
+    x_m: 600
+    y_m: 100
+    prototype_parent: grid_room
+    key: 南門
+    desc: 南門朝內陸的麥田敞開，門洞裡堆著新收的穀袋，車伕忙著替車輪上油，守衛靠在門框上打呵欠。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 426
+    y_m: 534
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街往西鋪展，河魚與布匹分列兩側，清晨的霧還沒散，秤已經響了，買主提著籃子在棚間穿梭。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 785
+    y_m: 715
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前朝東北，牆上貼著河運護衛與巡堤的委託，冒險者在簷下擦著濕透的靴子，桌上攤開河道圖。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  river_quay:
+    x_m: 150
+    y_m: 1050
+    prototype_parent: grid_room
+    key: 河港碼頭
+    desc: 河港碼頭順著北岸的淺灘築起，木棧橋伸進河心，駁船在此卸下上游來的木料，繩結在樁上磨得發亮。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  temple_forecourt:
+    x_m: 375
+    y_m: 1131
+    prototype_parent: grid_room
+    key: 神殿前
+    desc: 神殿前在西北的高地，鐘樓俯瞰河灣，朝聖者沿著堤岸的石階走上來，階前擺著沾露的野花。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  inn_lane:
+    x_m: 545
+    y_m: 371
+    prototype_parent: grid_room
+    key: 客棧巷
+    desc: 客棧巷朝南，窗下就是運貨的車道，旅人枕著車輪聲入睡，樓下的爐灶整夜溫著湯，爐火映著斑駁的牆。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  riverbank:
+    x_m: 150
+    y_m: 1600
+    prototype_parent: grid_room
+    key: 河岸道
+    desc: 河岸道沿西北的堤防延伸，柳樹成行，漁人把網晾在欄杆上，淺灘裡有孩子赤腳摸著螺螄。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  craft_alley:
+    x_m: 600
+    y_m: 2050
+    prototype_parent: grid_room
+    key: 工匠巷
+    desc: 工匠巷在北邊的河灣後方，水車帶動的鋸木聲整日不停，木屑順著水溝漂走，牆邊疊著新鋸的木板。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: west_gate
+  direction: w
+- source: central_plaza
+  destination: south_gate
+  direction: s
+- source: central_plaza
+  destination: market_street
+  direction: sw
+- source: central_plaza
+  destination: guild_forecourt
+  direction: ne
+- source: central_plaza
+  destination: inn_lane
+  direction: se
+- source: west_gate
+  destination: central_plaza
+  direction: e
+- source: west_gate
+  destination: river_quay
+  direction: n
+- source: south_gate
+  destination: central_plaza
+  direction: n
+- source: south_gate
+  destination: inn_lane
+  direction: nw
+- source: market_street
+  destination: central_plaza
+  direction: e
+- source: market_street
+  destination: inn_lane
+  direction: se
+- source: guild_forecourt
+  destination: central_plaza
+  direction: sw
+- source: river_quay
+  destination: west_gate
+  direction: s
+- source: river_quay
+  destination: temple_forecourt
+  direction: e
+- source: temple_forecourt
+  destination: river_quay
+  direction: w
+- source: temple_forecourt
+  destination: riverbank
+  direction: nw
+- source: inn_lane
+  destination: central_plaza
+  direction: n
+- source: inn_lane
+  destination: south_gate
+  direction: s
+- source: inn_lane
+  destination: market_street
+  direction: nw
+- source: riverbank
+  destination: temple_forecourt
+  direction: se
+- source: riverbank
+  destination: craft_alley
+  direction: ne
+- source: craft_alley
+  destination: riverbank
+  direction: sw
+wilderness_entry:
+  shape:
+  - '#'
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: e
+    destination_node: west_gate
+  - return_direction: n
+    destination_node: south_gate
+city_gate:

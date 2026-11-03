@@ -1,0 +1,181 @@
+version: 1
+kind: settlement
+id: city_border_bridge
+location_ref: city_border_bridge
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 550
+    y_m: 600
+    prototype_parent: anchor_room
+    key: 中央廣場
+    desc: 廣場離界河只有幾百步，北面傳來渡船的槳聲，東北的坡上聳著神殿的尖頂，通關的商隊在石階旁清點貨箱。
+    anchor_key: city_border_bridge
+    typeclass:
+    scene_archetype: city_street
+  south_gate:
+    x_m: 550
+    y_m: 100
+    prototype_parent: grid_room
+    key: 南門
+    desc: 南門背著界河朝內陸敞開，門外大道通往西方的王國腹地，商隊在此清點通關的貨箱，守衛逐件比對印記。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northeast_gate:
+    x_m: 1045
+    y_m: 1095
+    prototype_parent: grid_room
+    key: 東北門
+    desc: 東北門面向互市城的渡口，門洞裡擠著兩國的商販，守衛逐一核對過河的憑證，爭執聲混著叫賣聲。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northeast_gate_road_1:
+    x_m: 742
+    y_m: 837
+    prototype_parent: grid_room
+    key: 渡口大街
+    desc: 渡口大街從東北門直下河岸，路面混著碎石與車轍，兩旁擺滿等待過河的貨擔，挑夫靠著牆根歇肩。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 523
+    y_m: 813
+    prototype_parent: grid_room
+    key: 市場街
+    desc: 市場街往北通到河堤，攤上同時擺著王國的麥餅與獸人商隊的燻肉，氣味混在一起，價錢用兩種算法談。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 448
+    y_m: 410
+    prototype_parent: grid_room
+    key: 公會前
+    desc: 公會前朝西南，簷下貼著護送商隊過河的委託，幾名冒險者正檢查渡船的繩索，牆邊靠著包鐵的木箱。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  river_quay:
+    x_m: 100
+    y_m: 1050
+    prototype_parent: grid_room
+    key: 河港碼頭
+    desc: 河港碼頭泊著平底渡船，船伕把長篙插進界河的緩流，等最後一擔貨物上船，水鳥貼著船舷掠過。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  temple_forecourt:
+    x_m: 807
+    y_m: 1134
+    prototype_parent: grid_room
+    key: 神殿前
+    desc: 神殿前在東北的高地，鐘聲越過界河傳到對岸，階前立著一塊刻滿祈願的石碑，碑腳放著兩盞油燈。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  inn_lane:
+    x_m: 340
+    y_m: 681
+    prototype_parent: grid_room
+    key: 客棧巷
+    desc: 客棧巷朝西，來往兩國的旅人在此落腳，樓下酒桌旁混著兩種口音，牆上釘著通關的舊告示。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  riverbank:
+    x_m: 100
+    y_m: 1600
+    prototype_parent: grid_room
+    key: 河岸道
+    desc: 河岸道沿著界河的南岸往西北延伸，蘆葦間藏著幾處小渡口，水鳥貼著水面掠過，泥地上留著獸蹄印。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: south_gate
+  direction: s
+- source: central_plaza
+  destination: northeast_gate_road_1
+  direction: ne
+- source: central_plaza
+  destination: market_street
+  direction: n
+- source: central_plaza
+  destination: guild_forecourt
+  direction: sw
+- source: central_plaza
+  destination: inn_lane
+  direction: w
+- source: south_gate
+  destination: central_plaza
+  direction: n
+- source: northeast_gate
+  destination: northeast_gate_road_1
+  direction: sw
+- source: northeast_gate
+  destination: temple_forecourt
+  direction: w
+- source: northeast_gate_road_1
+  destination: central_plaza
+  direction: sw
+- source: northeast_gate_road_1
+  destination: northeast_gate
+  direction: ne
+- source: northeast_gate_road_1
+  destination: market_street
+  direction: w
+- source: market_street
+  destination: central_plaza
+  direction: s
+- source: market_street
+  destination: northeast_gate_road_1
+  direction: e
+- source: market_street
+  destination: inn_lane
+  direction: sw
+- source: guild_forecourt
+  destination: central_plaza
+  direction: ne
+- source: river_quay
+  destination: inn_lane
+  direction: se
+- source: river_quay
+  destination: riverbank
+  direction: n
+- source: temple_forecourt
+  destination: northeast_gate
+  direction: e
+- source: inn_lane
+  destination: central_plaza
+  direction: e
+- source: inn_lane
+  destination: market_street
+  direction: ne
+- source: inn_lane
+  destination: river_quay
+  direction: nw
+- source: riverbank
+  destination: river_quay
+  direction: s
+wilderness_entry:
+  shape:
+  - '#'
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: n
+    destination_node: south_gate
+  - return_direction: sw
+    destination_node: northeast_gate
+city_gate:

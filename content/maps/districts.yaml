@@ -105,7 +105,7 @@ districts:
       object_id:
       cell:
         cell_x: 996
-        cell_y: 1161
+        cell_y: 1164
     kind: voronoi
     region_key:
   white_ram_foothills:
@@ -187,7 +187,7 @@ districts:
       object_id:
       cell:
         cell_x: 330
-        cell_y: 1000
+        cell_y: 1003
     kind: voronoi
     region_key:
   east_river_fields:
