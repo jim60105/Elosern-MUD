@@ -1,0 +1,144 @@
+version: 1
+kind: settlement
+id: town_ancestor_shrine
+location_ref: town_ancestor_shrine
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 261
+    y_m: 577
+    prototype_parent: anchor_room
+    key: 石冢廣場
+    desc: 廣場中央壘著一座矮石冢，每塊石頭都由一個家族親手放下。往北百里餘便是咆哮王城，朝聖的人多在這裡歇一晚再上山。
+    anchor_key: town_ancestor_shrine
+    typeclass:
+    scene_archetype: city_street
+  north_gate:
+    x_m: 261
+    y_m: 1052
+    prototype_parent: grid_room
+    key: 北面關門
+    desc: 北門朝咆哮王城的方向敞開，門外石階一路通往高地。守門人不收通行費，只提醒來人把帶上山的祭品放好。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southeast_gate:
+    x_m: 738
+    y_m: 100
+    prototype_parent: grid_room
+    key: 東南柵門
+    desc: 東南門外的小徑通往灰熊鎮與互市城，路旁立著一排風化的舊石。往來的旅人多半安靜地走，極少在此喧嘩。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  north_gate_road_1:
+    x_m: 234
+    y_m: 786
+    prototype_parent: grid_room
+    key: 北門石階
+    desc: 石階沿著坡面向北延伸，每十階就有一處較寬的平台。朝聖的人習慣在平台上停一停，替下一段路默念一句。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 237
+    y_m: 414
+    prototype_parent: grid_room
+    key: 祭品市街
+    desc: 市街南側的攤子賣的是鹽、乾果與小火把，全是上山要用的東西。攤主從不吆喝，價格寫在木牌上，願買就買。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  tribal_hall:
+    x_m: 120
+    y_m: 337
+    prototype_parent: grid_room
+    key: 議事廳前庭
+    desc: 前庭西南側堆著修冢用的石料，族人議事時就圍著石堆坐下。屋簷下掛著一串骨鈴，風大一響，全場便自動靜下來。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  assembly_ground:
+    x_m: 100
+    y_m: 685
+    prototype_parent: grid_room
+    key: 集會石場
+    desc: 西北角的石場邊緣留著一圈供人跪坐的淺坑，是祭儀時留下的。集會多半在清晨，霧還沒散，鼓聲聽起來格外沉。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  training_ground:
+    x_m: 419
+    y_m: 797
+    prototype_parent: grid_room
+    key: 成年獵場
+    desc: 東北的空場是年輕族人受訓的地方，場邊擺著練習用的石錘。完成成年禮的人，得在冢前守上一整夜的燈火。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: southeast_gate
+  direction: se
+- source: central_plaza
+  destination: north_gate_road_1
+  direction: n
+- source: central_plaza
+  destination: market_street
+  direction: s
+- source: central_plaza
+  destination: assembly_ground
+  direction: nw
+- source: north_gate
+  destination: north_gate_road_1
+  direction: s
+- source: southeast_gate
+  destination: central_plaza
+  direction: nw
+- source: north_gate_road_1
+  destination: central_plaza
+  direction: s
+- source: north_gate_road_1
+  destination: north_gate
+  direction: n
+- source: north_gate_road_1
+  destination: assembly_ground
+  direction: sw
+- source: north_gate_road_1
+  destination: training_ground
+  direction: e
+- source: market_street
+  destination: central_plaza
+  direction: n
+- source: market_street
+  destination: tribal_hall
+  direction: sw
+- source: tribal_hall
+  destination: market_street
+  direction: ne
+- source: assembly_ground
+  destination: central_plaza
+  direction: se
+- source: assembly_ground
+  destination: north_gate_road_1
+  direction: ne
+- source: training_ground
+  destination: north_gate_road_1
+  direction: w
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: s
+    destination_node: north_gate
+  - return_direction: nw
+    destination_node: southeast_gate
+city_gate:

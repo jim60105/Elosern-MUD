@@ -486,7 +486,7 @@ locations:
     description: Mixed-tribe trading city on the Valhalla bank of the main 
       border crossing.
     cell:
-      cell_x: 824
+      cell_x: 823
       cell_y: 1370
     geographic_constraint: North bank of the central border river ford
     scene_archetype:
@@ -598,7 +598,7 @@ locations:
     display_name_zh: 西渡營
     description: Valhalla bank of the western border-river crossing.
     cell:
-      cell_x: 450
+      cell_x: 449
       cell_y: 1348
     geographic_constraint: North bank of the western border river ford
     scene_archetype:
@@ -634,7 +634,7 @@ locations:
     display_name_zh: 東渡營
     description: Valhalla bank of the eastern border-river crossing.
     cell:
-      cell_x: 1150
+      cell_x: 1149
       cell_y: 1366
     geographic_constraint: North bank of the eastern border river ford
     scene_archetype:

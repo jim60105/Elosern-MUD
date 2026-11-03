@@ -1235,7 +1235,7 @@ districts:
       object_id:
       cell:
         cell_x: 469
-        cell_y: 1850
+        cell_y: 1853
     kind: voronoi
     region_key:
   north_pass_west_slopes:
@@ -1259,7 +1259,7 @@ districts:
       object_id:
       cell:
         cell_x: 1168
-        cell_y: 1816
+        cell_y: 1819
     kind: voronoi
     region_key:
   frost_heath:
@@ -1331,7 +1331,7 @@ districts:
       object_id:
       cell:
         cell_x: 391
-        cell_y: 1661
+        cell_y: 1664
     kind: voronoi
     region_key:
   howling_highlands:
@@ -1355,7 +1355,7 @@ districts:
       object_id:
       cell:
         cell_x: 1175
-        cell_y: 1605
+        cell_y: 1608
     kind: voronoi
     region_key:
   ancestor_cairn_hills:
@@ -1367,7 +1367,7 @@ districts:
       object_id:
       cell:
         cell_x: 729
-        cell_y: 1595
+        cell_y: 1598
     kind: voronoi
     region_key:
   mossy_coast_woods:
@@ -1391,7 +1391,7 @@ districts:
       object_id:
       cell:
         cell_x: 896
-        cell_y: 1489
+        cell_y: 1492
     kind: voronoi
     region_key:
   giant_rockfall_slopes:
@@ -1415,7 +1415,7 @@ districts:
       object_id:
       cell:
         cell_x: 1093
-        cell_y: 1455
+        cell_y: 1458
     kind: voronoi
     region_key:
   blood_moon_vale:

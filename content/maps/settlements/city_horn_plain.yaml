@@ -1,0 +1,180 @@
+version: 1
+kind: settlement
+id: city_horn_plain
+location_ref: city_horn_plain
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 463
+    y_m: 401
+    prototype_parent: anchor_room
+    key: 野牛石坪
+    desc: 石坪上留著一圈踩實的土痕，是野牛群每年遷徙時繞行留下的。往東北的高地望去，坡線一路抬升，風裡混著草籽與獸群的氣味。
+    anchor_key: city_horn_plain
+    typeclass:
+    scene_archetype: city_street
+  east_gate:
+    x_m: 1538
+    y_m: 401
+    prototype_parent: grid_room
+    key: 東面柵門
+    desc: 東門外是一片開闊的草坡，往影林城的方向去的人都從這裡出發。門邊的木架上晾著剛鞣好的厚皮，是這座城最拿得出手的貨。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  north_gate:
+    x_m: 463
+    y_m: 876
+    prototype_parent: grid_room
+    key: 北面關門
+    desc: 北門正對鹿鳴渡，來往的牧隊多半在此分手。守門人會替遠行的人添一壺水，順便問一句今年草場的長勢。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  east_gate_road_1:
+    x_m: 967
+    y_m: 351
+    prototype_parent: grid_room
+    key: 東門大街
+    desc: 大街往東鋪出去，路面被牛車壓得平整，兩側立著拴牲口的木樁。清早的糞味還沒散，趕牛的人已經一路吆喝著出城。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 308
+    y_m: 541
+    prototype_parent: grid_room
+    key: 皮革市街
+    desc: 市街西北角是這座城最熱鬧的一段，整排架子掛著鞣好的牛皮與角料。買家用手掌摩挲皮面判斷厚薄，價錢全憑手感談定。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  tribal_hall:
+    x_m: 800
+    y_m: 100
+    prototype_parent: grid_room
+    key: 議事廳前庭
+    desc: 前庭東南側立著幾根綁滿布條的木柱，開會時各族依序坐下。屋簷下垂著一面牛骨串成的簾子，風一大就整片作響。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  assembly_ground:
+    x_m: 615
+    y_m: 570
+    prototype_parent: grid_room
+    key: 集會石場
+    desc: 東北角的石場圍著一圈矮石，是各部族共用的集會地。鼓聲響起時，連遠處放牧的人也會趕回來看熱鬧。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  training_ground:
+    x_m: 100
+    y_m: 661
+    prototype_parent: grid_room
+    key: 成年獵場
+    desc: 西北的空場上立著幾座草紮的假獸，年輕人練習圍堵與擲矛。場邊的木牌記著每一屆成年禮的獵物，字跡一年比一年深。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 271
+    y_m: 243
+    prototype_parent: grid_room
+    key: 公會前庭
+    desc: 公會前庭貼著草場與商路的消息，往北的牧道中斷時這裡最先知道。接任務的隊伍在階前分派人手，順便確認回程的補給。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  ancestral_altar:
+    x_m: 915
+    y_m: 899
+    prototype_parent: grid_room
+    key: 祖靈祭壇
+    desc: 祭壇築在東北的緩坡上，以野牛頭骨與灰石堆成。每逢遷徙前後，族人會來此獻上鹽塊與乳酪，請祖靈看顧整群牲口。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: north_gate
+  direction: n
+- source: central_plaza
+  destination: east_gate_road_1
+  direction: e
+- source: central_plaza
+  destination: market_street
+  direction: nw
+- source: central_plaza
+  destination: assembly_ground
+  direction: ne
+- source: central_plaza
+  destination: guild_forecourt
+  direction: sw
+- source: east_gate
+  destination: east_gate_road_1
+  direction: w
+- source: north_gate
+  destination: central_plaza
+  direction: s
+- source: east_gate_road_1
+  destination: central_plaza
+  direction: w
+- source: east_gate_road_1
+  destination: east_gate
+  direction: e
+- source: east_gate_road_1
+  destination: tribal_hall
+  direction: sw
+- source: market_street
+  destination: central_plaza
+  direction: se
+- source: market_street
+  destination: assembly_ground
+  direction: e
+- source: market_street
+  destination: training_ground
+  direction: nw
+- source: market_street
+  destination: guild_forecourt
+  direction: s
+- source: tribal_hall
+  destination: east_gate_road_1
+  direction: ne
+- source: assembly_ground
+  destination: central_plaza
+  direction: sw
+- source: assembly_ground
+  destination: market_street
+  direction: w
+- source: assembly_ground
+  destination: ancestral_altar
+  direction: ne
+- source: training_ground
+  destination: market_street
+  direction: se
+- source: guild_forecourt
+  destination: central_plaza
+  direction: ne
+- source: guild_forecourt
+  destination: market_street
+  direction: n
+- source: ancestral_altar
+  destination: assembly_ground
+  direction: sw
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: w
+    destination_node: east_gate
+  - return_direction: s
+    destination_node: north_gate
+city_gate:

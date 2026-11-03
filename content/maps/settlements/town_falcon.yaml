@@ -1,0 +1,144 @@
+version: 1
+kind: settlement
+id: town_falcon
+location_ref: town_falcon
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 577
+    y_m: 577
+    prototype_parent: anchor_room
+    key: 鷹架石坪
+    desc: 石坪邊上架著供獵鷹停歇的高木架，繩索上繫著叮噹作響的骨鈴。這片高地風勢平順，馴鷹的人一站就是半天。
+    anchor_key: town_falcon
+    typeclass:
+    scene_archetype: city_street
+  northwest_gate:
+    x_m: 100
+    y_m: 1054
+    prototype_parent: grid_room
+    key: 西北柵門
+    desc: 西北門朝著內陸高地的方向，門外的坡道寬得能容兩輛車交會。往來的行商在此換過牲口，再往北邊的礦城去。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southeast_gate:
+    x_m: 1054
+    y_m: 100
+    prototype_parent: grid_room
+    key: 東南關門
+    desc: 東南門外是通往東渡營與東渡鎮的路，沿途可見邊界河的乾谷。守門人總會提醒來人，天黑前別在河谷逗留。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northwest_gate_road_1:
+    x_m: 395
+    y_m: 871
+    prototype_parent: grid_room
+    key: 西北大街
+    desc: 大街往西北爬升，兩旁是馴鷹人家的矮屋，屋頂架著成排的棲木。天空裡常有一兩隻獵鷹盤旋，影子掃過路面。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 413
+    y_m: 567
+    prototype_parent: grid_room
+    key: 鷹羽市街
+    desc: 市街西側拍賣的是鷹羽、皮索與獵具，買家多是鄰近城鎮的獵手。攤主會當場放鷹示範，成交與否全看那一飛。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  tribal_hall:
+    x_m: 195
+    y_m: 645
+    prototype_parent: grid_room
+    key: 議事廳前庭
+    desc: 前庭西側的長竿上掛著各部族的羽飾，議事時誰家的旗先升都有次序。屋內那面皮鼓繃得極緊，敲起來聲音又短又亮。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  assembly_ground:
+    x_m: 754
+    y_m: 541
+    prototype_parent: grid_room
+    key: 集會石場
+    desc: 東側的石場空曠，最適合放鷹與比試。集會的日子，數十隻獵鷹同時升空，地面上的人得仰著頭才看得見。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  training_ground:
+    x_m: 787
+    y_m: 399
+    prototype_parent: grid_room
+    key: 成年獵場
+    desc: 東南的空場靠近坡緣，地上插著供鷹俯衝的標靶。年輕人得帶著自己的鷹完成一次完整獵捕，才被視為成年。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: southeast_gate
+  direction: se
+- source: central_plaza
+  destination: northwest_gate_road_1
+  direction: nw
+- source: central_plaza
+  destination: market_street
+  direction: w
+- source: central_plaza
+  destination: assembly_ground
+  direction: e
+- source: northwest_gate
+  destination: northwest_gate_road_1
+  direction: se
+- source: southeast_gate
+  destination: central_plaza
+  direction: nw
+- source: northwest_gate_road_1
+  destination: central_plaza
+  direction: se
+- source: northwest_gate_road_1
+  destination: northwest_gate
+  direction: nw
+- source: northwest_gate_road_1
+  destination: tribal_hall
+  direction: sw
+- source: market_street
+  destination: central_plaza
+  direction: e
+- source: market_street
+  destination: tribal_hall
+  direction: w
+- source: tribal_hall
+  destination: northwest_gate_road_1
+  direction: ne
+- source: tribal_hall
+  destination: market_street
+  direction: e
+- source: assembly_ground
+  destination: central_plaza
+  direction: w
+- source: assembly_ground
+  destination: training_ground
+  direction: s
+- source: training_ground
+  destination: assembly_ground
+  direction: n
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: se
+    destination_node: northwest_gate
+  - return_direction: nw
+    destination_node: southeast_gate
+city_gate:

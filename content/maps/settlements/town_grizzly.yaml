@@ -1,0 +1,144 @@
+version: 1
+kind: settlement
+id: town_grizzly
+location_ref: town_grizzly
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 577
+    y_m: 577
+    prototype_parent: anchor_room
+    key: 熊骨石坪
+    desc: 石坪中央埋著一具巨大的熊骨，只露出半截肩胛，被當成界石。往東南的谷地勢漸高，溪水從那頭繞著坡腳流走。
+    anchor_key: town_grizzly
+    typeclass:
+    scene_archetype: city_street
+  northwest_gate:
+    x_m: 100
+    y_m: 1054
+    prototype_parent: grid_room
+    key: 西北柵門
+    desc: 西北門朝祖靈聖地的方向開，門外的石階通往更高的谷地。守門人習慣在門邊烤火，順便替夜歸的人留一盞燈。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 西南關門
+    desc: 西南門外通往互市城與界橋城，來往的商隊帶著鹽與鐵器。門板厚得出奇，據說是為了擋住谷裡衝下來的野獸。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northwest_gate_road_1:
+    x_m: 278
+    y_m: 759
+    prototype_parent: grid_room
+    key: 西北大街
+    desc: 大街往西北爬升，兩旁的石屋牆上嵌著熊爪刻痕。路面乾淨，落葉總被住户掃到路邊堆成一垛。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 454
+    y_m: 681
+    prototype_parent: grid_room
+    key: 谷市石街
+    desc: 市街西北側的攤子以蜂蜜、獸脂與粗布為主，是谷裡最常見的收成。買賣之餘，人們更愛交換山裡的新消息。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  tribal_hall:
+    x_m: 688
+    y_m: 785
+    prototype_parent: grid_room
+    key: 議事廳前庭
+    desc: 前庭東北側的立柱比別處粗上一圈，專門用來掛那面熊皮鼓。族人議事時聲音不大，卻很少有人中途離席。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  assembly_ground:
+    x_m: 628
+    y_m: 409
+    prototype_parent: grid_room
+    key: 集會石場
+    desc: 南面的石場邊緣圍著削平的木樁，是各族立旗的地方。集會時火堆燒得旺，映得谷壁一片通紅。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  training_ground:
+    x_m: 436
+    y_m: 407
+    prototype_parent: grid_room
+    key: 成年獵場
+    desc: 西南的空場靠近谷口，地面被踩出一圈深色的土痕。年輕人要在此與一頭成年熊人對練，撐過三個回合才算過關。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: southwest_gate
+  direction: sw
+- source: central_plaza
+  destination: northwest_gate_road_1
+  direction: w
+- source: central_plaza
+  destination: market_street
+  direction: nw
+- source: central_plaza
+  destination: tribal_hall
+  direction: ne
+- source: central_plaza
+  destination: assembly_ground
+  direction: s
+- source: northwest_gate
+  destination: northwest_gate_road_1
+  direction: se
+- source: southwest_gate
+  destination: central_plaza
+  direction: ne
+- source: northwest_gate_road_1
+  destination: central_plaza
+  direction: se
+- source: northwest_gate_road_1
+  destination: northwest_gate
+  direction: nw
+- source: northwest_gate_road_1
+  destination: market_street
+  direction: e
+- source: market_street
+  destination: central_plaza
+  direction: se
+- source: market_street
+  destination: northwest_gate_road_1
+  direction: nw
+- source: tribal_hall
+  destination: central_plaza
+  direction: sw
+- source: assembly_ground
+  destination: central_plaza
+  direction: n
+- source: assembly_ground
+  destination: training_ground
+  direction: w
+- source: training_ground
+  destination: assembly_ground
+  direction: e
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: se
+    destination_node: northwest_gate
+  - return_direction: ne
+    destination_node: southwest_gate
+city_gate:

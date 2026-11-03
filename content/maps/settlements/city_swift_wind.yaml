@@ -1,0 +1,180 @@
+version: 1
+kind: settlement
+id: city_swift_wind
+location_ref: city_swift_wind
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 595
+    y_m: 595
+    prototype_parent: anchor_room
+    key: 長風石坪
+    desc: 石坪空曠得一眼望穿，風從草原上直接掃過來，連火把都得用陶罩護著。往南的坡勢平緩，人站在這裡就能看見遠處的邊境界河。
+    anchor_key: city_swift_wind
+    typeclass:
+    scene_archetype: city_street
+  northeast_gate:
+    x_m: 1090
+    y_m: 1090
+    prototype_parent: grid_room
+    key: 東北柵門
+    desc: 東北門朝著祖靈聖地的方向，門外是一條被風吹得發白的土路。守門人習慣把帽沿壓低，免得沙子撲進眼裡。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 西南關門
+    desc: 西南門外是通往西渡營的坡道，車隊常趁風小時趕路。門柱上纏著防風的皮繩，每隔一陣就得重新綁緊。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northeast_gate_road_1:
+    x_m: 785
+    y_m: 835
+    prototype_parent: grid_room
+    key: 東北大街
+    desc: 大街往東北延伸，兩旁少有高牆，多的是擋風的矮土壘。路面被風吹得乾淨，連落葉都留不住。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate_road_1:
+    x_m: 401
+    y_m: 403
+    prototype_parent: grid_room
+    key: 西南大街
+    desc: 西南這條路順著草坡往下，通往渡口與邊界的方向。路邊每隔一段插著一根測風的布條，牧人靠它決定今天走不走。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 505
+    y_m: 771
+    prototype_parent: grid_room
+    key: 風市石街
+    desc: 市街西北側的攤位都用石塊壓住篷布，免得整片被風掀走。賣的多是毛料、乾肉與耐放的穀物，交易速度比別處快。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  tribal_hall:
+    x_m: 391
+    y_m: 967
+    prototype_parent: grid_room
+    key: 議事廳前庭
+    desc: 前庭西北角的牆基壘得特別厚，是為了扛住冬季的強風。族人議事時坐得緊密，說話得提高聲量才聽得清。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  assembly_ground:
+    x_m: 673
+    y_m: 387
+    prototype_parent: grid_room
+    key: 集會石場
+    desc: 南面的石場沒有圍牆，只在外緣擺了一圈大石。鼓聲一起，聲音順著草原傳得很遠，連放牧的人都會回頭。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  training_ground:
+    x_m: 537
+    y_m: 233
+    prototype_parent: grid_room
+    key: 成年獵場
+    desc: 南側的空場是練跑與追獵的地方，地面被踩得結實。年輕人得在逆風裡追上獵物，這被視為最公平的試煉。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 834
+    y_m: 488
+    prototype_parent: grid_room
+    key: 公會前庭
+    desc: 公會前庭的告示板用四根木樁固定，上頭寫著草原與商路的消息。接任務的隊伍習慣先看風向，再決定往哪一頭走。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: northeast_gate_road_1
+  direction: ne
+- source: central_plaza
+  destination: southwest_gate_road_1
+  direction: sw
+- source: central_plaza
+  destination: market_street
+  direction: nw
+- source: central_plaza
+  destination: assembly_ground
+  direction: s
+- source: central_plaza
+  destination: guild_forecourt
+  direction: se
+- source: northeast_gate
+  destination: northeast_gate_road_1
+  direction: sw
+- source: southwest_gate
+  destination: southwest_gate_road_1
+  direction: ne
+- source: northeast_gate_road_1
+  destination: central_plaza
+  direction: sw
+- source: northeast_gate_road_1
+  destination: northeast_gate
+  direction: ne
+- source: southwest_gate_road_1
+  destination: central_plaza
+  direction: ne
+- source: southwest_gate_road_1
+  destination: southwest_gate
+  direction: sw
+- source: southwest_gate_road_1
+  destination: training_ground
+  direction: se
+- source: market_street
+  destination: central_plaza
+  direction: se
+- source: market_street
+  destination: tribal_hall
+  direction: nw
+- source: tribal_hall
+  destination: market_street
+  direction: se
+- source: assembly_ground
+  destination: central_plaza
+  direction: n
+- source: assembly_ground
+  destination: training_ground
+  direction: sw
+- source: assembly_ground
+  destination: guild_forecourt
+  direction: ne
+- source: training_ground
+  destination: southwest_gate_road_1
+  direction: nw
+- source: training_ground
+  destination: assembly_ground
+  direction: ne
+- source: guild_forecourt
+  destination: central_plaza
+  direction: nw
+- source: guild_forecourt
+  destination: assembly_ground
+  direction: sw
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: sw
+    destination_node: northeast_gate
+  - return_direction: ne
+    destination_node: southwest_gate
+city_gate:

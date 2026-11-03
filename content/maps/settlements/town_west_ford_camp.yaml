@@ -1,0 +1,144 @@
+version: 1
+kind: settlement
+id: town_west_ford_camp
+location_ref: town_west_ford_camp
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 287
+    y_m: 600
+    prototype_parent: anchor_room
+    key: 西渡石坪
+    desc: 石坪東側較高，站在那裡能望見南面邊界河的水光。渡口的木樁與繩索就架在坡下，來往的人都在此換氣再上路。
+    anchor_key: town_west_ford_camp
+    typeclass:
+    scene_archetype: city_street
+  northeast_gate:
+    x_m: 764
+    y_m: 1077
+    prototype_parent: grid_room
+    key: 東北柵門
+    desc: 東北門朝向疾風城的方向，門外的草原一路鋪到天邊。守門人會替過路的人指認那條避風的車道。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  south_gate:
+    x_m: 287
+    y_m: 100
+    prototype_parent: grid_room
+    key: 南面關門
+    desc: 南門正對渡口，出門就是往下的斜坡與河灘。渡船靠岸時，木樁被撞得悶響，聲音一路上傳到石坪。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northeast_gate_road_1:
+    x_m: 480
+    y_m: 879
+    prototype_parent: grid_room
+    key: 東北大街
+    desc: 大街往東北延伸，兩旁是替渡口備貨的棚屋，堆著繩索與木桶。車伕在此裝載，繩結打的是河邊通用的樣式。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 228
+    y_m: 761
+    prototype_parent: grid_room
+    key: 渡頭市街
+    desc: 市街北側的攤子擺著渡資換來的雜貨，鹽與布料最受歡迎。攤主認得每一戶人家，賒帳只記在心裡。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  tribal_hall:
+    x_m: 100
+    y_m: 823
+    prototype_parent: grid_room
+    key: 議事廳前庭
+    desc: 前庭西北角掛著渡口的排班木牌，誰守夜、誰出船寫得清清楚楚。族人議事時，最先談的總是如何看住這一段河面。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  assembly_ground:
+    x_m: 354
+    y_m: 436
+    prototype_parent: grid_room
+    key: 集會石場
+    desc: 南側的石場離河最近，集會時能聽見水聲墊在鼓聲底下。場邊擱著幾條待修的筏子，閒著的人就順手補一補。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  training_ground:
+    x_m: 477
+    y_m: 334
+    prototype_parent: grid_room
+    key: 成年獵場
+    desc: 東南的空場靠近坡緣，地面被踩得堅硬。年輕人得背著沙袋來回渡口兩趟，這被當成最實在的成年試煉。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: south_gate
+  direction: s
+- source: central_plaza
+  destination: northeast_gate_road_1
+  direction: ne
+- source: central_plaza
+  destination: market_street
+  direction: n
+- source: central_plaza
+  destination: assembly_ground
+  direction: se
+- source: northeast_gate
+  destination: northeast_gate_road_1
+  direction: sw
+- source: south_gate
+  destination: central_plaza
+  direction: n
+- source: northeast_gate_road_1
+  destination: central_plaza
+  direction: sw
+- source: northeast_gate_road_1
+  destination: northeast_gate
+  direction: ne
+- source: northeast_gate_road_1
+  destination: market_street
+  direction: w
+- source: market_street
+  destination: central_plaza
+  direction: s
+- source: market_street
+  destination: northeast_gate_road_1
+  direction: ne
+- source: market_street
+  destination: tribal_hall
+  direction: nw
+- source: tribal_hall
+  destination: market_street
+  direction: se
+- source: assembly_ground
+  destination: central_plaza
+  direction: n
+- source: assembly_ground
+  destination: training_ground
+  direction: se
+- source: training_ground
+  destination: assembly_ground
+  direction: nw
+wilderness_entry:
+  shape:
+  - '##'
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+  - return_direction: sw
+    destination_node: northeast_gate
+  - return_direction: n
+    destination_node: south_gate
+city_gate:

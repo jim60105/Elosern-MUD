@@ -1,0 +1,498 @@
+version: 1
+kind: settlement
+id: capital_valhalla
+location_ref: capital_valhalla
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  central_plaza:
+    x_m: 1598
+    y_m: 1600
+    prototype_parent: anchor_room
+    key: 中央石坪
+    desc: 四條獸道在此交會，腳下的石坪被獸蹄磨得發亮。部族的鼓聲一響，全城都聽得見，連林線上的鳥也一齊飛起。
+    anchor_key: capital_valhalla
+    typeclass:
+    scene_archetype: city_street
+  south_gate:
+    x_m: 1598
+    y_m: 100
+    prototype_parent: grid_room
+    key: 南面山口
+    desc: 木柵門朝祖靈聖地的方向敞開，門邊石堆是獵隊進出時添上的。誰要往南邊的丘陵去，都得先在這道門下讓守門人看一眼腰間的行囊。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southeast_gate:
+    x_m: 3083
+    y_m: 115
+    prototype_parent: grid_room
+    key: 東南柵門
+    desc: 門外小徑通往灰熊鎮，守門的熊人把長矛靠在柵柱上，替往來商隊清點貨物。柵縫間漏進來的風帶著松脂味，混著城裡的炊煙。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate:
+    x_m: 113
+    y_m: 115
+    prototype_parent: grid_room
+    key: 西南隘門
+    desc: 這道門面向疾風城，風從草原一路灌進來，門板上的獸皮條被吹得啪啪作響。守門人裹緊毛披，仍舊站得筆直。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northwest_gate:
+    x_m: 113
+    y_m: 3085
+    prototype_parent: grid_room
+    key: 西北山口
+    desc: 北向的隘口通往月嚎城，坡道兩側插滿各部族的圖騰旗。夜裡旗面翻動，看上去像一片低伏的獸背。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  south_gate_road_1:
+    x_m: 1528
+    y_m: 853
+    prototype_parent: grid_room
+    key: 南門大街
+    desc: 石階一路向南爬升，兩旁是獵戶搭的矮棚，風乾的肉條在簷下排成一列。往上走的人喘著氣，往下走的人肩上多半扛著獵物。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southeast_gate_road_1:
+    x_m: 2630
+    y_m: 504
+    prototype_parent: grid_room
+    key: 東南大街
+    desc: 這條路沿著山壁繞向灰熊鎮的方向，路面嵌著碎石。雨天馬蹄踩上去也不打滑，車伕都願意多繞這一段。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southeast_gate_road_2:
+    x_m: 2229
+    y_m: 1059
+    prototype_parent: grid_room
+    key: 東南石階
+    desc: 石階穿過一片老松，松針鋪得厚，腳步聲在樹幹之間來回彈。天亮前後，這裡總有提著水罐的孩子結伴走過。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate_road_1:
+    x_m: 596
+    y_m: 740
+    prototype_parent: grid_room
+    key: 西南大街
+    desc: 往疾風城的商隊在此集結，繩索、獸籠與鹽袋沿路肩堆得齊整。領隊會在這裡最後一次點算人數，然後才出隘門。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  southwest_gate_road_2:
+    x_m: 962
+    y_m: 1249
+    prototype_parent: grid_room
+    key: 西南坡道
+    desc: 坡道順著地勢往下滑，推車得兩個人一前一後才煞得住。路旁每隔幾步就有供人歇腳的平石，被坐得發亮。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northwest_gate_road_1:
+    x_m: 624
+    y_m: 2672
+    prototype_parent: grid_room
+    key: 西北大街
+    desc: 往月嚎城的路從這裡鑽進林間，路口立著一根刻滿記號的記年木。新添的一筆總在最上頭，由族裡最年長的人動刀。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  northwest_gate_road_2:
+    x_m: 1028
+    y_m: 2154
+    prototype_parent: grid_room
+    key: 西北石階
+    desc: 石階上每隔十步有一處凹槽，是歷年扛祭品上山的人踩出來的。階旁的鐵鍊換過幾回，磨得比石頭還滑。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  market_street:
+    x_m: 1305
+    y_m: 1717
+    prototype_parent: grid_room
+    key: 市集石街
+    desc: 各部族在此交換獵物、礦石與鹽，議價全靠喊，成交只握手。攤子後面的木樁拴著待售的獸崽，叫聲蓋過人聲。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  tribal_hall:
+    x_m: 2465
+    y_m: 1762
+    prototype_parent: grid_room
+    key: 議事廳前庭
+    desc: 前庭木柱掛滿各部族信物，族長開會時，外人在門檻外等著。屋簷下那面舊鼓只在議事開始與散會時各響一次。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  assembly_ground:
+    x_m: 1905
+    y_m: 1521
+    prototype_parent: grid_room
+    key: 集會石場
+    desc: 一圈石凳圍出空場，鼓一響，各部族就帶著自己的圖騰來報到。場中央的火塘常年不熄，灰堆裡埋著上一場集會的餘炭。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  training_ground:
+    x_m: 586
+    y_m: 1268
+    prototype_parent: grid_room
+    key: 成年獵場
+    desc: 場邊立著木樁與獸骨，年輕獸人在此完成成年禮的追獵。圍觀的人比上場的多，獵物一落地，歡呼便順著坡傳回石坪。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  guild_forecourt:
+    x_m: 1439
+    y_m: 1313
+    prototype_parent: grid_room
+    key: 公會前庭
+    desc: 冒險者公會的告示板釘在獸骨架上，接任務的隊伍在此湊齊人數。有人蹲在階上磨刀，有人把地圖攤在膝頭比對。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  ancestral_altar:
+    x_m: 3306
+    y_m: 1461
+    prototype_parent: grid_room
+    key: 祖靈祭壇
+    desc: 祭壇以巨石壘成，四時供應獸骨與野果，風一吹，懸著的骨鈴便輕輕作響。祭壇腳下不許喧嘩，連孩子經過都會自動放輕腳步。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  tavern_lane:
+    x_m: 1733
+    y_m: 1915
+    prototype_parent: grid_room
+    key: 醉狼巷
+    desc: 巷裡全是酒氣與烤肉煙，幾家酒館把長桌擺到街上。划拳聲一路傳到石坪，輸的人得替整桌添一輪酒。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  craft_alley:
+    x_m: 1205
+    y_m: 3089
+    prototype_parent: grid_room
+    key: 鍛骨匠巷
+    desc: 匠人在此打製骨刀與皮甲，爐火日夜不熄。巷口堆著待修的獵具，鐵鎚落下的間隔像一種只有匠人聽得懂的節拍。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  lane_01:
+    x_m: 2400
+    y_m: 2858
+    prototype_parent: grid_room
+    key: 東北巷
+    desc: 巷子順著山脊往上，住的多是牧人，院裡拴著剛換過毛的山羊。風從高處下來，把晾在繩上的羊毛吹成一團。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  lane_02:
+    x_m: 3067
+    y_m: 2214
+    prototype_parent: grid_room
+    key: 獵戶巷
+    desc: 每一戶門前都晾著獸皮，孩子蹲在牆根削箭桿，見了生人也不抬頭。牆上釘著各家今年的獵獲記號，刻得深淺不一。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  lane_03:
+    x_m: 100
+    y_m: 2139
+    prototype_parent: grid_room
+    key: 西坊巷
+    desc: 西邊的作坊街，木桶、繩具與鞍具沿牆排開，敲打聲從早到晚不停。地上鋪著一層木屑，踩過去軟軟的。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  lane_04:
+    x_m: 1671
+    y_m: 2625
+    prototype_parent: grid_room
+    key: 北坡巷
+    desc: 北坡的住屋沿地勢錯落，屋頂壓著石塊，好抵擋從山上灌下來的風。傍晚家家升火，煙順著坡面一起往南飄。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  lane_05:
+    x_m: 965
+    y_m: 136
+    prototype_parent: grid_room
+    key: 西南巷
+    desc: 巷底有一口石井，取水的人排成長龍，順便交換各部族的閒話。井欄被繩索磨出深溝，摸上去光滑冰涼。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  lane_06:
+    x_m: 2900
+    y_m: 1045
+    prototype_parent: grid_room
+    key: 東南巷
+    desc: 窄巷兩側是共用的儲糧棚，穀袋與醃肉堆到樑下。鼠患靠幾隻貓頂著，牠們白天就睡在糧袋上，誰也不趕。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  lane_07:
+    x_m: 2171
+    y_m: 131
+    prototype_parent: grid_room
+    key: 南隘巷
+    desc: 這條巷子通往南面山口的哨位，牆上釘著輪值的木牌。換班的人會在這裡靠牆坐一會兒，把最後一口乾糧吃完。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  lane_08:
+    x_m: 2238
+    y_m: 2341
+    prototype_parent: grid_room
+    key: 獸欄巷
+    desc: 欄裡關著待售的坐騎與獵犬，氣味濃得讓初來的人直皺眉。看欄的老人認得每一頭牲口的性子，也認得每個來買的人。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: central_plaza
+  destination: south_gate_road_1
+  direction: s
+- source: central_plaza
+  destination: southeast_gate_road_2
+  direction: se
+- source: central_plaza
+  destination: southwest_gate_road_2
+  direction: sw
+- source: central_plaza
+  destination: northwest_gate_road_2
+  direction: nw
+- source: central_plaza
+  destination: market_street
+  direction: w
+- source: central_plaza
+  destination: assembly_ground
+  direction: e
+- source: south_gate
+  destination: south_gate_road_1
+  direction: n
+- source: south_gate
+  destination: lane_05
+  direction: w
+- source: south_gate
+  destination: lane_07
+  direction: e
+- source: southeast_gate
+  destination: southeast_gate_road_1
+  direction: nw
+- source: southwest_gate
+  destination: southwest_gate_road_1
+  direction: ne
+- source: northwest_gate
+  destination: northwest_gate_road_1
+  direction: se
+- source: south_gate_road_1
+  destination: central_plaza
+  direction: n
+- source: south_gate_road_1
+  destination: south_gate
+  direction: s
+- source: south_gate_road_1
+  destination: guild_forecourt
+  direction: nw
+- source: southeast_gate_road_1
+  destination: southeast_gate
+  direction: se
+- source: southeast_gate_road_1
+  destination: southeast_gate_road_2
+  direction: nw
+- source: southeast_gate_road_1
+  destination: lane_06
+  direction: ne
+- source: southeast_gate_road_1
+  destination: lane_07
+  direction: sw
+- source: southeast_gate_road_2
+  destination: central_plaza
+  direction: nw
+- source: southeast_gate_road_2
+  destination: southeast_gate_road_1
+  direction: se
+- source: southeast_gate_road_2
+  destination: assembly_ground
+  direction: n
+- source: southeast_gate_road_2
+  destination: lane_06
+  direction: e
+- source: southwest_gate_road_1
+  destination: southwest_gate
+  direction: sw
+- source: southwest_gate_road_1
+  destination: southwest_gate_road_2
+  direction: ne
+- source: southwest_gate_road_1
+  destination: training_ground
+  direction: n
+- source: southwest_gate_road_2
+  destination: central_plaza
+  direction: ne
+- source: southwest_gate_road_2
+  destination: southwest_gate_road_1
+  direction: sw
+- source: southwest_gate_road_2
+  destination: market_street
+  direction: n
+- source: southwest_gate_road_2
+  destination: training_ground
+  direction: w
+- source: southwest_gate_road_2
+  destination: guild_forecourt
+  direction: e
+- source: northwest_gate_road_1
+  destination: northwest_gate
+  direction: nw
+- source: northwest_gate_road_1
+  destination: northwest_gate_road_2
+  direction: se
+- source: northwest_gate_road_1
+  destination: lane_03
+  direction: sw
+- source: northwest_gate_road_2
+  destination: central_plaza
+  direction: se
+- source: northwest_gate_road_2
+  destination: northwest_gate_road_1
+  direction: nw
+- source: northwest_gate_road_2
+  destination: market_street
+  direction: s
+- source: market_street
+  destination: central_plaza
+  direction: e
+- source: market_street
+  destination: southwest_gate_road_2
+  direction: sw
+- source: market_street
+  destination: northwest_gate_road_2
+  direction: nw
+- source: market_street
+  destination: guild_forecourt
+  direction: s
+- source: tribal_hall
+  destination: assembly_ground
+  direction: sw
+- source: tribal_hall
+  destination: lane_02
+  direction: ne
+- source: tribal_hall
+  destination: lane_08
+  direction: n
+- source: assembly_ground
+  destination: central_plaza
+  direction: w
+- source: assembly_ground
+  destination: southeast_gate_road_2
+  direction: se
+- source: assembly_ground
+  destination: tribal_hall
+  direction: ne
+- source: assembly_ground
+  destination: tavern_lane
+  direction: nw
+- source: training_ground
+  destination: southwest_gate_road_1
+  direction: s
+- source: training_ground
+  destination: southwest_gate_road_2
+  direction: e
+- source: guild_forecourt
+  destination: south_gate_road_1
+  direction: s
+- source: guild_forecourt
+  destination: southwest_gate_road_2
+  direction: w
+- source: guild_forecourt
+  destination: market_street
+  direction: n
+- source: ancestral_altar
+  destination: lane_06
+  direction: sw
+- source: tavern_lane
+  destination: assembly_ground
+  direction: se
+- source: tavern_lane
+  destination: lane_08
+  direction: ne
+- source: craft_alley
+  destination: lane_04
+  direction: se
+- source: lane_01
+  destination: lane_08
+  direction: s
+- source: lane_02
+  destination: tribal_hall
+  direction: sw
+- source: lane_03
+  destination: northwest_gate_road_1
+  direction: ne
+- source: lane_04
+  destination: craft_alley
+  direction: nw
+- source: lane_04
+  destination: lane_08
+  direction: se
+- source: lane_05
+  destination: south_gate
+  direction: e
+- source: lane_06
+  destination: southeast_gate_road_1
+  direction: sw
+- source: lane_06
+  destination: southeast_gate_road_2
+  direction: w
+- source: lane_06
+  destination: ancestral_altar
+  direction: ne
+- source: lane_07
+  destination: south_gate
+  direction: w
+- source: lane_07
+  destination: southeast_gate_road_1
+  direction: ne
+- source: lane_08
+  destination: tribal_hall
+  direction: s
+- source: lane_08
+  destination: tavern_lane
+  direction: sw
+- source: lane_08
+  destination: lane_01
+  direction: n
+- source: lane_08
+  destination: lane_04
+  direction: nw
+wilderness_entry:
+  shape:
+  - '###.'
+  - '####'
+  - '###.'
+  offset:
+    dx: -1
+    dy: -1
+  gates:
+  - return_direction: n
+    destination_node: south_gate
+  - return_direction: nw
+    destination_node: southeast_gate
+  - return_direction: ne
+    destination_node: southwest_gate
+  - return_direction: se
+    destination_node: northwest_gate
+city_gate:
