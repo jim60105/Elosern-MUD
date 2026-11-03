@@ -176,7 +176,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "4f405d845df2051c26aa34000a986f7c582cd83f2a64650e6e8c48fb0fcdd92f",
+  "fingerprint": "05e9f20593d481a31089cab67bc5f8603aa5f19eb26233826786ffe5ecc50aad",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -902,7 +902,7 @@
     "packages/map-core/elosern_map_core/schema.py": "0458f4a076803766c035487c74bed8739123e44f6910be8ddb0ad517ebeda6ba",
     "packages/map-core/elosern_map_core/sources.py": "b0e4642835cac8ce8ffdf22e00092fef5af91a1c693fbbf083b21ab8e9469fff",
     "packages/map-core/elosern_map_core/sparse.py": "7ef86b108afd37af4cc79e604632aefd61195a4de7a32262b915cd0ebd7f2f3a",
-    "packages/map-core/elosern_map_core/terrain.py": "d9042d45c2bc81c017c4e01232fbcdbac5a53b3eca27b06858f0a68ee77240e6",
+    "packages/map-core/elosern_map_core/terrain.py": "f5a098da48ec7fc3a55a9ef132ff289929f0a89653a2e9a2b7bd7e8024e610d8",
     "tools/map_reference_context.py": "c379dde7cef91d8f8cb2bc48cd1074ca867124109cb937f8327ab5bc436c7cfc",
     "world/lore/__init__.py": "2ca4eda0bdc91f2b0b85bd3d4fab00c08cd2f8c2dffc66d0d430c7e6657e73db",
     "world/lore/action_evidence.py": "289a02f07d315ce03a24eb38bebf9cf46e7c7913b2c5b3f4adc68f85f9438b33",

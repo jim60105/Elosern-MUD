@@ -228,6 +228,10 @@ def _mounted_command_surface():
 class AltoriaLearningExchangeTests(ServiceContentIsolation, EvenniaTestCase):
     """altoria-learning-and-exchange: the academy teaches, the hall posts nothing."""
 
+    # One method tears the three authored interiors down and rebuilds them, so
+    # every method here starts from its own converged world.
+    converge_world_per_test = True
+
     def setUp(self):
         super().setUp()
         with self.captureOnCommitCallbacks(execute=True):

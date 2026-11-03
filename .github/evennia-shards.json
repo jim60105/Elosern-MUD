@@ -932,11 +932,25 @@
    "workers": 4,
    "labels": [
     "world.maps.tests.test_altoria_capital",
-    "world.maps.tests.test_bootstrap",
+    "world.maps.tests.test_bootstrap"
+   ]
+  },
+  {
+   "index": 29,
+   "name": "maps-29",
+   "workers": 4,
+   "labels": [
     "world.maps.tests.test_city_movement_cost",
     "world.maps.tests.test_city_walkthrough",
     "world.maps.tests.test_city_wilderness_roundtrip",
-    "world.maps.tests.test_editor_final_yaml_adoption",
+    "world.maps.tests.test_editor_final_yaml_adoption"
+   ]
+  },
+  {
+   "index": 30,
+   "name": "maps-30",
+   "workers": 4,
+   "labels": [
     "world.maps.tests.test_geography_source",
     "world.maps.tests.test_gm",
     "world.maps.tests.test_instance_integration",
@@ -947,8 +961,8 @@
    ]
   },
   {
-   "index": 29,
-   "name": "maps-29",
+   "index": 31,
+   "name": "maps-31",
    "workers": 4,
    "labels": [
     "world.maps.tests.test_limbo_room",
@@ -957,21 +971,28 @@
    ]
   },
   {
-   "index": 30,
-   "name": "maps-30",
+   "index": 32,
+   "name": "maps-32",
    "workers": 4,
    "labels": [
     "world.maps.tests.test_monster_provisioning",
     "world.maps.tests.test_monster_sites",
     "world.maps.tests.test_movement_roundtrip",
     "world.maps.tests.test_retention_reclamation",
-    "world.maps.tests.test_room_art_metadata",
+    "world.maps.tests.test_room_art_metadata"
+   ]
+  },
+  {
+   "index": 33,
+   "name": "maps-33",
+   "workers": 4,
+   "labels": [
     "world.maps.tests.test_runtime_adoption"
    ]
   },
   {
-   "index": 31,
-   "name": "maps-31",
+   "index": 34,
+   "name": "maps-34",
    "workers": 4,
    "labels": [
     "world.maps.tests.test_service_interiors",
@@ -987,16 +1008,16 @@
    ]
   },
   {
-   "index": 32,
-   "name": "maps-32",
+   "index": 35,
+   "name": "maps-35",
    "workers": 4,
    "labels": [
     "world.maps.tests.test_wilderness_population_species"
    ]
   },
   {
-   "index": 33,
-   "name": "maps-33",
+   "index": 36,
+   "name": "maps-36",
    "workers": 4,
    "labels": [
     "world.maps.tests.test_wilderness_provider",
@@ -1026,8 +1047,8 @@
    ]
   },
   {
-   "index": 34,
-   "name": "webclient-34",
+   "index": 37,
+   "name": "webclient-37",
    "workers": 4,
    "labels": [
     "web.webclient.presentation.tests.test_affordances.test_contract",
@@ -1067,8 +1088,8 @@
    ]
   },
   {
-   "index": 35,
-   "name": "webclient-35",
+   "index": 38,
+   "name": "webclient-38",
    "workers": 4,
    "labels": [
     "web.webclient.presentation.tests.test_area_map",
@@ -1090,8 +1111,8 @@
    ]
   },
   {
-   "index": 36,
-   "name": "webclient-36",
+   "index": 39,
+   "name": "webclient-39",
    "workers": 4,
    "labels": [
     "web.webclient.presentation.tests.test_art_panel",

@@ -129,6 +129,10 @@ def _innate_practicable_skill():
 class AltoriaHospitalityTests(ServiceContentIsolation, EvenniaTestCase):
     """altoria-hospitality: the lane's three rooms teach, and add nothing."""
 
+    # One method tears the authored interiors down and rebuilds them, so every
+    # method here starts from its own converged world.
+    converge_world_per_test = True
+
     def setUp(self):
         super().setUp()
         with self.captureOnCommitCallbacks(execute=True):

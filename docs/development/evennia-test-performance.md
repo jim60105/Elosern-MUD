@@ -356,3 +356,91 @@ makespan 200 秒、top-level 分片 170 秒。這讓兩種池都能落在 6 分�
 下一輪 `41307019044` 全綠且仍在預算內。`41308349284` 是 editor suite 移出
 preflight 後的驗收：`map-editor` 自成一個工作（105 秒，遠低於 6 分鐘預算），
 而所有分片都在等的 `preflight` 由 122 秒縮到 58 秒。
+
+### 2026-11-03：逐格幾何成本與每測試世界收斂，37 → 40 個 Evennia 分片
+
+CI run 41605121589 的 37 個 evennia 分片工作有 8 個超過 6 分鐘（其餘皆在
+360 秒內，最接近者為 shard 9 的 357 秒）：
+
+| 分片 | job 時長 | 測試執行時間 | 主因 |
+|---|---:|---:|---|
+| `maps-32` | 5,975 s | 5,887 s | `test_wilderness_population_species` 兩個 method 各 2,805/2,789 秒 |
+| `maps-30` | 2,683 s | 2,601 s | `test_monster_provisioning`／`test_runtime_adoption` 共 15 個 method 超過 150 秒 |
+| `webclient-35` | 1,427 s | 1,355 s | `test_area_map` 每個 method 約 95 秒 |
+| `webclient-34` | 1,320 s | 1,239 s | `test_local_map.test_wilderness` 每個 method 約 135 秒 |
+| `quests-16` | 1,188 s | 1,108 s | `test_species_hunt_acceptance` 六個 method 143–385 秒 |
+| `maps-28` | 1,175 s | 1,090 s | `test_editor_final_yaml_adoption` 四個 method 164–402 秒 |
+| `commands-19` | 669 s | 585 s | `test_scene_flavor_service` 三個 method 135–174 秒 |
+| `maps-31` | 536 s | 469 s | `test_wilderness_geography_contract` 四個 method 82–246 秒 |
+
+`--durations 0` 的每測試輸出指向三個成本來源，全部與斷言無關：
+
+1. **逐格多邊形判定**：`is_land_cell` 每個 cell 都重跑 750 頂點的多邊形
+   even-odd 掃描（本機實測約 189 µs/cell）；provider 的
+   `is_valid_wilderness_cell` 另外每次重建並雜湊 60 筆 registry 內容
+   （約 31 µs/call）。任何列舉 region window 的程式因此是 10⁶ 級成本。
+2. **每個 method 重付整個世界**：`sync_test_settlements(全部 gate 目的地)`
+   會在 setUp 物化 60 張地圖（本機冷啟動 40 秒、暖機 10.6 秒）；只站在
+   一兩個 gate 的 local_map／area_map／scene_flavor 測試也付整張世界。
+3. **單一 class 是排程下限**：`test_bootstrap` 的兩個 17/24-method class
+   各 535／532 秒；`test_editor_final_yaml_adoption` 與
+   `test_runtime_adoption` 各只有一個 class，4 個 worker 幫不上忙。
+
+修正（標籤擁有權、斷言與 worker 數以外的設定均未改動）：
+
+- `elosern_map_core.terrain`：`is_land_cell` 改讀每列的 land X 區間；區間由
+  同一多邊形規則建一次並快取，`mainland_row_intervals` 成為該表的裁切視圖。
+  全 frame 7.29M 格的 `is_land_cell` 由約 23 分鐘降到 2.2 秒；
+  `is_valid_wilderness_cell` 由 31 µs 降到 1.25 µs。
+- `world/maps/wilderness_provider._footprint_union`：published registry 的
+  快取鍵改為 (registry, entries) 的 identity（快取值保留兩者，id 不會被回收
+  後誤命中），由 28.9 µs 降到 0.24 µs；純 mapping 的測試 patch 仍以內容為鍵。
+- `ServiceContentIsolation` 的世界與內部空間收斂升為 `setUpTestData`；會拆掉
+  並重建 authored interiors 的三個 class（learning exchange、crown watch、
+  hospitality）以 `converge_world_per_test = True` 保留逐 method 收斂。
+- 只宣告測試真正讀到的地圖：local_map gateway／disclosure 與 area_map 用
+  capital + 被隱藏點入口所在的地圖（皆由 registry 推導），scene_flavor 用
+  它選中的 anchor 那一張。
+- `test_editor_final_yaml_adoption` 的 moved-node 契約仍要求完整世界基準
+  （「收斂後不新增也不刪除任何 room／exit」），因此這兩個 method 的 class
+  fixture 仍物化全部 60 張地圖，只把兩個 method 拆成獨立 class 讓它們落在
+  不同 worker 並行；拒絕案例不寫入任何資料，只有它把 fixture 收斂到
+  interiors 所在與點入口的 settlement（scope 由 bundle 的 map id 推導）。
+- `test_runtime_adoption` 拆成「bundle 發布／拒絕」與「同步失敗回滾」兩個
+  class，`test_bootstrap` 拆成 Grid／Anchor／Bridging／Startup 與 Wilderness
+  的 GateProvisioning／Resync／其餘，讓 4 個 worker 有足夠的排程單位。
+
+**分片結果：37 → 40**。維持「只切不混」：每個新分片都是舊清單的連續子序列，
+`server` 套件標籤完整，每個模組仍只有一個擁有者。
+
+| 舊分片 | 新分片 | 內容（連續切片） |
+|---|---|---|
+| `maps-28` | `maps-28` / `maps-29` / `maps-30` | `altoria_capital`+`bootstrap` ／ `city_*`+`editor_final_yaml_adoption` ／ `geography_source`…`interior_sources` |
+| `maps-30` | `maps-32` / `maps-33` | `monster_provisioning`…`room_art_metadata` ／ `runtime_adoption` |
+| 其餘 | 內容不變 | 僅重新編號 |
+
+本機驗收（24 核心參考機，`--parallel 4`，`--keepdb`）：
+
+| 模組 | 本輪 CI（合計／最慢 method） | 修正後本機 |
+|---|---:|---:|
+| `test_wilderness_population_species` | 5,887 s／2,805 s | 最慢 method 4.1 s |
+| `test_monster_provisioning` + `test_species_hunt_acceptance` | 4,640 s／385 s | 24 tests 8.0 s／最慢 3.6 s |
+| `test_wilderness_geography_contract` | 732 s／246 s | 最慢 method 2.0 s |
+| `test_area_map` | 1,401 s／118 s | 46 tests 45.1 s／最慢 4.0 s |
+| `test_local_map.test_wilderness` | 1,567 s／171 s | 最慢 method 3.8 s |
+| `test_scene_flavor_service` | 449 s／174 s | 14 tests 13.6 s／最慢 9.0 s |
+| `test_service_host_identity` | 726 s／99 s | 28 tests 25.2 s／最慢 2.2 s |
+| `test_bootstrap` | 1,235 s／207 s | 61 tests 90.6 s／最慢 45.7 s |
+| `test_editor_final_yaml_adoption` | 972 s／402 s | 4 tests 78.6 s／最慢 30.7 s |
+| `test_runtime_adoption` | 1,513 s／319 s | 7 tests（兩個 class）85.7 s／最慢 18.9 s |
+
+唯一驗收仍是下一次 CI：每個分片的**完整 job 時長**必須 ≤ 6 分鐘。本輪的
+最慢分片工作（`webclient-24`／`-26` 這類 `workers: 1` 的 evidence 分片）
+未被本次改動影響。
+
+`maps-29`（`city_*` + `test_editor_final_yaml_adoption`）是唯一仍有風險的分片：
+它的兩個 moved-node method 各自需要在完整世界上做一次真實收斂，這是契約本身
+（whole-candidate adoption）的排程下限，不能靠縮小 fixture 或拆 method 消除。
+本機已把它從 109 秒壓到 78.6 秒（兩個 class 並行、拒絕案例使用 scoped
+fixture）；若下一次 CI 仍超過 360 秒，它就是「已是最小單位、單獨一個分片」
+的情況，後續只能從 `sync_grid` 的 ORM 成本下手。

@@ -102,23 +102,37 @@ def _room_of(map_id: str, node_id: str):
 
 
 class _CandidateCase(EvenniaTestCase):
-    def setUp(self):
-        super().setUp()
+    @classmethod
+    def _materialization_scope(cls, bundle) -> tuple[str, ...]:
+        """The settlements this case materializes before its first method."""
+
+        return tuple(bundle.settlements.graphs)
+
+    @classmethod
+    def setUpTestData(cls):
+        # The baseline is built once per class and every method's writes still
+        # roll back with its own transaction.
+        super().setUpTestData()
         create_object(Room, key=LIMBO_KEY, location=None)
-        self.baseline = runtime.adopt()
+        cls.baseline = runtime.adopt()
         from world.tests.geography_fixture import sync_test_settlements
 
-        # Candidate-wide materialization is this class's subject.
-        sync_test_settlements(tuple(self.baseline.settlements.graphs))
+        sync_test_settlements(cls._materialization_scope(cls.baseline))
         bootstrap.sync_interiors()
         runtime.commit_adoption()
+
+    def setUp(self):
+        super().setUp()
+        self.baseline = type(self).baseline
+        # Every method edits its own writable source copy (a move, a removal,
+        # an invalid reference); the materialized world above is shared.
         directory = tempfile.mkdtemp(prefix="editor-final-yaml-")
         self.addCleanup(shutil.rmtree, directory, True)
         self.root = Path(directory)
         shutil.copytree(REPOSITORY_ROOT / "content/maps", self.root / "content/maps")
 
     def tearDown(self):
-        runtime.publish(self.baseline)
+        runtime.publish(type(self).baseline)
         super().tearDown()
 
     # -- candidate editing (what the editor writes) -----------------------
@@ -197,8 +211,6 @@ class _CandidateCase(EvenniaTestCase):
         self.assertEqual(binding_signature(), signature)
         self.assertEqual(self.persistent(), persistent)
 
-
-class FinalYamlAdoptionTests(_CandidateCase):
     def choose_node(self):
         """The occupied-capable node with the most dependent families."""
 
@@ -222,6 +234,10 @@ class FinalYamlAdoptionTests(_CandidateCase):
             if candidate not in taken and candidate[0] >= 0:
                 return candidate
         self.fail("no free coordinate beside the node")
+
+
+class FinalYamlAdoptionTests(_CandidateCase):
+    """A moved node keeps its rooms, exits, homes and knowledge."""
 
     def test_a_moved_occupied_node_keeps_rooms_exits_homes_and_knowledge(self):
         map_id, node, room, families = self.choose_node()
@@ -277,6 +293,10 @@ class FinalYamlAdoptionTests(_CandidateCase):
         # A repeated synchronization of the same sources changes nothing.
         runtime.synchronize()
         self.assertEqual(self.persistent(), after)
+
+
+class FinalYamlMovedLocationTests(_CandidateCase):
+    """A moved location keeps the anchor room and moves every derived geometry."""
 
     @covers_requirement(
         "map-runtime-adoption::runtime-adoption-publishes-one-complete-validated-world"
@@ -408,6 +428,27 @@ class FinalYamlAdoptionTests(_CandidateCase):
         self.assertEqual([pk for pk, *_ in after["exits"]], [pk for pk, *_ in before["exits"]])
         runtime.synchronize()
         self.assertEqual(self.persistent(), after)
+
+
+class FinalYamlRejectionTests(_CandidateCase):
+    """A rejected candidate leaves the published and persistent baseline intact."""
+
+    @classmethod
+    def _materialization_scope(cls, bundle) -> tuple[str, ...]:
+        # Every probe here compares a rejected adoption against the baseline;
+        # no write happens, so only the settlements carrying the lookup
+        # targets need persistent rows.
+        return tuple(
+            sorted(
+                {exterior.settlement for exterior in bundle.interiors.exteriors.values()}
+                | {
+                    map_id
+                    for map_id, settlement in bundle.settlements.settlements.items()
+                    if settlement.wilderness_entry is not None
+                    and settlement.wilderness_entry.is_point_shape
+                }
+            )
+        )
 
     def test_failed_candidates_leave_the_registry_and_persistent_baseline(self):
         bundle = runtime.current()

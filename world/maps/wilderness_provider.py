@@ -45,11 +45,17 @@ LONG_DIRECTIONS = {
 # neighbor; the gate hook re-applies this same form to a registered gate exit.
 _EXIT_OPEN = "traverse:true();view:true()"
 
-# Footprint cache: keyed on the ordered (anchor_key, entry) pairs of the live
-# registry snapshot. The key tuple RETAINS the entry objects, so their ids
-# cannot be recycled behind the cache's back; a patch/rebind replaces value
-# objects and produces a key miss on the next call.
-_FOOTPRINT_CACHE: dict[tuple[tuple[str, object], ...], frozenset] = {}
+# Footprint cache. The published registry is a read view over one immutable
+# settlement snapshot, so its identity (and the underlying mapping's) is the
+# exact version: a republish or a rebind is a key miss, while a per-cell
+# lookup costs one id() pair instead of hashing every entry object. The
+# cached tuples RETAIN both objects, so their ids cannot be recycled behind
+# the cache's back. A plain mapping (a documented test patch) still keys on
+# its contents, which is the only cheap exact version it offers.
+_FOOTPRINT_CACHE: dict[
+    tuple[int, int] | tuple[tuple[str, object], ...],
+    tuple[object, object, frozenset],
+] = {}
 
 
 def __getattr__(name: str):
@@ -82,16 +88,25 @@ def _footprint_union() -> frozenset:
     """Every anchor footprint cell in the live registry (point shapes: none)."""
 
     registry = _wilderness_entry_module.WILDERNESS_ENTRY_REGISTRY
-    snapshot = tuple(registry.items())
-    cached = _FOOTPRINT_CACHE.get(snapshot)
+    read_value = getattr(registry, "_value", None)
+    if read_value is not None:
+        entries = read_value()
+        key: tuple = (id(registry), id(entries))
+    else:
+        entries = registry
+        key = tuple(entries.items())
+    cached = _FOOTPRINT_CACHE.get(key)
     if cached is None:
-        cached = frozenset(cell for entry in registry.values() for cell in entry.footprint_cells)
-        _FOOTPRINT_CACHE[snapshot] = cached
+        union = frozenset(
+            cell for entry in entries.values() for cell in entry.footprint_cells
+        )
+        cached = (registry, entries, union)
+        _FOOTPRINT_CACHE[key] = cached
         # Keep the cache bounded against long test histories (insertion order:
         # the entry just stored is the newest, never the first popped).
         while len(_FOOTPRINT_CACHE) > 8:
             _FOOTPRINT_CACHE.pop(next(iter(_FOOTPRINT_CACHE)))
-    return cached
+    return cached[2]
 
 
 def is_footprint_cell(coordinates: tuple[int, int]) -> bool:

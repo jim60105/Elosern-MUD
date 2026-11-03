@@ -96,7 +96,7 @@ def _approach(return_direction):
     return gate_approach_cell(document.wilderness_geometry(cell), return_direction)
 
 
-class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
+class _GridBootstrapCase(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
     """Grid bootstrap tests.
 
     ``at_server_start()`` runs the full startup synchronization (including
@@ -135,6 +135,10 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
             for exit_obj in Exit.objects.all()
             if exit_obj.location in targets or exit_obj.destination in targets
         ]
+
+
+class GridBootstrapTests(_GridBootstrapCase):
+    """Spawn, update and first-pass convergence cases."""
 
     @covers_requirement("sample-city-altoria::the-sample-city-has-the-declared-rooms-in-a-connected-sparse-topology")
     @covers_requirement("grid-room-sync::a-single-authored-idempotent-exit-bridges-limbo-and-the-sample-city")
@@ -238,6 +242,10 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         self.assertIsNotNone(south_gate)
         self.assertEqual(south_gate.db.desc, "A rebuilt southern gate.")
 
+
+class GridBootstrapAnchorTests(_GridBootstrapCase):
+    """The whole-roster anchor placement contract (one serial worker)."""
+
     @covers_requirement("scene-archetype-mixin::gridroom-is-retrofitted-onto-scenearchetypemixin-without-changing-its-contract")
     def test_anchor_room_matches_placement_registry_after_sync(self):
         create_object(Room, key=LIMBO_KEY, location=None)
@@ -257,6 +265,10 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
             self.assertEqual(room.anchor_key, placement.anchor_key)
             self.assertEqual(room.xyz[2], placement.zcoord)
             self.assertEqual(room.xyz, entrance)
+
+
+class GridBootstrapBridgingTests(_GridBootstrapCase):
+    """Limbo bridging, gate exits and startup cases."""
 
     def test_bridging_exits_bind_limbo_and_south_gate_idempotently(self):
         limbo = create_object(Room, key=LIMBO_KEY, location=None)
@@ -620,6 +632,10 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         sync_test_settlements(CITY_GATE_MAP_IDS)
         self.assertEqual(len(limbo.exits), len(rebound))
 
+
+class GridBootstrapStartupTests(_GridBootstrapCase):
+    """The real startup step converges lore and grid in the authored order."""
+
     @covers_requirement("grid-room-sync::sync-grid-runs-automatically-at-server-start-after-sync-all")
     @covers_requirement("grid-room-sync::the-evennia-xyzgrid-cli-remains-available-but-is-not-required-for-boot", "lore-startup-sync::sync-runs-automatically-at-evennia-server-start")
     def test_at_server_start_calls_sync_grid_after_sync_all(self):
@@ -661,7 +677,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         self.assertEqual(len(self._bridging_exits()), SELECTED_GATE_ROW_COUNT)
 
 
-class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
+class _WildernessBootstrapCase(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
     """Wilderness bootstrap tests (``at_server_start()`` mutates the shared
     registries, so they are snapshotted and restored around every test)."""
 
@@ -688,6 +704,10 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         gate = gate if gate is not None else self._east_gate()
         gates = [e for e in gate.exits if isinstance(e, WildernessGateExit)]
         return script, gates
+
+
+class WildernessGateProvisioningTests(_WildernessBootstrapCase):
+    """Whole-roster gate provisioning (one serial worker's worth of work)."""
 
     @covers_requirement("wilderness-gateway::sync-wilderness-idempotently-provisions-the-wilderness-map-and-one-grid-side-gate-per-registered-gate")
     def test_sync_wilderness_provisions_one_gate_exit_per_authored_gate(self):
@@ -760,6 +780,10 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         south_gate.at_traverse(self.char1, self._south_gate())
         self.assertEqual(self.char1.location.coordinates, _approach("n"))
 
+
+class WildernessResyncTests(_WildernessBootstrapCase):
+    """A second whole-roster wilderness pass changes no gate or exit."""
+
     def test_sync_wilderness_is_idempotent(self):
         from world.maps.map_data import current
 
@@ -781,6 +805,10 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
                 if document.wilderness_entry is not None
             ),
         )
+
+
+class WildernessBootstrapTests(_WildernessBootstrapCase):
+    """Localized gate, approach and startup cases."""
 
     @covers_requirement("wilderness-map-provider::the-continent-remains-virtual-with-bounded-local-lookup")
     def test_sync_wilderness_materializes_no_frame_rooms(self):

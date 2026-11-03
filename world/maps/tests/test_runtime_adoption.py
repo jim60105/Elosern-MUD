@@ -69,23 +69,34 @@ exterior:
 """
 
 
-class MapWorldAdoptionTests(EvenniaTestCase):
-    def setUp(self):
-        super().setUp()
+class _MapWorldAdoptionCase(EvenniaTestCase):
+    @classmethod
+    def setUpTestData(cls):
+        # This case intentionally adopts and materializes the complete
+        # candidate; it is an explicit full-candidate contract case, so the
+        # world is built once per class. Each method's writes still roll back
+        # with its own transaction, and the bundle is republished per test.
+        super().setUpTestData()
         create_object(Room, key="虛境", location=None)
-        self.baseline = runtime.adopt()
+        cls.baseline = runtime.adopt()
         from world.tests.geography_fixture import sync_test_settlements
 
-        # This class intentionally adopts and materializes the complete
-        # candidate; it is an explicit full-candidate contract case.
-        sync_test_settlements(tuple(self.baseline.settlements.graphs))
+        sync_test_settlements(tuple(cls.baseline.settlements.graphs))
         bootstrap.sync_interiors()
         # Startup settles the adoption once the persistent world converged.
         runtime.commit_adoption()
 
+    def setUp(self):
+        super().setUp()
+        self.baseline = type(self).baseline
+
     def tearDown(self):
-        runtime.publish(self.baseline)
+        runtime.publish(type(self).baseline)
         super().tearDown()
+
+
+class MapWorldAdoptionTests(_MapWorldAdoptionCase):
+    """Bundle publication, interior independence, sync reuse and rejection."""
 
     # -- one complete bundle ---------------------------------------------------
 
@@ -234,6 +245,10 @@ class MapWorldAdoptionTests(EvenniaTestCase):
         self.assertIs(runtime.current(), baseline)
         self.assertEqual(binding_signature(), baseline_signature)
         self.assertEqual(Room.objects.all_family().count(), rooms_before)
+
+
+class MapWorldSynchronizationRollbackTests(_MapWorldAdoptionCase):
+    """A synchronization failure restores the prior bundle and persistent world."""
 
     def test_a_second_adoption_keeps_the_last_synchronized_rollback_baseline(self):
         baseline = runtime.current()
