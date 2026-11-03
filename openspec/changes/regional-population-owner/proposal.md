@@ -8,6 +8,7 @@ Coordinate slots cannot retain ownership separately from position or count manua
 
 - Add a map-owned durable zone state and deterministic legal wave planner/committer with local, cell and home-owned individual ceilings.
 - Provide one-time constrained initialization, separate home ownership and actual coordinate registration, and complete transaction/cache compensation.
+- Establish the shared explicitly initialized world seed and actual GM/quest wilderness registration without enabling ordinary births.
 - This change supplies callable owner operations; startup/clock production registration switches only in the runtime-cutover change.
 
 ## Capabilities

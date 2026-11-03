@@ -51,3 +51,14 @@ Each wave SHALL commit its complete constructed population, registrations, attac
 - **WHEN** a wave commits or an unchanged read runs
 - **THEN** only the committed wave emits its bounded facade boundary event with available identifiers; reads emit no mutation event
 
+### Requirement: Shared population seed and explicit registrations are owner supplied
+Map population ownership SHALL persist an explicitly initialized world seed and register lawful explicit wilderness placements through the placing owner's atomic operation without applying ordinary birth exclusions or changing home ownership.
+
+#### Scenario: No implicit seed default
+- **WHEN** a fresh script is explicitly provisioned with a seed or an existing seed is reread
+- **THEN** the saved seed is written once and reused, while missing or malformed seed reads refuse without selecting an implicit default
+
+#### Scenario: Manual and quest actual registration
+- **WHEN** an existing GM or quest placement creates an approved individual on a valid wilderness surface inside an automatic birth buffer
+- **THEN** it is registered as that actual ID, counted locally and visible after room recycling, with unchanged placing ownership and complete post-registration rollback
+
