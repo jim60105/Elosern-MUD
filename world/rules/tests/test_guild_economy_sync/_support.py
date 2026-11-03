@@ -308,15 +308,21 @@ def _merchant_shop_key():
     return component_kwargs(_merchant_row(), Merchant.name)["shop_key"]
 
 class ServiceContentIsolation(QuestRegistryIsolation):
-    def setUp(self):
-        super().setUp()
-        # ``register_catalog`` validates every authored quest definition against
-        # the map consumers (``ANCHOR_PLACEMENT_REGISTRY``), which raise until
-        # this process has adopted the authored world. Publish it here so the
+    #: A method that tears the authored interiors down and rebuilds them must
+    #: start from a freshly converged world: with class-level rows, a
+    #: rolled-back deletion can leave stale Attribute rows behind for the
+    #: next method that re-reads the same room identity.
+    converge_world_per_test = False
+
+    @classmethod
+    def _converge_world(cls) -> None:
+        """Publish and materialize the authored world and its interiors."""
+
+        # The map consumers (``ANCHOR_PLACEMENT_REGISTRY``) raise until this
+        # process has adopted the authored world. Publish it here so the
         # package owns that prerequisite instead of inheriting it from whichever
         # module happened to run first in the same shard.
         map_runtime.ensure_published()
-        register_catalog()
         create_object(Room, key="虛境", location=None)
         from world.maps import interiors
         from world.tests.geography_fixture import sync_test_settlements
@@ -332,6 +338,26 @@ class ServiceContentIsolation(QuestRegistryIsolation):
             )
         )
         sync_interiors()
+
+    @classmethod
+    def setUpTestData(cls):
+        # The authored world and its interiors are the same for every method
+        # of a case, and each method's writes roll back with its own
+        # transaction, so the expensive convergence runs once per class
+        # instead of once per method.
+        super().setUpTestData()
+        if not cls.converge_world_per_test:
+            cls._converge_world()
+
+    def setUp(self):
+        super().setUp()
+        # ``register_catalog`` validates every authored quest definition against
+        # the map consumers; registering it here (after the quest-registry
+        # snapshot above) keeps those process-global registrations inside this
+        # method's isolation window.
+        register_catalog()
+        if type(self).converge_world_per_test:
+            type(self)._converge_world()
         # Snapshot the REAL module cache (the name imported above is a value
         # copy; rebinding it restores nothing). A test that calls
         # load_catalog_into_cache() inside a temporary registry patch would

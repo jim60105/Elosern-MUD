@@ -26,6 +26,32 @@ from ._support import (
 )
 
 
+def _declared_gateway_maps() -> tuple[str, ...]:
+    """The settlement maps these gateway checks actually stand on.
+
+    The city entry authoring both gateway faces contributes its east and
+    south destination maps; the hidden point entrance contributes its own.
+    Gateways of every other settlement are out of scope here, so their maps
+    are not materialized.
+    """
+    from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+
+    entry = _live_gateway_entry()
+    point = next(
+        candidate
+        for candidate in WILDERNESS_ENTRY_REGISTRY.values()
+        if candidate.is_point_shape
+    )
+    return tuple(
+        sorted(
+            {
+                entry.gate_for("w").destination.map_id,
+                entry.gate_for("n").destination.map_id,
+                point.gates[0].destination.map_id,
+            }
+        )
+    )
+
 
 class LocalMapWildernessTests(EvenniaTestCase):
     """Wilderness-layer adapter tests (task 3.3)."""
@@ -249,17 +275,7 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
     def setUp(self):
         super().setUp()
         create_object(Room, key="虛境", location=None)
-        from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
-
-        declared = tuple(
-            sorted(
-                {
-                    gate.destination.map_id
-                    for entry in WILDERNESS_ENTRY_REGISTRY.values()
-                    for gate in entry.gates
-                }
-            )
-        )
+        declared = _declared_gateway_maps()
         sync_test_settlements(declared)
         sync_test_wilderness(declared)
         self.south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
@@ -518,17 +534,7 @@ class LocalMapWildernessDisclosureTests(EvenniaTest):
     def setUp(self):
         super().setUp()
         create_object(Room, key="虛境", location=None)
-        from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
-
-        declared = tuple(
-            sorted(
-                {
-                    gate.destination.map_id
-                    for entry in WILDERNESS_ENTRY_REGISTRY.values()
-                    for gate in entry.gates
-                }
-            )
-        )
+        declared = _declared_gateway_maps()
         sync_test_settlements(declared)
         sync_test_wilderness(declared)
 

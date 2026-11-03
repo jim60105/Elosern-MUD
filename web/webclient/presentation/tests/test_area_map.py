@@ -89,6 +89,23 @@ def _render(actor):
     return area_map_presenter(_context(actor))
 
 
+def _wilderness_fixture_maps() -> tuple[str, ...]:
+    """The settlement maps the wilderness area cases actually stand on.
+
+    Every window is read at the city gate's approach cell, and the hidden
+    point entrance's gate room is named by the disclosure case; no other
+    settlement map is read here.
+    """
+    from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+
+    point = next(
+        candidate
+        for candidate in WILDERNESS_ENTRY_REGISTRY.values()
+        if candidate.is_point_shape
+    )
+    return tuple(sorted({EAST_GATE_XYZ[2], point.gates[0].destination.map_id}))
+
+
 def _by_id(payload):
     return {node["id"]: node for node in payload["nodes"]}
 
@@ -685,17 +702,7 @@ class WildernessAreaTests(EvenniaTest):
     def setUp(self):
         super().setUp()
         create_object(Room, key="虛境", location=None)
-        from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
-
-        declared = tuple(
-            sorted(
-                {
-                    gate.destination.map_id
-                    for entry in WILDERNESS_ENTRY_REGISTRY.values()
-                    for gate in entry.gates
-                }
-            )
-        )
+        declared = _wilderness_fixture_maps()
         sync_test_settlements(declared)
         sync_test_wilderness(declared)
         get_world_clock()

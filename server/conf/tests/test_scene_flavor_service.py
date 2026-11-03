@@ -325,15 +325,24 @@ class SceneFlavorCommandCompositionTests(RegistryIsolationMixin, EvenniaTestCase
         # The anchor room is resolved through the live placement registry:
         # sync_grid links each canonical AnchorRoom by its anchor key, so the
         # first placed anchor carries the traversal case without naming it.
+        from world.tests.geography_fixture import (
+            publish_shipped_map_world,
+            sync_test_settlements,
+        )
+
+        # The placement view reads the published settlement snapshot, so this
+        # case owns that prerequisite instead of inheriting it from whichever
+        # module happened to run first in the same shard.
+        publish_shipped_map_world()
         placements = _live_registry(
             "world.lore" + ".anchor_placement", "ANCHOR_PLACEMENT" + "_REGISTRY"
         )
-        from world.tests.geography_fixture import sync_test_settlements
 
-        sync_test_settlements(
-            tuple(sorted({placement.zcoord for placement in placements.values()}))
-        )
         placed = next(iter(placements))
+        # Only the chosen anchor's own settlement is traversed by this case;
+        # materializing every anchored settlement would converge the whole
+        # world on each method.
+        sync_test_settlements((placements[placed].zcoord,))
         # AttributeProperty is not a Django field: match in Python over the
         # synced anchor rooms.
         self.anchor = next(

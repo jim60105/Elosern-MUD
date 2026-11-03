@@ -197,6 +197,10 @@ def _mounted_command_surface():
 class AltoriaCrownWatchTests(ServiceContentIsolation, EvenniaTestCase):
     """altoria-crown-and-watch: the crown's rooms are open, and post nothing."""
 
+    # One method tears the authored interiors down and rebuilds them, so every
+    # method here starts from its own converged world.
+    converge_world_per_test = True
+
     def setUp(self):
         super().setUp()
         with self.captureOnCommitCallbacks(execute=True):

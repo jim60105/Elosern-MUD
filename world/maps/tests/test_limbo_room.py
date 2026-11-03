@@ -170,7 +170,9 @@ class LimboRoomTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
         from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 
         legacy = create_object(Room, key=LIMBO_LEGACY_KEY, location=None)
-        # Full startup also synchronizes service hosts in every settlement.
+        # Full startup also synchronizes service hosts in every settlement, so
+        # the declaration must cover every spawned host room, not only the
+        # bridge's own gate settlement.
         with selected_startup_settlements(
             tuple(
                 sorted(

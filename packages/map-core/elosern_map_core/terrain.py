@@ -484,6 +484,13 @@ class TerrainDefinition:
             "_border_river_rows",
             _column_table(self.waterway_routes[self.border_river_key], self.frame_cells),
         )
+        # Lazy landing row -> land X-interval cache. ``is_land_cell`` is the
+        # hot predicate every wilderness walk, provider lookup and map render
+        # reads; a per-cell polygon sweep costs roughly two orders of
+        # magnitude more than a row-interval membership test. The rows are
+        # pure derivations of this frozen boundary, so caching them cannot
+        # change a classification.
+        object.__setattr__(self, "_land_row_cache", {})
 
     # -- derived tables ---------------------------------------------------
     @property
@@ -671,20 +678,35 @@ def is_inland_water_cell(definition: TerrainDefinition, coordinates: Point) -> b
 
 
 def is_land_cell(definition: TerrainDefinition, coordinates: Point) -> bool:
-    """Whether the cell's centre lies inside the mainland polygon."""
+    """Whether the cell's centre lies inside the mainland polygon.
+
+    The polygon itself is the authority, but its even-odd sweep is expensive
+    per cell (a boundary with hundreds of vertices). A row's exact land
+    intervals are a pure derivation of that same polygon, so they are built
+    once per row and every later cell of the row is one membership test.
+    """
 
     x, y = coordinates
-    return is_on_mainland(definition.mainland_boundary_km, x + 0.5, y + 0.5)
+    intervals = definition._land_row_cache.get(y)
+    if intervals is None:
+        intervals = _land_row_intervals(definition, y)
+        definition._land_row_cache[y] = intervals
+    return any(low <= x <= high for low, high in intervals)
 
 
-def mainland_row_intervals(definition: TerrainDefinition, y: int) -> list[tuple[int, int]]:
-    """Inclusive X intervals of land cells in row ``y``.
+def _land_row_intervals(
+    definition: TerrainDefinition, y: int
+) -> tuple[tuple[int, int], ...]:
+    """Every land-cell X interval of row ``y``, unclamped and merged.
 
     The even-odd crossings of the row's centre line give the candidate ends;
-    each end is then corrected against :func:`is_land_cell` (the single land
-    rule), so a floating-point edge case can only move an end onto the rule's
-    own answer, never disagree with it.
+    each end is then corrected against the polygon rule itself (never against
+    :func:`is_land_cell`, which reads this table), so a floating-point edge
+    case can only move an end onto the polygon's own answer. Touching or
+    overlapping corrected ends are merged, so each land cell belongs to
+    exactly one interval.
     """
+
     north = y + 0.5
     vertices = definition.mainland_boundary_km
     crossings: list[float] = []
@@ -697,29 +719,49 @@ def mainland_row_intervals(definition: TerrainDefinition, y: int) -> list[tuple[
             + start_east
         )
     crossings.sort()
-    intervals: list[tuple[int, int]] = []
-    for west, east in zip(crossings[::2], crossings[1::2]):
-        low = max(math.ceil(west - 0.5), 0)
-        high = min(math.floor(east - 0.5), definition.max_x)
-        while low <= high and not is_land_cell(definition, (low, y)):
-            low += 1
-        while low > 0 and is_land_cell(definition, (low - 1, y)):
-            low -= 1
-        while high >= low and not is_land_cell(definition, (high, y)):
-            high -= 1
-        while high < definition.max_x and is_land_cell(definition, (high + 1, y)):
-            high += 1
-        if low <= high:
-            intervals.append((low, high))
-    # A corrected end can grow into its neighbour interval; merge so every
-    # land cell of the row belongs to exactly one interval.
+
+    def on_land(x: int) -> bool:
+        return is_on_mainland(definition.mainland_boundary_km, x + 0.5, north)
+
     merged: list[tuple[int, int]] = []
-    for low, high in intervals:
+    for west, east in zip(crossings[::2], crossings[1::2]):
+        low = math.ceil(west - 0.5)
+        high = math.floor(east - 0.5)
+        while low <= high and not on_land(low):
+            low += 1
+        while on_land(low - 1):
+            low -= 1
+        while high >= low and not on_land(high):
+            high -= 1
+        while on_land(high + 1):
+            high += 1
+        if low > high:
+            continue
         if merged and low <= merged[-1][1] + 1:
             merged[-1] = (merged[-1][0], max(merged[-1][1], high))
         else:
             merged.append((low, high))
-    return merged
+    return tuple(merged)
+
+
+def mainland_row_intervals(definition: TerrainDefinition, y: int) -> list[tuple[int, int]]:
+    """Inclusive X intervals of land cells in row ``y``.
+
+    The row table is clipped to the authored frame, which is what sparse-index
+    consumers enumerate; cells outside it are never land.
+    """
+
+    rows = definition._land_row_cache.get(y)
+    if rows is None:
+        rows = _land_row_intervals(definition, y)
+        definition._land_row_cache[y] = rows
+    intervals: list[tuple[int, int]] = []
+    for low, high in rows:
+        low = max(low, 0)
+        high = min(high, definition.max_x)
+        if low <= high:
+            intervals.append((low, high))
+    return intervals
 
 
 def is_passable_terrain(definition: TerrainDefinition, coordinates: Point) -> bool:
