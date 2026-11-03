@@ -1,8 +1,20 @@
 # Spec Delta
 
-## MODIFIED Requirements
+## REMOVED Requirements
 
 ### Requirement: Population reads share materialization decisions
+**Reason**: Prospective slots and creation/reconciliation-based presence are removed; actual committed entity reads are the authoritative mechanism.
+
+**Migration**: Cut all callers and substantively matching test annotations to the replacement contract using tool-generated canonical IDs; retain no legacy behavior, alias or data migration.
+
+### Requirement: Observation identities survive materialization
+**Reason**: Coordinate-slot aliases are retired; identity belongs to each actual persistent object across room lifecycle and fresh births.
+
+**Migration**: Cut all callers and substantively matching test annotations to the replacement contract using tool-generated canonical IDs; retain no legacy behavior, alias or data migration.
+
+## ADDED Requirements
+
+### Requirement: Population reads report actual living registrations
 Population reads SHALL project only actual living registered entities in requested cells without materializing, reconciling or predicting population.
 
 #### Scenario: No prospective entities
@@ -17,7 +29,7 @@ Population reads SHALL project only actual living registered entities in request
 - **WHEN** unprepared cells and stored HP are read repeatedly
 - **THEN** clock, objects, room pools, Attributes, registrations, seed, sequence and schedule remain unchanged, and no traits handler is created
 
-### Requirement: Observation identities survive materialization
+### Requirement: Observation identity belongs to persistent individuals
 Each living population observation SHALL use persistent individual identity across room activation, recycling, rename and reload, while each fresh birth retains a new distinct identity.
 
 #### Scenario: Identity across room lifecycle
