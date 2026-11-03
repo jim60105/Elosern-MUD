@@ -325,6 +325,35 @@ def _cell(cell) -> list[int]:
     return [int(cell[0]), int(cell[1])]
 
 
+def _landmark(landmark) -> dict[str, Any]:
+    """The qualified landmark reference with its cell as an ``[x, y]`` pair."""
+
+    return {
+        "domain": landmark.domain,
+        "map_id": landmark.map_id,
+        "object_id": landmark.object_id,
+        "cell": None if landmark.cell is None else _cell(landmark.cell),
+    }
+
+
+def _landmark_centre_m(landmark, location_cells, node_world_m) -> list[int] | None:
+    """The landmark's continental centre in metres, derived from its referent.
+
+    A wilderness cell is its cell centre, a location is its location cell's
+    centre, and a settlement node is that node's derived world position.
+    An interior room, an unknown referent, or a node whose settlement has no
+    frame yet has no continental position.
+    """
+
+    if landmark.domain == "wilderness_cell" and landmark.cell is not None:
+        return [int(value) for value in cell_center_m(landmark.cell)]
+    if landmark.domain == "location" and landmark.object_id in location_cells:
+        return [int(value) for value in cell_center_m(location_cells[landmark.object_id])]
+    if landmark.domain == "settlement_node":
+        return node_world_m.get((landmark.map_id, landmark.object_id))
+    return None
+
+
 def _terrain_preview(continent) -> dict[str, Any]:
     """The core's derived terrain preview of the current inputs (cell units).
 
@@ -403,6 +432,7 @@ def _project(world, layouts: Mapping[str, dict[str, Any]]) -> dict[str, Any]:
             interiors_by_settlement.setdefault(interior.exterior.settlement, []).append(interior_id)
 
     settlements = []
+    node_world_m: dict[tuple[str, str], list[int] | None] = {}
     for settlement_id, settlement in sorted(world.settlements.items()):
         lengths = road_lengths(settlement)
         location = world.locations.locations.get(settlement.location_ref)
@@ -422,6 +452,9 @@ def _project(world, layouts: Mapping[str, dict[str, Any]]) -> dict[str, Any]:
                 None
                 if world_frame is None
                 else local_to_world_m(location_cell, local_anchor, node.coordinate)
+            )
+            node_world_m[(settlement_id, node_id)] = (
+                None if world_m is None else [int(world_m[0]), int(world_m[1])]
             )
             nodes.append(
                 {
@@ -494,6 +527,9 @@ def _project(world, layouts: Mapping[str, dict[str, Any]]) -> dict[str, Any]:
             }
         )
 
+    location_cells = {
+        location_id: location.cell for location_id, location in world.locations.locations.items()
+    }
     return {
         "fingerprint": world.fingerprint,
         "continent": {
@@ -567,7 +603,8 @@ def _project(world, layouts: Mapping[str, dict[str, Any]]) -> dict[str, Any]:
                 "relative_path": world.districts.relative_path,
                 "district_name_zh": district.district_name_zh,
                 "landmark_name_zh": district.landmark_name_zh,
-                "landmark": thaw(world.districts.data["districts"][district_id]["landmark"]),
+                "landmark": _landmark(district.landmark),
+                "landmark_centre_m": _landmark_centre_m(district.landmark, location_cells, node_world_m),
                 "kind": district.kind,
                 "region_key": district.region_key,
                 # Optional distant-sighting authoring; absent values stay
