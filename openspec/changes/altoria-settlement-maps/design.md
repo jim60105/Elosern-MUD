@@ -44,6 +44,11 @@ There are two triggers:
   it does not contain. This trigger was added during implementation: the
   proposal expected only ports to fail, but no port does, and
   `city_border_bridge`, `city_east_river` and `town_east_ferry` hit (b).
+- (c) a generated footprint contains an authored ford. The district contract
+  requires a ford to stay walkable wilderness that joins the banks, and a
+  `river_crossing` plan reaches its ford cell. `town_west_ferry` consumed the
+  western border ford at 450,1345 and moved three cells west to a
+  waterside layout that leaves the ford free.
 
 Let `L` be the failing location. The target `T` is `site L --radius 12`'s
 `sea.nearest_cell`, or, when no sea is reported, `rivers[0].nearest_cell`.
@@ -98,6 +103,7 @@ cell that stays over 100 km from every other Voronoi landmark.
 - `city_border_bridge`: 822,1363 → 819,1363.
 - `city_east_river`: 1054,1072 → 1053,1073.
 - `town_east_ferry`: 1149,1360 → 1148,1360.
+- `town_west_ferry`: 450,1343 → 447,1343.
 
 ### D3. Prose
 

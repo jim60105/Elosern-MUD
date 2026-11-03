@@ -10,25 +10,16 @@ exit_prototype:
   typeclass: typeclasses.exits.CostedXYZExit
 nodes:
   central_plaza:
-    x_m: 550
+    x_m: 583
     y_m: 577
     prototype_parent: anchor_room
     key: 中央廣場
-    desc: 廣場離界河不遠，北面是渡口，南邊的大道通往遺跡鎮，兩國商販在此擦肩，石階上混著兩種口音。
+    desc: 廣場離界河的南岸不遠，北面是渡口，東南的大道通往遺跡鎮，兩國商販在此擦肩，石階上混著兩種口音。
     anchor_key: town_west_ferry
     typeclass:
     scene_archetype: city_street
-  ford_crossing:
-    x_m: 550
-    y_m: 2577
-    prototype_parent: grid_room
-    key: 渡口
-    desc: 渡口在北面的石灘，木樁上繫著粗繩，過河的人扶繩涉水，對岸就是獸人的營地，號角聲隨風傳來。
-    anchor_key:
-    typeclass:
-    scene_archetype: city_street
   southeast_gate:
-    x_m: 1027
+    x_m: 1060
     y_m: 100
     prototype_parent: grid_room
     key: 東南門
@@ -36,17 +27,17 @@ nodes:
     anchor_key:
     typeclass:
     scene_archetype: city_street
-  north_gate:
-    x_m: 550
-    y_m: 1252
+  northeast_gate:
+    x_m: 1060
+    y_m: 1054
     prototype_parent: grid_room
-    key: 北門
-    desc: 北門面向渡口與西渡營，門洞裡擠著兩邊的商隊，口音混成一片，守衛逐一檢視貨擔，木牌在腰間互相碰撞。
+    key: 東北門
+    desc: 東北門面向渡口與西渡營，門洞裡擠著兩邊的商隊，口音混成一片，守衛逐一檢視貨擔，木牌互相碰撞。
     anchor_key:
     typeclass:
     scene_archetype: city_street
   southeast_gate_road_1:
-    x_m: 714
+    x_m: 747
     y_m: 395
     prototype_parent: grid_room
     key: 渡口大街
@@ -55,7 +46,7 @@ nodes:
     typeclass:
     scene_archetype: city_street
   market_street:
-    x_m: 409
+    x_m: 442
     y_m: 539
     prototype_parent: grid_room
     key: 市場街
@@ -64,7 +55,7 @@ nodes:
     typeclass:
     scene_archetype: city_street
   guild_forecourt:
-    x_m: 507
+    x_m: 540
     y_m: 411
     prototype_parent: grid_room
     key: 公會前
@@ -73,7 +64,7 @@ nodes:
     typeclass:
     scene_archetype: city_street
   river_quay:
-    x_m: 100
+    x_m: 583
     y_m: 2027
     prototype_parent: grid_room
     key: 河港碼頭
@@ -81,10 +72,19 @@ nodes:
     anchor_key:
     typeclass:
     scene_archetype: city_street
+  temple_forecourt:
+    x_m: 100
+    y_m: 633
+    prototype_parent: grid_room
+    key: 神殿前
+    desc: 神殿前朝西，鐘樓望著界河，過路的車伕會進門添一炷香，階前擺著沾泥的草鞋與半截蠟燭。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
 roads:
 - source: central_plaza
-  destination: north_gate
-  direction: n
+  destination: northeast_gate
+  direction: ne
 - source: central_plaza
   destination: southeast_gate_road_1
   direction: se
@@ -94,16 +94,13 @@ roads:
 - source: central_plaza
   destination: guild_forecourt
   direction: s
-- source: ford_crossing
-  destination: river_quay
-  direction: sw
 - source: southeast_gate
   destination: southeast_gate_road_1
   direction: nw
-- source: north_gate
+- source: northeast_gate
   destination: central_plaza
-  direction: s
-- source: north_gate
+  direction: sw
+- source: northeast_gate
   destination: river_quay
   direction: nw
 - source: southeast_gate_road_1
@@ -118,6 +115,9 @@ roads:
 - source: market_street
   destination: guild_forecourt
   direction: se
+- source: market_street
+  destination: temple_forecourt
+  direction: w
 - source: guild_forecourt
   destination: central_plaza
   direction: n
@@ -125,14 +125,13 @@ roads:
   destination: market_street
   direction: nw
 - source: river_quay
-  destination: ford_crossing
-  direction: ne
-- source: river_quay
-  destination: north_gate
+  destination: northeast_gate
   direction: se
+- source: temple_forecourt
+  destination: market_street
+  direction: e
 wilderness_entry:
   shape:
-  - '#'
   - '#'
   - '#'
   offset:
@@ -141,6 +140,6 @@ wilderness_entry:
   gates:
   - return_direction: nw
     destination_node: southeast_gate
-  - return_direction: s
-    destination_node: north_gate
+  - return_direction: sw
+    destination_node: northeast_gate
 city_gate:

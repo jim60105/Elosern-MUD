@@ -438,7 +438,7 @@ locations:
     display_name_zh: 西渡鎮
     description: Kingdom bank of the western border-river crossing.
     cell:
-      cell_x: 450
+      cell_x: 447
       cell_y: 1343
     geographic_constraint: South bank of the western border river ford
     scene_archetype:
