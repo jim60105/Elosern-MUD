@@ -22,11 +22,17 @@ from evennia.utils.search import search_script
 from evennia.utils.test_resources import EvenniaTestCase
 
 from world.lore import monster_placement as registry
+from world.lore import monster_species as species_registry
 from world.lore.monster_placement import (
     RECOVERY_CONDITION_FIELDS,
     AmbientPlacementRule,
+    CompositionMember,
+    EcologyZone,
+    EncounterComposition,
     MonsterPlacementRegistryError,
     MonsterSite,
+    SettlementBirthPolicy,
+    WeightedComposition,
     variant_species_key,
 )
 from world.lore.monster_species import MonsterSpecies, MonsterVariant
@@ -46,6 +52,11 @@ STRONGER = "t_fixture_stronger"
 ABSENT_VARIANT = "t_fixture_absent_variant"
 SITE = "t_fixture_site"
 OTHER_SITE = "t_fixture_other_site"
+COMPOSITION = "t_fixture_composition"
+OTHER_COMPOSITION = "t_fixture_other_composition"
+ZONE = "t_fixture_zone"
+OTHER_ZONE = "t_fixture_other_zone"
+POLICY_ANCHOR = "t_fixture_policy_anchor"
 
 # The registry's public callables, in full: read and validate. An execution
 # entry point (spawn/place/populate/reconcile/respawn/recover) would have to
@@ -53,7 +64,12 @@ OTHER_SITE = "t_fixture_other_site"
 EXPECTED_PUBLIC_CALLABLES = frozenset(
     {
         "ambient_rule",
+        "build_encounter_composition_registry",
+        "build_ecology_zone_registry",
         "build_monster_site_registry",
+        "build_settlement_birth_policy_registry",
+        "composition_bounds",
+        "validate_ecology_registries",
         "validate_monster_placement_registry",
         "variant_species_key",
     }
@@ -149,6 +165,47 @@ def _site(**overrides) -> MonsterSite:
 
 def _recovered_site(**overrides) -> MonsterSite:
     return _site(one_shot=False, recover_after_ticks=3600, **overrides)
+
+
+def _member(
+    variant_key: str = ORDINARY, minimum: int = 1, maximum: int = 1
+) -> CompositionMember:
+    return CompositionMember(variant_key, minimum, maximum)
+
+
+def _composition(key: str = COMPOSITION, members=None) -> EncounterComposition:
+    return EncounterComposition(key, (_member(),) if members is None else tuple(members))
+
+
+def _zone(**overrides) -> EcologyZone:
+    fields = {
+        "key": ZONE,
+        "region_key": REGION,
+        "rectangles": ((10, 12, 20, 22),),
+        "pool": (WeightedComposition(COMPOSITION, 1),),
+        "lower_density": 1,
+        "upper_density": 10,
+        "cell_capacity": 3,
+        "recovery_delay": 3600,
+        "replenishment_interval": 600,
+        "wave_budget": 3,
+    }
+    fields.update(overrides)
+    return EcologyZone(**fields)
+
+
+def _ecology_faces(**overrides):
+    """The injected vocabularies every ecology validation case runs against."""
+    faces = {
+        "region_face": (REGION, SPARE_REGION),
+        "variant_face": {
+            ORDINARY: _variant_row(ORDINARY),
+            STRONGER: _variant_row(STRONGER),
+        },
+        "species_face": {SPECIES: _species_row()},
+    }
+    faces.update(overrides)
+    return faces
 
 
 class PlacementValidationTests(unittest.TestCase):
@@ -259,6 +316,233 @@ class PlacementValidationTests(unittest.TestCase):
         )
 
 
+class EcologyDeclarationTests(unittest.TestCase):
+    """Requirement: ecology declarations publish only complete bounded habitats."""
+
+    def _reject(self, zones=None, compositions=None, policies=None, **faces):
+        with self.assertRaises(MonsterPlacementRegistryError):
+            registry.validate_ecology_registries(
+                {ZONE: _zone()} if zones is None else zones,
+                {COMPOSITION: _composition()}
+                if compositions is None
+                else compositions,
+                {} if policies is None else policies,
+                **_ecology_faces(**faces),
+            )
+
+    def test_composition_forms_resolve_their_explicit_ranges(self):
+        # Solitary, repeated-variant and mixed compositions: the range totals
+        # come from the declared member ranges alone, never from prose.
+        solitary = _composition(COMPOSITION)
+        repeated = _composition(OTHER_COMPOSITION, (_member(ORDINARY, 2, 3),))
+        mixed = EncounterComposition(
+            "t_fixture_mixed",
+            (_member(ORDINARY, 1, 1), _member(STRONGER, 2, 2)),
+        )
+        compositions = {
+            composition.key: composition
+            for composition in (solitary, repeated, mixed)
+        }
+        zone = _zone(
+            pool=(
+                WeightedComposition(COMPOSITION, 1),
+                WeightedComposition(OTHER_COMPOSITION, 2),
+                WeightedComposition("t_fixture_mixed", 3),
+            )
+        )
+        registry.validate_ecology_registries(
+            {ZONE: zone}, compositions, {}, **_ecology_faces()
+        )
+        self.assertEqual(registry.composition_bounds(solitary), (1, 1))
+        self.assertEqual(registry.composition_bounds(repeated), (2, 3))
+        self.assertEqual(registry.composition_bounds(mixed), (3, 3))
+        self.assertEqual(
+            [row.composition_key for row in zone.pool],
+            [COMPOSITION, OTHER_COMPOSITION, "t_fixture_mixed"],
+        )
+        self.assertEqual([row.weight for row in zone.pool], [1, 2, 3])
+
+    def test_unknown_and_non_variant_references_are_rejected(self):
+        self._reject(
+            compositions={
+                COMPOSITION: _composition(members=(_member(ABSENT_VARIANT),))
+            }
+        )
+        # A species key is not a variant key, so it can never be a member.
+        self._reject(
+            compositions={COMPOSITION: _composition(members=(_member(SPECIES),))}
+        )
+
+    def test_habitat_mismatch_is_rejected_for_a_pooled_member(self):
+        mismatched = {SPECIES: _species_row(habitat_tags=(SPARE_REGION,))}
+        self._reject(species_face=mismatched)
+        # The mirror case: a spare-region zone pooling a variant whose species
+        # declares only the primary habitat.
+        self._reject(
+            zones={ZONE: _zone(region_key=SPARE_REGION)},
+            species_face={SPECIES: _species_row(habitat_tags=(REGION,))},
+        )
+
+    def test_duplicate_keys_are_rejected(self):
+        builders = (
+            (
+                registry.build_encounter_composition_registry,
+                (_composition(), _composition()),
+            ),
+            (registry.build_ecology_zone_registry, (_zone(), _zone())),
+            (
+                registry.build_settlement_birth_policy_registry,
+                (
+                    SettlementBirthPolicy(POLICY_ANCHOR, 1),
+                    SettlementBirthPolicy(POLICY_ANCHOR, 1),
+                ),
+            ),
+        )
+        for builder, rows in builders:
+            with self.subTest(builder=builder.__name__):
+                with self.assertRaises(MonsterPlacementRegistryError):
+                    builder(rows)
+        # A composition names each variant once; repetition is one range.
+        self._reject(
+            compositions={
+                COMPOSITION: _composition(
+                    members=(_member(ORDINARY, 1, 1), _member(ORDINARY, 1, 1))
+                )
+            }
+        )
+        # A pool names each composition once.
+        self._reject(
+            zones={
+                ZONE: _zone(
+                    pool=(
+                        WeightedComposition(COMPOSITION, 1),
+                        WeightedComposition(COMPOSITION, 2),
+                    )
+                )
+            }
+        )
+
+    def test_inverted_or_non_positive_counts_and_timings_are_rejected(self):
+        zone_cases = (
+            {"lower_density": True},
+            {"lower_density": 0},
+            {"upper_density": 0},
+            {"upper_density": 100},
+            {"lower_density": 5, "upper_density": 4},
+            {"cell_capacity": 0},
+            {"cell_capacity": True},
+            {"recovery_delay": 0},
+            {"replenishment_interval": -1},
+            {"wave_budget": 0},
+        )
+        for overrides in zone_cases:
+            with self.subTest(overrides=overrides):
+                self._reject(zones={ZONE: _zone(**overrides)})
+        member_cases = (
+            _member(ORDINARY, 0, 1),
+            _member(ORDINARY, 2, 1),
+            _member(ORDINARY, 1, True),
+            _member(ORDINARY, True, 1),
+        )
+        for member in member_cases:
+            with self.subTest(member=member):
+                self._reject(
+                    compositions={COMPOSITION: _composition(members=(member,))}
+                )
+
+    def test_pool_weights_must_be_positive_and_reference_known_compositions(self):
+        self._reject(
+            zones={
+                ZONE: _zone(
+                    pool=(WeightedComposition("t_fixture_absent_composition", 1),)
+                )
+            }
+        )
+        for weight in (0, -1, True):
+            with self.subTest(weight=weight):
+                self._reject(
+                    zones={
+                        ZONE: _zone(pool=(WeightedComposition(COMPOSITION, weight),))
+                    }
+                )
+
+    def test_bounded_geometry_must_be_inclusive_integer_rectangles(self):
+        rectangles = (
+            (),
+            ((10, 12, 20),),
+            ((12, 10, 20, 22),),
+            ((10, 12, 22, 20),),
+            ((10, True, 20, 22),),
+            ((10, 12, 20, 22.0),),
+        )
+        for geometry in rectangles:
+            with self.subTest(rectangles=geometry):
+                self._reject(zones={ZONE: _zone(rectangles=geometry)})
+
+    def test_a_complete_group_must_fit_cell_capacity_and_wave_budget(self):
+        group = _composition(COMPOSITION, (_member(ORDINARY, 1, 4),))
+        self._reject(
+            zones={ZONE: _zone(cell_capacity=3, wave_budget=4)},
+            compositions={COMPOSITION: group},
+        )
+        self._reject(
+            zones={ZONE: _zone(cell_capacity=4, wave_budget=3)},
+            compositions={COMPOSITION: group},
+        )
+        # The same group is legal once both limits can hold it.
+        registry.validate_ecology_registries(
+            {ZONE: _zone(cell_capacity=4, wave_budget=4)},
+            {COMPOSITION: group},
+            {},
+            **_ecology_faces(),
+        )
+
+    def test_policy_buffers_are_positive_and_keyed_by_their_anchor(self):
+        for buffer in (0, -1, True, 1.0):
+            with self.subTest(buffer=buffer):
+                self._reject(
+                    policies={
+                        POLICY_ANCHOR: SettlementBirthPolicy(POLICY_ANCHOR, buffer)
+                    }
+                )
+        self._reject(
+            policies={
+                "t_fixture_other_anchor": SettlementBirthPolicy(POLICY_ANCHOR, 2)
+            }
+        )
+        registry.validate_ecology_registries(
+            {ZONE: _zone()},
+            {COMPOSITION: _composition()},
+            {POLICY_ANCHOR: SettlementBirthPolicy(POLICY_ANCHOR, 2)},
+            **_ecology_faces(),
+        )
+
+    def test_validation_is_pure_and_publishes_nothing(self):
+        names = ("ENCOUNTER_COMPOSITION", "ECOLOGY_ZONE", "SETTLEMENT_BIRTH_POLICY")
+        zones = {ZONE: _zone()}
+        compositions = {COMPOSITION: _composition()}
+        policies = {POLICY_ANCHOR: SettlementBirthPolicy(POLICY_ANCHOR, 2)}
+        before = (
+            dict(zones),
+            dict(compositions),
+            dict(policies),
+            [dict(_published(name)) for name in names],
+        )
+        registry.validate_ecology_registries(
+            zones, compositions, policies, **_ecology_faces()
+        )
+        self.assertEqual(
+            (dict(zones), dict(compositions), dict(policies)), before[:3]
+        )
+        self.assertEqual([dict(_published(name)) for name in names], before[3])
+        with self.assertRaises(MonsterPlacementRegistryError):
+            registry.validate_ecology_registries(
+                {ZONE: _zone(rectangles=())}, compositions, policies,
+                **_ecology_faces(),
+            )
+        self.assertEqual([dict(_published(name)) for name in names], before[3])
+
+
 class PublishedRegistryTests(unittest.TestCase):
     """Requirement: the published registries are frozen and execution-free."""
 
@@ -294,6 +578,20 @@ class PublishedRegistryTests(unittest.TestCase):
         }
         self.assertEqual(public_callables, set(EXPECTED_PUBLIC_CALLABLES))
 
+    def test_the_published_ecology_registries_are_read_only_proxies(self):
+        # The birth-policy registry ships empty (every inhabited settlement
+        # already gets the generic minimum ring), so only a populated registry
+        # can demonstrate key deletion.
+        for name in ("ENCOUNTER_COMPOSITION", "ECOLOGY_ZONE", "SETTLEMENT_BIRTH_POLICY"):
+            with self.subTest(registry=name):
+                published = _published(name)
+                self.assertIsInstance(published, MappingProxyType)
+                with self.assertRaises(TypeError):
+                    published["t_fixture_intruder"] = None
+                if published:
+                    with self.assertRaises(TypeError):
+                        del published[next(iter(published))]
+
     def test_the_recovery_vocabulary_is_closed_and_complete(self):
         site_fields = {field.name for field in dataclasses.fields(MonsterSite)}
         self.assertEqual(
@@ -316,8 +614,6 @@ class PublishedRegistryTests(unittest.TestCase):
             self.assertIsNone(registry.ambient_rule(SPARE_REGION))
 
     def test_variant_species_key_reads_the_variant_registry(self):
-        from world.lore import monster_species as species_registry
-
         with patch.object(
             species_registry,
             "MONSTER_VARIANT" + "_REGISTRY",
@@ -358,6 +654,74 @@ class ShippedPlacementContentTests(unittest.TestCase):
             with self.subTest(region=key):
                 self.assertEqual(key, rule.region_key)
                 self.assertTrue(rule.variant_keys)
+
+
+class ShippedEcologyContentTests(unittest.TestCase):
+    """The authored ecology layer is coherent without naming a shipped key."""
+
+    def test_every_shipped_row_validates_against_the_shipped_vocabularies(self):
+        registry.validate_ecology_registries(
+            dict(_published("ECOLOGY_ZONE")),
+            dict(_published("ENCOUNTER_COMPOSITION")),
+            dict(_published("SETTLEMENT_BIRTH_POLICY")),
+        )
+
+    def test_every_shipped_zone_is_keyed_sparse_and_bounded(self):
+        published = _published("ECOLOGY_ZONE")
+        self.assertTrue(published)
+        for key, zone in published.items():
+            with self.subTest(zone=key):
+                self.assertEqual(key, zone.key)
+                self.assertTrue(zone.rectangles)
+                self.assertTrue(zone.pool)
+                self.assertGreaterEqual(zone.lower_density, 1)
+                self.assertLessEqual(zone.lower_density, zone.upper_density)
+                # Automatic population can never occupy every eligible cell.
+                self.assertLess(zone.upper_density, 100)
+
+    def test_every_shipped_composition_declares_complete_positive_ranges(self):
+        for key, composition in _published("ENCOUNTER_COMPOSITION").items():
+            with self.subTest(composition=key):
+                self.assertEqual(key, composition.key)
+                self.assertTrue(composition.members)
+                smallest, largest = registry.composition_bounds(composition)
+                self.assertGreaterEqual(smallest, len(composition.members))
+                self.assertGreaterEqual(largest, smallest)
+
+    def test_every_shipped_pooled_member_belongs_to_its_zone_habitat(self):
+        species = getattr(species_registry, "MONSTER_SPECIES" + "_REGISTRY")
+        variants = getattr(species_registry, "MONSTER_VARIANT" + "_REGISTRY")
+        compositions = _published("ENCOUNTER_COMPOSITION")
+        for zone_key, zone in _published("ECOLOGY_ZONE").items():
+            for row in zone.pool:
+                composition = compositions[row.composition_key]
+                for member in composition.members:
+                    species_key = variants[member.variant_key].species_key
+                    habitat_tags = species[species_key].habitat_tags
+                    with self.subTest(zone=zone_key, variant=member.variant_key):
+                        self.assertIn(zone.region_key, habitat_tags)
+
+    def test_every_shipped_composition_is_pooled_by_a_zone(self):
+        # An unreferenced composition would be an authoring leftover: every
+        # authored composition exists so some bounded habitat can select it.
+        pooled = {
+            row.composition_key
+            for zone in _published("ECOLOGY_ZONE").values()
+            for row in zone.pool
+        }
+        self.assertEqual(pooled, set(_published("ENCOUNTER_COMPOSITION")))
+
+    def test_explicit_site_placement_never_reads_automatic_birth_geometry(self):
+        # The design keeps explicit manual/quest placement outside automatic
+        # birth exclusions and density while shared placement validity still
+        # applies: the site owner must not consult the ecology geometry at all.
+        from pathlib import Path
+
+        from world.maps import monster_sites
+
+        source = Path(monster_sites.__file__).read_text(encoding="utf-8")
+        self.assertNotIn("population_geometry", source)
+        self.assertNotIn("ECOLOGY_ZONE", source)
 
 
 class MonsterPlacementSyncTests(EvenniaTestCase):
