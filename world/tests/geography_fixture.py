@@ -186,7 +186,8 @@ def selected_startup_settlements(settlement_ids: Iterable[str]) -> Iterator[None
     if isinstance(settlement_ids, str):
         raise TypeError("settlement_ids must be an iterable of map ids, not a string")
     ids = tuple(settlement_ids)
-    # Validate and freeze the declaration before anything is patched.
+    # Publish and validate/freeze the declaration before anything is patched.
+    publish_shipped_map_world()
     bootstrap._selected_settlement_graphs(ids)
     real_sync_grid = bootstrap.sync_grid
     real_sync_wilderness = bootstrap.sync_wilderness

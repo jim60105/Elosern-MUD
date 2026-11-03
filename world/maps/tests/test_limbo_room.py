@@ -172,7 +172,15 @@ class LimboRoomTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
         legacy = create_object(Room, key=LIMBO_LEGACY_KEY, location=None)
         # Full startup also synchronizes service hosts in every settlement.
         with selected_startup_settlements(
-            tuple(sorted(WILDERNESS_ENTRY_REGISTRY))
+            tuple(
+                sorted(
+                    {
+                        gate.destination.map_id
+                        for entry in WILDERNESS_ENTRY_REGISTRY.values()
+                        for gate in entry.gates
+                    }
+                )
+            )
         ):
             at_server_start()
 

@@ -1244,13 +1244,13 @@ def sync_grid(*, settlement_ids: Iterable[str] | None = None) -> SyncReport:
 
     from world.maps import runtime
 
-    graphs = _selected_settlement_graphs(settlement_ids)
-    settlement_id_set = frozenset(graph.map_id for graph in graphs)
-
     # This is a world composition root: adopt the complete map world (or use
     # the one startup already adopted) before any graph or reference read.
     runtime.ensure_published()
     validate_static_references()
+
+    graphs = _selected_settlement_graphs(settlement_ids)
+    settlement_id_set = frozenset(graph.map_id for graph in graphs)
 
     if not graphs:
         return SyncReport()
@@ -1436,13 +1436,13 @@ def sync_wilderness(*, settlement_ids: Iterable[str] | None = None) -> None:
 
     from world.maps import runtime
 
-    graphs = _selected_settlement_graphs(settlement_ids)
-    settlement_id_set = frozenset(graph.map_id for graph in graphs)
-
     # This is a world composition root: adopt the complete map world (or use
     # the one startup already adopted) before any graph or reference read.
     runtime.ensure_published()
     validate_static_references()
+
+    graphs = _selected_settlement_graphs(settlement_ids)
+    settlement_id_set = frozenset(graph.map_id for graph in graphs)
 
     if not graphs:
         return

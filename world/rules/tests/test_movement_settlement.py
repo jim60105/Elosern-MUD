@@ -407,8 +407,8 @@ class MovementSettlementWildernessTests(EvenniaTest):
             sync_test_wilderness,
         )
 
-        sync_test_settlements((_CAPITAL.anchor_key,))
-        sync_test_wilderness((_CAPITAL.anchor_key,))
+        sync_test_settlements((_EAST_GATE.destination.map_id,))
+        sync_test_wilderness((_EAST_GATE.destination.map_id,))
         self.east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
         self.gate = [e for e in self.east_gate.exits if isinstance(e, WildernessGateExit)][0]
 

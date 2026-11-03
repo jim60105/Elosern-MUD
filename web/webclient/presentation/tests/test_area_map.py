@@ -685,7 +685,17 @@ class WildernessAreaTests(EvenniaTest):
     def setUp(self):
         super().setUp()
         create_object(Room, key="虛境", location=None)
-        declared = (EAST_GATE_XYZ[2],)
+        from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+
+        declared = tuple(
+            sorted(
+                {
+                    gate.destination.map_id
+                    for entry in WILDERNESS_ENTRY_REGISTRY.values()
+                    for gate in entry.gates
+                }
+            )
+        )
         sync_test_settlements(declared)
         sync_test_wilderness(declared)
         get_world_clock()

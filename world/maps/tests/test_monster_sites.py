@@ -81,7 +81,8 @@ def _declared_map_id():
 
     from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 
-    return next(iter(WILDERNESS_ENTRY_REGISTRY.values())).anchor_key
+    entry = next(iter(WILDERNESS_ENTRY_REGISTRY.values()))
+    return entry.gates[0].destination.map_id
 
 
 def _local_row(ordinary, habitat: str, **overrides) -> AmbientPlacementRule:

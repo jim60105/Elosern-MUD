@@ -222,7 +222,17 @@ class LandmarkArrivalTests(EvenniaTest):
         # Import production-derived population constants before replacing the
         # entry registry. Population itself is unrelated to this seam test.
         import world.maps.wilderness_population
-        sync_test_wilderness(tuple(sorted(WILDERNESS_ENTRY_REGISTRY)))
+        sync_test_wilderness(
+            tuple(
+                sorted(
+                    {
+                        gate.destination.map_id
+                        for entry in WILDERNESS_ENTRY_REGISTRY.values()
+                        for gate in entry.gates
+                    }
+                )
+            )
+        )
         entry=WildernessEntryPoint(anchor_key="t_gate",shape=("#",),origin_xy=(500,500),
                                   gates=(WildernessGate("w",settlement_node_ref("t_probe_grid","gate")),))
         cell=entry.approach_cell(entry.gates[0])

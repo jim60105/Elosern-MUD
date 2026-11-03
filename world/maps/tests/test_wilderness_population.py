@@ -516,8 +516,18 @@ class OnboardingHuntIntegrationTests(BattlefieldIsolation, RegistryIsolationMixi
         super().setUp()
         create_object(Room, key="虛境", location=None)
         sync_all()
-        sync_test_settlements((_EAST_GATE.destination.map_id,))
-        sync_test_wilderness((_EAST_GATE.destination.map_id,))
+        from world.maps import interiors
+
+        declared = tuple(
+            sorted(
+                {
+                    exterior.settlement
+                    for exterior in interiors.current().exteriors.values()
+                }
+            )
+        )
+        sync_test_settlements(declared)
+        sync_test_wilderness(declared)
         register_catalog()
         sync_quest_runtime()
         sync_guild_economy()

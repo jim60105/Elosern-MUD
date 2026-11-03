@@ -209,7 +209,13 @@ class SampleCityCostedExitTests(_ChargeAssertions, EvenniaTest):
         # The village's wildcard link override spawns CostedXYZExit for every
         # intra-village link, and each step charges the same physical-edge
         # calculation as a capital street step.
-        sync_test_settlements((WILDERNESS_ENTRY_REGISTRY["village_ciaran"].anchor_key,))
+        sync_test_settlements(
+            (
+                WILDERNESS_ENTRY_REGISTRY["village_ciaran"]
+                .gate_for("n")
+                .destination.map_id,
+            )
+        )
         village_entrance = settlement_node_xyz(
             WILDERNESS_ENTRY_REGISTRY["village_ciaran"].gate_for("n").destination
         )
@@ -227,13 +233,13 @@ class SampleCityCostedExitTests(_ChargeAssertions, EvenniaTest):
     @covers_requirement("sample-city-altoria::the-sample-city-s-declared-intra-city-exits-spawn-as-costedxyzexit", "world-clock::move-and-converse-command-default-time-costs-are-declared-as-rulebook-data-only")
     def test_limbo_bridge_exit_advances_clock_on_successful_traversal(self):
         sync_test_settlements(
-            (WILDERNESS_ENTRY_REGISTRY["capital_altoria"].anchor_key,)
+            (WILDERNESS_ENTRY_REGISTRY["capital_altoria"].gate_for("n").destination.map_id,)
         )
         limbo = self.room2
         limbo.key = LIMBO_KEY
         limbo.save()
         sync_test_settlements(
-            (WILDERNESS_ENTRY_REGISTRY["capital_altoria"].anchor_key,)
+            (WILDERNESS_ENTRY_REGISTRY["capital_altoria"].gate_for("n").destination.map_id,)
         )
         south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
         from_each = [

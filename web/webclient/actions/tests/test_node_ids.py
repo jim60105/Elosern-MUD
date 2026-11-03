@@ -45,7 +45,7 @@ class NodeIdEncoderTests(EvenniaTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        sync_test_settlements((_gate_xyz()[2],))
+        sync_test_settlements((_south_gate_xyz()[2],))
 
     def setUp(self):
         self.player = create_object(PlayerCharacter, key="節點測試")

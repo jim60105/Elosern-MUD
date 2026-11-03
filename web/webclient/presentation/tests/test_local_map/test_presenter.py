@@ -47,8 +47,8 @@ class LocalMapPresenterTests(EvenniaTestCase):
     def setUpClass(cls):
         super().setUpClass()
         create_object(Room, key="虛境", location=None)
-        sync_test_settlements((EAST_GATE_XYZ[2],))
-        sync_test_wilderness((EAST_GATE_XYZ[2],))
+        sync_test_settlements((_T_MAP_KEY,))
+        sync_test_wilderness((_T_MAP_KEY,))
         cls._south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
 
     def setUp(self):

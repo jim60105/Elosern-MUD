@@ -30,7 +30,7 @@ Use a real env file containing `MUD_TEST_SETTINGS=1` and the single-token spelli
 
 - [x] 5.1 Run `uv run --locked --env-file=<file> evennia test --settings test_settings.py --keepdb --noinput --durations 0 world.maps.tests.test_bootstrap.SelectedSettlementSyncTests`, then the four existing classes as separate focused commands using the same prefix. Run `world.maps.tests.test_runtime_adoption`, each class in `world.maps.tests.test_editor_final_yaml_adoption`, `world.maps.tests.test_limbo_room` and `world.maps.tests.test_instance_stage_wiring` separately. Acceptance: every focused command reports `OK`; selected planner/writer membership is bounded by the declared fixture set even when unrelated synthetic graphs are added; the default-path tests cover all declared graphs; the whole-roster assertions still visit every registry row; and the two startup-boundary modules assert their original ordering, rename and registration outcomes under the adapter. Record informational post-apply durations alongside the proposal measurement, with no pass/fail timing threshold.
 - [ ] 5.2 Run focused classes for every migrated module from design decision 3, retaining each module's existing shard owner. Batch only while staying within the discovery/time limits. Include map/wilderness roundtrips, movement cost, service/interior setup, quest observation and the class-level presentation fixtures; these exercise the declaration dependency joins. Run `uv run --locked --env-file=<file> evennia test --settings test_settings.py --keepdb --noinput tests.test_evennia_test_optimization_contract`. Acceptance: all changed consumer classes and the ownership contract report `OK`; no assertion or requirement annotation has been removed merely to accommodate a smaller fixture.
-- [ ] 5.3 Run `openspec validate scope-test-settlement-sync --strict`, `uv run --locked python -m tools.observability_lint check`, `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.spec_traceability check` and `uv run --locked python -m tools.contract_gate`. Acceptance: all exit zero with no OpenSpec warnings, uncovered current requirements, added freeze entries or shard-ownership errors. Confirm the default full-roster test and unchanged production call signature separately from the startup adapter's selected behavior; report only the tests and diagnostics actually exercised.
+- [x] 5.3 Run `openspec validate scope-test-settlement-sync --strict`, `uv run --locked python -m tools.observability_lint check`, `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.spec_traceability check` and `uv run --locked python -m tools.contract_gate`. Acceptance: all exit zero with no OpenSpec warnings, uncovered current requirements, added freeze entries or shard-ownership errors. Confirm the default full-roster test and unchanged production call signature separately from the startup adapter's selected behavior; report only the tests and diagnostics actually exercised.
 
 ## Pre-synchronization annotation ledger
 
@@ -62,3 +62,28 @@ Hand-off (test -> delta requirement scenario):
 - `test_default_selection_materializes_every_graph_and_runtime_stays_selector_free` -> Modified requirement: default full-roster path and production runtime invocation.
 - `test_adapter_forwards_a_frozen_declaration_and_restores_bindings` -> Startup test selection retains the production writer; bindings restored after success/failure.
 - `test_adapter_requires_an_argument_and_preserves_the_published_bundle` -> Explicit declaration requirement; published bundle preserved.
+- `test_cold_process_default_sync_publishes_before_reading_the_registry` -> Modified requirement: publication precedes the registry read on a cold process.
+
+## Informational post-apply durations (no pass/fail threshold)
+
+Measured on the feature worktree with the focused labels above; compare with
+the proposal's historical 147.381 s (2 settlements) to 1,868 s (60
+settlements) for the 50-method bootstrap module. These are diagnostics, not
+acceptance gates.
+
+| Command | Tests | Duration |
+|---|---:|---:|
+| `SelectedSettlementSyncTests` | 10 | 5.428 s |
+| `GridBootstrapTests` | 24 | 108.331 s |
+| `WildernessBootstrapTests` | 17 | 116.356 s |
+| `SparseSettlementSyncTests` | 4 | 2.788 s |
+| `MetricCutoverTests` | 5 | 18.722 s |
+| `test_runtime_adoption` | 7 | 364.787 s |
+| `FinalYamlAdoptionTests` | 4 | 252.846 s |
+| `test_limbo_room` | 22 | 77.201 s |
+| `test_instance_stage_wiring` | 6 | 13.712 s |
+| map consumer batch (movement/walkthrough/roundtrip/art/service) | 44 | 89.618 s |
+| remaining map consumers batch | 88/51 (two runs) | 8.296 s / 12.208 s |
+| rules party batch | 89 | 29.255 s |
+| rules service/persona batch | 90 | 18.055 s |
+| web presentation batch | 80 | 618.345 s |

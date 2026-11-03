@@ -825,8 +825,8 @@ class WildernessPlanTestCase(EvenniaTest):
         self.room1.key = "Room1"
         self.room1.save()
         create_object(Room, key="虛境", location=None)
-        sync_test_settlements((_CAPITAL.anchor_key,))
-        sync_test_wilderness((_CAPITAL.anchor_key,))
+        sync_test_settlements((_EAST_GATE.destination.map_id,))
+        sync_test_wilderness((_EAST_GATE.destination.map_id,))
         self.east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
         self.gate = [
             exit_obj

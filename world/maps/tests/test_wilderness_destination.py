@@ -440,8 +440,9 @@ class WildernessDestinationTraversalPinTests(EvenniaTest):
         super().setUp()
         create_object(Room, key="虛境", location=None)
         sync_all()
-        sync_test_settlements((_ENTRY.anchor_key,))
-        sync_test_wilderness((_ENTRY.anchor_key,))
+        declared = (EAST_GATE_XYZ[2],)
+        sync_test_settlements(declared)
+        sync_test_wilderness(declared)
         from typeclasses.exits import WildernessGateExit
         from typeclasses.rooms import GridRoom
 

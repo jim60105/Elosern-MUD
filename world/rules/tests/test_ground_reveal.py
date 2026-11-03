@@ -467,7 +467,9 @@ class SkipObservationTests(EvenniaTest):
             sync_test_wilderness,
         )
 
-        declared = (next(iter(WILDERNESS_ENTRY_REGISTRY.values())).anchor_key,)
+        declared = (
+            next(iter(WILDERNESS_ENTRY_REGISTRY.values())).gate_for("w").destination.map_id,
+        )
         sync_test_settlements(declared)
         sync_test_wilderness(declared)
         self.cell = self._valid_cell()

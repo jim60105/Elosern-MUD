@@ -106,8 +106,9 @@ class CityWildernessRoundTripTests(_ChargeAssertions, EvenniaTest):
         self.room2.save()
         create_object(Room, key="虛境", location=None)
         sync_all()
-        sync_test_settlements((_ENTRY.anchor_key,))
-        sync_test_wilderness((_ENTRY.anchor_key,))
+        declared = (_EAST_GATE.destination.map_id,)
+        sync_test_settlements(declared)
+        sync_test_wilderness(declared)
         self.east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
         self.gate = [e for e in self.east_gate.exits if isinstance(e, WildernessGateExit)][0]
 

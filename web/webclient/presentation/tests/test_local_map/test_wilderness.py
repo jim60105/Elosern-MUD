@@ -249,8 +249,19 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
     def setUp(self):
         super().setUp()
         create_object(Room, key="虛境", location=None)
-        sync_test_settlements((EAST_GATE_XYZ[2],))
-        sync_test_wilderness((EAST_GATE_XYZ[2],))
+        from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+
+        declared = tuple(
+            sorted(
+                {
+                    gate.destination.map_id
+                    for entry in WILDERNESS_ENTRY_REGISTRY.values()
+                    for gate in entry.gates
+                }
+            )
+        )
+        sync_test_settlements(declared)
+        sync_test_wilderness(declared)
         self.south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
         self.east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
 
@@ -507,8 +518,19 @@ class LocalMapWildernessDisclosureTests(EvenniaTest):
     def setUp(self):
         super().setUp()
         create_object(Room, key="虛境", location=None)
-        sync_test_settlements((EAST_GATE_XYZ[2],))
-        sync_test_wilderness((EAST_GATE_XYZ[2],))
+        from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+
+        declared = tuple(
+            sorted(
+                {
+                    gate.destination.map_id
+                    for entry in WILDERNESS_ENTRY_REGISTRY.values()
+                    for gate in entry.gates
+                }
+            )
+        )
+        sync_test_settlements(declared)
+        sync_test_wilderness(declared)
 
     def _registry(self):
         return build_production_registry()

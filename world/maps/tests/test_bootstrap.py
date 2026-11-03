@@ -45,10 +45,14 @@ SOUTH_GATE_XYZ = settlement_node_xyz(_CAPITAL_ENTRY.gate_for("n").destination)
 EAST_GATE_XYZ = settlement_node_xyz(_CAPITAL_ENTRY.gate_for("w").destination)
 
 #: The capital/village pair every cross-settlement fixture in this module needs.
-CAPITAL_MAP_IDS = (_CAPITAL_ENTRY.anchor_key,)
-VILLAGE_MAP_IDS = (_VILLAGE_ENTRY.anchor_key,)
-CAPITAL_VILLAGE_MAP_IDS = tuple(
-    sorted({_CAPITAL_ENTRY.anchor_key, _VILLAGE_ENTRY.anchor_key})
+#: Selector ids are settlement map ids, never entry anchor/location identities.
+CAPITAL_MAP_IDS = (_CAPITAL_ENTRY.gate_for("w").destination.map_id,)
+VILLAGE_MAP_IDS = (_VILLAGE_ENTRY.gate_for("n").destination.map_id,)
+CAPITAL_VILLAGE_MAP_IDS = tuple(sorted({*CAPITAL_MAP_IDS, *VILLAGE_MAP_IDS}))
+SELECTED_GATE_ROW_COUNT = sum(
+    1
+    for row in CITY_GATE_REGISTRY.values()
+    if row.gate.map_id in CAPITAL_VILLAGE_MAP_IDS
 )
 #: The map ids the starting-room bridge rows would materialize.
 CITY_GATE_MAP_IDS = tuple(
@@ -149,7 +153,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         self.assertEqual(len(self._bridging_exits()), 2)
         self.assertEqual(
             len(self._bridging_exits()) + self._count_city_exits(),
-            _declared_road_count(CAPITAL_VILLAGE_MAP_IDS) + len(CITY_GATE_REGISTRY),
+            _declared_road_count(CAPITAL_VILLAGE_MAP_IDS) + SELECTED_GATE_ROW_COUNT,
         )
 
     def test_sync_grid_is_idempotent_and_preserves_dbid(self):
@@ -654,7 +658,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         self.assertEqual(
             self._count_city_exits(), _declared_road_count(CAPITAL_VILLAGE_MAP_IDS)
         )
-        self.assertEqual(len(self._bridging_exits()), len(CITY_GATE_REGISTRY))
+        self.assertEqual(len(self._bridging_exits()), SELECTED_GATE_ROW_COUNT)
 
 
 class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
@@ -2069,6 +2073,20 @@ class SelectedSettlementSyncTests(EvenniaTest):
         ):
             runtime.synchronize()
         grid_call.assert_called_once_with()
+
+    def test_cold_process_default_sync_publishes_before_reading_the_registry(self):
+        from world.maps import runtime
+
+        runtime.clear_published_world()
+        self.addCleanup(runtime.ensure_published)
+        alpha = self._alpha()
+        with patch(
+            "world.maps.bootstrap.SETTLEMENT_GRAPHS",
+            _synthetic_registry(alpha),
+        ):
+            sync_grid()
+        self.assertTrue(runtime.is_published())
+        self.assertEqual(len(self._rooms(ALPHA)), 2)
 
     def test_wilderness_selection_uses_destination_map_identity(self):
         from evennia.contrib.grid.wilderness.wilderness import WildernessScript

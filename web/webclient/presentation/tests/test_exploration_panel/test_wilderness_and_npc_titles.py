@@ -40,7 +40,7 @@ class WildernessExplorationPresenterTests(EvenniaTestCase):
 
         declared = (
             next(
-                entry.anchor_key
+                entry.gate_for("w").destination.map_id
                 for entry in WILDERNESS_ENTRY_REGISTRY.values()
                 if entry.gate_for("w") is not None
             ),

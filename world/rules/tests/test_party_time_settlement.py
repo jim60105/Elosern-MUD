@@ -627,8 +627,8 @@ class WildernessPartySettlementTests(_PartySettlementFixture, EvenniaTest):
             sync_test_wilderness,
         )
 
-        sync_test_settlements((_CAPITAL.anchor_key,))
-        sync_test_wilderness((_CAPITAL.anchor_key,))
+        sync_test_settlements((_EAST_GATE.destination.map_id,))
+        sync_test_wilderness((_EAST_GATE.destination.map_id,))
         self.east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
         self.gate = [
             exit_obj

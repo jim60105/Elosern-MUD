@@ -72,18 +72,6 @@ class GridRoomArtMetadataTests(EvenniaTest):
     def setUp(self):
         super().setUp()
         _limbo()
-        from world.tests.geography_fixture import sync_test_settlements
-
-        sync_test_settlements(
-            tuple(
-                sorted(
-                    {
-                        reference.map_id
-                        for reference in GRID_NODE_SCENE_ARCHETYPES
-                    }
-                )
-            )
-        )
 
     def _room(self, key):
         from world.maps.static_references import settlement_node_xyz
@@ -165,23 +153,17 @@ class GridRoomArtMetadataTests(EvenniaTest):
                 )
 
     def test_repeated_startup_converges_drifted_grid_metadata(self):
+        from world.tests.geography_fixture import sync_test_settlements
+
         key = next(iter(GRID_NODE_SCENE_ARCHETYPES))
+        sync_test_settlements((key.map_id,))
         room = self._room(key)
         room.scene_archetype = None
         room.room_art_key = _registered_room_art_key()
         room.scene_identity = "drifted"
         room.save()
 
-        sync_test_settlements(
-            tuple(
-                sorted(
-                    {
-                        reference.map_id
-                        for reference in GRID_NODE_SCENE_ARCHETYPES
-                    }
-                )
-            )
-        )
+        sync_test_settlements((key.map_id,))
 
         room = self._room(key)
         self.assertEqual(room.scene_archetype, GRID_NODE_SCENE_ARCHETYPES[key])
@@ -458,10 +440,7 @@ class RoomMetadataSmokeTests(EvenniaTest):
         sync_test_settlements(
             tuple(
                 sorted(
-                    {
-                        reference.map_id
-                        for reference in GRID_NODE_SCENE_ARCHETYPES
-                    }
+                    {next(iter(GRID_NODE_SCENE_ARCHETYPES)).map_id}
                     | {
                         exterior.settlement
                         for exterior in interiors.current().exteriors.values()
