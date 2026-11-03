@@ -1721,6 +1721,9 @@ class SelectedSettlementSyncTests(EvenniaTest):
     def _beta(self, start=(1, 1), north=(1, 2)):
         return _synthetic_graph_for(BETA, start, north)
 
+    @covers_requirement(
+        "grid-room-sync::explicit-settlement-selection-bounds-test-synchronization"
+    )
     def test_selected_work_is_bounded_and_unrelated_growth_adds_nothing(self):
         alpha = self._alpha()
         beta = self._beta()
@@ -1760,6 +1763,9 @@ class SelectedSettlementSyncTests(EvenniaTest):
         self.assertEqual(self._rooms(GAMMA), [])
         self.assertEqual(self._rooms(DELTA), [])
 
+    @covers_requirement(
+        "grid-room-sync::explicit-settlement-selection-bounds-test-synchronization"
+    )
     def test_unknown_and_malformed_selections_reject_before_planning(self):
         alpha = self._alpha()
         registry = _synthetic_registry(alpha)
@@ -1791,6 +1797,9 @@ class SelectedSettlementSyncTests(EvenniaTest):
         self.assertEqual({exit_obj.id for exit_obj in Exit.objects.all()}, before_exits)
         self.assertEqual(set(self._room((1, 1, ALPHA)).tags.all()), before_tags)
 
+    @covers_requirement(
+        "grid-room-sync::explicit-settlement-selection-bounds-test-synchronization"
+    )
     def test_selection_is_deduplicated_sorted_and_one_shot(self):
         alpha = self._alpha()
         beta = self._beta()
@@ -1809,6 +1818,9 @@ class SelectedSettlementSyncTests(EvenniaTest):
         self.assertEqual(len(self._rooms(ALPHA)), 2)
         self.assertEqual(len(self._rooms(BETA)), 2)
 
+    @covers_requirement(
+        "grid-room-sync::explicit-settlement-selection-bounds-test-synchronization"
+    )
     def test_explicit_empty_selection_performs_no_persistent_work(self):
         from evennia.contrib.grid.wilderness.wilderness import WildernessScript
         from evennia.contrib.grid.xyzgrid.xyzgrid import XYZGrid
@@ -1840,6 +1852,9 @@ class SelectedSettlementSyncTests(EvenniaTest):
             WildernessScript.objects.filter(db_key=WILDERNESS_NAME).count(), 0
         )
 
+    @covers_requirement(
+        "grid-room-sync::explicit-settlement-selection-bounds-test-synchronization"
+    )
     def test_selected_batch_failure_rolls_back_both_settlements(self):
         from typeclasses.characters import PlayerCharacter
         from typeclasses.npcs import NPC
@@ -1914,6 +1929,9 @@ class SelectedSettlementSyncTests(EvenniaTest):
 
         return ObjectDB.objects.get(pk=pk)
 
+    @covers_requirement(
+        "grid-room-sync::explicit-settlement-selection-bounds-test-synchronization"
+    )
     def test_ancillary_work_respects_the_selection_and_global_prune_stays(self):
         from evennia.contrib.grid.xyzgrid.xyzgrid import XYZGrid
         from world.maps import bootstrap
@@ -2074,6 +2092,9 @@ class SelectedSettlementSyncTests(EvenniaTest):
             runtime.synchronize()
         grid_call.assert_called_once_with()
 
+    @covers_requirement(
+        "grid-room-sync::sync-grid-is-distinct-from-sync-all-and-instantiates-real-rooms-and-exits"
+    )
     def test_cold_process_default_sync_publishes_before_reading_the_registry(self):
         from world.maps import runtime
 
@@ -2088,6 +2109,9 @@ class SelectedSettlementSyncTests(EvenniaTest):
         self.assertTrue(runtime.is_published())
         self.assertEqual(len(self._rooms(ALPHA)), 2)
 
+    @covers_requirement(
+        "grid-room-sync::explicit-settlement-selection-bounds-test-synchronization"
+    )
     def test_wilderness_selection_uses_destination_map_identity(self):
         from evennia.contrib.grid.wilderness.wilderness import WildernessScript
         from world.lore.wilderness_entry import WildernessEntryPoint, WildernessGate
@@ -2173,6 +2197,9 @@ class SelectedSettlementSyncTests(EvenniaTest):
             bootstrap.WILDERNESS_ENTRY_REGISTRY, WILDERNESS_ENTRY_REGISTRY
         )
 
+    @covers_requirement(
+        "grid-room-sync::explicit-settlement-selection-bounds-test-synchronization"
+    )
     def test_adapter_forwards_a_frozen_declaration_and_restores_bindings(self):
         from world.maps import bootstrap
 
@@ -2203,6 +2230,9 @@ class SelectedSettlementSyncTests(EvenniaTest):
         self.assertIs(bootstrap.sync_grid, real_grid)
         self.assertIs(bootstrap.sync_wilderness, real_wilderness)
 
+    @covers_requirement(
+        "grid-room-sync::explicit-settlement-selection-bounds-test-synchronization"
+    )
     def test_adapter_requires_an_argument_and_preserves_the_published_bundle(self):
         from world.maps import runtime
 
