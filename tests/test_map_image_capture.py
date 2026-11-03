@@ -36,6 +36,12 @@ DOCUMENTS = (
     "content/maps/locations.yaml",
     "content/maps/districts.yaml",
 )
+#: Mirrors ``FIT_TOLERANCE`` in ``tools/map-editor/frontend/src/lib/capture.js``:
+#: the relative growth (a fraction of the extent's span on each axis) below
+#: which the full-map fit counts as settled. Two fits of the same map agree
+#: only to within this slack, so a camera "does not move" when every bound
+#: stays within it.
+FIT_TOLERANCE = 0.005
 RESULT_KEYS = {
     "image_path",
     "view",
@@ -371,6 +377,15 @@ class CaptureInvocationTests(_CaptureCase):
         self.assertEqual((first["format"], second["format"]), ("WEBP", "PNG"))
         self.assertEqual((webp["format"], png["format"]), ("webp", "png"))
 
+    def assert_same_camera(self, bounds, expected, message):
+        """Equal within the fit's own settling slack, as ``boxContains`` measures it."""
+
+        min_x, min_y, max_x, max_y = expected
+        slack = ((max_x - min_x) * FIT_TOLERANCE, (max_y - min_y) * FIT_TOLERANCE)
+        self.assertEqual(len(bounds), 4, message)
+        for index, (actual, wanted) in enumerate(zip(bounds, expected)):
+            self.assertLessEqual(abs(actual - wanted), slack[index % 2], f"{message}: {bounds} != {expected}")
+
     @covers_requirement("map-image-capture::capture-invocation-selects-exactly-one-validated-map-view")
     def test_every_layer_can_be_hidden_and_the_camera_does_not_move(self):
         cases = (
@@ -392,7 +407,7 @@ class CaptureInvocationTests(_CaptureCase):
                     *identity, *camera, "--hide", layer, "--output", self.out(f"{view}-{layer}.webp")
                 )
                 self.assertEqual(document["hidden_layers"], [layer], layer)
-                self.assertEqual(document["bounds"], baseline["bounds"], f"{layer}: the camera must not move")
+                self.assert_same_camera(document["bounds"], baseline["bounds"], f"{layer}: the camera must not move")
                 pixels = decode_images(self.output / f"{view}-{layer}.webp")[
                     str(self.output / f"{view}-{layer}.webp")
                 ]["digest"]
@@ -402,7 +417,9 @@ class CaptureInvocationTests(_CaptureCase):
                 *identity, *camera, "--hide", *layers, "--output", self.out(f"{view}-none.webp")
             )
             self.assertEqual(hidden["hidden_layers"], sorted(layers))
-            self.assertEqual(hidden["bounds"], baseline["bounds"])
+            self.assert_same_camera(
+                hidden["bounds"], baseline["bounds"], f"{view}: hiding everything must not move the camera"
+            )
             self.assert_image(self.output / f"{view}-none.webp", hidden, image_format="webp")
 
     @covers_requirement("map-image-capture::capture-invocation-selects-exactly-one-validated-map-view")
