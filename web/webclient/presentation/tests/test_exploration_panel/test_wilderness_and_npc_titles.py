@@ -16,7 +16,7 @@ from web.webclient.presentation.exploration import (
     validate_exploration,
 )
 from web.webclient.presentation.registry import build_production_registry
-from world.maps.bootstrap import sync_grid, sync_wilderness
+from world.tests.geography_fixture import sync_test_settlements, sync_test_wilderness
 from world.rules.map_knowledge import record_arrival
 
 from ._support import _context
@@ -36,8 +36,17 @@ class WildernessExplorationPresenterTests(EvenniaTestCase):
     def setUpClass(cls):
         super().setUpClass()
         create_object(Room, key="虛境", location=None)
-        sync_grid()
-        sync_wilderness()
+        from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+
+        declared = (
+            next(
+                entry.anchor_key
+                for entry in WILDERNESS_ENTRY_REGISTRY.values()
+                if entry.gate_for("w") is not None
+            ),
+        )
+        sync_test_settlements(declared)
+        sync_test_wilderness(declared)
         # The east gate room, probed from the live wilderness-entry registry
         # (test-data gate): the entry authoring a "w" return-direction gate.
         import importlib

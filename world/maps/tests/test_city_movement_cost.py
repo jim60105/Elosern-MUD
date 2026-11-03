@@ -13,13 +13,15 @@ from typeclasses.exits import CostedXYZExit, Exit
 from typeclasses.rooms import GridRoom, Room
 from world.lore.sync import sync_all
 from world.maps.map_data import SETTLEMENT_GRAPHS
-from world.maps.bootstrap import sync_grid
 from world.maps.limbo import LIMBO_KEY
 from world.maps.static_references import settlement_node_xyz
 from world.rules.clock import CLOCK_YAML, get_world_clock
 
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
-from world.tests.geography_fixture import publish_shipped_geography
+from world.tests.geography_fixture import (
+    publish_shipped_geography,
+    sync_test_settlements,
+)
 
 publish_shipped_geography()
 
@@ -33,6 +35,46 @@ MOVE = CLOCK_YAML["command_defaults"]["move"]
 # settlement 1.25 m/s calibration, rounded upward once; the capital's own
 # duration is checked against the authored polyline instead.
 HIDDEN_PATH_TO_PLAZA_SECONDS = 394
+
+SYNTHETIC_COST_MAPS = ("t_cost_path", "t_cost_spur")
+
+
+def _synthetic_cost_graphs():
+    """Invented graphs with independently known directed-road counts."""
+
+    from elosern_map_core.sparse import SparseNode, SparseRoad, SparseSettlementGraph
+
+    def node(node_id, x, y):
+        return SparseNode(
+            node_id=node_id,
+            x=x,
+            y=y,
+            prototype={"prototype_parent": "grid_room", "key": f"測試{node_id}"},
+        )
+
+    path = SparseSettlementGraph(
+        SYNTHETIC_COST_MAPS[0],
+        [node("a", 1, 1), node("b", 1, 2), node("c", 1, 3)],
+        [
+            SparseRoad("a>b", "a", "b"),
+            SparseRoad("b>c", "b", "c"),
+            SparseRoad("c>a", "c", "a"),
+        ],
+        exit_prototype={
+            "prototype_parent": "xyz_exit",
+            "typeclass": "typeclasses.exits.CostedXYZExit",
+        },
+    )
+    spur = SparseSettlementGraph(
+        SYNTHETIC_COST_MAPS[1],
+        [node("s", 5, 5), node("t", 5, 6)],
+        [SparseRoad("s>t", "s", "t")],
+        exit_prototype={
+            "prototype_parent": "xyz_exit",
+            "typeclass": "typeclasses.exits.CostedXYZExit",
+        },
+    )
+    return {path.map_id: path, spur.map_id: spur}, {path.map_id: 3, spur.map_id: 1}
 
 
 def _polyline_metres(points):
@@ -64,13 +106,24 @@ class SampleCityCostedExitTests(_ChargeAssertions, EvenniaTest):
         return [obj for obj in XYZExit.objects.all_family()]
 
     def test_fresh_spawn_every_intra_city_exit_is_costed_xyz_exit(self):
-        sync_grid()
+        graphs, expected_roads = _synthetic_cost_graphs()
+        with patch("world.maps.bootstrap.SETTLEMENT_GRAPHS", graphs):
+            sync_test_settlements(SYNTHETIC_COST_MAPS)
         exits = self._intra_city_exits()
-        # Every authored directed road spawns the costed exit.
-        self.assertEqual(
-            len(exits),
-            sum(len(graph.edges) for graph in SETTLEMENT_GRAPHS.values()),
-        )
+        # Every invented directed road spawns the costed exit; the independently
+        # declared per-map counts would fail if one map were silently skipped.
+        self.assertEqual(len(exits), sum(expected_roads.values()))
+        for map_id, expected in expected_roads.items():
+            self.assertEqual(
+                len(
+                    [
+                        exit_obj
+                        for exit_obj in exits
+                        if exit_obj.destination.xyz[2] == map_id
+                    ]
+                ),
+                expected,
+            )
         for exit_obj in exits:
             self.assertIsInstance(exit_obj, CostedXYZExit)
 
@@ -88,7 +141,7 @@ class SampleCityCostedExitTests(_ChargeAssertions, EvenniaTest):
         )
         without_override = {"capital_altoria": bare_graph}
         with patch("world.maps.bootstrap.SETTLEMENT_GRAPHS", without_override):
-            sync_grid()
+            sync_test_settlements((capital.map_id,))
 
         loaded = self._intra_city_exits()
         self.assertEqual(len(loaded), len(capital.roads))
@@ -96,7 +149,7 @@ class SampleCityCostedExitTests(_ChargeAssertions, EvenniaTest):
             self.assertEqual(type(exit_obj).__name__, "XYZExit")
 
         # Second sync WITH the wildcard override.
-        sync_grid()
+        sync_test_settlements((capital.map_id,))
         for exit_obj in loaded:
             self.assertEqual(
                 exit_obj.db_typeclass_path, "typeclasses.exits.CostedXYZExit"
@@ -122,7 +175,7 @@ class SampleCityCostedExitTests(_ChargeAssertions, EvenniaTest):
     def test_fresh_intra_city_traversal_advances_clock_by_move(self):
         from world.maps.map_data import current
 
-        sync_grid()
+        sync_test_settlements((SETTLEMENT_GRAPHS["capital_altoria"].map_id,))
         south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
         self.char1.location = south_gate
         city_exit = next(e for e in south_gate.exits if isinstance(e, CostedXYZExit))
@@ -156,7 +209,7 @@ class SampleCityCostedExitTests(_ChargeAssertions, EvenniaTest):
         # The village's wildcard link override spawns CostedXYZExit for every
         # intra-village link, and each step charges the same physical-edge
         # calculation as a capital street step.
-        sync_grid()
+        sync_test_settlements((WILDERNESS_ENTRY_REGISTRY["village_ciaran"].anchor_key,))
         village_entrance = settlement_node_xyz(
             WILDERNESS_ENTRY_REGISTRY["village_ciaran"].gate_for("n").destination
         )
@@ -173,11 +226,15 @@ class SampleCityCostedExitTests(_ChargeAssertions, EvenniaTest):
 
     @covers_requirement("sample-city-altoria::the-sample-city-s-declared-intra-city-exits-spawn-as-costedxyzexit", "world-clock::move-and-converse-command-default-time-costs-are-declared-as-rulebook-data-only")
     def test_limbo_bridge_exit_advances_clock_on_successful_traversal(self):
-        sync_grid()
+        sync_test_settlements(
+            (WILDERNESS_ENTRY_REGISTRY["capital_altoria"].anchor_key,)
+        )
         limbo = self.room2
         limbo.key = LIMBO_KEY
         limbo.save()
-        sync_grid()
+        sync_test_settlements(
+            (WILDERNESS_ENTRY_REGISTRY["capital_altoria"].anchor_key,)
+        )
         south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
         from_each = [
             exit_obj

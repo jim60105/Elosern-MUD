@@ -30,7 +30,10 @@ from world.quests.definitions import (
 from world.quests.room_observation import QuestObservableRoomMixin
 from world.maps.static_references import settlement_node_xyz
 from world.quests.runtime import QuestState, accept_quest, read_records, to_storage
-from world.maps.bootstrap import sync_grid, sync_wilderness
+from world.tests.geography_fixture import (
+    sync_test_settlements,
+    sync_test_wilderness,
+)
 from world.rules.guild_offers import QuestReward
 from world.quests.tests._scene_package_fixtures import (
     issuer_capabilities,
@@ -206,7 +209,7 @@ class RoomArrivalProgressTests(EscortOfferMixin, QuestRegistryIsolation, Evennia
     def setUp(self):
         super().setUp()
         create_object(Room, key="虛境", location=None)
-        sync_grid()
+        sync_test_settlements((live_anchor_placement_row().zcoord,))
         self.player = create_object(PlayerCharacter, key="room-player")
         self.player.race = "human"
         self.player.apply_race_baseline()
@@ -464,7 +467,7 @@ class PartyArrivalProgressTests(EscortOfferMixin, QuestRegistryIsolation, Evenni
     def setUp(self):
         super().setUp()
         create_object(Room, key="虛境", location=None)
-        sync_grid()
+        sync_test_settlements((live_anchor_placement_row().zcoord,))
         self.room1.key = "Room1"
         self.room1.save()
         self.anchor = self._anchor()
@@ -624,9 +627,10 @@ class WildernessObservationExclusionTests(QuestRegistryIsolation, EvenniaTest):
     def setUp(self):
         super().setUp()
         create_object(Room, key="虛境", location=None)
-        sync_grid()
-        sync_wilderness()
-        self.east_gate = GridRoom.objects.filter_xyz(xyz=_east_gate_xyz()).first()
+        east_gate_xyz = _east_gate_xyz()
+        sync_test_settlements((east_gate_xyz[2],))
+        sync_test_wilderness((east_gate_xyz[2],))
+        self.east_gate = GridRoom.objects.filter_xyz(xyz=east_gate_xyz).first()
         self.gate = [e for e in self.east_gate.exits if e.key == "荒野"][0]
 
     def _step(self, direction: str):

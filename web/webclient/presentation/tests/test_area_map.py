@@ -62,7 +62,7 @@ from web.webclient.presentation.registry import (
     PresenterSpec,
     build_production_registry,
 )
-from world.maps.bootstrap import sync_grid, sync_wilderness
+from world.tests.geography_fixture import sync_test_settlements, sync_test_wilderness
 from world.rules.clock import get_world_clock
 from world.rules.map_knowledge import encode_grid, encode_room, parse_knowledge, record_arrival
 
@@ -193,8 +193,9 @@ class GridAreaTests(EvenniaTestCase):
     def setUpClass(cls):
         super().setUpClass()
         create_object(Room, key="虛境", location=None)
-        sync_grid()
-        sync_wilderness()
+        declared = (EAST_GATE_XYZ[2],)
+        sync_test_settlements(declared)
+        sync_test_wilderness(declared)
 
     def setUp(self):
         get_world_clock()
@@ -469,7 +470,7 @@ class RoomGraphAreaTests(EvenniaTestCase):
     def test_exits_out_of_the_family_are_gateways_never_traversed(self):
         street = GridRoom.objects.first()
         if street is None:
-            sync_grid()
+            sync_test_settlements((EAST_GATE_XYZ[2],))
             street = GridRoom.objects.first()
         create_object(Exit, key="出門", location=self.rooms["a"], destination=street)
         beyond = create_object(Room, key="合成鄰屋")
@@ -492,7 +493,7 @@ class RoomGraphAreaTests(EvenniaTestCase):
         self._visit("a", "b")
         street = GridRoom.objects.first()
         if street is None:
-            sync_grid()
+            sync_test_settlements((EAST_GATE_XYZ[2],))
             street = GridRoom.objects.first()
         # The non-current room's exit has the lower dbref and therefore
         # introduces the shared gateway node first.
@@ -684,8 +685,9 @@ class WildernessAreaTests(EvenniaTest):
     def setUp(self):
         super().setUp()
         create_object(Room, key="虛境", location=None)
-        sync_grid()
-        sync_wilderness()
+        declared = (EAST_GATE_XYZ[2],)
+        sync_test_settlements(declared)
+        sync_test_wilderness(declared)
         get_world_clock()
 
     def _at_wild(self, coordinates):

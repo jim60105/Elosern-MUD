@@ -12,7 +12,7 @@ from typeclasses.monsters import Monster
 from typeclasses.npcs import LLMNPC, NPC
 from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import Room, TerrainRoom
-from world.maps.bootstrap import sync_grid
+from world.tests.geography_fixture import sync_test_settlements
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from web.webclient.actions.exploration_actions import (
     MAX_EXIT_REF_CHARS,
@@ -335,7 +335,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
 
         gate_xyz = settlement_node_xyz(registry[sorted(registry)[0]].gate)
 
-        sync_grid()
+        sync_test_settlements((gate_xyz[2],))
         gate = GridRoom.objects.filter_xyz(xyz=gate_xyz).first()
         exit_obj = create_object(
             Exit, key="東", location=gate, destination=self.destination
@@ -651,16 +651,20 @@ class WildernessMoveInterruptTests(BattlefieldIsolation, EvenniaTest):
         super().setUp()
         from typeclasses.exits import WildernessGateExit
         from typeclasses.rooms import GridRoom, Room
-        from world.maps.bootstrap import sync_grid, sync_wilderness
-        from world.tests.geography_fixture import publish_shipped_map_world
+        from world.tests.geography_fixture import (
+            publish_shipped_map_world,
+            sync_test_settlements,
+            sync_test_wilderness,
+        )
 
         publish_shipped_map_world()
         self.room1.key = "Room1"
         self.room1.save()
         create_object(Room, key="虛境", location=None)
-        sync_grid()
-        sync_wilderness()
-        self.east_gate = GridRoom.objects.filter_xyz(xyz=_east_gate_xyz()).first()
+        east_gate_xyz = _east_gate_xyz()
+        sync_test_settlements((east_gate_xyz[2],))
+        sync_test_wilderness((east_gate_xyz[2],))
+        self.east_gate = GridRoom.objects.filter_xyz(xyz=east_gate_xyz).first()
         self.gate = next(
             exit_obj
             for exit_obj in self.east_gate.exits

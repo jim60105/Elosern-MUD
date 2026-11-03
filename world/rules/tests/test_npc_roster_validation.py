@@ -182,7 +182,9 @@ class ShippedPersistentAdventurerSmokeTests(EvenniaTest):
 
     def test_three_hosts_normal_lineage_equipment_homes_and_weekly_arrivals(self):
         from world.lore.guild_adventurers import ADVENTURER_REGISTRY
-        from world.maps.bootstrap import sync_grid, sync_interiors, resolve_residence_route
+        from world.maps import interiors
+        from world.maps.bootstrap import resolve_residence_route, sync_interiors
+        from world.tests.geography_fixture import sync_test_settlements
         from world.rules.human_guild_hosts import sync_persistent_adventurers, qualified_host
         from world.rules.npc_schedules import settle_npc_schedules, get_world_clock
         from world.rules.progression import can_use_skill
@@ -191,7 +193,16 @@ class ShippedPersistentAdventurerSmokeTests(EvenniaTest):
         from world.skills.registry import SKILL_REGISTRY
 
         get_world_clock().tick = 0
-        sync_grid()
+        sync_test_settlements(
+            tuple(
+                sorted(
+                    {
+                        exterior.settlement
+                        for exterior in interiors.current().exteriors.values()
+                    }
+                )
+            )
+        )
         sync_interiors()
         normal_hosts = sync_persistent_adventurers()
         rows = tuple(ADVENTURER_REGISTRY.values())
@@ -271,7 +282,9 @@ class ShippedPersistentExamLifecycleSmokeTests(EvenniaTest):
         from world.quests.catalog import register_catalog
         from world.rules.guild_economy import sync_guild_economy
         from world.rules.skip_safety import _BATTLEFIELDS
-        from world.maps.bootstrap import sync_grid, sync_interiors
+        from world.maps import interiors
+        from world.maps.bootstrap import sync_interiors
+        from world.tests.geography_fixture import sync_test_settlements
 
         super().setUp()
         self._battlefields = dict(_BATTLEFIELDS)
@@ -279,7 +292,16 @@ class ShippedPersistentExamLifecycleSmokeTests(EvenniaTest):
         register_catalog()
         sync_quest_runtime()
         create_object(Room, key="虛境", location=None)
-        sync_grid()
+        sync_test_settlements(
+            tuple(
+                sorted(
+                    {
+                        exterior.settlement
+                        for exterior in interiors.current().exteriors.values()
+                    }
+                )
+            )
+        )
         sync_interiors()
         sync_guild_economy()
 

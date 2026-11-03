@@ -361,6 +361,75 @@ Django 的 `TestCase` 使用 class-level 與 method-level transaction，並會�
 
 這個方法適合建立成本較高、各測試需要相同初始狀態的 Evennia Typeclass。
 
+## Settlement 測試：完整發佈，選擇性物化
+
+非瀏覽器測試若需要真實的 settlement 房間，必須明確宣告要物化哪些地圖，
+而不是讓整個 suite 一同承擔已發佈世界的全部收斂成本。這區分兩個邊界：
+
+1. **發佈（publication）** 永遠是完整的不可變 map world。`world.maps.runtime`
+   一次採納完整 bundle，完成 static-reference 驗證；測試不得只發佈部分世界。
+2. **物化（materialization）** 由測試宣告決定。只有宣告的地圖會經過 planner
+   與 writer，產生房間、道路、art、display 清理與 forward bridge。
+
+### 宣告 API
+
+`world/tests/geography_fixture.py` 提供三個 helper：
+
+```python
+sync_test_settlements(settlement_ids)      # -> SyncReport，先發佈再選擇性同步
+sync_test_wilderness(settlement_ids)       # -> None，依 destination map id 選擇閘門
+selected_startup_settlements(settlement_ids)  # context manager
+```
+
+- 參數必填，且必須是 map id 的 iterable；bare string 會在規劃前被拒絕。
+- 宣告會先被凍結成 tuple 一次，因此 one-shot generator 也可以使用。
+- 選擇會去重並依 map id 排序；未知 id 在 planner 執行前就失敗。
+- helper 只改變輸入，仍使用真正的 `sync_grid()`／`sync_wilderness()`、
+  同一個 transaction、knowledge journal 與 rollback 路徑。
+
+宣告值應由 fixture 已經解析的目標推導，不要複製整份 roster 或硬編碼座標：
+
+- 單一 grid 座標：`(xyz[2],)`。
+- 多個 grid 座標：`tuple(sorted({xyz[2] for xyz in coordinates}))`。
+- 已解析的 node reference：`(reference.map_id,)`。
+- wilderness entry：`tuple(sorted({gate.destination.map_id for gate in entry.gates}))`。
+- 室內場所的 exterior：經 `interiors.exterior_for(...)` 取得 `exterior.settlement`。
+- 若 fixture 同步全部室內空間，宣告其實際 exterior settlements 的聯集。
+
+單純外觀（plain-room）測試若不需要任何 grid 房間，應移除同步呼叫，而不是
+任意挑一張地圖。
+
+### Whole-roster 斷言是明文例外
+
+有些測試的主體就是「整個 registry 都收斂」：AnchorRoom placement、Limbo 對每個
+`CITY_GATE_REGISTRY` row 的 forward exit，以及 wilderness gate 總數。這些測試
+保留完整迴圈，並以 registry 推導完整宣告，例如
+`tuple(sorted({row.gate.map_id for row in CITY_GATE_REGISTRY.values()}))`。
+它們必須在模組內標記為 documented exception。
+
+不要為了縮小 fixture 而降低任何 assertion、迴圈上界或計數；那會把
+「完整 roster 契約」偷偷改成「部分 roster 契約」。若測試只是借用 roster 當作
+大量資料來源，應搬到自帶已知預期結果的 synthetic multi-map fixture。
+
+### Startup adapter 邊界
+
+`selected_startup_settlements(ids)` 只會暫時替換 `bootstrap.sync_grid` 與
+`bootstrap.sync_wilderness` 兩個 binding，讓真實的 `at_server_start()`／
+`runtime.synchronize()` 在啟動流程中仍執行原始 planner 與 writer。它不會替換
+`runtime.synchronize()`、`at_server_start()`、publication、validation 或任何
+低階 writer，且離開 scope（含例外）時一定會還原 binding。這個 adapter 僅供
+「測試主體是 startup orchestration」的案例使用；預設 full-roster 行為由
+不帶參數的 production 路徑與專門的 default-contract 測試覆蓋。
+
+### 量測診斷（僅供參考，不是門檻）
+
+歷史紀錄顯示 `world.maps.tests.test_bootstrap` 的 50 個 method 從 147.381 s
+（2 個 authored settlements）成長到 1,868 s（60 個）。聚焦診斷在目前 checkout
+量到 4 個 method 共 141.854 s 測試執行時間、0.687 s database setup；
+其中每個 fresh pass 都套用 60 個 graph，移除未選 graph 的應用是主要收益來源。
+完整 bundle 發佈、static-reference 驗證與 registry 過濾仍隨 roster 成長，
+因此本節不提供 wall-clock pass/fail 門檻。
+
 ## Command 測試也可以分級
 
 `EvenniaCommandTest` 繼承 `EvenniaTest`，因此會取得完整 Evennia fixture。

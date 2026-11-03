@@ -24,7 +24,7 @@ from elosern_map_core.references import settlement_node_ref
 from typeclasses.exits import Exit
 from typeclasses.rooms import GridRoom, Room
 from world.maps import interiors
-from world.maps.bootstrap import sync_grid, sync_interiors
+from world.maps.bootstrap import sync_interiors
 from world.maps.static_references import settlement_node_xyz
 from world.tests.geography_fixture import publish_shipped_map_world
 from world.tests.interior_fixture import (
@@ -63,7 +63,18 @@ class ServiceInteriorTests(EvenniaTestCase):
         super().setUp()
         publish_shipped_map_world()
         create_object(Room, key="虛境", location=None)
-        sync_grid()
+        from world.tests.geography_fixture import sync_test_settlements
+
+        sync_test_settlements(
+            tuple(
+                sorted(
+                    {
+                        exterior.settlement
+                        for exterior in interiors.current().exteriors.values()
+                    }
+                )
+            )
+        )
 
     def _count_grid_rooms(self):
         return GridRoom.objects.all_family().count()

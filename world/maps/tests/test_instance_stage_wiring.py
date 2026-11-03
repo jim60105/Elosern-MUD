@@ -19,6 +19,7 @@ from world.quests.tests._fixtures import RegistryIsolationMixin
 from world.rules import clock as clock_module
 from world.rules.clock import AdvanceSource, ScheduledEvent, get_world_clock
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
+from world.tests.geography_fixture import selected_startup_settlements
 
 EXPECTED_STAGE_ORDER = (
     "gauge_regen",
@@ -74,7 +75,23 @@ class InstanceStageWiringTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
 
     @covers_requirement("instance-reclamation::reclaim-due-instances-is-registered-as-the-instance-reclamation-event-source-at-server-start")
     def test_server_start_registers_instance_reclamation(self):
-        at_server_start()
+        from world.maps import interiors
+        from world.tests.geography_fixture import publish_shipped_map_world
+
+        # Registration lives on the nonempty grid path; startup's service-host
+        # steps still need every settlement carrying a permanent exterior.
+        publish_shipped_map_world()
+        with selected_startup_settlements(
+            tuple(
+                sorted(
+                    {
+                        exterior.settlement
+                        for exterior in interiors.current().exteriors.values()
+                    }
+                )
+            )
+        ):
+            at_server_start()
         registration = clock_module._EVENT_SOURCES["instance_reclamation"]
         self.assertIs(registration.settle, reclaim_due_instances)
         self.assertIsNotNone(registration.surfaces)

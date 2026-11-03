@@ -106,7 +106,10 @@ class _CandidateCase(EvenniaTestCase):
         super().setUp()
         create_object(Room, key=LIMBO_KEY, location=None)
         self.baseline = runtime.adopt()
-        bootstrap.sync_grid()
+        from world.tests.geography_fixture import sync_test_settlements
+
+        # Candidate-wide materialization is this class's subject.
+        sync_test_settlements(tuple(self.baseline.settlements.graphs))
         bootstrap.sync_interiors()
         runtime.commit_adoption()
         directory = tempfile.mkdtemp(prefix="editor-final-yaml-")

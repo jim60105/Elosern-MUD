@@ -16,7 +16,7 @@ from typeclasses.characters import Character, PlayerCharacter
 from typeclasses.exits import Exit
 from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom, LimboRoom, Room
-from world.maps.bootstrap import sync_grid, sync_limbo
+from world.maps.bootstrap import sync_limbo
 from world.maps.static_references import settlement_node_xyz
 from world.maps.limbo import (
     LIMBO_ALIAS,
@@ -26,7 +26,11 @@ from world.maps.limbo import (
 )
 from world.quests.tests._fixtures import RegistryIsolationMixin
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
-from world.tests.geography_fixture import publish_shipped_geography
+from world.tests.geography_fixture import (
+    publish_shipped_geography,
+    selected_startup_settlements,
+    sync_test_settlements,
+)
 
 
 #: The city-gate row the starting-room bridge is built from, read through the
@@ -139,15 +143,19 @@ class LimboRoomTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
         self.assertIn("sync_map_world", STARTUP_STEP_ORDER)
         create_object(Room, key=LIMBO_LEGACY_KEY, location=None)
         seen = {}
-        sync_grid_original = bootstrap.sync_grid
 
-        def recording_sync_grid():
-            room = self._limbo()
-            seen["key"] = None if room is None else room.key
-            return sync_grid_original()
+        with selected_startup_settlements((_gate_row().gate.map_id,)):
+            # Observe the adapted binding, so the selection and the ordering
+            # observation hold at the same time.
+            adapted_sync_grid = bootstrap.sync_grid
 
-        with patch.object(bootstrap, "sync_grid", recording_sync_grid):
-            runtime.synchronize()
+            def recording_sync_grid():
+                room = self._limbo()
+                seen["key"] = None if room is None else room.key
+                return adapted_sync_grid()
+
+            with patch.object(bootstrap, "sync_grid", recording_sync_grid):
+                runtime.synchronize()
 
         self.assertEqual(seen.get("key"), LIMBO_KEY)
         bridge = [
@@ -159,8 +167,14 @@ class LimboRoomTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
 
     @covers_requirement("limbo-room::sync-limbo-converges-the-starting-room-idempotently-at-server-start")
     def test_at_server_start_renames_legacy_room_and_bridges_it(self):
+        from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+
         legacy = create_object(Room, key=LIMBO_LEGACY_KEY, location=None)
-        at_server_start()
+        # Full startup also synchronizes service hosts in every settlement.
+        with selected_startup_settlements(
+            tuple(sorted(WILDERNESS_ENTRY_REGISTRY))
+        ):
+            at_server_start()
 
         room = self._limbo()
         self.assertEqual(room.id, legacy.id)
@@ -171,7 +185,7 @@ class LimboRoomTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
     @covers_requirement("limbo-room::the-bridge-to-the-capital-presents-zh-tw-exit-names-and-aliases-reconciled-in-place")
     def test_bridge_exits_carry_zh_tw_keys_and_aliases_only(self):
         create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
+        sync_test_settlements((_gate_row().gate.map_id,))
 
         limbo = self._limbo()
         south_gate = self._south_gate()
@@ -187,7 +201,7 @@ class LimboRoomTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
     @covers_requirement("limbo-room::the-bridge-to-the-capital-presents-zh-tw-exit-names-and-aliases-reconciled-in-place")
     def test_pre_existing_english_bridge_aliases_are_reconciled_in_place(self):
         create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
+        sync_test_settlements((_gate_row().gate.map_id,))
 
         limbo = self._limbo()
         south_gate = self._south_gate()
@@ -200,7 +214,7 @@ class LimboRoomTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
             Exit, key="離開王都", aliases=["回虛境"], location=south_gate, destination=limbo
         )
 
-        sync_grid()
+        sync_test_settlements((_gate_row().gate.map_id,))
 
         to_city = [e for e in limbo.exits if e.destination == south_gate]
         self.assertEqual(len(to_city), 1)
@@ -220,8 +234,8 @@ class LimboRoomTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
     @covers_requirement("limbo-room::the-bridge-to-the-capital-presents-zh-tw-exit-names-and-aliases-reconciled-in-place")
     def test_resync_keeps_bridge_zh_tw_without_duplicates(self):
         create_object(Room, key=LIMBO_KEY, location=None)
-        sync_grid()
-        sync_grid()
+        sync_test_settlements((_gate_row().gate.map_id,))
+        sync_test_settlements((_gate_row().gate.map_id,))
 
         limbo = self._limbo()
         south_gate = self._south_gate()
@@ -318,7 +332,7 @@ class GateHomePolicyTests(
         self.room2.save()
         create_object(Room, key=LIMBO_KEY, location=None)
         sync_limbo()
-        sync_grid()
+        sync_test_settlements((_gate_row().gate.map_id,))
         self.limbo = search_object(LIMBO_KEY, exact=True)[0]
         self.south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
         self.gate_exit = [e for e in self.limbo.exits if e.destination == self.south_gate][0]

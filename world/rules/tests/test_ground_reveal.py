@@ -15,7 +15,6 @@ from evennia.utils.test_resources import EvenniaTest
 from tools.spec_traceability import covers_requirement
 from typeclasses.npcs import NPC
 from world.maps import wilderness_provider
-from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.tests.geography_fixture import publish_shipped_geography
 from world.rules.clock import AdvanceSource, WorldClock, _EVENT_SOURCES, get_world_clock
 from world.rules.fatigue import SleepPosture, read_fatigue_state, write_fatigue_state
@@ -462,8 +461,15 @@ class SkipObservationTests(EvenniaTest):
         from typeclasses.rooms import Room
 
         create_object(Room, key="虛境", location=None)
-        sync_grid()
-        sync_wilderness()
+        from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+        from world.tests.geography_fixture import (
+            sync_test_settlements,
+            sync_test_wilderness,
+        )
+
+        declared = (next(iter(WILDERNESS_ENTRY_REGISTRY.values())).anchor_key,)
+        sync_test_settlements(declared)
+        sync_test_wilderness(declared)
         self.cell = self._valid_cell()
         self.player = self.char1
         self.player.race = "human"

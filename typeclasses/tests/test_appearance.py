@@ -65,9 +65,6 @@ class SceneFlavorParagraphTests(EvenniaTest):
 
     @covers_requirement("localized-appearance::the-shared-appearance-layer-renders-traditional-chinese-frames", "scene-flavor::completed-flavor-is-pushed-to-present-players-and-rendered-in-look")
     def test_at_look_seam_renders_the_flavor_paragraph(self):
-        from world.maps.bootstrap import sync_grid
-
-        sync_grid()
         self.char1.location = self.room1
         appearance = self.char1.at_look(self.room1)
         self.assertIn(self._FLAVOR, appearance)

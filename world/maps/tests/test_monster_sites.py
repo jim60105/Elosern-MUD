@@ -28,7 +28,7 @@ from world.lore.monster_placement import (
     variant_species_key,
 )
 from world.maps import monster_sites
-from world.maps.bootstrap import sync_wilderness
+from world.tests.geography_fixture import sync_test_wilderness
 from world.maps.monster_sites import (
     SITE_STAGE_KIND,
     SITE_STATE_CLEARED,
@@ -74,6 +74,14 @@ PROBE = (500, 700)
 NEST_KEY = "t_probe_nest"
 CAMP_KEY = "t_probe_camp"
 HOUR = 3600
+
+
+def _declared_map_id():
+    """One live registry map id; these tests never need grid gate provisioning."""
+
+    from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+
+    return next(iter(WILDERNESS_ENTRY_REGISTRY.values())).anchor_key
 
 
 def _local_row(ordinary, habitat: str, **overrides) -> AmbientPlacementRule:
@@ -242,7 +250,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         # one-shot site creates nothing: the defeated rows stay dead in place.
         self.clock.advance(86400, AdvanceSource.SKIP, [])
         self.wilderness.mapprovider.at_prepare_room(PROBE, self.char1, self.room)
-        sync_wilderness()
+        sync_test_wilderness((_declared_map_id(),))
         self.assertEqual(
             site_state(NEST_KEY, wilderness=self.wilderness).state,
             SITE_STATE_CLEARED,
@@ -327,7 +335,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         self.assertEqual(_living(self.wilderness, self.sites[CAMP_KEY]), ())
         # Re-entering the room before the condition matures recovers nothing.
         self.wilderness.mapprovider.at_prepare_room(PROBE, self.char1, self.room)
-        sync_wilderness()
+        sync_test_wilderness((_declared_map_id(),))
         self.assertEqual(_living(self.wilderness, self.sites[CAMP_KEY]), ())
         self.assertEqual(
             site_state(CAMP_KEY, wilderness=self.wilderness).state,

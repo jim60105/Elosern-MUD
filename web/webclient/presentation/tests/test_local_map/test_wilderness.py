@@ -7,7 +7,7 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import GridRoom, InstanceRoom, Room
 from web.webclient.presentation.local_map import LEGEND_LABELS, MAX_LEGEND, MAX_STRING_CODE_POINTS
 from web.webclient.presentation.registry import build_production_registry
-from world.maps.bootstrap import sync_grid, sync_wilderness
+from world.tests.geography_fixture import sync_test_settlements, sync_test_wilderness
 from world.rules.map_knowledge import encode_grid, record_arrival
 
 from ._support import (
@@ -34,8 +34,8 @@ class LocalMapWildernessTests(EvenniaTestCase):
     def setUpClass(cls):
         super().setUpClass()
         create_object(Room, key="虛境", location=None)
-        sync_grid()
-        sync_wilderness()
+        sync_test_settlements((EAST_GATE_XYZ[2],))
+        sync_test_wilderness((EAST_GATE_XYZ[2],))
         cls._east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
         cls._gate = [e for e in cls._east_gate.exits if e.key == "荒野"][0]
 
@@ -249,8 +249,8 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
     def setUp(self):
         super().setUp()
         create_object(Room, key="虛境", location=None)
-        sync_grid()
-        sync_wilderness()
+        sync_test_settlements((EAST_GATE_XYZ[2],))
+        sync_test_wilderness((EAST_GATE_XYZ[2],))
         self.south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
         self.east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
 
@@ -507,8 +507,8 @@ class LocalMapWildernessDisclosureTests(EvenniaTest):
     def setUp(self):
         super().setUp()
         create_object(Room, key="虛境", location=None)
-        sync_grid()
-        sync_wilderness()
+        sync_test_settlements((EAST_GATE_XYZ[2],))
+        sync_test_wilderness((EAST_GATE_XYZ[2],))
 
     def _registry(self):
         return build_production_registry()

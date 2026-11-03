@@ -9,7 +9,7 @@ from typeclasses.rooms import GridRoom, InstanceRoom, Room
 from web.webclient.presentation.local_map import LEGEND_LABELS
 from web.webclient.presentation.local_map.builder import _exit_ref, _traversable
 from web.webclient.presentation.registry import PanelUnavailableError, build_production_registry
-from world.maps.bootstrap import sync_grid, sync_wilderness
+from world.tests.geography_fixture import sync_test_settlements, sync_test_wilderness
 from world.rules.clock import get_world_clock
 from world.rules.map_knowledge import encode_grid, parse_knowledge, record_arrival
 
@@ -47,8 +47,8 @@ class LocalMapPresenterTests(EvenniaTestCase):
     def setUpClass(cls):
         super().setUpClass()
         create_object(Room, key="虛境", location=None)
-        sync_grid()
-        sync_wilderness()
+        sync_test_settlements((EAST_GATE_XYZ[2],))
+        sync_test_wilderness((EAST_GATE_XYZ[2],))
         cls._south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
 
     def setUp(self):

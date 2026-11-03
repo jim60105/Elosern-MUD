@@ -34,7 +34,6 @@ from typeclasses.exits import Exit, WildernessGateExit
 from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom, Room
 from world.rules.action import ActionRequest
-from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.maps.static_references import settlement_node_xyz
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules import church
@@ -623,8 +622,13 @@ class WildernessPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         self.room1.key = "Room1"
         self.room1.save()
         create_object(Room, key="虛境", location=None)
-        sync_grid()
-        sync_wilderness()
+        from world.tests.geography_fixture import (
+            sync_test_settlements,
+            sync_test_wilderness,
+        )
+
+        sync_test_settlements((_CAPITAL.anchor_key,))
+        sync_test_wilderness((_CAPITAL.anchor_key,))
         self.east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
         self.gate = [
             exit_obj

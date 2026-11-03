@@ -10,7 +10,8 @@ from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import InstanceRoom, Room
-from world.maps.bootstrap import sync_grid
+from world.maps.map_data import SETTLEMENT_GRAPHS
+from world.tests.geography_fixture import sync_test_settlements
 from world.quests.binding import bind_stage_runtime
 from world.quests.bootstrap import sync_quest_runtime
 from world.quests.deadlines import settle_quest_deadlines
@@ -232,7 +233,8 @@ class DeadlinePrecedesReclamationTests(QuestRegistryIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
         create_object(Room, key="虛境", location=None)
-        sync_grid()
+        # Registration lives on the nonempty grid path; one map is enough.
+        sync_test_settlements((next(iter(SETTLEMENT_GRAPHS)),))
         sync_quest_runtime()
         self.player = create_object(PlayerCharacter, key="reclaim-player")
         self.player.race = "human"

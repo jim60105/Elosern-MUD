@@ -958,7 +958,10 @@ class EscortRealOwnerSmokeTests(EscortTestBase):
         from evennia.utils.create import create_object
         from typeclasses.exits import Exit, WildernessGateExit
         from typeclasses.rooms import GridRoom, Room, TerrainRoom
-        from world.maps.bootstrap import sync_grid, sync_wilderness
+        from world.tests.geography_fixture import (
+            sync_test_settlements,
+            sync_test_wilderness,
+        )
         from world.rules.action import ActionRequest
         from world.rules.tests._combat_session_helpers import resolve_combat_action
         from world.rules.combat import BattlefieldActionContext
@@ -982,9 +985,9 @@ class EscortRealOwnerSmokeTests(EscortTestBase):
         # 3) A literal wilderness gateway traversal from the grid, with the
         #    protected companion following into the wilderness.
         create_object(Room, key="虛境", location=None)
-        sync_grid()
-        sync_wilderness()
         xyz, approach = _smoke_gate()
+        sync_test_settlements((xyz[2],))
+        sync_test_wilderness((xyz[2],))
         grid_room = GridRoom.objects.filter_xyz(xyz=xyz).first()
         gate = [
             exit_obj
