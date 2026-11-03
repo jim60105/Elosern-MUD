@@ -24,26 +24,19 @@ An enemy or noninteractive individual flee SHALL add only the actor's stable ind
 - **THEN** the request is routed to confirmed party retreat before any individual effect mutates the battlefield; enemy individual flee keeps the mechanism above unchanged
 
 ### Requirement: A fled entity is immediately excluded from targeting, turn order, and team-power
-aggregation through existing combat and overwhelm mechanics
-Once `battlefield.fled` contains an entity's stable individual identity, `world.rules.combat.BattlefieldActionContext.
-is_present()`/`is_in_range()`, `world.rules.combat.run_round()`'s turn-order loop, and
-`world.rules.overwhelm.team_effective_power()`/`hit_rate_verdict()` SHALL all treat that entity as no
-longer part of the encounter, using their existing, unmodified implementations.
+A fled individual SHALL remain roster-present by stable identity while failing range validation, receiving no further turns and contributing no active team power.
 
 #### Scenario: A fled entity is skipped by run_round's initiative loop
 - **WHEN** `combat.run_round(battlefield, action_provider)` is called on a battlefield where one roster
   member's stable individual identity is in `battlefield.fled`
-- **THEN** that member takes no action that round, using `run_round()`'s existing fled-member filter;
-  this change does not modify that function to produce the behavior
+- **THEN** that individual takes no action that round and a same-label non-fled member remains independently eligible
 
 #### Scenario: A fled entity contributes zero to its team's power aggregate
 - **WHEN** `overwhelm.team_effective_power(battlefield, team_key)` is computed for a team containing one
   fled member and one living, non-fled member
-- **THEN** the result equals the living, non-fled member's own `effective_power()` value exactly, using
-  `overwhelm.py`'s existing, unmodified filtering logic
+- **THEN** the result equals the living, non-fled member's own `effective_power()` value exactly
 
 #### Scenario: A fled entity cannot be targeted by any skill
 - **WHEN** any `TargetSpec.SINGLE` skill is resolved against a target whose stable individual identity is in `battlefield.fled`
-- **THEN** it rejects with `RejectReason.TARGET_OUT_OF_RANGE`, via `BattlefieldActionContext.
-  is_in_range()`'s existing, unmodified behavior
+- **THEN** presence succeeds for that roster identity and targeting rejects with `RejectReason.TARGET_OUT_OF_RANGE`, without changing the flee contest or allied party-retreat policy
 
