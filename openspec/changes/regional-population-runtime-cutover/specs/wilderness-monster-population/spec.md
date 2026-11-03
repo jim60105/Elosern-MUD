@@ -17,6 +17,17 @@ Runtime ordinary population SHALL initialize bounded authored habitats once and 
 - **WHEN** LLM and art services are disabled during real construction, hunt acceptance, combat, delay, recovery and reload
 - **THEN** the deterministic loop completes using approved registered species and actual entities
 
+### Requirement: Active encounters retain protected individuals and cells
+Regional population settlement SHALL exclude active and historically protected encounter cells from births and preserve every persisted participant until the owning session settles.
+
+#### Scenario: Session restoration before birth
+- **WHEN** startup restores a recorded terminal round or clock catch-up crosses its active interval
+- **THEN** population neither deletes/replaces its participants nor appends new enemies to its protected cell
+
+#### Scenario: Finished protection
+- **WHEN** an encounter has lawfully settled and its protection interval ended
+- **THEN** only future due lawful regional births may use the cell; no immediate per-cell refill or participant resurrection occurs
+
 ## MODIFIED Requirements
 
 ### Requirement: A registered wilderness monster survives room recycling
@@ -30,17 +41,6 @@ An actual wilderness individual SHALL remain registered independently of transie
 #### Scenario: Read and re-entry do not refill
 - **WHEN** a registered member is defeated or a habitat is empty before recovery due time
 - **THEN** room preparation, startup reuse, view reads and re-entry create no immediate replacement
-
-### Requirement: Population reconciliation never destroys an active-session participant
-Regional population settlement SHALL exclude active and historically protected encounter cells from births and preserve every persisted participant until the owning session settles.
-
-#### Scenario: Session restoration before birth
-- **WHEN** startup restores a recorded terminal round or clock catch-up crosses its active interval
-- **THEN** population neither deletes/replaces its participants nor appends new enemies to its protected cell
-
-#### Scenario: Finished protection
-- **WHEN** an encounter has lawfully settled and its protection interval ended
-- **THEN** only future due lawful regional births may use the cell; no immediate per-cell refill or participant resurrection occurs
 
 ## REMOVED Requirements
 
@@ -58,4 +58,9 @@ Regional population settlement SHALL exclude active and historically protected e
 **Reason**: Coordinate-slot generation, tier examples and guaranteed capital-local supply conflict with bounded delayed regional populations.
 
 **Migration**: Cut every caller to the regional population owner and actual-live view; incompatible development state uses explicit operator procedures, with no slot alias, reader or automatic reset.
+
+### Requirement: Population reconciliation never destroys an active-session participant
+**Reason**: Conformance reconciliation is deleted; participant retention and historical-cell birth protection become the live owner contract.
+
+**Migration**: Cut all callers and substantively matching test annotations to the replacement contract using tool-generated canonical IDs; retain no legacy behavior, alias or data migration.
 

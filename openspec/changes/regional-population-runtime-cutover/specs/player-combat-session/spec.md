@@ -2,7 +2,7 @@
 
 ## MODIFIED Requirements
 
-### Requirement: Startup restores combat sessions before wilderness population initialization
+### Requirement: Startup restores combat sessions before wilderness population reconciliation
 Startup SHALL register population clock sources before restoring combat sessions and restore recorded sessions before fresh wilderness population initialization, protecting recorded individuals throughout.
 
 #### Scenario: Defeated population monster survives until session restore
