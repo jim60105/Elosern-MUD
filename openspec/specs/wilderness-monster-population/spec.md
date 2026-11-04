@@ -23,7 +23,7 @@ An actual wilderness individual SHALL remain registered independently of transie
 - **THEN** room preparation, startup reuse, view reads and re-entry create no immediate replacement
 
 ### Requirement: Runtime population uses authored regions without implicit fallback
-Runtime ordinary population SHALL initialize bounded authored habitats once and thereafter evolve only through the regional owner's game-time recovery contract, with no tier-example fallback or capital supply guarantee.
+Runtime ordinary population SHALL initialize bounded authored habitats once and thereafter evolve through game-time recovery and explicitly bound activity under map ownership, without tier-example fallback, room-entry refill or capital supply guarantee.
 
 #### Scenario: Fresh world and reuse
 - **WHEN** fresh provisioning initializes habitats and the world then restarts or revisits
@@ -36,6 +36,10 @@ Runtime ordinary population SHALL initialize bounded authored habitats once and 
 #### Scenario: Offline delivery
 - **WHEN** LLM and art services are disabled during real construction, hunt acceptance, combat, delay, recovery and reload
 - **THEN** the deterministic loop completes using approved registered species and actual entities
+
+#### Scenario: Global actual activity
+- **WHEN** no player observes an initialized group while game time advances
+- **THEN** its due activity and journeys settle globally, preserve individual resources and home ownership, and create no observation-driven room or replacement
 
 ### Requirement: Active encounters retain protected individuals and cells
 Regional population settlement SHALL exclude active and historically protected encounter cells from births and preserve every persisted participant until the owning session settles.

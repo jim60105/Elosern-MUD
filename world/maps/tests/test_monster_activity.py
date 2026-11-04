@@ -372,6 +372,9 @@ class ActivityFixture(RegistryIsolationMixin, EvenniaTest):
 class SeededDecisionTests(ActivityFixture):
     """Saved stay/departure selection, cohesion, legality and bounds."""
 
+    @covers_requirement(
+        "monster-field-activity::due-activity-moves-bounded-complete-groups-globally"
+    )
     def test_saved_decision_is_stable_across_reads_and_reload(self):
         stay_seed = self._stay_seed(tick=90)
         self._reset_activity(tick=0)
@@ -411,6 +414,9 @@ class SeededDecisionTests(ActivityFixture):
         self.assertEqual(set(journey.member_ids), {body.pk for body in moving_bodies})
         self.assertNotIn(moving_bodies[0], self.wilderness.db.itemcoordinates)
 
+    @covers_requirement(
+        "monster-field-activity::due-activity-moves-bounded-complete-groups-globally"
+    )
     def test_mixed_group_travels_at_the_slowest_member_price(self):
         seed = None
         for candidate in range(64):
@@ -503,6 +509,9 @@ class SeededDecisionTests(ActivityFixture):
             decision.reason, monster_activity.STAY_MEMBER_SETTLED_AHEAD
         )
 
+    @covers_requirement(
+        "monster-journeys::activity-ordering-protects-encounters-across-deferred-time"
+    )
     def test_active_combat_participant_never_wanders_even_when_released(self):
         group_id, bodies = self._group(tick=0, members=1)
         decision = plan_group_decision(self.wilderness, group_id, tick=90)
@@ -544,6 +553,9 @@ class SeededDecisionTests(ActivityFixture):
         self.assertIs(waking_state.posture, SleepPosture.AWAKE)
         self.assertEqual(waking_state.reserve_units, 71960)
 
+    @covers_requirement(
+        "monster-field-activity::due-activity-moves-bounded-complete-groups-globally"
+    )
     def test_bounds_corner_and_locked_gates_hold(self):
         corner = (500, 700)
         self._seal_exits(corner, keep="w")
@@ -587,6 +599,9 @@ class SeededDecisionTests(ActivityFixture):
             state_to_dict(read_monster_activity(self.wilderness)), before
         )
 
+    @covers_requirement(
+        "monster-journeys::activity-ordering-protects-encounters-across-deferred-time"
+    )
     def test_protected_destination_prevents_departure(self):
         group_id, _bodies = self._group(tick=0, members=1)
         for dx in (-1, 0, 1):
@@ -757,6 +772,9 @@ class ChokepointLifecycleTests(ActivityFixture):
         self.assertFalse(arrivals[-1].after.alive)
         self.assertIsNone(read_monster_activity(self.wilderness).groups[group_id].journey_id)
 
+    @covers_requirement(
+        "monster-field-activity::due-activity-moves-bounded-complete-groups-globally"
+    )
     def test_stationary_group_never_moves_or_restores_identity(self):
         group_id, bodies = self._group(
             activity=STATIONARY_ACTIVITY, owner_kind="quest", owner_key="t_quest"
@@ -951,7 +969,8 @@ class ChronologicalSettlementTests(ActivityFixture):
     """Same-advance ordering and newly due facts."""
 
     @covers_requirement(
-        "regional-population::population-lifecycle-replays-loss-and-site-boundaries-chronologically"
+        "regional-population::population-lifecycle-replays-loss-and-site-boundaries-chronologically",
+        "monster-journeys::activity-ordering-protects-encounters-across-deferred-time",
     )
     def test_same_tick_phases_run_arrivals_births_then_departures(self):
         from world.maps import monster_sites
@@ -1012,7 +1031,8 @@ class ChronologicalSettlementTests(ActivityFixture):
         self.assertGreater(group.next_decision_tick, start)
 
     @covers_requirement(
-        "monster-journeys::journey-passage-preserves-elapsed-resources-and-actual-presence"
+        "monster-journeys::journey-passage-preserves-elapsed-resources-and-actual-presence",
+        "monster-journeys::activity-ordering-protects-encounters-across-deferred-time",
     )
     def test_advance_processes_decision_arrival_then_next_decision(self):
         self._register_lifecycle()
@@ -1066,6 +1086,7 @@ class ChronologicalSettlementTests(ActivityFixture):
     @covers_requirement(
         "wilderness-monster-population::runtime-population-uses-authored-regions-without-implicit-fallback",
         "monster-journeys::journey-passage-preserves-elapsed-resources-and-actual-presence",
+        "monster-field-activity::due-activity-moves-bounded-complete-groups-globally",
     )
     def test_unobserved_wandering_waits_for_a_live_encounter_then_reloads(self):
         group_id, bodies = self._group(

@@ -68,21 +68,22 @@ schedule; its sole purpose SHALL be surviving a server restart via ordinary Attr
 - **THEN** it defines no `at_repeat` method
 
 ### Requirement: advance() settles exactly the entities its caller supplies, never a global registry
-`WorldClock.advance(seconds, source, entities)` SHALL apply the per-entity settlement stages (gauge
-regen; buff ticks and sexual decay, subject to the `AdvanceSource` gate) only to the `entities`
-iterable the caller supplies. `advance()` SHALL NOT query any global entity registry, database-wide
-scan, or `evennia`-wide object search to discover additional entities to settle.
+Clock per-entity stages SHALL settle only the supplied scope without global actor discovery; registered owner sources SHALL settle their own declared durable activity/journey intervals globally through their snapshot contract, excluding duplicate settlement of any supplied body for that same interval.
 
 #### Scenario: Only the supplied entities are settled
 - **WHEN** `advance()` is called with `entities=[actor]`, and a different `LivingEntity` exists
   elsewhere in the database with an active buff
-- **THEN** that other entity's buff state is unchanged after the call — only `actor`'s state reflects
+- **THEN** that other entity's buff state is unchanged after the call , only `actor`'s state reflects
   settlement
 
 #### Scenario: The registered call sites pass their documented scopes
 - **WHEN** `CmdCast`'s integration, out-of-combat item use, and the skip commands call `advance()`
 - **THEN** each passes the acting character's present party scope, `charge_movement()` passes the
   travelling party, and `settle_combat_result()` passes `entities=battlefield.roster.values()`
+
+#### Scenario: Explicit activity-owned interval
+- **WHEN** a registered monster activity source settles an unobserved actual group and one group member is also supplied to the advance
+- **THEN** its declared physiology interval settles once under its owner, unrelated entities stay untouched and later source failure restores every owner surface
 
 ### Requirement: gauge regen is a closed-form computation, never a per-second or per-quantum loop
 `world/rules/clock.py` SHALL compute HP/MP/SP regen for a settled entity as

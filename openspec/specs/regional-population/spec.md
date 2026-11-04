@@ -100,7 +100,7 @@ Population settlement SHALL use actual committed loss occurrence times with reco
 - **THEN** the clock, pending-loss ledger, due state, all created IDs/registrations/attachments and caches roll back together and no success event survives
 
 ### Requirement: Population lifecycle replays loss and site boundaries chronologically
-Population settlement SHALL merge pending presence transitions, site lifecycle boundaries and regional due waves chronologically, applying same-tick site births before ordinary births without exposing future changes to earlier waves.
+Population settlement SHALL merge presence, site, recovery and activity boundaries chronologically, applying lawful arrivals and site-before-regional births before contacts and idle departures without exposing future state to earlier decisions.
 
 #### Scenario: Later loss starts a new episode
 - **WHEN** L is3, local population2 has due110, a wave restores3 at110, and a previously recorded later loss occurs118 with delay10
@@ -113,6 +113,10 @@ Population settlement SHALL merge pending presence transitions, site lifecycle b
 #### Scenario: Site recovery cannot affect earlier waves
 - **WHEN** a zone has a wave due110 and an overlapping site's recovery is due140 during [100,160]
 - **THEN** births and due state equal settlement through [100,125] then [125,160], and the140 site members do not occupy the110 headroom
+
+#### Scenario: Actual movement preserves both budgets
+- **WHEN** living home owners depart repeatedly or wait in transit while a foreign visitor enters their zone
+- **THEN** each still consumes its own home ceiling once, the visitor consumes local headroom, and movement gives no defeat/site-clear credit or unlimited replacements
 
 ### Requirement: Historical population evidence preserves removed ownership and cell protection
 Population history SHALL retain complete identity, before/after presence, home/site ownership and actual-coordinate encounter intervals until chronological settlement no longer needs them, with atomic restart-safe serialization.
