@@ -159,6 +159,9 @@ class ActivityRecordTests(RegistryIsolationMixin, EvenniaTest):
         self.wilderness.db.monster_activity = saved
         self.assertEqual(state_to_dict(read_monster_activity(self.wilderness)), saved)
 
+    @covers_requirement(
+        "monster-journeys::journey-operations-restore-complete-state-on-failure-and-replay"
+    )
     def test_codec_roundtrip_is_exact_and_rejects_unknown_shape(self):
         self._seed()
         cell = LOCAL[0]
@@ -480,6 +483,10 @@ class MappedFleeIntegrationTests(EvenniaTest):
         )
         return individual
 
+    @covers_requirement(
+        "monster-journeys::mapped-individual-escape-commits-a-real-adjacent-departure",
+        "monster-journeys::journey-passage-preserves-elapsed-resources-and-actual-presence",
+    )
     def test_a_two_enemy_rounds_flee_departs_and_reengages_the_same_identity(self):
         from unittest.mock import patch
 
@@ -741,6 +748,9 @@ class MappedPresenceConsumerTests(EvenniaTest):
         journey = read_monster_activity(self.wilderness).journeys[journey_id]
         return individual, journey
 
+    @covers_requirement(
+        "wilderness-population-view::population-reads-report-actual-living-registrations"
+    )
     def test_population_view_and_gm_inspection_never_show_transit_at_either_endpoint(self):
         from world.maps.wilderness_population import population_view
         from world.rules.travel_interrupts import live_hostile_facts

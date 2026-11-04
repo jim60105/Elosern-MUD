@@ -330,22 +330,22 @@ registration (`STAGED_STATIONARY_ACTIVITY`), and staged exams. Per-member
 terminal settlement. `population_lifecycle` merges journey arrival/retry
 boundaries and snapshots the activity owner.
 
-Delta requirement IDs do not exist until archive sync. The scenario-to-test map
-for this change:
+The scenario-to-test map for this change, with the canonical requirement IDs
+the sync produced (`uv run --locked python -m tools.spec_traceability list`):
 
-| Scenario | Test assertions |
-| --- | --- |
-| Real resolver departure | `world.maps.tests.test_monster_journeys.MappedFleeIntegrationTests.test_a_two_enemy_rounds_flee_departs_and_reengages_the_same_identity` (only the chosen enemy leaves `itemcoordinates`/room, keeps group ownership, journey starts at the round offset, remainder continues); `test_departure_removes_presence_and_replays_from_the_receipt` |
-| Route or reserve failure | `world.rules.tests.test_world_escape.WorldEscapeTests.test_no_lawful_route_returns_no_plan_even_without_a_pursuer`; `test_a_missing_escape_context_is_a_named_rejection`; `test_partial_physiology_is_a_named_rejection_not_a_skip` |
-| Outside normal range | `WorldEscapeTests.test_an_out_of_bounds_refuge_is_still_a_legal_escape` |
-| Explicit abstract calculation | `WorldEscapeTests.test_an_abstract_context_changes_eligibility_only` |
-| Unobserved partition and restart | `WorldEscapeTests.test_equal_partitions_and_a_reload_preserve_resources_and_progress`; `test_inactive_arrival_creates_no_room_and_preserves_identity` |
-| Protected arrival | `WorldEscapeTests.test_a_protected_arrival_waits_without_a_second_travel_charge` |
-| Deferred combat physiology transfers once | `MappedFleeIntegrationTests...` (reserve equals one 12-second combat prediction) and `WorldEscapeTests.test_two_deferred_combat_rounds_pay_twelve_seconds_once` |
-| Retained binding / group ownership | `test_monster_journeys.GroupConstructionTests.test_identical_member_rows_keep_their_own_selected_binding`; `test_a_group_collision_refuses_instead_of_absorbing_identities`; `ActivityRecordTests.test_missing_and_malformed_state_refuse_without_reset` |
-| Transit is not endpoint presence | `MappedPresenceConsumerTests.test_population_view_and_gm_inspection_never_show_transit_at_either_endpoint` (population view, hostile facts, room contents/name search, GM journey row; presence returns after arrival) |
-| Equal partitions and restart | `WorldEscapeTests.test_the_population_lifecycle_settles_a_journey_in_equal_partitions`; `test_equal_partitions_and_a_reload_preserve_resources_and_progress` |
-| Late failure restores the whole operation | `WorldEscapeTests.test_a_late_lifecycle_failure_restores_the_whole_journey` (clock failure after arrival restores activity state, body location and reserve) |
+| Requirement | Scenario | Test assertions |
+| --- | --- | --- |
+| `monster-journeys::mapped-individual-escape-commits-a-real-adjacent-departure` | Real resolver departure | `world.maps.tests.test_monster_journeys.MappedFleeIntegrationTests.test_a_two_enemy_rounds_flee_departs_and_reengages_the_same_identity` (only the chosen enemy leaves `itemcoordinates`/room, keeps group ownership, journey starts at the round offset, remainder continues); `test_departure_removes_presence_and_replays_from_the_receipt` |
+| `monster-journeys::mapped-individual-escape-commits-a-real-adjacent-departure` | Route or reserve failure | `world.rules.tests.test_world_escape.WorldEscapeTests.test_no_lawful_route_returns_no_plan_even_without_a_pursuer`; `test_a_missing_escape_context_is_a_named_rejection`; `test_partial_physiology_is_a_named_rejection_not_a_skip` |
+| `monster-journeys::mapped-individual-escape-commits-a-real-adjacent-departure` | Outside normal range | `WorldEscapeTests.test_an_out_of_bounds_refuge_is_still_a_legal_escape` |
+| `monster-journeys::mapped-individual-escape-commits-a-real-adjacent-departure` | Explicit abstract calculation | `WorldEscapeTests.test_an_abstract_context_changes_eligibility_only` |
+| `monster-journeys::journey-passage-preserves-elapsed-resources-and-actual-presence` | Unobserved partition and restart | `WorldEscapeTests.test_equal_partitions_and_a_reload_preserve_resources_and_progress`; `test_inactive_arrival_creates_no_room_and_preserves_identity` |
+| `monster-journeys::journey-passage-preserves-elapsed-resources-and-actual-presence` | Protected arrival | `WorldEscapeTests.test_a_protected_arrival_waits_without_a_second_travel_charge` |
+| `monster-journeys::journey-passage-preserves-elapsed-resources-and-actual-presence` | Deferred combat physiology transfers once | `MappedFleeIntegrationTests...` (reserve equals one 12-second combat prediction) and `WorldEscapeTests.test_two_deferred_combat_rounds_pay_twelve_seconds_once` |
+| `monster-journeys::journey-operations-restore-complete-state-on-failure-and-replay` | Retained binding / group ownership | `test_monster_journeys.GroupConstructionTests.test_identical_member_rows_keep_their_own_selected_binding`; `test_a_group_collision_refuses_instead_of_absorbing_identities`; `ActivityRecordTests.test_missing_and_malformed_state_refuse_without_reset` |
+| `wilderness-population-view::population-reads-report-actual-living-registrations` | Transit is not endpoint presence | `MappedPresenceConsumerTests.test_population_view_and_gm_inspection_never_show_transit_at_either_endpoint` (population view, hostile facts, room contents/name search, GM journey row; presence returns after arrival) |
+| `monster-journeys::journey-passage-preserves-elapsed-resources-and-actual-presence` | Equal partitions and restart | `WorldEscapeTests.test_the_population_lifecycle_settles_a_journey_in_equal_partitions`; `test_equal_partitions_and_a_reload_preserve_resources_and_progress` |
+| `monster-journeys::journey-operations-restore-complete-state-on-failure-and-replay` | Late failure restores the whole operation | `WorldEscapeTests.test_a_late_lifecycle_failure_restores_the_whole_journey` (clock failure after arrival restores activity state, body location and reserve) |
 
 Command docs (`docs/game/commands.md`,
 `docs/game/command-reference.md`) describe the real mapped enemy departure and

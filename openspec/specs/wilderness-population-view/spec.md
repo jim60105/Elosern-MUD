@@ -20,6 +20,10 @@ Population reads SHALL project only actual living registered entities in request
 - **WHEN** unprepared cells and stored HP are read repeatedly
 - **THEN** clock, objects, room pools, Attributes, registrations, seed, sequence and schedule remain unchanged, and no traits handler is created
 
+#### Scenario: Transit is not endpoint presence
+- **WHEN** a real individual has departed on an unfinished or protected-arrival journey
+- **THEN** neither endpoint reports it as a local target; authorized inspection reports its actual journey separately and stale entity targets reject
+
 ### Requirement: Observation identity belongs to persistent individuals
 Each living population observation SHALL use persistent individual identity across room activation, recycling, rename and reload, while each fresh birth retains a new distinct identity.
 

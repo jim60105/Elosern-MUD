@@ -146,7 +146,7 @@ class WorldEscapeTests(EvenniaTest):
         self.assertIn("escape_context", caught.exception.detail)
 
     @covers_requirement(
-        "disengage-action::the-disengage-effect-handler-computes-flee-success-from-the-same-agility-difference"
+        "monster-journeys::mapped-individual-escape-commits-a-real-adjacent-departure"
     )
     def test_an_abstract_context_changes_eligibility_only(self):
         from world.rules.combat import Battlefield
@@ -171,6 +171,9 @@ class WorldEscapeTests(EvenniaTest):
         self.assertIn(stable_actor_id(monster), field.fled)
         self.assertEqual(group_of_member(self.wilderness, monster.pk).journey_id, None)
 
+    @covers_requirement(
+        "monster-journeys::mapped-individual-escape-commits-a-real-adjacent-departure"
+    )
     def test_no_lawful_route_returns_no_plan_even_without_a_pursuer(self):
         from evennia.utils.create import create_object
 
@@ -244,6 +247,9 @@ class WorldEscapeTests(EvenniaTest):
         self.assertEqual(replay.edge, plan.edge)
         self.assertEqual(replay.expected_fingerprint, plan.expected_fingerprint)
 
+    @covers_requirement(
+        "monster-journeys::mapped-individual-escape-commits-a-real-adjacent-departure"
+    )
     def test_an_out_of_bounds_refuge_is_still_a_legal_escape(self):
         individual = construct_species_individual(
             next(iter(SYNTH_MONSTER_VARIANTS.values())).species_key, ORDINARY
@@ -271,6 +277,9 @@ class WorldEscapeTests(EvenniaTest):
 
     # -- settlement ---------------------------------------------------------
 
+    @covers_requirement(
+        "monster-journeys::journey-passage-preserves-elapsed-resources-and-actual-presence"
+    )
     def test_two_deferred_combat_rounds_pay_twelve_seconds_once(self):
         individual = self._monster()
         group = group_of_member(self.wilderness, individual.pk)
@@ -298,6 +307,10 @@ class WorldEscapeTests(EvenniaTest):
         )
         self.assertEqual(repeated.reserve_units, expected)
 
+    @covers_requirement(
+        "monster-journeys::mapped-individual-escape-commits-a-real-adjacent-departure",
+        "monster-journeys::journey-operations-restore-complete-state-on-failure-and-replay",
+    )
     def test_departure_removes_presence_and_replays_from_the_receipt(self):
         individual = self._monster()
         plan = plan_individual_escape(individual, None, self._context(individual))
@@ -328,6 +341,9 @@ class WorldEscapeTests(EvenniaTest):
             self.wilderness.db.itemcoordinates.get(individual), PROBE
         )
 
+    @covers_requirement(
+        "monster-journeys::journey-passage-preserves-elapsed-resources-and-actual-presence"
+    )
     def test_a_protected_arrival_waits_without_a_second_travel_charge(self):
         individual = self._monster()
         plan = plan_individual_escape(individual, None, self._context(individual))
@@ -376,6 +392,9 @@ class WorldEscapeTests(EvenniaTest):
             (destination.x, destination.y),
         )
 
+    @covers_requirement(
+        "monster-journeys::journey-passage-preserves-elapsed-resources-and-actual-presence"
+    )
     def test_inactive_arrival_creates_no_room_and_preserves_identity(self):
         individual = self._monster()
         plan = plan_individual_escape(individual, None, self._context(individual))
@@ -393,6 +412,9 @@ class WorldEscapeTests(EvenniaTest):
         )
         self.assertIsNone(individual.location)
 
+    @covers_requirement(
+        "monster-journeys::journey-passage-preserves-elapsed-resources-and-actual-presence"
+    )
     def test_equal_partitions_and_a_reload_preserve_resources_and_progress(self):
         individual = self._monster()
         write_fatigue_state(individual, RESERVE, SleepPosture.AWAKE)
@@ -425,7 +447,7 @@ class WorldEscapeTests(EvenniaTest):
         )
 
     @covers_requirement(
-        "wilderness-population-view::population-reads-report-actual-living-registrations"
+        "monster-journeys::journey-passage-preserves-elapsed-resources-and-actual-presence"
     )
     def test_the_population_lifecycle_settles_a_journey_in_equal_partitions(self):
         from types import MappingProxyType
@@ -480,6 +502,9 @@ class WorldEscapeTests(EvenniaTest):
             journey_id, read_monster_activity(self.wilderness).journeys
         )
 
+    @covers_requirement(
+        "monster-journeys::journey-operations-restore-complete-state-on-failure-and-replay"
+    )
     def test_a_late_lifecycle_failure_restores_the_whole_journey(self):
         from unittest.mock import patch
         from types import MappingProxyType
