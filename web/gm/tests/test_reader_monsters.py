@@ -19,12 +19,12 @@ from world.rules.traits import (
     NUMERIC_SOURCE_APPROVED_PROFILE,
     NUMERIC_SOURCE_INTERIM_TIER_BAND,
 )
+from world.tests.geography_fixture import publish_shipped_geography
 from world.tests.synthetic_data import (
     SYNTH_MONSTER_SITES,
     SYNTH_MONSTER_SPECIES,
     SYNTH_MONSTER_VARIANTS,
 )
-
 from tools.spec_traceability import covers_requirement
 from web.gm.readers import monsters
 from web.gm.readers._entities import read_attr, stored_attribute_keys
@@ -36,6 +36,8 @@ from web.gm.tests._state_support import (
     section_keys,
     section_of,
 )
+
+publish_shipped_geography()
 
 SPECIES = "t_whisper_quail"
 ORDINARY = "t_whisper_quail_ordinary"
@@ -146,17 +148,76 @@ class MonsterReaderTests(EvenniaTest):
         numeric = section_of(detail, "numeric")
         self.assertIn("hp=", row_value(numeric, "已核可數值"))
 
-    def test_placement_reports_a_site_or_the_ambient_region(self):
+    def test_placement_reports_home_ownership_and_actual_position_apart(self):
+        import types
+
+        from unittest.mock import patch
+
         monster = self._individual()
         ambient = section_of(monsters.detail(monster), "placement")
         self.assertEqual(row_value(ambient, "歸屬"), "環境散布")
-        self.assertEqual(row_value(ambient, "區域"), monsters.region_of(monster))
+        # No home ownership and no wilderness position: both are unknown, and
+        # the individual's variant membership is never read as a region.
+        self.assertIsNone(monsters.region_of(monster))
+        self.assertEqual(row_value(ambient, "歸屬區域"), "—")
+        self.assertEqual(row_value(ambient, "目前區域"), "—")
+        self.assertEqual(row_value(ambient, "實際座標"), "—")
+
+        # Home ownership is its own stored marker, independent of position.
+        zone_key, region_key = "t_home_wold", "t_home_region"
+        monster.db.home_ecology_zone = zone_key
+        with patch(
+            "world.lore.monster_placement.ECOLOGY_ZONE_REGISTRY",
+            {zone_key: types.SimpleNamespace(region_key=region_key)},
+        ):
+            owned = section_of(monsters.detail(monster), "placement")
+            self.assertEqual(row_value(owned, "歸屬"), "生態領域")
+            self.assertEqual(row_value(owned, "歸屬生態領域"), zone_key)
+            self.assertEqual(row_value(owned, "歸屬區域"), region_key)
+            self.assertEqual(row_value(owned, "目前區域"), "—")
+            self.assertEqual(row_value(owned, "實際座標"), "—")
+            self.assertEqual(monsters.region_of(monster), region_key)
+
         monster.db.site_key = SITE
         site = section_of(monsters.detail(monster), "placement")
         self.assertEqual(row_value(site, "歸屬"), "據點")
         self.assertEqual(row_value(site, "據點"), SITE)
-        self.assertEqual(row_value(site, "區域"), SYNTH_MONSTER_SITES[SITE].region_key)
-        self.assertIn(",", row_value(site, "座標"))
+        self.assertEqual(row_value(site, "歸屬區域"), SYNTH_MONSTER_SITES[SITE].region_key)
+        # The stored home marker is still reported beside the site ownership.
+        self.assertEqual(row_value(site, "歸屬生態領域"), zone_key)
+        self.assertEqual(row_value(site, "目前區域"), "—")
+        self.assertEqual(row_value(site, "實際座標"), "—")
+
+    def test_a_standing_position_is_read_from_the_actual_registration(self):
+        from evennia.contrib.grid.wilderness.wilderness import (
+            WildernessScript,
+            create_wilderness,
+        )
+        from world.maps.wilderness_provider import (
+            WILDERNESS_NAME,
+            ElosernWildernessMapProvider,
+            region_for_coordinates,
+        )
+
+        create_wilderness(name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider())
+        wilderness = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
+        cell = (1500, 1500)
+        monster = self._individual()
+        monster.db.site_key = SITE
+        wilderness.db.itemcoordinates[monster] = cell
+
+        self.assertEqual(monsters.actual_cell_of(monster), cell)
+        self.assertEqual(monsters.current_region_of(monster), region_for_coordinates(*cell))
+        placement = section_of(monsters.detail(monster), "placement")
+        self.assertEqual(row_value(placement, "實際座標"), f"{cell[0]}, {cell[1]}")
+        self.assertEqual(
+            row_value(placement, "目前區域"), region_for_coordinates(*cell)
+        )
+        # The site's authored coordinate never stands in for the actual one.
+        self.assertNotEqual(
+            row_value(placement, "實際座標"),
+            f"{SYNTH_MONSTER_SITES[SITE].coordinates[0]}, {SYNTH_MONSTER_SITES[SITE].coordinates[1]}",
+        )
 
     def test_loot_table_rows_cover_item_keys_and_quantity_rows(self):
         monster = self._individual()

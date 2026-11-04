@@ -29,7 +29,6 @@ from world.maps.monster_sites import (
 from world.maps.wilderness_population import (
     _population_key,
     _stored_hp,
-    ambient_observation_key,
     ensure_population,
     population_view,
 )
@@ -268,7 +267,10 @@ class HuntProvisioningTests(ProvisioningWorldFixture, EvenniaTest):
             self.assertIn(self.wilderness.db.itemcoordinates[individual], cells)
 
     @covers_requirement(
-        "wilderness-population-view::observation-identities-survive-materialization"
+        "wilderness-monster-population::ensure-population-idempotently-places-and-respawns-monsters-at-a-coordinate"
+    )
+    @covers_requirement(
+        "wilderness-population-view::population-reads-report-actual-living-registrations"
     )
     def test_supplementary_individuals_take_unique_slots_and_keep_them(self):
         result = ensure_hunt_targets(
@@ -320,15 +322,8 @@ class HuntProvisioningTests(ProvisioningWorldFixture, EvenniaTest):
         }
         self.assertEqual(after, before)
 
-        target = min(self.rule.quantity, self.rule.capacity)
-        expected_keys = {
-            (
-                ambient_observation_key(WILDERNESS_NAME, cell[0], cell[1], "species", slot)
-                if slot < target
-                else f"object:{pk}"
-            )
-            for pk, slot in after.items()
-        }
+        # The view reports each living individual under its own persistent key.
+        expected_keys = {f"object:{pk}" for pk in after}
         facts = [
             fact
             for fact in population_view(self.wilderness, [cell])

@@ -723,3 +723,151 @@ requirements, so no additional claim was added:
 - `monster-individual-construction::kill-accounting-keys-on-persistent-individual-identity-and-dedupes-duplicate-defeat-events`
 
 No retired, empty or skipped claim is retained.
+
+# Actual live population view
+
+`world/maps/wilderness_population.population_view(wilderness, cells)` is the
+single read projection every presence consumer shares (area map entities,
+live-sight travel notices, the hostile interrupt comparison, GM placement
+facts). Since `actual-live-population-view` it reports **only actually present
+individuals**:
+
+- The wilderness script's `db.itemcoordinates` is the one authoritative
+  position surface. The view builds one index over it and projects each living
+  `Monster` on a requested valid cell exactly once, under its persistent
+  `object:<dbref>` identity, with its current coordinate and the tier/danger
+  grade resolved from its species/variant record. Characters and NPCs keep
+  their existing observations.
+- Stored HP decides living (`world.rules.surfaces.persisted_hp`); no gauge is
+  ticked and no `TraitHandler` is constructed. The read creates, reconciles,
+  moves and deletes nothing and emits no event.
+- Nothing prospective exists in the fact stream. An uninitialized, empty,
+  blocked or due habitat, a composition declaration, a site's lifecycle state
+  and an ecology zone's home ownership are never evidence of presence: a
+  scheduled future birth is not a visible entity and never raises a sighting or
+  an interruption. A dead individual is absent. A cleared site whose members
+  are still alive keeps those members: physical presence is not filtered by
+  the site owner's read verdict.
+- Identity belongs to the individual. Renaming, activating the cell, recycling
+  the room or reloading keeps the same key; a freshly born individual is a new
+  ID, so two same-label individuals stay distinct.
+
+The view no longer consumes `ambient_population_decision`, `ExpectedSlot`,
+`ambient_observation_key`, the capital entry or slot matching. Those remain
+the materializer's own machinery until `regional-population-runtime-cutover`.
+No second view and no slot-projection alias exists.
+
+## Habitat guidance versus entity facts
+
+A regional hunt's authored hunting region or ecology zone is **habitat
+guidance**, owned by `regional-hunt-supply-cutover` and presented as a
+destination marker, never as a monster fact. Exact entity destinations and
+hostile travel interruptions require an actual present individual from this
+view; a marker for an undersupplied habitat stays a marker and never becomes an
+entity annotation or an exact target.
+
+## GM ownership versus current position
+
+`web/gm/readers/monsters.py` reports the two independently:
+
+- **Home ownership** — `home_zone_of` reads the individual's own
+  `home_ecology_zone` marker (reported even when the authored row no longer
+  resolves); `region_of` resolves the owning site's region or the home ecology
+  zone's region. Variant membership of an ambient placement rule is never read
+  as ownership. The GM `region` list filter selects by this ownership region.
+- **Actual position** — `actual_cell_of` reads the owner's registered cell and
+  `current_region_of` classifies that cell's terrain region. The placement
+  section prints `歸屬生態領域`, `歸屬區域`, `目前區域` and `實際座標` as separate
+  rows, so a moved individual no longer inherits its site's authored coordinate.
+
+## Assertion roles and requirement hand-off
+
+The delta removes
+`wilderness-population-view::population-reads-share-materialization-decisions`
+and `wilderness-population-view::observation-identities-survive-materialization`
+and adds two requirements. Following
+`docs/development/spec-test-traceability.md`, the IDs were generated from an
+equivalent spec tree (the main specs with this delta applied) before archiving,
+and the new tests were annotated with them **at the archive sync**, once the
+CLI had written the requirements into the main spec:
+
+- `wilderness-population-view::population-reads-report-actual-living-registrations`
+  ← `test_a_configured_cell_reports_nothing_until_an_individual_exists`,
+  `test_a_habitat_without_a_living_individual_reports_nothing`,
+  `test_every_actual_living_owner_is_reported_once_with_canonical_facts`,
+  `test_a_moved_individual_is_absent_from_its_former_cell`,
+  `test_repeated_reads_change_nothing`,
+  `test_population_view_does_not_construct_traits`,
+  `test_a_species_cell_reports_exactly_its_living_members`,
+  `test_a_protected_branch_migration_monster_stays_visible`,
+  `test_supplementary_individuals_take_unique_slots_and_keep_them`.
+- `wilderness-population-view::observation-identity-belongs-to-persistent-individuals`
+  ← `test_identity_survives_activation_rename_and_reload`,
+  `test_a_same_label_birth_gets_a_fresh_identity`,
+  `test_a_same_label_replacement_gets_a_fresh_identity`.
+
+The retired IDs are not re-pointed to any live requirement. This table is the
+hand-off: each test, its role, and the delta requirement/scenario it
+establishes.
+
+| Test | Role | Delta requirement and scenario |
+| --- | --- | --- |
+| `WildernessPopulationViewTests.test_a_configured_cell_reports_nothing_until_an_individual_exists` | synthetic mechanism | Population reads report actual living registrations — no prospective entities |
+| `WildernessPopulationViewTests.test_an_empty_cell_reports_no_monster` (configured habitat, covered by the test above) | synthetic mechanism | …no prospective entities (configured composition is not presence) |
+| `WildernessPopulationViewTests.test_a_habitat_without_a_living_individual_reports_nothing` | representative integration control | …no prospective entities (uninitialized, cleared and due habitat) |
+| `WildernessPopulationViewTests.test_every_actual_living_owner_is_reported_once_with_canonical_facts` | synthetic mechanism | …actual members of every owner (ambient, site, foreign, explicit; dead/absent excluded) |
+| `WildernessPopulationViewTests.test_repeated_reads_change_nothing` | synthetic mechanism | …no read mutation |
+| `WildernessPopulationViewTests.test_population_view_does_not_construct_traits` | synthetic mechanism | …no read mutation (no traits handler, no SQL write) |
+| `WildernessPopulationViewTests.test_identity_survives_activation_rename_and_reload` | representative integration control | Observation identity belongs to persistent individuals — identity across room lifecycle |
+| `WildernessPopulationViewTests.test_a_same_label_birth_gets_a_fresh_identity` | synthetic mechanism | …fresh birth and repeated labels |
+| `WildernessPopulationViewTests.test_a_moved_individual_is_absent_from_its_former_cell` | synthetic mechanism | …actual members of every owner (current position wins) |
+| `WildernessPopulationViewTests.test_a_hostile_interrupt_needs_an_actual_living_individual` | representative integration control | Wilderness steps report stateless committed interrupts — future birth is not an interruption |
+| `AmbientSpeciesReconciliationTests.test_a_species_cell_reports_exactly_its_living_members` | synthetic mechanism | …actual members of every owner (dead member absent while protected) |
+| `AmbientSpeciesReconciliationTests.test_a_same_label_replacement_gets_a_fresh_identity` | synthetic mechanism | …fresh birth and repeated labels |
+| `AmbientSpeciesReconciliationTests.test_a_protected_branch_migration_monster_stays_visible` | synthetic mechanism | …actual members of every owner (branch classification is not presence) |
+| `HuntProvisioningTests.test_supplementary_individuals_take_unique_slots_and_keep_them` | synthetic mechanism | …actual members of every owner (view reports the persistent IDs) |
+| `BuildTravelEventsTests.test_a_recycled_room_keeps_the_same_identity_and_raises_no_notice` | synthetic mechanism | Wilderness steps … — identity and absent context |
+| `BuildTravelEventsTests.test_a_new_live_identity_raises_the_hostile_notice` | synthetic mechanism | …transition/context table (new hostile) |
+| `WildernessAreaTests.test_entity_annotations_are_actual_living_individuals_only` | representative integration control | Wilderness area maps … — entity presence is actual |
+| `WildernessAreaTests.test_entities_carry_one_count_and_their_canonical_threat` | synthetic mechanism | …entity presence is actual (one count, canonical threat) |
+| `MonsterReaderTests.test_placement_reports_home_ownership_and_actual_position_apart` | synthetic mechanism | GM inspection (delta task 2.1, no ambient-rule ownership guess) |
+| `MonsterReaderTests.test_a_standing_position_is_read_from_the_actual_registration` | representative integration control | GM inspection reads the actual coordinate/region |
+| `StateApiListFilterTests.test_monster_species_and_region_filters_select_the_individual` | representative integration control | GM region filter selects home ownership, not variant membership |
+
+Affected assertions whose claim was retired rather than replaced:
+`test_view_agrees_with_entry_and_observation_identity_is_stable`,
+`test_species_view_agrees_with_materialization_and_session_protection`,
+`test_a_survivor_keeps_its_identity_when_the_slot_before_it_dies`,
+`test_a_protected_drifted_baseline_monster_stays_visible`,
+`test_a_protected_monster_on_a_now_empty_cell_stays_visible`,
+`test_protected_duplicate_baseline_monsters_are_both_visible`,
+`test_a_prospective_slot_that_materializes_is_not_resighted` and
+`test_a_slot_and_its_materialized_monster_state_one_threat` were deleted with
+their prospective-slot subject; their live-presence substance moved to the
+actual-owner and actual-annotation tests above. No annotation was re-pointed at
+a different requirement to keep the local traceability gate green.
+
+## Verification evidence (this change)
+
+| Command | Result |
+| --- | --- |
+| `… world.maps.tests.test_wilderness_population.WildernessPopulationViewTests` | `Ran 10 tests ... OK` |
+| `… world.maps.tests.test_wilderness_population_species.AmbientSpeciesReconciliationTests` | `Ran 12 tests ... OK` |
+| `… world.maps.tests.test_monster_provisioning.HuntProvisioningTests` | `Ran 11 tests ... OK` |
+| `… world.rules.tests.test_travel_events` | `Ran 35 tests ... OK` |
+| `… web.webclient.presentation.tests.test_area_map.WildernessAreaTests` | `Ran 15 tests ... OK` |
+| `… web.gm.tests.test_reader_monsters` | `Ran 12 tests ... OK` |
+| `… web.gm.tests.test_state_api.StateApiListFilterTests` | `Ran 2 tests ... OK` |
+| `uv run --locked python -m tools.spec_traceability --repo-root /tmp/omp-equiv-np8f_k9m list --json-output …/reqs.json` (equivalent tree outside Git: main specs + this delta, all test sources copied, new tests mounted to the generated IDs) | produced the two IDs quoted above |
+| `uv run --locked python -m tools.spec_traceability --repo-root /tmp/omp-equiv-np8f_k9m check` | `2702 requirements, 12332 associations, 2702 covered, 0 uncovered, 0 errors` |
+| `uv run --locked python -m tools.map_reference_context` | regenerated the source fingerprint after the `travel_interrupts` docstring change |
+| `uv run --locked python -m tools.observability_lint check` | `scanned=823 frozen=0 violations=0 exemptions=376` |
+| `uv run --locked python -m tools.contract_gate` | reference-context, observability, test-data, manifests and contracts pass; in the checkout, traceability reports the two requirements this delta REMOVES as uncovered with 0 errors until the archive sync replaces them — the expected pre-sync state, superseded by the equivalent-tree evidence above |
+
+The temporary equivalent tree is a disposable directory outside the checkout,
+not a branch or a worktree; it is deleted after the check and never committed.
+
+No logging path changed (the touched modules only had docstrings updated); the
+observability lint ran because they are facade-adopter files. CI shards, the
+managed browser suite and `tools.spec_traceability verify --evidence` remain
+CI-owned and were not claimed locally.

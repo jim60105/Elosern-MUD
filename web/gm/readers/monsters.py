@@ -4,8 +4,11 @@ Identity, provenance and placement are read back through the owning modules:
 ``world.rules.monster_individual`` resolves the variant, derived threat tier and
 danger grade, ``world.rules.traits`` names the numeric source that built the
 individual's traits, and ``world.lore.monster_placement`` names the owning site
-or ambient region. Loot and behaviour come from the monster's own stored state
-and the behaviour rulebook, both read without provisioning anything.
+or ecology zone. Placement reports home ownership and the region the individual
+actually stands in as independent facts: ownership never comes from variant
+membership, and a standing position never comes from the owner's original site
+coordinate. Loot and behaviour come from the monster's own stored state and the
+behaviour rulebook, both read without provisioning anything.
 """
 
 from __future__ import annotations
@@ -63,24 +66,56 @@ def _variant(key: Any) -> Any | None:
     return MONSTER_VARIANT_REGISTRY.get(key)
 
 
+def home_zone_of(monster: Any) -> str | None:
+    """The ecology zone this individual is home-owned by, or ``None``.
+
+    Ordinary home ownership is the individual's own stored marker, so it is
+    reported even when the authored zone row no longer resolves: ownership is
+    not inferred from a variant, a site coordinate or the current position.
+    """
+    from world.maps.regional_population import HOME_ZONE_ATTRIBUTE
+
+    zone_key = read_attr(monster, HOME_ZONE_ATTRIBUTE, default=None)
+    return zone_key if isinstance(zone_key, str) and zone_key else None
+
+
 def region_of(monster: Any) -> str | None:
-    """The region this individual stands in: its site's, or its ambient rule's."""
-    from world.lore.monster_placement import (
-        AMBIENT_PLACEMENT_REGISTRY,
-        MONSTER_SITE_REGISTRY,
-    )
+    """The region this individual is owned by: its site's, or its ecology zone's."""
+    from world.lore.monster_placement import ECOLOGY_ZONE_REGISTRY, MONSTER_SITE_REGISTRY
 
     site_key = read_attr(monster, "site_key", default=None)
     if isinstance(site_key, str) and site_key:
         site = MONSTER_SITE_REGISTRY.get(site_key)
         if site is not None:
             return str(site.region_key)
-    variant_key = read_attr(monster, "variant_key", default=None)
-    if isinstance(variant_key, str) and variant_key:
-        for rule in AMBIENT_PLACEMENT_REGISTRY.values():
-            if variant_key in tuple(rule.variant_keys):
-                return str(rule.region_key)
+    zone = ECOLOGY_ZONE_REGISTRY.get(home_zone_of(monster))
+    if zone is not None:
+        return str(zone.region_key)
     return None
+
+
+def actual_cell_of(monster: Any) -> tuple[int, int] | None:
+    """The wilderness cell this individual actually stands on, or ``None``."""
+    from world.maps.regional_population import actual_cell, live_wilderness
+
+    wilderness = live_wilderness()
+    if wilderness is None:
+        return None
+    return actual_cell(wilderness, monster)
+
+
+def current_region_of(monster: Any) -> str | None:
+    """The terrain region of the individual's actual position, or ``None``.
+
+    Read from the registered coordinate, never from the owning site's authored
+    coordinate: a moved member stands where it actually is.
+    """
+    from world.maps.wilderness_provider import region_for_coordinates
+
+    cell = actual_cell_of(monster)
+    if cell is None:
+        return None
+    return region_for_coordinates(*cell)
 
 
 def numeric_source(monster: Any) -> tuple[str, Any | None]:
@@ -153,21 +188,34 @@ def numeric_section(monster: Any) -> dict[str, Any]:
 
 
 def placement_section(monster: Any) -> dict[str, Any]:
+    """Home ownership and actual position, reported as independent facts."""
+    from world.lore.monster_placement import MONSTER_SITE_REGISTRY
+
     site_key = read_attr(monster, "site_key", default=None)
+    home_zone = home_zone_of(monster)
     rows: list[dict[str, Any]] = []
     if isinstance(site_key, str) and site_key:
-        from world.lore.monster_placement import MONSTER_SITE_REGISTRY
-
         site = MONSTER_SITE_REGISTRY.get(site_key)
         rows.append(row("歸屬", "據點", tone="gold"))
         rows.append(row("據點", site_key, mono=True))
         if site is not None:
             rows.append(row("據點類型", str(site.kind), mono=True))
-            rows.append(row("區域", str(site.region_key), mono=True))
-            rows.append(row("座標", f"{site.coordinates[0]}, {site.coordinates[1]}", mono=True))
+    elif home_zone is not None:
+        rows.append(row("歸屬", "生態領域", tone="gold"))
     else:
         rows.append(row("歸屬", "環境散布", tone="gold"))
-        rows.append(row("區域", str(region_of(monster) or "—"), mono=True))
+    if home_zone is not None:
+        rows.append(row("歸屬生態領域", home_zone, mono=True))
+    rows.append(row("歸屬區域", str(region_of(monster) or "—"), mono=True))
+    cell = actual_cell_of(monster)
+    rows.append(row("目前區域", str(current_region_of(monster) or "—"), mono=True))
+    rows.append(
+        row(
+            "實際座標",
+            "—" if cell is None else f"{cell[0]}, {cell[1]}",
+            mono=True,
+        )
+    )
     location = getattr(monster, "location", None)
     if location is not None:
         rows.append(
@@ -313,4 +361,14 @@ def item_of(monster: Any) -> dict[str, Any]:
     }
 
 
-__all__ = ["KIND", "NUMERIC_SOURCE_LABELS", "detail", "item_of", "numeric_source"]
+__all__ = [
+    "KIND",
+    "NUMERIC_SOURCE_LABELS",
+    "actual_cell_of",
+    "current_region_of",
+    "detail",
+    "home_zone_of",
+    "item_of",
+    "numeric_source",
+    "region_of",
+]

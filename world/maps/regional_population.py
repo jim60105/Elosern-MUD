@@ -269,6 +269,11 @@ def _wilderness() -> Any | None:
     return WildernessScript.objects.filter(db_key=WILDERNESS_NAME).first()
 
 
+def live_wilderness() -> Any | None:
+    """The live wilderness script this owner reads, or ``None`` before it exists."""
+    return _wilderness()
+
+
 def _zone(zone_key: str) -> EcologyZone:
     """The authored zone this key names, or its named refusal."""
     zone = ECOLOGY_ZONE_REGISTRY.get(zone_key)
@@ -467,7 +472,7 @@ def _is_wilderness(wilderness: Any, candidate: Any) -> bool:
     )
 
 
-def _cell_of(entity: Any, wilderness: Any) -> tuple[int, int] | None:
+def actual_cell(wilderness: Any, entity: Any) -> tuple[int, int] | None:
     """Where one entity actually stands in this wilderness, or ``None``.
 
     The coordinate registration is authoritative and independent of room
@@ -480,14 +485,14 @@ def _cell_of(entity: Any, wilderness: Any) -> tuple[int, int] | None:
     if registration is not None:
         registered = registration.get(entity)
         if registered is not None:
-            return _as_cell(registered)
+            return coordinate_pair(registered)
     location = getattr(entity, "location", None)
     if location is None or not _is_wilderness(wilderness, getattr(location, "wilderness", None)):
         return None
-    return _as_cell(getattr(location, "coordinates", None))
+    return coordinate_pair(getattr(location, "coordinates", None))
 
 
-def _as_cell(value: object) -> tuple[int, int] | None:
+def coordinate_pair(value: object) -> tuple[int, int] | None:
     """A coordinate pair, or ``None`` when the value is not one."""
     if not isinstance(value, (tuple, list)) or len(value) != 2:
         return None
@@ -564,14 +569,14 @@ def _protected_cells(wilderness: Any) -> frozenset[tuple[int, int]]:
     cells: set[tuple[int, int]] = set()
     for individual in _living_monsters():
         if individual.pk in participants:
-            cell = _cell_of(individual, wilderness)
+            cell = actual_cell(wilderness, individual)
             if cell is not None:
                 cells.add(cell)
     from typeclasses.characters import PlayerCharacter
 
     for player in PlayerCharacter.objects.all_family():
         if player.pk in participants:
-            cell = _cell_of(player, wilderness)
+            cell = actual_cell(wilderness, player)
             if cell is not None:
                 cells.add(cell)
     return frozenset(cells)
@@ -592,7 +597,7 @@ def population_counts(wilderness: Any, zone_key: str) -> PopulationCounts:
         pk = individual.pk
         if individual.db.home_ecology_zone == zone_key:
             home.add(pk)
-        cell = _cell_of(individual, wilderness)
+        cell = actual_cell(wilderness, individual)
         if cell is not None and cell in local_cells:
             cells.setdefault(cell, set()).add(pk)
     local = {pk for occupants in cells.values() for pk in occupants}
@@ -965,7 +970,7 @@ def wilderness_registration_target(room: Any) -> tuple[Any, tuple[int, int]] | N
     wilderness = getattr(room, "wilderness", None)
     if wilderness is None:
         return None
-    cell = _as_cell(getattr(room, "coordinates", None))
+    cell = coordinate_pair(getattr(room, "coordinates", None))
     if cell is None:
         raise ExplicitPlacementRefused(
             f"{PLACEMENT_REFUSED}: room {room!r} has no active wilderness coordinates"
@@ -991,7 +996,7 @@ def register_explicit_individual(
     transaction; it opens none and compensates nothing by itself.
     """
     _require_wilderness(wilderness)
-    cell = _as_cell(coordinates)
+    cell = coordinate_pair(coordinates)
     if cell is None:
         raise ExplicitPlacementRefused(
             f"{PLACEMENT_REFUSED}: {coordinates!r} is not one integer cell pair"
@@ -1164,10 +1169,13 @@ __all__ = [
     "RegionalPopulationWorldUnavailable",
     "UnknownEcologyZone",
     "ZonePopulationState",
+    "actual_cell",
     "commit_population_wave",
+    "coordinate_pair",
     "current_population_tick",
     "initialize_population_seed",
     "initialize_zone",
+    "live_wilderness",
     "plan_population_wave",
     "population_counts",
     "read_population_seed",

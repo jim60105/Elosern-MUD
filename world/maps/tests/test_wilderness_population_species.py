@@ -19,7 +19,6 @@ from world.maps.wilderness_population import (
     _coordinate_hash,
     _population_key,
     _stored_hp,
-    ambient_observation_key,
     ambient_variant_for_slot,
     ensure_population,
     species_rule_for_coordinates,
@@ -366,61 +365,43 @@ class AmbientSpeciesReconciliationTests(BattlefieldIsolation, EvenniaTest):
         )
 
     @covers_requirement(
-        "wilderness-population-view::population-reads-share-materialization-decisions"
+        "wilderness-population-view::population-reads-report-actual-living-registrations"
     )
-    def test_species_view_agrees_with_materialization_and_session_protection(self):
-        # Cell PROBE has 2 living species monsters placed in setUp
+    def test_a_species_cell_reports_exactly_its_living_members(self):
+        # Cell PROBE has 2 living species monsters placed in setUp.
         members = _species_members(self.wilderness, PROBE)
         self.assertEqual(len(members), self.rule.quantity)
-        # Each individual's observation identity is the slot it persists.
-        keys = {
-            member.pk: ambient_observation_key(
-                WILDERNESS_NAME, PROBE[0], PROBE[1], "species", member.db.population_slot
-            )
-            for member in members
-        }
-        self.assertEqual(len(set(keys.values())), len(members))
-
-        # View the populated cell; char1 is also at PROBE so filter monster facts
-        facts = population_view(self.wilderness, [PROBE])
-        monster_facts = [f for f in facts if f.kind == "monster"]
-        self.assertEqual(len(monster_facts), self.rule.quantity)
+        facts = [
+            fact
+            for fact in population_view(self.wilderness, [PROBE])
+            if fact.kind == "monster"
+        ]
         self.assertEqual(
-            {f.observation_key: f.label for f in monster_facts},
-            {keys[member.pk]: member.key for member in members},
+            {fact.observation_key: fact.label for fact in facts},
+            {f"object:{member.pk}": member.key for member in members},
         )
 
-        # Now start an active combat session with the slot-0 individual
         self.char1.race = "human"
         self.char1.apply_race_baseline()
-        victim = next(member for member in members if member.db.population_slot == 0)
-        survivor = next(member for member in members if member.pk != victim.pk)
+        victim, survivor = sorted(members, key=lambda member: member.pk)[:2]
         engage(self.char1, victim)
         victim.traits.hp.current = 0
 
-        # Session is active and victim is defeated:
-        # View must project living participant/monsters as protected without spawning prospective replacements
-        decision = ambient_population_decision(self.wilderness, PROBE)
-        self.assertTrue(decision.is_session_protected)
-        self.assertEqual(decision.spawns_needed, ())
-
-        facts_protected = population_view(self.wilderness, [PROBE])
-        monster_facts_protected = [f for f in facts_protected if f.kind == "monster"]
-        # Only the living survivor is projected, and under its own exact key:
-        # it never inherits the defeated individual's slot while the pass is
-        # frozen, and no prospective replacement appears.
-        self.assertEqual(
-            [(f.observation_key, f.label) for f in monster_facts_protected],
-            [(keys[survivor.pk], survivor.key)],
-        )
+        # A protected pass births nothing, so the dead participant is absent
+        # and the survivor keeps its own persistent key.
+        projected = [
+            (fact.observation_key, fact.label)
+            for fact in population_view(self.wilderness, [PROBE])
+            if fact.kind == "monster"
+        ]
+        self.assertEqual(projected, [(f"object:{survivor.pk}", survivor.key)])
 
     @covers_requirement(
-        "wilderness-population-view::observation-identities-survive-materialization",
-        "wilderness-population-view::population-reads-share-materialization-decisions",
+        "wilderness-population-view::observation-identity-belongs-to-persistent-individuals"
     )
-    def test_a_survivor_keeps_its_identity_when_the_slot_before_it_dies(self):
-        # One variant fills both slots, so matching survivors by variant alone
-        # would move the survivor into the defeated individual's slot.
+    def test_a_same_label_replacement_gets_a_fresh_identity(self):
+        # One variant fills both slots, so a replacement shares its label with
+        # the survivor; identity is the persistent individual, never the slot.
         narrow = AmbientPlacementRule(self.region, (ORDINARY,), 2, 3)
         self.enterContext(
             synthetic_registries(
@@ -439,53 +420,49 @@ class AmbientSpeciesReconciliationTests(BattlefieldIsolation, EvenniaTest):
         }
         self.assertEqual(set(by_slot), {0, 1})
         self.assertEqual({member.variant_key for member in by_slot.values()}, {ORDINARY})
-        keys = {
-            slot: ambient_observation_key(
-                WILDERNESS_NAME, cell[0], cell[1], "species", slot
-            )
-            for slot in by_slot
-        }
         victim, survivor = by_slot[0], by_slot[1]
+        survivor_key = f"object:{survivor.pk}"
 
         self.char1.race = "human"
         self.char1.apply_race_baseline()
         engage(self.char1, victim)
         victim.traits.hp.current = 0
 
-        decision = ambient_population_decision(self.wilderness, cell)
-        self.assertTrue(decision.is_session_protected)
-        self.assertEqual(decision.spawns_needed, ())
-        # Pre-fix the survivor was reassigned to slot 0, adopting the dead
-        # individual's observation identity.
-        projected = [
-            fact for fact in population_view(self.wilderness, [cell]) if fact.kind == "monster"
-        ]
         self.assertEqual(
-            [(fact.observation_key, fact.label) for fact in projected],
-            [(keys[1], survivor.key)],
+            {
+                fact.observation_key
+                for fact in population_view(self.wilderness, [cell])
+                if fact.kind == "monster"
+            },
+            {survivor_key},
         )
 
-        # Protection ends: reconciliation refills the vacant slot only.
+        # Protection ends: reconciliation refills the vacant position, and the
+        # freshly born individual is a new identity while the survivor's own
+        # key is unchanged.
         clear_session(self.char1)
         ensure_population(self.wilderness, cell)
 
         living = _species_members(self.wilderness, cell)
         self.assertEqual(len(living), 2)
         self.assertIn(survivor.pk, [member.pk for member in living])
-        self.assertEqual(Monster.objects.get(pk=survivor.pk).db.population_slot, 1)
         replacement = next(member for member in living if member.pk != survivor.pk)
-        self.assertEqual(replacement.db.population_slot, 0)
-        resumed = {
-            fact.observation_key: fact.label
-            for fact in population_view(self.wilderness, [cell])
-            if fact.kind == "monster"
-        }
-        self.assertEqual(resumed[keys[1]], survivor.key)
-        self.assertEqual(resumed[keys[0]], replacement.key)
+        self.assertNotEqual(replacement.pk, victim.pk)
+        self.assertEqual(replacement.key, survivor.key)
+        self.assertEqual(
+            {
+                fact.observation_key
+                for fact in population_view(self.wilderness, [cell])
+                if fact.kind == "monster"
+            },
+            {survivor_key, f"object:{replacement.pk}"},
+        )
 
     @covers_requirement(
-        "wilderness-population-view::population-reads-share-materialization-decisions",
         "wilderness-monster-population::population-reconciliation-never-destroys-an-active-session-participant",
+    )
+    @covers_requirement(
+        "wilderness-population-view::population-reads-report-actual-living-registrations"
     )
     def test_a_protected_branch_migration_monster_stays_visible(self):
         # A tier-example monster left at a coordinate an authored species rule
@@ -535,9 +512,12 @@ class AmbientSpeciesReconciliationTests(BattlefieldIsolation, EvenniaTest):
         facts = [
             fact for fact in population_view(self.wilderness, [cell]) if fact.kind == "monster"
         ]
-        # Pre-fix the species branch classified the living non-species monster
-        # as stale, so the view dropped an enemy materialization keeps.
-        self.assertEqual(len(facts), len(living_pks))
+        # Every living individual is an actual fact under its own persistent
+        # key; the view never classifies it by an ambient branch.
+        self.assertEqual(
+            {fact.observation_key for fact in facts},
+            {f"object:{pk}" for pk in living_pks},
+        )
         migrated_fact = next(
             (fact for fact in facts if fact.observation_key == f"object:{migrated.pk}"),
             None,

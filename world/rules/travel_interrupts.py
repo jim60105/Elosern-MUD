@@ -199,8 +199,10 @@ def _hostile_keys(location: Any, cell: tuple[int, int], calendar: Any) -> frozen
     The disc is the canonical live-sight geometry (``in_ground_disc`` over the
     committed radius); the knowledge-revealed filter of the presentation
     window is deliberately not applied, because an interrupt describes live
-    sight, not what the map has drawn. The view only reads: it never
-    materializes a prospective slot.
+    sight, not what the map has drawn. The view only reads, and it reports
+    only living registered individuals under their persistent object keys: a
+    scheduled future birth is not an entity, so it can never raise an
+    interrupt.
     """
     return frozenset(
         fact.observation_key for fact in live_hostile_facts(location, live_sight_disc(cell, calendar))

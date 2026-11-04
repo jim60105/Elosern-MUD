@@ -42,6 +42,10 @@ Wilderness area_map SHALL cover the centred41-by-41 window using permanent groun
 - **WHEN** the player opens area scope in wilderness
 - **THEN** the coordinate window is current minus twenty through current plus twenty in each axis, with out-of-frame cells unknown, actual visits distinguished from reveal, and only legal revealed immediate steps actionable
 
+#### Scenario: Entity presence is actual
+- **WHEN** revealed map cells contain actual living individuals and empty configured recovery habitats
+- **THEN** entity annotations include only actual current IDs with canonical threat facts; habitat commission markers remain separate and do not assert live presence
+
 ### Requirement: Area commission markers distinguish same-map identity from elsewhere
 Accepted commission markers SHALL carry a canonical node identity when the destination is on this area map and bearing/distance for destinations elsewhere. A uniquely registered ordinary interior or its instance origin SHALL supply its canonical enclosing anchor cell for external bearings. Resolving markers SHALL not reveal unvisited room topology or invent coordinates for coordinate-free rooms.
 
