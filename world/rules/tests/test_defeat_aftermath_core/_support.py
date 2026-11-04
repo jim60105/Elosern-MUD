@@ -29,7 +29,11 @@ from world.maps.wilderness_provider import (
 from world.tests.geography_fixture import publish_shipped_geography
 
 publish_shipped_geography()
-_CAPITAL_ENTRY = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
+_CAPITAL_ENTRY = next(
+    entry
+    for entry in WILDERNESS_ENTRY_REGISTRY.values()
+    if entry.gate_for("w") is not None
+)
 CAPITAL_ENTRY_XY = _CAPITAL_ENTRY.approach_cell(_CAPITAL_ENTRY.gate_for("w"))
 
 from world.rules.caravan_arrivals import register_caravan_arrivals

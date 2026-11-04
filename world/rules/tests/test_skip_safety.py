@@ -56,6 +56,9 @@ class SkipSafetyTests(BattlefieldIsolation, unittest.TestCase):
             self.assertIsNone(evaluate_skip_safety(player))
 
     @covers_requirement("skip-safety-gate::skip-safety-registers-battlefields-by-participant-dbref")
+    @covers_requirement(
+        "evennia-test-optimization::registry-content-assertions-use-the-registry-s-key-domain"
+    )
     def test_same_key_entities_in_separate_battlefields_do_not_cross_evict(self):
         first, second = actor("shared", 1), actor("shared", 2)
         field_a = Battlefield(

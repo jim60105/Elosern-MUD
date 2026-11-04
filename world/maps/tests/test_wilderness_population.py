@@ -135,6 +135,42 @@ class WildernessPopulationViewTests(EvenniaTest):
         self.assertEqual(facts[0].cell, cell)
 
     @covers_requirement(
+        "wilderness-monster-population::a-registered-wilderness-monster-survives-room-recycling"
+    )
+    def test_a_registered_individual_survives_room_recycling_without_refilling(self):
+        cell = self.cell
+        monster = create_object(Monster, key="t_recycled_beast")
+        monster.threat_tier = next(iter(live_monster_tier_registry()))
+        monster.apply_monster_tier("floor")
+        monster.traits.hp.current = 7
+        monster.db.home_ecology_zone = "t_home_zone"
+        self.script.db.itemcoordinates[monster] = cell
+        room = self.room
+        monster.location = room
+
+        east = next(exit_obj for exit_obj in room.exits if exit_obj.key == "east")
+        east.at_traverse(self.char1, room)
+        monster.refresh_from_db()
+        self.assertIsNone(monster.location)
+        self.assertEqual(self.script.db.itemcoordinates[monster], cell)
+        west_room = self.char1.location
+        west = next(exit_obj for exit_obj in west_room.exits if exit_obj.key == "west")
+        west.at_traverse(self.char1, west_room)
+        reloaded = Monster.objects.get(pk=monster.pk)
+        self.assertIs(reloaded, monster)
+        self.assertIs(reloaded.location, self.char1.location)
+        self.assertEqual(reloaded.traits.hp.current, 7)
+        self.assertEqual(reloaded.db.home_ecology_zone, "t_home_zone")
+        facts = [
+            fact
+            for fact in population_view(self.script, [cell])
+            if fact.kind == "monster"
+        ]
+        self.assertEqual(
+            [fact.observation_key for fact in facts], [f"object:{monster.pk}"]
+        )
+
+    @covers_requirement(
         "wilderness-population-view::population-reads-report-actual-living-registrations"
     )
     def test_repeated_reads_change_nothing(self):
