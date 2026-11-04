@@ -14,7 +14,7 @@ Complete one confirmed legal adjacent traversal with post-round affordability an
 
 Add `plan_party_retreat(commander: Any, record: CombatSessionRecord, battlefield: Battlefield, *, operation_id: str, preferred: PhysicalEdge | None) -> PartyRetreatPlan | None` to world_escape.py. Frozen `PartyRetreatPlan(edge: PhysicalEdge, member_ids: tuple[int,...], self_moving_ids: tuple[int,...], carried_ids: tuple[int,...], states_after_attempt: tuple[TravellerState,...], traversal: TraversalResolution, depart_tick: int, operation_id: str)` is the exact owner plan. None means legitimate blocked/unaffordable gameplay failure. Corrupt route/physiology raises by name.
 
-Use the shared combat-activity projector from mapped-monster-escape and settled_rounds cursor from hostile admission. Project every unpaid completed interval plus the attempt's six-second round from actual posture evidence. Never use only persisted pre-battle reserve, omit prior deferred rounds or count a paid prefix again. Pass detached post-attempt states to canonical quote_edge/plan_traversal, including fatigue speed changes, exact-zero arrival and normal authorized waivers. Partial physiology is an operational refusal, never an ordinary agility-failure story.
+Use the shared combat-activity projector from mapped-monster-escape and settled_rounds cursor from incapacitated-hostile-rounds. Project every unpaid completed interval plus the attempt's six-second round from actual posture evidence. Never use only persisted pre-battle reserve, omit prior deferred rounds or count a paid prefix again. Pass detached post-attempt states to canonical quote_edge/plan_traversal, including fatigue speed changes, exact-zero arrival and normal authorized waivers. Partial physiology is an operational refusal, never an ordinary agility-failure story.
 
 Present allies are the commander's current source team, including existing knocked-out carry-out companions; remote companions neither price nor move. Existing eligibility selects agility actors. Actual self-moving members determine slowest speed and must afford the full route. Carried bodies retain normal condition and applicable physiology without fictitious walking/awakening. A non-knocked-out sleeper keeps ordinary sleep movement restrictions; the carry exemption is exactly the existing knocked-out rule. No unrelated restraint is bypassed.
 
@@ -40,7 +40,7 @@ Fault after old-session close, physiology, actual movement/following, arrival co
 
 ## Risks / Trade-offs
 
-Affordability includes the full unpaid combat prefix and attempt, and successful commit consumes exactly that prefix. The prior settled-round cursor is authoritative; do not add another ledger. Confirmation replay stays bound to the old session even when arrival creates a new session.
+Affordability includes the full unpaid combat prefix and attempt, and successful commit consumes exactly that prefix. The incapacitated-hostile-rounds settled-round cursor is authoritative; do not add another ledger. Confirmation replay stays bound to the old session even when arrival creates a new session.
 
 ## Verification
 
@@ -58,6 +58,22 @@ Canonical IDs copied from traceability list output for the equivalent merged tre
 - `player-combat-session::party-exit-requires-a-commander-session-round-and-operation-bound-confirmation`, task2.1, confirmation/revalidation controls.
 - `player-combat-session::combat-time-settles-once-at-terminal-session-outcome`, task3.1, paid-prefix plus traversal accounting.
 
+## Blocking review disposition
+
+The complete initial seven-change set received one blocking rubber-duck critique. All five blocking findings are addressed in these proposal revisions; no feature implementation or verification is claimed.
+
+| Finding | Artifact remedy |
+| --- | --- |
+| Contradictory main timing/flee contracts | mapped-monster-escape now amends the whole agility requirement; incapacitated-hostile-rounds amends world-clock, party-time-settlement and field-combat-initiation as well as session/mental contracts; both session replacements bill/regenerate only the unpaid suffix |
+| Lost composition identity | PopulationPlacement retains composition_key and activity_key through pure planning, stale comparison, actual group creation and forecast; identical-member/different-binding test required |
+| Solitary validation used one runtime sample | authoring validates every possible count outcome and site override before publication; maximum total must be1 for solitary policy |
+| Missing monster physiology handoff | explicit per-member durable cursors, actual rules projector/writer and disjoint idle/combat/journey intervals; two-deferred-round flee/arrival/idle/reload control required |
+| No continuation after normal-round incapacity | separated continuation slice names the ordinary confirmed-round completion hook and reentrancy guard; end-to-end last-ally disabling test required |
+
+Nonblocking type ambiguity is resolved by exact EscapePlan, committed journey-plan keys and detached ActivitySnapshot/zone/site shapes. Sizing feedback produced the eighth independently playable change, incapacitated-hostile-rounds, so contact authority no longer implements paid combat continuation. The remaining movement/journey/forecast slices reuse existing owners and one planner instead of adding parallel services; construction, commit and consumer integration stay together to avoid nonplayable scaffolds.
+
+Requirement shape remains mechanism-based. Activity authoring adds one validation requirement; human ecology, visual quality and player wording stay in the named review document. Existing long agility prose is reduced to a short normative contest/admission sentence with every original scenario retained and the no-pursuer scenario amended. Entity/field inventories remain in design/tasks or scenarios. No requirement is justified solely by pinned shipped data or wording.
+
 ## Batch dependency and conflict matrix
 
 | Change | Required active predecessor | Shared-code conflict |
@@ -66,7 +82,8 @@ Canonical IDs copied from traceability list output for the equivalent merged tre
 | monster-activity-authoring | none | lore placement and candidate publication; serialize common metadata/docs |
 | mapped-monster-escape | movement-edge-history; monster-activity-authoring | activity owner, population lifecycle, resolver/session journals |
 | global-monster-activity | mapped-monster-escape | same activity/lifecycle owner, constructor integration and population tests |
-| hostile-field-admission | global-monster-activity | lifecycle ordering, movement arrival, combat/sleep/clock accounting |
+| incapacitated-hostile-rounds | global-monster-activity | session cursor, fatigue/clock and ordinary combat continuation |
+| hostile-field-admission | incapacitated-hostile-rounds | lifecycle ordering, movement arrival, combat/sleep/clock accounting |
 | interruptible-field-contact | hostile-field-admission | lifecycle forecasts, mental time, skips and authoritative travel surfaces |
 | paid-party-retreat | interruptible-field-contact | exit confirmation, session rounds/settlement, movement and contact publication |
 

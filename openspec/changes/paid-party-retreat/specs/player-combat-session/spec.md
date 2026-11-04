@@ -96,14 +96,14 @@ Interactive rounds SHALL defer combat time until terminal settlement except for 
 
 #### Scenario: Companion gauges regenerate from combat settlement
 - **WHEN** a session with a wounded or knocked-out companion reaches a terminal outcome
-- **THEN** the companion's HP/MP/SP are regenerated for the accumulated combat seconds, and a knocked-out
+- **THEN** the companion's HP/MP/SP are regenerated for only the remaining unpaid combat seconds, and a knocked-out
   companion rises above the nonlethal HP floor when its regen allows
 
 #### Scenario: Settlement scope is the living non-fled roster
 - **WHEN** a terminal settlement runs
 - **THEN** the settlement entity scope is every living, non-fled member of the session's battlefield
   roster (player, companions, and any non-defeated foe still present), so all participants receive
-  gauge regen for the accumulated combat time
+  gauge regen for only the remaining unpaid combat interval; any previously paid prefix is excluded
 
 #### Scenario: Population loss carries actual round offset
 - **WHEN** a mapped session records a defeat in a later round before terminal-only clock settlement
