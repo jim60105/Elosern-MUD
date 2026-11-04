@@ -240,3 +240,34 @@ Implementation smoke must exercise actual group movement, a live monster's arriv
 ## 13. Review and continuation
 
 This written specification and the first specification's home-population amendment must be committed and explicitly reviewed. The user selected the next design document rather than implementation planning; the remaining third content specification stays in scope. No feature implementation is authorized by this document. Resume `writing-plans` only when the user requests the planning transition after the required written-spec review.
+
+## 14. Proposal set and implementation batch (2026-11-04)
+
+The written specification has been split into eight OpenSpec changes under `openspec/changes/`. All eight are in phase `proposed`, hold no branch or worktree, and have passed `openspec validate --all --strict`. This section records their scope and order; it authorizes no implementation.
+
+| Order | Change | Design sections | Scope | Depends on |
+| --- | --- | --- | --- | --- |
+| 1 | `movement-edge-history` | 7.1, 8.1 | Persist the last completed physical edge by stable locator and price it through the canonical traversal resolver | none |
+| 2 | `monster-activity-authoring` | 4.1, 6 | Publish immutable activity and aggression declarations with complete validated composition and site bindings | none |
+| 3 | `mapped-monster-escape` | 5.1, 9, 10 | Turn mapped enemy flee into an atomic legal departure plus a durable, globally settled journey, with map-owned activity records and physiology cursors | 1, 2 |
+| 4 | `global-monster-activity` | 4.1, 5.2 | Let every real group make seeded bounded decisions on game time through the existing population clock source | 3 |
+| 5 | `incapacitated-hostile-rounds` | 6 | Replace sleep-caused hostile defeat and writer-side empty-party pauses with real paid enemy-only rounds and a durable settled-round cursor | 4 |
+| 6 | `hostile-field-admission` | 5.2, 6 | Admit authored aggressive contact at a real arrival, birth, or condition boundary with owner-mediated sleep interruption and no grace window | 5 |
+| 7 | `interruptible-field-contact` | 5.3, 6 | Forecast the first real future contact read-only and stop wait, rest, sleep, and travel there with exact accepted receipts | 6 |
+| 8 | `paid-party-retreat` | 7.2, 8 | Execute confirmed retreat over a real legal affordable edge, charging one attempt round plus normal travel once, then re-evaluate arrival contact | 7 |
+
+### 14.1 Batch structure
+
+Wave 1 runs changes 1 and 2 concurrently, and their code is disjoint. Change 1 edits movement pricing and player edge history in `world/rules/movement_settlement.py`, `world/rules/travel_cost.py`, and `typeclasses/exits.py`. Change 2 edits lore declaration publication and the runtime candidate bundle.
+
+Waves 2 to 7 run one change at a time in table order. Every later change edits the same session, clock, physiology, and arrival surfaces. The journey engine must exist before activity scheduling can use it, the paid-prefix continuation must exist before admission may trigger it, admission must exist before a forecast can target a real writer, and indivisible arrival contact must exist before paid retreat can commit a traversal.
+
+Every change serializes `.github/evennia-shards.json`, `.github/browser-shards.json`, the single developer evidence document, `docs/game/commands.md`, and `docs/game/command-reference.md`, independently of the wave.
+
+### 14.2 Requirement-level ordering constraints
+
+`player-combat-session::combat-time-settles-once-at-terminal-session-outcome` is modified by changes 5 and 8. Their replacement text must stay identical, so those two changes never land together.
+
+Three capabilities are added and then extended by a later change, which fixes their order. Those pairs are `monster-journeys` (3, then 4), `monster-field-activity` (2, then 4), and `hostile-field-contact` (6, then 7).
+
+`world-clock` receives two independent delta requirements, one from change 4 on caller-supplied settlement scope and one from change 5 on command-time advancement outside a persistent combat session. Their texts address separate requirements, and archive order still follows the chain.
