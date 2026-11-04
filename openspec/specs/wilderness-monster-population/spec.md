@@ -1,10 +1,10 @@
 ## Purpose
 
-The deterministic, offline-computable monster population for the wilderness/Virtual layer: a pure
-coordinate-to-monster model and an idempotent spawn/respawn service that places `Monster` objects at
-wilderness coordinates via the wilderness script's `itemcoordinates`, guaranteeing huntable low-tier
-monsters near `capital_altoria`'s entry point. No LLM, no RNG, no database reads in the population
-decision.
+The deterministic, offline-computable monster population for the wilderness/Virtual layer: bounded
+authored regional habitats whose actual individuals are created once through the regional population
+owner, evolve only through its game-time recovery contract, and remain registered by wilderness
+coordinate in the script's `itemcoordinates`. There is no coordinate-slot, tier-example, capital-supply
+or room-entry refill path, and reads project only actual living registrations.
 
 ## Requirements
 

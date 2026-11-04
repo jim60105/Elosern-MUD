@@ -1,7 +1,7 @@
 # wilderness-population-view Specification
 
 ## Purpose
-Project live and prospective population without materializing objects. This capability owns its observable mechanism and rejection boundaries.
+Project actual living population without materializing, reconciling or predicting objects. This capability owns its observable mechanism and rejection boundaries.
 
 ## Requirements
 

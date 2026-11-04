@@ -1523,3 +1523,118 @@ environment file `/tmp/mud-population-test.env` (`MUD_TEST_SETTINGS=1`):
 `world.rules.tests.test_clock` errors/failure (unloaded settlement maps) and two
 `test_action_pipeline_atomicity` errors reproduce identically on master and are
 not caused by this change.
+
+## Runtime cutover: activation, deletion boundary and operations
+
+`server/conf/at_server_startstop.py` registers
+`world.maps.population_lifecycle.register_regional_population()` as the
+`monster_site_lifecycle` stage before `restore_persisted_sessions()`. The
+coordinator merges exact-tick site lifecycle, pending presence transitions and
+regional recovery due times; no wall timer owns a population boundary and no
+second whole-interval regional stage exists.
+
+`world/maps/bootstrap.py::sync_wilderness` distinguishes a genuinely new
+wilderness script from a preexisting one:
+
+- **Fresh world.** One compensated transaction creates the script, writes the
+  configured `INITIAL_POPULATION_SEED` through `initialize_population_seed`,
+  then calls `initialize_zone` for every authored zone in stable-key order.
+  A later-zone failure restores earlier individuals and every owner/cache
+  surface; retrying the same provisioning is safe.
+- **Preexisting world.** The script is never re-seeded, rerolled, converted or
+  reset. It must already carry the seed and a complete record for every
+  authored zone. Missing or malformed state raises the named
+  `population_state_uninitialized` operator refusal. Repeated startup, source
+  reread, room preparation and player arrival create nothing and preserve
+  living IDs and resources.
+
+Incompatible development state is handled only by an explicit operator action:
+save the world if it must be kept, then repair it through the GM console, or
+delete the disposable development database and re-provision from scratch.
+Startup never mutates, fills or converts an incompatible world.
+
+### Deleted legacy path
+
+`world/maps/wilderness_population.py` now contains only the actual read
+projection (`population_view`, `PopulationFact`, `threat_label`, `_stored_hp`)
+and the explicit population-marker departure primitive still used by
+`defeat-aftermath-core`. Removed with every caller: `MonsterPopulation`,
+`population_for_coordinates`, region tier/density tables, tier visual rows,
+capital entry accessor, hunting band, coordinate hash/slot identity,
+`ExpectedSlot`/`PopulationDecision`, `ambient_population_decision`,
+`ambient_observation_key`, `ambient_slots_in_use`, `_population_key`, `_spawn`,
+`_spawn_species_individual`, `ensure_population`, conformance helpers, the
+`AmbientPlacementRule` registry/declarations/`ambient_rule`, the provider's
+room-entry reconciliation, the synthetic-kit ambient fixtures, and the
+test-only `settle_monster_sites(start, end)` interval replay.
+
+`world.lore.monster_placement` keeps the species/variant, site, composition,
+ecology-zone and settlement-policy registries. `settlement-stage-order`'s
+stale provenance sentence is corrected by a MODIFIED delta in this change;
+the `wilderness-monster-population` and `wilderness-population-view` Purpose
+texts are amended in place during implementation.
+
+### Assertion-role cutover ledger
+
+Retired requirement IDs disappear at archive sync. Rows name the delta
+requirement or, for ADDED contracts, the scenario; no canonical ID is
+fabricated.
+
+| Retired requirement | Retired test / role | Replacement or disposition |
+| --- | --- | --- |
+| `population_for_coordinates` is a pure, deterministic function over the bounded map | `test_wilderness_population.TerrainPopulationModelTests.*` — synthetic mechanism | Deleted with the model. No replacement: the coordinate-slot decision no longer exists. |
+| A hunting band around the capital's north gate always hosts a low-tier monster | `TerrainPopulationModelTests.test_hunting_band_is_contiguous_low_tier` — synthetic mechanism | Deleted. The guarantee is retired; no replacement guarantee. |
+| `ensure_population` idempotently places and respawns monsters at a coordinate | `WildernessPopulationSpawnTests.*` — representative integration | Deleted. Fresh-world constrained births are covered by `WildernessBootstrapTests.test_fresh_wilderness_provisioning_initializes_population_once` (bootstrap fresh/repeat) and the retained smoke (births + reload). |
+| Ambient species reconciliation | `test_wilderness_population_species.AmbientSpeciesReconciliationTests.*` — synthetic mechanism | Module deleted. Actual-member projection is covered by `WildernessPopulationViewTests`; ordinary births/recovery by `test_regional_population*` and `test_monster_sites`. |
+| `Population reconciliation never destroys an active-session participant` | `StartupSessionRestoreOrderTests.*` — representative integration | Contract replaced by `Active encounters retain protected individuals and cells`. Covered by `world.maps.tests.test_regional_population_recovery.RealSessionRecoveryTests` and the session-protection tests there. |
+| Capital introductory hunt immediate supply | `OnboardingHuntIntegrationTests` — representative integration | Deleted. Undersupplied acceptance is owned by the quest slice; site acceptance remains covered by `world.quests.tests.test_site_clear_out_acceptance`. |
+| Defeat departure followed by immediate respawn | `WildernessDepartureTests.test_population_winner_despawns_at_defeat_settlement` tail | Tail deleted; departure/registration assertions remain. Respawn is retired; delayed recovery is covered by the recovery module and the smoke. |
+| Site and ambient owners never cross domains | `MonsterSiteLifecycleTests.test_the_two_owners_never_cross_domains` — synthetic mechanism | Reworked as `test_site_settlement_never_touches_a_foreign_individual` (same requirement, foreign-owner control). |
+
+No new test carries a `covers_requirement` annotation for an ADDED delta
+requirement; those IDs do not exist until archive sync. Hand-off list:
+
+- `test_fresh_wilderness_provisioning_initializes_population_once` — ADDED
+  `Runtime population uses authored regions without implicit fallback`,
+  scenario `Fresh world and reuse`.
+- `test_preexisting_world_without_population_state_refuses` — ADDED
+  `Runtime population uses authored regions without implicit fallback`,
+  scenario `Unconfigured and incompatible world`.
+- `test_a_later_zone_failure_rolls_back_the_fresh_provisioning` — ADDED
+  `Runtime population uses authored regions without implicit fallback`,
+  scenario `Fresh world and reuse` (compensation half).
+- `test_enter_wilderness_creates_no_population` and the round-trip module — MODIFIED
+  `A registered wilderness monster survives room recycling`, scenario
+  `Read and re-entry do not refill`.
+- `world.maps.tests.test_regional_population_recovery.RealSessionRecoveryTests` —
+  ADDED `Active encounters retain protected individuals and cells`.
+
+### Real-world smoke evidence
+
+The retained entrypoint is `tools/monster_population_smoke.py`, run through
+`server/conf/monster_population_smoke_settings.py` against a disposable
+database (the Evennia shell launcher's first-boot superuser check is bypassed
+by the Django shell invocation):
+
+```
+MUD_SMOKE_DB=/tmp/mud-population-smoke.sqlite3 uv run --locked evennia migrate \
+  --settings monster_population_smoke_settings --noinput
+MUD_SMOKE_DB=/tmp/mud-population-smoke.sqlite3 \
+  DJANGO_SETTINGS_MODULE=server.conf.monster_population_smoke_settings \
+  uv run --locked python -m django shell \
+  -c "import evennia; evennia._init(); from tools.monster_population_smoke import run; run()"
+```
+
+Observed output on the disposable database:
+
+```json
+{"seed": 0, "zone": "smoke_zone", "region": "western_hills_valleys", "birth_cells": 225, "coordinator_registered_once": true, "initial_pks": [2, 3, 4], "initial_state": {"generation_sequence": 3, "recovery_due_tick": null}, "view_initial_ids": [2, 3, 4], "defeat": {"pk": 2, "was_alive": true, "now_alive": false, "due_tick": 5}, "before_due_living": [3, 4], "at_due_living": [3, 4, 5], "delayed_wave_pks": [5], "state_after_due": {"generation_sequence": 4, "recovery_due_tick": null}, "view_due_ids": [3, 4, 5], "interrupt_hostile_ids": [3, 4, 5], "reload": {"id": 3, "hp": 40, "home_zone": "smoke_zone"}, "rollback": {"before_count": 4, "after_count": 4, "state": null, "retry_created": [16, 17, 18]}, "legacy_absent": {"ensure_population": true, "ambient_registry": true}, "species": "t_whisper_quail", "variant": "t_whisper_quail_ordinary"}
+```
+
+This proves the coordinator is registered once, a configured zone initializes
+through the owner, births are actual registered individuals, one loss is
+recorded, the due tick produces a delayed wave, view and interrupt surfaces
+show only living IDs, a fresh-object reload keeps identity/resources/home, a
+post-construction fault leaves no state and a retry succeeds, and no legacy
+generation symbol is importable. Human review: the report names synthetic
+species/content only; no shipped copy or balance value is asserted.
