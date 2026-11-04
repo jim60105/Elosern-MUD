@@ -73,10 +73,11 @@ def register_explicit_group(
     activity_key: str,
     operation_id: str,
     ordinal: int = 0,
+    transition_source_id: str | None = None,
 ) -> None:
 ```
 
-It applies every per-individual check `register_explicit_individual` applies today (persisted `Monster`, valid coordinates), refuses an empty or duplicate individual list with `ExplicitPlacementRefused`, writes each coordinate and room attachment, calls `create_group` once with all member ids and the given `operation_id`/`ordinal`, then records one `PopulationTransition` per individual (`source_id=f"{operation_id}#{ordinal}"`) and emits the existing `monster_population_individual_registered` event per individual. `register_explicit_individual` becomes a thin delegate passing `[individual]`, `operation_id=f"explicit:{cell[0]}:{cell[1]}:{individual.pk}"`, `ordinal=0`, and keeps its transition `source_id` equal to its current `operation_id`, so quest, GM and exam callers keep identical ids and evidence.
+It applies every per-individual check `register_explicit_individual` applies today (persisted `Monster`, valid coordinates), refuses an empty or duplicate individual list with `ExplicitPlacementRefused`, writes each coordinate and room attachment, calls `create_group` once with all member ids and the given `operation_id`/`ordinal`, then records one `PopulationTransition` per individual with `source_id = transition_source_id if transition_source_id is not None else f"{operation_id}#{ordinal}"` and emits the existing `monster_population_individual_registered` event per individual. `register_explicit_individual` becomes a thin delegate passing `[individual]`, `operation_id=f"explicit:{cell[0]}:{cell[1]}:{individual.pk}"`, `ordinal=0` and `transition_source_id=operation_id` (the legacy `explicit:x:y:pk` value without `#0`), so quest, GM and exam callers keep byte-identical group ids (`explicit:x:y:pk#0`, as today) and transition `source_id` values. `_populate` passes no `transition_source_id`, so its transitions read `site:<key>:<sequence>#<ordinal>`.
 
 `monster_sites._populate(wilderness, site, *, seed, sequence, tick)` constructs every row in `site_occurrence_groups` order and stamps `db.site_key`, then computes `movement_units(rows, (site.activity_key,) * len(rows))` and calls `register_explicit_group(..., owner_kind="site", owner_key=site.key, activity_key=unit.activity_key, operation_id=f"site:{site.key}:{sequence}", ordinal=ordinal)` per unit. Shipped sites bind stationary overrides, so they keep one group per individual.
 
