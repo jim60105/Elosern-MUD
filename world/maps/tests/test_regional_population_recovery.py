@@ -60,13 +60,23 @@ from world.rules import clock as clock_module
 from world.rules.clock import AdvanceSource, get_world_clock
 from world.rules.combat_session.records import CombatSessionRecord
 from world.rules.combat_session.rounds import _record_round_defeats
+from world.rules.combat_session import engage, read_session
+from world.rules.combat_session import submit_player_action
 from world.rules.combat_session.settlement import (
     _ROUND_SECONDS,
     _record_terminal_population_protection,
 )
+from world.rules.tests._combat_session_helpers import (
+    _player,
+    complete_party_draft,
+    open_synthetic_scope,
+    synth_innate_overlay,
+)
+from world.rules.tests.combat_fixtures import BattlefieldIsolation, grant_lineage
 from world.rules.monster_individual import construct_species_individual
 from world.tests.geography_fixture import publish_shipped_map_world
 from world.tests.synthetic_data import (
+    SYNTH_SKILLS,
     SYNTH_MONSTER_TIERS,
     SYNTH_MONSTER_VARIANTS,
     synthetic_registries,
@@ -441,6 +451,12 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
         self.assertIn(cell, regional_population._protected_cells(self.wilderness, at_tick=118))
         self.assertNotIn(
             cell, regional_population._protected_cells(self.wilderness, at_tick=119)
+        )
+        # A reload re-reads the same durable evidence: protection is not an
+        # in-process cache.
+        reloaded = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
+        self.assertIn(
+            cell, regional_population.protected_cells(reloaded, at_tick=118)
         )
 
     # -- combat occurrence evidence ----------------------------------------
@@ -853,3 +869,248 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
             sorted(individual.pk for individual in self._individuals()), before
         )
         self.assertEqual(zone_state(self.wilderness, ZONE_KEY).recovery_due_tick, due)
+
+
+class RealSessionRecoveryTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
+    """A real multi-round session: the round occurrence drives recovery."""
+
+    ROUND_PATCHES = (
+        "world.rules.combat.battlefield.roll_d100",
+        "world.rules.combat.damage.roll_d100",
+        "world.rules.combat.rounds.roll_d100",
+    )
+
+    def setUp(self):
+        open_synthetic_scope(
+            self,
+            "skills",
+            "elements",
+            "items",
+            "item_effect_profiles",
+            extra=synth_innate_overlay(),
+        )
+        super().setUp()
+        publish_shipped_map_world()
+        self.enterContext(
+            synthetic_registries("monster_species", "monster_variants", "monster_tiers")
+        )
+        self.enterContext(
+            patch(
+                "world.maps.wilderness_population.ensure_population",
+                lambda *arguments, **keywords: None,
+            )
+        )
+        create_wilderness(
+            name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider()
+        )
+        self.wilderness = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
+        self.region = region_for_coordinates(*PROBE)
+        self.clock = get_world_clock()
+        initialize_population_seed(self.wilderness, seed=SEED, tick=0)
+        population_lifecycle.register_regional_population()
+        self.addCleanup(
+            clock_module._EVENT_SOURCES.pop,
+            population_lifecycle.STAGE_KIND,
+            None,
+        )
+        self.compositions = {"t_recovery_solo": _solo_composition()}
+        self.zone = self._use_zone(wave_budget=1)
+        # The clock is the persisted occurrence source every builder reads: the
+        # scenario starts at a committed tick, not an in-memory assignment.
+        self.clock.advance(100, AdvanceSource.SKIP, [])
+        self.created = initialize_zone(
+            self.wilderness, ZONE_KEY, seed=SEED, tick=100
+        )
+        self.baseline_sequence = zone_state(
+            self.wilderness, ZONE_KEY
+        ).generation_sequence
+        self.player = _player("recovery fighter")
+        self.skill = SYNTH_SKILLS["t_ember_burst"].key
+        self.player.traits.magic_power.base = 30
+        grant_lineage(self.player, [self.skill])
+        self.player.traits.hp.base = 100000
+        self.player.traits.hp.current = 100000
+        self.assertTrue(
+            enter_wilderness(
+                self.player, coordinates=LOCAL[0], name=WILDERNESS_NAME
+            )
+        )
+        self.combatant = Monster.objects.get(pk=self.created[1])
+        # The synthetic tier vocabulary is a zone-authoring seam; give the live
+        # behaviour rulebook the same key so the round policy resolves an
+        # authored archetype for the zone-born individual.
+        from world.rules import monster_behaviour
+
+        rulebook = dict(monster_behaviour.MONSTER_BEHAVIOUR_YAML)
+        tier_defaults = dict(rulebook["tier_default_archetype"])
+        tier_defaults[self.combatant.threat_tier] = next(iter(tier_defaults.values()))
+        rulebook["tier_default_archetype"] = tier_defaults
+        self.enterContext(
+            patch.object(monster_behaviour, "MONSTER_BEHAVIOUR_YAML", rulebook)
+        )
+        self.combatant.traits.hp.base = 100000
+        self.combatant.traits.hp.current = 100000
+        regional_population.register_explicit_individual(
+            self.wilderness, self.combatant, LOCAL[0], tick=100
+        )
+        engage(self.player, self.combatant)
+        # One earlier loss leaves the zone deficient and due at 110.
+        self._kill(Monster.objects.get(pk=self.created[0]), 100)
+        settle_population_lifecycle(100, 100)
+        self.assertEqual(
+            zone_state(self.wilderness, ZONE_KEY).recovery_due_tick, 110
+        )
+
+    def _use_zone(self, *, wave_budget: int) -> EcologyZone:
+        zone = EcologyZone(
+            ZONE_KEY,
+            self.region,
+            ((0, 0, 0, 0),),
+            (WeightedComposition("t_recovery_solo", 1),),
+            LOWER_DENSITY,
+            UPPER_DENSITY,
+            3,
+            recovery_delay=DELAY,
+            replenishment_interval=REPLENISH,
+            wave_budget=wave_budget,
+        )
+        self.enterContext(
+            patch.object(
+                regional_population,
+                "ECOLOGY_ZONE_REGISTRY",
+                MappingProxyType({zone.key: zone}),
+            )
+        )
+        self.enterContext(
+            patch.object(
+                regional_population,
+                "ENCOUNTER_COMPOSITION_REGISTRY",
+                MappingProxyType(dict(self.compositions)),
+            )
+        )
+        self.enterContext(
+            patch.object(
+                monster_sites,
+                "ENCOUNTER_COMPOSITION_REGISTRY",
+                MappingProxyType(dict(self.compositions)),
+            )
+        )
+        self.enterContext(
+            patch.object(
+                regional_population,
+                "SETTLEMENT_BIRTH_POLICY_REGISTRY",
+                MappingProxyType({}),
+            )
+        )
+        self.enterContext(
+            patch.object(
+                regional_population,
+                "eligible_birth_cells",
+                lambda *a, **k: tuple(LOCAL),
+            )
+        )
+        self.enterContext(
+            patch.object(
+                regional_population, "_region_cells", lambda zone: frozenset(LOCAL)
+            )
+        )
+        self.enterContext(
+            patch.object(monster_sites, "MONSTER_SITE_REGISTRY", MappingProxyType({}))
+        )
+        return zone
+
+    def _kill(self, individual, tick: int) -> None:
+        before = presence_of(self.wilderness, individual)
+        individual.traits.hp.current = 0
+        record_population_transition(
+            self.wilderness,
+            PopulationTransition(
+                source_id=f"test-loss:{individual.pk}:{tick}",
+                individual_id=int(individual.pk),
+                occurred_tick=tick,
+                before=before,
+                after=presence_of(self.wilderness, individual, alive=False),
+            ),
+        )
+
+    def _round(self) -> dict:
+        submitted = submit_player_action(
+            self.player, self.skill, [self.combatant]
+        )
+        with (
+            patch(self.ROUND_PATCHES[0], return_value=100),
+            patch(self.ROUND_PATCHES[1], return_value=100),
+            patch(self.ROUND_PATCHES[2], return_value=100),
+            # The enemy takes no action: this control is about the party's
+            # committed defeat occurrence, not enemy policy.
+            patch(
+                "world.rules.combat_session.policies._enemy_policy",
+                lambda *a, **k: None,
+            ),
+        ):
+            return complete_party_draft(
+                self.player, self.combatant, submitted
+            )
+
+    def test_a_real_later_round_death_drives_the_delayed_wave(self):
+        self.assertEqual(self._round()["outcome"], "round")
+        self.assertEqual(self._round()["outcome"], "round")
+        reloaded = read_session(self.player)
+        self.assertEqual(reloaded.started_tick, 100)
+        self.assertEqual(
+            reloaded.population_cell,
+            {"wilderness": WILDERNESS_NAME, "x": LOCAL[0][0], "y": LOCAL[0][1]},
+        )
+        self.assertEqual(reloaded.rounds_elapsed, 2)
+
+        self.combatant.traits.hp.current = 1
+        with self.captureOnCommitCallbacks(execute=True):
+            result = self._round()
+        self.assertEqual(result["outcome"], "victory")
+        self.assertIsNone(read_session(self.player))
+        self.assertEqual(
+            get_world_clock().tick, 100 + 3 * _ROUND_SECONDS
+        )
+
+        state = zone_state(self.wilderness, ZONE_KEY)
+        # The 110 wave ran from the first loss; the round-3 death at 118 starts
+        # its own episode instead of being backdated to the pre-combat tick.
+        self.assertEqual(state.generation_sequence, self.baseline_sequence + 1)
+        self.assertEqual(
+            state.recovery_due_tick,
+            118 + DELAY,
+            (
+                state,
+                population_counts(self.wilderness, ZONE_KEY),
+                read_population_timeline(self.wilderness),
+                read_session(self.player),
+            ),
+        )
+        self.assertEqual(len(population_counts(self.wilderness, ZONE_KEY).local_ids), 2)
+
+    def test_a_late_terminal_failure_rolls_back_the_wave_and_keeps_the_session(self):
+        self.assertEqual(self._round()["outcome"], "round")
+        self.assertEqual(self._round()["outcome"], "round")
+        self.combatant.traits.hp.current = 1
+
+        with patch(
+            "world.narrative.events.record_narrative_event",
+            side_effect=RuntimeError("synthetic post-advance failure"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self._round()
+
+        # The clock, the wave and the state rolled back together; the session
+        # is still exactly the pre-round one for one clean retry.
+        self.assertEqual(self.clock.tick, 100)
+        session = read_session(self.player)
+        self.assertIsNotNone(session)
+        self.assertEqual(session.rounds_elapsed, 2)
+        self.assertEqual(
+            zone_state(self.wilderness, ZONE_KEY).generation_sequence,
+            self.baseline_sequence,
+        )
+        self.assertEqual(
+            zone_state(self.wilderness, ZONE_KEY).recovery_due_tick, 110
+        )
+        self.assertEqual(len(population_counts(self.wilderness, ZONE_KEY).local_ids), 2)
