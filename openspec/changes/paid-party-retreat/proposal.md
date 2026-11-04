@@ -22,7 +22,7 @@ None.
 
 ## Impact
 
-Consumes landed mechanisms: Persistent combat IDs and whole-cell admission are already landed. The map population owner keeps actual arrivals and escaped enemies, and the existing clock source settles journeys during travel. Prior batch changes provide edge history, canonical route quotes, contact admission and indivisible traversal visibility.
+Consumes landed mechanisms. Persistent combat IDs and whole-cell admission are already landed. The map population owner keeps actual arrivals and escaped enemies, and the existing clock source settles journeys during travel. Prior batch changes provide edge history, canonical route quotes, contact admission and indivisible traversal visibility.
 
 Attaches at combat_session/exit.py confirmation receipts, rounds.py::resolve_party_retreat/_escaped_party_retreat/_failed_party_retreat, settlement.py, movement_settlement.py and travel_cost.py.
 
@@ -38,4 +38,4 @@ No patrol guards, full ecology, cross-cell pursuit, disease, corrosion, wildfire
 
 depends-on: interruptible-field-contact
 
-Code conflicts: Requires all predecessor session/movement contracts. Exclusive ownership of exit/round/settlement billing while landing; shard manifests and both command docs serialize. All changes share the developer review/evidence document; serialize that file, `.github/evennia-shards.json` and `.github/browser-shards.json`. Command behavior changes update `docs/game/commands.md` and `docs/game/command-reference.md` together.
+Code conflicts require every predecessor session and movement contract. Exit, round and settlement billing are owned exclusively while this change lands; shard manifests and both command docs serialize. All changes share the developer review/evidence document; serialize that file, `.github/evennia-shards.json` and `.github/browser-shards.json`. Command behavior changes update `docs/game/commands.md` and `docs/game/command-reference.md` together.
