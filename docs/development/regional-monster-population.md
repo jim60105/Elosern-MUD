@@ -889,6 +889,9 @@ All ordinary entry points reach the same rule: the text `engage` command and
 the `explore.engage` browser adapter call `engage`; field `cast`, `cast ... 由
 <成員>` and `explore.cast` route through `cast_in_field` / `cast_as_member` to
 `initiate_field_combat`. No one-element `engage_group` bypass remains.
+The `webclient-skillbook-casting` delta records the browser routing contract so
+the main spec's opening-membership scenario matches this rule after the archive
+sync.
 
 ### Assertion roles and requirement hand-off
 
@@ -918,6 +921,7 @@ SINGLE tests no longer claim it.
 | `PreviewFieldSkillTests.test_duplicate_display_labels_keep_individual_line_up_identities` | synthetic mechanism: preview discloses both same-label individuals instead of disabling | `field-combat-initiation` "Whole-cell field membership is independent of opening recipients" / "Single recipient in mixed cell" |
 | `OpeningOrderPolicyTests.test_ordinary_entry_order_never_reorders_initiative` | synthetic mechanism: whole-cell admission keeps `opening_first_actor` empty and the initiator does not act first | `player-combat-session` "engage creates one persistent local combat session" / "Whole-cell ordinary membership" |
 | `FieldCombatTargetTests.test_roster_is_empty_for_an_unlocated_actor` | synthetic mechanism: unlocated roster | `field-combat-initiation` / "Dead and absent exclusion" |
+| `SkillPreviewActionTests.test_single_openings_keep_recipient_shape_in_a_mixed_cell` | real browser preview panel: every same-cell anchor is listed while each SINGLE row keeps one recipient | `webclient-skillbook-casting` "Field submissions revalidate and preserve deterministic routing" / "Anchor engagement follows the skill shape" |
 
 ### Verification evidence (this change)
 
@@ -939,7 +943,7 @@ file:
 | `world.rules.tests.test_combat_session_persistence` | 37 tests, OK |
 | `world.rules.tests.test_combat_party` | 65 tests, OK |
 | `web.webclient.actions.tests.test_skill_use_actions.FieldCastActionTests.test_a_companion_opening_opens_the_commanders_encounter` | 1 test, OK |
-| `web.webclient.actions.tests.test_skill_use_actions.SkillPreviewActionTests` | 12 tests, OK |
+| `web.webclient.actions.tests.test_skill_use_actions.SkillPreviewActionTests` | 13 tests, OK |
 | `world.rules.tests.test_guild_exams.ExamStartTests.test_an_examination_roster_never_sweeps_a_co_located_monster` | 1 test, OK |
 
 The full `world.rules.tests.test_guild_exams` module also reproduces a

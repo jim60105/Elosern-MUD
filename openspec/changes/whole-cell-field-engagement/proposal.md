@@ -19,6 +19,7 @@ None.
 
 - `field-combat-initiation`: Revise the behavior contract in this change's delta.
 - `player-combat-session`: Revise the behavior contract in this change's delta.
+- `webclient-skillbook-casting`: Revise the browser field-submission routing contract so its opening membership matches the whole-cell rule in this change's delta.
 
 ## Impact
 

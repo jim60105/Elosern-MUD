@@ -517,6 +517,10 @@ class FailureBoundaryTests(BattlefieldIsolation, EvenniaTestCase):
         self.player.location = self.room
         self.monster = _monster("failure wolf", hp=2000, atk=1)
         self.monster.location = self.room
+        # A second living participant makes the rollback control cover the
+        # whole-cell roster rather than a one-enemy session.
+        self.bystander = _monster("failure wolf", hp=2000, atk=1)
+        self.bystander.location = self.room
 
     def _force_opening_failure(self):
         with (
@@ -538,14 +542,7 @@ class FailureBoundaryTests(BattlefieldIsolation, EvenniaTestCase):
         with patch.dict(_BATTLEFIELDS, {}, clear=True):
             self._force_opening_failure()
         self.assertIsNone(read_session(self.player))
-        self.assertEqual(
-            [
-                key
-                for key, field in _BATTLEFIELDS.items()
-                if field.roster.get(stable_actor_id(self.player)) is self.player
-            ],
-            [],
-        )
+        self.assertEqual(_BATTLEFIELDS, {})
         self.assertEqual(self.player.traits.mp.value, mp_before)
         self.assertEqual(self.player.traits.hp.value, hp_before)
         singleton = read_world_clock()

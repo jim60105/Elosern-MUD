@@ -367,6 +367,20 @@ class SkillPreviewActionTests(_SkillUseCase):
             self.assertEqual(row["target_ids"], ids)
             self.assertIn("3", row["label"])
 
+    def test_single_openings_keep_recipient_shape_in_a_mixed_cell(self):
+        first = self._wolf("single wolf")
+        second = self._wolf("single wolf")
+        third = self._wolf("single bear")
+        self._act("explore.skill_preview", {"skill_key": _T_DAMAGE})
+        openings = self._panel()["skill"]["openings"]
+        self.assertEqual(
+            [row["identity"] for row in openings],
+            sorted(int(monster.pk) for monster in (first, second, third)),
+        )
+        # Whole-cell membership does not widen a SINGLE action's recipients.
+        for row in openings:
+            self.assertEqual(row["target_ids"], [row["identity"]])
+
     @covers_requirement("webclient-skillbook-casting::skill-use-has-an-exact-on-demand-versioned-read-model")
     def test_a_companion_preview_is_computed_for_the_companion(self):
         from world.rules import field_cast as field_cast_rules
