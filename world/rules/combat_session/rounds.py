@@ -979,6 +979,7 @@ def _finalize_resolved_round(
         opening_first_actor=None,
     )
     _persist(actor, new_record)
+    _record_monster_combat_intervals(new_record, completed_round)
     _record_round_defeats(
         new_record,
         battlefield,
@@ -1008,6 +1009,52 @@ def _finalize_resolved_round(
 
     reconcile_session_memory(record.session_id)
     return result, notifications
+
+
+def _record_monster_combat_intervals(
+    record: CombatSessionRecord, completed_round: int
+) -> None:
+    """Record every combat-owned mapped enemy's completed posture interval.
+
+    The interval is exactly one round long, starts at the member's saved
+    cursor and carries the posture the round's boundary evidence declares, so
+    a sleep transition is paid as sleep and an awake round as awake combat.
+    The map owner rejects an unowned member, so this records nothing for an
+    abstract or staged participant.
+    """
+    if record.population_cell is None:
+        return
+    from world.maps import monster_activity, regional_population
+    from world.rules.combat_session.records import recorded_sleep_state
+
+    wilderness = regional_population.live_wilderness()
+    if wilderness is None or not monster_activity.activity_provisioned(wilderness):
+        return
+    posture = recorded_sleep_state(record)
+    start_tick = int(record.started_tick) + (completed_round - 1) * _ROUND_SECONDS
+    end_tick = start_tick + _ROUND_SECONDS
+    owned = set(
+        monster_activity.combat_owned_member_ids(wilderness, record.session_id)
+    )
+    for individual_id in record.enemy_ids:
+        if int(individual_id) not in owned:
+            continue
+        group = monster_activity.group_of_member(wilderness, int(individual_id))
+        if group is None:
+            continue
+        activity = (
+            monster_activity.ACTIVITY_SLEEP
+            if posture.get(int(individual_id), False)
+            else monster_activity.ACTIVITY_AWAKE_COMBAT
+        )
+        monster_activity.record_combat_interval(
+            wilderness,
+            group_id=group.group_id,
+            individual_id=int(individual_id),
+            start_tick=start_tick,
+            end_tick=end_tick,
+            activity=activity,
+        )
 
 
 def _record_round_defeats(

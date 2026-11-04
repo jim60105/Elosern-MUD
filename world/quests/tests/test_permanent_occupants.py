@@ -215,6 +215,9 @@ class WildernessSceneMonsterPlacementTests(EvenniaTest):
             name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider()
         )
         self.wilderness = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
+        from world.maps.regional_population import initialize_population_seed
+
+        initialize_population_seed(self.wilderness, seed=0, tick=0)
         self.assertTrue(
             enter_wilderness(self.char1, coordinates=self.CELL, name=WILDERNESS_NAME)
         )
@@ -253,8 +256,8 @@ class WildernessSceneMonsterPlacementTests(EvenniaTest):
         registrations_before = dict(self.wilderness.db.itemcoordinates)
         created: list[int] = []
 
-        def register_then_fail(wilderness, individual, coordinates, *, tick):
-            real_register(wilderness, individual, coordinates, tick=tick)
+        def register_then_fail(wilderness, individual, coordinates, **kwargs):
+            real_register(wilderness, individual, coordinates, **kwargs)
             created.append(individual.pk)
             raise RuntimeError("after actual registration")
 

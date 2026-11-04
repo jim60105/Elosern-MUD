@@ -31,6 +31,14 @@ from world.rules.monster_behaviour import monster_behaviour_policy
 from .combat_fixtures import FakeEntity
 from .test_monster_behaviour_policy import FakeMonster
 from world.rules.combat_identity import stable_actor_id
+from world.rules.world_escape import AbstractEscapeContext
+
+
+def _abstract_context(battlefield):
+    return {
+        "battlefield": battlefield,
+        "escape_context": AbstractEscapeContext(),
+    }
 
 
 def _field(actor, *pursuers):
@@ -168,14 +176,14 @@ class DisengageStagingTests(unittest.TestCase):
                 actor,
                 [actor],
                 "disengage:self",
-                {"battlefield": field},
+                _abstract_context(field),
                 1.0,
             )[0]
             failure = _handle_disengage(
                 actor,
                 [actor],
                 "disengage:self",
-                {"battlefield": field},
+                _abstract_context(field),
                 1.0,
             )[0]
         success_entry = _entries_from_effect(actor.key, stable_actor_id(actor), success)[0]
@@ -256,7 +264,7 @@ class DisengageGoldenTests(unittest.TestCase):
                 actor,
                 [actor],
                 "disengage:self",
-                {"battlefield": field},
+                _abstract_context(field),
                 1.0,
             )[0]
 

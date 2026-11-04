@@ -184,7 +184,16 @@ def _handle_disengage(
     event_context: dict[str, Any],
     scale: float,
 ) -> list[PendingEffect]:
-    """Stage one battlefield-level flee outcome."""
+    """Stage one battlefield-level flee outcome.
+
+    The agility contest is unchanged. A mapped combat context additionally
+    requires one lawful, affordable adjacent route quoted at the action's
+    occurrence: a successful roll without a route still fails, and the
+    committed departure is staged as one atomic effect covering the battlefield
+    marker and every map-owned surface. An explicit abstract context changes
+    battlefield eligibility only; a missing context is a named rejection, never
+    a silent location-preserving fallback.
+    """
     del targets, effect_id, scale
     battlefield = event_context.get("battlefield")
     if battlefield is None:
@@ -192,7 +201,54 @@ def _handle_disengage(
             RejectReason.EFFECT_RESOLUTION_FAILED,
             "flee: event_context missing required 'battlefield' key",
         )
+    from world.rules.world_escape import (
+        AbstractEscapeContext,
+        WorldEscapeContext,
+        WorldEscapeError,
+        plan_individual_escape,
+    )
+
+    escape_context = event_context.get("escape_context")
+    if escape_context is None:
+        raise RejectedAction(
+            RejectReason.EFFECT_RESOLUTION_FAILED,
+            "flee: event_context missing required 'escape_context' key",
+        )
     success, detail = _attempt_flee(actor, battlefield)
+    plan = None
+    if isinstance(escape_context, WorldEscapeContext):
+        from dataclasses import replace
+
+        from typeclasses.monsters import Monster
+
+        # One round may resolve more than one fleeing actor: the receipt and
+        # the deterministic candidate choice are keyed by the actor inside the
+        # round's own operation identity.
+        escape_context = replace(
+            escape_context,
+            operation_id=f"{escape_context.operation_id}:{stable_actor_id(actor)}",
+        )
+        if isinstance(actor, Monster):
+            try:
+                plan = plan_individual_escape(actor, battlefield, escape_context)
+            except WorldEscapeError as error:
+                raise RejectedAction(
+                    RejectReason.EFFECT_RESOLUTION_FAILED,
+                    f"flee: {error}",
+                ) from error
+            if success and plan is None:
+                # No lawful affordable neighbor: the roll does not manufacture
+                # a destination or energy, so the attempt is an ordinary
+                # failure.
+                success = False
+        # An allied interactive actor is routed to confirmed party retreat by
+        # its caller; its individual eligibility stays battlefield-local and
+        # never claims a world relocation it did not commit.
+    elif not isinstance(escape_context, AbstractEscapeContext):
+        raise RejectedAction(
+            RejectReason.EFFECT_RESOLUTION_FAILED,
+            "flee: the escape context has no supported authority",
+        )
     description = "|".join(
         (
             "disengage_attempt",
@@ -208,6 +264,24 @@ def _handle_disengage(
         )
     )
     actor_id = stable_actor_id(actor)
+    if plan is not None and success:
+        from world.maps import monster_activity, regional_population
+
+        def _depart() -> None:
+            battlefield.fled.add(actor_id)
+            wilderness = regional_population.live_wilderness()
+            if wilderness is None:
+                raise RuntimeError("mapped escape lost its wilderness world")
+            monster_activity.commit_monster_departure(wilderness, plan)
+
+        return [
+            PendingEffect(
+                entity=battlefield,
+                description=description,
+                surfaces=frozenset({"battlefield", "monster_journey"}),
+                apply=_depart,
+            )
+        ]
     return [
         PendingEffect(
             entity=battlefield,

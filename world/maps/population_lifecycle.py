@@ -33,7 +33,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from world.maps import monster_sites, regional_population
+from world.maps import monster_activity, monster_sites, regional_population
 from world.rules.clock import ScheduledEvent, SurfaceSnapshot, register_event_source
 
 #: The existing stage kind this coordinator installs itself under.
@@ -70,6 +70,7 @@ def _settle_population_at(wilderness: Any, tick: int) -> list[ScheduledEvent]:
                 wilderness, zone_key, tick=tick
             )
         )
+    events.extend(monster_activity.settle_monster_activity_at(wilderness, tick))
     regional_population.settle_timeline_through(
         wilderness, tick, retain=monster_sites.retained_loss_ids(wilderness)
     )
@@ -89,6 +90,11 @@ def _next_population_boundary(
     site_boundary = monster_sites.next_site_boundary(tick, end_tick)
     if site_boundary is not None:
         candidates.append(site_boundary)
+    journey_boundary = monster_activity.next_monster_activity_boundary(
+        wilderness, tick, end_tick
+    )
+    if journey_boundary is not None:
+        candidates.append(journey_boundary)
     # A birth route deferred by encounter protection retries on the first
     # unprotected tick, so protection end is a real merged boundary.
     for protection in timeline.protection:
@@ -130,6 +136,7 @@ def settle_population_lifecycle(
     regional_population.settle_timeline_through(
         wilderness, end_tick, retain=monster_sites.retained_loss_ids(wilderness)
     )
+    monster_activity.retire_room_protection(wilderness, end_tick)
     return events
 
 
@@ -172,6 +179,7 @@ def snapshot_population_lifecycle_surfaces(
         regional_population.snapshot_regional_population_surfaces(
             start_tick, end_tick
         ),
+        monster_activity.snapshot_monster_activity_surfaces(start_tick, end_tick),
     ):
         for object_id, surface in registry.items():
             existing = merged.get(object_id)

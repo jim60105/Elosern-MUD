@@ -480,7 +480,13 @@ def _populate(
             individual = construct_species_individual(species_key, variant_key)
             individual.db.site_key = site.key
             register_explicit_individual(
-                wilderness, individual, site.coordinates, tick=tick
+                wilderness,
+                individual,
+                site.coordinates,
+                tick=tick,
+                owner_kind="site",
+                owner_key=site.key,
+                activity_key=site.activity_key,
             )
             created.append(individual)
     return tuple(created)

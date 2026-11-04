@@ -43,6 +43,7 @@ from world.rules.event_log import EventEntry, EventLog
 from world.rules.items import ItemUseRequest, resolve_item_use
 from world.rules.progression import can_use_skill
 from world.rules.sexual_state import climax_settlement_action, decay_tick
+from world.rules.world_escape import AbstractEscapeContext
 from world.rules.sexual_transitions import apply_event
 from world.rules.unlock_notices import UnlockNotice
 from world.rules.upkeep import settle_upkeep
@@ -120,7 +121,13 @@ def default_attack_policy(
         actor=entity,
         skill_key=skill_key,
         targets=[target],
-        context=BattlefieldActionContext(battlefield),
+        context=BattlefieldActionContext(
+            battlefield,
+            event_context={
+                "battlefield": battlefield,
+                "escape_context": AbstractEscapeContext(),
+            },
+        ),
     )
 
 
@@ -607,7 +614,13 @@ def _resolve_round(
                         item_result = resolve_item_use(
                             request,
                             in_combat=True,
-                            context=BattlefieldActionContext(battlefield),
+                            context=BattlefieldActionContext(
+                                battlefield,
+                                event_context={
+                                    "battlefield": battlefield,
+                                    "escape_context": AbstractEscapeContext(),
+                                },
+                            ),
                         )
                         if item_result.outcome == "success":
                             if item_result.journal is not None and journal_sink is not None:

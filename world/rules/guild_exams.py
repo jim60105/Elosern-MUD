@@ -604,6 +604,7 @@ def start_guild_exam(
     }
     actor_traits_snapshot = snapshot_traits(actor)
     host_snapshot = snapshot_exam_host_surfaces(host)
+    staged_activity = _stage_exam_activity_binding(host, exam_id, start_tick)
     try:
         with transaction.atomic():
             _install_exam_kit(host, exam_id, start_tick, kit)
@@ -654,6 +655,19 @@ def start_guild_exam(
             )
             _write_exams(actor, [*records, exam_record])
             actor.db.active_combat = to_storage(session)
+            if staged_activity is not None:
+                staged_activity[0].create_group(
+                    staged_activity[1],
+                    operation_id=f"exam:{exam_id}",
+                    owner_kind="explicit",
+                    owner_key=exam_id,
+                    activity_key=staged_activity[2],
+                    home=staged_activity[3],
+                    position=staged_activity[3],
+                    member_ids=(int(host.pk),),
+                    seed=staged_activity[4],
+                    tick=start_tick,
+                )
             from world.rules.combat_session import reconstruct_battlefield
             from world.rules.skip_safety import register_active_battlefield
 
@@ -696,8 +710,43 @@ def start_guild_exam(
             restore_attribute_best_effort(actor, key, snapshot, category)
         restore_traits(actor, actor_traits_snapshot)
         restore_exam_host_surfaces(host, host_snapshot)
+        if staged_activity is not None:
+            staged_activity[0].release_group(
+                staged_activity[1], f"exam:{exam_id}"
+            )
         raise
     return exam_record
+
+
+def _stage_exam_activity_binding(
+    host: Any, exam_id: str, tick: int
+) -> tuple[Any, Any, str, Any, int] | None:
+    """The staged stationary activity binding of one examination's opponent.
+
+    A provisioned mapped world owns one staged group for the exam's persistent
+    host, bound to the explicit stationary policy under the placing operation.
+    An unprovisioned or abstract world creates no world group, exactly like the
+    direct combat fixtures: staged simulation owns no population record there.
+    """
+    import hashlib
+
+    from world.maps import monster_activity, regional_population
+    from world.rules.movement_edges import LocationRef
+
+    wilderness = regional_population.live_wilderness()
+    if wilderness is None or not monster_activity.activity_provisioned(wilderness):
+        return None
+    room_id = getattr(getattr(host, "location", None), "pk", None)
+    if not isinstance(room_id, int) or isinstance(room_id, bool) or room_id <= 0:
+        return None
+    seed = int.from_bytes(hashlib.sha256(f"{tick}:{exam_id}".encode("utf-8")).digest()[:8], "big")
+    return (
+        monster_activity,
+        wilderness,
+        monster_activity.STAGED_STATIONARY_ACTIVITY,
+        LocationRef.room(room_id),
+        seed,
+    )
 
 
 def settle_exam_outcome(

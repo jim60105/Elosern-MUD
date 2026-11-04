@@ -56,6 +56,7 @@ from world.rules.combat_modifiers import combat_modifier_rules
 from world.rules.disengage import FLEE_SKILL_KEY
 from world.rules.monster_individual import _registered_variant
 from world.rules.progression import can_use_skill
+from world.rules.world_escape import AbstractEscapeContext
 from world.skills.registry import (
     SKILL_REGISTRY,
     SkillDef,
@@ -978,7 +979,17 @@ def monster_behaviour_policy(
         if delegated is None or context is None:
             return delegated
         return replace(delegated, context=context, scale=scale)
-    settlement = BattlefieldActionContext(battlefield) if context is None else context
+    settlement = (
+        BattlefieldActionContext(
+            battlefield,
+            event_context={
+                "battlefield": battlefield,
+                "escape_context": AbstractEscapeContext(),
+            },
+        )
+        if context is None
+        else context
+    )
     resolution = resolve_monster_ai(entity) if decision is None else decision
     if resolution is not None and resolution.invalid_reason is not None:
         return _degraded_action(entity, battlefield, settlement, resolution)

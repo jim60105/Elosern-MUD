@@ -309,3 +309,42 @@ uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test
 uv run --locked python -m tools.contract_gate
 uv run --locked openspec validate monster-activity-authoring --strict
 ```
+
+## Mapped Monster Escape: Work in Progress
+
+`mapped-monster-escape` replaces the location-preserving mapped flee with an
+atomic legal departure and a durable journey. The owner is
+`world/maps/monster_activity.py` (strict group/journey/receipt codecs, the
+sole `wilderness.db.monster_activity` writer, chronological arrival and
+protected-arrival waiting), the pure planner is
+`world/rules/world_escape.py`, and the resolver seam is
+`world/rules/disengage.py::_handle_disengage` with
+`combat_session/battlefield.py::_context_for` supplying the explicit world or
+abstract escape context.
+
+Construction owners create the one initial group per occurrence:
+`commit_population_wave` (retained `composition_key`/`activity_key` on
+`PopulationPlacement`), `monster_sites._populate`, GM/quest explicit
+registration (`STAGED_STATIONARY_ACTIVITY`), and staged exams. Per-member
+`member_time` cursors mark admission, every completed round, departure and
+terminal settlement. `population_lifecycle` merges journey arrival/retry
+boundaries and snapshots the activity owner.
+
+Delta requirement IDs do not exist until archive sync. The scenario-to-test map
+for this change:
+
+| Scenario | Test assertions |
+| --- | --- |
+| Real resolver departure | `world.maps.tests.test_monster_journeys.MappedFleeIntegrationTests.test_a_two_enemy_rounds_flee_departs_and_reengages_the_same_identity` (only the chosen enemy leaves `itemcoordinates`/room, keeps group ownership, journey starts at the round offset, remainder continues); `test_departure_removes_presence_and_replays_from_the_receipt` |
+| Route or reserve failure | `world.rules.tests.test_world_escape.WorldEscapeTests.test_no_lawful_route_returns_no_plan_even_without_a_pursuer`; `test_a_missing_escape_context_is_a_named_rejection`; `test_partial_physiology_is_a_named_rejection_not_a_skip` |
+| Outside normal range | `WorldEscapeTests.test_an_out_of_bounds_refuge_is_still_a_legal_escape` |
+| Explicit abstract calculation | `WorldEscapeTests.test_an_abstract_context_changes_eligibility_only` |
+| Unobserved partition and restart | `WorldEscapeTests.test_equal_partitions_and_a_reload_preserve_resources_and_progress`; `test_inactive_arrival_creates_no_room_and_preserves_identity` |
+| Protected arrival | `WorldEscapeTests.test_a_protected_arrival_waits_without_a_second_travel_charge` |
+| Deferred combat physiology transfers once | `MappedFleeIntegrationTests...` (reserve equals one 12-second combat prediction) and `WorldEscapeTests.test_two_deferred_combat_rounds_pay_twelve_seconds_once` |
+| Retained binding / group ownership | `test_monster_journeys.GroupConstructionTests.test_identical_member_rows_keep_their_own_selected_binding`; `test_a_group_collision_refuses_instead_of_absorbing_identities`; `ActivityRecordTests.test_missing_and_malformed_state_refuse_without_reset` |
+
+Command docs (`docs/game/commands.md`,
+`docs/game/command-reference.md`) describe the real mapped enemy departure and
+its transit/arrival behaviour. GM inspection reports a travelling
+individual's journey separately (`web/gm/readers/monsters.py`).

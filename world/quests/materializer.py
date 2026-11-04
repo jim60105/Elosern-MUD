@@ -284,7 +284,13 @@ def spawn_role_actor(
     return npc
 
 
-def spawn_monster(room: Any, archetype: str | None, tier_key: str) -> Monster:
+def spawn_monster(
+    room: Any,
+    archetype: str | None,
+    tier_key: str,
+    *,
+    owner_key: str = "quest",
+) -> Monster:
     """Spawn one whitelisted scene monster from the monster-tier registry.
 
     A wilderness room is an explicit placement: the prototype carries no
@@ -304,6 +310,7 @@ def spawn_monster(room: Any, archetype: str | None, tier_key: str) -> Monster:
         snapshot_population_surfaces,
         wilderness_registration_target,
     )
+    from world.maps.monster_activity import STAGED_STATIONARY_ACTIVITY
 
     target = wilderness_registration_target(room)
     prototype = {
@@ -335,6 +342,9 @@ def spawn_monster(room: Any, archetype: str | None, tier_key: str) -> Monster:
                     monster,
                     coordinates,
                     tick=current_population_tick(),
+                    owner_kind="quest",
+                    owner_key=owner_key,
+                    activity_key=STAGED_STATIONARY_ACTIVITY,
                 )
     except Exception:
         if target is not None:
