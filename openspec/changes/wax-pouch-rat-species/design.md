@@ -50,7 +50,9 @@ Identical shape to `mudfilm_guard` (TargetSpec.SELF, `FactionConstraint.SELF_ONL
 
 ### D7. Tests
 
-Only `test_rule_wax_slip_agility_flat` in `CombatModifierTests` (four-line precedent). All other evidence is generic or the slime representative.
+- `test_rule_wax_slip_agility_flat` in `CombatModifierTests` (four-line precedent).
+- Group-member checks without cloning the battery: in `world/rules/tests/test_mudfilm_slime_resource_skill.py` add class `SelfSupportGroupMemberTests` that derives the representative's group members with `composition_groups(MONSTER_VARIANT_REGISTRY, SKILL_REGISTRY)` from `world.rules.tests.test_monster_composition_coverage` (no key list) and, for every member, constructs it and asserts: the shipped utility trace has a `TracePlan` for its kit skill targeting only itself with positive `control`; resolving it pays the declared cost once; the declared buff is mounted on the caster only; and the live modifier row whose `when.buff_active` names that buff changes the caster's evaluated bundle on its declared axis. This covers design §10 "Rat agility" on a real rat while refresh/lifetime arithmetic stays in the representative and shared suites. The module's first-line tag and freeze reason stay verbatim.
+- Review section: non-gating observations (trace candidate count, exclusions and slip selection over a short seeded run; one low-tier role observation) and the utility-never-flees deviation.
 
 ## Risks / Trade-offs
 

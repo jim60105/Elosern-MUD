@@ -10,7 +10,7 @@ Deliver 蠟囊鼠 (`wax_pouch_rat`) and its ordinary default variant 藏穀型 (
 - Skill `wax_pouch_slip`: self-only, no damage, positive SP cost, mounts a timed positive agility modifier on the caster under the shared lifetime/refresh rules; it changes combat modifiers, never location. Status display, narration and one modifier rule.
 - AI binding: utility override and authored intelligence for `wax_cache_forager`; activation evidence re-fingerprinted.
 - Bestiary section, overview row and ledger entry; review section in `docs/development/monster-content-expansion.md`.
-- One `test_rule_<id>` correspondence case. No new test module: the variant joins the self-support composition group whose representative (`mudbank_dweller`) remains the sorted minimum.
+- One `test_rule_<id>` correspondence case and a roster-free group-member class in the slime representative module that exercises a real rat cast. No new test module: the variant joins the self-support composition group whose representative (`mudbank_dweller`) remains the sorted minimum.
 
 ## Capabilities
 
