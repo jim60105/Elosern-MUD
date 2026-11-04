@@ -49,8 +49,16 @@ def _zone_keys(wilderness: Any) -> tuple[str, ...]:
     return regional_population.initialized_zone_keys(wilderness)
 
 
-def _settle_population_at(wilderness: Any, tick: int) -> list[ScheduledEvent]:
-    """Apply every category of boundary at one already selected tick."""
+def _settle_population_at(
+    wilderness: Any, tick: int, *, contact_tick: int | None = None
+) -> list[ScheduledEvent]:
+    """Apply every category of boundary at one already selected tick.
+
+    ``contact_tick`` names the advance's accepted endpoint. Authored contact is
+    admitted only there (never at an interior tick whose physiology was
+    already settled to a later endpoint) and always after the same tick's
+    lawful arrivals and births but before its idle departures.
+    """
     zone_keys = _zone_keys(wilderness)
     # 1. Lawful completed arrivals and protected-arrival retries first, so a
     # present arrival consumes the headroom it actually occupies at this tick.
@@ -59,8 +67,7 @@ def _settle_population_at(wilderness: Any, tick: int) -> list[ScheduledEvent]:
         regional_population.note_population_boundary(
             wilderness, zone_key, tick=tick
         )
-    # 2. Explicit site births, then 3. ordinary regional births. There is no
-    # contact policy in this change; nothing unimplemented is called here.
+    # 2. Explicit site births, then 3. ordinary regional births.
     events.extend(monster_sites.settle_monster_sites_at(tick))
     # Same-tick explicit site births restore local density: cancel or refresh
     # each episode from the post-site counts before any regional wave is
@@ -75,7 +82,18 @@ def _settle_population_at(wilderness: Any, tick: int) -> list[ScheduledEvent]:
                 wilderness, zone_key, tick=tick
             )
         )
-    # 4. Idle departures last: a contact cannot be avoided by iterating a
+    # 4. Authored field contact at the accepted endpoint: completed lawful
+    # arrivals and site/regional births precede it, and it precedes idle
+    # departures so a wandering departure can never avoid the encounter it
+    # belongs to. The source persists the session only; the owning rules
+    # action drains the predecessor continuation after the advance returned.
+    if contact_tick is not None and int(tick) == int(contact_tick):
+        from world.rules.field_contact import settle_population_contact_at
+
+        events.extend(
+            settle_population_contact_at(wilderness, tick, int(contact_tick))
+        )
+    # 5. Idle departures last: a contact cannot be avoided by iterating a
     # wandering departure before the encounter it belongs to.
     events.extend(monster_activity.settle_group_decisions_at(wilderness, tick))
     # A zero-duration committed departure arrives at this same tick. It is
@@ -142,7 +160,9 @@ def settle_population_lifecycle(
     events: list[ScheduledEvent] = []
     tick = start_tick
     while tick <= end_tick:
-        events.extend(_settle_population_at(wilderness, tick))
+        events.extend(
+            _settle_population_at(wilderness, tick, contact_tick=end_tick)
+        )
         following = _next_population_boundary(wilderness, tick, end_tick)
         if following is None or following <= tick:
             break

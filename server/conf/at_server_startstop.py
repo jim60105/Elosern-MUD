@@ -61,6 +61,7 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "register_correspondence_delivery",
     "register_title_planner",
     "register_regional_population",
+    "register_field_contact",
     "verify_population_state",
     "restore_persisted_sessions",
     "sync_wilderness",
@@ -559,6 +560,14 @@ def at_server_start():
         lambda: _late(
             "world.maps.population_lifecycle", "register_regional_population"
         ),
+    )
+    # Authored field contact is a registered boundary source and must be
+    # installed with every other clock source, before any restoring advance:
+    # its conservative next-boundary query keeps an interruptible skip from
+    # running past an arrival, birth, condition or daypart boundary.
+    _startup_step(
+        "register_field_contact",
+        lambda: _late("world.rules.field_contact", "register_field_contact_stage"),
     )
     # Refuse an incompatible preexisting world before restoration advances the
     # clock; fresh initialization remains after restoration.

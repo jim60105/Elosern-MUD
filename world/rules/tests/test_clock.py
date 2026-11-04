@@ -277,6 +277,7 @@ class ClockTests(unittest.TestCase):
                 "correspondence_delivery",
                 "instance_reclamation",
                 "monster_site_lifecycle",
+                "field_contact",
             ),
         )
         self.assertLess(_STAGE_ORDER.index("gauge_regen"), _STAGE_ORDER.index("buff_ticks"))
@@ -958,6 +959,7 @@ class AdvanceSurfaceContractUnitTests(unittest.TestCase):
                 "correspondence_delivery",
                 "instance_reclamation",
                 "monster_site_lifecycle",
+                "field_contact",
             ),
         )
         self.assertEqual(MAX_ADVANCE_SECONDS, 86400)

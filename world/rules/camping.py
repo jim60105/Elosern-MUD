@@ -516,10 +516,15 @@ def _commit_entry(
         _lock_members,
         _restore_sleep_surfaces,
         _sleep_surface_snapshot,
+        admit_contact_before_action,
         begin_sleep,
         enter_sleep,
     )
 
+    # The committed camp entry is a time-consuming exploration mutation: a
+    # real authored contact admits before the shared safety gate can refuse
+    # the room. ``camp_preflight`` stays a pure read-only predicate.
+    admit_contact_before_action(actor)
     if scope not in SCOPES:
         raise SleepRefused("invalid_scope", INVALID_SLEEP_MODE_MESSAGE)
     if answer not in ANSWERS:

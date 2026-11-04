@@ -267,6 +267,29 @@ def field_presence(body: Any, tick: int) -> bool:
     return True
 
 
+def in_passage(body: Any, tick: int) -> bool:
+    """Whether a committed traversal currently holds ``body`` in passage.
+
+    A body is in passage while the settlement's bound scope covers it and it
+    has not yet relocated to that scope's destination. Field contact uses this
+    stronger fact: a moving party never admits contact from the source's
+    occupants during the charge, even at the boundary tick the charge ends on,
+    and is ordinary presence again exactly once the relocation committed.
+    """
+    body_id = getattr(body, "id", None)
+    if not isinstance(body_id, int):
+        return False
+    for scope in reversed(_traversal_scopes.get()):
+        if not scope.covers(body_id):
+            continue
+        try:
+            current = location_ref(body)
+        except Exception:  # observability: ignore R2: an unrepresentable position cannot match the committed destination, so the body is treated as still in passage
+            return True
+        return current != scope.destination
+    return False
+
+
 @contextmanager
 def settlement_scope(actor: Any) -> Iterator[None]:
     """Mark that the movement settlement owns ``actor``'s relocation here.
@@ -763,6 +786,28 @@ def _body_moved(state: CompanionState) -> bool:
     return current != state.registration
 
 
+def _admit_arrival_contact(traversing_object: Any) -> None:
+    """Admit one authored contact at a party's committed physical arrival.
+
+    Resolves the authenticated commander behind the arriving body and runs the
+    field-contact authority inside the caller's transaction. A body with no
+    resolvable commander (a plain Monster relocation) or a non-player body has
+    no party to admit for and is a no-op; a refusal inside admission never
+    fabricates a session. Any real failure propagates so the owning movement
+    transaction compensates the whole arrival.
+    """
+    from world.rules.field_contact import SOURCE_MOVEMENT, admit_field_contact_at
+    from world.rules.party_scope import PartyScopeError, resolve_commander
+
+    try:
+        commander = resolve_commander(traversing_object)
+    except PartyScopeError:  # observability: ignore R2: a relocated monster has no player commander and therefore no authored-contact party
+        return
+    # A non-player body is not a field-contact commander; the player predicate
+    # inside the authority refuses it without a write.
+    admit_field_contact_at(commander, source_id=SOURCE_MOVEMENT)
+
+
 def _settled_for_history(
     result: Any,
     *,
@@ -960,6 +1005,18 @@ def settle_movement(
                         source_ref=source_ref,
                         route=route,
                     )
+                # Authored contact is admitted inside the owning movement
+                # transaction, after the charge's accepted advance returned
+                # and after the relocation/history steps, so the final
+                # publication is the combat state and no exploration frame
+                # intervenes. Passage itself is never contact: the bound
+                # traversal scope makes both endpoints non-presence until the
+                # relocation of this edge committed.
+                relocated = traversing_object.location is not source_location or (
+                    wilderness_lineage and bool(result)
+                )
+                if relocated:
+                    _admit_arrival_contact(traversing_object)
         except Exception:
             _compensate_after_rollback(snapshot)
             raise
@@ -1170,6 +1227,10 @@ def settle_relocation(entity: Any, destination: Any) -> None:
                                 after=after_presence,
                             ),
                         )
+                # An operator relocation is a committed arrival too: authored
+                # contact admits in this same transaction, never on a later
+                # read or presentation pass.
+                _admit_arrival_contact(entity)
         except Exception:
             _compensate(snapshot)
             restore_attributes(entity, attrs)

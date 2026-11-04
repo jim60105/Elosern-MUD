@@ -186,6 +186,9 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `action_commit` | `char`、`action`、`ms` |
 | `combat_round_settled` | `char`、`opponent`、`tick`、`hp_before`、`hp_after` |
 | `combat_incapacitated_continued` | `session`、`revision`、`from_round`、`to_round`、`members`（付費敵方專屬續戰邊界，僅於耐用提交時發出；`from_round`/`to_round` 為已結算回合範圍，`members` 為參與成員 dbref） |
+| `field_contact_admitted` | `char`、`source_id`、`session`、`engagement`、`tick`、`room`、`triggers`、`enemies`、`location`（具名敵意接觸的耐用提交邊界；`triggers` 為使條件成立的個體，`enemies` 為整格實際名冊，`source_id` 為 `movement`／`birth_or_arrival`／`source`／`pre_action`） |
+| `field_contact_failed` | `char`、`source_id`、`tick`、`room`、`triggers`＋`exc`（error 級；入場或睡眠打斷失敗後已還原現場，未留下任何成功事件） |
+| `sleep_interrupt_receipt_unusable` | `char`、`reason`（warn 級；接觸打斷讀到不可用的睡眠紀錄時不改寫、不補發） |
 | `clock_advance` | `tick_from`、`tick_to`、`scope` |
 | `quest_transition` | `char`、`quest`、`issuer`（治理該任務的發單方 key）、`stage_from`、`stage_to` |
 | `quest_auto_settlement` | `char`、`quest`（quest_id，即領取憑證）、`issuer`、`copper`、`items`（item keys）；自動結算的付款邊界，與櫃檯交回（`settlement_done`）可區辨 |

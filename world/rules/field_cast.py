@@ -126,6 +126,24 @@ def cast_in_field(
                 commander=commander,
             ),
         )
+    # A present authored contact admits before this exploration action spends
+    # any resource, roll or world time. An explicit monster anchor above is the
+    # player's own voluntary opening and keeps its existing route; every
+    # ordinary exploration cast is refused here once the encounter is real.
+    from world.rules.field_contact import (
+        SOURCE_PRE_ACTION,
+        admit_field_contact_at,
+    )
+    from world.rules.party_scope import PartyScopeError, resolve_commander
+
+    try:
+        owner = commander if commander is not None else resolve_commander(actor)
+    except PartyScopeError:  # observability: ignore R2: a caster outside any resolvable party has no field-contact commander
+        owner = None
+    if owner is not None and admit_field_contact_at(
+        owner, source_id=SOURCE_PRE_ACTION
+    ) is not None:
+        return _rejected(RejectReason.ACTIVE_COMBAT, skill_key)
     if any(field_combat_target(actor, target) is not None for target in targets):
         return _rejected(RejectReason.TARGET_SPEC_MISMATCH, skill_key)
     skill = SKILL_REGISTRY.get(skill_key)
