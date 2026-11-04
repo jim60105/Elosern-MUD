@@ -72,7 +72,7 @@ No `monster_behaviour.yaml` edit: `instinctive` legacy selects the damage-bearin
 - Overview row `| 低階 | 膠掌小鬼 | 丘陵灌木、廢棄採石地與岩棚 | 短效掌部黏液支撐懸掛巢與攀附 | 懸巢型 |`.
 - `### 膠掌小鬼` section at the end of `## 低階魔物` with a `bestiary` block (species/parent `sticky_palm_goblin`, sole variant `hanging_nest_forager` `delivered`, six public fields, status `delivered`) and affirmative paragraphs **原型與棲地。**, **外觀。**, **生態與在地關係。**, **戰鬥中的表現。**, variant row `| 懸巢型 | 普通版本，在岩棚與灌木間搬運巢材、維護懸掛巢 |`.
 - Ledger row for `sticky_palm_goblin`, including that the depiction stays an animal-level monster distinct from beastfolk.
-- Review section "膠掌小鬼" in `docs/development/monster-content-expansion.md`.
+- Review section "膠掌小鬼" in `docs/development/monster-content-expansion.md`, including one non-gating low-tier role observation and an evidence-map line that the hit-rider and fault-rollback vectors are owned by the shared rider suites and representative `cliff_stepper`.
 
 ### D7. Tests
 
