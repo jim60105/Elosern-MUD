@@ -22,6 +22,7 @@ from elosern_map_core.terrain import (
     region_for_coordinates,
 )
 
+from tools.spec_traceability import covers_requirement
 from world.lore import monster_activity as registry
 from world.lore.monster_activity import (
     ACTIVITY_AREA_REGISTRY,
@@ -128,6 +129,7 @@ def _wilderness_home(x: int, y: int) -> dict[str, object]:
 class GeometryResolutionTests(unittest.TestCase):
     """Region and home geometry resolve to deterministic legal-cell locators."""
 
+    @covers_requirement("monster-field-activity::activity-declarations-publish-complete-validated-bindings")
     def test_region_extent_enumerates_only_its_region_and_sorts_canonically(self):
         x, y, region_key = _land_block()
         rectangle = (x - 1, x + 1, y - 1, y + 1)
@@ -176,6 +178,7 @@ class GeometryResolutionTests(unittest.TestCase):
         self.assertEqual(len(resolved), 1)
         self.assertEqual(resolved[0], _wilderness_home(x, y))
 
+    @covers_requirement("monster-field-activity::activity-declarations-publish-complete-validated-bindings")
     def test_home_radius_is_inclusive_chebyshev_distance(self):
         x, y, _region = _land_block()
         area = _area(home_radius=1)
@@ -244,6 +247,7 @@ class GeometryResolutionTests(unittest.TestCase):
                         candidate_world=_candidate(),
                     )
 
+    @covers_requirement("monster-field-activity::activity-declarations-publish-complete-validated-bindings")
     def test_settlement_buffers_never_participate_in_activity_geometry(self):
         x, y, region_key = _land_block()
         area = _area(
@@ -335,6 +339,7 @@ class DeclarationValidationTests(unittest.TestCase):
         self._reject(areas={OTHER_AREA: _area()})
         self._reject(activities={OTHER_AREA: _activity()})
 
+    @covers_requirement("monster-field-activity::activity-declarations-publish-complete-validated-bindings")
     def test_validation_publishes_nothing_on_failure(self):
         areas = {AREA: _area()}
         activities = {ACTIVITY: _activity()}
@@ -350,6 +355,7 @@ class DeclarationValidationTests(unittest.TestCase):
 class BindingValidationTests(unittest.TestCase):
     """A solitary binding requires every legal composition outcome to be one."""
 
+    @covers_requirement("monster-field-activity::activity-declarations-publish-complete-validated-bindings")
     def test_solitary_binding_rejects_any_multi_individual_outcome(self):
         activity = _activity(policy="solitary_roaming")
         validate_activity_binding(activity, 1, "t_fixture")
@@ -378,6 +384,7 @@ class BindingValidationTests(unittest.TestCase):
 class CandidateAreaValidationTests(unittest.TestCase):
     """Candidate-world geometry rejects unknown regions and impossible bounds."""
 
+    @covers_requirement("monster-field-activity::activity-declarations-publish-complete-validated-bindings")
     def test_unknown_region_outside_frame_and_no_land_are_reported(self):
         unknown = activity_area_problems(
             _area(region_key="t_absent_region", rectangles=((1, 2, 1, 2),)),
@@ -427,6 +434,7 @@ class PublishedActivityRegistryTests(unittest.TestCase):
             with self.assertRaises(TypeError):
                 published["t_fixture_intruder"] = None
 
+    @covers_requirement("monster-field-activity::activity-declarations-publish-complete-validated-bindings")
     def test_every_shipped_reference_resolves(self):
         for key, activity in MONSTER_ACTIVITY_REGISTRY.items():
             with self.subTest(activity=key):
@@ -451,6 +459,7 @@ class PublishedActivityRegistryTests(unittest.TestCase):
                     activity, composition_bounds(composition)[1], key
                 )
 
+    @covers_requirement("monster-field-activity::activity-declarations-publish-complete-validated-bindings")
     def test_the_module_offers_no_execution_callable(self):
         public = {
             name

@@ -743,6 +743,9 @@ class ActivityCandidatePublicationTests(EvenniaTest):
         published = self._publish(area)
         self.assertTrue(published.identity)
 
+    @covers_requirement(
+        "monster-field-activity::activity-declarations-publish-complete-validated-bindings"
+    )
     def test_site_activity_bindings_are_validated_at_candidate_publication(self):
         x, y, region_key = _birth_block()
         group = EncounterComposition(

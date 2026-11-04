@@ -336,6 +336,9 @@ class PlacementValidationTests(unittest.TestCase):
     def test_a_site_must_name_a_known_activity(self):
         self._reject(sites={SITE: _site(activity_key=OTHER_ACTIVITY)})
 
+    @covers_requirement(
+        "monster-field-activity::activity-declarations-publish-complete-validated-bindings"
+    )
     def test_a_solitary_site_override_must_fit_every_composition_outcome(self):
         group = _composition(
             COMPOSITION, (_member(ORDINARY, 1, 1), _member(STRONGER, 1, 1))

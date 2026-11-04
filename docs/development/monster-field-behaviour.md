@@ -78,13 +78,11 @@ does not add runtime writers.
 
 ## Evidence map
 
-Canonical requirement ID (proposed tree, generated with
-`tools.spec_traceability --repo-root /tmp/mud-field-proposed-specs list`):
+Canonical requirement ID (generated with
+`uv run --locked python -m tools.spec_traceability list` against the synced
+`openspec/specs/monster-field-activity/spec.md`):
 `monster-field-activity::activity-declarations-publish-complete-validated-bindings`.
-
-The ID is not yet synced into `openspec/specs/`, so new tests carry no
-`covers_requirement` annotation in this slice; the mapping is recorded here and
-the annotation follows the archive sync.
+The listed tests carry that literal ID through `covers_requirement`.
 
 | Scenario | Substantive test assertions |
 | --- | --- |
