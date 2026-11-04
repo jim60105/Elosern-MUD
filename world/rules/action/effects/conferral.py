@@ -21,6 +21,7 @@ from world.skills.effects import parse_effect
 from world.skills.registry import SkillDef
 
 from world.rules.buffs import grant_conferred_growth_rate
+from world.rules.combat_identity import stable_actor_id
 from world.rules.action.contracts import (
     _entity_key,
     _effect_prefix,
@@ -83,7 +84,7 @@ def _handle_confer_skill_partial(
             _CONFERRAL_EMPTY_SET_DETAIL,
         )
     coefficient = _occurrence_scale(context)
-    source_key = _entity_key(actor)
+    source_key = stable_actor_id(actor)
     from world.skills.eligibility import skill_identity_eligible
     from world.skills.registry import SKILL_REGISTRY
 
@@ -200,7 +201,7 @@ def _handle_confer_growth_rate(
     """
     del scale
     coefficient = _occurrence_scale(context)
-    source_key = _entity_key(actor)
+    source_key = stable_actor_id(actor)
     return [
         PendingEffect(
             target,
