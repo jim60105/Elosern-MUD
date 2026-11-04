@@ -129,6 +129,36 @@ class ObservationMemoryTests(EvenniaTestCase):
         )
         self.assertEqual(MAX_RETAINED_ROUNDS, 3)
 
+    def test_same_label_sources_keep_independent_memory(self):
+        session = "hostile:1:0"
+        first = FakeEntity("twin", combat_identity="twin-first")
+        second = FakeEntity("twin", combat_identity="twin-second")
+        first_id = stable_actor_id(first)
+        second_id = stable_actor_id(second)
+        with self.captureOnCommitCallbacks(execute=True):
+            record_observation(
+                session,
+                _observation(
+                    1,
+                    source=first_id,
+                    recipients=(second_id,),
+                    magnitudes=((second_id, -2.0),),
+                ),
+            )
+            record_observation(
+                session,
+                _observation(
+                    1,
+                    source=second_id,
+                    recipients=(first_id,),
+                    magnitudes=((first_id, -3.0),),
+                ),
+            )
+        records = {record.source_id: record for record in session_observations(session)}
+        self.assertEqual(set(records), {first_id, second_id})
+        self.assertEqual(records[first_id].magnitudes, ((second_id, -2.0),))
+        self.assertEqual(records[second_id].magnitudes, ((first_id, -3.0),))
+
     @covers_requirement(
         "monster-ai-observation-memory::resolved-observations-are-compact-and-bounded"
     )

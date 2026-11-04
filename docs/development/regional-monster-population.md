@@ -659,6 +659,13 @@ step:
 - `SameLabelIndividualTests.test_rename_and_reorder_cannot_redirect_a_saved_selection`
   → `player-combat-session` "Independent selected recipient" (rename/reorder
   cannot redirect a selection; restoration preserves membership).
+- `SameLabelIndividualTests.test_duplicate_identity_rejects_before_any_session_write`
+  → `player-combat-session` "Invalid duplicate identity".
+- `ObservationMemoryTests.test_same_label_sources_keep_independent_memory`
+  → `monster-ai-observation-memory` (same-label observability stays separate);
+  the two quest-planner cases `test_a_redelivered_defeat_entry_advances_once`
+  and `test_two_individuals_with_one_display_key_count_separately` supply the
+  duplicate-delivery and same-label defeat-credit evidence.
 
 Nearest current anchors (from the design's generated list) whose scope these
 behaviours extend; after sync the archive step should attach the generated IDs

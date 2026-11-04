@@ -480,3 +480,12 @@ class SameLabelIndividualTests(BattlefieldIsolation, EvenniaTestCase):
             _draft_requests(record, reordered)[int(self.player.pk)].targets,
             [self.second],
         )
+
+    def test_duplicate_identity_rejects_before_any_session_write(self):
+        from world.rules.combat_session import engage_group
+
+        with self.assertRaises(CombatSessionError) as caught:
+            engage_group(self.player, [self.first, self.first])
+        self.assertEqual(caught.exception.args[0], SessionReason.DUPLICATE_PARTICIPANT)
+        self.assertIsNone(read_session(self.player))
+        self.assertIsNone(self.player.db.active_combat)
