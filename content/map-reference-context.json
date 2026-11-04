@@ -176,7 +176,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "1b6b495479ea640f0810dd959b11589b470b1b3c7f41f241c94995df0e23ccb4",
+  "fingerprint": "fe8b2ffe04c53bb82b222240511b3ccfa401691ef53a93faf20dc7951b8b131b",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -1037,7 +1037,7 @@
     "world/rules/action/effects/__init__.py": "6f5950507e162e6e275622b35805921a3ceddae2dedca8e5cd8b63ca03631464",
     "world/rules/action/effects/buffs.py": "7c50a7d0b4da0a6fedd40d7015992a8397b243a3de437aeb57b67ed1d9ad5486",
     "world/rules/action/effects/church.py": "486b56be0f277b62bacbfc976849684458fac5cb63aff0effc34b164f9e30cc1",
-    "world/rules/action/effects/conferral.py": "e354b766bb1d897e35fda2380bad1b11bf9296c768e858409f3eb095980ae1b2",
+    "world/rules/action/effects/conferral.py": "4e14c67416b8f6af8ec402cc0e4228a802d98aedcbfba4dfbed5a713296283d9",
     "world/rules/action/effects/divine.py": "7d553372ab6e47ea17e54636112a5d74d9cc7c4ab32ffa2215e93a8547056bbf",
     "world/rules/action/effects/gauge_transfer.py": "127ec5b26ac367295a303d4b2b8d7abd2f4757c7451b2f85405c19fe58f0693f",
     "world/rules/action/effects/sexual.py": "4c7415458058507fe7e29a31ec49b50a0c02d411bd928990919b4b245cb1fdad",
@@ -1078,7 +1078,7 @@
     "world/rules/combat_modifiers.py": "e92118029122d78857a12311167090bfb5e6303f95318ae1c197581c71598b22",
     "world/rules/combat_result.py": "959975c30966790d43f32d7e4f44634b699421b086ab111078829132e0ff84e8",
     "world/rules/combat_session/__init__.py": "743b969b7194ed4b455ab38e460ffde6c595dcab1034394142c3497eb5cfcff5",
-    "world/rules/combat_session/ai_tuning.py": "19b9e2b2b957e513a1e157e81ddec4e52f21c21ead4f1f0c08993adfd8fc5923",
+    "world/rules/combat_session/ai_tuning.py": "8ebd6a25d57758ed34e31ee07c7eb33d8bf756641532a042a12385e72a5fd256",
     "world/rules/combat_session/battlefield.py": "cda8e66640e78750f6f17a887d18dfcee26242413c7b2a4385943a5f72d6217f",
     "world/rules/combat_session/errors.py": "5b7bdca13f2e68fc6608b97ae9a2d650cc3213f1cad267419ac75e409b2fad0e",
     "world/rules/combat_session/exit.py": "2201050d4c919fba3d94d077f26bd3c964f42e312654dc376450c06883f0b611",
@@ -1144,7 +1144,7 @@
     "world/rules/items/journal.py": "9411848cf28a1bfffd63970b9f997c61a6b320053f4407f32b7df24a8eb192f1",
     "world/rules/items/planning.py": "c779fdeccbac8146d965bcba74dabc48c12d56423724000ff807e7123a519348",
     "world/rules/items/reads.py": "7dc93f3d671b2966f16f0c10a508ad221b03f71cea5d400f9ccf2c7d908d95a1",
-    "world/rules/items/settlement.py": "cdedc385a958dee57e6fe696d0366d8edd2ce5c8266202d2cf6c319cac2398a3",
+    "world/rules/items/settlement.py": "ce0805da1993bda2b1f5c95f3f95defd5e223f7ff507b9c570cde8be97127cba",
     "world/rules/lineage_query.py": "b9aaca47b1582b2d1556227a90e0ee21c5a6bf96a6ef945ce9424f0302de93ce",
     "world/rules/lore_knowledge.py": "04ee8bf163fc3b9ad5d0a428576650637204e37c8893b0e8fd5116a589ad0a02",
     "world/rules/map_discovery.py": "a97c3216776f3db32397c9a72050203922c7b6a6e51c006104208d1f245f10b3",
@@ -1156,7 +1156,7 @@
     "world/rules/monster_ai/coordination.py": "f4b485487c54a7880a83360dc193872cf7d11485b3019b8c86952b0a936f2f3d",
     "world/rules/monster_ai/estimation.py": "28d92976e04774debe6017c93133e8055f5c2f3a0da07b6a544f3c35b07d0c25",
     "world/rules/monster_ai/legality.py": "ae60d6f8d0c4250519bbf0229d7810124ac813187b985acd2657e5b0c9198758",
-    "world/rules/monster_ai/manual_campaign.py": "2053ff2902b147a06dbe3c327178daec5a077bb2197e259e6a3be733fabd4135",
+    "world/rules/monster_ai/manual_campaign.py": "070647161f40863b2a3f91538a0b76b236141fc0d86a57f5c10c465a01d41410",
     "world/rules/monster_ai/manual_reports.py": "a30c7c822ac36f1f8df36b97375d4de39d16aace0155970be7d7c7fffc3bafc5",
     "world/rules/monster_ai/models.py": "f662d4ca817be1a04887bc6b774972533fd68c57b022d2dc3744c38383481d85",
     "world/rules/monster_ai/selection.py": "55496d79645694bda3c6e46f526cbf13b7d83e3025f59409b39000c93267a52c",
@@ -1252,7 +1252,7 @@
     "world/rules/sleep_control.py": "80ee9144240e82d54e285970bbecbfe669e8796c0e1f3b345a612fb8df47393e",
     "world/rules/sleep_receipt.py": "1b6b08ee59c2bc7f99cece1548f9e33864e003a7d258779786e6adadb10b36f5",
     "world/rules/social_identity.py": "51a80969f1d78aa1ce06ed5c4b6d5cdec9e55608ad4b25234645fa46b076f9bf",
-    "world/rules/spell_conditions.py": "f5b07aa36a9e870eb76d53642d22ab5e0d3accf97855fce90cf27ad852b09323",
+    "world/rules/spell_conditions.py": "76f567b6f19671550b20a4c40d54721ef26ad2356eeca8be8410b1ebae63807e",
     "world/rules/starting_companions.py": "f7cf4e342cfc5bcb0fcbedeb1129a29872bd6ae95b247ed6198f8b77fb4b1029",
     "world/rules/state_derived_roll.py": "a2750faa8d5e9eeeddcd20a7c711e4d76be0b13a7f8dae6413f84f0c3ecfce99",
     "world/rules/state_reactions.py": "488f3d36ba86ee9c2e0694c2c5835c114926c270715d53c1a36afa3e9ed9c89d",
