@@ -126,27 +126,6 @@ using a `BattlefieldActionContext` through `world/rules/action_preview.revalidat
 - **THEN** the rejection returns before `engage_group()` is called, so no session is persisted, no
   resource is spent, and no world time passes
 
-### Requirement: A SINGLE skill opens against the named monster and an AREA skill opens against every living hostile monster in the room
-`initiate_field_combat()` SHALL select the session's enemy line-up from the skill's `TargetSpec`: a
-`SINGLE` skill SHALL open against the named monster alone, and an `AREA` skill SHALL open against
-every living `Monster` in the actor's room, resolved into an explicit list of concrete targets in
-deterministic order. It SHALL NOT pass an AREA shorthand, because the engagement persists exactly
-that list as the session's `enemy_ids` and the opening's own seed path takes concrete participants.
-
-#### Scenario: An AREA opening engages the whole room
-- **WHEN** `initiate_field_combat()` is called with an `AREA` skill and one of three living monsters
-  in the room
-- **THEN** the persisted session's `enemy_ids` contains all three
-
-#### Scenario: A SINGLE opening engages one monster
-- **WHEN** `initiate_field_combat()` is called with a `SINGLE` skill in a room holding three living
-  monsters
-- **THEN** the persisted session's `enemy_ids` contains only the named monster
-
-#### Scenario: An AREA opening in a single-monster room is not special-cased
-- **WHEN** `initiate_field_combat()` is called with an `AREA` skill in a room holding one monster
-- **THEN** the session opens against that monster with no distinct code path
-
 ### Requirement: Session creation and the opening action share one failure boundary
 `initiate_field_combat()` SHALL run `engage_group()` and `submit_opening_action()` inside one
 `transaction.atomic()` it owns, so a failure in the opening action rolls back the session's creation
@@ -286,3 +265,22 @@ When `initiate_field_combat` is called with a present effective companion as the
 #### Scenario: Other initiation rules keep applying
 - **WHEN** a companion initiation is validated and committed
 - **THEN** availability, SINGLE/AREA engagement and combat-time rules apply as for a commander initiator, and the boundary event names both the commander and the caster
+
+### Requirement: Whole-cell field membership is independent of opening recipients
+Ordinary field openings SHALL admit every living co-located monster in persistent-ID order while resolving opening recipients independently through the selected action's existing targeting rules.
+
+#### Scenario: Single recipient in mixed cell
+- **WHEN** a SINGLE action selects one A in a cell with A, A and B
+- **THEN** all three enter the roster, only selected A is the opening recipient, and untouched recipient controls retain their state
+
+#### Scenario: Area opening
+- **WHEN** an AREA action anchors a valid living monster
+- **THEN** the full roster is admitted and concrete action recipients pass existing targeting and faction checks
+
+#### Scenario: Preview and companion parity
+- **WHEN** a player or authorized companion previews then commits an opening
+- **THEN** candidate and committed roster and recipient identities agree; party authority, costs, order and draft semantics are unchanged
+
+#### Scenario: Dead and absent exclusion
+- **WHEN** a cell also contains a dead or remote monster
+- **THEN** neither enters ordinary membership and no invalid target is substituted

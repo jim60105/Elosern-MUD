@@ -7,12 +7,7 @@ Define persistent, deterministic player combat sessions.
 ## Requirements
 
 ### Requirement: engage creates one persistent local combat session
-`engage <target>` SHALL require a PlayerCharacter, one living hostile target in the same room, and no
-active session. It SHALL include every bound companion of the player that is co-located and living in
-the session's allied team (`player_ids`). It SHALL persist a JSON-safe CombatSessionRecord containing
-deterministic ID, mode, room
-dbref, participant dbrefs, fled/knockout identities, elapsed rounds, and optional exam ID. Live objects
-or Battlefield instances SHALL NOT be stored.
+Ordinary engagement SHALL require a player, a living local anchor target and no active session, persist every living co-located monster as enemies, include eligible local companions, and store only JSON-safe session values and persistent participant IDs.
 
 #### Scenario: Present monster can be engaged
 - **WHEN** a player invokes `engage` on a living hostile Monster in the current room
@@ -35,6 +30,10 @@ or Battlefield instances SHALL NOT be stored.
 #### Scenario: Active session blocks another engagement
 - **WHEN** a player already has a valid active session
 - **THEN** a second `engage` request is rejected without replacing it
+
+#### Scenario: Whole-cell ordinary membership
+- **WHEN** ordinary engagement selects one monster among mixed ambient, site and quest-owned living monsters
+- **THEN** all local living monsters join in persistent-ID order; designated examination and explicitly staged encounters retain their declared participants
 
 ### Requirement: Combat time settles once at terminal session outcome
 Session rounds SHALL accumulate without command-default cast time. Every terminal outcome (either
@@ -319,8 +318,7 @@ safety registration, and dialogue-session clearing that single-target engagement
 
 #### Scenario: engage is unchanged for its callers
 - **WHEN** `engage(actor, target)` is called
-- **THEN** it returns the same shape it returned before this change, persists an `enemy_ids` of
-  exactly one dbref, and its call sites require no edit
+- **THEN** it returns the same shape it returned before this change, persists every living co-located Monster ID in sorted persistent-ID order, and keeps its existing result shape
 
 #### Scenario: One invalid target rejects the whole group
 - **WHEN** `engage_group()` is called with one valid monster and one target that is dead, in another
@@ -330,8 +328,7 @@ safety registration, and dialogue-session clearing that single-target engagement
 
 #### Scenario: engage delegates to engage_group unchanged
 - **WHEN** `engage(actor, target)` is called
-- **THEN** it retains its signature and semantics and delegates to `engage_group(actor, [target])`,
-  so its existing call sites are unchanged
+- **THEN** it validates the anchor target, then delegates with all living co-located Monster IDs in persistent-ID order; explicitly staged engage_group callers keep their declared roster
 
 #### Scenario: Any invalid precondition rejects the whole request
 - **WHEN** the actor is not a `PlayerCharacter`, already has an active session, or any supplied

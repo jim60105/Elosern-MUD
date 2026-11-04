@@ -419,11 +419,8 @@ class LineUpSelectionTests(BattlefieldIsolation, EvenniaTestCase):
         self.player = _player("lineup opener")
         self.player.location = self.room
 
-    # Provisional pre-archive claim for the surviving AREA clause of the
-    # requirement this change retires; the archive sync replaces it with the
-    # generated replacement ID and removes the retired requirement.
     @covers_requirement(
-        "field-combat-initiation::a-single-skill-opens-against-the-named-monster-and-an-area-skill-opens-against-every-living-hostile-monster-in-the-room"
+        "field-combat-initiation::whole-cell-field-membership-is-independent-of-opening-recipients"
     )
     def test_area_opens_against_every_living_room_monster(self):
         grant_lineage(self.player, [SEAM_AREA_KEY])
@@ -447,6 +444,9 @@ class LineUpSelectionTests(BattlefieldIsolation, EvenniaTestCase):
         )
         self.assertNotIn(int(dead.pk), record.enemy_ids)
 
+    @covers_requirement(
+        "field-combat-initiation::whole-cell-field-membership-is-independent-of-opening-recipients"
+    )
     def test_single_open_admits_the_whole_room_but_targets_only_the_named_monster(self):
         # Same label, distinct persistent identities: display names carry no
         # membership and must not merge the roster.
@@ -476,6 +476,9 @@ class LineUpSelectionTests(BattlefieldIsolation, EvenniaTestCase):
             if bystander is not anchor:
                 self.assertEqual(int(bystander.traits.hp.current), 2000)
 
+    @covers_requirement(
+        "field-combat-initiation::whole-cell-field-membership-is-independent-of-opening-recipients"
+    )
     def test_preview_roster_matches_the_committed_admission(self):
         monsters = [_monster("preview wolf", hp=2000, atk=1) for _ in range(3)]
         for monster in monsters:

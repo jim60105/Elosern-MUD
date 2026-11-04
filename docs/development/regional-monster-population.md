@@ -895,16 +895,23 @@ sync.
 
 ### Assertion roles and requirement hand-off
 
-The delta requirements are not synced yet, so the new behaviour tests carry no
-`covers_requirement` annotation. The requirement this change retires
-(`field-combat-initiation::a-single-skill-opens-against-the-named-monster-and-an-area-skill-opens-against-every-living-hostile-monster-in-the-room`)
-still exists in the main spec until the archive sync, so the surviving AREA
-test keeps a **provisional** annotation on it to keep the pre-archive
-traceability regression guard green. The archive sync must replace that claim
-with the generated replacement ID and remove the retired requirement; the two
-SINGLE tests no longer claim it.
+After the archive sync, the whole-cell requirement the sync generated is
+`field-combat-initiation::whole-cell-field-membership-is-independent-of-opening-recipients`,
+and the retired single-target/AREA requirement no longer exists as an ID. Three
+assertion-bearing `LineUpSelectionTests` methods carry that generated ID as
+their `covers_requirement` claim, each because its assertions establish a
+clause of it:
+`test_area_opens_against_every_living_room_monster` (AREA membership admits
+every living occupant and excludes the dead),
+`test_single_open_admits_the_whole_room_but_targets_only_the_named_monster`
+(membership in persistent-ID order plus exactly one opening recipient), and
+`test_preview_roster_matches_the_committed_admission` (preview `enemies` equals
+the persisted `enemy_ids` while `targets` stays the anchor). The other tests in
+the table establish scenarios of the `player-combat-session` and
+`webclient-skillbook-casting` requirements, whose own annotated tests already
+carry those IDs.
 
-| Test | Role | Delta requirement / scenario |
+| Test | Role | Requirement / scenario |
 | --- | --- | --- |
 | `LineUpSelectionTests.test_single_open_admits_the_whole_room_but_targets_only_the_named_monster` | synthetic mechanism: same-label roster, selected-recipient HP, dead and remote exclusion | `field-combat-initiation` "Whole-cell field membership is independent of opening recipients" / "Single recipient in mixed cell", "Dead and absent exclusion" |
 | `LineUpSelectionTests.test_preview_roster_matches_the_committed_admission` | synthetic mechanism: preview `enemies` equals persisted `enemy_ids`, `targets` is the anchor | same / "Preview and companion parity" |
