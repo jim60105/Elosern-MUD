@@ -200,6 +200,14 @@ Ordinary wait, sleep and eligible study SHALL stop at the earliest involved forc
 - **WHEN** an interrupted result is retried with the same accepted interval identity
 - **THEN** that interval never replays; ordinary wait needs a new action and owner sleep recovery uses only its retained uncommitted target after interaction is resolved
 
+#### Scenario: Actual hostile contact
+- **WHEN** a long wait, rest, study, camp or accepted sleep encounters its first projected hostile contact before its requested endpoint
+- **THEN** only accepted time/recovery commits and unused time is discarded; distant maintenance is internal, voluntary sleep interrupts its receipt and forced sleep preserves its threshold
+
+#### Scenario: Separate hostile continuation
+- **WHEN** no party member can act after the accepted interval ends in combat
+- **THEN** normal enemy-only rounds are separately accounted combat time, never unused skip duration or extra sleep receipt recovery
+
 ### Requirement: Owner-targeted sleep continuation preserves skip safety
 If every operable present body sleeps, no companion is possessed and the player declines/closes dream entry, recovery SHALL automatically continue the same owner sleep to its duration deadline or declared recovery target. Earlier companion wake SHALL not stop it. Real interaction or combat/hostile safety SHALL interrupt without unsafe skips. A sleeping owner SHALL retain actionable status/recovery/handoff, without ordinary action authority.
 

@@ -433,6 +433,9 @@ class _BoundaryBase(BattlefieldIsolation, EvenniaTestCase):
 class ForecastPurityTests(_BoundaryBase):
     """The projection answers the first contact and writes nothing."""
 
+    @covers_requirement(
+        "hostile-field-contact::contact-forecasts-stop-interruptible-time-at-actual-interaction"
+    )
     def test_the_first_contact_is_the_intermediate_arrivals_tick(self):
         self._future_facts()
         enemy, seed = self._departing_group()
@@ -508,6 +511,9 @@ class ForecastPurityTests(_BoundaryBase):
         self.assertIsNone(self._forecast().first_tick)
         del enemy
 
+    @covers_requirement(
+        "hostile-field-contact::contact-forecasts-stop-interruptible-time-at-actual-interaction"
+    )
     def test_projection_preserves_every_owner_surface(self):
         self._future_facts()
         self._departing_group()
@@ -536,6 +542,9 @@ class WaitBoundaryTests(_BoundaryBase):
 
     @covers_requirement(
         "time-skip-commands::interruptible-skips-stop-at-the-earliest-relevant-boundary"
+    )
+    @covers_requirement(
+        "hostile-field-contact::contact-forecasts-stop-interruptible-time-at-actual-interaction"
     )
     def test_the_wait_stops_at_the_projected_contact(self):
         self._future_facts()
@@ -580,6 +589,9 @@ class WaitBoundaryTests(_BoundaryBase):
         self.assertEqual(context["tick"], contact_tick)
         self.assertTrue(context["session"])
 
+    @covers_requirement(
+        "hostile-field-contact::contact-forecasts-stop-interruptible-time-at-actual-interaction"
+    )
     def test_a_distant_maintenance_fact_does_not_interrupt_the_wait(self):
         self._future_facts(due=105, site_cleared_at=1000)
         result = advance_wait(self.player, 300)
@@ -748,6 +760,9 @@ class SleepBoundaryTests(_BoundaryBase):
 class IndivisibleEdgeTests(_BoundaryBase):
     """A committed physical edge completes its whole cost before contact."""
 
+    @covers_requirement(
+        "wilderness-travel-interrupts::arrival-combat-stops-walking-before-the-next-edge"
+    )
     def test_an_edge_completes_once_and_admits_at_its_arrival(self):
         from world.rules.movement_settlement import settle_movement
 
