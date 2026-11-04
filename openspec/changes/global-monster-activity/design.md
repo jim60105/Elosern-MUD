@@ -32,7 +32,7 @@ Actual view, GM and travel logs consume real departures/arrivals. Add `monster_a
 
 ## Risks / Trade-offs
 
-One planner and saved decision/cursor state are required for equal-time partitioning. Avoid a visible-groups-only cache. The existing regional owner already implements both birth ceilings; prove actual journeys consume them rather than introducing another budget.
+One planner and saved decision/cursor state are required for equal-time partitioning. Avoid a visible-groups-only cache. The existing regional owner already implements both birth ceilings; prove actual journeys consume them rather than introducing another budget. The world-clock delta makes explicit that registered population-owner intervals are separate from ordinary caller-scoped stages. Factor/reuse the canonical clock gauge/physiology interval writers for owner-settled bodies; do not merely omit generic regen or apply it twice. Monster idle/combat/journey handoffs use the member_time contract from mapped-monster-escape.
 
 ## Verification
 
@@ -46,6 +46,7 @@ Canonical IDs copied from traceability list output for the equivalent merged tre
 - `monster-journeys::activity-ordering-protects-encounters-across-deferred-time`, tasks2.1-3.1, activity/journey/protection controls.
 - `regional-population::population-lifecycle-replays-loss-and-site-boundaries-chronologically`, task2.1, test_regional_population_recovery.
 - `wilderness-monster-population::runtime-population-uses-authored-regions-without-implicit-fallback`, task2.1, unobserved actual-owner integration.
+- `world-clock::advance-settles-exactly-the-entities-its-caller-supplies-never-a-global-registry`, task2.1, explicit registered-owner versus ordinary caller-scope controls.
 
 Create `/tmp/mud-field-tests.env` containing `MUD_TEST_SETTINGS=1` outside tracked source. Run one focused method/class at a time using the guarded command shown below; never concatenate the inventory or exceed 100 discovered tests. Register every new Python test module exactly once in `.github/evennia-shards.json`; new managed browser modules/methods belong exactly once in `.github/browser-shards.json`. Full managed-browser and complete traceability evidence remain CI-owned.
 

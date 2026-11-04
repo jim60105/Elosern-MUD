@@ -22,6 +22,7 @@ None.
 - `monster-journeys`.
 - `regional-population`.
 - `wilderness-monster-population`.
+- `world-clock`.
 
 ## Impact
 
@@ -41,4 +42,4 @@ No patrol guards, full ecology, cross-cell pursuit, disease, corrosion, wildfire
 
 depends-on: mapped-monster-escape
 
-Code conflicts: mapped-monster-escape owns the journey engine first; hostile-field-admission changes same-tick contact ordering next. Shared lore and shard changes serialize. All changes share the developer review/evidence document; serialize that file, `.github/evennia-shards.json` and `.github/browser-shards.json`. Command behavior changes update `docs/game/commands.md` and `docs/game/command-reference.md` together.
+Code conflicts: mapped-monster-escape owns the journey engine first; incapacitated-hostile-rounds consumes physiology ownership next; hostile-field-admission subsequently changes same-tick contact ordering. Shared lore and shard changes serialize. All changes share the developer review/evidence document; serialize that file, `.github/evennia-shards.json` and `.github/browser-shards.json`. Command behavior changes update `docs/game/commands.md` and `docs/game/command-reference.md` together.
